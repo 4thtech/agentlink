@@ -1,6 +1,6 @@
 # Files page
 
-*Applies to AgentLink 0.4.2 (released 28 Oct 2026). The Received and Sent tabs are not in 0.3.0; the Send folders tab is.*
+*Applies to AgentLink 0.4.3 (released 28 Oct 2026). The Received and Sent tabs are not in 0.3.0; the Send folders tab is.*
 
 The Files page has three tabs: **Received**, **Sent** and **Send folders**. Received and Sent list your files. Send folders is where you allow a folder. Your AI can send a file only from a folder you have allowed, and that tab shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [owner code](../help/glossary.md).
 

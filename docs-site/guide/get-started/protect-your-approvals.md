@@ -1,6 +1,6 @@
 # Protect your approvals
 
-*Applies to AgentLink 0.4.2 (released 28 Oct 2026). The recommended way is the setup page: one Touch ID (or Windows Hello), and a backup code. The terminal way, `owner init`, with an owner code, still works and is the only way in the published 0.2.0.*
+*Applies to AgentLink 0.4.3 (released 28 Oct 2026). The recommended way is the setup page: one Touch ID (or Windows Hello), and a backup code. The terminal way, `owner init`, with an owner code, still works and is the only way in the published 0.2.0.*
 
 ## Why this step exists
 

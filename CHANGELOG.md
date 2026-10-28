@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-28
+
+### Added
+
+- Invites in the local app, server side (UX2-d1, S2, 08 §1, owner decision 1.1): the app can now create an invite without Touch ID, as your AI can, check an invite someone sent you, and accept it with Touch ID, which approves the new contact in one step. The invite link only ever goes back to the page that asked for it: never to a 4thTech service, a log or an error. The Add contact sheet that uses these routes is in this release (UX2-d2).
+- Add contact in the local app (UX2-d2, b11 §21, owner decisions 1.1 and 2.1): one button on Contacts opens a side sheet. Invite someone makes a ready-to-send invite without Touch ID and offers Copy invite, Share… where your browser supports it, and a QR code; it says to send it only to the person you mean, since anyone with the link can connect once. I have an invite checks a pasted invite and shows who it is from before Connect asks for Touch ID. Home's "Add a contact" step now opens the sheet.
+- The brand guidelines now carry the one exception to "don't rotate": the waiting mark, whose diamond turns only in the "Waiting for your funds" step (UX2-e1, S1, B-11 §23.4).
+- The local app's server can show how active each contact has been, for the activity pulse in Messages and Contacts (UX2-f1, S2, 08 §1, b11 §24): per contact, message counts per two hours over the last 24 hours, the last exchange time and Active now, Today or Quiet. Counts and times only, read on your computer: never message text or file names, and your AI gets no new tool.
+- Who is busy, at a glance (UX2-f2, b11 §24, decision 4.1): each row in Messages and Contacts now shows a small 24-hour pulse and a word. Active now has a filled dot, Today a hollow ring, Quiet nothing, so the state never depends on colour. A dot plays one small ring when someone turns Active now, never in a loop and not at all if you reduce motion. A new Sort control puts Most active first, and it is remembered in this browser. It shows only when messages moved, never what they said.
+- Compact view in the local app (UX2-h, b11 §25, owner decision 5.1): Home gets an Open compact window button that opens a small window with your agent's state, what is waiting for you with Review, your five most active contacts with their last-24-hours pulse, and your credits. It shows no message text and cannot approve anything; Review and Open AgentLink bring the main app to the front.
+
+### Changed
+
+- Docs and status now say AgentLink 0.4.2 was released on 28 Oct 2026 (the Approvals grid, switch-style controls, live Files progress and other polish). The user guide applies to 0.4.2, the Claude Desktop page links the 0.4.2 extension files, the changelog no longer says the UX wave 2 briefs wait for approval, and the rest of the UX wave and the cloud agent with business agents (0.5.0, a pilot) are named as planned next (DOCS-042-RELEASED).
+- Proofs & credits → Add credits now shows where your funds are in three steps: Waiting for your funds, Arrived (with the amount), and Added to credits. Each step changes only when AgentLink has checked your agent's account or your credits, never on a timer, and an amount appears only once a check shows it. To turn arrived funds into credits you press "Add $X to your credits" and confirm as before. While waiting, the AgentLink mark turns slowly (still with reduced motion); after 10 minutes it suggests checking where you sent the funds, and after 30 minutes it stops checking until you press Check again (UX2-e2, S2, B-11 §23).
+- Home: a "Start here" card walks you from first run to your first message: protect approvals, invite your first contact, check the safety code with them (recommended), send your first message and save your recovery kit. Each step ticks by itself when it has really happened, one button points at the next step, and the card goes away when the four required steps are done. It replaces the old Next step card. The Home item in the sidebar shows a dot until then, and the empty Messages and Files pages point you to the invite step (step 2). Until the Add contact sheet arrives, the invite step shows the existing way to invite someone (ask your AI to create an invite) (UX2-g).
+
 ## [0.4.2] - 2026-10-28
 
 ### Changed
@@ -722,7 +739,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/4thtech/agentlink/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/4thtech/agentlink/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/4thtech/agentlink/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/4thtech/agentlink/compare/v0.3.0...v0.4.0

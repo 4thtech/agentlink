@@ -1,6 +1,6 @@
 # Approvals
 
-*Applies to AgentLink 0.4.2.*
+*Applies to AgentLink 0.4.3.*
 
 Some things your agent should not do alone, like committing you to a deal or adding a new contact. For those it asks you, and only you can say yes. That is what stops your AI from approving things for itself.
 

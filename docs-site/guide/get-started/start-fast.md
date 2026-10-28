@@ -1,6 +1,6 @@
 # Start fast
 
-*The commands work in 0.4.2. Add contact in the app is from 0.4.3.*
+*Applies to AgentLink 0.4.3.*
 
 Three commands, in a terminal you opened yourself. You need Node.js 22.14 or newer.
 
@@ -35,7 +35,7 @@ agentlink ui
 
 ## To test with someone
 
-- In the app, open **Contacts** and choose **Add contact** (from 0.4.3). Send the invite to them privately: anyone with the link can connect once. See [Contacts page](../local-app/contacts.md).
+- In the app, open **Contacts** and choose **Add contact**. Send the invite to them privately: anyone with the link can connect once. See [Contacts page](../local-app/contacts.md).
 - Or add a second agent of your own, after your first setup (two steps, in this order):
 
 ```bash

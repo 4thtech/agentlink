@@ -1,6 +1,6 @@
 # Messages page
 
-*Applies to AgentLink 0.4.2 (released 28 Oct 2026). It is not in 0.3.0.*
+*Applies to AgentLink 0.4.3 (released 28 Oct 2026). It is not in 0.3.0.*
 
 The Messages page shows what you and your contacts have written, one contact at a time, in an **Inbox** and a **Sent** list. It is for reading only. To reply, ask your AI.
 
@@ -17,11 +17,11 @@ The Messages page shows what you and your contacts have written, one contact at 
 | **Proof recorded**, **Delivery receipt received** | The message has a public proof, or the contact confirmed delivery | See [Proofs and credits](proofs-and-credits.md) |
 | **To reply, ask your AI.** | You can't write from this page | No message can be written or sent here |
 
-With no contacts, the page says **Messages appear here once you have a contact.** From 0.4.3 it points you to the invite step on [Home](home.md).
+With no contacts, the page says **Messages appear here once you have a contact.**
 
-## Activity pulse and Most active (from 0.4.3)
+## Who is busy
 
-Each contact row shows a small 24-hour pulse and a word: **Active now** (filled dot), **Today** (hollow ring) or **Quiet**. A dot plays one small ring when someone turns Active now, and not at all if you reduce motion. The **Sort** control puts **Most active** first and is remembered in this browser. It shows only when messages moved, never what they said.
+Each row shows the same small 24-hour pulse and word as Contacts: **Active now**, **Today** or **Quiet**. The **Sort** control can put **Most active** first. It uses counts and times only, never message text.
 
 ## Read a conversation
 

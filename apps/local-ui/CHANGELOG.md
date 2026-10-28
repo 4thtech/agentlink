@@ -1,5 +1,18 @@
 # @4thtech-io/local-ui
 
+## 0.0.6
+
+### Patch Changes
+
+- 23ae7d8: UX2-d2: Contacts gets an Add contact button and side sheet (b11 §21). Invite someone creates an invite without Touch ID and hands it on through Copy invite, the system share sheet (only where the browser has one) or a QR code; the invite shows only in the sheet and never in an element attribute, the address, the title, a toast or a log. I have an invite checks a pasted invite first and asks "Is this who you expected?" with the name, label and short owner fingerprint before Connect asks for Touch ID. Home's contact step opens the sheet; the shared QR code no longer mirrors its value into `data-value` unless asked (Add credits still does).
+- a9c7f57: UX2-e2: Add credits gets a three-step tracker under the QR code and account (B-11 §23): Waiting for your funds (the waiting mark), Arrived · $X with one "Add $X to your credits" button that opens the existing confirm screen and backup code, then Adding to your credits… until the credits read shows the new value, and Added to credits · $X now. Steps move only on the existing top-up and credits reads; a failed read keeps the step ("Couldn't check. Trying again."). Checking runs every 5 s, every 15 s after 2 minutes, stops after 30 minutes with Check again, and pauses while the tab is hidden. Replaces "Waiting for your credits…" after adding credits.
+- d179054: UX2-f2: Messages and Contacts rows show a 24-hour pulse and an activity word (b11 §24). The word is Active now (static filled dot), Today (hollow ring) or Quiet (no dot); the pulse is 12 bars from `GET /api/ui/messages/pulse`, one image named "14 messages in the last 24 hours". One ring plays once when a row becomes Active now, never in a loop and never under reduced motion. One read serves the whole list, every 60 seconds while the tab is visible; a failed or partial read leaves a flat pulse and no word. A Sort control (Recent, Most active) is remembered in this browser. Counts and times only: no message text is read or shown.
+- b045a4b: UX2-g: Home shows a Start here card (protect approvals, invite your first contact, check the safety code, send your first message, save your recovery kit) in place of the Next step card. Each step ticks only from what the app reads (passkey state, contacts, Sent messages, the kit flag), never from a click; the count is "x of 4" for steps 1, 2, 4 and 5; step 3 is recommended and never holds the card; the card cannot be dismissed and leaves once the four are done. The Home sidebar item carries a dot until then, and the empty states on Contacts, Messages and Files point to step 2. ui: a nav item can carry a dot with its own accessible name.
+- befebc4: UX2-h: a compact view of the local app (b11 §25) at /settings/compact, opened as a small window from Home's new Open compact window button. It shows the agent state, how many requests wait with the soonest one and Review, the five most active contacts with their 24-hour pulse and "+n more", credits left and Open AgentLink. It never shows message text and never approves: Review and the other links open the main app. No new server route and no session token in the window's address.
+- Updated dependencies [9540e5d]
+- Updated dependencies [b045a4b]
+  - @4thtech-io/ui@0.4.3
+
 ## 0.0.5
 
 ### Patch Changes

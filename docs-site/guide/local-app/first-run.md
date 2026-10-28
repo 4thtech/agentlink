@@ -1,6 +1,6 @@
 # First run and your backup code
 
-*Applies to AgentLink 0.4.2 (released 28 Oct 2026).*
+*Applies to AgentLink 0.4.3 (released 28 Oct 2026).*
 
 First run is the page that sets you up as the owner of your agent. It takes one touch.
 
@@ -12,15 +12,13 @@ First run is the page that sets you up as the owner of your agent. It takes one 
 4. The page shows your **backup code** once. Press **Save in my password manager**, then **I saved it**.
 5. **Save your recovery kit** (step 3 of 4 on the page). The kit brings your agent and its contacts back if this computer is lost. Saving the kit from this page arrives in an update, so for now press **Later**; the page says it will remind you until it is saved.
 
-After first run, [Home](home.md) shows a **Start here** card (from 0.4.3) that points at the next step: invite your first contact, check the safety code, send your first message and save your recovery kit.
-
 ## What the backup code is for
 
 The backup code approves things when Touch ID is not available, for example in another browser. Nobody can get it back for you, not even 4thTech. Never give it to your AI or paste it into a chat.
 
 ## If you set up before 0.3.0
 
-*Applies to AgentLink 0.4.2 (released 28 Oct 2026); switching to Touch ID is not in 0.3.0.*
+*Applies to AgentLink 0.4.3 (released 28 Oct 2026); switching to Touch ID is not in 0.3.0.*
 
 If you set up AgentLink in the terminal before the local app, your approvals use a code. The local app now offers **Switch to Touch ID** (**Switch to Windows Hello** or **Switch to a passkey** on other computers), and shows a reminder on each page.
 

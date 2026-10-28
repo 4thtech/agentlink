@@ -1,5 +1,12 @@
 # @4thtech-io/storage
 
+## 0.4.3
+
+### Patch Changes
+
+- @4thtech-io/crypto@0.4.3
+  - @4thtech-io/log@0.4.3
+
 ## 0.4.2
 
 ### Patch Changes

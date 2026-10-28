@@ -1,5 +1,17 @@
 # @4thtech-io/node
 
+## 0.4.3
+
+### Patch Changes
+
+- 64d9338: UX2-d1: the local app's API can create an invite (`POST /api/ui/invites`) and check a pasted one (`POST /api/ui/invites/check`) with no owner presence, as a new named route kind `invite` (owner decision 1.1; session, CSRF, Origin and fetch-metadata gate; create limited to 10 per 10 minutes), and accept one (`POST /api/ui/invites/accept`) behind owner presence, which signs the `contacts.acceptInvites` approval before core pairs. The accept approval action, its summary and the invite share text move to core, so the MCP tool, the CLI and the app build the same action and text; `@4thtech-io/mcp-tools/accept-action.js` re-exports them. One core summary, `acceptInviteSummary` (name, label and short owner fingerprint, 04 §3.6 Accept step 2), is used by the MCP tool, `agentlink accept` and the app, and check refuses any invite the accept input cannot carry.
+- 29660b0: The local app's server can now show how active each contact has been (UX2-f1): one read-only route, `GET /api/ui/messages/pulse`, for the owner's browser session only. Per contact it returns message counts in twelve two-hour buckets over the last 24 hours, the last exchange time and an activity word (Active now, Today or Quiet). Counts and times only: never message text, a subject, a file name or size. At most 1 000 contacts per answer, and core's new `messages.pulseTimes` reads only contact IDs and times in one bounded store read. Nothing is written and no AI tool changes.
+- Updated dependencies [64d9338]
+- Updated dependencies [29660b0]
+  - @4thtech-io/core@0.4.3
+  - @4thtech-io/crypto@0.4.3
+  - @4thtech-io/transport-nostr@0.4.3
+
 ## 0.4.2
 
 ### Patch Changes

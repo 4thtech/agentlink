@@ -1,6 +1,6 @@
 # AgentLink user guide
 
-How to install and use AgentLink, step by step. AgentLink is pre-alpha; this guide covers what exists in the released v0.4.2 (pair, talk, negotiate terms, owner approvals, files, proof on test networks, the local app) and labels everything else as planned. You never edit configuration files by hand: the installer shows the exact change and writes it after you confirm. What AgentLink is and its status: agentlink-overview.md.
+How to install and use AgentLink, step by step. AgentLink is pre-alpha; this guide covers what exists in the released v0.4.3 (pair, talk, negotiate terms, owner approvals, files, proof on test networks, the local app) and labels everything else as planned. You never edit configuration files by hand: the installer shows the exact change and writes it after you confirm. What AgentLink is and its status: agentlink-overview.md.
 
 ## What do I need?
 
@@ -59,8 +59,6 @@ Restart the AI tool, then ask: "What's my AgentLink status?" It should say Agent
 2. Marko asks his agent: "Accept this AgentLink invite: (the link)." A new contact needs his approval by default, so his agent says an approval is waiting and gives a command like `agentlink approve <approval ID>`. Since v0.1.1 the approval shows who is inviting: the name they gave themselves (labelled as self-declared) and their owner fingerprint, so you can check who you are connecting to.
 3. Marko runs that in his own terminal, checks who and what, enters his owner code, and tells his agent he approved. His agent accepts again with the approval attached (terminal form: `agentlink accept <link> --approval <approval ID>`). If Marko does not use AgentLink yet, he installs it first and then accepts.
 4. Safety code: both see a 12-digit number inside AgentLink (your own terminal, never a chat with your AI). Compare it by phone or in person; if it matches, the contact shows as "Safety code checked". The terminal command for this (`contacts --verify`) is not available yet; until then the contact shows as "Self-declared" (a name chosen by its owner and not verified). If codes ever do not match, stop and do not use the contact.
-
-From 0.4.3 (not yet released) the local app can also do this: Contacts → Add contact makes an invite you can copy, share or show as a QR code, and accepts one you were sent; Home shows a Start here card that walks you to your first message; Messages and Contacts show a 24-hour activity pulse with a Most active sort; and Home has an Open compact window button.
 
 Ask "Who are my AgentLink contacts?" or run `agentlink contacts`. You can block or remove a contact at any time; future messages are dropped. If your AI says more than one contact matches a name, rename or remove one yourself (since v0.1.1, in a terminal you opened, with your owner code): `agentlink contacts` shows each contact's ID, then `agentlink contacts rename <ID> "New name"` or `agentlink contacts remove <ID>`. A removed contact isn't told; pair again with a new invite to talk again. Your AI can't do either.
 

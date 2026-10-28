@@ -1,6 +1,6 @@
 # CLI
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** v0.2.0 (24 Oct 2026), v0.3.0 (26 Oct 2026, with the local app and the `ui` command) and v0.4.0 (27 Oct 2026) added more commands; v0.4.1 and v0.4.2 (28 Oct 2026) changed no commands. The command list in [06 §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) is the design; `npx -y @4thtech-io/agentlink --help` prints the usage of the installed version.
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** v0.2.0 (24 Oct 2026), v0.3.0 (26 Oct 2026, with the local app and the `ui` command) and v0.4.0 (27 Oct 2026) added more commands; v0.4.1, v0.4.2 and v0.4.3 (28 Oct 2026) changed no commands. The command list in [06 §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) is the design; `npx -y @4thtech-io/agentlink --help` prints the usage of the installed version.
 
 **Purpose:** reference for the `agentlink` command.
 
