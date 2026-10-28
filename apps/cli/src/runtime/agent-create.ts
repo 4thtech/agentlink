@@ -59,16 +59,23 @@ export interface CreateAgentDeps extends OwnerCheck {
 
 /**
  * Creates a keychain agent in a new folder named from `label` and returns the folder name. When the
- * config cannot be written, the keychain agent just made is removed again.
+ * config cannot be written, the keychain agent just made is removed again. U3-g-b: `fixedName`
+ * (first run's first agent, `default`) is used as is: checked under the agent-name rule and refused
+ * when that folder exists (`agent_exists`, before any key is made).
  */
 export async function createAgentFolder(
   home: string,
   label: string,
   deps: CreateAgentDeps,
+  fixedName?: string,
 ): Promise<string> {
   const check: OwnerCheck = deps.uid === undefined ? {} : { uid: deps.uid };
   const taken = await listAgentNames(home, check).catch(() => [] as string[]);
-  const name = agentSlug(label, taken);
+  if (fixedName !== undefined) {
+    if (!isAgentName(fixedName)) throw new RuntimeError('agent_name_invalid');
+    if (taken.includes(fixedName)) throw new RuntimeError('agent_exists');
+  }
+  const name = fixedName ?? agentSlug(label, taken);
   const agentId = await deps.createAgent();
   try {
     // Never replaces an existing folder's config (`agent_exists`).

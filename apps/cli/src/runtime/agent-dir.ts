@@ -626,8 +626,14 @@ export function agentDirectory(
     writeLabel: (name, label) => writeAgentLabel(home, name, label, check),
     // U3-d: a new keychain agent in a folder named from the label, and its removal when the app
     // could not complete it (all or nothing; only for an agent the app just created).
-    create: async (label) => {
-      const name = await createAgentFolder(home, label, { ...check, createAgent, discardKeys });
+    // U3-g-b: `options.name` (first run's first agent, `default`) names the folder instead.
+    create: async (label, options) => {
+      const name = await createAgentFolder(
+        home,
+        label,
+        { ...check, createAgent, discardKeys },
+        options?.name,
+      );
       created.add(name);
       return name;
     },

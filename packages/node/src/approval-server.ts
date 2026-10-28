@@ -264,6 +264,7 @@ import { LOCAL_UI_MAX_INPUT_CHARS, NOT_AVAILABLE } from './local-ui/route-types.
 import {
   AppHostSlot,
   FIRST_AGENT_LABEL,
+  FIRST_AGENT_NAME,
   type AppHostAgent,
   type AppHostFirstRun,
   type AppHostHold,
@@ -2597,8 +2598,8 @@ export async function startApprovalServerWith(
   };
 
   /**
-   * U3-g-b: creates the first agent (AgentDirectory `create`, a keychain agent in a new folder named
-   * from the label) and opens it for its first parts only. Undefined, with nothing left behind,
+   * U3-g-b: creates the first agent (AgentDirectory `create`, a keychain agent in the new folder
+   * `default`, FIRST_AGENT_NAME) and opens it for its first parts only. Undefined, with nothing left behind,
    * when it cannot be created or opened or has no first card.
    */
   const createFirstAgent = async (label: string): Promise<AppHostAgent | undefined> => {
@@ -2607,8 +2608,12 @@ export async function startApprovalServerWith(
     if (slot === undefined || directory?.create === undefined) return undefined;
     let name: string;
     try {
-      name = await directory.create(label);
+      name = await directory.create(label, { name: FIRST_AGENT_NAME });
     } catch {
+      return undefined;
+    }
+    if (name !== FIRST_AGENT_NAME) {
+      await directory.discardNew?.(name).catch(() => undefined);
       return undefined;
     }
     const opened = await slot.openNew(name);

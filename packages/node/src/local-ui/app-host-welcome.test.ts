@@ -47,6 +47,7 @@ import { OWNER_ACCOUNT } from '../owner-keystore.js';
 import { defaultOwnerFiles, encodeSetupRegistration } from '../owner-setup.js';
 import {
   FIRST_AGENT_LABEL,
+  FIRST_AGENT_NAME,
   type AgentDirectory,
   type AgentDirectoryEntry,
   type AppHostAgent,
@@ -227,10 +228,11 @@ function world(): World {
       if (entry !== undefined) entries.set(name, { ...entry, label });
       return Promise.resolve();
     },
-    create: async (label) => {
-      log.push(`create ${label}`);
+    create: async (label, options) => {
+      log.push(`create ${label} as ${String(options?.name)}`);
       const agentId = await createKeychainAgent(keychain);
-      const name = 'my-agent';
+      // The CLI names the folder `options.name`, else a slug of the label (U3-d).
+      const name = options?.name ?? 'slug-of-label';
       ids.set(name, agentId);
       entries.set(name, { name, label: name, available: true, removing: false });
       return name;
@@ -570,7 +572,7 @@ describe('U3-g-b: agent routes are refused while no agent is open', () => {
     const res = await h.post(
       '/api/ui/agents/switch',
       s,
-      encodeUtf8(JSON.stringify({ name: 'my-agent', generation: 1 })),
+      encodeUtf8(JSON.stringify({ name: 'default', generation: 1 })),
     );
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body)).toEqual({ status: 'unknown_agent' });
@@ -592,18 +594,18 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     // The agent was created only at finish, opened for its first card, closed, then opened again
     // as the host's agent.
     expect(h.w.log).toEqual([
-      'create My agent',
-      'open my-agent',
-      'close my-agent',
-      'open my-agent',
+      'create My agent as default',
+      'open default',
+      'close default',
+      'open default',
     ]);
-    expect(h.w.labels).toEqual([['my-agent', 'My agent']]);
-    expect(h.w.current).toEqual(['my-agent']);
+    expect(h.w.labels).toEqual([['default', 'My agent']]);
+    expect(h.w.current).toEqual(['default']);
     // The answer carries the new generation and the agent's verified label.
     expect(finish?.headers['x-agentlink-generation']).toBe('2');
     expect(decodeURIComponent(String(finish?.headers['x-agentlink-agent']))).toBe('My agent');
     // The card, its first policy and its first label are signed and verified by core.
-    const client = h.w.clients.get('my-agent');
+    const client = h.w.clients.get('default');
     expect(await client?.identity.get()).toBeDefined();
     expect(await client?.ownerActions.loadLabel()).toEqual({
       status: 'verified',
@@ -619,7 +621,7 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     const state = await h.get('/api/ui/first-run', s);
     expect(JSON.parse(state.body)).toEqual({ owner: 'set_up' });
     const list = await h.get('/api/ui/agents', s);
-    expect(JSON.parse(list.body)).toMatchObject({ current: 'my-agent', generation: 2 });
+    expect(JSON.parse(list.body)).toMatchObject({ current: 'default', generation: 2 });
     const contacts = await h.get('/api/ui/contacts', s);
     expect(JSON.parse(contacts.body)).not.toEqual(NO_AGENT);
     // A page still built against the no-agent generation is refused before anything acts.
@@ -632,13 +634,27 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     expect(again.status).toBe(503);
   }, 60_000);
 
+  it('the first agent folder is `default` whatever its label (D5: its AI app entry needs no --agent)', async () => {
+    const h = await harness();
+    const s = await h.session();
+    const { finish } = await firstRun(h, s, 'Claude Code agent');
+    expect(finish?.status).toBe(200);
+    expect(FIRST_AGENT_NAME).toBe('default');
+    expect(h.w.log[0]).toBe('create Claude Code agent as default');
+    expect(h.w.labels).toEqual([['default', 'Claude Code agent']]);
+    expect(h.w.current).toEqual(['default']);
+    expect(decodeURIComponent(String(finish?.headers['x-agentlink-agent']))).toBe(
+      'Claude Code agent',
+    );
+  }, 60_000);
+
   it(`with no label the first agent is named "${FIRST_AGENT_LABEL}"`, async () => {
     const h = await harness();
     const s = await h.session();
     const { finish } = await firstRun(h, s, undefined);
     expect(finish?.status).toBe(200);
-    expect(h.w.log[0]).toBe(`create ${FIRST_AGENT_LABEL}`);
-    expect(h.w.labels).toEqual([['my-agent', FIRST_AGENT_LABEL]]);
+    expect(h.w.log[0]).toBe(`create ${FIRST_AGENT_LABEL} as default`);
+    expect(h.w.labels).toEqual([['default', FIRST_AGENT_LABEL]]);
   }, 60_000);
 
   it('refuses a label that is not restricted before any seed or folder exists', async () => {
@@ -658,10 +674,10 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     expect(finish?.status).toBe(500);
     expect(JSON.parse(finish?.body ?? '{}')).toMatchObject({ status: 'failed' });
     expect(h.w.log).toEqual([
-      'create My agent',
-      'open my-agent',
-      'close my-agent',
-      'discard my-agent',
+      'create My agent as default',
+      'open default',
+      'close default',
+      'discard default',
     ]);
     expect(h.w.entries.size).toBe(0);
     expect(h.w.current).toEqual([]);

@@ -79,9 +79,10 @@ export interface AgentDirectory {
   /**
    * Card U3-d: creates a keychain agent in a new folder whose name is a slug of `label` (06 §6), made
    * unique with a suffix; config.json holds no label yet (it is written only after the signed
-   * `agent.label` was verified). Returns the folder name.
+   * `agent.label` was verified). Returns the folder name. U3-g-b: `options.name` names the folder
+   * instead (first run's first agent is `default`, FIRST_AGENT_NAME); refused when it exists.
    */
-  create?(label: string): Promise<string>;
+  create?(label: string, options?: { readonly name?: string }): Promise<string>;
   /**
    * Card U3-d: removes an agent that `create` made and that was not completed (all or nothing): its
    * keychain items and its folder. Only ever called for an agent this process just created.
@@ -141,6 +142,12 @@ export interface AppHostFirstRun {
 
 /** U3-g-b: the first agent's label when first run is finished without one (b11 §28, prefilled). */
 export const FIRST_AGENT_LABEL = 'My agent';
+
+/**
+ * U3-g-b: the first agent's folder name (decided 2026-10-29): `default`, as `init` names it (D5), so
+ * its AI app entry needs no `--agent`. Later agents use the label slug (U3-d).
+ */
+export const FIRST_AGENT_NAME = 'default';
 
 /** A request's place in the host: `valid` re-checks the generation, `leave` ends it. */
 export interface AppHostHold {
