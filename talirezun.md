@@ -1,17 +1,19 @@
 # @talirezun — sync
-**Headline:** 27 Oct: AgentLink 0.4.0 released (npm latest; GitHub Release v0.4.0 with signed desktop bundles). Local app visual refresh next, then cloud agent as 0.5.0.
-_Updated 2026-10-27T17:09Z · claude-code / claude-haiku-5-5 · orchestrator, 27 Oct status_
+**Headline:** 28 Oct: local app visual refresh complete on main (cards a–t). Owner visual QA on his Mac next, then release; cloud agent as 0.5.0 after.
+_Updated 2026-10-28 · claude-code / claude-opus-5-5 · orchestrator, 28 Oct status_
 
 ## Now
 - 0.4.0 is out: Messages and Files views (read-only, local), Show in Finder, Touch ID upgrade for existing owners, payment confirmation sheet for proofs above limits and limit changes, live status bar, duplicate-contact suggestion.
 - Test submitter redeployed; health green.
-- Visual refresh of the local app (UI-REFRESH a–q): a–e done or merging; next f (shell), then Home and pages.
+- Visual refresh of the local app (UI-REFRESH a–t) merged: shell, translucency, transitions, all pages restyled, Approvals in the app, performance and accessibility audit passed (0 axe violations).
+- Follow-up cards for the refresh tail are being written.
 
 ## Next
-1. Finish the visual refresh (f shell, Home, remaining pages).
+1. Owner visual QA of the refresh on his Mac, then release it.
 2. Cloud agent, shipped as 0.5.0 (builds on D-131 spec and core M2-3a).
 
 ## Owner steps
+- Visual QA of the refreshed local app on his Mac (checklist ready).
 - Decide brand usage text for #540 (docs brand kit and owner intro GIF).
 - Upload the GitHub social preview image.
 - Create the Cloudflare test account for the cloud 24-hour loop.
