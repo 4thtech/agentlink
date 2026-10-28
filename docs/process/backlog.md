@@ -5537,6 +5537,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Scope:**
   - Welcome (one sentence, one button, Get started while no owner exists) and "Set up your agent": name prefilled "My agent" (any text up to 40 characters) and Use Touch ID in one gesture.
 - **Acceptance:**
+  - Owner input 2026-10-29, every agent clearly shows which AI app it works from: in first run "Connect your AI app" binds the new agent to the chosen app; the suggested name defaults to the app (for example "Claude Code agent") and stays editable. Rule unchanged: an AI app serves one agent at a time, an agent may serve several apps.
   - The owner's screenshot review at 1280 and 360, light and dark; a11y (axe) and reduced-motion tests; the name is shown as text only; strings per 11 §5; independent review.
 
 #### U3-h · switcher, Agents page, Add, Rename, Remove sheets (new, USABILITY-WAVE-3, owner decision 2026-10-29)
@@ -5548,6 +5549,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Scope:**
   - Top-bar switcher (current label and live dot; menu of agents with the AI apps each serves; Add agent, Manage agents; at 360 the initial with a dot and a bottom sheet), Agents page rows (label, AI apps, contacts, last activity; Rename, Connect an AI app, Remove), Add, Rename and Remove sheets. A switch reloads every page for that agent.
 - **Acceptance:**
+  - Owner input 2026-10-29: the switcher and the Agents cards show each agent's AI app name and a small generic mark; an agent with no AI app shows "Not connected to an AI app" with a Connect action (shared with U3-i). An AI app serves one agent at a time; an agent may serve several apps.
   - Generation sent on every mutating request; labels rendered as text; Remove sheet names what goes, offers "Export history first" and asks for the typed label; screenshot review at 1280 and 360, light and dark; a11y; independent review.
 
 #### U3-i · AI apps page and Connect step (new, USABILITY-WAVE-3, owner decision 2026-10-29)
@@ -5559,6 +5561,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Scope:**
   - AI apps cards and states (Not connected, Connected to {agent}, Connected to another agent, Needs restart, Running); Review change shows the exact `agentlink` entry; Apply with Touch ID; "Restart … to finish"; Claude Desktop blocked; move; manual steps.
 - **Acceptance:**
+  - Owner input 2026-10-29: an agent with no AI app shows "Not connected to an AI app" with Connect, which opens this page's Review change for that agent (shared with U3-h); an AI app serves one agent at a time, an agent may serve several apps.
   - The entry is shown before Touch ID and only the `agentlink` entry; states come from reads, never assumed; screenshot review at 1280 and 360, light and dark; a11y; independent review.
 
 #### U3-j · Start here v2, including the second-agent path (new, USABILITY-WAVE-3, owner decision 2026-10-29)
@@ -5570,6 +5573,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Scope:**
   - "x of 7" steps (Protect, Name, Connect, Invite, Say hello, See the reply, Recovery kit; safety code shown, uncounted); "Try it with a second agent of your own" path; the one-time "Tidy up" note when agents serve no AI app and have no contacts, linking to Agents; not dismissible.
 - **Acceptance:**
+  - Owner input 2026-10-29: Start here shows which AI app the agent works from (or "Not connected to an AI app" with Connect).
   - Ticks from reads only (never from local assumptions); screenshot review at 1280 and 360, light and dark; a11y; independent review.
 
 #### U3-map · live map on the Agents page, on the shared pulse module (new, USABILITY-WAVE-3, owner decision 2026-10-29)
@@ -5581,6 +5585,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Scope:**
   - Agents on the left (label, live dot, AI apps), contacts on the right, a line for exchange in the last 24 hours (weight from pulse counts), a stream only while a message or file is moving or arrived in the last minute; List and Map control. Top 12 contacts per agent plus "+N more", up to 8 agents, "Show quiet", at most 6 streams, fixed two-column layout sorted by activity, no physics. No content on boxes or lines; only owner-confirmed contact names, others "Unnamed contact".
 - **Acceptance:**
+  - Owner input 2026-10-29: each agent box shows its AI app name (text, with the small generic mark), not only the label.
   - Click on a box or line opens that conversation in Messages; no content drawn; one SVG layer, no dependency, under 8 KB gzipped, lazy-loaded; `perf-guards.test.ts` extended; animation on `transform` and `stroke-dashoffset` only and paused when hidden; reduced motion (static arrowhead and "now"), reduced transparency, increased contrast; List is the text alternative, polite live region at most one line per 10 s, keyboard order follows the list; screenshots at 1280 and 360, light and dark; independent review.
 
 #### U3-map-2 · Home mini map, Contacts Map, row stream marks, compact strip (new, USABILITY-WAVE-3, owner decision 2026-10-29)
