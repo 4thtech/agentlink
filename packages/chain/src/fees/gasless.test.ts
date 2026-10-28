@@ -39,6 +39,33 @@ vi.mock('../clients/registry.js', async (importOriginal) => {
   };
 });
 
+// CHORE-GASLESS-NONCE-TIMEOUT: secp256k1 public-key recovery is the slow part of a build (about
+// 1.0 ms of 1.6 ms locally; the 1 000-build nonce test took 56 s on a loaded CI runner). This
+// pass-through counts every real recovery. With `recovery.memo` on (one test only, reset before
+// each test), a signature the fake signer below made itself answers with its signer's address,
+// which is what real recovery returns for it; anything else still runs the real recovery.
+const recovery = vi.hoisted(() => ({
+  memo: false,
+  real: 0,
+  known: new Map<string, Uint8Array>(),
+}));
+vi.mock('@4thtech-io/crypto', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@4thtech-io/crypto')>();
+  return {
+    ...real,
+    recoverEvmAddress: (digest: Uint8Array, signature: Uint8Array): Uint8Array => {
+      if (recovery.memo) {
+        const hit = recovery.known.get(
+          `${real.encodeHex0x(digest)}:${real.encodeHex0x(signature)}`,
+        );
+        if (hit !== undefined) return hit.slice();
+      }
+      recovery.real += 1;
+      return real.recoverEvmAddress(digest, signature);
+    },
+  };
+});
+
 const { getChainConfig } = await import('../clients/registry.js');
 const { DEPOSIT_AUTH_CLOCK_SKEW_SECONDS } = await import('../submitter/deposit-relay.js');
 const {
@@ -225,6 +252,9 @@ async function refusal(promise: Promise<unknown>): Promise<{ code?: string; mess
 
 beforeEach(() => {
   capability.on = true;
+  recovery.memo = false;
+  recovery.real = 0;
+  recovery.known.clear();
 });
 
 describe('gasless top-up limits (owner decisions 2026-10-23)', () => {
@@ -420,6 +450,7 @@ describe('buildReceiveWithAuthorization', () => {
     const signer = fakeSigner();
     const token = fakeToken();
     const ethCall = ethCallOf(token);
+    const auths: Awaited<ReturnType<typeof buildReceiveWithAuthorization>>['auth'][] = [];
     for (let i = 0; i < 1_000; i += 1) {
       const req = await buildReceiveWithAuthorization(
         state,
@@ -427,9 +458,21 @@ describe('buildReceiveWithAuthorization', () => {
         { token: 'USDC', value: 5n * DOLLAR },
         { ethCall, nowSeconds: () => NOW },
       );
+      expect(req.auth.nonce).toMatch(/^0x[0-9a-f]{64}$/);
       nonces.add(req.auth.nonce);
+      auths.push(req.auth);
     }
     expect(nonces.size).toBe(1_000);
+    expect(signer.sign712).toHaveBeenCalledTimes(1_000);
+    // The time budget: no build in the loop repeats the real secp256k1 recovery.
+    expect(recovery.real).toBe(0);
+    // Real recovery on a sample: each signed authorization recovers the agent.
+    recovery.memo = false;
+    const domain = { name: 'USDC', version: '2', chainId: 84532, verifyingContract: USDC };
+    for (const i of [0, 1, 499, 998, 999]) {
+      expect(recoverAuthorizationSigner(domain, auths[i] as (typeof auths)[number])).toBe(AGENT);
+    }
+    expect(recovery.real).toBe(5);
   }, 60_000);
 
   it('refuses a signature that is not the agent key (the owner key never signs this)', async () => {
