@@ -8,6 +8,9 @@ interface Out {
   readonly fileName: string;
   readonly type: 'asset' | 'chunk';
   readonly text: string;
+  /** Chunks only: the module ids bundled in, and the chunks imported at load (not dynamic). */
+  readonly modules: readonly string[];
+  readonly imports: readonly string[];
 }
 let outputs: Out[] = [];
 
@@ -20,6 +23,8 @@ beforeAll(async () => {
       ? r.output.map((o) => ({
           fileName: o.fileName,
           type: o.type,
+          modules: o.type === 'chunk' ? Object.keys(o.modules) : [],
+          imports: o.type === 'chunk' ? o.imports : [],
           text:
             o.type === 'chunk'
               ? o.code
@@ -76,5 +81,46 @@ describe('production build', () => {
     for (const o of outputs.filter((x) => /\.(css|js)$/.test(x.fileName))) {
       expect(o.text).not.toMatch(/url\(\s*["']?data:/i);
     }
+  });
+});
+
+// UI-REFRESH-u: the Settings pages and the Under the hood panel load on first use.
+describe('first load (UI-REFRESH-u)', () => {
+  const LAZY_MODULES =
+    /\/pages\/(home|activity|messages|contacts|files|proofs|rules|about|appearance|backup|advanced)\/index\.tsx$|\/components\/hood\.js$/;
+
+  /** Every chunk the page loads at start: the scripts in index.html and what they import. */
+  function initialChunks(): Out[] {
+    const html = outputs.find((o) => o.fileName === 'index.html')?.text ?? '';
+    const names = new Set<string>(
+      [...html.matchAll(/(?:src|href)="\/(assets\/[^"]+\.js)"/g)].map((m) => m[1] as string),
+    );
+    const seen = new Set<string>();
+    const queue = [...names];
+    while (queue.length > 0) {
+      const name = queue.pop() as string;
+      if (seen.has(name)) continue;
+      seen.add(name);
+      queue.push(...(outputs.find((o) => o.fileName === name)?.imports ?? []));
+    }
+    return outputs.filter((o) => seen.has(o.fileName));
+  }
+
+  it('carries no Settings page and not the Under the hood panel in the first load', () => {
+    const initial = initialChunks();
+    expect(initial.length).toBeGreaterThan(0);
+    for (const chunk of initial) {
+      expect(chunk.modules.filter((m) => LAZY_MODULES.test(m))).toEqual([]);
+    }
+  });
+
+  it('ships each lazy part as its own chunk, loaded by a dynamic import', () => {
+    const initial = new Set(initialChunks().map((c) => c.fileName));
+    const lazy = outputs.filter(
+      (o) => o.type === 'chunk' && o.modules.some((m) => LAZY_MODULES.test(m)),
+    );
+    // 11 pages plus the panel.
+    expect(lazy.length).toBeGreaterThanOrEqual(12);
+    for (const chunk of lazy) expect(initial.has(chunk.fileName)).toBe(false);
   });
 });
