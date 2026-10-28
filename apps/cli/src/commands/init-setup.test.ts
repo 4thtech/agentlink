@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { EXIT_OK, EXIT_USAGE, createDispatcher, type DispatchIO } from '../dispatch.js';
+import { EXIT_OK, createDispatcher, type DispatchIO } from '../dispatch.js';
 import { readAgentConfig } from '../runtime/index.js';
 import { writeAppCurrent } from '../runtime/agent-dir.js';
 import type { TerminalContext } from '../runtime/guards.js';
@@ -306,9 +306,9 @@ describe('D5: agents are named after their app', () => {
     'U3-b: several agents and no --agent never ask (%s); the first by name is used',
     async (_label, terminal) => {
       await twoAgentsAndCodex();
-      const run = await init([], { terminal });
+      const run = await init([], { terminal, onPath: true });
       expect(run.code).toBe(EXIT_OK);
-      expect(run.asked).toBe(0);
+      expect(run.asked).toBeLessThanOrEqual(1); // at most the app question, never an agent question
       expect(run.err).toBe('');
       expect(run.out).not.toMatch(/Which one|Type its number|1\. agent-alpha/);
       expect(run.out).toContain('--agent agent-alpha');

@@ -286,4 +286,3 @@ describe('agentlink ui never asks which agent (U3-b)', () => {
     await expect(readFile(join(dir, 'agent-choice.ts'), 'utf8')).rejects.toThrow();
   });
 });
-
