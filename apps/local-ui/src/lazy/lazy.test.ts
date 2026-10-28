@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 function Real({ name }: { name: string }): ReactElement {
-  return <p className="real">{name}</p>;
+  return h('p', { className: 'real' }, name);
 }
 
 function deferred<T>(): {
