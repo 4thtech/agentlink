@@ -35,9 +35,7 @@ async function mount(unseen: number, waiting = 0): Promise<void> {
   });
 }
 const link = (name: string): Element | undefined =>
-  [...host.querySelectorAll('nav[aria-label="Main"] a')].find((a) =>
-    a.textContent?.includes(name),
-  );
+  [...host.querySelectorAll('nav[aria-label="Main"] a')].find((a) => a.textContent?.includes(name));
 
 describe('Messages nav badge', () => {
   it('uses the shared CountBadge, named for screen readers ("3 new")', async () => {
@@ -52,9 +50,7 @@ describe('Messages nav badge', () => {
   it('is the same component and class as the Approvals badge', async () => {
     await mount(2, 4);
     const m = link('Messages')?.querySelector('.al-count');
-    const a = [...host.querySelectorAll('nav[aria-label="Main"] .al-count')].find(
-      (el) => el !== m,
-    );
+    const a = [...host.querySelectorAll('nav[aria-label="Main"] .al-count')].find((el) => el !== m);
     expect(m).not.toBeNull();
     expect(a).toBeDefined();
     expect(m?.className).toBe(a?.className);

@@ -5230,7 +5230,7 @@ Low-severity findings from the independent reviews of #619, #620, #616, #627, #6
   - Tests first (RED commit); the approvals count and badge tick down only after a successful deny; no autofocus on Approve; reduced-motion and axe tests; short threat note (S2); no test weakened.
 
 #### UI-REFRESH-o-d · local-ui: Messages nav badge uses the shared CountBadge (new, low, from #629)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/shell/**` (Messages badge), tests
 - **Depends on:** UI-REFRESH-o-b (#629)
 - **Spec:** B-11 §7
