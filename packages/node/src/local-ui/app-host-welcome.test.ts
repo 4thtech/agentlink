@@ -296,7 +296,8 @@ function world(): World {
       },
       list: () => Promise.resolve([]),
       get: () => Promise.resolve(undefined),
-      apply: () => Promise.resolve({ status: 'applied', op: 'contact.check' } as OwnerActionOutcome),
+      apply: () =>
+        Promise.resolve({ status: 'applied', op: 'contact.check' } as OwnerActionOutcome),
     };
     return {
       name,
@@ -395,7 +396,9 @@ async function harness(options: { firstRun?: false; w?: World } = {}): Promise<H
       const cookie = (res.headers['set-cookie']?.[0] ?? '').split(';')[0] ?? '';
       const page = await send(server.port, '/first-run', { headers: { Cookie: cookie } });
       const csrf = /<meta name="agentlink-csrf" content="([A-Za-z0-9_-]+)">/.exec(page.body)?.[1];
-      const generation = /<meta name="agentlink-generation" content="([0-9]+)">/.exec(page.body)?.[1];
+      const generation = /<meta name="agentlink-generation" content="([0-9]+)">/.exec(
+        page.body,
+      )?.[1];
       return { cookie, csrf: csrf ?? '', generation: generation ?? '', page };
     },
     get: (path, s) => send(server.port, path, { headers: base(s) }),
@@ -472,7 +475,10 @@ describe('U3-g-b: ui with no agent at all serves Welcome', () => {
     const state = await h.get('/api/ui/first-run', s);
     expect(state.status).toBe(200);
     expect(JSON.parse(state.body)).toEqual({ owner: 'missing' });
-    const check = await h.get(`/api/ui/agents/label-check?label=${encodeURIComponent('My agent')}`, s);
+    const check = await h.get(
+      `/api/ui/agents/label-check?label=${encodeURIComponent('My agent')}`,
+      s,
+    );
     expect(check.status).toBe(200);
     expect(JSON.parse(check.body)).toEqual({ status: 'ok' });
     const list = await h.get('/api/ui/agents', s);
@@ -489,10 +495,16 @@ describe('U3-g-b: ui with no agent at all serves Welcome', () => {
     const h = await harness();
     const s = await h.session();
     const path = '/api/ui/first-run';
-    expect((await send(h.port, path, { headers: { 'X-AgentLink-CSRF': s.csrf } })).status).toBe(401);
+    expect((await send(h.port, path, { headers: { 'X-AgentLink-CSRF': s.csrf } })).status).toBe(
+      401,
+    );
     expect((await h.get(path, { cookie: s.cookie, csrf: 'x' })).status).toBe(403);
     const wrongHost = await send(h.port, path, {
-      headers: { Cookie: s.cookie, 'X-AgentLink-CSRF': s.csrf, Host: `127.0.0.1:${String(h.port)}` },
+      headers: {
+        Cookie: s.cookie,
+        'X-AgentLink-CSRF': s.csrf,
+        Host: `127.0.0.1:${String(h.port)}`,
+      },
     });
     expect(wrongHost.status).toBe(403);
     const crossSite = await send(h.port, path, {
@@ -579,7 +591,12 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     expect(done.label).toBe('saved');
     // The agent was created only at finish, opened for its first card, closed, then opened again
     // as the host's agent.
-    expect(h.w.log).toEqual(['create My agent', 'open my-agent', 'close my-agent', 'open my-agent']);
+    expect(h.w.log).toEqual([
+      'create My agent',
+      'open my-agent',
+      'close my-agent',
+      'open my-agent',
+    ]);
     expect(h.w.labels).toEqual([['my-agent', 'My agent']]);
     expect(h.w.current).toEqual(['my-agent']);
     // The answer carries the new generation and the agent's verified label.
@@ -588,7 +605,10 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     // The card, its first policy and its first label are signed and verified by core.
     const client = h.w.clients.get('my-agent');
     expect(await client?.identity.get()).toBeDefined();
-    expect(await client?.ownerActions.loadLabel()).toEqual({ status: 'verified', label: 'My agent' });
+    expect(await client?.ownerActions.loadLabel()).toEqual({
+      status: 'verified',
+      label: 'My agent',
+    });
     expect((await client?.ownerActions.loadPolicy())?.mode).toBe('signed');
   }, 60_000);
 
@@ -637,7 +657,12 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     const { finish } = await firstRun(h, s);
     expect(finish?.status).toBe(500);
     expect(JSON.parse(finish?.body ?? '{}')).toMatchObject({ status: 'failed' });
-    expect(h.w.log).toEqual(['create My agent', 'open my-agent', 'close my-agent', 'discard my-agent']);
+    expect(h.w.log).toEqual([
+      'create My agent',
+      'open my-agent',
+      'close my-agent',
+      'discard my-agent',
+    ]);
     expect(h.w.entries.size).toBe(0);
     expect(h.w.current).toEqual([]);
     // Still no agent: the host and its generation are unchanged.

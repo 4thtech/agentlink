@@ -18,6 +18,10 @@
 // between the owner's agents in the same process, port and session (ui-host.ts; node app-host.ts);
 // a switch signs nothing and takes no owner presence. Its server closes whichever agent is open.
 //
+// U3-g-b (08 §1 "with no agent yet, Welcome"): with no agent folder at all, the app host starts with
+// no agent open and the browser opens the first-run page (Welcome); first run creates the first agent
+// in the same host (ui-host.ts startUiWelcome). Run by an AI, the fixed line is unchanged (D-39).
+//
 // Threat note (G-1, D-67; 04 §2.5): the TTY and marker checks are UX guards, not a boundary; a
 // shell-capable agent as the same OS user could start the server itself. This step adds no route and
 // no authority: owner actions on the pages still need the owner's presence (passkey or code) and an
@@ -25,7 +29,8 @@
 import { homedir } from 'node:os';
 import process from 'node:process';
 import { createLogger, type Logger } from '@4thtech-io/log';
-import { startApprovalServer } from '@4thtech-io/node';
+import { probeOsKeychain, selectKeyStoreBackend, startApprovalServer } from '@4thtech-io/node';
+import { embeddedLocalUiAssets } from '../mcp/local-ui-assets.js';
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import { EXIT_FAILED, EXIT_OK, type CommandContext, type CommandHandler } from '../dispatch.js';
 import { localUiOptions, logOwnerSetupEvent } from '../mcp/local-ui-wiring.js';
@@ -35,7 +40,7 @@ import { DEFAULT_AGENT_NAME } from '../runtime/agent-name.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
 import { appServes, chooseCurrentAgent } from './current-agent.js';
 import { nodeOwnerDeps } from './owner/deps.js';
-import { openUiHostAgent, withoutAssets, type UiHostDeps } from './ui-host.js';
+import { openUiHostAgent, startUiWelcome, withoutAssets, type UiHostDeps } from './ui-host.js';
 
 /** How long `ui` serves the pages at most (proposed: 30 minutes, as for the first-run step). */
 export const UI_WAIT_MS = 30 * 60_000;
@@ -86,6 +91,11 @@ export interface UiDeps {
   lastUsed?(): Promise<string | undefined>;
   /** U3-b: whether an AI app already starts this agent. */
   serves?(name: string): Promise<boolean>;
+  /**
+   * U3-g-b: with no agent at all, starts the app host with no agent open (Welcome and first run);
+   * undefined when it cannot (an agent folder exists, no usable keychain, no app in this build).
+   */
+  startWelcome?(): Promise<UiServer | undefined>;
   /** The longest serve time, in milliseconds. */
   readonly waitMs: number;
   /** Calls `stop` on Ctrl+C; returns the unsubscribe. */
@@ -104,20 +114,27 @@ export async function uiStep(
     return EXIT_FAILED;
   }
   let agent = context.parsed.agent;
+  let none = false;
   if (agent === undefined && deps.agents !== undefined) {
     // U3-b (USABILITY-WAVE-3 §7.4): never asked. The last used agent, else the one an AI app
     // serves (`default` first), else the first by name.
-    const names = await deps.agents().catch(() => []);
+    const names = await deps.agents().catch(() => undefined);
+    none = names !== undefined && names.length === 0;
     const last = await deps.lastUsed?.().catch(() => undefined);
     const chosen = await chooseCurrentAgent(
-      names,
+      names ?? [],
       last,
       (name) => deps.serves?.(name) ?? Promise.resolve(false),
     );
     // `default` is opened the way every command without `--agent` opens it.
     if (chosen !== undefined && chosen !== DEFAULT_AGENT_NAME) agent = chosen;
   }
-  const server = await deps.start(agent).catch(() => undefined);
+  // U3-g-b (08 §1): no agent at all: the app opens on Welcome, with no agent open yet.
+  let server: UiServer | undefined =
+    none && deps.startWelcome !== undefined
+      ? await deps.startWelcome().catch(() => undefined)
+      : undefined;
+  server ??= await deps.start(agent).catch(() => undefined);
   if (server === undefined) {
     output.printError(UI_TEXT.notReady(prefix));
     return EXIT_FAILED;
@@ -160,6 +177,29 @@ export function nodeUiDeps(): UiDeps {
       env: process.env,
       now: Math.floor(Date.now() / 1000),
     }),
+    // U3-g-b: the no-agent app host (Welcome); first run creates the first agent from the page.
+    startWelcome: () => {
+      const directory = agentDirectory(homedir());
+      const hostDeps: UiHostDeps = {
+        owner,
+        directory,
+        localUi: (opened) => localUiOptions(opened),
+        now: () => Math.floor(Date.now() / 1000),
+      };
+      return startUiWelcome({
+        directory,
+        keychainUsable: async () =>
+          selectKeyStoreBackend(await probeOsKeychain(), { fileOptIn: false }).ok,
+        assets: () => embeddedLocalUiAssets(),
+        open: (name) => openUiHostAgent(hostDeps, name),
+        startServer: (options) => startApprovalServer(options),
+        // Fixed values only (ApprovalServerEvent, I-7).
+        onEvent: (event) => {
+          logger.debug('approval ui event', { ...event });
+          logOwnerSetupEvent(logger, event);
+        },
+      });
+    },
     start: async (name) => {
       // U3-c: the folders only through the AgentDirectory seam; a `removing` agent never opens.
       const directory = agentDirectory(homedir());

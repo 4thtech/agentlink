@@ -350,14 +350,17 @@ describe('agentlink ui with no agent at all opens Welcome (U3-g-b)', () => {
     expect(calls.names).toEqual(['work']);
   });
 
-  it.each([AGENT, PIPE])('run by an AI it prints the fixed line and opens nothing (D-39)', async (t) => {
-    const p = probe(t);
-    const { deps, calls } = fakeDeps({ agents: [], welcome: 'ok' });
-    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
-    expect(calls).toMatchObject({ welcome: 0, start: 0, opened: 0 });
-    expect(p.err).toEqual([UI_TEXT.agentRun(PREFIX)]);
-    expect(p.out).toEqual([]);
-  });
+  it.each([AGENT, PIPE])(
+    'run by an AI it prints the fixed line and opens nothing (D-39)',
+    async (t) => {
+      const p = probe(t);
+      const { deps, calls } = fakeDeps({ agents: [], welcome: 'ok' });
+      await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+      expect(calls).toMatchObject({ welcome: 0, start: 0, opened: 0 });
+      expect(p.err).toEqual([UI_TEXT.agentRun(PREFIX)]);
+      expect(p.out).toEqual([]);
+    },
+  );
 
   it('the production step wires the no-agent host', async () => {
     const dir = fileURLToPath(new URL('.', import.meta.url));

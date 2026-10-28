@@ -117,6 +117,7 @@ export type {
   AgentDirectoryEntry,
   AgentDirectoryStats,
   AppHostAgent,
+  AppHostFirstRun,
   AppHostOptions,
 } from './local-ui/app-host.js';
 // U3-c (06 §6): the shared agent folder lock every process holds while an agent is open, and the

@@ -9,12 +9,7 @@ import type {
 } from '@4thtech-io/node';
 import { describe, expect, it } from 'vitest';
 import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
-import {
-  openUiHostAgent,
-  startUiWelcome,
-  type UiHostDeps,
-  type UiWelcomeDeps,
-} from './ui-host.js';
+import { openUiHostAgent, startUiWelcome, type UiHostDeps, type UiWelcomeDeps } from './ui-host.js';
 
 function deps(
   entries: readonly AgentDirectoryEntry[],
@@ -97,7 +92,11 @@ describe('startUiWelcome (U3-g-b)', () => {
   const APP: LocalUiAssets = { files: new Map([['index.html', new Uint8Array([60])]]) };
 
   function welcome(
-    over: { entries?: readonly AgentDirectoryEntry[]; keychain?: boolean; assets?: LocalUiAssets } = {},
+    over: {
+      entries?: readonly AgentDirectoryEntry[];
+      keychain?: boolean;
+      assets?: LocalUiAssets;
+    } = {},
   ): { deps: UiWelcomeDeps; started: ApprovalServerOptions[]; log: string[] } {
     const started: ApprovalServerOptions[] = [];
     const log: string[] = [];
@@ -146,7 +145,10 @@ describe('startUiWelcome (U3-g-b)', () => {
 
   it.each([
     ['an agent exists', { entries: [{ name: 'a', label: 'a', available: true, removing: false }] }],
-    ['an agent is being removed', { entries: [{ name: 'a', label: 'a', available: true, removing: true }] }],
+    [
+      'an agent is being removed',
+      { entries: [{ name: 'a', label: 'a', available: true, removing: true }] },
+    ],
     ['no usable keychain', { keychain: false }],
     ['no app in this build', { assets: { files: new Map() } }],
   ] as const)('starts nothing when %s', async (_why, over) => {
