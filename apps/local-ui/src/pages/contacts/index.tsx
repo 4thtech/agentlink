@@ -41,6 +41,15 @@ import {
   type ReactElement,
 } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
+import { usePrefs } from '../../prefs/index.js';
+import {
+  ActivityCell,
+  ActivitySort,
+  compareMostActive,
+  sortKey,
+  usePulse,
+  type Pulse,
+} from '../pulse/index.js';
 import { PAGE_TITLES } from '../../strings.js';
 import { AddContactSheet } from './add-contact.js';
 import { ADD_CONTACT_MARKER } from './add-contact-link.js';
@@ -182,10 +191,16 @@ function duplicateNames(contacts: readonly ContactRow[]): ReadonlySet<string> {
 function ContactList({
   contacts,
   selected,
+  pulse,
+  arrivals,
+  seq,
   onSelect,
 }: {
   contacts: readonly ContactRow[];
   selected: string | undefined;
+  pulse: Pulse | undefined;
+  arrivals: ReadonlySet<string>;
+  seq: number;
   onSelect: (ref: string) => void;
 }): ReactElement {
   const dupes = duplicateNames(contacts);
@@ -210,6 +225,7 @@ function ContactList({
                 <span className="al-text-caption al-muted ct-same-name">{S.sameName}</span>
               ) : null}
             </span>
+            <ActivityCell pulse={pulse} contactId={c.ref} arrival={arrivals.has(c.ref) ? seq : 0} />
             <span className="al-contact-side">
               <StateChip contact={c} />
             </span>
@@ -732,6 +748,8 @@ export function ContactsPage({
   const [lastCreated, setLastCreated] = useState<number | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const addButtonId = useId();
+  const activity = usePulse(api);
+  const { activitySort } = usePrefs();
   const inviteFirst = useInviteFirst();
   const returnFocus = useRef(false);
 
@@ -926,9 +944,22 @@ export function ContactsPage({
         {status}
         <div className="ct-layout">
           {invitesList}
+          <ActivitySort />
           <ContactList
-            contacts={list.contacts}
+            contacts={
+              activitySort === 'active'
+                ? [...list.contacts].sort((a, b) =>
+                    compareMostActive(
+                      sortKey(activity.pulse, a.ref, 0),
+                      sortKey(activity.pulse, b.ref, 0),
+                    ),
+                  )
+                : list.contacts
+            }
             selected={current?.ref}
+            pulse={activity.pulse}
+            arrivals={activity.arrivals}
+            seq={activity.seq}
             onSelect={(ref) => {
               setRemoved(false);
               setSelected(ref);

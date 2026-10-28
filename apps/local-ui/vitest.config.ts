@@ -12,6 +12,7 @@ export default defineConfig({
         /contacts\.css/,
         /approvals\.css/,
         /activity\.css/,
+        /pulse\.css/,
         /about\.css/,
         /app\.css/,
         /compact\.css/,

@@ -43,6 +43,7 @@ describe('preferences', () => {
       transparency: 'system',
       theme: 'system',
       approvalsLayout: 'grid',
+      activitySort: 'recent',
     });
     expect(getPrefs()).toEqual(DEFAULT_PREFS);
     for (const a of ATTRS) expect(rootEl.hasAttribute(a)).toBe(false);
