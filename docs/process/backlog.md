@@ -5494,7 +5494,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Tests first: a `RED (expected): <ID> …` commit with the red-run excerpt; all or nothing on first run and Add (a failure leaves no half-made agent); label stored and shown as text only (never markup), up to 40 characters; the op is stored and nonce-checked in the agent's store, 600 s, never sent in an envelope; a presence route that signed nothing is refused (D-68); `finish` never writes AI-app configs (tested); stale generation refused; every owner statement names the label; Fable 5.1 audit; Opus independent review; Tali's "merge".
 
 #### U3-f · AI apps: list, preview, apply, disconnect, move; `app.connect` / `app.disconnect` ops; harness seam (new, USABILITY-WAVE-3, owner decision 2026-10-29)
-- **Status:** backlog · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b · **Build group:** 2
+- **Status:** in review · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b · **Build group:** 2
 - **Repo/path:** agentlink · `packages/node/src/local-ui/api/apps.ts` (new), `packages/core/src/owner-action.ts` (op schemas, added on top of U3-d's), `apps/cli/src/harness/` (replace, remove, entry-only view, mode-keeping backup), wiring in `ui.ts`
 - **Depends on:** U3-c, U3-spec-04, U3-d (shared core owner-action schema files; merge order: U3-d first); the `ui.ts` wiring merges after U3-b
 - **Spec:** USABILITY-WAVE-3 §7.1, §7.3; 04 §2.5.1; 06 §7
