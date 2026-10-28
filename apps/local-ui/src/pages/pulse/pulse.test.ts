@@ -10,7 +10,6 @@ import {
   compareMostActive,
   parsePulse,
   pulseSummary,
-  type PulseContact,
 } from './data.js';
 import { PULSE_STRINGS as S } from './strings.js';
 
@@ -111,13 +110,6 @@ describe('the bars (b11 §24.2)', () => {
 });
 
 describe('the words and the order', () => {
-  const c = (id: string, activity: PulseContact['activity'], lastAt: number): PulseContact => ({
-    contactId: id,
-    counts: flat(),
-    lastAt,
-    activity,
-  });
-
   it('says Active now, Today and Quiet, never Online', () => {
     expect(S.activeNow).toBe('Active now');
     expect(S.today).toBe('Today');

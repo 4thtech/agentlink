@@ -5,14 +5,7 @@
 import { Segmented, useReducedMotion } from '@4thtech-io/ui';
 import { useEffect, useId, useRef, type ReactElement } from 'react';
 import { setPref, usePrefs, type ActivitySortPref } from '../../prefs/index.js';
-import {
-  BUCKETS,
-  barHeights,
-  pulseSummary,
-  type Activity,
-  type Pulse,
-  type PulseContact,
-} from './data.js';
+import { BUCKETS, barHeights, pulseSummary, totalOf, type Activity, type Pulse } from './data.js';
 import './pulse.css';
 import { PULSE_STRINGS as S } from './strings.js';
 
@@ -38,16 +31,25 @@ export function activityOf(pulse: Pulse | undefined, id: string): Activity | und
   return pulse.partial ? undefined : 'quiet';
 }
 
-/** The sort key for "Most active": a contact without a read counts as Quiet with its own time. */
+/** The sort key for "Most active": a contact without a read counts zero, with its own last time. */
 export function sortKey(
   pulse: Pulse | undefined,
   id: string,
   fallbackAt: number,
-): Pick<PulseContact, 'activity' | 'lastAt'> {
+): { total: number; lastAt: number } {
   const found = pulse?.contacts.get(id);
   return found === undefined
-    ? { activity: 'quiet', lastAt: fallbackAt }
-    : { activity: found.activity, lastAt: found.lastAt };
+    ? { total: 0, lastAt: fallbackAt }
+    : { total: totalOf(found.counts), lastAt: found.lastAt };
+}
+
+const TIME = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+const SHORT_DAY = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
+
+/** The last-message time (b11 §24.2 fallback): the clock time today, the short date otherwise. */
+function timeText(at: number): string {
+  const d = new Date(at * 1000);
+  return d.toDateString() === new Date().toDateString() ? TIME.format(d) : SHORT_DAY.format(d);
 }
 
 function tokenMs(name: string, fallback: number): number {
@@ -143,16 +145,27 @@ export interface ActivityCellProps {
   readonly contactId: string;
   /** Non-zero when this row just became Active now (the read's number). */
   readonly arrival: number;
+  /** The last-message time (unix seconds) the list already has; shown when the read gives no word. */
+  readonly fallbackAt?: number;
 }
 
 /** `marker · word · pulse` for one row. */
-export function ActivityCell({ pulse, contactId, arrival }: ActivityCellProps): ReactElement {
+export function ActivityCell({
+  pulse,
+  contactId,
+  arrival,
+  fallbackAt,
+}: ActivityCellProps): ReactElement {
   const activity = activityOf(pulse, contactId);
   const counts = pulse?.contacts.get(contactId)?.counts ?? FLAT;
   return (
     <span className="act-cell">
       {activity === undefined ? (
-        <span className="act-status" />
+        <span className="act-status">
+          {fallbackAt === undefined || fallbackAt <= 0 ? null : (
+            <span className="act-time al-text-body-sm">{timeText(fallbackAt)}</span>
+          )}
+        </span>
       ) : (
         <span className="act-status" data-activity={activity}>
           <Marker activity={activity} arrival={arrival} />

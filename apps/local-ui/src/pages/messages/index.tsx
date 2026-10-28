@@ -380,7 +380,12 @@ function ContactRow({
           </span>
         </span>
         {isNew ? <span className="al-chip al-tone-info al-text-label">{S.newMessages}</span> : null}
-        <ActivityCell pulse={pulse} contactId={c.contactId} arrival={arrival} />
+        <ActivityCell
+          pulse={pulse}
+          contactId={c.contactId}
+          arrival={arrival}
+          fallbackAt={c.lastAt}
+        />
       </button>
     </li>
   );

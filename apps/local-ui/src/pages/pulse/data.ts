@@ -76,10 +76,10 @@ export function activityRank(a: Activity): number {
   return a === 'active_now' ? 0 : a === 'today' ? 1 : 2;
 }
 
-/** "Most active": by activity, then the most recent exchange (a stable sort keeps equal rows in place). */
+/** "Most active" (b11 §24.5): the 24-hour count, highest first, then the newest exchange first. */
 export function compareMostActive(
-  a: { activity: Activity; lastAt: number },
-  b: { activity: Activity; lastAt: number },
+  a: { total: number; lastAt: number },
+  b: { total: number; lastAt: number },
 ): number {
-  return activityRank(a.activity) - activityRank(b.activity) || b.lastAt - a.lastAt;
+  return b.total - a.total || b.lastAt - a.lastAt;
 }

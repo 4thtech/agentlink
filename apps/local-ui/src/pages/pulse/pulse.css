@@ -103,3 +103,8 @@
     stroke: CanvasText;
   }
 }
+
+/* The last-message time stands in for the word when the read gives none (b11 §24.2). */
+.act-time {
+  color: var(--al-color-fg-muted);
+}
