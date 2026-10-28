@@ -503,7 +503,7 @@ export async function removeAgentFolderLock(
 }
 
 /** True when the owner's revoked list has an entry for `agentId` (presence only; U3-e verifies). */
-async function inRevokedList(home: string, agentId: string): Promise<boolean> {
+export async function inRevokedList(home: string, agentId: string): Promise<boolean> {
   // `agentId` passed assertAgentId in parseAgentConfig: `0x` + 40 hex, safe as a file name.
   const info = await lstatOrMissing(join(home, '.agentlink', REVOKED_DIR, `${agentId}.json`));
   // Anything at that name counts: a revoked agent must never open as usable (fail closed).

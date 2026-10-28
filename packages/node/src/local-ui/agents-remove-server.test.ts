@@ -346,6 +346,14 @@ async function world(): Promise<World> {
     open: (name) => {
       const agent = agents.get(name);
       if (agent === undefined) return Promise.resolve(undefined);
+      // As openAgent: without the seed and the store key the agent does not open (identity_missing).
+      if (
+        !keychain.items.has(agent.agentId) ||
+        !keychain.items.has(keychainAccount(agent.agentId, 'store-key'))
+      ) {
+        log.push(`removal-open-failed ${name}`);
+        return Promise.resolve(undefined);
+      }
       log.push(`removal-open ${name}`);
       const real = agent.client.removal;
       const removal = {
@@ -646,6 +654,38 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
     expect(w.log.at(-1)).toBe('open default');
   });
 
+  it('GAP B: keys erased but the folder not deleted: Try again finishes steps 6 and 7 only', async () => {
+    const w = await world();
+    w.faults.folder = true;
+    const res = await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(res.json).toEqual({ status: 'failed' });
+    expect(itemsOf(w.work.agentId)).toEqual([]);
+    const recorded = w.revoked.get(w.work.agentId);
+    w.faults.folder = false;
+    const retry = await remove(
+      w,
+      { name: 'work', typedLabel: 'Work' },
+      { generation: (await generationOf(w)) ?? '1' },
+    );
+    expect(retry.json).toEqual({ status: 'removed' });
+    expect(w.log).toContain('removal-open-failed work');
+    expect(w.log.filter((l) => l === 'removeFolder work')).toEqual(['removeFolder work']);
+    // The recorded entry is kept; nothing more is sent.
+    expect(w.revoked.get(w.work.agentId)).toBe(recorded);
+    expect(w.carriers).toEqual([]);
+    // A wrong owner code still signs nothing on this path.
+    expectFixedEvents(w);
+  });
+
+  it('GAP B: an agent whose store does not open and that is not retired is never finished', async () => {
+    const w = await world();
+    keychain.items.delete(w.work.agentId);
+    const res = await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(res.json).toEqual({ status: 'failed' });
+    expect(w.ownerStores).toEqual([]);
+    expect(w.log).not.toContain('removeFolder work');
+  });
+
   it('crash test: a failure at each step leaves what was done, and Try again finishes', async () => {
     for (const fault of ['record', 'mark', 'apps', 'keys', 'folder'] as const) {
       const w = await world();
@@ -695,6 +735,10 @@ describe('the statement before the gesture (04 §2.5, 11 §5)', () => {
     expect(lines.join(' ')).toContain('cannot be restored');
     expect(lines.join(' ')).toContain('contacts are told');
     expect(removeStatement('Work', 'work', 0).join(' ')).not.toContain('are told');
+    // Remove anyway: the contacts could not be told, and the statement says so.
+    const anyway = removeStatement('Work', 'work', 2, true).join(' ');
+    expect(anyway).not.toContain('are told');
+    expect(anyway).toContain("can't be told");
     for (const word of ['wallet', 'gas', 'seed phrase', 'transaction']) {
       expect(lines.join(' ').toLowerCase()).not.toContain(word);
     }

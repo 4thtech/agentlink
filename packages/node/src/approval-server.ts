@@ -150,6 +150,7 @@ import {
   type OwnerActionOutcome,
   type PayConfirmFlow,
   type RevokeDeliveryOptions,
+  verifyRevokedEntry,
 } from '@4thtech-io/core';
 import {
   KeyStoreError,
@@ -263,6 +264,7 @@ import {
   REMOVE_STATUS,
   RemovalStepFailed,
   parseRemoveInput,
+  runFinishSteps,
   runRemovalSteps,
   type RemovalStep,
   type RemoveOutcome,
@@ -3399,6 +3401,10 @@ export async function startApprovalServerWith(
           ? { backend: 'keychain', keychain: keychainOf() }
           : { backend: 'file', keystoreDir: keys.keystoreDir },
       );
+      // GAP B: the owner context of the agent the app has open (the same owner), read before it may
+      // be closed; used only to finish a retired agent whose store no longer opens.
+      const openSource = source;
+      const openContext = (): Promise<ApprovalContext | undefined> => openSource.context();
       // (1) The app's own shared lock goes first, then the lock is taken exclusive.
       const closed = await slot.closeForRemoval(input.name);
       wasOpen = closed.closed;
@@ -3406,7 +3412,56 @@ export async function startApprovalServerWith(
       await removal.exclusive(input.name, async () => {
         const agent = await removal.open(input.name);
         if (agent === undefined) {
-          finishRemove('failed');
+          // GAP B: a retired agent whose keys are gone no longer opens; steps 6 and 7 finish it.
+          const recorded = entry.removing
+            ? await removal.readRevoked(keys.agentId).catch(() => undefined)
+            : undefined;
+          const checked =
+            recorded?.kind === 'entry'
+              ? verifyRevokedEntry(recorded.text, keys.agentId)
+              : undefined;
+          // The owner of the gesture: the agent that is open now (the same owner) signed that entry.
+          const context = await openContext().catch(() => undefined);
+          if (
+            recorded?.kind !== 'entry' ||
+            checked?.ok !== true ||
+            context === undefined ||
+            encodeHex(context.owner.ownerNostr) !== checked.owner
+          ) {
+            finishRemove('failed');
+            return;
+          }
+          const text = recorded.text;
+          const ownerNostr = checked.owner;
+          await ownerGate(
+            req,
+            res,
+            async (owner) => {
+              try {
+                await runFinishSteps({
+                  name: input.name,
+                  label: entry.label,
+                  agentId: keys.agentId,
+                  recorded: text,
+                  ownerNostr,
+                  removeFolder: (name) => slot.directory.removeFolder(name),
+                  erase,
+                  owner,
+                  now: () => now(),
+                });
+                settled = 'removed';
+                emit({ kind: 'remove', outcome: 'removed' });
+                return { status: REMOVE_STATUS.removed, body: { status: 'removed' } };
+              } catch (error) {
+                if (error instanceof RemovalStepFailed) {
+                  settled = 'retired';
+                  emit({ kind: 'remove', outcome: 'failed', step: error.step });
+                }
+                throw error;
+              }
+            },
+            { context: () => Promise.resolve(context) },
+          );
           return;
         }
         try {

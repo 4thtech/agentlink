@@ -32,11 +32,17 @@
 // I-7: logs and errors say only that an agent was removed or which fixed step failed; never a name,
 // label, path, key or ID.
 import {
+  buildAgentRevokeBody,
   verifyRevokedEntry,
   type AgentLinkClient,
   type RevokeDeliveryOptions,
 } from '@4thtech-io/core';
-import { canonicalize, type JsonValue, type KeyEraseControl } from '@4thtech-io/crypto';
+import {
+  canonicalize,
+  type JsonObject,
+  type JsonValue,
+  type KeyEraseControl,
+} from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../../owner-approval.js';
 import {
   AGENTS_REMOVE_PATH,
@@ -134,12 +140,21 @@ export function parseRemoveInput(input: JsonValue | undefined): RemoveInput | un
  * for good and cannot be restored; 11 §5: "keys" only here). The folder is the binding the owner
  * picked; the label is display text.
  */
-export function removeStatement(label: string, folder: string, contacts: number): string[] {
+export function removeStatement(
+  label: string,
+  folder: string,
+  contacts: number,
+  anyway = false,
+): string[] {
   return [
     `Remove the agent ${label} from this computer for good.`,
     `Agent folder: ${folder}`,
     'Its keys, messages and files on this computer are deleted. It is retired and cannot be restored.',
-    contacts > 0 ? 'Its contacts are told that it was removed.' : 'It has no contacts to tell.',
+    contacts === 0
+      ? 'It has no contacts to tell.'
+      : anyway
+        ? "Its contacts can't be told now. It is removed anyway."
+        : 'Its contacts are told that it was removed.',
   ];
 }
 
@@ -228,7 +243,7 @@ export async function runRemovalSteps(steps: RemovalSteps): Promise<'removed' | 
   const body = await step('sign', () => client.removal.prepareRevoke());
   // A refused or cancelled gesture propagates as it is (the gate answers it).
   const signatures = await owner.sign(
-    { lines: removeStatement(steps.label, name, facts.contacts) },
+    { lines: removeStatement(steps.label, name, facts.contacts, steps.anyway) },
     [{ kind: 'owner-action', action: body }],
   );
   const first = signatures[0];
@@ -283,5 +298,54 @@ export async function runRemovalSteps(steps: RemovalSteps): Promise<'removed' | 
   // (7) The store, the config and the folder.
   await step('folder', () => steps.removeFolder(name));
   steps.log?.('removed');
+  return 'removed';
+}
+
+/** What finishing a removal whose keys are already gone needs (04 §2.5 steps 6 and 7 only). */
+export interface FinishSteps {
+  readonly name: string;
+  readonly label: string;
+  /** The agent ID config.json records; its revoked-list entry must verify for it. */
+  readonly agentId: string;
+  /** The verifying revoked-list entry (the agent is retired for good). */
+  readonly recorded: string;
+  /** The owner key the entry is signed by (64 lowercase hex), the owner of this gesture. */
+  readonly ownerNostr: string;
+  readonly removeFolder: (name: string) => Promise<void>;
+  readonly erase: KeyEraseControl;
+  readonly owner: LocalUiOwnerOperation;
+  readonly now: () => number;
+}
+
+/**
+ * Try again after a stop between step 6 and step 7 (IR-U3-e-SEC-1 GAP B): the agent's keys are gone,
+ * so its store no longer opens, but it is retired (a verifying entry in the revoked list) and marked.
+ * The gesture signs a fresh `agent.revoke` for the same agent (D-68: every presence route signs; it
+ * is idempotent and not stored, the recorded entry stays), then the erase runs again (idempotent)
+ * and the folder goes. Nothing is sent: the contacts were told, or the owner chose Remove anyway,
+ * before the keys went.
+ */
+export async function runFinishSteps(steps: FinishSteps): Promise<'removed'> {
+  const { body } = buildAgentRevokeBody({
+    agent: steps.agentId,
+    owner: steps.ownerNostr,
+    issuedAt: steps.now(),
+  });
+  const signatures = await steps.owner.sign(
+    { lines: removeStatement(steps.label, steps.name, 0) },
+    [{ kind: 'owner-action', action: body as unknown as JsonObject }],
+  );
+  const first = signatures[0];
+  if (signatures.length !== 1 || first?.kind !== 'owner-action') {
+    throw new RemovalStepFailed('sign');
+  }
+  const signedText = canonicalize(first.signed as unknown as JsonValue);
+  if (!verifyRevokedEntry(signedText, steps.agentId, `0x${steps.ownerNostr}`).ok) {
+    throw new RemovalStepFailed('sign');
+  }
+  await step('keys', () =>
+    steps.erase.eraseAgentKeys({ agentId: steps.agentId, storageIds: [], revoke: steps.recorded }),
+  );
+  await step('folder', () => steps.removeFolder(steps.name));
   return 'removed';
 }
