@@ -178,7 +178,9 @@ describe('GET /api/ui/messages/pulse: counts and times only (zero access, I-5)',
     const json = JSON.stringify(body);
     expect(json).not.toContain(CANARY);
     expect(json).not.toContain('987654321');
-    expect(json).not.toMatch(/"(?:text|subject|name|fileName|files|size|envelope_json|payload_json|display)"/);
+    expect(json).not.toMatch(
+      /"(?:text|subject|name|fileName|files|size|envelope_json|payload_json|display)"/,
+    );
   });
 
   it('leaves out an item that is not a contact ID and a whole time (fail closed)', async () => {
@@ -207,7 +209,12 @@ describe('GET /api/ui/messages/pulse: buckets and words at the boundaries (b11 Â
       { contactId: BOB, at: NOON + 301 }, // further in the future: never counted
     ]);
     expect(body.contacts).toEqual([
-      { contactId: BOB, counts: counts({ 0: 1, 10: 1, 11: 3 }), lastAt: NOON, activity: 'active_now' },
+      {
+        contactId: BOB,
+        counts: counts({ 0: 1, 10: 1, 11: 3 }),
+        lastAt: NOON,
+        activity: 'active_now',
+      },
     ]);
   });
 

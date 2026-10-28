@@ -24,6 +24,8 @@ import { firstRunRoutes } from './api/first-run.js';
 // M1-11s-a-d: the status bar's health read (read-only).
 import { healthRoutes } from './api/health.js';
 import { messagesRoutes } from './api/messages.js';
+// UX2-f1: the per-contact activity pulse (read-only).
+import { pulseRoute } from './api/messages-pulse.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
@@ -189,6 +191,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     healthRoutes,
     approvalsRoutes,
     activityRoutes,
+    // UX2-f1: the activity pulse, before the Messages routes so `pulse` never reaches :contactId.
+    [pulseRoute],
     // MSG-FILES-IO-c: the Messages page (read-only).
     messagesRoutes,
     contactsRoutes,

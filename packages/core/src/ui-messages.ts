@@ -106,6 +106,22 @@ export interface SentMessage extends InboxMessage {
 
 export type MessageItem = InboxMessage | SentMessage;
 
+/**
+ * UX2-f1: one message exchanged with a contact, for the activity pulse (b11 §24): who and when,
+ * nothing else. Never a body, subject, file name, size or envelope field (zero access, I-5).
+ */
+export interface ExchangeTime {
+  readonly contactId: string;
+  /** The envelope's `created_at`, unix seconds. */
+  readonly at: number;
+}
+
+/** UX2-f1: the exchanges in a window, newest first; `capped` when the scan cap left some out. */
+export interface ExchangeTimes {
+  readonly times: readonly ExchangeTime[];
+  readonly capped: boolean;
+}
+
 /** A received file's state in this agent's store. */
 export type ReceivedFileState = 'saved' | 'not_saved' | 'expired';
 
@@ -163,6 +179,11 @@ const MAX_ACKS_SCANNED = 1_000;
 const FILES_BATCH = 50;
 /** At most this many envelopes are opened for one files page; the page then ends with a cursor. */
 const FILES_SCAN_CAP = 200;
+/**
+ * UX2-f1: at most this many envelopes per direction are read for one activity pulse, newest first;
+ * the pulse then says it is partial. Bounds the read whatever the store holds.
+ */
+export const PULSE_SCAN_CAP = 10_000;
 const FILE_ID = /^(.{1,64})\.([0-9]{2})$/;
 /** MSG-FILES-IO-h: an item ID as the local app sends it (an envelope ID is base64url or hex). */
 const SAVED_ITEM_ID = /^([A-Za-z0-9_-]{1,64})\.([0-9]{2})$/;
@@ -172,12 +193,15 @@ const invalid = (): CoreError =>
 const noContact = (): CoreError =>
   new CoreError('contact_not_found', 'That contact was not found.');
 
-/** The selection of one direction (inbox-page.ts categoryWheres), for the given contacts. */
-function whereOf(direction: MessageBox, contacts: readonly string[]): Where<'envelopes'> {
+/**
+ * The selection of one direction (inbox-page.ts categoryWheres), for the given contacts; with
+ * `'any'`, for every contact (UX2-f1: the caller then checks the contact itself).
+ */
+function whereOf(direction: MessageBox, contacts: readonly string[] | 'any'): Where<'envelopes'> {
   const base = {
     direction,
     state: 'ok' as const,
-    contact_id: { in: [...contacts] },
+    ...(contacts === 'any' ? {} : { contact_id: { in: [...contacts] } }),
     type: { in: [...PAGE_TYPES] },
   };
   return direction === 'out' ? { ...base, delivery: { in: [...DELIVERY_STATES] } } : base;
@@ -306,6 +330,42 @@ export class MessagesView {
         (x.contactId < y.contactId ? -1 : x.contactId > y.contactId ? 1 : 0),
     );
     return Object.freeze(out);
+  }
+
+  /**
+   * UX2-f1 (b11 §24): who exchanged messages with this agent, and when, for `since <= created_at <=
+   * until` (unix seconds), newest first. The selection is the inbox page's (whereOf), both
+   * directions, contacts that are not removed only. One store transaction, two bounded selects
+   * (PULSE_SCAN_CAP per direction), never one read per conversation. Reads `contact_id` and
+   * `created_at` only, columns the store keeps in clear (07 §3): no payload is opened.
+   * @throws CoreError `page_query_invalid` when the window is not two whole times in order.
+   */
+  async pulseTimes(since: number, until: number): Promise<ExchangeTimes> {
+    const whole = (v: unknown): v is number =>
+      typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+    if (!whole(since) || !whole(until) || since > until) throw invalid();
+    const read = await this.#ctx.store.transaction((tx) => {
+      const visible = new Set(visibleTx(tx));
+      let capped = false;
+      const times: ExchangeTime[] = [];
+      for (const direction of BOXES) {
+        // No contact list in the query (it could be 10 000 IDs); visibility is checked below.
+        const rows = tx.select(
+          'envelopes',
+          { ...whereOf(direction, 'any'), created_at: { gte: since, lte: until } },
+          { orderBy: [['created_at', 'desc']], limit: PULSE_SCAN_CAP + 1 },
+        );
+        if (rows.length > PULSE_SCAN_CAP) capped = true;
+        for (const row of rows.slice(0, PULSE_SCAN_CAP)) {
+          const contactId = row.contact_id;
+          if (contactId === null || !visible.has(contactId)) continue;
+          times.push(Object.freeze({ contactId, at: row.created_at }));
+        }
+      }
+      return { times, capped };
+    });
+    read.times.sort((x, y) => y.at - x.at);
+    return Object.freeze({ times: Object.freeze(read.times), capped: read.capped });
   }
 
   /**

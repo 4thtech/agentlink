@@ -372,23 +372,26 @@ describe('GET /api/ui/messages/:contactId (MSG-FILES-IO-c)', () => {
 });
 
 describe('the read-only messages view (context.ts, MSG-FILES-IO-c; I-4)', () => {
-  it('exposes only conversations and list, bound to core, and never a read mark', async () => {
+  it('exposes only conversations, list and (UX2-f1) pulseTimes, bound to core, and never a read mark', async () => {
     const markRead = vi.fn();
     const conversations = vi.fn(() => Promise.resolve(CONVERSATIONS));
     const list = vi.fn(() => Promise.resolve({ items: [] }));
+    const pulseTimes = vi.fn(() => Promise.resolve({ times: [], capped: false }));
     const full = {
       agentId: 'agent-1',
-      messages: { conversations, list, markRead, store: {} },
+      messages: { conversations, list, pulseTimes, markRead, store: {} },
       inbox: { list: markRead, page: markRead },
     };
     const view = readOnlyClient(full as never);
-    expect(Object.keys(view.messages).sort()).toEqual(['conversations', 'list']);
+    expect(Object.keys(view.messages).sort()).toEqual(['conversations', 'list', 'pulseTimes']);
     expect(Object.isFrozen(view.messages)).toBe(true);
     expect(view.messages).not.toBe(full.messages);
     await view.messages.conversations();
     await view.messages.list(BOB, 'out', { limit: 3 });
+    await view.messages.pulseTimes(10, 20);
     expect(conversations).toHaveBeenCalledTimes(1);
     expect(list).toHaveBeenCalledWith(BOB, 'out', { limit: 3 });
+    expect(pulseTimes).toHaveBeenCalledWith(10, 20);
     expect(markRead).not.toHaveBeenCalled();
   });
 });

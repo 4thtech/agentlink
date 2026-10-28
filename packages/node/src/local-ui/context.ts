@@ -15,6 +15,7 @@ import type {
   CreditsMoveResult,
   CreditsView,
   EffectivePolicy,
+  ExchangeTimes,
   MessageBox,
   MessageItem,
   OwnerActionOutcome,
@@ -145,6 +146,11 @@ export interface LocalUiReadClient {
   readonly messages: {
     conversations(): Promise<readonly Conversation[]>;
     list(contactId: string, box: MessageBox, query: PageQuery): Promise<Page<MessageItem>>;
+    /**
+     * UX2-f1 (b11 §24): who exchanged messages when, in a window (core `MessagesView.pulseTimes`):
+     * a contact ID and a time each, never content. Store only, bounded, writes nothing.
+     */
+    pulseTimes(since: number, until: number): Promise<ExchangeTimes>;
   };
   /**
    * MSG-FILES-IO-d (Files, Received and Sent): one page of core's `FilesIoView`, store only. Never
@@ -194,6 +200,8 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       conversations: () => client.messages.conversations(),
       list: (contactId: string, box: MessageBox, query: PageQuery) =>
         client.messages.list(contactId, box, query),
+      // UX2-f1: the activity pulse's exchange times.
+      pulseTimes: (since: number, until: number) => client.messages.pulseTimes(since, until),
     }),
     filesIo: Object.freeze({
       received: (query: PageQuery) => client.filesIo.received(query),

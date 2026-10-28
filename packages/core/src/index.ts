@@ -379,7 +379,11 @@ export {
 export {
   FilesIoView,
   MessagesView,
+  // UX2-f1: the activity pulse's exchange times (a contact and a time each, no content).
+  PULSE_SCAN_CAP,
   type Conversation,
+  type ExchangeTime,
+  type ExchangeTimes,
   type FilesIoViewOptions,
   type InboxMessage,
   type MessageBox,

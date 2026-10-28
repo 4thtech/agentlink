@@ -156,6 +156,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // MSG-FILES-IO-c: the Messages reads (api/messages.test.ts).
       '/api/ui/messages',
       '/api/ui/messages/:contactId',
+      // UX2-f1: the activity pulse (api/messages-pulse.test.ts).
+      '/api/ui/messages/pulse',
       // M1-11s-a-d: the status bar's health read (api/health.test.ts).
       '/api/ui/health',
       // MSG-FILES-IO-h: Show in Finder (api/files-io-reveal.test.ts).
