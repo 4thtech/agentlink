@@ -210,6 +210,76 @@ describe('row keys', () => {
     expect(host.querySelectorAll('tbody .al-moment').length).toBe(0);
   });
 
+  it('after a row lands below an in-flight row, the old row finishing fires the moment on that exact row', async () => {
+    const routes: Routes = {
+      '/api/ui/proofs?limit=20': { status: 'ok', items: [row(T, 'recording')] },
+      [CREDITS]: OK_CREDITS,
+      [TOP_UP]: {},
+    };
+    await mount(routes);
+    routes['/api/ui/proofs?limit=20'] = {
+      status: 'ok',
+      items: [row(T, 'recording'), row(T, 'recorded')],
+    };
+    await tick(5_000);
+    expect(host.querySelectorAll('tbody .al-moment').length).toBe(0);
+    routes['/api/ui/proofs?limit=20'] = {
+      status: 'ok',
+      items: [row(T, 'recorded'), row(T, 'recorded')],
+    };
+    await tick(5_000);
+    const trs = [...host.querySelectorAll('tbody tr')];
+    expect(trs.map((tr) => tr.querySelector('.al-moment') !== null)).toEqual([true, false]);
+  });
+
+  it('an existing moment is dropped when its group row count changes', async () => {
+    const routes: Routes = {
+      '/api/ui/proofs?limit=20': {
+        status: 'ok',
+        items: [row(T, 'recording'), row(T, 'recording')],
+      },
+      [CREDITS]: OK_CREDITS,
+      [TOP_UP]: {},
+    };
+    await mount(routes);
+    routes['/api/ui/proofs?limit=20'] = {
+      status: 'ok',
+      items: [row(T, 'recorded'), row(T, 'recording')],
+    };
+    await tick(5_000);
+    expect(host.querySelectorAll('tbody .al-moment').length).toBe(1);
+    // Another row lands in the same second: the group can no longer be matched row by row.
+    routes['/api/ui/proofs?limit=20'] = {
+      status: 'ok',
+      items: [row(T, 'recorded'), row(T, 'recorded'), row(T, 'recording')],
+    };
+    await tick(5_000);
+    expect(rows()).toBe(3);
+    expect(host.querySelectorAll('tbody .al-moment').length).toBe(0);
+  });
+
+  it('the cut-off oldest group of a page with a next cursor never fires a moment', async () => {
+    const routes: Routes = {
+      '/api/ui/proofs?limit=20': {
+        status: 'ok',
+        items: [row(T + 10, 'recording'), row(T, 'recording'), row(T, 'recording')],
+        nextCursor: 'c2',
+      },
+      [CREDITS]: OK_CREDITS,
+      [TOP_UP]: {},
+    };
+    await mount(routes);
+    routes['/api/ui/proofs?limit=20'] = {
+      status: 'ok',
+      items: [row(T + 10, 'recorded'), row(T, 'recorded'), row(T, 'recorded')],
+      nextCursor: 'c2',
+    };
+    await tick(5_000);
+    // Only the newer group (not cut off) plays the moment; the oldest group may have more rows below.
+    const trs = [...host.querySelectorAll('tbody tr')];
+    expect(trs.map((tr) => tr.querySelector('.al-moment') !== null)).toEqual([true, false, false]);
+  });
+
   it('renders rows in one second without a duplicate-key warning', async () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await mount({
