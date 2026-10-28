@@ -205,8 +205,9 @@ describe('switch to Touch ID on the first-run page (M1-UX-FIRSTRUN-V2-c, B-9)', 
     expect(host.querySelector('input')).toBeNull();
     expect(text()).not.toContain(CODE);
     expect(host.innerHTML).not.toContain(CODE);
-    const link = [...host.querySelectorAll('a')].find((a) => a.textContent === UPGRADE.toApprovals);
-    expect(link?.getAttribute('href')).toBe('/');
+    // U3-a (D-138): the end of the first-run page lands on Home.
+    const link = [...host.querySelectorAll('a')].find((a) => a.textContent === UPGRADE.toHome);
+    expect(link?.getAttribute('href')).toBe('/settings/home');
     expect(api.calls).toEqual([]);
   });
 
@@ -280,7 +281,7 @@ describe('switch to Touch ID on the first-run page (M1-UX-FIRSTRUN-V2-c, B-9)', 
       UPGRADE.noPrf('Touch ID', 'Safari'),
       UPGRADE.doneTitle('mac'),
       UPGRADE.doneBody('Touch ID'),
-      UPGRADE.toApprovals,
+      UPGRADE.toHome,
       UPGRADE.bannerTitle('mac'),
       UPGRADE.bannerBody,
       UPGRADE.bannerAction('mac'),

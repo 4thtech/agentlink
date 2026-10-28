@@ -574,6 +574,23 @@ describe('recovery kit "Later" and Ready (D-120 (2); UX audit 1c, 1d)', () => {
   });
 });
 
+describe('first run finishes on Home (U3-a, D-138; 08 §1)', () => {
+  it('Ready offers one primary link, to Home, and nothing else to go to', async () => {
+    await mount(fakeApi());
+    await click(FIRST_RUN.usePasskey);
+    await click(FIRST_RUN.savedIt);
+    await click(FIRST_RUN.later);
+    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.readyTitle);
+    const links = [...host.querySelectorAll('a')];
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/settings/home']);
+    expect(links[0]?.textContent).toBe(FIRST_RUN.toHome);
+    expect(links[0]?.className).toContain('al-btn-primary');
+    // The prompt to copy stays.
+    expect(host.querySelector('.al-copy.is-hero')?.textContent).toContain(FIRST_RUN.readyPrompt);
+    expect(text()).not.toMatch(BANNED);
+  });
+});
+
 describe('the setup calls (setup-api.ts)', () => {
   function recorder(answers: Record<string, { status: number; body: unknown }>) {
     const calls: { path: string; init: RequestInit }[] = [];
