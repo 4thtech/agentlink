@@ -5343,6 +5343,65 @@ Low-severity findings from the independent reviews of #637, #638, #647, #649, #6
 - **Acceptance:**
   - `node tools/docs-status/index.mjs --check` passes; a changelog fragment if user-visible.
 
+### Follow-ups from the 28 Oct reviews and merge-queue flakes (CARDS-1028E)
+
+Items from the orchestrator follow-up list of 28 Oct that no card covered yet. Phrased neutrally on this public repo.
+
+#### CHORE-DEPLOY-SUBMITTER-TLS-FLAKE · release tooling: the bounded-TLS-window test times out in the merge queue (new, from #655 and #657)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S1 (release tooling) · **Audit:** Fable · **Phase:** M1b
+- **Repo/path:** agentlink · `tools/release/deploy-submitter.test.mjs` ('gives up after a bounded TLS window'), the production health-check step or helper it exercises (`.github/**` only if the window lives in the workflow; then sensitive path, owner's "merge")
+- **Depends on:** —
+- **Spec:** `release-and-deployment.md`; D-52; M0-10e (test timeout policy)
+- **Invariants:** —
+- **Scope:**
+  - The test hit its 20 s timeout three times on 28 Oct and ejected #655 and #657 from the merge queue. Make the TLS window (attempt count and wait between attempts) injectable, and have the test inject a fake clock or a zero wait, so it checks the same bound without real waiting. The production window and its messages do not change.
+- **Acceptance:**
+  - Tests first (RED commit, or a failing CI run cited); the test finishes well under the timeout on a loaded runner; the production health check still gives up after the same bounded window and still names the certificate; the timeout is not raised and no assertion is weakened.
+
+#### UX2-pulse-shared · local-ui: one shared pulse module for the compact view and the activity pulse (new, low, from #657 and #658)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/pulse/**`, `apps/local-ui/src/**/compact/**`, tests
+- **Depends on:** UX2-f2 (#658), UX2-h (#657)
+- **Spec:** UX-WAVE-2 items 4 and 5; B-11 §24, §25
+- **Invariants:** —
+- **Scope:**
+  - (a) `parsePulse`, `barHeights`, `rankByActivity` and the `Spark` component exist in both `compact/` and `pulse/`: move them into one shared module used by both. (b) Arrival pulses are not limited to rows that are on screen: limit them to visible rows. (c) The compact "+n more" opens Messages sorted "Most active". (d) Docs note in B-11 §25: the compact path is `/settings/compact` (marked "proposed, owner confirms at merge").
+- **Acceptance:**
+  - Tests first (RED commit) for (b) and (c); no duplicated copy of the shared functions remains; behaviour of both views unchanged otherwise; reduced-motion and axe tests; no test weakened.
+
+#### DOCS-CHANGELOG-0.4.2-FIX · docs: fix stale 0.4.2 lines in the changelog and update README Status and Roadmap (new, low)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · `CHANGELOG.md`, `README.md` (Status, Roadmap)
+- **Depends on:** the 0.4.2 release
+- **Spec:** `docs/process/versioning.md`
+- **Invariants:** —
+- **Scope:**
+  - The released changelog lines for UX2-brief-0 ("waiting for owner approval, nothing built") and UX2-brief ("waiting for owner approval") are stale: both were approved, and UX2-a and UX2-b were built. Correct them without rewriting history beyond those lines, and bring README Status and Roadmap up to 0.4.2.
+- **Acceptance:**
+  - `node tools/docs-status/index.mjs --check` passes; no unimplemented feature claimed.
+
+#### DOCS-UPGRADING-0.2.0-FEATURES · docs: upgrading-from-0.2.0 lists new features only up to 0.4.0 (new, low, pre-existing)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs-site/guide/get-started/upgrading-from-0.2.0.md`
+- **Depends on:** DOCS-UPGRADING-0.2.0-FIX
+- **Spec:** `CHANGELOG.md`
+- **Invariants:** —
+- **Scope:**
+  - Extend the "what is new" list through the current release (0.4.x), in plain words, from the changelog.
+- **Acceptance:**
+  - Every listed feature exists in a released version; `node tools/docs-status/index.mjs --check` passes.
+
+#### CHORE-WIKI-SYNC-AFTER-0.4.3 · docs: re-run the wiki sync after v0.4.3 and fix the sync script (new, low)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · the wiki sync script (`sync-agentlink.mjs`) and its test; GitBook `wiki.4thtech.io` through the change-request flow
+- **Depends on:** the v0.4.3 tag
+- **Spec:** DOCS-PUB; 26 Oct owner decision (one GitBook space)
+- **Invariants:** —
+- **Scope:**
+  - After the v0.4.3 tag, re-run the sync so synced pages stop linking to 0.4.1 bundles. Fix the script's tag check to use `git tag --points-at HEAD`. Remove the stray period in the 24 Oct news entry.
+- **Acceptance:**
+  - The script test covers the tag check; synced pages link to the current release; edits go through a GitBook change request, never directly on published content.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
