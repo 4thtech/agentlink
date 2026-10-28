@@ -23,11 +23,7 @@ import {
   type ApprovalServerSource,
 } from '../approval-server.js';
 import { agentsSwitchRoute } from './api/agents.js';
-import type {
-  AgentDirectory,
-  AgentDirectoryEntry,
-  AppHostAgent,
-} from './app-host.js';
+import type { AgentDirectory, AgentDirectoryEntry, AppHostAgent } from './app-host.js';
 import type { LocalUiAssets } from './context.js';
 import { REVEAL_PATH } from './reveal-path.js';
 import type { LocalUiRoute } from './route-types.js';
@@ -94,6 +90,10 @@ function send(port: number, path: string, options: SendOptions = {}): Promise<Re
   return done;
 }
 
+/** A copy of `headers` without `name`. */
+const without = (headers: Record<string, string>, name: string): Record<string, string> =>
+  Object.fromEntries(Object.entries(headers).filter(([key]) => key !== name));
+
 const json = (value: unknown): Uint8Array => encodeUtf8(JSON.stringify(value));
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -136,7 +136,11 @@ function agents(): Agents {
     list: () => Promise.resolve([...entries.values()]),
     read: (name) => Promise.resolve(entries.get(name)),
     stats: (name) =>
-      Promise.resolve(name === 'old' ? undefined : { contacts: name === 'work' ? 3 : 1, running: name === 'work' }),
+      Promise.resolve(
+        name === 'old'
+          ? undefined
+          : { contacts: name === 'work' ? 3 : 1, running: name === 'work' },
+      ),
     writeLabel: () => Promise.reject(new Error('not in U3-c')),
     markRemoving: () => Promise.reject(new Error('not in U3-c')),
     removeFolder: () => Promise.reject(new Error('not in U3-c')),
@@ -167,7 +171,9 @@ interface Harness {
   write(cookie: string, csrf: string, extra?: Record<string, string>): Record<string, string>;
 }
 
-async function harness(options: { routes?: LocalUiRouteRegistry; host?: boolean } = {}): Promise<Harness> {
+async function harness(
+  options: { routes?: LocalUiRouteRegistry; host?: boolean } = {},
+): Promise<Harness> {
   const opened: string[] = [];
   const events: ApprovalServerEvent[] = [];
   const ownerStores: number[] = [];
@@ -295,9 +301,36 @@ describe('GET /api/ui/agents (U3-c)', () => {
       current: 'default',
       label: 'Personal',
       agents: [
-        { name: 'default', label: 'Personal', current: true, available: true, removing: false, contacts: 1, running: false, apps: [] },
-        { name: 'work', label: "Work's agent", current: false, available: true, removing: false, contacts: 3, running: true, apps: [] },
-        { name: 'old', label: 'Old', current: false, available: true, removing: true, contacts: null, running: false, apps: [] },
+        {
+          name: 'default',
+          label: 'Personal',
+          current: true,
+          available: true,
+          removing: false,
+          contacts: 1,
+          running: false,
+          apps: [],
+        },
+        {
+          name: 'work',
+          label: "Work's agent",
+          current: false,
+          available: true,
+          removing: false,
+          contacts: 3,
+          running: true,
+          apps: [],
+        },
+        {
+          name: 'old',
+          label: 'Old',
+          current: false,
+          available: true,
+          removing: true,
+          contacts: null,
+          running: false,
+          apps: [],
+        },
       ],
     });
     // The label is percent-encoded plain text in the header.
@@ -343,7 +376,12 @@ describe('the generation check on every mutating request (U3-c, 08 §1)', () => 
     const cookie = await h.cookie();
     const csrf = await h.csrf(cookie);
     const id = `apr_${'A'.repeat(22)}`;
-    for (const path of [`/api/approvals/${id}/approve`, `/api/approvals/${id}/deny`, '/api/approvals/review', '/api/owner/passkey']) {
+    for (const path of [
+      `/api/approvals/${id}/approve`,
+      `/api/approvals/${id}/deny`,
+      '/api/approvals/review',
+      '/api/owner/passkey',
+    ]) {
       const res = await send(h.port, path, {
         method: 'POST',
         headers: h.write(cookie, csrf, { 'X-AgentLink-Generation': '7' }),
@@ -362,13 +400,34 @@ describe('the generation check on every mutating request (U3-c, 08 §1)', () => 
     const path = '/api/ui/rules';
     const stale = { 'X-AgentLink-Generation': '9' };
     const base = h.write(cookie, csrf, stale);
-    const { Cookie: _c, ...noCookie } = base;
+    const noCookie = without(base, 'Cookie');
     expect((await send(h.port, path, { method: 'POST', headers: noCookie })).status).toBe(401);
-    expect((await send(h.port, path, { method: 'POST', headers: { ...base, 'X-AgentLink-CSRF': 'bad' } })).status).toBe(403);
-    const { Origin: _o, ...noOrigin } = base;
+    expect(
+      (
+        await send(h.port, path, {
+          method: 'POST',
+          headers: { ...base, 'X-AgentLink-CSRF': 'bad' },
+        })
+      ).status,
+    ).toBe(403);
+    const noOrigin = without(base, 'Origin');
     expect((await send(h.port, path, { method: 'POST', headers: noOrigin })).status).toBe(403);
-    expect((await send(h.port, path, { method: 'POST', headers: { ...base, 'Sec-Fetch-Site': 'cross-site' } })).status).toBe(403);
-    expect((await send(h.port, path, { method: 'POST', headers: { ...base, 'Content-Type': 'application/json' } })).status).toBe(415);
+    expect(
+      (
+        await send(h.port, path, {
+          method: 'POST',
+          headers: { ...base, 'Sec-Fetch-Site': 'cross-site' },
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await send(h.port, path, {
+          method: 'POST',
+          headers: { ...base, 'Content-Type': 'application/json' },
+        })
+      ).status,
+    ).toBe(415);
   });
 });
 
@@ -394,7 +453,13 @@ describe('U3 route stubs (U3-c review note c)', () => {
     ]) {
       expect(registered, route).toContain(route);
     }
-    for (const path of ['/api/ui/agents', '/api/ui/agents/label', '/api/ui/agents/remove', '/api/ui/apps/apply', '/api/ui/apps/disconnect']) {
+    for (const path of [
+      '/api/ui/agents',
+      '/api/ui/agents/label',
+      '/api/ui/agents/remove',
+      '/api/ui/apps/apply',
+      '/api/ui/apps/disconnect',
+    ]) {
       const res = await send(h.port, path, {
         method: 'POST',
         headers: h.write(cookie, csrf, { 'X-AgentLink-Generation': '1' }),
@@ -404,7 +469,9 @@ describe('U3 route stubs (U3-c review note c)', () => {
       expect(JSON.parse(res.body), path).toEqual({ error: 'not_available' });
     }
     for (const path of ['/api/ui/apps', '/api/ui/apps/preview', '/api/ui/flow']) {
-      const res = await send(h.port, path, { headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf } });
+      const res = await send(h.port, path, {
+        headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
+      });
       expect(res.status, path).toBe(501);
       expect(JSON.parse(res.body), path).toEqual({ error: 'not_available' });
     }
@@ -426,7 +493,9 @@ describe('POST /api/ui/agents/switch (U3-c, the switch kind)', () => {
     expect(h.ownerStores).toEqual([]);
     expect(h.events).toContainEqual({ kind: 'switch', outcome: 'done' });
     // The same cookie and CSRF keep working; the pages now read the other agent.
-    const list = await send(h.port, '/api/approvals', { headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf } });
+    const list = await send(h.port, '/api/approvals', {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
+    });
     expect(list.status).toBe(200);
     expect(h.world.log).toContain('list work');
     expect(list.headers['x-agentlink-agent']).toBe(encodeURIComponent("Work's agent"));
@@ -466,10 +535,13 @@ describe('POST /api/ui/agents/switch (U3-c, the switch kind)', () => {
     const csrf = await h.csrf(cookie);
     const good = h.write(cookie, csrf);
     const body = json({ name: 'work', generation: 1 });
-    const post = (headers: Record<string, string>, b: Uint8Array = body, path = '/api/ui/agents/switch') =>
-      send(h.port, path, { method: 'POST', headers, body: b }).then((r) => r.status);
-    const { Cookie: _c, ...noCookie } = good;
-    const { Origin: _o, ...noOrigin } = good;
+    const post = (
+      headers: Record<string, string>,
+      b: Uint8Array = body,
+      path = '/api/ui/agents/switch',
+    ) => send(h.port, path, { method: 'POST', headers, body: b }).then((r) => r.status);
+    const noCookie = without(good, 'Cookie');
+    const noOrigin = without(good, 'Origin');
     expect(await post(noCookie)).toBe(401);
     expect(await post({ ...good, 'X-AgentLink-CSRF': 'x' })).toBe(403);
     expect(await post(noOrigin)).toBe(403);
@@ -492,7 +564,9 @@ describe('POST /api/ui/agents/switch (U3-c, the switch kind)', () => {
       expect(await post(good, json(bad)), JSON.stringify(bad)).toBe(400);
     }
     expect(await post(good, encodeUtf8('{'))).toBe(400);
-    expect(await post(good, encodeUtf8(JSON.stringify({ name: 'w'.repeat(200), generation: 1 })))).toBe(413);
+    expect(
+      await post(good, encodeUtf8(JSON.stringify({ name: 'w'.repeat(200), generation: 1 }))),
+    ).toBe(413);
     expect(h.world.log).toEqual([]);
     expect(await post(good)).toBe(200);
   });
@@ -516,7 +590,9 @@ describe('POST /api/ui/agents/switch (U3-c, the switch kind)', () => {
     const h = await harness({ routes });
     const cookie = await h.cookie();
     const csrf = await h.csrf(cookie);
-    const reading = send(h.port, '/api/ui/slow', { headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf } });
+    const reading = send(h.port, '/api/ui/slow', {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
+    });
     await sleep(30);
     const switching = switchTo(h, cookie, csrf, 'work', 1);
     await sleep(50);

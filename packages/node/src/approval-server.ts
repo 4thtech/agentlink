@@ -1,5 +1,14 @@
 // M1-8d: the local approval server (08 §1; 04 §2.5; 06 §2.5; I-4, I-7).
 //
+// U3-c (D-138, 08 §1): with `options.host` the server is the app host of the `ui` process: one
+// agent open at a time, switched in the same process, port and session (local-ui/app-host.ts).
+// Every answer then carries the generation (`X-AgentLink-Generation`) and the open agent's label
+// (`X-AgentLink-Agent`, percent-encoded plain text); every mutating request must carry the current
+// generation in `X-AgentLink-Generation` (the switch carries it in its body) or it is refused with
+// 409 `agent_changed`, when it arrives (after the session, CSRF, Origin, fetch-metadata and
+// octet-stream checks, before any presence check) and again right before the server acts. Without
+// `options.host` (an `agentlink mcp` process) the server is bound to its one agent as before.
+//
 // What it is: an HTTP server inside the MCP/CLI process, at `http://localhost:<random port>`, that shows
 // the agent's pending approval requests and lets the owner approve or deny one with owner presence.
 // The M1b `ApprovalChannel` that returns its `/approve/<id>` link, the full local UI and the localhost
@@ -221,6 +230,8 @@ import {
   inviteAcceptPort,
   inviteDesk,
   readOnlyClient,
+  type LocalUiAgentView,
+  type LocalUiAgentsList,
   type LocalUiAssets,
   type LocalUiContext,
   type LocalUiOptions,
@@ -228,13 +239,23 @@ import {
 } from './local-ui/context.js';
 import type {
   LocalUiInviteRoute,
+  LocalUiReadRoute,
+  LocalUiRoute,
+  LocalUiSwitchRoute,
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
   LocalUiResult,
   LocalUiRevealRoute,
   LocalUiSetupStep,
 } from './local-ui/route-types.js';
-import { LOCAL_UI_MAX_INPUT_CHARS } from './local-ui/route-types.js';
+import { LOCAL_UI_MAX_INPUT_CHARS, NOT_AVAILABLE } from './local-ui/route-types.js';
+import {
+  AppHostSlot,
+  type AppHostAgent,
+  type AppHostHold,
+  type AppHostOptions,
+  type AppHostSwitchOutcome,
+} from './local-ui/app-host.js';
 import {
   LOCAL_UI_API_PREFIX,
   LocalUiRouteRegistry,
@@ -495,7 +516,9 @@ export type ApprovalServerEvent =
         | 'method'
         | 'content_type'
         | 'too_large'
-        | 'not_found';
+        | 'not_found'
+        /** U3-c: a mutating request built against another generation (app host). */
+        | 'agent_changed';
     }
   | {
       readonly kind: 'decision';
@@ -518,6 +541,8 @@ export type ApprovalServerEvent =
         | 'changed'
         | 'busy'
         | 'needs_setup'
+        /** U3-c: the open agent changed since the page was built (app host). */
+        | 'agent_changed'
         | 'failed';
     }
   /** M1-8e: the outcome of a passkey registration. */
@@ -548,6 +573,8 @@ export type ApprovalServerEvent =
         | 'busy'
         | 'needs_setup'
         | 'refused'
+        /** U3-c: the open agent changed since the page was built (app host). */
+        | 'agent_changed'
         | 'failed';
     }
   /** M1-11s-c: the outcome of an owner setup step (never the owner code, a key or a value). */
@@ -609,6 +636,8 @@ export type ApprovalServerEvent =
         | 'refused'
         | 'failed';
     }
+  /** U3-c: a switch of the open agent in the app host (fixed outcome only, never a name). */
+  | { readonly kind: 'switch'; readonly outcome: AppHostSwitchOutcome }
   | { readonly kind: 'closed' };
 
 /** M1-UX-FIRSTRUN-V2: what happened to the first policy's Send folder (fixed codes). */
@@ -636,6 +665,11 @@ export interface ApprovalServerOptions {
   readonly onEvent?: (event: ApprovalServerEvent) => void;
   /** M1-11s-b: the local UI app's files and the agent's core client (D-118). */
   readonly localUi?: LocalUiOptions;
+  /**
+   * U3-c: the app host (`agentlink ui` only). Present: the agent comes from `host.initial` and can be
+   * switched; `source` and `localUi.client` are ignored (`localUi.assets` and `version` are used).
+   */
+  readonly host?: AppHostOptions;
 }
 
 /** One listen call: a loopback host, a port (0 = the OS picks), IPv6-only for ::1. */
@@ -721,6 +755,27 @@ class ConfirmRequired extends Error {
     this.name = 'ConfirmRequired';
   }
 }
+
+/** U3-c: the open agent changed after the request arrived (the re-check before acting). */
+class AgentChanged extends Error {
+  constructor() {
+    super('The open agent changed.');
+    this.name = 'AgentChanged';
+  }
+}
+
+/** U3-c: the source while the app host has no agent open (a failed switch): nothing to show. */
+const NO_AGENT_SOURCE: ApprovalServerSource = Object.freeze<ApprovalServerSource>({
+  context: () => Promise.resolve(undefined),
+  list: () => Promise.resolve([]),
+  get: () => Promise.resolve(undefined),
+  apply: () => Promise.reject(new Error('No agent is open.')),
+});
+
+/** U3-c: the switch body is `{"name":"<32 chars>","generation":<16 digits>}`. */
+const MAX_SWITCH_BODY_BYTES = 128;
+/** U3-c: the most agents `GET /api/ui/agents` lists (b11 §29 shows search above 8). */
+const MAX_LISTED_AGENTS = 200;
 
 /** M1-11s-c: the owner seed `begin` holds for `finish`, in memory only. */
 interface PendingSetup {
@@ -926,7 +981,14 @@ export async function startApprovalServerWith(
   options: ApprovalServerOptions,
   internals: ApprovalServerInternals = {},
 ): Promise<ApprovalServer> {
-  const { source } = options;
+  // U3-c: the per-agent pieces; the app host rebinds them on a switch (bindAgent).
+  let source: ApprovalServerSource = options.source;
+  let agentUi: Omit<LocalUiOptions, 'assets'> | undefined = options.localUi;
+  let agentLabel: string | undefined;
+  /** U3-c: the app host, when this server is one (created once every gate below exists). */
+  let host: AppHostSlot | undefined = undefined;
+  /** U3-c: the host hold of each mutating request in flight, for the re-check before acting. */
+  const requestHolds = new WeakMap<IncomingMessage, AppHostHold>();
   // M1-11s-b: the bundle is checked before anything listens (fail closed).
   const localUi = loadLocalUi(options.localUi?.assets);
   const routes = internals.routes ?? createLocalUiRoutes();
@@ -963,36 +1025,34 @@ export async function startApprovalServerWith(
   let failures = 0;
   let waitUntil = 0;
   /** UX2-d1: the invite desk of the invite-kind routes (never reachable from another route). */
-  const invitesDesk =
-    options.localUi?.client === undefined ? undefined : inviteDesk(options.localUi.client);
+  let invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
   /** UX2-d1: when each recent invite was created (ms), oldest first, for the create limit. */
   const invitesCreated: number[] = [];
   /** M1-11s-c: the one owner setup in progress, if any. */
   let pendingSetup: PendingSetup | undefined;
-  const uiContext: LocalUiContext = Object.freeze<LocalUiContext>({
-    // IR-M1-11s-b-1 H-1: handlers read through a read-only view, never the client itself.
-    client:
-      options.localUi?.client === undefined ? undefined : readOnlyClient(options.localUi.client),
-    // M1-11c-a4c: for the presence routes only; core re-verifies the owner signature (I-4).
-    ...(options.localUi?.client === undefined
-      ? {}
-      : { credits: creditsPort(options.localUi.client) }),
-    // UX2-d1: accepting an invite, for the accept owner route; it pairs only after core used an
-    // owner-signed, applied approval (I-4).
-    ...(options.localUi?.client === undefined
-      ? {}
-      : { invites: inviteAcceptPort(options.localUi.client) }),
-    ownerContext: () => source.context(),
-    applyOwnerAction: (signed) => source.apply(signed),
-    now: () => now(),
-    // M1-11s-a-d: the status bar's health read (fixed fields, cached, bounded).
-    health: createHealthReader({
-      ...(options.localUi?.health === undefined ? {} : { source: options.localUi.health }),
-      hasClient: options.localUi?.client !== undefined,
-      ...(options.localUi?.version === undefined ? {} : { version: options.localUi.version }),
+  const buildUiContext = (): LocalUiContext =>
+    Object.freeze<LocalUiContext>({
+      // IR-M1-11s-b-1 H-1: handlers read through a read-only view, never the client itself.
+      client: agentUi?.client === undefined ? undefined : readOnlyClient(agentUi.client),
+      // M1-11c-a4c: for the presence routes only; core re-verifies the owner signature (I-4).
+      ...(agentUi?.client === undefined ? {} : { credits: creditsPort(agentUi.client) }),
+      // UX2-d1: accepting an invite, for the accept owner route; it pairs only after core used an
+      // owner-signed, applied approval (I-4).
+      ...(agentUi?.client === undefined ? {} : { invites: inviteAcceptPort(agentUi.client) }),
+      ownerContext: () => source.context(),
+      applyOwnerAction: (signed) => source.apply(signed),
       now: () => now(),
-    }),
-  });
+      // M1-11s-a-d: the status bar's health read (fixed fields, cached, bounded).
+      health: createHealthReader({
+        ...(agentUi?.health === undefined ? {} : { source: agentUi.health }),
+        hasClient: agentUi?.client !== undefined,
+        ...(options.localUi?.version === undefined ? {} : { version: options.localUi.version }),
+        now: () => now(),
+      }),
+      // U3-c: the Agents list, in the app host only.
+      ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
+    });
+  let uiContext: LocalUiContext = buildUiContext();
 
   // One request handler and one session behind both loopback listeners. Until both are bound, a
   // request (only possible on 127.0.0.1, in that short window) gets 503 and nothing else.
@@ -1357,6 +1417,12 @@ export async function startApprovalServerWith(
           finishDecision(res, 503, 'needs_setup');
           return;
         }
+        if (!stillCurrent(req)) {
+          // U3-c: the open agent changed while this request was on its way.
+          await store.close().catch(() => undefined);
+          finishDecision(res, 409, 'agent_changed');
+          return;
+        }
         let signed: { readonly body: JsonObject; readonly sig: string };
         try {
           // unlock wipes the presented bytes, whether or not they unlock.
@@ -1626,6 +1692,8 @@ export async function startApprovalServerWith(
           try {
             const owner: LocalUiOwnerOperation = Object.freeze<LocalUiOwnerOperation>({
               sign: async (review, requests) => {
+                // U3-c: right before acting, the open agent is still the one the page showed.
+                if (!stillCurrent(req)) throw new AgentChanged();
                 // One entry of the owner secret, one owner operation (D-68).
                 if (used) {
                   throw new NodeKeyStoreError(
@@ -1641,9 +1709,11 @@ export async function startApprovalServerWith(
                 return signGesture(session, frozen);
               },
             });
+            if (!stillCurrent(req)) throw new AgentChanged();
             result = await run(owner);
           } catch (error) {
-            if (error instanceof ConfirmRequired) finishOwner(res, 409, 'confirm_required');
+            if (error instanceof AgentChanged) finishOwner(res, 409, 'agent_changed');
+            else if (error instanceof ConfirmRequired) finishOwner(res, 409, 'confirm_required');
             else if (error instanceof NodeKeyStoreError) finishOwner(res, 409, 'refused');
             else finishOwner(res, 500, 'failed');
             return;
@@ -1686,7 +1756,7 @@ export async function startApprovalServerWith(
 
   /** The policy in force, or undefined when it fails closed or cannot be read (fail closed). */
   const policyInForce = async (): Promise<{ policy: unknown; version: number } | undefined> => {
-    const client = options.localUi?.client;
+    const client = agentUi?.client;
     if (client === undefined) return undefined;
     try {
       const effective = await client.ownerActions.loadPolicy();
@@ -1850,7 +1920,7 @@ export async function startApprovalServerWith(
       if (held?.kind !== 'owner-action') return 'changed';
       policySet = held.action;
     } else {
-      const client = options.localUi?.client;
+      const client = agentUi?.client;
       if (client === undefined) return 'refused';
       let prepared: Awaited<ReturnType<typeof client.ownerActions.preparePolicyEdit>>;
       try {
@@ -2006,6 +2076,10 @@ export async function startApprovalServerWith(
         return;
       }
       const session = sessions[sessionAt] as Uint8Array;
+      if (!stillCurrent(req)) {
+        agentChanged(res);
+        return;
+      }
       if (step === 'begin') await payBegin(res, input, body, session, passkey);
       else await payFinish(res, input, body, session, passkey);
     } finally {
@@ -2224,7 +2298,7 @@ export async function startApprovalServerWith(
       }
       if (hold.target.kind === 'proof') decided.add(hold.target.approvalId);
       else if (hold.target.keepDeliveryReceipts) {
-        await options.localUi?.client?.ownerActions
+        await agentUi?.client?.ownerActions
           .recordReceiptsKept(hold.target.version)
           .catch(() => false);
       }
@@ -2295,7 +2369,7 @@ export async function startApprovalServerWith(
    */
   const releaseFolders = async (folders: SetupFolders | undefined): Promise<void> => {
     if (folders === undefined) return;
-    const setup = options.localUi?.ownerSetup;
+    const setup = agentUi?.ownerSetup;
     let ownerElsewhere: boolean;
     try {
       ownerElsewhere = setup === undefined || (await ownerExistsAnywhere(setup));
@@ -2363,7 +2437,7 @@ export async function startApprovalServerWith(
       finishSetup(res, 429, 'wait', { retryAfter: wait });
       return;
     }
-    const setup = options.localUi?.ownerSetup;
+    const setup = agentUi?.ownerSetup;
     if (setup === undefined) {
       req.resume();
       finishSetup(res, 503, 'unavailable');
@@ -2372,6 +2446,10 @@ export async function startApprovalServerWith(
     const body = await boundedBody(req, res, MAX_SETUP_REGISTRATION_BYTES);
     if (body === undefined) return;
     try {
+      if (!stillCurrent(req)) {
+        agentChanged(res);
+        return;
+      }
       if (step === 'begin') await setupBegin(res, body, cookie, setup);
       else await setupFinish(res, body, cookie, setup);
     } finally {
@@ -2630,6 +2708,10 @@ export async function startApprovalServerWith(
       invalid();
       return;
     }
+    if (!stillCurrent(req)) {
+      agentChanged(res);
+      return;
+    }
     let result: LocalUiResult;
     try {
       result = await route.handler(uiContext, id, revealFile);
@@ -2698,6 +2780,10 @@ export async function startApprovalServerWith(
         sendJson(res, 400, { error: 'invalid' });
         return;
       }
+      if (!stillCurrent(req)) {
+        agentChanged(res);
+        return;
+      }
       if (route.step === 'create') invitesCreated.push(now());
       let result: LocalUiResult;
       try {
@@ -2741,11 +2827,48 @@ export async function startApprovalServerWith(
     if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
     if (!route.presence) {
       req.resume();
-      sendResult(res, await route.handler(uiContext, { params, query: url.searchParams }));
+      // U3-c: a read waits for a switch in progress and keeps the agent open while it runs.
+      const hold = host === undefined ? undefined : await host.enter();
+      try {
+        stamp(res);
+        sendResult(res, await route.handler(uiContext, { params, query: url.searchParams }));
+      } finally {
+        hold?.leave();
+      }
       return;
     }
     const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
     if (type !== 'application/octet-stream') return fail(415, 'content_type');
+    if (route.presence === 'switch') {
+      // U3-c: switching the open agent has its own gate; it carries the generation in its body.
+      await switchGate(req, res, url);
+      return;
+    }
+    // U3-c: the generation, before any presence check; held until the request is answered.
+    const hold = mutatingHold(req, res);
+    if (hold === false) return;
+    try {
+      await ownerRoute(req, res, url, route, params, cookie as string);
+    } finally {
+      hold?.leave();
+    }
+  }
+
+  /** The mutating /api/ui/ routes after the generation check (handleUi). */
+  async function ownerRoute(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: Exclude<LocalUiRoute, LocalUiReadRoute | LocalUiSwitchRoute>,
+    params: Readonly<Record<string, string>>,
+    cookie: string,
+  ): Promise<void> {
+    if (route.presence === true && route.stub === true) {
+      // U3-c: a reserved U3 route: refused before the presence gate; its handler never runs.
+      req.resume();
+      sendResult(res, NOT_AVAILABLE);
+      return;
+    }
     if (route.presence === 'reveal') {
       // MSG-FILES-IO-h: Show in Finder has its own gate; ownerGate never runs it (D-134).
       await revealGate(req, res, url, route);
@@ -2758,12 +2881,12 @@ export async function startApprovalServerWith(
     }
     if (route.presence === 'setup') {
       // M1-11s-c: owner setup has its own gate; ownerGate never runs it.
-      await setupGate(req, res, route.step, cookie as string);
+      await setupGate(req, res, route.step, cookie);
       return;
     }
     if (route.presence === 'pay-confirm') {
       // M1-PAY-CONFIRM-a: the paid-action confirmation has its own gate (04 §2.5.3).
-      await payConfirmGate(req, res, route.step, cookie as string);
+      await payConfirmGate(req, res, route.step, cookie);
       return;
     }
     const input = operationInput(req);
@@ -2783,6 +2906,7 @@ export async function startApprovalServerWith(
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     setCommonHeaders(res);
+    stamp(res);
     const peer = req.socket.remoteAddress;
     if (peer !== '127.0.0.1' && peer !== '::ffff:127.0.0.1' && peer !== '::1') {
       reject(res, 403, 'peer');
@@ -2858,7 +2982,12 @@ export async function startApprovalServerWith(
         return;
       }
       // The token is base64url, so it needs no escaping.
-      const meta = `<meta name="agentlink-csrf" content="${csrf}">`;
+      const meta =
+        `<meta name="agentlink-csrf" content="${csrf}">` +
+        // U3-c: the generation the page is built against (a decimal number, no escaping needed).
+        (host === undefined
+          ? ''
+          : `<meta name="agentlink-generation" content="${String(host.generation)}">`);
       sendText(res, 200, 'text/html; charset=utf-8', `${shell.before}${meta}${shell.after}`);
       return;
     }
@@ -2887,6 +3016,33 @@ export async function startApprovalServerWith(
     if (post) {
       const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
       if (type !== 'application/octet-stream') return reject(res, 415, 'content_type');
+      // U3-c: the generation, before any presence check; held until the request is answered.
+      const hold = mutatingHold(req, res);
+      if (hold === false) return;
+      try {
+        await approvalsPost(req, res, reviewRoute, decideMatch);
+      } finally {
+        hold?.leave();
+      }
+      return;
+    }
+    const hold = host === undefined ? undefined : await host.enter();
+    try {
+      stamp(res);
+      await approvalsRead(res, passkeyRoute, one);
+    } finally {
+      hold?.leave();
+    }
+  }
+
+  /** The approval API's POSTs (handle), after the generation check. */
+  async function approvalsPost(
+    req: IncomingMessage,
+    res: ServerResponse,
+    reviewRoute: boolean,
+    decideMatch: RegExpExecArray | null,
+  ): Promise<void> {
+    {
       if (reviewRoute) {
         const picks = parseReviewItems(header(req, 'x-agentlink-items'));
         if (picks === undefined) {
@@ -2915,6 +3071,14 @@ export async function startApprovalServerWith(
       );
       return;
     }
+  }
+
+  /** The approval API's reads (handle). */
+  async function approvalsRead(
+    res: ServerResponse,
+    passkeyRoute: boolean,
+    one: RegExpExecArray | null,
+  ): Promise<void> {
     if (passkeyRoute) {
       await passkeyInfo(res);
       return;
@@ -2932,6 +3096,168 @@ export async function startApprovalServerWith(
       .filter((i): i is PendingApprovalView => i !== undefined && !decided.has(i.approvalId));
     sendJson(res, 200, { approvals });
   }
+
+  // --- U3-c: the app host (D-138; 08 §1; 04 §2.5 "Several agents in one app") -----------------
+
+  /** Rebinds every per-agent piece to `agent` (or to none); nothing of the previous one is kept. */
+  function bindAgent(agent: AppHostAgent | undefined): void {
+    source = agent?.source ?? NO_AGENT_SOURCE;
+    agentUi = agent?.localUi;
+    agentLabel = agent?.label;
+    invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
+    uiContext = buildUiContext();
+    // Approvals, a held owner setup and held paid-action confirmations belong to the old agent.
+    decided.clear();
+    dropSetup();
+    payHolds.clear();
+  }
+
+  /** Every answer of the app host carries the generation and the open agent's label (08 §1). */
+  function stamp(res: ServerResponse): void {
+    if (host === undefined || res.headersSent) return;
+    res.setHeader('X-AgentLink-Generation', String(host.generation));
+    const label = agentLabel ?? host.current;
+    // The label is the owner's plain text from config.json: percent-encoded, never raw in a header.
+    if (label === undefined) res.removeHeader('X-AgentLink-Agent');
+    else res.setHeader('X-AgentLink-Agent', encodeURIComponent(label));
+  }
+
+  /** 409 `agent_changed`, with the current generation, so the page reloads (08 §1). */
+  function agentChanged(res: ServerResponse): void {
+    stamp(res);
+    sendJson(res, 409, { status: 'agent_changed' });
+  }
+
+  /** False when the request's hold says the open agent changed since it arrived (the re-check). */
+  function stillCurrent(req: IncomingMessage): boolean {
+    const hold = requestHolds.get(req);
+    return hold === undefined || hold.valid();
+  }
+
+  /**
+   * The generation check of a mutating request (08 §1): undefined outside the app host, the hold
+   * when `X-AgentLink-Generation` is the current generation, or false once 409 `agent_changed` was
+   * answered.
+   */
+  function mutatingHold(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): AppHostHold | undefined | false {
+    if (host === undefined) return undefined;
+    const hold = host.enterMutating(header(req, 'x-agentlink-generation'));
+    if (hold === undefined) {
+      req.resume();
+      emit({ kind: 'rejected', reason: 'agent_changed' });
+      agentChanged(res);
+      return false;
+    }
+    requestHolds.set(req, hold);
+    return hold;
+  }
+
+  /** `GET /api/ui/agents` in the app host: names, labels and counts, never a path or an ID. */
+  async function listAgents(): Promise<LocalUiAgentsList> {
+    const slot = host;
+    if (slot === undefined) throw new Error('not the app host');
+    const entries = (await slot.directory.list()).slice(0, MAX_LISTED_AGENTS);
+    const current = slot.current;
+    const agents: LocalUiAgentView[] = [];
+    for (const entry of entries) {
+      const stats = entry.available
+        ? await slot.directory.stats(entry.name).catch(() => undefined)
+        : undefined;
+      agents.push(
+        Object.freeze<LocalUiAgentView>({
+          name: entry.name,
+          label: entry.label,
+          current: entry.name === current,
+          available: entry.available,
+          removing: entry.removing,
+          contacts: stats?.contacts ?? null,
+          running: stats?.running ?? false,
+          // Card U3-f fills this from each AI app's `agentlink` entry only.
+          apps: [],
+        }),
+      );
+    }
+    return Object.freeze<LocalUiAgentsList>({
+      generation: slot.generation,
+      current: current ?? null,
+      label: current === undefined ? null : (agentLabel ?? current),
+      agents: Object.freeze(agents),
+    });
+  }
+
+  /**
+   * U3-c: `POST /api/ui/agents/switch` `{name, generation}`, the switch kind. The caller checked the
+   * session, CSRF, Origin, fetch metadata and the octet-stream type. No query, operation input or
+   * presence header; the body is exactly `{"name": <agent name>, "generation": <number>}`. No owner
+   * presence, nothing signed: the host closes the open agent and opens the named one, and writes only
+   * `app.json`. Answers fixed codes; never echoes the name.
+   */
+  async function switchGate(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    const finishSwitch = (status: number, outcome: AppHostSwitchOutcome | 'invalid'): void => {
+      if (outcome !== 'invalid') emit({ kind: 'switch', outcome });
+      stamp(res);
+      sendJson(
+        res,
+        status,
+        outcome === 'done' && host !== undefined
+          ? { status: 'done', generation: host.generation, current: host.current ?? null }
+          : { status: outcome },
+      );
+    };
+    if (host === undefined) {
+      req.resume();
+      sendResult(res, NOT_AVAILABLE);
+      return;
+    }
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      finishSwitch(400, 'invalid');
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_SWITCH_BODY_BYTES);
+    if (body === undefined) return;
+    let name: unknown;
+    let generation: unknown;
+    try {
+      const parsed = parseJson(decodeUtf8(body));
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error();
+      const keys = Object.keys(parsed).sort();
+      if (keys.length !== 2 || keys[0] !== 'generation' || keys[1] !== 'name') throw new Error();
+      ({ name, generation } = parsed as { name?: unknown; generation?: unknown });
+    } catch {
+      finishSwitch(400, 'invalid');
+      return;
+    }
+    if (
+      typeof name !== 'string' ||
+      typeof generation !== 'number' ||
+      !Number.isSafeInteger(generation) ||
+      generation < 1
+    ) {
+      finishSwitch(400, 'invalid');
+      return;
+    }
+    const outcome = await host.switchTo(name, String(generation));
+    const status =
+      outcome === 'done'
+        ? 200
+        : outcome === 'unknown_agent'
+          ? 404
+          : outcome === 'unavailable'
+            ? 503
+            : 409;
+    finishSwitch(status, outcome);
+  }
+
+  // Created last: binding the first agent clears state the gates above own.
+  host = options.host === undefined ? undefined : new AppHostSlot(options.host, bindAgent);
 
   dispatch = (req, res) => {
     handle(req, res).catch(() => {
@@ -2971,6 +3297,8 @@ export async function startApprovalServerWith(
       payHolds.clear();
       await folderRemoval;
       await Promise.all(listeners.map(closeServer));
+      // U3-c: the app host closes the agent it has open (whichever the owner switched to).
+      await host?.close();
       emit({ kind: 'closed' });
     },
   });

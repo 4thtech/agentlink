@@ -12,11 +12,22 @@
 //   `create` at INVITE_CREATE_PATH or step `check` at INVITE_CHECK_PATH, each registered once; the
 //   server's invite gate runs it. Accepting an invite (INVITE_ACCEPT_PATH) is a `presence: true`
 //   route like every other change.
+// - U3-c (D-138, 08 §1): a `presence: 'switch'` route is only a POST at AGENTS_SWITCH_PATH with no
+//   handler, registered once; the server's switch gate runs it. A `stub: true` route is a reserved U3
+//   route (`presence: true`, with a handler that never runs): the server answers it 501
+//   `not_available` before the presence gate. This file registers every U3 route of 08 §1 now, so the
+//   later cards only replace the stubs in their own api/ files.
 // - A path is fixed segments `[a-z0-9-]` and `:name` parameters; a parameter matches only
 //   `[A-Za-z0-9_-]{1,128}` (no dot, no percent-escape, no slash), so no handler sees `..` or an
 //   encoded separator. Duplicates throw.
 // - The page files in api/ each own their routes; this file only lists them.
 import { activityRoutes } from './api/activity.js';
+// U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
+import { agentsRoutes } from './api/agents.js';
+import { agentsManageRoutes } from './api/agents-manage.js';
+import { agentsRemoveRoutes } from './api/agents-remove.js';
+import { appsRoutes } from './api/apps.js';
+import { flowRoutes } from './api/flow.js';
 import { advancedRoutes } from './api/advanced.js';
 import { approvalsRoutes } from './api/approvals.js';
 import { backupRoutes } from './api/backup.js';
@@ -36,13 +47,19 @@ import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
 import { storageRoutes } from './api/storage.js';
-import type { LocalUiRoute } from './route-types.js';
+import { AGENTS_SWITCH_PATH, type LocalUiRoute } from './route-types.js';
 // The fixed path lives in reveal-path.ts so api/files-io.ts uses it without importing this file.
 import { REVEAL_PATH } from './reveal-path.js';
 // UX2-d1: the invite paths live in invite-paths.ts for the same reason.
 import { INVITE_ACCEPT_PATH, INVITE_CHECK_PATH, INVITE_CREATE_PATH } from './invite-paths.js';
 
-export { INVITE_ACCEPT_PATH, INVITE_CHECK_PATH, INVITE_CREATE_PATH, REVEAL_PATH };
+export {
+  AGENTS_SWITCH_PATH,
+  INVITE_ACCEPT_PATH,
+  INVITE_CHECK_PATH,
+  INVITE_CREATE_PATH,
+  REVEAL_PATH,
+};
 /** UX2-d1: the one path of each invite-kind step. */
 const INVITE_STEP_PATHS: Readonly<Record<string, string>> = Object.freeze({
   create: INVITE_CREATE_PATH,
@@ -108,13 +125,27 @@ export class LocalUiRouteRegistry {
   /** Adds a route, or throws when it breaks a rule above (nothing is added then). */
   register(route: LocalUiRoute): void {
     if (typeof route !== 'object' || route === null) throw invalid('malformed');
-    const { method, presence, handler, step } = route as unknown as {
+    const { method, presence, handler, step, stub } = route as unknown as {
       method: unknown;
       presence: unknown;
       handler: unknown;
       step: unknown;
+      stub: unknown;
     };
-    if (presence === 'setup') {
+    // U3-c: only an owner route (POST, presence) can be a stub; the flag is `true` or absent.
+    if (stub !== undefined && (stub !== true || presence !== true || method !== 'POST')) {
+      throw invalid('only a POST owner route can be a stub');
+    }
+    if (presence === 'switch') {
+      // U3-c: switching the open agent; the server's switch gate runs it (D-138).
+      if (method !== 'POST') throw invalid('a switch route is a POST');
+      if (route.path !== AGENTS_SWITCH_PATH)
+        throw invalid('a switch route is only at its fixed path');
+      if (handler !== undefined) throw invalid('a switch route has no handler');
+      if (this.#entries.some((e) => e.route.presence === 'switch')) {
+        throw invalid('the switch route is already registered');
+      }
+    } else if (presence === 'setup') {
       // M1-11s-c: owner setup is run by the server's setup gate, never by a page handler.
       if (method !== 'POST') throw invalid('a setup route is a POST');
       if (handler !== undefined) throw invalid('a setup route has no handler');
@@ -233,6 +264,13 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     payConfirmRoutes,
     backupRoutes,
     advancedRoutes,
+    // U3-c: every U3 route of 08 §1. The switch kind and the Agents list are live; the rest are
+    // stubs answering `not_available` until their cards (U3-d, U3-e, U3-f, U3-flow) fill them.
+    agentsRoutes,
+    agentsManageRoutes,
+    agentsRemoveRoutes,
+    appsRoutes,
+    flowRoutes,
   ]) {
     for (const route of routes) registry.register(route);
   }

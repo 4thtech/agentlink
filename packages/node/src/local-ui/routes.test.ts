@@ -395,15 +395,29 @@ describe('the switch route kind and the U3 stubs (U3-c, I-4)', () => {
 
   it('no other path, method, handler or second route can use the switch kind', () => {
     const route = (over: Record<string, unknown>) =>
-      ({ method: 'POST', path: AGENTS_SWITCH_PATH, presence: 'switch', ...over }) as unknown as LocalUiRoute;
-    for (const path of ['/api/ui/agents', '/api/ui/agents/label', '/api/ui/rules', `${AGENTS_SWITCH_PATH}/x`]) {
+      ({
+        method: 'POST',
+        path: AGENTS_SWITCH_PATH,
+        presence: 'switch',
+        ...over,
+      }) as unknown as LocalUiRoute;
+    for (const path of [
+      '/api/ui/agents',
+      '/api/ui/agents/label',
+      '/api/ui/rules',
+      `${AGENTS_SWITCH_PATH}/x`,
+    ]) {
       const registry = new LocalUiRouteRegistry();
       expect(() => registry.register(route({ path })), path).toThrow(/switch/);
     }
     for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) {
-      expect(() => new LocalUiRouteRegistry().register(route({ method })), method).toThrow(/switch/);
+      expect(() => new LocalUiRouteRegistry().register(route({ method })), method).toThrow(
+        /switch/,
+      );
     }
-    expect(() => new LocalUiRouteRegistry().register(route({ handler: answer }))).toThrow(/handler/);
+    expect(() => new LocalUiRouteRegistry().register(route({ handler: answer }))).toThrow(
+      /handler/,
+    );
     const registry = new LocalUiRouteRegistry();
     registry.register(route({}));
     expect(() => registry.register(route({}))).toThrow(/switch/);
@@ -419,13 +433,29 @@ describe('the switch route kind and the U3 stubs (U3-c, I-4)', () => {
     ]) {
       const registry = new LocalUiRouteRegistry();
       expect(
-        () => registry.register({ path: '/api/ui/agents/label', handler: answer, stub: true, ...over } as never),
+        () =>
+          registry.register({
+            path: '/api/ui/agents/label',
+            handler: answer,
+            stub: true,
+            ...over,
+          } as never),
         JSON.stringify(over),
       ).toThrow();
     }
-    for (const path of ['/api/ui/agents', '/api/ui/agents/label', '/api/ui/agents/remove', '/api/ui/apps/apply']) {
+    for (const path of [
+      '/api/ui/agents',
+      '/api/ui/agents/label',
+      '/api/ui/agents/remove',
+      '/api/ui/apps/apply',
+    ]) {
       expect(() =>
-        new LocalUiRouteRegistry().register({ method: 'POST', path, presence: false, handler: answer } as never),
+        new LocalUiRouteRegistry().register({
+          method: 'POST',
+          path,
+          presence: false,
+          handler: answer,
+        } as never),
       ).toThrow(/presence/);
     }
     const stubs = createLocalUiRoutes()

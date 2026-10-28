@@ -6,7 +6,17 @@
 // - `label` and `removing` in config.json: strict forms; old configs read exactly as before.
 // - app.json: 0600, written atomically, trusted for nothing but order; anything odd is ignored.
 // - The folder rules stay here: no recursive delete; links refused.
-import { chmod, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,7 +68,9 @@ describe('agent labels and the removing mark in config.json (U3-c, 07 §9.1)', (
     expect(parseAgentConfig(JSON.stringify({ ...base, label: "Tali's work" }), 'work').label).toBe(
       "Tali's work",
     );
-    expect(parseAgentConfig(JSON.stringify({ ...base, removing: true }), 'work').removing).toBe(true);
+    expect(parseAgentConfig(JSON.stringify({ ...base, removing: true }), 'work').removing).toBe(
+      true,
+    );
     for (const bad of [
       { label: '' },
       { label: 'x'.repeat(33) },
@@ -70,17 +82,38 @@ describe('agent labels and the removing mark in config.json (U3-c, 07 §9.1)', (
       { removing: 'true' },
       { other: 1 },
     ]) {
-      expect(() => parseAgentConfig(JSON.stringify({ ...base, ...bad }), 'work'), JSON.stringify(bad)).toThrow(
-        RuntimeError,
-      );
+      expect(
+        () => parseAgentConfig(JSON.stringify({ ...base, ...bad }), 'work'),
+        JSON.stringify(bad),
+      ).toThrow(RuntimeError);
     }
   });
 
   it('the label rule: 1 to 32 letters, digits, spaces, dots, apostrophes and hyphens', () => {
-    for (const ok of ['My agent', 'Work', 'Ana-Marija', "O'Neil", 'v2.0', 'Žiga', '日本', 'x'.repeat(32)]) {
+    for (const ok of [
+      'My agent',
+      'Work',
+      'Ana-Marija',
+      "O'Neil",
+      'v2.0',
+      'Žiga',
+      '日本',
+      'x'.repeat(32),
+    ]) {
       expect(isAgentLabel(ok), ok).toBe(true);
     }
-    for (const bad of ['', ' ', 'a  b', 'tab\there', 'new\nline', 'a/b', 'a_b', 'é', 'zero​width', 'x'.repeat(33)]) {
+    for (const bad of [
+      '',
+      ' ',
+      'a  b',
+      'tab\there',
+      'new\nline',
+      'a/b',
+      'a_b',
+      'é',
+      'zero​width',
+      'x'.repeat(33),
+    ]) {
       expect(isAgentLabel(bad), JSON.stringify(bad)).toBe(false);
     }
   });
@@ -98,7 +131,10 @@ describe('agent labels and the removing mark in config.json (U3-c, 07 §9.1)', (
       label: 'Work',
       removing: true,
     });
-    if (POSIX) expect((await stat(join(home, '.agentlink/agents/work/config.json'))).mode & 0o777).toBe(0o600);
+    if (POSIX)
+      expect((await stat(join(home, '.agentlink/agents/work/config.json'))).mode & 0o777).toBe(
+        0o600,
+      );
     expect(codeOf(await writeAgentLabel(home, 'work', 'bad/label').catch((e: unknown) => e))).toBe(
       'agent_label_invalid',
     );
@@ -171,14 +207,23 @@ describe('app.json (U3-c, 07 §9.1)', () => {
     expect(await readAppCurrent(home)).toBe('work');
     await writeAppCurrent(home, 'home');
     expect(await readAppCurrent(home)).toBe('home');
-    expect(codeOf(await writeAppCurrent(home, '../x').catch((e: unknown) => e))).toBe('agent_name_invalid');
+    expect(codeOf(await writeAppCurrent(home, '../x').catch((e: unknown) => e))).toBe(
+      'agent_name_invalid',
+    );
   });
 
   it('ignores a missing, malformed, oversized, linked or loose app.json', async () => {
     expect(await readAppCurrent(home)).toBeUndefined();
     await writeAppCurrent(home, 'work');
     const path = join(home, '.agentlink/app.json');
-    for (const text of ['{', '[]', '{"v":2,"current":"work"}', '{"v":1,"current":"Work"}', '{"v":1,"current":"work","x":1}', `{"v":1,"current":"${'a'.repeat(300)}"}`]) {
+    for (const text of [
+      '{',
+      '[]',
+      '{"v":2,"current":"work"}',
+      '{"v":1,"current":"Work"}',
+      '{"v":1,"current":"work","x":1}',
+      `{"v":1,"current":"${'a'.repeat(300)}"}`,
+    ]) {
       await writeFile(path, text, { mode: 0o600 });
       expect(await readAppCurrent(home), text).toBeUndefined();
     }
@@ -192,7 +237,9 @@ describe('app.json (U3-c, 07 §9.1)', () => {
       await symlink(target, path);
       expect(await readAppCurrent(home)).toBeUndefined();
       // A link is never written through either.
-      expect(codeOf(await writeAppCurrent(home, 'home').catch((e: unknown) => e))).toBe('agent_path_invalid');
+      expect(codeOf(await writeAppCurrent(home, 'home').catch((e: unknown) => e))).toBe(
+        'agent_path_invalid',
+      );
       expect(await readFile(target, 'utf8')).toBe('{"v":1,"current":"work"}');
     }
   });
@@ -202,7 +249,13 @@ describe('removeAgentFolder (U3-c seam; card U3-e calls it)', () => {
   it('deletes only the known files and the folder; never a recursive delete', async () => {
     await oldAgent('gone');
     const dir = join(home, '.agentlink/agents/gone');
-    for (const file of ['store.sqlite', 'store.sqlite-wal', 'store.sqlite-shm', 'store.sqlite.lock', 'open.lock']) {
+    for (const file of [
+      'store.sqlite',
+      'store.sqlite-wal',
+      'store.sqlite-shm',
+      'store.sqlite.lock',
+      'open.lock',
+    ]) {
       await writeFile(join(dir, file), '', { mode: 0o600 });
     }
     await removeAgentFolder(home, 'gone');
@@ -213,7 +266,9 @@ describe('removeAgentFolder (U3-c seam; card U3-e calls it)', () => {
     await oldAgent('keep');
     const dir = join(home, '.agentlink/agents/keep');
     await writeFile(join(dir, 'notes.txt'), 'mine', { mode: 0o600 });
-    expect(codeOf(await removeAgentFolder(home, 'keep').catch((e: unknown) => e))).toBe('agent_path_invalid');
+    expect(codeOf(await removeAgentFolder(home, 'keep').catch((e: unknown) => e))).toBe(
+      'agent_path_invalid',
+    );
     expect(await readFile(join(dir, 'notes.txt'), 'utf8')).toBe('mine');
     // Nothing was deleted: the agent still reads.
     expect(await readAgentConfig(home, 'keep')).toBeDefined();

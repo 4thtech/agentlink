@@ -1,7 +1,18 @@
 // The agent directory under `~/.agentlink` (M1-9k; 06 §6, 07 §9.1). One folder per local agent:
 //
-//   ~/.agentlink/agents/<name>/config.json   { "v": 1, "name", "agentId", "keyStore" }
+//   ~/.agentlink/agents/<name>/config.json   { "v": 1, "name", "agentId", "keyStore", "label"?, "removing"? }
 //   ~/.agentlink/agents/<name>/store.sqlite  the agent's shared SQLite store (07 §3.7; D-73 (3))
+//   ~/.agentlink/agents/<name>/open.lock     the shared folder lock while the agent is open (06 §6)
+//   ~/.agentlink/app.json                    { "v": 1, "current" }: the agent the app opens first
+//
+// U3-c (D-138; 07 §9.1): `label` is the owner's display text (06 §6 label rule), written only after
+// the server verified an `agent.label` owner action (card U3-d); `removing: true` is written before
+// anything of the agent is deleted (card U3-e). Neither is signed in the file: a same-user process
+// that changes them can mislabel an agent or hide it as "Removal not finished", nothing more (G-1).
+// Configs written by older versions (the four keys only) read exactly as before: no agent is lost or
+// renamed. `app.json` is not signed either and is trusted for nothing but which agent opens first;
+// a name in it that fails the rule or names no agent is ignored. The app host reaches all of this
+// only through `agentDirectory` below (the node AgentDirectory seam).
 //
 // `init` (M1-9a) writes the config through `writeAgentConfig`; every other command and every
 // `agentlink mcp` process reads it through `readAgentConfig`, so all of them open the same store
@@ -30,12 +41,20 @@ import {
   readdir,
   realpath,
   rename,
+  rmdir,
   unlink,
 } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
-import { assertAgentId, type KeyStoreBackendKind } from '@4thtech-io/node';
-import { isAgentName } from './agent-name.js';
+import {
+  AGENT_OPEN_LOCK_FILE,
+  assertAgentId,
+  peekAgentStore,
+  type AgentDirectory,
+  type AgentDirectoryEntry,
+  type KeyStoreBackendKind,
+} from '@4thtech-io/node';
+import { isAgentLabel, isAgentName } from './agent-name.js';
 import { RuntimeError } from './errors.js';
 
 /** The recorded per-agent config (07 §9.1). */
@@ -47,6 +66,10 @@ export interface AgentConfig {
   readonly agentId: string;
   /** The recorded KeyStore backend; every start uses only this one (07 §9.1). */
   readonly keyStore: KeyStoreBackendKind;
+  /** U3-c (07 §9.1): the owner's display text; absent: the name is shown. Never authorises. */
+  readonly label?: string;
+  /** U3-c (07 §9.1): the agent is being removed ("Removal not finished"); never opened as usable. */
+  readonly removing?: true;
 }
 
 export const CONFIG_FILE = 'config.json';
@@ -140,7 +163,13 @@ async function checkContained(home: string, name: string): Promise<string> {
   }
 }
 
-/** Strict parse: exactly the four keys, each of its exact type and form. */
+const REQUIRED_KEYS = ['agentId', 'keyStore', 'name', 'v'];
+const OPTIONAL_KEYS: ReadonlySet<string> = new Set(['label', 'removing']);
+
+/**
+ * Strict parse: the four keys, each of its exact type and form, plus optionally `label` (the label
+ * rule) and `removing` (exactly `true`); no other key.
+ */
 export function parseAgentConfig(text: string, expectedName: string): AgentConfig {
   let parsed: unknown;
   try {
@@ -153,7 +182,15 @@ export function parseAgentConfig(text: string, expectedName: string): AgentConfi
   }
   const record = parsed as Record<string, unknown>;
   const keys = Object.keys(record).sort();
-  if (keys.join(',') !== 'agentId,keyStore,name,v') throw new RuntimeError('agent_config_invalid');
+  const required = keys.filter((key) => !OPTIONAL_KEYS.has(key));
+  if (required.join(',') !== REQUIRED_KEYS.join(','))
+    throw new RuntimeError('agent_config_invalid');
+  if ('label' in record && !isAgentLabel(record['label'])) {
+    throw new RuntimeError('agent_config_invalid');
+  }
+  if ('removing' in record && record['removing'] !== true) {
+    throw new RuntimeError('agent_config_invalid');
+  }
   if (record['v'] !== 1) throw new RuntimeError('agent_config_invalid');
   // 06 §6: a recorded name that does not match is refused with a fixed error, never shown.
   if (!isAgentName(record['name'])) throw new RuntimeError('agent_name_invalid');
@@ -167,7 +204,14 @@ export function parseAgentConfig(text: string, expectedName: string): AgentConfi
   if (keyStore !== 'keychain' && keyStore !== 'file') {
     throw new RuntimeError('agent_config_invalid');
   }
-  return Object.freeze({ v: 1, name: expectedName, agentId: record['agentId'], keyStore });
+  return Object.freeze({
+    v: 1,
+    name: expectedName,
+    agentId: record['agentId'],
+    keyStore,
+    ...(typeof record['label'] === 'string' ? { label: record['label'] } : {}),
+    ...(record['removing'] === true ? { removing: true as const } : {}),
+  });
 }
 
 /**
@@ -266,12 +310,25 @@ export async function writeAgentConfig(
   if (config.keyStore !== 'keychain' && config.keyStore !== 'file') {
     throw new RuntimeError('agent_config_invalid');
   }
+  if (config.label !== undefined && !isAgentLabel(config.label)) {
+    throw new RuntimeError('agent_label_invalid');
+  }
+  if (config.removing !== undefined && config.removing !== true) {
+    throw new RuntimeError('agent_config_invalid');
+  }
   const uid = expectedUid(options);
   for (const dir of [paths.root, paths.agents, paths.dir]) await ensurePrivateDir(dir, uid);
   const dirReal = await checkContained(home, config.name);
   const target = join(dirReal, CONFIG_FILE);
 
-  const text = `${JSON.stringify({ v: 1, name: config.name, agentId: config.agentId, keyStore: config.keyStore })}\n`;
+  const text = `${JSON.stringify({
+    v: 1,
+    name: config.name,
+    agentId: config.agentId,
+    keyStore: config.keyStore,
+    ...(config.label === undefined ? {} : { label: config.label }),
+    ...(config.removing === true ? { removing: true } : {}),
+  })}\n`;
   const temp = join(dirReal, `.${CONFIG_FILE}.${encodeHex(randomBytes(8))}.tmp`);
   const handle = await open(
     temp,
@@ -323,4 +380,240 @@ export async function listAgentNames(home: string, options: OwnerCheck = {}): Pr
     .filter((entry) => entry.isDirectory() && isAgentName(entry.name))
     .map((entry) => entry.name)
     .sort();
+}
+
+// --- U3-c: the app host's AgentDirectory (D-138; 08 §1; 07 §9.1) ---------------------------------
+
+/** `~/.agentlink/app.json`: the agent the app opens first (07 §9.1). */
+export const APP_FILE = 'app.json';
+/** A valid app.json is about 50 bytes; anything larger is ignored unread. */
+const MAX_APP_FILE_BYTES = 256;
+/** The owner's revoked list (04 §2.5 "Removing an agent"; card U3-e writes and verifies it). */
+const REVOKED_DIR = 'revoked';
+
+/**
+ * Writes `label` into the agent's config.json (card U3-d calls this only after the server verified an
+ * `agent.label` owner action). Every other field stays; the folder name never changes.
+ */
+export async function writeAgentLabel(
+  home: string,
+  name: string,
+  label: string,
+  options: OwnerCheck = {},
+): Promise<void> {
+  if (!isAgentLabel(label)) throw new RuntimeError('agent_label_invalid');
+  const found = await readAgentConfig(home, name, options);
+  if (found === undefined) throw new RuntimeError('agent_config_invalid');
+  await writeAgentConfig(home, { ...found.config, label }, { ...options, replace: true });
+}
+
+/** Writes `removing: true` into the agent's config.json (card U3-e, before anything is deleted). */
+export async function markAgentRemoving(
+  home: string,
+  name: string,
+  options: OwnerCheck = {},
+): Promise<void> {
+  const found = await readAgentConfig(home, name, options);
+  if (found === undefined) throw new RuntimeError('agent_config_invalid');
+  await writeAgentConfig(home, { ...found.config, removing: true }, { ...options, replace: true });
+}
+
+/**
+ * Deletes an agent folder (card U3-e, its last step): after the folder rules (realpath, no links,
+ * regular private files), only the files AgentLink puts there are unlinked (store and WAL files, the
+ * locks, the free-credits marker, the config last), then the folder itself with a plain rmdir. There
+ * is no recursive delete: a folder that still holds anything else is refused (`agent_path_invalid`)
+ * and left as it is.
+ */
+export async function removeAgentFolder(
+  home: string,
+  name: string,
+  options: OwnerCheck = {},
+): Promise<void> {
+  const found = await readAgentConfig(home, name, options);
+  if (found === undefined) throw new RuntimeError('agent_config_invalid');
+  const uid = expectedUid(options);
+  const dir = found.paths.dir;
+  const files = [
+    ...STORE_FILES,
+    `${STORE_FILE}.lock`,
+    AGENT_OPEN_LOCK_FILE,
+    'free-credits.json',
+    CONFIG_FILE,
+  ];
+  // Anything else in the folder refuses the removal before a single file is deleted.
+  let present: string[];
+  try {
+    present = await readdir(dir);
+  } catch {
+    throw new RuntimeError('agent_path_invalid');
+  }
+  if (present.some((entry) => !files.includes(entry))) throw new RuntimeError('agent_path_invalid');
+  for (const file of files) {
+    const path = join(dir, file);
+    const info = await lstatOrMissing(path);
+    if (info === undefined) continue;
+    checkFileInfo(info, uid);
+    try {
+      await unlink(path);
+    } catch (error) {
+      if (!isMissing(error)) throw new RuntimeError('agent_path_invalid');
+    }
+  }
+  try {
+    await rmdir(dir);
+  } catch (error) {
+    if (!isMissing(error)) throw new RuntimeError('agent_path_invalid');
+  }
+}
+
+/** True when the owner's revoked list has an entry for `agentId` (presence only; U3-e verifies). */
+async function inRevokedList(home: string, agentId: string): Promise<boolean> {
+  // `agentId` passed assertAgentId in parseAgentConfig: `0x` + 40 hex, safe as a file name.
+  const info = await lstatOrMissing(join(home, '.agentlink', REVOKED_DIR, `${agentId}.json`));
+  // Anything at that name counts: a revoked agent must never open as usable (fail closed).
+  return info !== undefined;
+}
+
+/**
+ * The last used agent from `~/.agentlink/app.json`, or undefined. Not signed: it only picks which
+ * agent opens first. A link, a non-private file, a malformed or oversized file, or a name that fails
+ * the agent-name rule is ignored, never an error.
+ */
+export async function readAppCurrent(
+  home: string,
+  options: OwnerCheck = {},
+): Promise<string | undefined> {
+  const uid = expectedUid(options);
+  try {
+    const root = join(home, '.agentlink');
+    if ((await checkDir(root, uid)) === undefined) return undefined;
+    const path = join(root, APP_FILE);
+    const before = await lstatOrMissing(path);
+    if (before === undefined) return undefined;
+    checkFileInfo(before, uid);
+    const handle = await open(
+      path,
+      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0),
+    );
+    try {
+      const info = await handle.stat();
+      if (!info.isFile() || info.ino !== before.ino || info.dev !== before.dev) return undefined;
+      if (info.size > MAX_APP_FILE_BYTES) return undefined;
+      const buffer = Buffer.alloc(MAX_APP_FILE_BYTES + 1);
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+      if (bytesRead > MAX_APP_FILE_BYTES) return undefined;
+      const parsed: unknown = JSON.parse(
+        new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, bytesRead)),
+      );
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined;
+      const record = parsed as Record<string, unknown>;
+      if (Object.keys(record).sort().join(',') !== 'current,v' || record['v'] !== 1) {
+        return undefined;
+      }
+      return isAgentName(record['current']) ? record['current'] : undefined;
+    } finally {
+      await handle.close();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Writes `{"v":1,"current":<name>}` to `~/.agentlink/app.json` with mode 0600: a fresh temporary file
+ * (created exclusively, never following a link) renamed into place. Only the switch writes it.
+ */
+export async function writeAppCurrent(
+  home: string,
+  name: string,
+  options: OwnerCheck = {},
+): Promise<void> {
+  if (!isAgentName(name)) throw new RuntimeError('agent_name_invalid');
+  const uid = expectedUid(options);
+  const root = join(home, '.agentlink');
+  await ensurePrivateDir(root, uid);
+  const target = join(root, APP_FILE);
+  const existing = await lstatOrMissing(target);
+  if (existing !== undefined) checkFileInfo(existing, uid);
+  const temp = join(root, `.${APP_FILE}.${encodeHex(randomBytes(8))}.tmp`);
+  const handle = await open(
+    temp,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0),
+    FILE_MODE,
+  );
+  try {
+    if (POSIX) await handle.chmod(FILE_MODE);
+    await handle.writeFile(`${JSON.stringify({ v: 1, current: name })}\n`, 'utf8');
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  try {
+    await rename(temp, target);
+  } catch {
+    await unlink(temp).catch(() => undefined);
+    throw new RuntimeError('agent_path_invalid');
+  }
+}
+
+/** One agent folder as the app host lists it: never a path or an agent ID. */
+async function directoryEntry(
+  home: string,
+  name: string,
+  options: OwnerCheck,
+): Promise<AgentDirectoryEntry> {
+  try {
+    const found = await readAgentConfig(home, name, options);
+    if (found === undefined) {
+      return Object.freeze({ name, label: name, available: false, removing: false });
+    }
+    const { config } = found;
+    const removing = config.removing === true || (await inRevokedList(home, config.agentId));
+    return Object.freeze({ name, label: config.label ?? name, available: true, removing });
+  } catch {
+    // A folder that breaks the rules is still listed (never lost), and never opened.
+    return Object.freeze({ name, label: name, available: false, removing: false });
+  }
+}
+
+/**
+ * The node AgentDirectory seam over this file (U3-c; 08 §1), so the folder and name rules stay here.
+ * `now` (Unix seconds) is the clock of the Running check.
+ */
+export function agentDirectory(
+  home: string,
+  options: OwnerCheck & { readonly now?: () => number } = {},
+): AgentDirectory {
+  const now = options.now ?? ((): number => Math.floor(Date.now() / 1000));
+  const check: OwnerCheck = options.uid === undefined ? {} : { uid: options.uid };
+  return Object.freeze<AgentDirectory>({
+    list: async () => {
+      const names = await listAgentNames(home, check);
+      const entries: AgentDirectoryEntry[] = [];
+      for (const name of names) entries.push(await directoryEntry(home, name, check));
+      return Object.freeze(entries);
+    },
+    read: async (name) => {
+      if (!isAgentName(name)) return undefined;
+      const names = await listAgentNames(home, check);
+      if (!names.includes(name)) return undefined;
+      return directoryEntry(home, name, check);
+    },
+    stats: async (name) => {
+      if (!isAgentName(name)) return undefined;
+      try {
+        const found = await readAgentConfig(home, name, check);
+        if (found === undefined) return undefined;
+        return peekAgentStore(found.paths.store, now());
+      } catch {
+        return undefined;
+      }
+    },
+    writeLabel: (name, label) => writeAgentLabel(home, name, label, check),
+    markRemoving: (name) => markAgentRemoving(home, name, check),
+    removeFolder: (name) => removeAgentFolder(home, name, check),
+    readCurrent: () => readAppCurrent(home, check),
+    writeCurrent: (name) => writeAppCurrent(home, name, check),
+  });
 }

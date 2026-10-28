@@ -11,6 +11,11 @@
 // 6. the files platform (M1-9d-1, src/runtime/files.ts): the allowed-folder check of `path`
 //    arguments, the encrypted drop (D-48), the SSRF-safe download and the inbox folder.
 //
+// U3-c (06 §6 "Open agents and removal", D-138): right after the config is read, the process takes
+// the SHARED lock on the agent folder (@4thtech-io/node holdAgentFolderShared) and holds it until
+// `close()`, so removing the agent (card U3-e, which needs the lock exclusive) is refused with
+// `in_use` while any process has it open. The lock is released on every failure path too.
+//
 // I-1/I-4: the runtime holds only the agent's KeyStore interface; it never holds an owner key and
 // takes no owner presence. Owner commands (M1-9b) take presence themselves, through @4thtech-io/node.
 // I-7: errors carry fixed text only (RuntimeError, or @4thtech-io/node's own fixed messages).
@@ -29,7 +34,9 @@ import {
   nodeHostResolver,
   nodeNip11Fetcher,
   nodeRelayConnector,
+  holdAgentFolderShared,
   openAgentKeyStore,
+  type AgentFolderLock,
   openAgentStore,
   probeOsKeychain,
   selectKeyStoreBackend,
@@ -38,7 +45,7 @@ import {
   type KeychainProbe,
 } from '@4thtech-io/node';
 import { createLocalApprovalChannel, storeApprovalReader } from '../approval/local-channel.js';
-import { readAgentConfig, type AgentPaths } from './agent-dir.js';
+import { readAgentConfig, type AgentConfig, type AgentPaths } from './agent-dir.js';
 import { DEFAULT_AGENT_NAME, isAgentName } from './agent-name.js';
 import { NPX_PREFIX } from './cli-prefix.js';
 import { RuntimeError } from './errors.js';
@@ -148,6 +155,36 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
   const { config, paths } = found;
   const home = options.home ?? homedir();
 
+  // U3-c: the shared folder lock, held while the agent is open (06 §6).
+  let folderLock: AgentFolderLock;
+  try {
+    folderLock = holdAgentFolderShared(paths.dir);
+  } catch {
+    throw new RuntimeError('agent_open_failed');
+  }
+  try {
+    const result = await openLocked(deps, clock, logger, config, paths, home, folderLock);
+    // Nothing is open on `needs_setup`: the lock goes too.
+    if (result.status !== 'ok') folderLock.release();
+    return result;
+  } catch (error) {
+    folderLock.release();
+    throw error;
+  }
+}
+
+/** The rest of openAgent, with the shared folder lock held (released by the caller on failure). */
+async function openLocked(
+  deps: RuntimeDeps,
+  clock: () => number,
+  logger: Logger,
+  config: AgentConfig,
+  paths: AgentPaths,
+  home: string,
+  folderLock: AgentFolderLock,
+): Promise<OpenAgentResult> {
+  const name = config.name;
+
   if (config.keyStore === 'keychain') {
     const probe = await deps.probeKeychain();
     const selection = selectKeyStoreBackend(probe, { fileOptIn: false });
@@ -238,6 +275,8 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
         }
         await agentStore.close().catch(() => undefined);
         await keyStore.close().catch(() => undefined);
+        // U3-c: last, once the store and the KeyStore are closed.
+        folderLock.release();
       })();
       return closing;
     },

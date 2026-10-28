@@ -24,10 +24,18 @@ function seed(statuses: readonly string[], leaseUntil?: number): void {
   db.exec('CREATE TABLE contacts (contact_id TEXT PRIMARY KEY, status TEXT, name BLOB)');
   db.exec('CREATE TABLE publisher_lease (name TEXT PRIMARY KEY, holder TEXT, lease_until INTEGER)');
   statuses.forEach((status, i) => {
-    db.prepare('INSERT INTO contacts VALUES (?, ?, ?)').run(`c${String(i)}`, status, Buffer.from('x'));
+    db.prepare('INSERT INTO contacts VALUES (?, ?, ?)').run(
+      `c${String(i)}`,
+      status,
+      Buffer.from('x'),
+    );
   });
   if (leaseUntil !== undefined) {
-    db.prepare('INSERT INTO publisher_lease VALUES (?, ?, ?)').run('subscriptions', 'h', leaseUntil);
+    db.prepare('INSERT INTO publisher_lease VALUES (?, ?, ?)').run(
+      'subscriptions',
+      'h',
+      leaseUntil,
+    );
   }
   db.close();
 }

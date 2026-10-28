@@ -18,6 +18,8 @@ export type RuntimeErrorCode =
   | 'agent_exists'
   /** The agent's store or keys could not be opened. */
   | 'agent_open_failed'
+  /** U3-c (06 §6): an agent label breaks the label rule. */
+  | 'agent_label_invalid'
   /** An approval ID failed its exact pattern (04 §2.4.1). */
   | 'approval_id_invalid';
 
@@ -36,6 +38,8 @@ export const RUNTIME_MESSAGES: Readonly<Record<RuntimeErrorCode, string>> = Obje
   get agent_open_failed(): string {
     return `AgentLink couldn't open this agent on this machine. Run \`${commandPrefix()} doctor\` in your own terminal to see why.`;
   },
+  agent_label_invalid:
+    'Use letters, digits, spaces, dots, apostrophes and hyphens, up to 32 characters.',
   approval_id_invalid: "That approval ID isn't valid. Check it and try again.",
 });
 

@@ -46,7 +46,9 @@ function deps(
 
 describe('openUiHostAgent (U3-c)', () => {
   it('opens a listed agent with its label and without the app files', async () => {
-    const { deps: d, log } = deps([{ name: 'work', label: 'Work', available: true, removing: false }]);
+    const { deps: d, log } = deps([
+      { name: 'work', label: 'Work', available: true, removing: false },
+    ]);
     const agent = await openUiHostAgent(d, 'work');
     expect(agent?.name).toBe('work');
     expect(agent?.label).toBe('Work');
@@ -67,9 +69,12 @@ describe('openUiHostAgent (U3-c)', () => {
   });
 
   it('closes the agent again when the page wiring fails', async () => {
-    const { deps: d, log } = deps([{ name: 'work', label: 'Work', available: true, removing: false }], {
-      failWiring: true,
-    });
+    const { deps: d, log } = deps(
+      [{ name: 'work', label: 'Work', available: true, removing: false }],
+      {
+        failWiring: true,
+      },
+    );
     expect(await openUiHostAgent(d, 'work')).toBeUndefined();
     expect(log).toEqual(['open work', 'close work']);
   });

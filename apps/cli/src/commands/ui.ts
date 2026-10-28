@@ -11,6 +11,10 @@
 //   no link exists. Handing an agent the session link would let it use the page (G-1).
 // - Not an MCP tool: no tool returns or opens this page (I-4).
 //
+// U3-c (D-138, 08 §1): the served process is the app host. It starts with this agent and switches
+// between the owner's agents in the same process, port and session (ui-host.ts; node app-host.ts);
+// a switch signs nothing and takes no owner presence. Its server closes whichever agent is open.
+//
 // Threat note (G-1, D-67; 04 §2.5): the TTY and marker checks are UX guards, not a boundary; a
 // shell-capable agent as the same OS user could start the server itself. This step adds no route and
 // no authority: owner actions on the pages still need the owner's presence (passkey or code) and an
@@ -23,11 +27,13 @@ import { createUiApprovalSource } from '../approval/ui-source.js';
 import { EXIT_FAILED, EXIT_OK, type CommandContext, type CommandHandler } from '../dispatch.js';
 import { localUiOptions, logOwnerSetupEvent } from '../mcp/local-ui-wiring.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
-import { listAgentNames } from '../runtime/agent-dir.js';
+import { agentDirectory, listAgentNames } from '../runtime/agent-dir.js';
+import { DEFAULT_AGENT_NAME } from '../runtime/agent-name.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
 import { AGENT_CHOICE_TEXT, pickAgent, selectAgent } from './agent-choice.js';
 import { sharedLineReader } from './init.js';
 import { nodeOwnerDeps } from './owner/deps.js';
+import { openUiHostAgent, withoutAssets, type UiHostDeps } from './ui-host.js';
 
 /** How long `ui` serves the pages at most (proposed: 30 minutes, as for the first-run step). */
 export const UI_WAIT_MS = 30 * 60_000;
@@ -139,6 +145,10 @@ export function nodeUiDeps(): UiDeps {
     agents: () => listAgentNames(homedir()),
     readLine: sharedLineReader(),
     start: async (name) => {
+      // U3-c: the folders only through the AgentDirectory seam; a `removing` agent never opens.
+      const directory = agentDirectory(homedir());
+      const entry = await directory.read(name ?? DEFAULT_AGENT_NAME).catch(() => undefined);
+      if (entry?.removing === true) return undefined;
       const opened = await owner.open(name);
       if (opened.status !== 'ok') return undefined;
       const { agent } = opened;
@@ -155,9 +165,29 @@ export function nodeUiDeps(): UiDeps {
           { ...agent, close: () => Promise.resolve() },
           { now: () => Math.floor(Date.now() / 1000) },
         );
+        const now = (): number => Math.floor(Date.now() / 1000);
+        const hostDeps: UiHostDeps = {
+          owner,
+          directory,
+          localUi: (opened) => localUiOptions(opened),
+          now,
+        };
+        const initialUi = withoutAssets(localUi);
         const server = await startApprovalServer({
           source,
           localUi,
+          // U3-c: the app host; it owns the agent from here and closes whichever is open.
+          host: {
+            directory,
+            initial: {
+              name: agent.name,
+              label: entry?.label ?? agent.name,
+              source,
+              localUi: initialUi,
+              close: () => agent.close(),
+            },
+            open: (other) => openUiHostAgent(hostDeps, other),
+          },
           // Fixed values only (ApprovalServerEvent, I-7).
           onEvent: (event) => {
             logger.debug('approval ui event', { ...event });
