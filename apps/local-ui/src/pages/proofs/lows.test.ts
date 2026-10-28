@@ -137,6 +137,48 @@ describe('row keys', () => {
     expect(host.querySelectorAll('tbody .al-moment').length).toBe(1);
   });
 
+  it('a new proof landing in the same second does not give the moment to the wrong row', async () => {
+    const routes: Routes = {
+      '/api/ui/proofs?limit=20': { status: 'ok', items: [row(T, 'recording')] },
+      [CREDITS]: OK_CREDITS,
+      [TOP_UP]: {},
+    };
+    await mount(routes);
+    // A new, already finished proof lands at the top in the same second; the old one is still going.
+    routes['/api/ui/proofs?limit=20'] = {
+      status: 'ok',
+      items: [row(T, 'recorded'), row(T, 'recording')],
+    };
+    await tick(5_000);
+    expect(host.querySelectorAll('tbody .al-moment').length).toBe(0);
+    // Now the old one finishes: only its row (the second) plays the moment.
+    routes['/api/ui/proofs?limit=20'] = {
+      status: 'ok',
+      items: [row(T, 'recorded'), row(T, 'recorded')],
+    };
+    await tick(5_000);
+    const trs = [...host.querySelectorAll('tbody tr')];
+    expect(trs.map((tr) => tr.querySelector('.al-moment') !== null)).toEqual([false, true]);
+  });
+
+  it('an existing row keeps its DOM node when a new row lands in the same second', async () => {
+    const routes: Routes = {
+      '/api/ui/proofs?limit=20': { status: 'ok', items: [row(T, 'recording')] },
+      [CREDITS]: OK_CREDITS,
+      [TOP_UP]: {},
+    };
+    await mount(routes);
+    const before = host.querySelector('tbody tr');
+    routes['/api/ui/proofs?limit=20'] = {
+      status: 'ok',
+      items: [row(T, 'recorded'), row(T, 'recording')],
+    };
+    await tick(5_000);
+    const trs = host.querySelectorAll('tbody tr');
+    expect(trs.length).toBe(2);
+    expect(trs[1]).toBe(before);
+  });
+
   it('renders rows in one second without a duplicate-key warning', async () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await mount({
