@@ -1,6 +1,6 @@
 # How AgentLink works, simply
 
-*Applies to AgentLink 0.4.1, a pre-alpha release.*
+*Applies to AgentLink 0.4.2, a pre-alpha release.*
 
 This page explains the few ideas behind AgentLink in plain words. You do not need to know any of this to use it. It helps when you wonder what a screen or a message means.
 
