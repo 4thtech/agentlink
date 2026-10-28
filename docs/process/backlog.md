@@ -4979,7 +4979,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Invariants:** I-5
 - **Scope:** low-severity robustness findings from the independent review of UI-REFRESH-e3 (#619). The cases are described in the tests, not in the PR text.
   - (a) The `id` kind check treats values built from several parts more strictly, so a value under the usual length limit is judged the same way as a single piece.
-  - (b) The rule that looks at split values is revisited (for example by comparing the number of parts with the total length) revisit the split-value rule without refusing normal text.
+  - (b) The rule that looks at split values is revisited (for example by comparing the number of parts with the total length), without refusing normal text.
   - (c) The label list that decides which rows are treated as sensitive is completed with the missing terms from the spec (salt, private, recovery and mnemonic wording).
   - (d) Look-alike spellings of those labels are handled the same as the plain ones.
 - **Acceptance:**
