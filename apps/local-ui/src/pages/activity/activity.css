@@ -13,28 +13,8 @@
 .al-activity-asof {
   margin-inline-start: auto;
 }
-.al-activity-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-2);
+.al-activity-filter {
   margin: var(--al-space-5) 0;
-}
-.al-activity-chip {
-  min-height: var(--al-size-control-md);
-  padding: 0 var(--al-space-4);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  border-radius: var(--al-radius-full);
-  background: var(--al-color-bg-surface);
-  color: var(--al-color-fg-default);
-  cursor: pointer;
-}
-.al-activity-chip[aria-pressed='true'] {
-  border-color: var(--al-color-accent-default);
-  background: var(--al-color-accent-subtle);
-}
-.al-activity-chip:focus-visible {
-  outline: var(--al-border-width-thick) solid var(--al-color-focus-ring);
-  outline-offset: var(--al-space-1);
 }
 /* The stage keeps its place while the list inside it is swapped and fades in. */
 .al-activity-stage {

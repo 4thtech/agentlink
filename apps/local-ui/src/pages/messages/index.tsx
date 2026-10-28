@@ -267,6 +267,9 @@ function Conversation_({
       </div>
       <Segmented
         label={S.boxLabel}
+        variant="tabs"
+        idPrefix="ms"
+        panelId="ms-panel"
         value={box}
         onChange={(v) => setBox(v === 'out' ? 'out' : 'in')}
         options={[
@@ -274,38 +277,40 @@ function Conversation_({
           { value: 'out', label: S.sent },
         ]}
       />
-      <p className="al-text-body-sm al-muted" role="status">
-        {note}
-      </p>
-      {detail.state === 'loading' ? (
-        <Skeleton loading label={S.loading} lines={3} />
-      ) : detail.state === 'failed' ? (
-        <ProblemView problem={detail.problem} onRetry={() => void load()} />
-      ) : detail.items.length === 0 && detail.next === undefined ? (
-        <EmptyState icon="inbox" title={S.nothingYet(contact.name)} />
-      ) : (
-        <>
-          <ul className="ms-items" aria-label={box === 'in' ? S.inbox : S.sent}>
-            {detail.items.map((item) => (
-              <Message key={item.id} item={item} who={who} onCopy={copy} />
-            ))}
-          </ul>
-          {detail.more !== 'idle' && detail.more !== 'loading' ? (
-            <ProblemView problem={detail.more} onRetry={() => void more(detail)} />
-          ) : null}
-          {detail.next !== undefined ? (
-            <div className="ms-more">
-              <Button
-                onClick={() => void more(detail)}
-                disabled={detail.more === 'loading'}
-                aria-busy={detail.more === 'loading'}
-              >
-                {detail.more === 'loading' ? S.loadingMore : S.showMore}
-              </Button>
-            </div>
-          ) : null}
-        </>
-      )}
+      <div id="ms-panel" role="tabpanel" aria-labelledby={`ms-tab-${box}`}>
+        <p className="al-text-body-sm al-muted" role="status">
+          {note}
+        </p>
+        {detail.state === 'loading' ? (
+          <Skeleton loading label={S.loading} lines={3} />
+        ) : detail.state === 'failed' ? (
+          <ProblemView problem={detail.problem} onRetry={() => void load()} />
+        ) : detail.items.length === 0 && detail.next === undefined ? (
+          <EmptyState icon="inbox" title={S.nothingYet(contact.name)} />
+        ) : (
+          <>
+            <ul className="ms-items" aria-label={box === 'in' ? S.inbox : S.sent}>
+              {detail.items.map((item) => (
+                <Message key={item.id} item={item} who={who} onCopy={copy} />
+              ))}
+            </ul>
+            {detail.more !== 'idle' && detail.more !== 'loading' ? (
+              <ProblemView problem={detail.more} onRetry={() => void more(detail)} />
+            ) : null}
+            {detail.next !== undefined ? (
+              <div className="ms-more">
+                <Button
+                  onClick={() => void more(detail)}
+                  disabled={detail.more === 'loading'}
+                  aria-busy={detail.more === 'loading'}
+                >
+                  {detail.more === 'loading' ? S.loadingMore : S.showMore}
+                </Button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
       <p className="ms-footer al-text-body-sm">{S.reply}</p>
     </section>
   );

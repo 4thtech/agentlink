@@ -14,10 +14,10 @@ import { ActivityPage } from './activity/index.js';
 import { ACTIVITY_STRINGS as A } from './activity/strings.js';
 import { AppearancePage } from './appearance/index.js';
 import { APPEARANCE_STRINGS as P } from './appearance/strings.js';
-import { FilesPage } from './files/index.js';
+import { FilesPage, type FilesPageProps } from './files/index.js';
 import { MessagesPage } from './messages/index.js';
 import { MESSAGES_STRINGS as M } from './messages/strings.js';
-import { RulesPage } from './rules/index.js';
+import { RulesPage, type RulesPageProps } from './rules/index.js';
 import { createOwnerClient } from './rules/owner.js';
 import { RULES_STRINGS as R } from './rules/strings.js';
 
@@ -139,7 +139,9 @@ describe('Files: Received / Sent / Send folders', () => {
   }) as typeof fetch;
   const mount = async (): Promise<void> => {
     await act(async () => {
-      root.render(h(FilesPage, { fetch: fetchFn, token: 'tok', initialTab: 'received' }));
+      root.render(
+        h<FilesPageProps>(FilesPage, { fetch: fetchFn, token: 'tok', initialTab: 'received' }),
+      );
     });
     await flush();
   };
@@ -294,7 +296,7 @@ describe('Rules: "Unsaved" beside draft switches (b11 §22.5)', () => {
     const api = createApiClient({ fetch: fetchFn, token: 't' });
     const owner = createOwnerClient({ fetch: fetchFn, token: 't' });
     const payConfirm = createPayConfirmClient({ fetch: fetchFn, token: 't' });
-    act(() => root.render(h(RulesPage, { api, owner, payConfirm })));
+    act(() => root.render(h<RulesPageProps>(RulesPage, { api, owner, payConfirm })));
     await flush();
     const more = host.querySelector<HTMLButtonElement>('button[aria-controls="rules-more"]');
     if (more?.getAttribute('aria-expanded') !== 'true') await click(more);
