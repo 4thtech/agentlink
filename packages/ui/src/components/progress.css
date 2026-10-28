@@ -283,7 +283,7 @@
   }
 }
 .al-waiting-mark.is-resting .al-waiting-diamond {
-  animation-iteration-count: 1;
+  animation: none;
 }
 .al-waiting-mark[data-paused='true'] .al-waiting-diamond {
   animation-play-state: paused;

@@ -91,11 +91,50 @@ describe('WaitingMark component', () => {
     expect(ink.getAttribute('class') ?? '').not.toContain('waiting');
     expect(host.querySelectorAll('.al-waiting-diamond')).toHaveLength(1);
   });
-  it('rests (finishes its turn and stops) when not active', () => {
+  const diamond = (): Element => svg().querySelector('.al-waiting-diamond') as Element;
+  const iterate = (): void =>
+    act(() => {
+      // jsdom has no AnimationEvent, so React listens to the prefixed name there; browsers fire the
+      // unprefixed one. Dispatch both.
+      for (const name of ['animationiteration', 'webkitAnimationIteration']) {
+        diamond().dispatchEvent(new Event(name, { bubbles: true }));
+      }
+    });
+  it('keeps turning after active goes false, and rests only at the next cycle boundary', () => {
     render();
+    render({ active: false });
     expect(svg().getAttribute('class')).not.toContain('is-resting');
+    iterate();
+    expect(svg().getAttribute('class')).toContain('is-resting');
+  });
+  it('ignores cycle boundaries while still active', () => {
+    render();
+    iterate();
+    iterate();
+    expect(svg().getAttribute('class')).not.toContain('is-resting');
+  });
+  it('rests at once when mounted inactive, and when paused while inactive', () => {
     render({ active: false });
     expect(svg().getAttribute('class')).toContain('is-resting');
+    render({ active: true });
+    expect(svg().getAttribute('class')).not.toContain('is-resting');
+    render({ active: false, paused: true });
+    expect(svg().getAttribute('class')).toContain('is-resting');
+  });
+  it('rests at once under reduced motion when inactive', () => {
+    document.documentElement.setAttribute('data-motion', 'reduced');
+    try {
+      render();
+      render({ active: false });
+      expect(svg().getAttribute('class')).toContain('is-resting');
+    } finally {
+      document.documentElement.removeAttribute('data-motion');
+    }
+  });
+  it('turns again when active returns', () => {
+    render({ active: false });
+    render({ active: true });
+    expect(svg().getAttribute('class')).not.toContain('is-resting');
   });
   it('has no inline style anywhere (08 §4)', () => {
     render();
@@ -145,10 +184,10 @@ describe('waiting mark styles (progress.css)', () => {
     expect(blocks.length).toBeGreaterThan(0);
     for (const b of blocks) expect(b).not.toMatch(/al-mark-ink/);
   });
-  it('rests after one cycle when not active', () => {
-    expect(rule('.al-waiting-mark.is-resting .al-waiting-diamond')).toMatch(
-      /animation-iteration-count:\s*1/,
-    );
+  it('stops the turn outright once resting (the cycle boundary is the rest pose)', () => {
+    const r = rule('.al-waiting-mark.is-resting .al-waiting-diamond');
+    expect(r).toMatch(/animation:\s*none/);
+    expect(r).not.toMatch(/iteration-count/);
   });
   it('is still under prefers-reduced-motion and the app reduced-motion switch', () => {
     const media =
