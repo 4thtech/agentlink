@@ -5031,7 +5031,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Both sections merged and approved by the owner before UX2-a and UX2-b start; they use only existing components and tokens.
 
 #### UX2-a · local-ui: Approvals responsive grid and Grid/List control (new, 0.4.2, UX-WAVE-2 item 7)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**` (including `approvals.css`), tests
 - **Depends on:** UX2-brief-0
 - **Spec:** B-11 §26; UX-WAVE-2 §9.1; 08 §1
@@ -5077,7 +5077,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Owner approves each section; sections follow 11 §5 words (no wallet, gas or transaction words); the brand exception is written once and used in one place.
 
 #### UX2-d1 · node: local API routes to create and accept an invite (new, UX-WAVE-2 item 1, decision 1.1)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/**` (new routes `POST /api/ui/invites`, `POST /api/ui/invites/accept`, `route-types.ts`), tests; changeset; 08 §1 and 06 §7.1 edits marked "proposed, owner confirms at merge"
 - **Depends on:** —
 - **Spec:** 04 §3.6, §3.6.1, §4; 06 §2.1, §7.1; 08 §1; D-69
@@ -5113,7 +5113,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit); the brackets never move; reduced-motion still; the component is used in no other loading state; axe tests; no test weakened.
 
 #### UX2-e2 · local-ui: Add credits three-step tracker (new, UX-WAVE-2 item 3)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (money path, owner presence) · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/top-up.tsx` and its tests
 - **Depends on:** UX2-e1; B-11 §23
 - **Spec:** B-11 §15.3, §23; 04 §2.5.1; D-122, D-123; UX-WAVE-2 §5
@@ -5186,7 +5186,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
 Low-severity findings from the independent reviews of #619, #620, #616, #627, #628, #629 and #630. Phrased neutrally on this public repo: the cases live in the tests.
 
 #### CHORE-LOCALUI-EMBED-NONEMPTY · release-time check that the CLI's embedded local-ui bundle is not empty (new, low, from the refresh follow-ups)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (CI and supply chain; sensitive path if `.github/**` changes, then the owner's "merge") · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (CI and supply chain; sensitive path if `.github/**` changes, then the owner's "merge") · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/test/local-ui-embed.test.ts`, the release/pack workflow step or script that builds the CLI (`.github/**` if needed), tests
 - **Depends on:** —
 - **Spec:** release-and-deployment; 08 §1
@@ -8065,7 +8065,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 
 ### Business agents (BIZ, Decision 20, 0.5.0)
 
-Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions). Part of the 0.5.0 milestone with the cloud agent (D-131, D-135); the business slice ships behind a pilot switch. **Owner decisions 1–10 and 12 accepted by Tali, 2026-10-28 (every recommended option):** 1.1 the company hosts the business agent in its own Cloudflare account (4thTech hosts no keys); 2.1 one tool surface (remote MCP) plus invokers, 15-minute token per conversation; 3.1 Claude invoker for the pilot, then OpenAI, then webhook and A2A; 4.1 0.5.0 carries the foundations behind a pilot switch, general availability in 0.5.x; 5.1 monthly Business plan, proofs at the standard fee paid by the company, users free; 6.1 pilot free, billing when D-111 and D-15 exist; 7.1 only answers inside a conversation the person started, for 14 days after their last message; 8.1 verified domain required; 9.1 keep 60-second sync and measure; 10.1 invoker-driven answers in business mode only (amends 08 §3.4); 12.1 invoker grants at most 30 days (D-131 (m)). **Open: decision 11, the pilot company, to be named by the owner** (one travel or booking company). **Fable audits (keys, owner presence, money), per the proposal §9:** BIZ-b, BIZ-e and BIZ-m (named in the card owner's request), plus BIZ-a, BIZ-f and BIZ-j, which the proposal also marks; BIZ-AUDIT is the independent Fable audit of the whole slice. Order: BIZ-0 alongside M2-3b and M2-3c; BIZ-SPEC → BIZ-a, BIZ-b, BIZ-e in parallel → BIZ-d → BIZ-f → BIZ-g and BIZ-j → BIZ-c, BIZ-k, BIZ-l → BIZ-AUDIT → BIZ-PILOT. BIZ-h, BIZ-i and BIZ-m may follow in 0.5.x. Nothing here blocks the person-facing 0.5.0 cloud release.
+Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions). Part of the 0.5.0 milestone with the cloud agent (D-131, D-135); the business slice ships behind a pilot switch. **Owner decisions 1–10 and 12 accepted by Tali, 2026-10-28 (every recommended option):** 1.1 the company hosts the business agent in its own Cloudflare account (4thTech hosts no keys); 2.1 one tool surface (remote MCP) plus invokers, 15-minute token per conversation; 3.1 Claude invoker for the pilot, then OpenAI, then webhook and A2A; 4.1 0.5.0 carries the foundations behind a pilot switch, general availability in 0.5.x; 5.1 monthly Business plan, proofs at the standard fee paid by the company, users free; 6.1 pilot free, billing when D-111 and D-15 exist; 7.1 only answers inside a conversation the person started, for 14 days after their last message; 8.1 verified domain required; 9.1 keep 60-second sync and measure; 10.1 invoker-driven answers in business mode only (amends 08 §3.4); 12.1 invoker grants at most 30 days (D-131 (m)). **Open: decision 11, the pilot company, to be named by the owner** (one travel or booking company). **Fable audits (`Audit: Fable` field; keys, owner presence, money), per the proposal §9:** BIZ-b, BIZ-e and BIZ-m (named in the card owner's request), plus BIZ-a, BIZ-f and BIZ-j, which the proposal also marks; BIZ-AUDIT is the independent Fable audit of the whole slice. Order: BIZ-0 alongside M2-3b and M2-3c; BIZ-SPEC → BIZ-a, BIZ-b, BIZ-e in parallel → BIZ-d → BIZ-f → BIZ-g and BIZ-j → BIZ-c, BIZ-k, BIZ-l → BIZ-AUDIT → BIZ-PILOT. BIZ-h, BIZ-i and BIZ-m may follow in 0.5.x. Nothing here blocks the person-facing 0.5.0 cloud release.
 
 #### BIZ-0 · spikes for business agents (new, 0.5.0 business agents)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S0 (spike notes)
@@ -8090,7 +8090,7 @@ Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions).
   - Independent review; the owner confirms the proposed details at merge; D-136 is numbered at merge (see the open item in the cards PR).
 
 #### BIZ-a · business link v2: codec, pairing at the inviter, limits and link ops (new, 0.5.0 business agents)
-- **Status:** backlog · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2, Fable
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
 - **Repo/path:** agentlink · `packages/core/src/pairing.ts` and neighbours, vectors, tests; changeset
 - **Depends on:** BIZ-SPEC, M1-7c
 - **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §3.6; 04 §2.5.1, §3.6
@@ -8101,7 +8101,7 @@ Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions).
   - Tests first (RED commit); new vectors; owner presence on `link.create`/`link.revoke`; full threat note; Fable audit; owner "merge".
 
 #### BIZ-b · domain claim: sign, verify at accept, pause on lapse (covers the core of M2-12) (new, 0.5.0 business agents)
-- **Status:** backlog · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2, Fable
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
 - **Repo/path:** agentlink · `packages/core/**` (`DomainClaim`), `packages/node/**` (DoH and SSRF-safe fetch), tests; changeset
 - **Depends on:** BIZ-SPEC, M1-15
 - **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §4.2, §6; 04 §2.7, §4
@@ -8134,7 +8134,7 @@ Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions).
   - Tests first (RED commit); limits enforced; pause stops answers; full threat note; independent review; owner "merge".
 
 #### BIZ-e · policy: per-link rule for accepts and firm offers, and answer-only-in-person-started-conversations (new, 0.5.0 business agents)
-- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2, Fable (money, owner presence)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (money, owner presence) · **Audit:** Fable
 - **Repo/path:** agentlink · `packages/core/**` policy code, tests; changeset
 - **Depends on:** BIZ-SPEC
 - **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §3, §6; 06 §3; D-132
@@ -8145,7 +8145,7 @@ Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions).
   - Tests first (RED commit); caps cannot be exceeded; buy-side never auto-agreed; a message outside a person-started conversation is refused; full threat note; Fable audit; owner "merge".
 
 #### BIZ-f · invoker framework: queue, retries, fixed wake-up text, per-conversation token, grants (new, 0.5.0 business agents)
-- **Status:** backlog · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2, Fable
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
 - **Repo/path:** agentlink · `apps/cloud-agent/**`, `packages/mcp-tools/**` (token scope), tests; changeset
 - **Depends on:** M2-3b, M2-3c, BIZ-d
 - **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5, §6; D-131 (m)
@@ -8200,7 +8200,7 @@ Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions).
   - Owner approves; vocabulary per 11 §5 (no wallet, gas or transaction words; no "official" or "verified company").
 
 #### BIZ-j · setup wizard on the Worker origin, with the test conversation (new, 0.5.0 business agents)
-- **Status:** backlog · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2, Fable
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
 - **Repo/path:** agentlink · `apps/cloud-agent/**` (wizard), tests
 - **Depends on:** M2-3f-1, BIZ-b, BIZ-f, BIZ-DESIGN
 - **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5.4; 08 §3
@@ -8222,7 +8222,7 @@ Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions).
   - Tests first (RED commit); counts only, no message text; axe and vocabulary lint; independent review; owner "merge".
 
 #### BIZ-l · person side: business badge and label, approval-card domain line, checkout-link host line, local app and CLI copy (new, 0.5.0 business agents)
-- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S1 (S2 where `packages/core`)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (approval-card domain line, anti-impersonation badge)
 - **Repo/path:** agentlink · `apps/local-ui/**`, `packages/ui/**`, `apps/cli/**`, `packages/core/**` (only where needed), tests; changeset
 - **Depends on:** BIZ-b, BIZ-e
 - **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §3, §6; 11 §5
@@ -8230,10 +8230,10 @@ Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions).
 - **Scope:**
   - "Business" label and badge, the approval card's domain line, the checkout-link host line, the vendor note, local app and CLI copy. No "official" or "verified company".
 - **Acceptance:**
-  - Tests first (RED commit); a contact name or alias cannot imitate the badge; vocabulary lint and axe tests; independent review (S2 on core paths).
+  - Tests first (RED commit); a contact name or alias cannot imitate the badge; vocabulary lint and axe tests; independent review (S2).
 
 #### BIZ-m · Business plan: quotas on relay and drop for a business key, directory entitlement, billing hook (new, 0.5.0 business agents)
-- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2, Fable (money)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (money) · **Audit:** Fable
 - **Repo/path:** agentlink · `apps/drop/**`, `apps/submitter/**` as needed, tests; changeset
 - **Depends on:** decisions 5.1 and 6.1; D-111 for the billing hook
 - **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §7; 12
