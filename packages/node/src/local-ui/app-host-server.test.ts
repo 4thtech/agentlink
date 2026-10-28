@@ -780,3 +780,102 @@ describe('a switch shows the other agent’s own contacts and messages (U3-c)', 
     expect(after).not.toContain(ANNA);
   });
 });
+
+// U3-c, IR-U3-c-SEC-1 L-1: a handler that outlives the switch's drain wait keeps the context it was
+// given. Its owner context and apply stay bound to the agent it started with; it never reaches the
+// agent opened after the switch.
+describe('a late handler after a switch cannot reach the new agent (U3-c, L-1)', () => {
+  it('ownerContext and applyOwnerAction stay bound to the agent the handler started with', async () => {
+    const world = agents();
+    const reached: string[] = [];
+    const bound = (name: string): AppHostAgent => {
+      const base = world.agent(name);
+      return {
+        ...base,
+        source: {
+          ...base.source,
+          context: () => {
+            reached.push(`context ${name}`);
+            return Promise.resolve(undefined);
+          },
+          apply: () => {
+            reached.push(`apply ${name}`);
+            return Promise.reject(new Error('refused in this test'));
+          },
+        },
+      };
+    };
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let finished: () => void = () => undefined;
+    const handlerDone = new Promise<void>((resolve) => {
+      finished = resolve;
+    });
+    const routes = new LocalUiRouteRegistry();
+    routes.register(agentsSwitchRoute);
+    routes.register({
+      method: 'GET',
+      path: '/api/ui/late',
+      presence: false,
+      handler: async (context) => {
+        await gate;
+        await context.ownerContext();
+        await context.applyOwnerAction({ body: {}, sig: '' } as never).catch(() => undefined);
+        finished();
+        return { status: 200, body: { ok: true } };
+      },
+    } as LocalUiRoute);
+    const opened: string[] = [];
+    const server = await startApprovalServerWith(
+      {
+        source: bound('default').source,
+        localUi: { assets: bundle() },
+        host: {
+          directory: world.directory,
+          initial: bound('default'),
+          open: (name) => Promise.resolve(bound(name)),
+        },
+      },
+      {
+        routes,
+        opener: (url) => {
+          opened.push(url);
+          return Promise.resolve(true);
+        },
+        notifier: () => Promise.resolve(true),
+      },
+    );
+    servers.push(server);
+    const port = server.port;
+    await server.open();
+    const t = new URL(opened[0] ?? '').searchParams.get('t') ?? '';
+    const cookie =
+      ((await send(port, `/?t=${t}`)).headers['set-cookie']?.[0] ?? '').split(';')[0] ?? '';
+    const page = await send(port, '/', { headers: { Cookie: cookie } });
+    const csrf =
+      /<meta name="agentlink-csrf" content="([A-Za-z0-9_-]+)">/.exec(page.body)?.[1] ?? '';
+    const late = send(port, '/api/ui/late', {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
+    });
+    await sleep(30);
+    // The switch waits for the handler at most SWITCH_DRAIN_MS, then opens the other agent anyway.
+    const switched = await send(port, '/api/ui/agents/switch', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: server.origin,
+        'X-AgentLink-CSRF': csrf,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: json({ name: 'work', generation: 1 }),
+    });
+    expect(switched.status).toBe(200);
+    // Now the late handler goes on: it must never reach the agent opened after it started.
+    release();
+    await handlerDone;
+    await late;
+    expect(reached).toEqual(['context default', 'apply default']);
+  }, 30_000);
+});
