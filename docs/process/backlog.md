@@ -5009,7 +5009,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Initial JS gz measured and recorded; a test that the first load does not include the lazy chunks; a failed chunk load shows a plain retry message; axe and reduced-motion tests unchanged; no test weakened.
 
 #### CHORE-GASLESS-NONCE-TIMEOUT · chain: gasless nonce uniqueness test hit the 60 s timeout (new, flake 2026-10-27, #607 push run)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (content rule: touches nonces; path `packages/chain/**` is S1)
+- **Status:** in review · **Size:** XS · **Tier:** Opus · **Security:** S2 (content rule: touches nonces; path `packages/chain/**` is S1)
 - **Repo/path:** agentlink · `packages/chain/src/fees/gasless.test.ts` (tests only, no product code)
 - **Depends on:** —
 - **Scope:** Seen 2026-10-27 about 19:08Z on the push run of #607: "draws a fresh 32-byte nonce every time (1 000 builds)" hit the 60 s test timeout. Measure where the time goes, then make the test faster or give it a measured per-test timeout under the test timeout policy (`repo-reference.md`, M0-10e). No retries; never lower a timeout.
