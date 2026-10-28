@@ -463,7 +463,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§4, §9.1) and the owner's decis
 | Settings › Appearance | Theme (System / Light / Dark), Motion (System / On / Off) | Segmented (unchanged) | Three values |
 | Settings › Appearance | Transparency (System / Reduce) | **Stays segmented** | On a switch, "Off" would read as "never reduce", which is not what System means |
 | Settings › Appearance | Under the hood | Switch (unchanged) | |
-| Approval card (`/approve`) | Keep delivery receipts | Switch (unchanged) | The only receipt setting in the app today; notification settings get a switch when they exist |
+| Rules, "Before you save" confirm step | Keep delivery receipts | Switch (unchanged) | The only receipt setting in the app today; notification settings get a switch when they exist |
 | Messages | Inbox / Sent | Segmented look, **tab** semantics | Today a radiogroup; it swaps the conversation panel |
 | Files | Received / Sent / Send folders | Segmented look, tab semantics (role unchanged) | Replaces today's `fl-tabs` look; the count badges (`CountBadge`) stay inside each option |
 | Activity | All / Approvals / Proofs / Other | Segmented, radiogroup | Today four `aria-pressed` chips; exactly one is always chosen, so a radiogroup is the honest role |
@@ -514,7 +514,7 @@ Switch (today, unchanged)              Segmented (proposed restyle)
 | Reduced motion | No slide: knob and word change at once (the global `transition: none` rule) | The thumb jumps; the check icon and the label carry the choice |
 | Forced colours, increased contrast | 1 px `CanvasText` border (today's rule); the On/Off word carries the state | The same border; the chosen option keeps its check icon, so it never relies on the tint |
 
-Never colour alone: the switch has its On/Off word, the segmented control its check icon. No new strings beyond the option labels already in each page's `strings.ts` (11 §5).
+Never colour alone: the switch has its On/Off word, the segmented control its check icon. New strings: **"Unsaved"** (§22.5), **"Layout"**, **"Grid"** and **"List"** (§26.2). They are plain words that follow 11 §5, with none of its banned terms. Every other label already exists in its page's `strings.ts`.
 
 ### 22.5 Switches that need owner presence (Rules)
 
@@ -530,6 +530,7 @@ A switch in Rules edits the **draft**, never the rules in force. While a switch 
 - **List view:** today's layout exactly: one column, at most 480 px.
 - Everything that is not a card (title and lede, owner panel, notices, "Waiting for you ({count})", "{n} more waiting", the Review bar and the Review step) keeps today's 480 px measure, aligned left, above or below the grid. The Review button never stretches across the window.
 - Cards keep their content and order (soonest expiry first). A card's height follows its content; cards in one row align to the top.
+- **Narrower Grid cards never truncate, ellipsize, line-clamp or hide any fact; text wraps.** What the owner approves is exactly what the card shows.
 
 **Columns.** The sidebar is `--al-layout-sidebar-width` (232 px) and the content padding `--al-space-6` (20 px) each side; at 600 px and under, the sidebar becomes the bottom bar and the padding is `--al-space-4` (12 px).
 
