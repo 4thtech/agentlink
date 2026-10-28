@@ -4,7 +4,7 @@
 // UI-REFRESH-f: a top bar with the page title and the global controls; the preferences reach every
 // page through PrefsHood (the Under the hood switch).
 import { AppShell, type NavItem } from '@4thtech-io/ui';
-import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react';
 import { NAV_ITEMS, SETTINGS_LABEL, SETTINGS_PAGES } from '../nav.js';
 import { PrefsHood } from '../prefs/index.js';
 import { PAGE_TITLES, SHELL_STRINGS } from '../strings.js';
@@ -120,6 +120,15 @@ export async function needsPasskeySwitch(): Promise<boolean> {
 
 const FIRST_RUN_PATH = '/first-run';
 
+/** UI-REFRESH-t: the first Tab stop. Focus goes to the page content (it is made focusable here). */
+function skipToContent(event: MouseEvent<HTMLAnchorElement>): void {
+  const main = document.querySelector<HTMLElement>('main.al-shell-content');
+  if (main === null) return;
+  event.preventDefault();
+  main.setAttribute('tabindex', '-1');
+  main.focus();
+}
+
 export interface LayoutProps {
   readonly path: string;
   readonly children?: ReactNode;
@@ -175,6 +184,9 @@ export function Layout({
   }));
   return (
     <PrefsHood>
+      <a href="#al-main" className="al-skip al-text-body-sm" onClick={skipToContent}>
+        {SHELL_STRINGS.skipToContent}
+      </a>
       <AppShell
         nav={nav}
         pageTitle={pageTitleOf(path)}

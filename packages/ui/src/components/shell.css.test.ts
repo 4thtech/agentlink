@@ -117,9 +117,14 @@ describe('360 px: the sidebar becomes the bottom bar', () => {
 });
 
 describe('route transition (View Transitions)', () => {
-  it('fades the page in with a 4 px rise over --al-duration-fast, content only', () => {
+  it('fades the page in with a 4 px rise over --al-duration-fast, page only', () => {
     const t = squash(chrome);
-    expect(t).toMatch(/\.al-shell-content \{[^}]*view-transition-name: al-page/);
+    // UI-REFRESH-t: the named part is the viewport-sized body (top bar and page). The document is
+    // not named and neither is the content box (as tall as a 200-row list): the browser keeps two
+    // pictures of every named part, and those were the dropped frames of the route changes.
+    expect(t).toMatch(/\.al-shell-body \{[^}]*view-transition-name: al-page/);
+    expect(t).toMatch(/:root \{[^}]*view-transition-name: none/);
+    expect(t).not.toMatch(/\.al-shell-content \{[^}]*view-transition-name: [^n]/);
     expect(t).toMatch(
       /::view-transition-new\(al-page\) \{[^}]*animation: [^;]*var\(--al-duration-fast\)/,
     );

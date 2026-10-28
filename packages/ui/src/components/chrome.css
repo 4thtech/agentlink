@@ -115,8 +115,15 @@
 }
 
 /* Route change: only the page fades in with a 4 px rise; the chrome does not flash. The browser
-   draws these only where View Transitions exist, and the app never starts one with reduced motion. */
-.al-shell-content {
+   draws these only where View Transitions exist, and the app never starts one with reduced motion.
+   UI-REFRESH-t: the browser keeps two pictures for each named part. Naming the whole document, or
+   the content box (as tall as a 200-row list), made every route change paint pictures of pixels
+   nobody sees and dropped 3 to 5 frames at 4x CPU. Now only the viewport-sized body (top bar and
+   page) is named; the sidebar and status bar stay live. */
+:root {
+  view-transition-name: none;
+}
+.al-shell-body {
   view-transition-name: al-page;
 }
 @keyframes al-page-in {

@@ -135,7 +135,9 @@ export function AppShell({
               <div className="al-topbar-end">{topBarEnd}</div>
             </header>
           )}
-          <main className="al-shell-content">{children}</main>
+          <main className="al-shell-content" id="al-main">
+            {children}
+          </main>
         </div>
       </div>
       <footer className="al-statusbar al-chrome al-text-code">

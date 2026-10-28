@@ -3,6 +3,7 @@
 export const SHELL_STRINGS = {
   appName: 'AgentLink',
   navLabel: 'Main',
+  skipToContent: 'Skip to content',
   notAvailableTitle: "This page isn't available yet.",
   notAvailableHint: 'It arrives in an update. Nothing is lost while you wait.',
   notFoundTitle: "This page isn't here.",

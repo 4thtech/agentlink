@@ -194,6 +194,8 @@ export interface SegmentedOption {
 
 export interface SegmentedProps {
   label: string;
+  /** The id of a visible label for the group. The group keeps `label` too (same words). */
+  labelledBy?: string;
   options: readonly SegmentedOption[];
   value?: string;
   defaultValue?: string;
@@ -203,6 +205,7 @@ export interface SegmentedProps {
 /** Pick one of 2 to 4 options (Allowed / Ask me / Never). One tab stop, arrow keys move and select. */
 export function Segmented({
   label,
+  labelledBy,
   options,
   value,
   defaultValue,
@@ -235,7 +238,7 @@ export function Segmented({
     refs.current[target]?.focus();
   };
   return (
-    <div className="al-seg" role="radiogroup" aria-label={label}>
+    <div className="al-seg" role="radiogroup" aria-label={label} aria-labelledby={labelledBy}>
       {options.map((option, i) => {
         const on = option.value === current;
         return (

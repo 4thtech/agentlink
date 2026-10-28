@@ -13,6 +13,7 @@ export default defineConfig({
         /approvals\.css/,
         /activity\.css/,
         /about\.css/,
+        /app\.css/,
       ],
     },
     testTimeout: 20_000,
