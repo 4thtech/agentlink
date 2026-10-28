@@ -1,6 +1,6 @@
 # B-11 · A state-of-the-art local app: Home, live state, motion, under the hood (design brief)
 
-> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20; UX2-brief-0 on 2026-10-28 adds §22 and §26 in Part 4, and UX2-brief on 2026-10-28 adds §21, §23, §24, §25 and §27 there, all approved by the owner in chat on 2026-10-28, recorded as D-137; U3-brief on 2026-10-29 amends §27 and adds §28 to §32 for usability wave 3 (owner decisions of 2026-10-29 as recommended; the owner approves these screens by screenshot review in the build PRs, D-137), which extends D-135 (3) (c) to UX wave 2 so §21 to §27 are built from this brief with PR screenshots; 'pending owner' no longer applies to §21 to §27). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
+> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20; UX2-brief-0 on 2026-10-28 adds §22 and §26 in Part 4, and UX2-brief on 2026-10-28 adds §21, §23, §24, §25 and §27 there, all approved by the owner in chat on 2026-10-28, recorded as D-137, which extends D-135 (3) (c) to UX wave 2 so §21 to §27 are built from this brief with PR screenshots; 'pending owner' no longer applies to §21 to §27). Nothing here is built.** **U3-brief (2026-10-29) amends §27 and adds §28 to §32 for usability wave 3, from the owner's decisions of 2026-10-29 (all as recommended); the owner approves those screens by screenshot review in the build PRs (D-137).** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
 
 ## 1. Why, and what the owner asked for
 
@@ -926,7 +926,7 @@ New strings: "Start here", "{n} of {total}", "Protect approvals", "Name your age
 └──────────────────────────────────────────────┘  └────────────────────────┘
 ```
 
-- **One sentence, one button.** Heading `al-text-title`, centred; **Get started** is the only primary. "What's AgentLink?" is a quiet text link to the public docs (new tab; no data sent). No account, no email, no choices.
+- **One sentence, one button.** Heading `al-text-title-1`, centred; **Get started** is the only primary. "What's AgentLink?" is a quiet text link to the public docs (new tab; no data sent). No account, no email, no choices.
 - **Surface:** `--al-color-bg-default` page, content on level 1; `Mark` 48 px, still. Dark first, as the brand.
 - **Motion:** the content fades in once (`--al-duration-base`, `--al-easing-enter`); nothing loops. Reduced motion: appears at once.
 - **States:** a skeleton of the same size while the owner read runs (under 400 ms shows nothing). If it fails: "Couldn't start AgentLink. Close this tab and run it again." with **Try again**. A half-finished setup skips Welcome and lands on the first screen not yet done (§28.2 to §28.4).
@@ -980,7 +980,7 @@ Shown right after setup when an app was chosen. It is the §30.3 change panel in
 Connect Claude Code to Claude Code agent
 This adds one entry to Claude Code's settings.
   File   ~/.claude.json
-  Adds   "agentlink": { "command": "npx", "args": ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "Claude Code agent"] }
+  Adds   "agentlink": { "command": "npx", "args": ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "claude-code-agent"] }
 A backup of the file is saved first. Nothing else in it changes.
 [   Apply with Touch ID   ]        Later (text)
 ```
@@ -992,7 +992,7 @@ A backup of the file is saved first. Nothing else in it changes.
 - **Errors, in progress and conflicts** are those of §30.3 (an entry we didn't write goes to manual steps; cancelled Touch ID keeps the card open and says "Not connected yet. Try again.").
 - **Accessibility:** focus moves to the title; the entry block is a labelled region; the live region announces "Claude Code needs a restart" on success.
 
-New strings: "Private messages between AI agents. Only you and your contact can read them.", "Get started", "What's AgentLink?", "Which AI app will you use?", "Found", "I'll choose later", "Continue", "Change", "No AI app found yet. You can connect one later.", "Couldn't look for AI apps. You can connect one later.", "Set up your agent", "Name your agent", "{app} agent", "My agent", "Shown to you and your contacts.", "Give your agent a name.", "Setting up…", "Your agent is ready", "Not protected yet. Try again.", "Couldn't finish setup. Nothing was saved. Try again.", "Couldn't start AgentLink. Close this tab and run it again.", "Use a backup code instead", "Later". The connect screen uses the strings of §30.
+New strings: "Private messages between AI agents. Only you and your contact can read them.", "Get started", "What's AgentLink?", "Which AI app will you use?", "Found", "I'll choose later", "Continue", "Change", "No AI app found yet. You can connect one later.", "Couldn't look for AI apps. You can connect one later.", "Set up your agent", "Name your agent", "{app} agent", "My agent", "Shown to you and your contacts.", "Give your agent a name.", "Setting up…", "Not protected yet. Try again.", "Couldn't finish setup. Nothing was saved. Try again.", "Couldn't start AgentLink. Close this tab and run it again.", "Use a backup code instead", "Later". The connect screen uses the strings of §30.
 
 ## 29. Agents: the switcher and the Agents page
 
@@ -1054,7 +1054,7 @@ Agents, 1440
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Row:** label (`al-text-title-sm`), "Open" chip when it is the open agent, live dot and word; a **"Works from" line** with an AppMark, name and state word (§30.2) for **each** AI app it serves (an agent may serve several); contacts count; last activity (§24 word); actions. Actions: **Switch** (secondary, other agents only), **Rename**, **Connect an AI app** (opens §30 for that agent; the primary action of a row with no AI app) and an overflow menu holding **Remove** (destructive, text style, never a primary). With no AI app the "Works from" line reads **"Not connected to an AI app"** with the warning-neutral ring mark.
+- **Row:** label (`al-text-title-3`), "Open" chip when it is the open agent, live dot and word; a **"Works from" line** with an AppMark, name and state word (§30.2) for **each** AI app it serves (an agent may serve several); contacts count; last activity (§24 word); actions. Actions: **Switch** (secondary, other agents only), **Rename**, **Connect an AI app** (opens §30 for that agent; the primary action of a row with no AI app) and an overflow menu holding **Remove** (destructive, text style, never a primary). With no AI app the "Works from" line reads **"Not connected to an AI app"** with the warning-neutral ring mark.
 - **One agent per AI app:** an AI app listed on one agent does not appear on another; to move it, use the move step in §30.3.
 - **360:** each row is a card: label and dot on top, the "Works from" line below (wraps, one app per line), counts, and the actions in the overflow menu except one visible button (**Switch**, or **Connect an AI app** for an agent with none).
 - **List and Map:** a `Segmented` control (§22, tab semantics): **List** (default) and **Map** (§32). The map is only a view of the list; actions live in the list.
@@ -1098,13 +1098,13 @@ Type the agent's name to confirm
 - **"Quit the AI app first":** if an AI app is running this agent, the sheet shows, in place of the button, **"Quit the AI app that uses Work first."** with the app names (AppMarks) and **Check again** (answer `in_use`). Nothing is closed by us.
 - **In progress** (stepped bar, §15.1: "Telling contacts · Removing the app entry · Erasing · Done"): the sheet stays open, cannot be dismissed, and the title becomes "Removing Work…". Closing the tab is safe.
 - **"Remove anyway?":** if the contacts cannot be told now (offline or timeout), the sheet pauses at the first step: **"Remove anyway? Your contacts can't be told now."** Buttons: **Remove anyway** (destructive) and **Wait and try again** (secondary, default focus). It never continues silently. After "Remove anyway" the sheet says once that contacts will see no reply.
-- **Removal not finished:** if the process stops part-way (power loss, closed lid) the agent is marked and appears in the list and switcher as "Removal not finished" with **Try again** (§29.2). Trying again resumes where it stopped; it needs Touch ID but not the name again.
+- **Removal not finished:** if the process stops part-way (power loss, closed lid) the agent is marked and appears in the list and switcher as "Removal not finished" with **Try again** (§29.2). **Try again** opens the Remove sheet in its in-progress state and asks for **Touch ID and the typed name again**, exactly as a first removal (the request carries the name, the typed label and the generation); it then resumes where it stopped.
 - **Errors:** Touch ID cancelled ("Not removed. Try again."); a failure after the mark ("Couldn't finish removing Work. Nothing else was changed." with **Try again**).
 - **Success:** the row collapses, the success moment plays, a toast says "Work was removed." and the page shows the next agent. The sheet says "retired" for what contacts are told; never "revoked", "deleted identity" or "wallet".
 
 ### 29.5 Rename
 
-An inline edit on the Agents page row and from Home step 2 (**Name it**): the label becomes a `TextField` (up to 40 characters, Enter saves, Esc cancels) with **Save**. It needs **no Touch ID** (a label only), shows to contacts the next time they hear from the agent, and the top bar and menu update at once. Error: "Couldn't rename it. Try again."
+An inline edit on the Agents page row and from Home step 2 (**Name it**): the label becomes a `TextField` (up to 40 characters, Enter saves, Esc cancels) with **Save**. It **needs Touch ID**: the owner signs `agent.label`, and the statement names the agent and the new name ("Rename Personal to Home"), so the button reads **Save with Touch ID**. The label shows to contacts the next time they hear from the agent, and the top bar and menu update at once. The agent's folder name (its slug, §30.3) does not change. Errors: Touch ID cancelled ("Not renamed yet. Try again."); "Couldn't rename it. Try again."
 
 ### 29.6 Several agents: what each page does
 
@@ -1112,12 +1112,12 @@ Every page shows the **open agent's** data. The page title area carries no agent
 
 ### 29.7 The one-time "Tidy up" note
 
-Owners upgrading with several agents (the four leftover test agents of the 0.4.3 try) see **one calm note** on Home, above the Start here card, never inside it:
+Owners with leftover agents (the four test agents of the 0.4.3 try) see **one calm note** on Home, above the Start here card, never inside it:
 
-> **You have 4 agents on this computer.** If some were only for testing, you can remove them.  [ Tidy up ]  [ Not now ]
+> **4 of your agents aren't connected to an AI app and have no contacts.** If they were only for testing, you can remove them.  [ Tidy up ]  [ Not now ]
 
 - **Tidy up** opens the Agents page; **Not now** hides the note for good (stored with the agents, not in the browser). Nothing is removed or hidden automatically.
-- Level 2, neutral tone (no orange: nothing needs you); at 360 full width with the buttons stacked. Shown once per computer, only when two or more agents exist and the Agents page has not been opened. Reduced motion: appears at once.
+- Level 2, neutral tone (no orange: nothing needs you); at 360 full width with the buttons stacked. Shown once per computer, **only when at least one agent serves no AI app and has no contacts** (counted from the agents read; the open agent counts too, and agents with removal not finished do not), and the Agents page has not been opened. **Tidy up** opens the Agents page with those agents marked "No AI app, no contacts" so they are easy to pick. Reduced motion: appears at once.
 
 ### 29.8 Refusals and errors in one place
 
@@ -1136,7 +1136,7 @@ Owners upgrading with several agents (the four leftover test agents of the 0.4.3
 - **Motion:** the menu opens with `--al-duration-fast` and `--al-easing-enter` (scale and fade from the trigger); the page swap on a switch is a 120 ms fade; nothing else moves. At most two things move at once (§14). Reduced motion: menu and swap appear at once, dots are still. Reduced transparency: solid sheet and menu surfaces (§13.2).
 - **Accessibility:** the trigger is a button with `aria-haspopup="menu"` and `aria-expanded`; the menu is a `role="menu"` list with arrow keys, Home, End, type-ahead, Esc returning focus to the trigger; a switch announces "Now showing Work" (polite). Remove sheet: focus moves to the title, the field is labelled "Type {label} to confirm", the button's disabled reason is in text ("Type the name to enable this"), and progress announces each step. Live dots always have a word; "Removal not finished" has a warning shape; the AppMark is decorative (`aria-hidden`) because the app's name is always next to it as text. AA contrast in light, dark and increased contrast; targets 44 px at 360.
 
-New strings: "Agent: {label}, {apps}, {state}. Switch agent.", "Add agent", "Manage agents", "No AI app", "Not connected to an AI app", "Find an agent", "Couldn't load your agents.", "Open the AgentLink app to switch.", "You switched agents. Nothing was changed.", "Now showing {label}", "Agents", "Open", "Works from", "Switch", "Rename", "Connect", "Connect an AI app", "Remove", "Removal not finished", "Removing it stopped part-way. Nothing else was affected.", "Try again", "No agents left. Add one to keep using AgentLink.", "Add an agent", "Used by {agent}", "Add with Touch ID", "Connect {app} to it?", "Connect an AI app to it?", "Not now", "Switch to it", "Adding…", "Not added yet. Try again.", "Couldn't add it. Nothing was saved. Try again.", "Remove {label}?", "This will delete, from this computer:", "{label}'s keys and settings", "Its message and file history ({contacts} contacts, {messages} messages)", "Its entry in {app}", "Your {n} contacts will be told {label} is retired.", "This can't be undone.", "Export history first", "Type the agent's name to confirm", "Remove with Touch ID", "Quit the AI app that uses {label} first.", "Check again", "Telling contacts", "Removing the app entry", "Erasing", "Done", "Removing {label}…", "Remove anyway? Your contacts can't be told now.", "Remove anyway", "Wait and try again", "Not removed. Try again.", "Couldn't finish removing {label}. Nothing else was changed.", "{label} was removed.", "Couldn't rename it. Try again.", "{n} waiting", "You have {n} agents on this computer.", "If some were only for testing, you can remove them.", "Tidy up".
+New strings: "Agent: {label}, {apps}, {state}. Switch agent.", "Add agent", "Manage agents", "No AI app", "Not connected to an AI app", "Find an agent", "Couldn't load your agents.", "Open the AgentLink app to switch.", "You switched agents. Nothing was changed.", "Now showing {label}", "Agents", "Open", "Works from", "Switch", "Rename", "Connect", "Connect an AI app", "Remove", "Removal not finished", "Removing it stopped part-way. Nothing else was affected.", "Try again", "No agents left. Add one to keep using AgentLink.", "Add an agent", "Used by {agent}", "Add with Touch ID", "Connect {app} to it?", "Connect an AI app to it?", "Not now", "Switch to it", "Adding…", "Not added yet. Try again.", "Couldn't add it. Nothing was saved. Try again.", "Remove {label}?", "This will delete, from this computer:", "{label}'s keys and settings", "Its message and file history ({contacts} contacts, {messages} messages)", "Its entry in {app}", "Your {n} contacts will be told {label} is retired.", "This can't be undone.", "Export history first", "Type the agent's name to confirm", "Remove with Touch ID", "Quit the AI app that uses {label} first.", "Check again", "Telling contacts", "Removing the app entry", "Erasing", "Done", "Removing {label}…", "Remove anyway? Your contacts can't be told now.", "Remove anyway", "Wait and try again", "Not removed. Try again.", "Couldn't finish removing {label}. Nothing else was changed.", "{label} was removed.", "Couldn't rename it. Try again.", "{n} waiting", "{n} of your agents aren't connected to an AI app and have no contacts.", "If they were only for testing, you can remove them.", "No AI app, no contacts", "Tidy up".
 
 ## 30. AI apps: connect from the app
 
@@ -1174,7 +1174,7 @@ At 1440 the cards form a grid of up to three columns (min 300 px); at 360 one co
 |---|---|---|---|
 | **Not connected** | Hollow ring, `--al-color-fg-muted` | "Not connected" | **Review change** (primary on the first card only; secondary on the rest) |
 | **Connected to {agent}** | Filled dot, success | "Connected to Personal" | **Disconnect** (secondary; same step, §30.3) |
-| **Connected to another agent** | Hollow ring with a swap arrow | "Uses Work" | **Use {open agent} instead** (secondary; shows both entries, §30.3). The app leaves the other agent |
+| **Connected to another agent** | Hollow ring (as §24.3, 1.5 px, `--al-color-fg-muted`) and the word "Uses {agent}" | "Uses Work" | **Use {open agent} instead** (secondary; shows both entries, §30.3). The app leaves the other agent |
 | **Needs restart** | Warning triangle, `--al-color-status-warning-icon` | "Restart {app} to finish" | none (status word; **Check again** text button) |
 | **Running** | Filled dot with one arrival pulse, success | "Running" (after the app has run AgentLink) | none |
 | **Entry we didn't write** | Warning triangle | "This app already has an AgentLink entry we didn't write." | **Show manual steps** (§30.4). We never overwrite it |
@@ -1199,7 +1199,7 @@ This adds one entry to Claude Code's settings.
            │ "agentlink": {                                │
            │   "command": "npx",                           │
            │   "args": ["-y", "@4thtech-io/agentlink",     │
-           │            "mcp", "--agent", "Personal"]      │
+           │            "mcp", "--agent", "personal"]      │
            │ }                                             │
            └──────────────────────────────────────────────┘
 A backup of the file is saved first. Nothing else in it changes.
@@ -1208,7 +1208,7 @@ A backup of the file is saved first. Nothing else in it changes.
 ```
 
 - **Shows only the AgentLink entry.** Never other entries, context lines or the whole file (those files hold other tools' secrets). The preview is the only part of the file the page ever receives.
-- **The change shown is the change written.** The Touch ID statement names the app and the agent ("Connect Claude Code to Personal"). If the file changed since it was shown: "The file changed. Review it again." and the entry is shown again.
+- **The change shown is the change written, with the agent's folder name.** `--agent` takes the agent's folder name (its slug: lower case, letters, digits and hyphens, made from the label when the agent is created, "claude-code-agent" for "Claude Code agent"), never the display label, which can hold spaces and capitals. The title and the Touch ID statement use the label; the entry uses the slug, and a line under the entry says "Agent folder: personal". Renaming (§29.5) changes the label only. The Touch ID statement names the app and the agent ("Connect Claude Code to Personal"). If the file changed since it was shown: "The file changed. Review it again." and the entry is shown again.
 - **Moving an app between agents:** the panel shows **both entries**, removed and added, side by side (stacked at 360), under "Claude Code will use Personal instead of Work." Same button, same Touch ID.
 - **Disconnect:** the same panel with the entry shown as removed, "Claude Code will stop using Personal." The agent then reads "Not connected to an AI app" if it was the last one.
 - **After applying:** the success moment, then the card turns to **Needs restart** ("Restart Claude Code to finish"); Home step 3 shows the same word until the app runs AgentLink, then **Running**. We never close or restart the app ourselves.
@@ -1262,7 +1262,7 @@ All new strings are listed at the end of §27 to §30 and §32. Rules this brief
 ```text
 Agents → Map, 1440 (level 1 page, map on a level 2 canvas, 960 × ~480)
 ┌───────────────────────────────────────────────────────────────────────┐
-│ [ List │ Map ]                                  ☐ Show quiet           │
+│ [ List │ Map ]                          Show quiet  (◯━ off)          │
 │ ┌────────────────┐                        ┌──────────────────┐        │
 │ │ Personal ●     │━━━━━━ ▸▸ ━━━━━━━━━━━━━━│ Marko  Active now│        │
 │ │ [▢] Claude Code│────────────────────────│ Ana    Today     │        │
