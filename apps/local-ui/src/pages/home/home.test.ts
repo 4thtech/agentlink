@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import homeCss from './home.css?raw';
 import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { ApprovalItem, ListAnswer } from '../approvals/client.js';
+import { PAGE_PARTS } from '../../lazy/pages.js';
 import { ROUTES } from '../../router.js';
 import { HoodProvider, HOOD_STRINGS } from '@4thtech-io/ui';
 import { Layout } from '../../layout/index.js';
@@ -151,7 +152,10 @@ function setHidden(hidden: boolean): void {
 
 describe('Home: where it lives', () => {
   it('is routed at /settings/home (D-135)', () => {
-    expect(ROUTES.some((r) => r.path === '/settings/home' && r.page === HomePage)).toBe(true);
+    // UI-REFRESH-u: the route holds the lazy wrapper of Home (loaded on first visit).
+    const lazy = PAGE_PARTS['/settings/home']?.Part;
+    expect(lazy).toBeDefined();
+    expect(ROUTES.some((r) => r.path === '/settings/home' && r.page === lazy)).toBe(true);
   });
 
   it('shows the page title, the date and a greeting for the time of day', async () => {

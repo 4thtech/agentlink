@@ -24,10 +24,10 @@ import {
   SuccessMoment,
   Surface,
   TextField,
-  UnderTheHood,
   formatContactName,
   useReducedMotion,
 } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import type { IdentityKind } from '@4thtech-io/ui';
 import {
   useCallback,

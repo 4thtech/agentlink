@@ -17,7 +17,8 @@
 //   sent, when presence is asked and what the owner sees are unchanged (approvals.test.ts).
 // - UI-REFRESH-o-b: an approved card collapses out and leaves its result as a line of text; the
 //   sidebar badge is told how many still wait (a number only; badge.ts).
-import { Button, Skeleton, Surface, UnderTheHood, type PayPlatform } from '@4thtech-io/ui';
+import { Button, Skeleton, Surface, type PayPlatform } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { announceDecided, announceWaiting } from './badge.js';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';

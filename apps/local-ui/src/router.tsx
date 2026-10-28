@@ -5,20 +5,10 @@
 import { useEffect, useSyncExternalStore, type ComponentType, type ReactElement } from 'react';
 import { Layout } from './layout/index.js';
 import { withRouteTransition } from './layout/transition.js';
-import { ActivityPage } from './pages/activity/index.js';
 import { ApprovalsPage } from './pages/approvals/index.js';
 import { ApprovePage, approvalIdOf } from './pages/approve/index.js';
-import { AboutPage } from './pages/about/index.js';
-import { AdvancedPage } from './pages/advanced/index.js';
-import { AppearancePage } from './pages/appearance/index.js';
-import { BackupPage } from './pages/backup/index.js';
-import { ContactsPage } from './pages/contacts/index.js';
-import { FilesPage } from './pages/files/index.js';
 import { FirstRunPage } from './pages/first-run/index.js';
-import { HomePage } from './pages/home/index.js';
-import { MessagesPage } from './pages/messages/index.js';
-import { ProofsPage } from './pages/proofs/index.js';
-import { RulesPage } from './pages/rules/index.js';
+import { PAGE_PARTS, loadRoutePage } from './lazy/pages.js';
 import { PASSKEYS_LABEL, REDIRECTS } from './nav.js';
 import { NotAvailablePage, NotFoundPage } from './states/index.js';
 
@@ -32,23 +22,30 @@ function PasskeysPage(): ReactElement {
   return <NotAvailablePage title={PASSKEYS_LABEL} />;
 }
 
+/** A Settings page fetched on first visit (UI-REFRESH-u); the first load of the app carries none. */
+function lazyPage(path: string): ComponentType {
+  return (PAGE_PARTS[path] as (typeof PAGE_PARTS)[string]).Part;
+}
+
 export const ROUTES: readonly RouteDef[] = [
   { path: '/', page: ApprovalsPage },
-  { path: '/settings/home', page: HomePage },
+  { path: '/settings/home', page: lazyPage('/settings/home') },
   { path: '/first-run', page: FirstRunPage },
-  { path: '/settings/activity', page: ActivityPage },
-  { path: '/settings/messages', page: MessagesPage },
-  { path: '/settings/contacts', page: ContactsPage },
-  { path: '/settings/files', page: FilesPage },
-  { path: '/settings/proofs', page: ProofsPage },
-  { path: '/settings/rules', page: RulesPage },
-  { path: '/settings/backup', page: BackupPage },
+  { path: '/settings/activity', page: lazyPage('/settings/activity') },
+  { path: '/settings/messages', page: lazyPage('/settings/messages') },
+  { path: '/settings/contacts', page: lazyPage('/settings/contacts') },
+  { path: '/settings/files', page: lazyPage('/settings/files') },
+  { path: '/settings/proofs', page: lazyPage('/settings/proofs') },
+  { path: '/settings/rules', page: lazyPage('/settings/rules') },
+  { path: '/settings/backup', page: lazyPage('/settings/backup') },
   { path: '/settings/passkeys', page: PasskeysPage },
-  { path: '/settings/appearance', page: AppearancePage },
-  { path: '/settings/advanced', page: AdvancedPage },
-  { path: '/settings/about', page: AboutPage },
+  { path: '/settings/appearance', page: lazyPage('/settings/appearance') },
+  { path: '/settings/advanced', page: lazyPage('/settings/advanced') },
+  { path: '/settings/about', page: lazyPage('/settings/about') },
 ];
 
+/** The longest a route change waits for a page that is still loading. */
+const LAZY_WAIT_MS = 200;
 const CHANGE = 'agentlink:navigate';
 const SETTINGS = '/settings';
 const SETTINGS_HOME = '/settings/activity';
@@ -67,8 +64,25 @@ export function navigate(to: string, replace = false): void {
   const notify = (): void => {
     window.dispatchEvent(new Event(CHANGE));
   };
-  if (replace || !changesPage) notify();
-  else withRouteTransition(notify);
+  const go = (): void => {
+    if (replace || !changesPage) notify();
+    else withRouteTransition(notify);
+  };
+  const lazy = PAGE_PARTS[target];
+  if (lazy === undefined || lazy.ready()) {
+    go();
+    return;
+  }
+  // A page that is not loaded yet: let the transition wait for it, but at most LAZY_WAIT_MS, so the
+  // skeleton (and a retry on failure) appear instead of a page that seems stuck.
+  let started = false;
+  const once = (): void => {
+    if (started) return;
+    started = true;
+    go();
+  };
+  void loadRoutePage(target).then(once);
+  setTimeout(once, LAZY_WAIT_MS);
 }
 
 function subscribe(onChange: () => void): () => void {

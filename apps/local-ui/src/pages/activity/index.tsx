@@ -20,11 +20,11 @@ import {
   ProofBadge,
   Skeleton,
   StatusChip,
-  UnderTheHood,
   useRowPresence,
   useVisibilityPause,
   type ProofState,
 } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
 import './activity.css';

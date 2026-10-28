@@ -27,10 +27,10 @@ import {
   RingMeter,
   SuccessMoment,
   Surface,
-  UnderTheHood,
   useRowPresence,
   useVisibilityPause,
 } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { PayConfirm, type PayConfirmClient } from '../../pay-confirm/index.js';
 import type { PayPlatform } from '@4thtech-io/ui';
