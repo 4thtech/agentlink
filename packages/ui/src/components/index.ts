@@ -19,6 +19,7 @@ export * from './review.js';
 export * from './shell.js';
 export * from './surface.js';
 export * from './trust.js';
+export * from './waiting-mark.js';
 export type {
   ApprovalState,
   ContactNameInput,

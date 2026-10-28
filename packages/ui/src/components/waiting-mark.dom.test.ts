@@ -3,8 +3,6 @@
 // Only the diamond turns, about its own centre, with transform only; the brackets never move; at
 // 24 px and up; still with reduced motion; used for no other loading state; no inline styles.
 import axe from 'axe-core';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -33,8 +31,25 @@ const render = (props: Record<string, unknown> = {}): void =>
   act(() => root.render(h(WaitingMark as never, props)));
 const svg = (): SVGElement => host.querySelector('svg') as SVGElement;
 
-const repoRoot = join(__dirname, '..', '..', '..', '..');
-const read = (p: string): string => readFileSync(join(repoRoot, p), 'utf8');
+// Repo files as text (the ui package may not import node built-ins). Keys are relative to this file.
+const files = import.meta.glob(
+  [
+    './*.css',
+    './*.ts',
+    './*.tsx',
+    '../../../../docs/design/b11-local-app.md',
+    '../../../../docs/design/brand/brand-guidelines.md',
+    '../../../../docs/design/d1/components/Mark.md',
+    '../../../../apps/*/src/**/*.{ts,tsx,css}',
+    '../../../*/src/**/*.{ts,tsx,css}',
+  ],
+  { query: '?raw', import: 'default', eager: true },
+) as Record<string, string>;
+const read = (p: string): string => {
+  const hit = Object.entries(files).find(([k]) => k.endsWith('/' + p) || k === './' + p);
+  if (hit === undefined) throw new Error(`not loaded: ${p}`);
+  return hit[1];
+};
 
 describe('WaitingMark component', () => {
   it('is exported with a minimum size above 20 px', () => {
@@ -136,7 +151,8 @@ describe('waiting mark styles (progress.css)', () => {
     );
   });
   it('is still under prefers-reduced-motion and the app reduced-motion switch', () => {
-    const media = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?\n\})/.exec(css)?.[1] ?? '';
+    const media =
+      /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?\n\})/.exec(css)?.[1] ?? '';
     expect(media).toMatch(/\.al-waiting-diamond[^{]*\{[^}]*animation:\s*none/);
     expect(css).toMatch(
       /:root\[data-motion='reduced'\]\s+\.al-waiting-diamond[^{]*\{[^}]*animation:\s*none/,
@@ -148,40 +164,30 @@ describe('waiting mark styles (progress.css)', () => {
     );
   });
   it('keeps the forced-colours ink from the shared mark rules', () => {
-    expect(read('packages/ui/src/components/components.css')).toMatch(
-      /\.al-mark-seal,[\s\S]*?fill:\s*CanvasText/,
-    );
+    expect(read('components.css')).toMatch(/\.al-mark-seal,[\s\S]*?fill:\s*CanvasText/);
   });
 });
 
 describe('the waiting mark is used in no other loading state', () => {
-  const walk = (dir: string, out: string[] = []): string[] => {
-    for (const name of readdirSync(dir)) {
-      if (name === 'node_modules' || name === 'dist') continue;
-      const p = join(dir, name);
-      if (statSync(p).isDirectory()) walk(p, out);
-      else if (/\.(tsx?|css)$/.test(name)) out.push(p);
-    }
-    return out;
-  };
   it('appears only in its own component, styles, exports and tests', () => {
-    const files = [...walk(join(repoRoot, 'packages')), ...walk(join(repoRoot, 'apps'))].filter(
-      (f) => /WaitingMark|al-waiting/.test(readFileSync(f, 'utf8')),
-    );
-    const rels = files.map((f) => relative(repoRoot, f)).sort();
-    const allowed = new Set([
-      'packages/ui/src/components/waiting-mark.tsx',
-      'packages/ui/src/components/progress.css',
-      'packages/ui/src/components/index.ts',
-      'packages/ui/src/components/waiting-mark.dom.test.ts',
+    const hits = Object.entries(files)
+      .filter(([k]) => /\.(tsx?|css)$/.test(k) && !k.includes('node_modules'))
+      .filter(([, text]) => /WaitingMark|al-waiting/.test(text))
+      .map(([k]) => k.split('/').pop() as string)
+      .sort();
+    expect(Object.keys(files).some((k) => k.includes('apps/local-ui'))).toBe(true);
+    expect(hits.filter((f) => !f.endsWith('.test.ts'))).toEqual([
+      'progress.css',
+      'waiting-mark.tsx',
     ]);
-    expect(rels.filter((r) => !allowed.has(r))).toEqual([]);
   });
 });
 
 describe('brand guidelines carry the exception once, word for word', () => {
   const spec = read('docs/design/b11-local-app.md');
-  const quote = /### 23\.4[\s\S]*?\n> (\*\*Exception: the waiting mark\*\*[^\n]*)\n/.exec(spec)?.[1];
+  const quote = /### 23\.4[\s\S]*?\n> (\*\*Exception: the waiting mark\*\*[^\n]*)\n/.exec(
+    spec,
+  )?.[1];
   const guidelines = read('docs/design/brand/brand-guidelines.md');
   it('finds the spec text', () => {
     expect(quote).toBeDefined();

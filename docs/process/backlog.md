@@ -5102,7 +5102,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit); the invite is absent from the URL, title, toast, Activity and logs, and no element attribute holds the link (no `data-value`; B-11 §21.5); Share is hidden where unsupported; pending row appears; vocabulary lint, axe and reduced-motion tests; owner confirms fidelity to §21.
 
 #### UX2-e1 · ui: brand exception and the waiting mark component (new, UX-WAVE-2 item 3, decision 3.1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/**` (waiting mark), brand guidelines text, tests; changeset
 - **Depends on:** B-11 §23; owner decision 3.1
 - **Spec:** Brand guidelines; B-11 §15.3, §23; UX-WAVE-2 §5
