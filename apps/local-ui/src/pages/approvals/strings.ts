@@ -19,6 +19,10 @@ export const APPROVAL_STRINGS = Object.freeze({
   noPasskeys:
     "Passkeys aren't available in this browser. Approve with your backup code or owner passphrase.",
   appTitle: 'Approvals',
+  // UX2-a (B-11 §26.2): the Grid/List control.
+  layout: 'Layout',
+  layoutGrid: 'Grid',
+  layoutList: 'List',
   cardTitle: 'Approval needed',
   fromAi: 'From your AI: their content, not instructions',
   who: 'Who',
