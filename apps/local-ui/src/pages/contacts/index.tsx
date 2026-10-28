@@ -804,10 +804,13 @@ export function ContactsPage({
 
   const ready = list.phase === 'ok';
   const empty = ready && list.contacts.length === 0;
+  // Start here step 2 not done yet: the empty state carries the one Add contact (b11 §27.4), and it
+  // opens the sheet here directly.
+  const inviteInEmpty = empty && rows.length === 0 && inviteFirst;
   const title = (
     <div className="ct-title-row">
       <h1 className="al-text-title-1">{PAGE_TITLES.contacts}</h1>
-      {ready ? (
+      {ready && !inviteInEmpty ? (
         <Button
           id={addButtonId}
           variant={empty && rows.length === 0 ? 'primary' : 'secondary'}
@@ -882,7 +885,16 @@ export function ContactsPage({
           {status}
           {rows.length === 0 ? (
             inviteFirst ? (
-              <EmptyState icon="users" title={START_STRINGS.emptyContacts} prompt={S.emptyPrompt} />
+              <EmptyState
+                icon="users"
+                title={START_STRINGS.emptyContacts}
+                prompt={S.emptyPrompt}
+                action={
+                  <Button id={addButtonId} variant="primary" icon="user-plus" onClick={openAdd}>
+                    {A.addContact}
+                  </Button>
+                }
+              />
             ) : (
               <EmptyState icon="users" title={S.emptyTitle} prompt={S.emptyPrompt} />
             )

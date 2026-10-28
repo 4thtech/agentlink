@@ -8,6 +8,7 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApiClient } from '../api/client.js';
+import { ADD_CONTACT_HREF } from './contacts/add-contact-link.js';
 import { ContactsPage } from './contacts/index.js';
 import { CONTACTS_STRINGS } from './contacts/strings.js';
 import { FilesPage } from './files/index.js';
@@ -76,17 +77,30 @@ async function mount(which: Which, ctx: StartHereModel | null): Promise<void> {
   });
   await settle();
 }
+// The empty state's own Add contact (UX2-d2: Contacts also has one in its title row, b11 §21.1).
 const addContact = (): HTMLElement | undefined =>
-  [...host.querySelectorAll<HTMLElement>('a, button')].find(
+  [...host.querySelectorAll<HTMLElement>('.al-empty a, .al-empty button')].find(
     (e) => e.textContent === START_STRINGS.addContact,
   );
 
 describe('Empty states point to step 2 of Start here', () => {
-  it('Contacts: "No contacts yet. Invite someone to start." with the invite prompt, and no link to itself', async () => {
+  it('Contacts: "No contacts yet. Invite someone to start." with one Add contact that opens the sheet here', async () => {
     await mount('contacts', model(false));
     expect(host.textContent).toContain('No contacts yet. Invite someone to start.');
     expect(host.textContent).toContain(CONTACTS_STRINGS.emptyPrompt);
-    expect(addContact()).toBeUndefined();
+    const all = [...host.querySelectorAll<HTMLElement>('a, button')].filter(
+      (e) => e.textContent === START_STRINGS.addContact,
+    );
+    expect(all.length).toBe(1);
+    const add = all[0] as HTMLElement;
+    expect(add.tagName).toBe('BUTTON');
+    expect(add.classList.contains('al-btn-primary')).toBe(true);
+    expect(add.closest('.al-empty')).not.toBeNull();
+    await act(async () => {
+      add.click();
+    });
+    await settle();
+    expect(document.body.querySelector('[role="region"][aria-label="Add contact"]')).not.toBeNull();
   });
 
   it('Messages: "No messages yet. Invite someone first, then ask your AI to say hello."', async () => {
@@ -95,13 +109,13 @@ describe('Empty states point to step 2 of Start here', () => {
       'No messages yet. Invite someone first, then ask your AI to say hello.',
     );
     expect(addContact()?.classList.contains('al-btn-primary')).toBe(true);
-    expect(addContact()?.getAttribute('href')).toBe('/settings/contacts');
+    expect(addContact()?.getAttribute('href')).toBe(ADD_CONTACT_HREF);
   });
 
   it('Files: "No files yet. Invite someone first." with Add contact', async () => {
     await mount('files', model(false));
     expect(host.textContent).toContain('No files yet. Invite someone first.');
-    expect(addContact()?.getAttribute('href')).toBe('/settings/contacts');
+    expect(addContact()?.getAttribute('href')).toBe(ADD_CONTACT_HREF);
   });
 
   it("once step 2 is done they return to today's empty states, with no Add contact", async () => {
