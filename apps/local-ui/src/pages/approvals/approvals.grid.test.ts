@@ -304,6 +304,28 @@ describe('Grid is the default and holds only the cards (B-11 §26.1)', () => {
     await flush();
     expect(layoutGroup()).toBeUndefined();
   });
+
+  it('/approve/<id>: a card with long unbroken text sits where the wrap rule applies', async () => {
+    const LONG = 'x'.repeat(400);
+    const long = item('A', 3, {
+      summary: LONG,
+      details: { ...item('A', 3).details, headline: LONG, who: LONG, what: LONG, terms: [LONG] },
+    });
+    history.replaceState(null, '', `/approve/${id('A')}`);
+    try {
+      const { props } = pageProps({ [`/api/approvals/${id('A')}`]: [ok({ approval: long })] });
+      act(() => root.render(h<ApprovalsPageProps>(ApprovePage, props)));
+      await flush();
+      const card = cardOf('A');
+      expect(card).not.toBeNull();
+      // `.al-approvals .al-approval` carries min-width: 0 and overflow-wrap: anywhere (stylesheet
+      // test below); the 360 px browser check is in the PR (jsdom has no layout).
+      expect(card?.matches('.al-approvals .al-approval')).toBe(true);
+      expect(card?.textContent).toContain(LONG);
+    } finally {
+      history.replaceState(null, '', '/');
+    }
+  });
 });
 
 // ------------------------------------------------------------------------------- the control
@@ -520,6 +542,8 @@ describe('the stylesheet (B-11 §26.1, §26.3, §22.3)', () => {
     const item = rules.find((r) => /\.ap-cards\s*>\s*\*/.test(r.sel));
     expect(item?.body).toMatch(/min-width\s*:\s*0/);
     expect(item?.body).toMatch(/overflow-wrap\s*:\s*anywhere/);
+    // The same rule holds on every card, so /approve/<id> (no grid) wraps too (IR-UX2-a-1).
+    expect(item?.sel.split(',').map((x) => x.trim())).toContain('.al-approvals .al-approval');
     for (const r of rules.filter((x) => x.sel.includes('.ap-cards'))) {
       expect(r.body, r.sel).not.toMatch(
         /overflow\s*:\s*hidden|max-height|display\s*:\s*none|visibility\s*:\s*hidden/,

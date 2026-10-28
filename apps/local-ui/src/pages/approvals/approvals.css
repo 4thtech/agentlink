@@ -36,7 +36,10 @@
   gap: 12px;
   max-width: 480px;
 }
-.al-approvals .ap-cards > * {
+/* Every approval card, on Approvals and on /approve/<id>: long unbroken text (a file name, an ID,
+   a term) wraps inside the card instead of running past it or making the page scroll sideways. */
+.al-approvals .ap-cards > *,
+.al-approvals .al-approval {
   min-width: 0;
   overflow-wrap: anywhere;
 }
