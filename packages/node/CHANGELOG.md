@@ -1,5 +1,16 @@
 # @4thtech-io/node
 
+## 0.4.1
+
+### Patch Changes
+
+- 5ee314c: M1-11b-2: with the local app bundled, the approval server serves the app for `/` and `/approve/<id>` too, so Approvals and one request render inside the app (its sidebar, status bar and paid-action sheet). The session, CSRF, Origin, fetch-metadata and presence checks and the approval decision logic are unchanged; without the bundle the server-rendered approval page stays.
+- 68e25ae: M1-11b-2c: the server-rendered approval page is removed. `/app.js` and `/app.css` are gone (404); Approvals live only in the local app, which the approval server serves on `/` and `/approve/<id>`. A server without the app bundle answers those two with a fixed page (503, no script, no CSRF token) that points to `approve` in the owner's own terminal. The session, CSRF, Origin, fetch-metadata and presence checks and the approval decision logic are unchanged. `@4thtech-io/ui`: a comment in the confirmation sheet no longer points to the removed page.
+- 276951a: UI-REFRESH-f: the app shell. A top bar (page title; the Under the hood switch, a live status chip and the theme control), the sidebar, top bar, status bar and Settings sub-navigation on the chrome material on a Mac only (`data-os` is set at start-up; Windows, Linux and reduced transparency stay solid), one sliding nav highlight, a bottom bar at 360 px, route changes through the View Transitions API (instant with reduced motion or where missing), Home (at `/settings/home` for now) and Appearance in the menu and router, and an inert background behind every Sheet and dialog. The chrome material opacity is raised from 72 % to 85 % so the chrome text meets WCAG 2.1 AA over the worst content under it. The old approval page copies the new Home entry in its fixed sidebar list.
+- @4thtech-io/core@0.4.1
+  - @4thtech-io/crypto@0.4.1
+  - @4thtech-io/transport-nostr@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
