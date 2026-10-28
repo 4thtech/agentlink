@@ -449,6 +449,7 @@ export async function removeAgentFolder(
     throw new RuntimeError('agent_path_invalid');
   }
   if (present.some((entry) => !files.includes(entry))) throw new RuntimeError('agent_path_invalid');
+  let lockLeft = false;
   for (const file of files) {
     const path = join(dir, file);
     const info = await lstatOrMissing(path);
@@ -457,13 +458,47 @@ export async function removeAgentFolder(
     try {
       await unlink(path);
     } catch (error) {
+      // U3-e: on Windows the lock file the removal itself holds open cannot be unlinked; it and the
+      // folder go once the lock is released (removeAgentFolderLock). The config is gone already.
+      if (!POSIX && file === AGENT_OPEN_LOCK_FILE) {
+        lockLeft = true;
+        continue;
+      }
       if (!isMissing(error)) throw new RuntimeError('agent_path_invalid');
     }
   }
+  if (lockLeft) return;
   try {
     await rmdir(dir);
   } catch (error) {
     if (!isMissing(error)) throw new RuntimeError('agent_path_invalid');
+  }
+}
+
+/**
+ * U3-e: after a removal released the folder lock, deletes a lock file left behind (Windows, where the
+ * held file could not be unlinked) and the empty folder. Only when the config is gone and nothing
+ * but the lock file is there; anything else is left as it is. Best effort, never throws.
+ */
+export async function removeAgentFolderLock(
+  home: string,
+  name: string,
+  options: OwnerCheck = {},
+): Promise<void> {
+  try {
+    const paths = agentPaths(home, name);
+    const uid = expectedUid(options);
+    if ((await checkDir(paths.dir, uid)) === undefined) return;
+    const dir = await checkContained(home, name);
+    const present = await readdir(dir);
+    if (present.length !== 1 || present[0] !== AGENT_OPEN_LOCK_FILE) return;
+    const info = await lstatOrMissing(join(dir, AGENT_OPEN_LOCK_FILE));
+    if (info === undefined) return;
+    checkFileInfo(info, uid);
+    await unlink(join(dir, AGENT_OPEN_LOCK_FILE));
+    await rmdir(dir);
+  } catch {
+    // Left for the next removal attempt or `doctor`.
   }
 }
 
@@ -473,6 +508,107 @@ async function inRevokedList(home: string, agentId: string): Promise<boolean> {
   const info = await lstatOrMissing(join(home, '.agentlink', REVOKED_DIR, `${agentId}.json`));
   // Anything at that name counts: a revoked agent must never open as usable (fail closed).
   return info !== undefined;
+}
+
+/** A revoked-list entry is one signed `agent.revoke` (about 400 bytes); larger is damaged. */
+const MAX_REVOKED_BYTES = 4_096;
+
+/** One entry of the owner's revoked list, as read (U3-e; the caller re-verifies `text`). */
+export type RevokedFile =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'entry'; readonly text: string }
+  | { readonly kind: 'damaged' };
+
+/**
+ * U3-e (04 §2.5 step 2, §2.5.1 "The owner's revoked list"): reads `~/.agentlink/revoked/<agentId>.json`
+ * under the folder rules: the folders real and private, the file a regular private file with one
+ * name, opened without following a link. Anything at that name that breaks a rule, is too large or
+ * is not UTF-8 is `damaged` (the agent still counts as revoked: fail closed). The text is returned
+ * exactly as stored; it is the signed object itself, and the caller verifies it.
+ */
+export async function readRevokedEntry(
+  home: string,
+  agentId: string,
+  options: OwnerCheck = {},
+): Promise<RevokedFile> {
+  assertAgentId(agentId);
+  const uid = expectedUid(options);
+  const root = join(home, '.agentlink');
+  const dir = join(root, REVOKED_DIR);
+  const path = join(dir, `${agentId}.json`);
+  try {
+    const before = await lstatOrMissing(path);
+    if (before === undefined) return { kind: 'none' };
+    if ((await checkDir(root, uid)) === undefined) return { kind: 'damaged' };
+    if ((await checkDir(dir, uid)) === undefined) return { kind: 'damaged' };
+    checkFileInfo(before, uid);
+    const handle = await open(
+      path,
+      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0),
+    );
+    try {
+      const info = await handle.stat();
+      if (!info.isFile() || info.ino !== before.ino || info.dev !== before.dev) {
+        return { kind: 'damaged' };
+      }
+      if (info.size > MAX_REVOKED_BYTES) return { kind: 'damaged' };
+      const buffer = Buffer.alloc(MAX_REVOKED_BYTES + 1);
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+      if (bytesRead > MAX_REVOKED_BYTES) return { kind: 'damaged' };
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, bytesRead));
+      return { kind: 'entry', text };
+    } finally {
+      await handle.close();
+    }
+  } catch {
+    return { kind: 'damaged' };
+  }
+}
+
+/**
+ * U3-e (04 §2.5 step 2): records `text` (the exact signed `agent.revoke`, nothing else) as the
+ * owner's revoked-list entry for `agentId`: folder 0700, file 0600, written to a fresh temporary
+ * name (created exclusively, never through a link), synced, then linked into place, so an existing
+ * entry is never replaced (revocation is permanent; AgentLink never removes one). An existing entry
+ * is left as it is and is not an error; the caller reads it back.
+ */
+export async function recordRevokedEntry(
+  home: string,
+  agentId: string,
+  text: string,
+  options: OwnerCheck = {},
+): Promise<void> {
+  assertAgentId(agentId);
+  if (typeof text !== 'string' || text.length === 0 || text.length > MAX_REVOKED_BYTES) {
+    throw new RuntimeError('agent_config_invalid');
+  }
+  const uid = expectedUid(options);
+  const root = join(home, '.agentlink');
+  const dir = join(root, REVOKED_DIR);
+  await ensurePrivateDir(root, uid);
+  await ensurePrivateDir(dir, uid);
+  const target = join(dir, `${agentId}.json`);
+  if ((await lstatOrMissing(target)) !== undefined) return;
+  const temp = join(dir, `.${agentId}.${encodeHex(randomBytes(8))}.tmp`);
+  const handle = await open(
+    temp,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0),
+    FILE_MODE,
+  );
+  try {
+    if (POSIX) await handle.chmod(FILE_MODE);
+    await handle.writeFile(text, 'utf8');
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  try {
+    await link(temp, target);
+  } catch (error) {
+    if (codeOf(error) !== 'EEXIST') throw new RuntimeError('agent_path_invalid');
+  } finally {
+    await unlink(temp).catch(() => undefined);
+  }
 }
 
 /**

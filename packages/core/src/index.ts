@@ -291,6 +291,17 @@ export {
   type DeliveryAckStatus,
 } from './acks.js';
 export {
+  AgentRemovalService,
+  REVOKE_DELIVERY_TIMEOUT_MS,
+  buildAgentRevokeBody,
+  verifyRevokedEntry,
+  type BuiltAgentRevoke,
+  type RemovalFacts,
+  type RevokeDelivery,
+  type RevokeDeliveryOptions,
+  type RevokedEntryCheck,
+} from './agent-removal.js';
+export {
   CardUpdateSender,
   MAX_CARD_UPDATES_PER_PASS,
   type CardUpdateSendResult,

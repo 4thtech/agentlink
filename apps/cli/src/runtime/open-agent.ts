@@ -99,6 +99,12 @@ export interface OpenAgentOptions {
   /** Unix seconds. Default the system clock. */
   readonly clock?: () => number;
   readonly logger?: Logger;
+  /**
+   * U3-e: the folder lock this open holds; default the SHARED lock (holdAgentFolderShared). Only the
+   * removal passes another, from inside its own EXCLUSIVE hold of the same folder (ui-remove.ts),
+   * where a shared take would refuse.
+   */
+  readonly folderLock?: (dir: string) => AgentFolderLock;
 }
 
 /** An opened agent. `close()` closes the relay connections, the store and the KeyStore, once. */
@@ -158,7 +164,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
   // U3-c: the shared folder lock, held while the agent is open (06 §6).
   let folderLock: AgentFolderLock;
   try {
-    folderLock = holdAgentFolderShared(paths.dir);
+    folderLock = (options.folderLock ?? holdAgentFolderShared)(paths.dir);
   } catch {
     throw new RuntimeError('agent_open_failed');
   }

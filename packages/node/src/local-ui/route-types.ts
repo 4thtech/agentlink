@@ -17,7 +17,7 @@
 // stubs (`stub: true`) for the U3 routes later cards fill: a stub answers 501 `not_available` before
 // any presence check and never runs its handler.
 import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
-import type { JsonObject, JsonValue } from '@4thtech-io/crypto';
+import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiContext } from './context.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
@@ -63,6 +63,13 @@ export interface LocalUiOwnerOperation {
     review: OwnerReview,
     requests: readonly OwnerSignRequest[],
   ): Promise<readonly OwnerSignature[]>;
+  /**
+   * U3-e, the remove gate only: after `sign` signed this gesture's `agent.revoke`, the keys that seal
+   * its `revoke` carriers with the owner as sender (04 §3.4.1): the envelope signature, the seal
+   * (Nostr kind 13 only) and NIP-44 encryption of this gesture's owner session. Nothing that
+   * decrypts. Undefined on every other route, before `sign`, and once the gesture has ended.
+   */
+  carrierKeys?(): EnvelopeKeys | undefined;
 }
 
 export interface LocalUiReadRoute {
@@ -211,7 +218,26 @@ export interface LocalUiSwitchRoute {
   readonly presence: 'switch';
 }
 
+/** U3-e: the fixed path of the remove kind (08 §1). */
+export const AGENTS_REMOVE_PATH = '/api/ui/agents/remove';
+
+/**
+ * U3-e (D-138; 08 §1; 04 §2.5 "Removing an agent"): removing an agent, the seventh named route kind.
+ * Only `POST /api/ui/agents/remove`, registered once (routes.ts), with no handler: the server's
+ * remove gate runs it after the same session, CSRF, Origin, fetch-metadata, octet-stream and
+ * generation checks as every write. It needs owner presence, checked against the owner the removed
+ * agent's own card names, and signs `agent.revoke` (and, with contacts, its `revoke` carriers) in
+ * one gesture, inside the agent's exclusive folder lock (api/agents-remove.ts). Outside the app host
+ * it answers `not_available`.
+ */
+export interface LocalUiRemoveRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'remove';
+}
+
 export type LocalUiRoute =
+  | LocalUiRemoveRoute
   | LocalUiSwitchRoute
   | LocalUiReadRoute
   | LocalUiOwnerRoute
