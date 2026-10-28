@@ -17,6 +17,7 @@
 //   sent, when presence is asked and what the owner sees are unchanged (approvals.test.ts).
 // - UI-REFRESH-o-b: an approved card collapses out and leaves its result as a line of text; the
 //   sidebar badge is told how many still wait (a number only; badge.ts).
+// - UI-REFRESH-o-c: a denied card leaves the same way and leaves "Denied: <summary>".
 import { Button, Skeleton, Surface, type PayPlatform } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
@@ -127,7 +128,7 @@ export function OwnerPanel({
 }
 
 /**
- * What an approved card left behind once it collapsed out (UI-REFRESH-o-b): plain text a screen
+ * What a decided card left behind once it collapsed out (UI-REFRESH-o-b, o-c): plain text a screen
  * reader can reach. Not a live region: the card's own status line already said it. When the card
  * took the focus with it, the focus lands on the line, never on a button.
  */

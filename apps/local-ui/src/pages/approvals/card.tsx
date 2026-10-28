@@ -20,8 +20,13 @@
 // approval ID, through the shared panel's `id` kind. After an applied approval the card holds
 // "Approved." and every fact while the check draws, then collapses out with the shared row leave
 // (reduced motion: removed at once); the page keeps the result as a line of text. An open
-// confirmation sheet, a refused attempt and a denial keep the card. Presence, signing and the
-// decide calls are untouched.
+// confirmation sheet and a refused attempt keep the card. Presence, signing and the decide calls are
+// untouched.
+//
+// UI-REFRESH-o-c (state handling only; B-11 §16, §6 row 4): an applied denial leaves the same way.
+// The card holds "Denied." and every fact (faded, as before), then collapses out (reduced motion:
+// removed at once) and the page keeps "Denied: <summary>". A refused, expired or failed attempt and
+// an open sheet keep the card. The line is built from the core's summary only, as React text (I-5).
 import {
   Button,
   RingMeter,
@@ -154,8 +159,8 @@ export function approvalHoodFields(item: ApprovalItem): readonly unknown[] {
 }
 
 /**
- * How long an approved card stays, with "Approved." and every fact, before it collapses out: the
- * check has drawn and the line can be read (B-11 §6 rows 4 and 7).
+ * How long a decided card stays, with "Approved." or "Denied." and every fact, before it collapses
+ * out: the check has drawn (or the denial has faded) and the line can be read (B-11 §6 rows 4, 7).
  */
 export const APPROVED_HOLD_MS = 1600;
 
@@ -384,7 +389,7 @@ export function SingleApproval({
   sheet: SheetOptions;
   /** An applied decision (approve or deny); never called for a refused or failed attempt. */
   onDecided?: () => void;
-  /** The approved card has collapsed out; the page keeps this line in its place. */
+  /** The decided card has collapsed out; the page keeps this line in its place. */
   onLeft?: (line: string) => void;
 }): ReactElement | null {
   const [step, setStep] = useState<Decision | undefined>(undefined);
@@ -394,16 +399,20 @@ export function SingleApproval({
   const [outcome, setOutcome] = useState<'approved' | 'denied' | undefined>(undefined);
   const say = (text: string): void => setLines((l) => [...l, text]);
 
-  // UI-REFRESH-o-b: an approved card leaves once the sheet (if any) is closed and the hold is over.
+  // UI-REFRESH-o-b / o-c: a decided card (approved or denied) leaves once the sheet (if any) is
+  // closed and the hold is over. Only an applied answer sets `outcome`.
   const [present, setPresent] = useState(true);
-  const leaving = outcome === 'approved' && !paying;
+  const leaving = outcome !== undefined && !paying;
   useEffect(() => {
     if (!leaving) return undefined;
     const timer = setTimeout(() => setPresent(false), APPROVED_HOLD_MS);
     return () => clearTimeout(timer);
   }, [leaving]);
   const row = useRowPresence<HTMLDivElement>(present, {
-    onGone: () => onLeft?.(fmt(S.approvedLine, { summary: item.summary })),
+    onGone: () =>
+      onLeft?.(
+        fmt(outcome === 'denied' ? S.deniedLine : S.approvedLine, { summary: item.summary }),
+      ),
   });
 
   const answer = (a: DecideAnswer): void => {
