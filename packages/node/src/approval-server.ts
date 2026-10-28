@@ -1030,7 +1030,9 @@ export async function startApprovalServerWith(
   const invitesCreated: number[] = [];
   /** M1-11s-c: the one owner setup in progress, if any. */
   let pendingSetup: PendingSetup | undefined;
-  const buildUiContext = (): LocalUiContext =>
+  // U3-c (IR-U3-c-SEC-1 L-1): the source is captured when the context is built, so a handler that
+  // outlives a switch's drain wait keeps the agent it started with and never reaches the next one.
+  const buildUiContext = (bound: ApprovalServerSource = source): LocalUiContext =>
     Object.freeze<LocalUiContext>({
       // IR-M1-11s-b-1 H-1: handlers read through a read-only view, never the client itself.
       client: agentUi?.client === undefined ? undefined : readOnlyClient(agentUi.client),
@@ -1039,8 +1041,8 @@ export async function startApprovalServerWith(
       // UX2-d1: accepting an invite, for the accept owner route; it pairs only after core used an
       // owner-signed, applied approval (I-4).
       ...(agentUi?.client === undefined ? {} : { invites: inviteAcceptPort(agentUi.client) }),
-      ownerContext: () => source.context(),
-      applyOwnerAction: (signed) => source.apply(signed),
+      ownerContext: () => bound.context(),
+      applyOwnerAction: (signed) => bound.apply(signed),
       now: () => now(),
       // M1-11s-a-d: the status bar's health read (fixed fields, cached, bounded).
       health: createHealthReader({
