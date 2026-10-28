@@ -4959,7 +4959,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - axe: 0 serious or critical on all pages and modes; no test weakened.
 
 #### UI-REFRESH-o-b · local-ui: Approvals restyle follow-ups, ID in Under the hood, decided-card state, nav badge (new, low, S2 by content, #616)
-- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/{approvals,approve}/**`, `apps/local-ui/src/shell/**` (the approvals badge only), `apps/local-ui/src/strings.ts`, tests; `packages/ui/src/**` only for the ID-kind part, together with UI-REFRESH-e3; changeset if `packages/ui` changes
 - **Depends on:** UI-REFRESH-o; UI-REFRESH-e3 (for part a)
 - **Spec:** B-11 §7, §16 (Approvals); 08 §1; 04 §2.5
@@ -4972,7 +4972,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Tests first (RED commit) for (a) to (c); all M1-11a, M1-11b-2 and UI-REFRESH-o approval flows unchanged; no autofocus on Approve; reduced-motion and axe tests; short threat note (S2); no test weakened.
 
 #### UI-REFRESH-e4 · ui: Under the hood filter robustness follow-ups (new, low, #619)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/**` (Under the hood filter), tests; changeset
 - **Depends on:** UI-REFRESH-e3
 - **Spec:** B-11 §7; 04 §4
@@ -5009,7 +5009,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Initial JS gz measured and recorded; a test that the first load does not include the lazy chunks; a failed chunk load shows a plain retry message; axe and reduced-motion tests unchanged; no test weakened.
 
 #### CHORE-GASLESS-NONCE-TIMEOUT · chain: gasless nonce uniqueness test hit the 60 s timeout (new, flake 2026-10-27, #607 push run)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (content rule: touches nonces; path `packages/chain/**` is S1)
+- **Status:** in review · **Size:** XS · **Tier:** Opus · **Security:** S2 (content rule: touches nonces; path `packages/chain/**` is S1)
 - **Repo/path:** agentlink · `packages/chain/src/fees/gasless.test.ts` (tests only, no product code)
 - **Depends on:** —
 - **Scope:** Seen 2026-10-27 about 19:08Z on the push run of #607: "draws a fresh 32-byte nonce every time (1 000 builds)" hit the 60 s test timeout. Measure where the time goes, then make the test faster or give it a measured per-test timeout under the test timeout policy (`repo-reference.md`, M0-10e). No retries; never lower a timeout.

@@ -1645,6 +1645,10 @@ body {
     top: 2px;
     right: 6px;
   }
+  /* The tick badge (CountBadge, motion.css) sits in the same corner (UI-REFRESH-o-b). */
+  .al-nav-count.al-count {
+    position: absolute;
+  }
   .al-nav-slider {
     display: none;
   }

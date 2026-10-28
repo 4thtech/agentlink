@@ -7,8 +7,8 @@
 //
 // Cards sit on level 1; the card being decided rises to level 2; each card has a ring meter for the
 // time left; an applied approval draws the check, a denial fades the decided card. Under the hood
-// shows the kind and the exact expiry. The approval ID is not offered there: the shared panel's
-// allowlist refuses its 26-character run (reported for a follow-up to UI-REFRESH-e).
+// shows the approval ID (UI-REFRESH-o-b, through the shared panel's `id` kind), the kind and the
+// exact expiry. The collapse after an approval is pinned in approvals.followups.test.ts.
 import { HoodProvider, PAY_CONFIRM_STRINGS as P, lintVocabulary } from '@4thtech-io/ui';
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -480,7 +480,7 @@ describe('Under the hood', () => {
     expect(host.querySelector('.al-hood')).toBeNull();
   });
 
-  it('shows the kind and the exact expiry per card, and nothing the agent wrote', async () => {
+  it('shows the approval ID, the kind and the exact expiry per card, and nothing the agent wrote', async () => {
     await mount(
       {
         [LIST]: [
@@ -499,14 +499,15 @@ describe('Under the hood', () => {
       ]);
     const iso = new Date((NOW_S + 3 * 3600) * 1000).toISOString();
     expect(rows('A')).toEqual([
+      [S.hoodId, id('A')],
       [S.hoodKind, S.kindRequest],
       [S.hoodExpiry, iso],
     ]);
-    expect(rows('C')[0]).toEqual([S.hoodKind, S.kindPaid]);
-    expect(rows('D')[0]).toEqual([S.hoodKind, S.kindTerms]);
+    expect(rows('C')[1]).toEqual([S.hoodKind, S.kindPaid]);
+    expect(rows('D')[1]).toEqual([S.hoodKind, S.kindTerms]);
     for (const panel of host.querySelectorAll('.al-hood')) {
       expect(panel.textContent).not.toContain(CANARY);
-      expect(panel.textContent).not.toContain(id('A'));
+      expect(panel.textContent).not.toContain('Headline');
       expect(panel.textContent).not.toMatch(/[0-9a-f]{64}/);
       expect(panel.querySelector('a')).toBeNull();
     }

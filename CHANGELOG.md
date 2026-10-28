@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-28
+
+### Added
+
+- A new Appearance page (theme, reduce motion, transparency) and an optional "Under the hood" view that shows technical details in a clearly marked panel, off by default and never showing keys, codes or private links (UI-REFRESH-e). The page and the top bar switch appear in the menu with a later step.
+- The Files page looks and moves like the rest of the refreshed app: the Received list sits on a raised card, files still arriving or sending show a short stepped bar with plain words, the tabs show how many files wait, a file that arrives while the page is open gets a small "File received" moment, and the Under the hood panel lists how many files and how much data (UI-REFRESH-j).
+- The local app has an About page under Settings: the AgentLink mark with "by 4thTech", your version, the licence, and links to the guides and to support. It shows nothing private.
+
+### Changed
+
+- Docs and status now say AgentLink 0.4.0 was released on 27 Oct 2026 (Messages, the Files tabs, Touch ID for earlier owners, paid-action confirmation, the status bar and duplicate-contact help). The user guide applies to 0.4.0, the Claude Desktop page links the 0.4.0 extension files, and the visual refresh and the cloud agent (0.5.0) are named as next (DOCS-040-RELEASED).
+- Approvals now open inside the local app (M1-11b-2, S2): the list, review together, one request from a link (`/approve/…`) and the paid-action confirmation sheet sit in the same window as Activity, Messages and the rest, with the sidebar to get back. The rules are unchanged: a request that costs credits is approved on its own card through the sheet ("Remember for this contact" when offered, the backup code with its three tries), terms are decided one at a time, and your AI still can't approve anything for you. The page says "backup code" like the rest of the app.
+- Layers for the local app's visual refresh (UI-REFRESH-b, S1): cards and sheets now sit at five calm depth levels, side sheets and dialogs focus and close properly, and the sidebar can be frosted on a Mac and solid everywhere else. Nothing shows in the app yet; later cards use these.
+- New progress components for the local app's refresh (UI-REFRESH-c, S1): progress bars, a ring meter for credits and time left, loading placeholders and a short error line. They are not on any page yet, and the spinning icon on the proof chip is gone.
+- Building blocks for the local app's live look (UI-REFRESH-d, S1): status dots that show a shape and a word, calm "done" moments for approvals, proofs, matching codes and received files, a ticking count badge, and gentle row arrival and exit. With Reduce motion on, everything changes instantly and says what happened in words. Not used on any page yet.
+- The on/off switch glides more smoothly, and the optional "Under the hood" view can now show long folder paths such as the Files folder, while still never showing keys, codes or private links (UI-REFRESH-e2).
+- While the paid-action confirmation is open, nothing on the page behind it can be clicked, tabbed into or focused, so only the confirmation can act until it closes (UI-REFRESH-f-b).
+- The app window has a top bar with the page title, the Under the hood switch, the live connection status and a theme button. On a Mac the sidebar and bars are softly frosted (solid on Windows and Linux, or when you ask for less transparency); the highlight in the menu glides to the page you open, pages fade in gently (no motion if you turned it off), and on a phone-sized window the menu moves to a bar at the bottom. Home and Appearance join the menu, and the dimmed background behind a side panel or dialog can no longer be clicked or tabbed into (UI-REFRESH-f).
+- Home (UI-REFRESH-g, S1): a new Home page at `/settings/home` with five live tiles (Agent, Network, Waiting for you, Credits, Last activity) and one Next step card while setup is unfinished. The tiles update on their own, pause while the tab is hidden, keep their last values with an "as of" time when the app is offline, and stack with Waiting for you first in a narrow window. Last activity names what happened, never message text or file names.
+- Activity looks and feels like the rest of the refreshed app (UI-REFRESH-h): events sit under a date header that stays in view while you scroll, you can filter by approvals, proofs, or blocks and rules, a small dot shows the list is live, and new events appear at the top on their own with a soft highlight. If AgentLink can't be reached, the list stays and says when it was last up to date.
+- Contacts has a calmer look: the list sits on a raised card, a contact opens in a side sheet (a full page on a narrow window), "Waiting for {name}" breathes while an invite is open, a short "codes match" moment plays after a safety-code check, and the second-connection notice is a raised banner. The optional "Under the hood" view shows a contact's fingerprint, identity level and pairing date (UI-REFRESH-i).
+- Messages has the new look: contacts and messages sit on solid cards, a soft placeholder shows while they load, a contact that appears later slides in, and message text never moves. The technical details use the same Under the hood panel as the other pages (UI-REFRESH-k).
+- Proofs & credits: credits show as a ring on a raised card that fills on load, a proof that finishes gets a short "Proof recorded" check, "Waiting for your credits…" shows after adding credits, first load uses calm placeholders, and the optional Under the hood panel lists the proof count and fee (UI-REFRESH-l).
+- The Rules page looks calmer: a short summary of the rules in force, a placeholder instead of a loading line on first load, "Saved" plays once after saving, and the optional "Under the hood" panel shows the rules version. What each rule means and how it is saved are unchanged (UI-REFRESH-m).
+- Approvals has the new look: each request sits on its own card that lifts while you decide it, a small ring shows how much time is left, approving draws a check and a denied card fades. A soft placeholder shows while requests load, and Under the hood shows each request's kind and exact expiry. What you approve and how you confirm it are unchanged (UI-REFRESH-o).
+- The user guide shows the refreshed local app: new screenshots for every page, and new guide pages for Home, Approvals, and Appearance with Under the hood. The refresh is merged and ships in the next release (UI-REFRESH-p).
+
+### Removed
+
+- The old stand-alone approval page is gone (M1-11b-2c, S2): approvals open only inside the local app, with the same rules as before (your passkey or backup code after you click, review together, paid actions on their own card through the confirmation sheet). If your copy of AgentLink can't show the app, the browser says so and points you to `npx -y @4thtech-io/agentlink approve` in your own terminal. The backup code field is now as tall as its Confirm button.
+
+### Fixed
+
+- Small fixes across the refreshed pages (UI-REFRESH-r, S1, B-11 §7): Under the hood shows a contact's fingerprint in groups, Files labels its folders from the strings file and says "N more" past five, a Files refresh that comes back empty keeps the rows you already see and says "as of", Rules says "Allowed" for new contacts, and Proofs keeps every row after "Show more", no longer mixes up two proofs from the same second, and does not announce an empty credits ring to screen readers before it fills.
+- The refreshed local app is smoother and easier to use from the keyboard (UI-REFRESH-t, S1, B-11 §7): page changes no longer stall on the long Activity list, scrolling a long Messages conversation no longer drops frames, the Proofs table can be reached and scrolled with the keyboard on a narrow window, a "Skip to content" link is the first Tab stop, and Settings › Appearance shows the names Theme, Reduce motion and Transparency above their choices.
+
+### Security
+
+- UI-REFRESH-e3: the "Under the hood" panel refuses more disguised forms of private links, keys and codes, and now shows message IDs in full.
+
 ## [0.4.0] - 2026-10-27
 
 ### Added
@@ -658,7 +698,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/4thtech/agentlink/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/4thtech/agentlink/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/4thtech/agentlink/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/4thtech/agentlink/compare/v0.1.2...v0.2.0

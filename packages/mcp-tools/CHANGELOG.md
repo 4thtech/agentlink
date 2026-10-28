@@ -1,5 +1,15 @@
 # @4thtech-io/mcp-tools
 
+## 0.4.1
+
+### Patch Changes
+
+- @4thtech-io/chain@0.4.1
+  - @4thtech-io/core@0.4.1
+  - @4thtech-io/crypto@0.4.1
+  - @4thtech-io/log@0.4.1
+  - @4thtech-io/types@0.4.1
+
 ## 0.4.0
 
 ### Patch Changes

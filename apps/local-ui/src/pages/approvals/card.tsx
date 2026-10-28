@@ -15,7 +15,21 @@
 // applied approval draws the check (SuccessMoment), an applied denial fades the decided card; Under
 // the hood shows the kind and the exact expiry. Nothing the agent wrote reaches the ring, the moment
 // or the panel, and every fact stays on the card before, during and after the decision (WYSIWYS).
-import { Button, RingMeter, SuccessMoment, Surface, useVisibilityPause } from '@4thtech-io/ui';
+//
+// UI-REFRESH-o-b (state handling only; B-11 §16, §6 row 4, §7): Under the hood also shows the
+// approval ID, through the shared panel's `id` kind. After an applied approval the card holds
+// "Approved." and every fact while the check draws, then collapses out with the shared row leave
+// (reduced motion: removed at once); the page keeps the result as a line of text. An open
+// confirmation sheet, a refused attempt and a denial keep the card. Presence, signing and the
+// decide calls are untouched.
+import {
+  Button,
+  RingMeter,
+  SuccessMoment,
+  Surface,
+  useRowPresence,
+  useVisibilityPause,
+} from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { PayConfirm, type PayConfirmClient } from '../../pay-confirm/index.js';
@@ -117,21 +131,33 @@ export function TimeLeft({ expiresAt }: { expiresAt: number }): ReactElement {
   );
 }
 
-/** Under the hood for one request: its kind and exact expiry (B-11 §16). */
+/**
+ * Under the hood for one request: its approval ID, kind and exact expiry (B-11 §16). The ID goes
+ * through the shared panel's `id` kind, so the panel's allowlist has the last word; only a
+ * well-formed `apr_` ID is offered.
+ */
 export function approvalHoodFields(item: ApprovalItem): readonly unknown[] {
-  const fields: unknown[] = [
-    {
-      kind: 'text',
-      label: S.hoodKind,
-      value: item.commitment ? S.kindTerms : item.paid ? S.kindPaid : S.kindRequest,
-    },
-  ];
+  const fields: unknown[] = [];
+  if (APPROVAL_ID.test(item.approvalId)) {
+    fields.push({ kind: 'id', label: S.hoodId, value: item.approvalId });
+  }
+  fields.push({
+    kind: 'text',
+    label: S.hoodKind,
+    value: item.commitment ? S.kindTerms : item.paid ? S.kindPaid : S.kindRequest,
+  });
   const at = new Date(item.expiresAt * 1000);
   if (Number.isFinite(at.getTime())) {
     fields.push({ kind: 'time', label: S.hoodExpiry, value: at.toISOString() });
   }
   return fields;
 }
+
+/**
+ * How long an approved card stays, with "Approved." and every fact, before it collapses out: the
+ * check has drawn and the line can be read (B-11 §6 rows 4 and 7).
+ */
+export const APPROVED_HOLD_MS = 1600;
 
 /**
  * The approved moment, with the shared component's own word ("Approved"). The status line ("Approved.")
@@ -349,18 +375,36 @@ export function SingleApproval({
   owner,
   client,
   sheet,
+  onDecided,
+  onLeft,
 }: {
   item: ApprovalItem;
   owner: OwnerState;
   client: ApprovalsClient;
   sheet: SheetOptions;
-}): ReactElement {
+  /** An applied decision (approve or deny); never called for a refused or failed attempt. */
+  onDecided?: () => void;
+  /** The approved card has collapsed out; the page keeps this line in its place. */
+  onLeft?: (line: string) => void;
+}): ReactElement | null {
   const [step, setStep] = useState<Decision | undefined>(undefined);
   const [actions, setActions] = useState(true);
   const [lines, setLines] = useState<readonly string[]>([]);
   const [paying, setPaying] = useState(false);
   const [outcome, setOutcome] = useState<'approved' | 'denied' | undefined>(undefined);
   const say = (text: string): void => setLines((l) => [...l, text]);
+
+  // UI-REFRESH-o-b: an approved card leaves once the sheet (if any) is closed and the hold is over.
+  const [present, setPresent] = useState(true);
+  const leaving = outcome === 'approved' && !paying;
+  useEffect(() => {
+    if (!leaving) return undefined;
+    const timer = setTimeout(() => setPresent(false), APPROVED_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [leaving]);
+  const row = useRowPresence<HTMLDivElement>(present, {
+    onGone: () => onLeft?.(fmt(S.approvedLine, { summary: item.summary })),
+  });
 
   const answer = (a: DecideAnswer): void => {
     if (a.kind === 'dismissed') {
@@ -371,6 +415,7 @@ export function SingleApproval({
     if (a.kind === 'status' && a.status === 'applied') {
       if (a.decision === 'approve') setOutcome('approved');
       else if (a.decision === 'deny') setOutcome('denied');
+      onDecided?.();
     }
     say(decisionText(a));
     if (a.kind === 'status' && RETRY.has(a.status)) setActions(true);
@@ -386,61 +431,69 @@ export function SingleApproval({
     setStep(decision);
   };
 
+  if (!row.mounted) return null;
   return (
-    <Surface
-      as="section"
-      level={step !== undefined || paying ? 2 : 1}
-      className="al-approval"
-      {...(APPROVAL_ID.test(item.approvalId) ? { 'data-approval': item.approvalId } : {})}
-      {...(outcome === undefined ? {} : { 'data-outcome': outcome })}
-    >
-      <ApprovalFacts item={item} />
-      {item.commitment ? <p className="al-note">{S.termsAlone}</p> : null}
-      {item.paid ? <p className="al-note">{S.paidAlone}</p> : null}
-      <div className="al-slot">
-        {owner.ready && actions ? (
-          // Deny first, Approve as the wider primary (D1); neither is a default button (11 §8).
-          <div className="al-approval-actions">
-            <Button size="lg" onClick={() => open('deny')}>
-              {S.deny}
-            </Button>
-            <Button variant="primary" size="lg" onClick={() => open('approve')}>
-              {S.approve}
-            </Button>
-          </div>
-        ) : null}
-        {outcome === 'approved' ? <ApprovedMoment /> : null}
-        <Statuses lines={lines} />
-        {step === undefined ? null : (
-          <OwnerStep
-            passkey={owner.passkey !== undefined}
-            passkeyLabel={step === 'approve' ? S.approveWithPasskey : S.denyWithPasskey}
-            codeSubmit={step === 'approve' ? S.confirmApproval : S.confirmDenial}
-            label={step === 'approve' ? S.confirmApproval : S.confirmDenial}
-            onPasskey={async () => {
-              if (owner.passkey === undefined) return;
-              answer(await client.decide(item, step, { kind: 'passkey', passkey: owner.passkey }));
+    <div ref={row.ref} className="ap-leave">
+      <Surface
+        as="section"
+        level={step !== undefined || paying ? 2 : 1}
+        className="al-approval"
+        {...(APPROVAL_ID.test(item.approvalId) ? { 'data-approval': item.approvalId } : {})}
+        {...(outcome === undefined ? {} : { 'data-outcome': outcome })}
+      >
+        <ApprovalFacts item={item} />
+        {item.commitment ? <p className="al-note">{S.termsAlone}</p> : null}
+        {item.paid ? <p className="al-note">{S.paidAlone}</p> : null}
+        <div className="al-slot">
+          {owner.ready && actions ? (
+            // Deny first, Approve as the wider primary (D1); neither is a default button (11 §8).
+            <div className="al-approval-actions">
+              <Button size="lg" onClick={() => open('deny')}>
+                {S.deny}
+              </Button>
+              <Button variant="primary" size="lg" onClick={() => open('approve')}>
+                {S.approve}
+              </Button>
+            </div>
+          ) : null}
+          {outcome === 'approved' ? <ApprovedMoment /> : null}
+          <Statuses lines={lines} />
+          {step === undefined ? null : (
+            <OwnerStep
+              passkey={owner.passkey !== undefined}
+              passkeyLabel={step === 'approve' ? S.approveWithPasskey : S.denyWithPasskey}
+              codeSubmit={step === 'approve' ? S.confirmApproval : S.confirmDenial}
+              label={step === 'approve' ? S.confirmApproval : S.confirmDenial}
+              onPasskey={async () => {
+                if (owner.passkey === undefined) return;
+                answer(
+                  await client.decide(item, step, { kind: 'passkey', passkey: owner.passkey }),
+                );
+              }}
+              onCode={async (code) =>
+                answer(await client.decide(item, step, { kind: 'code', code }))
+              }
+            />
+          )}
+        </div>
+        <ApprovalFoot />
+        <UnderTheHood fields={approvalHoodFields(item)} />
+        {paying ? (
+          <PayConfirm
+            {...(sheet.payConfirm === undefined ? {} : { client: sheet.payConfirm })}
+            {...(sheet.platform === undefined ? {} : { platform: sheet.platform })}
+            {...(sheet.reducedMotion === undefined ? {} : { reducedMotion: sheet.reducedMotion })}
+            input={{ flow: 'proof', approvalId: item.approvalId }}
+            onDone={() => {
+              setActions(false);
+              setOutcome('approved');
+              say(S.approved);
+              onDecided?.();
             }}
-            onCode={async (code) => answer(await client.decide(item, step, { kind: 'code', code }))}
+            onClose={() => setPaying(false)}
           />
-        )}
-      </div>
-      <ApprovalFoot />
-      <UnderTheHood fields={approvalHoodFields(item)} />
-      {paying ? (
-        <PayConfirm
-          {...(sheet.payConfirm === undefined ? {} : { client: sheet.payConfirm })}
-          {...(sheet.platform === undefined ? {} : { platform: sheet.platform })}
-          {...(sheet.reducedMotion === undefined ? {} : { reducedMotion: sheet.reducedMotion })}
-          input={{ flow: 'proof', approvalId: item.approvalId }}
-          onDone={() => {
-            setActions(false);
-            setOutcome('approved');
-            say(S.approved);
-          }}
-          onClose={() => setPaying(false)}
-        />
-      ) : null}
-    </Surface>
+        ) : null}
+      </Surface>
+    </div>
   );
 }
