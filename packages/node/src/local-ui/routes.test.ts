@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import type { LocalUiContext } from './context.js';
 import type { LocalUiRoute } from './route-types.js';
 import {
+  AGENTS_SWITCH_PATH,
   INVITE_ACCEPT_PATH,
   INVITE_CHECK_PATH,
   INVITE_CREATE_PATH,
@@ -169,6 +170,16 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/invites',
       '/api/ui/invites/check',
       '/api/ui/invites/accept',
+      // U3-c: the Agents list, the switch kind and the U3 stubs (local-ui/app-host-server.test.ts).
+      '/api/ui/agents',
+      '/api/ui/agents/switch',
+      '/api/ui/agents/label',
+      '/api/ui/agents/remove',
+      '/api/ui/apps',
+      '/api/ui/apps/preview',
+      '/api/ui/apps/apply',
+      '/api/ui/apps/disconnect',
+      '/api/ui/flow',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
@@ -366,5 +377,67 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
         registry.register({ method: 'POST', path, presence: false, handler: answer } as never),
       ).toThrow(/presence/);
     }
+  });
+});
+
+// U3-c (D-138, 08 §1): switching the open agent is the sixth named route kind `switch`: only POST,
+// only at the fixed path, no handler, once. A stub (`stub: true`) is only a POST owner route.
+describe('the switch route kind and the U3 stubs (U3-c, I-4)', () => {
+  const answer = () => Promise.resolve({ status: 200, body: { status: 'ok' } });
+
+  it('the default registry has exactly one switch route, at the fixed path, with no handler', () => {
+    const routes = createLocalUiRoutes().routes();
+    const switches = routes.filter((r) => r.presence === 'switch');
+    expect(switches.map((r) => `${r.method} ${r.path}`)).toEqual([`POST ${AGENTS_SWITCH_PATH}`]);
+    expect(AGENTS_SWITCH_PATH).toBe('/api/ui/agents/switch');
+    expect('handler' in (switches[0] as object)).toBe(false);
+  });
+
+  it('no other path, method, handler or second route can use the switch kind', () => {
+    const route = (over: Record<string, unknown>) =>
+      ({ method: 'POST', path: AGENTS_SWITCH_PATH, presence: 'switch', ...over }) as unknown as LocalUiRoute;
+    for (const path of ['/api/ui/agents', '/api/ui/agents/label', '/api/ui/rules', `${AGENTS_SWITCH_PATH}/x`]) {
+      const registry = new LocalUiRouteRegistry();
+      expect(() => registry.register(route({ path })), path).toThrow(/switch/);
+    }
+    for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) {
+      expect(() => new LocalUiRouteRegistry().register(route({ method })), method).toThrow(/switch/);
+    }
+    expect(() => new LocalUiRouteRegistry().register(route({ handler: answer }))).toThrow(/handler/);
+    const registry = new LocalUiRouteRegistry();
+    registry.register(route({}));
+    expect(() => registry.register(route({}))).toThrow(/switch/);
+    expect(registry.routes()).toHaveLength(1);
+  });
+
+  it('a stub is only a POST owner route; a POST without presence is still refused at the U3 paths', () => {
+    for (const over of [
+      { method: 'GET', presence: false },
+      { method: 'POST', presence: 'reveal' },
+      { method: 'PUT', presence: true },
+      { method: 'POST', presence: true, stub: 'yes' },
+    ]) {
+      const registry = new LocalUiRouteRegistry();
+      expect(
+        () => registry.register({ path: '/api/ui/agents/label', handler: answer, stub: true, ...over } as never),
+        JSON.stringify(over),
+      ).toThrow();
+    }
+    for (const path of ['/api/ui/agents', '/api/ui/agents/label', '/api/ui/agents/remove', '/api/ui/apps/apply']) {
+      expect(() =>
+        new LocalUiRouteRegistry().register({ method: 'POST', path, presence: false, handler: answer } as never),
+      ).toThrow(/presence/);
+    }
+    const stubs = createLocalUiRoutes()
+      .routes()
+      .filter((r) => r.presence === true && r.stub === true)
+      .map((r) => r.path);
+    expect(stubs).toEqual([
+      '/api/ui/agents',
+      '/api/ui/agents/label',
+      '/api/ui/agents/remove',
+      '/api/ui/apps/apply',
+      '/api/ui/apps/disconnect',
+    ]);
   });
 });
