@@ -4960,7 +4960,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 
 #### UI-REFRESH-o-b · local-ui: Approvals restyle follow-ups, ID in Under the hood, decided-card state, nav badge (new, low, S2 by content, #616)
 - **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI) · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/{approvals,approve}/**`, `apps/local-ui/src/shell/**` (the approvals badge only), `apps/local-ui/src/strings.ts`, tests; `packages/ui/src/**` only for the ID-kind part, together with UI-REFRESH-e3
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/{approvals,approve}/**`, `apps/local-ui/src/shell/**` (the approvals badge only), `apps/local-ui/src/strings.ts`, tests; `packages/ui/src/**` only for the ID-kind part, together with UI-REFRESH-e3; changeset if `packages/ui` changes
 - **Depends on:** UI-REFRESH-o; UI-REFRESH-e3 (for part a)
 - **Spec:** B-11 §7, §16 (Approvals); 08 §1; 04 §2.5
 - **Invariants:** I-4, I-5
@@ -4979,7 +4979,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Invariants:** I-5
 - **Scope:** low-severity robustness findings from the independent review of UI-REFRESH-e3 (#619). The cases are described in the tests, not in the PR text.
   - (a) The `id` kind check treats values built from several parts more strictly, so a value under the usual length limit is judged the same way as a single piece.
-  - (b) The rule that looks at split values is revisited (for example by comparing the number of parts with the total length) so short multi-part values are covered without refusing normal text.
+  - (b) The rule that looks at split values is revisited (for example by comparing the number of parts with the total length) revisit the split-value rule without refusing normal text.
   - (c) The label list that decides which rows are treated as sensitive is completed with the missing terms from the spec (salt, private, recovery and mnemonic wording).
   - (d) Look-alike spellings of those labels are handled the same as the plain ones.
 - **Acceptance:**
@@ -4998,7 +4998,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 
 #### UI-REFRESH-u · local-ui: lazy-load the Settings pages and the Under the hood panel (new, post-release UI performance, owner decision 17, 2026-10-28)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/shell/router.tsx`, `apps/local-ui/src/pages/{backup,advanced,storage,about,appearance}/**` (import sites only), the Under the hood panel mount, `apps/local-ui/vite.config.*`, tests
+- **Repo/path:** agentlink · `apps/local-ui/src/router.tsx` (test: `router.test.ts`), `apps/local-ui/src/pages/{backup,advanced,storage,about,appearance}/**` (import sites only), the Under the hood panel mount, `apps/local-ui/vite.config.*`, tests
 - **Depends on:** UI-REFRESH-t
 - **Spec:** plan §7 (`docs/process/proposals/UI-REFRESH.md`); B-11 §7
 - **Invariants:** —
