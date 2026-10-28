@@ -1,6 +1,6 @@
 # B-11 · A state-of-the-art local app: Home, live state, motion, under the hood (design brief)
 
-> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20; UX2-brief-0 on 2026-10-28 adds §22 and §26 in Part 4, pending the owner's approval). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
+> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20; UX2-brief-0 on 2026-10-28 adds §22 and §26 in Part 4, and UX2-brief on 2026-10-28 adds §21, §23, §24, §25 and §27 there, all pending the owner's approval). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
 
 ## 1. Why, and what the owner asked for
 
@@ -441,6 +441,84 @@ Never "wallet", "bank", "transaction", "gas", "deposit", "payment method" or "ba
 
 Source: `docs/process/proposals/UX-WAVE-2.md` (§4, §9.1) and the owner's decisions of 2026-10-28 (all as recommended; decision 8.1 puts §22 and §26 into 0.4.2). Card UX2-brief-0 adds §22 and §26 here; §21, §23, §24, §25 and §27 follow with card UX2-brief and slot in by number. **Both sections wait for the owner's approval; UX2-a and UX2-b start only after it.** Nothing new is drawn: every control below is an existing `packages/ui` component (`Switch`, `Segmented`, `Button`), restyled only with existing `--al-*` tokens. The screenshots in the UX2-a and UX2-b PRs are the owner's visual review, as for the refresh (D-116, D-135).
 
+## 21. Add contact: create an invite, or use one
+
+**Idea.** Today a newcomer has to know to ask their AI for an invite, and Home's Next step leads to a page without a button (UX-WAVE-2 item 1). One **Add contact** button now does it in the app: create a ready-to-send invite and hand it on through Copy, the system share sheet or a QR code, or paste an invite someone sent you. Pattern: Slack and Linear "Invite people", Signal and WhatsApp contact QR codes, Apple's share sheet. Built from `Button`, `Segmented` (§22), `TextField`, the `QrCode` of Add credits (`pages/proofs/qr.tsx`), the copied moment (§6 row 6) and the level-3 side sheet (§13.1). Owner decisions 1.1 and 2.1 apply. **This section replaces §8 screens 8 and 9** where they differ: creating an invite needs no Touch ID (decision 1.1), the QR code shows on request, and the safety line is the one in §21.3.
+
+### 21.1 Where it opens
+
+- **Contacts:** an **Add contact** button (secondary; primary only when the list is empty) at the end of the page title row.
+- **Home:** step 2 of Start here (§27) and the empty states of Contacts, Messages and Files (§27.4) open the same sheet.
+- **The sheet:** level 3 (§13.1), from the right, 480 px wide, full height; the page behind stays visible and is not dimmed (it is not a modal). At 600 px and under it is a full page with a Back arrow. Esc and Close close it. Opening it changes nothing in the address bar except, at most, a fixed marker with no data (never an invite, a name or an ID); the page title stays "Contacts".
+
+### 21.2 The two choices
+
+A `Segmented` control at the top of the sheet (§22: tab semantics, since it swaps the panel below): **Invite someone** (default) and **I have an invite**.
+
+```text
+1280, sheet open (level 3, 480 px)                         360 (full page)
+┌────────────────────────────────┬─────────────────────┐   ┌──────────────────────────────┐
+│ Contacts      [ Add contact ]  │ Add contact       ✕ │   │ ←  Add contact               │
+│ ┌────────────────────────────┐ │ [✓ Invite someone │ │   │ [✓ Invite someone │ I have…] │
+│ │ row                        │ │   I have an invite ]│   │                              │
+│ └────────────────────────────┘ │                     │   │ Who is it for? (optional)    │
+│ ┌────────────────────────────┐ │ Who is it for?      │   │ [ Marko                    ] │
+│ │ row                        │ │ (optional)          │   │                              │
+│ └────────────────────────────┘ │ [ Marko           ] │   │ [      Create invite       ] │
+│                                │ [ Create invite ]   │   │                              │
+└────────────────────────────────┴─────────────────────┘   └──────────────────────────────┘
+```
+
+### 21.3 Invite someone
+
+| State | What shows |
+|---|---|
+| **Form** | `TextField` **"Who is it for?"** (optional), hint "Helps you recognise them when they answer." The name is stored as the invite label and stays a suggested name until you approve the new contact (06 §2.1, 11 §5.2). One primary button **Create invite** |
+| **Creating** | The button shows "Creating…" and is disabled; nothing else moves (§15.2: under 400 ms nothing shows) |
+| **Ready** | Heading "Invite ready" (with a name: "Invite ready for Marko"). The ready-to-send text (`shareText`: our fixed template with the link and expiry, 11 §6.1 J7) in a recessed well (`--al-color-bg-sunken`, `al-text-body-sm`, wraps, never scrolls sideways). Under it: "Works once, until 19 Oct." Then the **safety line** (below). Then three ways out, in this order: **Copy invite** (primary), **Share…** (secondary), **Show QR code** (secondary; becomes **Hide QR code**). Last, **Done** (ghost) closes the sheet |
+| **Copied** | §6 row 6: the Copy icon becomes a check and the label "Copied" for 1.6 s; a polite announcement "Invite copied". No toast (a toast would be a second place showing it) |
+| **QR shown** | The code (`QrCode`, dark modules on a light square in both themes, as Add credits) at least 240 px square, centred in the sheet, full width at 360; the caption "Scan it with their phone's camera." The QR encodes the invite link only, not the whole message |
+| **Can't create** | Red edge and one sentence: "Couldn't create the invite. Try again in a minute." with **Try again**; the name typed stays |
+| **Agent not running / not set up** | The whole-app states of §8 screen 23; the button is not shown |
+
+**The safety line** (`al-text-body-sm`, `--al-color-fg-muted`, an `info` icon, directly above the three buttons; never colour alone):
+
+> **Send it only to Marko. Anyone with this link can connect once.** A private chat, email or text message is fine. Don't post it publicly.
+
+Without a name: "Send it only to the person you mean. Anyone with this link can connect once." It claims nothing more: the sheet never says "secure", "safe" or "encrypted" about the link. Why the wording holds (UX-WAVE-2 §3): the link is single use, expires, carries no key or code of the owner, and a copied or swapped invite is caught by the safety code (04 §3.6.1); a link posted publicly is answered by whoever is first.
+
+**Share…** opens the operating system's share sheet (`navigator.share`, text only, title "AgentLink invite"). It is **hidden, not disabled,** where the browser has no `navigator.share` or `navigator.canShare({ text })` says no, so nobody meets a button that does nothing. If the person closes the share sheet, nothing happens; if sharing fails: "Sharing didn't work. Use Copy invite instead." **No email button and no `mailto:`** (decision 2.1).
+
+**Closing.** Done or Close closes the sheet. The new **pending row** is already in the list (it arrived with §6 row 3 when the invite was created) and gets the 1.2 s highlight as the sheet leaves: "Waiting for Marko to accept", with the ring meter counting the days left (§15.3). From there the existing steps take over: the safety-code step when they answer (§8 screen 10). If the person closes before Copy, Share or Show QR code, the sheet first says, in place: "You haven't sent the invite yet. Close anyway?" with **Close anyway** and **Keep it open**. The invite is not shown again after the sheet closes (§21.5).
+
+### 21.4 I have an invite
+
+| State | What shows |
+|---|---|
+| **Paste** | `TextField` (multi-line) **"Paste the invite link"**, hint "It starts with https://{inviteHost}/i#". **Check invite** (primary), disabled while the field is empty |
+| **Checking** | Indeterminate bar "Checking the invite…" (§15.1) |
+| **Who it is** | The inviter as 11 §6.5 and §5.2 show them: name under the name rule with its label (for example "Self-declared"), the short owner fingerprint, and the expiry; the question **"Is this who you expected?"**; **Connect** (primary) and **Cancel**. Connect asks for Touch ID (the presence prompt, §8 screen 5, level 4), because it leads to a new contact (decision 1.1) |
+| **Connecting** | "Connecting to Marko…" with the indeterminate bar; then the step the route returns: either the new-contact approval under your rules ("One more step: approve Marko as a contact." with **Review**, which opens it in Approvals), or the pending row and, when their agent answers, the safety-code step |
+| **Can't use it** | One sentence each, then **Ask for a new invite** guidance (11 §9, "Invite expired, used or damaged"): "This invite has expired.", "This invite was already used.", "This link isn't a complete AgentLink invite. Ask for it again.", "This is your own invite." |
+| **Offline** | "Can't reach AgentLink on this computer. Try again in a minute."; the pasted text stays in the field |
+
+The pasted text is cleared from the field once the invite is used or the sheet closes.
+
+### 21.5 Where the invite may appear (for the build card)
+
+The invite (link and share text) appears **only in the sheet**: the well, the QR code and the clipboard or share sheet the person chose. Never in the address bar, the page or window title, a toast, a notification, Activity, Under the hood, a log or an error message, and never sent through a 4thTech service (no link shortener, no "email it for me"). The pending row shows the name and days left, never the link. Copy copies `shareText`; Share sends `shareText`; the QR code holds `inviteUrl`.
+
+### 21.6 Accessibility and motion
+
+- The sheet is a labelled region ("Add contact"); focus moves to its first field on open and returns to the Add contact button on close. Live region (polite): "Invite ready", "Invite copied", the error sentence.
+- QR code accessible name: "QR code of the invite for Marko" (never the link itself).
+- Reduced motion: the sheet appears without sliding; Copied changes the word at once; the new row appears without the highlight's movement (the highlight colour still fades).
+- 44 px targets at 360 (`--al-size-control-lg`); the three buttons stack full width at 360.
+
+### 21.7 Copy (11 §5)
+
+New strings: "Add contact", "Invite someone", "I have an invite", "Who is it for?", "Helps you recognise them when they answer.", "Create invite", "Creating…", "Invite ready", "Invite ready for {name}", "Works once, until {date}.", the safety line (§21.3), "Copy invite", "Invite copied", "Share…", "AgentLink invite", "Show QR code", "Hide QR code", "Scan it with their phone's camera.", "Done", "You haven't sent the invite yet. Close anyway?", "Close anyway", "Keep it open", "Couldn't create the invite. Try again in a minute.", "Sharing didn't work. Use Copy invite instead.", "Paste the invite link", "Check invite", "Checking the invite…", "Is this who you expected?", "Connect", "Connecting to {name}…", "One more step: approve {name} as a contact.", and the four "Can't use it" sentences. `{name}` is always the name-rule output, rendered as text. No "wallet", "address", "key", "transaction" or "relay".
+
 ## 22. Control map: switch, segmented control, button
 
 **Idea.** The owner likes the Under the hood switch (§7) and wants that feel wherever it fits. It fits where something is *on or off*. Choosing between views gets the same track and sliding marker, as a segmented control. Doing something stays a button: a switch on an action ("Approve") would mislead people and screen readers alike (Apple HIG, Material).
@@ -520,6 +598,159 @@ Never colour alone: the switch has its On/Off word, the segmented control its ch
 
 A switch in Rules edits the **draft**, never the rules in force. While a switch differs from the saved value, its row shows the word **"Unsaved"** (`al-text-caption`, muted, beside the switch) and today's unsaved-changes bar appears ("1 change", Discard, Review and save). Saving goes through the owner-presence prompt as today; the word goes only once the save has succeeded. Discard puts the switch back. So a Rules switch never shows a state that is not in force without "Unsaved" beside it.
 
+## 23. Waiting for funds, with the AgentLink mark
+
+**Idea.** After sending funds, people stare at a still page and wonder whether it worked (UX-WAVE-2 item 3). Add credits gets a three-step tracker in the style of Wise's transfer tracker and Stripe's payout timeline: named steps, the current one alive, an honest time hint, and an amount only once a read has proved it. While waiting, the AgentLink mark's diamond turns slowly: the one brand exception of owner decision 3.1 (§23.4). It replaces §15.3's "Waiting for your credits…" indeterminate bar inside Add credits only. Built from `Mark`, the `ReceiptTimeline` step look (done steps solid, pending steps hollow and dashed), the drawn check (§6 row 7), the ring meter (§15.1) and the presence prompt.
+
+### 23.1 The three steps
+
+Shown inside the Add credits panel (`pages/proofs/top-up.tsx`), under today's QR code and account (the details), as a vertical list of three rows. Each row: a 20 px marker, the step word, and the time it was reached ("14:02"), once reached.
+
+| Step | Shown when (server reads only) | Marker and motion | Words |
+|---|---|---|---|
+| **1 · Waiting for your funds** | The panel is open and the top-up read shows nothing new yet | The waiting mark (§23.3), 40 px, beside the step | "Waiting for your funds" · "Usually takes about a minute." |
+| **2 · Arrived** | A top-up read returns `received` **above the value it had when the panel opened**. If funds were already there when the panel opened (`addable` above zero), the panel opens on this step | The diamond finishes its current quarter turn and rests; step 1's marker draws its check (`--al-duration-moment`, `--al-easing-emphasized`); step 2 becomes current | "Arrived · $5.00" (the `received` value). One primary button with today's string **"Add $4.98 to your credits"** (`addable`), which asks for Touch ID (`credits.deposit`, 04 §2.5.1). When `addable` is below `received`, today's line "A little stays with your agent to cover network costs." |
+| *(between 2 and 3)* | The owner operation has been sent, and the credits read does not show the new value yet | Indeterminate bar (§15.1) on step 3, **not** the waiting mark | "Adding to your credits…" |
+| **3 · Added to credits** | The owner operation **succeeded and** `/api/ui/proofs/credits` returns the new value | Step 3's check draws; the credits ring meter fills over `--al-duration-slow` | "Added to credits · $9.78 now" (the credits read) |
+
+**Never early.** No timer advances a step and no amount appears before the read that proves it: step 2's amount is the `received` value of that read; step 3's is the credits read after success. A submitted owner operation is not "added". If a read fails, the tracker stays on its step and adds "Couldn't check. Trying again." in muted caption type; it never goes back a step and never guesses.
+
+**Checking.** While the panel is open and the tab is visible, the existing top-up read runs every 5 s; after 2 minutes every 15 s; after 30 minutes it stops with "Stopped checking." and today's **Check again** button (the pattern Proofs uses). Hidden tab: no reads; on return, one read at once.
+
+**After 10 minutes on step 1** the hint becomes "Still waiting. Check that you sent it to this account." with **Show details again**, which scrolls today's QR code and account back into view and moves focus to them. The diamond keeps turning; nothing turns red, because nothing has failed.
+
+**Words.** Funds, account, credits, in dollars. Never "wallet", "deposit", "transaction" or "address" in these steps; the network and coin stay only inside the details part, where the sender's app asks for them (11 §5.1, D-117 B).
+
+### 23.2 Sketch
+
+```text
+Add credits  (today's QR code and account above)               Step 1 (waiting)
+  ┌────────────────────────────────────────────────────┐
+  │  [◆]   Waiting for your funds                       │   [◆] = waiting mark, 40 px:
+  │        Usually takes about a minute.                │         brackets still, diamond
+  │  ◌┄    Arrived                                      │         turns a quarter turn
+  │  ◌┄    Added to credits                             │         every 2 s
+  └────────────────────────────────────────────────────┘
+
+                                                                Step 2 (arrived)
+  │  ✓     Waiting for your funds              14:02    │
+  │  ●     Arrived · $5.00                     14:03    │
+  │        [ Add $4.98 to your credits ]                │
+  │        A little stays with your agent to cover …    │
+  │  ◌┄    Added to credits                             │
+```
+
+### 23.3 The waiting mark
+
+- **What turns:** the diamond only, about its own centre (`transform-box: fill-box; transform-origin: center`). The brackets never move, scale or change colour.
+- **How:** one quarter turn (90°) over the first half of each `--al-duration-ambient` (2 s) cycle with `--al-easing-standard`, then still for the second half. A quarter turn ends in the diamond's normal pose, so whenever it rests the mark is exactly the brand mark. Only `transform` animates; no glow, no scale, no colour change, no trail.
+- **Size:** 40 px (`Mark`, colour version for the theme). Never at 20 px or below (the pixel-snapped `mark-small` drawing never turns).
+- **Stops:** when step 1 ends (it finishes the current quarter turn and rests, §14: interrupted motion never jumps), when the tab is hidden, and when checking stops after 30 minutes.
+- **Reduced motion:** the diamond is still in its normal pose; the step word "Waiting for your funds" carries the meaning.
+- **Accessible name:** the mark is decorative here (`aria-hidden`); the step row is the status ("Waiting for your funds, step 1 of 3"). Step changes are announced politely ("Your funds arrived: $5.00", "Added to credits").
+- **Forced colours:** the mark in `CanvasText`; the turn still plays unless reduced motion is on.
+
+### 23.4 Brand guideline exception (decision 3.1)
+
+The text below is the **one** place the exception is written. UX2-e1 copies it word for word into `docs/design/brand/brand-guidelines.md` under Rules, and adds "except the waiting mark (see the brand guidelines)" to the "Don't: rotate it" line of `d1/components/Mark.md`.
+
+> **Exception: the waiting mark** (owner decision, 2026-10-28). In the AgentLink app's "Waiting for your funds" step, and nowhere else, the diamond may turn about its own centre: a quarter turn every 2 seconds, resting in its normal pose between turns. The brackets never move. Nothing else changes: no recolour, glow, scaling or outline. It is not a loading indicator and is not used for any other waiting or loading state, in tray or app icons, favicons, marketing, video or print, or at 20 px and below. With reduced motion the mark is still.
+
+## 24. Activity pulse per contact
+
+**Idea.** With many contacts, people cannot see who is busy without opening each conversation (UX-WAVE-2 item 4). Each contact row gets a tiny 24-hour **pulse** and an **activity word** with a shaped marker. Pattern: Slack presence for "now", GitHub's contribution graph and Linear's pulse for "lately", Datadog sparklines for many rows. Data: one read, `GET /api/ui/messages/pulse` (UX2-f1): per contact, counts per two-hour bucket for 24 hours and the last exchange time. Counts and times only. Decision 4.1.
+
+### 24.1 Where
+
+The Messages list rows and the Contacts list rows, right-aligned before the time: `marker · word · pulse`. Requests from unknown senders get neither (they are not contacts). At 360 the pulse stays and the word moves under the name.
+
+```text
+Messages, 1280                                                     
+┌──────────────────────────────────────────────────────────────────┐
+│ Sort  [ ✓ Recent │ Most active ]                                  │
+│ Marko · Self-declared        ● Active now  ▁▁▂▁▃▁▁▅▂▁▆█   2 min  │
+│ Ana   · Registered           ○ Today       ▁▁▁▃▁▁▁▁▂▁▁▁   11:40  │
+│ Ivo   · Self-declared          Quiet       ▁▁▁▁▁▁▁▁▁▁▁▁   Mon    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### 24.2 The pulse (sparkline)
+
+- **Shape:** 12 bars, one per two hours, oldest left, the current two hours right; messages in and out counted together. Each bar 3 px wide with a 1 px gap: **47 × 16 px**, the same at every width.
+- **Scale:** per row. A bar's height is its count divided by the larger of the row's busiest bar and 4, times 16 px; any bar with a count is at least 2 px. So one message does not fill the row, and a busy contact's own rhythm stays readable. An empty bucket is a 1 px baseline tick in `--al-color-fg-subtle`, so the 24 hours always show.
+- **Colour:** bars `--al-color-fg-muted`, the current two-hour bar `--al-color-fg-default`. **No orange** (orange means "this needs you") and no status colours. Forced colours: `CanvasText`.
+- **Meaning without seeing it:** the pulse is one image (`role="img"`) named "14 messages in the last 24 hours" (zero: "No messages in the last 24 hours"); bars are not read one by one. The detail (messages and times) stays one click deeper, in the conversation.
+- **Loading:** the 47 × 16 slot shows the flat baseline until the read arrives, so rows never shift. If the read fails, the slot stays flat and the word falls back to the last-message time the list already has; no per-row error.
+- **Updates:** re-read every 60 s while the tab is visible; bars change without animation.
+
+### 24.3 The activity word and marker
+
+| Word | When | Marker (8 px, in a fixed 8 px slot so words line up) | Tone |
+|---|---|---|---|
+| **Active now** | Last exchange within the last 5 minutes | Filled dot, with the heartbeat (§24.4) | `--al-color-status-success-icon`; word `--al-color-fg-default` |
+| **Today** | Last exchange earlier today (local day), more than 5 minutes ago | Hollow ring, 1.5 px | `--al-color-fg-muted` |
+| **Quiet** | Nothing today | No marker (the empty slot) | word `--al-color-fg-subtle` |
+
+The shapes differ (filled, hollow, none), so the state never depends on colour (§9). The word switches from Active now to Today on its own once 5 minutes pass after the last exchange time from the read; that is a server time, not a guess. We say **"Active now", never "Online"**: AgentLink only knows when messages moved, not whether the other agent is running.
+
+### 24.4 The heartbeat
+
+On the Active now dot only: one soft ring grows from 1× to 2× and fades (`transform` and `opacity`, `--al-duration-moment`, `--al-easing-enter`), once every 4 s. **All heartbeats on the page share one phase**, so many Active now rows beat as one thing (§14: at most two things move). It plays only for rows on screen and stops when the tab is hidden, when the row turns Today, and with reduced motion (then the filled dot and the word carry the state). This is a loop that is not progress; 11 §11 item 6 allows loops only for progress, so the owner's decision 4.1 makes it the one live-state exception (owner approval item, PR body).
+
+### 24.5 Sorting and scale
+
+- A `Segmented` (§22, radiogroup) **"Sort"**: **Recent** (today's order, the default) and **Most active** (24-hour count, then the most recent exchange). Remembered per browser in the prefs store; if storage fails, Recent.
+- **At 50 and more contacts:** one pulse read for the whole list (never one per conversation); fixed row height so nothing reflows when pulses arrive; heartbeats only for rows on screen; the list keeps its existing paging. Smooth on the reference slow machine (D-135 (3) (d), the UI-REFRESH-q gate).
+- New strings: "Active now", "Today", "Quiet", "Sort", "Recent", "Most active", "{n} messages in the last 24 hours", "1 message in the last 24 hours", "No messages in the last 24 hours".
+
+## 25. Compact view, and the menu-bar popover
+
+**Idea.** People running many agents want a small, always-visible view of activity and anything waiting, and the full app only when needed (UX-WAVE-2 item 5, decision 5.1). Now: a **compact view** of today's web app at `/compact`, opened as a small window. Later (M2, UX2-i): the same content as the desktop app's **menu-bar or tray popover**. Designed once, so nothing is designed twice. Pattern: Raycast and Arc's small windows, Apple HIG menu-bar extras (a template icon whose shape shows the state, a popover with the few things that matter), Slack's status bar.
+
+### 25.1 The compact view (UX2-h)
+
+**Opening.** **Open compact window** (secondary button with the existing `external-link` icon) at the end of Home's greeting row. It opens `/compact` as a small separate browser window, 380 × 600 px, in the same session (08 §1: no session token in its address, title or browser storage; no install, no PWA). A browser cannot keep it on top of other windows; the M2 popover can.
+
+**Content, top to bottom** (the order is the design; it never scrolls at 50+ contacts):
+
+| # | Block | Content | Size |
+|---|---|---|---|
+| 1 | **Agent row** (reserved) | `Mark` 16 px (still), the agent's name, the live dot and word (§5: Running, Paused, Not running, Needs setup). Today one row: this computer's agent only. Reserved so a second agent can join without a redesign (§25.3) | 44 px |
+| 2 | **Needs you** | "Waiting for you · 3", the soonest item ("Send a file to Marko · 9 min left") and **Review** (primary, orange), which brings the main app's Approvals to the front (or opens it). With an orange left edge when not zero, as the Home tile. Zero: "Nothing is waiting." without a button | 88 px; 44 px at zero |
+| 3 | **Contacts by activity** | Caption "Most active". The top five contacts, Most active order (§24.5): name under the name rule, marker and word, pulse. Then "+12 more", which opens Messages in the main app sorted Most active. None: "No contacts yet." with **Add contact** (opens the §21 sheet in the main app) | 5 × 32 px + 32 px |
+| 4 | **Credits** | One line: "$4.80 · about 48 proofs" (today's strings); test credits as today | 32 px |
+| 5 | **Footer** | **Open AgentLink** (secondary, full width) | 44 px |
+
+Type `al-text-body-sm`, captions `al-text-caption`; padding `--al-space-4`; blocks on level 1 with `--al-space-3` between them; chrome material for the agent row (§13.2), with its solid fallbacks. The window title is "AgentLink" only (no counts, no names). **No message text, file name or file size anywhere** (B-11 §17.4).
+
+### 25.2 States (compact view and popover)
+
+| State | Agent row | The rest | Popover tray icon (brand tray variants) |
+|---|---|---|---|
+| **Fine** | Solid dot, "Running" | As §25.1 | `connected` (solid) |
+| **Waiting** | As fine | Needs you block with the orange edge and Review | `approvals` (badge dot) |
+| **Paused** | Two bars, "Paused", line "Nothing is sent or received for now." | Contacts and credits keep their values | `paused` (hollow seal) |
+| **Offline** | Hollow dot with a slash, "Not running" or "Offline" | Last known values, each block marked "as of 14:02"; Review hidden | `offline` (slash) |
+| **Loading** | Skeleton | Skeleton blocks in the final sizes (§6 row 2) | — |
+| **Error reading** | Keeps old values | "Couldn't read the latest. Trying again." (today's Home string) | — |
+| **Process gone** (compact view only) | — | The whole-app state "AgentLink isn't running. Start your AI app, then reload." | — |
+
+Live updates: the existing Home reads plus the pulse read, while the window is visible; nothing runs while it is hidden.
+
+### 25.3 Many agents (overflow, reserved)
+
+This wave shows **this computer's agent only**. When a second agent arrives (the 0.5.0 cloud agent, D-131, or another computer; M2 owner-console and desktop work), the agent row becomes a list of up to three agent rows (name, live word, Needs-you count), then "+2 more agents". Needs you then counts across agents and lists the soonest first; Contacts and Credits follow the selected agent row. Nothing else moves, so the window keeps its height.
+
+### 25.4 The menu-bar and tray popover (M2, UX2-i)
+
+- **Content and order:** exactly §25.1 blocks 1 to 5; width 360 px; height fits the content, at most 560 px. The **Open compact window** button does not exist there.
+- **macOS:** a popover under the menu-bar template icon. **Windows:** a flyout above the notification-area icon. **Linux:** a popover where the desktop supports it; otherwise today's `TrayMenu` (status, Approvals waiting (n), Open dashboard, Pause / Resume, Quit).
+- **Never approves.** Review opens the native approval window; the popover has no Approve, Deny or presence prompt.
+- **Keyboard:** opens with focus on the first actionable item; Esc and a click outside close it. Shows only counts, names under the name rule and pulses; no message text; no notifications of its own.
+- **Icon:** the existing tray variants (`connected`, `approvals`, `paused`, `offline`, `update`), different by shape, never colour. No wallet words (D-39), no network picker (D-40).
+
+New strings: "Open compact window", "Most active", "+{n} more", "+{n} more agents", "Open AgentLink". The rest exist today.
+
 ## 26. Approvals grid and the Grid/List control
 
 **Idea.** One narrow column of approval cards leaves most of a wide window empty (UX-WAVE-2 item 7). In Grid view the cards fill the width by themselves; List keeps today's single column. Nothing about deciding changes.
@@ -590,3 +821,58 @@ A switch in Rules edits the **draft**, never the rules in force. While a switch 
 - **At most one presence prompt at a time** (one level-4 layer, §13.1).
 - **A decided card leaves** with today's motion in List. In Grid it fades out (`--al-duration-base`, `--al-easing-exit`) and the cards after it close the gap without sliding (a moving grid would be layout animation and more than two things moving). With reduced motion it goes at once.
 - No change to the data, the decide calls, owner presence or signing. Axe and reduced-motion tests stay as they are.
+
+## 27. Start here
+
+**Idea.** A newcomer should see the whole short path from first run to a first message, with one obvious next action (UX-WAVE-2 item 8). Pattern: Stripe's "Get started", Linear and Notion onboarding: a few steps, ticked from real state, progress shown, one highlighted next step, gone when done. **Owner decision 7.1:** it replaces §4's single Next step card (and §8 screen 3) with a short checklist, and it is **not dismissible**: it goes when done, as §8 screen 3 says of the Next step card today. Built from the Home card on level 2 (§16), `Button`, `CopyPrompt`, the determinate bar (§15.1), the drawn check (§6 row 7) and the nav badge dot.
+
+### 27.1 The steps
+
+| # | Step | Done when (existing reads only) | Its one action while it is the next step |
+|---|---|---|---|
+| 1 | **Protect approvals** | A passkey protects approvals (health read). After first run this is normally done already | "Use Touch ID" (platform word as first run: "Use Windows Hello", "Use a passkey"), when only a backup code exists |
+| 2 | **Invite your first contact** | An invite exists or a contact exists (contacts read) | **Add contact** (opens the §21 sheet) |
+| 3 | **Check the safety code with them** | Any contact shows "Safety code checked" (contacts read). While the invite is unanswered, the row says "Waiting for Marko to accept" with no button (§15.2: waiting on a person is a status word, not a button) | **Compare safety code** (opens §8 screen 10 for that contact) |
+| 4 | **Send your first message** | Any message was sent (Messages list, Sent) | `CopyPrompt` with **"Say hello to Marko on AgentLink."** and Copy, under "Ask your AI to say hello." |
+| 5 | **Save your recovery kit** | The backup read says a recovery kit was saved | **Save it now** (today's Next step string) |
+
+- **Names in step 3 and 4** are the owner-confirmed alias only (the invite label you typed, or the name you confirmed when approving the contact). With no alias, step 4's prompt reads "Say hello to my new contact on AgentLink." A name the other side chose never goes into a prompt you copy to your AI (the spirit of 11 §6.5: prompts hold only our template).
+- **"Done" means "has happened once".** A step does not untick later (removing the only contact does not bring the card back), so the card does not return in normal use.
+- **Steps tick only from reads.** No step ticks on a click, a timer or a copy; copying step 4's prompt does not tick it, sending does.
+
+### 27.2 The card
+
+```text
+Home, 1280
+┌──────────────────────────────────────────────────────────────────────┐
+│ START HERE                                              2 of 5        │
+│ ▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱  (determinate bar, 4 px)                         │
+│ ✓  Protect approvals                                                  │
+│ ✓  Invite your first contact                                          │
+│ ●  Check the safety code with them                                    │
+│    Waiting for Marko to accept · 6 days left                          │
+│ ○  Send your first message                                            │
+│ ○  Save your recovery kit                                             │
+└──────────────────────────────────────────────────────────────────────┘
+  tiles grid below (§4)
+```
+
+- **Place:** the top of Home, above the tiles, full grid width, level 2 (§16: one level above the grid). At 360 it is first, full width, before Waiting for you.
+- **Header:** caption "Start here" (`al-text-caption`, mono caps as Home's date line) and the progress "2 of 5" with the determinate bar (`--al-color-accent-default` fill on the sunken track).
+- **Rows:** done steps show a check (`--al-color-status-success-icon`) and muted text; the next step shows a filled dot, the step in `--al-color-fg-default`, one short line and its **one** button (primary; the only primary in the card); later steps show a hollow ring and muted text, no button. One primary button in the whole card, so it is a short list, not a checklist wall.
+- **No dismiss.** No close, hide, snooze or menu; steps cannot be ticked by hand.
+
+### 27.3 Ticking and leaving
+
+- A step that becomes done **while you watch** draws its check once (`--al-duration-moment`, `--al-easing-emphasized`), the count ticks (§6 row 3) and the next step's button fades in (`--al-duration-base`). Steps already done when Home loads simply show as done.
+- When the last step ticks, the card shows "You're all set." for 1.6 s, then leaves with §6 row 4 (fade and collapse, `--al-duration-base`, `--al-easing-exit`) and the tiles move up. Home then has no Next step card.
+- **Reduced motion:** checks and the count change at once; the card goes at once with the polite announcement "You're all set." Live region (polite): "Step done: Invite your first contact. 2 of 5."
+- Loading: the card's skeleton in its final size, only while the reads it needs are loading and only when setup is not known to be complete; a failed read keeps the last known ticks and adds nothing alarming.
+
+### 27.4 The Home dot and the empty states
+
+- **Home nav dot:** while the card is shown, the Home item in the sidebar (and the 360 bottom bar) carries a small dot in the "Needs setup" style (§5: dot with a small mark, accent tone). Its accessible name: "Home, setup not finished". It goes with the card.
+- **Empty states point to step 2:** Contacts ("No contacts yet. Invite someone to start." with **Add contact**, primary), Messages ("No messages yet. Invite someone first, then ask your AI to say hello." with **Add contact**) and Files ("No files yet. Invite someone first." with **Add contact**). Each opens the §21 sheet. Once step 2 is done they return to today's empty states.
+- The navigation order stays (Home first).
+
+New strings: "Start here", "{n} of {total}", "Protect approvals", "Invite your first contact", "Check the safety code with them", "Send your first message", "Ask your AI to say hello.", "Say hello to {name} on AgentLink.", "Say hello to my new contact on AgentLink.", "You're all set.", "Step done: {step}. {n} of {total}.", "Home, setup not finished", the three empty-state lines. Existing: "Use Touch ID" (and its platform variants), "Add contact", "Compare safety code", "Save your recovery kit", "Save it now", "Waiting for {name} to accept".

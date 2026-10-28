@@ -5065,7 +5065,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit): rows move without a reload, polling stops when hidden, after backoff and at 30 minutes; no step advances on a timer alone; reduced-motion and axe tests; no test weakened.
 
 #### UX2-brief · design brief: b11 §21, §23, §24, §25 and §27 (new, UX-WAVE-2 §10)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S0 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/design/b11-local-app.md`
 - **Depends on:** UX2-brief-0; owner decisions of 2026-10-28 (recorded above)
 - **Spec:** D-116, D-135; UX-WAVE-2 §3, §5, §6, §7, §9.2
