@@ -66,7 +66,7 @@ A page for an unreleased feature contains only: the title, the status hint, a **
 
 ### Versions
 
-Milestones map to versions per [versioning.md](../docs/process/versioning.md): M1a = 0.1.0, M1 gate = 0.2.0, the usable local app = 0.3.0, the Messages and Files release = 0.4.0 (released 27 Oct 2026), the refreshed local app = 0.4.1 (28 Oct 2026), the first UX wave = 0.4.2 (28 Oct 2026), M2 = 0.5.0 first (the cloud agent, D-131), M3 = 1.0.0.
+Milestones map to versions per [versioning.md](../docs/process/versioning.md): M1a = 0.1.0, M1 gate = 0.2.0, the usable local app = 0.3.0, the Messages and Files release = 0.4.0 (released 27 Oct 2026), the refreshed local app = 0.4.1 (28 Oct 2026), the first UX wave = 0.4.2 and the second = 0.4.3 (both 28 Oct 2026), M2 = 0.5.0 first (the cloud agent, D-131), M3 = 1.0.0.
 
 ## 4. Who updates what, and when
 

@@ -1,6 +1,6 @@
 # Approvals page
 
-*Applies to AgentLink 0.4.2 (released 28 Oct 2026). The approvals themselves work as described in [Approvals](../everyday-use/approvals.md).*
+*Applies to AgentLink 0.4.3 (released 28 Oct 2026). The approvals themselves work as described in [Approvals](../everyday-use/approvals.md).*
 
 This is the page where requests wait for you. Your AI can ask, but only you can approve.
 
