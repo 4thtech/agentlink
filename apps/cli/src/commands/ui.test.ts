@@ -42,6 +42,8 @@ interface Script {
   readonly last?: string;
   /** U3-b: the agents an AI app serves. */
   readonly serves?: readonly string[];
+  /** U3-g-b: the no-agent host (Welcome): absent, started, or not startable. */
+  readonly welcome?: 'ok' | 'none';
 }
 
 function fakeDeps(script: Script) {
@@ -50,6 +52,7 @@ function fakeDeps(script: Script) {
     opened: 0,
     closed: 0,
     unsubscribed: 0,
+    welcome: 0,
     names: [] as (string | undefined)[],
   };
   let stop: (() => void) | undefined;
@@ -60,6 +63,26 @@ function fakeDeps(script: Script) {
           agents: () => Promise.resolve(script.agents ?? []),
           lastUsed: () => Promise.resolve(script.last),
           serves: (name: string) => Promise.resolve((script.serves ?? []).includes(name)),
+        }),
+    ...(script.welcome === undefined
+      ? {}
+      : {
+          startWelcome: () => {
+            calls.welcome += 1;
+            if (script.welcome === 'none') return Promise.resolve(undefined);
+            return Promise.resolve({
+              page: 'first-run' as const,
+              open: () => {
+                calls.opened += 1;
+                setTimeout(() => stop?.(), 5);
+                return Promise.resolve(true);
+              },
+              close: () => {
+                calls.closed += 1;
+                return Promise.resolve();
+              },
+            });
+          },
         }),
     start: (name) => {
       calls.start += 1;
@@ -287,5 +310,59 @@ describe('agentlink ui never asks which agent (U3-b)', () => {
   it('the picker is gone', async () => {
     const dir = fileURLToPath(new URL('.', import.meta.url));
     await expect(readFile(join(dir, 'agent-choice.ts'), 'utf8')).rejects.toThrow();
+  });
+});
+
+// U3-g-b (08 §1 "with no agent yet, Welcome"; USABILITY-WAVE-3 §7.4): a brand-new user with no agent
+// folder at all runs `agentlink ui` (or bare `agentlink`): the app host starts with no agent open and
+// the browser opens the first-run page (Welcome), never the "not set up here yet" line.
+describe('agentlink ui with no agent at all opens Welcome (U3-g-b)', () => {
+  it('starts the no-agent host and opens the first-run page', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ agents: [], welcome: 'ok' });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls).toMatchObject({ welcome: 1, start: 0, opened: 1, closed: 1 });
+    expect(p.out).toEqual([UI_TEXT.openedSetup]);
+    expect(p.err).toEqual([]);
+    expectNoLink(p);
+  });
+
+  it('falls back to the agent open path when the no-agent host cannot start', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ agents: [], welcome: 'none', start: 'none' });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+    expect(calls).toMatchObject({ welcome: 1, start: 1 });
+    expect(p.err).toEqual([UI_TEXT.notReady(PREFIX)]);
+  });
+
+  it('with any agent the no-agent host is never started', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ agents: ['solo'], welcome: 'ok' });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls).toMatchObject({ welcome: 0, start: 1 });
+  });
+
+  it('with --agent the named agent is opened, never Welcome', async () => {
+    const p = probe(TTY, 'work');
+    const { deps, calls } = fakeDeps({ agents: [], welcome: 'ok', start: 'none' });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+    expect(calls).toMatchObject({ welcome: 0, start: 1 });
+    expect(calls.names).toEqual(['work']);
+  });
+
+  it.each([AGENT, PIPE])('run by an AI it prints the fixed line and opens nothing (D-39)', async (t) => {
+    const p = probe(t);
+    const { deps, calls } = fakeDeps({ agents: [], welcome: 'ok' });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+    expect(calls).toMatchObject({ welcome: 0, start: 0, opened: 0 });
+    expect(p.err).toEqual([UI_TEXT.agentRun(PREFIX)]);
+    expect(p.out).toEqual([]);
+  });
+
+  it('the production step wires the no-agent host', async () => {
+    const dir = fileURLToPath(new URL('.', import.meta.url));
+    const source = await readFile(join(dir, 'ui.ts'), 'utf8');
+    expect(source).toContain('startWelcome:');
+    expect(source).toContain('startUiWelcome(');
   });
 });

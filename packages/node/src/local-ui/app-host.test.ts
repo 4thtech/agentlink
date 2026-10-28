@@ -194,3 +194,67 @@ describe('AppHostSlot (U3-c)', () => {
     expect(await host.switchTo('default', '2')).toBe('unavailable');
   });
 });
+
+// U3-g-b: with no agent at all, the host starts with none open and opens the first agent that first
+// run created (adoptFirst): the generation increases first, its own request hold is released, the
+// requests in flight drain, then the agent is opened and app.json written. Never while one is open.
+describe('AppHostSlot with no agent yet (U3-g-b)', () => {
+  function empty(w: World): { slot: AppHostSlot; bound: (string | undefined)[] } {
+    const bound: (string | undefined)[] = [];
+    const host = new AppHostSlot(
+      {
+        directory: w.directory,
+        open: (name) => {
+          w.log.push(`open ${name}`);
+          return Promise.resolve(w.failOpen.has(name) ? undefined : w.agent(name));
+        },
+      },
+      (agent) => bound.push(agent?.name),
+      50,
+    );
+    return { slot: host, bound };
+  }
+
+  it('starts at generation 1 with no agent bound', () => {
+    const w = world([]);
+    const { slot: s, bound } = empty(w);
+    expect(s.current).toBeUndefined();
+    expect(s.generation).toBe(1);
+    expect(bound).toEqual([undefined]);
+  });
+
+  it('adoptFirst opens the new agent, raises the generation and writes app.json', async () => {
+    const w = world(['my-agent']);
+    const { slot: s, bound } = empty(w);
+    const own = s.enterMutating('1');
+    expect(own).toBeDefined();
+    await expect(s.adoptFirst('my-agent', own)).resolves.toBe(true);
+    expect(s.current).toBe('my-agent');
+    expect(s.generation).toBe(2);
+    expect(own?.valid()).toBe(false);
+    expect(bound).toEqual([undefined, 'my-agent']);
+    expect(w.written).toEqual(['my-agent']);
+  });
+
+  it('adoptFirst is refused while an agent is open, for a bad name, or when it cannot open', async () => {
+    const w = world(['default', 'my-agent']);
+    const { slot: open } = slot(w);
+    await expect(open.adoptFirst('my-agent')).resolves.toBe(false);
+    expect(open.current).toBe('default');
+    const { slot: s } = empty(world([]));
+    await expect(s.adoptFirst('Bad Name')).resolves.toBe(false);
+    const w2 = world(['my-agent']);
+    w2.failOpen.add('my-agent');
+    const { slot: s2 } = empty(w2);
+    await expect(s2.adoptFirst('my-agent')).resolves.toBe(false);
+    expect(s2.current).toBeUndefined();
+  });
+
+  it('adoptFirst refuses an agent marked removing', async () => {
+    const w = world(['my-agent']);
+    w.entries.set('my-agent', { name: 'my-agent', label: 'x', available: true, removing: true });
+    const { slot: s } = empty(w);
+    await expect(s.adoptFirst('my-agent')).resolves.toBe(false);
+    expect(w.log).toEqual([]);
+  });
+});
