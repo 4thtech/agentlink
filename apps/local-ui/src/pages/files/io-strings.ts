@@ -46,6 +46,8 @@ export const FILES_IO_STRINGS = {
   expired: 'Expired. It can no longer be fetched.',
   deleted: 'Deleted from this computer.',
   statusSent: 'Sent',
+  // A day without a receipt: the wait is over and nothing more will change (owner decision 6.1).
+  statusSentNoReceipt: 'Sent · no receipt yet',
   statusQueued: 'Waiting to send',
   statusNotDelivered: 'Not delivered',
   receiptConfirmed: 'Delivery confirmed',
