@@ -35,6 +35,7 @@ import {
 import {
   FilesIoView,
   MessagesView,
+  FLOW_SCAN_CAP,
   PULSE_SCAN_CAP,
   type Conversation,
   type MessageItem,
@@ -394,6 +395,144 @@ describe('MessagesView.pulseTimes (UX2-f1, b11 §24: GET /api/ui/messages/pulse)
       [Number.NaN, T0],
     ] as const) {
       await expect(a.client.messages.pulseTimes(since, until)).rejects.toMatchObject({
+        code: 'page_query_invalid',
+      });
+    }
+  });
+});
+
+// ---- Messages: the live connections map's flow events (U3-flow) ---------------------------------
+
+describe('MessagesView.flowEvents (U3-flow, USABILITY-WAVE-3 §4.1: GET /api/ui/flow)', () => {
+  const FLOW_KEYS = ['capped', 'events'];
+  const EVENT_KEYS = ['at', 'contactId', 'direction', 'kind', 'state'];
+  const HOSTILE = 'HOSTILE-NAME-<script>alert(1)</script>';
+
+  it('returns only who, which way, message or file, its state and when, inside [since, until]', async () => {
+    await put({ contact: b.id, createdAt: T0 - 1 }); // before the window
+    await put({ contact: b.id, createdAt: T0 });
+    await put({ contact: b.id, createdAt: T0 + 5, direction: 'out', delivery: 'queued' });
+    await put({ contact: c.id, createdAt: T0 + 7, direction: 'out', delivery: 'not_delivered' });
+    const withFile = await put({
+      contact: c.id,
+      createdAt: T0 + 9,
+      payload: { type: 'file', body: 'see attached', replyTo: null, files: [fileEntry()] },
+    });
+    await putFileRow(withFile, 0);
+    await putFileRow(withFile, 1);
+    const sentFile = await put({
+      contact: c.id,
+      createdAt: T0 + 10, // `until` itself is in
+      direction: 'out',
+      delivery: 'sent',
+      payload: { type: 'file', body: '', replyTo: null, files: [fileEntry()] },
+    });
+    await putFileRow(sentFile, 0);
+    await put({ contact: c.id, createdAt: T0 + 11 }); // after the window
+    const flow = await a.client.messages.flowEvents(T0, T0 + 10);
+    expect(keys(flow)).toEqual(FLOW_KEYS);
+    expect(flow.capped).toBe(false);
+    for (const e of flow.events) expect(keys(e)).toEqual(EVENT_KEYS);
+    expect(flow.events).toEqual([
+      { contactId: c.id, direction: 'out', kind: 'file', state: 'sent', at: T0 + 10 },
+      { contactId: c.id, direction: 'in', kind: 'file', state: 'received', at: T0 + 9 },
+      { contactId: c.id, direction: 'out', kind: 'message', state: 'not_delivered', at: T0 + 7 },
+      { contactId: b.id, direction: 'out', kind: 'message', state: 'queued', at: T0 + 5 },
+      { contactId: b.id, direction: 'in', kind: 'message', state: 'received', at: T0 },
+    ]);
+    await expectNoSecrets(flow);
+  });
+
+  it('never carries a name, subject, file name, link, key or hash, even hostile ones in the store', async () => {
+    // Hostile names everywhere the store keeps one: the contact's name, the file's name, a subject.
+    const hostileName = await seal(ctxOf(a), 'contacts', 'name', [b.id], HOSTILE);
+    await a.store.transaction((tx) =>
+      tx.update('contacts', { contact_id: b.id }, { name: hostileName }),
+    );
+    const id = await put({
+      contact: b.id,
+      createdAt: T0,
+      payload: {
+        type: 'file',
+        body: { subject: HOSTILE, text: `BODY-PLAINTEXT ${HOSTILE}` },
+        replyTo: null,
+        files: [fileEntry({ name: `${HOSTILE}.pdf` })],
+      },
+    });
+    await putFileRow(id, 0, {
+      name: await seal(ctxOf(a), 'files', 'name', [id, 0], `${HOSTILE}.pdf`),
+    });
+    const flow = await a.client.messages.flowEvents(T0, T0 + 10);
+    expect(flow.events).toHaveLength(1);
+    const json = JSON.stringify(flow);
+    expect(json).not.toMatch(/HOSTILE|BODY-PLAINTEXT|report\.pdf|Bob|Carol|CANARY|https?:/);
+    const envelopeHash = await a.store.transaction(
+      (tx) => tx.get('envelopes', { envelope_id: id })?.envelope_hash ?? '',
+    );
+    expect(json).not.toContain(envelopeHash);
+    expect(json).not.toContain(id); // not even the envelope ID
+    await expectNoSecrets(flow);
+  });
+
+  it('lists only messages: never a request, a refused or protocol row, or a removed contact', async () => {
+    await put({ contact: null, createdAt: T0 + 1 }); // a request from an unknown sender
+    await put({ contact: b.id, createdAt: T0 + 2, state: 'refused' });
+    await put({
+      contact: b.id,
+      createdAt: T0 + 3,
+      payload: textPayload({ kind: 'received', envelopeId: newId() }, 'ack'),
+    });
+    await put({ contact: c.id, createdAt: T0 + 5 });
+    await a.store.transaction((tx) =>
+      tx.update('contacts', { contact_id: c.id }, { status: 'removed' }),
+    );
+    await put({ contact: b.id, createdAt: T0 + 6 });
+    const flow = await a.client.messages.flowEvents(T0, T0 + 100);
+    expect(flow.events.map((e) => [e.contactId, e.at])).toEqual([[b.id, T0 + 6]]);
+  });
+
+  it('never opens a payload, writes nothing and never marks a message read', async () => {
+    const unread = await put({
+      contact: b.id,
+      createdAt: T0,
+      payload: textPayload('BODY-PLAINTEXT'),
+      readAt: null,
+    });
+    const before = await snapshot();
+    const flow = await a.client.messages.flowEvents(T0, T0 + 10);
+    expect(JSON.stringify(flow)).not.toMatch(/BODY-PLAINTEXT/);
+    expect(await snapshot()).toBe(before);
+    expect(
+      await a.store.transaction((tx) => tx.get('envelopes', { envelope_id: unread })?.read_at),
+    ).toBeNull();
+    expect(lines.join('\n')).not.toMatch(/BODY-PLAINTEXT/);
+  });
+
+  it('reads at most FLOW_SCAN_CAP (200) per direction, newest first, and says so', async () => {
+    expect(FLOW_SCAN_CAP).toBe(200);
+    const rows = FLOW_SCAN_CAP + 5;
+    for (let i = 0; i < rows; i += 1) await put({ contact: b.id, createdAt: T0 + i });
+    for (let i = 0; i < 3; i += 1) {
+      await put({ contact: c.id, createdAt: T0 + i, direction: 'out' });
+    }
+    const flow = await a.client.messages.flowEvents(T0, T0 + rows);
+    expect(flow.capped).toBe(true);
+    const inbound = flow.events.filter((e) => e.direction === 'in');
+    expect(inbound).toHaveLength(FLOW_SCAN_CAP);
+    expect(flow.events.filter((e) => e.direction === 'out')).toHaveLength(3);
+    expect(inbound.reduce((m, e) => Math.min(m, e.at), Infinity)).toBe(T0 + 5);
+    const under = await a.client.messages.flowEvents(T0 + 5, T0 + rows);
+    expect(under.capped).toBe(false);
+  });
+
+  it('refuses a window that is not two whole times in order', async () => {
+    for (const [since, until] of [
+      [T0 + 1, T0],
+      [-1, T0],
+      [T0, 1.5],
+      [Number.NaN, T0],
+    ] as const) {
+      await expect(a.client.messages.flowEvents(since, until)).rejects.toMatchObject({
         code: 'page_query_invalid',
       });
     }

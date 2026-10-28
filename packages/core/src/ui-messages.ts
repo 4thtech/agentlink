@@ -122,6 +122,31 @@ export interface ExchangeTimes {
   readonly capped: boolean;
 }
 
+/** U3-flow: a received message is `received`; a sent one is its delivery state (07 §3). */
+export type FlowState = 'received' | 'queued' | 'sent' | 'not_delivered';
+
+/**
+ * U3-flow (USABILITY-WAVE-3 §4.1): one message or file exchanged with a contact, for the live
+ * connections map: who, which way, a message or a file, its state and when. Nothing else: never a
+ * body, subject, name, size, link, key, hash or envelope field or ID (zero access, I-5). The store
+ * keeps no upload byte counts, so there is no progress here.
+ */
+export interface FlowEvent {
+  readonly contactId: string;
+  readonly direction: MessageBox;
+  /** `file` when the envelope has a row in `files` (its envelope ID only is read), else `message`. */
+  readonly kind: 'message' | 'file';
+  readonly state: FlowState;
+  /** The envelope's `created_at`, unix seconds. */
+  readonly at: number;
+}
+
+/** U3-flow: the flow events in a window, newest first; `capped` when the scan cap left some out. */
+export interface FlowEvents {
+  readonly events: readonly FlowEvent[];
+  readonly capped: boolean;
+}
+
 /** A received file's state in this agent's store. */
 export type ReceivedFileState = 'saved' | 'not_saved' | 'expired';
 
@@ -184,6 +209,11 @@ const FILES_SCAN_CAP = 200;
  * the pulse then says it is partial. Bounds the read whatever the store holds.
  */
 export const PULSE_SCAN_CAP = 10_000;
+/**
+ * U3-flow: at most this many envelopes per direction are read for one flow answer, newest first;
+ * the answer then says it is capped. GET /api/ui/flow passes on at most 200 in all.
+ */
+export const FLOW_SCAN_CAP = 200;
 const FILE_ID = /^(.{1,64})\.([0-9]{2})$/;
 /** MSG-FILES-IO-h: an item ID as the local app sends it (an envelope ID is base64url or hex). */
 const SAVED_ITEM_ID = /^([A-Za-z0-9_-]{1,64})\.([0-9]{2})$/;
@@ -380,6 +410,72 @@ export class MessagesView {
     });
     read.times.sort((x, y) => y.at - x.at);
     return Object.freeze({ times: Object.freeze(read.times), capped: read.capped });
+  }
+
+  /**
+   * U3-flow (USABILITY-WAVE-3 §4.1, GET /api/ui/flow): the messages and files exchanged with this
+   * agent for `since <= created_at <= until` (unix seconds), newest first (then by contact,
+   * direction). The selection is the pulse's (whereOf), both directions, contacts that are not
+   * removed only. One store transaction, two bounded selects (FLOW_SCAN_CAP per direction) and one
+   * `files` select by those envelope IDs; reads `contact_id`, `direction`, `delivery` and
+   * `created_at` of `envelopes` and `envelope_id` of `files`, columns the store keeps in clear (07
+   * §3): no payload or sealed value is opened, and nothing of a `files` row but its envelope ID is
+   * kept. Envelope IDs never leave this method.
+   * @throws CoreError `page_query_invalid` when the window is not two whole times in order.
+   */
+  async flowEvents(since: number, until: number): Promise<FlowEvents> {
+    const whole = (v: unknown): v is number =>
+      typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+    if (!whole(since) || !whole(until) || since > until) throw invalid();
+    const read = await this.#ctx.store.transaction((tx) => {
+      const visible = new Set(visibleTx(tx));
+      let capped = false;
+      const picked: { id: string; event: Omit<FlowEvent, 'kind'> }[] = [];
+      for (const direction of BOXES) {
+        const rows = tx.select(
+          'envelopes',
+          { ...whereOf(direction, 'any'), created_at: { gte: since, lte: until } },
+          { orderBy: [['created_at', 'desc']], limit: FLOW_SCAN_CAP + 1 },
+        );
+        if (rows.length > FLOW_SCAN_CAP) capped = true;
+        for (const row of rows.slice(0, FLOW_SCAN_CAP)) {
+          const contactId = row.contact_id;
+          if (contactId === null || !visible.has(contactId)) continue;
+          const state: FlowState | undefined =
+            direction === 'in' ? 'received' : isSentStatus(row.delivery) ? row.delivery : undefined;
+          if (state === undefined) continue;
+          picked.push({
+            id: row.envelope_id,
+            event: { contactId, direction, state, at: row.created_at },
+          });
+        }
+      }
+      const withFiles =
+        picked.length === 0
+          ? new Set<string>()
+          : new Set(
+              tx
+                .select('files', { envelope_id: { in: picked.map((p) => p.id) } })
+                .map((r) => r.envelope_id),
+            );
+      const events: FlowEvent[] = picked.map(({ id, event }) =>
+        Object.freeze({
+          contactId: event.contactId,
+          direction: event.direction,
+          kind: withFiles.has(id) ? ('file' as const) : ('message' as const),
+          state: event.state,
+          at: event.at,
+        }),
+      );
+      return { events, capped };
+    });
+    read.events.sort(
+      (x, y) =>
+        y.at - x.at ||
+        (x.contactId < y.contactId ? -1 : x.contactId > y.contactId ? 1 : 0) ||
+        (x.direction < y.direction ? -1 : x.direction > y.direction ? 1 : 0),
+    );
+    return Object.freeze({ events: Object.freeze(read.events), capped: read.capped });
   }
 
   /**

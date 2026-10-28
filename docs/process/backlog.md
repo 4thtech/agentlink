@@ -5524,7 +5524,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Tests first: a `RED (expected): <ID> …` commit with the red-run excerpt; `in_use` refusal while any process has the agent open (shared lock held by every server, `agentlink mcp` and the app host); `removing` marker plus a crash test at every step; the erased item list is exact and owner items are untouched (tests assert owner items survive); undeliverable revoke asks and never proceeds silently; tests for four backends (macOS Keychain, Windows Credential Manager, Linux Secret Service, file KeyStore); the revoked list is the signed object re-verified on load; restore refuses a revoked agent; typed label checked; the owner statement names the agent's label; stale generation refused; logs say "removed" only; Fable 5.1 audit; Opus independent review; Tali's "merge".
 
 #### U3-flow · `GET /api/ui/flow` live connections read (new, USABILITY-WAVE-3, owner decision 2026-10-29)
-- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 2
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 2
 - **Repo/path:** agentlink · `packages/node/src/local-ui/api/flow.ts` (new), `packages/core/src` store read (metadata columns)
 - **Depends on:** U3-c
 - **Spec:** USABILITY-WAVE-3 §4.1; 07 §3

@@ -923,9 +923,15 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
       'proofs',
     ]);
     expect(Object.isFrozen(client)).toBe(true);
-    // UX2-f1 adds only the pulse's exchange times (contact and time, no content) to the view.
+    // UX2-f1 adds only the pulse's exchange times (contact and time, no content) to the view;
+    // U3-flow only the flow events (metadata, no content).
     const messages = (client as { messages: object }).messages;
-    expect(Object.keys(messages).sort()).toEqual(['conversations', 'list', 'pulseTimes']);
+    expect(Object.keys(messages).sort()).toEqual([
+      'conversations',
+      'flowEvents',
+      'list',
+      'pulseTimes',
+    ]);
     expect(Object.isFrozen(messages)).toBe(true);
   });
 });
