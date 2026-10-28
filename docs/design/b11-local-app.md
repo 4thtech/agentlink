@@ -1,6 +1,6 @@
 # B-11 · A state-of-the-art local app: Home, live state, motion, under the hood (design brief)
 
-> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20; UX2-brief-0 on 2026-10-28 adds §22 and §26 in Part 4, and UX2-brief on 2026-10-28 adds §21, §23, §24, §25 and §27 there, all approved by the owner in chat on 2026-10-28, recorded as D-137, which extends D-135 (3) (c) to UX wave 2 so §21 to §27 are built from this brief with PR screenshots; 'pending owner' no longer applies to §21 to §27). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
+> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20; UX2-brief-0 on 2026-10-28 adds §22 and §26 in Part 4, and UX2-brief on 2026-10-28 adds §21, §23, §24, §25 and §27 there, all approved by the owner in chat on 2026-10-28, recorded as D-137; U3-brief on 2026-10-29 amends §27 and adds §28 to §32 for usability wave 3 (owner decisions of 2026-10-29 as recommended; the owner approves these screens by screenshot review in the build PRs, D-137), which extends D-135 (3) (c) to UX wave 2 so §21 to §27 are built from this brief with PR screenshots; 'pending owner' no longer applies to §21 to §27). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
 
 ## 1. Why, and what the owner asked for
 
@@ -824,57 +824,488 @@ New strings: "Open compact window", "Most active", "+{n} more", "+{n} more agent
 
 ## 27. Start here
 
-**Idea.** A newcomer should see the whole short path from first run to a first message, with one obvious next action (UX-WAVE-2 item 8). Pattern: Stripe's "Get started", Linear and Notion onboarding: a few steps, ticked from real state, progress shown, one highlighted next step, gone when done. **Owner decision 7.1:** it replaces §4's single Next step card (and §8 screen 3) with a short checklist, and it is **not dismissible**: it goes when done, as §8 screen 3 says of the Next step card today. Built from the Home card on level 2 (§16), `Button`, `CopyPrompt`, the determinate bar (§15.1), the drawn check (§6 row 7) and the nav badge dot.
+> **Amended by U3-brief (2026-10-29), Start here v2.** Source: `docs/process/proposals/USABILITY-WAVE-3.md` (owner decisions of 2026-10-29, all recommended options, plus the owner's input that every agent shows its AI app). The owner approves the screens in §27 to §32 by **screenshot review in each build PR (D-137)**, as for wave 2. The card's rules (reads only, no dismiss, leaves when done) are unchanged.
+
+**Idea.** A newcomer should see the whole short path from install to a first reply, with one obvious next action (UX-WAVE-2 item 8). Pattern: Stripe's "Get started", Linear and Notion onboarding: a few steps, ticked from real state, progress shown, one highlighted next step, gone when done. **Owner decision 7.1 (wave 2):** it replaces §4's single Next step card (and §8 screen 3) with a short checklist, and it is **not dismissible**: it goes when done. **v2:** the app **opens on Home** every time (not Activity), and the card covers the whole path, including connecting an AI app and seeing the first reply arrive. Built from the Home card on level 2 (§16), `Button`, `CopyPrompt`, the determinate bar (§15.1), the drawn check (§6 row 7), the nav badge dot and the **AppMark** (§30.2).
 
 ### 27.1 The steps
 
+Seven counted steps ("2 of 7"), plus one shown and uncounted.
+
 | # | Step | Done when (existing reads only) | Its one action while it is the next step |
 |---|---|---|---|
-| 1 | **Protect approvals** | A passkey protects approvals (health read). After first run this is normally done already | "Use Touch ID" (platform word as first run: "Use Windows Hello", "Use a passkey"), when only a backup code exists |
-| 2 | **Invite your first contact** | An invite exists or a contact exists (contacts read) | **Add contact** (opens the §21 sheet) |
-| 3 | **Check the safety code with them** (recommended) | Any contact shows "Safety code checked" (contacts read). While the invite is unanswered, the row says "Waiting for Marko to accept" with no button (§15.2: waiting on a person is a status word, not a button) | **Compare safety code** (secondary, once they have answered; opens §8 screen 10 for that contact). Never the card's primary button |
-| 4 | **Send your first message** | Any message was sent (Messages list, Sent) | `CopyPrompt` with **"Say hello to Marko on AgentLink."** and Copy, under "Ask your AI to say hello." |
-| 5 | **Save your recovery kit** | The backup read says a recovery kit was saved | **Save it now** (today's Next step string) |
+| 1 | **Protect approvals** | A passkey protects approvals (health read). Done by first run (§28.3) in the normal case | "Use Touch ID" (platform word as first run: "Use Windows Hello", "Use a passkey"), only when a backup code is all that exists |
+| 2 | **Name your agent** | The agent has a label (agents read). Done by first run (§28.3); a leftover agent with no label shows this step with **Name it** (opens Rename, §29.5) | **Name it**, only in that case |
+| 3 | **Connect your AI app** | A connection entry for **this agent** exists in a detected AI app (AI apps read, §30). The row shows the app's **AppMark and name** ("Claude Code") and adds **Running** (§30.2) once the app has run AgentLink, and says "Restart Claude Code to finish" while the entry exists but the app has not run it. When first run recorded the app the person chose (§28.2) and they pressed Later in §28.4, this step opens that app's change panel directly | **Connect Claude Code** (the chosen app's name; **Connect an AI app** when none was chosen). Opens the §30 change panel or page. Never writes anything itself |
+| 4 | **Invite your first contact** | An invite exists or a contact exists (contacts read) | **Add contact** (opens the §21 sheet). Below it, a quiet link, **No one to invite yet?**, which opens the second-agent path (§27.5) |
+| — | **Check the safety code with them** (recommended, **not counted**) | Any contact shows "Safety code checked" (contacts read). While the invite is unanswered the row says "Waiting for Marko to accept" with no button (§15.2: waiting on a person is a status word, not a button) | **Compare safety code** (secondary, once they have answered; opens §8 screen 10 for that contact). Never the card's primary button |
+| 5 | **Say hello** | Any message was sent (Messages list, Sent) | `CopyPrompt` with **"Say hello to Marko on AgentLink."** and Copy, under "Ask your AI to say hello." |
+| 6 | **See the reply arrive** | The first stored inbound message from a contact (Messages list, Inbox) | **Open the conversation** (secondary; opens that conversation in Messages). While waiting: "Waiting for Marko's reply" as a status word, no button |
+| 7 | **Save your recovery kit** | The backup read says a recovery kit was saved | **Save it now** (today's Next step string) |
 
-- **Names in step 3 and 4** are the owner-confirmed alias only (the invite label you typed, or the name you confirmed when approving the contact). With no alias, step 4's prompt reads "Say hello to my new contact on AgentLink." A name the other side chose never goes into a prompt you copy to your AI (the spirit of 11 §6.5: prompts hold only our template).
-- **Step 3 neither holds the card nor blocks step 4.** The progress counts steps 1, 2, 4 and 5 ("2 of 4"), and the next step with the primary button is the first of those not done. Step 3 is shown, and ticks when a code is checked, but **the card leaves once steps 1, 2, 4 and 5 are done**, whether or not step 3 has ticked. An unchecked contact stays visible where it always is: on its contact row, by the absence of the existing "Safety code checked" chip. Nothing becomes dismissible.
-- **"Done" means "has happened once".** A step does not untick later (removing the only contact does not bring the card back), so the card does not return in normal use.
-- **Steps tick only from reads.** No step ticks on a click, a timer or a copy; copying step 4's prompt does not tick it, sending does.
+- **Names in the safety-code, hello and reply steps** are the owner-confirmed alias only (the invite label you typed, or the name you confirmed when approving the contact). With no alias, the hello prompt reads "Say hello to my new contact on AgentLink." A name the other side chose never goes into a prompt you copy to your AI (11 §6.5: prompts hold only our template).
+- **The safety-code row neither holds the card nor blocks the steps after it.** The progress counts the seven steps above ("2 of 7"); the next step with the primary button is the first counted step not done. The safety-code row is shown, ticks when a code is checked, and **the card leaves once the seven counted steps are done**, whether or not it has ticked. An unchecked contact stays visible on its contact row, by the absence of the "Safety code checked" chip. Nothing becomes dismissible.
+- **"Done" means "has happened once".** A step does not untick later (removing the only contact does not bring the card back). **One exception, by design:** step 3 follows the open agent. After a switch (§29.1) the card describes that agent, so a second agent with no AI app shows step 3 open ("Not connected to an AI app").
+- **Steps tick only from reads.** No step ticks on a click, a timer or a copy; copying the hello prompt does not tick step 5, sending does. Step 3 ticks from the file read in §30, never from the Apply click alone.
+- **Existing owners (upgrading from 0.4.3):** steps already true tick at once; the card shows only what is left, and the one-time **Tidy up** note (§29.7) sits above it, never inside it.
 
 ### 27.2 The card
 
 ```text
-Home, 1280
+Home, 1440 (content column ~1180)
 ┌──────────────────────────────────────────────────────────────────────┐
-│ START HERE                                              2 of 4        │
-│ ▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱  (determinate bar, 4 px)                         │
+│ START HERE                                              3 of 7        │
+│ ▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱  (determinate bar, 4 px)                       │
 │ ✓  Protect approvals                                                  │
-│ ✓  Invite your first contact                                          │
+│ ✓  Name your agent                                                    │
+│ ✓  Connect your AI app             [▢] Claude Code · Running          │
+│ ●  Invite your first contact                      [ Add contact ]     │
+│    No one to invite yet?                                              │
 │ ○  Check the safety code with them (recommended)                      │
-│    Waiting for Marko to accept · 6 days left                          │
-│ ●  Send your first message                                            │
-│    Ask your AI to say hello.   [ Say hello to Marko …   Copy ]        │
+│ ○  Say hello                                                          │
+│ ○  See the reply arrive                                               │
 │ ○  Save your recovery kit                                             │
 └──────────────────────────────────────────────────────────────────────┘
   tiles grid below (§4)
 ```
 
-- **Place:** the top of Home, above the tiles, full grid width, level 2 (§16: one level above the grid). At 360 it is first, full width, before Waiting for you.
-- **Header:** caption "Start here" (`al-text-caption`, mono caps as Home's date line) and the progress "2 of 4" (steps 1, 2, 4 and 5) with the determinate bar (`--al-color-accent-default` fill on the sunken track).
-- **Rows:** done steps show a check (`--al-color-status-success-icon`) and muted text; the next step shows a filled dot, the step in `--al-color-fg-default`, one short line and its **one** button (primary; the only primary in the card); later steps show a hollow ring and muted text, no button. One primary button in the whole card, so it is a short list, not a checklist wall.
+- **Place:** the top of Home, above the tiles, full grid width, level 2 (§16). At 360 it is first, full width, before Waiting for you; the button goes under the step text and is full width; rows keep a 44 px touch height.
+- **Header:** caption "Start here" (`al-text-caption`, mono caps as Home's date line) and the progress "3 of 7" with the determinate bar (`--al-color-accent-default` fill on the sunken track).
+- **Rows:** done steps show a check (`--al-color-status-success-icon`) and muted text; step 3 adds the AppMark, the app's name and its state word (§30.2); the next step shows a filled dot, the step in `--al-color-fg-default`, one short line and its **one** button (primary; the only primary in the card); later steps show a hollow ring and muted text, no button. Eight rows is the ceiling.
+- **Row heights are fixed** (44 px; the next step 72 px), so ticking never moves a settled row.
 - **No dismiss.** No close, hide, snooze or menu; steps cannot be ticked by hand.
+- **Error:** if the AI apps read fails, step 3 keeps its last known tick; with no known tick it shows a muted "Couldn't check your AI apps." and a **Try again** text button.
 
 ### 27.3 Ticking and leaving
 
 - A step that becomes done **while you watch** draws its check once (`--al-duration-moment`, `--al-easing-emphasized`), the count ticks (§6 row 3) and the next step's button fades in (`--al-duration-base`). Steps already done when Home loads simply show as done.
-- When the last of steps 1, 2, 4 and 5 ticks, the card shows "You're all set." for 1.6 s, then leaves with §6 row 4 (fade and collapse, `--al-duration-base`, `--al-easing-exit`) and the tiles move up. Home then has no Next step card.
-- **Reduced motion:** checks and the count change at once; the card goes at once with the polite announcement "You're all set." Live region (polite): "Step done: Invite your first contact. 2 of 4."
-- Loading: the card's skeleton in its final size, only while the reads it needs are loading and only when setup is not known to be complete; a failed read keeps the last known ticks and adds nothing alarming.
+- Step 3 may tick from the AI app side (the app runs AgentLink for the first time): the row's word changes "Needs restart" to "Running" with the arrival pulse of §5, once.
+- When the last counted step ticks, the card shows "You're all set." for 1.6 s, then leaves with §6 row 4 (fade and collapse, `--al-duration-base`, `--al-easing-exit`) and the tiles move up.
+- **Reduced motion:** checks and the count change at once; the card goes at once with the polite announcement "You're all set." Live region (polite): "Step done: Connect your AI app. 3 of 7."
+- **Loading:** the card's skeleton in its final size (eight rows), only while the reads it needs are loading and only when setup is not known to be complete; a failed read keeps the last known ticks.
+- **Opening on Home.** `agentlink ui` and `npx -y @4thtech-io/agentlink` open Home, not Activity. While no owner exists they open Welcome (§28). Approval pages opened by an AI app (06 §4 flow) still open Approvals.
 
 ### 27.4 The Home dot and the empty states
 
-- **Home nav dot:** while the card is shown, the Home item in the sidebar (and the 360 bottom bar) carries a small dot in the "Needs setup" style (§5: dot with a small mark, accent tone). Its accessible name: "Home, setup not finished". It goes with the card.
-- **Empty states point to step 2:** Contacts ("No contacts yet. Invite someone to start." with **Add contact**, primary), Messages ("No messages yet. Invite someone first, then ask your AI to say hello." with **Add contact**) and Files ("No files yet. Invite someone first." with **Add contact**). Each opens the §21 sheet. Once step 2 is done they return to today's empty states.
-- The navigation order stays (Home first).
+- **Home nav dot:** while the card is shown, the Home item in the sidebar (and the 360 bottom bar) carries a small dot in the "Needs setup" style (§5). Accessible name: "Home, setup not finished". It goes with the card.
+- **Empty states point to the right step:** Contacts ("No contacts yet. Invite someone to start." with **Add contact**, primary), Messages ("No messages yet. Invite someone first, then ask your AI to say hello." with **Add contact**) and Files ("No files yet. Invite someone first." with **Add contact**). Each opens the §21 sheet. When step 3 is open, Messages and Files add a muted line: "Not connected to an AI app." with **Connect an AI app** as a text button. Once step 4 is done they return to today's empty states.
+- The navigation order stays (Home first); new items are in §29.2 and §30.5.
 
-New strings: "Start here", "{n} of {total}", "Protect approvals", "Invite your first contact", "Check the safety code with them", "(recommended)", "Send your first message", "Ask your AI to say hello.", "Say hello to {name} on AgentLink.", "Say hello to my new contact on AgentLink.", "You're all set.", "Step done: {step}. {n} of {total}.", "Home, setup not finished", the three empty-state lines. Existing: "Use Touch ID" (and its platform variants), "Add contact", "Compare safety code", "Save your recovery kit", "Save it now", "Waiting for {name} to accept".
+### 27.5 "No one to invite yet?": try it with a second agent of your own
+
+A solo user can still see a reply end to end. The quiet link under step 4 opens a short panel in the §21 sheet shell (level 3, 480 px; a full page at 600 px and under): **"Try it with a second agent of your own"**.
+
+1. **Add an agent** (the §29.3 Add sheet, AI app chosen, name prefilled from it, Touch ID). A second agent needs a **different AI app** from the first (an AI app serves one agent at a time, §30.2): for example Claude Desktop beside Claude Code.
+2. **Connect that AI app to it** (the §30.3 change panel). The panel shows the two agents side by side with their AppMark, app name and state word.
+3. **The app accepts the invite for that agent**: it creates an invite from one agent and accepts it for the other. The owner sees one confirmation line, "Pair Claude Code agent and Claude Desktop agent?", and the safety code is shown once as a pair.
+
+- The steps tick as a stepped bar (§15.1): "Add · Connect · Pair".
+- **Contacts then show the other agent by its label,** with the "Your own agent" chip (neutral). Step 4 ticks. The safety-code row ticks when both have checked.
+- **Hello and reply:** step 5's prompt names the second agent; the reply (step 6) arrives from it.
+- States: pairing in progress (indeterminate bar, "Pairing…"), pairing failed ("Couldn't pair them. Try again." and **Try again**), nothing to pair yet ("Connect an AI app to the second agent first." with **Connect an AI app**).
+- Whether two agents of one owner can pair is verified by card U3-k; if not, this panel is hidden and the link reads "Invite someone" (it opens the §21 sheet).
+
+New strings: "Start here", "{n} of {total}", "Protect approvals", "Name your agent", "Name it", "Connect your AI app", "Connect {app}", "Connect an AI app", "Not connected to an AI app.", "Invite your first contact", "Check the safety code with them", "(recommended)", "Say hello", "See the reply arrive", "Open the conversation", "Waiting for {name}'s reply", "Ask your AI to say hello.", "Say hello to {name} on AgentLink.", "Say hello to my new contact on AgentLink.", "You're all set.", "Step done: {step}. {n} of {total}.", "Home, setup not finished", "Couldn't check your AI apps.", "No one to invite yet?", "Try it with a second agent of your own", "Add · Connect · Pair", "Pair {a} and {b}?", "Your own agent", "Couldn't pair them. Try again.", "Connect an AI app to the second agent first.", the three empty-state lines. Existing: "Use Touch ID" (and platform variants), "Add contact", "Compare safety code", "Save your recovery kit", "Save it now", "Waiting for {name} to accept".
+
+## 28. Welcome and first run v3
+
+**Idea.** The first minute is a short path, not a wizard: one sentence and one button, then three short screens after it: **pick your AI app, then one screen that names the agent and protects it with one Touch ID gesture, then connect the AI app** as its own signed step (skippable with Later). Today's first run (B-9) is already one gesture; v3 adds the Welcome, the app choice, the name field and the connect step. **Owner decision 3.1 (2026-10-29):** name and Touch ID share one screen. **Owner input (29 Oct):** every agent shows which AI app it works from, so the AI app is chosen here and the suggested name follows it. Pattern: Linear workspace setup and Raycast first launch (one screen per decision, minimal fields). Shown only while no owner exists. Built from the first-run screen (B-9, D1/D2 files), `TextField`, `Button`, the `Mark` (§23), the Home card shell (§16) and the **AppMark** (§30.2).
+
+### 28.1 Welcome
+
+```text
+1440 (centred column, 480 px)                    360
+┌──────────────────────────────────────────────┐  ┌────────────────────────┐
+│                    ◈ Mark (48, still)        │  │       ◈ Mark           │
+│        Private messages between AI agents.   │  │  Private messages      │
+│        Only you and your contact can read    │  │  between AI agents.    │
+│        them.                                 │  │  Only you and your     │
+│                  [   Get started   ]         │  │  contact can read      │
+│                  What's AgentLink? (link)    │  │  them.                 │
+│                                              │  │  [    Get started    ]  │
+└──────────────────────────────────────────────┘  └────────────────────────┘
+```
+
+- **One sentence, one button.** Heading `al-text-title`, centred; **Get started** is the only primary. "What's AgentLink?" is a quiet text link to the public docs (new tab; no data sent). No account, no email, no choices.
+- **Surface:** `--al-color-bg-default` page, content on level 1; `Mark` 48 px, still. Dark first, as the brand.
+- **Motion:** the content fades in once (`--al-duration-base`, `--al-easing-enter`); nothing loops. Reduced motion: appears at once.
+- **States:** a skeleton of the same size while the owner read runs (under 400 ms shows nothing). If it fails: "Couldn't start AgentLink. Close this tab and run it again." with **Try again**. A half-finished setup skips Welcome and lands on the first screen not yet done (§28.2 to §28.4).
+
+### 28.2 Pick your AI app
+
+The first real decision, on its own screen. It also suggests the agent's name on the next one.
+
+```text
+1440 (centred card, 520 px, level 2)             360 (full width, 16 px gutter)
+┌────────────────────────────────────────┐       ┌────────────────────────┐
+│ Which AI app will you use?             │       │ Which AI app will you  │
+│ (●) [▢] Claude Code     Found          │       │ use?                   │
+│ ( ) [▢] Claude Desktop  Found          │       │ (●) [▢] Claude Code    │
+│ ( ) [▢] Codex           Found          │       │ ( ) [▢] Claude Desktop │
+│ ( ) I'll choose later                  │       │ ( ) I'll choose later  │
+│ [           Continue           ]       │       │ [      Continue      ]  │
+└────────────────────────────────────────┘       └────────────────────────┘
+```
+
+- **Radio list** (`role="radiogroup"`) of the supported AI apps **found on this computer** (a local look at the fixed config paths, §30.2), each with its AppMark, name and "Found"; the first found is preselected. "I'll choose later" is last. Supported apps not found are not listed (they appear on the AI apps page). If none is found, the list is replaced by "No AI app found yet. You can connect one later." and Continue goes on with no app.
+- **Nothing is written here.** The choice is only remembered for the next two screens. **Continue** is the only primary; Back returns to Welcome.
+- **States:** loading is a three-row skeleton (under 400 ms shows nothing); if the look fails, the list is replaced by "Couldn't look for AI apps. You can connect one later." and Continue stays enabled.
+
+### 28.3 Name your agent and protect it (one screen, one gesture)
+
+```text
+1440 (centred card, 520 px, level 2)             360
+┌────────────────────────────────────────┐       ┌────────────────────────┐
+│ Set up your agent                      │       │ Set up your agent      │
+│ [▢] Claude Code            Change      │       │ [▢] Claude Code        │
+│ Name your agent                        │       │ Name your agent        │
+│ [ Claude Code agent                ]   │       │ [ Claude Code agent  ] │
+│ Shown to you and your contacts.        │       │ Shown to you and your  │
+│ [        Use Touch ID        ]         │       │ contacts.              │
+│ Use a backup code instead (link)       │       │ [   Use Touch ID   ]   │
+└────────────────────────────────────────┘       └────────────────────────┘
+```
+
+- **The name follows the app.** The `TextField` "Name your agent" is prefilled "{App} agent" ("Claude Code agent", "Claude Desktop agent", "Codex agent", "OpenCode agent", "Antigravity agent"; "My agent" with no app), selected on open, any text up to 40 characters, always editable. An edited name is never overwritten. Empty after trimming is refused inline ("Give your agent a name."). Names need not be unique. The chosen app shows above the field as AppMark and name, with a **Change** text link back to §28.2.
+- **One gesture creates the owner and the agent.** **Use Touch ID** (platform word: "Use Windows Hello", "Use a passkey") creates the agent, the owner, the passkey, the first card and the policy, as today (D-130 (2)); the statement names the agent as typed. **Use a backup code instead** stays a small link (passkey first). Enter in the field does not submit; focus moves to the button.
+- **In progress:** the button becomes the indeterminate bar with "Setting up…", the field read-only; the `Mark` draws once (§23) and the page moves on to §28.4 (or to Home when no app was chosen), with Home's steps 1 and 2 ticked.
+- **Errors:** Touch ID cancelled ("Not protected yet. Try again.", text kept); not available here (the passkey line is replaced by the backup-code path with a one-sentence reason); setup failed ("Couldn't finish setup. Nothing was saved. Try again." with **Try again**).
+- **Back:** returns to §28.2 without losing the typed name. **Words (11 §5):** never "keys", "seed", "wallet", "identity" or "account".
+
+### 28.4 Connect your AI app (separate, signed step)
+
+Shown right after setup when an app was chosen. It is the §30.3 change panel in the first-run shell (a centred card, 520 px), so first run and the AI apps page behave the same.
+
+```text
+Connect Claude Code to Claude Code agent
+This adds one entry to Claude Code's settings.
+  File   ~/.claude.json
+  Adds   "agentlink": { "command": "npx", "args": ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "Claude Code agent"] }
+A backup of the file is saved first. Nothing else in it changes.
+[   Apply with Touch ID   ]        Later (text)
+```
+
+- **Exact entry, then Touch ID:** only the AgentLink entry is shown (§30.3). Applying is **its own signed step** (a second Touch ID, with a statement naming the app and the agent); setting up never writes an AI app's settings by itself.
+- **Later:** **Later** skips the step. The agent then shows **"Not connected to an AI app"** with a **Connect** action everywhere (§27 step 3, §29.1, §29.2, §30.5), and Home's step 3 stays open with its button.
+- **Claude Desktop running:** if the chosen app is open and rewrites its file on exit, the card says **"Quit Claude Desktop first."** with **Check again**; Apply is disabled with the reason in text, **Later** stays available. We never close it.
+- **After applying:** the success moment, then "Restart Claude Code to finish" (Needs restart), and the page moves to Home with step 3 ticked and showing the same word until the app runs AgentLink (**Running**).
+- **Errors, in progress and conflicts** are those of §30.3 (an entry we didn't write goes to manual steps; cancelled Touch ID keeps the card open and says "Not connected yet. Try again.").
+- **Accessibility:** focus moves to the title; the entry block is a labelled region; the live region announces "Claude Code needs a restart" on success.
+
+New strings: "Private messages between AI agents. Only you and your contact can read them.", "Get started", "What's AgentLink?", "Which AI app will you use?", "Found", "I'll choose later", "Continue", "Change", "No AI app found yet. You can connect one later.", "Couldn't look for AI apps. You can connect one later.", "Set up your agent", "Name your agent", "{app} agent", "My agent", "Shown to you and your contacts.", "Give your agent a name.", "Setting up…", "Your agent is ready", "Not protected yet. Try again.", "Couldn't finish setup. Nothing was saved. Try again.", "Couldn't start AgentLink. Close this tab and run it again.", "Use a backup code instead", "Later". The connect screen uses the strings of §30.
+
+## 29. Agents: the switcher and the Agents page
+
+**Idea.** People with more than one agent (a work one, a personal one, test ones) must see which agent they are looking at, **which AI app each works from**, and move between them without a terminal (the 0.4.3 try printed four leftover test names and asked for a number). Pattern: Slack workspaces, Chrome profiles, Arc spaces: the current one named in a corner, a menu of the others with a status mark, "Add" and "Manage"; removing a Chrome profile names what is deleted. **Owner decisions of 2026-10-29:** one agent is open at a time; **switching in the top bar needs no Touch ID** (it only changes what you look at); adding takes Touch ID; removal takes Touch ID **plus the typed name**. **Owner input:** an AI app serves one agent at a time; one agent may serve several AI apps; an agent with none says "Not connected to an AI app" with a Connect action. Built from the top bar (D1/D2), the Menu of the Under the hood switch, the sheet of §21.1, `Button`, `TextField`, `Segmented` (§22), `StatusChip`/live dot (§5), `Skeleton`, the §15.1 bars and the **AppMark** (§30.2).
+
+### 29.1 The top-bar switcher
+
+```text
+Top bar, 1440                                           Open menu (level 3, 340 px)
+┌──────────────────────────────────────────────────┐   ┌────────────────────────────────────┐
+│ ◈ Personal ▾ ● [▢] Claude Code        Under the hood│   │ ✓ Personal      ● Running          │
+└──────────────────────────────────────────────────┘   │   [▢] Claude Code  [▢] Claude Desktop│
+ 360: ┌──────────────┐                                  │   Work          ○ Not running       │
+      │ [P]● ☰       │  (initial in a 32 px circle)     │   [▢] Codex                         │
+      └──────────────┘                                  │   Second agent  ○ Not running       │
+                                                        │     Not connected to an AI app      │
+                                                        │ ───────────────────────────────── │
+                                                        │ + Add agent                         │
+                                                        │ Manage agents                       │
+                                                        └────────────────────────────────────┘
+```
+
+- **Trigger:** the current agent's label (truncated at 20 characters with a tooltip), a chevron, the live dot (§5) and the **AppMark with the app's name** (first app, "+1" when it serves more; "Not connected to an AI app" in muted type when none, which at 1440 shows as "No AI app" in the bar and in full in the menu). Placed at the left of the top bar after the `Mark`. At 360 it is the agent's **initial in a 32 px circle** with the dot at its corner and no app text (the app shows in the menu); its accessible name is "Agent: Personal, Claude Code, Running. Switch agent."
+- **Menu rows:** label, live dot and word, and under it the agent's AI apps, each as AppMark and name. An agent with none shows "Not connected to an AI app" with a **Connect** text button (opens §30 for that agent). The open agent has a check. At 360 the menu is a **bottom sheet** (level 3, rises from the bottom, 56 px rows, a grab handle, Esc and Close).
+- **Switching needs no Touch ID.** Choosing another agent closes the menu, the page area shows a skeleton of the current route for at most 600 ms (a 120 ms fade, no layout jump) and **every page reloads for that agent** (Home, Approvals, Messages, Files, Contacts, Rules, Settings). The label and AppMark in the trigger change at the same moment as the data, never before. The address stays on the same route.
+- **Nothing mutating is in flight across a switch.** Every mutating request carries the generation the page loaded with; if it no longer matches it is refused, and the page says "You switched agents. Nothing was changed." with the current agent's label, and re-reads (`agent_changed`, §29.8). A Touch ID prompt always names the agent it concerns ("Approve for Personal"), so a prompt never approves something for an agent you are not looking at.
+- **States:**
+  - *One agent:* no chevron on the label, the trigger opens the same menu with only **Add agent** and **Manage agents**, so the feature is discoverable and the bar never changes shape.
+  - *Several:* as drawn. Order: the open agent first, then last used, then by label.
+  - *Needs setup:* the row shows a "Needs setup" dot and word; choosing it opens Home with step 1 or 2 open (§27).
+  - *Loading:* the trigger shows the last known label; the menu shows three skeleton rows.
+  - *More than 8:* a search field ("Find an agent") filters by label or AI app name as you type; the list scrolls inside a 360 px height; the Agents page stays the place for the full list.
+  - *Error:* "Couldn't load your agents." with **Try again**; the open agent stays usable.
+  - *Bound to an AI app's approval page* (opened by an MCP process): the trigger is not a menu; its tooltip and text read "Open the AgentLink app to switch."
+  - *Removal not finished* agents are listed last, dimmed, with "Removal not finished" and no action (handled in §29.2).
+
+### 29.2 The Agents page
+
+A page `/agents` ("Agents"), sidebar item after Contacts. Level 1 page, level 2 rows.
+
+```text
+Agents, 1440
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Agents                          [ List │ Map ]            [ Add agent ]       │
+│ ┌──────────────────────────────────────────────────────────────────────────┐ │
+│ │ Personal  ✓ Open   ● Running                                              │ │
+│ │ Works from  [▢] Claude Code  ● Running   [▢] Claude Desktop  ○ Needs restart│ │
+│ │ 4 contacts · Active 2 min ago              [ Rename ] [ Connect ] [ ⋯ ]   │ │
+│ ├──────────────────────────────────────────────────────────────────────────┤ │
+│ │ Work      ○ Not running                                                   │ │
+│ │ Works from  [▢] Codex                                                     │ │
+│ │ 1 contact · Quiet                          [ Switch ] [ Rename ] [ ⋯ ]    │ │
+│ ├──────────────────────────────────────────────────────────────────────────┤ │
+│ │ Second agent  ○ Not running                                               │ │
+│ │ Not connected to an AI app                 [ Connect an AI app ] [ ⋯ ]    │ │
+│ ├──────────────────────────────────────────────────────────────────────────┤ │
+│ │ Old test  ⚠ Removal not finished                       [ Try again ]      │ │
+│ └──────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Row:** label (`al-text-title-sm`), "Open" chip when it is the open agent, live dot and word; a **"Works from" line** with an AppMark, name and state word (§30.2) for **each** AI app it serves (an agent may serve several); contacts count; last activity (§24 word); actions. Actions: **Switch** (secondary, other agents only), **Rename**, **Connect an AI app** (opens §30 for that agent; the primary action of a row with no AI app) and an overflow menu holding **Remove** (destructive, text style, never a primary). With no AI app the "Works from" line reads **"Not connected to an AI app"** with the warning-neutral ring mark.
+- **One agent per AI app:** an AI app listed on one agent does not appear on another; to move it, use the move step in §30.3.
+- **360:** each row is a card: label and dot on top, the "Works from" line below (wraps, one app per line), counts, and the actions in the overflow menu except one visible button (**Switch**, or **Connect an AI app** for an agent with none).
+- **List and Map:** a `Segmented` control (§22, tab semantics): **List** (default) and **Map** (§32). The map is only a view of the list; actions live in the list.
+- **Not-finished removals** show "Removal not finished" with a warning mark (shape, not colour alone), a one-line reason ("Removing it stopped part-way. Nothing else was affected.") and **Try again**, which opens the Remove sheet in its in-progress state. They never open as usable.
+- **Empty:** after removing the last agent: "No agents left. Add one to keep using AgentLink." with **Add agent** (primary).
+- **Loading:** three skeleton rows in the final size. **Error:** "Couldn't load your agents." with **Try again**; rows keep the last known values.
+- **Motion:** a new row slides in and settles (§6 row 1); a removed row collapses (§6 row 4); live dots as §5. Reduced motion: changes at once.
+
+### 29.3 Add an agent (sheet)
+
+The §21.1 sheet shell (level 3, right, 480 px; a full page at 600 px and under; not a modal). Title "Add an agent".
+
+1. **Which AI app will use it?** The same radio list as first run (§28.2), but apps already serving another agent show "Used by Personal" and are not selectable here (an AI app serves one agent at a time; to move one, use §30.3). "I'll choose later" is allowed.
+2. **Name:** `TextField` "Name your agent", prefilled "{App} agent" (or "Second agent" with no app), up to 40 characters, not overwritten once edited.
+3. **Touch ID:** **Add with Touch ID**. The owner signs the new agent's card; the statement names the label. The owner is the same, so no new passkey is created.
+4. **After it:** the success moment (§6 row 7), then, when an app was chosen, **"Connect {App} to it?"** with **Connect {App}** (primary; opens the §30.3 change panel) and **Not now** (text); with none chosen, **"Connect an AI app to it?"**. The new agent does not become the open one unless **Switch to it** (a checkbox, off by default) was ticked.
+- **In progress:** indeterminate bar, "Adding…". **Errors:** Touch ID cancelled ("Not added yet. Try again."); failed ("Couldn't add it. Nothing was saved. Try again.").
+
+### 29.4 Remove an agent (sheet)
+
+**Owner decision 4.1:** Touch ID and the typed name; offer to export history first; the agent is always marked retired; its contacts are told if it has any; its AI app entries, keys and history are deleted; it cannot be restored. The sheet (§21.1 shell, level 3, 480 px; a full page at 600 px and under) is the one place the word **"keys"** appears in the default UI, because it is what is deleted.
+
+```text
+Remove "Work"?                                                       ✕
+This will delete, from this computer:
+  • Work's keys and settings
+  • Its message and file history (4 contacts, 212 messages)
+  • Its entry in [▢] Codex
+Your 4 contacts will be told Work is retired. This can't be undone.
+
+[ Export history first ]            (secondary; opens the Backup/Export flow)
+
+Type the agent's name to confirm
+[ Work                                        ]
+[        Remove with Touch ID        ]   (destructive; disabled until the name matches)
+```
+
+- **Names exactly what goes:** keys and settings, history (counts), AI app entries (a list with AppMarks, entry only, as §30.3), in plain words. With contacts: "Your {n} contacts will be told {label} is retired." Without: nothing about contacts.
+- **Export history first (I-10)** is offered, never forced; afterwards the person returns to this sheet with the typed name kept.
+- **Typed name:** case-sensitive exact match to the label enables the button; paste is allowed. Removing the open agent is allowed; the app then opens another agent, or shows "Add an agent" when none is left. The owner stays.
+- **"Quit the AI app first":** if an AI app is running this agent, the sheet shows, in place of the button, **"Quit the AI app that uses Work first."** with the app names (AppMarks) and **Check again** (answer `in_use`). Nothing is closed by us.
+- **In progress** (stepped bar, §15.1: "Telling contacts · Removing the app entry · Erasing · Done"): the sheet stays open, cannot be dismissed, and the title becomes "Removing Work…". Closing the tab is safe.
+- **"Remove anyway?":** if the contacts cannot be told now (offline or timeout), the sheet pauses at the first step: **"Remove anyway? Your contacts can't be told now."** Buttons: **Remove anyway** (destructive) and **Wait and try again** (secondary, default focus). It never continues silently. After "Remove anyway" the sheet says once that contacts will see no reply.
+- **Removal not finished:** if the process stops part-way (power loss, closed lid) the agent is marked and appears in the list and switcher as "Removal not finished" with **Try again** (§29.2). Trying again resumes where it stopped; it needs Touch ID but not the name again.
+- **Errors:** Touch ID cancelled ("Not removed. Try again."); a failure after the mark ("Couldn't finish removing Work. Nothing else was changed." with **Try again**).
+- **Success:** the row collapses, the success moment plays, a toast says "Work was removed." and the page shows the next agent. The sheet says "retired" for what contacts are told; never "revoked", "deleted identity" or "wallet".
+
+### 29.5 Rename
+
+An inline edit on the Agents page row and from Home step 2 (**Name it**): the label becomes a `TextField` (up to 40 characters, Enter saves, Esc cancels) with **Save**. It needs **no Touch ID** (a label only), shows to contacts the next time they hear from the agent, and the top bar and menu update at once. Error: "Couldn't rename it. Try again."
+
+### 29.6 Several agents: what each page does
+
+Every page shows the **open agent's** data. The page title area carries no agent name (the top bar does); a toast or sheet that names an agent uses its label. Sidebar counts are for the open agent; the Agents page shows "2 waiting" (shape and word) on any **other** agent's row so nothing waits unseen.
+
+### 29.7 The one-time "Tidy up" note
+
+Owners upgrading with several agents (the four leftover test agents of the 0.4.3 try) see **one calm note** on Home, above the Start here card, never inside it:
+
+> **You have 4 agents on this computer.** If some were only for testing, you can remove them.  [ Tidy up ]  [ Not now ]
+
+- **Tidy up** opens the Agents page; **Not now** hides the note for good (stored with the agents, not in the browser). Nothing is removed or hidden automatically.
+- Level 2, neutral tone (no orange: nothing needs you); at 360 full width with the buttons stacked. Shown once per computer, only when two or more agents exist and the Agents page has not been opened. Reduced motion: appears at once.
+
+### 29.8 Refusals and errors in one place
+
+| Case | What the person sees | Where |
+|---|---|---|
+| `agent_changed` (page loaded for another agent) | "You switched agents. Nothing was changed." + the current label; the page re-reads | Toast and live region |
+| `in_use` (an AI app runs this agent) | "Quit the AI app that uses {label} first." + **Check again** | Remove sheet |
+| Contacts cannot be told | "Remove anyway? Your contacts can't be told now." | Remove sheet |
+| Removal part-way | "Removal not finished" + **Try again** | Agents page, switcher |
+| Touch ID cancelled | "Not {added/removed/changed} yet. Try again." | The sheet in use |
+| Agent list cannot be read | "Couldn't load your agents." + **Try again** | Switcher, Agents page |
+
+### 29.9 Layout, motion and accessibility
+
+- **Layout:** 1440, the Agents page is one column (max 960 px) of level 2 rows; 360, cards at full width with 16 px gutters. Sheets as §21.1.
+- **Motion:** the menu opens with `--al-duration-fast` and `--al-easing-enter` (scale and fade from the trigger); the page swap on a switch is a 120 ms fade; nothing else moves. At most two things move at once (§14). Reduced motion: menu and swap appear at once, dots are still. Reduced transparency: solid sheet and menu surfaces (§13.2).
+- **Accessibility:** the trigger is a button with `aria-haspopup="menu"` and `aria-expanded`; the menu is a `role="menu"` list with arrow keys, Home, End, type-ahead, Esc returning focus to the trigger; a switch announces "Now showing Work" (polite). Remove sheet: focus moves to the title, the field is labelled "Type {label} to confirm", the button's disabled reason is in text ("Type the name to enable this"), and progress announces each step. Live dots always have a word; "Removal not finished" has a warning shape; the AppMark is decorative (`aria-hidden`) because the app's name is always next to it as text. AA contrast in light, dark and increased contrast; targets 44 px at 360.
+
+New strings: "Agent: {label}, {apps}, {state}. Switch agent.", "Add agent", "Manage agents", "No AI app", "Not connected to an AI app", "Find an agent", "Couldn't load your agents.", "Open the AgentLink app to switch.", "You switched agents. Nothing was changed.", "Now showing {label}", "Agents", "Open", "Works from", "Switch", "Rename", "Connect", "Connect an AI app", "Remove", "Removal not finished", "Removing it stopped part-way. Nothing else was affected.", "Try again", "No agents left. Add one to keep using AgentLink.", "Add an agent", "Used by {agent}", "Add with Touch ID", "Connect {app} to it?", "Connect an AI app to it?", "Not now", "Switch to it", "Adding…", "Not added yet. Try again.", "Couldn't add it. Nothing was saved. Try again.", "Remove {label}?", "This will delete, from this computer:", "{label}'s keys and settings", "Its message and file history ({contacts} contacts, {messages} messages)", "Its entry in {app}", "Your {n} contacts will be told {label} is retired.", "This can't be undone.", "Export history first", "Type the agent's name to confirm", "Remove with Touch ID", "Quit the AI app that uses {label} first.", "Check again", "Telling contacts", "Removing the app entry", "Erasing", "Done", "Removing {label}…", "Remove anyway? Your contacts can't be told now.", "Remove anyway", "Wait and try again", "Not removed. Try again.", "Couldn't finish removing {label}. Nothing else was changed.", "{label} was removed.", "Couldn't rename it. Try again.", "{n} waiting", "You have {n} agents on this computer.", "If some were only for testing, you can remove them.", "Tidy up".
+
+## 30. AI apps: connect from the app
+
+**Idea.** Connecting an AI app used to be a terminal job (`init`). The app now shows which AI apps it found, which agent each works with, and connects one in two steps: **see the exact change, then Touch ID**. Pattern: Linear integrations and Raycast extensions (cards with a state), VS Code and Cursor "Install MCP server" (the entry is shown before it is added). **Owner decision 5.1:** the app shows the exact `agentlink` entry, then Touch ID, with a backup of the file; Claude Desktop must be closed; moving an AI app between agents is allowed with the same step. **Owner input:** an AI app serves **one agent at a time**; an agent may serve **several** AI apps. Built from the §15.1 bars, `StatusChip`, `Button`, the code/preview block of `CopyPrompt` (monospace, level 2), the §21.1 sheet and the live dot (§5).
+
+### 30.1 The page
+
+A page `/apps` ("AI apps"). **Navigation default (§30.5):** a sidebar item after Contacts while no AI app is connected to the open agent; once one is connected it moves under Settings. The header shows the open agent's label ("for Personal"), so it is clear which agent is being connected.
+
+```text
+AI apps, 1440                              for Personal ▾
+┌───────────────────────────────┐ ┌───────────────────────────────┐
+│ [▢] Claude Code                │ │ [▢] Claude Desktop             │
+│ ● Running                      │ │ ○ Not connected                │
+│ Connected to Personal          │ │ Quit Claude Desktop first      │
+│ [ Disconnect ]                 │ │ [ Review change ]  (disabled)  │
+└───────────────────────────────┘ └───────────────────────────────┘
+┌───────────────────────────────┐ ┌───────────────────────────────┐
+│ [▢] Codex                      │ │ [▢] Cursor                     │
+│ ○ Connected to another agent   │ │ ⚠ Needs restart                │
+│ Uses Work                      │ │ Restart Cursor to finish       │
+│ [ Use Personal instead ]       │ │                                │
+└───────────────────────────────┘ └───────────────────────────────┘
+ Not listed? Connect it by hand (manual steps, §30.4)
+```
+
+At 1440 the cards form a grid of up to three columns (min 300 px); at 360 one column, cards at full width, the button full width.
+
+### 30.2 The cards, the AppMark and their states
+
+- **AppMark (new small component, used in §27 to §32).** A 20 px (28 px on cards) rounded square in `--al-color-bg-sunken` with a hairline border and the **app's first letter** in `al-text-caption`; **generic, no third-party logos** unless `docs/design` already holds one (none is assumed). The app's name always sits next to it as text; the mark never carries meaning alone and is `aria-hidden`. Supported apps named in copy: Claude Code, Claude Desktop, Codex, OpenCode, Antigravity, Cursor and the others `init` knows.
+- Each card: AppMark, the app's name, a state word with a shaped mark, one line of detail and **one** button. The state is **read from the app's own config file** and from the lease row (never from a click).
+
+| State | Mark and tone | Detail line | Button |
+|---|---|---|---|
+| **Not connected** | Hollow ring, `--al-color-fg-muted` | "Not connected" | **Review change** (primary on the first card only; secondary on the rest) |
+| **Connected to {agent}** | Filled dot, success | "Connected to Personal" | **Disconnect** (secondary; same step, §30.3) |
+| **Connected to another agent** | Hollow ring with a swap arrow | "Uses Work" | **Use {open agent} instead** (secondary; shows both entries, §30.3). The app leaves the other agent |
+| **Needs restart** | Warning triangle, `--al-color-status-warning-icon` | "Restart {app} to finish" | none (status word; **Check again** text button) |
+| **Running** | Filled dot with one arrival pulse, success | "Running" (after the app has run AgentLink) | none |
+| **Entry we didn't write** | Warning triangle | "This app already has an AgentLink entry we didn't write." | **Show manual steps** (§30.4). We never overwrite it |
+| **Couldn't read** | Warning triangle | "Couldn't read its settings." | **Try again** |
+| **Not found** | Not a card; listed under "Not listed?" | — | — |
+
+- **The rule:** one AI app serves one agent at a time (the card shows "Connected to {agent}" for exactly one), and one agent may have several apps (several cards say "Connected to Personal").
+- **Needs restart → Running** changes by itself when the app has run AgentLink (the lease row, polled with the health poller; polling stops when the page is hidden).
+- **One primary:** at most one primary button on the page.
+- **Detection is silent and local:** only the fixed config paths of supported apps are looked at; nothing is sent anywhere.
+
+### 30.3 The change panel: exact entry, then Touch ID
+
+**Review change** opens the §21.1 sheet (level 3, 480 px; a full page at 600 px and under) titled "Connect Claude Code to Personal". When first run or Add agent chose the app, it opens here directly.
+
+```text
+Connect Claude Code to Personal                                   ✕
+This adds one entry to Claude Code's settings.
+
+  File     ~/.claude.json                       (path shown without the home folder)
+  Adds     ┌──────────────────────────────────────────────┐
+           │ "agentlink": {                                │
+           │   "command": "npx",                           │
+           │   "args": ["-y", "@4thtech-io/agentlink",     │
+           │            "mcp", "--agent", "Personal"]      │
+           │ }                                             │
+           └──────────────────────────────────────────────┘
+A backup of the file is saved first. Nothing else in it changes.
+
+[        Apply with Touch ID        ]
+```
+
+- **Shows only the AgentLink entry.** Never other entries, context lines or the whole file (those files hold other tools' secrets). The preview is the only part of the file the page ever receives.
+- **The change shown is the change written.** The Touch ID statement names the app and the agent ("Connect Claude Code to Personal"). If the file changed since it was shown: "The file changed. Review it again." and the entry is shown again.
+- **Moving an app between agents:** the panel shows **both entries**, removed and added, side by side (stacked at 360), under "Claude Code will use Personal instead of Work." Same button, same Touch ID.
+- **Disconnect:** the same panel with the entry shown as removed, "Claude Code will stop using Personal." The agent then reads "Not connected to an AI app" if it was the last one.
+- **After applying:** the success moment, then the card turns to **Needs restart** ("Restart Claude Code to finish"); Home step 3 shows the same word until the app runs AgentLink, then **Running**. We never close or restart the app ourselves.
+- **"Quit the AI app first":** for Claude Desktop (and other apps that rewrite their file on exit) while it is open, the card and the sheet say **"Quit Claude Desktop first."** with **Check again**; Apply is disabled with the reason in text. When closed, the next check enables it. Never closed by us.
+- **An entry we didn't write** stays a conflict: no overwrite; link to **Show manual steps** (§30.4).
+- **In progress:** indeterminate bar, "Connecting…". **Errors:** Touch ID cancelled ("Not connected yet. Try again."); file could not be written ("Couldn't change Claude Code's settings. Nothing was changed." with **Try again** and **Show manual steps**); `agent_changed` (§29.8).
+
+### 30.4 Manual steps
+
+For a conflict, an app we can't edit, or someone who prefers it: a calm panel in the same sheet with the same entry as copyable text (`CopyPrompt` style: block and **Copy**), the file path, and three short numbered lines ("Open this file", "Add the entry above", "Restart {app}"). Nothing in the panel is run by us. The page ends with "Not listed? Connect it by hand", which opens the same panel with a generic entry.
+
+### 30.5 Navigation
+
+"AI apps" is a sidebar item after Contacts (icon from `brand/icons/ui/`), with a "Needs setup" dot while no AI app is connected to the open agent. Once one is connected it moves under Settings (after Profile) and the dot goes; Home's step 3 and the Agents rows' **Connect an AI app** always link to it. The agent switcher is in the top bar (§29.1). At 360 it is in the bottom bar's More list.
+
+### 30.6 States, motion and accessibility
+
+- **Loading:** three skeleton cards in the final size. **Error:** "Couldn't check your AI apps." with **Try again**; cards keep the last known state. **Empty:** "We didn't find a supported AI app on this computer." with **Show manual steps**.
+- **Motion:** state words and marks change with the §6 row 3 tick; a card turning Running plays the arrival pulse once. Reduced motion: still shapes and words.
+- **Accessibility:** each card is a group named "Claude Code, Not connected" with its button inside; the preview block is `role="region"` labelled "The entry that will be added", selectable text; Apply's disabled reason is in text; state changes announce politely ("Claude Code needs a restart", "Claude Code is running"). Colour is never the only signal.
+
+New strings: "AI apps", "for {agent}", "Not connected", "Connected to {agent}", "Connected to another agent", "Uses {agent}", "Needs restart", "Restart {app} to finish", "Running", "Review change", "Disconnect", "Use {agent} instead", "This app already has an AgentLink entry we didn't write.", "Show manual steps", "Couldn't read its settings.", "Not listed? Connect it by hand", "Connect {app} to {agent}", "This adds one entry to {app}'s settings.", "File", "Adds", "A backup of the file is saved first. Nothing else in it changes.", "Apply with Touch ID", "The file changed. Review it again.", "{app} will use {agent} instead of {other}.", "{app} will stop using {agent}.", "Connecting…", "Quit {app} first.", "Check again", "Not connected yet. Try again.", "Couldn't change {app}'s settings. Nothing was changed.", "Open this file", "Add the entry above", "Restart {app}", "We didn't find a supported AI app on this computer.", "The entry that will be added".
+
+## 31. Copy for the new screens (11 §5)
+
+All new strings are listed at the end of §27 to §30 and §32. Rules this brief applies:
+
+- **"AI app", never "harness", "client", "MCP server" or "tool"** in the default UI. "Agent" is the person's agent; "contact" is the other side. Every agent shows its AI app's name as text, or "Not connected to an AI app".
+- **No "wallet", "gas", "seed phrase", "transaction" or "chain"** in any default string. Also avoid "identity", "account", "private key", "revoke" and "publisher".
+- **"Keys" appears only in the Remove sheet** (§29.4), because it is what is deleted; **"retired"** describes what contacts are told. Paths and the `agentlink` entry appear only in the change panel (§30.3) and Advanced.
+- **Touch ID wording is platform-aware** ("Use Touch ID", "Use Windows Hello", "Use a passkey").
+- **Every refusal says what happened and what to do** in one sentence (§29.8); no codes (`agent_changed`, `in_use`) reach the screen.
+- **Names:** only the owner-confirmed alias or the agent's label; others read "Unnamed contact"; a name the other side chose appears only in the untrusted container (I-5). No content on the map (§32).
+- **Marks:** the AppMark is a generic letter mark, never a third-party logo, and never the only carrier of the app's name.
+- **Checks:** sentence case, no exclamation marks, no emoji; buttons are verbs; destructive buttons name the effect ("Remove with Touch ID"). A copy test against the 11 §5 banned-word list runs on the new strings (card U3-copy).
+
+## 32. Live connections
+
+**Idea.** Someone running many agent sessions should see **who is talking, right now, at a glance**. Owner input (28 Oct): each agent as a box, with live lines to its contacts while messages or files flow. **Owner decision 8.1 (2026-10-29):** the Agents page gets the map first, plus a **moving-row mark in Messages and Files**; **no preview on hover and no message content on the map; clicking opens Messages**. Home's Last activity mini map (top 5), a Contacts Map view and a one-line strip in the compact view (§25.1) follow later (0.4.5) and reuse this section. Pattern: Tailscale's machines map, Figma presence, Vercel and Linear live status, Grafana service maps: the list stays primary, motion only on change, clustering at scale. Built from the pulse (§24), the determinate bar (§15.1), the live dot (§5), `Segmented` (§22), the AppMark (§30.2) and the level 2 card (§16).
+
+### 32.1 Where it is, and what it shows
+
+- **Agents → Map** (the `Segmented` of §29.2). The List is the default and the **text alternative** of the map; the Map is an extra view, lazily loaded.
+- **Messages and Files:** a small **moving-row mark** on a row (and a Contacts row) that has a stream now (§32.3), in the slot right of the §24.3 marker, 12 px, with the word "Sending" or "Receiving".
+- **Map content:** your agents as boxes on the left (label, live dot, **AppMark and app name for each AI app, or "Not connected to an AI app"**), contacts as smaller boxes on the right, and a line when they exchanged anything in the last 24 hours. Line weight follows the pulse counts (§24). A **stream** (a short travelling dash in the flow's direction) runs only while a message or file is moving or arrived in the last minute, then settles. A file in progress shows the determinate fill of Files (§15.1).
+- **No content, ever, on the map.** Names (owner-confirmed; others "Unnamed contact"), activity words and direction only. No text, subject, file name, link or envelope on a box or line, and no preview on hover. Calm and safe while screen sharing. Zero access is unchanged: nothing leaves the device for this view; it works offline.
+- **Click opens Messages:** a contact box or a line opens that conversation (switching the open agent first with the §29.1 rules if the line belongs to another agent). An agent box opens Messages for that agent. "+N more" opens Contacts sorted Most active. Nothing else opens.
+
+### 32.2 Layout
+
+```text
+Agents → Map, 1440 (level 1 page, map on a level 2 canvas, 960 × ~480)
+┌───────────────────────────────────────────────────────────────────────┐
+│ [ List │ Map ]                                  ☐ Show quiet           │
+│ ┌────────────────┐                        ┌──────────────────┐        │
+│ │ Personal ●     │━━━━━━ ▸▸ ━━━━━━━━━━━━━━│ Marko  Active now│        │
+│ │ [▢] Claude Code│────────────────────────│ Ana    Today     │        │
+│ └────────────────┘                        │ Ivo    Quiet     │        │
+│ ┌────────────────┐                        │ + 7 more         │        │
+│ │ Work ○         │────────────────────────│ Dana   Today     │        │
+│ │ [▢] Codex      │                        └──────────────────┘        │
+│ └────────────────┘                                                     │
+│ Second agent ○  Not connected to an AI app                             │
+│ A line shows people who exchanged something in the last 24 hours.      │
+└───────────────────────────────────────────────────────────────────────┘
+
+360: one column. Each agent is a card (label, dot, AppMark and app name);
+under it its contacts as rows with the activity word and the moving-row
+mark. No lines are drawn.
+```
+
+- **1440:** a fixed **two-column layout**, no physics, no dragging: agents left, contacts right, sorted by activity (most recent first). Agent boxes 72 px, contact boxes 44 px; lines straight or one soft elbow. The canvas scrolls inside the card past 480 px.
+- **360:** the map does not draw lines. Each agent is a card and its contacts are rows underneath; the "stream" is a 2 px moving segment at the row's left edge. 44 px rows, 16 px gutters. The List and Map `Segmented` stays.
+- **Lines:** weight 1 to 3 px by the pulse count (§24.2 scale, per agent); `--al-color-fg-muted` for a line, `--al-color-status-success-icon` for a **running** stream segment only; **no orange**. Arrowhead for direction; solid when both ways, dashed when one way (shape, not colour).
+- **Light, dark and increased contrast** follow the tokens; in increased contrast line weights go up by 1 px and box edges use `--al-color-border-strong`; forced colours use `CanvasText` for lines and `Highlight` for a running stream.
+
+### 32.3 Streams and states
+
+- **Message stream:** a 12 px dash travels the line in the flow's direction for 1.2 s once per arrival, then the line settles; a burst is combined into one. **File stream:** the dash travels while the file moves, and the contact box shows the determinate fill ("Sending to Marko", "2.1 of 8 MB · about 20 s"); if bytes are unknown the indeterminate bar is used (§15.1), never a guessed percentage. After one minute the stream stops and the line keeps its weight.
+- **Active now** and **Today** use the §24.3 shapes. The moving-row mark in Messages and Files is the same dash at 12 px for the same period.
+- **Loading:** two skeleton agent boxes and a skeleton column in the final size. **Empty:** "No one to talk to yet." with **Add contact** (primary). **No recent activity:** lines hidden and the note "Nothing has moved in the last 24 hours."; **Show quiet** lists the quiet contacts. **Error:** "Couldn't load what's moving." with **Try again**; the last view stays dimmed and streams stop. **Offline:** stored activity still shows; streams only run from what arrives.
+- **Data:** the pulse read shared with §24 (one shared pulse module) and one flow read polled every 3 s while the tab is visible and stopped when hidden: metadata only, never text, subject, file name, link or envelope (07 §3). The endpoint is specified by card U3-flow, not here.
+
+### 32.4 Scale and calm
+
+- **Top 12 contacts per agent,** the rest in a "+N more" group (click opens Contacts sorted Most active); **up to 8 agents drawn,** the rest in "+N more agents" (opens the List).
+- **Quiet contacts hidden** by default; **Show quiet** (a `Switch`, §22, remembered per browser; off if storage fails).
+- **At most 6 streams at once;** more show as lines with the moving-row mark and no dash. At most two things move at once on screen (§14).
+- **Calm default:** the map opens with no stream unless something is moving right now; nothing loops (11 §11 item 6). Animation uses `transform` and `stroke-dashoffset` only and pauses when the tab is hidden.
+- **Budget:** one SVG layer, no new dependency, lazy-loaded, under 8 KB gzipped; the flow answer under 20 KB; `perf-guards.test.ts` extended. Smooth on the reference slow machine (D-135 (3) (d)).
+
+### 32.5 Reduced motion, transparency, accessibility
+
+- **Reduced motion:** no travelling dash; a static arrowhead and the word "now" on the line and the row; the determinate fill changes without easing. **Reduced transparency:** solid canvas and box surfaces (§13.2).
+- **Text alternative:** the map is decoration over the List, which carries every fact (names, words, counts, AI apps). The SVG is `aria-hidden="true"`; the Map view's heading "Live connections" is followed by a visible summary line: "2 agents, 5 contacts. Marko is talking with Personal now."
+- **Live region:** polite, at most one line per 10 s ("Marko is sending a file to Personal", "Reply from Marko"); never contents.
+- **Keyboard:** order follows the list (agent, then its contacts); boxes are buttons labelled such as "Personal and Marko, Active now. Open conversation"; Enter opens Messages. **Colour is never the only signal:** words, dash and solid lines, and marks accompany every colour.
+- **Hover preview:** none ships. If the owner later chooses it (decision 8, option 3), it must come from the Messages read as plain text in the untrusted container.
+
+New strings: "Live connections", "List", "Map", "Show quiet", "+{n} more", "+{n} more agents", "{agents} agents, {contacts} contacts. {name} is talking with {agent} now.", "Sending", "Receiving", "Sending to {name}", "No one to talk to yet.", "Nothing has moved in the last 24 hours.", "Couldn't load what's moving.", "{name} is sending a file to {agent}", "Reply from {name}", "Open conversation", "now". Existing: "Active now", "Today", "Quiet", "Add contact", "Try again", "Not connected to an AI app".
