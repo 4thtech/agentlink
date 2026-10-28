@@ -498,7 +498,7 @@ Switch (today, unchanged)              Segmented (proposed restyle)
 | Track | `--al-color-bg-sunken`; `--al-border-width-thin` in `--al-color-border-strong`; `--al-radius-sm`; padding `--al-space-1`. Today it has `--al-radius-md` and dividers between options |
 | Option | Height `--al-size-control-md` (32 px), `--al-size-control-lg` at 360 (44 px touch targets, as §19.5); padding `0 --al-space-3`; `al-text-body-sm`; `--al-color-fg-muted` |
 | Thumb (chosen) | `--al-color-accent-subtle`; `--al-radius-xs`; a 2 px `--al-color-accent-default` bottom edge (today's `inset 0 -2px 0` marker); text `--al-color-fg-default`; the existing `check` icon. The same tint marks the switch's On track and the selected nav item, so "chosen" reads the same everywhere |
-| Motion | The thumb moves with `transform` only, `--al-duration-fast`, `--al-easing-standard` (the knob's and the nav slider's values); the label colour cross-fades in the same time |
+| Motion | The thumb moves with `transform` only, `--al-duration-fast`, `--al-easing-standard` (the knob's and the nav slider's values). The label colour changes instantly while the thumb slides, because motion is limited to transform and opacity |
 
 ### 22.4 States and focus
 

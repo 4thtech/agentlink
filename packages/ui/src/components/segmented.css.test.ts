@@ -43,6 +43,17 @@ describe('.al-seg: the switch track', () => {
   });
 });
 
+describe('.al-seg: equal columns, so the thumb always sits under its option (360 px)', () => {
+  it('uses equal, content-independent columns and lets labels wrap', () => {
+    expect(rule('.al-seg')).toMatch(/grid-auto-columns:\s*minmax\(0,\s*1fr\)/);
+    const opt = rule('.al-seg-opt');
+    expect(opt).toContain('min-width: 0');
+    expect(opt).toMatch(/min-height:\s*var\(--al-size-control-md\)/);
+    expect(opt).not.toMatch(/(^|[\s;])height:/);
+    expect(opt).toContain('flex-wrap: wrap');
+  });
+});
+
 describe('.al-seg: the sliding thumb', () => {
   it('is accent-subtle, radius-xs, with a 2 px accent bottom edge, and the label turns default', () => {
     const thumb = rule('.al-seg::before');
