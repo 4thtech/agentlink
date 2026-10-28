@@ -22,8 +22,8 @@ import {
   Surface,
   Switch,
   TextField,
-  UnderTheHood,
 } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import {
   useCallback,
   useEffect,

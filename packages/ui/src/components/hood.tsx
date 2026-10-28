@@ -5,28 +5,11 @@
 // public proof record link on a public block explorer. Keys, codes, tokens, the session link and
 // drop, upload, download and presigned URLs are refused before anything is rendered (I-5; zero
 // access). A refused field is dropped without a trace: no error text, no log.
-import {
-  createContext,
-  useContext,
-  useId,
-  useState,
-  type ReactElement,
-  type ReactNode,
-} from 'react';
+import { useContext, useId, useState, type ReactElement } from 'react';
 import { Icon } from './brand.js';
+import { HOOD_STRINGS, HoodContext } from './hood-core.js';
 
-export const HOOD_STRINGS = {
-  title: 'Under the hood',
-  tooltip: 'Show the technical details. Nothing here changes how the app works.',
-  empty: 'Nothing technical to show here yet.',
-  hide: 'Hide technical details',
-  show: 'Show technical details',
-  proofLink: 'Open the public record',
-  previewTitle: 'Preview',
-  previewTry: 'Try it',
-  previewStill: 'The sample sits still.',
-  previewMoved: 'The sample has moved. With reduced motion it jumps instead of gliding.',
-} as const;
+export { HOOD_STRINGS, HoodProvider, useHood } from './hood-core.js';
 
 export type HoodTextKind = 'text' | 'id' | 'size' | 'time' | 'count' | 'path';
 
@@ -244,19 +227,6 @@ export function acceptHoodField(input: unknown): HoodField | null {
   if (shape !== undefined && !shape.test(value)) return null;
   if (!valueAllowed(value, kind as HoodTextKind)) return null;
   return { kind: kind as HoodTextKind, label, value };
-}
-
-const HoodContext = createContext(false);
-
-/** The global switch's value, handed down by the app. Off outside a provider. */
-export function HoodProvider({
-  value,
-  children,
-}: {
-  value: boolean;
-  children?: ReactNode;
-}): ReactElement {
-  return <HoodContext.Provider value={value}>{children}</HoodContext.Provider>;
 }
 
 export interface UnderTheHoodProps {

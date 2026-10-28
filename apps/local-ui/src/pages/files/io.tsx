@@ -20,10 +20,10 @@ import {
   StatusChip,
   Surface,
   SuccessMoment,
-  UnderTheHood,
   UntrustedContent,
   useRowPresence,
 } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import {
   useCallback,
   useEffect,

@@ -19,10 +19,10 @@ import {
   LiveDot,
   RingMeter,
   Skeleton,
-  UnderTheHood,
   useRowPresence,
   type LiveDotState,
 } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import {
   useCallback,
   useEffect,

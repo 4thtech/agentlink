@@ -17,8 +17,8 @@ import {
   Skeleton,
   Surface,
   SuccessMoment,
-  UnderTheHood,
 } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
 import { AddCreditsPanel, ConfirmMove, type Move } from './top-up.js';

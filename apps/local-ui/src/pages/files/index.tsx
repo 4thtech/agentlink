@@ -12,7 +12,8 @@
 // Three tabs (MSG-FILES-IO-f): Received and Sent (io.tsx, read-only) and this page as Send folders.
 // Out of scope here: inbox folder and link expiry (UX audit 4b "More options"), and Storage
 // (folded in by D-120 later).
-import { Banner, Button, EmptyState, Icon, TextField, UnderTheHood } from '@4thtech-io/ui';
+import { Banner, Button, EmptyState, Icon, TextField } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
 import {

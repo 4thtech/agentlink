@@ -1,6 +1,7 @@
 // UI-REFRESH-n: Settings › About (B-11 §16 row 22). The mark with "by 4thTech", the version from the
 // health read, the licence and public docs and support links. Nothing private is read or shown (I-7).
-import { Lockup, Skeleton, Surface, UnderTheHood } from '@4thtech-io/ui';
+import { Lockup, Skeleton, Surface } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import { useEffect, useState, type ReactElement } from 'react';
 import type { ApiResult } from '../../api/client.js';
 import { parseHealth, readHealth } from '../../layout/health.js';

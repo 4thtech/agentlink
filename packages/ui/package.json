@@ -23,6 +23,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./hood": {
+      "types": "./dist/components/hood.d.ts",
+      "default": "./dist/components/hood.js"
+    },
     "./tokens.css": "./src/tokens/tokens.css",
     "./components.css": "./src/components/components.css",
     "./depth.css": "./src/components/depth.css",

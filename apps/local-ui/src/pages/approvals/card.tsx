@@ -15,14 +15,8 @@
 // applied approval draws the check (SuccessMoment), an applied denial fades the decided card; Under
 // the hood shows the kind and the exact expiry. Nothing the agent wrote reaches the ring, the moment
 // or the panel, and every fact stays on the card before, during and after the decision (WYSIWYS).
-import {
-  Button,
-  RingMeter,
-  SuccessMoment,
-  Surface,
-  UnderTheHood,
-  useVisibilityPause,
-} from '@4thtech-io/ui';
+import { Button, RingMeter, SuccessMoment, Surface, useVisibilityPause } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { PayConfirm, type PayConfirmClient } from '../../pay-confirm/index.js';
 import type { PayPlatform } from '@4thtech-io/ui';

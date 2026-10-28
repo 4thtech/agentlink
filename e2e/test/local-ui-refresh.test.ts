@@ -504,7 +504,26 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       sizes[ext] += gzipSync(readFileSync(join(dir, f)), { level: 9 }).length;
     }
     const growth = { css: sizes.css - BASELINE_040.cssGzip, js: sizes.js - BASELINE_040.jsGzip };
-    report['bundle'] = { gzip: sizes, baseline040: BASELINE_040, growth, budget: BUDGET };
+    // UI-REFRESH-u: the Settings pages and the Under the hood panel load on first use, so the JS a
+    // visitor downloads at start is only what index.html lists (scripts and preloads). Reported next
+    // to the total; the JS budget is a report here, as before.
+    const html = readFileSync(join(DIST, 'index.html'), 'utf8');
+    const initialFiles = new Set(
+      [...html.matchAll(/(?:src|href)="\/(assets\/[^"]+\.js)"/g)].map((m) => m[1] as string),
+    );
+    let initialJs = 0;
+    for (const f of initialFiles) {
+      initialJs += gzipSync(readFileSync(join(DIST, f)), { level: 9 }).length;
+    }
+    const initialJsGrowth = initialJs - BASELINE_040.jsGzip;
+    report['bundle'] = {
+      gzip: sizes,
+      baseline040: BASELINE_040,
+      growth,
+      initialJsGzip: initialJs,
+      initialJsGrowth,
+      budget: BUDGET,
+    };
     expect(growth.css).toBeLessThanOrEqual(BUDGET.cssGzip);
   });
 

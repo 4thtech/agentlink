@@ -15,7 +15,8 @@
 // - UI-REFRESH-o (visual only): cards on level 1, the one being decided on level 2; the shared
 //   Skeleton on first load; the approved moment after a review that approved something. What is
 //   sent, when presence is asked and what the owner sees are unchanged (approvals.test.ts).
-import { Button, Skeleton, Surface, UnderTheHood, type PayPlatform } from '@4thtech-io/ui';
+import { Button, Skeleton, Surface, type PayPlatform } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import {

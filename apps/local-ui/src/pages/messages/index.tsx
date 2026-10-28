@@ -16,10 +16,10 @@ import {
   Skeleton,
   StatusChip,
   Surface,
-  UnderTheHood,
   UntrustedContent,
   useRowPresence,
 } from '@4thtech-io/ui';
+import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import {

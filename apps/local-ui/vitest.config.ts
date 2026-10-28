@@ -16,6 +16,8 @@ export default defineConfig({
         /app\.css/,
       ],
     },
+    // Loads the lazy parts once, so tests can render them synchronously (UI-REFRESH-u).
+    setupFiles: ['./src/test-setup.ts'],
     testTimeout: 20_000,
   },
 });
