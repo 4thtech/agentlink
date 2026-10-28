@@ -156,7 +156,15 @@ export function useStartHere(
   }, [enabled, readAll, refreshKey]);
 
   const view = useMemo(() => deriveStart(signals, remembered), [signals, remembered]);
-  const rememberedComplete = COUNTED.every((id) => remembered.has(id));
+  // The kit is never remembered: it is read again on every load (it is a cheap local read).
+  let kitNow: boolean;
+  try {
+    kitNow = (readsRef.current.kitSaved ?? defaultKit)() === true;
+  } catch {
+    kitNow = false;
+  }
+  const rememberedComplete =
+    kitNow && COUNTED.filter((id) => id !== 'kit').every((id) => remembered.has(id));
 
   // Remember what has happened once; a step never unticks.
   useEffect(() => {

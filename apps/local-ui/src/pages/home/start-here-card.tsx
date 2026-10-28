@@ -114,64 +114,68 @@ export function StartHere({
   } else if (view !== null && (phase === 'shown' || phase === 'allset' || phase === 'leaving')) {
     const fresh = new Set(model.fresh ?? []);
     card = (
-      <section
-        className={`hm-start${phase === 'leaving' ? ' is-leaving' : ''}`}
-        data-start-here
-        data-phase={phase}
-        aria-labelledby="hm-start-title"
-      >
-        <header className="hm-start-head">
-          <h2 id="hm-start-title" className="hm-start-title al-text-code">
-            {T.title}
-          </h2>
-          <span key={view.doneCount} className="hm-start-count al-text-code" data-start-count>
-            {startProgress(view.doneCount, view.total)}
-          </span>
-        </header>
-        <div
-          className="hm-start-bar"
-          role="progressbar"
-          aria-label={T.progressLabel}
-          aria-valuemin={0}
-          aria-valuemax={view.total}
-          aria-valuenow={view.doneCount}
-          aria-valuetext={startProgress(view.doneCount, view.total)}
-        >
-          <span className="hm-start-fill" data-n={view.doneCount} />
+      <div className={`hm-start-wrap${phase === 'leaving' ? ' is-leaving' : ''}`}>
+        <div className="hm-start-clip">
+          <section
+            className="hm-start"
+            data-start-here
+            data-phase={phase}
+            aria-labelledby="hm-start-title"
+          >
+            <header className="hm-start-head">
+              <h2 id="hm-start-title" className="hm-start-title al-text-code">
+                {T.title}
+              </h2>
+              <span key={view.doneCount} className="hm-start-count al-text-code" data-start-count>
+                {startProgress(view.doneCount, view.total)}
+              </span>
+            </header>
+            <div
+              className="hm-start-bar"
+              role="progressbar"
+              aria-label={T.progressLabel}
+              aria-valuemin={0}
+              aria-valuemax={view.total}
+              aria-valuenow={view.doneCount}
+              aria-valuetext={startProgress(view.doneCount, view.total)}
+            >
+              <span className="hm-start-fill" data-n={view.doneCount} />
+            </div>
+            {phase === 'shown' ? (
+              <ol className="hm-start-steps">
+                {view.steps.map((step) => (
+                  <li
+                    key={step.id}
+                    className={`hm-start-step${fresh.has(step.id) ? ' is-fresh' : ''}`}
+                    data-step={step.id}
+                    data-state={step.state}
+                    aria-current={step.state === 'next' ? 'step' : undefined}
+                  >
+                    <Mark state={step.state} />
+                    <div className="hm-start-text">
+                      <p className="hm-start-name al-text-body">
+                        {TITLE[step.id]}
+                        {step.id === 'check' ? (
+                          <span className="hm-start-rec al-muted"> {T.recommended}</span>
+                        ) : null}
+                        {STATE_WORD[step.state] === '' ? null : (
+                          <span className="al-visually-hidden">. {STATE_WORD[step.state]}</span>
+                        )}
+                      </p>
+                      <Detail step={step} view={view} platform={platform} />
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="hm-start-allset al-text-title-3">
+                <Icon name="check" size={20} className="hm-start-check" />
+                {T.allSet}
+              </p>
+            )}
+          </section>
         </div>
-        {phase === 'shown' ? (
-          <ol className="hm-start-steps">
-            {view.steps.map((step) => (
-              <li
-                key={step.id}
-                className={`hm-start-step${fresh.has(step.id) ? ' is-fresh' : ''}`}
-                data-step={step.id}
-                data-state={step.state}
-                aria-current={step.state === 'next' ? 'step' : undefined}
-              >
-                <Mark state={step.state} />
-                <div className="hm-start-text">
-                  <p className="hm-start-name al-text-body">
-                    {TITLE[step.id]}
-                    {step.id === 'check' ? (
-                      <span className="hm-start-rec al-muted"> {T.recommended}</span>
-                    ) : null}
-                    {STATE_WORD[step.state] === '' ? null : (
-                      <span className="al-visually-hidden">. {STATE_WORD[step.state]}</span>
-                    )}
-                  </p>
-                  <Detail step={step} view={view} platform={platform} />
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="hm-start-allset al-text-title-3">
-            <Icon name="check" size={20} className="hm-start-check" />
-            {T.allSet}
-          </p>
-        )}
-      </section>
+      </div>
     );
   }
   return (

@@ -80,7 +80,8 @@ export function deriveStart(signals: Signals, remembered: ReadonlySet<StepId>): 
     check:
       remembered.has('check') || (rows?.some((r) => r.label === 'safety-code-checked') ?? false),
     send: remembered.has('send') || signals.sent === true,
-    kit: remembered.has('kit') || signals.kitSaved === true,
+    // Never remembered: "kit not put off" is not a saved read, so it is derived on every load.
+    kit: signals.kitSaved === true,
   };
   const unknown =
     (!done.protect && signals.protect === undefined) ||
@@ -135,7 +136,7 @@ export function loadDone(): ReadonlySet<StepId> {
     if (Array.isArray(parsed)) {
       for (const id of parsed as unknown[]) {
         const known = STEP_IDS.find((s) => s === id);
-        if (known !== undefined) out.add(known);
+        if (known !== undefined && known !== 'kit') out.add(known);
       }
     }
   } catch {
@@ -146,7 +147,7 @@ export function loadDone(): ReadonlySet<StepId> {
 
 export function saveDone(done: ReadonlySet<StepId>): void {
   try {
-    storage()?.setItem(START_DONE_KEY, JSON.stringify([...done]));
+    storage()?.setItem(START_DONE_KEY, JSON.stringify([...done].filter((id) => id !== 'kit')));
   } catch {
     // Not remembered; nothing else changes.
   }

@@ -82,12 +82,11 @@ const addContact = (): HTMLElement | undefined =>
   );
 
 describe('Empty states point to step 2 of Start here', () => {
-  it('Contacts: "No contacts yet. Invite someone to start." with a primary Add contact', async () => {
+  it('Contacts: "No contacts yet. Invite someone to start." with the invite prompt, and no link to itself', async () => {
     await mount('contacts', model(false));
     expect(host.textContent).toContain('No contacts yet. Invite someone to start.');
-    const a = addContact();
-    expect(a?.classList.contains('al-btn-primary')).toBe(true);
-    expect(a?.getAttribute('href')).toBe('/settings/home');
+    expect(host.textContent).toContain(CONTACTS_STRINGS.emptyPrompt);
+    expect(addContact()).toBeUndefined();
   });
 
   it('Messages: "No messages yet. Invite someone first, then ask your AI to say hello."', async () => {
@@ -96,12 +95,13 @@ describe('Empty states point to step 2 of Start here', () => {
       'No messages yet. Invite someone first, then ask your AI to say hello.',
     );
     expect(addContact()?.classList.contains('al-btn-primary')).toBe(true);
+    expect(addContact()?.getAttribute('href')).toBe('/settings/contacts');
   });
 
   it('Files: "No files yet. Invite someone first." with Add contact', async () => {
     await mount('files', model(false));
     expect(host.textContent).toContain('No files yet. Invite someone first.');
-    expect(addContact()).toBeDefined();
+    expect(addContact()?.getAttribute('href')).toBe('/settings/contacts');
   });
 
   it("once step 2 is done they return to today's empty states, with no Add contact", async () => {

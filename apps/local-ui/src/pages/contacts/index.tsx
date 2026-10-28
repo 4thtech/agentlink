@@ -71,7 +71,7 @@ import {
   waitSeconds,
   waitingFor,
 } from './strings.js';
-import { AddContactAction, useInviteFirst } from '../home/start-here-empty.js';
+import { useInviteFirst } from '../home/start-here-empty.js';
 import { START_STRINGS } from '../home/strings.js';
 import './contacts.css';
 
@@ -835,12 +835,7 @@ export function ContactsPage({
           </p>
         ) : null}
         {inviteFirst ? (
-          <EmptyState
-            icon="users"
-            title={START_STRINGS.emptyContacts}
-            prompt={S.emptyPrompt}
-            action={<AddContactAction />}
-          />
+          <EmptyState icon="users" title={START_STRINGS.emptyContacts} prompt={S.emptyPrompt} />
         ) : (
           <EmptyState icon="users" title={S.emptyTitle} prompt={S.emptyPrompt} />
         )}

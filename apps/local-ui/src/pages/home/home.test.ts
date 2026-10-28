@@ -628,4 +628,16 @@ describe('Home: layout at 1280 and 360 (stylesheet)', () => {
     );
     expect(homeCss).toMatch(/prefers-reduced-motion|data-motion='reduced'/);
   });
+
+  it('Start here leaves with fade plus collapse (base duration, exit easing), instant when reduced', () => {
+    const css = homeCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).toMatch(/\.hm-start-wrap\.is-leaving\s*\{[^}]*grid-template-rows:\s*0fr/);
+    const wrap = css.match(/\.hm-start-wrap\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(wrap).toMatch(/grid-template-rows var\(--al-duration-base\) var\(--al-easing-exit\)/);
+    expect(wrap).toMatch(/opacity var\(--al-duration-base\) var\(--al-easing-exit\)/);
+    expect(css).toMatch(
+      /prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.hm-start-wrap,[\s\S]*?transition:\s*none/,
+    );
+    expect(css).toMatch(/\[data-motion='reduced'\] \.hm-start-wrap,[\s\S]*?transition:\s*none/);
+  });
 });

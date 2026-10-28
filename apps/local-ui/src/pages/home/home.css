@@ -22,19 +22,36 @@
 .hm-start {
   display: grid;
   gap: var(--al-space-4);
-  margin-block-end: var(--al-space-6);
   padding: var(--al-space-6);
   border: var(--al-border-width-thin) solid var(--al-color-border-default);
   border-radius: var(--al-radius-lg);
   background: var(--al-color-bg-raised);
   box-shadow: var(--al-shadow-2);
-  transition: opacity var(--al-duration-base) var(--al-easing-exit);
 }
 .hm-start.is-loading {
   min-block-size: 280px;
+  margin-block-end: var(--al-space-6);
 }
-.hm-start.is-leaving {
+/* Leaving (B-11 §27.3, §6 row 4): fade and collapse, so the tiles glide up instead of snapping.
+   The grid-row collapse is the one named height exception; the clip also holds the gap below. */
+.hm-start-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--al-duration-base) var(--al-easing-exit),
+    opacity var(--al-duration-base) var(--al-easing-exit);
+}
+.hm-start-wrap.is-leaving {
+  grid-template-rows: 0fr;
   opacity: 0;
+}
+.hm-start-clip {
+  min-block-size: 0;
+  overflow: hidden;
+  padding: var(--al-space-2) var(--al-space-3) var(--al-space-6);
+  margin-inline: calc(var(--al-space-3) * -1);
+  margin-block-start: calc(var(--al-space-2) * -1);
 }
 .hm-start-head {
   display: flex;
@@ -323,7 +340,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hm-start,
+  .hm-start-wrap,
   .hm-start-fill {
     transition: none;
   }
@@ -342,7 +359,7 @@
     transform: none;
   }
 }
-[data-motion='reduced'] .hm-start,
+[data-motion='reduced'] .hm-start-wrap,
 [data-motion='reduced'] .hm-start-fill {
   transition: none;
 }

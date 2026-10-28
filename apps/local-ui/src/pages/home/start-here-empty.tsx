@@ -1,6 +1,6 @@
 // The empty states on Contacts, Messages and Files point to step 2 of Start here (UX2-g; B-11 §27.4).
-// Until the Add contact sheet (UX2-d1, UX2-d2) lands, "Add contact" goes to Home, where the invite
-// instructions of Start here are; the sheet replaces the link then. Once step 2 is done, or while it
+// Until the Add contact sheet (UX2-d1, UX2-d2) lands, "Add contact" goes to Contacts, where the
+// invite prompt is (the Contacts page itself does not show it); the sheet replaces the link then. Once step 2 is done, or while it
 // is not known, the pages keep their own empty states.
 import type { ReactElement } from 'react';
 import { inviteStillToDo, useStartHereContext } from './start-here-context.js';
@@ -13,7 +13,7 @@ export function useInviteFirst(): boolean {
 
 export function AddContactAction(): ReactElement {
   return (
-    <a className="al-btn al-btn-primary" href="/settings/home">
+    <a className="al-btn al-btn-primary" href="/settings/contacts">
       {T.addContact}
     </a>
   );

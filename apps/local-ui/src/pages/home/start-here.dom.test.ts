@@ -394,9 +394,24 @@ describe('Start here: loading and failed reads', () => {
   });
 
   it('no skeleton when setup was already complete in this browser', async () => {
-    localStorage.setItem(START_DONE_KEY, JSON.stringify(['protect', 'invite', 'send', 'kit']));
-    await mount(props(reads(fresh(), { protect: () => new Promise<boolean>(() => undefined) })));
+    localStorage.setItem(START_DONE_KEY, JSON.stringify(['protect', 'invite', 'send']));
+    await mount(
+      props(
+        reads(fresh({ kitSaved: true }), {
+          protect: () => new Promise<boolean>(() => undefined),
+        }),
+      ),
+    );
     expect(card()).toBeNull();
+  });
+
+  it('the recovery kit is never remembered: it is derived again on every load', async () => {
+    await mount(props(reads(fresh({ contacts: [contact()], sent: true, kitSaved: true }))));
+    expect(JSON.parse(localStorage.getItem(START_DONE_KEY) ?? '[]')).not.toContain('kit');
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount(props(reads(fresh({ contacts: [contact()], sent: true, kitSaved: false }))));
+    expect(step('kit').getAttribute('data-state')).toBe('next');
   });
 
   it('a read that fails and was never known adds nothing alarming', async () => {

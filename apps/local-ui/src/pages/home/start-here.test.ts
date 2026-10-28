@@ -206,8 +206,13 @@ describe('deriveStart: names', () => {
 
 describe('remembering what has happened once', () => {
   it('round-trips the ids and ignores anything else', () => {
+    saveDone(new Set<StepId>(['protect', 'send']));
+    expect([...loadDone()].sort()).toEqual(['protect', 'send']);
+    // The recovery kit is never remembered: it is derived again on every load.
     saveDone(new Set<StepId>(['protect', 'kit']));
-    expect([...loadDone()].sort()).toEqual(['kit', 'protect']);
+    expect(JSON.parse(localStorage.getItem(START_DONE_KEY) ?? '[]')).toEqual(['protect']);
+    localStorage.setItem(START_DONE_KEY, JSON.stringify(['protect', 'kit']));
+    expect([...loadDone()]).toEqual(['protect']);
     localStorage.setItem(START_DONE_KEY, JSON.stringify(['protect', 'x', 7, '__proto__']));
     expect([...loadDone()]).toEqual(['protect']);
     localStorage.setItem(START_DONE_KEY, '{not json');
