@@ -59,6 +59,14 @@ describe('skip to content', () => {
     expect(skip().compareDocumentPosition(side) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('points at an element that exists: the page content', () => {
+    const target = skip().getAttribute('href');
+    expect(target).toBe('#al-main');
+    const found = document.getElementById('al-main');
+    expect(found).not.toBeNull();
+    expect(found).toBe(host.querySelector('main.al-shell-content'));
+  });
+
   it('moves focus to the page content', () => {
     const main = host.querySelector('main.al-shell-content') as HTMLElement;
     expect(main).not.toBeNull();
