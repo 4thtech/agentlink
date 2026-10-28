@@ -16,6 +16,7 @@ import {
   Icon,
   ProgressBar,
   ProofBadge,
+  Segmented,
   Skeleton,
   StatusChip,
   Surface,
@@ -24,15 +25,7 @@ import {
   useRowPresence,
 } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactElement,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { RevealOutcome } from './files-api.js';
 import {
   RECEIVED_PATH,
@@ -55,7 +48,7 @@ const TABS: readonly (readonly [FilesTab, string])[] = [
   ['folders', IO.tabFolders],
 ];
 
-/** Tabs with the roving tabindex and arrow keys of the ARIA tabs pattern. */
+/** The segmented control with tab semantics (b11 §22): roving tabindex, arrows, Home and End. */
 export function FilesTabs({
   tab,
   onTab,
@@ -66,46 +59,26 @@ export function FilesTabs({
   /** Files waiting (to be saved, to be sent): a ticking badge when above zero. */
   readonly counts?: Readonly<Partial<Record<FilesTab, number>>>;
 }): ReactElement {
-  const refs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const move = (e: KeyboardEvent<HTMLButtonElement>): void => {
-    const at = TABS.findIndex(([id]) => id === tab);
-    let to: number;
-    if (e.key === 'ArrowRight') to = (at + 1) % TABS.length;
-    else if (e.key === 'ArrowLeft') to = (at + TABS.length - 1) % TABS.length;
-    else if (e.key === 'Home') to = 0;
-    else if (e.key === 'End') to = TABS.length - 1;
-    else return;
-    e.preventDefault();
-    const next = TABS[to];
-    if (next === undefined) return;
-    onTab(next[0]);
-    refs.current[next[0]]?.focus();
-  };
   return (
-    <div className="fl-tabs" role="tablist" aria-label={IO.tabsLabel}>
-      {TABS.map(([id, label]) => (
-        <button
-          key={id}
-          ref={(el) => {
-            refs.current[id] = el;
-          }}
-          type="button"
-          role="tab"
-          id={`fl-tab-${id}`}
-          aria-selected={tab === id}
-          aria-controls="fl-tabpanel"
-          tabIndex={tab === id ? 0 : -1}
-          className={tab === id ? 'fl-tab is-active' : 'fl-tab'}
-          onClick={() => onTab(id)}
-          onKeyDown={move}
-        >
-          {label}
-          {(counts?.[id] ?? 0) > 0 ? (
+    <Segmented
+      label={IO.tabsLabel}
+      variant="tabs"
+      idPrefix="fl"
+      panelId="fl-tabpanel"
+      value={tab}
+      onChange={(v) => {
+        const next = TABS.find(([id]) => id === v)?.[0];
+        if (next !== undefined) onTab(next);
+      }}
+      options={TABS.map(([id, label]) => ({
+        value: id,
+        label,
+        badge:
+          (counts?.[id] ?? 0) > 0 ? (
             <CountBadge count={counts?.[id] ?? 0} label={IO.waitingLabel[id]} />
-          ) : null}
-        </button>
-      ))}
-    </div>
+          ) : undefined,
+      }))}
+    />
   );
 }
 

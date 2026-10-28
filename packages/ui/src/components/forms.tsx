@@ -133,6 +133,8 @@ export interface SwitchProps {
   checked?: boolean;
   defaultChecked?: boolean;
   disabled?: boolean;
+  /** A quiet word beside the switch, e.g. "Unsaved" while a draft differs from what is in force. */
+  note?: string;
   onChange?: (on: boolean) => void;
 }
 
@@ -146,11 +148,16 @@ export function Switch({
   checked,
   defaultChecked,
   disabled,
+  note,
   onChange,
 }: SwitchProps): ReactElement {
   const [inner, setInner] = useState(defaultChecked === true);
   const on = checked ?? inner;
   const id = useId();
+  const describedBy =
+    [description === undefined ? '' : `${id}-d`, note === undefined ? '' : `${id}-n`]
+      .filter((x) => x !== '')
+      .join(' ') || undefined;
   const toggle = (): void => {
     if (disabled === true) return;
     if (checked === undefined) setInner(!on);
@@ -168,12 +175,17 @@ export function Switch({
           </span>
         )}
       </span>
+      {note === undefined ? null : (
+        <span id={`${id}-n`} className="al-switch-note al-text-caption al-muted">
+          {note}
+        </span>
+      )}
       <button
         type="button"
         role="switch"
         aria-checked={on ? 'true' : 'false'}
         aria-labelledby={`${id}-l`}
-        aria-describedby={description === undefined ? undefined : `${id}-d`}
+        aria-describedby={describedBy}
         className={cx('al-switch', on && 'is-on')}
         onClick={toggle}
         disabled={disabled}
@@ -190,6 +202,8 @@ export interface SegmentedOption {
   label: string;
   /** `recommended` marks the safe default. */
   hint?: string;
+  /** Shown inside the option after the label (a count badge). */
+  badge?: ReactNode;
 }
 
 export interface SegmentedProps {
@@ -200,9 +214,21 @@ export interface SegmentedProps {
   value?: string;
   defaultValue?: string;
   onChange?: (value: string) => void;
+  /**
+   * `radio` (default) for values, filters and layouts. `tabs` for views that swap the panel below:
+   * tablist semantics (ARIA APG), same look (b11 §22.1).
+   */
+  variant?: 'radio' | 'tabs';
+  /** Tabs: tab ids are `<idPrefix>-tab-<value>`, so the panel can name its tab. */
+  idPrefix?: string;
+  /** Tabs: the id of the tabpanel that every tab controls. */
+  panelId?: string;
 }
 
-/** Pick one of 2 to 4 options (Allowed / Ask me / Never). One tab stop, arrow keys move and select. */
+/**
+ * Pick one of 2 to 4 options (Allowed / Ask me / Never) in the switch's visual language: a recessed
+ * track and a sliding thumb. One tab stop; arrow keys move and select (wrapping); Home and End jump.
+ */
 export function Segmented({
   label,
   labelledBy,
@@ -210,7 +236,13 @@ export function Segmented({
   value,
   defaultValue,
   onChange,
+  variant = 'radio',
+  idPrefix,
+  panelId,
 }: SegmentedProps): ReactElement {
+  const fallbackId = useId();
+  const prefix = idPrefix ?? fallbackId;
+  const tabs = variant === 'tabs';
   const [inner, setInner] = useState(defaultValue ?? options[0]?.value);
   const current = value ?? inner;
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -229,16 +261,26 @@ export function Segmented({
         : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
           ? -1
           : 0;
-    if (step === 0) return;
+    let target: number;
+    if (event.key === 'Home') target = 0;
+    else if (event.key === 'End') target = options.length - 1;
+    else if (step === 0) return;
+    else target = (index + step + options.length) % options.length;
     event.preventDefault();
-    const target = (index + step + options.length) % options.length;
     const option = options[target];
     if (option === undefined) return;
     choose(option.value);
     refs.current[target]?.focus();
   };
   return (
-    <div className="al-seg" role="radiogroup" aria-label={label} aria-labelledby={labelledBy}>
+    <div
+      className="al-seg"
+      role={tabs ? 'tablist' : 'radiogroup'}
+      aria-label={label}
+      aria-labelledby={labelledBy}
+      data-count={options.length}
+      data-index={stop}
+    >
       {options.map((option, i) => {
         const on = option.value === current;
         return (
@@ -248,8 +290,14 @@ export function Segmented({
               refs.current[i] = el;
             }}
             type="button"
-            role="radio"
-            aria-checked={on ? 'true' : 'false'}
+            role={tabs ? 'tab' : 'radio'}
+            {...(tabs
+              ? {
+                  id: `${prefix}-tab-${option.value}`,
+                  'aria-selected': on ? 'true' : 'false',
+                  'aria-controls': panelId,
+                }
+              : { 'aria-checked': on ? 'true' : 'false' })}
             tabIndex={i === stop ? 0 : -1}
             className={cx('al-seg-opt al-text-body-sm', on && 'is-on')}
             onClick={() => choose(option.value)}
@@ -258,6 +306,7 @@ export function Segmented({
             {on ? <Icon name="check" size={14} /> : null}
             {option.label}
             {option.hint === undefined ? null : <span className="al-seg-hint">{option.hint}</span>}
+            {option.badge}
           </button>
         );
       })}

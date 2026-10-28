@@ -64,6 +64,7 @@ export const RULES_STRINGS = {
   noListed: 'No contacts are listed for this yet.',
 
   changes: (n: number): string => (n === 1 ? '1 change' : `${String(n)} changes`),
+  unsaved: 'Unsaved',
   reviewSave: 'Review and save',
   discard: 'Discard',
   invalidAmount: 'Enter an amount in dollars, like 5 or 0.50.',

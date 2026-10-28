@@ -43,6 +43,7 @@ import {
   parseReview,
   parseRules,
   reviewPath,
+  buyOn as viewBuyOn,
   sellOn as viewSellOn,
   type Draft,
   type Review,
@@ -546,6 +547,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
                       : S.buyHelp(dollars(draft.buyMaxUSD) ?? S.someAmount, c.autoAcceptContacts)
                   }
                   checked={draft.buyOn}
+                  {...(draft.buyOn !== viewBuyOn(view) ? { note: S.unsaved } : {})}
                   disabled={listedNone && !draft.buyOn}
                   onChange={(on) => edit(on ? { buyOn: true, sellOn: false } : { buyOn: false })}
                 />
@@ -570,6 +572,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
                         : S.sellHelpOff
                   }
                   checked={draft.sellOn}
+                  {...(draft.sellOn !== viewSellOn(view) ? { note: S.unsaved } : {})}
                   disabled={listedNone && !draft.sellOn}
                   onChange={(on) => edit(on ? { sellOn: true, buyOn: false } : { sellOn: false })}
                 />

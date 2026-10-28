@@ -18,6 +18,7 @@ import {
   Fingerprint,
   LiveDot,
   ProofBadge,
+  Segmented,
   Skeleton,
   StatusChip,
   useRowPresence,
@@ -445,22 +446,17 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
         <EmptyState icon="activity" title={S.emptyTitle} prompt={S.emptyPrompt} />
       ) : (
         <>
-          <div className="al-activity-chips" role="group" aria-label={S.filterLabel}>
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                className="al-activity-chip al-text-body-sm"
-                aria-pressed={filter === f.id ? 'true' : 'false'}
-                onClick={() => {
-                  setFilter(f.id);
-                  // A filter change remounts the rows; none of them replays its entrance.
-                  setView((v) => (v.state === 'ready' ? { ...v, entering: [] } : v));
-                }}
-              >
-                {f.label}
-              </button>
-            ))}
+          <div className="al-activity-filter">
+            <Segmented
+              label={S.filterLabel}
+              value={filter}
+              onChange={(v) => {
+                setFilter(FILTERS.find((f) => f.id === v)?.id ?? 'all');
+                // A filter change remounts the rows; none of them replays its entrance.
+                setView((cur) => (cur.state === 'ready' ? { ...cur, entering: [] } : cur));
+              }}
+              options={FILTERS.map((f) => ({ value: f.id, label: f.label }))}
+            />
           </div>
           <div className="al-activity-stage">
             <FilteredList

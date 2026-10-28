@@ -240,12 +240,12 @@ describe('a conversation', () => {
     await click(button('Marko'));
     expect(api.get).toHaveBeenCalledWith('/api/ui/messages/c-marko?box=in&limit=20');
     expect(api.post).not.toHaveBeenCalled();
-    const tabs = host.querySelector('[role="radiogroup"]');
+    const tabs = host.querySelector('[role="tablist"]');
     expect(tabs?.getAttribute('aria-label')).toBe(S.boxLabel);
     expect(
-      [...(tabs?.querySelectorAll('[role="radio"]') ?? [])].map((r) => r.textContent?.trim()),
+      [...(tabs?.querySelectorAll('[role="tab"]') ?? [])].map((r) => r.textContent?.trim()),
     ).toEqual([S.inbox, S.sent]);
-    expect(tabs?.querySelector('[aria-checked="true"]')?.textContent).toContain(S.inbox);
+    expect(tabs?.querySelector('[aria-selected="true"]')?.textContent).toContain(S.inbox);
   });
 
   it('shows inbound text only inside the untrusted container, labelled with the contact name', async () => {
@@ -343,7 +343,7 @@ describe('a conversation', () => {
   it('shows Sent with plain status words, a receipt, and the text as untrusted content', async () => {
     await openMarko();
     await click(
-      [...host.querySelectorAll('[role="radio"]')].find((r) => r.textContent?.includes(S.sent)),
+      [...host.querySelectorAll('[role="tab"]')].find((r) => r.textContent?.includes(S.sent)),
     );
     expect(text()).toContain('SENT-CANARY');
     expect(text()).toContain(S.statusSent);

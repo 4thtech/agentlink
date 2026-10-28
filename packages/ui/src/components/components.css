@@ -296,32 +296,95 @@ body {
   opacity: var(--al-opacity-disabled);
 }
 .al-seg {
-  display: inline-flex;
+  position: relative;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: var(--al-space-1);
   border: var(--al-border-width-thin) solid var(--al-color-border-strong);
-  border-radius: var(--al-radius-md);
-  overflow: hidden;
+  border-radius: var(--al-radius-sm);
   background: var(--al-color-bg-sunken);
+  --seg-n: 2;
+  --seg-i: 0;
+}
+.al-seg[data-count='2'] {
+  --seg-n: 2;
+}
+.al-seg[data-count='3'] {
+  --seg-n: 3;
+}
+.al-seg[data-count='4'] {
+  --seg-n: 4;
+}
+.al-seg[data-index='0'] {
+  --seg-i: 0;
+}
+.al-seg[data-index='1'] {
+  --seg-i: 1;
+}
+.al-seg[data-index='2'] {
+  --seg-i: 2;
+}
+.al-seg[data-index='3'] {
+  --seg-i: 3;
+}
+/* The thumb: the chosen option's tint and 2 px edge, sliding under the options like the knob. */
+.al-seg::before {
+  content: '';
+  position: absolute;
+  inset-block: var(--al-space-1);
+  inset-inline-start: var(--al-space-1);
+  width: calc((100% - 2 * var(--al-space-1)) / var(--seg-n));
+  border-radius: var(--al-radius-xs);
+  background: var(--al-color-accent-subtle);
+  box-shadow: inset 0 -2px 0 var(--al-color-accent-default);
+  transform: translateX(calc(var(--seg-i) * 100%));
+  transition: transform var(--al-duration-fast) var(--al-easing-standard);
 }
 .al-seg-opt {
+  position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--al-space-1);
-  height: var(--al-size-control-md);
+  min-height: var(--al-size-control-md);
+  min-width: 0;
+  flex-wrap: wrap;
+  text-align: center;
   padding: 0 var(--al-space-3);
   border: 0;
-  border-right: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-xs);
   background: transparent;
   color: var(--al-color-fg-muted);
   cursor: pointer;
   font-family: var(--font-sans);
 }
-.al-seg-opt:last-child {
-  border-right: 0;
-}
 .al-seg-opt.is-on {
-  background: var(--al-color-bg-raised);
   color: var(--al-color-fg-default);
-  box-shadow: inset 0 -2px 0 var(--al-color-accent-default);
+}
+/* The ring goes around the focused option, not the whole track. */
+.al-seg-opt:focus-visible {
+  outline: var(--al-focus-ring-width) solid var(--al-color-focus-ring);
+  outline-offset: var(--al-focus-ring-offset);
+}
+@media (max-width: 600px) {
+  .al-seg-opt {
+    min-height: var(--al-size-control-lg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .al-seg::before {
+    transition: none;
+  }
+}
+:root[data-motion='reduced'] .al-seg::before {
+  transition: none;
+}
+.al-switch-row > .al-switch-text {
+  flex: 1;
+}
+.al-switch-note {
+  flex: none;
 }
 .al-seg-hint {
   color: var(--al-color-fg-subtle);
@@ -1731,6 +1794,9 @@ body {
   .al-nav.is-active {
     border: 1px solid CanvasText;
     forced-color-adjust: auto;
+  }
+  .al-seg::before {
+    border: 1px solid Highlight;
   }
   .al-btn-primary {
     background: Highlight;
