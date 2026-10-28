@@ -981,7 +981,7 @@ Connect Claude Code to Claude Code agent
 This adds one entry to Claude Code's settings.
   File   ~/.claude.json
   Adds   "agentlink": { "command": "npx", "args": ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "claude-code-agent"] }
-A backup of the file is saved first. Nothing else in it changes.
+Agent folder: claude-code-agent. A backup of the file is saved first. Nothing else in it changes.
 [   Apply with Touch ID   ]        Later (text)
 ```
 
@@ -1054,7 +1054,7 @@ Agents, 1440
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Row:** label (`al-text-title-3`), "Open" chip when it is the open agent, live dot and word; a **"Works from" line** with an AppMark, name and state word (§30.2) for **each** AI app it serves (an agent may serve several); contacts count; last activity (§24 word); actions. Actions: **Switch** (secondary, other agents only), **Rename**, **Connect an AI app** (opens §30 for that agent; the primary action of a row with no AI app) and an overflow menu holding **Remove** (destructive, text style, never a primary). With no AI app the "Works from" line reads **"Not connected to an AI app"** with the warning-neutral ring mark.
+- **Row:** label (`al-text-title-3`), "Open" chip when it is the open agent, live dot and word; a **"Works from" line** with an AppMark, name and state word (§30.2) for **each** AI app it serves (an agent may serve several); contacts count; last activity (§24 word); actions. Actions: **Switch** (secondary, other agents only), **Rename**, **Connect an AI app** (opens §30 for that agent; the primary action of a row with no AI app) and an overflow menu holding **Remove** (destructive, text style, never a primary). With no AI app the "Works from" line reads **"Not connected to an AI app"** with the hollow ring of §24.3.
 - **One agent per AI app:** an AI app listed on one agent does not appear on another; to move it, use the move step in §30.3.
 - **360:** each row is a card: label and dot on top, the "Works from" line below (wraps, one app per line), counts, and the actions in the overflow menu except one visible button (**Switch**, or **Connect an AI app** for an agent with none).
 - **List and Map:** a `Segmented` control (§22, tab semantics): **List** (default) and **Map** (§32). The map is only a view of the list; actions live in the list.
@@ -1202,7 +1202,7 @@ This adds one entry to Claude Code's settings.
            │            "mcp", "--agent", "personal"]      │
            │ }                                             │
            └──────────────────────────────────────────────┘
-A backup of the file is saved first. Nothing else in it changes.
+Agent folder: personal. A backup of the file is saved first. Nothing else in it changes.
 
 [        Apply with Touch ID        ]
 ```
