@@ -1,6 +1,6 @@
 # Proofs and credits
 
-*Applies to AgentLink 0.4.2 (released 28 Oct 2026). Confirming paid actions is not in 0.3.0.*
+*Applies to AgentLink 0.4.3 (released 28 Oct 2026). Confirming paid actions is not in 0.3.0.*
 
 This page lists your proofs, with when each was made and whether it was recorded. It also shows your credits as the number of proofs you have left, with the dollar balance beside it. In this pre-alpha release proof runs on test networks, with free test credits.
 
@@ -15,5 +15,9 @@ Under **Advanced**, **Withdraw credits** sends unused credits back to your agent
 From 0.4.0, a proof that costs more than your limit asks you to confirm with Touch ID, Windows Hello or your passkey first. Proofs inside your limits still run on their own. See [Confirming paid actions](confirm-paid-actions.md). The page says it too: **Your credits stay yours; 4thTech never holds them.**
 
 How credits work: [Credits](../everyday-use/credits.md). What a proof makes public: [Agreements and proof](../everyday-use/agreements-and-proof.md).
+
+## Follow your funds
+
+**Add credits** shows where your funds are in three steps: **Waiting for your funds** (with the AgentLink waiting mark, a diamond that turns only here), **Arrived** (with the amount) and **Added to credits**. A step changes only when AgentLink has checked, never on a timer. To turn arrived funds into credits, press **Add $X to your credits** and confirm as before.
 
 Back to [The local app](README.md).

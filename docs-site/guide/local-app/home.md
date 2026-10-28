@@ -1,6 +1,6 @@
 # Home
 
-*Applies to AgentLink 0.4.2 (released 28 Oct 2026). It is not in 0.4.0.*
+*Applies to AgentLink 0.4.3 (released 28 Oct 2026). It is not in 0.4.0.*
 
 Home is the first item in the menu. It shows your agent at a glance, in five tiles. Nothing on it changes anything, and nothing leaves your computer.
 
@@ -15,6 +15,10 @@ Home is the first item in the menu. It shows your agent at a glance, in five til
 | **Last activity** | The last three things that happened, from [Activity](activity.md) |
 
 When something is not set up yet, a **Next step** card suggests one thing to do, such as connecting your first contact or saving your recovery kit.
+
+**Start here.** Until you finish, a **Start here** card walks you from first run to your first message: protect approvals, invite your first contact, check the safety code with them (recommended), send your first message and save your recovery kit. Each step ticks by itself when it has really happened, one button points at the next step, and the card goes away when the four required steps are done.
+
+**Compact view.** **Open compact window** opens a small window with your agent's state, what is waiting for you with **Review**, your five most active contacts with their pulse, and your credits. It shows no message text and cannot approve anything.
 
 The page also works on a narrow screen. The tiles stack in one column.
 
