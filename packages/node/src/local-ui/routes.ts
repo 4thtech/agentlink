@@ -8,6 +8,10 @@
 // - MSG-FILES-IO-h (D-134): a `presence: 'reveal'` route (Show in Finder) is only a POST at
 //   REVEAL_PATH with a handler, registered once; the server's reveal gate runs it. No other path,
 //   method or route can use the kind, and every other mutating route still needs presence.
+// - UX2-d1 (owner decision 1.1): a `presence: 'invite'` route is only a POST with a handler, step
+//   `create` at INVITE_CREATE_PATH or step `check` at INVITE_CHECK_PATH, each registered once; the
+//   server's invite gate runs it. Accepting an invite (INVITE_ACCEPT_PATH) is a `presence: true`
+//   route like every other change.
 // - A path is fixed segments `[a-z0-9-]` and `:name` parameters; a parameter matches only
 //   `[A-Za-z0-9_-]{1,128}` (no dot, no percent-escape, no slash), so no handler sees `..` or an
 //   encoded separator. Duplicates throw.
@@ -23,6 +27,8 @@ import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
 import { firstRunRoutes } from './api/first-run.js';
 // M1-11s-a-d: the status bar's health read (read-only).
 import { healthRoutes } from './api/health.js';
+// UX2-d1: create, check and accept an invite.
+import { invitesRoutes } from './api/invites.js';
 import { messagesRoutes } from './api/messages.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
@@ -31,8 +37,15 @@ import { storageRoutes } from './api/storage.js';
 import type { LocalUiRoute } from './route-types.js';
 // The fixed path lives in reveal-path.ts so api/files-io.ts uses it without importing this file.
 import { REVEAL_PATH } from './reveal-path.js';
+// UX2-d1: the invite paths live in invite-paths.ts for the same reason.
+import { INVITE_ACCEPT_PATH, INVITE_CHECK_PATH, INVITE_CREATE_PATH } from './invite-paths.js';
 
-export { REVEAL_PATH };
+export { INVITE_ACCEPT_PATH, INVITE_CHECK_PATH, INVITE_CREATE_PATH, REVEAL_PATH };
+/** UX2-d1: the one path of each invite-kind step. */
+const INVITE_STEP_PATHS: Readonly<Record<string, string>> = Object.freeze({
+  create: INVITE_CREATE_PATH,
+  check: INVITE_CHECK_PATH,
+});
 export const LOCAL_UI_API_PREFIX = '/api/ui/';
 /** M1-11s-c: setup routes live only under the first-run page's API. */
 const SETUP_PREFIX = '/api/ui/first-run/';
@@ -129,6 +142,17 @@ export class LocalUiRouteRegistry {
       if (this.#entries.some((e) => e.route.presence === 'reveal')) {
         throw invalid('the reveal route is already registered');
       }
+    } else if (presence === 'invite') {
+      // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.
+      if (method !== 'POST') throw invalid('an invite route is a POST');
+      if (step !== 'create' && step !== 'check') throw invalid('unknown invite step');
+      if (route.path !== INVITE_STEP_PATHS[step]) {
+        throw invalid('an invite route is only at its fixed path');
+      }
+      if (typeof handler !== 'function') throw invalid('an invite route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'invite' && e.route.step === step)) {
+        throw invalid('this invite step is already registered');
+      }
     } else if (typeof handler !== 'function') {
       throw invalid('no handler');
     } else if (method === 'GET') {
@@ -192,6 +216,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     // MSG-FILES-IO-c: the Messages page (read-only).
     messagesRoutes,
     contactsRoutes,
+    // UX2-d1: create and check an invite (the invite kind) and accept one (owner presence).
+    invitesRoutes,
     filesRoutes,
     // MSG-FILES-IO-d: Files, Received and Sent (read-only).
     filesIoRoutes,

@@ -10,6 +10,9 @@ import { describe, expect, it } from 'vitest';
 import type { LocalUiContext } from './context.js';
 import type { LocalUiRoute } from './route-types.js';
 import {
+  INVITE_ACCEPT_PATH,
+  INVITE_CHECK_PATH,
+  INVITE_CREATE_PATH,
   LOCAL_UI_API_PREFIX,
   LocalUiRouteRegistry,
   REVEAL_PATH,
@@ -160,6 +163,10 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/health',
       // MSG-FILES-IO-h: Show in Finder (api/files-io-reveal.test.ts).
       '/api/ui/files/received/reveal',
+      // UX2-d1: create, check and accept an invite (api/invites.test.ts).
+      '/api/ui/invites',
+      '/api/ui/invites/check',
+      '/api/ui/invites/accept',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
@@ -283,6 +290,78 @@ describe('the reveal route kind (MSG-FILES-IO-h, D-134, I-4)', () => {
       const registry = new LocalUiRouteRegistry();
       expect(() =>
         registry.register({ method: 'POST', path, presence: false, handler: reveal } as never),
+      ).toThrow(/presence/);
+    }
+  });
+});
+
+// UX2-d1 (owner decision 1.1): creating and checking an invite need no owner presence, as their own
+// named route kind `invite`: only POST, only at the two fixed paths, one route per step. Accepting is
+// an ordinary owner route (`presence: true`). Every other mutating route still needs presence.
+describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
+  const answer = () => Promise.resolve({ status: 200, body: { status: 'ok' } });
+  const route = (over: Record<string, unknown>) =>
+    ({
+      method: 'POST',
+      path: INVITE_CREATE_PATH,
+      presence: 'invite',
+      step: 'create',
+      handler: answer,
+      ...over,
+    }) as unknown as LocalUiRoute;
+
+  it('the default registry has create and check as the invite kind, and accept behind presence', () => {
+    const routes = createLocalUiRoutes().routes();
+    expect(
+      routes.filter((r) => r.presence === 'invite').map((r) => `${r.method} ${r.path}`),
+    ).toEqual([`POST ${INVITE_CREATE_PATH}`, `POST ${INVITE_CHECK_PATH}`]);
+    expect(routes.find((r) => r.path === INVITE_ACCEPT_PATH)).toMatchObject({
+      method: 'POST',
+      presence: true,
+    });
+    expect([INVITE_CREATE_PATH, INVITE_CHECK_PATH, INVITE_ACCEPT_PATH]).toEqual([
+      '/api/ui/invites',
+      '/api/ui/invites/check',
+      '/api/ui/invites/accept',
+    ]);
+  });
+
+  it('no other path, method, step or second route can use the kind', () => {
+    for (const path of [
+      INVITE_ACCEPT_PATH,
+      '/api/ui/invites/new',
+      '/api/ui/contacts/invite',
+      '/api/ui/rules/set',
+      `${INVITE_CREATE_PATH}/x`,
+    ]) {
+      const registry = new LocalUiRouteRegistry();
+      expect(() => registry.register(route({ path })), path).toThrow(/invite/);
+      expect(registry.routes()).toHaveLength(0);
+    }
+    for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) {
+      const registry = new LocalUiRouteRegistry();
+      expect(() => registry.register(route({ method })), method).toThrow(/invite/);
+    }
+    const mismatched = new LocalUiRouteRegistry();
+    expect(() => mismatched.register(route({ step: 'check' }))).toThrow(/invite/);
+    expect(() => mismatched.register(route({ step: 'accept' }))).toThrow(/invite/);
+    expect(() => mismatched.register(route({ path: INVITE_CHECK_PATH, step: 'create' }))).toThrow(
+      /invite/,
+    );
+    expect(() => mismatched.register(route({ handler: undefined }))).toThrow(/handler/);
+    const registry = new LocalUiRouteRegistry();
+    registry.register(route({}));
+    registry.register(route({ path: INVITE_CHECK_PATH, step: 'check' }));
+    expect(() => registry.register(route({}))).toThrow();
+    expect(() => registry.register(route({ path: INVITE_CHECK_PATH, step: 'check' }))).toThrow();
+    expect(registry.routes()).toHaveLength(2);
+  });
+
+  it('accept cannot drop presence, and a POST without presence is still refused anywhere', () => {
+    for (const path of [INVITE_ACCEPT_PATH, INVITE_CREATE_PATH, '/api/ui/invites/other']) {
+      const registry = new LocalUiRouteRegistry();
+      expect(() =>
+        registry.register({ method: 'POST', path, presence: false, handler: answer } as never),
       ).toThrow(/presence/);
     }
   });

@@ -534,6 +534,7 @@ M1a variant (no local setup page until M1b): the setup sentence reads "and tell 
 - The page builds the prompt from the official per-harness template and the invite link only. It never puts the inviter's self-declared name or any other text from the invite into the prompt: the prompt is pasted as the user's own instruction, so it must contain nothing another party chose (I-5).
 - Every step keeps its own check: `init` shows the diff and waits for confirmation, owner setup happens on the local setup page (M1b) or in the owner's own terminal (M1a), never through the agent, and accepting goes through `contacts.acceptInvites` (default `approval`) whether the agent uses `agentlink_accept_invite` or the CLI `accept`.
 - The invite fragment is read only in the browser and is never sent to a server (04 §3.6, 08 §4).
+- **The local app is a second way (UX2-d1, owner decision 1.1; proposed, owner confirms at merge).** The owner can also create an invite, and paste one to accept, in the local app's Add contact sheet (08 §1, b11 §21). Creating there returns the same `inviteUrl`, `shareText`, short owner fingerprint and expiry as `agentlink_create_invite`, with no owner presence and no approval, like the tool. Accepting there builds the same approval action as `agentlink_accept_invite` and the CLI `accept`, so one owner approval serves every surface; it needs owner presence, which signs that approval under `contacts.acceptInvites`. No MCP tool is added or changed (I-4).
 
 ---
 

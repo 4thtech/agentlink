@@ -82,6 +82,14 @@ export {
   decodeInviteLink,
   encodeInviteLink,
 } from './invite-link.js';
+// UX2-d1: the accept-invite approval action and the share text, one for every surface.
+export {
+  acceptInviteAction,
+  acceptInviteApprovalSummary,
+  acceptInviteSummary,
+  inviteShareText,
+  type AcceptInviteAction,
+} from './invite-accept-action.js';
 export {
   openPairingMessage,
   recomputeSafetyCode,
