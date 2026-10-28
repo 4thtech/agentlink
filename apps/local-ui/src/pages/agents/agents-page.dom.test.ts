@@ -222,7 +222,7 @@ describe('Rename', () => {
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));
     const field = rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!;
-    expect(field.maxLength).toBe(40);
+    expect(field.maxLength).toBe(32);
     await type(field, 'Home');
     await click(button(rowOf('work'), 'Save with Touch ID'));
     expect(host.textContent).toContain('Rename Work to Home');
@@ -242,6 +242,37 @@ describe('Rename', () => {
     await click(button(host, 'Confirm'));
     expect(host.textContent).toContain('Not renamed yet. Try again.');
     expect(rowOf('work')).toBeTruthy();
+  });
+});
+
+describe('label check and removal states', () => {
+  it('refuses a label the server would not sign, before any Touch ID step', async () => {
+    answers['GET /api/ui/agents/label-check?label=Home'] = {
+      status: 200,
+      body: { status: 'refused', reason: 'label_invalid' },
+    };
+    await mountPage();
+    await click(button(rowOf('work'), 'Rename'));
+    await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
+    await click(button(rowOf('work'), 'Save with Touch ID'));
+    expect(host.textContent).toContain("That name can't be used.");
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+  });
+  it('closes the Remove sheet on agent_removing: the agent shows as Removal not finished', async () => {
+    answers['POST /api/ui/agents/remove'] = { status: 409, body: { status: 'agent_removing' } };
+    await mountPage();
+    await click(button(rowOf('work'), 'More'));
+    await click(
+      [...host.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+        (m) => m.textContent === 'Remove',
+      ),
+    );
+    const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
+    await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
+    await click(button(sheet, 'Remove with Touch ID'));
+    await type(code(), '123456');
+    await click(button(host, 'Confirm'));
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
   });
 });
 
@@ -286,7 +317,7 @@ describe('Remove', () => {
     const sent = JSON.parse(
       atob(post.headers.get('X-AgentLink-Input')!.replace(/-/g, '+').replace(/_/g, '/')),
     );
-    expect(sent).toMatchObject({ name: 'work', typedLabel: 'Work', generation: '7' });
+    expect(sent).toEqual({ name: 'work', typedLabel: 'Work' });
     expect(host.textContent).toContain('Quit any AI app that uses Work first.');
     expect(button(host, 'Check again')).toBeDefined();
   });
@@ -300,7 +331,7 @@ describe('Remove', () => {
   it('offers Remove anyway when contacts cannot be told, with Not now', async () => {
     answers['POST /api/ui/agents/remove'] = {
       status: 409,
-      body: { status: 'contacts_unreachable' },
+      body: { status: 'undeliverable' },
     };
     const sheet = await open('work');
     await confirmTyped(sheet);
@@ -332,7 +363,7 @@ describe('Add', () => {
     const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
     expect(sheet.textContent).toContain('Add an agent');
     const field = sheet.querySelector<HTMLInputElement>('input[type="text"]')!;
-    expect(field.maxLength).toBe(40);
+    expect(field.maxLength).toBe(32);
     expect(field.value).toBe('Second agent');
     await click(button(sheet, 'Add with Touch ID'));
     await type(code(), '123456');

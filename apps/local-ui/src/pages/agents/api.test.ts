@@ -40,6 +40,7 @@ describe('switch', () => {
     expect(await t.agents.switchTo('work', 4)).toEqual({ kind: 'done' });
     expect(t.seen[0]?.url).toBe('/api/ui/agents/switch');
     expect(JSON.parse(t.seen[0]!.body)).toEqual({ name: 'work', generation: 4 });
+    expect(t.seen[0]?.headers.get('Content-Type')).toBe('application/octet-stream');
     expect(t.seen[0]?.headers.get('X-AgentLink-CSRF')).toBe('t');
   });
   it('maps the refusals', async () => {
@@ -57,38 +58,34 @@ describe('owner operations', () => {
   const proof = { kind: 'code', code: '123456' } as const;
   it('rename sends name, label and generation in the input, the code as the body', async () => {
     const t = api(200, { status: 'done' });
-    expect(await t.agents.rename({ name: 'work', label: 'Home', generation: 4 }, proof)).toEqual({
+    expect(await t.agents.rename({ name: 'work', label: 'Home' }, proof)).toEqual({
       kind: 'done',
     });
     const s = t.seen[0]!;
     expect(s.url).toBe('/api/ui/agents/label');
-    expect(input(s)).toEqual({ name: 'work', label: 'Home', generation: '4' });
+    expect(input(s)).toEqual({ name: 'work', label: 'Home' });
     expect(s.body).toBe('123456');
     expect(s.headers.get('X-AgentLink-Input')).not.toContain('123456');
   });
   it('remove sends the typed label; add posts to the collection', async () => {
     const r = api(200, { status: 'done' });
-    await r.agents.remove({ name: 'w', typedLabel: 'Work', generation: 4 }, proof);
+    await r.agents.remove({ name: 'w', typedLabel: 'Work' }, proof);
     expect(r.seen[0]?.url).toBe('/api/ui/agents/remove');
-    expect(input(r.seen[0]!)).toEqual({ name: 'w', typedLabel: 'Work', generation: '4' });
+    expect(input(r.seen[0]!)).toEqual({ name: 'w', typedLabel: 'Work' });
     const a = api(200, { status: 'done' });
-    await a.agents.add({ label: 'New', generation: 4 }, proof);
+    await a.agents.add({ label: 'New' }, proof);
     expect(a.seen[0]?.url).toBe('/api/ui/agents');
-    expect(input(a.seen[0]!)).toEqual({ label: 'New', generation: '4' });
+    expect(input(a.seen[0]!)).toEqual({ label: 'New' });
   });
   it('maps each answer to a word', async () => {
-    const p = { name: 'w', label: 'L', generation: 1 };
+    const p = { name: 'w', label: 'L' };
     expect((await api(501, {}).agents.rename(p, proof)).kind).toBe('not_available');
     expect((await api(409, { status: 'agent_changed' }).agents.rename(p, proof)).kind).toBe(
       'agent_changed',
     );
     expect(
-      (
-        await api(409, { status: 'in_use' }).agents.remove(
-          { name: 'w', typedLabel: 'x', generation: 1 },
-          proof,
-        )
-      ).kind,
+      (await api(409, { status: 'in_use' }).agents.remove({ name: 'w', typedLabel: 'x' }, proof))
+        .kind,
     ).toBe('in_use');
     expect((await api(403, { status: 'presence_rejected' }).agents.rename(p, proof)).kind).toBe(
       'rejected',
@@ -99,10 +96,35 @@ describe('owner operations', () => {
     );
     expect((await api(409, { status: 'refused' }).agents.rename(p, proof)).kind).toBe('refused');
     expect((await api(500, {}).agents.rename(p, proof)).kind).toBe('failed');
+    // U3-d and U3-e refusals arrive as {error}; U3-e answers `removed` and `undeliverable`.
+    expect((await api(400, { error: 'label_invalid' }).agents.rename(p, proof)).kind).toBe(
+      'label_invalid',
+    );
+    expect((await api(400, { error: 'invalid' }).agents.rename(p, proof)).kind).toBe('invalid');
+    expect((await api(409, { error: 'not_applied' }).agents.rename(p, proof)).kind).toBe(
+      'not_applied',
+    );
+    expect((await api(409, { error: 'agent_changed' }).agents.rename(p, proof)).kind).toBe(
+      'agent_changed',
+    );
+    const r = { name: 'w', typedLabel: 'x' };
+    expect((await api(200, { status: 'removed' }).agents.remove(r, proof)).kind).toBe('done');
+    expect((await api(409, { status: 'undeliverable' }).agents.remove(r, proof)).kind).toBe(
+      'contacts_unreachable',
+    );
+    expect((await api(409, { status: 'label_mismatch' }).agents.remove(r, proof)).kind).toBe(
+      'label_mismatch',
+    );
+    expect((await api(409, { status: 'agent_removing' }).agents.remove(r, proof)).kind).toBe(
+      'agent_removing',
+    );
+    expect((await api(404, { status: 'unknown_agent' }).agents.remove(r, proof)).kind).toBe(
+      'unknown_agent',
+    );
   });
   it('wipes nothing it does not own and never puts the code in the URL', async () => {
     const t = api(200, { status: 'done' });
-    await t.agents.rename({ name: 'w', label: 'L', generation: 1 }, proof);
+    await t.agents.rename({ name: 'w', label: 'L' }, proof);
     expect(t.seen[0]?.url).not.toContain('123456');
   });
 });

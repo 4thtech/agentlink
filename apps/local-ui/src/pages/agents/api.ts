@@ -25,6 +25,11 @@ export type OwnerKind =
   | 'in_use'
   | 'contacts_unreachable'
   | 'label_invalid'
+  | 'label_mismatch'
+  | 'invalid'
+  | 'not_applied'
+  | 'agent_removing'
+  | 'unknown_agent'
   | 'refused'
   | 'not_available'
   | 'session'
@@ -36,14 +41,13 @@ export interface OwnerOutcome {
 
 export interface AgentsApi {
   list(): Promise<ReadOutcome>;
+  /** GET label-check: whether the server would sign this label (before Touch ID). */
+  labelCheck(label: string): Promise<'ok' | 'refused' | 'unavailable'>;
   switchTo(name: string, generation: number): Promise<SwitchOutcome>;
-  add(input: { label: string; generation: number }, proof: PresenceProof): Promise<OwnerOutcome>;
-  rename(
-    input: { name: string; label: string; generation: number },
-    proof: PresenceProof,
-  ): Promise<OwnerOutcome>;
+  add(input: { label: string }, proof: PresenceProof): Promise<OwnerOutcome>;
+  rename(input: { name: string; label: string }, proof: PresenceProof): Promise<OwnerOutcome>;
   remove(
-    input: { name: string; typedLabel: string; generation: number; anyway?: boolean },
+    input: { name: string; typedLabel: string; anyway?: boolean },
     proof: PresenceProof,
   ): Promise<OwnerOutcome>;
 }
@@ -57,8 +61,12 @@ const AGENTS = '/api/ui/agents';
 const WORDS: ReadonlySet<string> = new Set([
   'agent_changed',
   'in_use',
-  'contacts_unreachable',
   'label_invalid',
+  'label_mismatch',
+  'invalid',
+  'not_applied',
+  'agent_removing',
+  'unknown_agent',
   'refused',
   'busy',
 ]);
@@ -78,9 +86,11 @@ function base64url(text: string): string {
 async function statusWord(res: Response): Promise<string | undefined> {
   try {
     const body: unknown = await res.json();
-    const s =
-      typeof body === 'object' && body !== null ? (body as { status?: unknown }).status : undefined;
-    return typeof s === 'string' ? s : undefined;
+    if (typeof body !== 'object' || body === null) return undefined;
+    // Presence answers use `status`; a route's refusals arrive as `{error}` (U3-d, U3-e).
+    const { status, error } = body as { status?: unknown; error?: unknown };
+    if (typeof status === 'string') return status;
+    return typeof error === 'string' ? error : undefined;
   } catch {
     return undefined;
   }
@@ -97,13 +107,12 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
   async function owner(
     path: string,
     input: Record<string, unknown>,
-    generation: number,
     proof: PresenceProof,
   ): Promise<OwnerOutcome> {
     const headers = new Headers({
       'X-AgentLink-CSRF': token(),
       'Content-Type': 'application/octet-stream',
-      'X-AgentLink-Input': base64url(JSON.stringify({ ...input, generation: String(generation) })),
+      'X-AgentLink-Input': base64url(JSON.stringify(input)),
     });
     if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
     const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
@@ -125,7 +134,8 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
     if (res.status === 401) return { kind: 'session' };
     if (res.status === 429) return { kind: 'wait' };
     const word = await statusWord(res);
-    if (res.status === 200 && word === 'done') return { kind: 'done' };
+    if (res.status === 200 && (word === 'done' || word === 'removed')) return { kind: 'done' };
+    if (word === 'undeliverable') return { kind: 'contacts_unreachable' };
     if (word === 'presence_rejected') return { kind: 'rejected' };
     if (word === 'presence_required') return { kind: 'required' };
     if (word === 'wait') return { kind: 'wait' };
@@ -141,18 +151,38 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
       const list = parseAgents(result.data);
       return list === undefined ? { kind: 'error' } : { kind: 'ok', list };
     },
+    async labelCheck(label) {
+      const result = await client.get(`${AGENTS}/label-check?label=${encodeURIComponent(label)}`);
+      if (result.kind !== 'ok') return 'unavailable';
+      const status = (result.data as { status?: unknown } | null)?.status;
+      return status === 'ok' ? 'ok' : status === 'refused' ? 'refused' : 'unavailable';
+    },
     async switchTo(name, generation) {
-      const result = await client.post(`${AGENTS}/switch`, { name, generation });
-      if (result.kind === 'ok') return { kind: 'done' };
-      if (result.kind === 'not_available') return { kind: 'not_available' };
-      if (result.kind === 'offline') return { kind: 'offline' };
+      // The switch kind reads an octet-stream body like every other presence route (no presence).
+      let res: Response;
+      try {
+        res = await doFetch(`${AGENTS}/switch`, {
+          method: 'POST',
+          headers: {
+            'X-AgentLink-CSRF': token(),
+            'Content-Type': 'application/octet-stream',
+          },
+          body: JSON.stringify({ name, generation }),
+          credentials: 'same-origin',
+          cache: 'no-store',
+        });
+      } catch {
+        return { kind: 'offline' };
+      }
+      if (res.status === 200) return { kind: 'done' };
+      if (res.status === 501) return { kind: 'not_available' };
       // 409 is `agent_changed` or a switch already running: either way the page re-reads.
-      if (result.kind === 'error' && result.status === 409) return { kind: 'agent_changed' };
+      if (res.status === 409) return { kind: 'agent_changed' };
       return { kind: 'failed' };
     },
-    add: (input, proof) => owner(AGENTS, { label: input.label }, input.generation, proof),
+    add: (input, proof) => owner(AGENTS, { label: input.label }, proof),
     rename: (input, proof) =>
-      owner(`${AGENTS}/label`, { name: input.name, label: input.label }, input.generation, proof),
+      owner(`${AGENTS}/label`, { name: input.name, label: input.label }, proof),
     remove: (input, proof) =>
       owner(
         `${AGENTS}/remove`,
@@ -161,7 +191,6 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
           typedLabel: input.typedLabel,
           ...(input.anyway === true ? { anyway: true } : {}),
         },
-        input.generation,
         proof,
       ),
   };

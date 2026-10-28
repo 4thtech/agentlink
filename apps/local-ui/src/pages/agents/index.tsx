@@ -304,7 +304,6 @@ export function AgentsPage({
                         row={row}
                         api={api}
                         owner={owner}
-                        generation={generation}
                         onDone={done}
                         onCancel={cancel}
                         onChanged={changed}
@@ -324,7 +323,6 @@ export function AgentsPage({
         <AddSheet
           api={api}
           owner={owner}
-          generation={generation}
           existing={rows}
           onClose={() => setAdding(false)}
           onChanged={changed}
@@ -346,7 +344,6 @@ export function AgentsPage({
           row={removing}
           api={api}
           owner={owner}
-          generation={generation}
           onClose={() => {
             setRemoving(undefined);
             reread();

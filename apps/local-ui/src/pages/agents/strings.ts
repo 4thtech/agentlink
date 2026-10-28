@@ -36,6 +36,7 @@ export const AGENTS_STRINGS = {
   switcherLabel: 'Agents',
   renameField: 'Name',
   saveTouchId: 'Save with Touch ID',
+  labelInvalid: "That name can't be used. Change it and try again.",
   notRenamed: 'Not renamed yet. Try again.',
   renameFailed: "Couldn't rename it. Try again.",
   addTitle: 'Add an agent',

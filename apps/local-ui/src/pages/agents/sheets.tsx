@@ -12,8 +12,8 @@ import { AGENTS_APPS_PATH, type AgentRow } from './data.js';
 import { gateMessage, OwnerGate, RETRY_IN_PLACE, usePasskey } from './owner-gate.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
-/** The label rule the person sees: 1 to 40 characters, no control characters (06 §6). */
-export const LABEL_MAX = 40;
+/** The label rule the person sees: 1 to 32 characters, no control characters (06 §6). */
+export const LABEL_MAX = 32;
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f]/;
 export function labelProblem(text: string): boolean {
@@ -24,7 +24,6 @@ export function labelProblem(text: string): boolean {
 interface Shared {
   readonly api: AgentsApi;
   readonly owner: OwnerClient;
-  readonly generation: number;
 }
 
 // ------------------------------------------------------------------------------------------ Rename
@@ -33,7 +32,6 @@ export function RenameEditor({
   row,
   api,
   owner,
-  generation,
   onDone,
   onCancel,
   onChanged,
@@ -55,7 +53,7 @@ export function RenameEditor({
     if (busy) return;
     setBusy(true);
     setError(undefined);
-    void api.rename({ name: row.name, label, generation }, proof).then((outcome) => {
+    void api.rename({ name: row.name, label }, proof).then((outcome) => {
       setBusy(false);
       if (outcome.kind === 'done') {
         onChanged();
@@ -69,9 +67,11 @@ export function RenameEditor({
         return setError(S.agentChanged);
       }
       setError(
-        outcome.kind === 'failed' || outcome.kind === 'label_invalid' || outcome.kind === 'refused'
-          ? S.renameFailed
-          : S.notRenamed,
+        outcome.kind === 'label_invalid' || outcome.kind === 'invalid'
+          ? S.labelInvalid
+          : outcome.kind === 'not_applied' || outcome.kind === 'not_available'
+            ? S.notRenamed
+            : S.renameFailed,
       );
       if (!RETRY_IN_PLACE.has(outcome.kind)) setStep('edit');
     });
@@ -91,9 +91,14 @@ export function RenameEditor({
   }
   const submit = (event: FormEvent): void => {
     event.preventDefault();
-    if (labelProblem(text) || unchanged) return;
+    if (labelProblem(text) || unchanged || busy) return;
     setError(undefined);
-    setStep('presence');
+    setBusy(true);
+    void api.labelCheck(label).then((checked) => {
+      setBusy(false);
+      if (checked === 'refused') return setError(S.labelInvalid);
+      setStep('presence');
+    });
   };
   return (
     <form className="ag-rename" onSubmit={submit}>
@@ -139,7 +144,6 @@ export function RenameEditor({
 export function AddSheet({
   api,
   owner,
-  generation,
   existing,
   onClose,
   onChanged,
@@ -165,7 +169,7 @@ export function AddSheet({
     if (busy) return;
     setBusy(true);
     setError(undefined);
-    void api.add({ label, generation }, proof).then((outcome: OwnerOutcome) => {
+    void api.add({ label }, proof).then((outcome: OwnerOutcome) => {
       setBusy(false);
       if (outcome.kind === 'done') {
         onChanged();
@@ -179,7 +183,13 @@ export function AddSheet({
         onChanged();
         return setError(S.agentChanged);
       }
-      setError(outcome.kind === 'label_invalid' ? S.notAdded : S.addFailed);
+      setError(
+        outcome.kind === 'label_invalid' || outcome.kind === 'invalid'
+          ? S.labelInvalid
+          : outcome.kind === 'not_applied'
+            ? S.notAdded
+            : S.addFailed,
+      );
       if (!RETRY_IN_PLACE.has(outcome.kind)) setStep('name');
     });
   };
@@ -221,9 +231,14 @@ export function AddSheet({
           className="ag-sheet-body"
           onSubmit={(e) => {
             e.preventDefault();
-            if (labelProblem(text)) return;
+            if (labelProblem(text) || busy) return;
             setError(undefined);
-            setStep('presence');
+            setBusy(true);
+            void api.labelCheck(label).then((checked) => {
+              setBusy(false);
+              if (checked === 'refused') return setError(S.labelInvalid);
+              setStep('presence');
+            });
           }}
         >
           <TextField
@@ -277,7 +292,6 @@ export function RemoveSheet({
   row,
   api,
   owner,
-  generation,
   onClose,
   onChanged,
   onRemoved,
@@ -305,10 +319,7 @@ export function RemoveSheet({
       setBusy(true);
       setError(undefined);
       void api
-        .remove(
-          { name: row.name, typedLabel: typed, generation, ...(anyway ? { anyway: true } : {}) },
-          proof,
-        )
+        .remove({ name: row.name, typedLabel: typed, ...(anyway ? { anyway: true } : {}) }, proof)
         .then((outcome) => {
           setBusy(false);
           if (outcome.kind === 'done') {
@@ -324,6 +335,12 @@ export function RemoveSheet({
           if (said !== undefined) return setError(said);
           if (outcome.kind === 'in_use') return setPhase({ kind: 'in_use' });
           if (outcome.kind === 'contacts_unreachable') return setPhase({ kind: 'anyway' });
+          if (outcome.kind === 'agent_removing') {
+            // The agent is retired and shows as "Removal not finished" with Try again.
+            onChanged();
+            onClose();
+            return;
+          }
           // Part-way or not available yet: the agent may now be marked "Removal not finished".
           onChanged();
           setPhase({ kind: 'failed' });
