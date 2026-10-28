@@ -4958,6 +4958,56 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Tests first (RED commit) for (d) and (e); the strict local run of the UI-REFRESH-q test (`LOCAL_UI_REFRESH_STRICT=1`) passes plan §7: no frame over 33 ms on route changes and on Messages scrolling at 4× CPU, JS growth within budget or the measured refresh-only share recorded in the PR.
   - axe: 0 serious or critical on all pages and modes; no test weakened.
 
+#### UI-REFRESH-o-b · local-ui: Approvals restyle follow-ups, ID in Under the hood, decided-card state, nav badge (new, low, S2 by content, #616)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/{approvals,approve}/**`, `apps/local-ui/src/shell/**` (the approvals badge only), `apps/local-ui/src/strings.ts`, tests; `packages/ui/src/**` only for the ID-kind part, together with UI-REFRESH-e3
+- **Depends on:** UI-REFRESH-o; UI-REFRESH-e3 (for part a)
+- **Spec:** B-11 §7, §16 (Approvals); 08 §1; 04 §2.5
+- **Invariants:** I-4, I-5
+- **Scope:** found while reviewing UI-REFRESH-o (#616); visual and state handling only, no change to presence, signing or the decide calls.
+  - (a) The approval ID is refused by the Under the hood filter, so the row is missing on an approval. Show it through the `id` kind (check that UI-REFRESH-e3 covers the approval ID shape; if not, extend the kind there, not in a page).
+  - (b) After Approve, the card stays in the "Approved." state instead of collapsing out as the card says. Collapse it out (reduced motion: remove without animation) and keep the result reachable by the screen reader.
+  - (c) The nav approvals badge gets the refresh restyle and ticks down when a card is decided (no count change on a failed decide).
+- **Acceptance:**
+  - Tests first (RED commit) for (a) to (c); all M1-11a, M1-11b-2 and UI-REFRESH-o approval flows unchanged; no autofocus on Approve; reduced-motion and axe tests; short threat note (S2); no test weakened.
+
+#### UI-REFRESH-e4 · ui: Under the hood filter robustness follow-ups (new, low, #619)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` (Under the hood filter), tests; changeset
+- **Depends on:** UI-REFRESH-e3
+- **Spec:** B-11 §7; 04 §4
+- **Invariants:** I-5
+- **Scope:** low-severity robustness findings from the independent review of UI-REFRESH-e3 (#619). The cases are described in the tests, not in the PR text.
+  - (a) The `id` kind check treats values built from several parts more strictly, so a value under the usual length limit is judged the same way as a single piece.
+  - (b) The rule that looks at split values is revisited (for example by comparing the number of parts with the total length) so short multi-part values are covered without refusing normal text.
+  - (c) The label list that decides which rows are treated as sensitive is completed with the missing terms from the spec (salt, private, recovery and mnemonic wording).
+  - (d) Look-alike spellings of those labels are handled the same as the plain ones.
+- **Acceptance:**
+  - Tests first (RED commit) for (a) to (d); each refused kind stays refused; no allowed shape becomes refused except the ones above; no test weakened.
+
+#### UI-REFRESH-r-b · local-ui: Proofs row key can fire the success moment on the wrong row (new, low, #620)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**`, tests
+- **Depends on:** UI-REFRESH-r
+- **Spec:** B-11 §14, §15, §16
+- **Invariants:** —
+- **Scope:**
+  - The Proofs row key uses an occurrence index within the same second and direction. When a new row lands in that second, the index of the existing rows shifts and the SuccessMoment can play on the wrong row. Key rows by a server-side ID if the proofs feed provides one; otherwise by a key that does not shift when a row is added.
+- **Acceptance:**
+  - Tests first (RED commit): a new row arriving in the same second and direction leaves the other rows' keys and animations unchanged; reduced-motion unchanged; no test weakened.
+
+#### UI-REFRESH-u · local-ui: lazy-load the Settings pages and the Under the hood panel (new, post-release UI performance, owner decision 17, 2026-10-28)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/shell/router.tsx`, `apps/local-ui/src/pages/{backup,advanced,storage,about,appearance}/**` (import sites only), the Under the hood panel mount, `apps/local-ui/vite.config.*`, tests
+- **Depends on:** UI-REFRESH-t
+- **Spec:** plan §7 (`docs/process/proposals/UI-REFRESH.md`); B-11 §7
+- **Invariants:** —
+- **Scope:**
+  - The refresh JS is +17.9 KB gz against the 0.4.0 baseline, over the +10 KB budget; this was accepted for the first refresh release (owner decision 17, 2026-10-28). Load the Settings pages and the Under the hood panel on first use (route-level dynamic imports with a skeleton fallback), to bring the initial bundle back toward the budget. Post-release work.
+  - Record the before and after sizes (gzip) in the PR. No change in behaviour, routes or copy; the strict run of the UI-REFRESH-q test stays green.
+- **Acceptance:**
+  - Initial JS gz measured and recorded; a test that the first load does not include the lazy chunks; a failed chunk load shows a plain retry message; axe and reduced-motion tests unchanged; no test weakened.
+
 #### CHORE-GASLESS-NONCE-TIMEOUT · chain: gasless nonce uniqueness test hit the 60 s timeout (new, flake 2026-10-27, #607 push run)
 - **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (content rule: touches nonces; path `packages/chain/**` is S1)
 - **Repo/path:** agentlink · `packages/chain/src/fees/gasless.test.ts` (tests only, no product code)
