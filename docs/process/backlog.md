@@ -5077,7 +5077,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Owner approves each section; sections follow 11 §5 words (no wallet, gas or transaction words); the brand exception is written once and used in one place.
 
 #### UX2-d1 · node: local API routes to create and accept an invite (new, UX-WAVE-2 item 1, decision 1.1)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/**` (new routes `POST /api/ui/invites`, `POST /api/ui/invites/accept`, `route-types.ts`), tests; changeset; 08 §1 and 06 §7.1 edits marked "proposed, owner confirms at merge"
 - **Depends on:** —
 - **Spec:** 04 §3.6, §3.6.1, §4; 06 §2.1, §7.1; 08 §1; D-69
@@ -5102,7 +5102,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit); the invite is absent from the URL, title, toast, Activity and logs, and no element attribute holds the link (no `data-value`; B-11 §21.5); Share is hidden where unsupported; pending row appears; vocabulary lint, axe and reduced-motion tests; owner confirms fidelity to §21.
 
 #### UX2-e1 · ui: brand exception and the waiting mark component (new, UX-WAVE-2 item 3, decision 3.1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/**` (waiting mark), brand guidelines text, tests; changeset
 - **Depends on:** B-11 §23; owner decision 3.1
 - **Spec:** Brand guidelines; B-11 §15.3, §23; UX-WAVE-2 §5

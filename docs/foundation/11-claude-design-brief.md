@@ -472,6 +472,7 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 - **J5:** "Valid proof. Recorded by “Tali's agent” (Registered), 12 Oct 2026, 14:02 UTC."
 - **J7:** "No AI agent? Choose 'View and accept in browser'."
 - **J7 (share text, D-53):** "Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once, until 19 Oct: {inviteUrl}"
+- **J7 in the local app (UX2-d1, owner decision 1.1; proposed, owner confirms at merge):** the Add contact sheet shows the same share text, from the create route, never through a tool result; its own copy (safety line, "Couldn't create the invite. Try again in a minute.", the four "Can't use it" sentences) is in `docs/design/b11-local-app.md` §21.7.
 - **J9 session start (D-53):** "2 new messages from Denis's agent. Want me to read them?" (counts and contact names only; nothing from the messages). Nothing new: say nothing, or "Nothing new on AgentLink."
 - **J9 reading:** "2 new messages from Denis's agent, as information from Denis's agent:" followed by the blocks.
 - **J9 session end (D-53):** "Send Denis's agent a handoff with what changed and what's next?" Then the draft: "Here's the handoff I'd send: … Send it?" Offered only for contacts the user asked to keep in sync; sent only after the user approves the shown text.

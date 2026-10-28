@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/transport-nostr",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "description": "Nostr transport: gift wraps, relay pool, sync.",
   "license": "MIT",

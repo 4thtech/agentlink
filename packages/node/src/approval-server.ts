@@ -87,6 +87,15 @@
 //   octet-stream checks, the body must be exactly `{"id":"<item ID>"}` (no query, input or presence
 //   header); the handler gets only that ID and the checked reveal (local-ui/reveal-file.ts). No
 //   owner presence, no owner store, nothing signed or written.
+// - UX2-d1 (owner decision 1.1; proposed in 08 §1, owner confirms at merge), creating an invite and
+//   checking a pasted one: the two `presence: 'invite'` routes are run by `inviteGate`, never by
+//   `ownerGate`. After the same session, CSRF, Origin, fetch-metadata and octet-stream checks, no
+//   query, operation input or presence header; the body is one strict JSON object (1 KiB for create,
+//   22 KiB for check). Create is limited to INVITE_CREATE_LIMIT per INVITE_CREATE_WINDOW_MS
+//   (429 `wait`). The handler gets only that object and the invite desk (local-ui/context.ts): no
+//   owner presence, no owner store, nothing signed. The body (a pasted link holds the invite
+//   secret) is wiped after the handler, and nothing here logs it. Accepting an invite is an ordinary
+//   owner route behind `ownerGate`.
 // - M1-11s-c, owner setup on the first-run page (D-120 (1); proposed, owner confirms at merge): the
 //   two `presence: 'setup'` routes (begin, finish) are run by `setupGate`, never by `ownerGate`
 //   (which is unchanged). After the same session, CSRF, Origin, fetch-metadata and octet-stream
@@ -209,6 +218,8 @@ import {
 } from './owner-passkey.js';
 import {
   creditsPort,
+  inviteAcceptPort,
+  inviteDesk,
   readOnlyClient,
   type LocalUiAssets,
   type LocalUiContext,
@@ -216,12 +227,14 @@ import {
   type LocalUiOwnerSetup as LocalUiOwnerSetupOption,
 } from './local-ui/context.js';
 import type {
+  LocalUiInviteRoute,
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
   LocalUiResult,
   LocalUiRevealRoute,
   LocalUiSetupStep,
 } from './local-ui/route-types.js';
+import { LOCAL_UI_MAX_INPUT_CHARS } from './local-ui/route-types.js';
 import {
   LOCAL_UI_API_PREFIX,
   LocalUiRouteRegistry,
@@ -316,8 +329,19 @@ const MAX_REVEAL_BODY_BYTES = 256;
 /** MSG-FILES-IO-h: an item ID, `<envelope ID>.<index>` (core ui-messages.ts). */
 const REVEAL_ITEM_ID = /^[A-Za-z0-9_-]{1,64}\.[0-9]{2}$/;
 
-/** Longest `X-AgentLink-Input` (base64url JSON) a /api/ui/ owner route accepts. */
-const MAX_INPUT_CHARS = 8192;
+/**
+ * UX2-d1: the largest check body: `{"invite":"<link>"}` with the longest link (the canonical prefix
+ * and 21 846 payload characters, 04 §3.6) fits.
+ */
+const MAX_INVITE_CHECK_BODY_BYTES = 22_528;
+/** UX2-d1: the largest create body: `{"label":"<name>"}`, a name of at most 128 characters. */
+const MAX_INVITE_CREATE_BODY_BYTES = 1_024;
+/** UX2-d1: at most this many invites created per window, per server (a store and spam bound). */
+const INVITE_CREATE_LIMIT = 10;
+const INVITE_CREATE_WINDOW_MS = 10 * 60_000;
+
+/** Longest `X-AgentLink-Input` (base64url JSON) a /api/ui/ owner route accepts (route-types.ts). */
+const MAX_INPUT_CHARS = LOCAL_UI_MAX_INPUT_CHARS;
 /** M1-11s-c: the setup routes report an expired hold themselves (no sweep before them). */
 const SETUP_PATH_PREFIX = '/api/ui/first-run/';
 
@@ -938,6 +962,11 @@ export async function startApprovalServerWith(
   /** Rejected presence proofs in a row, and when the wait they caused ends (ms). */
   let failures = 0;
   let waitUntil = 0;
+  /** UX2-d1: the invite desk of the invite-kind routes (never reachable from another route). */
+  const invitesDesk =
+    options.localUi?.client === undefined ? undefined : inviteDesk(options.localUi.client);
+  /** UX2-d1: when each recent invite was created (ms), oldest first, for the create limit. */
+  const invitesCreated: number[] = [];
   /** M1-11s-c: the one owner setup in progress, if any. */
   let pendingSetup: PendingSetup | undefined;
   const uiContext: LocalUiContext = Object.freeze<LocalUiContext>({
@@ -948,6 +977,11 @@ export async function startApprovalServerWith(
     ...(options.localUi?.client === undefined
       ? {}
       : { credits: creditsPort(options.localUi.client) }),
+    // UX2-d1: accepting an invite, for the accept owner route; it pairs only after core used an
+    // owner-signed, applied approval (I-4).
+    ...(options.localUi?.client === undefined
+      ? {}
+      : { invites: inviteAcceptPort(options.localUi.client) }),
     ownerContext: () => source.context(),
     applyOwnerAction: (signed) => source.apply(signed),
     now: () => now(),
@@ -2606,6 +2640,78 @@ export async function startApprovalServerWith(
     sendResult(res, result);
   }
 
+  /**
+   * UX2-d1 (owner decision 1.1): the gate of the two invite-kind routes (create, check). The caller
+   * checked the session, CSRF, Origin, fetch metadata and the octet-stream type. No query, operation
+   * input or presence header; create is rate-limited before the body is read; the body must be one
+   * strict JSON object. No owner presence, no owner store, nothing signed. The handler gets that
+   * object and the invite desk only. The body is wiped afterwards (a pasted link holds the invite
+   * secret); nothing here logs it, and an error answers a fixed code (I-7).
+   */
+  async function inviteGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiInviteRoute,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (route.step === 'create') {
+      const at = now();
+      while (
+        invitesCreated.length > 0 &&
+        (invitesCreated[0] as number) <= at - INVITE_CREATE_WINDOW_MS
+      ) {
+        invitesCreated.shift();
+      }
+      if (invitesCreated.length >= INVITE_CREATE_LIMIT) {
+        const oldest = invitesCreated[0] as number;
+        const retryAfter = Math.max(1, Math.ceil((oldest + INVITE_CREATE_WINDOW_MS - at) / 1000));
+        req.resume();
+        res.setHeader('Retry-After', String(retryAfter));
+        sendJson(res, 429, { error: 'wait', retryAfter });
+        return;
+      }
+    }
+    const body = await boundedBody(
+      req,
+      res,
+      route.step === 'create' ? MAX_INVITE_CREATE_BODY_BYTES : MAX_INVITE_CHECK_BODY_BYTES,
+    );
+    if (body === undefined) return;
+    try {
+      let parsed: JsonValue;
+      try {
+        parsed = parseJson(decodeUtf8(body));
+      } catch {
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      if (route.step === 'create') invitesCreated.push(now());
+      let result: LocalUiResult;
+      try {
+        result = await route.handler(uiContext, parsed as JsonObject, invitesDesk);
+      } catch {
+        sendJson(res, 500, { status: 'failed' });
+        return;
+      }
+      sendResult(res, result);
+    } finally {
+      wipe(body);
+    }
+  }
+
   /** M1-11s-b: one /api/ui/ request (route registry, session, CSRF, presence gate). */
   async function handleUi(
     req: IncomingMessage,
@@ -2643,6 +2749,11 @@ export async function startApprovalServerWith(
     if (route.presence === 'reveal') {
       // MSG-FILES-IO-h: Show in Finder has its own gate; ownerGate never runs it (D-134).
       await revealGate(req, res, url, route);
+      return;
+    }
+    if (route.presence === 'invite') {
+      // UX2-d1: creating and checking an invite have their own gate; ownerGate never runs them.
+      await inviteGate(req, res, url, route);
       return;
     }
     if (route.presence === 'setup') {

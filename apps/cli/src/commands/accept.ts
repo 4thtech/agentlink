@@ -12,7 +12,13 @@
 //
 // The link is untrusted input (I-5): core decodes and checks it; nothing the link carries is
 // printed except through the contact-name rule (restricted name plus label).
-import { CoreError, evaluate, renderContactName, type CoreErrorCode } from '@4thtech-io/core';
+import {
+  CoreError,
+  acceptInviteSummary,
+  evaluate,
+  renderContactName,
+  type CoreErrorCode,
+} from '@4thtech-io/core';
 import { approvalNextStep, isApprovalId } from '../approval/next-step.js';
 import {
   DISPATCH_TEXT,
@@ -22,10 +28,7 @@ import {
   type CommandContext,
   type CommandHandler,
 } from '../dispatch.js';
-import {
-  acceptInviteAction,
-  acceptInviteApprovalSummary,
-} from '@4thtech-io/mcp-tools/accept-action.js';
+import { acceptInviteAction } from '@4thtech-io/mcp-tools/accept-action.js';
 import { RUNTIME_MESSAGES } from '../runtime/errors.js';
 import type { OpenedAgent } from '../runtime/open-agent.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
@@ -75,7 +78,7 @@ export function createAcceptHandler(deps: CommandDeps = createDeps()): CommandHa
         if (approvalId === undefined) {
           const pending = await client.approvalService.request({
             action,
-            summary: acceptInviteApprovalSummary(contactName),
+            summary: acceptInviteSummary(checked.contact),
           });
           printAll(context, [
             approvalNextStep(pending.approvalId, agent.name),

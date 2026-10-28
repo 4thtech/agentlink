@@ -8,10 +8,20 @@
 // assertion or the session values. M1-11s-c adds a third kind, `presence: 'setup'`, for owner setup
 // on the first-run page: no handler, run by the server's own setup gate. MSG-FILES-IO-h (D-134) adds
 // a fourth, `presence: 'reveal'`, for Show in Finder only: one fixed POST, no presence, no signing,
-// no store write; its handler gets only the checked item ID.
-import type { JsonValue } from '@4thtech-io/crypto';
+// no store write; its handler gets only the checked item ID. UX2-d1 (owner decision 1.1) adds a
+// fifth, `presence: 'invite'`, for creating an invite and checking a pasted one: two fixed POSTs, no
+// presence, no signing; its handler gets only the parsed body and the invite desk. Accepting an
+// invite is an ordinary `presence: true` route.
+import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
+import type { JsonObject, JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiContext } from './context.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
+
+/**
+ * The longest `X-AgentLink-Input` (base64url JSON) an owner route accepts (approval-server.ts). The
+ * invite routes derive their one link bound from it (api/invites.ts, IR UX2-d1 L).
+ */
+export const LOCAL_UI_MAX_INPUT_CHARS = 8192;
 
 /** The methods a read route uses. */
 export type LocalUiReadMethod = 'GET';
@@ -131,12 +141,55 @@ export interface LocalUiRevealRoute {
   ) => Promise<LocalUiResult>;
 }
 
+/** UX2-d1: the two steps of the invite kind. */
+export type LocalUiInviteStep = 'create' | 'check';
+
+/** UX2-d1: a pasted invite after core's accept step 1 (04 §3.6): who it is and its expiry. */
+export interface LocalUiCheckedInvite {
+  readonly contact: PendingContact;
+  /** Unix seconds, from the link (advisory on this side, 04 §3.6). */
+  readonly expiresAt: number;
+}
+
+/**
+ * UX2-d1: what an invite-kind handler may call (context.ts inviteDesk, built by the server over the
+ * core client). `create` is core `createInvite`; `check` is core's accept step 1 only (the one D-69
+ * codec, strict schema, expiry, both card signatures, name and relay URL rule) and stores nothing.
+ * Neither signs, pairs or reaches the owner store. The link holds the invite secret: never log it.
+ */
+export interface LocalUiInviteDesk {
+  create(input: { readonly label?: string }): Promise<CreatedInvite>;
+  check(link: string): Promise<LocalUiCheckedInvite>;
+}
+
+/**
+ * UX2-d1 (owner decision 1.1; 08 §1): creating an invite, and checking a pasted one before
+ * connecting, need no owner presence, as the MCP tool does not (04 §3.6 sets no invite policy).
+ * Only `POST /api/ui/invites` (step `create`) and `POST /api/ui/invites/check` (step `check`), each
+ * registered once (routes.ts). The server's invite gate runs after the same session, CSRF, Origin,
+ * fetch-metadata and octet-stream checks as every write, refuses a query, an operation input or a
+ * presence header, rate-limits `create`, parses the body itself (one strict JSON object) and hands
+ * the handler only that object and the desk: never the request, a header or the client.
+ */
+export interface LocalUiInviteRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'invite';
+  readonly step: LocalUiInviteStep;
+  readonly handler: (
+    context: LocalUiContext,
+    body: JsonObject,
+    invites: LocalUiInviteDesk | undefined,
+  ) => Promise<LocalUiResult>;
+}
+
 export type LocalUiRoute =
   | LocalUiReadRoute
   | LocalUiOwnerRoute
   | LocalUiSetupRoute
   | LocalUiPayConfirmRoute
-  | LocalUiRevealRoute;
+  | LocalUiRevealRoute
+  | LocalUiInviteRoute;
 
 /**
  * The shared fixed answers of the page read routes (M1-11c; the same codes as Activity, #417). A
