@@ -171,6 +171,10 @@ describe('constants (04, 05, 06)', () => {
         'storage.set',
         'storage.remove',
         'backup.export',
+        // U3-d (D-138, U3-spec-04): the local owner actions.
+        'agent.label',
+        'app.connect',
+        'app.disconnect',
       ].sort(),
     );
     expect(APPROVAL_DECISIONS).toEqual(['approve', 'deny']);
@@ -246,6 +250,9 @@ describe('constants (04, 05, 06)', () => {
       'backup.export': 600,
       'credits.deposit': 600,
       'credits.withdraw': 600,
+      'agent.label': 600,
+      'app.connect': 600,
+      'app.disconnect': 600,
       'agent.revoke': null,
     });
     expect(LATER_OP_DEFAULT_LIFETIME_SECONDS).toBe(600);

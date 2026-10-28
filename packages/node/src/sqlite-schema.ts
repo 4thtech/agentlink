@@ -64,6 +64,8 @@ const V4_FILES_COLUMNS: readonly string[] = ['delete_after'];
 const V5_TABLES: readonly TableName[] = ['own_storage'];
 /** Files columns added by version 6 (MSG-FILES-IO-b): the sealed name a fetched file was saved as. */
 const V6_FILES_COLUMNS: readonly string[] = ['saved_name'];
+/** Tables added by version 7 (U3-d, D-138): the signed local owner actions (07 §3.4). */
+const V7_TABLES: readonly TableName[] = ['local_owner_actions'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -140,7 +142,8 @@ function v6Statements(): readonly string[] {
  * and `outbox_staged` tables (M1-7k-b; new tables only, so existing rows are untouched), version 4
  * adds `files.delete_after` (M1-1g-i; a nullable column, null on existing rows), version 5 adds
  * `own_storage` (M1-9i-a, D-115; a new table with its one-row trigger, existing rows untouched), version
- * 6 adds `files.saved_name` (MSG-FILES-IO-b; a nullable sealed column, null on existing rows). A later
+ * 6 adds `files.saved_name` (MSG-FILES-IO-b; a nullable sealed column, null on existing rows), version
+ * 7 adds `local_owner_actions` (U3-d, D-138; a new table, existing rows untouched). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -150,7 +153,11 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
     version: 1,
     statements: createSchemaStatements(
       TABLE_NAMES.filter(
-        (t) => !V2_TABLES.includes(t) && !V3_TABLES.includes(t) && !V5_TABLES.includes(t),
+        (t) =>
+          !V2_TABLES.includes(t) &&
+          !V3_TABLES.includes(t) &&
+          !V5_TABLES.includes(t) &&
+          !V7_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -160,6 +167,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 4, statements: Object.freeze(v4Statements()) }),
   Object.freeze({ version: 5, statements: createSchemaStatements(V5_TABLES) }),
   Object.freeze({ version: 6, statements: Object.freeze(v6Statements()) }),
+  Object.freeze({ version: 7, statements: createSchemaStatements(V7_TABLES) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

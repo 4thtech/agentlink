@@ -74,6 +74,7 @@ import {
   type SendFolderResult,
 } from './owner-first-policy.js';
 import { signFirstCardWith, type FirstAgentCard } from './owner-init.js';
+import type { FirstLabelResult } from './owner-first-label.js';
 import {
   OWNER_ACCOUNT,
   OWNER_NEXT_ACCOUNT,
@@ -399,6 +400,12 @@ export interface OwnerSetupResult {
   readonly passkey: boolean;
   /** M1-UX-FIRSTRUN-V2: the first policy, when a Send folder was given (fixed outcome). */
   readonly sendFolder?: SendFolderResult;
+  /**
+   * U3-d (08 §1 first run v3): the first `agent.label`, when the first card carried `firstLabel`.
+   * `not_saved` keeps the owner and the card (removing them could lock the agent out); the agent is
+   * then shown by its folder name and can be renamed.
+   */
+  readonly label?: FirstLabelResult;
 }
 
 const ownerExists = (): NodeKeyStoreError =>
@@ -515,6 +522,7 @@ export async function completeOwnerSetup(
         ownerCode: code,
         passkey: withPasskey,
         ...(policy === undefined ? {} : { sendFolder: policy }),
+        ...(outcome.label === undefined ? {} : { label: outcome.label }),
       });
     }
     if (outcome.kind === 'unknown') {

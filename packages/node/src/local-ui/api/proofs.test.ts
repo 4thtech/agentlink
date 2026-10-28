@@ -36,6 +36,7 @@ function fakeClient(
       conversations: () => Promise.reject(new Error('not used')),
       list: () => Promise.reject(new Error('not used')),
       pulseTimes: () => Promise.reject(new Error('not used')),
+      flowEvents: () => Promise.reject(new Error('not used')),
     },
     filesIo: {
       received: () => Promise.reject(new Error('not used')),
@@ -444,6 +445,8 @@ describe('the read-only client view (context.ts)', () => {
     };
     const view = readOnlyClient(full as never);
     expect(Object.keys(view).sort()).toEqual([
+      // U3-d: the verified label and the unsigned agent.label (reads and prepare only).
+      'agent',
       'agentId',
       'contacts',
       'files',

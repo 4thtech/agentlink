@@ -39,16 +39,20 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
 } from '@4thtech-io/crypto';
+import { isRestrictedAlias } from '@4thtech-io/core';
 import { NodeKeyStoreError } from './errors.js';
-import { KEYCHAIN_CALL_TIMEOUT_MS } from './keychain-keystore.js';
+import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import {
   assertAgentId,
+  keychainAccount,
   osKeychain,
   type KeyStoreBackendKind,
   type KeychainBackend,
 } from './keychain.js';
 import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
+import { signFirstParts, type FirstPartsResult } from './owner-first-label.js';
 import {
+  cardNamesOwner,
   keepsFolder,
   notAttempted,
   prepareSendFolder,
@@ -436,4 +440,93 @@ export function addAgentToOwner(options: AddAgentOptions): Promise<AddAgentResul
     assertNoHarnessMarker(options.env ?? process.env);
     return addAgentWith(osKeychain(), ttyOwnerTerminal(), options);
   });
+}
+
+// --- U3-d: "Add an agent" from the local app (D-138; 04 §2.8 "From the local app") ---------------
+
+/** How an Add from the local app ended (fixed values only). */
+export type NewAgentOutcome =
+  | { readonly status: 'done'; readonly sendFolder?: SendFolderResult }
+  | { readonly status: 'failed' };
+
+/** The longest label: 32 code points (06 §6, 04 §2.5.1 `agent.label`). */
+const MAX_LABEL_CODE_POINTS = 32;
+
+/**
+ * U3-d (04 §2.8 "From the local app"; proposed, owner confirms at merge): the one gesture of "Add an
+ * agent" signs exactly the new agent's first card (restricted FirstCardSession), its first policy
+ * (the 06 §3 defaults with the Send folder, only when `plan` is ready) and its first `agent.label`,
+ * each for this agent and this owner only, with the owner session `inner` the presence gate
+ * unlocked (the gate closes it). It never touches the owner key or the owner item. A label that is
+ * not its own restricted form (06 §2.1) signs nothing at all. `done` only when the card is stored and
+ * names this owner, the label is in force, and the first policy is in force or was not attempted
+ * (no ready Send folder: the agent keeps the 06 §3 defaults); anything else is `failed`, and the
+ * caller removes the new agent (all or nothing).
+ */
+export async function signNewAgent(
+  inner: OwnerSession,
+  owner: OwnerPublicKeys,
+  first: FirstAgentCard,
+  plan: SendFolderPlan,
+): Promise<NewAgentOutcome> {
+  const failed = { status: 'failed' } as const;
+  const label = first.firstLabel?.label;
+  if (
+    typeof label !== 'string' ||
+    [...label].length > MAX_LABEL_CODE_POINTS ||
+    !isRestrictedAlias(label)
+  ) {
+    return failed;
+  }
+  let parts: FirstPartsResult;
+  try {
+    parts = await signFirstParts(inner, owner, first, plan);
+  } catch {
+    return failed;
+  }
+  if (!(await cardNamesOwner(first, owner))) return failed;
+  if (parts.label !== 'saved') return failed;
+  const attempted = plan.status === 'ready' && first.firstPolicy !== undefined;
+  if (attempted && parts.sendFolder?.status !== 'allowed') return failed;
+  return parts.sendFolder === undefined
+    ? { status: 'done' }
+    : { status: 'done', sendFolder: parts.sendFolder };
+}
+
+/** Every fixed KeyStore item an agent can have (04 §2.2); a new agent has no `s3:<id>` item. */
+const NEW_AGENT_ITEMS = Object.freeze([
+  'seed',
+  'store-key',
+  'policy-version',
+  'receipts-kept',
+  'storage-mark',
+] as const);
+
+/**
+ * U3-d: removes the keychain items of an agent that THIS request created and could not finish (Add
+ * an agent, all or nothing). Only for a new agent: never the owner's items, never another agent's
+ * (the account names are derived from `agentId` alone). Rejects when an item could not be removed.
+ */
+export async function discardNewKeychainAgent(
+  keychain: KeychainBackend,
+  agentId: string,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<void> {
+  assertAgentId(agentId);
+  let failedOne = false;
+  for (const item of NEW_AGENT_ITEMS) {
+    try {
+      await guarded(() => keychain.delete(keychainAccount(agentId, item)), timeoutMs);
+    } catch {
+      failedOne = true;
+    }
+  }
+  if (failedOne) {
+    throw new NodeKeyStoreError('keychain_failed', 'The system keychain refused the request.');
+  }
+}
+
+/** The package entry (index.ts): discardNewKeychainAgent against the OS keychain. */
+export function discardNewOsKeychainAgent(agentId: string): Promise<void> {
+  return Promise.resolve().then(() => discardNewKeychainAgent(osKeychain(), agentId));
 }

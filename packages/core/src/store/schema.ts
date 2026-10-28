@@ -394,6 +394,21 @@ export const TABLES = {
     primaryKey: ['id'],
     maxRows: 1,
   },
+  // 07 §3.4 (U3-d, D-138; schema version 7; proposed, owner confirms at merge): the local owner
+  // actions as the owner signed them, stored like `contact.check` and re-verified on every load.
+  // record names what the row holds: `agent.label` (the one label row, the latest applied one) or,
+  // for card U3-f, `app:<id>` (the latest `app.connect` or `app.disconnect` for one AI app).
+  // signed_json is the applied SignedOwnerAction, verbatim and sealed (the label is the owner's own
+  // text). The nonce row in owner_action_nonces is written in the same transaction.
+  local_owner_actions: {
+    columns: {
+      record: id,
+      op: oneOf('agent.label', 'app.connect', 'app.disconnect'),
+      signed_json: enc,
+      applied_at: int,
+    },
+    primaryKey: ['record'],
+  },
   // 07 §3.5.
   budget_ledger: {
     columns: {

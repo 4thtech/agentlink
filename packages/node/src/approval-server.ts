@@ -215,7 +215,15 @@ import {
   type SetupFolders,
   type SetupRegistration,
 } from './owner-setup.js';
-import { keepsFolder } from './owner-first-policy.js';
+import {
+  keepsFolder,
+  prepareSendFolder,
+  removeCreated,
+  type SendFolderPlan,
+} from './owner-first-policy.js';
+import { labelActionsOf, type FirstAgentCard } from './owner-first-card.js';
+import { signNewAgent } from './owner-add-agent.js';
+import { isAgentLabelText } from './local-ui/api/agents-manage.js';
 import {
   PASSKEY_RP_ID,
   assertPasskeyAssertion,
@@ -233,6 +241,8 @@ import {
   readOnlyClient,
   type LocalUiAgentView,
   type LocalUiAgentsList,
+  type LocalUiAgentsManage,
+  type LocalUiNewAgent,
   type LocalUiAssets,
   type LocalUiContext,
   type LocalUiOptions,
@@ -264,8 +274,10 @@ import {
 } from './local-ui/routes.js';
 import { createHealthReader } from './local-ui/api/health.js';
 import {
+  assertPrintable,
   checkGesture,
   signGesture,
+  type OwnerReview,
   type OwnerSignRequest,
   type PromptingOwnerKeyStore,
 } from './owner-operation.js';
@@ -597,6 +609,8 @@ export type ApprovalServerEvent =
         | 'done_unconfirmed'
         /** M1-UX-FIRSTRUN-V2: the Send folder can't be used; nothing began (reason says why). */
         | 'folder_refused'
+        /** U3-d: the label is not its own restricted form, or not the one `begin` was given. */
+        | 'label_invalid'
         | 'failed';
       /** IR-M1-11s-c-1 L-4: with `failed`, which kind of failure (a fixed code). */
       readonly reason?: OwnerSetupFailure;
@@ -789,6 +803,8 @@ interface PendingSetup {
   readonly timer: ReturnType<typeof setTimeout>;
   /** M1-UX-FIRSTRUN-V2: the folders begin prepared (removed unless the first policy applies). */
   readonly folders?: SetupFolders;
+  /** U3-d: the label `begin` was given (06 §6 label rule); `finish` must carry the same. */
+  readonly label?: string;
 }
 
 /** The default listen: one `server.listen`, rejecting with the socket error. */
@@ -990,6 +1006,11 @@ export async function startApprovalServerWith(
   let host: AppHostSlot | undefined = undefined;
   /** U3-c: the host hold of each mutating request in flight, for the re-check before acting. */
   const requestHolds = new WeakMap<IncomingMessage, AppHostHold>();
+  /** U3-d: the open agent's verified label is read once per bind; answers wait for it. */
+  let labelReady: Promise<void> = Promise.resolve();
+  /** U3-d: the agents this server created and has not settled, with their opened handles. */
+  const newAgents = new WeakSet<LocalUiNewAgent>();
+  const newAgentHandles = new WeakMap<LocalUiNewAgent, AppHostAgent>();
   // M1-11s-b: the bundle is checked before anything listens (fail closed).
   const localUi = loadLocalUi(options.localUi?.assets);
   const routes = internals.routes ?? createLocalUiRoutes();
@@ -1031,6 +1052,67 @@ export async function startApprovalServerWith(
   const invitesCreated: number[] = [];
   /** M1-11s-c: the one owner setup in progress, if any. */
   let pendingSetup: PendingSetup | undefined;
+  // U3-d (D-138; 08 §1; 04 §2.8 "From the local app"): create an agent and save a verified label.
+  // Nothing here signs: the first parts are signed only by the owner gate's `addAgent`.
+  const agentsManage: LocalUiAgentsManage = Object.freeze<LocalUiAgentsManage>({
+    current: () => host?.current,
+    create: async (label: string) => {
+      const slot = host;
+      const directory = slot?.directory;
+      if (slot === undefined || directory?.create === undefined) return undefined;
+      let name: string;
+      try {
+        name = await directory.create(label);
+      } catch {
+        return undefined;
+      }
+      const opened = await slot.openNew(name);
+      const first = opened?.firstCard;
+      const firstPolicy = first?.firstPolicy;
+      const actions = labelActionsOf(firstPolicy?.actions);
+      if (opened === undefined || first === undefined || actions === undefined) {
+        await opened?.close().catch(() => undefined);
+        await directory.discardNew?.(name).catch(() => undefined);
+        return undefined;
+      }
+      // The Send folder for its first policy, checked (or created) now; removed again on failure.
+      const plan = await prepareSendFolder(firstPolicy?.home).catch(
+        () => ({ status: 'refused', reason: 'not_real' }) as const,
+      );
+      const agent: LocalUiNewAgent = Object.freeze<LocalUiNewAgent>({
+        name,
+        label,
+        first: Object.freeze<FirstAgentCard>({ ...first, firstLabel: { label, actions } }),
+        plan: plan as SendFolderPlan,
+      });
+      newAgents.add(agent);
+      newAgentHandles.set(agent, opened);
+      return agent;
+    },
+    settle: async (agent: LocalUiNewAgent, ok: boolean) => {
+      const opened = newAgentHandles.get(agent);
+      newAgentHandles.delete(agent);
+      newAgents.delete(agent);
+      await opened?.close().catch(() => undefined);
+      const directory = host?.directory;
+      if (opened === undefined || directory === undefined) return;
+      if (ok) {
+        // Display only (07 §9.1): the verified label is in the new agent's store.
+        await directory.writeLabel(agent.name, agent.label).catch(() => undefined);
+        return;
+      }
+      // All or nothing (04 §2.8): exactly what this request made goes again.
+      await removeCreated(agent.plan).catch(() => undefined);
+      await directory.discardNew?.(agent.name).catch(() => undefined);
+    },
+    labelSaved: async (name: string, label: string) => {
+      const slot = host;
+      if (slot === undefined) return;
+      if (name === slot.current) agentLabel = label;
+      await slot.directory.writeLabel(name, label);
+    },
+  });
+
   // U3-c (IR-U3-c-SEC-1 L-1): the source is captured when the context is built, so a handler that
   // outlives a switch's drain wait keeps the agent it started with and never reaches the next one.
   const buildUiContext = (bound: ApprovalServerSource = source): LocalUiContext =>
@@ -1054,8 +1136,23 @@ export async function startApprovalServerWith(
       }),
       // U3-c: the Agents list, in the app host only.
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
+      // U3-d: create an agent and save a verified label, in the app host only.
+      ...(options.host === undefined ? {} : { agentsManage }),
     });
   let uiContext: LocalUiContext = buildUiContext();
+
+  /** U3-d: reads the open agent's verified label (core loadLabel); the folder name otherwise. */
+  async function refreshLabel(): Promise<void> {
+    const bound = agentUi;
+    const client = bound?.client;
+    if (client === undefined) return;
+    try {
+      const reading = await client.ownerActions.loadLabel();
+      if (agentUi === bound && reading.status === 'verified') agentLabel = reading.label;
+    } catch {
+      // Not verified: the folder name is shown (fail closed).
+    }
+  }
 
   // One request handler and one session behind both loopback listeners. Until both are bound, a
   // request (only possible on 127.0.0.1, in that short window) gets 503 and nothing else.
@@ -1711,6 +1808,34 @@ export async function startApprovalServerWith(
                 await refuseUnconfirmedPaid(frozen);
                 return signGesture(session, frozen);
               },
+              // U3-d (04 §2.8 "From the local app"): Add an agent, in the app host only. The same
+              // one owner operation: exactly the new agent's first card, first policy and first
+              // label, for that agent only (signNewAgent); never `sign` as well.
+              ...(host === undefined
+                ? {}
+                : {
+                    addAgent: async (review: OwnerReview, agent: LocalUiNewAgent) => {
+                      if (used) {
+                        throw new NodeKeyStoreError(
+                          'owner_operation_invalid',
+                          'One owner operation signs once.',
+                        );
+                      }
+                      used = true;
+                      if (!newAgents.has(agent)) {
+                        throw new NodeKeyStoreError(
+                          'owner_operation_invalid',
+                          'Only an agent this app just created gets its first card here.',
+                        );
+                      }
+                      if (!Array.isArray(review.lines) || review.lines.length === 0) {
+                        throw new NodeKeyStoreError('owner_operation_invalid', 'Nothing to show.');
+                      }
+                      for (const line of review.lines) assertPrintable(line, 'A review line');
+                      if (!stillCurrent(req)) throw new AgentChanged();
+                      return signNewAgent(session, context.owner, agent.first, agent.plan);
+                    },
+                  }),
             });
             if (!stillCurrent(req)) throw new AgentChanged();
             result = await run(owner);
@@ -2423,6 +2548,22 @@ export async function startApprovalServerWith(
     (await source.context()) !== undefined ||
     !(await noOwnerAnywhere(keychainOf(), setup.firstCard, undefined, setup.ownerFiles));
 
+  /** U3-d: the setup's first card with its first label, when `begin` was given one. */
+  const withFirstLabel = (first: FirstAgentCard, label: string | undefined): FirstAgentCard => {
+    const actions = labelActionsOf(first.firstPolicy?.actions);
+    if (label === undefined || actions === undefined) return first;
+    return { ...first, firstLabel: { label, actions } };
+  };
+
+  /** U3-d: after a verified first label at setup, the open agent's config.json label (app host). */
+  const labelSavedForOpen = async (label: string): Promise<void> => {
+    const slot = host;
+    const name = slot?.current;
+    if (slot === undefined || name === undefined) return;
+    agentLabel = label;
+    await slot.directory.writeLabel(name, label).catch(() => undefined);
+  };
+
   /**
    * M1-11s-c: the setup gate for the two `presence: 'setup'` routes (never ownerGate). The caller
    * checked the session, CSRF, Origin, fetch metadata and the octet-stream type.
@@ -2446,6 +2587,13 @@ export async function startApprovalServerWith(
       finishSetup(res, 503, 'unavailable');
       return;
     }
+    // U3-d (08 §1 first run v3): `begin` and `finish` may carry `{label}` as the operation input.
+    const label = setupLabel(req);
+    if (label === 'invalid' || label === 'label_invalid') {
+      req.resume();
+      finishSetup(res, 400, label);
+      return;
+    }
     const body = await boundedBody(req, res, MAX_SETUP_REGISTRATION_BYTES);
     if (body === undefined) return;
     try {
@@ -2453,11 +2601,33 @@ export async function startApprovalServerWith(
         agentChanged(res);
         return;
       }
-      if (step === 'begin') await setupBegin(res, body, cookie, setup);
-      else await setupFinish(res, body, cookie, setup);
+      if (step === 'begin') await setupBegin(res, body, cookie, setup, label);
+      else await setupFinish(res, body, cookie, setup, label);
     } finally {
       wipe(body);
     }
+  }
+
+  /**
+   * U3-d: the setup steps' label: absent (no input), exactly `{"label": <text>}` under the 06 §6
+   * label rule, or a fixed refusal (`invalid` for any other input, `label_invalid` for a label core
+   * would not sign). The label is never logged or echoed.
+   */
+  function setupLabel(req: IncomingMessage): string | undefined | 'invalid' | 'label_invalid' {
+    const input = operationInput(req);
+    if (input === undefined) return undefined;
+    if (
+      input === 'invalid' ||
+      typeof input !== 'object' ||
+      input === null ||
+      Array.isArray(input)
+    ) {
+      return 'invalid';
+    }
+    const keys = Object.keys(input);
+    if (keys.length !== 1 || keys[0] !== 'label') return 'invalid';
+    const label = (input as { label?: unknown }).label;
+    return isAgentLabelText(label) ? label : 'label_invalid';
   }
 
   async function setupBegin(
@@ -2465,6 +2635,7 @@ export async function startApprovalServerWith(
     body: Uint8Array,
     cookie: string,
     setup: LocalUiOwnerSetupOption,
+    label: string | undefined,
   ): Promise<void> {
     if (body.length !== 0) {
       finishSetup(res, 400, 'invalid');
@@ -2517,6 +2688,7 @@ export async function startApprovalServerWith(
         expiresAt: now() + SETUP_HOLD_MS,
         timer: setTimeout(() => dropSetup(held), SETUP_HOLD_MS),
         ...(folders === undefined ? {} : { folders }),
+        ...(label === undefined ? {} : { label }),
       };
       held.timer.unref();
       pendingSetup = held;
@@ -2542,6 +2714,7 @@ export async function startApprovalServerWith(
     body: Uint8Array,
     cookie: string,
     setup: LocalUiOwnerSetupOption,
+    label: string | undefined,
   ): Promise<void> {
     const held = pendingSetup;
     // Bound to its session: another session neither finishes nor consumes it.
@@ -2585,6 +2758,11 @@ export async function startApprovalServerWith(
       finishSetup(...args);
     };
     try {
+      // U3-d: the label signed is the one `begin` was given and the page still shows.
+      if (label !== held.label) {
+        await answer(res, 400, 'label_invalid');
+        return;
+      }
       try {
         registration = parseSetupRegistration(body);
       } catch {
@@ -2618,7 +2796,7 @@ export async function startApprovalServerWith(
             credentialId: registration.credentialId,
             prfOutput: registration.prfOutput,
             authenticatorData: registration.authenticatorData,
-            firstCard: setup.firstCard,
+            firstCard: withFirstLabel(setup.firstCard, held.label),
             ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),
           },
           {
@@ -2643,6 +2821,10 @@ export async function startApprovalServerWith(
       try {
         const fingerprint = ownerFingerprintText(held.keys);
         const sendFolder: SetupSendFolder | undefined = result.sendFolder?.status;
+        // U3-d: config.json's label (display only, 07 §9.1) after core applied the signed one.
+        if (result.label === 'saved' && held.label !== undefined) {
+          await labelSavedForOpen(held.label);
+        }
         // The owner code goes to the page once, for the backup-code step; never an event.
         // IR-M1-11s-c-1 M-1: also when the card is unconfirmed, since the owner was kept.
         await answer(
@@ -2655,6 +2837,7 @@ export async function startApprovalServerWith(
             fingerprint,
             computerName: computerNameOf(safeHostname()),
             ...(sendFolder === undefined ? {} : { sendFolder }),
+            ...(result.label === undefined ? {} : { label: result.label }),
           },
           { fingerprint, ...(sendFolder === undefined ? {} : { sendFolder }) },
         );
@@ -2909,6 +3092,8 @@ export async function startApprovalServerWith(
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     setCommonHeaders(res);
+    // U3-d: the open agent's verified label is known before anything is stamped with it.
+    if (host !== undefined) await labelReady;
     stamp(res);
     const peer = req.socket.remoteAddress;
     if (peer !== '127.0.0.1' && peer !== '::ffff:127.0.0.1' && peer !== '::1') {
@@ -3106,7 +3291,11 @@ export async function startApprovalServerWith(
   function bindAgent(agent: AppHostAgent | undefined): void {
     source = agent?.source ?? NO_AGENT_SOURCE;
     agentUi = agent?.localUi;
-    agentLabel = agent?.label;
+    // U3-d (04 §2.5.1 "Labels and AI app connections"): the open agent is named only by its
+    // verified label (core re-verifies the stored `agent.label`), else by its folder name; the label
+    // in config.json (`agent.label`) is display text for listed agents only.
+    agentLabel = undefined;
+    labelReady = refreshLabel();
     invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
     uiContext = buildUiContext();
     // Approvals, a held owner setup and held paid-action confirmations belong to the old agent.
@@ -3172,7 +3361,8 @@ export async function startApprovalServerWith(
       agents.push(
         Object.freeze<LocalUiAgentView>({
           name: entry.name,
-          label: entry.label,
+          // U3-d: the open agent shows its verified label, else its folder name.
+          label: entry.name === current ? (agentLabel ?? entry.name) : entry.label,
           current: entry.name === current,
           available: entry.available,
           removing: entry.removing,

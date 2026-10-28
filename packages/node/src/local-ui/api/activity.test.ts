@@ -251,6 +251,8 @@ describe('the read-only client view (M1-11c-a1 adds listActivity)', () => {
     };
     const view = readOnlyClient(client as never);
     expect(Object.keys(view).sort()).toEqual([
+      // U3-d: the verified label and the unsigned agent.label (reads and prepare only).
+      'agent',
       'agentId',
       'contacts',
       'files',

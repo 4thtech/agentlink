@@ -64,6 +64,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'revoked_agents',
         // M1-9i-a (D-115; 07 §3.4): the owner-signed own storage, schema version 5.
         'own_storage',
+        'local_owner_actions',
         'budget_ledger',
         'budget_state',
         'commitment_parts',
@@ -92,8 +93,25 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
     });
   });
 
+  it('local_owner_actions (U3-d, schema 7): the signed local owner actions, sealed', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(7);
+    expect(TABLES.local_owner_actions).toEqual({
+      columns: {
+        record: { kind: 'id', nullable: false },
+        op: {
+          kind: 'enum',
+          nullable: false,
+          values: ['agent.label', 'app.connect', 'app.disconnect'],
+        },
+        signed_json: { kind: 'enc', nullable: false },
+        applied_at: { kind: 'int', nullable: false },
+      },
+      primaryKey: ['record'],
+    });
+  });
+
   it('files.saved_name (MSG-FILES-IO-b, schema 6): a nullable sealed column, appended last', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(6);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(6);
     expect(TABLES.files.columns.saved_name).toEqual({ kind: 'enc', nullable: true });
     expect(Object.keys(TABLES.files.columns).at(-1)).toBe('saved_name');
   });

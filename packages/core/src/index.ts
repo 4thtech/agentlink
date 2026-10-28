@@ -131,6 +131,9 @@ export {
   type PolicyRecovery,
   type PolicyVersionMark,
   type ReceiptsKeptMark,
+  // U3-d (D-138): the agent's verified label.
+  LABEL_RECORD,
+  type LabelReading,
 } from './owner-actions.js';
 // M1-11r-b (D-118; 04 §2.5.1; 06 §3): unsigned owner-action bodies for the local UI server to sign
 // after presence. Owner surfaces only: no MCP tool uses them (I-4).
@@ -389,6 +392,11 @@ export {
   MessagesView,
   // UX2-f1: the activity pulse's exchange times (a contact and a time each, no content).
   PULSE_SCAN_CAP,
+  // U3-flow: the live connections map's flow events (metadata only, no content).
+  FLOW_SCAN_CAP,
+  type FlowEvent,
+  type FlowEvents,
+  type FlowState,
   type Conversation,
   type ExchangeTime,
   type ExchangeTimes,

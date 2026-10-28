@@ -19,6 +19,7 @@ import {
   compareUsd,
   ownerActionSchema,
   type PolicyRule,
+  type AgentLabelParams,
   type ContactCheckParams,
   type ContactRule,
   type ContactRemoveParams,
@@ -37,13 +38,16 @@ import {
 export const PREPARED_OWNER_ACTION_LIFETIME_SECONDS = 600;
 
 /** The ops an owner surface can prepare here. */
-export type PreparableOp = 'policy.set' | 'contact.check' | 'contact.rename' | 'contact.remove';
+export type PreparableOp =
+  'policy.set' | 'contact.check' | 'contact.rename' | 'contact.remove' | 'agent.label';
 
 const PREPARABLE: readonly string[] = [
   'policy.set',
   'contact.check',
   'contact.rename',
   'contact.remove',
+  // U3-d (D-138): the owner names this agent from the local app.
+  'agent.label',
 ];
 
 interface ParamsOf {
@@ -51,6 +55,7 @@ interface ParamsOf {
   readonly 'contact.check': ContactCheckParams;
   readonly 'contact.rename': ContactRenameParams;
   readonly 'contact.remove': ContactRemoveParams;
+  readonly 'agent.label': AgentLabelParams;
 }
 
 export interface OwnerActionBodyInput<O extends PreparableOp = PreparableOp> {
@@ -124,7 +129,9 @@ export type PrepareRefusal =
   | 'contact_revoked'
   | 'pairing_unavailable'
   | 'alias_invalid'
-  | 'alias_taken';
+  | 'alias_taken'
+  /** U3-d: the label is not 1 to 32 code points already in its own restricted form (06 §2.1). */
+  | 'label_invalid';
 
 export type PreparedOwnerAction =
   | {
