@@ -39,6 +39,8 @@ import {
   type ReceivedItem,
   type SentItem,
 } from './io-api.js';
+import { AddContactAction, useInviteFirst } from '../home/start-here-empty.js';
+import { START_STRINGS } from '../home/strings.js';
 import { FILES_IO_STRINGS as IO, asOf } from './strings.js';
 
 export type FilesTab = 'received' | 'sent' | 'folders';
@@ -292,6 +294,7 @@ function FeedFrame<T extends { readonly id: string; readonly at: number }>({
   readonly card?: boolean;
 }): ReactElement {
   const { state } = feed;
+  const inviteFirst = useInviteFirst();
   if (state.phase === 'loading') return <FilesSkeleton word={IO.loading} />;
   if (state.phase === 'not_set_up') return <Banner tone="info">{IO.notSetUp}</Banner>;
   if (state.phase === 'error') {
@@ -305,7 +308,14 @@ function FeedFrame<T extends { readonly id: string; readonly at: number }>({
     );
   }
   if (state.items.length === 0) {
-    return (
+    // UX2-g: until step 2 of Start here is done, the empty state points to it (B-11 §27.4).
+    return inviteFirst ? (
+      <EmptyState
+        icon={empty.icon}
+        title={START_STRINGS.emptyFiles}
+        action={<AddContactAction />}
+      />
+    ) : (
       <EmptyState
         icon={empty.icon}
         title={empty.title}

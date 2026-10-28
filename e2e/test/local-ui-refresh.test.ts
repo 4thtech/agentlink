@@ -246,6 +246,14 @@ async function axe(page: Page, forced: boolean): Promise<AxeViolation[]> {
   }, forced);
 }
 
+/**
+ * The one named layout-transition exception: the Start here card collapses by grid rows when it
+ * leaves (UX2-g, B-11 §27.3), the same exception packages/ui/src/motion-lint.test.ts names. Only
+ * `grid-template-rows` on a label containing `start-wrap`; nothing else is excused.
+ */
+const startWrapException = (entry: string): boolean =>
+  /^[a-z0-9]+[^:]*start-wrap[^:]*: grid-template-rows$/.test(entry);
+
 /** Computed-style checks: running layout transitions and the backdrop-filter elements. */
 async function motionAndDepth(page: Page): Promise<{
   layoutTransitions: string[];
@@ -553,6 +561,14 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     AXE_MS_PER_MODE * AXE_MODES.length,
   );
 
+  it('the Start here exception covers only grid-template-rows on start-wrap', () => {
+    expect(startWrapException('div.hm-start-wrap: grid-template-rows')).toBe(true);
+    expect(startWrapException('div.hm-start-wrap: height')).toBe(false);
+    expect(startWrapException('div.hm-start-wrap: all')).toBe(false);
+    expect(startWrapException('div.hm-tile: grid-template-rows')).toBe(false);
+    expect(startWrapException('div.hm-start-wrap: grid-template-rows, height')).toBe(false);
+  });
+
   it('motion: no layout-property animation; backdrop-filter on at most four chrome elements', async () => {
     const { ctx, page } = await open(MODES[0] as Mode);
     const perPage: Record<string, unknown> = {};
@@ -575,7 +591,11 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         await page.waitForTimeout(100);
         const m = await motionAndDepth(page);
         perPage[p.path] = m;
-        layout.push(...m.layoutTransitions.map((s) => `${p.path} transition ${s}`));
+        layout.push(
+          ...m.layoutTransitions
+            .filter((s) => !startWrapException(s))
+            .map((s) => `${p.path} transition ${s}`),
+        );
         layout.push(
           ...m.animated
             .filter((k) => !/^(opacity|transform|translate|scale|rotate|strokeDashoffset)$/.test(k))

@@ -17,28 +17,175 @@
   letter-spacing: 0.08em;
 }
 
-/* Next step: one card, above the grid, a level up. */
-.hm-next {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--al-space-5);
-  margin-block-end: var(--al-space-6);
+/* Start here (UX2-g; B-11 §27): one card above the grid, a level up. A short list, one primary
+   button on the next step. Only opacity and transform move; reduced motion changes things at once. */
+.hm-start {
+  display: grid;
+  gap: var(--al-space-4);
   padding: var(--al-space-6);
   border: var(--al-border-width-thin) solid var(--al-color-border-default);
   border-radius: var(--al-radius-lg);
   background: var(--al-color-bg-raised);
   box-shadow: var(--al-shadow-2);
 }
-.hm-next-text {
+.hm-start.is-loading {
+  min-block-size: 280px;
+  margin-block-end: var(--al-space-6);
+}
+/* Leaving (B-11 §27.3, §6 row 4): fade and collapse, so the tiles glide up instead of snapping.
+   The grid-row collapse is the one named height exception; the clip also holds the gap below. */
+.hm-start-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--al-duration-base) var(--al-easing-exit),
+    opacity var(--al-duration-base) var(--al-easing-exit);
+}
+.hm-start-wrap.is-leaving {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.hm-start-clip {
+  min-block-size: 0;
+  overflow: hidden;
+  padding: var(--al-space-2) var(--al-space-3) var(--al-space-6);
+  margin-inline: calc(var(--al-space-3) * -1);
+  margin-block-start: calc(var(--al-space-2) * -1);
+}
+.hm-start-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--al-space-4);
+}
+.hm-start-title {
+  margin: 0;
+  color: var(--al-color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.hm-start-count {
+  color: var(--al-color-fg-default);
+  animation: hm-start-fade var(--al-duration-base) var(--al-easing-standard);
+}
+.hm-start-bar {
+  block-size: 4px;
+  overflow: hidden;
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+}
+.hm-start-fill {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  background: var(--al-color-accent-default);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform var(--al-duration-moment) var(--al-easing-emphasized);
+}
+.hm-start-fill[data-n='1'] {
+  transform: scaleX(0.25);
+}
+.hm-start-fill[data-n='2'] {
+  transform: scaleX(0.5);
+}
+.hm-start-fill[data-n='3'] {
+  transform: scaleX(0.75);
+}
+.hm-start-fill[data-n='4'] {
+  transform: scaleX(1);
+}
+.hm-start-steps {
+  display: grid;
+  gap: var(--al-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hm-start-step {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: var(--al-space-3);
+  align-items: start;
+}
+.hm-start-step[data-state='done'] .hm-start-name,
+.hm-start-step[data-state='later'] .hm-start-name,
+.hm-start-step[data-state='waiting'] .hm-start-name {
+  color: var(--al-color-fg-muted);
+}
+.hm-start-step[data-state='next'] .hm-start-name {
+  color: var(--al-color-fg-default);
+}
+.hm-start-text {
   display: grid;
   gap: var(--al-space-2);
   min-inline-size: 0;
 }
-.hm-next-text p,
-.hm-next-text h2 {
+.hm-start-text p {
   margin: 0;
+}
+.hm-start-action {
+  justify-self: start;
+  text-decoration: none;
+}
+.hm-start-mark {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 24px;
+}
+/* A hollow ring for what is still to do, a filled dot for the next step, a check once done. */
+.hm-start-mark[data-mark='later']::before,
+.hm-start-mark[data-mark='waiting']::before {
+  content: '';
+  inline-size: 12px;
+  block-size: 12px;
+  border: 2px solid var(--al-color-border-strong);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.hm-start-mark[data-mark='next']::before {
+  content: '';
+  inline-size: 12px;
+  block-size: 12px;
+  border-radius: 50%;
+  background: var(--al-color-accent-default);
+}
+.hm-start-check {
+  color: var(--al-color-status-success-icon);
+}
+.hm-start-step.is-fresh .hm-start-check,
+.hm-start-allset .hm-start-check {
+  animation: hm-start-pop var(--al-duration-moment) var(--al-easing-emphasized);
+}
+.hm-start-step.is-fresh .hm-start-action,
+.hm-start-step.is-fresh .al-copy {
+  animation: hm-start-fade var(--al-duration-base) var(--al-easing-standard);
+}
+.hm-start-allset {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  margin: 0;
+}
+@keyframes hm-start-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hm-start-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .hm-note {
@@ -193,6 +340,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hm-start-wrap,
+  .hm-start-fill {
+    transition: none;
+  }
+  .hm-start-count,
+  .hm-start-check,
+  .hm-start-action,
+  .hm-start .al-copy {
+    animation: none;
+  }
   .hm-tile,
   .hm-tile::before {
     transition: none;
@@ -201,6 +358,16 @@
   .hm-tile:focus-within {
     transform: none;
   }
+}
+[data-motion='reduced'] .hm-start-wrap,
+[data-motion='reduced'] .hm-start-fill {
+  transition: none;
+}
+[data-motion='reduced'] .hm-start-count,
+[data-motion='reduced'] .hm-start-check,
+[data-motion='reduced'] .hm-start-action,
+[data-motion='reduced'] .hm-start .al-copy {
+  animation: none;
 }
 [data-motion='reduced'] .hm-tile,
 [data-motion='reduced'] .hm-tile::before {
@@ -213,7 +380,7 @@
 
 @media (forced-colors: active), (prefers-contrast: more) {
   .hm-tile,
-  .hm-next {
+  .hm-start {
     box-shadow: none;
   }
   .hm-tile::before {

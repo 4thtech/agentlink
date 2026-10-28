@@ -66,6 +66,8 @@ import {
 } from './owner.js';
 import { addPendingInvite, pendingInvites, type PendingInvite } from './pending-invites.js';
 import { PresencePrompt } from './presence-prompt.js';
+import { useInviteFirst } from '../home/start-here-empty.js';
+import { START_STRINGS } from '../home/strings.js';
 import {
   CONTACTS_STRINGS as S,
   HOOD,
@@ -730,6 +732,7 @@ export function ContactsPage({
   const [lastCreated, setLastCreated] = useState<number | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const addButtonId = useId();
+  const inviteFirst = useInviteFirst();
   const returnFocus = useRef(false);
 
   useEffect(() => {
@@ -878,7 +881,11 @@ export function ContactsPage({
           ) : null}
           {status}
           {rows.length === 0 ? (
-            <EmptyState icon="users" title={S.emptyTitle} prompt={S.emptyPrompt} />
+            inviteFirst ? (
+              <EmptyState icon="users" title={START_STRINGS.emptyContacts} prompt={S.emptyPrompt} />
+            ) : (
+              <EmptyState icon="users" title={S.emptyTitle} prompt={S.emptyPrompt} />
+            )
           ) : (
             <div className="ct-layout">{invitesList}</div>
           )}
