@@ -77,25 +77,33 @@ function When({ seconds }: { seconds: number }): ReactElement {
 
 /**
  * One key per row, unique even when several proofs share a second: time and direction, plus how many
- * rows after it (counted from the bottom, the oldest) have the same pair. The feed has no row ID, and
- * new rows land at the top, so counting from the bottom keeps every existing row's key when one arrives.
- * The oldest group on a page that has more below it may be cut short; `trusted` is false for those.
+ * rows after it (counted from the bottom) have the same pair. The feed has no row ID, and rows in the
+ * same second are ordered by a hash, so a new row can land anywhere in its group. Keys are therefore
+ * only trusted for a group whose row count did not change since the last look (see `groupCounts` in
+ * the page). The oldest group of a page that has more below it may be cut short: not trusted either.
  */
 function keysOf(
   items: readonly ProofRow[],
   hasMore = false,
-): { readonly key: string; readonly trusted: boolean }[] {
+): { readonly key: string; readonly group: string; readonly cut: boolean }[] {
   const counts = new Map<string, number>();
   const oldest = items.length === 0 ? 0 : (items[items.length - 1]?.createdAt ?? 0);
-  const out: { key: string; trusted: boolean }[] = [];
+  const out: { key: string; group: string; cut: boolean }[] = [];
   for (let i = items.length - 1; i >= 0; i -= 1) {
     const item = items[i] as ProofRow;
-    const base = `${String(item.createdAt)}-${item.direction}`;
-    const n = counts.get(base) ?? 0;
-    counts.set(base, n + 1);
-    out[i] = { key: `${base}-${String(n)}`, trusted: !(hasMore && item.createdAt === oldest) };
+    const group = `${String(item.createdAt)}-${item.direction}`;
+    const n = counts.get(group) ?? 0;
+    counts.set(group, n + 1);
+    out[i] = { key: `${group}-${String(n)}`, group, cut: hasMore && item.createdAt === oldest };
   }
   return out;
+}
+
+/** Row counts per group (second and direction) of a page; the cut-off oldest group is left out. */
+function groupSizes(keys: ReturnType<typeof keysOf>): Map<string, number> {
+  const sizes = new Map<string, number>();
+  for (const k of keys) if (!k.cut) sizes.set(k.group, (sizes.get(k.group) ?? 0) + 1);
+  return sizes;
 }
 
 /** The newest page from a quiet re-read on top, then the older rows already loaded below it. */
@@ -273,6 +281,7 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
   const [moments, setMoments] = useState<ReadonlySet<string>>(new Set());
   const [waiting, setWaiting] = useState<{ readonly from: number } | undefined>(undefined);
   const seen = useRef<Map<string, string>>(new Map());
+  const groupCounts = useRef<Map<string, number>>(new Map());
   const polls = useRef(0);
 
   const readMoney = useCallback(() => {
@@ -296,19 +305,33 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
       const answer = res.kind === 'ok' ? parseList(res.data) : undefined;
       if (answer?.kind !== 'ok') return;
       const keys = keysOf(answer.items, answer.next !== undefined);
+      const sizes = groupSizes(keys);
+      // A group whose row count changed (a row landed or left) cannot be matched row by row: no moment
+      // from it this look, its old moments are dropped, and its marks start again from what is shown.
+      const unstable = new Set(
+        [...sizes].filter(([g, n]) => (groupCounts.current.get(g) ?? n) !== n).map(([g]) => g),
+      );
+      groupCounts.current = sizes;
+      const trusted = (k: (typeof keys)[number] | undefined): k is (typeof keys)[number] =>
+        k !== undefined && !k.cut && !unstable.has(k.group);
       const done = answer.items
         .map((r, i) => [r, keys[i]] as const)
         .filter(
           ([r, k]) =>
-            k?.trusted === true &&
-            r.state === 'recorded' &&
-            inFlight(seen.current.get(k.key) ?? ''),
+            trusted(k) && r.state === 'recorded' && inFlight(seen.current.get(k.key) ?? ''),
         )
         .map(([, k]) => k?.key ?? '');
       answer.items.forEach((r, i) => {
         const k = keys[i];
-        if (k?.trusted === true) seen.current.set(k.key, r.state);
+        if (k === undefined || k.cut) return;
+        seen.current.set(k.key, r.state);
       });
+      if (unstable.size > 0) {
+        const gone = keys.filter((k) => unstable.has(k.group)).map((k) => k.key);
+        setMoments((m) =>
+          gone.some((k) => m.has(k)) ? new Set([...m].filter((k) => !gone.includes(k))) : m,
+        );
+      }
       if (done.length > 0) setMoments((m) => new Set([...m, ...done]));
       setList((old) =>
         old.phase === 'ok' ? { ...old, items: mergeNewest(answer.items, old.items) } : old,
@@ -344,9 +367,10 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
       const answer = res.kind === 'ok' ? parseList(res.data) : problem(res);
       if (answer.kind === 'ok') {
         const keys = keysOf(answer.items, answer.next !== undefined);
+        groupCounts.current = groupSizes(keys);
         answer.items.forEach((r, i) => {
           const k = keys[i];
-          if (k?.trusted === true) seen.current.set(k.key, r.state);
+          if (k !== undefined && !k.cut) seen.current.set(k.key, r.state);
         });
         setList({
           phase: 'ok',
