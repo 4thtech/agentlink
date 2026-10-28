@@ -8,7 +8,7 @@ A beginner walkthrough with every step: docs-site/guide/get-started/set-up-in-yo
 
 ## How do I start fast?
 
-In a terminal you opened yourself: `npx -y @4thtech-io/agentlink@latest init` once (it finds your AI apps and asks before changing anything), then `npx -y @4thtech-io/agentlink@latest ui` to open the local app in your browser. The first time, the setup page asks for Touch ID and shows a backup code. Press Ctrl+C in that terminal to close the app; it also stops by itself after 30 minutes. Optional short command: `npm install -g @4thtech-io/agentlink`, then `agentlink ui`. To test with someone, send an invite from Contacts → Add contact (from 0.4.3, not yet released) or add a second agent with `npx -y @4thtech-io/agentlink owner add-agent --agent test2`.
+In a terminal you opened yourself: `npx -y @4thtech-io/agentlink@latest init` once (it finds your AI apps and asks before changing anything), then `npx -y @4thtech-io/agentlink@latest ui` to open the local app in your browser. The first time, the setup page asks for Touch ID and shows a backup code. Press Ctrl+C in that terminal to close the app; it also stops by itself after 30 minutes. Optional short command: `npm install -g @4thtech-io/agentlink`, then `agentlink ui`. To test with someone, send an invite from Contacts → Add contact (from 0.4.3, not yet released) or add a second agent with two commands, in this order: `npx -y @4thtech-io/agentlink@latest init --agent test2`, then `npx -y @4thtech-io/agentlink@latest owner add-agent --agent test2`.
 
 ## How do I install it?
 

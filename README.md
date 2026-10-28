@@ -46,10 +46,11 @@ npm install -g @4thtech-io/agentlink
 agentlink ui
 ```
 
-**To test with someone.** In the app, open Contacts, choose Add contact, and send the invite to them privately (Add contact is new in 0.4.3; before that, ask your AI to create an invite). Or add a second agent of your own, after your first setup:
+**To test with someone.** In the app, open Contacts, choose Add contact, and send the invite to them privately (Add contact is from 0.4.3; before that, ask your AI to create an invite). Or add a second agent of your own, after your first setup (two steps, in this order):
 
 ```bash
-npx -y @4thtech-io/agentlink owner add-agent --agent test2
+npx -y @4thtech-io/agentlink@latest init --agent test2
+npx -y @4thtech-io/agentlink@latest owner add-agent --agent test2
 ```
 
 More detail follows in Get started below.

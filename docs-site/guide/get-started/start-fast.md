@@ -36,10 +36,11 @@ agentlink ui
 ## To test with someone
 
 - In the app, open **Contacts** and choose **Add contact** (from 0.4.3). Send the invite to them privately: anyone with the link can connect once. See [Contacts page](../local-app/contacts.md).
-- Or add a second agent of your own, after your first setup:
+- Or add a second agent of your own, after your first setup (two steps, in this order):
 
 ```bash
-npx -y @4thtech-io/agentlink owner add-agent --agent test2
+npx -y @4thtech-io/agentlink@latest init --agent test2
+npx -y @4thtech-io/agentlink@latest owner add-agent --agent test2
 ```
 
 Next: [Set up in your AI tool](set-up-in-your-ai-tool.md) · [Pair with someone](pair-with-someone.md).
