@@ -114,7 +114,7 @@ function ProofTable({
 }): ReactElement {
   const keys = keysOf(items);
   return (
-    <div className="pf-table-wrap">
+    <div className="pf-table-wrap" role="region" tabIndex={0} aria-label={S.listCaption}>
       <table className="pf-table">
         <caption className="al-sr-only">{S.listCaption}</caption>
         <thead>

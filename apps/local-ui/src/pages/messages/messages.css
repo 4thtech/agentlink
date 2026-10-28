@@ -105,6 +105,12 @@
   min-width: 0;
   padding: var(--al-space-5);
 }
+/* UI-REFRESH-t: a button under a pointer that rests while a long conversation scrolls past would
+   start a colour fade on every row it crosses; each fade repaints the scroller and drops a frame at
+   4x CPU. Hover here changes the colour at once (measured: 0 dropped frames, from 5). */
+.ms-item .al-btn {
+  transition: none;
+}
 .ms-meta {
   display: flex;
   flex-wrap: wrap;

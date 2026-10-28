@@ -67,6 +67,10 @@
   border: var(--al-border-width-thin) solid var(--al-color-border-default);
   border-radius: var(--al-radius-lg);
   background: var(--al-color-bg-surface);
+  /* UI-REFRESH-t: day sections far off screen are not laid out or painted, so a long history opens
+     without a dropped frame. The remembered size keeps the scroll bar steady. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 14em;
 }
 .al-activity-day {
   position: sticky;

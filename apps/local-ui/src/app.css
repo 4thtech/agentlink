@@ -11,3 +11,24 @@ body {
 #root {
   min-height: 100dvh;
 }
+
+/* UI-REFRESH-t: the skip link is the first Tab stop. It waits above the window and drops in on
+   focus (no motion). The page content it jumps to is focusable by script only, so it shows no ring. */
+.al-skip {
+  position: absolute;
+  top: var(--al-space-3);
+  left: var(--al-space-3);
+  z-index: 10;
+  padding: var(--al-space-2) var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-strong);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-raised);
+  color: var(--al-color-fg-default);
+  transform: translateY(-300%);
+}
+.al-skip:focus {
+  transform: translateY(0);
+}
+main.al-shell-content:focus {
+  outline: none;
+}

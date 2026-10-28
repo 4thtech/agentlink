@@ -16,6 +16,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactElement,
   type RefObject,
 } from 'react';
@@ -32,31 +33,49 @@ function readReduced(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+// One listener pair for the whole page: a long list of rows each asks "is motion reduced?", and a
+// matchMedia listener plus a MutationObserver per row made the first render of a 200-row page slow.
+const reducedSubscribers = new Set<() => void>();
+let stopReducedWatch: (() => void) | null = null;
+
+function watchReduced(): () => void {
+  const notify = (): void => {
+    for (const subscriber of [...reducedSubscribers]) subscriber();
+  };
+  const mql =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)')
+      : null;
+  mql?.addEventListener?.('change', notify);
+  let observer: MutationObserver | null = null;
+  if (typeof MutationObserver === 'function') {
+    observer = new MutationObserver(notify);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-motion'],
+    });
+  }
+  return () => {
+    mql?.removeEventListener?.('change', notify);
+    observer?.disconnect();
+  };
+}
+
+function subscribeReduced(onChange: () => void): () => void {
+  reducedSubscribers.add(onChange);
+  stopReducedWatch ??= watchReduced();
+  return () => {
+    reducedSubscribers.delete(onChange);
+    if (reducedSubscribers.size === 0) {
+      stopReducedWatch?.();
+      stopReducedWatch = null;
+    }
+  };
+}
+
 /** True when motion is reduced (system setting or Settings, Appearance). Follows changes live. */
 export function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState<boolean>(readReduced);
-  useEffect(() => {
-    const update = (): void => setReduced(readReduced());
-    update();
-    const mql =
-      typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        ? window.matchMedia('(prefers-reduced-motion: reduce)')
-        : null;
-    mql?.addEventListener?.('change', update);
-    let observer: MutationObserver | null = null;
-    if (typeof MutationObserver === 'function') {
-      observer = new MutationObserver(update);
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ['data-motion'],
-      });
-    }
-    return () => {
-      mql?.removeEventListener?.('change', update);
-      observer?.disconnect();
-    };
-  }, []);
-  return reduced;
+  return useSyncExternalStore(subscribeReduced, readReduced, () => false);
 }
 
 /** True while the tab is hidden: loops and polling pause (B-11 §6, performance). */
