@@ -50,9 +50,9 @@ In the owner's words: "wow" factor plus functionality, to the latest industry st
 
 **Spec and security impact.**
 - New local API routes `POST /api/ui/invites` (create) and `POST /api/ui/invites/accept` in `packages/node`: **S2** (pairing protocol; inbound invite parsing through the one D-69 codec; the relay URL SSRF rules of 04 §4).
-- Owner presence: creating an invite through the MCP tool needs none today, so the route needs none either (parity; a shell-capable agent can already do it). It keeps the session, CSRF, Origin and fetch-metadata gate of the other write routes. Accepting already leads to the owner's approval. Recorded as §12 decision 1.
+- **Owner presence, and an amendment to 08 §1.** Today the session token grants viewing only (08 §1), and `packages/node/src/local-ui/route-types.ts` requires `presence: true` on every POST except the named kinds `setup`, pay-confirm and `reveal`. So a create route without Touch ID is **not** parity with today's write routes: it **amends 08 §1 and adds a new named route kind** (for example `presence: 'invite'`: one fixed POST, session, CSRF, Origin and fetch-metadata gate, no signing). The case for it: the MCP tool already creates invites with no approval, and 04 §3.6 sets no invite policy, so a shell-capable agent gains nothing. **Accepting** (`POST /api/ui/invites/accept`) leads to a new contact, so it requires owner presence like every other write route. §12 decision 1.
 - The `label` the owner types here is owner-typed, but 06 §2.1 rule 1 treats only owner-set or owner-confirmed text as an alias; it stays a suggested alias until the pairing approval confirms it (no rule change).
-- Spec edits (proposed, owner confirms at merge): 08 §1 (two routes), 06 §7.1 (the app as a second way to create invites), 11 §6.1 (sheet copy).
+- Spec edits (proposed, owner confirms at merge): 08 §1 (two routes and, under decision 1 (1), the new no-presence route kind), 06 §7.1 (the app as a second way to create invites), 11 §6.1 (sheet copy).
 
 ## 4. Item 2: The toggle style where it fits
 
@@ -104,6 +104,8 @@ In the owner's words: "wow" factor plus functionality, to the latest industry st
 
 **What the compact view shows** (the same content as the widget): live status word and dot; **Waiting for you** count with the soonest item and **Review**; the top five contacts by activity with their pulse (item 4), the rest as "+12 more"; credits left; **Open AgentLink**. At scale it lists "Needs you" first, then by activity, and never more than one screen.
 
+**The owner's own several agents.** An owner may run more than one agent: the local one, the 0.5.0 cloud agent (D-131), and agents on other computers. **In scope for this wave:** this computer's agent only, as the local app is today. **Deferred:** one view across the owner's agents (local plus cloud) needs the cloud agent to expose a read to the local app or the console, and that is M2 owner-console and desktop work (D-41: "this computer's agents"; one owner on several computers is M2, D-130 (5)). The compact layout reserves an agent row at the top so a second agent can be added without a redesign.
+
 **Where it runs: options.**
 
 | Option | What it is | Can it be a widget? | Cost and risk |
@@ -144,7 +146,7 @@ In the owner's words: "wow" factor plus functionality, to the latest industry st
 
 ### 9.2 First run and navigation (item 8)
 
-**Pattern.** Product onboarding checklists (Stripe's dashboard "Get started", Linear, Notion): three to five steps, ticked automatically from real state, progress shown ("2 of 4"), one highlighted next action, dismissible, gone when done.
+**Pattern.** Product onboarding checklists (Stripe's dashboard "Get started", Linear, Notion): three to five steps, ticked automatically from real state, progress shown ("2 of 4"), one highlighted next action, usually dismissible, gone when done.
 
 **Recommendation.** A **Start here** card at the top of Home while setup is incomplete:
 1. Protect approvals (passkey) — done after first run.
@@ -152,9 +154,9 @@ In the owner's words: "wow" factor plus functionality, to the latest industry st
 3. Check the safety code with them.
 4. Send your first message — "Ask your AI to say hello to {name}." with a copyable prompt.
 
-Optional fifth: Save your recovery kit. Each step ticks itself from existing reads (health, contacts, backup state, messages). One primary button only, on the next step, so it is a short list rather than a "checklist wall". The Home nav item carries a dot until it is done; empty states on Contacts, Messages and Files point to step 2. The navigation order stays (Home first).
+Optional fifth: Save your recovery kit. Each step ticks itself from existing reads (health, contacts, backup state, messages). One primary button only, on the next step, so it is a short list rather than a "checklist wall". **Dismiss:** the industry pattern lets people hide the checklist, but b11 §8 screen 3 says of the Next step card "no dismiss, it goes when done". This proposal does not settle that; §12 decision 7 offers both. The Home nav item carries a dot until it is done; empty states on Contacts, Messages and Files point to step 2. The navigation order stays (Home first).
 
-**Spec and security impact.** S1. It changes brief §4's "one Next step card, never a checklist" rule (§12 decision 7). It supersedes M1-37b item 13 (the getting-started checklist); the cards PR marks that item as moved here.
+**Spec and security impact.** S1. It changes brief §4's "one Next step card, never a checklist" rule and may change b11 §8 screen 3's "no dismiss" (§12 decision 7). It supersedes M1-37b item 13 (the getting-started checklist); the cards PR marks that item as moved here.
 
 ## 10. Cards (proposed)
 
@@ -162,8 +164,8 @@ Class per `audit-rules.md` §2 (paths: `packages/node` S2; `apps/local-ui`, `pac
 
 | Card | What | Class | Depends on | Size | Brief first? |
 |---|---|---|---|---|---|
-| **UX2-a** | Approvals responsive grid and Grid/List control | S1 | — | S | Short note, b11 §26; the owner approves from PR screenshots |
-| **UX2-b** | Control map: switches for settings, segmented controls for views (item 2) | S1 | — | S | Short note, b11 §22 |
+| **UX2-a** | Approvals responsive grid and Grid/List control | S1 | UX2-brief-0 | S | Yes: the short note b11 §26 (UX2-brief-0) |
+| **UX2-b** | Control map: switches for settings, segmented controls for views (item 2) | S1 | UX2-brief-0 | S | Yes: the short note b11 §22 (UX2-brief-0) |
 | **UX2-c** | Files Sent: live re-read while rows are in flight; Sent as a final state where receipts are off | S1 | — (S2 split if decision 6 (b)) | S | No (existing components) |
 | **UX2-d1** | Local API: create and accept invite routes | S2 | — | M | No |
 | **UX2-d2** | Add contact sheet: create, copy, share sheet, QR, paste an invite | S1 | UX2-d1, b11 §21 | M | Yes, §21 |
@@ -172,9 +174,10 @@ Class per `audit-rules.md` §2 (paths: `packages/node` S2; `apps/local-ui`, `pac
 | **UX2-f1** | Local API: per-contact pulse (counts per two hours, last exchange) | S2 | — | M | No |
 | **UX2-f2** | Pulse and activity word in Messages and Contacts; "Most active" sort | S1 | UX2-f1, b11 §24 | M | Yes, §24 |
 | **UX2-g** | Start here card on Home; empty states point to it | S1 | UX2-d2, b11 §27, decision 7 | M | Yes, §27 |
-| **UX2-h** | Compact view (`/compact`) and "Open compact window" | S1 | UX2-f1, b11 §25 | M | Yes, §25 |
+| **UX2-h** | Compact view (`/compact`) and "Open compact window" | S1 | UX2-f1, UX2-f2, b11 §25 | M | Yes, §25 |
 | **UX2-i** | Menu-bar / tray popover: added to M2-11b, M2-11c, M2-11d | S2 | M2-11a, UX2-h | L | Yes, §25.2 |
-| **UX2-brief** | b11 §21 to §27 (below), for the owner's approval | S0 | decisions in §12 | M | It is the brief |
+| **UX2-brief-0** | b11 §22 and §26 only (short notes for the 0.4.2 cards a and b), for the owner's approval | S0 | decisions 7 and 8 not needed | S | It is the brief |
+| **UX2-brief** | b11 §21, §23, §24, §25, §27 (below), for the owner's approval | S0 | decisions in §12 | M | It is the brief |
 
 **Brief sections to add to b11 (per D-116 and D-135; no final visuals invented here):**
 - §21 Add contact sheet: both choices, the share options, the "send it only to {name}" line, pending row hand-off; 1280 and 360.
@@ -189,7 +192,7 @@ Class per `audit-rules.md` §2 (paths: `packages/node` S2; `apps/local-ui`, `pac
 
 | Group | Cards | Why |
 |---|---|---|
-| **1 · 0.4.2 polish** | UX2-a, UX2-b, UX2-c | Small, S1, built from existing components, no new route; the owner checks them from screenshots |
+| **1 · 0.4.2 polish** | UX2-brief-0 → UX2-a, UX2-b; UX2-c in parallel | Small, S1, built from existing components, no new route. Per D-116 and D-135, new visuals follow an approved brief: the two short notes (§22, §26) are approved first, then the owner's visual review of the PR screenshots replaces a screens step, as for the refresh. UX2-c needs no brief (existing components and states) |
 | **2 · Next minor: first step and funding** | UX2-brief (§21, §23, §27 first), UX2-d1 → UX2-d2 → UX2-g, UX2-e1 → UX2-e2 | Closes the newcomer's biggest gap (item 1 plus item 8) and the funding moment |
 | **3 · Activity and compact** | UX2-brief (§24, §25), UX2-f1 → UX2-f2 → UX2-h | One data route serves the pulse, the compact view and later the widget |
 | **4 · Desktop (M2)** | UX2-i inside M2-11 | Needs the M2-11a framework decision |
@@ -200,9 +203,10 @@ S2 cards (d1, f1) run in parallel with their briefs. Each follows tests first, a
 
 Recommended option first in each.
 
-1. **Creating an invite from the app**
-   1. Session gate only, like the MCP tool (recommended): one click, nothing new for an agent that already has the tool.
-   2. Ask for Touch ID to create an invite.
+1. **Owner presence for invites in the app** (amends 08 §1 in options 1 and 3)
+   1. Creating an invite needs no Touch ID, as a new named route kind (like the MCP tool; 04 §3.6 sets no invite policy); accepting an invite (`POST /api/ui/invites/accept`, which adds a contact) requires owner presence (recommended).
+   2. Both creating and accepting require owner presence (no change to 08 §1).
+   3. Neither requires owner presence.
 2. **Invite delivery options in the sheet**
    1. Copy, Share… (system share sheet) and QR code (recommended).
    2. Copy only.
@@ -221,11 +225,12 @@ Recommended option first in each.
 6. **Files when the recipient sends no receipts**
    1. Show "Sent · no receipt yet" after a day, with no API change (recommended for 0.4.2).
    2. Add a "receipts expected" field to the Sent read (S2), so the row says at once that receipts are off.
-7. **Start here on Home**
-   1. A short checklist with progress and one highlighted next step, replacing brief §4's single Next step card (recommended).
-   2. Keep the single Next step card and add Add contact to it.
+7. **Start here on Home** (conflict: b11 §8 screen 3 says the Next step card has "no dismiss, it goes when done")
+   1. A short checklist with progress and one highlighted next step, replacing brief §4's single Next step card, **not dismissible**: it goes when done, as b11 says today (recommended).
+   2. The same checklist, **dismissible** (the common industry pattern), with a way back from Home; changes b11 §8 screen 3.
+   3. Keep the single Next step card and add Add contact to it.
 8. **0.4.2 scope**
-   1. UX2-a, b and c only (recommended).
+   1. UX2-brief-0, then UX2-a, b and c only (recommended).
    2. Also UX2-d (Add contact) once its S2 route has passed review.
 
 ## 13. Risks
