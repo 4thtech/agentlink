@@ -1,6 +1,6 @@
 # B-11 · A state-of-the-art local app: Home, live state, motion, under the hood (design brief)
 
-> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20; UX2-brief-0 on 2026-10-28 adds §22 and §26 in Part 4, and UX2-brief on 2026-10-28 adds §21, §23, §24, §25 and §27 there, all pending the owner's approval). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
+> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20; UX2-brief-0 on 2026-10-28 adds §22 and §26 in Part 4, and UX2-brief on 2026-10-28 adds §21, §23, §24, §25 and §27 there, all pending the owner's approval; building §21 to §27 from this brief with PR screenshots instead of screens first needs an owner decision-log row extending D-135 (3) (c), which is scoped to the visual refresh, to UX wave 2; without that row, §21 and §23 get Claude Design screens first). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
 
 ## 1. Why, and what the owner asked for
 
@@ -506,7 +506,7 @@ The pasted text is cleared from the field once the invite is used or the sheet c
 
 ### 21.5 Where the invite may appear (for the build card)
 
-The invite (link and share text) appears **only in the sheet**: the well, the QR code and the clipboard or share sheet the person chose. Never in the address bar, the page or window title, a toast, a notification, Activity, Under the hood, a log or an error message, and never sent through a 4thTech service (no link shortener, no "email it for me"). The pending row shows the name and days left, never the link. Copy copies `shareText`; Share sends `shareText`; the QR code holds `inviteUrl`.
+The invite (link and share text) appears **only in the sheet**: the well, the QR code and the clipboard or share sheet the person chose. Never in the address bar, the page or window title, a toast, a notification, Activity, Under the hood, a log or an error message, and never sent through a 4thTech service (no link shortener, no "email it for me"). No element attribute holds the link (no `data-value`, `title`, `aria-label` or `data-*` carrying it): it is only text content of the well and the QR code's drawing. The pending row shows the name and days left, never the link. Copy copies `shareText`; Share sends `shareText`; the QR code holds `inviteUrl`.
 
 ### 21.6 Accessibility and motion
 
@@ -687,20 +687,20 @@ Messages, 1280
 
 | Word | When | Marker (8 px, in a fixed 8 px slot so words line up) | Tone |
 |---|---|---|---|
-| **Active now** | Last exchange within the last 5 minutes | Filled dot, with the heartbeat (§24.4) | `--al-color-status-success-icon`; word `--al-color-fg-default` |
+| **Active now** | Last exchange within the last 5 minutes | Filled dot, with one pulse on becoming Active now (§24.4) | `--al-color-status-success-icon`; word `--al-color-fg-default` |
 | **Today** | Last exchange earlier today (local day), more than 5 minutes ago | Hollow ring, 1.5 px | `--al-color-fg-muted` |
 | **Quiet** | Nothing today | No marker (the empty slot) | word `--al-color-fg-subtle` |
 
 The shapes differ (filled, hollow, none), so the state never depends on colour (§9). The word switches from Active now to Today on its own once 5 minutes pass after the last exchange time from the read; that is a server time, not a guess. We say **"Active now", never "Online"**: AgentLink only knows when messages moved, not whether the other agent is running.
 
-### 24.4 The heartbeat
+### 24.4 The arrival pulse (no loop)
 
-On the Active now dot only: one soft ring grows from 1× to 2× and fades (`transform` and `opacity`, `--al-duration-moment`, `--al-easing-enter`), once every 4 s. **All heartbeats on the page share one phase**, so many Active now rows beat as one thing (§14: at most two things move). It plays only for rows on screen and stops when the tab is hidden, when the row turns Today, and with reduced motion (then the filled dot and the word carry the state). This is a loop that is not progress; 11 §11 item 6 allows loops only for progress, so the owner's decision 4.1 makes it the one live-state exception (owner approval item, PR body).
+Active now is **static**: the filled dot and the word. When a row **becomes** Active now while on screen, its dot plays one ring pulse, the existing arrival pattern of §5 and §6 row 1: a soft ring grows from 1× to 2× and fades (`transform` and `opacity`, `--al-duration-moment`, `--al-easing-enter`), once. Nothing loops, so 11 §11 item 6 ("nothing loops except progress") holds; decision 4.1's "slow heartbeat" is read as this one pulse. Rows already Active now when the list loads do not pulse; if several rows turn Active now in the same read, they pulse together, as one thing (§14: at most two things move). Reduced motion: no pulse; the filled dot and the word carry the state. A **looping** heartbeat would need an explicit amendment of 11 §11 item 6 (a decision-log row); that is an owner option, not this brief's default.
 
 ### 24.5 Sorting and scale
 
 - A `Segmented` (§22, radiogroup) **"Sort"**: **Recent** (today's order, the default) and **Most active** (24-hour count, then the most recent exchange). Remembered per browser in the prefs store; if storage fails, Recent.
-- **At 50 and more contacts:** one pulse read for the whole list (never one per conversation); fixed row height so nothing reflows when pulses arrive; heartbeats only for rows on screen; the list keeps its existing paging. Smooth on the reference slow machine (D-135 (3) (d), the UI-REFRESH-q gate).
+- **At 50 and more contacts:** one pulse read for the whole list (never one per conversation); fixed row height so nothing reflows when pulses arrive; arrival pulses only for rows on screen; the list keeps its existing paging. Smooth on the reference slow machine (D-135 (3) (d), the UI-REFRESH-q gate).
 - New strings: "Active now", "Today", "Quiet", "Sort", "Recent", "Most active", "{n} messages in the last 24 hours", "1 message in the last 24 hours", "No messages in the last 24 hours".
 
 ## 25. Compact view, and the menu-bar popover
@@ -832,11 +832,12 @@ New strings: "Open compact window", "Most active", "+{n} more", "+{n} more agent
 |---|---|---|---|
 | 1 | **Protect approvals** | A passkey protects approvals (health read). After first run this is normally done already | "Use Touch ID" (platform word as first run: "Use Windows Hello", "Use a passkey"), when only a backup code exists |
 | 2 | **Invite your first contact** | An invite exists or a contact exists (contacts read) | **Add contact** (opens the §21 sheet) |
-| 3 | **Check the safety code with them** | Any contact shows "Safety code checked" (contacts read). While the invite is unanswered, the row says "Waiting for Marko to accept" with no button (§15.2: waiting on a person is a status word, not a button) | **Compare safety code** (opens §8 screen 10 for that contact) |
+| 3 | **Check the safety code with them** (recommended) | Any contact shows "Safety code checked" (contacts read). While the invite is unanswered, the row says "Waiting for Marko to accept" with no button (§15.2: waiting on a person is a status word, not a button) | **Compare safety code** (secondary, once they have answered; opens §8 screen 10 for that contact). Never the card's primary button |
 | 4 | **Send your first message** | Any message was sent (Messages list, Sent) | `CopyPrompt` with **"Say hello to Marko on AgentLink."** and Copy, under "Ask your AI to say hello." |
 | 5 | **Save your recovery kit** | The backup read says a recovery kit was saved | **Save it now** (today's Next step string) |
 
 - **Names in step 3 and 4** are the owner-confirmed alias only (the invite label you typed, or the name you confirmed when approving the contact). With no alias, step 4's prompt reads "Say hello to my new contact on AgentLink." A name the other side chose never goes into a prompt you copy to your AI (the spirit of 11 §6.5: prompts hold only our template).
+- **Step 3 neither holds the card nor blocks step 4.** The progress counts steps 1, 2, 4 and 5 ("2 of 4"), and the next step with the primary button is the first of those not done. Step 3 is shown, and ticks when a code is checked, but **the card leaves once steps 1, 2, 4 and 5 are done**, whether or not step 3 has ticked. An unchecked contact stays visible where it always is: on its contact row, by the absence of the existing "Safety code checked" chip. Nothing becomes dismissible.
 - **"Done" means "has happened once".** A step does not untick later (removing the only contact does not bring the card back), so the card does not return in normal use.
 - **Steps tick only from reads.** No step ticks on a click, a timer or a copy; copying step 4's prompt does not tick it, sending does.
 
@@ -845,28 +846,29 @@ New strings: "Open compact window", "Most active", "+{n} more", "+{n} more agent
 ```text
 Home, 1280
 ┌──────────────────────────────────────────────────────────────────────┐
-│ START HERE                                              2 of 5        │
+│ START HERE                                              2 of 4        │
 │ ▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱  (determinate bar, 4 px)                         │
 │ ✓  Protect approvals                                                  │
 │ ✓  Invite your first contact                                          │
-│ ●  Check the safety code with them                                    │
+│ ○  Check the safety code with them (recommended)                      │
 │    Waiting for Marko to accept · 6 days left                          │
-│ ○  Send your first message                                            │
+│ ●  Send your first message                                            │
+│    Ask your AI to say hello.   [ Say hello to Marko …   Copy ]        │
 │ ○  Save your recovery kit                                             │
 └──────────────────────────────────────────────────────────────────────┘
   tiles grid below (§4)
 ```
 
 - **Place:** the top of Home, above the tiles, full grid width, level 2 (§16: one level above the grid). At 360 it is first, full width, before Waiting for you.
-- **Header:** caption "Start here" (`al-text-caption`, mono caps as Home's date line) and the progress "2 of 5" with the determinate bar (`--al-color-accent-default` fill on the sunken track).
+- **Header:** caption "Start here" (`al-text-caption`, mono caps as Home's date line) and the progress "2 of 4" (steps 1, 2, 4 and 5) with the determinate bar (`--al-color-accent-default` fill on the sunken track).
 - **Rows:** done steps show a check (`--al-color-status-success-icon`) and muted text; the next step shows a filled dot, the step in `--al-color-fg-default`, one short line and its **one** button (primary; the only primary in the card); later steps show a hollow ring and muted text, no button. One primary button in the whole card, so it is a short list, not a checklist wall.
 - **No dismiss.** No close, hide, snooze or menu; steps cannot be ticked by hand.
 
 ### 27.3 Ticking and leaving
 
 - A step that becomes done **while you watch** draws its check once (`--al-duration-moment`, `--al-easing-emphasized`), the count ticks (§6 row 3) and the next step's button fades in (`--al-duration-base`). Steps already done when Home loads simply show as done.
-- When the last step ticks, the card shows "You're all set." for 1.6 s, then leaves with §6 row 4 (fade and collapse, `--al-duration-base`, `--al-easing-exit`) and the tiles move up. Home then has no Next step card.
-- **Reduced motion:** checks and the count change at once; the card goes at once with the polite announcement "You're all set." Live region (polite): "Step done: Invite your first contact. 2 of 5."
+- When the last of steps 1, 2, 4 and 5 ticks, the card shows "You're all set." for 1.6 s, then leaves with §6 row 4 (fade and collapse, `--al-duration-base`, `--al-easing-exit`) and the tiles move up. Home then has no Next step card.
+- **Reduced motion:** checks and the count change at once; the card goes at once with the polite announcement "You're all set." Live region (polite): "Step done: Invite your first contact. 2 of 4."
 - Loading: the card's skeleton in its final size, only while the reads it needs are loading and only when setup is not known to be complete; a failed read keeps the last known ticks and adds nothing alarming.
 
 ### 27.4 The Home dot and the empty states
@@ -875,4 +877,4 @@ Home, 1280
 - **Empty states point to step 2:** Contacts ("No contacts yet. Invite someone to start." with **Add contact**, primary), Messages ("No messages yet. Invite someone first, then ask your AI to say hello." with **Add contact**) and Files ("No files yet. Invite someone first." with **Add contact**). Each opens the §21 sheet. Once step 2 is done they return to today's empty states.
 - The navigation order stays (Home first).
 
-New strings: "Start here", "{n} of {total}", "Protect approvals", "Invite your first contact", "Check the safety code with them", "Send your first message", "Ask your AI to say hello.", "Say hello to {name} on AgentLink.", "Say hello to my new contact on AgentLink.", "You're all set.", "Step done: {step}. {n} of {total}.", "Home, setup not finished", the three empty-state lines. Existing: "Use Touch ID" (and its platform variants), "Add contact", "Compare safety code", "Save your recovery kit", "Save it now", "Waiting for {name} to accept".
+New strings: "Start here", "{n} of {total}", "Protect approvals", "Invite your first contact", "Check the safety code with them", "(recommended)", "Send your first message", "Ask your AI to say hello.", "Say hello to {name} on AgentLink.", "Say hello to my new contact on AgentLink.", "You're all set.", "Step done: {step}. {n} of {total}.", "Home, setup not finished", the three empty-state lines. Existing: "Use Touch ID" (and its platform variants), "Add contact", "Compare safety code", "Save your recovery kit", "Save it now", "Waiting for {name} to accept".
