@@ -5426,7 +5426,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Spec:** USABILITY-WAVE-3 §7.1, §7.2, §7.5; 04 §2.3.3, §2.5, §2.5.1, §2.8
 - **Invariants:** I-1, I-2, I-4, I-7, I-10
 - **Scope:**
-  - 04 §2.5.1: the local owner ops `agent.label {agent, label}`, `app.connect {app, agent, changeId}`, `app.disconnect {app, agent, changeId}`: stored and nonce-checked in the agent's store like `contact.check`, short-lived (600 s), never sent in an envelope, verified by the server before it acts. §2.5: config writes and removal as signed local actions, generation binding, residuals (G-1). §2.3.3: `backup restore` refuses a revoked agent (it returns only as a new identity). §2.8: adding an agent from the app.
+  - 04 §2.5.1: the local owner ops `agent.label {agent, label}`, `app.connect {app, agent, changeId}`, `app.disconnect {app, agent, changeId}`: stored and nonce-checked in the agent's store like `contact.check`, short-lived (600 s), never sent in an envelope, verified by the server before it acts. §2.5: config writes and removal as signed local actions, generation binding, residuals (G-1). §2.3.3: `backup restore` refuses a revoked agent (it returns only as a new identity). §2.8: adding an agent from the app. Every owner statement for these ops (label, connect, disconnect, remove) names the agent's label.
   - Review note (a): the revoked-list entry is stored as the signed `agent.revoke` object and re-verified on load, like policies; never as a plain JSON file.
 - **Acceptance:**
   - Ops, lifetimes and residuals stated; marked "proposed, owner confirms at merge"; the revoked list is specified as the signed `agent.revoke` object re-verified on load, not a plain JSON file (review note a); Fable 5.1 audit; Tali's "merge"; changelog.d fragment.
@@ -5455,7 +5455,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 
 #### U3-c · app host: AgentDirectory seam, current agent, generation, switch, agents list, route stubs (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b · **Build group:** 1
-- **Repo/path:** agentlink · `packages/node/src/approval-server.ts`, `local-ui/routes.ts`, `local-ui/api/agents.ts` (new), `apps/cli/src/runtime/agent-dir.ts` (seam)
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts`, `packages/node/src/local-ui/routes.ts`, `packages/node/src/local-ui/api/agents.ts` (new), `apps/cli/src/runtime/agent-dir.ts` (seam)
 - **Depends on:** U3-a, U3-spec
 - **Spec:** USABILITY-WAVE-3 §6, §7.1; 06 §6; 07 §9.1
 - **Invariants:** I-1, I-2, I-4, I-7
@@ -5470,7 +5470,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 
 #### U3-b · CLI: no picker, bare command opens the app, `ui` with no agent opens Welcome (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 2
-- **Repo/path:** agentlink · `apps/cli/src/commands/{ui,init,agent-choice}.ts`, `apps/cli/src/dispatch.ts`
+- **Repo/path:** agentlink · `apps/cli/src/commands/ui.ts`, `apps/cli/src/commands/init.ts`, `apps/cli/src/commands/agent-choice.ts`, `apps/cli/src/dispatch.ts`
 - **Depends on:** U3-c
 - **Spec:** USABILITY-WAVE-3 §7.4; 06 §8
 - **Invariants:** D-39
@@ -5481,31 +5481,31 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 
 #### U3-d · create agent, `agent.label` op, first run v3 with name (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b · **Build group:** 2
-- **Repo/path:** agentlink · `local-ui/api/agents-manage.ts` (new), `owner-setup.ts`, `owner-add-agent.ts`, core owner-op schema for `agent.label`; owns the shared core owner-action schema files (review note b)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/agents-manage.ts` (new), `packages/node/src/owner-setup.ts`, `packages/node/src/owner-add-agent.ts`, `packages/core/src/owner-action.ts` (owner-op schema for `agent.label`); owns the shared core owner-action schema files (review note b)
 - **Depends on:** U3-c, U3-spec-04
 - **Spec:** USABILITY-WAVE-3 §7.1; 04 §2.5, §2.5.1, §2.8; D-130 (2)
 - **Invariants:** I-1, I-2, I-4, I-7
 - **Scope:**
-  - `POST /api/ui/agents {label}` (presence): keychain agent, owner signs its card (§2.8) and first policy (06 §3 defaults); folder name a slug of the label. `POST /api/ui/agents/label` (presence, signs `agent.label`): label only; folder, entries, identity unchanged. First run `begin`/`finish` (kind `setup`, unchanged) also takes `{label}`; with no agent yet, `finish` creates it first, all or nothing.
+  - `POST /api/ui/agents {label}` (presence): keychain agent, owner signs its card (§2.8) and first policy (06 §3 defaults); folder name a slug of the label. `POST /api/ui/agents/label` (presence, signs `agent.label`): label only; folder, entries, identity unchanged. First run `begin`/`finish` (kind `setup`, unchanged) also takes `{label}`; with no agent yet, `finish` creates the owner and the agent in one gesture, all or nothing. `finish` stays `{label}`: it never writes AI app configs and takes no app (one gesture per signed operation; connecting is U3-f's separate signed `app.connect`).
   - Review note (b): U3-d and U3-f both touch the core owner-action schemas. U3-d owns those schema files; U3-f depends on U3-d for them (U3-d merges first and U3-f adds its `app.connect`/`app.disconnect` entries on top of the merged schemas).
 - **Acceptance:**
-  - Tests first: a `RED (expected): <ID> …` commit with the red-run excerpt; all or nothing on first run and Add (a failure leaves no half-made agent); label stored and shown as text only (never markup), up to 40 characters; the op is stored and nonce-checked in the agent's store, 600 s, never sent in an envelope; a presence route that signed nothing is refused (D-68); stale generation refused; every owner statement names the label; Fable 5.1 audit; Opus independent review; Tali's "merge".
+  - Tests first: a `RED (expected): <ID> …` commit with the red-run excerpt; all or nothing on first run and Add (a failure leaves no half-made agent); label stored and shown as text only (never markup), up to 40 characters; the op is stored and nonce-checked in the agent's store, 600 s, never sent in an envelope; a presence route that signed nothing is refused (D-68); `finish` never writes AI-app configs (tested); stale generation refused; every owner statement names the label; Fable 5.1 audit; Opus independent review; Tali's "merge".
 
 #### U3-f · AI apps: list, preview, apply, disconnect, move; `app.connect` / `app.disconnect` ops; harness seam (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b · **Build group:** 2
-- **Repo/path:** agentlink · `local-ui/api/apps.ts` (new), core op schemas (added on top of U3-d's), `apps/cli/src/harness/` (replace, remove, entry-only view, mode-keeping backup), wiring in `ui.ts`
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/apps.ts` (new), `packages/core/src/owner-action.ts` (op schemas, added on top of U3-d's), `apps/cli/src/harness/` (replace, remove, entry-only view, mode-keeping backup), wiring in `ui.ts`
 - **Depends on:** U3-c, U3-spec-04, U3-d (shared core owner-action schema files; merge order: U3-d first); the `ui.ts` wiring merges after U3-b
 - **Spec:** USABILITY-WAVE-3 §7.1, §7.3; 04 §2.5.1; 06 §7
 - **Invariants:** I-1, I-2, I-4, I-7
 - **Scope:**
-  - Routes: `GET /api/ui/apps` (read; detected apps, the agent each serves, Claude Desktop running); `GET /api/ui/apps/preview?app=&agent=` (read; the entry change and `changeId` = hash(app, resolved path, old entry, new entry, agent)); `POST /api/ui/apps/apply {changeId, generation}` (presence, signs `app.connect`; recompute, refuse `changed` on mismatch, then write); `POST /api/ui/apps/disconnect` (presence, signs `app.disconnect`; removes this agent's entry). Moving an app between agents uses the same step and shows both entries.
+  - Routes: `GET /api/ui/apps` (read; detected apps, the agent each serves, Claude Desktop running); `GET /api/ui/apps/preview?app=&agent=` (read; the entry change and `changeId` = hash(app, resolved path, old entry, new entry, agent)); `POST /api/ui/apps/apply {changeId, generation}` (presence, signs `app.connect`; recompute, refuse `changed` on mismatch, then write); `POST /api/ui/apps/disconnect` (presence, signs `app.disconnect`; removes this agent's entry). Moving an app between agents uses the same step and shows both entries. `GET /api/ui/apps` is a read allowed during setup (before an owner exists), with entry-only output and the same local-origin and page-session guard as the other setup reads, so first run can show the "Connect your AI app" screen; `preview` and `apply` still need the owner and presence.
   - Security requirements (§7.3): fixed content `npx -y @4thtech-io/agentlink mcp` plus `--agent <name>` (checked again), no secret ever written. The files hold other servers' secrets: list, preview and apply parse the file and show only the `agentlink` entry, never context lines, other entries or the whole file; nothing from the file reaches a log or an error. Paths only from the fixed table; realpath, no-link, regular-file, atomic temp-and-rename and the `files.ts` backup (06 §7) apply; the backup keeps the original file's mode. The harness code is reused through a seam the CLI passes in, so `packages/node` has no second writer. The change written is the change shown (`changeId`); the owner signs `app.connect` over it and the agent's label. Claude Desktop open: refused ("Quit Claude Desktop first"), re-checked, never closed by us. An entry we did not write is a conflict with manual steps. Threat note: an entry starts a program, so this is a code-execution path; hence fixed content, fixed paths and the gesture (06 §7: transparency, not a boundary).
 - **Acceptance:**
   - Tests first: a `RED (expected): <ID> …` commit with the red-run excerpt; entry-only output proven with a test file that holds another server's secret (it appears nowhere in answers, logs or errors); `changeId` mismatch gives `changed` and writes nothing; backup keeps the file mode; Claude Desktop rule; no path taken from the page; stale generation refused; a presence route that signed nothing is refused; Fable 5.1 audit; Opus independent review; Tali's "merge".
 
 #### U3-e · remove an agent; KeyStore erase API (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b · **Build group:** 3
-- **Repo/path:** agentlink · `packages/crypto/src/keystore-api.ts` (erase), `packages/node/src/keychain-keystore.ts`, `keychain.ts`, `file-keystore.ts`, `file-keystore-fs.ts`, `local-ui/api/agents-remove.ts` (new), core revoke-send helper, restore check
+- **Repo/path:** agentlink · `packages/crypto/src/keystore-api.ts` (erase), `packages/node/src/keychain-keystore.ts`, `packages/node/src/keychain.ts`, `packages/node/src/file-keystore.ts`, `packages/node/src/file-keystore-fs.ts`, `packages/node/src/local-ui/api/agents-remove.ts` (new), `packages/core/src` revoke-send helper, restore check
 - **Depends on:** U3-c, U3-f
 - **Spec:** USABILITY-WAVE-3 §7.2; 04 §2.3.3, §2.5.1; I-10
 - **Invariants:** I-1, I-2, I-4, I-7, I-10
@@ -5515,11 +5515,11 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Review note (a): the revoked-list entry is the signed `agent.revoke` object, re-verified on load like policies, never a plain JSON file.
   - Review note (d): per owner decision 1, U3-e's removal may ship in 0.4.5 if its Fable audit is not done by the 0.4.4 cut; the other U3 cards ship in 0.4.4 without it.
 - **Acceptance:**
-  - Tests first: a `RED (expected): <ID> …` commit with the red-run excerpt; lease refusal (`in_use`); `removing` marker plus a crash test at every step; the erased item list is exact and owner items are untouched (tests assert owner items survive); undeliverable revoke asks and never proceeds silently; tests for four backends (macOS Keychain, Windows Credential Manager, Linux Secret Service, file KeyStore); the revoked list is the signed object re-verified on load; restore refuses a revoked agent; typed label checked; stale generation refused; logs say "removed" only; Fable 5.1 audit; Opus independent review; Tali's "merge".
+  - Tests first: a `RED (expected): <ID> …` commit with the red-run excerpt; lease refusal (`in_use`); `removing` marker plus a crash test at every step; the erased item list is exact and owner items are untouched (tests assert owner items survive); undeliverable revoke asks and never proceeds silently; tests for four backends (macOS Keychain, Windows Credential Manager, Linux Secret Service, file KeyStore); the revoked list is the signed object re-verified on load; restore refuses a revoked agent; typed label checked; the owner statement names the agent's label; stale generation refused; logs say "removed" only; Fable 5.1 audit; Opus independent review; Tali's "merge".
 
 #### U3-flow · `GET /api/ui/flow` live connections read (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 2
-- **Repo/path:** agentlink · `local-ui/api/flow.ts` (new), core store read
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/flow.ts` (new), `packages/core/src` store read (metadata columns)
 - **Depends on:** U3-c
 - **Spec:** USABILITY-WAVE-3 §4.1; 07 §3
 - **Invariants:** I-1, I-2, I-5, I-7
@@ -5530,19 +5530,19 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 
 #### U3-g · Welcome and first run v3 screens (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 3
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/`, `pages/welcome/` (new)
-- **Depends on:** U3-brief, U3-d
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/`, `apps/local-ui/src/pages/welcome/` (new)
+- **Depends on:** U3-brief, U3-d, U3-f
 - **Spec:** b11 §28 (U3-brief); D-116, D-137; 11 §5
 - **Invariants:** I-5
 - **Scope:**
   - Welcome (one sentence, one button, Get started while no owner exists) and "Set up your agent": name prefilled "My agent" (any text up to 40 characters) and Use Touch ID in one gesture.
 - **Acceptance:**
-  - Owner input 2026-10-29, every agent clearly shows which AI app it works from: in first run "Connect your AI app" binds the new agent to the chosen app; the suggested name defaults to the app (for example "Claude Code agent") and stays editable. Rule unchanged: an AI app serves one agent at a time, an agent may serve several apps.
+  - Owner input 2026-10-29, every agent clearly shows which AI app it works from. First-run flow (Fable rule: one gesture per signed operation): the app is picked on the screen before naming (detection runs before the owner exists, via `GET /api/ui/apps` during setup); the suggested name is computed client-side from that app (for example "Claude Code agent") and stays editable; `finish` stays `{label}` and creates the owner and agent with one gesture; the next screen "Connect your AI app" uses U3-f's flow unchanged (exact entry shown, then Touch ID, then a signed `app.connect`); it can be skipped ("Later"), and the agent then shows "Not connected to an AI app". Rule unchanged: an AI app serves one agent at a time, an agent may serve several apps.
   - The owner's screenshot review at 1280 and 360, light and dark; a11y (axe) and reduced-motion tests; the name is shown as text only; strings per 11 §5; independent review.
 
 #### U3-h · switcher, Agents page, Add, Rename, Remove sheets (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 2 (list and switch) and 3 (sheets)
-- **Repo/path:** agentlink · `apps/local-ui/src/layout/top-bar.tsx`, `pages/agents/` (new)
+- **Repo/path:** agentlink · `apps/local-ui/src/layout/top-bar.tsx`, `apps/local-ui/src/pages/agents/` (new; owns the List and Map control, U3-map plugs into it)
 - **Depends on:** U3-brief, U3-c (then U3-d, U3-e for the sheets)
 - **Spec:** b11 §29 (U3-brief); D-116, D-137
 - **Invariants:** I-5, I-10
@@ -5578,7 +5578,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 
 #### U3-map · live map on the Agents page, on the shared pulse module (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 3
-- **Repo/path:** agentlink · `pages/agents/map/` (new), `pages/pulse/`
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/agents/map/` (new, plugs into U3-h's List and Map control), `apps/local-ui/src/pages/pulse/`
 - **Depends on:** U3-brief §32, U3-flow, U3-h; UX2-pulse-shared (this card builds it if not yet built)
 - **Spec:** USABILITY-WAVE-3 §4.1; b11 §24, §32
 - **Invariants:** I-5, I-7
@@ -5590,7 +5590,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 
 #### U3-map-2 · Home mini map, Contacts Map, row stream marks, compact strip (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 4
-- **Repo/path:** agentlink · `pages/home/`, `contacts/`, `messages/`, `files/`, `compact/`
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/home/`, `apps/local-ui/src/pages/contacts/`, `apps/local-ui/src/pages/messages/`, `apps/local-ui/src/pages/files/`, `apps/local-ui/src/**/compact/`
 - **Depends on:** U3-map, decision 8
 - **Spec:** USABILITY-WAVE-3 §4.1, §11 decision 8
 - **Invariants:** I-5, I-7
