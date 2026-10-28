@@ -1,7 +1,7 @@
 // First run (d1 Local-firstrun with DESIGN-ADJ-1 (a); 02 J1 step 3; D-120; 08 §1): protect approvals
 // with a passkey that creates the owner key on this computer, see the owner fingerprint and the
 // collapsed backup owner code, put the recovery kit off ("Later", M1-11b-3 builds the kit step), then
-// hand back to the AI with a prompt to copy.
+// hand back to the AI with a prompt to copy, and finish on Home (U3-a, D-138).
 //
 // The browser never signs: the passkey ceremony is the one gesture; the owner key is created, wrapped
 // and stored by the local server (setup routes, M1-11s-c). The owner code arrives once, lives only in
@@ -57,6 +57,9 @@ import {
   WORKING_BROWSER,
   type Platform,
 } from './strings.js';
+
+/** U3-a (D-138; 08 §1): first run, and the passkey switch on this page, finish on Home. */
+const HOME = '/settings/home';
 
 export interface FirstRunPageProps {
   /** Test seams; the page uses the real server and browser by default. */
@@ -504,8 +507,8 @@ export function FirstRunPage({
             {U.doneTitle(platform)}
           </h1>
           <p className="al-text-body-lg al-muted">{U.doneBody(sensor)}</p>
-          <a className="al-btn al-btn-primary al-btn-lg" href="/">
-            {U.toApprovals}
+          <a className="al-btn al-btn-primary al-btn-lg" href={HOME}>
+            {U.toHome}
           </a>
         </section>
       );
@@ -644,6 +647,9 @@ export function FirstRunPage({
           <p className="al-text-body-lg al-muted">{T.readyBody}</p>
           <CopyPrompt size="hero" title={T.readyPromptTitle} prompt={T.readyPrompt} />
           <p className="al-text-body">{T.readyRestart}</p>
+          <a className="al-btn al-btn-primary al-btn-lg" href={HOME}>
+            {T.toHome}
+          </a>
           <p className="al-text-body al-muted">{T.readyClose}</p>
         </section>
       );

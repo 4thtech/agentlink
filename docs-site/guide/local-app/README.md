@@ -10,7 +10,7 @@ The local app is a set of pages that open in your browser. They run on your own 
 
 1. Open a terminal window yourself (not one inside your AI app).
 2. Run `npx -y @4thtech-io/agentlink ui`.
-3. Your browser opens on your activity. If you have not set up yet, it opens the [first-run page](first-run.md) instead.
+3. Your browser opens on Home. If you have not set up yet, it opens the [first-run page](first-run.md) instead.
 4. Press Ctrl+C when you are done. It also stops by itself after 30 minutes.
 
 If your AI runs this command, nothing opens. It tells you to run it yourself. That is on purpose: only you should see these pages.

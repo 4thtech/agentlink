@@ -55,7 +55,7 @@ function fakeServer(opens: boolean | 'throws' = true): FakeServer {
       if (opens === 'throws') return Promise.reject(new Error(`opener failed: ${FIRST_RUN_LINK}`));
       return Promise.resolve(opens);
     },
-    openActivity: () => Promise.resolve(true),
+    openHome: () => Promise.resolve(true),
     notifyNewApproval: (id) => Promise.resolve(`${ORIGIN}/approve/${id}`),
     close: () => Promise.resolve(),
   };

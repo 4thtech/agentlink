@@ -121,8 +121,9 @@
 //   does for `/`; the CLI's `init` calls it for a new owner (the CLI's first-run step). G-1: a
 //   same-user process holding a session link can race the human to set up an owner it controls
 //   (owner-setup.ts threat note).
-// - M1-11b-9: `openActivity()` is the same for `/settings/activity`, for `agentlink ui`; a session
-//   link grants viewing and the owner-presence-gated actions only, as for `open()`.
+// - M1-11b-9, U3-a (D-138; 08 §1): `openHome()` is the same for Home (`/settings/home`), for
+//   `agentlink ui`; it replaces `openActivity()`. A session link grants viewing and the
+//   owner-presence-gated actions only, as for `open()`.
 //
 // Out of scope and accepted (G-1, D-67; 04 §2.5): a same-user process that reads memory, modifies the
 // installed package, or serves a look-alike page on another localhost port. Cookies are not isolated
@@ -698,10 +699,10 @@ export interface ApprovalServer {
    */
   openFirstRun(): Promise<boolean>;
   /**
-   * M1-11b-9: the same for the settings pages, at `/settings/activity` (`agentlink ui`). A fixed
-   * path; nothing from a caller reaches the link.
+   * M1-11b-9, U3-a (D-138): the same for Home, the landing page, at `/settings/home`
+   * (`agentlink ui`). A fixed path; nothing from a caller reaches the link.
    */
-  openActivity(): Promise<boolean>;
+  openHome(): Promise<boolean>;
   /** Raises the fixed OS notification for a new request and returns its approvalUrl. */
   notifyNewApproval(approvalId: string): Promise<string>;
   close(): Promise<void>;
@@ -2959,8 +2960,7 @@ export async function startApprovalServerWith(
       return opener(`${origin}${path}?t=${mintLink()}`).catch(() => false);
     },
     openFirstRun: async () => opener(`${origin}/first-run?t=${mintLink()}`).catch(() => false),
-    openActivity: async () =>
-      opener(`${origin}/settings/activity?t=${mintLink()}`).catch(() => false),
+    openHome: async () => opener(`${origin}/settings/home?t=${mintLink()}`).catch(() => false),
     notifyNewApproval: async (approvalId: string) => {
       const url = approvalUrl(approvalId);
       await notifier(NOTIFICATION).catch(() => false);

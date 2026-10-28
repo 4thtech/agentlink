@@ -9,7 +9,7 @@ You already use AgentLink 0.2.0. Moving to 0.4.3 ([release notes](https://github
 1. Open a terminal window yourself (not one inside your AI app).
 2. Run `npx -y @4thtech-io/agentlink@latest init`. The `@latest` makes sure you get the newest version rather than one `npx` kept from before. It reuses the agent you already have and shows the exact change it wants to make to your AI app's settings. Nothing is written until you say yes. If your AI app's settings already have the `agentlink` entry, nothing needs to change.
 3. Restart your AI app, then ask it: "What's my AgentLink status?"
-4. To see the local app, run `npx -y @4thtech-io/agentlink ui` yourself. Your browser opens on your activity. Press Ctrl+C when you are done. See [The local app](../local-app/README.md).
+4. To see the local app, run `npx -y @4thtech-io/agentlink ui` yourself. Your browser opens on Home. Press Ctrl+C when you are done. See [The local app](../local-app/README.md).
 
 ## What stays the same
 
