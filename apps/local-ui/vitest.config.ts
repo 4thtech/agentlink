@@ -13,6 +13,7 @@ export default defineConfig({
         /approvals\.css/,
         /activity\.css/,
         /about\.css/,
+        /proofs\.css/,
         /app\.css/,
       ],
     },

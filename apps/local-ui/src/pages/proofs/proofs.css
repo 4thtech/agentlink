@@ -138,11 +138,108 @@
   align-items: center;
   gap: var(--al-space-4);
 }
-.pf-waiting {
-  margin: 0;
-}
 
 /* The wrapper adds no box: the ring stays the flex child it was. */
 .pf-ring {
   display: contents;
+}
+
+/* UX2-e2: the Add credits tracker (B-11 §23.1-§23.3). Three rows: a marker column wide enough for
+   the 40 px waiting mark, the step, and the time it was reached. Done markers solid, pending hollow
+   and dashed (the ReceiptTimeline look). The waiting mark's own turn lives in the ui package. */
+.pf-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--al-space-4);
+  inline-size: 100%;
+  border-radius: var(--al-radius-md);
+}
+.pf-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  inline-size: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.pf-step {
+  display: grid;
+  grid-template-columns: calc(var(--al-space-9) + var(--al-space-1)) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--al-space-3);
+}
+.pf-step-marker {
+  inline-size: 100%;
+  min-block-size: var(--al-space-6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--al-color-proof-seal);
+}
+.pf-step-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--al-space-2);
+  min-inline-size: 0;
+}
+.pf-step-body > p,
+.pf-step-body .al-progress {
+  margin: 0;
+  inline-size: 100%;
+}
+.pf-step.is-pending .pf-step-word {
+  color: var(--al-color-fg-muted);
+}
+.pf-step.is-current .pf-step-word {
+  font-weight: var(--al-font-weight-semibold);
+}
+.pf-step-time {
+  color: var(--al-color-fg-muted);
+}
+.pf-step-mark {
+  display: inline-flex;
+}
+.pf-step-dot {
+  inline-size: var(--al-space-6);
+  block-size: var(--al-space-6);
+  border-radius: var(--al-radius-full);
+  box-sizing: border-box;
+}
+.pf-step-dot.is-hollow {
+  border: var(--al-border-width-thick) dashed var(--al-color-border-strong);
+}
+.pf-step-dot.is-solid {
+  background: var(--al-color-proof-seal);
+}
+.pf-step-check path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset var(--al-duration-moment) var(--al-easing-emphasized);
+}
+.pf-step-check.is-drawn path {
+  stroke-dashoffset: 0;
+}
+:root[data-motion='reduced'] .pf-step-check path {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-step-check path {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .pf-step-marker {
+    color: CanvasText;
+  }
+  .pf-step-dot.is-solid {
+    background: CanvasText;
+  }
 }

@@ -250,9 +250,9 @@ describe('step 1: Waiting for your funds', () => {
     expect(tracker()?.querySelectorAll('svg.al-waiting-mark')).toHaveLength(1);
     expect(one?.querySelector('svg.al-waiting-mark')).not.toBeNull();
     // No Add button before a read proves the funds.
-    expect([...host.querySelectorAll('button')].some((b) => /^Add \$/.test(b.textContent ?? ''))).toBe(
-      false,
-    );
+    expect(
+      [...host.querySelectorAll('button')].some((b) => /^Add \$/.test(b.textContent ?? '')),
+    ).toBe(false);
     // The tracker sits under the QR code and account details.
     const qr = host.querySelector('section[aria-label="Add credits"] svg[aria-label]');
     expect(qr).not.toBeNull();
@@ -305,7 +305,9 @@ describe('step 1: Waiting for your funds', () => {
   });
 
   it('an unreadable account (available: false) is a failed read too, never an amount', async () => {
-    const { routes } = await mount({ [TOP_UP]: topUp({ ...NET0, available: false, received: undefined }) });
+    const { routes } = await mount({
+      [TOP_UP]: topUp({ ...NET0, available: false, received: undefined }),
+    });
     await press('Add credits');
     expect(states()).toEqual(['current', 'pending', 'pending']);
     expect(tracker()?.textContent).toContain("Couldn't check. Trying again.");
@@ -359,9 +361,7 @@ describe('checking: polite polling', () => {
     expect(reads(calls, TOP_UP)).toBe(at);
     await setHidden(false);
     expect(reads(calls, TOP_UP)).toBe(at + 1);
-    expect(
-      tracker()?.querySelector('svg.al-waiting-mark')?.getAttribute('data-paused'),
-    ).toBeNull();
+    expect(tracker()?.querySelector('svg.al-waiting-mark')?.getAttribute('data-paused')).toBeNull();
   });
 
   it('closing the panel stops the reads', async () => {
@@ -436,7 +436,11 @@ describe('step 2: Arrived', () => {
     const { routes, calls } = await mount({ [TOP_UP]: topUp(NET5) });
     await press('Add credits');
     const at = reads(calls, TOP_UP);
-    routes[TOP_UP] = topUp({ ...NET5, received: '$9.00', addable: { usd: '$8.99', amount: '8990000000000000000' } });
+    routes[TOP_UP] = topUp({
+      ...NET5,
+      received: '$9.00',
+      addable: { usd: '$8.99', amount: '8990000000000000000' },
+    });
     await tick(60_000);
     expect(reads(calls, TOP_UP)).toBe(at);
     expect(button('Add $4.99 to your credits')).toBeDefined();
@@ -587,7 +591,9 @@ describe('motion', () => {
 
 describe('axe', () => {
   const run = (): Promise<axe.AxeResults> =>
-    axe.run(host, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } });
+    axe.run(host, {
+      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+    });
   it('finds no violation on Waiting, Arrived and Adding', async () => {
     const m = await mount({}, false);
     await press('Add credits', false);

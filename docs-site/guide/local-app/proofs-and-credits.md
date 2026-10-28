@@ -8,7 +8,7 @@ This page lists your proofs, with when each was made and whether it was recorded
 
 If you have no proofs yet, the page suggests what to ask your AI.
 
-**Add credits** shows a QR code for your agent's account, with a copy button. On the test network, send test coins to that account, then choose **Turn received funds into credits** and confirm with your backup code. A little stays with your agent to cover network costs. The account you add credits from is publicly linked to your agent. Adding real credits is not available yet.
+**Add credits** shows a QR code for your agent's account, with a copy button. On the test network, send test coins to that account, then wait on the panel: it shows **Waiting for your funds**, then **Arrived** with the amount once AgentLink has checked your agent's account. Choose **Add $X to your credits** and confirm with your backup code; the last step, **Added to credits**, appears once your credits show the new amount. A little stays with your agent to cover network costs. The account you add credits from is publicly linked to your agent. Adding real credits is not available yet.
 
 Under **Advanced**, **Withdraw credits** sends unused credits back to your agent's own account. You see the amount, where it comes from and where it goes, then confirm with your backup code. Sending them to another account comes in a later update.
 

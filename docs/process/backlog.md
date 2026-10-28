@@ -5113,7 +5113,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit); the brackets never move; reduced-motion still; the component is used in no other loading state; axe tests; no test weakened.
 
 #### UX2-e2 · local-ui: Add credits three-step tracker (new, UX-WAVE-2 item 3)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (money path, owner presence) · **Audit:** Fable · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (money path, owner presence) · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/top-up.tsx` and its tests
 - **Depends on:** UX2-e1; B-11 §23
 - **Spec:** B-11 §15.3, §23; 04 §2.5.1; D-122, D-123; UX-WAVE-2 §5

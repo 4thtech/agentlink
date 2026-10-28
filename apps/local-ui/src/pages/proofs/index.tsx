@@ -6,6 +6,7 @@
 // test network now, D-123), "Add credits" opens the address, its QR code and the privacy note, and
 // "Withdraw credits" returns credits to the agent's own account; both changes are owner operations
 // behind a confirm screen and the owner code (top-up.tsx). Elsewhere the not-available line stays.
+// UX2-e2: inside Add credits, the three-step tracker (B-11 §23) replaces "Waiting for your credits…".
 // On load the page only reads.
 import {
   Button,
@@ -21,7 +22,7 @@ import {
 import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
-import { AddCreditsPanel, ConfirmMove, type Move } from './top-up.js';
+import { AddCreditsPanel, ConfirmMove, useAddCreditsTracker, type Move } from './top-up.js';
 import { PAGE_TITLES } from '../../strings.js';
 import {
   CREDITS_PATH,
@@ -52,10 +53,8 @@ type ListState =
 
 /** The ring is full at this many proofs left; the words carry the exact numbers. */
 const RING_FULL_AT = 100;
-/** While a proof is on its way or credits are expected, the page looks again this often. */
+/** While a proof is on its way, the page looks again this often. */
 const POLL_MS = 5000;
-/** Stop waiting for credits after this many looks (about two minutes). */
-const MAX_POLLS = 24;
 
 type CreditsState = { readonly kind: 'loading' } | CreditsAnswer;
 
@@ -277,12 +276,15 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
   const [notice, setNotice] = useState<string | undefined>(undefined);
   // IR-M1-11c-a4c-1 L-1 (owner, 11 §14 Q7): Withdraw credits lives under Advanced.
   const [advanced, setAdvanced] = useState(false);
-  // UI-REFRESH-l: proofs that just finished (success moment) and credits we are waiting for.
+  // UI-REFRESH-l: proofs that just finished (success moment).
   const [moments, setMoments] = useState<ReadonlySet<string>>(new Set());
-  const [waiting, setWaiting] = useState<{ readonly from: number } | undefined>(undefined);
   const seen = useRef<Map<string, string>>(new Map());
   const groupCounts = useRef<Map<string, number>>(new Map());
-  const polls = useRef(0);
+  // UX2-e2: the Add credits tracker; its ok credits reads update the credits card too.
+  // M1-11c-a4c: the network where funds sent to the agent's address become credits, if any.
+  const net = addressNetwork(topUp);
+  // Open only while the panel shows: no reads for a panel that is not on screen.
+  const tracker = useAddCreditsTracker(api, panel === 'add' && net !== undefined, setCredits);
 
   const readMoney = useCallback(() => {
     void api.get(CREDITS_PATH).then((res) => {
@@ -343,22 +345,12 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
     });
   }, [api]);
 
-  const pending =
-    waiting !== undefined || (list.phase === 'ok' && list.items.some((r) => inFlight(r.state)));
+  const pending = list.phase === 'ok' && list.items.some((r) => inFlight(r.state));
   useEffect(() => {
     if (!pending) return undefined;
-    const timer = setInterval(() => {
-      polls.current += 1;
-      if (waiting !== undefined && polls.current > MAX_POLLS) setWaiting(undefined);
-      look();
-    }, POLL_MS);
+    const timer = setInterval(look, POLL_MS);
     return () => clearInterval(timer);
-  }, [pending, waiting, look]);
-  useEffect(() => {
-    if (waiting !== undefined && credits.kind === 'ok' && credits.proofsLeft > waiting.from) {
-      setWaiting(undefined);
-    }
-  }, [credits, waiting]);
+  }, [pending, look]);
 
   useEffect(() => {
     let live = true;
@@ -436,8 +428,6 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
 
   const title = <h1 className="al-text-title-1">{PAGE_TITLES.proofs}</h1>;
 
-  // M1-11c-a4c: the network where funds sent to the agent's address become credits, if any.
-  const net = addressNetwork(topUp);
   const soon =
     topUp.kind === 'ok'
       ? topUp.networks
@@ -455,6 +445,7 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
             onClick={() => {
               setNotice(undefined);
               setMove(undefined);
+              tracker.start(net);
               setPanel('add');
             }}
           >
@@ -544,10 +535,14 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
               api={api}
               move={move}
               onClose={() => setMove(undefined)}
-              onDone={(line) => {
-                if (move.kind === 'deposit' && line === S.pending) {
-                  polls.current = 0;
-                  setWaiting({ from: credits.kind === 'ok' ? credits.proofsLeft : 0 });
+              onDone={(line, ok) => {
+                if (move.kind === 'deposit' && ok) {
+                  // Submitted, not added: the tracker stays open on "Adding to your credits…"
+                  // until the credits read shows the new value (B-11 §23.1).
+                  tracker.submitted();
+                  setMove(undefined);
+                  readMoney();
+                  return;
                 }
                 setMove(undefined);
                 setPanel('none');
@@ -559,18 +554,17 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
             <AddCreditsPanel
               net={net}
               soon={soon}
+              track={tracker.state}
+              hidden={tracker.hidden}
               onTurn={(m) => {
                 setNotice(undefined);
+                // The credits before the owner operation: step 3 needs a read above this.
+                tracker.arm(credits.kind === 'ok' ? credits.balance : undefined);
                 setMove(m);
               }}
-              onCheckAgain={readMoney}
+              onCheckAgain={tracker.checkAgain}
             />
           ) : null}
-          {waiting === undefined ? null : (
-            <p className="pf-waiting al-text-body-sm al-muted" role="status">
-              {S.waiting}
-            </p>
-          )}
           {credits.kind === 'ok' ? (
             <p className="al-text-body-sm al-muted">{priceLine(credits.price)}</p>
           ) : null}

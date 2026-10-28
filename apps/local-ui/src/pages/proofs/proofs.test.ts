@@ -518,9 +518,9 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
       }),
     );
     await click(PROOFS_STRINGS.addCredits);
-    expect([...host.querySelectorAll('button')].some((b) => /^Add \$/.test(b.textContent ?? ''))).toBe(
-      false,
-    );
+    expect(
+      [...host.querySelectorAll('button')].some((b) => /^Add \$/.test(b.textContent ?? '')),
+    ).toBe(false);
     expect(text()).toContain('Waiting for your funds');
   });
 });
