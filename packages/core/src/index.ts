@@ -86,6 +86,7 @@ export {
 export {
   acceptInviteAction,
   acceptInviteApprovalSummary,
+  acceptInviteSummary,
   inviteShareText,
   type AcceptInviteAction,
 } from './invite-accept-action.js';

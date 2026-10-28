@@ -234,6 +234,7 @@ import type {
   LocalUiRevealRoute,
   LocalUiSetupStep,
 } from './local-ui/route-types.js';
+import { LOCAL_UI_MAX_INPUT_CHARS } from './local-ui/route-types.js';
 import {
   LOCAL_UI_API_PREFIX,
   LocalUiRouteRegistry,
@@ -339,8 +340,8 @@ const MAX_INVITE_CREATE_BODY_BYTES = 1_024;
 const INVITE_CREATE_LIMIT = 10;
 const INVITE_CREATE_WINDOW_MS = 10 * 60_000;
 
-/** Longest `X-AgentLink-Input` (base64url JSON) a /api/ui/ owner route accepts. */
-const MAX_INPUT_CHARS = 8192;
+/** Longest `X-AgentLink-Input` (base64url JSON) a /api/ui/ owner route accepts (route-types.ts). */
+const MAX_INPUT_CHARS = LOCAL_UI_MAX_INPUT_CHARS;
 /** M1-11s-c: the setup routes report an expired hold themselves (no sweep before them). */
 const SETUP_PATH_PREFIX = '/api/ui/first-run/';
 

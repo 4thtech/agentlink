@@ -14,9 +14,9 @@
 // I-5: the link, and the name and relays it carries, are untrusted. Nothing from the link is echoed
 // except the counterparty's name under the 06 §2.1 rule (restricted name plus label, never the
 // self-declared name). No safety code is ever returned (04 §3.6.1).
-import type { PendingContact } from '@4thtech-io/core';
-import { acceptInviteAction, acceptInviteApprovalSummary } from './accept-action.js';
-import { renderRef, type ContactRef } from './contacts.js';
+import { acceptInviteSummary, type PendingContact } from '@4thtech-io/core';
+import { acceptInviteAction } from './accept-action.js';
+import type { ContactRef } from './contacts.js';
 import type { ToolContext } from './context.js';
 import {
   INVITE_TEXT,
@@ -25,7 +25,6 @@ import {
   inviteFailure,
 } from './invite-common.js';
 import { fail, notAvailable, ok, pendingApproval, type HandlerOutput } from './result.js';
-import { removeInvisible } from './untrusted.js';
 
 interface AcceptInput {
   inviteUrl: string;
@@ -52,8 +51,6 @@ function acceptPending(context: ToolContext, approvalId: string, summary: string
     },
   };
 }
-
-const oneLine = (text: string): string => removeInvisible(text).replace(/\n/g, ' ').trim();
 
 export async function acceptInviteHandler(
   input: unknown,
@@ -84,7 +81,8 @@ export async function acceptInviteHandler(
         'POLICY_DENIED',
       );
     }
-    const askSummary = acceptInviteApprovalSummary(oneLine(renderRef(ref)));
+    // IR UX2-d1 M: core's one summary (name, label, owner fingerprint), as the app and the CLI.
+    const askSummary = acceptInviteSummary(checked);
 
     if (decision === 'approval') {
       if (approvalId === undefined) {

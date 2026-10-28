@@ -105,6 +105,7 @@ describe('acceptInviteSummary (IR UX2-d1 M: 04 §3.6 Accept step 2)', () => {
 
   it('is one line: control characters and line breaks become spaces', () => {
     const text = acceptInviteSummary(contact('Mar\nko\u2028x\u0007'));
+    // eslint-disable-next-line no-control-regex
     expect(text).not.toMatch(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/);
     expect(text).toContain('(owner AB12·CD34)');
   });

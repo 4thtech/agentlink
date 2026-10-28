@@ -17,6 +17,12 @@ import type { JsonObject, JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiContext } from './context.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
+/**
+ * The longest `X-AgentLink-Input` (base64url JSON) an owner route accepts (approval-server.ts). The
+ * invite routes derive their one link bound from it (api/invites.ts, IR UX2-d1 L).
+ */
+export const LOCAL_UI_MAX_INPUT_CHARS = 8192;
+
 /** The methods a read route uses. */
 export type LocalUiReadMethod = 'GET';
 /** The methods of an owner operation: always behind the presence gate. */

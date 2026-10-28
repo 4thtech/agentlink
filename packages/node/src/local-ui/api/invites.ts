@@ -29,9 +29,8 @@ import {
   CoreError,
   INVITE_LINK_PREFIX,
   INVITE_MAX_PAYLOAD_CHARS,
-  acceptInviteApprovalSummary,
+  acceptInviteSummary,
   inviteShareText,
-  renderContactName,
   type CreatedInvite,
   type PendingContact,
 } from '@4thtech-io/core';
@@ -46,6 +45,7 @@ import { buildApprovalOperation } from '../../owner-approval.js';
 import type { LocalUiContext } from '../context.js';
 import { INVITE_ACCEPT_PATH, INVITE_CHECK_PATH, INVITE_CREATE_PATH } from '../invite-paths.js';
 import {
+  LOCAL_UI_MAX_INPUT_CHARS,
   UI_NOT_SET_UP,
   type LocalUiCheckedInvite,
   type LocalUiInviteDesk,
@@ -57,16 +57,21 @@ import {
   type LocalUiRoute,
 } from '../route-types.js';
 
-/** The longest invite the routes take: the canonical prefix and the largest payload (04 §3.6). */
-export const INVITE_LINK_MAX_CHARS = INVITE_LINK_PREFIX.length + INVITE_MAX_PAYLOAD_CHARS;
+/**
+ * The longest invite check and accept take (IR UX2-d1 L): the longest link the accept route's
+ * operation input can carry as `{"invite":"<link>"}` (LOCAL_UI_MAX_INPUT_CHARS of base64url, so at
+ * most 3/4 of that in JSON bytes, less the 13 bytes around the link; a link is ASCII). Check uses
+ * the same bound, so an invite check takes is never one accept cannot carry; both refuse a longer
+ * one with `invalid_invite`. AgentLink's own invites are far smaller; a longer one is accepted
+ * through the AI or `agentlink accept` (08 §1).
+ */
+export const INVITE_LINK_MAX_CHARS =
+  Math.floor((LOCAL_UI_MAX_INPUT_CHARS * 3) / 4) - JSON.stringify({ invite: '' }).length;
 /** A payload's characters: strict base64url (the codec checks the rest). */
 const PAYLOAD = /^[A-Za-z0-9_-]+$/;
 /** The longest name typed for an invite; core checks the restricted form (06 §2.1). */
 const MAX_LABEL_CHARS = 128;
 const MAX_NAME_CHARS = 128;
-/** C0 and C1 controls and the line and paragraph separators. */
-// eslint-disable-next-line no-control-regex
-const CONTROL_OR_BREAK = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]', 'g');
 /** The short owner fingerprint core shows (04 §2.9). */
 const FINGERPRINT = /^[0-9A-F]{4}·[0-9A-F]{4}$/;
 
@@ -250,9 +255,6 @@ async function checkInvite(
 
 // --- accept -----------------------------------------------------------------------------------
 
-/** One line of printable text for the approval summary (the name is core's name-rule output). */
-const oneLine = (text: string): string => text.replace(CONTROL_OR_BREAK, ' ').trim();
-
 async function acceptInvite(
   context: LocalUiContext,
   request: LocalUiRequest,
@@ -280,7 +282,8 @@ async function acceptInvite(
   if ((await port.decision()) === 'deny') return POLICY_DENIED;
 
   const action = await port.action(link);
-  const summary = acceptInviteApprovalSummary(oneLine(renderContactName(contact.display)));
+  // IR UX2-d1 M: core's one summary (name, label, owner fingerprint), as the MCP tool and the CLI.
+  const summary = acceptInviteSummary(contact);
   const opened = await port.openRequest(action, summary);
   const operation = buildApprovalOperation(
     ownerContext,

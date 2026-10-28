@@ -13,6 +13,8 @@
 // I-7: the link carries the invite secret. Nothing here logs it; the action holding it is sealed by
 // the approval store, and the share text goes only to the user's own agent or page.
 import { INVITE_LINK_PREFIX, decodeInviteLink } from './invite-link.js';
+import { renderContactName } from './names.js';
+import type { PendingContact } from './pairing.js';
 
 export interface AcceptInviteAction {
   readonly tool: 'agentlink_accept_invite';
@@ -51,6 +53,22 @@ export async function acceptInviteAction(inviteUrl: string): Promise<AcceptInvit
 /** The approval summary the owner sees (`contactName` is the name-rule form, one line). */
 export const acceptInviteApprovalSummary = (contactName: string): string =>
   `Accept an invite from ${contactName}`;
+
+/** C0 and C1 controls and the line and paragraph separators. */
+// eslint-disable-next-line no-control-regex
+const CONTROL_OR_BREAK = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]+', 'g');
+
+/**
+ * IR UX2-d1 (Medium): the one approval summary for accepting `contact`'s invite, on every surface
+ * (MCP tool, CLI, local app), so a request reused through `findOpen` reads the same everywhere. It
+ * shows what 04 §3.6 Accept step 2 requires: the name under the name rule with its label, and the
+ * short owner fingerprint. One line: controls and line breaks become spaces.
+ */
+export function acceptInviteSummary(contact: PendingContact): string {
+  const name = renderContactName(contact.display).replace(CONTROL_OR_BREAK, ' ').trim();
+  const owner = contact.ownerFingerprint.short.replace(CONTROL_OR_BREAK, ' ').trim();
+  return acceptInviteApprovalSummary(`${name} (owner ${owner})`);
+}
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
