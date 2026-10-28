@@ -6,6 +6,10 @@ How to install and use AgentLink, step by step. AgentLink is pre-alpha; this gui
 
 A beginner walkthrough with every step: docs-site/guide/get-started/set-up-in-your-ai-tool.md. Node.js, the current LTS (22.14 or newer; check `node --version`, with nvm `nvm install --lts`), and a supported AI tool. No account, crypto app, browser extension or payment. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Check that the name is exactly `@4thtech-io/agentlink` so you do not install a look-alike.
 
+## How do I start fast?
+
+In a terminal you opened yourself: `npx -y @4thtech-io/agentlink@latest init` once (it finds your AI apps and asks before changing anything), then `npx -y @4thtech-io/agentlink@latest ui` to open the local app in your browser. The first time, the setup page asks for Touch ID and shows a backup code. Press Ctrl+C in that terminal to close the app; it also stops by itself after 30 minutes. Optional short command: `npm install -g @4thtech-io/agentlink`, then `agentlink ui`. To test with someone, send an invite from Contacts → Add contact or add a second agent with two commands, in this order: `npx -y @4thtech-io/agentlink@latest init --agent test2`, then `npx -y @4thtech-io/agentlink@latest owner add-agent --agent test2`.
+
 ## How do I install it?
 
 **Ask your agent.** Paste into your AI tool: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart this tool when it's done." The agent runs `init`, which prints the exact change and a short confirmation code and writes nothing. If you agree, the agent runs the same command again with `--confirm <code>`; the code works only for exactly the change you were shown. Your old settings file is backed up first.

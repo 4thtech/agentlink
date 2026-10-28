@@ -6,6 +6,7 @@
 ## Get started
 
 * [Get started](get-started/README.md)
+  * [Start fast](get-started/start-fast.md)
   * [Set up in your AI tool](get-started/set-up-in-your-ai-tool.md)
   * [Claude Code](get-started/claude-code.md)
   * [Codex](get-started/codex.md)
