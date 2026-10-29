@@ -126,6 +126,7 @@ export type {
   AgentDirectoryEntry,
   AgentDirectoryStats,
   AppHostAgent,
+  AppHostFirstRun,
   AppHostOptions,
 } from './local-ui/app-host.js';
 // U3-e (04 §2.5 "Removing an agent"): the removal seam the CLI implements (the folder lock, the

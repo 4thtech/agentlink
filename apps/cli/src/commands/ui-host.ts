@@ -11,7 +11,23 @@
 //
 // I-4: nothing here adds an MCP tool or a route; a switch signs nothing and takes no owner presence.
 // I-7: no name, label or path is logged; failures are a plain `undefined`.
-import type { AgentDirectory, AppHostAgent, LocalUiOptions } from '@4thtech-io/node';
+//
+// U3-g-b (08 §1 "with no agent yet, Welcome"; proposed, owner confirms at merge): with no agent folder
+// at all (not even one being removed), `ui` starts the app host with NO open agent (`startUiWelcome`):
+// the server serves Welcome and the setup-time reads only, and first run's `finish` creates the first
+// agent (AgentDirectory `create`) and opens it in the same host. Only when the OS keychain can hold a
+// new agent (07 §9.4; a file-KeyStore setup stays `agentlink init` in the terminal) and this build
+// has the app. Nothing here signs or holds a secret.
+import type {
+  AgentDirectory,
+  ApprovalServer,
+  ApprovalServerEvent,
+  ApprovalServerOptions,
+  ApprovalServerSource,
+  AppHostAgent,
+  LocalUiAssets,
+  LocalUiOptions,
+} from '@4thtech-io/node';
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import { newAgentFirstCard } from '../mcp/local-ui-wiring.js';
 import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
@@ -68,4 +84,66 @@ export async function openUiHostAgent(
     await agent.close().catch(() => undefined);
     return undefined;
   }
+}
+
+/** U3-g-b: what the no-agent app host needs (tests pass doubles). */
+export interface UiWelcomeDeps {
+  readonly directory: AgentDirectory;
+  /** True when the OS keychain can hold a new agent (selectKeyStoreBackend without file opt-in). */
+  keychainUsable(): Promise<boolean>;
+  /** The app's files embedded in this build. */
+  assets(): LocalUiAssets;
+  /** Opens an agent for the host (openUiHostAgent): the first agent, once first run created it. */
+  open(name: string): Promise<AppHostAgent | undefined>;
+  /** Starts the approval server (startApprovalServer). */
+  startServer(
+    options: ApprovalServerOptions,
+  ): Promise<Pick<ApprovalServer, 'openFirstRun' | 'close'>>;
+  /** Fixed-value events (I-7). */
+  readonly onEvent?: (event: ApprovalServerEvent) => void;
+}
+
+/** U3-g-b: the running no-agent app host: it always opens on the first-run page (Welcome). */
+export interface UiWelcomeServer {
+  readonly page: 'first-run';
+  open(): Promise<boolean>;
+  close(): Promise<void>;
+}
+
+/** U3-g-b: the host's source while no agent is open; the host replaces it (it never answers). */
+const NO_AGENT_SOURCE: ApprovalServerSource = Object.freeze<ApprovalServerSource>({
+  context: () => Promise.resolve(undefined),
+  list: () => Promise.resolve([]),
+  get: () => Promise.resolve(undefined),
+  apply: () => Promise.reject(new Error('No agent is open.')),
+});
+
+/**
+ * U3-g-b: starts the app host with no agent open, or undefined (nothing started) when any agent
+ * folder exists (even one marked `removing`), the keychain cannot hold a new agent, or this build has
+ * no app. The server closes whichever agent first run opened.
+ */
+export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServer | undefined> {
+  const entries = await deps.directory.list().catch(() => undefined);
+  if (entries === undefined || entries.length !== 0) return undefined;
+  if (!(await deps.keychainUsable().catch(() => false))) return undefined;
+  const assets = deps.assets();
+  if (assets.files.has('index.html') !== true) return undefined;
+  const server = await deps.startServer({
+    source: NO_AGENT_SOURCE,
+    // The app's files only: no agent client, no owner setup of an agent (first run makes one).
+    localUi: { assets },
+    host: {
+      directory: deps.directory,
+      open: (name) => deps.open(name),
+      // The real home and owner files (no override).
+      firstRun: {},
+    },
+    ...(deps.onEvent === undefined ? {} : { onEvent: deps.onEvent }),
+  });
+  return Object.freeze<UiWelcomeServer>({
+    page: 'first-run',
+    open: () => server.openFirstRun(),
+    close: () => server.close(),
+  });
 }

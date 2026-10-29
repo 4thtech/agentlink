@@ -18,6 +18,7 @@ export default defineConfig({
         /app\.css/,
         /compact\.css/,
         /map\.css/,
+        /moving\.css/,
         /welcome\.css/,
       ],
     },

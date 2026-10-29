@@ -1,0 +1,142 @@
+/* AI apps (U3-i, b11 §30): the cards, the change panel and the manual steps. Design tokens only, no
+   inline styles (CSP). At 1440 the cards form a grid of up to three columns (min 300 px); at 600 px
+   and under one column, cards at full width and the button full width. */
+.ap-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+  max-width: 960px;
+}
+.ap-page h1,
+.ap-page p {
+  margin: 0;
+}
+.ap-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-4);
+  align-items: baseline;
+  justify-content: space-between;
+}
+.ap-live:empty {
+  display: none;
+}
+.ap-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--al-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+}
+.ap-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+  padding: var(--al-space-4) var(--al-space-5);
+  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+}
+.ap-card-head {
+  display: flex;
+  gap: var(--al-space-3);
+  align-items: center;
+}
+.ap-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--al-radius-sm);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-muted);
+}
+.ap-state {
+  display: flex;
+  gap: var(--al-space-2);
+  align-items: center;
+}
+.ap-warn {
+  color: var(--al-color-status-warning-icon);
+}
+.ap-ok {
+  color: var(--al-color-status-success-icon);
+}
+.ap-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+  align-items: center;
+  margin-top: auto;
+  padding-top: var(--al-space-2);
+}
+.ap-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  color: var(--al-color-fg-link, var(--al-color-fg-default));
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ap-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.ap-sheet-body p {
+  margin: 0;
+}
+.ap-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--al-space-2) var(--al-space-4);
+  margin: 0;
+}
+.ap-facts dt {
+  color: var(--al-color-fg-muted);
+}
+.ap-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ap-entries {
+  display: grid;
+  gap: var(--al-space-3);
+  grid-template-columns: 1fr 1fr;
+}
+.ap-entry {
+  margin: 0;
+  padding: var(--al-space-3) var(--al-space-4);
+  overflow-x: auto;
+  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-sunken);
+  font-family: var(--al-font-mono, monospace);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.ap-entry-removed {
+  border-color: var(--al-color-status-warning-icon);
+}
+.ap-steps {
+  margin: 0;
+  padding-left: var(--al-space-5);
+}
+.ap-error {
+  padding: var(--al-space-4);
+}
+@media (max-width: 600px) {
+  .ap-entries {
+    grid-template-columns: 1fr;
+  }
+  .ap-card-actions > button {
+    width: 100%;
+  }
+}

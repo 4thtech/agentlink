@@ -211,6 +211,7 @@ import {
   checkSetupRegistration,
   completeOwnerSetup,
   computerNameOf,
+  noOwnerAndNoAgent,
   noOwnerAnywhere,
   parseSetupRegistration,
   prepareSetupFolders,
@@ -265,7 +266,10 @@ import type {
 import { LOCAL_UI_MAX_INPUT_CHARS, NOT_AVAILABLE } from './local-ui/route-types.js';
 import {
   AppHostSlot,
+  FIRST_AGENT_LABEL,
+  FIRST_AGENT_NAME,
   type AppHostAgent,
+  type AppHostFirstRun,
   type AppHostHold,
   type AppHostOptions,
   type AppHostSwitchOutcome,
@@ -545,7 +549,9 @@ export type ApprovalServerEvent =
         | 'too_large'
         | 'not_found'
         /** U3-c: a mutating request built against another generation (app host). */
-        | 'agent_changed';
+        | 'agent_changed'
+        /** U3-g-b: an agent-scoped route while the app host has no agent open. */
+        | 'no_agent';
     }
   | {
       readonly kind: 'decision';
@@ -830,6 +836,29 @@ const NO_AGENT_SOURCE: ApprovalServerSource = Object.freeze<ApprovalServerSource
   apply: () => Promise.reject(new Error('No agent is open.')),
 });
 
+/**
+ * U3-g-b (08 §1 "with no agent yet, Welcome"): the only `/api/ui/` routes the app host answers while
+ * no agent is open: the setup-time reads (owner state, AI apps, label check, the Agents list, health)
+ * and first run's two setup steps. Every other route (and the approval API) is refused with 409
+ * `no_agent` after every guard and before any handler, presence check or agent is reached. The switch
+ * kind keeps its own gate (it opens only a listed agent).
+ */
+/** U3-g-b (IR-U3-g-b-1 H-1): marks the successful first-run finish that opened the first agent. */
+const GENERATION_ADOPTED_HEADER = 'X-AgentLink-Generation-Adopted';
+
+const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
+  'GET /api/ui/first-run',
+  'GET /api/ui/apps',
+  'GET /api/ui/agents/label-check',
+  'GET /api/ui/agents',
+  'GET /api/ui/health',
+  'POST /api/ui/first-run/owner/begin',
+  'POST /api/ui/first-run/owner/finish',
+  // U3-e: removal leaves no agent open after `undeliverable` ("Remove anyway?") or when none is
+  // left; the remove kind keeps its own gate (owner presence, typed label) and needs no open agent.
+  'POST /api/ui/agents/remove',
+]);
+
 /** U3-c: the switch body is `{"name":"<32 chars>","generation":<16 digits>}`. */
 const MAX_SWITCH_BODY_BYTES = 128;
 /** U3-c: the most agents `GET /api/ui/agents` lists (b11 §29 shows search above 8). */
@@ -848,7 +877,14 @@ interface PendingSetup {
   readonly folders?: SetupFolders;
   /** U3-d: the label `begin` was given (06 §6 label rule); `finish` must carry the same. */
   readonly label?: string;
+  /** U3-g-b: begun with no agent yet (first run creates the agent); `finish` must be the same. */
+  readonly noAgent?: true;
 }
+
+/** U3-g-b: what a setup runs against: the open agent's setup, or first run with no agent yet. */
+type SetupTarget =
+  | { readonly kind: 'agent'; readonly setup: LocalUiOwnerSetupOption }
+  | { readonly kind: 'first'; readonly firstRun: AppHostFirstRun };
 
 /** The default listen: one `server.listen`, rejecting with the socket error. */
 function listenOnce(server: Server, options: ApprovalListenOptions): Promise<void> {
@@ -1181,6 +1217,10 @@ export async function startApprovalServerWith(
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
       // U3-d: create an agent and save a verified label, in the app host only.
       ...(options.host === undefined ? {} : { agentsManage }),
+      // U3-g-b (IR-U3-g-b-1 L): with no agent yet, the first-run page's owner state is the real one.
+      ...(agentUi === undefined && options.host?.firstRun !== undefined
+        ? { setupBlocked: () => setupBlockedNoAgent() }
+        : {}),
       // U3-f: the CLI's harness desk (the one AI app config writer), when the caller wired it.
       ...(agentUi?.aiApps === undefined ? {} : { aiApps: agentUi.aiApps }),
     });
@@ -2545,6 +2585,8 @@ export async function startApprovalServerWith(
   ): void => {
     // Fixed values only in the event: never the owner code or anything from the request.
     emit({ kind: 'owner_setup', outcome, ...fixed });
+    // U3-g-b: the generation and label as they are now (first run may have opened the first agent).
+    stamp(res);
     sendJson(res, status, {
       status: outcome,
       ...(fixed.reason === undefined ? {} : { reason: fixed.reason }),
@@ -2570,9 +2612,13 @@ export async function startApprovalServerWith(
   const releaseFolders = async (folders: SetupFolders | undefined): Promise<void> => {
     if (folders === undefined) return;
     const setup = agentUi?.ownerSetup;
+    const firstRun = setup === undefined ? noAgentFirstRun() : undefined;
     let ownerElsewhere: boolean;
     try {
-      ownerElsewhere = setup === undefined || (await ownerExistsAnywhere(setup));
+      ownerElsewhere =
+        setup !== undefined
+          ? await ownerExistsAnywhere(setup)
+          : firstRun === undefined || (await ownerExistsFor({ kind: 'first', firstRun }));
     } catch {
       ownerElsewhere = true;
     }
@@ -2620,6 +2666,56 @@ export async function startApprovalServerWith(
     (await source.context()) !== undefined ||
     !(await noOwnerAnywhere(keychainOf(), setup.firstCard, undefined, setup.ownerFiles));
 
+  /**
+   * U3-g-b: true when setup must be refused for `target`: for the open agent, ownerExistsAnywhere;
+   * with no agent yet, when any agent folder is listed (even one being removed) or any owner item,
+   * owner file or agent folder exists (noOwnerAndNoAgent). Rejects on errors (callers fail closed).
+   */
+  const ownerExistsFor = async (target: SetupTarget): Promise<boolean> => {
+    if (target.kind === 'agent') return ownerExistsAnywhere(target.setup);
+    const slot = host;
+    if (slot === undefined || slot.current !== undefined) return true;
+    if ((await slot.directory.list()).length > 0) return true;
+    return !(await noOwnerAndNoAgent(keychainOf(), target.firstRun.ownerFiles));
+  };
+
+  /**
+   * U3-g-b: creates the first agent (AgentDirectory `create`, a keychain agent in the new folder
+   * `default`, FIRST_AGENT_NAME) and opens it for its first parts only. Undefined, with nothing left behind,
+   * when it cannot be created or opened or has no first card.
+   */
+  const createFirstAgent = async (label: string): Promise<AppHostAgent | undefined> => {
+    const slot = host;
+    const directory = slot?.directory;
+    if (slot === undefined || directory?.create === undefined) return undefined;
+    let name: string;
+    try {
+      name = await directory.create(label, { name: FIRST_AGENT_NAME });
+    } catch {
+      return undefined;
+    }
+    if (name !== FIRST_AGENT_NAME) {
+      await directory.discardNew?.(name).catch(() => undefined);
+      return undefined;
+    }
+    const opened = await slot.openNew(name);
+    if (opened === undefined || opened.name !== name || opened.firstCard === undefined) {
+      await opened?.close().catch(() => undefined);
+      await directory.discardNew?.(name).catch(() => undefined);
+      return undefined;
+    }
+    return opened;
+  };
+
+  /**
+   * U3-g-b: with no agent open, true when first run cannot set up an owner here (an owner or any
+   * agent folder exists): `GET /api/ui/first-run` then answers `set_up`. Rejects on errors.
+   */
+  const setupBlockedNoAgent = async (): Promise<boolean> => {
+    const firstRun = noAgentFirstRun();
+    return firstRun === undefined || (await ownerExistsFor({ kind: 'first', firstRun }));
+  };
+
   /** U3-d: the setup's first card with its first label, when `begin` was given one. */
   const withFirstLabel = (first: FirstAgentCard, label: string | undefined): FirstAgentCard => {
     const actions = labelActionsOf(first.firstPolicy?.actions);
@@ -2653,19 +2749,26 @@ export async function startApprovalServerWith(
       finishSetup(res, 429, 'wait', { retryAfter: wait });
       return;
     }
+    // U3-g-b: the open agent's setup, else first run with no agent yet (the host's firstRun).
     const setup = agentUi?.ownerSetup;
-    if (setup === undefined) {
+    const firstRun = setup === undefined ? noAgentFirstRun() : undefined;
+    let target: SetupTarget;
+    if (setup !== undefined) target = { kind: 'agent', setup };
+    else if (firstRun !== undefined) target = { kind: 'first', firstRun };
+    else {
       req.resume();
       finishSetup(res, 503, 'unavailable');
       return;
     }
     // U3-d (08 §1 first run v3): `begin` and `finish` may carry `{label}` as the operation input.
-    const label = setupLabel(req);
-    if (label === 'invalid' || label === 'label_invalid') {
+    const given = setupLabel(req);
+    if (given === 'invalid' || given === 'label_invalid') {
       req.resume();
-      finishSetup(res, 400, label);
+      finishSetup(res, 400, given);
       return;
     }
+    // U3-g-b: the first agent always gets a label (b11 §28 prefills it; a page without one gets it).
+    const label = given ?? (target.kind === 'first' ? FIRST_AGENT_LABEL : undefined);
     const body = await boundedBody(req, res, MAX_SETUP_REGISTRATION_BYTES);
     if (body === undefined) return;
     try {
@@ -2673,8 +2776,8 @@ export async function startApprovalServerWith(
         agentChanged(res);
         return;
       }
-      if (step === 'begin') await setupBegin(res, body, cookie, setup, label);
-      else await setupFinish(res, body, cookie, setup, label);
+      if (step === 'begin') await setupBegin(res, body, cookie, target, label);
+      else await setupFinish(req, res, body, cookie, target, label);
     } finally {
       wipe(body);
     }
@@ -2706,7 +2809,7 @@ export async function startApprovalServerWith(
     res: ServerResponse,
     body: Uint8Array,
     cookie: string,
-    setup: LocalUiOwnerSetupOption,
+    target: SetupTarget,
     label: string | undefined,
   ): Promise<void> {
     if (body.length !== 0) {
@@ -2725,7 +2828,7 @@ export async function startApprovalServerWith(
       await folderRemoval;
       let exists: boolean;
       try {
-        exists = await ownerExistsAnywhere(setup);
+        exists = await ownerExistsFor(target);
       } catch {
         finishSetup(res, 500, 'failed', {}, { reason: 'check_failed' });
         return;
@@ -2740,7 +2843,11 @@ export async function startApprovalServerWith(
         return;
       }
       // M1-UX-FIRSTRUN-V2: the folders, before the gesture and before any seed exists.
-      const { firstPolicy } = setup.firstCard;
+      // U3-g-b: the first agent always gets its first policy (newAgentFirstCard), so its folders too.
+      const firstPolicy =
+        target.kind === 'agent'
+          ? target.setup.firstCard.firstPolicy
+          : { home: target.firstRun.home };
       let folders: SetupFolders | undefined;
       if (firstPolicy !== undefined) {
         folders = await prepareSetupFolders(firstPolicy.home);
@@ -2761,6 +2868,7 @@ export async function startApprovalServerWith(
         timer: setTimeout(() => dropSetup(held), SETUP_HOLD_MS),
         ...(folders === undefined ? {} : { folders }),
         ...(label === undefined ? {} : { label }),
+        ...(target.kind === 'first' ? { noAgent: true as const } : {}),
       };
       held.timer.unref();
       pendingSetup = held;
@@ -2782,15 +2890,21 @@ export async function startApprovalServerWith(
   }
 
   async function setupFinish(
+    req: IncomingMessage,
     res: ServerResponse,
     body: Uint8Array,
     cookie: string,
-    setup: LocalUiOwnerSetupOption,
+    target: SetupTarget,
     label: string | undefined,
   ): Promise<void> {
     const held = pendingSetup;
-    // Bound to its session: another session neither finishes nor consumes it.
-    if (held === undefined || !matches(cookie, held.session)) {
+    // Bound to its session: another session neither finishes nor consumes it. U3-g-b: and to its
+    // kind (begun with no agent yet, or for the open agent).
+    if (
+      held === undefined ||
+      !matches(cookie, held.session) ||
+      (held.noAgent === true) !== (target.kind === 'first')
+    ) {
       finishSetup(res, 409, 'not_pending');
       return;
     }
@@ -2814,11 +2928,20 @@ export async function startApprovalServerWith(
     let released = false;
     // M1-UX-FIRSTRUN-V2-b: true once this run's owner exists (completeOwnerSetup returned).
     let ownerIsOurs = false;
+    // U3-g-b: the first agent this run created (no agent yet), until it is settled.
+    let created: AppHostAgent | undefined;
     /**
      * Removes the folders this run created (unless kept): directly once the owner is this run's;
      * before that, only while no owner exists anywhere (releaseFolders, L-1 cross-process).
+     * U3-g-b: a first agent this run created goes first when no owner was made (all or nothing).
      */
     const release = async (): Promise<void> => {
+      const agent = created;
+      created = undefined;
+      if (agent !== undefined) {
+        await agent.close().catch(() => undefined);
+        if (!ownerIsOurs) await host?.directory.discardNew?.(agent.name).catch(() => undefined);
+      }
       if (keepFolders || released) return;
       released = true;
       if (ownerIsOurs) await removeFolders(held.folders);
@@ -2846,6 +2969,35 @@ export async function startApprovalServerWith(
       } catch {
         await answer(res, 403, 'presence_rejected');
         return;
+      }
+      let setup: LocalUiOwnerSetupOption;
+      if (target.kind === 'agent') setup = target.setup;
+      else {
+        // U3-g-b: with no agent yet, the agent is created only now, after the gesture was checked
+        // and while still no owner and no agent exists; on any failure below it goes again.
+        let none: boolean;
+        try {
+          none = !(await ownerExistsFor(target));
+        } catch {
+          await answer(res, 500, 'failed', {}, { reason: 'check_failed' });
+          return;
+        }
+        if (!none) {
+          await answer(res, 409, 'owner_exists');
+          return;
+        }
+        created = await createFirstAgent(held.label ?? FIRST_AGENT_LABEL);
+        const firstCard = created?.firstCard;
+        if (created === undefined || firstCard === undefined) {
+          await answer(res, 500, 'failed', {}, { reason: 'internal' });
+          return;
+        }
+        setup = {
+          firstCard,
+          ...(target.firstRun.ownerFiles === undefined
+            ? {}
+            : { ownerFiles: target.firstRun.ownerFiles }),
+        };
       }
       let exists: boolean;
       try {
@@ -2894,7 +3046,22 @@ export async function startApprovalServerWith(
         const fingerprint = ownerFingerprintText(held.keys);
         const sendFolder: SetupSendFolder | undefined = result.sendFolder?.status;
         // U3-d: config.json's label (display only, 07 §9.1) after core applied the signed one.
-        if (result.label === 'saved' && held.label !== undefined) {
+        const first = created;
+        if (first !== undefined) {
+          // U3-g-b: the first agent's label, then it is closed and opened as the host's agent.
+          if (result.label === 'saved' && held.label !== undefined) {
+            await host?.directory.writeLabel(first.name, held.label).catch(() => undefined);
+          }
+          created = undefined;
+          await first.close().catch(() => undefined);
+          const adopted = (await host?.adoptFirst(first.name, requestHolds.get(req))) === true;
+          // The answer names the agent now open, with the new generation (stamped below).
+          await labelReady;
+          // IR-U3-g-b-1 H-1: the one answer whose new generation the page adopts instead of
+          // reloading (apps/local-ui generation.ts accepts it only on a 200 finish), so the one-time
+          // backup code stays on screen. Set nowhere else.
+          if (adopted) res.setHeader(GENERATION_ADOPTED_HEADER, '1');
+        } else if (result.label === 'saved' && held.label !== undefined) {
           await labelSavedForOpen(held.label);
         }
         // The owner code goes to the page once, for the backup-code step; never an event.
@@ -3088,6 +3255,11 @@ export async function startApprovalServerWith(
       // U3-c: a read waits for a switch in progress and keeps the agent open while it runs.
       const hold = host === undefined ? undefined : await host.enter();
       try {
+        // U3-g-b: with no agent open, only the setup-time reads answer.
+        if (noAgentRefused(route)) {
+          noAgent(res);
+          return;
+        }
         stamp(res);
         sendResult(res, await route.handler(uiContext, { params, query: url.searchParams }));
       } finally {
@@ -3106,6 +3278,12 @@ export async function startApprovalServerWith(
     const hold = mutatingHold(req, res);
     if (hold === false) return;
     try {
+      // U3-g-b: with no agent open, only first run's setup steps run (after the generation check).
+      if (noAgentRefused(route)) {
+        req.resume();
+        noAgent(res);
+        return;
+      }
       await ownerRoute(req, res, url, route, params, cookie as string);
     } finally {
       hold?.leave();
@@ -3285,6 +3463,12 @@ export async function startApprovalServerWith(
       const hold = mutatingHold(req, res);
       if (hold === false) return;
       try {
+        // U3-g-b: no approvals while no agent is open.
+        if (noAgentOpen()) {
+          req.resume();
+          noAgent(res);
+          return;
+        }
         await approvalsPost(req, res, reviewRoute, decideMatch);
       } finally {
         hold?.leave();
@@ -3293,6 +3477,10 @@ export async function startApprovalServerWith(
     }
     const hold = host === undefined ? undefined : await host.enter();
     try {
+      if (noAgentOpen()) {
+        noAgent(res);
+        return;
+      }
       stamp(res);
       await approvalsRead(res, passkeyRoute, one);
     } finally {
@@ -3395,6 +3583,36 @@ export async function startApprovalServerWith(
   function agentChanged(res: ServerResponse): void {
     stamp(res);
     sendJson(res, 409, { status: 'agent_changed' });
+  }
+
+  /** U3-g-b: true while the app host has no agent open (no agent yet, or a failed switch). */
+  function noAgentOpen(): boolean {
+    return host !== undefined && host.current === undefined;
+  }
+
+  /** U3-g-b: true when `route` is refused because no agent is open (NO_AGENT_ROUTES). */
+  function noAgentRefused(route: LocalUiRoute): boolean {
+    return noAgentOpen() && !NO_AGENT_ROUTES.has(`${route.method} ${route.path}`);
+  }
+
+  /** U3-g-b: 409 `no_agent`, the one fixed answer of an agent route while no agent is open. */
+  function noAgent(res: ServerResponse): void {
+    emit({ kind: 'rejected', reason: 'no_agent' });
+    stamp(res);
+    sendJson(res, 409, { status: 'no_agent' });
+  }
+
+  /**
+   * U3-g-b: first run with no agent yet: the host's `firstRun`, only while no agent is open and the
+   * directory can create one. Undefined otherwise (the setup steps then need the open agent's setup).
+   */
+  function noAgentFirstRun(): AppHostFirstRun | undefined {
+    const slot = host;
+    const firstRun = options.host?.firstRun;
+    if (slot === undefined || firstRun === undefined || slot.current !== undefined)
+      return undefined;
+    if (slot.directory.create === undefined) return undefined;
+    return firstRun;
   }
 
   /** False when the request's hold says the open agent changed since it arrived (the re-check). */

@@ -470,6 +470,11 @@ export function inviteAcceptPort(client: AgentLinkClient): LocalUiInviteAcceptPo
 }
 
 export interface LocalUiContext {
+  /**
+   * U3-g-b: present only while the app host has no agent yet: true when first run cannot set up an
+   * owner here (an owner or any agent folder exists). `GET /api/ui/first-run` answers from it.
+   */
+  readonly setupBlocked?: () => Promise<boolean>;
   /** Read-only access to the agent's core; undefined when not set up. */
   readonly client: LocalUiReadClient | undefined;
   /** M1-11c-a4c: the credits moves for the owner routes; undefined when not set up. */
