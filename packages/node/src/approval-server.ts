@@ -3054,7 +3054,13 @@ export async function startApprovalServerWith(
             credentialId: registration.credentialId,
             prfOutput: registration.prfOutput,
             authenticatorData: registration.authenticatorData,
-            firstCard: withFirstLabel(setup.firstCard, held.label),
+            // U3-d-b: the first agent always gets its first label (the typed one, else the
+            // prefilled FIRST_AGENT_LABEL its folder was created with), so its card is never
+            // named after the folder `default`.
+            firstCard: withFirstLabel(
+              setup.firstCard,
+              held.label ?? (created === undefined ? undefined : FIRST_AGENT_LABEL),
+            ),
             ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),
           },
           {
