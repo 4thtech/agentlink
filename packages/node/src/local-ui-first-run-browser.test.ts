@@ -325,17 +325,22 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     await page.getByRole('button', { name: /^Use (Touch ID|Windows Hello|a passkey)$/ }).click();
     await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
 
-    // The label was checked, then carried by begin and finish exactly as the server parses it
-    // (X-AgentLink-Input = base64url JSON {label}); the first agent.label is stored and verified.
+    // The label was checked, then carried by begin exactly as the server parses it (X-AgentLink-Input
+    // = base64url JSON {label}); W4-ONE-TOUCH (04 §2.8): finish carries only {nonce}. The first
+    // agent.label is stored and verified.
     const labelInput = Buffer.from(JSON.stringify({ label: 'Home base' })).toString('base64url');
     expect(
       asked.find((a) => a.url.startsWith('/api/ui/agents/label-check?label=Home')),
     ).toBeDefined();
-    for (const step of ['begin', 'finish']) {
-      const call = asked.find((a) => a.url === `/api/ui/first-run/owner/${step}`);
-      expect(call?.method).toBe('POST');
-      expect(call?.input).toBe(labelInput);
-    }
+    const begin = asked.find((a) => a.url === '/api/ui/first-run/owner/begin');
+    expect(begin?.method).toBe('POST');
+    expect(begin?.input).toBe(labelInput);
+    const finish = asked.find((a) => a.url === '/api/ui/first-run/owner/finish');
+    expect(finish?.method).toBe('POST');
+    const finishInput = JSON.parse(
+      Buffer.from(finish?.input ?? '', 'base64url').toString('utf8'),
+    ) as Record<string, unknown>;
+    expect(Object.keys(finishInput)).toEqual(['nonce']);
     expect(await client.ownerActions.loadLabel()).toEqual({
       status: 'verified',
       label: 'Home base',
