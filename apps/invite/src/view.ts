@@ -30,14 +30,19 @@ const COPIED_MS = 1600;
 
 type Way = 'command' | 'askAi';
 
-/** Shows `view`. `copy` writes a string to the clipboard; the page never pastes or opens anything. */
+/**
+ * Shows `view`. `copy` writes a string to the clipboard; the page never pastes or opens anything.
+ * `retry` checks the invite once more (the `unreachable` state's Try again button).
+ */
 export function render(
   doc: Document,
   view: InviteView,
   host: string,
   copy: (text: string) => Promise<void>,
+  retry?: () => void,
 ): void {
   const state = element(doc, 'state');
+  const retryButton = element(doc, 'retry') as HTMLButtonElement;
   const inviter = element(doc, 'inviter');
   const step = element(doc, 'step');
   const next = element(doc, 'next');
@@ -62,6 +67,9 @@ export function render(
   copyButton.onclick = null;
   tabCommand.onclick = null;
   tabAi.onclick = null;
+  retryButton.onclick = null;
+  retryButton.hidden = true;
+  retryButton.disabled = false;
   element(doc, 'inviter-host').textContent = host;
 
   state.dataset['state'] = view.kind;
@@ -70,6 +78,18 @@ export function render(
       ? expiredFor(view.name)
       : strings.states[view.kind];
   state.hidden = view.kind === 'ready';
+
+  if (view.kind === 'unreachable' && retry !== undefined) {
+    retryButton.textContent = strings.retry;
+    retryButton.hidden = false;
+    // One click, one more check: the button is off until that check is shown.
+    retryButton.onclick = (): void => {
+      retryButton.onclick = null;
+      retryButton.disabled = true;
+      state.textContent = strings.states.loading;
+      retry();
+    };
+  }
 
   if (view.kind === 'ready') {
     const { inviter: who } = view;

@@ -141,7 +141,7 @@ describe('inviteFetcher: the answer (04 §3.6.2 step 4)', () => {
 
   it('refuses a Content-Length above 17 441 bytes before reading the body', async () => {
     const pull = vi.fn();
-    const body = new ReadableStream<Uint8Array>({ pull });
+    const body = new ReadableStream<Uint8Array>({ pull }, { highWaterMark: 0 });
     const answer = new Response(body, {
       headers: { 'content-type': 'application/octet-stream', 'content-length': '17442' },
     });
