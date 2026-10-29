@@ -1,0 +1,155 @@
+/* First run v3 (U3-g; B-11 §28.2 to §28.4): pick your AI app, name and protect, connect your AI app.
+   A centred card of 520 px on level 2 (full width with a 16 px gutter at 360). Tokens only; nothing
+   here animates. The AppMark is generic: the app's first letter on a sunken square, aria-hidden. */
+.fr-card {
+  display: grid;
+  gap: var(--al-space-6);
+  max-inline-size: 520px;
+  inline-size: 100%;
+  margin-inline: auto;
+  padding: var(--al-space-7);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-raised);
+  box-shadow: var(--al-shadow-2);
+  box-sizing: border-box;
+}
+.fr-card h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.fr-card h1:focus {
+  outline: none;
+}
+.fr-card p {
+  margin: 0;
+}
+
+/* The AppMark (B-11 §30.2): 20 px in a row, 28 px on cards. */
+.fr-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  inline-size: 20px;
+  block-size: 20px;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Which AI app: a radio list. */
+.fr-apps {
+  display: grid;
+  gap: var(--al-space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.fr-app {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  min-block-size: 44px;
+  padding: var(--al-space-3) var(--al-space-5);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-surface);
+  cursor: pointer;
+}
+.fr-app:has(input:checked) {
+  border-color: var(--al-color-border-strong);
+}
+.fr-app:has(input:focus-visible) {
+  outline: 2px solid var(--al-color-focus-ring, currentColor);
+  outline-offset: 2px;
+}
+.fr-app input {
+  flex: none;
+  inline-size: 18px;
+  block-size: 18px;
+  margin: 0;
+  accent-color: var(--al-color-accent-default, currentColor);
+}
+.fr-app-name {
+  flex: 1;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+.fr-app-state {
+  color: var(--al-color-fg-muted);
+}
+
+/* Name and protect. */
+.fr-chosen {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  justify-content: space-between;
+}
+.fr-chosen-name {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+.fr-actions {
+  display: grid;
+  gap: var(--al-space-4);
+  justify-items: start;
+}
+.fr-actions .al-btn-lg {
+  inline-size: 100%;
+}
+.fr-folders {
+  display: grid;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-sunken);
+}
+.fr-folders dl {
+  margin: 0;
+}
+
+/* Connect your AI app: the exact entry. */
+.fr-entry {
+  display: grid;
+  gap: var(--al-space-3);
+}
+.fr-entry-row {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: var(--al-space-4);
+  align-items: start;
+}
+.fr-entry pre {
+  margin: 0;
+  padding: var(--al-space-4) var(--al-space-5);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-sunken);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.fr-entry code {
+  overflow-wrap: anywhere;
+}
+.fr-move {
+  display: grid;
+  gap: var(--al-space-4);
+}
+@media (max-width: 480px) {
+  .fr-card {
+    padding: var(--al-space-5);
+    border-radius: var(--al-radius-md);
+  }
+  .fr-entry-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--al-space-2);
+  }
+}
