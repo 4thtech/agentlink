@@ -19,7 +19,8 @@ export interface MenuProps {
   readonly children: ReactNode;
 }
 
-const ITEMS = '[role="menuitem"]:not([aria-disabled="true"])';
+const ITEMS =
+  '[role="menuitem"]:not([aria-disabled="true"]), [role="menuitemcheckbox"]:not([aria-disabled="true"])';
 
 export function Menu({ label, onClose, triggerRef, className, children }: MenuProps): ReactElement {
   const ref = useRef<HTMLDivElement>(null);

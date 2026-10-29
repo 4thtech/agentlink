@@ -1,11 +1,26 @@
-// The sidebar, nine items (D-120, D-133, UI-REFRESH-f): Home, Approvals, Activity, Messages, Contacts, Files, Proofs & credits, Rules and
-// Settings (Backup, Passkeys, Appearance, Advanced in a sub-navigation). Before: the settings pages (d1/screens/local). M1-11b-2: Approvals
-// (`/`) is a page of this app now.
+// W4-SHELL (Decision 40; b11 §34.1, §34.6; WAVE-4 build plan §3): the wave-4 information
+// architecture. Two destinations only, Inbox (the home) and Contacts. Everything else is under
+// Settings, reached from the avatar menu at the right of the top bar and from Cmd+K: Settings (AI
+// apps, Backup & Touch ID, Appearance, Proofs & credits, Default rules, Notifications) and its
+// Advanced group (the full activity log, files and storage, network and relays, diagnostics). The
+// agent switcher (top left) holds the agents and the AI apps. Every route here points at today's
+// page; the Inbox, Contacts and Settings builders replace those page bodies in their own folders.
 import { AGENTS_PATH } from './pages/agents/data.js';
 import { PAGE_TITLES } from './strings.js';
 
 export const SETTINGS_LABEL = 'Settings';
-export const PASSKEYS_LABEL = 'Passkeys';
+export const ADVANCED_LABEL = 'Advanced';
+
+export const INBOX_PATH = '/inbox';
+export const CONTACTS_PATH = '/contacts';
+/**
+ * Approvals fold into the Inbox (b11 §34.4). Until the Inbox holds them, the waiting list stays at
+ * `/`, where every approval link of the terminal, the MCP and notifications already points; it marks
+ * the Inbox item current.
+ */
+export const APPROVALS_PATH = '/';
+export const SETTINGS_HOME = '/settings/apps';
+export const ADVANCED_HOME = '/settings/activity';
 
 export interface AppNavItem {
   readonly id: string;
@@ -17,72 +32,82 @@ export interface AppNavItem {
 }
 
 export const NAV_ITEMS: readonly AppNavItem[] = [
-  // Home lives at /settings/home until M1-11b-2 moves it to `/` (D-135).
-  { id: 'home', label: PAGE_TITLES.home, icon: 'agent', path: '/settings/home', routed: true },
-  { id: 'approvals', label: PAGE_TITLES.approvals, icon: 'approval', path: '/', routed: true },
+  { id: 'inbox', label: PAGE_TITLES.inbox, icon: 'inbox', path: INBOX_PATH, routed: true },
+  { id: 'contacts', label: PAGE_TITLES.contacts, icon: 'users', path: CONTACTS_PATH, routed: true },
+];
+
+export interface SettingsPage {
+  readonly label: string;
+  readonly path: string;
+}
+export interface SettingsGroup {
+  readonly label: string;
+  readonly pages: readonly SettingsPage[];
+}
+
+/** The Settings sub-navigation, in its two groups (b11 §34.6). */
+export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
-    id: 'activity',
-    label: PAGE_TITLES.activity,
-    icon: 'activity',
-    path: '/settings/activity',
-    routed: true,
-  },
-  {
-    id: 'messages',
-    label: PAGE_TITLES.messages,
-    icon: 'inbox',
-    path: '/settings/messages',
-    routed: true,
-  },
-  {
-    id: 'contacts',
-    label: PAGE_TITLES.contacts,
-    icon: 'users',
-    path: '/settings/contacts',
-    routed: true,
-  },
-  {
-    id: 'agents',
-    label: PAGE_TITLES.agents,
-    icon: 'identity-registered',
-    path: AGENTS_PATH,
-    routed: true,
-  },
-  { id: 'files', label: PAGE_TITLES.files, icon: 'folder', path: '/settings/files', routed: true },
-  {
-    id: 'proofs',
-    label: PAGE_TITLES.proofs,
-    icon: 'proof-seal',
-    path: '/settings/proofs',
-    routed: true,
-  },
-  {
-    id: 'rules',
-    label: PAGE_TITLES.rules,
-    icon: 'sliders-horizontal',
-    path: '/settings/rules',
-    routed: true,
-  },
-  {
-    id: 'settings',
     label: SETTINGS_LABEL,
-    icon: 'settings',
-    path: '/settings/backup',
-    routed: true,
+    pages: [
+      { label: PAGE_TITLES.apps, path: '/settings/apps' },
+      { label: PAGE_TITLES.backupTouchId, path: '/settings/backup' },
+      { label: PAGE_TITLES.appearance, path: '/settings/appearance' },
+      { label: PAGE_TITLES.proofs, path: '/settings/proofs' },
+      { label: PAGE_TITLES.defaultRules, path: '/settings/rules' },
+      { label: PAGE_TITLES.notifications, path: '/settings/notifications' },
+    ],
+  },
+  {
+    label: ADVANCED_LABEL,
+    pages: [
+      { label: PAGE_TITLES.activityLog, path: '/settings/activity' },
+      { label: PAGE_TITLES.filesStorage, path: '/settings/files' },
+      { label: PAGE_TITLES.network, path: '/settings/advanced' },
+      { label: PAGE_TITLES.diagnostics, path: '/settings/about' },
+    ],
   },
 ];
 
-/** The pages under the one Settings item, in the order of its sub-navigation (11 §6.2.1). */
-export const SETTINGS_PAGES: readonly { readonly label: string; readonly path: string }[] = [
-  { label: PAGE_TITLES.apps, path: '/settings/apps' },
-  { label: PAGE_TITLES.backup, path: '/settings/backup' },
-  { label: PASSKEYS_LABEL, path: '/settings/passkeys' },
-  { label: PAGE_TITLES.appearance, path: '/settings/appearance' },
-  { label: PAGE_TITLES.advanced, path: '/settings/advanced' },
-  { label: PAGE_TITLES.about, path: '/settings/about' },
-];
+/** Every Settings page, in order. */
+export const SETTINGS_PAGES: readonly SettingsPage[] = SETTINGS_GROUPS.flatMap((g) => g.pages);
 
-/** Old paths that still work and where they now go. Storage lives inside Files. */
-export const REDIRECTS: Readonly<Record<string, string>> = {
-  '/settings/storage': '/settings/files',
+/**
+ * Pages that are no destination of their own but still open (deep links, Cmd+K, older links): the
+ * title the top bar shows for them, and the nav item marked current (none: no mark).
+ */
+export const OTHER_PAGES: Readonly<
+  Record<string, { readonly title: string; readonly nav?: string }>
+> = {
+  [APPROVALS_PATH]: { title: PAGE_TITLES.approvals, nav: INBOX_PATH },
+  '/settings/home': { title: PAGE_TITLES.home },
+  [AGENTS_PATH]: { title: PAGE_TITLES.agents },
+  '/first-run': { title: PAGE_TITLES.firstRun },
 };
+
+/** Old paths that still work and where they now go. */
+export const REDIRECTS: Readonly<Record<string, string>> = {
+  '/settings': SETTINGS_HOME,
+  '/settings/messages': INBOX_PATH,
+  '/settings/contacts': CONTACTS_PATH,
+  '/settings/storage': '/settings/files',
+  '/settings/passkeys': '/settings/backup',
+};
+
+/** One entry of Cmd+K (b11 §34.8): a name and where it goes. */
+export interface GoToEntry {
+  readonly label: string;
+  readonly path: string;
+  /** Extra words it is found by. */
+  readonly keywords?: string;
+}
+
+/** Everything Cmd+K reaches by name, in the order it lists them. */
+export const GO_TO: readonly GoToEntry[] = [
+  ...NAV_ITEMS.map((i) => ({ label: i.label, path: i.path })),
+  { label: PAGE_TITLES.approvals, path: APPROVALS_PATH, keywords: 'needs you waiting' },
+  ...SETTINGS_PAGES.map((p) => ({ label: p.label, path: p.path })),
+  { label: 'Manage agents & apps', path: AGENTS_PATH, keywords: 'agents rename remove' },
+  { label: 'New agent', path: `${AGENTS_PATH}?add=1`, keywords: 'add agent create' },
+  { label: PAGE_TITLES.home, path: '/settings/home', keywords: 'start here setup' },
+];

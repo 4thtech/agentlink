@@ -1,20 +1,31 @@
 // The shared frame: sidebar, content and status bar from the design system's AppShell. Content
-// switches by route; the layout itself never changes (d1/screens/local). Nine sidebar items; the
-// Settings item opens a sub-navigation (Backup, Passkeys, Appearance, Advanced) above its page (D-120).
-// UI-REFRESH-f: a top bar with the page title and the global controls; the preferences reach every
-// page through PrefsHood (the Under the hood switch).
+// switches by route; the layout itself never changes (d1/screens/local).
+// W4-SHELL (Decision 40; b11 §34.1, d2 console/home 1280 and 360): the agent switcher top left (first
+// in the sidebar under the mark; at 360 at the start of the top bar), two destinations (Inbox and
+// Contacts), the page title, and the avatar menu at the right (Settings, Advanced, Under the hood,
+// Cmd+K). A Settings page shows the grouped Settings sub-navigation above it. The preferences reach
+// every page through PrefsHood (the Under the hood switch).
 import { AppShell, type NavItem } from '@4thtech-io/ui';
-import { useEffect, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react';
-import { NAV_ITEMS, SETTINGS_LABEL, SETTINGS_PAGES } from '../nav.js';
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
+import { INBOX_PATH, NAV_ITEMS, OTHER_PAGES, SETTINGS_GROUPS, SETTINGS_PAGES } from '../nav.js';
 import { PrefsHood } from '../prefs/index.js';
-import { PAGE_TITLES, SHELL_STRINGS } from '../strings.js';
-import { TopBarControls } from './top-bar.js';
+import { SHELL_STRINGS } from '../strings.js';
+import { AgentSwitcher } from './agent-switcher.js';
+import { GoTo } from './go-to.js';
+import { AccountMenu, connectionChip } from './top-bar.js';
 import { useUnseenMessages } from '../pages/messages/badge.js';
 import { useApprovalsWaiting } from '../pages/approvals/badge.js';
 import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js';
 import { createUpgradeApi } from '../pages/first-run/setup-api.js';
 import type { Platform } from '../pages/first-run/strings.js';
-import { StartHereContext, startHereShown } from '../pages/home/start-here-context.js';
+import { StartHereContext } from '../pages/home/start-here-context.js';
 import type { StartHereReads } from '../pages/home/start-here.js';
 import { useStartHere } from '../pages/home/use-start-here.js';
 import { SwitchToPasskeyBanner } from '../states/index.js';
@@ -103,13 +114,34 @@ function inSettings(path: string): boolean {
   return SETTINGS_PAGES.some((p) => p.path === path);
 }
 
-/** The title in the top bar: the nav or Settings entry of the path, else the app's name. */
+/** The title in the top bar: the nav, Settings or other page entry of the path, else the app's name. */
 function pageTitleOf(path: string): string {
-  if (path === '/first-run') return PAGE_TITLES.firstRun;
-  const item = NAV_ITEMS.find((i) => i.path === path && i.label !== SETTINGS_LABEL);
+  const item = NAV_ITEMS.find((i) => i.path === path);
   if (item !== undefined) return item.label;
   const page = SETTINGS_PAGES.find((p) => p.path === path);
-  return page === undefined ? SHELL_STRINGS.appName : page.label;
+  if (page !== undefined) return page.label;
+  return OTHER_PAGES[path]?.title ?? SHELL_STRINGS.appName;
+}
+
+/** The nav item marked current on a path: its own, or the one a page belongs to (Approvals: Inbox). */
+function navOf(path: string): string | undefined {
+  if (NAV_ITEMS.some((i) => i.path === path)) return path;
+  return OTHER_PAGES[path]?.nav;
+}
+
+const NARROW = '(max-width: 600px)';
+
+/** True at 600 px and under, where the sidebar is the bottom bar (B-11 §13.2). */
+function useNarrow(): boolean {
+  return useSyncExternalStore(
+    (on) => {
+      if (typeof window.matchMedia !== 'function') return () => undefined;
+      const query = window.matchMedia(NARROW);
+      query.addEventListener?.('change', on);
+      return () => query.removeEventListener?.('change', on);
+    },
+    () => typeof window.matchMedia === 'function' && window.matchMedia(NARROW).matches,
+  );
 }
 
 /**
@@ -168,6 +200,8 @@ export function Layout({
   const unseen = useUnseenMessages(path, unseenMessages);
   const waiting = useApprovalsWaiting(path, waitingApprovals);
   const settings = inSettings(path);
+  const narrow = useNarrow();
+  const current = navOf(path);
   // UX2-g: one Start here model for the shell: the Home dot, the card and the empty states.
   const start = useStartHere(startHere, path !== FIRST_RUN_PATH, path);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
@@ -195,17 +229,14 @@ export function Layout({
     icon: item.icon,
     label: item.label,
     href: item.path,
-    active: item.routed && (item.label === SETTINGS_LABEL ? settings : item.path === path),
-    // UI-REFRESH-o-d: the same shared tick badge as Approvals, read as "3 new".
-    ...(item.id === 'messages' && unseen > 0
-      ? { count: unseen, countLabel: SHELL_STRINGS.messagesNew }
-      : {}),
-    // UX2-g (B-11 §27.4): a dot on Home while Start here is shown; it goes with the card.
-    ...(item.id === 'home' && startHereShown(start) ? { dotLabel: SHELL_STRINGS.homeSetup } : {}),
-    // UI-REFRESH-o-b: the shared tick badge; it counts down as requests are decided.
-    ...(item.id === 'approvals' && waiting > 0
+    active: item.routed && item.path === current,
+    // The Inbox carries what needs you first (approvals waiting), else the new messages: the same
+    // shared tick badge (UI-REFRESH-o-b, -o-d), read as "3 waiting for you" or "3 new".
+    ...(item.id === 'inbox' && waiting > 0
       ? { count: waiting, countLabel: SHELL_STRINGS.approvalsWaiting }
-      : {}),
+      : item.id === 'inbox' && unseen > 0
+        ? { count: unseen, countLabel: SHELL_STRINGS.messagesNew }
+        : {}),
   }));
   // U3-g (b11 §28): first run is a focused column, with no sidebar, top bar or status bar.
   // U3-invite (b11 §33.2): so is the join screen that ends it.
@@ -229,7 +260,10 @@ export function Layout({
       <AppShell
         nav={nav}
         pageTitle={pageTitleOf(path)}
-        topBarEnd={<TopBarControls connection={connection} />}
+        {...(narrow
+          ? { topBarStart: <AgentSwitcher chip={connectionChip(connection)} place="bar" /> }
+          : { sideTop: <AgentSwitcher chip={connectionChip(connection)} place="side" /> })}
+        topBarEnd={<AccountMenu />}
         connection={SHELL_STATE[connection]}
         {...(version === undefined ? {} : { version })}
       >
@@ -238,23 +272,30 @@ export function Layout({
         ) : null}
         {settings ? (
           <nav aria-label="Settings" className="al-subnav al-chrome">
-            {SETTINGS_PAGES.map((p) => (
-              <a
-                key={p.path}
-                href={p.path}
-                className={p.path === path ? 'is-active' : undefined}
-                aria-current={p.path === path ? 'page' : undefined}
-              >
-                {p.label}
-              </a>
+            {SETTINGS_GROUPS.map((group) => (
+              <div key={group.label} className="al-subnav-group">
+                <span className="al-subnav-label al-text-label al-muted">{group.label}</span>
+                {group.pages.map((p) => (
+                  <a
+                    key={p.path}
+                    href={p.path}
+                    className={p.path === path ? 'is-active' : undefined}
+                    aria-current={p.path === path ? 'page' : undefined}
+                  >
+                    {p.label}
+                  </a>
+                ))}
+              </div>
             ))}
           </nav>
         ) : null}
         <StartHereContext.Provider value={start}>
-          {path === '/settings/home' ? <TidyNote /> : null}
+          {/* The one-time Tidy up note (b11 §29.7), on the home: the Inbox (and Home while it stays). */}
+          {path === INBOX_PATH || path === '/settings/home' ? <TidyNote /> : null}
           {children}
         </StartHereContext.Provider>
       </AppShell>
+      <GoTo />
     </PrefsHood>
   );
 }

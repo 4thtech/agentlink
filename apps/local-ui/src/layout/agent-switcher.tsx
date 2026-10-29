@@ -1,10 +1,15 @@
-// U3-h: the top-bar agent switcher (b11 §29.1). The open agent's label, a live dot and the AI app it
-// works from; a menu of the other agents (each with its AI apps), Add agent and Manage agents.
-// Switching needs no Touch ID (it only changes what you look at): one POST, then every page reloads
-// for that agent. Labels are text only (I-5). At 360 the trigger is the agent's initial in a circle.
-import { Icon, LiveDot, TextField, type LiveDotState } from '@4thtech-io/ui';
+// U3-h: the agent switcher (b11 §29.1). W4-SHELL (Decision 40, Decision 44 B1; b11 §34.2): it sits
+// top-left, first in the sidebar under the mark (at 360, where the sidebar is the bottom bar, at the
+// start of the top bar). The trigger shows the open agent's letter icon, its label, one merged
+// status and the AI app it works from. The menu keeps the dropdown the owner likes: per agent the
+// letter icon, the label, one status and its AI apps by name; then "Not connected yet", the detected
+// AI apps that serve no agent, each with Connect; then "New agent" and "Manage agents & apps".
+// Switching needs no Touch ID (it only changes what you look at): one POST, and every view follows
+// the agent that is open now without a reload (api/generation.ts, router.tsx). Labels and app names
+// are text only (I-5).
+import { AgentIcon, Icon, LiveDot, TextField, type LiveDotState } from '@4thtech-io/ui';
 import { createPortal } from 'react-dom';
-import { useCallback, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { navigate } from '../router.js';
 import { AppMark } from '../pages/agents/app-mark.js';
 import type { AgentsApi } from '../pages/agents/api.js';
@@ -19,6 +24,8 @@ import {
 import { Menu } from '../pages/agents/menu.js';
 import { AGENTS_STRINGS as S } from '../pages/agents/strings.js';
 import { listOf, useAgents } from '../pages/agents/use-agents.js';
+import { createAppsApi, type AppsApi } from '../pages/apps/api.js';
+import { APPS_PAGE_PATH } from '../pages/apps/data.js';
 import '../pages/agents/agents.css';
 
 const MANY = 8;
@@ -31,14 +38,15 @@ export interface SwitcherChip {
 
 export interface AgentSwitcherProps {
   readonly api?: AgentsApi;
+  /** The AI apps read, for "Not connected yet" (default: GET /api/ui/apps). */
+  readonly appsApi?: AppsApi;
   /** The connection chip. The switcher shows exactly one chip: this one, or "Not running" for the open agent. */
   readonly chip?: SwitcherChip;
-  /** Reloads every page after a switch (default: the browser reload). */
+  /** Runs after a switch the server took (default: nothing; the views follow without a reload). */
   readonly reload?: () => void;
+  /** Where it sits: the sidebar (wide screens) or the top bar (360). */
+  readonly place?: 'side' | 'bar';
 }
-
-const defaultReload = (): void => window.location.reload();
-const initialOf = (label: string): string => ([...label.trim()][0] ?? '?').toUpperCase();
 
 function Dot({ row }: { row: AgentRow }): ReactElement {
   return <LiveDot state={row.running ? 'connected' : 'not-running'} label={stateWord(row)} />;
@@ -64,12 +72,43 @@ function merged(
   return { state: 'not-running', label: stateWord(row) };
 }
 
+/** The detected AI apps that serve no agent yet (b11 §34.2 "Not connected yet"). */
+function useFreeApps(appsApi: AppsApi | undefined): {
+  readonly names: readonly { readonly app: string; readonly name: string }[];
+  readonly reread: () => void;
+} {
+  const [client] = useState<AppsApi>(() => appsApi ?? createAppsApi());
+  const [names, setNames] = useState<readonly { app: string; name: string }[]>([]);
+  const live = useRef(true);
+  const reread = useCallback(() => {
+    void client.list().then((result) => {
+      if (!live.current || result.kind !== 'ok') return;
+      setNames(
+        result.list.apps
+          .filter((a) => a.state === 'not_connected' && a.agent === undefined)
+          .map((a) => ({ app: a.app, name: a.name })),
+      );
+    });
+  }, [client]);
+  useEffect(() => {
+    live.current = true;
+    reread();
+    return () => {
+      live.current = false;
+    };
+  }, [reread]);
+  return { names, reread };
+}
+
 export function AgentSwitcher({
   api,
+  appsApi,
   chip,
-  reload = defaultReload,
+  reload,
+  place = 'side',
 }: AgentSwitcherProps): ReactElement | null {
   const { state, reload: reread, switchTo } = useAgents(api, reload);
+  const free = useFreeApps(appsApi);
   const list = listOf(state);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -83,11 +122,17 @@ export function AgentSwitcher({
   const rows = useMemo(() => orderAgents(list?.agents ?? []), [list]);
   const usable = rows.filter((r) => !r.removing);
   const current = rows.find((r) => r.current);
+  const cls = `ag-switch is-${place}`;
 
   if (list === undefined) {
-    if (state.kind !== 'error') return <Chip chip={chip} />;
+    if (state.kind !== 'error')
+      return (
+        <div className={cls}>
+          <Chip chip={chip} />
+        </div>
+      );
     return (
-      <>
+      <div className={cls}>
         <span className="ag-switch-note al-text-body-sm">
           {S.loadError}{' '}
           <button type="button" className="ag-link" onClick={reread}>
@@ -95,38 +140,38 @@ export function AgentSwitcher({
           </button>
         </span>
         <Chip chip={chip} />
-      </>
+      </div>
     );
   }
   if (!list.switchable) {
     return (
-      <>
+      <div className={cls}>
         <span className="ag-switch-note al-text-body-sm al-muted" title={S.openApp}>
           {S.openApp}
         </span>
         <Chip chip={chip} />
-      </>
+      </div>
     );
   }
 
+  const q = query.trim().toLowerCase();
   const shownRows =
-    query.trim() === ''
+    q === ''
       ? rows
-      : rows.filter((r) => {
-          const q = query.trim().toLowerCase();
-          return (
-            r.label.toLowerCase().includes(q) || r.apps.some((a) => a.toLowerCase().includes(q))
-          );
-        });
+      : rows.filter(
+          (r) =>
+            r.label.toLowerCase().includes(q) || r.apps.some((a) => a.toLowerCase().includes(q)),
+        );
 
   const label = current?.label ?? list.label ?? S.switcherLabel;
+  const seed = current?.name ?? label;
   const apps = current === undefined ? S.notConnected : (current.apps[0] ?? S.notConnected);
   const one = merged(chip, current);
   const word = one?.label ?? (current === undefined ? S.notRunning : stateWord(current));
   const many = usable.length > MANY;
   // At 600 px and under the menu is a bottom sheet: outside the top bar, whose blur would make it
   // position against the bar instead of the screen.
-  const place = (menu: ReactElement): ReactElement =>
+  const sheet = (menu: ReactElement): ReactElement =>
     typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 600px)').matches
       ? createPortal(menu, document.body)
       : menu;
@@ -136,9 +181,13 @@ export function AgentSwitcher({
     if (row.current || row.removing) return;
     void switchTo(row.name);
   };
+  const go = (to: string): void => {
+    close(false);
+    navigate(to);
+  };
 
   return (
-    <div className="ag-switch">
+    <div className={cls}>
       <button
         ref={trigger}
         type="button"
@@ -148,26 +197,33 @@ export function AgentSwitcher({
         aria-label={S.switcherName(label, apps, word)}
         title={label}
         onClick={() => {
-          if (!open) reread();
+          if (!open) {
+            reread();
+            free.reread();
+          }
           setOpen((v) => !v);
         }}
       >
-        <span className="ag-initial" aria-hidden="true">
-          {initialOf(label)}
-        </span>
-        <span className="ag-switch-label al-text-label">{shortLabel(label)}</span>
-        {usable.length > 1 ? <Icon name="chevron-down" size={14} /> : null}
-        <Chip chip={one} />
-        <span className="ag-switch-app">
-          {current !== undefined && current.apps.length > 0 ? (
-            <AppMark name={current.apps[0] ?? ''} />
-          ) : (
-            <span className="al-text-body-sm al-muted">{S.noAiApp}</span>
-          )}
+        <AgentIcon label={label} seed={seed} size={place === 'bar' ? 'lg' : 'md'} />
+        <span className="ag-switch-body">
+          <span className="ag-switch-top">
+            <span className="ag-switch-label al-text-label">{shortLabel(label)}</span>
+            {usable.length > 1 ? <Icon name="chevron-down" size={14} /> : null}
+          </span>
+          <span className="ag-switch-sub">
+            <Chip chip={one} />
+            <span className="ag-switch-app">
+              {current !== undefined && current.apps.length > 0 ? (
+                <AppMark name={current.apps[0] ?? ''} />
+              ) : (
+                <span className="al-text-body-sm al-muted">{S.noAiApp}</span>
+              )}
+            </span>
+          </span>
         </span>
       </button>
       {open
-        ? place(
+        ? sheet(
             <Menu
               label={S.switcherLabel}
               onClose={close}
@@ -202,6 +258,7 @@ export function AgentSwitcher({
                     <span className="ag-menu-check" aria-hidden="true">
                       {row.current ? <Icon name="check" size={14} /> : null}
                     </span>
+                    <AgentIcon label={row.label} seed={row.name} />
                     <span className="ag-menu-main">
                       <span className="ag-menu-top">
                         <span className="al-text-body ag-label">{row.label}</span>
@@ -230,39 +287,56 @@ export function AgentSwitcher({
                       type="button"
                       role="menuitem"
                       className="ag-menu-item ag-menu-connect"
-                      onClick={() => {
-                        close(false);
-                        navigate(`${AGENTS_APPS_PATH}?agent=${encodeURIComponent(row.name)}`);
-                      }}
+                      onClick={() =>
+                        go(`${AGENTS_APPS_PATH}?agent=${encodeURIComponent(row.name)}`)
+                      }
                     >
                       {S.connect}
                     </button>
                   ) : null}
                 </div>
               ))}
+              {free.names.length > 0 && q === '' ? (
+                <>
+                  <div className="ag-menu-sep" role="separator" />
+                  <div className="ag-menu-group al-text-label al-muted" role="presentation">
+                    {S.notConnectedYet}
+                  </div>
+                  {free.names.map((a) => (
+                    <div key={a.app} className="ag-menu-row ag-menu-free" data-free-app={a.app}>
+                      <span className="ag-menu-free-app">
+                        <AppMark name={a.name} />
+                      </span>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="ag-menu-item ag-menu-connect"
+                        aria-label={S.connectFreeApp(a.name)}
+                        onClick={() => go(APPS_PAGE_PATH)}
+                      >
+                        {S.connect}
+                      </button>
+                    </div>
+                  ))}
+                </>
+              ) : null}
               <div className="ag-menu-sep" role="separator" />
               <button
                 type="button"
                 role="menuitem"
                 className="ag-menu-item"
-                onClick={() => {
-                  close(false);
-                  navigate(`${AGENTS_PATH}?add=1`);
-                }}
+                onClick={() => go(`${AGENTS_PATH}?add=1`)}
               >
                 <Icon name="plus" size={14} />
-                <span>{S.add}</span>
+                <span>{S.newAgent}</span>
               </button>
               <button
                 type="button"
                 role="menuitem"
                 className="ag-menu-item"
-                onClick={() => {
-                  close(false);
-                  navigate(AGENTS_PATH);
-                }}
+                onClick={() => go(AGENTS_PATH)}
               >
-                {S.manage}
+                {S.manageAgentsApps}
               </button>
             </Menu>,
           )

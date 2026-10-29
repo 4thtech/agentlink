@@ -20,10 +20,18 @@ export const SHELL_STRINGS = {
   themeLight: 'Light',
   themeDark: 'Dark',
   offlineChip: 'Not connected',
+  /** W4-SHELL: the avatar menu at the right of the top bar (b11 §34.1). */
+  accountMenu: 'Settings and more',
+  goTo: 'Go to',
+  goToFind: 'Find a page',
+  goToNone: 'Nothing by that name.',
+  goToHint: 'Type a name, then Enter.',
 } as const;
 
 export const PAGE_TITLES = {
   firstRun: 'Set up AgentLink',
+  inbox: 'Inbox',
+  settings: 'Settings',
   home: 'Home',
   approvals: 'Approvals',
   approve: 'Approval',
@@ -40,6 +48,14 @@ export const PAGE_TITLES = {
   appearance: 'Appearance',
   advanced: 'Advanced',
   about: 'About',
+  // W4-SHELL: the Settings and Advanced entries (b11 §34.6); the pages keep their own headings.
+  backupTouchId: 'Backup & Touch ID',
+  defaultRules: 'Default rules',
+  notifications: 'Notifications',
+  activityLog: 'Activity log',
+  filesStorage: 'Files & storage',
+  network: 'Network & relays',
+  diagnostics: 'Diagnostics',
 } as const;
 
 /** Shown under every code field: 0.2.0 owners only know the code from the terminal (B-9 not built yet). */

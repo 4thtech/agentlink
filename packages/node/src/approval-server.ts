@@ -75,7 +75,8 @@
 //   server listens. `/assets/<name>` is an exact map lookup (no decoding, no path join), served with
 //   its fixed content type, nosniff, the strict CSP (plus `font-src 'self'`) and immutable caching;
 //   anything else is 404. The app's index.html, with this server's CSRF token filled in, is served
-//   for `/first-run` and `/settings[/...]`, and (M1-11b-2) for `/` and `/approve/<id>`.
+//   for `/first-run` and `/settings[/...]`, (M1-11b-2) for `/` and `/approve/<id>`, and (W4-SHELL)
+//   for `/inbox` and `/contacts`.
 // - M1-11b-2c: the server-rendered approval page, its `/app.js` and `/app.css`, are gone (404).
 //   Without a bundle, `/` and `/approve/<id>` answer the fixed NO_APP_HTML (approval-pages.ts):
 //   no script, no form, no CSRF token, so nothing can be decided in the browser; it points to
@@ -366,8 +367,12 @@ const API_ONE = /^\/api\/approvals\/(apr_[A-Za-z0-9_-]{22})$/;
 const API_DECIDE = /^\/api\/approvals\/(apr_[A-Za-z0-9_-]{22})\/(approve|deny)$/;
 const REVIEW_ITEM = /^(apr_[A-Za-z0-9_-]{22}):([0-9a-f]{64}):([ad])$/;
 
-/** M1-11s-b: the local UI app's pages (D-118); everything else keeps its own route or is 404. */
-const APP_PAGE = /^\/(?:first-run|settings(?:\/[a-z0-9]+(?:-[a-z0-9]+)*){0,4})$/;
+/**
+ * M1-11s-b: the local UI app's pages (D-118); everything else keeps its own route or is 404.
+ * W4-SHELL (Decision 40): the wave-4 destinations `/inbox` and `/contacts`, exactly; nothing below
+ * or beside them.
+ */
+const APP_PAGE = /^\/(?:first-run|inbox|contacts|settings(?:\/[a-z0-9]+(?:-[a-z0-9]+)*){0,4})$/;
 const ASSETS_PREFIX = '/assets/';
 /** One file name: no separator, no leading dot, no escape. */
 const ASSET_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;

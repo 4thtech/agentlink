@@ -1,4 +1,4 @@
-// UI-REFRESH-u: the Settings pages (everything under /settings, which is every page but Approvals and first run), loaded on first visit. The first load of the app carries none of
+// UI-REFRESH-u: the pages other than Approvals and first run (W4-SHELL: the Inbox, Contacts and everything under /settings), loaded on first visit. The first load of the app carries none of
 // them. `loadRoutePage(path)` starts the load for a path (the router calls it before it changes page,
 // so the new page usually arrives with the transition); `loadAllPages` is for tests.
 import type { ComponentType } from 'react';
@@ -11,8 +11,9 @@ const part = (importer: () => Promise<ComponentType<never>>): LazyPart<object> =
 export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   '/settings/home': part(async () => (await import('../pages/home/index.js')).HomePage),
   '/settings/activity': part(async () => (await import('../pages/activity/index.js')).ActivityPage),
-  '/settings/messages': part(async () => (await import('../pages/messages/index.js')).MessagesPage),
-  '/settings/contacts': part(async () => (await import('../pages/contacts/index.js')).ContactsPage),
+  // W4-SHELL: the two destinations. Their builders replace the page bodies in their own folders.
+  '/inbox': part(async () => (await import('../pages/messages/index.js')).MessagesPage),
+  '/contacts': part(async () => (await import('../pages/contacts/index.js')).ContactsPage),
   '/settings/agents': part(async () => (await import('../pages/agents/index.js')).AgentsPage),
   '/settings/apps': part(async () => (await import('../pages/apps/index.js')).AppsPage),
   '/settings/files': part(async () => (await import('../pages/files/index.js')).FilesPage),

@@ -222,7 +222,14 @@ describe('the fixed pages (M1-11b-2c; 11 §6.2.1)', () => {
       expect(res.status, path).toBe(200);
       expect(res.headers['content-security-policy'], path).toBe(CSP);
     }
-    for (const path of ['/inboxx', '/inbox/x', '/contacts/', '/Contacts', '/inbox.html']) {
+    for (const path of [
+      '/inboxx',
+      '/inbox/x',
+      '/contacts/',
+      '/Contacts',
+      '/inbox.html',
+      '/approvals',
+    ]) {
       const res = await send(withApp.server.port, path, { headers: { Cookie: c } });
       expect(res.status, path).toBe(404);
     }

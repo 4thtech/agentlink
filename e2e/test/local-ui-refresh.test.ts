@@ -43,13 +43,14 @@ const PAGES = [
   { path: '/', title: 'Approvals' },
   { path: '/settings/home', title: 'Home' },
   { path: '/settings/activity', title: 'Activity' },
-  { path: '/settings/messages', title: 'Messages' },
-  { path: '/settings/contacts', title: 'Contacts' },
+  // W4-SHELL: the two destinations (today's pages until their builders replace the bodies).
+  { path: '/inbox', title: 'Messages' },
+  { path: '/contacts', title: 'Contacts' },
   { path: '/settings/files', title: 'Files' },
   { path: '/settings/proofs', title: 'Proofs & credits' },
   { path: '/settings/rules', title: 'Rules' },
   { path: '/settings/backup', title: 'Backup' },
-  { path: '/settings/passkeys', title: 'Passkeys' },
+  { path: '/settings/notifications', title: 'Notifications' },
   { path: '/settings/appearance', title: 'Appearance' },
   { path: '/settings/advanced', title: 'Advanced' },
   { path: '/settings/about', title: 'About' },
@@ -479,17 +480,14 @@ async function timedNav(page: Page, label: string, title: string): Promise<numbe
   return page.evaluate(() => (window as unknown as { __nav: Promise<number> }).__nav);
 }
 
-/** The nav order a route-change pass walks (every sidebar item, then back to Home). */
+/**
+ * The nav order a route-change pass walks: W4-SHELL (Decision 40) has two sidebar items, the Inbox
+ * (today's Messages page) and Contacts; the walk goes there and back again.
+ */
 const NAV_WALK: readonly (readonly [string, string])[] = [
-  ['Approvals', 'Approvals'],
-  ['Activity', 'Activity'],
-  ['Messages', 'Messages'],
+  ['Inbox', 'Messages'],
   ['Contacts', 'Contacts'],
-  ['Files', 'Files'],
-  ['Proofs & credits', 'Proofs & credits'],
-  ['Rules', 'Rules'],
-  ['Settings', 'Backup'],
-  ['Home', 'Home'],
+  ['Inbox', 'Messages'],
 ];
 
 beforeAll(async () => {
@@ -612,7 +610,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         }
       }
       // With a Sheet open: the chrome plus the overlay, never more than five.
-      await page.goto(`${origin}/settings/contacts`);
+      await page.goto(`${origin}/contacts`);
       await settle(page, 'Contacts');
       await page.getByRole('button', { name: /Ana/ }).first().click();
       await page.getByRole('dialog').first().waitFor();
@@ -726,7 +724,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         // Scrolling Activity (200 rows) and Messages (60 conversations, 200 messages).
         for (const [path, title, open200] of [
           ['/settings/activity', 'Activity', false],
-          ['/settings/messages', 'Messages', true],
+          ['/inbox', 'Messages', true],
         ] as const) {
           await page.goto(origin + path);
           await settle(page, title);
@@ -749,7 +747,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         }
 
         // Sheet open and close (Contacts detail).
-        await page.goto(`${origin}/settings/contacts`);
+        await page.goto(`${origin}/contacts`);
         await settle(page, 'Contacts');
         await startRecorder(page);
         for (let i = 0; i < 3; i++) {
@@ -825,30 +823,39 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       const reached = navNames.filter((n) => stops.some((s) => s.includes(n)));
       kb['navReached'] = reached;
 
-      // Under the hood switch: reachable and toggles with Space.
+      // Under the hood (W4-SHELL: in the avatar menu): reachable by Tab, the menu opens with Enter,
+      // and the item toggles with Space.
       await page.goto(`${origin}/settings/activity`);
       await settle(page, 'Activity');
-      const sw = page.getByRole('switch', { name: /Under the hood/i }).first();
-      const hasSwitch = (await sw.count()) > 0;
+      const avatar = page.getByRole('button', { name: 'Settings and more' }).first();
+      const hasSwitch = (await avatar.count()) > 0;
       let toggled = false;
       if (hasSwitch) {
         let found = false;
         for (let i = 0; i < 60 && !found; i++) {
           await page.keyboard.press('Tab');
-          found = await sw.evaluate((el) => el === document.activeElement);
+          found = await avatar.evaluate((el) => el === document.activeElement);
         }
         if (found) {
+          await page.keyboard.press('Enter');
+          const sw = page.getByRole('menuitemcheckbox', { name: /Under the hood/i }).first();
+          await sw.waitFor();
+          for (let i = 0; i < 6; i++) {
+            if (await sw.evaluate((el) => el === document.activeElement)) break;
+            await page.keyboard.press('ArrowDown');
+          }
           const before = await sw.getAttribute('aria-checked');
           await page.keyboard.press('Space');
           toggled = (await sw.getAttribute('aria-checked')) !== before;
           await page.keyboard.press('Space');
+          await page.keyboard.press('Escape');
         }
         kb['hoodSwitchByTab'] = found;
       }
       kb['hoodSwitch'] = { present: hasSwitch, toggledBySpace: toggled };
 
       // Sheet: focus moves in, background inert, Escape closes and focus returns.
-      await page.goto(`${origin}/settings/contacts`);
+      await page.goto(`${origin}/contacts`);
       await settle(page, 'Contacts');
       const row = page.getByRole('button', { name: /Ana/ }).first();
       await row.focus();

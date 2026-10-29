@@ -36,11 +36,11 @@ function mountAt(path: string): void {
 const EXPECTED: ReadonlyArray<readonly [string, string, string]> = [
   ['/inbox', 'Messages', 'Inbox'],
   ['/contacts', 'Contacts', 'Contacts'],
-  ['/approvals', 'Approvals', 'Approvals'],
+  ['/', 'Approvals', 'Approvals'],
   ['/first-run', 'Set up AgentLink', 'Set up AgentLink'],
   ['/settings/home', 'Home', 'Home'],
   ['/settings/agents', 'Agents', 'Agents'],
-  ['/settings/files', 'Files', 'Files'],
+  ['/settings/files', 'Files', 'Files & storage'],
   ['/settings/apps', 'AI apps', 'AI apps'],
   ['/settings/backup', 'Backup', 'Backup & Touch ID'],
   ['/settings/appearance', 'Appearance', 'Appearance'],
@@ -89,10 +89,11 @@ describe('routes', () => {
     expect(host.querySelector('main .al-empty')).not.toBeNull();
   });
 
-  it('the home is the Inbox: / goes to /inbox', () => {
+  it('keeps / on the waiting approvals (every approval link points there), inside the Inbox item', () => {
     mountAt('/');
-    expect(location.pathname).toBe('/inbox');
-    expect(host.querySelector('header.al-topbar .al-topbar-title')?.textContent).toBe('Inbox');
+    expect(location.pathname).toBe('/');
+    expect(host.querySelector('main h1')?.textContent).toBe('Approvals');
+    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Inbox');
   });
 
   it('sends /settings to its first page, AI apps', () => {
@@ -233,15 +234,12 @@ describe('nav', () => {
   });
 
   // Approvals fold into the Inbox (b11 §34.4): the waiting list and one request mark the Inbox.
-  it.each(['/approvals', `/approve/apr_${'A'.repeat(22)}`])(
-    'marks the Inbox current on %s',
-    (path) => {
-      mountAt(path);
-      expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
-      expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Inbox');
-      expect(host.querySelector('main h1')?.textContent).toBe('Approvals');
-    },
-  );
+  it.each(['/', `/approve/apr_${'A'.repeat(22)}`])('marks the Inbox current on %s', (path) => {
+    mountAt(path);
+    expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
+    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Inbox');
+    expect(host.querySelector('main h1')?.textContent).toBe('Approvals');
+  });
 
   it('shows not-found for an /approve path that is not an approval ID', () => {
     mountAt('/approve/nope');

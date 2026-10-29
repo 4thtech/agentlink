@@ -512,20 +512,31 @@ describe('copy', () => {
 });
 
 describe('the sidebar item', () => {
-  it('shows the count of contacts with something new next to Messages, and nothing at zero', async () => {
+  // W4-SHELL: the count sits on the Inbox item (the Inbox holds the conversations).
+  it('shows the count of contacts with something new next to the Inbox, and nothing at zero', async () => {
     const none = async (): Promise<boolean> => false;
     await act(async () => {
       root.render(
-        h(Layout, { path: '/settings/messages', nextStep: none, unseenMessages: async () => 2 }),
+        h(Layout, {
+          path: '/inbox',
+          nextStep: none,
+          unseenMessages: async () => 2,
+          waitingApprovals: async () => 0,
+        }),
       );
     });
     const link = [...host.querySelectorAll('nav[aria-label="Main"] a')].find((a) =>
-      a.textContent?.includes('Messages'),
+      a.textContent?.includes('Inbox'),
     );
     expect(link?.querySelector('.al-nav-count .al-count-in')?.textContent).toBe('2');
     await act(async () => {
       root.render(
-        h(Layout, { path: '/settings/messages', nextStep: none, unseenMessages: async () => 0 }),
+        h(Layout, {
+          path: '/inbox',
+          nextStep: none,
+          unseenMessages: async () => 0,
+          waitingApprovals: async () => 0,
+        }),
       );
     });
     expect(host.querySelector('nav[aria-label="Main"] .al-nav-count')).toBeNull();

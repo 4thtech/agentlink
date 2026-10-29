@@ -249,7 +249,9 @@
   padding: var(--al-space-2);
 }
 
-/* The trigger in the top bar. */
+/* The trigger. W4-SHELL (b11 §34.2): first in the sidebar under the mark (two lines: icon, label and
+   chevron; the one status and the AI app under it); at 360 at the start of the top bar (the icon
+   with its status). */
 .ag-switch-btn {
   display: inline-flex;
   gap: var(--al-space-2);
@@ -261,6 +263,7 @@
   background: none;
   color: var(--al-color-fg-default);
   font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 .ag-switch-btn:hover {
@@ -269,15 +272,64 @@
 .ag-switch-note {
   white-space: nowrap;
 }
-.ag-initial {
-  display: none;
+.ag-switch-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ag-switch-top,
+.ag-switch-sub {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--al-color-accent-subtle);
-  font-weight: var(--al-font-weight-semibold);
+  gap: var(--al-space-2);
+  min-width: 0;
+}
+.ag-switch-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ag-switch.is-side {
+  display: flex;
+  width: 100%;
+}
+.ag-switch.is-side .ag-switch-btn {
+  width: 100%;
+  padding: var(--al-space-2);
+  border-color: var(--al-color-border-default);
+  background: var(--al-color-bg-sunken);
+}
+.ag-switch.is-side .ag-switch-top {
+  justify-content: space-between;
+}
+.ag-switch.is-side .ag-switch-body {
+  flex: 1;
+}
+.ag-switch.is-side .ag-switch-sub {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.ag-switch.is-side .ag-switch-menu {
+  top: calc(100% + var(--al-space-1));
+}
+.ag-menu-row > .ag-menu-item .al-agent-icon {
+  margin-top: 2px;
+  align-self: flex-start;
+}
+.ag-menu-group {
+  padding: var(--al-space-1) var(--al-space-3);
+}
+.ag-menu-free {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+  padding-left: var(--al-space-3);
+}
+.ag-menu-free .ag-menu-connect {
+  width: auto;
+  padding-left: var(--al-space-3);
 }
 
 @media (max-width: 600px) {
@@ -288,12 +340,12 @@
     min-height: 44px;
     gap: var(--al-space-1);
   }
-  .ag-initial {
-    display: inline-flex;
+  .ag-switch.is-bar .ag-switch-body {
+    flex-direction: row;
   }
   .ag-switch-label,
   .ag-switch-app,
-  .ag-switch-btn > .al-icon {
+  .ag-switch-top > .al-icon {
     display: none;
   }
   .ag-switch-note {

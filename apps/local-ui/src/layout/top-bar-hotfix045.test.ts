@@ -4,7 +4,9 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetPrefsForTests } from '../prefs/index.js';
-import { TopBarControls } from './top-bar.js';
+import { resetAgentsCacheForTests } from '../pages/agents/use-agents.js';
+import { AgentSwitcher } from './agent-switcher.js';
+import { connectionChip } from './top-bar.js';
 import type { ConnectionState } from './index.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -31,6 +33,7 @@ const agents = (running: boolean) => ({
 });
 
 beforeEach(() => {
+  resetAgentsCacheForTests();
   window.localStorage.clear();
   resetPrefsForTests();
   host = document.createElement('div');
@@ -49,7 +52,8 @@ async function mount(connection: ConnectionState, running: boolean): Promise<voi
     Promise.resolve(new Response(JSON.stringify(agents(running)), { status: 200 })),
   );
   await act(async () => {
-    root.render(h(TopBarControls, { connection }));
+    // W4-SHELL: the one chip lives in the agent switcher, top left.
+    root.render(h(AgentSwitcher, { chip: connectionChip(connection) }));
   });
   for (let i = 0; i < 5; i += 1) {
     await act(async () => {

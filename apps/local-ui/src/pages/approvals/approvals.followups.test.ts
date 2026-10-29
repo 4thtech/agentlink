@@ -660,7 +660,7 @@ describe('(d) a denied card leaves like an approved one (UI-REFRESH-o-c)', () =>
     reduced();
     const navCount = (): string | null | undefined =>
       [...host.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')]
-        .find((a) => a.getAttribute('href') === '/')
+        .find((a) => a.getAttribute('href') === '/inbox')
         ?.querySelector('.al-count-in')?.textContent;
     const { props } = pageProps({
       [LIST]: [
@@ -727,7 +727,7 @@ describe('(d) a denied card leaves like an approved one (UI-REFRESH-o-c)', () =>
 describe('(c) the sidebar Approvals badge', () => {
   const navLink = (): HTMLAnchorElement | null =>
     [...host.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')].find(
-      (a) => a.getAttribute('href') === '/',
+      (a) => a.getAttribute('href') === '/inbox',
     ) ?? null;
 
   function mountLayout(

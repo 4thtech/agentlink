@@ -5,6 +5,7 @@
 // B-2 (M1-35b-b) is built: the review-together view and the ApprovalCard batch variant. Not here,
 // waiting for the owner's redesign briefs (docs/design/adjustments.md): the receipt request card
 // (B-1) and the export proof dialog (B-8). They are not invented.
+export * from './agent-icon.js';
 export * from './approval.js';
 export * from './brand.js';
 export * from './feedback.js';

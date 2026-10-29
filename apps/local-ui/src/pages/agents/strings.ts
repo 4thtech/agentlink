@@ -9,6 +9,11 @@ export const AGENTS_STRINGS = {
   noAppNoContacts: 'No AI app, no contacts',
   add: 'Add agent',
   manage: 'Manage agents',
+  // W4-SHELL (b11 §34.2): the switcher's menu.
+  newAgent: 'New agent',
+  manageAgentsApps: 'Manage agents & apps',
+  notConnectedYet: 'Not connected yet',
+  connectFreeApp: (app: string): string => `Connect ${app}`,
   switch: 'Switch',
   rename: 'Rename',
   connect: 'Connect',

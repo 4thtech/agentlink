@@ -402,7 +402,7 @@ describe('the top-bar switcher', () => {
       'Agent: Personal, Claude Code, Running. Switch agent.',
     );
   });
-  it('opens a menu with every agent, its apps, Add agent and Manage agents', async () => {
+  it('opens a menu with every agent, its apps, New agent and Manage agents & apps', async () => {
     await mountSwitcher();
     await click(triggerOf());
     const menu = host.querySelector('[role="menu"]')!;
@@ -414,14 +414,14 @@ describe('the top-bar switcher', () => {
       'Second agent',
       'Not connected to an AI app',
       'Removal not finished',
-      'Add agent',
-      'Manage agents',
+      'New agent',
+      'Manage agents & apps',
     ]) {
       expect(menu.textContent).toContain(s);
     }
     expect(triggerOf().getAttribute('aria-expanded')).toBe('true');
   });
-  it('switching needs no Touch ID: one POST, then every page reloads', async () => {
+  it('switching needs no Touch ID: one POST, then the views follow (W4-SHELL: no reload)', async () => {
     answers['POST /api/ui/agents/switch'] = {
       status: 200,
       body: { status: 'done', generation: 8, current: 'work' },
@@ -448,13 +448,13 @@ describe('the top-bar switcher', () => {
     expect(host.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement).toBe(triggerOf());
   });
-  it('with one agent: still Add agent and Manage agents', async () => {
+  it('with one agent: still New agent and Manage agents & apps', async () => {
     answers['GET /api/ui/agents'] = { status: 200, body: list([FOUR[0]]) };
     await mountSwitcher();
     await click(triggerOf());
     const menu = host.querySelector('[role="menu"]')!;
-    expect(menu.textContent).toContain('Add agent');
-    expect(menu.textContent).toContain('Manage agents');
+    expect(menu.textContent).toContain('New agent');
+    expect(menu.textContent).toContain('Manage agents & apps');
   });
   it('is not a menu when the page is bound to an AI app (not switchable)', async () => {
     answers['GET /api/ui/agents'] = { status: 200, body: { switchable: false, agents: [] } };

@@ -54,6 +54,6 @@ describe('U3-g: the shell on first run', () => {
   it('other pages keep the sidebar', () => {
     render('/settings/home');
     expect(host.querySelector('nav')).not.toBeNull();
-    expect(host.textContent).toContain('Approvals');
+    expect(host.textContent).toContain('Inbox');
   });
 });

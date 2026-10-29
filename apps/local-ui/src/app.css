@@ -39,3 +39,84 @@ main.al-first-run {
   padding: var(--al-space-8) var(--al-space-5);
   box-sizing: border-box;
 }
+
+/* W4-SHELL (b11 §34.6): the Settings sub-navigation in two groups, Settings and Advanced. */
+.al-subnav-group {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+.al-subnav-group + .al-subnav-group {
+  padding-left: var(--al-space-3);
+  border-left: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.al-subnav-label {
+  flex: none;
+  padding: 0 var(--al-space-2);
+}
+
+/* W4-SHELL (b11 §34.1): the avatar menu at the right of the top bar. */
+.al-account-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: 50%;
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-muted);
+  cursor: pointer;
+}
+.al-account-btn:hover {
+  color: var(--al-color-fg-default);
+}
+.ag-menu.al-account-menu {
+  min-width: 240px;
+}
+.al-account-menu .ag-menu-item {
+  justify-content: space-between;
+}
+.al-account-check {
+  display: inline-flex;
+  width: 16px;
+}
+
+/* W4-SHELL (b11 §34.8): Cmd+K, on the switcher's level-3 menu surface. */
+.al-goto-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh var(--al-space-4) 0;
+  background: var(--al-color-bg-overlay);
+}
+.ag-menu.al-goto {
+  position: static;
+  width: 480px;
+  max-width: 100%;
+  max-height: 70vh;
+  gap: var(--al-space-2);
+  overflow: hidden;
+}
+.al-goto-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+.al-goto-list .ag-menu-item.is-active {
+  background: var(--al-color-bg-sunken);
+}
+.al-goto-none {
+  padding: var(--al-space-3);
+}
+@media (max-width: 600px) {
+  .al-account-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
