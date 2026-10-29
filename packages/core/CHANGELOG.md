@@ -1,5 +1,16 @@
 # @4thtech-io/core
 
+## 0.4.5
+
+### Patch Changes
+
+- @4thtech-io/chain@0.4.5
+  - @4thtech-io/crypto@0.4.5
+  - @4thtech-io/log@0.4.5
+  - @4thtech-io/storage@0.4.5
+  - @4thtech-io/transport-nostr@0.4.5
+  - @4thtech-io/types@0.4.5
+
 ## 0.4.4
 
 ### Patch Changes
