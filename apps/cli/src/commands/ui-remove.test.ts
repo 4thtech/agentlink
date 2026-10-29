@@ -146,6 +146,30 @@ describe('the removal port (U3-e, 06 §6 "Open agents and removal")', () => {
     await expect(stat(paths.dir)).rejects.toThrow();
   });
 
+  // HOTFIX-045-REMOVE (B1): the remove gate deletes the folder (agentDirectory.removeFolder) inside
+  // the port's exclusive hold. Real folder, real lock, real delete: nothing here is faked.
+  it('deletes the agent folder from inside its own exclusive hold (HOTFIX-045-REMOVE)', async () => {
+    const agentId = newId();
+    const paths = await writeAgentConfig(home, {
+      v: 1,
+      name: 'work',
+      agentId,
+      keyStore: 'keychain',
+      removing: true,
+    });
+    // The store and its WAL files, as an agent that was open leaves them.
+    for (const file of ['store.sqlite', 'store.sqlite-wal', 'store.sqlite-shm']) {
+      await writeFile(join(paths.dir, file), 'x', { mode: 0o600 });
+    }
+    // The app host had the agent open (the shared lock): `open.lock` is in the folder.
+    holdAgentFolderShared(paths.dir).release();
+    const port = uiRemovalPort({ home });
+    const directory = agentDirectory(home);
+    await port.exclusive('work', () => directory.removeFolder('work'));
+    await expect(stat(paths.dir)).rejects.toThrow();
+    expect(await directory.read('work')).toBeUndefined();
+  });
+
   it('opens an agent only inside its own exclusive hold', async () => {
     const agentId = newId();
     await writeAgentConfig(home, { v: 1, name: 'work', agentId, keyStore: 'keychain' });

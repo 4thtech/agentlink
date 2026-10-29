@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   AgentLinkClient,
+  buildAgentRevokeBody,
   encodeStorageMark,
   verifyRevokedEntry,
   type ApprovalChannel,
@@ -27,15 +28,19 @@ import {
 import {
   TAGS,
   bip340Verify,
+  canonicalize,
   decodeHex,
   encodeBase64url,
   encodeHex,
   encodeUtf8,
+  randomBytes,
   taggedHash,
   type EnvelopeKeys,
+  type JsonObject,
   type KeyStore,
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
+import { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { holdAgentFolderShared, withAgentFolderExclusive } from '../agent-folder-lock.js';
 import { openAgentStoreWith, type AgentStore } from '../agent-store.js';
@@ -263,7 +268,8 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => s.close()));
 });
 
-async function world(): Promise<World> {
+/** `solo`: a computer with one agent (HOTFIX-045-REMOVE B2): only `work` is listed and opens. */
+async function world(options: { solo?: boolean } = {}): Promise<World> {
   const work = await makeAgent('work');
   const other = await makeAgent('default');
   const agents = new Map([
@@ -293,6 +299,10 @@ async function world(): Promise<World> {
       { name: 'work', label: 'Work', available: true, removing: false, agentId: work.agentId },
     ],
   ]);
+  if (options.solo === true) {
+    entries.delete('default');
+    agents.delete('default');
+  }
   const entryOf = (name: string): AgentDirectoryEntry | undefined => {
     const e = entries.get(name);
     if (e === undefined) return undefined;
@@ -680,6 +690,90 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
     expect(w.carriers).toEqual([]);
     // A wrong owner code still signs nothing on this path.
     expectFixedEvents(w);
+  });
+
+  // HOTFIX-045-REMOVE (B2): on a computer with one agent, nothing is open after the first failure,
+  // so Try again cannot take the owner from an open agent. The owner comes from the verified revoked
+  // entry, checked against the owner stored on this computer, with presence and a signed revoke.
+  it('GAP B on a one-agent computer: Try again finishes with no agent open (HOTFIX-045-REMOVE)', async () => {
+    const w = await world({ solo: true });
+    const ownerBefore = OWNER_ACCOUNTS.filter((a) => keychain.items.has(a));
+    w.faults.folder = true;
+    const res = await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(res.json).toEqual({ status: 'failed' });
+    expect(itemsOf(w.work.agentId)).toEqual([]);
+    // Nothing else to open: the app has no agent open now.
+    expect(w.log.at(-1)).toBe('removal-close work');
+    const recorded = w.revoked.get(w.work.agentId);
+    w.faults.folder = false;
+    const retry = await remove(
+      w,
+      { name: 'work', typedLabel: 'Work' },
+      { generation: (await generationOf(w)) ?? '1' },
+    );
+    expect(retry.json).toEqual({ status: 'removed' });
+    expect(retry.status).toBe(200);
+    expect(w.log).toContain('removal-open-failed work');
+    expect(w.log.filter((l) => l === 'removeFolder work')).toEqual(['removeFolder work']);
+    expect(w.revoked.get(w.work.agentId)).toBe(recorded);
+    expect(w.carriers).toEqual([]);
+    expect(OWNER_ACCOUNTS.filter((a) => keychain.items.has(a))).toEqual(ownerBefore);
+    expectFixedEvents(w);
+  });
+
+  it('GAP B with no agent open: a wrong owner code signs nothing and deletes nothing (HOTFIX-045-REMOVE)', async () => {
+    const w = await world({ solo: true });
+    w.faults.folder = true;
+    await remove(w, { name: 'work', typedLabel: 'Work' });
+    w.faults.folder = false;
+    const generation = (await generationOf(w)) ?? '1';
+    const wrong = await remove(
+      w,
+      { name: 'work', typedLabel: 'Work' },
+      { generation, presence: '0000-0000' },
+    );
+    expect(wrong.status).toBe(403);
+    expect(wrong.json).toEqual({ status: 'presence_rejected' });
+    expect(w.log).not.toContain('removeFolder work');
+    // No presence at all is refused the same way, before anything.
+    const none = await remove(w, { name: 'work', typedLabel: 'Work' }, { generation, presence: '' });
+    expect(none.status).toBe(403);
+    expect(none.json).toEqual({ status: 'presence_required' });
+    expect(w.log).not.toContain('removeFolder work');
+    const right = await remove(w, { name: 'work', typedLabel: 'Work' }, { generation });
+    expect(right.json).toEqual({ status: 'removed' });
+  });
+
+  it("GAP B with no agent open: an entry signed by another owner is never finished, even with this computer's owner code (HOTFIX-045-REMOVE)", async () => {
+    const w = await world({ solo: true });
+    // Another owner's signed agent.revoke for this agent sits in the revoked list; its keys are gone.
+    const stranger = new MemoryOwnerKeyStore(randomBytes(32), {
+      kind: 'passphrase',
+      secret: encodeUtf8('stranger passphrase'),
+    });
+    const keys = await stranger.getPublicKeys();
+    const { body } = buildAgentRevokeBody({
+      agent: w.work.agentId,
+      owner: encodeHex(keys.ownerNostr),
+      issuedAt: 1_760_000_000,
+    });
+    const session = await stranger.unlock({
+      kind: 'passphrase',
+      secret: encodeUtf8('stranger passphrase'),
+    });
+    const sig = await session.signOwnerAction(body as unknown as JsonObject);
+    await session.close();
+    const text = canonicalize({ body, sig } as never);
+    expect(verifyRevokedEntry(text, w.work.agentId).ok).toBe(true);
+    w.revoked.set(w.work.agentId, text);
+    for (const item of itemsOf(w.work.agentId)) keychain.items.delete(item);
+    const ownerBefore = OWNER_ACCOUNTS.map((a) => keychain.items.get(a));
+    const res = await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(res.json).not.toEqual({ status: 'removed' });
+    expect(res.status).not.toBe(200);
+    expect(w.log).not.toContain('removeFolder work');
+    expect(w.revoked.get(w.work.agentId)).toBe(text);
+    expect(OWNER_ACCOUNTS.map((a) => keychain.items.get(a))).toEqual(ownerBefore);
   });
 
   it('GAP B: an agent whose store does not open and that is not retired is never finished', async () => {
