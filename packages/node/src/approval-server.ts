@@ -149,6 +149,8 @@ import {
   rememberContactRules,
   type OwnerActionOutcome,
   type PayConfirmFlow,
+  type RevokeDeliveryOptions,
+  verifyRevokedEntry,
 } from '@4thtech-io/core';
 import {
   KeyStoreError,
@@ -166,6 +168,7 @@ import {
   parseJson,
   wipe,
   type Argon2idParams,
+  type EnvelopeKeys,
   type JsonObject,
   type JsonValue,
   type OwnerPresence,
@@ -267,6 +270,17 @@ import {
   type AppHostOptions,
   type AppHostSwitchOutcome,
 } from './local-ui/app-host.js';
+import {
+  REMOVE_STATUS,
+  RemovalStepFailed,
+  parseRemoveInput,
+  runFinishSteps,
+  runRemovalSteps,
+  type RemovalStep,
+  type RemoveOutcome,
+} from './local-ui/api/agents-remove.js';
+import { AgentFolderLockError } from './agent-folder-lock.js';
+import { createKeyEraseControl } from './key-controls.js';
 import {
   LOCAL_UI_API_PREFIX,
   LocalUiRouteRegistry,
@@ -653,6 +667,8 @@ export type ApprovalServerEvent =
     }
   /** U3-c: a switch of the open agent in the app host (fixed outcome only, never a name). */
   | { readonly kind: 'switch'; readonly outcome: AppHostSwitchOutcome }
+  /** U3-e: removing an agent (fixed outcome and step only, never a name, label or ID; I-7). */
+  | { readonly kind: 'remove'; readonly outcome: RemoveOutcome; readonly step?: RemovalStep }
   | { readonly kind: 'closed' };
 
 /** M1-UX-FIRSTRUN-V2: what happened to the first policy's Send folder (fixed codes). */
@@ -701,6 +717,8 @@ export interface ApprovalServerInternals {
   readonly openOwnerStore?: (owner: OwnerPublicKeys) => Promise<PromptingOwnerKeyStore>;
   /** The keychain holding the `owner` and `owner-passkey` items (M1-8e). Default: the OS keychain. */
   readonly keychain?: KeychainBackend;
+  /** U3-e: the bounded wait of the revoke carriers (tests: a fake clock). */
+  readonly removalDelivery?: RevokeDeliveryOptions;
   readonly opener?: BrowserOpener;
   readonly notifier?: OsNotifier;
   /** MSG-FILES-IO-h: the OS file revealer behind Show in Finder. Default: osFileRevealer. */
@@ -777,6 +795,31 @@ class AgentChanged extends Error {
     super('The open agent changed.');
     this.name = 'AgentChanged';
   }
+}
+
+/**
+ * U3-e: the carrier keys of one removal gesture (route-types.ts `carrierKeys`): the owner session's
+ * envelope signature, seal (Nostr kind 13 only) and NIP-44 encryption, while `open()` holds. Nothing
+ * that decrypts: `nip44Decrypt` and `unwrapCek` always refuse.
+ */
+function carrierKeysOf(session: OwnerSession, open: () => boolean): EnvelopeKeys {
+  const closed = (): Promise<never> =>
+    Promise.reject(new KeyStoreError('owner_locked', 'The owner session has ended.'));
+  const refused = (): Promise<never> =>
+    Promise.reject(
+      new KeyStoreError('operation_not_allowed', 'Removal keys only seal revoke carriers.'),
+    );
+  return Object.freeze<EnvelopeKeys>({
+    signEnvelopeHash: (hash) => (open() ? session.signEnvelopeHash(hash) : closed()),
+    signNostr: (event) => {
+      if (!open()) return closed();
+      if ((event as { kind?: unknown }).kind !== 13) return refused();
+      return session.signNostr(event);
+    },
+    nip44Encrypt: (peer, plaintext) => (open() ? session.nip44Encrypt(peer, plaintext) : closed()),
+    nip44Decrypt: () => refused(),
+    unwrapCek: () => refused(),
+  });
 }
 
 /** U3-c: the source while the app host has no agent open (a failed switch): nothing to show. */
@@ -1138,6 +1181,8 @@ export async function startApprovalServerWith(
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
       // U3-d: create an agent and save a verified label, in the app host only.
       ...(options.host === undefined ? {} : { agentsManage }),
+      // U3-f: the CLI's harness desk (the one AI app config writer), when the caller wired it.
+      ...(agentUi?.aiApps === undefined ? {} : { aiApps: agentUi.aiApps }),
     });
   let uiContext: LocalUiContext = buildUiContext();
 
@@ -1699,11 +1744,19 @@ export async function startApprovalServerWith(
    * allowlist and one gesture, D-68); the session is closed and the store locked when `run` returns,
    * whatever happened. A presence route that returns without signing performed no owner operation
    * and is answered 409 `refused`, never its own result.
+   *
+   * U3-e (the remove gate only): `gate.context` checks presence against the owner the removed
+   * agent's own card names instead of the open agent's, and `gate.carriers` gives `run` the carrier
+   * keys of this session once it signed an `agent.revoke` (route-types.ts `carrierKeys`).
    */
   async function ownerGate(
     req: IncomingMessage,
     res: ServerResponse,
     run: (owner: LocalUiOwnerOperation) => Promise<LocalUiResult>,
+    gate: {
+      readonly context?: () => Promise<ApprovalContext | undefined>;
+      readonly carriers?: true;
+    } = {},
   ): Promise<void> {
     const wait = waitSeconds();
     if (wait > 0) {
@@ -1745,7 +1798,7 @@ export async function startApprovalServerWith(
       }
       busy = true;
       try {
-        const context = await source.context();
+        const context = await (gate.context ?? (() => source.context()))();
         if (context === undefined) {
           finishOwner(res, 503, 'needs_setup');
           return;
@@ -1788,9 +1841,17 @@ export async function startApprovalServerWith(
           }
           presenceSucceeded();
           let used = false;
+          // U3-e: open only between this gesture's signed `agent.revoke` and the end of `run`.
+          let carriersOpen = false;
           let result: LocalUiResult;
           try {
             const owner: LocalUiOwnerOperation = Object.freeze<LocalUiOwnerOperation>({
+              ...(gate.carriers === true
+                ? {
+                    carrierKeys: () =>
+                      carriersOpen ? carrierKeysOf(session, () => carriersOpen) : undefined,
+                  }
+                : {}),
               sign: async (review, requests) => {
                 // U3-c: right before acting, the open agent is still the one the page showed.
                 if (!stillCurrent(req)) throw new AgentChanged();
@@ -1806,7 +1867,17 @@ export async function startApprovalServerWith(
                 // M1-PAY-CONFIRM-a (04 §2.5.3): a spending change or a paid approval is signed
                 // only through the confirmation, never by an ordinary owner route.
                 await refuseUnconfirmedPaid(frozen);
-                return signGesture(session, frozen);
+                const signatures = await signGesture(session, frozen);
+                const only = frozen[0];
+                if (
+                  gate.carriers === true &&
+                  frozen.length === 1 &&
+                  only?.kind === 'owner-action' &&
+                  only.action['op'] === 'agent.revoke'
+                ) {
+                  carriersOpen = true;
+                }
+                return signatures;
               },
               // U3-d (04 §2.8 "From the local app"): Add an agent, in the app host only. The same
               // one owner operation: exactly the new agent's first card, first policy and first
@@ -1846,6 +1917,7 @@ export async function startApprovalServerWith(
             else finishOwner(res, 500, 'failed');
             return;
           } finally {
+            carriersOpen = false;
             await session.close().catch(() => undefined);
           }
           if (!used) {
@@ -3055,6 +3127,11 @@ export async function startApprovalServerWith(
       sendResult(res, NOT_AVAILABLE);
       return;
     }
+    if (route.presence === 'remove') {
+      // U3-e: removing an agent has its own gate around ownerGate (the folder lock, its context).
+      await removeGate(req, res, url);
+      return;
+    }
     if (route.presence === 'reveal') {
       // MSG-FILES-IO-h: Show in Finder has its own gate; ownerGate never runs it (D-134).
       await revealGate(req, res, url, route);
@@ -3353,6 +3430,16 @@ export async function startApprovalServerWith(
     if (slot === undefined) throw new Error('not the app host');
     const entries = (await slot.directory.list()).slice(0, MAX_LISTED_AGENTS);
     const current = slot.current;
+    // U3-f: the agent each AI app runs, from its `agentlink` entry only (the seam's entry-only view).
+    const apps = await (agentUi?.aiApps?.list() ?? Promise.resolve(undefined)).catch(
+      () => undefined,
+    );
+    const appsOf = (name: string): readonly string[] =>
+      Object.freeze(
+        (apps?.apps ?? []).flatMap((view) =>
+          view.state.kind === 'agent' && view.state.agent === name ? [view.app] : [],
+        ),
+      );
     const agents: LocalUiAgentView[] = [];
     for (const entry of entries) {
       const stats = entry.available
@@ -3371,8 +3458,8 @@ export async function startApprovalServerWith(
           removing: entry.removing,
           contacts: stats?.contacts ?? null,
           running: stats?.running ?? false,
-          // Card U3-f fills this from each AI app's `agentlink` entry only.
-          apps: [],
+          // U3-f: from each AI app's `agentlink` entry only.
+          apps: appsOf(entry.name),
         }),
       );
     }
@@ -3450,6 +3537,195 @@ export async function startApprovalServerWith(
             ? 503
             : 409;
     finishSwitch(status, outcome);
+  }
+
+  /** U3-e: one removal at a time. */
+  let removalBusy = false;
+
+  /**
+   * U3-e: `POST /api/ui/agents/remove` `{name, typedLabel, anyway?}` (08 §1; 04 §2.5 "Removing an
+   * agent"), the remove kind. The caller checked the session, CSRF, Origin, fetch metadata, the
+   * octet-stream type and the generation (the request's hold). No query. In order: the strict input;
+   * the name must be a listed agent and the typed label its label exactly (`label_mismatch`); the app
+   * closes the agent if it has it open (same generation: a refused removal opens it again); the
+   * folder lock is taken EXCLUSIVE, or `in_use` before any presence is used; the agent is opened for
+   * its removal under that lock; then ownerGate checks presence against the owner its own card names
+   * and runs the steps (api/agents-remove.ts runRemovalSteps), which sign `agent.revoke` (and its
+   * carriers) in the one gesture. The lock is held until the folder is gone. Then the app opens
+   * another agent, or none ("Add an agent"); after `undeliverable` it opens none, so the page can
+   * ask "Remove anyway?" (the agent is retired and listed as "Removal not finished").
+   */
+  async function removeGate(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    const finishRemove = (outcome: RemoveOutcome, step?: RemovalStep): void => {
+      emit({ kind: 'remove', outcome, ...(step === undefined ? {} : { step }) });
+      if (res.headersSent) return;
+      req.resume();
+      stamp(res);
+      sendJson(res, REMOVE_STATUS[outcome], { status: outcome });
+    };
+    const slot = host;
+    const removal = options.host?.removal;
+    if (slot === undefined || removal === undefined) {
+      req.resume();
+      sendResult(res, NOT_AVAILABLE);
+      return;
+    }
+    const raw = operationInput(req);
+    const input = raw === 'invalid' || url.search !== '' ? undefined : parseRemoveInput(raw);
+    if (input === undefined) {
+      finishRemove('invalid');
+      return;
+    }
+    if (removalBusy) {
+      req.resume();
+      finishOwner(res, 409, 'busy');
+      return;
+    }
+    removalBusy = true;
+    let reopen: (() => Promise<void>) | undefined;
+    let settled: 'removed' | 'undeliverable' | 'retired' | undefined;
+    let wasOpen = false;
+    try {
+      const entry = await slot.directory.read(input.name).catch(() => undefined);
+      if (entry === undefined || entry.name !== input.name || !entry.available) {
+        finishRemove('unknown_agent');
+        return;
+      }
+      // The typed label is the confirmation (b11 §29): exactly the label shown, never normalised.
+      if (input.typedLabel !== entry.label) {
+        finishRemove('label_mismatch');
+        return;
+      }
+      const keys = await removal.keys(input.name).catch(() => undefined);
+      if (keys === undefined) {
+        finishRemove('unknown_agent');
+        return;
+      }
+      const erase = createKeyEraseControl(
+        keys.backend === 'keychain'
+          ? { backend: 'keychain', keychain: keychainOf() }
+          : { backend: 'file', keystoreDir: keys.keystoreDir },
+      );
+      // GAP B: the owner context of the agent the app has open (the same owner), read before it may
+      // be closed; used only to finish a retired agent whose store no longer opens.
+      const openSource = source;
+      const openContext = (): Promise<ApprovalContext | undefined> => openSource.context();
+      // (1) The app's own shared lock goes first, then the lock is taken exclusive.
+      const closed = await slot.closeForRemoval(input.name);
+      wasOpen = closed.closed;
+      reopen = closed.restore;
+      await removal.exclusive(input.name, async () => {
+        const agent = await removal.open(input.name);
+        if (agent === undefined) {
+          // GAP B: a retired agent whose keys are gone no longer opens; steps 6 and 7 finish it.
+          const recorded = entry.removing
+            ? await removal.readRevoked(keys.agentId).catch(() => undefined)
+            : undefined;
+          const checked =
+            recorded?.kind === 'entry'
+              ? verifyRevokedEntry(recorded.text, keys.agentId)
+              : undefined;
+          // The owner of the gesture: the agent that is open now (the same owner) signed that entry.
+          const context = await openContext().catch(() => undefined);
+          if (
+            recorded?.kind !== 'entry' ||
+            checked?.ok !== true ||
+            context === undefined ||
+            encodeHex(context.owner.ownerNostr) !== checked.owner
+          ) {
+            finishRemove('failed');
+            return;
+          }
+          const text = recorded.text;
+          const ownerNostr = checked.owner;
+          await ownerGate(
+            req,
+            res,
+            async (owner) => {
+              try {
+                await runFinishSteps({
+                  name: input.name,
+                  label: entry.label,
+                  agentId: keys.agentId,
+                  recorded: text,
+                  ownerNostr,
+                  removeFolder: (name) => slot.directory.removeFolder(name),
+                  erase,
+                  owner,
+                  now: () => now(),
+                });
+                settled = 'removed';
+                emit({ kind: 'remove', outcome: 'removed' });
+                return { status: REMOVE_STATUS.removed, body: { status: 'removed' } };
+              } catch (error) {
+                if (error instanceof RemovalStepFailed) {
+                  settled = 'retired';
+                  emit({ kind: 'remove', outcome: 'failed', step: error.step });
+                }
+                throw error;
+              }
+            },
+            { context: () => Promise.resolve(context) },
+          );
+          return;
+        }
+        try {
+          await ownerGate(
+            req,
+            res,
+            async (owner) => {
+              try {
+                const outcome = await runRemovalSteps({
+                  name: input.name,
+                  agentId: keys.agentId,
+                  label: entry.label,
+                  anyway: input.anyway,
+                  agent,
+                  port: removal,
+                  markRemoving: (name) => slot.directory.markRemoving(name),
+                  removeFolder: (name) => slot.directory.removeFolder(name),
+                  erase,
+                  owner,
+                  ...(internals.removalDelivery === undefined
+                    ? {}
+                    : { delivery: internals.removalDelivery }),
+                });
+                settled = outcome;
+                emit({ kind: 'remove', outcome });
+                return { status: REMOVE_STATUS[outcome], body: { status: outcome } };
+              } catch (error) {
+                if (error instanceof RemovalStepFailed) {
+                  // Recorded (any later step failed): the agent is retired either way.
+                  if (error.step !== 'sign' && error.step !== 'record') settled = 'retired';
+                  emit({ kind: 'remove', outcome: 'failed', step: error.step });
+                }
+                throw error;
+              }
+            },
+            { context: () => agent.context(), carriers: true },
+          );
+        } finally {
+          await agent.close().catch(() => undefined);
+        }
+      });
+    } catch (error) {
+      if (error instanceof AgentFolderLockError && error.code === 'in_use') {
+        finishRemove('in_use');
+      } else {
+        finishRemove('failed');
+      }
+    } finally {
+      try {
+        if (settled === undefined) {
+          // Nothing was signed: the agent the page showed is opened again, same generation.
+          await reopen?.();
+        } else if (settled !== 'undeliverable') {
+          await slot.openAfterRemoval(wasOpen);
+        }
+      } finally {
+        removalBusy = false;
+      }
+    }
   }
 
   // Created last: binding the first agent clears state the gates above own.

@@ -15,10 +15,13 @@
 //   core owner actions, so the one first-run gesture also signs the first policy (the 06 §3
 //   defaults with `~/AgentLink/Send` allowed), as `owner init` does. The real home is used (no
 //   `home` override). The owner actions stay with the approval server, never with a page handler.
+// - U3-f: the AI apps seam (harness/app-desk.ts) for the local app's AI apps routes; its list is
+//   also read on the first-run page, before an owner exists (entry-only).
 // - Events: an owner set up from the page is named outside the browser with one fixed line and the
 //   public fingerprint (IR-M1-11s-c-1 L-2), through the redacting logger. Nothing else of an event
 //   is logged at info, and no event ever holds a token, link, code or seed (I-7).
 import { homedir } from 'node:os';
+import process from 'node:process';
 import type { AgentLinkClient } from '@4thtech-io/core';
 import type { Logger } from '@4thtech-io/log';
 import {
@@ -26,12 +29,14 @@ import {
   type ApprovalServerEvent,
   type FirstAgentCard,
   type KeyStoreBackendKind,
+  type LocalUiAiApps,
   type LocalUiAssets,
   type LocalUiOptions,
 } from '@4thtech-io/node';
 // The card relay list `owner init` uses (commands/owner/card-relays.ts re-exports this same list;
 // the MCP side never imports an owner command, test/policy-command.test.ts).
 import { DEFAULT_RELAYS } from '@4thtech-io/transport-nostr';
+import { createAiAppsDesk } from '../harness/app-desk.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
 import { readAgentConfig } from '../runtime/index.js';
 import { embeddedLocalUiAssets } from './local-ui-assets.js';
@@ -46,6 +51,11 @@ export interface LocalUiWiringDeps {
   cardRelays(): readonly string[];
   /** The app's files (embedded in this build). */
   assets(): LocalUiAssets;
+  /**
+   * U3-f (06 §7 "The app as a second path"): the AI apps seam over the harness code, the one writer
+   * of AI app configs. A new desk per opened agent, so a switch drops the open previews.
+   */
+  aiApps(): LocalUiAiApps;
 }
 
 export function nodeLocalUiWiring(home: string = homedir()): LocalUiWiringDeps {
@@ -54,6 +64,9 @@ export function nodeLocalUiWiring(home: string = homedir()): LocalUiWiringDeps {
     ownerSetupAvailable: (first) => ownerSetupAvailable(first),
     cardRelays: () => DEFAULT_RELAYS,
     assets: () => embeddedLocalUiAssets(),
+    // The real home and this process's environment, as `init` uses (harnesses.ts: only Windsurf's
+    // own folder variables are followed, and CLAUDE_CONFIG_DIR is refused).
+    aiApps: () => createAiAppsDesk({ home, env: process.env }),
   });
 }
 
@@ -110,6 +123,7 @@ export async function localUiOptions(
   return {
     assets: deps.assets(),
     client: agent.client,
+    aiApps: deps.aiApps(),
     ...(wired
       ? {
           ownerSetup: {

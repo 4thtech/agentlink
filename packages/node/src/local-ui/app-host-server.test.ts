@@ -24,7 +24,7 @@ import {
 } from '../approval-server.js';
 import { agentsSwitchRoute } from './api/agents.js';
 import type { AgentDirectory, AgentDirectoryEntry, AppHostAgent } from './app-host.js';
-import type { LocalUiAssets } from './context.js';
+import type { LocalUiAiApps, LocalUiAiAppView, LocalUiAssets } from './context.js';
 import { REVEAL_PATH } from './reveal-path.js';
 import type { LocalUiRoute } from './route-types.js';
 import { LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
@@ -105,6 +105,30 @@ interface Agents {
   agent(name: string): AppHostAgent;
 }
 
+/** U3-f: a fake AI apps seam (the CLI's harness desk in production). */
+function aiAppsSeam(): LocalUiAiApps {
+  const view = (app: string, state: LocalUiAiAppView['state']): LocalUiAiAppView => ({
+    app,
+    name: app,
+    path: `~/.${app}`,
+    state,
+    quitFirst: false,
+  });
+  return {
+    list: () =>
+      Promise.resolve({
+        desktopRunning: false,
+        apps: [
+          view('claude-code', { kind: 'agent', agent: 'default' }),
+          view('codex', { kind: 'agent', agent: 'work' }),
+          view('cursor', { kind: 'foreign' }),
+        ],
+      }),
+    plan: () => Promise.reject(new Error('not here')),
+    agentIdOf: () => Promise.resolve(undefined),
+  };
+}
+
 function agents(): Agents {
   const log: string[] = [];
   const written: string[] = [];
@@ -141,7 +165,9 @@ function agents(): Agents {
               },
             } as never,
           }
-        : {},
+        : // U3-f: the AI apps seam: Claude Code runs `default`, Codex runs `work`, Cursor holds a
+          // foreign entry (never listed for any agent).
+          { aiApps: aiAppsSeam() },
     close: () => {
       log.push(`close ${name}`);
       return Promise.resolve();
@@ -328,7 +354,8 @@ describe('GET /api/ui/agents (U3-c)', () => {
           removing: false,
           contacts: 1,
           running: false,
-          apps: [],
+          // U3-f: from each AI app's `agentlink` entry only.
+          apps: ['claude-code'],
         },
         {
           name: 'work',
@@ -339,7 +366,7 @@ describe('GET /api/ui/agents (U3-c)', () => {
           removing: false,
           contacts: 3,
           running: true,
-          apps: [],
+          apps: ['codex'],
         },
         {
           name: 'old',
@@ -474,8 +501,9 @@ describe('U3 route stubs (U3-c review note c)', () => {
     ]) {
       expect(registered, route).toContain(route);
     }
-    // U3-d replaced the stubs of POST /api/ui/agents and /api/ui/agents/label.
-    for (const path of ['/api/ui/agents/remove', '/api/ui/apps/apply', '/api/ui/apps/disconnect']) {
+    // U3-d replaced the stubs of POST /api/ui/agents and /api/ui/agents/label; U3-f the AI apps
+    // routes (api/apps.test.ts).
+    for (const path of ['/api/ui/agents/remove']) {
       const res = await send(h.port, path, {
         method: 'POST',
         headers: h.write(cookie, csrf, { 'X-AgentLink-Generation': '1' }),
@@ -484,14 +512,7 @@ describe('U3 route stubs (U3-c review note c)', () => {
       expect(res.status, path).toBe(501);
       expect(JSON.parse(res.body), path).toEqual({ error: 'not_available' });
     }
-    // U3-flow replaced its stub: `/api/ui/flow` is a live read (see the U3-flow block below).
-    for (const path of ['/api/ui/apps', '/api/ui/apps/preview']) {
-      const res = await send(h.port, path, {
-        headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
-      });
-      expect(res.status, path).toBe(501);
-      expect(JSON.parse(res.body), path).toEqual({ error: 'not_available' });
-    }
+    // U3-flow and U3-f replaced the read stubs (`/api/ui/flow`, `/api/ui/apps`, `/api/ui/apps/preview`).
     expect(h.ownerStores).toEqual([]);
   });
 });

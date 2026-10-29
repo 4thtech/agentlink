@@ -50,6 +50,7 @@ import {
   type AgentCard,
   type Envelope,
   type EnvelopeHeader,
+  type EnvelopeKeys,
   type EnvelopeRecipient,
   type JsonValue,
 } from '@4thtech-io/crypto';
@@ -1798,6 +1799,11 @@ async function sealOutbound(
     readonly payload: Payload;
     readonly thread: string;
     readonly id?: Uint8Array;
+    /**
+     * U3-e: an owner-authored carrier (`revoke`, 04 §3.4.1) is signed by the owner key: `from` is the
+     * owner's Nostr key (64 lowercase hex) and `keys` the owner session. Default: the agent's KeyStore.
+     */
+    readonly signer?: { readonly keys: EnvelopeKeys; readonly from: string };
   },
 ): Promise<SealedOutbound> {
   const bundle = await ctx.keyStore.getPublicBundle();
@@ -1836,7 +1842,7 @@ async function sealOutbound(
       v: 1,
       id: encodeBase64url(id),
       thread: input.thread,
-      from: encodeHex(bundle.agentNostr),
+      from: input.signer?.from ?? encodeHex(bundle.agentNostr),
       createdAt: now,
       recipients,
     };
@@ -1846,7 +1852,12 @@ async function sealOutbound(
     wipe(cek);
   }
   const hash = envelopeHash(unsigned);
-  const envelope = parseEnvelope({ ...unsigned, sig: await ctx.keyStore.signEnvelopeHash(hash) });
+  const signer = input.signer?.keys ?? ctx.keyStore;
+  const envelope = parseEnvelope({ ...unsigned, sig: await signer.signEnvelopeHash(hash) });
+  // U3-e: an owner-signed carrier must verify under the `from` it names (the session's own key).
+  if (input.signer !== undefined && !verifyEnvelope(envelope)) {
+    throw new CoreError('owner_key_mismatch', 'The owner key did not sign this message.');
+  }
   const envelopeJson = canonicalize(envelope as unknown as JsonValue);
   if (encodeUtf8(envelopeJson).length > MAX_ENVELOPE_BYTES) {
     throw new CoreError('envelope_too_large', 'The message is too large to send.');
@@ -1927,6 +1938,54 @@ export async function sealPairingEnvelope(
     payload: parsed.data,
     thread: input.thread,
     ...(input.id === undefined ? {} : { id: input.id }),
+  });
+}
+
+/**
+ * U3-e: seals one `revoke` carrier (04 §3.4.1) of the own agent's signed `agent.revoke` to one
+ * contact, with the owner as sender: `from` is the owner key of the agent's own card and the
+ * envelope and its seals are signed by `ownerKeys` (the owner session of the removal gesture), never
+ * by the agent's KeyStore (the key table, 04 §3.1.1). Recipients per 04 §3.2: the contact's agent and
+ * owner, the own owner and the own agent. Core-internal: no MCP tool reaches it (I-4).
+ */
+export async function sealRevokeCarrier(
+  ctx: CoreContext,
+  identity: IdentityService,
+  input: {
+    readonly signed: unknown;
+    readonly peer: AgentCard;
+    readonly ownerKeys: EnvelopeKeys;
+  },
+): Promise<SealedOutbound> {
+  const parsed = payloadSchema.safeParse({
+    type: 'revoke',
+    body: { signed: input.signed },
+    replyTo: null,
+    files: [],
+  });
+  if (!parsed.success || parsed.data.type !== 'revoke') {
+    throw new CoreError('payload_invalid', 'The message content is not valid.');
+  }
+  const self = await identity.get();
+  if (self === undefined) {
+    throw new CoreError('identity_missing', 'This agent has no identity yet. Run init first.');
+  }
+  // Only this agent's own retirement travels here.
+  if (parsed.data.body.signed.body.agent !== self.agentId) {
+    throw new CoreError('payload_invalid', 'The message content is not valid.');
+  }
+  const bundle = await ctx.keyStore.getPublicBundle();
+  const parties: Party[] = [
+    { enc: bytesOf(input.peer.agentEnc), nostr: agentNostrKey(input.peer) },
+    { enc: bytesOf(input.peer.ownerEnc), nostr: input.peer.ownerNostr.slice(2) },
+    { enc: bytesOf(self.card.ownerEnc), nostr: self.card.ownerNostr.slice(2) },
+    { enc: bundle.agentEnc, nostr: encodeHex(bundle.agentNostr) },
+  ];
+  return sealOutbound(ctx, {
+    parties,
+    payload: parsed.data,
+    thread: encodeBase64url(randomBytes(THREAD_ID_LENGTH)),
+    signer: { keys: input.ownerKeys, from: self.card.ownerNostr.slice(2) },
   });
 }
 

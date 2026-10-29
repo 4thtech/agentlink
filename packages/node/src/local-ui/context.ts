@@ -79,6 +79,93 @@ export interface LocalUiOptions {
   readonly health?: LocalUiHealthSource;
   /** M1-11s-a-d: the app version the health read answers (a plain version, else nothing). */
   readonly version?: string;
+  /**
+   * U3-f (08 §1 "AI apps"; 06 §7 "The app as a second path"): the CLI's harness desk, the one writer
+   * of AI app configs (apps/cli/src/harness/app-desk.ts). Absent: the AI apps routes answer
+   * `not_available`.
+   */
+  readonly aiApps?: LocalUiAiApps;
+}
+
+/**
+ * U3-f: what an AI app's `agentlink` entry is (entry-only, 08 §1): none, exactly AgentLink's for a
+ * local agent name, one AgentLink did not write (nothing of it is ever passed on), or a file that
+ * cannot be read (a link, too large, not valid, another form).
+ */
+export type LocalUiAiAppEntryState =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'agent'; readonly agent: string }
+  | { readonly kind: 'foreign' }
+  | { readonly kind: 'unreadable' };
+
+/** U3-f: one detected AI app. Fixed names and display paths only; never file content. */
+export interface LocalUiAiAppView {
+  /** The id of the fixed harness table (06 §7). */
+  readonly app: string;
+  /** Its fixed display name. */
+  readonly name: string;
+  /** The config file as shown (`~/…`), from the fixed table. */
+  readonly path: string;
+  readonly state: LocalUiAiAppEntryState;
+  /** Claude Desktop runs now: it is not written ("Quit Claude Desktop first"). */
+  readonly quitFirst: boolean;
+}
+
+/** U3-f: how a planned write ended. */
+export type LocalUiAiAppWrite =
+  | 'written'
+  /** The file is not the one planned (bytes or identity): nothing written. */
+  | 'changed'
+  /** Claude Desktop runs: nothing written. */
+  | 'quit_first'
+  /** The agent the entry runs is not the agent the owner signed for: nothing written. */
+  | 'agent_mismatch'
+  | 'failed';
+
+/**
+ * U3-f: the exact entry change for one app and one agent, or why there is none. `file` is the
+ * resolved config path (bound by the `changeId`, never answered); `identity` is the file's device
+ * and inode as read (`none` when it does not exist). `commit` writes exactly this change (atomic,
+ * with a mode-keeping backup) after checking again that the file is unchanged, Claude Desktop is
+ * not running and the entry's agent is `agentId`'s folder.
+ */
+export type LocalUiAiAppPlan =
+  | {
+      readonly status: 'change';
+      readonly kind: 'connect' | 'move' | 'disconnect';
+      readonly app: string;
+      readonly name: string;
+      readonly path: string;
+      readonly file: string;
+      readonly oldEntry: JsonObject | null;
+      readonly newEntry: JsonObject | null;
+      readonly oldAgent: string | null;
+      readonly newAgent: string | null;
+      readonly identity: string;
+      commit(agentId: string): Promise<LocalUiAiAppWrite>;
+    }
+  | {
+      readonly status:
+        'present' | 'not_connected' | 'conflict' | 'quit_first' | 'unreadable' | 'not_found';
+      readonly app: string;
+      readonly name: string;
+    };
+
+/**
+ * U3-f: the harness seam the CLI passes in (06 §7: one writer; packages/node builds no config path
+ * and writes no config). Every method checks the app id and the agent name itself and never throws
+ * with file content.
+ */
+export interface LocalUiAiApps {
+  /** The detected apps, entry-only, and whether Claude Desktop runs. */
+  list(): Promise<{ readonly apps: readonly LocalUiAiAppView[]; readonly desktopRunning: boolean }>;
+  /**
+   * The change that makes `app` run `agent` (connect, or move from another agent), or, when it
+   * already runs `agent`, the change that disconnects it.
+   */
+  plan(app: string, agent: string): Promise<LocalUiAiAppPlan>;
+  /** The agentId recorded for an agent folder (07 §9.1); undefined when it cannot be read. */
+  agentIdOf(agent: string): Promise<string | undefined>;
 }
 
 /** M1-11s-c: what owner setup needs from the caller (the CLI). Keychain machines only. */
@@ -192,6 +279,18 @@ export interface LocalUiReadClient {
     label(): Promise<LabelReading>;
     prepareLabel(label: string): Promise<PreparedOwnerAction>;
   };
+  /**
+   * U3-f (04 §2.5.1 `app.connect`, `app.disconnect`): core's prepare helper for an AI app change of
+   * this agent. Writes nothing (I-4): the body changes nothing until the gate's one-use `sign`
+   * signed it and core applied it. Optional so that page fakes without it stay valid.
+   */
+  readonly apps?: {
+    prepare(
+      op: 'app.connect' | 'app.disconnect',
+      app: string,
+      changeId: string,
+    ): Promise<PreparedOwnerAction>;
+  };
 }
 
 /** The read-only view of `client` (a fresh frozen object, nothing else of the client). */
@@ -243,6 +342,11 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
     agent: Object.freeze({
       label: () => client.ownerActions.loadLabel(),
       prepareLabel: (label: string) => client.ownerActions.prepareLabel(label),
+    }),
+    // U3-f: the unsigned `app.connect` / `app.disconnect` (prepare only).
+    apps: Object.freeze({
+      prepare: (op: 'app.connect' | 'app.disconnect', app: string, changeId: string) =>
+        client.ownerActions.prepareAppChange(op, app, changeId),
     }),
   });
 }
@@ -402,6 +506,12 @@ export interface LocalUiContext {
    * config.json only after core applied the signed `agent.label` (07 §9.1).
    */
   readonly agentsManage?: LocalUiAgentsManage;
+  /**
+   * U3-f (08 §1 "AI apps"): the CLI's harness desk for the AI apps routes (api/apps.ts) only. It
+   * writes only through a plan's `commit`, which the apply and disconnect routes call after the
+   * owner signed the change and core applied it.
+   */
+  readonly aiApps?: LocalUiAiApps;
 }
 
 /** U3-c: one agent in `GET /api/ui/agents`. Never a path, an agent ID or a key. */
@@ -420,7 +530,7 @@ export interface LocalUiAgentView {
   readonly contacts: number | null;
   /** An AI app is running this agent (the publisher lease row, read only, 06 §6). */
   readonly running: boolean;
-  /** The AI apps whose `agentlink` entry runs this agent (card U3-f fills it; empty until then). */
+  /** The AI app ids whose `agentlink` entry runs this agent (U3-f: from the entry only). */
   readonly apps: readonly string[];
 }
 

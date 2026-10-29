@@ -22,8 +22,9 @@
 // seed, item value and code is wiped after use and on every failure (04 §8 rule 3). Errors are fixed
 // sentences that never contain an input (I-7).
 import { constants } from 'node:fs';
-import { open, realpath, unlink, type FileHandle } from 'node:fs/promises';
-import { dirname, isAbsolute, resolve, sep } from 'node:path';
+import { lstat, open, realpath, unlink, type FileHandle } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import {
   CryptoInputError,
   KeyStoreError,
@@ -35,6 +36,8 @@ import {
   type DisplayCode,
   type ImportAgentOptions,
   type ImportedAgentKeys,
+  type AgentKeyEraseRequest,
+  type KeyEraseControl,
   type KeyExportControl,
   type KeyImportControl,
   type KeystoreEntry,
@@ -59,13 +62,23 @@ import {
   type RecoveryKitStoreSink,
   type RecoveryKitStoreSource,
 } from '@4thtech-io/crypto/keystore';
-import { STORAGE_MARK_ITEM, encodeStorageMark, type OwnStorageKeys } from '@4thtech-io/core';
+import {
+  STORAGE_MARK_ITEM,
+  encodeStorageMark,
+  verifyRevokedEntry,
+  type OwnStorageKeys,
+} from '@4thtech-io/core';
 import { CLI_COMMAND } from './cli-command.js';
 import { NodeKeyStoreError } from './errors.js';
-import { OWNER_FILE, defaultKeystoreDir, importAgentFile } from './file-keystore.js';
+import {
+  OWNER_FILE,
+  defaultKeystoreDir,
+  eraseFileAgent,
+  importAgentFile,
+} from './file-keystore.js';
 import { readKeystoreFile, type KeystoreFsOptions } from './file-keystore-fs.js';
 import { withInterProcessLock, type LockHold } from './inter-process-lock.js';
-import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
+import { KEYCHAIN_CALL_TIMEOUT_MS, eraseKeychainAgent, guarded } from './keychain-keystore.js';
 import {
   assertAgentId,
   keychainAccount,
@@ -123,6 +136,11 @@ const fileOwnerUnsupported = (): KeyStoreError =>
   new KeyStoreError(
     'unsupported_operation',
     'restore: an owner on a passphrase-locked key file machine is not supported yet',
+  );
+const agentRetired = (): KeyStoreError =>
+  new KeyStoreError(
+    'operation_not_allowed',
+    'restore: this agent was removed and is retired for good; it comes back only as a new agent',
   );
 const argument = (message: string): CryptoInputError =>
   new CryptoInputError('invalid_argument', message);
@@ -363,10 +381,32 @@ export interface KeyImportControlOptions {
    * importAgent needs a live session it issued.
    */
   readonly ownerStore?: KeychainOwnerKeyStore;
+  /**
+   * U3-e: the owner's revoked list (04 §2.3.3, §2.5.1); default `~/.agentlink/revoked`. Any entry
+   * for an agent's ID refuses that agent before anything of it is written.
+   */
+  readonly revokedDir?: string;
   /** Test seams. */
   readonly fs?: KeystoreFsOptions;
   readonly kdf?: Argon2idParams;
   readonly timeoutMs?: number;
+}
+
+/**
+ * U3-e (04 §2.3.3 restore table, D-138): true unless the owner's revoked list certainly has no entry
+ * for `agentId`. Any entry refuses, whether it verifies (under the kit's owner or any other) or is
+ * damaged, and so does a list that cannot be checked (fail closed). Residual (G-1): a same-user
+ * process that deletes the entry lets the restore proceed; contacts that applied the revoke still
+ * drop the agent.
+ */
+export async function inOwnersRevokedList(revokedDir: string, agentId: string): Promise<boolean> {
+  assertAgentId(agentId);
+  try {
+    await lstat(join(revokedDir, `${agentId}.json`));
+    return true;
+  } catch (error) {
+    return (error as { code?: unknown }).code !== 'ENOENT';
+  }
 }
 
 interface KitState {
@@ -397,6 +437,7 @@ function asciiName(bytes: Uint8Array): string {
 /** 04 §2.3.3 "Restore": the KeyImportControl of one backend. */
 export function createKeyImportControl(options: KeyImportControlOptions): KeyImportControl {
   const { backend, keychain, ownerStore, fs = {}, kdf } = options;
+  const revokedDir = options.revokedDir ?? join(homedir(), '.agentlink', 'revoked');
   // On a keychain machine the owner item is in the same OS keychain unless the caller says otherwise,
   // so the owner check below can never be skipped by leaving the option out.
   const ownerKeychain = options.ownerKeychain ?? (backend === 'keychain' ? keychain : undefined);
@@ -544,6 +585,8 @@ export function createKeyImportControl(options: KeyImportControlOptions): KeyImp
       const opened = stateOf(kit);
       const agent = opened.agents.find((a) => a.agentId === agentId);
       if (agent === undefined) throw argument('restore: that agent is not in the kit');
+      // U3-e: a removed agent is retired for good (04 §2.3.3): refused before anything is written.
+      if (await inOwnersRevokedList(revokedDir, agentId)) throw agentRetired();
       const name = importOptions.name ?? asciiName(agent.name);
       if (typeof name !== 'string' || !AGENT_NAME.test(name)) {
         throw argument('restore: the agent name is not valid');
@@ -603,6 +646,59 @@ export function createKeyImportControl(options: KeyImportControlOptions): KeyImp
         wipe(ownerCode);
         throw error;
       }
+    },
+  });
+}
+
+// --- KeyEraseControl (U3-e) -----------------------------------------------------------------------
+
+export interface KeyEraseControlOptions {
+  /** The agent's recorded backend (07 §9.1). */
+  readonly backend: 'keychain' | 'file';
+  /** The OS keychain (backend `keychain`). */
+  readonly keychain?: KeychainBackend;
+  /** The keystore folder (backend `file`); default `~/.agentlink/keystore`. */
+  readonly keystoreDir?: string;
+  /** Test seams. */
+  readonly fs?: KeystoreFsOptions;
+  readonly timeoutMs?: number;
+}
+
+const eraseRefused = (): NodeKeyStoreError =>
+  new NodeKeyStoreError(
+    'keystore_erase_failed',
+    "AgentLink couldn't erase all of this agent's keys. Nothing else was changed. Try again.",
+  );
+
+/**
+ * U3-e (04 §2.5 "Removing an agent" step 6): the KeyEraseControl of one backend. The request must
+ * carry the agent's verifying `agent.revoke` (the revoked-list entry) for the same `agentId`, or
+ * nothing is deleted. The keychain backend erases agentEraseAccounts (never an owner account); the
+ * file backend erases `<agentId>.alks` (never `owner.alko` or `owner.alkp`).
+ */
+export function createKeyEraseControl(options: KeyEraseControlOptions): KeyEraseControl {
+  const { backend, keychain, fs = {} } = options;
+  if (backend !== 'keychain' && backend !== 'file') throw argument('erase: unknown backend');
+  if (backend === 'keychain' && keychain === undefined) throw argument('erase: no keychain');
+  const keystoreDir = options.keystoreDir ?? defaultKeystoreDir();
+  const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  return Object.freeze<KeyEraseControl>({
+    async eraseAgentKeys(request: AgentKeyEraseRequest): Promise<void> {
+      if (typeof request !== 'object' || request === null) throw eraseRefused();
+      const { agentId, storageIds, revoke } = request as unknown as Record<string, unknown>;
+      if (typeof agentId !== 'string' || !/^0x[0-9a-f]{40}$/.test(agentId)) throw eraseRefused();
+      if (!Array.isArray(storageIds) || !storageIds.every((id) => typeof id === 'string')) {
+        throw eraseRefused();
+      }
+      // Only a retired agent's keys are erased: its signed `agent.revoke` must verify for it.
+      if (!verifyRevokedEntry(revoke, agentId).ok) throw eraseRefused();
+      if (backend === 'keychain') {
+        await eraseKeychainAgent(keychain as KeychainBackend, agentId, storageIds as string[], {
+          timeoutMs,
+        });
+        return;
+      }
+      await eraseFileAgent(keystoreDir, agentId, fs);
     },
   });
 }

@@ -45,7 +45,7 @@ import {
   type KeychainProbe,
 } from '@4thtech-io/node';
 import { createLocalApprovalChannel, storeApprovalReader } from '../approval/local-channel.js';
-import { readAgentConfig, type AgentConfig, type AgentPaths } from './agent-dir.js';
+import { inRevokedList, readAgentConfig, type AgentConfig, type AgentPaths } from './agent-dir.js';
 import { DEFAULT_AGENT_NAME, isAgentName } from './agent-name.js';
 import { NPX_PREFIX } from './cli-prefix.js';
 import { RuntimeError } from './errors.js';
@@ -99,6 +99,12 @@ export interface OpenAgentOptions {
   /** Unix seconds. Default the system clock. */
   readonly clock?: () => number;
   readonly logger?: Logger;
+  /**
+   * U3-e: the folder lock this open holds; default the SHARED lock (holdAgentFolderShared). Only the
+   * removal passes another, from inside its own EXCLUSIVE hold of the same folder (ui-remove.ts),
+   * where a shared take would refuse.
+   */
+  readonly folderLock?: (dir: string) => AgentFolderLock;
 }
 
 /** An opened agent. `close()` closes the relay connections, the store and the KeyStore, once. */
@@ -122,7 +128,7 @@ export type OpenAgentResult =
   | { readonly status: 'ok'; readonly agent: OpenedAgent }
   | {
       readonly status: 'needs_setup';
-      readonly reason: 'no_agent' | 'no_keychain';
+      readonly reason: 'no_agent' | 'no_keychain' | 'agent_removing';
       /** Fixed copy for the user (07 §9.4 for `no_keychain`). */
       readonly message: string;
       /** How to make the keychain usable, when the probe said so (07 §9.1). */
@@ -131,6 +137,13 @@ export type OpenAgentResult =
 
 /** `needs_setup` `no_agent`: nothing is set up for this name. Fixed text; never names the agent. */
 export const NO_AGENT_MESSAGE = `AgentLink is not set up for this agent on this machine yet. Run \`${NPX_PREFIX} init\` yourself, in your own terminal.`;
+
+/**
+ * `needs_setup` `agent_removing` (U3-e): the agent was removed or its removal did not finish. Fixed
+ * text; never names the agent.
+ */
+export const AGENT_REMOVING_MESSAGE =
+  'This agent was removed, or its removal did not finish. Open the AgentLink app to finish removing it; it cannot be used any more.';
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
 
@@ -155,10 +168,25 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
   const { config, paths } = found;
   const home = options.home ?? homedir();
 
+  // U3-e (04 §2.5 step 3, D-58): a retired agent (the `removing` mark, or any entry in the owner's
+  // revoked list) is never opened as usable, by any process. Only its own removal opens it, from
+  // inside its exclusive hold (`folderLock`).
+  if (options.folderLock === undefined) {
+    let retired: boolean;
+    try {
+      retired = config.removing === true || (await inRevokedList(home, config.agentId));
+    } catch {
+      retired = true; // a list that cannot be checked fails closed
+    }
+    if (retired) {
+      return { status: 'needs_setup', reason: 'agent_removing', message: AGENT_REMOVING_MESSAGE };
+    }
+  }
+
   // U3-c: the shared folder lock, held while the agent is open (06 §6).
   let folderLock: AgentFolderLock;
   try {
-    folderLock = holdAgentFolderShared(paths.dir);
+    folderLock = (options.folderLock ?? holdAgentFolderShared)(paths.dir);
   } catch {
     throw new RuntimeError('agent_open_failed');
   }

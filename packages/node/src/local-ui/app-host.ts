@@ -35,6 +35,7 @@
 // items (04 §2.8 "Logical isolation", G-1).
 import type { ApprovalServerSource } from '../approval-server.js';
 import type { LocalUiOptions } from './context.js';
+import type { AgentRemovalPort } from './api/agents-remove.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
 
 /** One agent folder as the directory reports it. Never a path. */
@@ -115,6 +116,8 @@ export interface AppHostOptions {
   readonly initial: AppHostAgent;
   /** Opens an agent through the CLI's openAgent path; undefined when it cannot be opened. */
   open(name: string): Promise<AppHostAgent | undefined>;
+  /** U3-e: removing an agent (agents-remove.ts); absent: the remove route answers `not_available`. */
+  readonly removal?: AgentRemovalPort;
 }
 
 /** A request's place in the host: `valid` re-checks the generation, `leave` ends it. */
@@ -202,7 +205,8 @@ export class AppHostSlot {
         if (left) return;
         left = true;
         this.#inflight -= 1;
-        if (this.#inflight === 0) for (const done of this.#idle.splice(0)) done();
+        // Each waiter re-checks its own bound (#drainedBut) and waits again if it is not met.
+        for (const done of this.#idle.splice(0)) done();
       },
     });
   }
@@ -223,14 +227,7 @@ export class AppHostSlot {
   }
 
   #drained(): Promise<void> {
-    if (this.#inflight === 0) return Promise.resolve();
-    return new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, this.#drainMs);
-      this.#idle.push(() => {
-        clearTimeout(timer);
-        resolve();
-      });
-    });
+    return this.#drainedBut(0);
   }
 
   /** `POST /api/ui/agents/switch {name, generation}` (approval-server.ts switchGate). */
@@ -293,6 +290,107 @@ export class AppHostSlot {
       }
     }
     return 'unavailable';
+  }
+
+  /**
+   * U3-e (04 §2.5 "Removing an agent" step 1): closes the open agent when it is `name`, so that this
+   * process no longer holds its shared folder lock and the removal can take it exclusive. The
+   * generation does not change: the page still shows that agent, and a refused removal opens it
+   * again (`restore`) in its place. Waits for the other requests in flight (not the removal's own
+   * `hold`); new ones wait or are refused while it closes. False when `name` was not open.
+   */
+  async closeForRemoval(
+    name: string,
+  ): Promise<{ readonly closed: boolean; restore(): Promise<void> }> {
+    const none = { closed: false, restore: () => Promise.resolve() };
+    if (this.#closed || this.#agent?.name !== name) return none;
+    while (this.#switching !== undefined) await this.#switching;
+    if (this.#agent?.name !== name) return none;
+    let finish: () => void = () => undefined;
+    this.#switching = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    try {
+      await this.#drainedBut(1);
+      const agent = this.#agent;
+      this.#agent = undefined;
+      this.#bind(undefined);
+      await agent?.close().catch(() => undefined);
+    } finally {
+      this.#switching = undefined;
+      finish();
+    }
+    return {
+      closed: true,
+      restore: async () => {
+        // Only into an empty host (a switch in between opened another agent: it stays).
+        if (this.#closed || this.#agent !== undefined) return;
+        const back = await this.#options.open(name).catch(() => undefined);
+        if (back === undefined || back.name !== name || this.#agent !== undefined) {
+          await back?.close().catch(() => undefined);
+          return;
+        }
+        this.#agent = back;
+        this.#bind(back);
+      },
+    };
+  }
+
+  /**
+   * U3-e (04 §2.5 step 7): after a removal, opens another agent when none is open: the last used
+   * one, else the first listed that is not `removing`; a new generation, so every page reloads for
+   * it. With none left the host stays empty and the page shows "Add an agent". The owner stays.
+   * `wasOpen`: the removed agent was the one open (the page must reload even when none opens).
+   */
+  async openAfterRemoval(wasOpen: boolean): Promise<void> {
+    if (this.#closed || this.#agent !== undefined || this.#switching !== undefined) return;
+    if (wasOpen) this.#generation += 1;
+    let entries: readonly AgentDirectoryEntry[];
+    try {
+      entries = await this.#options.directory.list();
+    } catch {
+      return;
+    }
+    const usable = entries.filter((e) => e.available && !e.removing);
+    const last = await this.#options.directory.readCurrent().catch(() => undefined);
+    const order = [
+      ...usable.filter((e) => e.name === last),
+      ...usable.filter((e) => e.name !== last),
+    ];
+    for (const entry of order) {
+      if (this.#agent !== undefined) return;
+      const opened = await this.#options.open(entry.name).catch(() => undefined);
+      if (opened === undefined || opened.name !== entry.name) {
+        await opened?.close().catch(() => undefined);
+        continue;
+      }
+      if (this.#agent !== undefined) {
+        await opened.close().catch(() => undefined);
+        return;
+      }
+      if (!wasOpen) this.#generation += 1;
+      this.#agent = opened;
+      this.#bind(opened);
+      await this.#options.directory.writeCurrent(entry.name).catch(() => undefined);
+      return;
+    }
+  }
+
+  /** Resolves when at most `keep` requests are in flight (the caller's own), or after the drain. */
+  #drainedBut(keep: number): Promise<void> {
+    if (this.#inflight <= keep) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, this.#drainMs);
+      const check = (): void => {
+        if (this.#inflight <= keep) {
+          clearTimeout(timer);
+          resolve();
+        } else {
+          this.#idle.push(check);
+        }
+      };
+      this.#idle.push(check);
+    });
   }
 
   /** Closes the open agent (server close). */
