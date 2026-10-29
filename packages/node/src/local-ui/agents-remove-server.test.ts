@@ -691,8 +691,9 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
     expect(w.log).not.toContain('removeFolder work');
   });
 
-  it('crash test: a failure at each step leaves what was done, and Try again finishes', async () => {
-    for (const fault of ['record', 'mark', 'apps', 'keys', 'folder'] as const) {
+  it.each(['record', 'mark', 'apps', 'keys', 'folder'] as const)(
+    'crash test: a failure at the %s step leaves what was done, and Try again finishes',
+    async (fault) => {
       const w = await world();
       if (fault === 'keys') keychain.failDelete = `${w.work.agentId}:store-key`;
       else w.faults[fault] = true;
@@ -728,8 +729,8 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
       expect(retry.json, fault).toEqual({ status: 'removed' });
       expect(itemsOf(w.work.agentId), fault).toEqual([]);
       expectFixedEvents(w);
-    }
-  });
+    },
+  );
 });
 
 describe('the statement before the gesture (04 §2.5, 11 §5)', () => {
