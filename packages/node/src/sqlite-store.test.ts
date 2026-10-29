@@ -531,16 +531,17 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     expect(v7.every((st) => st.includes('"local_owner_actions"'))).toBe(true);
     expect(v7[0]).toMatch(/^CREATE TABLE "local_owner_actions" \(/);
     expect(digestOf(6)).toBe('4a2c345f5568856e05a29aeef0996efa642dbdeb2c50fe09bffb894ef709a32a');
-    // Version 8 (W4-RENAME-REACHES-CONTACTS, D-141): three nullable contacts columns, appended.
+    // Version 8 (W4-RENAME-REACHES-CONTACTS, D-141): four nullable contacts columns, appended.
     const v8 = MIGRATIONS[7]?.statements ?? [];
-    expect(v8).toHaveLength(3);
+    expect(v8).toHaveLength(4);
     expect(v8.every((st) => st.startsWith('ALTER TABLE "contacts" ADD COLUMN'))).toBe(true);
     expect(v8.map((st) => /ADD COLUMN "([a-z_]+)"/.exec(st)?.[1])).toEqual([
       'former_name',
       'name_changed_at',
       'name_change_seen',
+      'declared_name',
     ]);
-    expect(digestOf(7)).toBe('7066a785f172bf6fea515d0efd9de1309eb56d2547a47cd384d1bcfde4efbda6');
+    expect(digestOf(7)).toBe('1966a9af7c3f60389de97963606d0b694e5b7d5489aec1554cd5f4efd817726a');
   });
 
   it('migrates a version 7 file to version 8 (D-141): contacts kept, the former-name columns null', async () => {
@@ -1023,6 +1024,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       former_name: null,
       name_changed_at: null,
       name_change_seen: null,
+      declared_name: null,
     };
     await store.transaction((tx) => tx.insert('contacts', contact));
     expect(

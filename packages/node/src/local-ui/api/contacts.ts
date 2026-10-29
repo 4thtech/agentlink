@@ -77,11 +77,19 @@ const DONE: LocalUiResult = Object.freeze({ status: 200, body: Object.freeze({ s
  * D-141 (07 §3 "Former name"): `formerName` while core says a note is due, only as core's restricted
  * form (the name rule, 06 §2.1) and only as short plain text; never the raw name.
  */
-function formerNameOf(view: ContactView): { readonly formerName?: string } {
+function formerNameOf(view: ContactView): {
+  readonly formerName?: string;
+  readonly newName?: string;
+} {
+  const plain = (name: unknown): name is string =>
+    typeof name === 'string' && name.length > 0 && name.length <= MAX_NAME_CHARS;
   const former: unknown = view.nameChange?.formerName;
-  if (typeof former !== 'string' || former.length === 0 || former.length > MAX_NAME_CHARS)
-    return {};
-  return { formerName: former };
+  if (!plain(former)) return {};
+  // Under the owner's alias the row's name stays the alias: the note reads "Now calls itself
+  // {newName} (was {formerName})", so the contact's own new name (restricted) comes with it.
+  if (view.display.nameSource !== 'owner') return { formerName: former };
+  const own: unknown = view.nameChange?.newName;
+  return plain(own) ? { formerName: former, newName: own } : {};
 }
 
 function row(view: ContactView): JsonObject | undefined {

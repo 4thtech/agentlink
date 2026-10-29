@@ -97,7 +97,9 @@ export const TABLES = {
   // (02 F-14): the keys stay so later envelopes from them are dropped.
   // W4-RENAME-REACHES-CONTACTS (D-141; 07 §3 "Former name", store version 8, appended): former_name
   // (`enc`, the name the owner last saw before a card-update changed it), name_changed_at and
-  // name_change_seen (null or 1: no note due; 0: the note is due). Display state only.
+  // name_change_seen (null or 1: no note due; 0: the note is due), and declared_name (`enc`, the
+  // contact's own self-declared name, kept also while the owner's alias is shown, so the note can read
+  // "Now calls itself {new} (was {old})"; null on rows from before version 8). Display state only.
   contacts: {
     columns: {
       contact_id: id,
@@ -123,6 +125,7 @@ export const TABLES = {
       former_name: opt('enc'),
       name_changed_at: opt('int'),
       name_change_seen: opt('flag'),
+      declared_name: opt('enc'),
     },
     primaryKey: ['contact_id'],
     unique: [{ columns: ['agent_nostr'] }],

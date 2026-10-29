@@ -67,7 +67,9 @@ const seenRoute = contactNamesRoutes.find(
 describe('GET /api/ui/contacts: formerName (D-141)', () => {
   it('carries the restricted former name while the note is unseen; the label stays', async () => {
     const r = await list.handler(
-      ctx(client([view({ nameChange: { formerName: 'Marko', at: 1_759_449_700 } })])),
+      ctx(
+        client([view({ nameChange: { formerName: 'Marko', newName: 'Mark', at: 1_759_449_700 } })]),
+      ),
       req(),
     );
     expect(r.status).toBe(200);
@@ -80,6 +82,23 @@ describe('GET /api/ui/contacts: formerName (D-141)', () => {
     });
   });
 
+  it('under the owner alias: the alias stays, formerName and the own newName come with it', async () => {
+    const r = await list.handler(
+      ctx(
+        client([
+          view({
+            name: { value: 'Boss', source: 'owner', selfDeclared: false },
+            display: { name: 'Boss', label: 'self-declared', nameSource: 'owner' },
+            nameChange: { formerName: 'Marko', newName: 'Mark', at: 1 },
+          } as Partial<ContactView>),
+        ]),
+      ),
+      req(),
+    );
+    const [row] = (r.body as { contacts: Record<string, unknown>[] }).contacts;
+    expect(row).toMatchObject({ name: 'Boss', formerName: 'Marko', newName: 'Mark' });
+  });
+
   it('no note: no formerName key at all', async () => {
     const r = await list.handler(ctx(client([view()])), req());
     const [row] = (r.body as { contacts: Record<string, unknown>[] }).contacts;
@@ -88,7 +107,7 @@ describe('GET /api/ui/contacts: formerName (D-141)', () => {
 
   it('a former name that is not plain short text is left out (never raw text)', async () => {
     const r = await list.handler(
-      ctx(client([view({ nameChange: { formerName: 'x'.repeat(200), at: 1 } })])),
+      ctx(client([view({ nameChange: { formerName: 'x'.repeat(200), newName: 'Mark', at: 1 } })])),
       req(),
     );
     const [row] = (r.body as { contacts: Record<string, unknown>[] }).contacts;
@@ -105,7 +124,7 @@ describe('GET /api/ui/contacts/:ref/name-seen', () => {
     expect(seenRoute.presence).toBe(false);
     const seen: string[] = [];
     const r = await seenRoute.handler(
-      ctx(client([view({ nameChange: { formerName: 'Marko', at: 1 } })], seen)),
+      ctx(client([view({ nameChange: { formerName: 'Marko', newName: 'Mark', at: 1 } })], seen)),
       req({ ref: MARKO }),
     );
     expect(r).toEqual({ status: 200, body: { status: 'done' } });

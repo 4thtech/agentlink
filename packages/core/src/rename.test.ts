@@ -237,6 +237,15 @@ describe('the contact sees the new name, once with the former one (07 §3; 08 §
     expect(seen.name.value).toBe('Alicia');
     expect(seen.display.name).toBe('Alicia');
     expect(seen.nameChange?.formerName).toBe('Alice');
+    // Activity: "{old} is now called {new}" (it stays after the note was seen).
+    await b.client.contacts.markNameChangeSeen(a.id);
+    const feed = await b.client.activity.list({ limit: 20 });
+    expect(feed.items.find((e) => e.kind === 'contact_renamed')).toMatchObject({
+      kind: 'contact_renamed',
+      contactId: a.id,
+      formerName: 'Alice',
+      newName: 'Alicia',
+    });
     // Every contact is told, not only one.
     expect((await announce(a, c)).map((r) => r.outcome)).toEqual(['ok']);
     expect((await contactOf(c, a.id)).nameChange?.formerName).toBe('Alice');
@@ -277,6 +286,35 @@ describe('the contact sees the new name, once with the former one (07 §3; 08 §
     const seen = await contactOf(b, a.id);
     expect(seen.keyEpoch).toBe(1);
     expect(seen.nameChange).toBeUndefined();
+  });
+});
+
+describe('a contact shown by the owner alias: "Now calls itself {new} (was {old})" (08 §1)', () => {
+  it('the alias stays; the note names the contact own old and new names', async () => {
+    // B's owner calls A "Boss" (contact.rename), signed and applied as the app does.
+    const prepared = await b.client.ownerActions.prepareContactRename(a.id, 'Boss');
+    if (prepared.status !== 'prepared') throw new Error('test: rename not prepared');
+    const session = await ownerB.unlock(passphrase());
+    const body = prepared.body as unknown as JsonObject;
+    const sig = await session.signOwnerAction(body);
+    await session.close();
+    expect((await b.client.ownerActions.apply({ body, sig })).status).toBe('applied');
+    expect((await contactOf(b, a.id)).display.name).toBe('Boss');
+
+    await renameTo(a, 'Alicia');
+    await announce(a, b);
+    const seen = await contactOf(b, a.id);
+    expect(seen.display.name).toBe('Boss');
+    expect(seen.name.source).toBe('owner');
+    expect(seen.nameChange).toMatchObject({ formerName: 'Alice', newName: 'Alicia' });
+    expect(seen.safetyCodeChecked).toBe(false);
+    // A second rename keeps the last seen former name and moves the new one.
+    await renameTo(a, 'Ally');
+    await announce(a, b);
+    expect((await contactOf(b, a.id)).nameChange).toMatchObject({
+      formerName: 'Alice',
+      newName: 'Ally',
+    });
   });
 });
 
@@ -394,6 +432,71 @@ describe('catch-up: a contact still on a superseded key gets the card again (D-1
     clock.t += DAY + 60;
     await deliver(a, await say(b, a, 'ok'));
     expect(await a.client.sendCardUpdates()).toEqual({ sent: 0, failed: 0 });
+  });
+});
+
+describe('an interrupted rename finishes on the next open (04 §2.6; identity.ts finishPendingRotation)', () => {
+  it('pending card with the new name + KeyStore advanced → the next open commits card and name', async () => {
+    const owner = new MemoryOwnerKeyStore(seed(174), passphrase());
+    const inner = new MemoryKeyStore(seed(74));
+    // The KeyStore the client uses; `failPop` breaks the step right after the epoch advance.
+    let failPop = false;
+    const keyStore: KeyStore = new Proxy(inner, {
+      get(target, prop, receiver) {
+        if (prop === 'signCardPop' && failPop) {
+          return () => Promise.reject(new Error('test: interrupted after the advance'));
+        }
+        const value = Reflect.get(target, prop, receiver) as unknown;
+        return typeof value === 'function'
+          ? (value as (...a: unknown[]) => unknown).bind(target)
+          : value;
+      },
+    });
+    const store = new MemoryStore();
+    const cipher = new TestStoreCipher();
+    const mark = new MemoryPolicyMark();
+    const open = () =>
+      AgentLinkClient.create({
+        keyStore,
+        store,
+        cipher,
+        approvals: new RecordingApprovalChannel(),
+        clock: clock.now,
+        transport: new RelaySpy().factory,
+        policyMark: mark,
+      });
+    const first = await open();
+    await first.identity.init({
+      owner: await owner.unlock(passphrase()),
+      ownerKeys: await owner.getPublicKeys(),
+      name: 'Dora',
+      relays: RELAYS,
+    });
+    failPop = true;
+    const session = await owner.unlock(passphrase());
+    await expect(
+      first.identity.rotate({
+        owner: session,
+        ownerKeys: await owner.getPublicKeys(),
+        epochControl: owner.epochControl(inner),
+        name: 'Dorothy',
+      }),
+    ).rejects.toThrow();
+    await session.close();
+    // Interrupted: the KeyStore is at epoch 1, the store still at 0 with the pending card.
+    expect((await inner.getPublicBundle()).keyEpoch).toBe(1);
+    expect((await first.identity.get())?.keyEpoch).toBe(0);
+    expect(await first.identity.sendState()).toBe('rotation_pending');
+    expect(await first.identity.cardName()).toBe('Dora');
+    // The next open finishes it with the name the owner signed.
+    failPop = false;
+    const next = await open();
+    expect((await next.identity.get())?.keyEpoch).toBe(1);
+    expect(await next.identity.cardName()).toBe('Dorothy');
+    const card = await next.identity.signedCard();
+    expect(card.name).toBe('Dorothy');
+    expect(card.card.keyEpoch).toBe(1);
+    expect(await next.identity.sendState()).toBe('ready');
   });
 });
 

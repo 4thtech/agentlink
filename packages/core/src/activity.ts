@@ -14,6 +14,10 @@
 // - `blocked_keys`: an unknown sender the owner blocked, shown by its sender code (04 §2.9, D-72);
 // - `contacts` with status `blocked`, at the row's `updated_at` (the store keeps no separate block
 //   time, so a later change to a blocked contact moves it);
+// - `contacts` with a `name_changed_at` (W4-RENAME-REACHES-CONTACTS, D-141; 08 §1): "{old} is now
+//   called {new}", the contact's latest name change from a card-update, at that time; both names
+//   under the name rule (restrictName), the old one from `former_name`, the new one the contact's own
+//   name (also under an owner alias). It stays after the note was seen;
 // - `policies`: the signed rules now in force, at `applied_at` (the store keeps only the current
 //   version, so earlier changes are not listed).
 //
@@ -37,6 +41,7 @@ import { open, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { sanitizeFileName } from './file-name.js';
 import { PAGE_TYPES } from './inbox-page.js';
+import { restrictName } from './names.js';
 import {
   candidatesByTimeTx,
   candidatesTx,
@@ -145,6 +150,14 @@ export type ActivityEntry =
       readonly contactId: string;
       readonly contact: ActivityContact;
     })
+  | (EntryBase & {
+      /** D-141: "{formerName} is now called {newName}"; both restricted (06 §2.1). */
+      readonly kind: 'contact_renamed';
+      readonly contactId: string;
+      readonly contact: ActivityContact;
+      readonly formerName: string;
+      readonly newName: string;
+    })
   | (EntryBase & { readonly kind: 'rules_changed'; readonly version: number });
 
 export type ApprovalDecision = 'approved' | 'approved_by_rules' | 'denied' | 'cancelled';
@@ -155,12 +168,19 @@ export type ActivityMessageStatus = 'received' | 'request' | 'queued' | 'sent' |
 interface Pending {
   readonly contactId: string | null;
   readonly files: readonly Row<'files'>[];
+  /** D-141: a rename entry's sealed former and own names and the contact's short fingerprint. */
+  readonly renamed?: {
+    readonly row: Row<'contacts'>;
+    readonly short: string;
+  };
   readonly build: (resolved: Resolved) => ActivityEntry;
 }
 
 interface Resolved {
   readonly contact: ActivityContact | null;
   readonly files: readonly ActivityFile[];
+  /** D-141: the rename entry's names, opened and restricted outside the transaction. */
+  readonly renamed?: { readonly formerName: string; readonly newName: string };
 }
 
 /** A feed position; `pending` runs inside the transaction, for the page items only. */
@@ -394,6 +414,38 @@ export class ActivityService {
         );
       }
 
+      // D-141: the latest name change of each contact (rows without one are never read).
+      const renamed = candidatesTx(
+        tx,
+        'contacts',
+        { status: { ne: 'removed' } },
+        'name_changed_at',
+        'contact_id',
+        'contact_renamed:',
+        cursor,
+        limit,
+      );
+      for (const r of renamed) {
+        const at = r.name_changed_at;
+        if (at === null || r.former_name === null) continue;
+        const id = `contact_renamed:${r.contact_id}`;
+        const short = formatFingerprint(decodeHex(r.owner_fingerprint, { length: 32 }), 'short');
+        add(at, id, () => ({
+          contactId: r.contact_id,
+          files: [],
+          renamed: { row: r, short },
+          build: ({ contact, renamed: names }) => ({
+            kind: 'contact_renamed',
+            id,
+            at,
+            contactId: r.contact_id,
+            contact: contact ?? { id: r.contact_id, display: null },
+            formerName: names?.formerName ?? '',
+            newName: names?.newName ?? '',
+          }),
+        }));
+      }
+
       const policy = tx.get('policies', { slot: SINGLETON_SLOT });
       if (policy !== undefined) {
         const id = `rules_changed:${String(policy.version)}`;
@@ -424,12 +476,33 @@ export class ActivityService {
         files.push({ name: sanitizeFileName(name), size: f.size, removed: f.deleted_at !== null });
       }
       const contact = p.contactId === null ? null : (contacts.get(p.contactId) ?? null);
-      items.push(deepFreeze(p.build({ contact, files })));
+      const renamed = p.renamed === undefined ? undefined : await this.#renamedNames(p.renamed);
+      items.push(
+        deepFreeze(p.build({ contact, files, ...(renamed === undefined ? {} : { renamed }) })),
+      );
     }
     return Object.freeze({
       items: Object.freeze(items),
       ...(read.nextCursor === undefined ? {} : { nextCursor: read.nextCursor }),
     });
+  }
+
+  /** D-141: a rename entry's former and own new names, opened and restricted (06 §2.1). */
+  async #renamedNames(renamed: NonNullable<Pending['renamed']>): Promise<{
+    readonly formerName: string;
+    readonly newName: string;
+  }> {
+    const { row, short } = renamed;
+    const key = [row.contact_id];
+    const former =
+      row.former_name === null
+        ? ''
+        : await open(this.#ctx, 'contacts', 'former_name', key, row.former_name);
+    const own =
+      row.declared_name !== null
+        ? await open(this.#ctx, 'contacts', 'declared_name', key, row.declared_name)
+        : await open(this.#ctx, 'contacts', 'name', key, row.name);
+    return { formerName: restrictName(former, short), newName: restrictName(own, short) };
   }
 
   /** The display of every contact a page names, once each; a null display for a removed one. */

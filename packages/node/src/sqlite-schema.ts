@@ -71,6 +71,7 @@ const V8_CONTACTS_COLUMNS: readonly string[] = [
   'former_name',
   'name_changed_at',
   'name_change_seen',
+  'declared_name',
 ];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */

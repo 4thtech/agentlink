@@ -111,9 +111,15 @@ export interface ContactView {
    * changed the contact's own name and the owner has not seen the note yet. `formerName` is the name
    * the owner last saw, under the name rule (restrictName, like `display`), never the raw text. Display
    * state only: it changes neither the identity label nor "Safety code checked" (04 §2.6). Absent for
-   * a contact shown by the owner's own alias.
+   * Also for a contact shown by the owner's own alias: the alias stays and the note reads "Now calls
+   * itself {newName} (was {formerName})" (08 §1).
    */
-  readonly nameChange?: { readonly formerName: string; readonly at: number };
+  readonly nameChange?: {
+    readonly formerName: string;
+    /** The contact's own new name, restricted (for an aliased contact: "Now calls itself {new}"). */
+    readonly newName: string;
+    readonly at: number;
+  };
   readonly createdAt: number;
   readonly updatedAt: number;
 }
@@ -462,13 +468,14 @@ export class ContactBook {
   async #nameChange(
     row: Row<'contacts'>,
     short: string,
-  ): Promise<{ readonly nameChange?: { readonly formerName: string; readonly at: number } }> {
-    if (
-      row.name_source !== 'counterparty' ||
-      row.name_change_seen !== 0 ||
-      row.former_name === null ||
-      row.name_changed_at === null
-    ) {
+  ): Promise<{
+    readonly nameChange?: {
+      readonly formerName: string;
+      readonly newName: string;
+      readonly at: number;
+    };
+  }> {
+    if (row.name_change_seen !== 0 || row.former_name === null || row.name_changed_at === null) {
       return {};
     }
     const former = await open(
@@ -478,7 +485,21 @@ export class ContactBook {
       [row.contact_id],
       row.former_name,
     );
-    return { nameChange: { formerName: restrictName(former, short), at: row.name_changed_at } };
+    const key = [row.contact_id];
+    const declared =
+      row.declared_name !== null
+        ? await open(this.#ctx, 'contacts', 'declared_name', key, row.declared_name)
+        : row.name_source === 'counterparty'
+          ? await open(this.#ctx, 'contacts', 'name', key, row.name)
+          : undefined;
+    if (declared === undefined) return {};
+    return {
+      nameChange: {
+        formerName: restrictName(former, short),
+        newName: restrictName(declared, short),
+        at: row.name_changed_at,
+      },
+    };
   }
 
   /**
@@ -822,6 +843,8 @@ export class ContactBook {
     };
     const sealedCard = await seal(ctx, 'contacts', 'agent_card_json', ckey, storedCardText(signed));
     const sealedName = await seal(ctx, 'contacts', 'name', ckey, staged.name);
+    // D-141: the self-declared name, kept also under an owner alias.
+    const sealedDeclared = await seal(ctx, 'contacts', 'declared_name', ckey, staged.name);
     const sealedRelays = await seal(
       ctx,
       'contacts',
@@ -926,6 +949,7 @@ export class ContactBook {
           former_name: null,
           name_changed_at: null,
           name_change_seen: null,
+          declared_name: sealedDeclared,
         };
         tx.insert('contacts', written);
       } else {
@@ -941,6 +965,7 @@ export class ContactBook {
           former_name: null,
           name_changed_at: null,
           name_change_seen: null,
+          declared_name: sealedDeclared,
         };
         const where = {
           contact_id: id,
@@ -1071,12 +1096,21 @@ export class ContactBook {
     const sealedCard = await seal(ctx, 'contacts', 'agent_card_json', key, storedCardText(update));
     const name = await seal(ctx, 'contacts', 'name', key, checked.name);
     const relays = await seal(ctx, 'contacts', 'relays', key, canonicalize([...checked.relays]));
-    // D-141 (07 §3 "Former name"): the name the owner saw before, read now and checked unchanged at
-    // apply time. Only a contact shown by its own name gets a note (the alias stays otherwise).
+    // D-141 (07 §3 "Former name"): the contact's own name before, read now and checked unchanged at
+    // apply time: `declared_name`, else (a row from before version 8) its shown name when that is its
+    // own. Under an owner alias the alias stays and the note reads "Now calls itself …".
+    const declared = await seal(ctx, 'contacts', 'declared_name', key, checked.name);
     const before = await ctx.store.transaction((tx) => tx.get('contacts', { contact_id: id }));
     let formerSealed: Sealed | undefined;
-    if (before !== undefined && before.name_source === 'counterparty') {
-      const oldName = await open(ctx, 'contacts', 'name', key, before.name);
+    const oldName =
+      before === undefined
+        ? undefined
+        : before.declared_name !== null
+          ? await open(ctx, 'contacts', 'declared_name', key, before.declared_name)
+          : before.name_source === 'counterparty'
+            ? await open(ctx, 'contacts', 'name', key, before.name)
+            : undefined;
+    if (oldName !== undefined) {
       const short = formatFingerprint(decodeHex(fingerprint, { length: 32 }), 'short');
       // Equal under the name rule (06 §2.1): no note is due.
       if (restrictName(oldName, short) !== restrictName(checked.name, short)) {
@@ -1089,7 +1123,9 @@ export class ContactBook {
       // The name read above is still the stored one (another update would change the note).
       if (
         before !== undefined &&
-        (existing.name !== before.name || existing.name_source !== before.name_source)
+        (existing.name !== before.name ||
+          existing.name_source !== before.name_source ||
+          existing.declared_name !== before.declared_name)
       ) {
         throw new CoreError('contact_conflict', 'The contact changed meanwhile. Try again.');
       }
@@ -1108,7 +1144,7 @@ export class ContactBook {
       // the name the owner last saw.
       const unseen = existing.name_change_seen === 0 && existing.former_name !== null;
       const note =
-        formerSealed === undefined || ownerName
+        formerSealed === undefined
           ? {}
           : {
               former_name: unseen ? existing.former_name : formerSealed,
@@ -1124,6 +1160,7 @@ export class ContactBook {
         key_epoch: card.keyEpoch,
         nostr_keys: withKey(parseKeyList(existing.nostr_keys), nostr),
         updated_at: now,
+        declared_name: declared,
         ...note,
       };
       if (tx.update('contacts', { contact_id: id, key_epoch: existing.key_epoch }, patch) !== 1) {

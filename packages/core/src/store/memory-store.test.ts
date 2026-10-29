@@ -110,13 +110,15 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
     });
   });
 
-  it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 8): three nullable columns, appended last', () => {
+  it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 8): four nullable columns, appended last', () => {
     expect(STORE_SCHEMA_VERSION).toBe(8);
-    expect(Object.keys(TABLES.contacts.columns).slice(-3)).toEqual([
+    expect(Object.keys(TABLES.contacts.columns).slice(-4)).toEqual([
       'former_name',
       'name_changed_at',
       'name_change_seen',
+      'declared_name',
     ]);
+    expect(TABLES.contacts.columns.declared_name).toEqual({ kind: 'enc', nullable: true });
     expect(TABLES.contacts.columns.former_name).toEqual({ kind: 'enc', nullable: true });
     expect(TABLES.contacts.columns.name_changed_at).toEqual({ kind: 'int', nullable: true });
     expect(TABLES.contacts.columns.name_change_seen).toEqual({ kind: 'flag', nullable: true });
