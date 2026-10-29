@@ -11,6 +11,9 @@ export type {
 } from './approval-channel.js';
 export {
   IdentityService,
+  RENAMES_PER_DAY,
+  RENAME_WINDOW_SECONDS,
+  type RenameAllowance,
   type FingerprintForms,
   type OwnFingerprints,
   type IdentityView,
@@ -310,6 +313,7 @@ export {
 export {
   CardUpdateSender,
   MAX_CARD_UPDATES_PER_PASS,
+  CATCH_UP_SECONDS,
   type CardUpdateSendResult,
 } from './card-update.js';
 export {

@@ -25,6 +25,9 @@ export {
   type KeychainKeyStoreOptions,
   type OpenAgentKeyStoreOptions,
 } from './keychain-keystore.js';
+// W4-RENAME-REACHES-CONTACTS (D-141): the opaque key-items token of a KeyStore this package opened,
+// for the app host's rename gesture (LocalUiOptions `epochKeys`). The control itself is not exported.
+export { epochKeysOf, type AgentEpochKeys } from './key-epoch.js';
 // M1-8f (04 §2.8, D-54): the passphrase-locked file KeyStore for headless machines. Only the unlock
 // and passphrase-change entry points and an opaque handle: no kek, file reader, directory or KDF seam.
 export {

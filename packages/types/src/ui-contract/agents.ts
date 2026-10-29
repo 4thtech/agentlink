@@ -66,6 +66,8 @@ export const AGENTS_SWITCH_PATH = '/api/ui/agents/switch';
 export const AGENTS_LABEL_PATH = '/api/ui/agents/label';
 export const AGENTS_LABEL_CHECK_PATH = '/api/ui/agents/label-check';
 export const AGENTS_REMOVE_PATH = '/api/ui/agents/remove';
+/** W4-RENAME-REACHES-CONTACTS (D-141): "Contacts still see {cardName}" (a read, no presence). */
+export const AGENTS_CARD_NAME_PATH = '/api/ui/agents/card-name';
 /** Every owner operation and the switch send this type (the presence body; the switch's JSON). */
 export const OCTET_STREAM = 'application/octet-stream';
 
@@ -156,16 +158,48 @@ export const AGENTS_LABEL_CHECK = {
 
 /**
  * The owner operations of U3-d, run as the presence gate hands them over (the input JSON). The world:
- * the open agent is `personal`; Add creates `home`.
+ * the open agent is `personal`, its verified label and its card's name are `Personal`, and it has 2
+ * active contacts; Add creates `home`.
+ *
+ * W4-RENAME-REACHES-CONTACTS (D-141): a label that differs from the card's name renames for the
+ * contacts too (one gesture rotates the card); the answer adds `contacts`, how many will be told
+ * ("Renamed. Your contacts will see {label} next time they're online.", 11 §5.8). A label equal to
+ * the card's name changes only the label (`renameLabelOnly`). Before the gesture: `rename_limited`
+ * with `retryAt` (unix seconds; "You can rename {label} again at {time}.") and `rotation_pending`.
  */
 export const AGENTS_OWNER = {
   openAgent: 'personal',
   createdAgent: 'home',
+  cardName: 'Personal',
+  contacts: 2,
   rename: {
     input: { name: 'personal', label: 'Home' } satisfies AgentsRenameInput,
-    answer: { status: 200, body: { status: 'done', label: 'Home' } } satisfies UiAnswer,
+    answer: {
+      status: 200,
+      body: { status: 'done', label: 'Home', contacts: 2 },
+    } satisfies UiAnswer,
     outcome: 'done',
   },
+  renameLabelOnly: {
+    input: { name: 'personal', label: 'Personal' } satisfies AgentsRenameInput,
+    answer: { status: 200, body: { status: 'done', label: 'Personal' } } satisfies UiAnswer,
+    outcome: 'done',
+  },
+  renameRefusals: [
+    {
+      input: { name: 'personal', label: 'Home' } satisfies AgentsRenameInput,
+      answer: {
+        status: 409,
+        body: { error: 'rename_limited', retryAt: 1_800_086_400 },
+      } satisfies UiAnswer,
+      outcome: 'rename_limited',
+    },
+    {
+      input: { name: 'personal', label: 'Home' } satisfies AgentsRenameInput,
+      answer: { status: 409, body: { error: 'rotation_pending' } } satisfies UiAnswer,
+      outcome: 'rotation_pending',
+    },
+  ],
   add: {
     input: { label: 'Home' } satisfies AgentsAddInput,
     answer: {
@@ -186,6 +220,23 @@ export const AGENTS_OWNER = {
       outcome: 'agent_changed',
     },
   ],
+} as const;
+
+/**
+ * W4-RENAME-REACHES-CONTACTS (D-141, Decision 46): `GET /api/ui/agents/card-name` for the open agent.
+ * `differs`: its verified label is not the name in its card (renamed before D-141); the Agents row
+ * shows once "Contacts still see {cardName}" with "Update contacts", which posts the rename route with
+ * the current label (one gesture). `same`: nothing to update.
+ */
+export const AGENTS_CARD_NAME = {
+  differs: {
+    answer: { status: 200, body: { status: 'differs', cardName: 'My agent' } } satisfies UiAnswer,
+    outcome: 'differs',
+  },
+  same: {
+    answer: { status: 200, body: { status: 'same' } } satisfies UiAnswer,
+    outcome: 'same',
+  },
 } as const;
 
 /**

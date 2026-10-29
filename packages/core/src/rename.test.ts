@@ -411,9 +411,9 @@ describe('another process on the same agent never sends under the old epoch (08 
     });
     await renameTo(a, 'Alicia');
     expect(await second.identity.sendState()).toBe('key_epoch_mismatch');
-    await expect(
-      second.sendMessage({ to: b.id, text: 'old key?' }),
-    ).rejects.toBeInstanceOf(CoreError);
+    await expect(second.sendMessage({ to: b.id, text: 'old key?' })).rejects.toBeInstanceOf(
+      CoreError,
+    );
     const fromOld = await a.store.transaction((tx) =>
       tx
         .select('envelopes', { direction: 'out', type: 'text' })

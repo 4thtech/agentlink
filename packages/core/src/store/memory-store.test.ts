@@ -94,7 +94,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   });
 
   it('local_owner_actions (U3-d, schema 7): the signed local owner actions, sealed', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(7);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(7);
     expect(TABLES.local_owner_actions).toEqual({
       columns: {
         record: { kind: 'id', nullable: false },
@@ -108,6 +108,18 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
       },
       primaryKey: ['record'],
     });
+  });
+
+  it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 8): three nullable columns, appended last', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(8);
+    expect(Object.keys(TABLES.contacts.columns).slice(-3)).toEqual([
+      'former_name',
+      'name_changed_at',
+      'name_change_seen',
+    ]);
+    expect(TABLES.contacts.columns.former_name).toEqual({ kind: 'enc', nullable: true });
+    expect(TABLES.contacts.columns.name_changed_at).toEqual({ kind: 'int', nullable: true });
+    expect(TABLES.contacts.columns.name_change_seen).toEqual({ kind: 'flag', nullable: true });
   });
 
   it('files.saved_name (MSG-FILES-IO-b, schema 6): a nullable sealed column, appended last', () => {

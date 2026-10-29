@@ -473,7 +473,8 @@ describe('W4-RENAME-REACHES-CONTACTS: a rename reaches contacts (D-141; 08 §1)'
   it('without the rename operation (outside the app host) a renaming label is not_available', async () => {
     const w = world({ cardName: 'Personal' });
     const o = owner();
-    const operation = { ...o.operation, renameAgent: undefined } as LocalUiOwnerOperation;
+    const { renameAgent: _dropped, ...operation } = o.operation;
+    void _dropped;
     const result = await rename.handler(
       w.context,
       { params: {}, query: new URLSearchParams(), input: { name: 'personal', label: 'Home' } },

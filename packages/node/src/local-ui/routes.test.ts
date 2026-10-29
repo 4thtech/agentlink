@@ -188,6 +188,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/join/accept',
       '/api/ui/join/dismiss',
       '/api/ui/join/handoff',
+      // W4-RENAME-REACHES-CONTACTS: "Contacts still see" and the former-name seen mark.
+      '/api/ui/agents/card-name',
+      '/api/ui/contacts/:ref/name-seen',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

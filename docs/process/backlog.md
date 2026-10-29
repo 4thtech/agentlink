@@ -5645,7 +5645,7 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
   - RED tests first: one gesture on first run and on New agent (journey gesture counter); a plan cannot be extended, split or replayed; a file changed between begin and finish is refused before signing; `created_not_connected` records the `app.connect` as not applied; the reservation is released on every unused end; full threat note, Fable 5.1 audit.
 
 #### W4-RENAME-REACHES-CONTACTS · agents: renames reach contacts through a signed card update (owner test of 0.4.4: B10; D-141)
-- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus + Fable 5.1 review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Status:** in review (D2 core and server part; the was-name row is C2), wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus + Fable 5.1 review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core/src/{identity,card-update}.ts` rename path; node `local-ui/api/agents*.ts` label route; contacts store columns; local-ui Contacts/Messages note (C2)
 - **Depends on:** owner decision W6 (decided yes, Decision 43); D-141 (Q1 and Q2 decided, Decision 46); merge order D2 (core/server) before C2 (was-name row)
 - **Spec:** D-141; 04 §2.5.1, §2.6, §3.4.1; 06 §6; 07 §3, §4.3; 08 §1; 11 §5.8

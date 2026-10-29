@@ -133,7 +133,7 @@ New in 0.4.3 (28 Oct 2026):
 New in 0.4.4 (29 Oct 2026):
 
 - **Welcome and a short first run.** On a new computer `npx -y @4thtech-io/agentlink` opens the app on Welcome. Pick your AI app, name your agent, use one Touch ID, then connect the AI app as a separate step you can skip.
-- **All your agents in one window.** A switcher in the top bar and an Agents page to add, rename and remove an agent, with a Live connections map of who is talking to whom. Agents from 0.4.3 are all listed and keep their history; the terminal no longer asks which agent you mean, and your contacts see the name you typed for your agent, not its folder name.
+- **All your agents in one window.** A switcher in the top bar and an Agents page to add, rename and remove an agent, with a Live connections map of who is talking to whom. Agents from 0.4.3 are all listed and keep their history; the terminal no longer asks which agent you mean, and your contacts see the name you typed for your agent, not its folder name. A rename now reaches your contacts too: one Touch ID signs a new card with the new name, and your safety codes stay checked (up to 3 renames a day).
 - **AI apps page.** Connect an AI app to an agent, move it to another agent or disconnect it, with one Touch ID. You see the exact entry first, and a backup of the app's settings is saved.
 - **Start here in seven steps**, including a way to try AgentLink with a second agent of your own, and a small mark in Messages and Files on what is moving right now.
 - **Join from an invite link.** A friend without AgentLink runs one command from the invite page (`agentlink join`), sets up in the app and accepts with Touch ID; the pairing finishes in the app even when no AI app is running yet.

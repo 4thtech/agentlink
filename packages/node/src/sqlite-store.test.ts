@@ -443,8 +443,8 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     // add a migration with the next version instead (07 §3.7: forward migrations only).
     const digestOf = (i: number) =>
       encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-    expect(STORE_SCHEMA_VERSION).toBe(7);
-    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(STORE_SCHEMA_VERSION).toBe(8);
+    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     // Version 1 (G-9) is unchanged by D-72.
     expect(digestOf(0)).toMatchInlineSnapshot(
       `"6a2a36755c97cca746bdfe0b166c409cf1a067b1fd526011470446c0bb7dfd1b"`,
@@ -531,6 +531,52 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     expect(v7.every((st) => st.includes('"local_owner_actions"'))).toBe(true);
     expect(v7[0]).toMatch(/^CREATE TABLE "local_owner_actions" \(/);
     expect(digestOf(6)).toBe('4a2c345f5568856e05a29aeef0996efa642dbdeb2c50fe09bffb894ef709a32a');
+    // Version 8 (W4-RENAME-REACHES-CONTACTS, D-141): three nullable contacts columns, appended.
+    const v8 = MIGRATIONS[7]?.statements ?? [];
+    expect(v8).toHaveLength(3);
+    expect(v8.every((st) => st.startsWith('ALTER TABLE "contacts" ADD COLUMN'))).toBe(true);
+    expect(v8.map((st) => /ADD COLUMN "([a-z_]+)"/.exec(st)?.[1])).toEqual([
+      'former_name',
+      'name_changed_at',
+      'name_change_seen',
+    ]);
+    expect(digestOf(7)).toBe('7066a785f172bf6fea515d0efd9de1309eb56d2547a47cd384d1bcfde4efbda6');
+  });
+
+  it('migrates a version 7 file to version 8 (D-141): contacts kept, the former-name columns null', async () => {
+    const raw = new Database(path());
+    for (const m of MIGRATIONS.slice(0, 7)) {
+      for (const statement of m.statements) raw.prepare(statement).run();
+    }
+    raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+    raw.pragma('user_version = 7');
+    raw
+      .prepare(
+        'INSERT INTO "contacts" ("contact_id", "name", "name_source", "agent_card_json", "relays", ' +
+          '"agent_nostr", "key_epoch", "nostr_keys", "owner_fingerprint", "verified", "status", ' +
+          '"pairing", "safety_code_checked", "created_at", "updated_at") ' +
+          "VALUES ('c1', 'n', 'counterparty', 'a', 'r', 'k1', 0, '[\"k1\"]', 'f', 0, 'active', " +
+          "'complete', 0, 1, 1)",
+      )
+      .run();
+    raw.close();
+    const v8 = await SqliteStore.open(path());
+    expect(v8.schemaVersion).toBe(8);
+    const [row] = await v8.transaction((tx) => tx.select('contacts'));
+    expect(row?.contact_id).toBe('c1');
+    expect(row?.former_name).toBeNull();
+    expect(row?.name_changed_at).toBeNull();
+    expect(row?.name_change_seen).toBeNull();
+    await v8.transaction((tx) =>
+      tx.update(
+        'contacts',
+        { contact_id: 'c1' },
+        { former_name: sealed('o'), name_change_seen: 0 },
+      ),
+    );
+    const [after] = await v8.transaction((tx) => tx.select('contacts'));
+    expect(after?.name_change_seen).toBe(0);
+    await v8.close();
   });
 
   it('migrates a version 6 file to version 7 (U3-d): every row kept, local_owner_actions added', async () => {
@@ -548,7 +594,8 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       .run('AAAAAAAAAAAAAAAAAAAAAA', 'policy.set', 'ab'.repeat(32));
     raw.close();
     const v7 = await SqliteStore.open(path());
-    expect(v7.schemaVersion).toBe(7);
+    // Opening migrates forward to the current version (8 since D-141); version 7's table is there.
+    expect(v7.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     expect(await v7.transaction((tx) => tx.select('owner_action_nonces'))).toHaveLength(1);
     expect(await v7.transaction((tx) => tx.select('local_owner_actions'))).toEqual([]);
     await v7.transaction((tx) =>
@@ -973,6 +1020,9 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       safety_code_checked: 0,
       created_at: 0,
       updated_at: 0,
+      former_name: null,
+      name_changed_at: null,
+      name_change_seen: null,
     };
     await store.transaction((tx) => tx.insert('contacts', contact));
     expect(

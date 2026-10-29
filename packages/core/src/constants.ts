@@ -6,10 +6,12 @@
 /**
  * The logical schema version of 07 §3 that this code implements (forward migrations only, §3.7).
  * Version 5 (M1-9i-a, D-115) adds `own_storage` (07 §3.4). Version 6 (MSG-FILES-IO-b) adds
- * `files.saved_name`. Version 7 (U3-d, D-138) adds `local_owner_actions` (07 §3.4). An older build refuses a newer store (`store_schema_newer`), so an upgrade
+ * `files.saved_name`. Version 7 (U3-d, D-138) adds `local_owner_actions` (07 §3.4). Version 8
+ * (W4-RENAME-REACHES-CONTACTS, D-141) adds the contacts former-name columns (07 §3). An older build
+ * refuses a newer store (`store_schema_newer`), so an upgrade
  * cannot be rolled back.
  */
-export const STORE_SCHEMA_VERSION = 7;
+export const STORE_SCHEMA_VERSION = 8;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;

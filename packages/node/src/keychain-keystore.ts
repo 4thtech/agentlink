@@ -51,6 +51,7 @@ import {
 } from '@4thtech-io/crypto/keystore';
 import { decodeStorageMark } from '@4thtech-io/core';
 import { NodeKeyStoreError } from './errors.js';
+import { aliasEpochKeys, readKeyEpoch, registerEpochKeys, type GuardedCall } from './key-epoch.js';
 import {
   createFileKeyStoreAgentWith,
   fileKeychain,
@@ -186,7 +187,11 @@ function derivesAgent(seed: Uint8Array, agentId: string): boolean {
 }
 
 export interface KeychainKeyStoreOptions {
-  /** The current key epoch (04 §2.6), as recorded in the agent's `identity` row. Default 0. */
+  /**
+   * A fixed key epoch (04 §2.6; the conformance suites open stores at an epoch). Absent (every
+   * production open): the agent's `key-epoch` item (key-epoch.ts), read at open and followed forward
+   * whenever the current public bundle is asked for (W4-RENAME-REACHES-CONTACTS, D-141).
+   */
   readonly keyEpoch?: number;
   /** Limit for each keychain call in milliseconds. Default KEYCHAIN_CALL_TIMEOUT_MS. */
   readonly timeoutMs?: number;
@@ -203,7 +208,10 @@ function notOwnCard(): CryptoInputError {
 export class KeychainKeyStore implements KeyStore {
   readonly #keychain: KeychainBackend;
   readonly #agentId: string;
-  readonly #keyEpoch: number;
+  /** The current epoch; moves only forward, and only when it follows the item (`#follows`). */
+  #keyEpoch: number;
+  /** D-141: true when the epoch follows the agent's `key-epoch` item (no fixed epoch given). */
+  readonly #follows: boolean;
   readonly #timeoutMs: number;
   #closed = false;
 
@@ -211,11 +219,13 @@ export class KeychainKeyStore implements KeyStore {
     keychain: KeychainBackend,
     agentId: string,
     keyEpoch: number,
+    follows: boolean,
     timeoutMs: number,
   ) {
     this.#keychain = keychain;
     this.#agentId = agentId;
     this.#keyEpoch = keyEpoch;
+    this.#follows = follows;
     this.#timeoutMs = timeoutMs;
   }
 
@@ -229,12 +239,41 @@ export class KeychainKeyStore implements KeyStore {
     options: KeychainKeyStoreOptions = {},
   ): Promise<KeychainKeyStore> {
     assertAgentId(agentId);
-    const keyEpoch = options.keyEpoch ?? 0;
-    assertEpoch(keyEpoch);
     const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
-    const store = new KeychainKeyStore(keychain, agentId, keyEpoch, timeoutMs);
+    const call: GuardedCall = (fn) => guarded(fn, timeoutMs);
+    const follows = options.keyEpoch === undefined;
+    // D-141: without a fixed epoch, the agent's `key-epoch` item (absent: 0; damaged: refused).
+    const keyEpoch = options.keyEpoch ?? (await readKeyEpoch(keychain, agentId, call));
+    assertEpoch(keyEpoch);
+    const store = new KeychainKeyStore(keychain, agentId, keyEpoch, follows, timeoutMs);
     await store.#withSeed(() => undefined);
+    if (follows) {
+      registerEpochKeys(store, {
+        items: keychain,
+        agentId,
+        call,
+        publicAt: (epoch) => store.#publicAt(epoch),
+      });
+    }
     return store;
+  }
+
+  /**
+   * D-141: follows the agent's `key-epoch` item forward (another process, or this one's owner flow,
+   * advanced it). Never back: a lowered item leaves the epoch where it is.
+   */
+  async #follow(): Promise<void> {
+    if (!this.#follows || this.#closed) return;
+    const stored = await readKeyEpoch(this.#keychain, this.#agentId, (fn) =>
+      guarded(fn, this.#timeoutMs),
+    );
+    if (stored > this.#keyEpoch) this.#keyEpoch = stored;
+  }
+
+  /** The public keys of any epoch from the seed (the epoch control's preview). */
+  async #publicAt(epoch: number): Promise<PublicIdentity> {
+    assertEpoch(epoch);
+    return this.#withSeed((seed) => derivePublicIdentity(seed, epoch));
   }
 
   /** Reads one item of this agent, or throws `identity_missing`. The caller wipes the result. */
@@ -274,6 +313,8 @@ export class KeychainKeyStore implements KeyStore {
   }
 
   async getPublicBundle(options?: EpochOptions): Promise<PublicIdentity> {
+    // D-141: the current bundle (and any epoch above the cached one) follows the item first.
+    if (options?.epoch === undefined || options.epoch > this.#keyEpoch) await this.#follow();
     const epoch = this.#epochOf(options);
     return this.#withSeed((seed) => derivePublicIdentity(seed, epoch));
   }
@@ -578,7 +619,7 @@ export function recordedBackend(
  * no `withStoreKey`, no backend and no constructor to reach a raw item through.
  */
 function keyStoreFacade(store: KeychainKeyStore): KeyStore {
-  return Object.freeze({
+  const facade: KeyStore = Object.freeze({
     getPublicBundle: (options?: EpochOptions) => store.getPublicBundle(options),
     signNostr: (event: UnsignedNostrEvent) => store.signNostr(event),
     signEnvelopeHash: (hash: Uint8Array) => store.signEnvelopeHash(hash),
@@ -594,6 +635,9 @@ function keyStoreFacade(store: KeychainKeyStore): KeyStore {
       store.signDropRequest(request, createdAt, options),
     close: () => store.close(),
   });
+  // D-141: the facade has the same epoch-keys token as the store it wraps (epochKeysOf).
+  aliasEpochKeys(facade, store);
+  return facade;
 }
 
 // --- The package's public entry points (index.ts). They take no backend and return nothing that

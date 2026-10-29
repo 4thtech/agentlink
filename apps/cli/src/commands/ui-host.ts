@@ -73,8 +73,12 @@ export async function openUiHostAgent(
   if (opened?.status !== 'ok') return undefined;
   const { agent } = opened;
   try {
-    // The app's files are the server's and never change on a switch.
-    const localUi = withoutAssets(await deps.localUi(agent));
+    // The app's files are the server's and never change on a switch. W4-RENAME-REACHES-CONTACTS
+    // (D-141): the host's agent also gets its key-items token, for the rename gesture only.
+    const localUi = {
+      ...withoutAssets(await deps.localUi(agent)),
+      ...(agent.epochKeys === undefined ? {} : { epochKeys: agent.epochKeys }),
+    };
     const source = createUiApprovalSource(
       // The host owns the agent's lifetime; the source never closes it.
       { ...agent, close: () => Promise.resolve() },

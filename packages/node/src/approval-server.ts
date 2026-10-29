@@ -233,6 +233,7 @@ import {
 } from './owner-first-policy.js';
 import { labelActionsOf, type FirstAgentCard } from './owner-first-card.js';
 import { signNewAgent } from './owner-add-agent.js';
+import { signRename } from './owner-rename.js';
 import { isAgentLabelText } from './local-ui/api/agents-manage.js';
 import {
   PASSKEY_RP_ID,
@@ -269,6 +270,7 @@ import type {
   LocalUiSwitchRoute,
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
+  LocalUiRenameRequest,
   LocalUiResult,
   LocalUiRevealRoute,
   LocalUiSetupStep,
@@ -2046,6 +2048,8 @@ export async function startApprovalServerWith(
           let used = false;
           // U3-e: open only between this gesture's signed `agent.revoke` and the end of `run`.
           let carriersOpen = false;
+          // D-141: the agent this gesture renames is the one open now (stillCurrent fences a switch).
+          const renameUi = agentUi;
           let result: LocalUiResult;
           try {
             const owner: LocalUiOwnerOperation = Object.freeze<LocalUiOwnerOperation>({
@@ -2109,6 +2113,44 @@ export async function startApprovalServerWith(
                       for (const line of review.lines) assertPrintable(line, 'A review line');
                       if (!stillCurrent(req)) throw new AgentChanged();
                       return signNewAgent(session, ownerKeys, agent.first, agent.plan);
+                    },
+                  }),
+              // W4-RENAME-REACHES-CONTACTS (D-141; 04 §2.5.1 `agent.label`, §2.6): a rename that
+              // rotates, in the app host only and with the open agent's key items. The same one
+              // owner operation: exactly the open agent's next card, then exactly the prepared
+              // `agent.label` (signRename); never `sign` as well. Never on the HOTFIX-045-REMOVE path.
+              ...(host === undefined ||
+              byNostr !== undefined ||
+              renameUi?.client === undefined ||
+              renameUi.epochKeys === undefined
+                ? {}
+                : {
+                    renameAgent: async (review: OwnerReview, request: LocalUiRenameRequest) => {
+                      if (used) {
+                        throw new NodeKeyStoreError(
+                          'owner_operation_invalid',
+                          'One owner operation signs once.',
+                        );
+                      }
+                      used = true;
+                      if (!stillCurrent(req)) throw new AgentChanged();
+                      const client = renameUi.client;
+                      const epochKeys = renameUi.epochKeys;
+                      if (client === undefined || epochKeys === undefined) {
+                        throw new NodeKeyStoreError('owner_operation_invalid', 'Not here.');
+                      }
+                      return signRename(session, ownerKeys, {
+                        agent: client.agentId,
+                        client: {
+                          identity: client.identity,
+                          sendCardUpdates: () => client.sendCardUpdates(),
+                          contacts: client.contacts,
+                        },
+                        epochKeys,
+                        review,
+                        label: request.label,
+                        labelBody: request.labelBody,
+                      });
                     },
                   }),
             });

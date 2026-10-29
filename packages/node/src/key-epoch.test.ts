@@ -10,11 +10,7 @@
 //   nothing; advanceEpoch(n, owner) is a compare-and-set on the item that takes only a session the
 //   control accepts (presence_required otherwise, owner_locked once it ended).
 // - The control is reached only through an AgentEpochKeys token of a KeyStore this package opened.
-import {
-  KeyStoreError,
-  encodeHex0x,
-  type OwnerSession,
-} from '@4thtech-io/crypto';
+import { KeyStoreError, encodeHex0x, type OwnerSession } from '@4thtech-io/crypto';
 import { deriveAgentId } from '@4thtech-io/crypto/keystore';
 import { describe, expect, it } from 'vitest';
 import {
