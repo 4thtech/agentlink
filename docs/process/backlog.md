@@ -5402,6 +5402,269 @@ Items from the orchestrator follow-up list of 28 Oct that no card covered yet. P
 - **Acceptance:**
   - The test fails with the old tag check and passes with the new one; synced pages match main.
 
+### 0.4.5 hotfix and day-0 stabilisation (CARDS-1029)
+
+After the owner tested 0.4.4 on two Macs (29 Oct), the basics that did not work are fixed first in a small hotfix release (0.4.5), together with three flaky checks that kept ejecting pull requests from the merge queue. Wave 4 (a simpler structure: an agent switcher, an Inbox and Contacts) follows in 0.4.6 and is listed here only as placeholders. Phrased as symptoms and fixes on this public repo. Every hotfix card starts from a failing test that reproduces what the owner saw, on a real folder or in a real browser, with no fake of the step that failed.
+
+**Day 0 (stabilise before any feature work):** the three CHORE-FLAKE and OS-matrix cards below, plus the release-check fix (#693), land first; no feature work until three green merge-queue runs in a row.
+
+#### CHORE-FLAKE-TERMS-FLOW · core: the terms-flow test fails now and then in the merge queue (new, 0.4.5 day 0)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S2 (packages/core path default; test-only change) · **Phase:** M1b
+- **Repo/path:** agentlink · the terms-flow test under `packages/core` (test file only)
+- **Depends on:** —
+- **Spec:** M0-10e (test timeout policy)
+- **Invariants:** —
+- **Scope:**
+  - The terms-flow test fails on some merge-queue runs and passes on a re-run. Find the timing or ordering assumption and remove it (wait for the event, not a fixed delay). No production code changes.
+- **Acceptance:**
+  - A failing CI run or a loop run that reproduces the failure is cited before the fix; the test then passes many runs in a row; no assertion weakened and the timeout is not raised.
+
+#### CHORE-FLAKE-SB-CONTRAST · local app: the status-bar contrast test is unstable (new, 0.4.5 day 0)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (apps/local-ui path default) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui` (the `.al-sb-state` contrast check and its test)
+- **Depends on:** —
+- **Spec:** `docs/design/README.md`; B-11 accessibility rules
+- **Invariants:** —
+- **Scope:**
+  - The contrast check on the status-bar state label sometimes fails depending on which colour is behind it at the time. Make the test measure the real rendered colours after the theme has settled, or fix the colour pair if it truly falls below the required ratio.
+- **Acceptance:**
+  - A failing CI run is cited before the fix; the contrast ratio still meets the existing threshold in light and dark; the threshold is not lowered and no assertion is removed.
+
+#### CHORE-OSMATRIX-BROWSER-EXCLUDE · CI: skip the browser tests on operating systems that have no browser (new, 0.4.5 day 0, sensitive path)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet build, Opus review · **Security:** S1 (`.github/**` path default; sensitive path, the owner's "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/ci.yml` (the OS-matrix node job's test command only)
+- **Depends on:** #691 (welcome browser test skip)
+- **Spec:** `docs/process/repo-reference.md`; D-52
+- **Invariants:** —
+- **Scope:**
+  - The OS-matrix job fails on runners with no browser installed, and this is seen only in the merge queue. Exclude the browser-test files from that job with `--exclude`; the Linux job keeps running them. No other CI step changes.
+- **Acceptance:**
+  - A failing queue run is cited; the OS-matrix job is green on all operating systems; the browser tests still run in the Linux job; no required check is removed or loosened; Tali's "merge".
+
+#### HOTFIX-045-REMOVE · local app: Remove agent never finishes, and Try again fails on a one-agent Mac (new, 0.4.5, owner test of 0.4.4: B1 and B2)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/runtime/agent-folder-lock.ts`, `apps/cli/src/runtime/agent-dir.ts` (folder removal, retry path), tests
+- **Depends on:** U3-e (shipped in 0.4.4)
+- **Spec:** USABILITY-WAVE-3 §7.2; 04 §2.5, §2.5.1 (as amended by U3-spec-04); 07 §9.1
+- **Invariants:** I-1, I-2, I-4, I-7
+- **Scope:**
+  - Symptom 1: Remove shows "Removal not finished, try again" forever. The agent's folder lock leaves a stray file next to it, and folder deletion refuses the unexpected file. Fix: keep the lock's bookkeeping in memory so it leaves no extra file, and keep deletion strict about everything else.
+  - Symptom 2: Try again fails on a Mac with one agent. After the first failure no agent is open, and the retry looks for the owner in the open agent. Fix: take the owner from the verified revoked entry and the stored owner keys, never from page input or an unsigned file.
+  - No weaker check on what may be deleted; the owner presence check and signed removal are unchanged.
+- **Acceptance:**
+  - A RED test reproduces the exact symptom (real folder / real browser, no fake of the failing step) before the fix: remove a real agent folder end to end, then retry with one agent and none open; both finish and the folder is gone. Short full threat note; Opus independent review and Fable 5.1 audit; Tali's "merge"; changelog.d fragment; no test weakened.
+
+#### HOTFIX-045-CONTACTS-REFRESH · local app: Contacts stays on "Waiting" after pairing completed (new, 0.4.5, owner test of 0.4.4: B3)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/index.tsx` (loading and refresh), tests
+- **Depends on:** —
+- **Spec:** 08 §1; B-11 Contacts
+- **Invariants:** —
+- **Scope:**
+  - Symptom: on both Macs, Contacts kept saying "Waiting" although pairing had completed. The page loads its list once and never again. Fix: reload every 5 seconds while any contact is still pending, and whenever the browser tab regains focus; stop polling when nothing is pending.
+- **Acceptance:**
+  - A RED test reproduces the exact symptom (real folder / real browser, no fake of the failing step) before the fix: pairing completes while the page is open and the row turns to connected without a reload. Polling stops when nothing is pending and does not run in a hidden tab; reduced-motion and axe checks pass; changelog.d fragment.
+
+#### HOTFIX-045-TOUCHID · local app: Accept asks for the backup code instead of Touch ID (new, 0.4.5, owner test of 0.4.4: B5)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/**` and `apps/local-ui/src/pages/contacts/**` (accept flow, owner lookup), `packages/node` only if the passkey check lives there, tests
+- **Depends on:** —
+- **Spec:** 04 §2.5, §2.8; USABILITY-WAVE-3 §7.1
+- **Invariants:** I-1, I-2, I-4, I-7
+- **Scope:**
+  - Symptom: accepting an invite asks for the backup code instead of Touch ID. With no agent open, the passkey check answers "not available" and the page falls back to the code; agents made before 0.3.0 need to move to Touch ID once per Mac. Fix: read the owner from the owner store, so Touch ID works without an open agent; when Touch ID truly is not available say why in plain words; offer a one-time "Switch to Touch ID" step inside the flow for older owners.
+  - The backup code stays available as the fallback, and no owner check is skipped or weakened.
+- **Acceptance:**
+  - A RED test reproduces the exact symptom (real folder / real browser, no fake of the failing step) before the fix: accept an invite on a Mac with no open agent and see Touch ID asked, not the code. Short full threat note; Opus independent review and Fable 5.1 audit; Tali's "merge"; changelog.d fragment; no test weakened.
+
+#### HOTFIX-045-PASTE-FIELD · local app: the Add contact paste field is drawn over its label (new, 0.4.5, owner test of 0.4.4: B6)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui` (a multi-line field variant, `components.css`), `apps/local-ui/src/pages/contacts/add-contact.tsx`, tests
+- **Depends on:** —
+- **Spec:** `docs/design/README.md`; B-11 Contacts
+- **Invariants:** —
+- **Scope:**
+  - Symptom: the paste field on Add contact shows the typed text on top of its label and hint. A multi-line text area sits inside the wrapper made for a single-line input. Fix: a multi-line field variant in `packages/ui` with its own layout, used by Add contact.
+- **Acceptance:**
+  - A RED test reproduces the exact symptom (real folder / real browser, no fake of the failing step) before the fix: in a real browser, the label, field and hint do not overlap with a long pasted link, at 1440 and 360, light and dark. Screenshots in the PR; axe test passes; changelog.d fragment.
+
+#### HOTFIX-045-TOPBAR · local app: confusing top bar and a files bar that never stops moving (new, 0.4.5, owner test of 0.4.4: B7 label only and B8 minimal)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/io.tsx` (state label), the top-bar and status components in `apps/local-ui/src/**`, tests
+- **Depends on:** —
+- **Spec:** B-11 shell and Files; 11 §5
+- **Invariants:** —
+- **Scope:**
+  - Symptom (files): after a file arrives, its bar keeps animating as if it were still working. Fix: show the 11 §5 label "Not saved yet. Ask your AI to fetch it.", with no moving bar. Saving from the app is not part of this card (W4-FILES-SAVE).
+  - Symptom (top bar): "Not running" is shown next to "Connected", with a "+4" and the computer's name where the agent's name should be. Minimal fix: one merged status for the agent, the agent's own name, and "Under the hood" moved into Settings. The larger redesign is wave 4.
+- **Acceptance:**
+  - A RED test reproduces the exact symptom (real folder / real browser, no fake of the failing step) before the fix: in a real browser, an arrived file shows the label and no animation, and the top bar never shows two contradicting statuses. Copy checked against 11 §5; screenshots at 1440 and 360, light and dark; reduced-motion and axe pass; changelog.d fragment.
+
+### Follow-ups from the 29 Oct reviews (CARDS-1029B)
+
+Small items the reviews of the 0.4.5 hotfix pull requests left over (all rated Low), plus two wave 4 placeholders from the owner's test. None blocks 0.4.5. Phrased as symptoms and fixes on this public repo.
+
+#### CHORE-RELEASE-NPMVIEW-SILENT · release: a registry outage looks like a green run with nothing to do (new, from the #693 audit, Low, sensitive path)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet build, Opus review · **Security:** S1 (`.github/**` path default; sensitive path, the owner's "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/release.yml` (the `release` step only)
+- **Depends on:** #693
+- **Spec:** `docs/process/release-and-deployment.md`; D-52
+- **Invariants:** —
+- **Scope:**
+  - The `release` step ignores errors from `npm view` (`|| true`). If the registry is down, the step ends green and nothing is published, with no sign that anything went wrong. Tell "version not on the registry yet" apart from "the lookup failed", and make the failure visible (a failed step or a clear warning).
+- **Acceptance:**
+  - A test or a dry run shows a lookup failure no longer ends as a silent green no-op; the "already published" case still skips cleanly; no other release step changes; Tali's "merge".
+
+#### CHORE-LOCALUI-PLAYWRIGHT-DEP · local app: declare the browser-test tool where it is used (new, from the #699 review, Low)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet build, Opus review · **Security:** S1 (`apps/local-ui/**` and root `package.json` path defaults) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/package.json`, `pnpm-lock.yaml`
+- **Depends on:** —
+- **Spec:** `docs/process/repo-reference.md`
+- **Invariants:** —
+- **Scope:**
+  - `playwright` is a development dependency of the repository root only, yet the browser tests in `apps/local-ui` import it. Declare it in `apps/local-ui` at the same version, so the package stands on its own. No new package and no `postinstall` script.
+- **Acceptance:**
+  - Install and the local-ui tests pass; the lockfile shows one version; a justification line in the PR.
+
+#### CHORE-CONTACTS-POLL-GUARD · local app: Contacts refresh paths skip the polling guard, and a stuck read pauses polling (new, from the #696 review, Low)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/index.tsx` (the two manual refresh paths near lines 845 and 893), tests
+- **Depends on:** HOTFIX-045-CONTACTS-REFRESH
+- **Spec:** 08 §1; B-11 Contacts
+- **Invariants:** —
+- **Scope:**
+  - Two manual refresh paths do not go through the guard that stops the poll from starting a read while another is running. The result is two reads at once for a moment; the list is never stale. Route both through the guard.
+  - A read that never returns keeps the guard closed, so polling stays paused until another trigger. Give the read a timeout so the guard opens again.
+- **Acceptance:**
+  - Tests first: a manual refresh during a poll starts no second read; a read that never answers is given up after the timeout and the next poll runs; polling still stops when nothing is pending and in a hidden tab; changelog.d fragment.
+
+#### W4-SWITCHER-STATUS · local app: the agent switcher shows both "not connected" and "stopped", and System moves into Settings (placeholder, wave 4, from the #697 review, Low)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · the top bar and agent switcher in `apps/local-ui/src/**` (to be decided)
+- **Depends on:** HOTFIX-045-TOPBAR
+- **Spec:** B-11 shell; 11 §5
+- **Invariants:** —
+- **Scope:**
+  - When the connection is down and the agent is stopped, the top bar shows only "Not connected". The switcher must show both facts in plain words.
+  - Wave 4 structure: move "Under the hood" (System) into Settings.
+- **Acceptance:**
+  - To be written when planned; starts with a RED test in a real browser for the down-and-stopped case; axe check passes.
+
+#### W4-AGENT-NAME-AT-CREATE · local app: ask for the agent's name on the first screen (placeholder, wave 4, owner test of 0.4.4: B8)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 (`packages/node/**` path default if agent creation changes there) · **Phase:** M1b
+- **Repo/path:** agentlink · first-run in `apps/local-ui/src/pages/first-run/`, agent creation and rename (to be decided)
+- **Depends on:** U3-d
+- **Spec:** USABILITY-WAVE-3 §7.1; 04 §2.5.1
+- **Invariants:** I-1, I-2, I-4
+- **Scope:**
+  - Agents created on 0.4.x were named after the computer (its hostname). Ask for the name on the first onboarding screen, and offer a rename to existing agents that still carry the computer's name.
+- **Acceptance:**
+  - To be written when planned; starts with a RED test in a real browser; the rename uses the existing signed rename path; threat note if creation code changes.
+
+#### CHORE-TOUCHID-SHEET-E2E · local app: a real-browser test of the Touch ID sheet (new, from the #701 review, Low)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (`e2e/**`, `apps/local-ui/**` path defaults) · **Phase:** M1b
+- **Repo/path:** agentlink · the journey end-to-end test, `e2e/**` or `apps/local-ui` browser tests
+- **Depends on:** HOTFIX-045-TOUCHID
+- **Spec:** 04 §2.5, §2.8; USABILITY-WAVE-3 §7.1
+- **Invariants:** —
+- **Scope:**
+  - The presence sheet change from HOTFIX-045-TOUCHID (the reason line and the one-time "Switch to Touch ID" step) is covered by page tests with a faked switch. Add one real-browser step to the journey test that shows the reason and takes the switch step.
+- **Acceptance:**
+  - The journey test passes in a real browser; no assertion weakened; the faked-switch tests stay.
+
+#### CHORE-AXE-PAUSED-ANIMATION · tests: the accessibility check can wait forever on a paused animation (new, from the #702 review, Low)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet build, Opus review · **Security:** S1 (`apps/local-ui/**` path default; test helper only) · **Phase:** M1b
+- **Repo/path:** agentlink · the axe test helper under `apps/local-ui` (test file only)
+- **Depends on:** —
+- **Spec:** B-11 accessibility rules
+- **Invariants:** —
+- **Scope:**
+  - The helper waits for finite animations to end before checking. An animation that is finite but paused never ends, so the wait would last until the test timeout. Bound the wait and report which animation was still running.
+- **Acceptance:**
+  - A test with a paused finite animation ends with a clear message within the bound; ordinary pages are checked as before; the timeout is not raised.
+
+#### CHORE-REVIEWGATE-RELEASE-PATHS · CI: keep review-gate, the audit rules and CODEOWNERS in step for the release paths (new, from the #704 audit, Low, sensitive path)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (`.github/**` and `docs/process/**` path defaults; sensitive path, the owner's "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/review-gate.yml`, `.github/CODEOWNERS`, `docs/process/audit-rules.md` §2.2
+- **Depends on:** #704
+- **Spec:** `docs/process/audit-rules.md` §2.2, §3.3, SC-6; D-52
+- **Invariants:** —
+- **Scope:**
+  - CODEOWNERS now lists `/tools/release/` and `/.changeset/`, but the class rules in review-gate and the table in audit-rules do not. Decide their class (the owner confirms), then add the same rows to review-gate and audit-rules in the same PR.
+  - State in audit-rules that the `main` ruleset does not require code-owner review: CODEOWNERS only notifies, it does not enforce.
+- **Acceptance:**
+  - The three files agree on the paths and the class; a review-gate test covers a change under each path; the "notice, not enforcement" sentence is in audit-rules; Tali's "merge".
+
+#### CHORE-REMOVE-SERVER-REALFOLDER · tests: prove Remove on a real folder at the server level too (new, from the #698 review, Low)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S2 (`packages/node/**` path default; test-only change) · **Phase:** M1b
+- **Repo/path:** agentlink · the server Remove tests under `packages/node` (test files only)
+- **Depends on:** HOTFIX-045-REMOVE
+- **Spec:** USABILITY-WAVE-3 §7.2; 04 §2.5.1
+- **Invariants:** I-7
+- **Scope:**
+  - HOTFIX-045-REMOVE proves the lock fix through the command-line test on a real folder. The server Remove tests still fake the folder delete. Add one server test that removes a real agent folder end to end. No production code changes.
+- **Acceptance:**
+  - The new test fails if the folder is left behind; existing tests are kept; no assertion weakened.
+
+### Wave 4 placeholders (0.4.6, planned)
+
+Not started. These record what the 0.4.4 test left over, so nothing is lost. Each gets a full card when wave 4 is planned; the owner's decisions on the wave come first.
+
+#### W4-INVITES-LIST · local app: a lost invite link cannot be shown again (placeholder, owner test of 0.4.4: B4)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** TBD · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · local app invites list and its route (to be decided)
+- **Depends on:** W4-SHORT-INVITE
+- **Spec:** 08 §1; 04 §2.5.1
+- **Invariants:** I-1
+- **Scope:**
+  - Open invites live only in page memory, so a reload loses the link. Add a list of open invites (name and expiry, never the link itself) with Cancel, so an invite can be cancelled and shared again after a reload.
+- **Acceptance:**
+  - To be written when planned; starts with a RED test in a real browser across a reload.
+
+#### W4-SHORT-INVITE · invites: much shorter invite links (placeholder, owner test of 0.4.4: B9, Decision 41)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Repo/path:** agentlink · invite creation, the encrypted drop and the join flow (to be decided)
+- **Depends on:** —
+- **Spec:** Decision 41; 04 §2.8; D-48
+- **Invariants:** I-1, I-2
+- **Scope:**
+  - The invite link is far too long because it carries the whole signed card. Put an encrypted invite on the drop and make the link an id plus a key in the fragment, about 50 characters; shareable as a link, QR code or Share sheet. The drop only ever receives ciphertext.
+- **Acceptance:**
+  - To be written when planned; full threat note, Fable 5.1 audit.
+
+#### W4-RENAME-REACHES-CONTACTS · agents: contacts keep seeing an agent's old name after a rename (placeholder, owner test of 0.4.4: B10)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Repo/path:** agentlink · agent card signing and card updates (to be decided)
+- **Depends on:** owner decision W6 (renames reach contacts: yes with signed card updates, or no)
+- **Spec:** 06 §6; 04 §2.5.1
+- **Invariants:** I-1, I-2, I-7
+- **Scope:**
+  - A contact still shows the agent's old name after the agent was renamed, because the name in the signed card is fixed at creation. If decided yes: sign the card again with the new name, send a signed update to every contact, and show "new name (was old name)" once.
+- **Acceptance:**
+  - To be written when planned; spec edits marked "proposed, owner confirms at merge"; full threat note, Fable 5.1 audit.
+
+#### W4-CONTACTS-BY-PERSON · local app: group contacts by person and fix the wrong "second connection" notice (placeholder, owner test of 0.4.4: B11)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**` (to be decided)
+- **Depends on:** —
+- **Spec:** B-11 Contacts
+- **Invariants:** —
+- **Scope:**
+  - A notice says "second connection, remove older" for a different agent of the same person, because it matches on the person, not on the agent. Show "Another agent of the same person" and group contacts by person with their agents beneath, as the switcher groups your own agents. Keep the warning only when the same agent was paired twice.
+- **Acceptance:**
+  - To be written when planned; starts with a RED test in a real browser using two agents of one person.
+
+#### W4-FILES-SAVE · local app: save a received file from the app (placeholder, owner test of 0.4.4: B7 save part)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Repo/path:** agentlink · files page and its save route (to be decided)
+- **Depends on:** HOTFIX-045-TOPBAR
+- **Spec:** 06 §4; 04 §4 (paths)
+- **Invariants:** I-1, I-5
+- **Scope:**
+  - Add "Save to Inbox" with Touch ID: the file is decrypted locally and written to a folder chosen on the user's computer. The app still never opens a received file, and no path comes from inbound content.
+- **Acceptance:**
+  - To be written when planned; full threat note, Fable 5.1 audit.
+
 ### Usability wave 3 (U3, 0.4.4)
 
 Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The owner (Tali) decided on 2026-10-29 to take all recommended options of §11: (1) 0.4.4 with every card, and if Remove (U3-e) has not passed its Fable security audit when the rest is ready, 0.4.4 ships without it and Remove follows in 0.4.5; (2) one app, one agent open at a time, switching without Touch ID; (3) name and Touch ID on one screen; (4) Remove with Touch ID, typed label, export offer, always retired, contacts told; (5) AI app connect with the exact entry shown, Touch ID and a backup; (6) existing agents kept, last used opens, one-time "Tidy up" note, the terminal never asks which agent; (7) new screens from the new b11 sections, styled from the D2 screens, with the owner's screenshot review in each PR; (8) live view: Agents page map and the moving-row mark in Messages and Files in 0.4.4, Home, Contacts and compact view in 0.4.5, no preview on hover. Spec edits are marked "proposed, owner confirms at merge". S2 cards: tests first, Opus independent review, Fable where marked, Tali's "merge". UI cards: screenshots at 1440 and 360, light and dark. All new local routes sit behind the session, CSRF, `Host`, `Origin`, fetch-metadata and octet-stream gate; every presence route signs an owner action (D-68); errors are fixed codes; no route takes a path from the page.
@@ -7846,6 +8109,17 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - The node-os job is not in the `ci-gate` needs list (existing behaviour): add it, or record why not.
 - **Acceptance:**
   - The node-os job runs the browser tests on both systems; `ci-gate` needs the job or the reason is recorded; no step skipped; owner says "merge" (sensitive path).
+
+#### CHORE-RELEASE-HEALTH-TARBALL-WAIT · Release: wait for the tarball and finish an already-published version (new, incident 0.4.4)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** sensitive (`.github/**`, supply chain; owner "merge", Fable audit) · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/release.yml` (`publish-latest`), `tools/release/release-resume.test.mjs`, `docs/runbooks/merge-and-release.md`
+- **Depends on:** none
+- **Scope:**
+  - Incident (run 40872091202): `publish-latest` published 0.4.4; the health check waited only for the metadata, fetched the tarball while npm's CDN still answered E404, rolled `latest` back and set `DEPLOY_FREEZE`. The re-run published nothing and stopped: no `latest`, no GitHub Release, no desktop bundles.
+  - The health check now waits for each exact tarball URL (built from the validated name and version) with backoff, within one 15-minute budget, before the provenance and signature checks.
+  - A run that publishes nothing finishes this commit's stable versions that are on npm, not deprecated and newer than `latest`: the same health check, then `latest` is moved and read back, then the GitHub Release; smoke-latest, the desktop jobs, `record` and `freeze` follow from the job outputs.
+- **Acceptance:**
+  - RED tests first; DEPLOY_FREEZE, the `npm-publish` approval and rollback on failure unchanged; `latest` moves only after the health check; no new dependency or action; owner says "merge".
 
 #### DOCS-CURRENCY-1027 · docs currency: wiki lows and spec nits (new, low, wiki #11 GITBOOK-PR2, #572, #573)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (docs/foundation text); S0 for the wiki repo · **Phase:** M1b

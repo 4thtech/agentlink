@@ -45,7 +45,28 @@ function appAssets(): Map<string, Uint8Array> | undefined {
 
 const AXE_SOURCE = readFileSync(fileURLToPath(import.meta.resolve('axe-core/axe.min.js')), 'utf8');
 
+/**
+ * CHORE-FLAKE-SB-CONTRAST: the status bar state (`.al-sb-state`) fades in (opacity, 200 ms) every time
+ * the connection state changes. axe samples the computed colour, so a pass while the fade runs blends
+ * text and background and can fail colour-contrast on a slow runner. Wait until every animation and
+ * transition has finished, so axe always reads the settled colours; the rule stays on.
+ */
+async function settleAnimations(page: Page): Promise<void> {
+  await page.evaluate(
+    `(async () => {
+      for (let i = 0; i < 5; i += 1) {
+        const running = document
+          .getAnimations()
+          .filter((a) => a.playState !== 'finished' && a.effect.getComputedTiming().endTime !== Infinity);
+        if (running.length === 0) return;
+        await Promise.allSettled(running.map((a) => a.finished));
+      }
+    })()`,
+  );
+}
+
 async function axeViolations(page: Page): Promise<string[]> {
+  await settleAnimations(page);
   await page.evaluate(AXE_SOURCE);
   return page.evaluate(`(async () => {
     const result = await window.axe.run(document, {

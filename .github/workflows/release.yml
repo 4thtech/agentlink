@@ -34,12 +34,21 @@
 #   behind the approval, and OIDC dist-tag access is used only to roll `latest` back.
 #
 # AFTER A `latest` PUBLISH
-#   publish-latest  checks the registry without running package code (version on `latest`,
-#                   provenance, registry signatures); on failure it moves `latest` back to the
+#   publish-latest  checks the registry without running package code (tarball served, waiting up to
+#                   15 minutes for npm's CDN; version on `latest`, provenance, registry signatures); on failure it moves `latest` back to the
 #                   previous version in the same job (no second click). When all of that passed it
 #                   creates the product GitHub Release `v<version>` from the root CHANGELOG.md
 #                   section (D-43, docs/process/versioning.md §6). The section is checked BEFORE
 #                   publishing, so a missing one blocks the release while nothing is published.
+#   re-run          (CHORE-RELEASE-HEALTH-TARBALL-WAIT) a re-run publishes nothing new. When this commit's
+#                   stable versions are already on npm, not deprecated and newer than `latest` (a check
+#                   failed after the publish and `latest` was rolled back), publish-latest finishes them:
+#                   the same health check, then it moves `latest`, then the GitHub Release, smoke-latest
+#                   and the desktop jobs. Same approval click, DEPLOY_FREEZE check and rollback on failure.
+#                   Only on a re-run of the same run (`github.run_attempt` > 1), and only a version whose
+#                   npm tarball is one this run packed (registry dist.integrity = sha512 of a tarball in the
+#                   run's `pack` artifact); anything else fails closed. Use "Re-run failed jobs": a full
+#                   re-run packs again, and a rebuilt tarball that differs fails the check.
 #   smoke-latest    runs the CLI from npm in a job without credentials.
 #   freeze          sets DEPLOY_FREEZE when a publish failed after publishing or smoke-latest failed.
 #   rollback-latest after a failed smoke-latest: moves `latest` back. It needs the `npm-publish`
@@ -502,7 +511,8 @@ jobs:
     needs: [guard, select-mode, pack]
     if: needs.select-mode.outputs.mode == 'publish' && needs.guard.outputs.channel == 'latest' && vars.DEPLOY_FREEZE != 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 45, not 30: the health check may wait up to 15 minutes for npm's CDN to serve the tarballs.
+    timeout-minutes: 45
     # Required reviewer @talirezun: this job waits for the approval click.
     environment: npm-publish
     concurrency:
@@ -511,9 +521,12 @@ jobs:
     permissions:
       contents: write # git tags and the product GitHub Release v<version>
       id-token: write # npm trusted publishing (OIDC), provenance, dist-tag rollback
+    # `published` and `packages` describe what this run releases: what it published now, or, on a
+    # re-run after a failed check, the planned versions that were already published (step `release`).
+    # Falls back to the publish step's outputs when that step failed after publishing, so `freeze` still runs.
     outputs:
-      published: ${{ steps.publish.outputs.published }}
-      packages: ${{ steps.publish.outputs.published-packages }}
+      published: ${{ steps.release.outputs.published || steps.publish.outputs.published }}
+      packages: ${{ steps.release.outputs.packages || steps.publish.outputs.published-packages }}
       previous: ${{ steps.previous.outputs.previous }}
     steps:
       - name: Check out repository
@@ -681,20 +694,156 @@ jobs:
           pack-dir-artifact-id: ${{ needs.pack.outputs.pack-dir-artifact-id }}
           create-github-releases: "false" # the product release is created below, for the `v<version>` tag only
 
+      # What this run releases (CHORE-RELEASE-HEALTH-TARBALL-WAIT). After a fresh publish: what was published.
+      # Otherwise, a re-run after a failed check (0.4.4, run 40872091202: the tarball was not served yet,
+      # latest was rolled back, and the re-run published nothing and stopped): the stable versions in this
+      # commit that are already on npm, not deprecated, and newer than their `latest`. Those are finished
+      # below exactly like a fresh publish: the same health check, then `latest` is moved, then the GitHub
+      # Release and the desktop jobs. A version the owner deprecated is never promoted again. Registry
+      # reads only; this run waited for the owner's approval click and re-checked DEPLOY_FREEZE above.
+      # Fable audit of #693: only on a re-run of this run (run_attempt > 1), so a later run on another
+      # commit cannot promote a version and point the GitHub Release at the wrong commit; and only when
+      # npm's dist.integrity for the version equals a tarball in this run's `pack` artifact, so a version
+      # published from anywhere else is never promoted. Any mismatch fails the step (no promotion).
+      - name: Settle what this run releases (new publish, or a re-run of an already-published version)
+        id: release
+        shell: bash
+        env:
+          PUBLISHED: ${{ steps.publish.outputs.published }}
+          PUBLISHED_PACKAGES: ${{ steps.publish.outputs.published-packages }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          PACK_ARTIFACT_ID: ${{ needs.pack.outputs.pack-dir-artifact-id }}
+        run: |
+          set -euo pipefail
+          if [ "$PUBLISHED" = "true" ]; then
+            {
+              echo "published=true"
+              echo "resumed=false"
+              echo "packages=$PUBLISHED_PACKAGES"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # RESUME-BEGIN
+          name_re='^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$'
+          stable_re='^[0-9]+\.[0-9]+\.[0-9]+$'
+          resume='[]'
+          [[ "$RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Unexpected run attempt."; exit 1; }
+          rerun=false
+          if [ "$RUN_ATTEMPT" -le 1 ]; then
+            echo "First attempt of this run: nothing already published is finished here (only a re-run of the same run does that)."
+          else
+            # The tarballs this run packed: the `pack` artifact, which the publish step above downloaded to
+            # $RUNNER_TEMP/changeset-pack-<artifact id>-<timestamp>/ (changesets/action publish, pinned).
+            # A version is finished only if npm serves exactly one of them (registry dist.integrity).
+            [[ "$PACK_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Unexpected pack artifact id."; exit 1; }
+            shopt -s nullglob
+            pack_dirs=("$RUNNER_TEMP/changeset-pack-$PACK_ARTIFACT_ID-"*/)
+            shopt -u nullglob
+            if [ "${#pack_dirs[@]}" -ne 1 ]; then
+              echo "::error::Expected one downloaded pack artifact of this run, found ${#pack_dirs[@]}; nothing is finished."
+              exit 1
+            fi
+            built=""
+            while IFS= read -r -d '' tarball; do
+              built+="sha512-$(openssl dgst -sha512 -binary "$tarball" | openssl base64 -A)"$'\n'
+            done < <(find "${pack_dirs[0]}" -type f -name '*.tgz' -print0)
+            if [ -z "$built" ]; then
+              echo "::error::The pack artifact of this run holds no tarball; nothing is finished."
+              exit 1
+            fi
+            rerun=true
+          fi
+          while IFS= read -r -d '' manifest; do
+            [ "$rerun" = "true" ] || break
+            name="$(jq -r 'select(.private != true) | .name // empty' "$manifest")"
+            [ -n "$name" ] || continue
+            [[ "$name" =~ $name_re ]] || { echo "::error file=$manifest::Unexpected package name."; exit 1; }
+            version="$(jq -r '.version // empty' "$manifest")"
+            [[ "$version" =~ $stable_re ]] || continue
+            on_npm="$(cd "$RUNNER_TEMP" && npm view "$name@$version" version 2> /dev/null || true)"
+            [ "$on_npm" = "$version" ] || continue
+            latest="$(cd "$RUNNER_TEMP" && npm view "$name" dist-tags.latest 2> /dev/null || true)"
+            [ "$latest" != "$version" ] || continue
+            if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "$latest" "$version" | sort -V | tail -n 1)" != "$version" ]; then
+              echo "::notice::$name: latest ($latest) is newer than $version; left alone."
+              continue
+            fi
+            deprecated="$(cd "$RUNNER_TEMP" && npm view "$name@$version" deprecated 2> /dev/null || true)"
+            if [ -n "$deprecated" ]; then
+              echo "::notice::$name@$version is deprecated; it is not moved to latest."
+              continue
+            fi
+            integrity="$(cd "$RUNNER_TEMP" && npm view "$name@$version" dist.integrity 2> /dev/null || true)"
+            if [ -z "$integrity" ] || ! grep -qxF -- "$integrity" <<< "$built"; then
+              echo "::error::$name@$version on npm is not the package this run built (integrity differs); nothing is moved to latest."
+              exit 1
+            fi
+            resume="$(jq -c --arg n "$name" --arg v "$version" '. + [{name: $n, version: $v}]' <<< "$resume")"
+          done < <(git ls-files -z -- ':(glob)**/package.json')
+          # RESUME-END
+          if [ "$resume" = "[]" ]; then
+            echo "Nothing was published and no planned version waits to be finished."
+            {
+              echo "published=false"
+              echo "resumed=false"
+              echo "packages=[]"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::warning::Re-run: finishing already-published versions (health check, then latest, then the GitHub Release): $resume"
+          {
+            echo "published=true"
+            echo "resumed=true"
+            echo "packages=$resume"
+          } >> "$GITHUB_OUTPUT"
+
       # Health check: registry reads only, no package code runs in this job (it holds the OIDC token).
       # zizmor adhoc-packages is ignored on the `run:` line below, for the reason given in `publish-next`:
       # exact `name@version` of this run's own packages, --ignore-scripts, empty scratch directory.
-      - name: Health check (latest updated, provenance, signatures)
-        if: steps.publish.outputs.published == 'true'
+      # npm's CDN can serve a new version's metadata minutes before its tarball (0.4.4: E404 for about
+      # 8 minutes), so the check first waits for each exact tarball URL, with backoff, within one shared
+      # 15-minute budget, and fails only after that. On a re-run, `latest` is not checked here: it is
+      # moved by the next step, only after this check passed.
+      - name: Health check (tarball served, provenance, signatures, latest updated)
+        if: steps.release.outputs.published == 'true'
         shell: bash
         env:
-          PACKAGES: ${{ steps.publish.outputs.published-packages }}
+          PACKAGES: ${{ steps.release.outputs.packages }}
+          RESUMED: ${{ steps.release.outputs.resumed }}
         run: | # zizmor: ignore[adhoc-packages] exact name@version of this run's own packages, --ignore-scripts, scratch dir
           set -euo pipefail
           name_re='^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$'
           version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
           mkdir -p "$RUNNER_TEMP/registry-check"
           cd "$RUNNER_TEMP/registry-check"
+          wait_budget=900
+          max_delay=60
+          # Tested by tools/release/release-resume.test.mjs, which runs the block between the TARBALL-WAIT markers.
+          # TARBALL-WAIT-BEGIN
+          deadline=$((SECONDS + wait_budget))
+          # wait_for_tarball <name> <version>: 0 once the registry serves the exact tarball, 1 after the budget.
+          # The URL is built from the validated name and version, never read from the registry, and not logged.
+          wait_for_tarball() {
+            local name="$1" version="$2" delay=5
+            local url="https://registry.npmjs.org/$name/-/${name##*/}-$version.tgz"
+            while :; do
+              if npm view "$name@$version" version > /dev/null 2>&1 &&
+                curl --fail --silent --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+                  --max-time 120 --output /dev/null "$url"; then
+                echo "$name@$version: tarball served."
+                return 0
+              fi
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::error::$name@$version: the registry did not serve the package tarball within $wait_budget seconds."
+                return 1
+              fi
+              echo "$name@$version: not served yet; checking again in ${delay}s."
+              sleep "$delay"
+              delay=$((delay * 2))
+              if [ "$delay" -gt "$max_delay" ]; then delay="$max_delay"; fi
+            done
+          }
+          # TARBALL-WAIT-END
           status=0
           specs=()
           while IFS=$'\t' read -r name version; do
@@ -702,14 +851,14 @@ jobs:
               echo "::error::Unexpected package name or version in the publish output."
               exit 1
             fi
-            for _ in $(seq 1 20); do
-              npm view "$name@$version" version > /dev/null 2>&1 && break
-              sleep 15
-            done
+            if ! wait_for_tarball "$name" "$version"; then
+              status=1
+              continue
+            fi
             latest_tag="$(npm view "$name" dist-tags.latest 2> /dev/null || true)"
             predicate="$(npm view --json "$name@$version" dist 2> /dev/null | jq -r '.attestations.provenance.predicateType // empty' || true)"
             echo "$name@$version: latest=$latest_tag provenance=${predicate:-none}"
-            if [ "$latest_tag" != "$version" ]; then
+            if [ "$RESUMED" != "true" ] && [ "$latest_tag" != "$version" ]; then
               echo "::error::$name: dist-tag latest is not $version."
               status=1
             fi
@@ -722,19 +871,52 @@ jobs:
             esac
             specs+=("$name@$version")
           done < <(jq -r '.[] | [.name, .version] | @tsv' <<< "$PACKAGES")
-          if [ "${#specs[@]}" -gt 0 ]; then
+          if [ "$status" -eq 0 ] && [ "${#specs[@]}" -gt 0 ]; then
             printf '{"name":"registry-check","version":"0.0.0","private":true}\n' > package.json
             npm install --ignore-scripts --no-audit --no-fund "${specs[@]}" > /dev/null
             npm audit signatures || status=1
           fi
           exit "$status"
 
-      # Automatic rollback: runs when anything above failed after at least one package was published.
-      - name: Roll latest back to the recorded versions
-        if: failure() && steps.publish.outputs.published == 'true'
+      # Re-run only: the versions are already published and passed the health check above, so `latest` is
+      # moved to them now (OIDC dist-tag access, the same as the rollback) and read back. A failure here
+      # rolls `latest` back (next step) and sets DEPLOY_FREEZE, like a failed fresh publish.
+      - name: Move latest to the already-published versions (re-run)
+        if: steps.release.outputs.resumed == 'true'
         shell: bash
         env:
-          PACKAGES: ${{ steps.publish.outputs.published-packages }}
+          PACKAGES: ${{ steps.release.outputs.packages }}
+        run: |
+          set -euo pipefail
+          name_re='^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$'
+          stable_re='^[0-9]+\.[0-9]+\.[0-9]+$'
+          cd "$RUNNER_TEMP"
+          status=0
+          while IFS=$'\t' read -r name version; do
+            [[ "$name" =~ $name_re && "$version" =~ $stable_re ]] || { echo "::error::Unexpected package in the release set."; exit 1; }
+            npm dist-tag add "$name@$version" latest
+            latest_tag=""
+            for _ in $(seq 1 20); do
+              latest_tag="$(npm view "$name" dist-tags.latest 2> /dev/null || true)"
+              [ "$latest_tag" != "$version" ] || break
+              sleep 15
+            done
+            if [ "$latest_tag" != "$version" ]; then
+              echo "::error::$name: dist-tag latest is not $version after moving it."
+              status=1
+            else
+              echo "$name: latest moved to $version."
+            fi
+          done < <(jq -r '.[] | [.name, .version] | @tsv' <<< "$PACKAGES")
+          exit "$status"
+
+      # Automatic rollback: runs when anything above failed after at least one package was published, or
+      # while finishing an already-published version.
+      - name: Roll latest back to the recorded versions
+        if: failure() && (steps.publish.outputs.published == 'true' || steps.release.outputs.resumed == 'true')
+        shell: bash
+        env:
+          PACKAGES: ${{ steps.release.outputs.packages || steps.publish.outputs.published-packages }}
           PREVIOUS: ${{ steps.previous.outputs.previous }}
         run: |
           set -euo pipefail
@@ -761,7 +943,7 @@ jobs:
       # freeze (continue-on-error): the owner creates the release by hand. If smoke-latest fails later and
       # `latest` is rolled back, the owner edits or deletes this release.
       - name: Create the GitHub Release v<version> from the CHANGELOG
-        if: steps.publish.outputs.published == 'true' && steps.notes.outputs.version != ''
+        if: steps.release.outputs.published == 'true' && steps.notes.outputs.version != ''
         continue-on-error: true
         shell: bash
         env:
@@ -769,7 +951,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           COMMIT: ${{ github.sha }}
           VERSION: ${{ steps.notes.outputs.version }}
-          PACKAGES: ${{ steps.publish.outputs.published-packages }}
+          PACKAGES: ${{ steps.release.outputs.packages }}
         run: |
           set -euo pipefail
           version_re='^[0-9]+\.[0-9]+\.[0-9]+$'
