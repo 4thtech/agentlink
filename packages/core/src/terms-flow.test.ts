@@ -19,7 +19,7 @@ import {
   wrapEnvelope,
   type PublishOutcome,
 } from '@4thtech-io/transport-nostr';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { policyDocumentHash } from './commitments.js';
 import { computeActionDigest } from './owner-action.js';
@@ -40,6 +40,13 @@ import type {
   TermsPending,
 } from './terms-flow.js';
 import type { TransportFactory } from './transport.js';
+
+// CHORE-FLAKE-TERMS-FLOW (test timeout policy, M0-10e: a longer limit where measured). Every test here
+// opens two real cores and pairs them. Measured on a developer Mac: the slowest test without its own
+// limit takes 2.8 s and the "per record state" test (three full setups) 1.1 s, yet a loaded CI runner
+// (a 790 s unit run) timed that test out at the 20 s default, a slowdown of 18x or more. 60 s is above
+// the worst observed slowdown with room to spare; tests with their own limit keep it.
+vi.setConfig({ testTimeout: 60_000 });
 
 let clock: FakeClock;
 

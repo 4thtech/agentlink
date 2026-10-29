@@ -20,6 +20,7 @@ import {
   InlineError,
   ProgressBar,
   Segmented,
+  TextArea,
   TextField,
   formatContactName,
   useReducedMotion,
@@ -269,7 +270,6 @@ function HaveInvite({
   onConnected: (name: string) => void;
 }): ReactElement {
   const fieldId = useId();
-  const hintId = useId();
   const [text, setText] = useState('');
   const [phase, setPhase] = useState<PastePhase>({ kind: 'paste' });
   const [message, setMessage] = useState<string | undefined>(undefined);
@@ -412,28 +412,18 @@ function HaveInvite({
 
   return (
     <form className="ct-add-form" onSubmit={check}>
-      <div className="al-field">
-        <label htmlFor={fieldId} className="al-field-label al-text-body-sm">
-          {A.pasteLabel}
-        </label>
-        <div className="al-input-wrap">
-          {/* A textarea: its value is never mirrored into an attribute (b11 §21.5). */}
-          <textarea
-            id={fieldId}
-            className="al-input ct-paste"
-            name="invite-link"
-            rows={3}
-            autoComplete="off"
-            spellCheck={false}
-            aria-describedby={hintId}
-            value={text}
-            onChange={(e) => setText(e.currentTarget.value)}
-          />
-        </div>
-        <div id={hintId} className="al-field-hint al-text-caption">
-          {A.pasteHint}
-        </div>
-      </div>
+      {/* A textarea: its value is never mirrored into an attribute (b11 §21.5). */}
+      <TextArea
+        id={fieldId}
+        label={A.pasteLabel}
+        hint={A.pasteHint}
+        name="invite-link"
+        rows={3}
+        autoComplete="off"
+        spellCheck={false}
+        value={text}
+        onChange={(e) => setText(e.currentTarget.value)}
+      />
       <Button type="submit" variant="primary" disabled={link === '' || phase.kind === 'checking'}>
         {A.checkInvite}
       </Button>

@@ -64,15 +64,16 @@ describe('top bar', () => {
     expect(bar().querySelector('.al-topbar-title')?.textContent).toBe('AgentLink');
   });
 
-  it('keeps the order: title, then Under the hood, status chip, theme', () => {
+  it('keeps the order: title, then the one status chip (in the switcher), Under the hood, theme', () => {
     mount('/settings/home');
     const end = bar().querySelector('.al-topbar-end') as HTMLElement;
     const parts = [
-      end.querySelector('[role="switch"]'),
       end.querySelector('.al-livedot'),
+      end.querySelector('[role="switch"]'),
       end.querySelector('button[aria-label^="Theme"]'),
     ];
     for (const p of parts) expect(p).not.toBeNull();
+    expect(end.querySelectorAll('.al-livedot')).toHaveLength(1);
     const [a, b, c] = parts as Element[];
     expect(
       (a as Element).compareDocumentPosition(b as Element) & Node.DOCUMENT_POSITION_FOLLOWING,

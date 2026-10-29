@@ -8,6 +8,7 @@ import {
   type KeyboardEvent,
   type ReactElement,
   type ReactNode,
+  type TextareaHTMLAttributes,
 } from 'react';
 import { Icon } from './brand.js';
 import { cx } from './util.js';
@@ -109,6 +110,63 @@ export function TextField({
           {...rest}
           id={id}
           className={cx('al-input', mono === true && 'al-text-code')}
+          aria-invalid={error === undefined ? undefined : 'true'}
+          aria-describedby={described ? `${id}-d` : undefined}
+        />
+      </div>
+      {described ? (
+        <div
+          id={`${id}-d`}
+          className={cx('al-field-hint al-text-caption', error !== undefined && 'is-error')}
+        >
+          {error === undefined ? null : <Icon name="circle-alert" size={14} />}
+          {error ?? hint}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
+  hint?: string;
+  /** Replaces the hint and says what to do. */
+  error?: string;
+  /** For pasted text that is a code or a link. */
+  mono?: boolean;
+}
+
+/**
+ * Labelled multi-line field on a sunken well (HOTFIX-045-PASTE-FIELD). The well grows with the box,
+ * so the label above and the hint below never overlap the text; use it for pasted text, not
+ * `TextField`, whose well is one line tall.
+ */
+export function TextArea({
+  label,
+  hint,
+  error,
+  mono,
+  className,
+  id: givenId,
+  rows = 3,
+  ...rest
+}: TextAreaProps): ReactElement {
+  const generated = useId();
+  const id = givenId ?? generated;
+  const described = error !== undefined || hint !== undefined;
+  return (
+    <div className={cx('al-field', error !== undefined && 'is-error', className)}>
+      {label === undefined ? null : (
+        <label htmlFor={id} className="al-field-label al-text-body-sm">
+          {label}
+        </label>
+      )}
+      <div className="al-input-wrap al-input-wrap-multi">
+        <textarea
+          {...rest}
+          id={id}
+          rows={rows}
+          className={cx('al-input al-textarea', mono === true && 'al-text-code')}
           aria-invalid={error === undefined ? undefined : 'true'}
           aria-describedby={described ? `${id}-d` : undefined}
         />

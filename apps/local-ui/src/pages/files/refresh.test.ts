@@ -161,7 +161,7 @@ describe('surfaces', () => {
 describe('progress on rows in flight', () => {
   const bar = (row: Element | null | undefined) => row?.querySelector('[role="progressbar"]');
 
-  it('a file waiting to be saved shows a stepped bar at "Arrived"; a saved one shows none', async () => {
+  it('a file waiting to be saved shows no bar (a fixed line instead, HOTFIX-045); a saved one shows none', async () => {
     await mount({
       [RECEIVED]: page([
         received({ id: 'a.00', state: 'not_saved', savedName: undefined, name: 'secret-plan.pdf' }),
@@ -169,12 +169,9 @@ describe('progress on rows in flight', () => {
       ]),
     });
     const [first, second] = [...host.querySelectorAll('.fl-item')];
-    const b = bar(first);
-    expect(b).not.toBeNull();
-    expect(b?.getAttribute('aria-valuetext')).toContain('Arrived');
+    expect(bar(first)).toBeNull();
+    expect(first?.textContent).toContain('Not saved yet. Ask your AI to fetch it.');
     expect(bar(second)).toBeNull();
-    // the label names neither the file nor the contact (I-5)
-    expect(b?.getAttribute('aria-label')).toBe('File arriving');
   });
 
   it('a queued file waits to send, a sent one waits for delivery, a delivered one shows none', async () => {
@@ -358,8 +355,6 @@ describe("others' names (I-5)", () => {
       expect(live.textContent).not.toContain('onerror');
       expect(live.textContent).not.toContain('Eve');
     }
-    expect(row?.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe(
-      'File arriving',
-    );
+    expect(row?.querySelector('[role="progressbar"]')).toBeNull();
   });
 });

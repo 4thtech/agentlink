@@ -502,9 +502,8 @@ function ReceivedRow({
         {moving === undefined ? null : <MovingMark moving={moving} />}
       </p>
       {arrived ? <SuccessMoment kind="file" /> : null}
-      {item.state === 'not_saved' ? (
-        <ProgressBar label={IO.progressArriving} steps={IO.arrivingSteps} current={0} />
-      ) : null}
+      {/* HOTFIX-045: a file that arrived and waits to be saved is a fixed line (below), not a bar
+          drawn at step 0 that animated for ever. */}
       {item.state === 'saved' && item.savedName !== null ? (
         <p className="fl-state al-text-body-sm">
           {IO.savedAs} <Name>{item.savedName}</Name>
