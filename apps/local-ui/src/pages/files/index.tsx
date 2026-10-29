@@ -15,6 +15,8 @@
 import { Banner, Button, EmptyState, Icon, TextField } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { createApiClient } from '../../api/client.js';
+import { useFileMarks } from '../moving/use-file-marks.js';
 import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
 import {
   COMMIT_PATH,
@@ -517,6 +519,41 @@ function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
   );
 }
 
+/**
+ * Received and Sent, with the moving-row mark (U3-map-2). The flow read lives here, so the Send
+ * folders tab (which never shows a stream) reads nothing.
+ */
+function FileLists({
+  tab,
+  api,
+  fetch: givenFetch,
+  token,
+  onReceived,
+  onSent,
+}: {
+  readonly tab: 'received' | 'sent';
+  readonly api: FilesApi;
+  readonly fetch: typeof fetch | undefined;
+  readonly token: string | undefined;
+  readonly onReceived: (n: number) => void;
+  readonly onSent: (n: number) => void;
+}): ReactElement {
+  const client = useMemo(
+    () =>
+      createApiClient({
+        ...(givenFetch === undefined ? {} : { fetch: givenFetch }),
+        ...(token === undefined ? {} : { token }),
+      }),
+    [givenFetch, token],
+  );
+  const marks = useFileMarks(client);
+  return tab === 'received' ? (
+    <ReceivedPanel get={api.get} reveal={api.reveal} onWaiting={onReceived} marks={marks} />
+  ) : (
+    <SentPanel get={api.get} onWaiting={onSent} marks={marks} />
+  );
+}
+
 export function FilesPage({
   fetch: givenFetch,
   token,
@@ -542,10 +579,16 @@ export function FilesPage({
       <p className="al-text-body-sm al-muted">{IO.explainer}</p>
       <FilesTabs tab={tab} onTab={setTab} counts={waiting} />
       <div id="fl-tabpanel" role="tabpanel" aria-labelledby={`fl-tab-${tab}`}>
-        {tab === 'received' ? (
-          <ReceivedPanel get={api.get} reveal={api.reveal} onWaiting={onReceived} />
+        {tab === 'received' || tab === 'sent' ? (
+          <FileLists
+            tab={tab}
+            api={api}
+            fetch={givenFetch}
+            token={token}
+            onReceived={onReceived}
+            onSent={onSent}
+          />
         ) : null}
-        {tab === 'sent' ? <SentPanel get={api.get} onWaiting={onSent} /> : null}
         {tab === 'folders' ? <SendFolders api={api} /> : null}
       </div>
     </div>

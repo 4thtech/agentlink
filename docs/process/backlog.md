@@ -5597,13 +5597,15 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Click on a box or line opens that conversation in Messages; no content drawn; one SVG layer, no dependency, under 8 KB gzipped, lazy-loaded; `perf-guards.test.ts` extended; animation on `transform` and `stroke-dashoffset` only and paused when hidden; reduced motion (static arrowhead and "now"), reduced transparency, increased contrast; List is the text alternative, polite live region at most one line per 10 s, keyboard order follows the list; screenshots at 1440 and 360, light and dark; independent review.
 
 #### U3-map-2 · Home mini map, Contacts Map, row stream marks, compact strip (new, USABILITY-WAVE-3, owner decision 2026-10-29)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 4
+- **Status:** in progress (0.4.4 part: the moving-row mark in Messages and Files; the remainder below is 0.4.5) · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 4
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/home/`, `apps/local-ui/src/pages/contacts/`, `apps/local-ui/src/pages/messages/`, `apps/local-ui/src/pages/files/`, `apps/local-ui/src/**/compact/`
 - **Depends on:** U3-map, decision 8
 - **Spec:** USABILITY-WAVE-3 §4.1, §11 decision 8
 - **Invariants:** I-5, I-7
 - **Scope:**
   - Decision 8 (taken 2026-10-29): the moving-row stream mark in Messages and Files ships in 0.4.4 with U3-map; the Home mini map (top 5), Contacts Map view and the one-line compact strip ship in 0.4.5; no preview on hover.
+- **Built in 0.4.4 (this card, owner decision 8):** the moving-row mark in Messages and Files (`apps/local-ui/src/pages/moving/`, on `GET /api/ui/flow` through the Agents map's client and poller). Files rows carry no contact ID, so a Files row is matched by an owner-confirmed name that exactly one active contact holds (else no mark); a later change can add the contact ID to the files read.
+- **Remainder, 0.4.5 (not built):** the Home mini map (top 5), the Contacts Map view and Contacts row mark, and the one-line compact strip.
 - **Acceptance:**
   - Same rules, one source (the shared pulse module and `GET /api/ui/flow`); no content drawn; budget and reduced-motion rules as U3-map; screenshots at 1440 and 360, light and dark; independent review.
 

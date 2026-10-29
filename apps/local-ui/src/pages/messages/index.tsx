@@ -41,6 +41,7 @@ import {
   usePulse,
   type Pulse,
 } from '../pulse/index.js';
+import { MovingMark, useMoving, type Moving, type MovingMap } from '../moving/index.js';
 import { START_STRINGS } from '../home/strings.js';
 import './messages.css';
 import { countUnseen, loadSeen, markSeen, type Seen } from './seen.js';
@@ -348,9 +349,12 @@ function ContactRow({
   selected,
   pulse,
   arrival,
+  moving,
   onOpen,
 }: {
   c: Conversation;
+  /** A stream now (U3-map-2, b11 §32.1): the moving-row mark. */
+  moving: Moving | undefined;
   pulse: Pulse | undefined;
   /** Non-zero when this row just became Active now. */
   arrival: number;
@@ -386,6 +390,7 @@ function ContactRow({
           arrival={arrival}
           fallbackAt={c.lastAt}
         />
+        {moving === undefined ? null : <MovingMark moving={moving} />}
       </button>
     </li>
   );
@@ -407,6 +412,7 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
   const listRef = useRef<HTMLUListElement>(null);
   const lastOpened = useRef<string | undefined>(undefined);
   const activity = usePulse(apiClient);
+  const moving: MovingMap = useMoving(apiClient);
   const { activitySort } = usePrefs();
   // Contacts that showed up after the first load (they enter); the first list never animates.
   const known = useRef<Set<string> | undefined>(undefined);
@@ -528,6 +534,7 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
                     fresh={fresh.has(c.contactId)}
                     pulse={activity.pulse}
                     arrival={activity.arrivals.has(c.contactId) ? activity.seq : 0}
+                    moving={moving.get(c.contactId)}
                     selected={c.contactId === selected}
                     onOpen={() => {
                       lastOpened.current = c.contactId;

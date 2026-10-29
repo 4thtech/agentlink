@@ -18,6 +18,7 @@ export default defineConfig({
         /app\.css/,
         /compact\.css/,
         /map\.css/,
+        /moving\.css/,
       ],
     },
     // Loads the lazy parts once, so tests can render them synchronously (UI-REFRESH-u).

@@ -134,7 +134,10 @@ describe('tabs', () => {
     expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
     expect(host.querySelector('[role="tablist"]')?.getAttribute('aria-label')).toBeTruthy();
     expect(host.querySelector('[role="tabpanel"]')).not.toBeNull();
-    expect(s.calls.map((c) => c.url)).toEqual([RECEIVED]);
+    // The moving-row mark (U3-map-2) adds the one flow read; no other call.
+    expect(s.calls.map((c) => c.url).filter((u) => !u.startsWith('/api/ui/flow'))).toEqual([
+      RECEIVED,
+    ]);
     expect(host.textContent).toContain(IO.explainer);
   });
 

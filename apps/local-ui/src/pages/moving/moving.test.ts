@@ -37,7 +37,10 @@ describe('movingRows', () => {
   });
 
   it('takes the newest direction when both moved', () => {
-    const m = movingRows(flowOf(item(id(1), 'out', 'message', 30), item(id(1), 'in', 'message', 4)), NOW);
+    const m = movingRows(
+      flowOf(item(id(1), 'out', 'message', 30), item(id(1), 'in', 'message', 4)),
+      NOW,
+    );
     expect(m.get(id(1))?.direction).toBe('in');
   });
 

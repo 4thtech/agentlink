@@ -123,7 +123,13 @@ describe('Messages', () => {
         ok(
           flowBody([
             { contactId: MARKO, direction: 'out', kind: 'message', state: 'sent', at: ago(90) },
-            { contactId: ANA, direction: 'out', kind: 'message', state: 'not_delivered', at: ago(1) },
+            {
+              contactId: ANA,
+              direction: 'out',
+              kind: 'message',
+              state: 'not_delivered',
+              at: ago(1),
+            },
           ]),
         ),
       ),
@@ -232,7 +238,10 @@ describe('Files', () => {
         { contactId: MARKO, direction: 'out', kind: 'file', state: 'queued', at: ago(4) },
         { contactId: ANA, direction: 'out', kind: 'message', state: 'sent', at: ago(4) },
       ]),
-      '/api/ui/contacts': { status: 'ok', contacts: [contact(MARKO, 'Marko'), contact(ANA, 'Ana')] },
+      '/api/ui/contacts': {
+        status: 'ok',
+        contacts: [contact(MARKO, 'Marko'), contact(ANA, 'Ana')],
+      },
     });
     const marks = [...host.querySelectorAll('.mv-mark')];
     expect(marks.length).toBe(1);
