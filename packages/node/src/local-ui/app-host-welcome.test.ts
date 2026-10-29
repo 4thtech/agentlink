@@ -53,6 +53,8 @@ import {
   type AppHostAgent,
 } from './app-host.js';
 import { createLocalUiRoutes } from './routes.js';
+import type { JoinCheck } from './join-desk.js';
+import { CoreError } from '@4thtech-io/core';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
 const NOW = 1_800_000_000;
@@ -325,6 +327,8 @@ interface Harness {
   readonly origin: string;
   readonly w: World;
   readonly events: ApprovalServerEvent[];
+  /** Every URL handed to the OS opener (U3-invite). */
+  readonly opened: string[];
   /** A page session: the cookie, the CSRF token and the generation the page was built against. */
   session(): Promise<{ cookie: string; csrf: string; generation: string; page: Response }>;
   get(path: string, s: { cookie: string; csrf: string }): Promise<Response>;
@@ -336,7 +340,9 @@ interface Harness {
   ): Promise<Response>;
 }
 
-async function harness(options: { firstRun?: false; w?: World } = {}): Promise<Harness> {
+async function harness(
+  options: { firstRun?: false; w?: World; waitingInvite?: string; checkInvite?: JoinCheck } = {},
+): Promise<Harness> {
   const w = options.w ?? world();
   const opened: string[] = [];
   const events: ApprovalServerEvent[] = [];
@@ -362,6 +368,8 @@ async function harness(options: { firstRun?: false; w?: World } = {}): Promise<H
                 ownerFiles: defaultOwnerFiles(join(dir, 'home')),
               },
             }),
+        // U3-invite: `join` on a computer with no agent folder at all.
+        ...(options.waitingInvite === undefined ? {} : { waitingInvite: options.waitingInvite }),
       },
       onEvent: (event) => void events.push(event),
     },
@@ -374,6 +382,7 @@ async function harness(options: { firstRun?: false; w?: World } = {}): Promise<H
       notifier: () => Promise.resolve(true),
       ownerKdf: KDF,
       // Never the real ~/.agentlink: the owner store opens on the test keychain only.
+      ...(options.checkInvite === undefined ? {} : { checkInvite: options.checkInvite }),
     },
   );
   servers.push(server);
@@ -387,6 +396,7 @@ async function harness(options: { firstRun?: false; w?: World } = {}): Promise<H
     port: server.port,
     origin: server.origin,
     w,
+    opened,
     events,
     async session() {
       const at = opened.length;
@@ -458,6 +468,11 @@ const SETUP_TIME = new Set([
   'POST /api/ui/agents/switch',
   // U3-e: the remove kind keeps its own gate; it needs no open agent (Remove anyway, 04 §2.5).
   'POST /api/ui/agents/remove',
+  // U3-invite: the waiting invite is the host's, not an agent's: its read and "Not now" answer
+  // during first run; the handoff kind runs before the session gate. Accept needs an agent.
+  'GET /api/ui/join',
+  'POST /api/ui/join/dismiss',
+  'POST /api/ui/join/handoff',
 ]);
 
 describe('U3-g-b: ui with no agent at all serves Welcome', () => {
@@ -760,5 +775,56 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     expect(begin.status).toBe(503);
     expect(JSON.parse(begin.body)).toEqual({ status: 'unavailable' });
     expect(h.w.log).toEqual([]);
+  });
+});
+
+// U3-invite fix round (IR-U3-invite-2 BLOCKING): `agentlink join` on a computer with NO agent folder
+// at all. The no-agent host holds the waiting invite; the opener goes to first run because no owner
+// exists yet (not because an agent's `ownerSetup` is set); first run v3 creates the agent and the
+// owner; then the invite is still waiting and the join screen opens.
+describe('U3-invite: join with an empty agent folder ends on the waiting invite', () => {
+  const LINK = `https://agentlink.4thtech.io/i#${'Q'.repeat(48)}`;
+  const INVITE_ID = 'AQEBAQEBAQEBAQEBAQEBAQ';
+  const check: JoinCheck = (link) =>
+    link === LINK
+      ? Promise.resolve({
+          inviteId: INVITE_ID,
+          contact: {
+            id: `0x${'1a'.repeat(20)}`,
+            display: { name: 'Marko', label: 'self-declared', nameSource: 'counterparty' },
+            ownerFingerprint: { short: '7F3A·19C2', long: 'AB'.repeat(32) },
+            pairing: 'pending',
+            safetyCodeChecked: false,
+          } as never,
+          expiresAt: NOW + 86_400 * 3 + 1_000_000_000,
+        })
+      : Promise.reject(new CoreError('invite_invalid', 'x'));
+
+  it('openJoin goes to first run while no owner exists; the invite waits through it; then the join screen', async () => {
+    const h = await harness({ waitingInvite: LINK, checkInvite: check });
+    expect(await h.server.openJoin()).toBe(true);
+    expect(new URL(h.opened.at(-1) ?? '').pathname).toBe('/first-run');
+    const s = await h.session();
+    // The join read answers with no agent open (only the display fields, never the link).
+    const before = await h.get('/api/ui/join', s);
+    expect(before.status).toBe(200);
+    expect(JSON.parse(before.body)).toMatchObject({ state: 'waiting', inviteId: INVITE_ID });
+    expect(before.body).not.toContain('Q'.repeat(20));
+    const { finish } = await firstRun(h, s, 'My agent');
+    expect(finish?.status).toBe(200);
+    // After first run: an owner exists and the agent is open; the invite is still waiting.
+    const after = await h.get('/api/ui/join', s);
+    expect(JSON.parse(after.body)).toMatchObject({ state: 'waiting', inviteId: INVITE_ID });
+    expect(await h.server.openJoin()).toBe(true);
+    expect(new URL(h.opened.at(-1) ?? '').pathname).toBe('/settings/join');
+    expect(JSON.stringify(h.events)).not.toContain('Q'.repeat(20));
+  }, 60_000);
+
+  it('"Not now" works with no agent open (the invite kind, nothing signed)', async () => {
+    const h = await harness({ waitingInvite: LINK, checkInvite: check });
+    const s = await h.session();
+    const res = await h.post('/api/ui/join/dismiss', s, encodeUtf8('{}'));
+    expect(res.status).toBe(200);
+    expect(JSON.parse((await h.get('/api/ui/join', s)).body)).toEqual({ state: 'none' });
   });
 });

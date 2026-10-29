@@ -85,10 +85,15 @@ describe('U3-invite: the command and the sentence (08 §4)', () => {
     expect(command).not.toMatch(/[\r\n]/);
   });
 
-  it('the sentence is exactly the 08 §4 wording with the link twice, never the inviter', () => {
+  it('the sentence is exactly the 08 §4 wording with the link once, never the inviter', () => {
+    // Orchestrator Decision 36: until the AI can open the app (M1-UX-OPEN-APP), the AI runs `init`
+    // (the change shown, applied after the person confirms) and then only SHOWS the join command;
+    // the person runs it in their own terminal.
     expect(ASK_AI_TEMPLATE).toBe(
-      "Set up AgentLink for me and open an invite. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then run `npx -y @4thtech-io/agentlink join '{inviteUrl}'`, which opens the AgentLink app so I can finish there. Never ask me for a code or passphrase, and don't accept the invite for me.",
+      "Set up AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then show me this command so I can run it myself in my own terminal, and don't run it for me: `npx -y @4thtech-io/agentlink join '{inviteUrl}'`. It opens the AgentLink app, where I accept the invite. Never ask me for a code or passphrase.",
     );
+    expect(ASK_AI_TEMPLATE).toContain("don't run it for me");
+    expect(ASK_AI_TEMPLATE).not.toMatch(/\bThen run\b/);
     expect(ASK_AI_TEMPLATE.split('{inviteUrl}')).toHaveLength(2);
     expect(ASK_AI_TEMPLATE.replaceAll('{inviteUrl}', '')).not.toMatch(/[{}]/);
     const sentence = buildAskAi(LINK);

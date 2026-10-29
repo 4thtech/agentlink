@@ -143,6 +143,46 @@ describe('startUiWelcome (U3-g-b)', () => {
     expect(w.log).toEqual(['openFirstRun', 'close']);
   });
 
+  it('U3-invite: with an invite, the host holds it and the handoff record, and open goes to openJoin', async () => {
+    const w = welcome();
+    const log = w.log;
+    const handoff = { write: () => Promise.resolve(), remove: () => Promise.resolve() };
+    const LINK = `https://agentlink.4thtech.io/i#${'Z'.repeat(30)}`;
+    const server = await startUiWelcome({
+      ...w.deps,
+      waitingInvite: LINK,
+      handoff,
+      startServer: (options) => {
+        w.started.push(options);
+        return Promise.resolve({
+          openFirstRun: () => {
+            log.push('openFirstRun');
+            return Promise.resolve(true);
+          },
+          openJoin: () => {
+            log.push('openJoin');
+            return Promise.resolve(true);
+          },
+          close: () => Promise.resolve(),
+        });
+      },
+    });
+    const options = w.started[0];
+    expect(options?.host?.waitingInvite).toBe(LINK);
+    expect(options?.host?.handoff).toBe(handoff);
+    await server?.open();
+    // The server's openJoin goes to first run while no owner exists, then the join screen.
+    expect(log).toEqual(['openJoin']);
+  });
+
+  it('without an invite the host still writes the handoff record when given one', async () => {
+    const w = welcome();
+    const handoff = { write: () => Promise.resolve(), remove: () => Promise.resolve() };
+    await startUiWelcome({ ...w.deps, handoff });
+    expect(w.started[0]?.host?.handoff).toBe(handoff);
+    expect(w.started[0]?.host?.waitingInvite).toBeUndefined();
+  });
+
   it.each([
     ['an agent exists', { entries: [{ name: 'a', label: 'a', available: true, removing: false }] }],
     [

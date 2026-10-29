@@ -145,6 +145,18 @@ describe('the waiting card (b11 §33.2)', () => {
     expect(host.querySelector('input[type="password"]')).not.toBeNull();
   });
 
+  it('the rules refuse new contacts: says so (the server answers policy_denied before presence)', async () => {
+    const { api } = fakeApi(['waiting'], { kind: 'policy_denied' });
+    await render({
+      api,
+      passkey: PASSKEY,
+      gesture: () => Promise.resolve({ kind: 'passkey', body: new Uint8Array([1]) }),
+    });
+    await click('Accept with Touch ID');
+    expect(text()).toContain("Your rules don't allow new contacts.");
+    expect(text()).not.toContain('Not accepted yet');
+  });
+
   it('invite_changed: says so and reads again; nothing else', async () => {
     const { api } = fakeApi(['waiting'], { kind: 'invite_changed' });
     await render({

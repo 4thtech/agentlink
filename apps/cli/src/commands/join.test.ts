@@ -19,7 +19,7 @@ import {
 } from '../dispatch.js';
 import type { AppHostRecord, HandoffOutcome } from '../runtime/app-host-record.js';
 import type { TerminalContext } from '../runtime/guards.js';
-import { JOIN_TEXT, joinLinkOf, joinStep, type JoinDeps } from './join.js';
+import { JOIN_TEXT, joinLinkOf, joinPatternMatchesShippedHost, joinStep, type JoinDeps } from './join.js';
 import type { UiDeps } from './ui.js';
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
@@ -138,6 +138,9 @@ function harness(
 }
 
 describe('joinLinkOf: the 08 §4 argument rule', () => {
+  it('the literal pattern is exactly core INVITE_LINK_PREFIX and the payload cap (CodeQL js/incomplete-hostname-regexp)', () => {
+    expect(joinPatternMatchesShippedHost()).toBe(true);
+  });
   it('takes the canonical link, bare (sh, zsh, PowerShell) or in one pair of single quotes (cmd.exe)', () => {
     expect(joinLinkOf([LINK])).toBe(LINK);
     expect(joinLinkOf([`'${LINK}'`])).toBe(LINK);
@@ -217,6 +220,60 @@ describe('agentlink join: a running app host takes it with one loopback handoff'
     expect(await h.run([LINK])).toBe(EXIT_OK);
     expect(h.calls.handoffs).toHaveLength(1);
     expect(h.out.join(' ')).not.toContain(PAYLOAD.slice(0, 20));
+  });
+});
+
+describe('agentlink join: a computer with no agent folder at all (IR-U3-invite-2 BLOCKING)', () => {
+  it('starts the no-agent app host (Welcome, first run v3) with the invite waiting in it', async () => {
+    const h = harness(TTY);
+    const welcomes: ({ readonly invite?: string } | undefined)[] = [];
+    let stop: (() => void) | undefined;
+    const ui: UiDeps = {
+      ...h.deps.ui,
+      agents: () => Promise.resolve([]),
+      lastUsed: () => Promise.resolve(undefined),
+      startWelcome: (options) => {
+        welcomes.push(options);
+        return Promise.resolve({
+          page: 'first-run',
+          open: () => {
+            setTimeout(() => stop?.(), 5);
+            return Promise.resolve(true);
+          },
+          close: () => Promise.resolve(),
+        });
+      },
+      interrupt: (s) => {
+        stop = s;
+        return () => undefined;
+      },
+    };
+    const err: string[] = [];
+    const out: string[] = [];
+    const code = await joinStep(
+      {
+        command: 'join',
+        parsed: { values: {}, positionals: [LINK], agent: undefined },
+        output: { print: (t) => out.push(t), printError: (t) => err.push(t) },
+        terminal: TTY,
+      },
+      { ...h.deps, ui },
+    );
+    expect(code).toBe(EXIT_OK);
+    expect(welcomes).toEqual([{ invite: LINK }]);
+    // Not the "not set up here yet, run init" dead end, and the agent start is not tried.
+    expect(h.calls.starts).toEqual([]);
+    expect(err).toEqual([]);
+    expect(out).toEqual([JOIN_TEXT.opened]);
+  });
+
+  it('the production no-agent host gets the waiting invite and the handoff record', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const source = await readFile(new URL('./ui.ts', import.meta.url), 'utf8');
+    const welcome = source.slice(source.indexOf('startWelcome: ('), source.indexOf('start: async'));
+    expect(welcome).toContain('waitingInvite');
+    expect(welcome).toContain('writeAppHostRecord');
+    expect(welcome).toContain('removeAppHostRecord');
   });
 });
 
