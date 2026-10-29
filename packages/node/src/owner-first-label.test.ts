@@ -14,6 +14,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   AgentLinkClient,
+  checkInviteLink,
+  decodeInviteLink,
   type ApprovalChannel,
   type OwnerActionOutcome,
   type PreparedOwnerAction,
@@ -183,6 +185,31 @@ describe('signNewAgent (U3-d; 04 §2.8 "From the local app")', () => {
     expect(outcome.status).toBe('done');
     expect(signed).toEqual(['card', 'agent.label']);
     expect((await agent.client.ownerActions.loadPolicy()).mode).toBe('defaults');
+  });
+
+  it('U3-d-b: contacts see the label the owner typed, never the folder name', async () => {
+    const agent = await initAgent('ana');
+    const { keys, session } = await ownerSession();
+    // The folder is `work-agent` (newAgentCard); the owner typed "Ana".
+    const outcome = await signNewAgent(
+      session,
+      keys,
+      newAgentCard(agent, 'Ana'),
+      await prepareSendFolder(home),
+    );
+    expect(outcome.status).toBe('done');
+    // The signed card commits to the typed label (nameHash), and its signatures verify.
+    expect((await agent.client.identity.signedCard()).name).toBe('Ana');
+    const { inviteUrl } = await agent.client.pairing.createInvite();
+    // The invite carries the card's name, and a peer's Accept step 1 (signatures and nameHash
+    // checked) shows it under the contact-name rule.
+    expect((await decodeInviteLink(inviteUrl)).name).toBe('Ana');
+    const peer = await checkInviteLink(inviteUrl, now);
+    expect(peer.contact.display).toEqual({
+      name: 'Ana',
+      label: 'self-declared',
+      nameSource: 'counterparty',
+    });
   });
 
   for (const label of ['', 'Work  agent', 'Work‮agent', '<b>Work</b>', 'a'.repeat(33)]) {
