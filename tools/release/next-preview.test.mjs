@@ -92,7 +92,9 @@ describe('preparePlan (pack-preview, before packing)', () => {
   });
 
   it('refuses tag-only entries, foreign scopes and malformed plans', () => {
-    expect(() => preparePlan(planOf([{ kind: 'tag-only', name: 'x', version: SNAPSHOT }]))).toThrow();
+    expect(() =>
+      preparePlan(planOf([{ kind: 'tag-only', name: 'x', version: SNAPSHOT }])),
+    ).toThrow();
     expect(() => preparePlan(planOf([entry({ name: 'left-pad' })]))).toThrow(/@4thtech-io/);
     expect(() => preparePlan({ version: 2, plan: [] })).toThrow();
     expect(() => preparePlan({ version: 1 })).toThrow();
@@ -146,15 +148,18 @@ describe('checkTree (no pre-mode file or snapshot version leaks into main)', () 
 
   it('wave-4: refuses .changeset/pre.json in any mode (snapshots only, nothing to exit later)', () => {
     for (const mode of ['pre', 'exit']) {
-      const problems = checkTree({ root: tree({ preJson: { mode, tag: 'next' } }), lane: 'wave-4' });
+      const problems = checkTree({
+        root: tree({ preJson: { mode, tag: 'next' } }),
+        lane: 'wave-4',
+      });
       expect(problems.join('\n')).toMatch(/pre\.json/);
     }
   });
 
   it('main: pre mode with tag next stays a legal channel', () => {
-    expect(checkTree({ root: tree({ preJson: { mode: 'pre', tag: 'next' } }), lane: 'main' })).toEqual(
-      [],
-    );
+    expect(
+      checkTree({ root: tree({ preJson: { mode: 'pre', tag: 'next' } }), lane: 'main' }),
+    ).toEqual([]);
   });
 
   it('both lanes: refuses a committed snapshot version (it would publish to latest from main)', () => {
@@ -325,10 +330,14 @@ describe('release.yml: the preview lane', () => {
 
   it('publishes from npm-next with provenance, no git tags, no GitHub Release, no custom tag', () => {
     expect(publish).toMatch(/\n {4}environment: npm-next\n/);
-    expect(publish).toMatch(/\n {4}permissions:\n {6}contents: read[^\n]*\n {6}id-token: write[^\n]*\n {4}[a-z]/);
+    expect(publish).toMatch(
+      /\n {4}permissions:\n {6}contents: read[^\n]*\n {6}id-token: write[^\n]*\n {4}[a-z]/,
+    );
     expect(publish).not.toMatch(/contents: write/);
     expect(publish).toMatch(/NPM_CONFIG_PROVENANCE: "true"/);
-    expect(publish).toMatch(/pnpm exec changeset publish --from-pack-dir "\$PACK_DIR" --no-git-tag\n/);
+    expect(publish).toMatch(
+      /pnpm exec changeset publish --from-pack-dir "\$PACK_DIR" --no-git-tag\n/,
+    );
     expect(publish).not.toMatch(/--tag[ =]/);
     expect(publish).not.toMatch(/gh release|create-github-releases/);
     // The packed plan is verified in this job, before the publish step.

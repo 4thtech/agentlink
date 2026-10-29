@@ -25,6 +25,25 @@
 #                     Environment `npm-next`: no reviewer, so merging the Version packages PR
 #                     publishes prereleases (x.y.z-next.n) automatically. Then smoke-next.
 #     publish-latest  otherwise. Environment `npm-publish`: waits for the owner's approval click.
+#   These channels run only for pushes to `main` (select-mode is main-only).
+#
+# PREVIEW LANE (W4-NEXT-PREVIEW, owner Decision 44 A1)
+#   A push to the `wave-4` integration branch runs ci-green and guard for that branch, then
+#     pack-preview     no publish rights: `changeset version --snapshot next` (never committed),
+#                      build, `changeset publish-plan`, every entry forced onto the `next` dist-tag
+#                      and checked to be an `@4thtech-io/*` snapshot `x.y.z-next.wave4.<UTC datetime>`
+#                      (tools/release/next-preview.mjs; `.changeset/config.json` `snapshot`), pack.
+#     publish-preview  environment `npm-next`, OIDC + provenance: re-checks the packed plan, publishes
+#                      it with no git tags and no GitHub Release, then the same registry check as
+#                      publish-next (next updated, latest untouched, provenance, signatures).
+#     smoke-preview    `npx -y @4thtech-io/agentlink@<version> --version` without credentials.
+#   The main-lane jobs (Version packages PR, publish-next, publish-latest, desktop extension,
+#   rollback, freeze, record) never run for wave-4. Snapshot versions cannot collide with a real
+#   release (`x.y.z` or the main pre-mode `x.y.z-next.<n>`). Nothing is committed, so there is no
+#   pre mode to exit when wave-4 merges into main; guard refuses `.changeset/pre.json` on wave-4
+#   and a committed snapshot version on either branch (next-preview.mjs check-tree).
+#   No freeze job for this lane (deploy-freeze allows main only): a registry check that finds
+#   `latest` moved fails red, and the orchestrator or the owner sets DEPLOY_FREEZE by hand.
 #   Why not "publish to next, then promote with a dist-tag": Changesets v3 publishes from the
 #   packed artifacts ("artifact mode") so that build code never runs in the job holding
 #   `id-token: write`, and artifact mode refuses a custom --tag. The tag comes from the publish
@@ -73,7 +92,9 @@
 #
 # MANUAL SETTINGS REQUIRED (docs/process/ci-cd.md, "Owner setup checklist", sections 4, 5 and 8)
 #   1. GitHub Environments:
-#        npm-next       no required reviewer; deployment branches: main only; no secrets.
+#        npm-next       no required reviewer; deployment branches: main and wave-4 (the preview
+#                       lane; wave-4 has its own ruleset: required checks, no force push, no
+#                       deletion); no secrets.
 #        npm-publish    required reviewer @talirezun, "Prevent self-review" OFF;
 #                       deployment branches: main and tags; one secret, DESKTOP_EXT_SIGNING_KEY
 #                       (optional, M1-9f: the desktop extension signing key, RSA PEM; unset = unsigned).
@@ -101,7 +122,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, wave-4]
 
 permissions: {}
 
@@ -138,9 +159,11 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           node tools/release/wait-for-ci.mjs \
+            --branch "$BRANCH" \
             --require ci.yml:ci-gate \
             --require security.yml:security-gate \
             --timeout-minutes 45 \
@@ -160,6 +183,7 @@ jobs:
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
       channel: ${{ steps.check.outputs.channel }}
+      lane: ${{ steps.lane.outputs.lane }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -196,10 +220,28 @@ jobs:
           echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
 
+      # W4-NEXT-PREVIEW: main runs the channels above, wave-4 the preview lane. Neither may hold a
+      # committed snapshot version, and wave-4 may not hold .changeset/pre.json (it would reach main).
+      - name: Pick the lane and refuse leaked pre-mode files or snapshot versions
+        id: lane
+        shell: bash
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          case "$REF" in
+            refs/heads/main) LANE=main ;;
+            refs/heads/wave-4) LANE=wave-4 ;;
+            *) echo "::error::release.yml runs only for main and wave-4."; exit 1 ;;
+          esac
+          node tools/release/next-preview.mjs check-tree --lane "$LANE"
+          echo "lane=$LANE" >> "$GITHUB_OUTPUT"
+
   select-mode:
     name: select-mode
     needs: guard
-    if: needs.guard.outputs.enabled == 'true'
+    # The Version packages PR and every main channel: main only, never for a wave-4 push.
+    if: needs.guard.outputs.enabled == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -492,6 +534,282 @@ jobs:
           out="$(npx -y "@4thtech-io/agentlink@$cli" --version)"
           case "$out" in
             *"$cli"*) echo "CLI $cli runs." ;;
+            *) echo "::error::@4thtech-io/agentlink@$cli --version did not print $cli."; exit 1 ;;
+          esac
+
+  # ---------------------------------------------------------------------------
+  # Preview lane (W4-NEXT-PREVIEW): every green push to `wave-4` publishes a snapshot to `next`.
+  # Never `latest`, never a git tag or GitHub Release, never the desktop extension.
+  pack-preview:
+    name: pack-preview
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true' && github.ref == 'refs/heads/wave-4'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read # no publish rights: build code never sees the OIDC token
+    outputs:
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Check that no M1a vector suite is pending
+        run: node tools/vectors/check-pending.mjs --gate M1a
+
+      # Versions every package with a pending changeset as x.y.z-next.wave4.<UTC datetime>
+      # (.changeset/config.json `snapshot`). Only in this runner's checkout; nothing is pushed.
+      - name: Version as a preview snapshot (never committed)
+        run: pnpm exec changeset version --snapshot next
+
+      - name: Build
+        run: pnpm build
+
+      - name: Check the CLI embeds the local UI
+        run: node apps/cli/scripts/check-embedded-ui.mjs
+
+      # The plan lists versions not yet on npm. prepare-plan moves every entry to `next` and refuses
+      # anything but an @4thtech-io/* preview snapshot (a stable version never leaves wave-4).
+      - name: Plan the snapshot publish on the next dist-tag
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec changeset publish-plan --output "$RUNNER_TEMP/publish-plan.raw.json"
+          node tools/release/next-preview.mjs prepare-plan \
+            --in "$RUNNER_TEMP/publish-plan.raw.json" \
+            --out "$RUNNER_TEMP/publish-plan.next.json"
+          count="$(jq '[.plan[][]] | length' "$RUNNER_TEMP/publish-plan.next.json")"
+          if [ "$count" = "0" ]; then
+            echo "::notice::Nothing to publish: no pending changeset on wave-4."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pack the snapshot
+        if: steps.plan.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec changeset pack --from-publish-plan "$RUNNER_TEMP/publish-plan.next.json" --out-dir "$RUNNER_TEMP/preview-pack"
+
+      - name: Upload the packed snapshot
+        if: steps.plan.outputs.publish == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: preview-pack
+          path: ${{ runner.temp }}/preview-pack
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-preview:
+    name: publish-preview
+    needs: pack-preview
+    if: needs.pack-preview.result == 'success' && needs.pack-preview.outputs.publish == 'true' && github.ref == 'refs/heads/wave-4' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Same environment and trusted publisher as publish-next (no reviewer). Its deployment branches
+    # must list wave-4 (owner setting); without it GitHub refuses this job before it starts.
+    environment: npm-next
+    concurrency:
+      group: release-npm-preview
+      cancel-in-progress: false
+    permissions:
+      contents: read # no git tags and no GitHub Release for previews
+      id-token: write # npm trusted publishing (OIDC) and provenance
+    outputs:
+      packages: ${{ steps.verify.outputs.packages }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Stop if DEPLOY_FREEZE is set
+        shell: bash
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
+            echo "::error::DEPLOY_FREEZE is set; nothing is published until the owner clears it."
+            exit 1
+          fi
+
+      # The Changesets CLI (a devDependency) must be installed; the package contents come from the packed tarballs.
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Download the packed snapshot
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: preview-pack
+          path: ${{ runner.temp }}/preview-pack
+
+      # Checked here, in the job that holds the OIDC token: every entry is an @4thtech-io/* preview
+      # snapshot on `next` with a tarball. Anything else (latest, a stable version) stops the job.
+      - name: Verify the packed plan (next only, preview snapshots only)
+        id: verify
+        shell: bash
+        env:
+          PACK_DIR: ${{ runner.temp }}/preview-pack
+        run: |
+          set -euo pipefail
+          if ! node tools/release/next-preview.mjs verify-plan --in "$PACK_DIR/publish-plan.json" > "$RUNNER_TEMP/preview-packages.json"; then
+            cat "$RUNNER_TEMP/preview-packages.json"
+            exit 1
+          fi
+          echo "packages=$(jq -c . "$RUNNER_TEMP/preview-packages.json")" >> "$GITHUB_OUTPUT"
+          jq -r '.[] | "Publishing \(.name)@\(.version) to next"' "$RUNNER_TEMP/preview-packages.json"
+
+      - name: Refuse registry overrides
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=0
+          # No `grep -q` here: with pipefail, an early exit would SIGPIPE the first grep and hide a match.
+          if [ -f .npmrc ] && grep -Ev '^[[:space:]]*([#;]|$)' .npmrc | grep -Ei 'registry|_auth|^[[:space:]]*//' > /dev/null; then
+            echo "::error file=.npmrc::.npmrc must not set a registry or credentials (the OIDC token would follow it)."
+            status=1
+          fi
+          # The dist-tag comes from the publish plan only (`next`, set by pack-preview): a project-level
+          # `tag=` line or `publishConfig.tag` could send a publish to another tag.
+          if [ -f .npmrc ] && grep -Ev '^[[:space:]]*([#;]|$)' .npmrc | grep -Ei '^[[:space:]]*tag[[:space:]]*=' > /dev/null; then
+            echo "::error file=.npmrc::.npmrc must not set tag (the dist-tag comes from the publish plan)."
+            status=1
+          fi
+          while IFS= read -r -d '' manifest; do
+            registry="$(jq -r '.publishConfig.registry // empty' "$manifest")"
+            if [ -n "$registry" ] && [ "$registry" != "https://registry.npmjs.org/" ]; then
+              echo "::error file=$manifest::publishConfig.registry must be absent or https://registry.npmjs.org/."
+              status=1
+            fi
+            # True when publishConfig is an object with a "tag" key, whatever its value; a jq parse error fails the step.
+            has_tag="$(jq -r '(.publishConfig | objects | has("tag")) // false' "$manifest")"
+            if [ "$has_tag" = "true" ]; then
+              echo "::error file=$manifest::publishConfig.tag must be absent (the dist-tag comes from the publish plan)."
+              status=1
+            fi
+          done < <(git ls-files -z -- ':(glob)**/package.json')
+          exit "$status"
+
+      - name: Require an npm version that supports trusted publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          required="11.5.1"
+          current="$(npm --version)"
+          lowest="$(printf '%s\n%s\n' "$required" "$current" | sort -V | head -n 1)"
+          echo "npm $current (minimum $required)"
+          if [ "$lowest" != "$required" ]; then
+            echo "::error::npm $current is older than $required, which cannot publish with OIDC trusted publishing. Use a newer Node 24 release in .nvmrc."
+            exit 1
+          fi
+
+      # No NPM_TOKEN / NODE_AUTH_TOKEN is set on purpose: npm falls back to OIDC only when no token is present.
+      # The dist-tag comes from the verified plan (`next`); artifact mode refuses a custom tag anyway.
+      - name: Publish the snapshot to npm (next, trusted publishing, with provenance)
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+          PACK_DIR: ${{ runner.temp }}/preview-pack
+        run: pnpm exec changeset publish --from-pack-dir "$PACK_DIR" --no-git-tag
+
+      - name: Check the registry (next updated, latest untouched, provenance, signatures)
+        shell: bash
+        env:
+          PACKAGES: ${{ steps.verify.outputs.packages }}
+        run: | # zizmor: ignore[adhoc-packages] exact name@version of this run's own packages, --ignore-scripts, scratch dir
+          set -euo pipefail
+          name_re='^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$'
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          mkdir -p "$RUNNER_TEMP/registry-check"
+          cd "$RUNNER_TEMP/registry-check"
+          status=0
+          specs=()
+          while IFS=$'\t' read -r name version; do
+            if ! [[ "$name" =~ $name_re && "$version" =~ $version_re ]]; then
+              echo "::error::Unexpected package name or version in the publish output."
+              exit 1
+            fi
+            for _ in $(seq 1 20); do
+              npm view "$name@$version" version > /dev/null 2>&1 && break
+              sleep 15
+            done
+            next_tag="$(npm view "$name" dist-tags.next 2> /dev/null || true)"
+            latest_tag="$(npm view "$name" dist-tags.latest 2> /dev/null || true)"
+            predicate="$(npm view --json "$name@$version" dist 2> /dev/null | jq -r '.attestations.provenance.predicateType // empty' || true)"
+            echo "$name@$version: next=$next_tag latest=$latest_tag provenance=${predicate:-none}"
+            if [ "$next_tag" != "$version" ]; then
+              echo "::error::$name: dist-tag next is not $version."
+              status=1
+            fi
+            if [ "$latest_tag" = "$version" ]; then
+              echo "::error::$name: the unattended job moved latest to $version. Incident: the owner fixes latest by hand."
+              status=1
+            fi
+            case "$predicate" in
+              https://slsa.dev/provenance/*) ;;
+              *)
+                echo "::error::$name@$version has no provenance attestation."
+                status=1
+                ;;
+            esac
+            specs+=("$name@$version")
+          done < <(jq -r '.[] | [.name, .version] | @tsv' <<< "$PACKAGES")
+          if [ "${#specs[@]}" -gt 0 ]; then
+            printf '{"name":"registry-check","version":"0.0.0","private":true}\n' > package.json
+            npm install --ignore-scripts --no-audit --no-fund "${specs[@]}" > /dev/null
+            npm audit signatures || status=1
+          fi
+          exit "$status"
+
+  smoke-preview:
+    name: smoke-preview
+    needs: publish-preview
+    if: needs.publish-preview.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read # no credentials: this job runs the published code
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+          install: "false"
+
+      - name: Smoke-test the CLI from npm
+        shell: bash
+        env:
+          PACKAGES: ${{ needs.publish-preview.outputs.packages }}
+        run: |
+          set -euo pipefail
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+-next\.wave4\.[0-9]{14}$'
+          cli="$(jq -r '.[] | select(.name == "@4thtech-io/agentlink") | .version' <<< "$PACKAGES")"
+          if [ -z "$cli" ]; then
+            echo "::notice::@4thtech-io/agentlink is not part of this snapshot; nothing to smoke-test."
+            exit 0
+          fi
+          [[ "$cli" =~ $version_re ]] || { echo "::error::Unexpected CLI version."; exit 1; }
+          cd "$RUNNER_TEMP"
+          out="$(npx -y "@4thtech-io/agentlink@$cli" --version)"
+          case "$out" in
+            *"$cli"*) echo "CLI $cli runs. Try it: npx -y @4thtech-io/agentlink@next" ;;
             *) echo "::error::@4thtech-io/agentlink@$cli --version did not print $cli."; exit 1 ;;
           esac
 
