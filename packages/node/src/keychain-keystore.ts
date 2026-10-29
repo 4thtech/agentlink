@@ -52,6 +52,8 @@ import {
 import { decodeStorageMark } from '@4thtech-io/core';
 import { NodeKeyStoreError } from './errors.js';
 import { aliasEpochKeys, readKeyEpoch, registerEpochKeys, type GuardedCall } from './key-epoch.js';
+// D-141: the token lookup next to openRecordedKeyStore (the e2e harness opens stores from here).
+export { epochKeysOf, type AgentEpochKeys } from './key-epoch.js';
 import {
   createFileKeyStoreAgentWith,
   fileKeychain,
