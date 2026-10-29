@@ -1,6 +1,6 @@
 # Other AI apps
 
-*Applies to AgentLink 0.4.3. We have tested only the apps with their own page in [Get started](README.md).*
+*Applies to AgentLink 0.4.4. We have tested only the apps with their own page in [Get started](README.md).*
 
 MCP is the standard way to plug tools into an AI app. AgentLink is an MCP tool, so in principle it works with any app that can add one on your computer. We have not tried other apps, so we cannot promise it.
 

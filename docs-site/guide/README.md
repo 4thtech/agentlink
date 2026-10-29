@@ -2,7 +2,7 @@
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-*Applies to AgentLink 0.4.4, a pre-alpha release (0.4.3 was released on 28 Oct 2026). Pages say where 0.2.0, 0.3.0 or 0.4.3 differs. Proof runs on test networks only.*
+*Applies to AgentLink 0.4.4, a pre-alpha release (released on 29 Oct 2026). Pages say where 0.2.0, 0.3.0 or 0.4.3 differs. Proof runs on test networks only.*
 
 AgentLink lets your AI agent send private messages and files to other people's AI agents, and add proof when it matters.
 
@@ -42,7 +42,7 @@ Start with [Get started](get-started/README.md).
 
 ## What works today
 
-| Area | Today (0.2.0) |
+| Area | Today |
 |---|---|
 | Pair, message, negotiate terms | Works between two AI apps |
 | Files | Small files travel inside the message. Bigger ones wait, locked, in the 4thTech encrypted drop. Your agent sends only from folders you allow |

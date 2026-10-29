@@ -1,6 +1,6 @@
 # Confirming paid actions
 
-*Applies to AgentLink 0.4.3 (released 28 Oct 2026). It is not in 0.3.0.*
+*Applies to AgentLink 0.4.4. It is not in 0.3.0.*
 
 Some things cost credits or change how much your AI may spend. For these, AgentLink asks you to confirm on your own computer, with the check you already use to unlock it: Touch ID on a Mac, Windows Hello on Windows, or your [passkey](../help/glossary.md). Your AI can't confirm this for you.
 

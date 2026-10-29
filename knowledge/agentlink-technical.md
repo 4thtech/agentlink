@@ -22,16 +22,16 @@ flowchart LR
 
 | Name | Role | Status (18 Oct 2026) |
 |---|---|---|
-| `@4thtech-io/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Built into the released CLI package (v0.4.3), not published on its own; STREAM file encryption (1 MiB chunks, header bound into every chunk) is used for file transfer since v0.2.0 |
+| `@4thtech-io/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Built into the released CLI package (v0.4.4), not published on its own; STREAM file encryption (1 MiB chunks, header bound into every chunk) is used for file transfer since v0.2.0 |
 | `@4thtech-io/types` | Shared schemas for policies, approvals, proof packs and tool results | Built into the released CLI package, not published on its own |
 | `@4thtech-io/transport-nostr` | Gift wrap and unwrap, relay pool, delivery outbox, inbox sync, the default relay set | Built into the released CLI package, not published on its own |
 | `@4thtech-io/core` | Identity, signed agent card, contacts, envelopes, invites and pairing, owner-signed actions and policies, approvals, the send pipeline, inbox, terms negotiation | Built into the released CLI package, not published on its own |
 | `@4thtech-io/node` | OS-keychain key store, local SQLite database, relay connection | Built into the released CLI package, not published on its own |
-| MCP server and `agentlink` command line (`apps/cli`) | The tools an AI app calls, and the owner commands typed in a terminal | Fifteen tools: the nine from M1a (status, invites, contacts, send, inbox, terms and approvals) plus, since v0.1.2, saving a received file and the proof tools (add proof, acknowledge, get, export and verify a proof pack), released as `@4thtech-io/agentlink` (current v0.3.0, which adds the local app, opened with `agentlink ui`); an agent skill file and quickstart guides exist |
+| MCP server and `agentlink` command line (`apps/cli`) | The tools an AI app calls, and the owner commands typed in a terminal | Fifteen tools: the nine from M1a (status, invites, contacts, send, inbox, terms and approvals) plus, since v0.1.2, saving a received file and the proof tools (add proof, acknowledge, get, export and verify a proof pack), released as `@4thtech-io/agentlink` (current v0.4.4, which has the local app, opened with `agentlink` or `agentlink ui`); an agent skill file and quickstart guides exist |
 | Storage and chain client | Encrypted drop and own-storage adapters; proof client | Released (v0.2.0, test networks): the encrypted drop is the default for files above about 12 KB and the proof client is built into the CLI. The S3-compatible adapter (multipart upload, streaming encryption; tested against MinIO and Cloudflare R2) is merged, but choosing your own storage is not available yet |
 | Desktop apps, owner console, cloud agent | Native approvals and dashboard; web supervision; always-on agent in the user's own Cloudflare account | Planned (M2) |
 
-Merged for 0.4.4 (not on npm yet): the local app is an app host that holds one agent open at a time and switches in the same process, port and session (a generation number refuses requests made against another agent; every owner action is signed bound to the agent), `agentlink join` and bare `agentlink` commands, and an AI apps desk that is the one writer of AI app settings files (fixed entry, realpath checks, a backup that keeps the file mode). Only the CLI package `@4thtech-io/agentlink` is published (current v0.4.3, 28 Oct 2026, with provenance; v0.1.0 was the first, on 16 Oct 2026); the libraries are private workspace packages bundled into it. End-to-end tests drive two real MCP server processes over local relays in CI.
+Released in 0.4.4 (29 Oct 2026): the local app is an app host that holds one agent open at a time and switches in the same process, port and session (a generation number refuses requests made against another agent; every owner action is signed bound to the agent), `agentlink join` and bare `agentlink` commands, and an AI apps desk that is the one writer of AI app settings files (fixed entry, realpath checks, a backup that keeps the file mode). Only the CLI package `@4thtech-io/agentlink` is published (current v0.4.4, 29 Oct 2026, with provenance; v0.1.0 was the first, on 16 Oct 2026); the libraries are private workspace packages bundled into it. End-to-end tests drive two real MCP server processes over local relays in CI.
 
 ## MCP server
 
@@ -64,7 +64,7 @@ A submitter (sends signed proof records and pays network fees, recovered from th
 
 ## Packagings
 
-Local `npx` package with keys in the OS keychain (M1a, released as v0.1.0; current v0.4.3); desktop apps with OS-biometric approvals (M2); self-hosted cloud agent with a remote MCP endpoint (M2); hosted approval-mode MCP (M4, after design review).
+Local `npx` package with keys in the OS keychain (M1a, released as v0.1.0; current v0.4.4); desktop apps with OS-biometric approvals (M2); self-hosted cloud agent with a remote MCP endpoint (M2); hosted approval-mode MCP (M4, after design review).
 
 ## Protocol OCC v2
 

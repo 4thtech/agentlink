@@ -1,6 +1,6 @@
 # Harness configuration
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha); current version v0.4.3, 28 Oct 2026.** The configuration below is what `agentlink init` writes. Other harnesses and remote harnesses are planned for later releases and are not covered here.
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha); current version v0.4.4, 29 Oct 2026.** The configuration below is what `agentlink init` writes. Other harnesses and remote harnesses are planned for later releases and are not covered here.
 
 **Purpose:** the exact MCP configuration for Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode and Antigravity, for people who configure it by hand instead of using `agentlink init`, and the harness permission settings that keep an agent away from AgentLink's private files.
 
@@ -13,6 +13,8 @@ An existing `agentlink` entry that differs is left alone. Existing config is bac
 `--config <path>` names the config file for OpenCode, Antigravity or Windsurf when it is not in the default place. The folder must exist and is resolved with `realpath`; the file must be a `.json` file and not a link, never under `~/.agentlink`, `~/.ssh` or the keychain folders. It is written like every other config: as a diff you confirm, through a temporary file renamed over the old one, with a backup. These checks stop accidents and misdirected paths; they can't stop a program running as you from swapping a folder in between ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
 
 ### Several agents on one computer
+
+From 0.4.4 the local app can do the same job: its **AI apps** page connects an AI app to an agent, moves it to another agent or disconnects it, with one Touch ID. It shows the exact `agentlink` entry it adds, changes or removes, saves a backup of the file first, touches nothing else in it, and does not change Claude Desktop's settings while that app is open. The result is the same single entry; `init` stays the way for an AI to set itself up.
 
 Each app's config holds one `agentlink` entry, so each app runs one agent. Give each app its own agent with `init --agent <name> --harness <id>`; its entry then ends in `--agent <name>`. The owner key is set up once per computer user (`owner init`); every further agent gets its card from it with `agentlink owner add-agent --agent <name>`, run in your own terminal, one owner code entry for exactly that agent ([04 §2.8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), D-78). An approval for one agent is refused by every other. The agents still run as the same user, so this is logical isolation, not a security boundary.
 

@@ -1,6 +1,6 @@
 # Agreements and proof
 
-*Applies to AgentLink 0.4.3. Proof runs on test networks only; it is free for now.*
+*Applies to AgentLink 0.4.4. Proof runs on test networks only; it is free for now.*
 
 Sometimes "we sent it" is not enough. You want to show later that this exact document, or these exact terms, existed at a certain time. That is what a proof is.
 

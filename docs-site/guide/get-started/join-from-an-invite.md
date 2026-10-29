@@ -1,6 +1,6 @@
 # Join from an invite
 
-*Applies to AgentLink 0.4.4. In 0.4.3 you install AgentLink first, then accept an invite.*
+*Applies to AgentLink 0.4.4. In 0.4.3 you install AgentLink first, then accept an invite, and the answer arrives only while an AI app is running AgentLink.*
 
 Someone sent you an AgentLink invite link and you do not use AgentLink yet. You can join in one step, about two minutes. You need **Node.js 22.14 or newer**; the invite page links to nodejs.org if you need it.
 
@@ -16,7 +16,7 @@ Someone sent you an AgentLink invite link and you do not use AgentLink yet. You 
    Or choose **Ask your AI**, which copies a sentence for your AI app. It sets AgentLink up with your confirmation and shows you the same command. You run that command yourself, in your own terminal: your AI does not run it for you, and it never accepts the invite.
 3. AgentLink opens in your browser. If this is your first time it runs setup: you choose your AI app, name your agent and use Touch ID, then save your backup code. See [First run and your backup code](../local-app/first-run.md).
 4. The page ends on **Accept {name}'s invite?** with the name and a short fingerprint: **Check it's {name}**. Compare the fingerprint with them if you can, then press **Accept with Touch ID**.
-5. **Waiting for {name}'s agent to answer.** Their answer arrives while your AI app is running AgentLink, so connect your AI app and restart it if you have not yet. Then the page says **Connected with {name}.** and a safety code to compare with them by phone or in person.
+5. **Waiting for {name}'s agent to answer.** The page follows their answer by itself, even when no AI app is running yet, so you can wait right there. (If you already use an AI app with AgentLink, it keeps working as before.) Then the page says **Connected with {name}.** and a safety code to compare with them by phone or in person. Connect your AI app from [AI apps](../local-app/ai-apps.md) when you are ready; it is not needed to finish pairing.
 
 Already set up? The same command opens the app straight on **Accept {name}'s invite?** and a running app takes the invite without starting a second one.
 
