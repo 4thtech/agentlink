@@ -7847,6 +7847,17 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Acceptance:**
   - The node-os job runs the browser tests on both systems; `ci-gate` needs the job or the reason is recorded; no step skipped; owner says "merge" (sensitive path).
 
+#### CHORE-RELEASE-HEALTH-TARBALL-WAIT · Release: wait for the tarball and finish an already-published version (new, incident 0.4.4)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** sensitive (`.github/**`, supply chain; owner "merge", Fable audit) · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/release.yml` (`publish-latest`), `tools/release/release-resume.test.mjs`, `docs/runbooks/merge-and-release.md`
+- **Depends on:** none
+- **Scope:**
+  - Incident (run 40872091202): `publish-latest` published 0.4.4; the health check waited only for the metadata, fetched the tarball while npm's CDN still answered E404, rolled `latest` back and set `DEPLOY_FREEZE`. The re-run published nothing and stopped: no `latest`, no GitHub Release, no desktop bundles.
+  - The health check now waits for each exact tarball URL (built from the validated name and version) with backoff, within one 15-minute budget, before the provenance and signature checks.
+  - A run that publishes nothing finishes this commit's stable versions that are on npm, not deprecated and newer than `latest`: the same health check, then `latest` is moved and read back, then the GitHub Release; smoke-latest, the desktop jobs, `record` and `freeze` follow from the job outputs.
+- **Acceptance:**
+  - RED tests first; DEPLOY_FREEZE, the `npm-publish` approval and rollback on failure unchanged; `latest` moves only after the health check; no new dependency or action; owner says "merge".
+
 #### DOCS-CURRENCY-1027 · docs currency: wiki lows and spec nits (new, low, wiki #11 GITBOOK-PR2, #572, #573)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (docs/foundation text); S0 for the wiki repo · **Phase:** M1b
 - **Repo/path:** `WIKI-030-wiki` repo (sync script, `home/news.md`, `home/product-family.md`, `CONTRIBUTING`), agentlink `docs/foundation/**`

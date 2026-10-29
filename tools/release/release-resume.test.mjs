@@ -16,10 +16,9 @@ const workflow = readFileSync(
   'utf8',
 );
 const extract = (marker) =>
-  (new RegExp(`# ${marker}-BEGIN\\n([\\s\\S]*?)\\s*# ${marker}-END`).exec(workflow)?.[1] ?? '').replace(
-    /^ {10}/gm,
-    '',
-  );
+  (
+    new RegExp(`# ${marker}-BEGIN\\n([\\s\\S]*?)\\s*# ${marker}-END`).exec(workflow)?.[1] ?? ''
+  ).replace(/^ {10}/gm, '');
 const waitBlock = extract('TARBALL-WAIT');
 const resumeBlock = extract('RESUME');
 
@@ -182,7 +181,10 @@ describe('re-run of an already-published version (RESUME block)', () => {
 });
 
 describe('publish-latest step order and outputs', () => {
-  const job = workflow.slice(workflow.indexOf('\n  publish-latest:'), workflow.indexOf('\n  smoke-latest:'));
+  const job = workflow.slice(
+    workflow.indexOf('\n  publish-latest:'),
+    workflow.indexOf('\n  smoke-latest:'),
+  );
   const at = (name) => {
     const i = job.indexOf(`- name: ${name}`);
     expect(i, name).toBeGreaterThan(-1);
@@ -205,7 +207,9 @@ describe('publish-latest step order and outputs', () => {
 
   it('keeps the approval environment and hands the release set to the later jobs', () => {
     expect(job).toContain('environment: npm-publish');
-    expect(job).toContain('published: ${{ steps.release.outputs.published || steps.publish.outputs.published }}');
+    expect(job).toContain(
+      'published: ${{ steps.release.outputs.published || steps.publish.outputs.published }}',
+    );
     expect(job).toContain(
       'packages: ${{ steps.release.outputs.packages || steps.publish.outputs.published-packages }}',
     );
@@ -213,6 +217,8 @@ describe('publish-latest step order and outputs', () => {
     expect(job).toMatch(
       /Roll latest back[^\n]*\n\s+if: failure\(\) && \(steps\.publish\.outputs\.published == 'true' \|\| steps\.release\.outputs\.resumed == 'true'\)/,
     );
-    expect(job).toMatch(/Create the GitHub Release[^\n]*\n\s+if: steps\.release\.outputs\.published == 'true'/);
+    expect(job).toMatch(
+      /Create the GitHub Release[^\n]*\n\s+if: steps\.release\.outputs\.published == 'true'/,
+    );
   });
 });
