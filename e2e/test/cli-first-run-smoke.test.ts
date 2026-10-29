@@ -167,6 +167,12 @@ describe('the built CLI serves the first-run page (M1-11b-6)', () => {
           ownerSetupAvailableWith(keychain, first, defaultOwnerFiles(home)),
         cardRelays: () => ['wss://relay.one.example', 'wss://relay.two.example'],
         assets: () => localUiAssets(entries),
+        // U3-f: no AI apps on this clean home; the smoke test reads none.
+        aiApps: () => ({
+          list: () => Promise.resolve({ apps: [], desktopRunning: false }),
+          plan: () => Promise.reject(new Error('not in the smoke test')),
+          agentIdOf: () => Promise.resolve(undefined),
+        }),
       },
     );
     // Clean home: no card, no owner item, no owner file, so owner setup is wired.

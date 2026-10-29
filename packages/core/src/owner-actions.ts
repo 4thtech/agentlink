@@ -33,6 +33,7 @@ import {
 } from '@4thtech-io/crypto';
 import {
   agentLabelParamsSchema,
+  appChangeParamsSchema,
   approvalIdSchema,
   contactRenameParamsSchema,
   evmAddress,
@@ -343,11 +344,11 @@ export class OwnerActions {
         return this.#applyLabel(value, base);
       case 'app.connect':
       case 'app.disconnect':
+        return this.#applyAppChange(value, base);
       case 'credits.deposit':
       case 'credits.withdraw':
       case 'agent.revoke': {
-        // Verified for the report, applied elsewhere: app.connect and app.disconnect are card U3-f
-        // (the recomputed changeId and their record); revocation delivery is M1-7h; the credits ops
+        // Verified for the report, applied elsewhere: revocation delivery is M1-7h; the credits ops
         // only through ProofService.addReceivedFunds and withdrawCredits (M1-11c-a4c), which check
         // the chain before anything is sent. Nothing is written here, so the nonce stays unused.
         const verdict = verifyOwnerAction(value, base);
@@ -494,6 +495,56 @@ export class OwnerActions {
         applied_at: now,
       });
       return { status: 'applied', op: 'agent.label' };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * `app.connect` and `app.disconnect` (U3-f; 04 §2.5.1, §2.5 "Writing AI app configs"; 08 §1):
+   * the object checks and the nonce first (another owner, another agent in the body or in
+   * `params.agent`, a replay, an expired object or one outliving 600 s is refused and writes
+   * nothing; the app id and `changeId` form are the schema's). Then, in one store transaction, the
+   * nonce is checked again and recorded and the signed object is stored as the record of the entry
+   * the owner wrote for that app (`app:<app>`, the latest applied one). It grants nothing on load.
+   * The recomputed `changeId` is the owner surface's check, made before this and before the write
+   * (node local-ui/api/apps.ts): core cannot read AI app configs. No envelope carries these ops.
+   */
+  async #applyAppChange(
+    value: unknown,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    const { body } = signed;
+    if (
+      (body.op !== 'app.connect' && body.op !== 'app.disconnect') ||
+      body.params.agent !== base.agent
+    ) {
+      return this.#report(refused(body.op, 'agent_mismatch'));
+    }
+    const op = body.op;
+    const record = `app:${body.params.app}`;
+    const sealed = await seal(
+      this.#ctx,
+      'local_owner_actions',
+      'signed_json',
+      [record],
+      canonicalize(value as JsonObject),
+    );
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) {
+        return refused(op, 'nonce_used');
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      if (tx.get('local_owner_actions', { record }) !== undefined) {
+        tx.delete('local_owner_actions', { record });
+      }
+      tx.insert('local_owner_actions', { record, op, signed_json: sealed, applied_at: now });
+      return { status: 'applied', op };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
   }
@@ -1227,6 +1278,28 @@ export class OwnerActions {
       return refuse('label_invalid');
     }
     return this.#build(signer, 'agent.label', { agent: signer.agent, label });
+  }
+
+  /**
+   * The unsigned `app.connect` or `app.disconnect` for this agent (U3-f; 04 §2.5.1): `agent` and
+   * `params.agent` are this agent's agentId; `app` must be an id of the fixed harness table and
+   * `changeId` 64 lowercase hex, else `change_invalid`. Writes nothing; the owner surface recomputes
+   * the change after the gesture and before the write.
+   */
+  async prepareAppChange(
+    op: 'app.connect' | 'app.disconnect',
+    app: string,
+    changeId: string,
+  ): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) => ({ status: 'refused', op, reason }) as const;
+    if (op !== 'app.connect' && op !== 'app.disconnect') {
+      return { status: 'refused', op: 'app.connect', reason: 'change_invalid' };
+    }
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    const params = appChangeParamsSchema.safeParse({ app, agent: signer.agent, changeId });
+    if (!params.success) return refuse('change_invalid');
+    return this.#build(signer, op, { app: params.data.app, agent: signer.agent, changeId });
   }
 
   /**

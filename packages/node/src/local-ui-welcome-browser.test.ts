@@ -297,7 +297,7 @@ describe('first run with no agent yet in a real browser (U3-g-b)', () => {
     expect(w.opens()).toBe(2);
 
     // The next change the page sends (through the guarded fetch) carries generation 2: it reaches
-    // the route (a U3-f stub today) instead of the `agent_changed` refusal.
+    // the real U3-f route instead of the `agent_changed` or `no_agent` refusal.
     // A string, as the page's own code (this package has no DOM types).
     const answer = await page.evaluate<{ status: number; body: string }>(`(async () => {
       const meta = document.querySelector('meta[name="agentlink-csrf"]');
@@ -309,9 +309,9 @@ describe('first run with no agent yet in a real browser (U3-g-b)', () => {
       });
       return { status: res.status, body: await res.text() };
     })()`);
-    expect(answer.status).not.toBe(409);
-    expect(answer.body).not.toContain('agent_changed');
-    expect(answer.body).not.toContain('no_agent');
+    // U3-f made the route real: with no presence proof it answers its own owner-presence refusal.
+    expect(answer.status).toBe(403);
+    expect(JSON.parse(answer.body)).toEqual({ status: 'presence_required' });
     expect(loads).toBe(loadsAfterFinish);
   }, 180_000);
 });

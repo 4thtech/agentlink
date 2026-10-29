@@ -197,27 +197,4 @@ describe('agent.label (U3-d; 04 §2.5.1)', () => {
     });
     expect(await nonceRows(a)).toEqual([]);
   });
-
-  it('app.connect and app.disconnect are not applied by core yet (card U3-f)', async () => {
-    const a = await agentOf(11);
-    const owner = encodeHex((await ownerA.getPublicKeys()).ownerNostr);
-    const body: JsonObject = {
-      v: 1,
-      agent: a.id,
-      owner,
-      op: 'app.connect',
-      params: { app: 'claude-desktop', agent: a.id, changeId: 'ab'.repeat(32) },
-      nonce: encodeBase64url(randomBytes(16)),
-      issuedAt: clock.t,
-      expiresAt: clock.t + 600,
-    };
-    const session = await ownerA.unlock(passphrase());
-    const sig = await session.signOwnerAction(body);
-    await session.close();
-    expect(await a.client.ownerActions.apply({ body, sig })).toMatchObject({
-      status: 'refused',
-      reason: 'unsupported_op',
-    });
-    expect(await nonceRows(a)).toEqual([]);
-  });
 });
