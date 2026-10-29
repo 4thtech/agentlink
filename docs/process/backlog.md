@@ -5668,7 +5668,7 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
   - To be written when planned; starts with a RED test in a real browser using two agents of one person.
 
 #### W4-FILES-SAVE · local app: save a received file from the app (placeholder, owner test of 0.4.4: B7 save part)
-- **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Status:** in review, wave 4 (0.4.6), built with W4-INBOX · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
 - **Repo/path:** agentlink · files page and its save route (to be decided)
 - **Depends on:** HOTFIX-045-TOPBAR
 - **Spec:** 06 §4; 04 §4 (paths)

@@ -361,7 +361,8 @@ Local app pages that show what the AI sent and received (08 §1). They are read-
 | Files explainer (top of Files) | "You don't upload here. Put files in your Send folder or ask your AI to send them. Files you receive appear under Received." |
 | Files tabs | "Received" · "Sent" · "Send folders" |
 | Received file, saved | "Saved as {fileName}" (the name it got in the Inbox folder; it may have been moved or renamed since, so never "Saved at" or a path) |
-| Received file, not saved | "Not saved yet. Ask your AI to fetch it." |
+| Received file, not saved | "Arrived · not saved", with **Save to Inbox** (W4-FILES-SAVE; proposed, owner confirms at merge). Saving: "Confirm with your passkey" or the backup code ("Confirm save"); "Saved to your Inbox folder."; "Your Inbox folder can't take files right now, so nothing was saved."; "This file is already in your Inbox folder." |
+| Inbox (W4-INBOX) | "Inbox", "Needs you", "All caught up" ("Nothing needs you right now. New messages, files and approvals appear here."), "Conversations", "New message", "Conversation with {name}", "To reply, ask your AI." (proposed, owner confirms at merge) |
 | Received file, gone | "Expired" · "Deleted" |
 | Show in Finder | "Show in Finder" (Windows and Linux: "Show in folder"); no Touch ID |
 
