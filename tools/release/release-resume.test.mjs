@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -120,36 +121,92 @@ describe('tarball wait in the publish-latest health check', () => {
   });
 });
 
-function runResume(box, manifests) {
+// Fable audit of #693: a re-run finishes only a version whose npm tarball is the one this run packed
+// (registry `dist.integrity` equals the sha512 of a tarball in the downloaded `pack` artifact), and only
+// on a re-run of the same run (`github.run_attempt > 1`). The publish action downloads the artifact to
+// $RUNNER_TEMP/changeset-pack-<artifact id>-<timestamp>/.
+const PACK_ID = '4242';
+const sri = (content) => `sha512-${createHash('sha512').update(content).digest('base64')}`;
+
+function runResume(
+  box,
+  manifests,
+  { attempt = '2', tarballs = { 'agentlink-0.4.4.tgz': 'built-0.4.4' }, packDirs = 1 } = {},
+) {
   for (const [path, json] of Object.entries(manifests)) {
     mkdirSync(join(box.dir, path, '..'), { recursive: true });
     writeFileSync(join(box.dir, path), JSON.stringify(json));
+  }
+  for (let i = 0; i < packDirs; i += 1) {
+    const packDir = join(box.dir, `changeset-pack-${PACK_ID}-17000000000${i}`, 'apps', 'cli');
+    mkdirSync(packDir, { recursive: true });
+    for (const [file, content] of Object.entries(tarballs))
+      writeFileSync(join(packDir, file), content);
   }
   execFileSync('git', ['init', '-q'], { cwd: box.dir });
   execFileSync('git', ['add', '--', ...Object.keys(manifests)], { cwd: box.dir });
   const script = `${resumeBlock}\nprintf '%s' "$resume"`;
   const r = spawnSync('bash', ['-euo', 'pipefail', '-c', script], {
     cwd: box.dir,
-    env: { PATH: `${box.bin}:${process.env.PATH}`, RUNNER_TEMP: box.dir },
+    env: {
+      PATH: `${box.bin}:${process.env.PATH}`,
+      RUNNER_TEMP: box.dir,
+      RUN_ATTEMPT: attempt,
+      PACK_ARTIFACT_ID: PACK_ID,
+    },
     encoding: 'utf8',
   });
-  if (r.status !== 0) throw new Error(r.stderr || r.stdout);
-  return { set: JSON.parse(r.stdout.slice(r.stdout.lastIndexOf('['))), out: r.stdout };
+  const set = r.status === 0 ? JSON.parse(r.stdout.slice(r.stdout.lastIndexOf('['))) : undefined;
+  return { status: r.status, set, out: r.stdout + r.stderr };
 }
 
 describe('re-run of an already-published version (RESUME block)', () => {
   const cli = { 'apps/cli/package.json': { name: '@4thtech-io/agentlink', version: '0.4.4' } };
+  const rolledBack = (integrity = sri('built-0.4.4')) => ({
+    '@4thtech-io/agentlink@0.4.4': { version: '0.4.4', 'dist.integrity': integrity },
+    '@4thtech-io/agentlink': { 'dist-tags.latest': '0.4.3' },
+  });
 
   it('finds the block', () => expect(resumeBlock).toContain('resume='));
 
   it('picks a published version whose latest was rolled back (the 0.4.4 case)', () => {
-    const box = sandbox({
-      registry: {
-        '@4thtech-io/agentlink@0.4.4': { version: '0.4.4' },
-        '@4thtech-io/agentlink': { 'dist-tags.latest': '0.4.3' },
-      },
-    });
-    expect(runResume(box, cli).set).toEqual([{ name: '@4thtech-io/agentlink', version: '0.4.4' }]);
+    const r = runResume(sandbox({ registry: rolledBack() }), cli);
+    expect(r.status, r.out).toBe(0);
+    expect(r.set).toEqual([{ name: '@4thtech-io/agentlink', version: '0.4.4' }]);
+  });
+
+  it('finishes nothing on the first attempt of a run (only a re-run of the same run resumes)', () => {
+    const r = runResume(sandbox({ registry: rolledBack() }), cli, { attempt: '1' });
+    expect(r.status, r.out).toBe(0);
+    expect(r.set).toEqual([]);
+    expect(r.out).toContain('First attempt of this run');
+  });
+
+  it('fails closed when the npm tarball is not the one this run packed', () => {
+    const r = runResume(sandbox({ registry: rolledBack(sri('someone-else-built-this')) }), cli);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toContain('is not the package this run built');
+  });
+
+  it('fails closed when the registry reports no integrity', () => {
+    const registry = rolledBack();
+    delete registry['@4thtech-io/agentlink@0.4.4']['dist.integrity'];
+    const r = runResume(sandbox({ registry }), cli);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toContain('is not the package this run built');
+  });
+
+  it('fails closed without exactly one downloaded pack artifact holding tarballs', () => {
+    const box = () => sandbox({ registry: rolledBack() });
+    expect(runResume(box(), cli, { packDirs: 0 }).status).not.toBe(0);
+    expect(runResume(box(), cli, { packDirs: 2 }).status).not.toBe(0);
+    expect(runResume(box(), cli, { tarballs: {} }).status).not.toBe(0);
+  });
+
+  it('fails closed on a malformed attempt number', () => {
+    expect(runResume(sandbox({ registry: rolledBack() }), cli, { attempt: '2x' }).status).not.toBe(
+      0,
+    );
   });
 
   it('skips a version that is not published, already latest, older than latest, or deprecated', () => {
@@ -173,10 +230,19 @@ describe('re-run of an already-published version (RESUME block)', () => {
         'prerelease@1.0.0-next.1': { version: '1.0.0-next.1' },
       },
     });
-    const { set, out } = runResume(box, manifests);
+    const { status, set, out } = runResume(box, manifests);
+    expect(status, out).toBe(0);
     expect(set).toEqual([]);
     expect(out).toContain('older: latest (1.10.0) is newer than 1.0.0; left alone.');
     expect(out).toContain('deprecated@1.0.0 is deprecated');
+  });
+
+  it('the settle step gets the attempt number and the pack artifact id through env', () => {
+    const step = workflow.slice(workflow.indexOf('- name: Settle what this run releases'));
+    const head = step.slice(0, step.indexOf('run: |'));
+    expect(head).toContain('RUN_ATTEMPT: ${{ github.run_attempt }}');
+    expect(head).toContain('PACK_ARTIFACT_ID: ${{ needs.pack.outputs.pack-dir-artifact-id }}');
+    expect(resumeBlock).not.toContain('${{');
   });
 });
 
