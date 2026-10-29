@@ -399,7 +399,7 @@ export const ZONES = {
   // M1-8a: `crypto` for the KeyStore interface and its restricted /keystore entry (the backends).
   // M1-5b-b: `transport-nostr` for the RelayConnector, HostResolver and Nip11Fetcher interfaces that
   // this package implements, and for the Docker relay suite (RelayPool, OutboxWorker).
-  // U3-h: `types` for the local app's shared wire samples (`@4thtech-io/types/ui-contract/*`): the
+  // U3-j: `types` for the local app's shared wire samples (`@4thtech-io/types/ui-contract/*`): the
   // server-side contract tests run the real handlers against the same samples that apps/local-ui's
   // client tests use (apps/local-ui may not import this package). `types` is already under core.
   'packages/node': entry(
