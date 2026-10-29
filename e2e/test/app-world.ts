@@ -246,6 +246,8 @@ export function uiDepsOf(
         open: (name) => openUiHostAgent(hostDeps, name),
         startServer: (options) => startServer(options),
         ...(welcome.invite === undefined ? {} : { waitingInvite: welcome.invite }),
+        // U3-g-c: the same harness desk as `ui` (list only on Welcome).
+        aiApps: () => wiring.aiApps(),
       });
       if (server !== undefined) servers.push(server);
       return server;

@@ -106,34 +106,27 @@ interface FirstHour {
 let firstHour: FirstHour | undefined;
 
 describe('a new person: Welcome to a reply (U3-k)', () => {
-  // KNOWN GAP (reported with U3-k, not fixed here): with no agent open the app host serves no AI apps
-  // desk (ui-host.ts startUiWelcome passes `localUi: { assets }` only), so `GET /api/ui/apps` answers
-  // not_available and Welcome's picker says "Couldn't look for AI apps" even with Claude Code
-  // installed. `it.fails` passes while that is so and fails (remove `.fails`) once the picker lists
-  // the app on a fresh computer, as 08 §1 and b11 §28.2 describe.
-  it.fails(
-    'the AI app picker lists Claude Code on a computer with no agent yet',
-    async (ctx) => {
-      const ready = need(ctx);
-      if (ready === undefined) return;
-      const pc = await newComputer();
-      await fakeClaudeCode(pc.home);
-      const run = runUi(pc, ready.files);
-      closers.push(async () => {
-        run.deps.stop();
-        await run.done;
-      });
-      const { page } = await pageWithTouchId(ready.browser);
-      await page.goto(await openedLink(pc));
-      await page.getByRole('button', { name: 'Get started' }).click();
-      await page.getByRole('heading', { name: 'Which AI app will you use?' }).waitFor();
-      // Wait for the look to end (the loading line goes), then expect the app.
-      await page.getByRole('button', { name: 'Continue' }).isEnabled();
-      await page.waitForTimeout(1500);
-      await expect(page.getByText('Claude Code').first().isVisible()).resolves.toBe(true);
-    },
-    120_000,
-  );
+  // U3-g-c: with no agent open the app host gets the CLI's AI apps reader (list only), so Welcome's
+  // picker lists the detected apps on a fresh computer (08 §1, b11 §28.2).
+  it('the AI app picker lists Claude Code on a computer with no agent yet', async (ctx) => {
+    const ready = need(ctx);
+    if (ready === undefined) return;
+    const pc = await newComputer();
+    await fakeClaudeCode(pc.home);
+    const run = runUi(pc, ready.files);
+    closers.push(async () => {
+      run.deps.stop();
+      await run.done;
+    });
+    const { page } = await pageWithTouchId(ready.browser);
+    await page.goto(await openedLink(pc));
+    await page.getByRole('button', { name: 'Get started' }).click();
+    await page.getByRole('heading', { name: 'Which AI app will you use?' }).waitFor();
+    // Wait for the look to end (the loading line goes), then expect the app.
+    await page.getByRole('button', { name: 'Continue' }).isEnabled();
+    await page.waitForTimeout(1500);
+    await expect(page.getByText('Claude Code').first().isVisible()).resolves.toBe(true);
+  }, 120_000);
 
   it('runs the first hour on a fresh home: Welcome, Touch ID, connect, a second agent, hello and reply', async (ctx) => {
     const ready = need(ctx);
@@ -166,6 +159,11 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     await page.getByRole('button', { name: TOUCH_ID }).click();
     await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
     await page.getByRole('button', { name: 'I saved it' }).click();
+    // U3-g-c: the picker found Claude Code, so "Connect your AI app" follows; "Later" writes nothing
+    // (the connection is made from the AI apps page below).
+    await page.getByRole('heading', { name: 'Connect Claude Code to Home base' }).waitFor();
+    expect(readFileSync(claude.file, 'utf8')).toBe(settingsBefore);
+    await page.getByRole('button', { name: 'Later' }).click();
     await page.waitForURL(/\/settings\/home$/);
     const first = await pc.directory.read('default');
     expect(first).toMatchObject({ name: 'default', label: 'Home base', available: true });
