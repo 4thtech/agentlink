@@ -258,9 +258,11 @@ describe('contract (server): the real U3-d handlers answer the owner samples', (
     expect(await ownerCall(AGENTS_LABEL_PATH, input)).toEqual(answer);
   });
 
-  it('add takes exactly {label}', async () => {
-    const { input, answer } = AGENTS_OWNER.add;
-    expect(await ownerCall(AGENTS_PATH, input)).toEqual(answer);
+  it('W4-ONE-TOUCH: add is the create-agent kind at begin and the collection (the real gate answers the samples: create-connect-server.test.ts)', () => {
+    const begin = route('POST', AGENTS_OWNER.add.beginPath) as { presence: unknown; step: unknown };
+    const finish = route('POST', AGENTS_PATH) as { presence: unknown; step: unknown };
+    expect([begin.presence, begin.step]).toEqual(['create-agent', 'begin']);
+    expect([finish.presence, finish.step]).toEqual(['create-agent', 'finish']);
   });
 
   it('the refusals arrive as {error}: label_invalid, and another agent than the open one is agent_changed', async () => {

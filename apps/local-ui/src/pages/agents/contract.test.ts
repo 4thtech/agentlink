@@ -133,15 +133,8 @@ describe('contract (page): label-check, Add and Rename (U3-d)', () => {
     expect(input(s)).toEqual(sample.input);
   });
 
-  it('add sends exactly {label} in X-AgentLink-Input and reads done', async () => {
-    const sample = AGENTS_OWNER.add;
-    const t = answering(sample.answer);
-    expect(await t.api.add(sample.input, proof)).toEqual({ kind: sample.outcome });
-    const s = only(t.sent);
-    expect([s.method, s.path]).toEqual(['POST', AGENTS_PATH]);
-    expect(s.headers.get('Content-Type')).toBe(OCTET_STREAM);
-    expect(input(s)).toEqual(sample.input);
-  });
+  // W4-ONE-TOUCH: Add is begin + finish with one gesture; its contract test is
+  // pages/apps/create-agent.contract.test.ts (the same samples).
 
   it('the {error} refusals map: label_invalid, and another open agent is agent_changed', async () => {
     for (const sample of AGENTS_OWNER.refusals) {

@@ -355,9 +355,47 @@ describe('Remove', () => {
   });
 });
 
+const backupCode = (): HTMLInputElement =>
+  host.querySelector<HTMLInputElement>('input[name="backup-code"]')!;
+
 describe('Add', () => {
-  it('asks for a name (40 characters, prefilled) and posts it behind presence', async () => {
-    answers['POST /api/ui/agents'] = { status: 200, body: { status: 'done' } };
+  // W4-ONE-TOUCH (D-140): one screen and one gesture (pages/apps/create-agent-gate.tsx); its calls go
+  // through the page's own fetch.
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchFn);
+    answers['GET /api/ui/apps'] = { status: 200, body: { desktopRunning: false, apps: [] } };
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  const READY = {
+    status: 200,
+    body: {
+      status: 'ready',
+      nonce: 'N'.repeat(43),
+      statement: {
+        label: 'Second agent',
+        agentFingerprint: '1A2B·3C4D',
+        ownerFingerprint: '7F3A·19C2',
+        folder: 'second-agent',
+      },
+      expiresInMs: 120000,
+      publicKey: {
+        rpId: 'localhost',
+        challenge: 'C'.repeat(43),
+        allowCredentials: [],
+        userVerification: 'required',
+        timeoutMs: 120000,
+        prfSalt: 'U2FsdA',
+      },
+    },
+  };
+  it('asks for a name (40 characters, prefilled); begin, then the backup code finishes with only the nonce', async () => {
+    answers['POST /api/ui/agents/begin'] = READY;
+    answers['POST /api/ui/agents'] = {
+      status: 200,
+      body: { status: 'done', name: 'second-agent', label: 'Second agent' },
+    };
     await mountPage();
     await click(button(host, 'Add agent'));
     const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
@@ -366,20 +404,29 @@ describe('Add', () => {
     expect(field.maxLength).toBe(32);
     expect(field.value).toBe('Second agent');
     await click(button(sheet, 'Add with Touch ID'));
-    await type(code(), '123456');
-    await click(button(host, 'Confirm'));
-    expect(calls.some((c) => c.url === '/api/ui/agents' && c.method === 'POST')).toBe(true);
+    await click(button(host, 'Use a backup code instead'));
+    await type(backupCode(), '123456');
+    await click(button(host, 'Confirm with my backup code'));
+    await settle();
+    const begin = calls.find((c) => c.url === '/api/ui/agents/begin' && c.method === 'POST');
+    const finish = calls.find((c) => c.url === '/api/ui/agents' && c.method === 'POST');
+    expect(begin?.body).toBe('');
+    expect(finish?.body).toBe('123456');
+    expect(finish?.headers.get('X-AgentLink-Input')).not.toContain('123456');
     expect(host.textContent).toContain('Connect an AI app to it?');
   });
-  it('says "Couldn\'t add it. Nothing was saved. Try again." when it is not available yet', async () => {
-    answers['POST /api/ui/agents'] = { status: 501, body: {} };
+  it('a refused begin says why and creates nothing', async () => {
+    answers['POST /api/ui/agents/begin'] = { status: 409, body: { status: 'busy' } };
     await mountPage();
     await click(button(host, 'Add agent'));
     const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
     await click(button(sheet, 'Add with Touch ID'));
-    await type(code(), '123456');
-    await click(button(host, 'Confirm'));
-    expect(host.textContent).toContain("Couldn't add it. Nothing was saved. Try again.");
+    await click(button(host, 'Use a backup code instead'));
+    await type(backupCode(), '123456');
+    await click(button(host, 'Confirm with my backup code'));
+    await settle();
+    expect(calls.some((c) => c.url === '/api/ui/agents' && c.method === 'POST')).toBe(false);
+    expect(host.textContent).toContain('Another setup or approval is running.');
   });
 });
 

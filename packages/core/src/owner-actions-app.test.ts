@@ -136,3 +136,37 @@ describe('app.connect and app.disconnect (U3-f; 04 §2.5.1)', () => {
     expect(await nonceRows(a)).toEqual([]);
   });
 });
+
+describe('W4-ONE-TOUCH: a stored app.connect recorded as not applied (D-140; 04 §2.8)', () => {
+  it('removes exactly that app record; the nonce stays used, so it can never be applied later', async () => {
+    const a = await agentOf(9);
+    const nonce = encodeBase64url(randomBytes(16));
+    const signed = await signedApp(a, { nonce });
+    expect((await a.client.ownerActions.apply(signed)).status).toBe('applied');
+    expect((await a.client.ownerActions.apply(await signedApp(a, { app: 'codex' }))).status).toBe(
+      'applied',
+    );
+    // Another nonce or another app is never removed.
+    expect(await a.client.ownerActions.markAppNotApplied('claude-code', 'A'.repeat(22))).toBe(
+      false,
+    );
+    expect(await a.client.ownerActions.markAppNotApplied('codex', nonce)).toBe(false);
+    expect(await a.client.ownerActions.markAppNotApplied('claude-code', nonce)).toBe(true);
+    expect((await records(a)).map((r) => r.record)).toEqual(['app:codex']);
+    expect(await nonceRows(a)).toHaveLength(2);
+    expect(await a.client.ownerActions.apply(signed)).toMatchObject({
+      status: 'refused',
+      reason: 'nonce_used',
+    });
+    // Idempotent: nothing is left to remove.
+    expect(await a.client.ownerActions.markAppNotApplied('claude-code', nonce)).toBe(false);
+  });
+
+  it('never touches an app.disconnect record', async () => {
+    const a = await agentOf(10);
+    const nonce = encodeBase64url(randomBytes(16));
+    await a.client.ownerActions.apply(await signedApp(a, { op: 'app.disconnect', nonce }));
+    expect(await a.client.ownerActions.markAppNotApplied('claude-code', nonce)).toBe(false);
+    expect((await records(a)).map((r) => r.op)).toEqual(['app.disconnect']);
+  });
+});
