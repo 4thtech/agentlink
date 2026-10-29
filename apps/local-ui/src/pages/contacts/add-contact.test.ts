@@ -18,11 +18,16 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../api/client.js';
 import { ADD_CONTACT_HREF } from './add-contact-link.js';
-import { ADD_STRINGS as A, inviteReady, safetyLine, waitingToAccept } from './add-strings.js';
+import {
+  ADD_STRINGS as A,
+  expiresIn,
+  inviteReady,
+  safetyLine,
+  waitingToAccept,
+} from './add-strings.js';
 import { ContactsPage, type ContactsPageProps } from './index.js';
 import { createInviteApi } from './invite-api.js';
 import { createOwnerClient } from './owner.js';
-import { forgetPendingInvites } from './pending-invites.js';
 import { CONTACTS_STRINGS as S } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -36,6 +41,7 @@ const CREATED = {
   shareText: SHARE,
   ownerFingerprint: '7F3A·19C2',
   expiresAt: '2026-11-04T12:00:00Z',
+  format: 'long',
 };
 const CHECKED = {
   status: 'ok',
@@ -43,6 +49,7 @@ const CHECKED = {
   expiresAt: '2026-11-04T12:00:00Z',
 };
 const LIST = '/api/ui/contacts';
+const CANCEL = '/api/ui/invites/cancel';
 const CREATE = '/api/ui/invites';
 const CHECK = '/api/ui/invites/check';
 const ACCEPT = '/api/ui/invites/accept';
@@ -62,9 +69,11 @@ const ana = {
 let host: HTMLElement;
 let root: Root;
 let logs: unknown[][];
+/** W4-INVITES-LIST: the server's open invites; the default routes add to it on create. */
+let open: { inviteId: string; name: string | null; expiresAt: string }[];
 
 beforeEach(() => {
-  forgetPendingInvites();
+  open = [];
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -114,9 +123,10 @@ function server(routes: Routes): { calls: Call[]; fetch: typeof fetch } {
         : ArrayBuffer.isView(raw)
           ? new TextDecoder().decode(raw)
           : String(raw);
-    calls.push({ url, method, headers: new Headers(init?.headers), body });
+    const call = { url, method, headers: new Headers(init?.headers), body };
+    calls.push(call);
     const found = routes[`${method} ${url}`];
-    const value = typeof found === 'function' ? (found as () => unknown)() : found;
+    const value = typeof found === 'function' ? (found as (c: Call) => unknown)(call) : found;
     if (value instanceof Error) throw value;
     if (value === undefined) return new Response('{}', { status: 404 });
     const answer = value instanceof Answer ? value : new Answer(200, value);
@@ -140,6 +150,13 @@ async function mount(routes: Routes = {}): Promise<Call[]> {
   const s = server({
     'GET /api/owner/passkey': NO_PASSKEY,
     [`GET ${LIST}`]: { status: 'ok', contacts: [ana] },
+    [`GET ${CREATE}`]: () => ({ invites: open }),
+    [`POST ${CANCEL}`]: (c: Call) => {
+      const { inviteId } = JSON.parse(c.body) as { inviteId: string };
+      const had = open.some((o) => o.inviteId === inviteId);
+      open = open.filter((o) => o.inviteId !== inviteId);
+      return had ? { status: 'cancelled' } : new Answer(404, { error: 'not_found' });
+    },
     ...routes,
   });
   const api = createApiClient({ fetch: s.fetch, token: 't' });
@@ -252,7 +269,14 @@ async function openSheet(routes: Routes = {}): Promise<Call[]> {
 }
 
 async function createFor(name: string | undefined, routes: Routes = {}): Promise<Call[]> {
-  const calls = await openSheet({ [`POST ${CREATE}`]: CREATED, ...routes });
+  const calls = await openSheet({
+    [`POST ${CREATE}`]: (c: Call) => {
+      const label = (JSON.parse(c.body) as { label?: string }).label ?? null;
+      open = [{ inviteId: `id${String(open.length)}`.padEnd(22, 'A'), name: label, expiresAt: CREATED.expiresAt }, ...open];
+      return CREATED;
+    },
+    ...routes,
+  });
   if (name !== undefined) await type(field(A.whoFor), name);
   await click(A.createInvite);
   return calls;
@@ -496,6 +520,172 @@ describe('UX2-d2: Invite someone', () => {
   });
 });
 
+describe('W4-SHORT-INVITE: the long link under Advanced', () => {
+  const advanced = (): HTMLDetailsElement | null =>
+    sheet()?.querySelector<HTMLDetailsElement>('details') ?? null;
+  const SHORT = 'https://agentlink.4thtech.io/i#2.AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8';
+
+  it('keeps the long-link option under a closed Advanced disclosure', async () => {
+    await openSheet();
+    const d = advanced();
+    expect(d).not.toBeNull();
+    expect(d?.open).toBe(false);
+    expect(d?.querySelector('summary')?.textContent?.trim()).toBe(A.advanced);
+    expect(d?.textContent).toContain(A.longLink);
+    expect(d?.textContent).toContain(A.longLinkHint);
+  });
+
+  it('sends {long: true} (with the name) only when the option is on', async () => {
+    const calls = await openSheet({ [`POST ${CREATE}`]: CREATED });
+    await type(field(A.whoFor), 'Marko');
+    const toggle = advanced()?.querySelector<HTMLElement>(
+      '[role="switch"], input[type="checkbox"]',
+    );
+    expect(toggle).not.toBeNull();
+    await click(toggle as HTMLElement);
+    await click(A.createInvite);
+    const [call] = posts(calls, CREATE);
+    expect(JSON.parse(call?.body ?? '')).toEqual({ label: 'Marko', long: true });
+    expect(sheet()?.textContent).toContain(SHARE);
+  });
+
+  it('sends no long field when the option stays off', async () => {
+    const calls = await createFor(undefined);
+    const [call] = posts(calls, CREATE);
+    expect(JSON.parse(call?.body ?? '')).toEqual({});
+  });
+
+  it('works the same for a short link and for the automatic long fallback', async () => {
+    await createFor('Marko', {
+      [`POST ${CREATE}`]: {
+        ...CREATED,
+        inviteUrl: SHORT,
+        shareText: `Add my AI agent on AgentLink: ${SHORT}`,
+        format: 'short',
+      },
+    });
+    expect(sheet()?.textContent).toContain(SHORT);
+    expect(sheet()?.querySelector('[role="alert"]')).toBeNull();
+    expect(attributesWithLink()).toEqual([]);
+  });
+
+  it('says a short link that is gone cannot be used', async () => {
+    await openSheet({ [`POST ${CHECK}`]: new Answer(400, { error: 'unavailable_invite' }) });
+    await click(A.haveInvite);
+    await type(field(A.pasteLabel), SHORT);
+    await click(A.checkInvite);
+    expect(sheet()?.textContent).toContain("can't be used");
+    expect(sheet()?.textContent).toContain(A.unavailableInvite);
+  });
+
+  it('asks to try again, without a refusal, when the service was busy', async () => {
+    await openSheet({ [`POST ${CHECK}`]: new Answer(503, { error: 'try_again' }) });
+    await click(A.haveInvite);
+    await type(field(A.pasteLabel), SHORT);
+    await click(A.checkInvite);
+    expect(sheet()?.textContent).toContain(A.busyTryAgain);
+    expect(sheet()?.textContent).not.toContain(A.unavailableInvite);
+  });
+});
+
+describe('W4-INVITES-LIST: open invites from the server', () => {
+  const rowsEl = (): HTMLElement | null => document.querySelector('.ct-invites');
+  const BO = { inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ', name: 'Bo', expiresAt: '2999-01-01T00:00:00Z' };
+  const NONE = { inviteId: 'BwcHBwcHBwcHBwcHBwcHBw', name: null, expiresAt: '2999-01-01T00:00:00Z' };
+
+  it('shows the server rows on load: name or a neutral line, expiry, a Cancel each', async () => {
+    open = [BO, NONE];
+    await mount();
+    const el = rowsEl();
+    expect(el?.querySelectorAll('li').length).toBe(2);
+    expect(el?.textContent).toContain(waitingToAccept('Bo'));
+    expect(el?.textContent).toContain(waitingToAccept(undefined));
+    expect(el?.textContent).toMatch(/Expires in [\d,]+ days/);
+    const cancels = [...(el?.querySelectorAll('button') ?? [])].filter(
+      (b) => (b.textContent ?? '').trim() === 'Cancel',
+    );
+    expect(cancels.length).toBe(2);
+    expect(A.cancelInvite).toBe('Cancel');
+  });
+
+  it('shows nothing when there are none, and when the list cannot be read', async () => {
+    await mount();
+    expect(rowsEl()).toBeNull();
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount({ [`GET ${CREATE}`]: new Answer(500, {}) });
+    expect(rowsEl()).toBeNull();
+  });
+
+  it('re-reads the list after create, so the row comes from the server', async () => {
+    stubClipboard();
+    const calls = await createFor('Marko');
+    await click(A.copyInvite);
+    await click(A.done);
+    expect(calls.filter((c) => c.method === 'GET' && c.url === CREATE).length).toBeGreaterThan(1);
+    expect(rowsEl()?.textContent).toContain(waitingToAccept('Marko'));
+    expect(rowsEl()?.textContent).not.toContain(PAYLOAD);
+    expect(attributesWithLink()).toEqual([]);
+  });
+
+  it('keeps the rows across a reload (a fresh page reads the server)', async () => {
+    stubClipboard();
+    await createFor('Marko');
+    await click(A.copyInvite);
+    await click(A.done);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount();
+    expect(rowsEl()?.textContent).toContain(waitingToAccept('Marko'));
+  });
+
+  it('cancels with one octet-stream POST of the ID, then re-reads and drops the row', async () => {
+    open = [BO, NONE];
+    const calls = await mount();
+    const first = rowsEl()?.querySelector('li button') as HTMLButtonElement;
+    const reads = calls.filter((c) => c.method === 'GET' && c.url === CREATE).length;
+    await click(first);
+    const [call, ...more] = posts(calls, CANCEL);
+    expect(more).toEqual([]);
+    expect(call?.headers.get('content-type')).toBe('application/octet-stream');
+    expect(call?.headers.get('x-agentlink-csrf')).toBe('t');
+    expect(call?.headers.get('x-agentlink-presence')).toBeNull();
+    expect(JSON.parse(call?.body ?? '')).toEqual({ inviteId: BO.inviteId });
+    expect(calls.filter((c) => c.method === 'GET' && c.url === CREATE).length).toBeGreaterThan(
+      reads,
+    );
+    expect(rowsEl()?.querySelectorAll('li').length).toBe(1);
+    expect(rowsEl()?.textContent).not.toContain('Bo');
+  });
+
+  it('drops a row the server no longer has (not found) without an error', async () => {
+    open = [BO];
+    await mount({
+      [`POST ${CANCEL}`]: () => {
+        open = [];
+        return new Answer(404, { error: 'not_found' });
+      },
+    });
+    await click(rowsEl()?.querySelector('li button') as HTMLButtonElement);
+    expect(rowsEl()).toBeNull();
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('says so once when cancel fails, and keeps the row', async () => {
+    open = [BO];
+    await mount({ [`POST ${CANCEL}`]: new Answer(500, {}) });
+    await click(rowsEl()?.querySelector('li button') as HTMLButtonElement);
+    expect(rowsEl()?.querySelectorAll('li').length).toBe(1);
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain(A.cantCancel);
+  });
+
+  it('keeps the rows when there are no contacts, instead of the empty state', async () => {
+    open = [BO];
+    await mount({ [`GET ${LIST}`]: { status: 'ok', contacts: [] } });
+    expect(text()).toContain(waitingToAccept('Bo'));
+  });
+});
+
 describe('UX2-d2: I have an invite', () => {
   async function paste(routes: Routes = {}, value = LINK): Promise<Call[]> {
     const calls = await openSheet({ [`POST ${CHECK}`]: CHECKED, ...routes });
@@ -666,6 +856,9 @@ describe('UX2-d2: the copy (11 §5)', () => {
       safetyLine('Marko'),
       safetyLine(undefined),
       waitingToAccept('Marko'),
+      waitingToAccept(undefined),
+      expiresIn(1),
+      expiresIn(6),
     ];
     for (const line of all) expect([line, lintVocabulary(line)]).toEqual([line, []]);
   });

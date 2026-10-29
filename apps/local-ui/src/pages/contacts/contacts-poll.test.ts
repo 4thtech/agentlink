@@ -26,11 +26,16 @@ let host: HTMLElement;
 let root: Root;
 let pairing: 'pending' | 'complete';
 let reads: number;
+let inviteReads: number;
 let mode: 'ok' | 'fail' | 'slow';
 let release: (() => void) | undefined;
 
 const api = {
   get: async (path: string) => {
+    if (path === '/api/ui/invites') {
+      inviteReads += 1;
+      return { kind: 'ok', data: { invites: [] } };
+    }
     if (path !== '/api/ui/contacts') return { kind: 'error', status: 404 };
     reads += 1;
     if (mode === 'fail') return { kind: 'error', status: 500 };
@@ -52,6 +57,7 @@ beforeEach(async () => {
   mode = 'ok';
   release = undefined;
   reads = 0;
+  inviteReads = 0;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -129,5 +135,14 @@ describe('HOTFIX-045-CONTACTS-REFRESH', () => {
     });
     await flush(0);
     expect(reads).toBe(before + 1);
+  });
+
+  // W4-INVITES-LIST: the open invites are read wherever the page refreshes the contacts.
+  it('reads the open invites on load and with every refresh, no more often than the contacts', async () => {
+    expect(inviteReads).toBe(reads);
+    expect(inviteReads).toBeGreaterThan(0);
+    await flush(5_100);
+    expect(inviteReads).toBe(reads);
+    expect(reads).toBeGreaterThan(1);
   });
 });
