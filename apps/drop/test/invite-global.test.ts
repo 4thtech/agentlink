@@ -40,7 +40,11 @@ async function upload(id: string): Promise<Response> {
   );
   return SELF.fetch(url, {
     method: 'POST',
-    headers: { authorization, 'content-type': 'application/json', 'cf-connecting-ip': '192.0.2.50' },
+    headers: {
+      authorization,
+      'content-type': 'application/json',
+      'cf-connecting-ip': '192.0.2.50',
+    },
     body: text,
   });
 }

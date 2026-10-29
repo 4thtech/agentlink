@@ -176,7 +176,9 @@ async function fetchInvite(
   ip: string,
   headers: Record<string, string> = {},
 ): Promise<Response> {
-  return SELF.fetch(`${HOST}/v1/i/${lookupId}`, { headers: { 'cf-connecting-ip': ip, ...headers } });
+  return SELF.fetch(`${HOST}/v1/i/${lookupId}`, {
+    headers: { 'cf-connecting-ip': ip, ...headers },
+  });
 }
 
 async function report(lookupId: unknown, ip: string, reason = 'spam'): Promise<Response> {
@@ -185,10 +187,6 @@ async function report(lookupId: unknown, ip: string, reason = 'spam'): Promise<R
     headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
     body: JSON.stringify({ v: 1, lookupId, reason }),
   });
-}
-
-async function json(response: Response): Promise<Record<string, unknown>> {
-  return (await response.json()) as Record<string, unknown>;
 }
 
 async function expectUniform404(response: Response): Promise<void> {
@@ -328,9 +326,9 @@ describe('POST /v1/invite and GET /v1/i/{lookupId}', () => {
       const response = await uploadInvite(key, ip, newLookupId(), options);
       expect(response.status).toBe(400);
     }
-    expect(
-      (await uploadInvite(key, ip, newLookupId(), { expiresAt: ts + 7 * DAY })).status,
-    ).toBe(201);
+    expect((await uploadInvite(key, ip, newLookupId(), { expiresAt: ts + 7 * DAY })).status).toBe(
+      201,
+    );
   });
 
   it('refuses an unsigned or wrongly signed upload', async () => {

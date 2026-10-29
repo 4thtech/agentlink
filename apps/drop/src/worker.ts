@@ -7,10 +7,14 @@
 //   GET    /v1/get/{id}?e&m           signed GET until expiresAt, up to the download limit
 //   DELETE /v1/o/{id}                 signed by the uploading drop key: {v, objectId, nonce, ts}
 //   POST   /v1/report                 {v, url, reason}: deletes only that object
+//   POST   /v1/invite                 signed: {v, lookupId, expiresAt, object, nonce, ts} (D-139)
+//   GET    /v1/i/{lookupId}           unauthenticated: the ALI1 bytes, up to the download limit
+//   DELETE /v1/i/{lookupId}           signed by the uploading drop key: {v, lookupId, nonce, ts}
+//   POST   /v1/report                 {v, lookupId, reason}: deletes only that invite object
 //   GET    /v1/health                 liveness only
 //
 // Logging (I-7): this Worker writes nothing to the console and logs no request, URL, object ID,
-// drop key, signature, nonce or IP. It keeps only the aggregate counters in state.ts (METRICS).
+// drop key, signature, nonce, invite lookupId or IP. It keeps only the aggregate counters in state.ts (METRICS).
 // Errors are typed codes; no response echoes request input.
 import {
   DROP_OBJECT_ID_LENGTH,
@@ -42,6 +46,23 @@ export interface DropEnv {
 /** Largest signed JSON body (upload, commit, DELETE) and report body. */
 const MAX_SIGNED_BODY = 1024;
 const MAX_REPORT_BODY = 2048;
+/**
+ * Largest signed `POST /v1/invite` body: the object as base64url (17 441 bytes are 23 255
+ * characters) plus the other fields. This route only; the other signed bodies keep 1024.
+ */
+const MAX_INVITE_BODY = 24 * 1024;
+/** `ALI1` and version 0x01 (04 §3.6.2). */
+const ALI1_HEADER = [0x41, 0x4c, 0x49, 0x31, 0x01] as const;
+/**
+ * The least an `ALI1` object can be: the 17-byte header and the 16-byte GCM tag. A real object is
+ * never smaller (its padded plaintext is at least 1 KiB), so this refuses nothing a client sends.
+ */
+const MIN_INVITE_OBJECT = 17 + 16;
+/**
+ * A strict lookupId: 22 base64url characters with zero trailing bits (the last is A, Q, g or w),
+ * so exactly one string names each 16-byte ID (07 §5.4).
+ */
+const LOOKUP_ID = /^[A-Za-z0-9_-]{21}[AQgw]$/;
 const REPORT_REASONS = ['malware', 'illegal', 'spam', 'other'] as const;
 const OBJECT_ID = '[A-Za-z0-9_-]{22}';
 const HEX_64 = /^[0-9a-f]{64}$/;
@@ -87,6 +108,7 @@ const DEFERRED: ReadonlySet<Metric> = new Set<Metric>([
   'bad_request',
   'unauthorized',
   'download_refused',
+  'invite_not_found',
   'put_refused',
   'unavailable',
   'internal_error',
@@ -272,8 +294,9 @@ function checkSignedUrl(
 /** Reads and verifies a signed request; returns the drop key and the parsed body, or a response. */
 async function readSigned(
   c: Context,
+  maxBody = MAX_SIGNED_BODY,
 ): Promise<{ pubkey: string; createdAt: number; body: Record<string, unknown> } | Response> {
-  const bytes = await readCapped(c.request, MAX_SIGNED_BODY);
+  const bytes = await readCapped(c.request, maxBody);
   if (bytes === null) return badRequest(c);
   const auth = verifyDropAuthorization(
     c.request.headers.get('authorization'),
@@ -616,6 +639,9 @@ async function deleteStored(
 async function handleReport(c: Context): Promise<Response> {
   const bytes = await readCapped(c.request, MAX_REPORT_BODY);
   const body = bytes === null ? null : parseObject(bytes);
+  if (body !== null && hasExactly(body, ['v', 'lookupId', 'reason'])) {
+    return handleInviteReport(c, body);
+  }
   if (body === null || !hasExactly(body, ['v', 'url', 'reason']) || body.v !== 1) {
     return badRequest(c);
   }
@@ -645,6 +671,233 @@ async function handleReport(c: Context): Promise<Response> {
   const removed = await stateStub(c, `o:${target.idText}`).objDelete({ owner: null });
   if (removed.ok) await deleteStored(c, removed);
   bump(c, 'report');
+  return respond(202, { ok: true });
+}
+
+// --- short-invite objects (W4-SHORT-INVITE, D-139; 07 §5.4, 04 §3.6.2) ----------------------------
+
+/** The 16 bytes of a strict lookupId, or null. Never used to build a key from the string itself. */
+function decodeLookupId(text: unknown): Uint8Array | null {
+  if (typeof text !== 'string' || !LOOKUP_ID.test(text)) return null;
+  try {
+    return decodeBase64url(text, { length: 16 });
+  } catch {
+    return null;
+  }
+}
+
+/** State and R2 names derived from the decoded bytes, so no two strings alias one object. */
+function inviteNames(lookupId: Uint8Array): { state: string; r2Key: string } {
+  const hex = encodeHex(lookupId);
+  return { state: `inv:${hex}`, r2Key: `i/${hex}` };
+}
+
+/** The decoded `ALI1` object, `size` when it is over the cap, or null when it is malformed. */
+function decodeInviteObject(c: Context, text: unknown): Uint8Array | 'size' | null {
+  if (typeof text !== 'string') return null;
+  // A cheap bound before decoding: base64url of the cap, rounded up.
+  if (text.length > Math.ceil((c.limits.inviteMaxSize * 4) / 3) + 4) return 'size';
+  let bytes: Uint8Array;
+  try {
+    bytes = decodeBase64url(text);
+  } catch {
+    return null;
+  }
+  if (bytes.length > c.limits.inviteMaxSize) return 'size';
+  if (bytes.length < MIN_INVITE_OBJECT) return null;
+  return ALI1_HEADER.every((byte, i) => bytes[i] === byte) ? bytes : null;
+}
+
+function releaseInvite(c: Context, owner: string): Promise<void> {
+  return stateStub(c, `k:${owner}`).keyInviteReleased();
+}
+
+async function handleInviteUpload(c: Context): Promise<Response> {
+  const signed = await readSigned(c, MAX_INVITE_BODY);
+  if (signed instanceof Response) return signed;
+  const { body, pubkey } = signed;
+  if (!hasExactly(body, ['v', 'lookupId', 'expiresAt', 'object', 'nonce', 'ts'])) {
+    return badRequest(c);
+  }
+  const { expiresAt, nonce, ts } = body as { expiresAt: unknown; nonce: string; ts: number };
+  const lookupId = decodeLookupId(body.lookupId);
+  if (lookupId === null || !isInt(expiresAt)) return badRequest(c);
+  const maxExpiry = c.limits.maxExpirySeconds;
+  if (expiresAt <= c.now || expiresAt > ts + maxExpiry || expiresAt > c.now + maxExpiry) {
+    return badRequest(c);
+  }
+  const object = decodeInviteObject(c, body.object);
+  if (object === null) return badRequest(c);
+  if (object === 'size') {
+    bump(c, 'limit_refused');
+    return respond(413, { error: 'limit', limit: 'size' });
+  }
+  const size = object.length;
+
+  // The per-IP ceiling runs first, before any drop key's state is created or touched.
+  const ipStub = stateStub(c, ipName(c));
+  const ipGate = await ipStub.ipRequest({ now: c.now, limits: c.limits });
+  if (!ipGate.ok) {
+    bump(c, 'invite_refused');
+    return refused(c, ipGate);
+  }
+  // The key's nonce and rate, then its invite limits and weekly quota, taken together.
+  const keyStub = stateStub(c, `k:${pubkey}`);
+  const key = await keyStub.keyRequest({ nonce, now: c.now, limits: c.limits, inviteSize: size });
+  if (!key.ok) {
+    bump(c, 'invite_refused');
+    return refused(c, key);
+  }
+  const refund = (): Promise<void> =>
+    keyStub.keyInviteRefund({ now: c.now, size, known: key.known });
+  // Only a key's first upload needs admission from this IP, as for files.
+  const freshKey = !key.known;
+  if (freshKey) {
+    const admitted = await ipStub.ipAdmitFreshKey({ now: c.now, limits: c.limits });
+    if (!admitted.ok) {
+      await refund();
+      bump(c, 'invite_refused');
+      return refused(c, admitted);
+    }
+  }
+  const undoAdmission = async (): Promise<void> => {
+    await refund();
+    if (freshKey) await ipStub.ipUnadmitFreshKey({ now: c.now });
+  };
+
+  const names = inviteNames(lookupId);
+  const objectStub = stateStub(c, names.state);
+  const claim = await objectStub.invCreate({ r2Key: names.r2Key, owner: pubkey, size, expiresAt });
+  if (!claim.ok) {
+    await undoAdmission();
+    return objectRefused(c, claim, 'invite_refused');
+  }
+  let storedOk: boolean;
+  try {
+    const stored = await c.env.DROP_BUCKET.put(names.r2Key, object);
+    storedOk = stored !== null && stored.size === size;
+  } catch {
+    storedOk = false;
+  }
+  if (!storedOk) {
+    await c.env.DROP_BUCKET.delete(names.r2Key).catch(() => undefined);
+    await objectStub.invAbort();
+    await undoAdmission();
+    return refused(c, { ok: false, error: 'unavailable', retryAfter: 60 });
+  }
+  bump(c, 'invite_upload');
+  return respond(201, { expiresAt });
+}
+
+function inviteNotFound(c: Context): Response {
+  bump(c, 'invite_not_found');
+  return respond(404, { error: 'not_found' });
+}
+
+function allowedInviteOrigin(c: Context): string | null {
+  const origin = c.request.headers.get('origin');
+  return origin !== null && c.config.inviteOrigins.includes(origin) ? origin : null;
+}
+
+function handleInvitePreflight(c: Context): Response {
+  const origin = allowedInviteOrigin(c);
+  if (origin === null || c.request.headers.get('access-control-request-method') !== 'GET') {
+    return respond(403, null, { vary: 'Origin' });
+  }
+  return respond(204, null, {
+    'access-control-allow-origin': origin,
+    'access-control-allow-methods': 'GET',
+    'access-control-max-age': '600',
+    vary: 'Origin',
+  });
+}
+
+async function handleInviteGet(c: Context, lookupId: Uint8Array): Promise<Response> {
+  // Both fetch limits are checked before any object is looked up; 404 answers count too.
+  const ipGate = await stateStub(c, ipName(c)).ipInviteFetch({ now: c.now, limits: c.limits });
+  if (!ipGate.ok) return refused(c, ipGate);
+  const global = await stateStub(c, 'invite-fetches').inviteFetchReserve({
+    now: c.now,
+    limits: c.limits,
+  });
+  if (!global.ok) return refused(c, global);
+
+  const names = inviteNames(lookupId);
+  // Fetch first and count after, as for files: a failed R2 read uses none of the downloads.
+  const stored = await c.env.DROP_BUCKET.get(names.r2Key);
+  if (stored === null) return inviteNotFound(c);
+  const download = await stateStub(c, names.state).invDownload({
+    now: c.now,
+    limit: c.limits.inviteDownloadLimit,
+  });
+  if (!download.ok) {
+    await stored.body.cancel().catch(() => undefined);
+    return inviteNotFound(c);
+  }
+  if (download.release) c.ctx.waitUntil(releaseInvite(c, download.owner).catch(() => undefined));
+  const headers = new Headers({
+    ...BASE_HEADERS,
+    'content-type': 'application/octet-stream',
+    'content-length': String(stored.size),
+    'cache-control': 'no-store',
+    vary: 'Origin',
+  });
+  const origin = allowedInviteOrigin(c);
+  if (origin !== null) headers.set('access-control-allow-origin', origin);
+  bump(c, 'invite_download');
+  return new Response(stored.body, { status: 200, headers });
+}
+
+async function handleInviteDelete(
+  c: Context,
+  idText: string,
+  lookupId: Uint8Array,
+): Promise<Response> {
+  const signed = await readSigned(c);
+  if (signed instanceof Response) return signed;
+  const { body, pubkey } = signed;
+  if (!hasExactly(body, ['v', 'lookupId', 'nonce', 'ts']) || body.lookupId !== idText) {
+    return badRequest(c);
+  }
+  const ipGate = await stateStub(c, ipName(c)).ipRequest({ now: c.now, limits: c.limits });
+  if (!ipGate.ok) return refused(c, ipGate);
+  const key = await stateStub(c, `k:${pubkey}`).keyRequest({
+    nonce: body.nonce as string,
+    now: c.now,
+    limits: c.limits,
+  });
+  if (!key.ok) return refused(c, key);
+  const removed = await stateStub(c, inviteNames(lookupId).state).invDelete({ owner: pubkey });
+  if (!removed.ok) return objectRefused(c, removed, 'bad_request');
+  await c.env.DROP_BUCKET.delete(removed.r2Key);
+  if (removed.release) await releaseInvite(c, removed.owner);
+  bump(c, 'invite_delete');
+  return respond(204, null);
+}
+
+/**
+ * `{v: 1, lookupId, reason}`: deletes only that invite object. Unauthenticated, so a deny-only
+ * delete for anyone who holds the lookupId (04 §7); the answer is the same whether it existed.
+ */
+async function handleInviteReport(c: Context, body: Record<string, unknown>): Promise<Response> {
+  const { reason } = body;
+  const lookupId = decodeLookupId(body.lookupId);
+  if (
+    body.v !== 1 ||
+    lookupId === null ||
+    typeof reason !== 'string' ||
+    !(REPORT_REASONS as readonly string[]).includes(reason)
+  ) {
+    return badRequest(c);
+  }
+  const rate = await stateStub(c, ipName(c)).ipReport({ now: c.now, limits: c.limits });
+  if (!rate.ok) return refused(c, rate);
+  const removed = await stateStub(c, inviteNames(lookupId).state).invDelete({ owner: null });
+  if (removed.ok) {
+    await c.env.DROP_BUCKET.delete(removed.r2Key);
+    if (removed.release) await releaseInvite(c, removed.owner);
+  }
+  bump(c, 'invite_report');
   return respond(202, { ok: true });
 }
 
@@ -684,6 +937,21 @@ async function route(request: Request, env: DropEnv, ctx: ExecutionContext): Pro
   }
   if (path === '/v1/upload') {
     return method === 'POST' ? handleUpload(c) : respond(405, { error: 'method_not_allowed' });
+  }
+  if (path === '/v1/invite') {
+    return method === 'POST'
+      ? handleInviteUpload(c)
+      : respond(405, { error: 'method_not_allowed' });
+  }
+  if (path.startsWith('/v1/i/')) {
+    // A non-strict lookupId is the uniform 404 for every method, with no lookup and no counter.
+    const idText = path.slice('/v1/i/'.length);
+    const lookupId = decodeLookupId(idText);
+    if (lookupId === null) return inviteNotFound(c);
+    if (method === 'GET') return handleInviteGet(c, lookupId);
+    if (method === 'OPTIONS') return handleInvitePreflight(c);
+    if (method === 'DELETE') return handleInviteDelete(c, idText, lookupId);
+    return respond(405, { error: 'method_not_allowed' });
   }
   if (path === '/v1/report') {
     return method === 'POST' ? handleReport(c) : respond(405, { error: 'method_not_allowed' });
