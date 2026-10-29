@@ -3,6 +3,8 @@
 // back. They read the stylesheets as text.
 import { describe, expect, it } from 'vitest';
 import activity from './pages/activity/activity.css?raw';
+import map from './pages/agents/map/map.css?raw';
+import agentsPage from './pages/agents/index.tsx?raw';
 import messages from './pages/messages/messages.css?raw';
 
 const squash = (css: string): string =>
@@ -33,5 +35,27 @@ describe('Activity first render (a)', () => {
     const r = block(activity, '.al-activity-section');
     expect(r).toMatch(/content-visibility:\s*auto/);
     expect(r).toMatch(/contain-intrinsic-size:\s*auto\s/);
+  });
+});
+
+describe('Live connections map (U3-map, b11 §32.4)', () => {
+  const text = squash(map);
+  it('animates only stroke-dashoffset and transform, and never loops', () => {
+    const frames = [...text.matchAll(/@keyframes [\w-]+ \{(.*?\}) \}/g)].map((m) => m[1] as string);
+    expect(frames.length).toBeGreaterThan(0);
+    for (const body of frames) {
+      const props = [...body.matchAll(/([a-z-]+):/g)].map((m) => m[1]);
+      for (const p of props) expect(['stroke-dashoffset', 'transform']).toContain(p);
+    }
+    expect(text).not.toMatch(/infinite/);
+    expect(text).not.toMatch(/transition:\s*all/);
+  });
+  it('is switched off under reduced motion', () => {
+    expect(text).toMatch(/prefers-reduced-motion: reduce\) \{[^@]*animation: none/);
+    expect(text).toMatch(/data-motion='reduced'\] \.mp-stream-run/);
+  });
+  it('is loaded lazily, never with the list', () => {
+    expect(agentsPage).toMatch(/import\('\.\/map\/index\.js'\)/);
+    expect(agentsPage).not.toMatch(/^import .* from '\.\/map\//m);
   });
 });
