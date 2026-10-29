@@ -1,5 +1,16 @@
 # @4thtech-io/local-ui
 
+## 0.0.7
+
+### Patch Changes
+
+- c338a75: U3-c: `agentlink ui` becomes the app host (D-138, 08 §1). It serves one agent at a time and switches to another of your agents in the same window, port and session (`POST /api/ui/agents/switch`, a new named route kind `switch` with no owner presence that signs nothing and writes only `~/.agentlink/app.json`). `GET /api/ui/agents` lists every agent on this computer, including ones made by older versions, with its label, contact count, whether an AI app is running it and whether its removal is unfinished. Every answer carries a generation number and the open agent's label; every change the page sends carries the generation and is refused with `agent_changed` when another agent was opened meanwhile, so the page reloads for the agent that is open. Every process that opens an agent now holds a shared lock on its folder. The other U3 routes are registered as stubs answering `not_available` until their cards land.
+- 2eb812b: U3-g-b: `agentlink ui` with no agent at all opens the app on Welcome instead of stopping at "isn't set up here yet" (08 §1). The app host can start with no agent open (`AppHostOptions.initial` is optional, `firstRun` new): it then serves only the first-run page and the setup-time reads, and refuses every other route and the approval API with `409 no_agent`. First run's `begin`/`finish {label}` create the first agent (folder `default`, as `init` names it, with the label you typed) and the owner with one gesture, all or nothing, and open that agent in the same window without a restart. Run by an AI, `ui` still prints its fixed line and opens nothing. The successful first-run `finish` answer is marked `X-AgentLink-Generation-Adopted: 1`; the page's generation guard adopts the new generation on that answer only (no reload, so the backup code stays on screen). `GET /api/ui/first-run` answers the real owner state while no agent is open.
+- 3307e7d: U3-h: the local app has an agent switcher in the top bar and an Agents page. The switcher shows the open agent, the AI app it works from and whether it is running, and switches to another agent with no Touch ID. The Agents page lists every agent with its AI apps (or "Not connected to an AI app"), its contacts and Switch, Rename, Connect and Remove, plus Add agent. Rename, Add and Remove ask for the owner's presence; their routes arrive with U3-d and U3-e, and until then the sheets say plainly that nothing was changed.
+- a591518: U3-map-2: Messages and Files rows show "Sending" or "Receiving" with a small arrow while a message or file is moving for that contact. A word and a direction only: no content and no hover preview.
+- b2f3aa0: U3-map: the Agents page has a Map view, "Live connections". Your agents are boxes with their AI app, the open agent's contacts sit on the right in a fixed two-column layout sorted by activity, and a line shows who exchanged something in the last 24 hours. A short dash travels the line while a message or file is moving, and the row says "Sending" or "Receiving". Names and words only: no message content and no hover preview. Clicking a box or line opens that conversation in Messages.
+- @4thtech-io/ui@0.4.4
+
 ## 0.0.6
 
 ### Patch Changes

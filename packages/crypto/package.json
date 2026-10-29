@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/crypto",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "private": true,
   "description": "Key derivation, HPKE, AES-GCM, STREAM, JCS, BIP-340 and EIP-712 helpers.",
   "license": "MIT",

@@ -1,5 +1,29 @@
 # @4thtech-io/core
 
+## 0.4.4
+
+### Patch Changes
+
+- c3e523c: U3-d: create an agent and rename one from the local app, and name your agent at first run (D-138, 08 §1, 04 §2.5.1, §2.8). New local owner actions `agent.label`, `app.connect` and `app.disconnect` (schemas; `params.agent` must be the body's `agent`, 600 s, never in an envelope). Core applies `agent.label` (label in its own restricted form, else `label_invalid`), stores it sealed with its nonce row in the new `local_owner_actions` table (store schema 7, a forward migration) and re-verifies it on every load. `POST /api/ui/agents {label}` creates a keychain agent in a folder named from the label and signs its first card, first policy and first label with one Touch ID, all or nothing; `POST /api/ui/agents/label {name, label}` renames the open agent with Touch ID; `GET /api/ui/agents/label-check` checks a label first. First run `begin`/`finish` also take `{label}` and never write an AI app config. The open agent is now named by its verified label (or its folder name), never by the unsigned label in config.json.
+- 6d5b6aa: U3-e: remove an agent from the app (D-138, 08 §1, 04 §2.5). `POST /api/ui/agents/remove {name, typedLabel, anyway?}` is a new named route kind `remove`: it is refused with `in_use` while any process has the agent open (the shared folder lock), checks the typed label, and with one owner gesture always signs `agent.revoke {reason: "retired"}` for the agent, records it in the owner's revoked list (`~/.agentlink/revoked/<agentId>.json`, re-verified as the signed object), marks the agent `removing`, tells its contacts with owner-signed `revoke` envelopes (bounded wait; `undeliverable` asks before going on), erases its keys through the new KeyStore erase API (`KeyEraseControl` in `@4thtech-io/crypto`, keychain and file backends in `@4thtech-io/node`; never an owner item) and deletes its folder, inside the exclusive folder lock. `backup restore` refuses an agent that is in the revoked list.
+- 0af8fb0: U3-f: connect, move and disconnect AI apps from the local app (D-138; 08 §1, 04 §2.5, §2.5.1, 06 §7). `GET /api/ui/apps` lists the detected AI apps and the agent each one runs (entry-only; also on the first-run page, before an owner exists) and whether Claude Desktop runs; `GET /api/ui/apps/preview?app=&agent=` shows the exact `agentlink` entry change and its `changeId`; `POST /api/ui/apps/apply` and `/disconnect {changeId}` sign `app.connect` / `app.disconnect` with Touch ID, recompute the change after the gesture (refused with `changed` on any difference, the file's device and inode included), and only then write. Core prepares and applies both ops (stored with their nonce row, one record per app). The CLI passes its harness code in as the one writer (`LocalUiOptions.aiApps`): fixed paths and fixed content only, realpath and no links, atomic write with a backup that keeps the original file mode, Claude Desktop never written while it runs, and the agent folder the entry runs must record the signed agentId. `GET /api/ui/agents` now fills `apps`.
+- 0a54944: U3-flow: `GET /api/ui/flow?since=<cursor>` answers the live connections map's metadata for the open agent (`{now, cursor, items: [{contactId, direction, kind, state, at}], partial}`), through a new read-only core view `MessagesView.flowEvents`. Never content, names, links, keys, hashes or envelope IDs; at most 200 items and 20 000 bytes; no byte progress (the store records none).
+- 5901726: The local app keeps the open agent up to date when no AI app is running (U3-invite-b, Decision 37; 06 §6, 08 §4): while the app is open and no other process holds the agent's publisher lease, it takes the lease for one short pass (fetch, process, deliver due rows) and releases it. Passes run every 5 s while a pairing is pending on either side (the join screen, sent invites, Contacts-page accepts) and every 15 s otherwise while a page is visible, so pairings finish and messages arrive. An AI app's AgentLink server holding the lease always wins. New in core: `pairing.waiting()`.
+- 276b400: Join from an invite link (U3-invite, 08 §4, 06 §8, b11 §33): `agentlink join '<invite link>'` checks the invite on this computer and opens the AgentLink app with it waiting; after setup (or at once when AgentLink is already set up) the app asks "Accept {name}'s invite?" and accepts only with Touch ID (or the backup code). When the app is already open, `join` hands the invite to it with one local request. A bad or incomplete link gets one fixed line and exit code 2, and the link is never printed, logged or saved.
+- Updated dependencies [c3e523c]
+- Updated dependencies [6d5b6aa]
+- Updated dependencies [3307e7d]
+- Updated dependencies [e469067]
+- Updated dependencies [276b400]
+- Updated dependencies [4802f9a]
+- Updated dependencies [b2f3aa0]
+  - @4thtech-io/types@0.4.4
+  - @4thtech-io/crypto@0.4.4
+  - @4thtech-io/chain@0.4.4
+  - @4thtech-io/transport-nostr@0.4.4
+  - @4thtech-io/storage@0.4.4
+  - @4thtech-io/log@0.4.4
+
 ## 0.4.3
 
 ### Patch Changes
