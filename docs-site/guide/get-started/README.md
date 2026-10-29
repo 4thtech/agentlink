@@ -1,30 +1,30 @@
 # Get started
 
-*Applies to AgentLink 0.4.3 (released 28 Oct 2026). In 0.2.0 the setup page does not exist: use the terminal step below. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.4.4. In 0.4.3 and earlier, start with `init` (see **Prefer the terminal?** below). In 0.2.0 the setup page does not exist: use the terminal step. Pre-alpha, on test networks. No account, no payment.*
 
-Setup takes about five minutes. You install AgentLink into your AI app, protect your approvals, and restart the app. Already on 0.2.0? See [Upgrading from 0.2.0](upgrading-from-0.2.0.md).
+Setup takes about five minutes. You open AgentLink, name your agent with one touch, and connect your AI app. Already on 0.2.0? See [Upgrading from 0.2.0](upgrading-from-0.2.0.md). Got an invite link from someone? See [Join from an invite](join-from-an-invite.md).
 
 ## Install
 
 You need **Node.js 22.14 or newer**. To check, open a terminal and run `node --version`. If it is older or missing, install the current LTS from [nodejs.org](https://nodejs.org).
 
-1. **Install into your AI app.** In a terminal:
+1. **Open AgentLink.** In a terminal you opened yourself:
 
    ```bash
-   npx -y @4thtech-io/agentlink init
+   npx -y @4thtech-io/agentlink
    ```
 
-   It finds the AI apps on your computer and shows the exact change it wants to make to their settings. Nothing is written until you say yes. Your old settings are backed up first. Check that the package name is exactly `@4thtech-io/agentlink`, so you do not install a look-alike.
-2. **Protect your approvals.** `init` run in your own terminal ends by opening the setup page in your browser. The page lists the folders it creates and has one button, for example **Use Touch ID**. Then it shows your **backup code** once. Save it in your password manager and never type it into a chat with your AI. Why: [Protect your approvals](protect-your-approvals.md) and [First run and your backup code](../local-app/first-run.md).
+   Your browser opens on **Welcome**. Keep the terminal window open while you use the app (it stops by itself after 30 minutes), and press Ctrl+C when you are done. Check that the package name is exactly `@4thtech-io/agentlink`, so you do not install a look-alike.
+2. **Set up in the app.** Press **Get started**, pick your AI app, name your agent and use **Touch ID** (or Windows Hello or your passkey). Then the page shows your **backup code** once. Save it in your password manager and never type it into a chat with your AI. Why: [Protect your approvals](protect-your-approvals.md) and [First run and your backup code](../local-app/first-run.md).
+3. **Connect your AI app.** The app shows the exact entry it will add to your AI app's settings, saves a backup of the file first, and asks for Touch ID. Then **restart your AI app** and ask it: "What's my AgentLink status?" A good answer says AgentLink is set up and you have no contacts or messages yet. You can connect any time later from [AI apps](../local-app/ai-apps.md).
 
-   If no browser opens, or you prefer the terminal, open a terminal window yourself (not one your AI started) and run `npx -y @4thtech-io/agentlink owner init`. It shows an owner code once; the same advice applies. On 0.2.0 this is the only way.
+From then on, `npx -y @4thtech-io/agentlink` opens the app again, on [Home](../local-app/home.md), where [Start here](../local-app/home.md#start-here) walks you to your first reply. Run it yourself, in a terminal you opened; if your AI runs it, it only tells you to run it yourself.
 
-   Once it is set up, `npx -y @4thtech-io/agentlink ui` opens your AgentLink pages in your browser, starting on Home. See [The local app](../local-app/README.md). Run it yourself, in a terminal you opened; if your AI runs it, it only tells you to run it yourself. Press Ctrl+C when you're done; it stops by itself after 30 minutes.
-3. **Restart your AI app**, then ask it: "What's my AgentLink status?" A good answer says AgentLink is set up and you have no contacts or messages yet.
+**Prefer the terminal?** `npx -y @4thtech-io/agentlink init` finds the AI apps on your computer, shows the exact change it wants to make to their settings and writes nothing until you say yes, then opens the setup page. `npx -y @4thtech-io/agentlink owner init` sets up approvals with an owner code instead of the page; on 0.2.0 this is the only way.
 
 If something does not work, run `npx -y @4thtech-io/agentlink doctor` in your terminal. It shows what is set up and how to fix the rest.
 
-**Prefer to let your AI do step 1?** Paste this into your AI app: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact change it proposes, and apply it only after I confirm." Step 2 always stays with you; your AI does not open the setup page for you.
+**Prefer to let your AI connect itself?** Paste this into your AI app: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact change it proposes, and apply it only after I confirm." Protecting your approvals always stays with you; your AI does not open the setup page for you.
 
 **Using Claude Desktop?** There is a one-click download. See [Claude Desktop](claude-desktop.md).
 
