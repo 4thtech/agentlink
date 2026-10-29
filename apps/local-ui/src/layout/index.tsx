@@ -19,6 +19,7 @@ import type { StartHereReads } from '../pages/home/start-here.js';
 import { useStartHere } from '../pages/home/use-start-here.js';
 import { SwitchToPasskeyBanner } from '../states/index.js';
 import type { ApiResult } from '../api/client.js';
+import { TidyNote } from '../pages/agents/tidy-note.js';
 import { subscribeHealth } from './health-feed.js';
 import { readHealth as defaultReadHealth, type HealthState } from './health.js';
 
@@ -233,7 +234,10 @@ export function Layout({
             ))}
           </nav>
         ) : null}
-        <StartHereContext.Provider value={start}>{children}</StartHereContext.Provider>
+        <StartHereContext.Provider value={start}>
+          {path === '/settings/home' ? <TidyNote /> : null}
+          {children}
+        </StartHereContext.Provider>
       </AppShell>
     </PrefsHood>
   );

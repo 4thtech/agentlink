@@ -193,7 +193,7 @@ describe('navigation', () => {
     mount('/');
     expect(wrap().dataset['active']).toBe('1');
     mount('/settings/rules');
-    expect(wrap().dataset['active']).toBe('7');
+    expect(wrap().dataset['active']).toBe('8');
   });
 
   it('has Appearance in the Settings sub-navigation, which is sticky chrome', () => {
