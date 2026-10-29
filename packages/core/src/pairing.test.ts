@@ -31,6 +31,7 @@ import { ownerFingerprintHex, type SignedCard } from './card.js';
 import { AgentLinkClient } from './client.js';
 import type { InboundReport } from './envelopes.js';
 import { INVITE_LINK_PREFIX, decodeInviteLink, encodeInviteLink } from './invite-link.js';
+import { checkInviteLink } from './pairing.js';
 import { openPairingMessage } from './safety-code.js';
 import { MemoryStore } from './store/memory-store.js';
 import {
@@ -1016,5 +1017,41 @@ describe('invite options', () => {
     const decoded = await decodeInviteLink(invite.inviteUrl);
     expect(row?.invite_id).toBe(decoded.inviteId);
     expect(row?.expires_at).toBe(decoded.expiresAt);
+  });
+});
+
+describe('U3-invite: checkInviteLink is Accept step 1 alone (04 §3.6; 08 §4)', () => {
+  it('answers the public inviteId, who it names and the expiry, and stores nothing', async () => {
+    const invite = await a.client.pairing.createInvite();
+    const decoded = await decodeInviteLink(invite.inviteUrl);
+    const checked = await checkInviteLink(invite.inviteUrl, clock.t);
+    expect(checked.inviteId).toBe(decoded.inviteId);
+    expect(checked.expiresAt).toBe(decoded.expiresAt);
+    expect(checked.contact.id).toBe(a.client.agentId);
+    expect(checked.contact.display).toMatchObject({ name: 'alice', label: 'self-declared' });
+    expect(checked.contact.ownerFingerprint.short).toBe(invite.ownerFingerprint.short);
+    // Never the secret, in any field.
+    expect(JSON.stringify(checked)).not.toContain(decoded.secret);
+    expect(await count(b, 'pairings')).toBe(0);
+  });
+
+  it('refuses what acceptInvite refuses at step 1, with the same fixed codes', async () => {
+    const invite = await a.client.pairing.createInvite({ expiresInDays: 1 });
+    const renamed = await tamper(invite.inviteUrl, (i) => {
+      i.name = 'Mallory';
+    });
+    await expect(checkInviteLink(renamed, clock.t)).rejects.toMatchObject({ code: 'name_invalid' });
+    const cardChanged = await tamper(invite.inviteUrl, (i) => {
+      i.card = { ...(i.card as Record<string, unknown>), keyEpoch: 5 };
+    });
+    await expect(checkInviteLink(cardChanged, clock.t)).rejects.toMatchObject({
+      code: 'card_owner_signature_invalid',
+    });
+    await expect(checkInviteLink(invite.inviteUrl, clock.t + 86_400)).rejects.toMatchObject({
+      code: 'invite_expired',
+    });
+    await expect(checkInviteLink('not a link', clock.t)).rejects.toMatchObject({
+      code: expect.stringMatching(/^invite_/) as unknown as string,
+    });
   });
 });

@@ -99,6 +99,15 @@ export interface LocalUiOwnerRoute {
    * presence gate; the handler never runs.
    */
   readonly stub?: true;
+  /**
+   * U3-invite: a read-only check run after the generation check and before the presence gate. A
+   * result refuses the request with it (the owner store is never opened, nothing is signed); the
+   * handler still checks again after presence. Undefined lets the request on.
+   */
+  readonly precheck?: (
+    context: LocalUiContext,
+    request: LocalUiRequest,
+  ) => Promise<LocalUiResult | undefined>;
   readonly handler: (
     context: LocalUiContext,
     request: LocalUiRequest,
@@ -168,8 +177,8 @@ export interface LocalUiRevealRoute {
   ) => Promise<LocalUiResult>;
 }
 
-/** UX2-d1: the two steps of the invite kind. */
-export type LocalUiInviteStep = 'create' | 'check';
+/** UX2-d1: the steps of the invite kind (U3-invite adds `dismiss`, "Not now" on the join screen). */
+export type LocalUiInviteStep = 'create' | 'check' | 'dismiss';
 
 /** UX2-d1: a pasted invite after core's accept step 1 (04 §3.6): who it is and its expiry. */
 export interface LocalUiCheckedInvite {
@@ -246,7 +255,25 @@ export interface LocalUiRemoveRoute {
   readonly presence: 'remove';
 }
 
+/**
+ * U3-invite (08 §4 "One step from an invite link"): `agentlink join` handing an invite to an app
+ * host that is already running, the eighth named route kind. Only `POST /api/ui/join/handoff`,
+ * registered once (routes.ts), with no handler: the server's handoff gate runs it BEFORE the session
+ * gate, because the caller is a local process, not the page. It accepts only the host's handoff
+ * token (32 random bytes, in `X-AgentLink-Handoff`, compared in constant time; not the page's
+ * session token), refuses any request with an `Origin`, any `Sec-Fetch-*` header, a cookie, a CSRF
+ * value or a query, takes at most one handoff per 5 s, runs Accept step 1 again, stores the waiting
+ * invite, signs nothing, and opens the join screen through the OS opener. The token grants nothing
+ * else. Outside the app host it answers `not_available`.
+ */
+export interface LocalUiHandoffRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'handoff';
+}
+
 export type LocalUiRoute =
+  | LocalUiHandoffRoute
   | LocalUiRemoveRoute
   | LocalUiSwitchRoute
   | LocalUiReadRoute

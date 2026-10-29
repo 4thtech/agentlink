@@ -260,12 +260,26 @@ async function acceptInvite(
   request: LocalUiRequest,
   owner: LocalUiOwnerOperation,
 ): Promise<LocalUiResult> {
-  const port = context.invites;
-  if (port === undefined) return UI_NOT_SET_UP;
+  if (context.invites === undefined) return UI_NOT_SET_UP;
   const link = inviteOf(request.input);
   if (link === 'invalid') return INVALID;
   if (link === 'not_a_link') return INVALID_INVITE;
   if ([...request.query.keys()].length > 0) return INVALID;
+  return acceptInviteLink(context, link, owner);
+}
+
+/**
+ * Steps 1 to 3 of 04 §3.6 Accept for a link the caller already bounded (this route's input, or the
+ * app host's waiting invite for `POST /api/ui/join/accept`, U3-invite): the same approval action and
+ * the same one `approval.decide` on every surface. A `deny` rule or a failed check signs nothing.
+ */
+export async function acceptInviteLink(
+  context: LocalUiContext,
+  link: string,
+  owner: LocalUiOwnerOperation,
+): Promise<LocalUiResult> {
+  const port = context.invites;
+  if (port === undefined) return UI_NOT_SET_UP;
   const ownerContext = await context.ownerContext();
   if (ownerContext === undefined) return UI_NOT_SET_UP;
 

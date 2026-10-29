@@ -47,6 +47,8 @@ const EXPECTED: ReadonlyArray<readonly [string, string]> = [
   ['/settings/appearance', 'Appearance'],
   // UI-REFRESH-n: About.
   ['/settings/about', 'About'],
+  // U3-invite: the join screen, in the first-run shell (no sidebar).
+  ['/settings/join', 'AgentLink'],
 ];
 
 describe('routes', () => {
@@ -71,7 +73,12 @@ describe('routes', () => {
     '/settings/appearance',
     '/settings/about',
   ]);
-  const STUBS = EXPECTED.filter(([p]) => p !== '/first-run');
+  const STUBS = EXPECTED.filter(([p]) => p !== '/first-run' && p !== '/settings/join');
+  it('U3-invite: /settings/join renders in the focused first-run shell, with no sidebar', () => {
+    mountAt('/settings/join');
+    expect(host.querySelector('nav[aria-label="Main"]')).toBeNull();
+    expect(host.querySelector('main.al-first-run')).not.toBeNull();
+  });
   it.each(STUBS)('%s renders its page inside the layout', (path, title) => {
     mountAt(path);
     expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();

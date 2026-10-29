@@ -59,6 +59,7 @@ export type CommandName =
   | 'status'
   | 'invite'
   | 'accept'
+  | 'join'
   | 'contacts'
   | 'requests'
   | 'policy'
@@ -120,6 +121,14 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     usage: ['agentlink accept <url> [--approval <approvalId>]'],
     guard: 'none',
     options: { ...AGENT, approval: { type: 'string' } },
+  },
+  {
+    // U3-invite (08 §4): the invite page's one command. Its one argument is checked by the handler
+    // itself (raw, before any option parsing), so a bad form gets the fixed join line, exit 2.
+    name: 'join',
+    usage: ["agentlink join '<invite link>'"],
+    guard: 'none',
+    options: {},
   },
   {
     name: 'contacts',
@@ -266,7 +275,7 @@ export const DISPATCH_TEXT = Object.freeze({
 
 /** The `--help` groups (M1-36c): a one-line purpose each, so a new user knows where to start. */
 const HELP_GROUPS: readonly { readonly title: string; readonly names: readonly CommandName[] }[] = [
-  { title: 'Start here (once):', names: ['init', 'owner'] },
+  { title: 'Start here (once):', names: ['init', 'owner', 'join'] },
   {
     title: 'Every day:',
     names: ['status', 'invite', 'accept', 'requests', 'approve', 'deny', 'cancel'],
@@ -344,6 +353,24 @@ export function createDispatcher(
     if (spec === undefined) {
       output.printError(DISPATCH_TEXT.unknownCommand);
       return EXIT_USAGE;
+    }
+
+    if (spec.name === 'join') {
+      // U3-invite (08 §4): the raw arguments go to the handler, which takes exactly one (the
+      // invite link) and answers every other form with its own fixed line and exit code 2. No
+      // option parsing, so nothing of the argument reaches a parse error (I-5).
+      const handler = table.get('join') ?? notAvailable;
+      const raw: ParsedCommand = Object.freeze({
+        values: Object.freeze({}),
+        positionals: Object.freeze([...rest]),
+        agent: undefined,
+      });
+      try {
+        return await handler({ command: 'join', parsed: raw, output, terminal: io.terminal });
+      } catch {
+        output.printError(DISPATCH_TEXT.failed);
+        return EXIT_FAILED;
+      }
     }
 
     let parsed: ParsedCommand;

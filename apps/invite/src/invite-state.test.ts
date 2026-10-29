@@ -15,21 +15,35 @@ import {
   rawPayload,
 } from './testing/fixtures.js';
 import { evaluateFragment, type InviteView } from './invite-state.js';
-import { buildPrompt } from './prompt.js';
+import {
+  ASK_AI_TEMPLATE,
+  JOIN_COMMAND_TEMPLATE,
+  MAX_COMMAND_CHARS,
+  buildAskAi,
+  buildJoinCommand,
+} from './prompt.js';
 
-const CANONICAL = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]+$/;
+const CANONICAL = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,21846}$/;
 
-/** A view that shows a prompt must show exactly the template plus the canonical link. */
+/** A ready view must show exactly the templates plus the canonical link (08 §4, U3-invite). */
 function expectSafe(view: InviteView, payload: string): void {
   if (view.kind !== 'ready') {
-    // Damaged, expired, oversized and empty invites carry nothing from the payload at all.
-    expect(Object.keys(view)).toEqual(['kind']);
+    // Damaged, oversized and empty invites carry nothing from the payload at all; an expired one
+    // at most the restricted name.
+    expect(Object.keys(view).filter((k) => k !== 'name')).toEqual(['kind']);
     return;
   }
   expect(view.inviteUrl).toBe(`${PREFIX}${payload}`);
   expect(view.inviteUrl).toMatch(CANONICAL);
-  expect(view.prompt).toBe(buildPrompt(view.inviteUrl));
-  expect(view.prompt).toMatch(/^[\x20-\x7e\n]+$/); // ASCII only
+  expect(view.command).toBe(JOIN_COMMAND_TEMPLATE.replace('{inviteUrl}', view.inviteUrl));
+  expect(view.command).toBe(buildJoinCommand(view.inviteUrl));
+  expect(view.command).toBe(`npx -y @4thtech-io/agentlink join '${view.inviteUrl}'`);
+  expect(view.sentence).toBe(ASK_AI_TEMPLATE.replaceAll('{inviteUrl}', view.inviteUrl));
+  expect(view.sentence).toBe(buildAskAi(view.inviteUrl));
+  for (const text of [view.command ?? '', view.sentence]) {
+    expect(text).toMatch(/^[\x20-\x7e]+$/); // ASCII only, no line break anywhere
+    expect(text.endsWith('\n')).toBe(false);
+  }
 }
 
 describe('evaluateFragment: a good invite', () => {
@@ -68,9 +82,24 @@ describe('evaluateFragment: states with no prompt', () => {
 
   it('refuses an expired invite, at the expiry second and after it', async () => {
     const payload = payloadOf(await linkFor());
-    expect(await evaluateFragment(payload, BASE_EXPIRES_AT)).toEqual({ kind: 'expired' });
-    expect(await evaluateFragment(payload, BASE_EXPIRES_AT + 1)).toEqual({ kind: 'expired' });
+    const expired = { kind: 'expired', name: BASE_INVITE.name };
+    expect(await evaluateFragment(payload, BASE_EXPIRES_AT)).toEqual(expired);
+    expect(await evaluateFragment(payload, BASE_EXPIRES_AT + 1)).toEqual(expired);
     expect((await evaluateFragment(payload, BASE_EXPIRES_AT - 1)).kind).toBe('ready');
+  });
+
+  it('an expired invite names only the restricted name, and none on the fallback (b11 §33.1)', async () => {
+    const hostile = await evaluateFragment(
+      payloadOf(await linkFor({ name: '<img src=x onerror=alert(1)>' })),
+      BASE_EXPIRES_AT,
+    );
+    expect(hostile.kind).toBe('expired');
+    if (hostile.kind === 'expired') expect(hostile.name).toMatch(/^[\p{L}\p{N} .'·-]{1,45}$/u);
+    const reserved = await evaluateFragment(
+      payloadOf(await linkFor({ name: 'AgentLink support' })),
+      BASE_EXPIRES_AT,
+    );
+    expect(reserved).toEqual({ kind: 'expired' });
   });
 
   it('refuses a wrong version, an unknown field and a missing field as damaged', async () => {
@@ -161,11 +190,16 @@ describe('evaluateFragment: hostile inviter names (06 §2.1, I-5)', () => {
       // The restricted name has no markup, no punctuation of an instruction, no control or bidi.
       expect(view.inviter.name).toMatch(/^[\p{L}\p{N} .'·-]{1,45}$/u);
       expect(view.inviter.label).toBe('self-declared');
-      // Nothing the inviter chose reaches the prompt.
-      expect(view.prompt).toBe(buildPrompt(view.inviteUrl));
-      for (const word of ['SYSTEM', 'curl', 'ignore', 'onerror', 'approve', 'Copy this']) {
-        expect(view.prompt).not.toContain(word);
+      // Nothing the inviter chose reaches the command or the sentence.
+      for (const text of [view.command ?? '', view.sentence]) {
+        for (const word of ['SYSTEM', 'curl', 'ignore', 'onerror', 'approve', 'Copy this']) {
+          expect(text).not.toContain(word);
+        }
       }
+      // The heading says "Someone" exactly when the name rule fell back.
+      expect(view.inviter.fallback).toBe(
+        view.inviter.name === `Contact ${view.inviter.fingerprint}`,
+      );
     });
   }
 
@@ -175,19 +209,99 @@ describe('evaluateFragment: hostile inviter names (06 §2.1, I-5)', () => {
       expect(view.kind).toBe('ready');
       if (view.kind !== 'ready') continue;
       expect(view.inviter.name).toBe(`Contact ${view.inviter.fingerprint}`);
+      // The heading then reads "Someone invites you…" (b11 §33.1).
+      expect(view.inviter.fallback).toBe(true);
     }
   });
 
-  it('shows the same prompt shape for every payload: only the link differs', async () => {
+  it('shows the same command and sentence for every payload: only the link differs', async () => {
     const a = await evaluateFragment(payloadOf(await linkFor({ name: 'Ana' })), NOW);
     const b = await evaluateFragment(
       payloadOf(await linkFor({ name: HOSTILE_NAMES[0] ?? '' })),
       NOW,
     );
     if (a.kind !== 'ready' || b.kind !== 'ready') throw new Error('expected ready views');
-    expect(a.prompt.replaceAll(a.inviteUrl, '{inviteUrl}')).toBe(
-      b.prompt.replaceAll(b.inviteUrl, '{inviteUrl}'),
-    );
+    expect(a.command?.replaceAll(a.inviteUrl, '{inviteUrl}')).toBe(JOIN_COMMAND_TEMPLATE);
+    expect(b.command?.replaceAll(b.inviteUrl, '{inviteUrl}')).toBe(JOIN_COMMAND_TEMPLATE);
+    expect(a.sentence.replaceAll(a.inviteUrl, '{inviteUrl}')).toBe(ASK_AI_TEMPLATE);
+    expect(b.sentence.replaceAll(b.inviteUrl, '{inviteUrl}')).toBe(ASK_AI_TEMPLATE);
+  });
+});
+
+describe('U3-invite: crafted fragments give the damaged state, with no command and no sentence (08 §4)', () => {
+  it('refuses quotes, spaces, line breaks and every shell metacharacter around a good payload', async () => {
+    const payload = payloadOf(await linkFor());
+    const injected = [
+      "'",
+      '"',
+      ' ',
+      '\n',
+      '\r\n',
+      '\t',
+      ';',
+      '$(id)',
+      '`id`',
+      '%',
+      '%27',
+      '&',
+      '&&calc',
+      '|',
+      '^',
+      '!',
+      '\\',
+      '#second',
+      '<',
+      '>',
+      '(',
+      ')',
+      '{',
+      '*',
+      ' ',
+      '​',
+      ' ',
+      'а', // Cyrillic a, a confusable letter
+      '＇', // fullwidth apostrophe
+    ];
+    for (const bad of injected) {
+      for (const fragment of [
+        `${payload}${bad}`,
+        `${bad}${payload}`,
+        `${payload.slice(0, 20)}${bad}${payload.slice(20)}`,
+      ]) {
+        const view = await evaluateFragment(`#${fragment}`, NOW);
+        expect(view, JSON.stringify(bad)).toEqual({ kind: 'damaged' });
+      }
+    }
+  });
+
+  it('refuses a percent-encoded payload and a look-alike host spelled into the fragment', async () => {
+    const payload = payloadOf(await linkFor());
+    const encoded = [...payload.slice(0, 10)]
+      .map((c) => `%${c.charCodeAt(0).toString(16)}`)
+      .join('');
+    for (const fragment of [
+      `${encoded}${payload.slice(10)}`,
+      encodeURIComponent(`https://agentlink.4thtech.io/i#${payload}`),
+      `https://agentIink.4thtech.io/i#${payload}`,
+      `//evil.example/i#${payload}`,
+    ]) {
+      expect(await evaluateFragment(`#${fragment}`, NOW)).toEqual({ kind: 'damaged' });
+    }
+  });
+
+  it('builds the link from its own prefix only, never from the address the page was opened at', async () => {
+    const payload = payloadOf(await linkFor());
+    const view = await evaluateFragment(`#${payload}`, NOW);
+    if (view.kind !== 'ready') throw new Error('expected ready');
+    expect(view.inviteUrl.startsWith('https://agentlink.4thtech.io/i#')).toBe(true);
+  });
+
+  it('offers only the sentence when the command would pass 8 000 characters (cmd.exe)', async () => {
+    const link = `${PREFIX}${'A'.repeat(MAX_COMMAND_CHARS)}`;
+    expect(buildJoinCommand(link)).toBeUndefined();
+    expect(buildAskAi(link)).toContain(link);
+    const fits = `${PREFIX}${'A'.repeat(100)}`;
+    expect(buildJoinCommand(fits)).toBe(`npx -y @4thtech-io/agentlink join '${fits}'`);
   });
 });
 

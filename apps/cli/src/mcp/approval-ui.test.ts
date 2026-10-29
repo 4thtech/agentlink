@@ -81,6 +81,7 @@ function fakeServer(origin = 'http://localhost:47321'): FakeServer {
     // M1-11b-6: the first-run link; not used by the approval UI.
     openFirstRun: () => Promise.resolve(true),
     openHome: () => Promise.resolve(true),
+    openJoin: () => Promise.resolve(true),
     notifyNewApproval: (id) => {
       notified.push(id);
       return Promise.resolve(`${origin}/approve/${id}`);

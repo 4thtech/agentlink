@@ -61,6 +61,9 @@ export {
   PairingService,
   type AcceptInviteInput,
   type AcceptInviteResult,
+  // U3-invite: Accept step 1 alone, for `agentlink join` and the app host's waiting invite.
+  checkInviteLink,
+  type CheckedInviteLink,
   type CreateInviteInput,
   type CreatedInvite,
   type OwnerSafetyCode,

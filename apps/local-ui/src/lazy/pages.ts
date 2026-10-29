@@ -24,6 +24,8 @@ export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
     async () => (await import('../pages/appearance/index.js')).AppearancePage,
   ),
   '/settings/about': part(async () => (await import('../pages/about/index.js')).AboutPage),
+  // U3-invite: "Accept {name}'s invite?" (b11 §33.2), in the first-run shell.
+  '/settings/join': part(async () => (await import('../pages/join/index.js')).JoinPage),
 };
 
 /** Start loading the page of a path, if that page is a lazy one. Never throws. */

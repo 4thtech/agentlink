@@ -42,6 +42,7 @@ import { appServes, chooseCurrentAgent } from './current-agent.js';
 import { nodeOwnerDeps } from './owner/deps.js';
 import { openUiHostAgent, startUiWelcome, withoutAssets, type UiHostDeps } from './ui-host.js';
 import { uiRemovalPort } from './ui-remove.js';
+import { removeAppHostRecord, writeAppHostRecord } from '../runtime/app-host-record.js';
 
 /** How long `ui` serves the pages at most (proposed: 30 minutes, as for the first-run step). */
 export const UI_WAIT_MS = 30 * 60_000;
@@ -83,9 +84,24 @@ export interface UiServer {
   close(): Promise<void>;
 }
 
+/** U3-invite: what `agentlink join` adds to a `ui` start (08 §4). */
+export interface UiJoin {
+  /** The canonical link `join` checked; the host holds it in memory only (never logged). */
+  readonly invite: string;
+  /** The fixed line printed once the browser opened. */
+  readonly opened: string;
+}
+
 export interface UiDeps {
-  /** Opens the agent and starts the server; undefined when the agent is not set up here. */
-  start(name: string | undefined): Promise<UiServer | undefined>;
+  /**
+   * Opens the agent and starts the server; undefined when the agent is not set up here. U3-invite:
+   * with `invite`, the host holds it as the waiting invite and `open` goes to first run (no owner
+   * yet) or the join screen.
+   */
+  start(
+    name: string | undefined,
+    options?: { readonly invite?: string },
+  ): Promise<UiServer | undefined>;
   /** U3-b: the local agent names on this computer (absent: not looked for). */
   agents?(): Promise<readonly string[]>;
   /** U3-b: the last used agent (app.json), if any. */
@@ -96,7 +112,7 @@ export interface UiDeps {
    * U3-g-b: with no agent at all, starts the app host with no agent open (Welcome and first run);
    * undefined when it cannot (an agent folder exists, no usable keychain, no app in this build).
    */
-  startWelcome?(): Promise<UiServer | undefined>;
+  startWelcome?(options?: { readonly invite?: string }): Promise<UiServer | undefined>;
   /** The longest serve time, in milliseconds. */
   readonly waitMs: number;
   /** Calls `stop` on Ctrl+C; returns the unsubscribe. */
@@ -109,11 +125,25 @@ export async function uiStep(
   deps: UiDeps = nodeUiDeps(),
   prefix: string = cliPrefix(),
 ): Promise<number> {
-  const { output } = context;
   if (!checkOwnerTerminal(context.terminal).ok) {
-    output.printError(UI_TEXT.agentRun(prefix));
+    context.output.printError(UI_TEXT.agentRun(prefix));
     return EXIT_FAILED;
   }
+  return serveUi(context, deps, prefix);
+}
+
+/**
+ * The served part of `ui`, after the terminal check (U3-invite: shared with `join`, which passes
+ * the checked invite). Picks the agent, starts the app host, opens the browser and serves until
+ * Ctrl+C or UI_WAIT_MS.
+ */
+export async function serveUi(
+  context: CommandContext,
+  deps: UiDeps,
+  prefix: string,
+  join?: UiJoin,
+): Promise<number> {
+  const { output } = context;
   let agent = context.parsed.agent;
   let none = false;
   if (agent === undefined && deps.agents !== undefined) {
@@ -130,12 +160,14 @@ export async function uiStep(
     // `default` is opened the way every command without `--agent` opens it.
     if (chosen !== undefined && chosen !== DEFAULT_AGENT_NAME) agent = chosen;
   }
-  // U3-g-b (08 §1): no agent at all: the app opens on Welcome, with no agent open yet.
+  const startOptions = join === undefined ? {} : { invite: join.invite };
+  // U3-g-b (08 §1): no agent at all: the app opens on Welcome, with no agent open yet. U3-invite:
+  // with an invite, first run then ends on "Accept {name}'s invite?" (08 §4).
   let server: UiServer | undefined =
     none && deps.startWelcome !== undefined
-      ? await deps.startWelcome().catch(() => undefined)
+      ? await deps.startWelcome(startOptions).catch(() => undefined)
       : undefined;
-  server ??= await deps.start(agent).catch(() => undefined);
+  server ??= await deps.start(agent, startOptions).catch(() => undefined);
   if (server === undefined) {
     output.printError(UI_TEXT.notReady(prefix));
     return EXIT_FAILED;
@@ -148,7 +180,13 @@ export async function uiStep(
       output.printError(UI_TEXT.noBrowser);
       return EXIT_FAILED;
     }
-    output.print(server.page === 'first-run' ? UI_TEXT.openedSetup : UI_TEXT.opened);
+    output.print(
+      join !== undefined
+        ? join.opened
+        : server.page === 'first-run'
+          ? UI_TEXT.openedSetup
+          : UI_TEXT.opened,
+    );
     const stopped = new Promise<void>((resolve) => {
       unsubscribe = deps.interrupt(resolve);
     });
@@ -179,7 +217,8 @@ export function nodeUiDeps(): UiDeps {
       now: Math.floor(Date.now() / 1000),
     }),
     // U3-g-b: the no-agent app host (Welcome); first run creates the first agent from the page.
-    startWelcome: () => {
+    // U3-invite: it also holds the waiting invite (`join`) and the handoff record.
+    startWelcome: (welcomeOptions = {}) => {
       const directory = agentDirectory(homedir());
       const hostDeps: UiHostDeps = {
         owner,
@@ -199,9 +238,15 @@ export function nodeUiDeps(): UiDeps {
           logger.debug('approval ui event', { ...event });
           logOwnerSetupEvent(logger, event);
         },
+        ...(welcomeOptions.invite === undefined ? {} : { waitingInvite: welcomeOptions.invite }),
+        handoff: {
+          write: (record) => writeAppHostRecord(homedir(), record),
+          remove: () => removeAppHostRecord(homedir()),
+        },
       });
     },
-    start: async (name) => {
+    start: async (name, startOptions = {}) => {
+      const { invite } = startOptions;
       // U3-c: the folders only through the AgentDirectory seam; a `removing` agent never opens.
       const directory = agentDirectory(homedir());
       const entry = await directory.read(name ?? DEFAULT_AGENT_NAME).catch(() => undefined);
@@ -246,6 +291,13 @@ export function nodeUiDeps(): UiDeps {
             open: (other) => openUiHostAgent(hostDeps, other),
             // U3-e: removing an agent (the folder lock, its own open, the revoked list).
             removal: uiRemovalPort(),
+            // U3-invite (08 §4): the invite `join` checked, held in memory by the host only.
+            ...(invite === undefined ? {} : { waitingInvite: invite }),
+            // U3-invite: the 0600 handoff record, so a later `join` hands its invite over here.
+            handoff: {
+              write: (record) => writeAppHostRecord(homedir(), record),
+              remove: () => removeAppHostRecord(homedir()),
+            },
           },
           // Fixed values only (ApprovalServerEvent, I-7).
           onEvent: (event) => {
@@ -255,7 +307,8 @@ export function nodeUiDeps(): UiDeps {
         });
         return Object.freeze<UiServer>({
           page,
-          open: () => openUiPage(page, server),
+          // U3-invite: first run (no owner yet) or the join screen; never a link with the invite.
+          open: () => (invite === undefined ? openUiPage(page, server) : server.openJoin()),
           close: async () => {
             await server.close().catch(() => undefined);
             await agent.close();

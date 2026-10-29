@@ -46,6 +46,8 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/settings/appearance', page: lazyPage('/settings/appearance') },
   { path: '/settings/advanced', page: lazyPage('/settings/advanced') },
   { path: '/settings/about', page: lazyPage('/settings/about') },
+  // U3-invite (b11 §33.2): the waiting invite, in the first-run shell (no sidebar).
+  { path: '/settings/join', page: lazyPage('/settings/join') },
 ];
 
 /**

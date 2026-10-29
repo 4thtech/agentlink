@@ -177,6 +177,56 @@ function pendingContact(card: AgentCard, name: string): PendingContact {
   };
 }
 
+/**
+ * U3-invite (08 §4; 06 §8 `agentlink join`): an invite after Accept step 1 alone (04 §3.6), with no
+ * agent open. `inviteId` is the invite's public 16-byte ID (never its secret); `contact` is who it
+ * names under the contact-name rule. Nothing is stored, signed or sent.
+ */
+export interface CheckedInviteLink {
+  readonly inviteId: string;
+  readonly contact: PendingContact;
+  readonly expiresAt: number;
+}
+
+interface StepOne {
+  readonly invite: Invite;
+  readonly checked: ReturnType<typeof checkReceivedCard>;
+  readonly contact: PendingContact;
+}
+
+/**
+ * Accept step 1 (04 §3.6): the one D-69 codec and the strict schema, the expiry, both card
+ * signatures, the name and relays against the card and the relay URL rule (04 §4). No agent, no
+ * store. Throws core's fixed errors only; none carries anything from the link (I-5, I-7).
+ */
+async function acceptStepOne(link: string, now: number): Promise<StepOne> {
+  const invite = await decodeInviteLink(link);
+  // B's expiry check is advisory (A enforces the expiry it stored, 04 §3.6).
+  if (invite.expiresAt <= now) {
+    throw new CoreError('invite_expired', 'The invite has expired. Ask for a new one.');
+  }
+  const checked = checkReceivedCard(
+    {
+      card: invite.card,
+      cardSig: invite.cardSig,
+      cardAgentSig: invite.cardAgentSig,
+      name: invite.name,
+      relays: invite.relays,
+    },
+    { requireAgentSig: true, now },
+  );
+  return { invite, checked, contact: pendingContact(checked.card, checked.name) };
+}
+
+/** U3-invite: Accept step 1 only, for `agentlink join` and the app host's waiting invite. */
+export async function checkInviteLink(
+  link: string,
+  nowSeconds: number,
+): Promise<CheckedInviteLink> {
+  const { invite, contact } = await acceptStepOne(link, nowSeconds);
+  return { inviteId: invite.inviteId, contact, expiresAt: invite.expiresAt };
+}
+
 const same = (a: unknown, b: unknown): boolean =>
   canonicalize(a as JsonValue) === canonicalize(b as JsonValue);
 
@@ -256,28 +306,14 @@ export class PairingService implements PairingHandler {
    */
   async acceptInvite(input: AcceptInviteInput): Promise<AcceptInviteResult> {
     const ctx = this.#ctx;
-    const invite = await decodeInviteLink(input.link);
     const now = nowOf(ctx);
-    // B's expiry check is advisory (A enforces the expiry it stored, 04 §3.6).
-    if (invite.expiresAt <= now) {
-      throw new CoreError('invite_expired', 'The invite has expired. Ask for a new one.');
-    }
-    const checked = checkReceivedCard(
-      {
-        card: invite.card,
-        cardSig: invite.cardSig,
-        cardAgentSig: invite.cardAgentSig,
-        name: invite.name,
-        relays: invite.relays,
-      },
-      { requireAgentSig: true, now },
-    );
+    // Step 1, shared with checkInviteLink (one implementation for every surface).
+    const { invite, checked, contact } = await acceptStepOne(input.link, now);
     const self = await ctx.keyStore.getPublicBundle();
     if (checked.card.agentEvm === self.agentId) {
       throw new CoreError('contact_is_self', 'An agent cannot add itself as a contact.');
     }
     await this.#identity.assertCanSend();
-    const contact = pendingContact(checked.card, checked.name);
     if (input.allowed !== true) return { status: 'pending_approval', contact };
 
     const prepared = await this.#contacts.prepareStage({

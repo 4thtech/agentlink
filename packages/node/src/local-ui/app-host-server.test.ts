@@ -397,7 +397,9 @@ describe('the generation check on every mutating request (U3-c, 08 §1)', () => 
     const csrf = await h.csrf(cookie);
     const mutating = createLocalUiRoutes()
       .routes()
-      .filter((r) => r.method !== 'GET' && r.presence !== 'switch');
+      // U3-invite: the handoff is not a page request (no session, no generation); it refuses any
+      // generation header outright (local-ui/join-server.test.ts).
+      .filter((r) => r.method !== 'GET' && r.presence !== 'switch' && r.presence !== 'handoff');
     expect(mutating.length).toBeGreaterThan(10);
     for (const route of mutating) {
       for (const generation of [undefined, '0', '2', 'x', '01', '1.0']) {

@@ -63,6 +63,7 @@ import {
   type UpgradeValues,
 } from './setup-api.js';
 import './first-run.css';
+import { createJoinApi, type JoinRead } from '../join/api.js';
 import {
   FIRST_RUN as T,
   NAME as N,
@@ -78,9 +79,25 @@ import {
 /** U3-a (D-138; 08 §1): first run, and the passkey switch on this page, finish on Home. */
 const HOME = '/settings/home';
 
-/** Home, with a full load: the shell then reads the new owner and agent fresh. */
+/** U3-invite (08 §4, b11 §33.2): first run ends on the waiting invite, when there is one. */
+const JOIN = '/settings/join';
+
+/**
+ * Home, with a full load: the shell then reads the new owner and agent fresh. U3-invite: when
+ * `agentlink join` left an invite waiting, first run ends on "Accept {name}'s invite?" instead.
+ */
 function openHome(): void {
-  window.location.assign(HOME);
+  void endFirstRun(() => createJoinApi().read());
+}
+
+/** Where first run ends: the join screen while an invite waits, else Home (tests pass `read`). */
+export function endFirstRun(read: () => Promise<JoinRead>): Promise<void> {
+  return read()
+    .catch((): JoinRead => ({ kind: 'failed' }))
+    .then((answer) => {
+      const waiting = answer.kind === 'ok' && answer.state !== 'none';
+      window.location.assign(waiting ? JOIN : HOME);
+    });
 }
 
 export interface FirstRunPageProps {

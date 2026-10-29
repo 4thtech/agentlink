@@ -1,0 +1,210 @@
+/* The invite page (b11 §33.1, styled from the D2 invite landing, D-116). One first-party style file
+   (CSP style-src 'self'); no web font, no external URL, no inline style. Values from the D1 tokens. */
+:root {
+  --bg: #f5f6f7;
+  --surface: #ffffff;
+  --border: #d9dce1;
+  --text: #14171a;
+  --muted: #5c636b;
+  /* Darker than the D1 accent so white text and the link pass 4.5:1 (WCAG AA). */
+  --accent: #b34400;
+  --accent-fg: #ffffff;
+  --accent-border: #c44a08;
+  --code-bg: #f0f1f3;
+  --focus: #1a6dff;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1013;
+    --surface: #16191d;
+    --border: #2b3036;
+    --text: #e7e9ec;
+    --muted: #9aa2ab;
+    --accent: #ff6a1a;
+    --accent-fg: #14171a;
+    --accent-border: #ff8a4c;
+    --code-bg: #1c2025;
+    --focus: #7aa7ff;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    16px/1.5 system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.brand {
+  font-weight: 650;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.host,
+.mono,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.host {
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px 16px 40px;
+}
+.eyebrow,
+.caps {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+h1 {
+  font-size: 28px;
+  line-height: 1.2;
+  margin: 4px 0 4px;
+  overflow-wrap: anywhere;
+}
+h2 {
+  font-size: 18px;
+  margin: 28px 0 10px;
+}
+p {
+  margin: 0 0 8px;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 14px;
+}
+.card,
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+.who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.badge {
+  font-size: 13px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  padding: 0 6px;
+  color: var(--muted);
+}
+.row {
+  display: flex;
+  gap: 16px;
+}
+.switch {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.switch[hidden] {
+  display: none;
+}
+.switch button {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.switch button[aria-selected='true'] {
+  box-shadow: inset 0 -2px 0 var(--accent);
+  font-weight: 600;
+}
+#node-help {
+  margin-top: 12px;
+}
+a {
+  color: var(--accent);
+}
+.panel {
+  border-color: var(--accent-border);
+}
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.copy {
+  min-height: 44px;
+  min-width: 72px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+pre {
+  margin: 12px 0 0;
+  padding: 12px;
+  background: var(--code-bg);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  user-select: all;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+footer {
+  margin-top: 32px;
+}
+[hidden] {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

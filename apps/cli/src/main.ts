@@ -11,6 +11,7 @@ import { creditsHandler } from './commands/credits.js';
 import { doctorHandler } from './commands/doctor.js';
 import { uiHandler } from './commands/ui.js';
 import { inviteHandler } from './commands/invite.js';
+import { joinHandler } from './commands/join.js';
 import { requestsHandler } from './commands/requests.js';
 import { statusHandler } from './commands/status.js';
 import { verifyHandler } from './commands/verify.js';
@@ -47,6 +48,8 @@ const dispatch = createDispatcher({
   doctor: doctorHandler,
   // M1-11b-9.
   ui: uiHandler,
+  // U3-invite: the invite page's one command.
+  join: joinHandler,
   requests: requestsHandler,
   // M1-9h.
   credits: creditsHandler,
