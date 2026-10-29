@@ -5650,6 +5650,15 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - End to end (macOS): a fresh account opens an invite link, copies the command, runs it, completes first run v3 and accepts; the inviter sees the new contact, both compare the safety code, and a message and a file go both ways.
   - Screenshot review by the owner at 1280 and 360, light and dark (invite page and app end); a11y (axe) and reduced-motion tests; Fable 5.1 audit; Opus independent review; Tali's "merge".
 
+#### U3-invite-b · finish pairing in the app when no AI app is running (new, found by the U3-k end-to-end test, #687)
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** independent review (lease rule change) · **Phase:** M1b · **Build group:** 4
+- **Repo/path:** agentlink · `packages/node/src/local-ui/pairing-follow.ts` (new), `packages/node/src/local-ui/api/join.ts`, `packages/node/src/local-ui/context.ts`, `packages/node/src/approval-server.ts`; 06 §6 and 08 §4 notes (proposed)
+- **Depends on:** U3-invite
+- **Spec:** 06 §6 "One active publisher per agent", 07 §3.2 `publisher_lease`, 08 §4 "One step from an invite link"
+- **Invariants:** I-5, I-7
+- **Scope:** while the join screen waits for the inviter's answer, the app host takes the publisher lease only when no other process holds it (core compare-and-set), runs one short pass (catch-up fetch with processing, then due outbox rows), and releases it; at most one pass per 5 s; never renews, subscribes or loops.
+- **Acceptance:** tests first (`RED (expected): U3-invite-b …`): with no MCP server running, accepting in the app ends on Connected; with an MCP server holding the lease, the host never fetches or publishes; a failed pass releases the lease; independent review; Tali's "merge".
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)

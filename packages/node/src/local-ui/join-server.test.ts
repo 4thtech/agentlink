@@ -615,7 +615,8 @@ describe('POST /api/ui/join/accept (08 §4)', () => {
   });
 
   it('with the owner code: one approval.decide by the owner key, used once; the link is dropped', async () => {
-    const h = await harness({ waitingInvite: LINK });
+    // The inviter's agent has not answered yet: a pass finds nothing (U3-invite-b).
+    const h = await harness({ waitingInvite: LINK, sync: () => Promise.resolve() });
     const res = await h.accept(INVITE_ID, world.code);
     expect(res.status).toBe(200);
     expect(parse(res.body)).toEqual({

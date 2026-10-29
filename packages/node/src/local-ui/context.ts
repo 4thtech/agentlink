@@ -519,6 +519,13 @@ export interface LocalUiContext {
    */
   readonly join?: JoinDesk;
   /**
+   * U3-invite-b (06 §6, 08 §4; proposed): one short pass for the join screen while it waits for the
+   * inviter's answer, only when no other process holds the agent's publisher lease (it takes the
+   * lease, fetches and processes, delivers due rows and releases it). In the app host only; never
+   * throws (local-ui/pairing-follow.ts).
+   */
+  readonly followPairing?: () => Promise<unknown>;
+  /**
    * U3-f (08 §1 "AI apps"): the CLI's harness desk for the AI apps routes (api/apps.ts) only. It
    * writes only through a plan's `commit`, which the apply and disconnect routes call after the
    * owner signed the change and core applied it.

@@ -253,6 +253,7 @@ import {
   type LocalUiOwnerSetup as LocalUiOwnerSetupOption,
 } from './local-ui/context.js';
 import { JoinDesk, type JoinCheck } from './local-ui/join-desk.js';
+import { pairingFollower, type PairingFollower } from './local-ui/pairing-follow.js';
 import { JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
 import type {
   LocalUiInviteRoute,
@@ -1156,6 +1157,15 @@ export async function startApprovalServerWith(
   /** U3-invite (08 §4): the app host's waiting invite, in memory only; absent outside the host. */
   const joinDesk =
     options.host === undefined ? undefined : new JoinDesk(() => now(), internals.checkInvite);
+  /**
+   * U3-invite-b (06 §6; proposed): the open agent's pairing follower, in the app host only; a fresh
+   * one per bound agent, so a switch never reaches the previous agent's client.
+   */
+  const followerOf = (bound: typeof agentUi): PairingFollower | undefined =>
+    options.host === undefined || bound?.client === undefined
+      ? undefined
+      : pairingFollower(bound.client, { nowMs: () => now() });
+  let follower = followerOf(agentUi);
   /** U3-invite: the handoff token (32 random bytes), only with a handoff record to publish it in. */
   const handoffToken =
     options.host?.handoff === undefined ? undefined : encodeBase64url(randomBytes(32));
@@ -1251,6 +1261,8 @@ export async function startApprovalServerWith(
       ...(options.host === undefined ? {} : { agentsManage }),
       // U3-invite: the waiting invite, in the app host only.
       ...(joinDesk === undefined ? {} : { join: joinDesk }),
+      // U3-invite-b: the join screen's lease-gated pass, captured with this context's agent.
+      ...(follower === undefined ? {} : { followPairing: follower.follow }),
       // U3-g-b (IR-U3-g-b-1 L): with no agent yet, the first-run page's owner state is the real one.
       ...(agentUi === undefined && options.host?.firstRun !== undefined
         ? { setupBlocked: () => setupBlockedNoAgent() }
@@ -3732,6 +3744,7 @@ export async function startApprovalServerWith(
     agentLabel = undefined;
     labelReady = refreshLabel();
     invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
+    follower = followerOf(agentUi);
     uiContext = buildUiContext();
     // Approvals, a held owner setup and held paid-action confirmations belong to the old agent.
     decided.clear();

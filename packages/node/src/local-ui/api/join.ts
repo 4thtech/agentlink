@@ -4,7 +4,9 @@
 //
 // - `GET /api/ui/join` (read; also before an owner exists, like the other reads): the state, the
 //   public `inviteId`, the name-rule name with its Self-declared label, the short owner fingerprint
-//   and the expiry. Never the link, the payload or any other invite field.
+//   and the expiry. Never the link, the payload or any other invite field. While the state is
+//   `waiting_for_them`, it first runs the host's lease-gated pass (`followPairing`, U3-invite-b), so
+//   the pairing completes with no AI app running; with an MCP server holding the lease it only reads.
 // - `POST /api/ui/join/accept`, input `{"inviteId": "<id>"}` (an ordinary owner route behind the
 //   presence gate; refused before an owner exists). The input carries no invite: only the ID of the
 //   invite the screen shows. A different ID is `invite_changed` before the presence gate
@@ -67,7 +69,14 @@ function inviteIdOf(input: unknown): string | undefined {
 async function readJoin(context: LocalUiContext, request: LocalUiRequest): Promise<LocalUiResult> {
   if (context.join === undefined) return NOT_AVAILABLE;
   if ([...request.query.keys()].length > 0) return INVALID;
-  const view = await context.join.view(context.client);
+  let view = await context.join.view(context.client);
+  // U3-invite-b (06 §6; proposed): while it waits for the inviter's answer, one short pass when no
+  // other process holds the publisher lease (no AI app runs this agent), then the state again.
+  if (view.state === 'waiting_for_them' && context.followPairing !== undefined) {
+    if ((await context.followPairing().catch(() => undefined)) === 'ran') {
+      view = await context.join.view(context.client);
+    }
+  }
   return Object.freeze({ status: 200, body: view as unknown as JsonObject });
 }
 
