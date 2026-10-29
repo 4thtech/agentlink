@@ -384,6 +384,7 @@ Local app pages that hold several agents and connect AI apps (08 §1; design b11
 | AI app states | "Not connected" · "Connected to {label}" · "Connected to another agent" · "Needs restart" · "Running" |
 | AI app change | "Review change" · "Apply with Touch ID" · "Restart {app} to finish" |
 | Move | "{app} will use {newLabel} instead of {oldLabel}" |
+| Create and connect (D-140; proposed, owner confirms at merge) | "Connect to {app}" (prefilled with the detected app) · "Not now" · "Use Touch ID"; after it: "{label} is ready in {app}. Restart {app} to finish."; if the entry could not be written: "{label} is ready. {app} isn't connected yet." · "Connect" |
 | Claude Desktop open | "Quit Claude Desktop first" |
 | Switcher | "Add agent" · "Manage agents"; on an approval page opened by an AI app: "Open the AgentLink app to switch" |
 | Agent in use | "Quit the AI app that uses {label} first." |
