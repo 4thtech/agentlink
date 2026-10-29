@@ -43,6 +43,8 @@ export interface AgentDirectoryEntry {
   readonly name: string;
   /** The label from config.json (display only, 07 §9.1), else the name. Plain text. */
   readonly label: string;
+  /** config.json holds a label (written only after a verified `agent.label`). */
+  readonly labelled?: boolean;
   /** False when the folder's config cannot be read (the agent is listed, never opened). */
   readonly available: boolean;
   /** `removing: true` in config.json, or the agent's ID is in the owner's revoked list. */

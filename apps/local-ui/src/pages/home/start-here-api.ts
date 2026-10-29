@@ -39,12 +39,35 @@ function appName(raw: string): string | null {
   return chars.length <= MAX_NAME ? text : `${chars.slice(0, MAX_NAME - 1).join('')}…`;
 }
 
+function addApp(names: string[], raw: unknown): void {
+  if (typeof raw !== 'string') return;
+  const name = appName(raw);
+  if (name !== null && !names.includes(name)) names.push(name);
+}
+
+/** Entries of the AI apps list that run `agent` (any agent when null), by their fixed names. */
+function collectApps(apps: unknown, agent: string | null, names: string[]): void {
+  if (!isRecord(apps) || !Array.isArray(apps['apps'])) return;
+  for (const entry of apps['apps'] as unknown[]) {
+    if (!isRecord(entry) || entry['state'] !== 'connected') continue;
+    if (agent !== null && entry['agent'] !== agent) continue;
+    addApp(names, typeof entry['name'] === 'string' ? entry['name'] : entry['app']);
+  }
+}
+
 /**
  * The open agent's signal from the two answers, or undefined when the agents answer does not name an
  * open agent (outside the app host, or a shape that does not parse). `apps` is optional: the agents
  * list already carries each agent's apps; the AI apps list adds entries that run this agent.
  */
 export function parseAgentSignal(agents: unknown, apps: unknown): AgentSignal | undefined {
+  if (isRecord(agents) && agents['switchable'] === false) {
+    // Outside the app host (a page bound to its agent): no agent can be named or switched here, so
+    // there is nothing to name; the AI apps list is the only thing left to read.
+    const names: string[] = [];
+    collectApps(apps, null, names);
+    return { named: true, connected: names.length > 0, appName: names[0] ?? null, running: false };
+  }
   if (!isRecord(agents) || agents['switchable'] !== true || !Array.isArray(agents['agents'])) {
     return undefined;
   }
@@ -54,25 +77,14 @@ export function parseAgentSignal(agents: unknown, apps: unknown): AgentSignal | 
     (a): a is Record<string, unknown> => isRecord(a) && a['name'] === current,
   );
   if (row === undefined) return undefined;
-  const label = typeof row['label'] === 'string' ? row['label'].trim() : '';
   const names: string[] = [];
-  const add = (raw: unknown): void => {
-    if (typeof raw !== 'string') return;
-    const name = appName(raw);
-    if (name !== null && !names.includes(name)) names.push(name);
-  };
-  if (Array.isArray(row['apps'])) for (const a of row['apps'] as unknown[]) add(a);
-  if (isRecord(apps) && Array.isArray(apps['apps'])) {
-    for (const entry of apps['apps'] as unknown[]) {
-      if (!isRecord(entry) || entry['state'] !== 'connected' || entry['agent'] !== current) {
-        continue;
-      }
-      add(typeof entry['name'] === 'string' ? entry['name'] : entry['app']);
-    }
+  if (Array.isArray(row['apps'])) {
+    for (const a of row['apps'] as unknown[]) addApp(names, a);
   }
+  collectApps(apps, current, names);
   return {
-    // An agent with no label of its own is listed under its folder name.
-    named: label !== '' && label !== current,
+    // A verified `agent.label` exists (the agents read says so); never guessed from the text.
+    named: row['labelled'] === true,
     connected: names.length > 0,
     appName: names[0] ?? null,
     running: row['running'] === true,
@@ -88,6 +100,12 @@ export async function readAgentSignal(
     client.get<unknown>(APPS_READ),
   ]);
   if (agents.kind !== 'ok') return undefined;
+  // `not_available` is the AI apps list not being built yet: the agents list alone decides. Any other
+  // failure leaves us unable to say "not connected", so there is no answer (the step says so).
+  if (apps.kind !== 'ok' && apps.kind !== 'not_available') {
+    const known = parseAgentSignal(agents.data, undefined);
+    return known?.connected === true ? known : undefined;
+  }
   return parseAgentSignal(agents.data, apps.kind === 'ok' ? apps.data : undefined);
 }
 

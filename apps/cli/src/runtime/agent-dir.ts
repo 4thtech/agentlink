@@ -573,7 +573,13 @@ async function directoryEntry(
     }
     const { config } = found;
     const removing = config.removing === true || (await inRevokedList(home, config.agentId));
-    return Object.freeze({ name, label: config.label ?? name, available: true, removing });
+    return Object.freeze({
+      name,
+      label: config.label ?? name,
+      labelled: config.label !== undefined,
+      available: true,
+      removing,
+    });
   } catch {
     // A folder that breaks the rules is still listed (never lost), and never opened.
     return Object.freeze({ name, label: name, available: false, removing: false });

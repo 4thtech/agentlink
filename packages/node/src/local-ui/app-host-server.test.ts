@@ -110,7 +110,10 @@ function agents(): Agents {
   const written: string[] = [];
   const entries = new Map<string, AgentDirectoryEntry>([
     ['default', { name: 'default', label: 'Personal', available: true, removing: false }],
-    ['work', { name: 'work', label: "Work's agent", available: true, removing: false }],
+    [
+      'work',
+      { name: 'work', label: "Work's agent", labelled: true, available: true, removing: false },
+    ],
     ['old', { name: 'old', label: 'Old', available: true, removing: true }],
   ]);
   const source = (name: string): ApprovalServerSource => ({
@@ -319,6 +322,7 @@ describe('GET /api/ui/agents (U3-c)', () => {
           name: 'default',
           // U3-d: the open agent's row shows its verified label, else its folder name.
           label: 'default',
+          labelled: false,
           current: true,
           available: true,
           removing: false,
@@ -329,6 +333,7 @@ describe('GET /api/ui/agents (U3-c)', () => {
         {
           name: 'work',
           label: "Work's agent",
+          labelled: true,
           current: false,
           available: true,
           removing: false,
@@ -339,6 +344,7 @@ describe('GET /api/ui/agents (U3-c)', () => {
         {
           name: 'old',
           label: 'Old',
+          labelled: false,
           current: false,
           available: true,
           removing: true,

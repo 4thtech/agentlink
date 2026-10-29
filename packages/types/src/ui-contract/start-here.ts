@@ -141,7 +141,14 @@ export const START_HERE_AGENT_CASES: readonly AgentCase[] = [
   agentCase(
     'an AI app id and a running lease: connected with the fixed app name, running',
     [
-      row({ name: 'work', label: 'Work', current: true, running: true, apps: ['claude-code'] }),
+      row({
+        name: 'work',
+        label: 'Work',
+        labelled: true,
+        current: true,
+        running: true,
+        apps: ['claude-code'],
+      }),
       row({ name: 'other', label: 'Other', apps: ['codex'] }),
     ],
     { named: true, connected: true, appName: 'Claude Code', running: true },
@@ -150,7 +157,7 @@ export const START_HERE_AGENT_CASES: readonly AgentCase[] = [
     'follows the OPEN agent, not the first one in the list',
     [
       row({ name: 'a', label: 'A', apps: ['codex'] }),
-      row({ name: 'b', label: 'B', current: true }),
+      row({ name: 'b', label: 'B', labelled: true, current: true }),
     ],
     { named: true, connected: false, appName: null, running: false },
   ),
@@ -165,7 +172,9 @@ export const START_HERE_AGENT_CASES: readonly AgentCase[] = [
   {
     title: 'a failed AI apps read is no signal (the step says it could not check), never "none"',
     desk: desk([row({ name: 'work', label: 'Work', labelled: true, current: true })]),
-    agentsAnswer: listAnswer(desk([row({ name: 'work', label: 'Work', labelled: true, current: true })])),
+    agentsAnswer: listAnswer(
+      desk([row({ name: 'work', label: 'Work', labelled: true, current: true })]),
+    ),
     appsAnswer: { status: 503, body: { error: 'unavailable' } },
     signal: null,
     appsFromServer: false,
