@@ -1,0 +1,72 @@
+/* Moving-row mark (U3-map-2; b11 §32): tokens only, no orange. The one motion is a dash that travels
+   once by stroke-dashoffset; it is not drawn under reduced motion, where the arrowhead and "now" stay. */
+.mv-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: var(--al-color-fg-default);
+}
+.mv-glyph {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  overflow: visible;
+}
+.mv-line {
+  fill: none;
+  stroke: var(--al-color-fg-muted);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+}
+.mv-head {
+  fill: none;
+  stroke: var(--al-color-status-success-icon);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mv-dash {
+  fill: none;
+  stroke: var(--al-color-status-success-icon);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 3 10;
+  stroke-dashoffset: 3;
+}
+.mv-run {
+  animation: mv-travel calc(var(--al-duration-moment) * 2.5) var(--al-ease-standard, ease-out) 1
+    forwards;
+}
+@keyframes mv-travel {
+  from {
+    stroke-dashoffset: 3;
+  }
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mv-dash {
+    display: none;
+  }
+}
+:root[data-motion='reduced'] .mv-dash {
+  display: none;
+}
+@media (prefers-contrast: more) {
+  .mv-line,
+  .mv-head {
+    stroke-width: 2;
+  }
+}
+@media (forced-colors: active) {
+  .mv-line {
+    stroke: CanvasText;
+  }
+  .mv-head,
+  .mv-dash {
+    stroke: Highlight;
+  }
+}

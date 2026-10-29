@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import activity from './pages/activity/activity.css?raw';
 import map from './pages/agents/map/map.css?raw';
+import moving from './pages/moving/moving.css?raw';
 import agentsPage from './pages/agents/index.tsx?raw';
 import messages from './pages/messages/messages.css?raw';
 
@@ -57,5 +58,24 @@ describe('Live connections map (U3-map, b11 §32.4)', () => {
   it('is loaded lazily, never with the list', () => {
     expect(agentsPage).toMatch(/import\('\.\/map\/index\.js'\)/);
     expect(agentsPage).not.toMatch(/^import .* from '\.\/map\//m);
+  });
+});
+
+describe('Moving-row mark (U3-map-2, b11 §32.1, §32.4)', () => {
+  const text = squash(moving);
+  it('animates only stroke-dashoffset, once, and never loops', () => {
+    const frames = [...text.matchAll(/@keyframes [\w-]+ \{(.*?\}) \}/g)].map((m) => m[1] as string);
+    expect(frames.length).toBeGreaterThan(0);
+    for (const body of frames) {
+      const props = [...body.matchAll(/([a-z-]+):/g)].map((m) => m[1]);
+      for (const p of props) expect(['stroke-dashoffset']).toContain(p);
+    }
+    expect(text).not.toMatch(/infinite/);
+    // 1.2 s from the moment token (480 ms x 2.5); the motion lint refuses a literal duration.
+    expect(text).toMatch(/mv-travel calc\(var\(--al-duration-moment\) \* 2\.5\) [^;]* 1 forwards/);
+  });
+  it('draws no travelling dash under reduced motion', () => {
+    expect(text).toMatch(/prefers-reduced-motion: reduce\) \{ \.mv-dash \{ display: none/);
+    expect(text).toMatch(/data-motion='reduced'\] \.mv-dash/);
   });
 });

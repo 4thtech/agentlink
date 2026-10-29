@@ -14,6 +14,7 @@ export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   '/settings/messages': part(async () => (await import('../pages/messages/index.js')).MessagesPage),
   '/settings/contacts': part(async () => (await import('../pages/contacts/index.js')).ContactsPage),
   '/settings/agents': part(async () => (await import('../pages/agents/index.js')).AgentsPage),
+  '/settings/apps': part(async () => (await import('../pages/apps/index.js')).AppsPage),
   '/settings/files': part(async () => (await import('../pages/files/index.js')).FilesPage),
   '/settings/proofs': part(async () => (await import('../pages/proofs/index.js')).ProofsPage),
   '/settings/rules': part(async () => (await import('../pages/rules/index.js')).RulesPage),

@@ -330,6 +330,33 @@ export async function noOwnerAnywhere(
 }
 
 /**
+ * U3-g-b (08 §1 "with no agent yet, Welcome"): true when no owner key AND no agent exists for this OS
+ * user: none of the `owner`, `owner-passkey` and `owner-next` keychain items exists, none of
+ * `ownerFiles` exists, and their `.agentlink` folder holds no agent folder at all and no file-KeyStore
+ * entry. The check of first run before it creates the first agent. Reads ciphertext only and wipes
+ * it. A keychain or file-system error rejects (callers fail closed).
+ */
+export async function noOwnerAndNoAgent(
+  keychain: KeychainBackend,
+  ownerFiles: readonly string[] = defaultOwnerFiles(),
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<boolean> {
+  for (const account of [OWNER_ACCOUNT, OWNER_PASSKEY_ACCOUNT, OWNER_NEXT_ACCOUNT]) {
+    const item = await guarded(() => keychain.get(account), timeoutMs);
+    if (item !== null) {
+      wipe(item);
+      return false;
+    }
+  }
+  for (const path of ownerFiles) {
+    if (await entryExists(path)) return false;
+  }
+  // No own name: any entry in the agents folder counts.
+  if (await otherAgentOrKeystoreEntry(ownerFiles, '')) return false;
+  return true;
+}
+
+/**
  * M1-11b-6: whether owner setup may be offered for `first` (the CLI wires the first-run page's
  * setup only then): noOwnerAnywhere against `keychain` and `ownerFiles`. Store-only: reads no
  * secret, unlocks nothing. Any error answers false (fail closed: setup is then never wired).

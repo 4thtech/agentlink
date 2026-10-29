@@ -5546,6 +5546,15 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Owner input 2026-10-29, every agent clearly shows which AI app it works from. First-run flow (Fable rule: one gesture per signed operation): the app is picked on the screen before naming (detection runs before the owner exists, via `GET /api/ui/apps` during setup); the suggested name is computed client-side from that app (for example "Claude Code agent") and stays editable; `finish` stays `{label}` and creates the owner and agent with one gesture; the next screen "Connect your AI app" uses U3-f's flow unchanged (exact entry shown, then Touch ID, then a signed `app.connect`); it can be skipped ("Later"), and the agent then shows "Not connected to an AI app". Rule unchanged: an AI app serves one agent at a time, an agent may serve several apps.
   - The owner's screenshot review at 1440 and 360, light and dark; a11y (axe) and reduced-motion tests; the name is shown as text only; strings per 11 §5; independent review.
 
+#### U3-g-b · `ui` with no agent at all opens Welcome (split from U3-g, 2026-10-29)
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** independent review (app host, approval server) · **Phase:** M1b · **Build group:** 3
+- **Repo/path:** agentlink · `packages/node/src/local-ui/app-host.ts`, `packages/node/src/approval-server.ts`, `packages/node/src/owner-setup.ts`, `apps/cli/src/commands/{ui,ui-host}.ts`
+- **Depends on:** U3-c (app host), U3-d (first run with a name, AgentDirectory `create`), U3-b (CLI current agent)
+- **Spec:** 08 §1 "App host" ("with no agent yet, Welcome") and first run `begin`/`finish`; 04 §2.5, §2.8 "From the local app"; D-138, D-39
+- **Invariants:** I-1, I-4, I-7
+- **Scope:** with no agent folder at all, `agentlink ui` (and bare `agentlink`) starts the app host with no open agent and opens the first-run page (Welcome); it serves only the setup-time reads (`GET /api/ui/first-run`, `/api/ui/apps`, `/api/ui/agents/label-check`, `/api/ui/agents`, `/api/ui/health`) and first run's `begin`/`finish`; every other route and the approval API answer the fixed 409 `no_agent` after every guard. `finish {label}` (default "My agent") creates the first agent folder (named `default`, as `init` names it, D5; decided 2026-10-29; later agents use the label slug) and the owner with one gesture, all or nothing, and opens that agent in the same host (generation raised; no restart, no new link).
+- **Acceptance:** tests first (`RED (expected): U3-g-b`): `ui` with zero agents serves Welcome; agent routes are refused with no agent; first run creates and opens the agent; an AI-run `ui` prints its fixed line and opens nothing (D-39); agents marked removing (or revoked) are never opened and block the no-agent setup; contract tests against the real app host.
+
 #### U3-h · switcher, Agents page, Add, Rename, Remove sheets (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 2 (list and switch) and 3 (sheets)
 - **Repo/path:** agentlink · `apps/local-ui/src/layout/top-bar.tsx`, `apps/local-ui/src/pages/agents/` (new; owns the List and Map control, U3-map plugs into it)
@@ -5561,7 +5570,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Generation sent on every mutating request; labels rendered as text; Remove sheet names what goes, offers "Export history first" and asks for the typed label; screenshot review at 1440 and 360, light and dark; a11y; independent review.
 
 #### U3-i · AI apps page and Connect step (new, USABILITY-WAVE-3, owner decision 2026-10-29)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 3
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 3
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/apps/` (new)
 - **Depends on:** U3-brief, U3-f
 - **Spec:** b11 §30 (U3-brief); D-116, D-137
@@ -5597,13 +5606,15 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Click on a box or line opens that conversation in Messages; no content drawn; one SVG layer, no dependency, under 8 KB gzipped, lazy-loaded; `perf-guards.test.ts` extended; animation on `transform` and `stroke-dashoffset` only and paused when hidden; reduced motion (static arrowhead and "now"), reduced transparency, increased contrast; List is the text alternative, polite live region at most one line per 10 s, keyboard order follows the list; screenshots at 1440 and 360, light and dark; independent review.
 
 #### U3-map-2 · Home mini map, Contacts Map, row stream marks, compact strip (new, USABILITY-WAVE-3, owner decision 2026-10-29)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 4
+- **Status:** in progress (0.4.4 part: the moving-row mark in Messages and Files; the remainder below is 0.4.5) · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 4
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/home/`, `apps/local-ui/src/pages/contacts/`, `apps/local-ui/src/pages/messages/`, `apps/local-ui/src/pages/files/`, `apps/local-ui/src/**/compact/`
 - **Depends on:** U3-map, decision 8
 - **Spec:** USABILITY-WAVE-3 §4.1, §11 decision 8
 - **Invariants:** I-5, I-7
 - **Scope:**
   - Decision 8 (taken 2026-10-29): the moving-row stream mark in Messages and Files ships in 0.4.4 with U3-map; the Home mini map (top 5), Contacts Map view and the one-line compact strip ship in 0.4.5; no preview on hover.
+- **Built in 0.4.4 (this card, owner decision 8):** the moving-row mark in Messages and Files (`apps/local-ui/src/pages/moving/`, on `GET /api/ui/flow` through the Agents map's client and poller). Files rows carry no contact ID, so a Files row is matched by an owner-confirmed name that exactly one active contact holds (else no mark); a later change can add the contact ID to the files read.
+- **Remainder, 0.4.5 (not built):** the Home mini map (top 5), the Contacts Map view and Contacts row mark, and the one-line compact strip.
 - **Acceptance:**
   - Same rules, one source (the shared pulse module and `GET /api/ui/flow`); no content drawn; budget and reduced-motion rules as U3-map; screenshots at 1440 and 360, light and dark; independent review.
 

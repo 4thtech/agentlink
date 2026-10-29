@@ -126,6 +126,7 @@ export type {
   AgentDirectoryEntry,
   AgentDirectoryStats,
   AppHostAgent,
+  AppHostFirstRun,
   AppHostOptions,
   // U3-invite (08 §4): the handoff record the CLI keeps at ~/.agentlink/app-host.json.
   AppHostHandoffRecord,

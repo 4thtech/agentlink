@@ -199,6 +199,7 @@ describe('navigation', () => {
     mount('/settings/appearance');
     const sub = host.querySelector('nav[aria-label="Settings"]') as HTMLElement;
     expect([...sub.querySelectorAll('a')].map((a) => a.textContent)).toEqual([
+      'AI apps',
       'Backup',
       'Passkeys',
       'Appearance',

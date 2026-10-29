@@ -66,6 +66,38 @@ describe('createAgentFolder and discardNewAgentFolder (U3-d)', () => {
     expect(found?.config).toEqual({ v: 1, name: 'work-2', agentId, keyStore: 'keychain' });
   });
 
+  it('U3-g-b: a fixed name (the first agent, default) is used as is, never slugged', async () => {
+    const agentId = newId();
+    const name = await createAgentFolder(
+      home,
+      'My agent',
+      { createAgent: () => Promise.resolve(agentId) },
+      'default',
+    );
+    expect(name).toBe('default');
+    const found = await readAgentConfig(home, 'default');
+    expect(found?.config).toEqual({ v: 1, name: 'default', agentId, keyStore: 'keychain' });
+  });
+
+  it('U3-g-b: a fixed name that exists is refused before any key is made', async () => {
+    await writeAgentConfig(home, { v: 1, name: 'default', agentId: newId(), keyStore: 'keychain' });
+    let made = 0;
+    await expect(
+      createAgentFolder(
+        home,
+        'My agent',
+        {
+          createAgent: () => {
+            made += 1;
+            return Promise.resolve(newId());
+          },
+        },
+        'default',
+      ),
+    ).rejects.toBeDefined();
+    expect(made).toBe(0);
+  });
+
   it('a config that cannot be written discards the keychain agent it just made', async () => {
     const discarded: string[] = [];
     const agentId = newId();

@@ -74,6 +74,7 @@ export const NAV_ITEMS: readonly AppNavItem[] = [
 
 /** The pages under the one Settings item, in the order of its sub-navigation (11 §6.2.1). */
 export const SETTINGS_PAGES: readonly { readonly label: string; readonly path: string }[] = [
+  { label: PAGE_TITLES.apps, path: '/settings/apps' },
   { label: PAGE_TITLES.backup, path: '/settings/backup' },
   { label: PASSKEYS_LABEL, path: '/settings/passkeys' },
   { label: PAGE_TITLES.appearance, path: '/settings/appearance' },

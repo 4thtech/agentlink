@@ -31,6 +31,7 @@ export const PAGE_TITLES = {
   messages: 'Messages',
   contacts: 'Contacts',
   agents: 'Agents',
+  apps: 'AI apps',
   files: 'Files',
   storage: 'Storage',
   proofs: 'Proofs & credits',

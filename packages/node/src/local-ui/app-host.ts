@@ -33,6 +33,14 @@
 // process; without it the open fails and the switch answers `unavailable` (the previous agent is
 // opened again). This adds no exposure: every agent of the OS user can already read the others'
 // items (04 §2.8 "Logical isolation", G-1).
+//
+// U3-g-b (08 §1 "with no agent yet, Welcome"; proposed, owner confirms at merge): with no agent folder
+// at all the host starts with NO open agent (`initial` absent, `firstRun` present). The server then
+// serves the app shell and the setup-time reads only, and refuses every agent-scoped route with one
+// fixed answer (approval-server.ts `NO_AGENT_ROUTES`). First run `finish` creates the first agent
+// (AgentDirectory `create`), signs its first parts with the owner's one gesture, and hands it here
+// with `adoptFirst`: the generation increases first, the requests in flight drain, then the agent is
+// opened through the same `open` path as a switch. Nothing is signed here.
 import type { ApprovalServerSource } from '../approval-server.js';
 import type { LocalUiOptions } from './context.js';
 import type { AgentRemovalPort } from './api/agents-remove.js';
@@ -72,9 +80,10 @@ export interface AgentDirectory {
   /**
    * Card U3-d: creates a keychain agent in a new folder whose name is a slug of `label` (06 §6), made
    * unique with a suffix; config.json holds no label yet (it is written only after the signed
-   * `agent.label` was verified). Returns the folder name.
+   * `agent.label` was verified). Returns the folder name. U3-g-b: `options.name` names the folder
+   * instead (first run's first agent is `default`, FIRST_AGENT_NAME); refused when it exists.
    */
-  create?(label: string): Promise<string>;
+  create?(label: string, options?: { readonly name?: string }): Promise<string>;
   /**
    * Card U3-d: removes an agent that `create` made and that was not completed (all or nothing): its
    * keychain items and its folder. Only ever called for an agent this process just created.
@@ -110,8 +119,16 @@ export interface AppHostAgent {
 /** `ApprovalServerOptions.host`: present only in the `ui` process (the app host). */
 export interface AppHostOptions {
   readonly directory: AgentDirectory;
-  /** The agent opened first (by the CLI, before the server starts). The host owns it from here. */
-  readonly initial: AppHostAgent;
+  /**
+   * The agent opened first (by the CLI, before the server starts). The host owns it from here.
+   * U3-g-b: absent when no agent exists yet; the host then starts with none open.
+   */
+  readonly initial?: AppHostAgent;
+  /**
+   * U3-g-b: present only when the CLI found no agent folder at all. First run may then create the
+   * first agent from the page (begin / finish, the setup kind) and open it here (`adoptFirst`).
+   */
+  readonly firstRun?: AppHostFirstRun;
   /** Opens an agent through the CLI's openAgent path; undefined when it cannot be opened. */
   open(name: string): Promise<AppHostAgent | undefined>;
   /** U3-e: removing an agent (agents-remove.ts); absent: the remove route answers `not_available`. */
@@ -143,6 +160,23 @@ export interface AppHostHandoffRecord {
   write(record: AppHostHandoffRecordValue): Promise<void>;
   remove(): Promise<void>;
 }
+
+/** U3-g-b: first run with no agent yet (the folders of its first policy, the owner-file check). */
+export interface AppHostFirstRun {
+  /** The home folder the Send folder is created in; default the OS user's (tests only). */
+  readonly home?: string;
+  /** The file-KeyStore owner files whose presence refuses setup (owner-setup.ts defaultOwnerFiles). */
+  readonly ownerFiles?: readonly string[];
+}
+
+/** U3-g-b: the first agent's label when first run is finished without one (b11 §28, prefilled). */
+export const FIRST_AGENT_LABEL = 'My agent';
+
+/**
+ * U3-g-b: the first agent's folder name (decided 2026-10-29): `default`, as `init` names it (D5), so
+ * its AI app entry needs no `--agent`. Later agents use the label slug (U3-d).
+ */
+export const FIRST_AGENT_NAME = 'default';
 
 /** A request's place in the host: `valid` re-checks the generation, `leave` ends it. */
 export interface AppHostHold {
@@ -314,6 +348,55 @@ export class AppHostSlot {
       }
     }
     return 'unavailable';
+  }
+
+  /**
+   * U3-g-b: opens the first agent, which first run just created, while no agent is open. `own` is
+   * the hold of the finish request that calls this (released here, so the drain never waits for it).
+   * False (nothing opened) when an agent is open, a switch is in progress, the host is closed, the
+   * name is not valid, the agent is unknown or `removing` (the generation is then unchanged), or it
+   * cannot be opened (the generation was already raised; the page reloads).
+   */
+  async adoptFirst(name: string, own?: AppHostHold): Promise<boolean> {
+    if (
+      this.#closed ||
+      this.#agent !== undefined ||
+      this.#switching !== undefined ||
+      !HOST_AGENT_NAME.test(name)
+    ) {
+      return false;
+    }
+    let finish: () => void = () => undefined;
+    this.#switching = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    try {
+      let entry: AgentDirectoryEntry | undefined;
+      try {
+        entry = await this.#options.directory.read(name);
+      } catch {
+        return false;
+      }
+      if (entry === undefined || entry.name !== name || !entry.available || entry.removing) {
+        return false;
+      }
+      // Raised first: every request still on its way (built against no agent) is refused.
+      this.#generation += 1;
+      own?.leave();
+      await this.#drained();
+      const opened = await this.#options.open(name).catch(() => undefined);
+      if (opened === undefined || opened.name !== name) {
+        await opened?.close().catch(() => undefined);
+        return false;
+      }
+      this.#agent = opened;
+      this.#bind(opened);
+      await this.#options.directory.writeCurrent(name).catch(() => undefined);
+      return true;
+    } finally {
+      this.#switching = undefined;
+      finish();
+    }
   }
 
   /**

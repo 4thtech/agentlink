@@ -6,6 +6,7 @@
 // mutating request by the page's generation guard (api/generation.ts).
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import type { PresenceProof } from '../contacts/owner.js';
+import { appNameOf, parseAppNames } from './app-names.js';
 import { parseAgents, type AgentsList } from './data.js';
 
 export type ReadOutcome =
@@ -149,7 +150,22 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
       const result = await client.get(AGENTS);
       if (result.kind !== 'ok') return { kind: 'error' };
       const list = parseAgents(result.data);
-      return list === undefined ? { kind: 'error' } : { kind: 'ok', list };
+      if (list === undefined) return { kind: 'error' };
+      // U3-i: the rows hold app ids; every screen shows names. The names are read only when an
+      // agent has an app, and a failed read falls back to the fixed names.
+      if (!list.agents.some((r) => r.apps.length > 0)) return { kind: 'ok', list };
+      const named = await client.get('/api/ui/apps');
+      const names = parseAppNames(named.kind === 'ok' ? named.data : undefined);
+      return {
+        kind: 'ok',
+        list: {
+          ...list,
+          agents: list.agents.map((r) => ({
+            ...r,
+            apps: r.apps.map((id) => appNameOf(id, names)),
+          })),
+        },
+      };
     },
     async labelCheck(label) {
       const result = await client.get(`${AGENTS}/label-check?label=${encodeURIComponent(label)}`);
