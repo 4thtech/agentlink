@@ -254,6 +254,8 @@ describe('the read-only client view (M1-11c-a1 adds listActivity)', () => {
       // U3-d: the verified label and the unsigned agent.label (reads and prepare only).
       'agent',
       'agentId',
+      // U3-f: the unsigned app.connect / app.disconnect (prepare only).
+      'apps',
       'contacts',
       'files',
       'filesIo',

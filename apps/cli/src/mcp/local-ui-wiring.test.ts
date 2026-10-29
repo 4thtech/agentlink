@@ -3,7 +3,7 @@
 // the file-KeyStore owner files included (IR-M1-11s-c-1 L-6); every doubt leaves it out.
 import type { AgentLinkClient } from '@4thtech-io/core';
 import type { Logger } from '@4thtech-io/log';
-import type { ApprovalServerEvent, LocalUiAssets } from '@4thtech-io/node';
+import type { ApprovalServerEvent, LocalUiAiApps, LocalUiAssets } from '@4thtech-io/node';
 import { describe, expect, it, vi } from 'vitest';
 import {
   localUiOptions,
@@ -18,6 +18,12 @@ const ownerActions = { preparePolicyEdit: vi.fn(), apply: vi.fn() };
 const client = { agentId: AGENT_ID, identity, ownerActions } as unknown as AgentLinkClient;
 const assets: LocalUiAssets = { files: new Map([['index.html', new Uint8Array([60])]]) };
 const RELAYS = ['wss://relay.one.example', 'wss://relay.two.example'];
+// U3-f: the AI apps seam (harness/app-desk.ts in production).
+const aiApps = {
+  list: vi.fn(),
+  plan: vi.fn(),
+  agentIdOf: vi.fn(),
+} as unknown as LocalUiAiApps;
 
 function deps(overrides: Partial<LocalUiWiringDeps> = {}): LocalUiWiringDeps & {
   readonly checked: unknown[];
@@ -31,6 +37,7 @@ function deps(overrides: Partial<LocalUiWiringDeps> = {}): LocalUiWiringDeps & {
     },
     cardRelays: () => RELAYS,
     assets: () => assets,
+    aiApps: () => aiApps,
     ...overrides,
     checked,
   };
@@ -42,6 +49,8 @@ describe('localUiOptions (M1-11b-6)', () => {
     const options = await localUiOptions({ name: 'work', client }, d);
     expect(options.assets).toBe(assets);
     expect(options.client).toBe(client);
+    // U3-f: the AI apps seam is wired for every agent (its list is read on first run too).
+    expect(options.aiApps).toBe(aiApps);
     // M1-UX-FIRSTRUN-V2 (D-130 (2)): the same gesture signs the first policy (the Send folder)
     // with the agent's own core owner actions, in the real home folder (no `home` override).
     expect(options.ownerSetup).toEqual({
