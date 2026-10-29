@@ -53,6 +53,13 @@ async function pageHtml(): Promise<string> {
       }),
     );
   });
+  // The real state of the sheet with "I have an invite" selected (the invite panel is hidden).
+  await act(async () => {
+    const tab = [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find(
+      (el) => el.textContent?.trim() === 'I have an invite',
+    );
+    tab?.click();
+  });
   const markup = document.body.innerHTML;
   act(() => root.unmount());
   host.remove();
@@ -81,9 +88,11 @@ describe('Add contact paste field layout (HOTFIX-045-PASTE-FIELD)', () => {
       });
       try {
         await page.setContent(await pageHtml());
-        await page.evaluate(() => {
-          for (const el of document.querySelectorAll('[hidden]')) el.removeAttribute('hidden');
-        });
+        // Only the paste panel shows, as in the real sheet.
+        await expect(page.locator('textarea[name="invite-link"]').isVisible()).resolves.toBe(true);
+        await expect(page.getByRole('button', { name: 'Create invite' }).isVisible()).resolves.toBe(
+          false,
+        );
         const field = page.locator('textarea[name="invite-link"]');
         await field.fill(LONG);
         const box = async (sel: string) => {
