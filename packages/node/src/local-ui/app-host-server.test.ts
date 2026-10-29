@@ -134,7 +134,10 @@ function agents(): Agents {
   const written: string[] = [];
   const entries = new Map<string, AgentDirectoryEntry>([
     ['default', { name: 'default', label: 'Personal', available: true, removing: false }],
-    ['work', { name: 'work', label: "Work's agent", available: true, removing: false }],
+    [
+      'work',
+      { name: 'work', label: "Work's agent", labelled: true, available: true, removing: false },
+    ],
     ['old', { name: 'old', label: 'Old', available: true, removing: true }],
   ]);
   const source = (name: string): ApprovalServerSource => ({
@@ -345,6 +348,7 @@ describe('GET /api/ui/agents (U3-c)', () => {
           name: 'default',
           // U3-d: the open agent's row shows its verified label, else its folder name.
           label: 'default',
+          labelled: false,
           current: true,
           available: true,
           removing: false,
@@ -356,6 +360,7 @@ describe('GET /api/ui/agents (U3-c)', () => {
         {
           name: 'work',
           label: "Work's agent",
+          labelled: true,
           current: false,
           available: true,
           removing: false,
@@ -366,6 +371,7 @@ describe('GET /api/ui/agents (U3-c)', () => {
         {
           name: 'old',
           label: 'Old',
+          labelled: false,
           current: false,
           available: true,
           removing: true,
@@ -512,6 +518,28 @@ describe('U3 route stubs (U3-c review note c)', () => {
 });
 
 describe('POST /api/ui/agents/switch (U3-c, the switch kind)', () => {
+  it('a verified label makes the open agent labelled; one without stays unlabelled', async () => {
+    const h = await harness();
+    const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
+    const readAgents = async (): Promise<{ name: string; label: string; labelled: boolean }[]> => {
+      const res = await send(h.port, '/api/ui/agents', {
+        headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
+      });
+      return (
+        JSON.parse(res.body) as { agents: { name: string; label: string; labelled: boolean }[] }
+      ).agents;
+    };
+    // `default` is open: its store has no verified label.
+    expect((await readAgents()).find((a) => a.name === 'default')?.labelled).toBe(false);
+    expect((await switchTo(h, cookie, csrf, 'work', 1)).status).toBe(200);
+    // `work` is open now: core verified its label ("Work verified"), so it is labelled.
+    const work = (await readAgents()).find((a) => a.name === 'work');
+    expect(work).toMatchObject({ label: 'Work verified', labelled: true });
+    // The agent that is no longer open falls back to what its folder says (none here).
+    expect((await readAgents()).find((a) => a.name === 'default')?.labelled).toBe(false);
+  });
+
   it('closes the old agent, opens the other in the same port and session, writes app.json and signs nothing', async () => {
     const h = await harness();
     const cookie = await h.cookie();

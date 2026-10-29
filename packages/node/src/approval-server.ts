@@ -3668,6 +3668,9 @@ export async function startApprovalServerWith(
           name: entry.name,
           // U3-d: the open agent shows its verified label, else its folder name.
           label: entry.name === current ? (agentLabel ?? entry.name) : entry.label,
+          // True once an `agent.label` exists: the open agent's is verified by core, another's is
+          // the one written to its config.json after core applied it (07 §9.1).
+          labelled: entry.name === current ? agentLabel !== undefined : entry.labelled === true,
           current: entry.name === current,
           available: entry.available,
           removing: entry.removing,

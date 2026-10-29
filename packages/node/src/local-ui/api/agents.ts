@@ -36,6 +36,7 @@ const listRoute: LocalUiReadRoute = Object.freeze<LocalUiReadRoute>({
           agents: list.agents.map((agent) => ({
             name: agent.name,
             label: agent.label,
+            labelled: agent.labelled === true,
             current: agent.current,
             available: agent.available,
             removing: agent.removing,

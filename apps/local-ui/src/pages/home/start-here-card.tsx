@@ -1,4 +1,4 @@
-// The Start here card on Home (UX2-g; B-11 §27.2, §27.3). Presentational: the model comes from
+// The Start here card on Home (UX2-g, U3-j; B-11 §27.2, §27.3 v2). Presentational: the model comes from
 // useStartHere (shared by the shell through StartHereContext).
 //
 // One primary button in the whole card, on the next step; later steps show a hollow ring and no
@@ -10,7 +10,16 @@ import { ADD_CONTACT_HREF } from '../contacts/add-contact-link.js';
 import { FIRST_RUN, type Platform } from '../first-run/strings.js';
 import type { StartHereModel } from './start-here-context.js';
 import type { StartView, StepId, StepView } from './start-here.js';
-import { START_STRINGS as T, startProgress, startWaiting } from './strings.js';
+import { AppMark } from './app-mark.js';
+import {
+  START_LINKS,
+  START_STRINGS as T,
+  startConnectName,
+  startProgress,
+  startRestart,
+  startWaiting,
+  startWaitingReply,
+} from './strings.js';
 
 const PLATFORM_WORD: Readonly<Record<Platform, string>> = {
   mac: FIRST_RUN.useTouchId,
@@ -19,9 +28,12 @@ const PLATFORM_WORD: Readonly<Record<Platform, string>> = {
 };
 const TITLE: Readonly<Record<StepId, string>> = {
   protect: T.protect,
+  name: T.name,
+  connect: T.connect,
   invite: T.invite,
   check: T.check,
   send: T.send,
+  reply: T.reply,
   kit: T.kit,
 };
 const STATE_WORD = {
@@ -39,14 +51,32 @@ function Mark({ state }: { state: StepView['state'] }): ReactElement {
   );
 }
 
+/** The connect row's line for an agent that has an AI app: its mark, its name and where it stands. */
+function AppLine({ step }: { step: StepView }): ReactNode {
+  const app = step.appName;
+  if (app === null || app === undefined) return null;
+  const running = step.running === true;
+  return (
+    <p className="hm-start-app al-text-body-sm">
+      <AppMark name={app} />
+      <span className="hm-start-app-name">{app}</span>
+      <span className={running ? 'hm-start-app-state is-running' : 'hm-start-app-state al-muted'}>
+        {running ? T.running : startRestart(app)}
+      </span>
+    </p>
+  );
+}
+
 function Detail({
   step,
   view,
   platform,
+  retry,
 }: {
   step: StepView;
   view: StartView;
   platform: Platform;
+  retry: (() => void) | undefined;
 }): ReactNode {
   const next = step.state === 'next';
   switch (step.id) {
@@ -59,14 +89,61 @@ function Detail({
           </a>
         </>
       ) : null;
+    case 'name':
+      // Only a leftover agent with no label of its own gets here (first run names the agent).
+      return next ? (
+        <>
+          <p className="al-text-body-sm al-muted">{T.nameBody}</p>
+          <a className="al-btn al-btn-primary hm-start-action" href={START_LINKS.agents}>
+            {T.nameAction}
+          </a>
+        </>
+      ) : null;
+    case 'connect':
+      // Follows the open agent. Never writes anything itself: the button opens the AI apps page.
+      if (step.state === 'done') return <AppLine step={step} />;
+      if (step.problem === true) {
+        return (
+          <p className="al-text-body-sm al-muted hm-start-problem">
+            {T.checkFailed}{' '}
+            {retry === undefined ? null : (
+              <button type="button" className="al-btn al-btn-text al-btn-sm" onClick={retry}>
+                {T.tryAgain}
+              </button>
+            )}
+          </p>
+        );
+      }
+      return (
+        <>
+          <p className="al-text-body-sm al-muted">
+            {next ? T.connectBody : T.notConnected}
+            {next ? <span className="hm-start-not"> {T.notConnected}</span> : null}
+          </p>
+          {next ? (
+            <a className="al-btn al-btn-primary hm-start-action" href={START_LINKS.apps}>
+              {step.appName === null || step.appName === undefined
+                ? T.connectAny
+                : startConnectName(step.appName)}
+            </a>
+          ) : null}
+        </>
+      );
     case 'invite':
-      // Step 2's one action opens the Add contact sheet (UX2-d2, b11 §21.1, §27.1).
+      // The one action opens the Add contact sheet (UX2-d2, b11 §21.1, §27.1). Below it, a quiet
+      // link to the second-agent path (U3-j, §27.5).
       return next ? (
         <>
           <p className="al-text-body-sm al-muted">{T.inviteBody}</p>
           <a className="al-btn al-btn-primary hm-start-action" href={ADD_CONTACT_HREF}>
             {T.addContact}
           </a>
+          <p className="hm-start-quiet al-text-body-sm al-muted">
+            {T.noOneYet}{' '}
+            <a className="hm-start-link" href={START_LINKS.agents}>
+              {T.secondAgent}
+            </a>
+          </p>
         </>
       ) : null;
     case 'check':
@@ -84,6 +161,18 @@ function Detail({
           <p className="al-text-body-sm al-muted">{T.sendBody}</p>
           <CopyPrompt prompt={view.helloPrompt} />
         </>
+      ) : null;
+    case 'reply':
+      if (step.state === 'next') {
+        return <p className="al-text-body-sm al-muted">{startWaitingReply(step.name ?? null)}</p>;
+      }
+      return step.state === 'done' ? (
+        <a
+          className="al-btn al-btn-secondary al-btn-sm hm-start-action"
+          href={START_LINKS.messages}
+        >
+          {T.openConversation}
+        </a>
       ) : null;
     case 'kit':
       return next ? (
@@ -163,7 +252,7 @@ export function StartHere({
                           <span className="al-visually-hidden">. {STATE_WORD[step.state]}</span>
                         )}
                       </p>
-                      <Detail step={step} view={view} platform={platform} />
+                      <Detail step={step} view={view} platform={platform} retry={model.retry} />
                     </div>
                   </li>
                 ))}

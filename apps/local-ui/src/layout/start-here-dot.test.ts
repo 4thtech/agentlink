@@ -40,6 +40,8 @@ const reads = (over: Partial<StartHereReads> = {}): StartHereReads => ({
   contacts: async () => [],
   sent: async () => false,
   kitSaved: () => false,
+  agent: async () => ({ named: true, connected: true, appName: 'Claude Code', running: true }),
+  replied: async () => false,
   ...over,
 });
 
@@ -81,7 +83,12 @@ describe('Home nav dot', () => {
   it('has no dot and the plain name when setup is finished', async () => {
     await mount(
       '/settings/home',
-      reads({ contacts: async () => [contact], sent: async () => true, kitSaved: () => true }),
+      reads({
+        contacts: async () => [contact],
+        sent: async () => true,
+        replied: async () => true,
+        kitSaved: () => true,
+      }),
     );
     expect(home()?.querySelector('.al-nav-dot')).toBeNull();
     expect(home()?.getAttribute('aria-label')).toBeNull();
@@ -95,6 +102,8 @@ describe('Home nav dot', () => {
         protect: async () => undefined,
         contacts: async () => undefined,
         sent: async () => undefined,
+        agent: async () => undefined,
+        replied: async () => undefined,
         kitSaved: () => undefined,
       }),
     );

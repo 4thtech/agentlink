@@ -524,6 +524,8 @@ export interface LocalUiAgentView {
   readonly name: string;
   /** Plain text: the owner's label from config.json (display only), else the name. */
   readonly label: string;
+  /** A verified `agent.label` exists (U3-d); false: shown under its folder name. */
+  readonly labelled: boolean;
   readonly current: boolean;
   /** False when the agent's config cannot be read: listed, never opened. */
   readonly available: boolean;
