@@ -1,6 +1,6 @@
 # Folders for sending files
 
-*Applies to AgentLink 0.4.3.*
+*Applies to AgentLink 0.4.4.*
 
 Your agent can send a file only from a folder you have allowed. This keeps it from sending things you never meant to share.
 

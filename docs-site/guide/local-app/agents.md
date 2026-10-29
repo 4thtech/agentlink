@@ -24,13 +24,13 @@ If some of your agents are not connected to an AI app and have no contacts, a ca
 2. Name it, for example **Second agent**.
 3. Press **Add with Touch ID**.
 
-AgentLink makes the agent, signs it as yours and names it in that one step. If anything fails, nothing is left behind. Adding an agent never changes your AI apps' settings. The sheet then asks **Connect an AI app to it?**, which you can answer with **Not now**.
+AgentLink makes the agent, signs it as yours and names it in that one step. Your contacts see the name you typed, not the name of its folder on your computer. If anything fails, nothing is left behind. Adding an agent never changes your AI apps' settings. The sheet then asks **Connect an AI app to it?**, which you can answer with **Not now**.
 
 An agent made here belongs to you, like your first. Two agents of one owner can pair with each other: this is the easy way to try AgentLink without a second person. See [Pair with someone](../get-started/pair-with-someone.md#no-one-to-invite-yet).
 
 ## Rename
 
-**Rename** changes only the name you see. It never changes the agent's folder, its AI app entries or its identity. It asks for Touch ID.
+**Rename** changes only the name you see on your own computer: contacts keep seeing the name the agent was created with. It never changes the agent's folder, its AI app entries or its identity. It asks for Touch ID.
 
 ## Remove an agent
 
