@@ -267,17 +267,16 @@ describe('GET /api/ui/apps', () => {
 
   it('is allowed before an owner exists (first run) and refuses any query', async () => {
     const w = world({ owner: false });
-    const noClient: Partial<LocalUiContext> = { ...w.context };
-    delete noClient.client;
-    delete noClient.agentsManage;
+    const noClient = Object.fromEntries(
+      Object.entries(w.context).filter(([k]) => k !== 'client' && k !== 'agentsManage'),
+    );
     expect((await list.handler(noClient as LocalUiContext, q(''))).status).toBe(200);
     expect((await list.handler(w.context, q('x=1'))).status).toBe(400);
   });
 
   it('is not_available without the seam', async () => {
     const w = world();
-    const noApps: Partial<LocalUiContext> = { ...w.context };
-    delete noApps.aiApps;
+    const noApps = Object.fromEntries(Object.entries(w.context).filter(([k]) => k !== 'aiApps'));
     const result = await list.handler(noApps as LocalUiContext, q(''));
     expect(result).toEqual({ status: 501, body: { error: 'not_available' } });
   });
