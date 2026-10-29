@@ -197,7 +197,7 @@ body {
   height: auto;
   align-items: stretch;
 }
-.al-textarea {
+.al-input.al-textarea {
   height: auto;
   min-block-size: calc(var(--al-size-control-lg) * 2);
   padding-block: var(--al-space-3);

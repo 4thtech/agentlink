@@ -98,6 +98,9 @@ describe('Add contact paste field layout (HOTFIX-045-PASTE-FIELD)', () => {
         expect(hint.y).toBeGreaterThanOrEqual(area.y + area.height - 0.5);
         // The box is tall enough for several lines of the pasted text, not one clipped line.
         expect(area.height).toBeGreaterThanOrEqual(60);
+        // The box has a vertical inset, so text never touches the well's edge.
+        const inset = await field.evaluate((el) => parseFloat(getComputedStyle(el).paddingTop));
+        expect(inset).toBeGreaterThan(0);
       } finally {
         await page.close();
       }

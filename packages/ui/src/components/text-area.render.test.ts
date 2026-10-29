@@ -2,6 +2,7 @@
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import css from './components.css?raw';
 import { TextArea } from './index.js';
 
 describe('TextArea', () => {
@@ -24,5 +25,9 @@ describe('TextArea', () => {
     expect(html).toContain('Not a link');
     expect(html).not.toContain('Paste it');
     expect(html).toContain('aria-invalid="true"');
+  });
+
+  it('its inset rule outranks the one-line .al-input rule', () => {
+    expect(css).toContain('.al-input.al-textarea {');
   });
 });
