@@ -85,7 +85,7 @@ describe('Remove in the session first run started (HOTFIX-045-REMOVE-FIRSTRUN)',
     const pc = await newComputer();
     const deps = uiDepsOf(pc, APP);
     // `agentlink ui` on a home with no agent at all: the no-agent app host (Welcome).
-    const welcome = await deps.startWelcome();
+    const welcome = await deps.startWelcome?.();
     if (welcome === undefined) throw new Error('the welcome host did not start');
     closers.push(() => welcome.close());
     expect(welcome.page).toBe('first-run');
