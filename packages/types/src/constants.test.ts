@@ -175,6 +175,8 @@ describe('constants (04, 05, 06)', () => {
         'agent.label',
         'app.connect',
         'app.disconnect',
+        // W4-FILES-SAVE (proposed, owner confirms at merge): save a received file from the app.
+        'file.save',
       ].sort(),
     );
     expect(APPROVAL_DECISIONS).toEqual(['approve', 'deny']);
