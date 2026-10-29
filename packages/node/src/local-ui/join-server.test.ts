@@ -16,6 +16,8 @@
 import {
   CoreError,
   INVITE_LINK_PREFIX,
+  MemoryStore,
+  PublisherLease,
   encodeInviteLink,
   type OwnerActionOutcome,
 } from '@4thtech-io/core';
@@ -126,6 +128,9 @@ interface Core {
   applied: { body: JsonObject; sig: string }[];
   ownerStores: number;
   contacts: { id: string; status: string }[];
+  /** U3-invite-b: `outbox.processDue` calls, and `syncInbox` calls with the lease row seen then. */
+  published: number;
+  synced: { budgetMs: number | undefined; leaseHolder: string | undefined }[];
 }
 
 const servers: ApprovalServer[] = [];
@@ -138,11 +143,29 @@ interface Options {
   readonly agentId?: string;
   readonly realCheck?: boolean;
   readonly host?: boolean;
+  /**
+   * U3-invite-b: the agent's store for the real core publisher lease (07 §3.2), and what one
+   * `syncInbox` does (default: the inviter's handshake-ack arrives and the contact is active).
+   */
+  readonly store?: MemoryStore;
+  readonly sync?: (core: Core) => Promise<void>;
 }
 
 async function harness(opts: Options = {}) {
-  const core: Core = { accepted: [], requested: [], applied: [], ownerStores: 0, contacts: [] };
+  const core: Core = {
+    accepted: [],
+    requested: [],
+    applied: [],
+    ownerStores: 0,
+    contacts: [],
+    published: 0,
+    synced: [],
+  };
   let stored: ApprovalForDecision | undefined;
+  let clock = 1_790_000_000_000;
+  const store = opts.store ?? new MemoryStore();
+  const leaseHolder = (): Promise<string | undefined> =>
+    store.transaction((tx) => tx.get('publisher_lease', { name: 'subscriptions' })?.holder);
   const client = {
     agentId: opts.agentId ?? world.agentId,
     pairing: {
@@ -185,7 +208,20 @@ async function harness(opts: Options = {}) {
       },
       use: () => Promise.resolve({ status: core.applied.length === 1 ? 'used' : 'void' }),
     },
-    outbox: { processDue: () => Promise.resolve({ sent: 1, failed: 0, notDelivered: 0 }) },
+    outbox: {
+      processDue: () => {
+        core.published += 1;
+        return Promise.resolve({ sent: 1, failed: 0, notDelivered: 0 });
+      },
+    },
+    // U3-invite-b: core's own lease over the agent's store, on the server's clock (07 §3.2).
+    publisherLease: () => new PublisherLease({ store, now: () => Math.floor(clock / 1000) }),
+    syncInbox: async (options?: { budgetMs?: number }) => {
+      core.synced.push({ budgetMs: options?.budgetMs, leaseHolder: await leaseHolder() });
+      if (opts.sync !== undefined) await opts.sync(core);
+      else core.contacts.push({ id: CONTACT_ID, status: 'active' });
+      return { partial: false, stored: 1, reports: [] };
+    },
   };
   const source: ApprovalServerSource = {
     context: () => Promise.resolve({ agent: world.agentId, owner: world.owner }),
@@ -222,7 +258,6 @@ async function harness(opts: Options = {}) {
   let removed = 0;
   const events: ApprovalServerEvent[] = [];
   const opened: string[] = [];
-  let clock = 1_790_000_000_000;
   const server = await startApprovalServerWith(
     {
       source,
@@ -282,6 +317,8 @@ async function harness(opts: Options = {}) {
   });
   return {
     core,
+    store,
+    leaseHolder,
     events,
     opened,
     records,
@@ -637,5 +674,88 @@ describe('POST /api/ui/join/dismiss (08 §4)', () => {
     expect((await h.dismiss({ Origin: 'http://evil.example' })).status).toBe(403);
     expect((await h.dismiss({ 'X-AgentLink-Generation': '9' })).status).toBe(409);
     expect(parse((await h.read()).body)).toMatchObject({ state: 'waiting' });
+  });
+});
+
+// U3-invite-b (S2; 06 §6 "One active publisher per agent", 07 §3.2; 08 §4): after an accept in the
+// app, the join screen follows the pairing to Connected even when no AI app runs this agent. The
+// host takes the agent's publisher lease only when no other process holds it, for one short pass
+// (fetch and process, then due outbox rows), and releases it right after. While an MCP server holds
+// the lease, the host never fetches or publishes for it.
+describe('following the pairing after accept (U3-invite-b)', () => {
+  it('with no AI app running, the join read finishes the pairing under the lease: Connected', async () => {
+    const h = await harness({ waitingInvite: LINK });
+    // Before accepting, a read does nothing but read.
+    expect(parse((await h.read()).body)).toMatchObject({ state: 'waiting' });
+    expect(h.core.synced).toHaveLength(0);
+    const res = await h.accept(INVITE_ID, world.code);
+    expect(res.status).toBe(200);
+    const publishedByAccept = h.core.published;
+    // The screen polls: one short pass runs, under a lease the host took and released.
+    expect(parse((await h.read()).body)).toMatchObject({ state: 'connected' });
+    expect(h.core.synced).toHaveLength(1);
+    expect(h.core.synced[0]?.budgetMs).toBeGreaterThan(0);
+    expect(h.core.synced[0]?.budgetMs).toBeLessThanOrEqual(5_000);
+    expect(h.core.synced[0]?.leaseHolder).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(h.core.published).toBe(publishedByAccept + 1);
+    expect(await h.leaseHolder()).toBeUndefined();
+    expectNoLink(h, res.body);
+  });
+
+  it('with an MCP server holding the lease, the host never fetches or publishes', async () => {
+    const store = new MemoryStore();
+    const mcp = new PublisherLease({ store, now: () => 1_790_000_000 });
+    expect(await mcp.take()).toBe(true);
+    const h = await harness({ waitingInvite: LINK, store });
+    expect((await h.accept(INVITE_ID, world.code)).status).toBe(200);
+    const publishedByAccept = h.core.published;
+    for (let i = 0; i < 3; i += 1) {
+      expect(parse((await h.read()).body)).toMatchObject({ state: 'waiting_for_them' });
+      h.advance(6_000);
+    }
+    expect(h.core.synced).toHaveLength(0);
+    expect(h.core.published).toBe(publishedByAccept);
+    // The MCP server's lease is untouched.
+    expect(await h.leaseHolder()).toBe(mcp.holder);
+    // Once the MCP server stops (clean shutdown releases the lease), the host may follow.
+    expect(await mcp.release()).toBe(true);
+    expect(parse((await h.read()).body)).toMatchObject({ state: 'connected' });
+    expect(h.core.synced).toHaveLength(1);
+    expect(await h.leaseHolder()).toBeUndefined();
+  });
+
+  it('runs at most one pass per 5 s while waiting, and releases the lease when a pass fails', async () => {
+    let fail = true;
+    const h = await harness({
+      waitingInvite: LINK,
+      sync: () => (fail ? Promise.reject(new Error('relay down')) : Promise.resolve()),
+    });
+    expect((await h.accept(INVITE_ID, world.code)).status).toBe(200);
+    const first = await h.read();
+    expect(first.status).toBe(200);
+    expect(parse(first.body)).toMatchObject({ state: 'waiting_for_them' });
+    expect(h.core.synced).toHaveLength(1);
+    expect(await h.leaseHolder()).toBeUndefined();
+    // Within 5 s: no second pass.
+    h.advance(2_000);
+    await h.read();
+    expect(h.core.synced).toHaveLength(1);
+    fail = false;
+    h.advance(3_000);
+    await h.read();
+    expect(h.core.synced).toHaveLength(2);
+    expect(await h.leaseHolder()).toBeUndefined();
+    // The failure text reaches no answer or event.
+    expect(JSON.stringify(h.events)).not.toContain('relay down');
+  });
+
+  it('follows nothing for a dismissed invite or before any accept', async () => {
+    const h = await harness({ waitingInvite: LINK });
+    await h.read();
+    expect((await h.dismiss()).status).toBe(200);
+    expect(parse((await h.read()).body)).toMatchObject({ state: 'none' });
+    expect(h.core.synced).toHaveLength(0);
+    expect(h.core.published).toBe(0);
+    expect(await h.leaseHolder()).toBeUndefined();
   });
 });
