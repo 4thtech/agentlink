@@ -185,6 +185,10 @@ async function harness(opts: Options = {}) {
   const client = {
     agentId: opts.agentId ?? world.agentId,
     pairing: {
+      // W4-SHORT-INVITE: a format 1 link resolves to itself.
+      resolveInviteLink: (link: string) => Promise.resolve(link),
+      openInvites: () => Promise.resolve([]),
+      cancelInvite: () => Promise.resolve('not_found'),
       acceptInvite: ({ link, allowed }: { link: string; allowed?: boolean }) => {
         core.accepted.push({ link, allowed: allowed === true });
         if (allowed === true) core.pending = true;

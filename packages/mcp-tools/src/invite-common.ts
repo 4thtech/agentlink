@@ -18,6 +18,11 @@ export const INVITE_TEXT = Object.freeze({
   inviteInvalid: "That invite link isn't valid, so nothing was done.",
   inviteInvalidNextStep:
     'Ask the user to check the link, or to ask the other person for a new invite.',
+  inviteUnavailable:
+    'That invite is no longer available (it expired, was used or was cancelled), so nothing was done.',
+  inviteUnavailableNextStep: 'Ask the user to ask the other person for a new invite.',
+  inviteFetchFailed: "AgentLink couldn't fetch that invite just now, so nothing was done.",
+  inviteFetchFailedNextStep: 'Call the tool again in a minute with the same inviteUrl.',
   inviteExpired: 'That invite has expired, so nothing was done.',
   inviteExpiredNextStep: 'Ask the user to ask the other person for a new invite.',
   inviteSelf: 'That invite was made by this agent, so nothing was done.',
@@ -94,6 +99,20 @@ export function inviteFailure(error: unknown): HandlerOutput | undefined {
         INVITE_TEXT.inviteExpired,
         INVITE_TEXT.inviteExpiredNextStep,
         'INVITE_EXPIRED',
+      );
+    case 'invite_unavailable':
+      return fail(
+        'rejected',
+        INVITE_TEXT.inviteUnavailable,
+        INVITE_TEXT.inviteUnavailableNextStep,
+        'INVITE_UNAVAILABLE',
+      );
+    case 'invite_fetch_failed':
+      return fail(
+        'error',
+        INVITE_TEXT.inviteFetchFailed,
+        INVITE_TEXT.inviteFetchFailedNextStep,
+        'INVITE_FETCH_FAILED',
       );
     case 'contact_is_self':
       return fail(

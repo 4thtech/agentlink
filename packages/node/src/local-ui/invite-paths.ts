@@ -4,6 +4,10 @@
 export const INVITE_CREATE_PATH = '/api/ui/invites';
 /** Check a pasted invite before connecting: the `presence: 'invite'` kind, step `check`. */
 export const INVITE_CHECK_PATH = '/api/ui/invites/check';
+/** W4-INVITES-LIST: the open invites (a GET read at the create path; never a link). */
+export const INVITES_LIST_PATH = '/api/ui/invites';
+/** W4-INVITES-LIST: cancel an open invite: the `presence: 'invite'` kind, step `cancel`. */
+export const INVITE_CANCEL_PATH = '/api/ui/invites/cancel';
 /** Accept an invite: an owner route (`presence: true`), behind the central presence gate. */
 export const INVITE_ACCEPT_PATH = '/api/ui/invites/accept';
 

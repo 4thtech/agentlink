@@ -63,6 +63,9 @@ export {
   type AcceptInviteResult,
   // U3-invite: Accept step 1 alone, for `agentlink join` and the app host's waiting invite.
   checkInviteLink,
+  // W4-SHORT-INVITE / W4-INVITES-LIST (D-139): the drop fetcher of a short link, and an open invite.
+  shortInviteFetcher,
+  type OpenInvite,
   type CheckedInviteLink,
   type CreateInviteInput,
   type CreatedInvite,

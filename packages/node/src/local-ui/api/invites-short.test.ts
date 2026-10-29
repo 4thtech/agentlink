@@ -238,14 +238,15 @@ describe('check and accept a short link (04 §3.6.2)', () => {
           },
         });
       },
-      openRequest: () => Promise.resolve({ approvalId: 'ap1', expiresAt: 1_790_000_600 }),
+      openRequest: () =>
+        Promise.resolve({ approvalId: `apr_${'A'.repeat(22)}`, expiresAt: 1_790_000_600 }),
       acceptApproved: (link) => {
         seen.push(`accept:${link}`);
         return Promise.resolve({ status: 'started', contact: CONTACT, sent: true });
       },
     };
     const owner: LocalUiOwnerOperation = {
-      sign: (_req: OwnerSignRequest, items) =>
+      sign: (_req: OwnerSignRequest, items: readonly unknown[]) =>
         Promise.resolve(items.map(() => ({ kind: 'owner-action', signed: {} as never })) as never),
     } as unknown as LocalUiOwnerOperation;
     const result = await inviteAcceptRoute.handler(

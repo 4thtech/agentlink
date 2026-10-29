@@ -39,7 +39,7 @@ const aLink = (): Promise<string> =>
     cardAgentSig: `0x${hex(64, '4d')}1c`,
     codeCommit: encodeBase64url(new Uint8Array(32).fill(3)),
     name: 'Marko',
-    relays: ['wss://relay.example.org'],
+    relays: ['wss://relay.example.org', 'wss://nos.example.net:7447/sub/path'],
     expiresAt: 1_800_000_000,
   } as never);
 
