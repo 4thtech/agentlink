@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
-// M1-11s-a: every route renders its stub inside the shared layout, the nav marks the active item
+// M1-11s-a: every route renders its page inside the shared layout, the nav marks the active item
 // and a nav click changes the page without a reload.
+// W4-SHELL (Decision 40, b11 §34.1): two destinations only, Inbox (the home) and Contacts; every
+// other page sits under Settings (and its Advanced group), reached from the avatar menu and Cmd+K.
+// All routes land here, pointing at today's pages; the Inbox, Contacts and Settings builders replace
+// the page bodies in their own folders and never touch the router or the nav.
 import { createElement as h, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setConnectionState } from './layout/index.js';
-import { NAV_ITEMS } from './nav.js';
+import { NAV_ITEMS, REDIRECTS, SETTINGS_GROUPS } from './nav.js';
 import { AppRoutes, ROUTES } from './router.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -28,27 +32,26 @@ function mountAt(path: string): void {
   act(() => root.render(h(AppRoutes)));
 }
 
-const EXPECTED: ReadonlyArray<readonly [string, string]> = [
-  ['/', 'Approvals'],
-  ['/first-run', 'Set up AgentLink'],
-  ['/settings/home', 'Home'],
-  ['/settings/activity', 'Activity'],
-  ['/settings/messages', 'Messages'],
-  ['/settings/contacts', 'Contacts'],
-  ['/settings/agents', 'Agents'],
-  ['/settings/apps', 'AI apps'],
-  ['/settings/files', 'Files'],
-  ['/settings/proofs', 'Proofs & credits'],
-  ['/settings/rules', 'Rules'],
-  ['/settings/backup', 'Backup'],
-  ['/settings/passkeys', 'Passkeys'],
-  ['/settings/advanced', 'Advanced'],
-  // UI-REFRESH-f: Appearance (Home sits at /settings/home until M1-11b-2 moves it to /, D-135).
-  ['/settings/appearance', 'Appearance'],
-  // UI-REFRESH-n: About.
-  ['/settings/about', 'About'],
+/** Path, the page's own heading (today's page), and the title in the top bar. */
+const EXPECTED: ReadonlyArray<readonly [string, string, string]> = [
+  ['/inbox', 'Messages', 'Inbox'],
+  ['/contacts', 'Contacts', 'Contacts'],
+  ['/approvals', 'Approvals', 'Approvals'],
+  ['/first-run', 'Set up AgentLink', 'Set up AgentLink'],
+  ['/settings/home', 'Home', 'Home'],
+  ['/settings/agents', 'Agents', 'Agents'],
+  ['/settings/files', 'Files', 'Files'],
+  ['/settings/apps', 'AI apps', 'AI apps'],
+  ['/settings/backup', 'Backup', 'Backup & Touch ID'],
+  ['/settings/appearance', 'Appearance', 'Appearance'],
+  ['/settings/proofs', 'Proofs & credits', 'Proofs & credits'],
+  ['/settings/rules', 'Rules', 'Default rules'],
+  ['/settings/notifications', 'Notifications', 'Notifications'],
+  ['/settings/activity', 'Activity', 'Activity log'],
+  ['/settings/advanced', 'Advanced', 'Network & relays'],
+  ['/settings/about', 'About', 'Diagnostics'],
   // U3-invite: the join screen, in the first-run shell (no sidebar).
-  ['/settings/join', 'AgentLink'],
+  ['/settings/join', 'AgentLink', 'AgentLink'],
 ];
 
 describe('routes', () => {
@@ -57,35 +60,25 @@ describe('routes', () => {
   });
 
   // Built pages test their own content (pages/<page>/*.test.tsx).
-  // M1-11b-1: /first-run is a real page now (pages/first-run/first-run.test.ts).
-  // M1-11b-2: Approvals (`/`) is a real page now (pages/approvals/approvals.test.ts).
-  const BUILT: ReadonlySet<string> = new Set([
-    '/',
-    '/settings/home',
-    '/settings/activity',
-    '/settings/messages',
-    '/settings/contacts',
-    '/settings/agents',
-    '/settings/apps',
-    '/settings/files',
-    '/settings/proofs',
-    '/settings/rules',
-    '/settings/appearance',
-    '/settings/about',
+  const STUBS: ReadonlySet<string> = new Set([
+    '/settings/backup',
+    '/settings/notifications',
+    '/settings/advanced',
   ]);
-  const STUBS = EXPECTED.filter(([p]) => p !== '/first-run' && p !== '/settings/join');
+  const SHELL = EXPECTED.filter(([p]) => p !== '/first-run' && p !== '/settings/join');
   it('U3-invite: /settings/join renders in the focused first-run shell, with no sidebar', () => {
     mountAt('/settings/join');
     expect(host.querySelector('nav[aria-label="Main"]')).toBeNull();
     expect(host.querySelector('main.al-first-run')).not.toBeNull();
   });
-  it.each(STUBS)('%s renders its page inside the layout', (path, title) => {
+  it.each(SHELL)('%s renders its page inside the layout', (path, heading, title) => {
     mountAt(path);
     expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
     expect(host.querySelector('footer.al-statusbar')).not.toBeNull();
     const main = host.querySelector('main');
-    expect(main?.querySelector('h1')?.textContent).toBe(title);
-    if (!BUILT.has(path)) {
+    expect(main?.querySelector('h1')?.textContent).toBe(heading);
+    expect(host.querySelector('header.al-topbar .al-topbar-title')?.textContent).toBe(title);
+    if (STUBS.has(path)) {
       expect(main?.querySelector('.al-empty')?.textContent).toContain('available yet');
     }
   });
@@ -96,69 +89,88 @@ describe('routes', () => {
     expect(host.querySelector('main .al-empty')).not.toBeNull();
   });
 
-  it('sends /settings to Activity', () => {
+  it('the home is the Inbox: / goes to /inbox', () => {
+    mountAt('/');
+    expect(location.pathname).toBe('/inbox');
+    expect(host.querySelector('header.al-topbar .al-topbar-title')?.textContent).toBe('Inbox');
+  });
+
+  it('sends /settings to its first page, AI apps', () => {
     mountAt('/settings');
-    expect(location.pathname).toBe('/settings/activity');
-    expect(host.querySelector('main h1')?.textContent).toBe('Activity');
+    expect(location.pathname).toBe('/settings/apps');
+    expect(host.querySelector('main h1')?.textContent).toBe('AI apps');
+  });
+
+  it.each([
+    ['/settings/messages', '/inbox'],
+    ['/settings/contacts', '/contacts'],
+    ['/settings/storage', '/settings/files'],
+    ['/settings/passkeys', '/settings/backup'],
+  ])('keeps the old path %s working: it goes to %s', (from, to) => {
+    expect(REDIRECTS[from]).toBe(to);
+    mountAt(from);
+    expect(location.pathname).toBe(to);
   });
 });
 
 describe('nav', () => {
-  it('lists Home first, then Approvals and the settings pages', () => {
-    expect(NAV_ITEMS.map((i) => i.label)).toEqual([
-      'Home',
-      'Approvals',
-      'Activity',
-      'Messages',
-      'Contacts',
-      'Agents',
-      'Files',
-      'Proofs & credits',
-      'Rules',
-      'Settings',
+  it('has two destinations only: Inbox, then Contacts', () => {
+    expect(NAV_ITEMS.map((i) => [i.label, i.path])).toEqual([
+      ['Inbox', '/inbox'],
+      ['Contacts', '/contacts'],
     ]);
-    expect(NAV_ITEMS).toHaveLength(10);
   });
 
-  it('keeps every nav label in plain words', () => {
+  it('groups Settings and Advanced (b11 §34.6)', () => {
+    expect(SETTINGS_GROUPS.map((g) => [g.label, g.pages.map((p) => p.label)])).toEqual([
+      [
+        'Settings',
+        [
+          'AI apps',
+          'Backup & Touch ID',
+          'Appearance',
+          'Proofs & credits',
+          'Default rules',
+          'Notifications',
+        ],
+      ],
+      ['Advanced', ['Activity log', 'Files & storage', 'Network & relays', 'Diagnostics']],
+    ]);
+  });
+
+  it('keeps every nav and Settings label in plain words', () => {
     // 11 §5: no wallet, gas, seed phrase or transaction words in the default UI.
     const text = [
       ...NAV_ITEMS.map((i) => i.label),
-      'Backup',
-      'Passkeys',
-      'Appearance',
-      'Advanced',
-      'About',
+      ...SETTINGS_GROUPS.flatMap((g) => [g.label, ...g.pages.map((p) => p.label)]),
     ].join(' ');
     expect(text).not.toMatch(/wallet|gas|seed|transaction|chain|address|hash/i);
   });
 
-  it('redirects the old storage path to Files', () => {
-    mountAt('/settings/storage');
-    expect(location.pathname).toBe('/settings/files');
-    expect(host.querySelector('main h1')?.textContent).toBe('Files');
-  });
-
-  it('shows a Settings sub-navigation with AI apps, Backup, Passkeys, Appearance, Advanced and About', () => {
-    mountAt('/settings/passkeys');
+  it('shows the grouped Settings sub-navigation on a Settings page; Main marks nothing', () => {
+    mountAt('/settings/rules');
     const sub = host.querySelector('nav[aria-label="Settings"]');
     expect(sub).not.toBeNull();
     expect([...(sub?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual([
       'AI apps',
-      'Backup',
-      'Passkeys',
+      'Backup & Touch ID',
       'Appearance',
-      'Advanced',
-      'About',
+      'Proofs & credits',
+      'Default rules',
+      'Notifications',
+      'Activity log',
+      'Files & storage',
+      'Network & relays',
+      'Diagnostics',
     ]);
-    expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Passkeys');
-    expect(
-      host.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.textContent,
-    ).toContain('Settings');
+    expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Default rules');
+    expect(host.querySelector('nav[aria-label="Main"] a[aria-current="page"]')).toBeNull();
   });
 
-  it('has no Settings sub-navigation on other pages', () => {
-    mountAt('/settings/rules');
+  it('has no Settings sub-navigation on the Inbox or Contacts', () => {
+    mountAt('/inbox');
+    expect(host.querySelector('nav[aria-label="Settings"]')).toBeNull();
+    mountAt('/contacts');
     expect(host.querySelector('nav[aria-label="Settings"]')).toBeNull();
   });
 
@@ -192,23 +204,23 @@ describe('nav', () => {
   });
 
   it('marks only the active item with aria-current', () => {
-    mountAt('/settings/rules');
-    const current = host.querySelectorAll('nav a[aria-current="page"]');
+    mountAt('/contacts');
+    const current = host.querySelectorAll('nav[aria-label="Main"] a[aria-current="page"]');
     expect(current).toHaveLength(1);
-    expect(current[0]?.textContent).toContain('Rules');
-    expect(host.querySelectorAll('nav a.is-active')).toHaveLength(1);
+    expect(current[0]?.textContent).toContain('Contacts');
+    expect(host.querySelectorAll('nav[aria-label="Main"] a.is-active')).toHaveLength(1);
   });
 
   it('changes page on a click without a reload and moves the active mark', () => {
-    mountAt('/settings/activity');
-    const link = host.querySelector<HTMLAnchorElement>('nav a[href="/settings/files"]');
+    mountAt('/inbox');
+    const link = host.querySelector<HTMLAnchorElement>('nav a[href="/contacts"]');
     expect(link).not.toBeNull();
     act(() => {
       link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
     });
-    expect(location.pathname).toBe('/settings/files');
-    expect(host.querySelector('main h1')?.textContent).toBe('Files');
-    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Files');
+    expect(location.pathname).toBe('/contacts');
+    expect(host.querySelector('main h1')?.textContent).toBe('Contacts');
+    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Contacts');
   });
 
   it('follows the browser back button', () => {
@@ -220,26 +232,16 @@ describe('nav', () => {
     expect(host.querySelector('main h1')?.textContent).toBe('Backup');
   });
 
-  // M1-11b-2: Approvals lives in this app now; `/approve/<id>` renders inside the same layout.
-  it('routes the Approvals link inside the app, Approvals current', () => {
-    mountAt('/settings/activity');
-    const link = host.querySelector<HTMLAnchorElement>('nav a[href="/"]');
-    expect(link?.textContent).toContain('Approvals');
-    const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
-    act(() => {
-      link?.dispatchEvent(event);
-    });
-    expect(event.defaultPrevented).toBe(true);
-    expect(location.pathname).toBe('/');
-    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Approvals');
-  });
-
-  it('marks Approvals current on a deep link to one request', () => {
-    mountAt(`/approve/apr_${'A'.repeat(22)}`);
-    expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
-    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Approvals');
-    expect(host.querySelector('main h1')?.textContent).toBe('Approvals');
-  });
+  // Approvals fold into the Inbox (b11 §34.4): the waiting list and one request mark the Inbox.
+  it.each(['/approvals', `/approve/apr_${'A'.repeat(22)}`])(
+    'marks the Inbox current on %s',
+    (path) => {
+      mountAt(path);
+      expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
+      expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Inbox');
+      expect(host.querySelector('main h1')?.textContent).toBe('Approvals');
+    },
+  );
 
   it('shows not-found for an /approve path that is not an approval ID', () => {
     mountAt('/approve/nope');
