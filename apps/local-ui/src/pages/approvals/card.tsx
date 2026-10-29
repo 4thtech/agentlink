@@ -248,6 +248,27 @@ export function ApprovalFacts({ item }: { item: ApprovalItem }): ReactElement {
   );
 }
 
+/**
+ * W4-INBOX: the compact card's head (d2 `negotiation-thread--waiting-for-approval`): the kind and
+ * the time left, the headline, and one line with who, what and the cost. The server's display
+ * strings only, as plain text; the AI's arguments stay in Details, in the untrusted container.
+ */
+export function CompactHead({ item }: { item: ApprovalItem }): ReactElement {
+  const d = item.details;
+  return (
+    <>
+      <div className="al-approval-top">
+        <p className="al-approval-type">{S.cardTitle}</p>
+        <TimeLeft expiresAt={item.expiresAt} />
+      </div>
+      <h2>{d === undefined ? item.summary : (d.headline ?? d.what)}</h2>
+      {d === undefined ? null : (
+        <p className="al-approval-line al-text-body-sm">{[d.who, d.what, d.cost].join(' · ')}</p>
+      )}
+    </>
+  );
+}
+
 /** The footer every approval carries (11 §6.2.1 security copy). */
 export function ApprovalFoot(): ReactElement {
   return <p className="al-approval-foot">{S.cannotApprove}</p>;
@@ -383,6 +404,7 @@ export function SingleApproval({
   onDecided,
   onLeft,
   passkeyLabel,
+  compact = false,
 }: {
   item: ApprovalItem;
   owner: OwnerState;
@@ -397,6 +419,12 @@ export function SingleApproval({
   onDecided?: () => void;
   /** The decided card has collapsed out; the page keeps this line in its place. */
   onLeft?: (line: string) => void;
+  /**
+   * W4-INBOX (owner feedback on #714): one head line (what, who, cost, time left) and the actions
+   * in view; everything else (the facts, the quoted terms, the notes, the footer, Under the hood)
+   * folded behind "Details", closed by default, with the same text and untrusted wrapping inside.
+   */
+  compact?: boolean;
 }): ReactElement | null {
   const [step, setStep] = useState<Decision | undefined>(undefined);
   const [actions, setActions] = useState(true);
@@ -456,9 +484,15 @@ export function SingleApproval({
         {...(APPROVAL_ID.test(item.approvalId) ? { 'data-approval': item.approvalId } : {})}
         {...(outcome === undefined ? {} : { 'data-outcome': outcome })}
       >
-        <ApprovalFacts item={item} />
-        {item.commitment ? <p className="al-note">{S.termsAlone}</p> : null}
-        {item.paid ? <p className="al-note">{S.paidAlone}</p> : null}
+        {compact ? (
+          <CompactHead item={item} />
+        ) : (
+          <>
+            <ApprovalFacts item={item} />
+            {item.commitment ? <p className="al-note">{S.termsAlone}</p> : null}
+            {item.paid ? <p className="al-note">{S.paidAlone}</p> : null}
+          </>
+        )}
         <div className="al-slot">
           {owner.ready && actions ? (
             // Deny first, Approve as the wider primary (D1); neither is a default button (11 §8).
@@ -493,8 +527,21 @@ export function SingleApproval({
             />
           )}
         </div>
-        <ApprovalFoot />
-        <UnderTheHood fields={approvalHoodFields(item)} />
+        {compact ? (
+          <details className="al-approval-details">
+            <summary className="al-text-body-sm">{S.details}</summary>
+            <ApprovalFacts item={item} />
+            {item.commitment ? <p className="al-note">{S.termsAlone}</p> : null}
+            {item.paid ? <p className="al-note">{S.paidAlone}</p> : null}
+            <ApprovalFoot />
+            <UnderTheHood fields={approvalHoodFields(item)} />
+          </details>
+        ) : (
+          <>
+            <ApprovalFoot />
+            <UnderTheHood fields={approvalHoodFields(item)} />
+          </>
+        )}
         {paying ? (
           <PayConfirm
             {...(sheet.payConfirm === undefined ? {} : { client: sheet.payConfirm })}

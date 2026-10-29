@@ -45,6 +45,11 @@ export interface SaveReceivedFileDeps {
   readonly ownerActions: Pick<OwnerActions, 'apply'>;
   readonly filesIo: Pick<FilesIoView, 'savedName'>;
   readonly fetcher: Pick<FileFetcher, 'fetch'>;
+  /**
+   * Saves in flight per item ID (IR L2): a second save of the same file waits for the first, then
+   * sees it saved and answers `already_saved`, so two at once never write two copies.
+   */
+  readonly inFlight?: Map<string, Promise<unknown>>;
 }
 
 const MALFORMED: SaveReceivedFileResult = Object.freeze({ status: 'refused', reason: 'malformed' });
@@ -66,7 +71,27 @@ export async function saveReceivedFile(
   if (!shape.success || shape.data.body.op !== 'file.save') return MALFORMED;
   const { envelopeId, fileIndex } = shape.data.body.params;
   const itemId = `${envelopeId}.${String(fileIndex).padStart(2, '0')}`;
+  const queue = deps.inFlight;
+  if (queue === undefined) return saveOne(deps, text, itemId, envelopeId, fileIndex);
+  const before = queue.get(itemId) ?? Promise.resolve();
+  const run = before
+    .catch(() => undefined)
+    .then(() => saveOne(deps, text, itemId, envelopeId, fileIndex));
+  queue.set(itemId, run);
+  try {
+    return await run;
+  } finally {
+    if (queue.get(itemId) === run) queue.delete(itemId);
+  }
+}
 
+async function saveOne(
+  deps: SaveReceivedFileDeps,
+  text: string,
+  itemId: string,
+  envelopeId: string,
+  fileIndex: number,
+): Promise<SaveReceivedFileResult> {
   if ((await deps.filesIo.savedName(itemId)) !== null) return { status: 'already_saved' };
 
   const outcome = await deps.ownerActions.apply(text);

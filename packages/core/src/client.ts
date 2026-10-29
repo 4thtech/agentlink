@@ -441,6 +441,9 @@ export class AgentLinkClient {
     return this.#files.fetch(input);
   }
 
+  /** W4-FILES-SAVE (IR L2): saves in flight per item, so one file is never saved twice at once. */
+  readonly #savesInFlight = new Map<string, Promise<unknown>>();
+
   /**
    * W4-FILES-SAVE (04 §2.5.1 `file.save`; 08 §1): saves one received file from the local app with
    * an owner-signed `file.save` (files/save.ts): only that op, verified and nonce-recorded by
@@ -449,7 +452,12 @@ export class AgentLinkClient {
    */
   saveReceivedFile(signed: unknown): Promise<SaveReceivedFileResult> {
     return saveReceivedFile(
-      { ownerActions: this.ownerActions, filesIo: this.filesIo, fetcher: this.#files },
+      {
+        ownerActions: this.ownerActions,
+        filesIo: this.filesIo,
+        fetcher: this.#files,
+        inFlight: this.#savesInFlight,
+      },
       signed,
     );
   }

@@ -165,6 +165,14 @@ describe('file.save: saveReceivedFile (W4-FILES-SAVE)', () => {
     );
     expect(byStranger).toMatchObject({ status: 'refused' });
 
+    // A forgery: the body names the real owner, the signature is a stranger's key over that body.
+    const strangerSigned = await signBody(
+      { ...body, owner: encodeHex((await stranger.getPublicKeys()).ownerNostr) },
+      stranger,
+    );
+    const forged = await b.client.saveReceivedFile({ body, sig: strangerSigned.sig });
+    expect(forged).toMatchObject({ status: 'refused' });
+
     const forA = {
       ...body,
       agent: a.id,
@@ -229,5 +237,48 @@ describe('file.save: saveReceivedFile (W4-FILES-SAVE)', () => {
     expect(out).toEqual({ status: 'saved', name: 'brief (1).txt' });
     expect(b.inbox.entries.get('brief.txt')?.kind).toBe('symlink');
     expect(b.inbox.writes).not.toContain('brief.txt');
+  });
+
+  // IR (Fable) L1: the nonce is recorded when the save is applied, before the fetch. A fetch that then
+  // fails leaves the nonce used: the same signed object is refused on a retry (the owner signs again).
+  it('a fetch that fails after apply burns the nonce: retrying the same object is refused', async () => {
+    const { a, b } = await agents();
+    const envelopeId = await send(a, b, 'brief.txt', 1_000);
+    const signedSave = await signBody(await prepared(b, `${envelopeId}.00`));
+    const platform = b.platform as { inbox: (folder: string) => Promise<unknown> };
+    const inbox = platform.inbox;
+    platform.inbox = () => Promise.reject(new Error('inbox gone'));
+    expect(await b.client.saveReceivedFile(signedSave)).toEqual({
+      status: 'failed',
+      code: 'inbox_unavailable',
+    });
+    platform.inbox = inbox;
+    expect((await nonceRows(b)).length).toBe(1);
+    expect(await b.client.saveReceivedFile(signedSave)).toEqual({
+      status: 'refused',
+      reason: 'nonce_used',
+    });
+    expect(b.inbox.files().size).toBe(0);
+    // A fresh signature saves it.
+    const again = await b.client.saveReceivedFile(
+      await signBody(await prepared(b, `${envelopeId}.00`)),
+    );
+    expect(again).toEqual({ status: 'saved', name: 'brief.txt' });
+  });
+
+  // IR (Fable) L2: saves of one item are serialised: two at once yield one copy; the second waits
+  // and is answered already_saved.
+  it('two concurrent saves of the same file write one copy; the second is already_saved', async () => {
+    const { a, b } = await agents();
+    const envelopeId = await send(a, b, 'brief.txt', 50_000);
+    const first = await signBody(await prepared(b, `${envelopeId}.00`));
+    const second = await signBody(await prepared(b, `${envelopeId}.00`));
+    const outs = await Promise.all([
+      b.client.saveReceivedFile(first),
+      b.client.saveReceivedFile(second),
+    ]);
+    expect(outs).toEqual([{ status: 'saved', name: 'brief.txt' }, { status: 'already_saved' }]);
+    expect([...b.inbox.files().keys()]).toEqual(['brief.txt']);
+    expect((await nonceRows(b)).length).toBe(1);
   });
 });

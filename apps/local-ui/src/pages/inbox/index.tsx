@@ -190,6 +190,7 @@ function ApprovalCard({
         client={client}
         sheet={{}}
         passkeyLabel={S.confirmPasskey}
+        compact
         onDecided={onDecided}
       />
     </article>

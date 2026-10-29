@@ -190,3 +190,20 @@
     padding: var(--al-space-2);
   }
 }
+/* The compact approval card (owner feedback on #714; d2 negotiation-thread--waiting-for-approval):
+   the head line and the actions in view, everything else behind "Details", closed by default. */
+.ib-approval .al-approval-line {
+  margin: 0;
+  color: var(--al-color-fg-muted);
+  overflow-wrap: anywhere;
+}
+.ib-approval .al-approval-details {
+  margin-top: var(--al-space-3);
+}
+.ib-approval .al-approval-details > summary {
+  cursor: pointer;
+  color: var(--al-color-fg-muted);
+}
+.ib-approval .al-approval-details[open] > summary {
+  margin-bottom: var(--al-space-3);
+}

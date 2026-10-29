@@ -267,6 +267,28 @@ describe('Needs you: an approval is a card with inline Touch ID (the existing ap
     expect(new TextDecoder().decode(post?.body)).toBe('owner-code-123');
   });
 
+  it('is compact: one head line and the actions in view, the rest behind Details (closed)', async () => {
+    await mount(base({ [APPROVALS]: ok({ approvals: [approval()] }) }));
+    const card = [...host.querySelectorAll('article')].find((a) =>
+      a.textContent?.includes('Logo design'),
+    );
+    expect(card).toBeDefined();
+    const line = card?.querySelector('.al-approval-line');
+    expect(line?.textContent).toBe('\u201cMarko\u201d (self-declared) · Accept terms · Free');
+    const details = card?.querySelector('details');
+    expect(details).not.toBeNull();
+    expect(details?.open).toBe(false);
+    expect(details?.querySelector('summary')?.textContent).toBe('Details');
+    // The rule ("Why"), the expiry and the footer are inside Details only; the actions are not.
+    expect(details?.textContent).toContain('Ask me');
+    expect(details?.textContent).toContain("Your AI can't approve this for you.");
+    const outside = [...(card?.querySelectorAll('*') ?? [])].filter((el) => !details?.contains(el));
+    expect(outside.some((el) => el.textContent === 'Ask me')).toBe(false);
+    const approveButton = button(S.approve, card ?? host);
+    expect(approveButton).toBeDefined();
+    expect(details?.contains(approveButton ?? null)).toBe(false);
+  });
+
   it('with a passkey, the step says "Confirm with your passkey" and sends the assertion', async () => {
     const credential = {
       rawId: new Uint8Array([1, 2]).buffer,
