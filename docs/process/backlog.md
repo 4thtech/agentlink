@@ -4143,7 +4143,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
 - **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 is 16, owner-confirmed 23 Oct 2026 (D-129); counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
-- **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, terms before anyone outside the internal testers uses the drop
+- **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, terms before anyone outside the internal testers uses the drop for files (short-invite objects are open to every user: D-129 as amended by D-139 (7))
 - **Spec:** D-48; 04 §4 (encrypted drop), §7; 07 §5.4; 08 §6; 12 §2
 - **Invariants:** I-3
 - **Scope:**
