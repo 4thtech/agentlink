@@ -14,6 +14,7 @@
 // - I-4: nothing here is reachable from MCP. The owner session never leaves node.
 import {
   PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
+  isRestrictedAlias,
   type OwnerActionOutcome,
   type PreparedOwnerAction,
 } from '@4thtech-io/core';
@@ -25,6 +26,7 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
 } from '@4thtech-io/crypto';
+import { NodeKeyStoreError } from './errors.js';
 import { assertAllowedOwnerAction } from './owner-allowlist.js';
 import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
 import {
@@ -126,6 +128,23 @@ export interface FirstPartsResult {
   readonly label?: FirstLabelResult;
 }
 
+/** 06 §6: a label is 1 to 32 code points. */
+const MAX_LABEL_CODE_POINTS = 32;
+
+/**
+ * U3-d-b: the self-declared name the first card commits to (`nameHash`, what contacts see): the first
+ * label when one is signed in the same gesture, else `first.name`. A label that is not its own
+ * restricted form (06 §2.1) is refused before anything is signed.
+ */
+export function cardNameOf(first: FirstAgentCard): string {
+  const label = first.firstLabel?.label;
+  if (label === undefined) return first.name;
+  if (!isRestrictedAlias(label) || [...label].length > MAX_LABEL_CODE_POINTS) {
+    throw new NodeKeyStoreError('owner_operation_invalid', 'The label is not a restricted name.');
+  }
+  return label;
+}
+
 /**
  * The agent's first parts with one unlocked owner session `inner` (owner init, first run, Add an
  * agent; the caller closes `inner`): exactly one card for `first.agent` and `owner` through the
@@ -143,10 +162,13 @@ export async function signFirstParts(
   // The wrapper signs one card for this agent and owner, then nothing; `inner` stays open for the
   // rules and the label, which are checked here byte for byte before `inner` signs them.
   const session = new FirstCardSession(inner, first.agent, owner);
+  // U3-d-b (06 §6, 04 §2.8): with a first label, the card's self-declared name is that label (the
+  // text the owner typed, already its own restricted form, 06 §2.1), never the folder name. Fixed
+  // at creation: a later `agent.label` is local only and never re-publishes the card.
   await first.identity.init({
     owner: session,
     ownerKeys: owner,
-    name: first.name,
+    name: cardNameOf(first),
     relays: first.relays,
   });
   const { firstPolicy, firstLabel } = first;

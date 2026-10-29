@@ -253,6 +253,7 @@ import {
   type LocalUiOwnerSetup as LocalUiOwnerSetupOption,
 } from './local-ui/context.js';
 import { JoinDesk, type JoinCheck } from './local-ui/join-desk.js';
+import { pairingFollower, type PairingFollower } from './local-ui/pairing-follow.js';
 import { JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
 import type {
   LocalUiInviteRoute,
@@ -1156,6 +1157,15 @@ export async function startApprovalServerWith(
   /** U3-invite (08 §4): the app host's waiting invite, in memory only; absent outside the host. */
   const joinDesk =
     options.host === undefined ? undefined : new JoinDesk(() => now(), internals.checkInvite);
+  /**
+   * U3-invite-b (06 §6, Decision 37; proposed): the open agent's pass follower, in the app host
+   * only; a fresh one per bound agent, so a switch never reaches the previous agent's client.
+   */
+  const followerOf = (bound: typeof agentUi): PairingFollower | undefined =>
+    options.host === undefined || bound?.client === undefined
+      ? undefined
+      : pairingFollower(bound.client, { nowMs: () => now() });
+  let follower = followerOf(agentUi);
   /** U3-invite: the handoff token (32 random bytes), only with a handoff record to publish it in. */
   const handoffToken =
     options.host?.handoff === undefined ? undefined : encodeBase64url(randomBytes(32));
@@ -1251,6 +1261,8 @@ export async function startApprovalServerWith(
       ...(options.host === undefined ? {} : { agentsManage }),
       // U3-invite: the waiting invite, in the app host only.
       ...(joinDesk === undefined ? {} : { join: joinDesk }),
+      // U3-invite-b: the join screen's lease-gated pass, captured with this context's agent.
+      ...(follower === undefined ? {} : { followPairing: follower.follow }),
       // U3-g-b (IR-U3-g-b-1 L): with no agent yet, the first-run page's owner state is the real one.
       ...(agentUi === undefined && options.host?.firstRun !== undefined
         ? { setupBlocked: () => setupBlockedNoAgent() }
@@ -3054,7 +3066,13 @@ export async function startApprovalServerWith(
             credentialId: registration.credentialId,
             prfOutput: registration.prfOutput,
             authenticatorData: registration.authenticatorData,
-            firstCard: withFirstLabel(setup.firstCard, held.label),
+            // U3-d-b: the first agent always gets its first label (the typed one, else the
+            // prefilled FIRST_AGENT_LABEL its folder was created with), so its card is never
+            // named after the folder `default`.
+            firstCard: withFirstLabel(
+              setup.firstCard,
+              held.label ?? (created === undefined ? undefined : FIRST_AGENT_LABEL),
+            ),
             ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),
           },
           {
@@ -3411,6 +3429,8 @@ export async function startApprovalServerWith(
       } finally {
         hold?.leave();
       }
+      // U3-invite-b (Decision 37): a page is visible and reading; maybe one host pass after it.
+      hostTick();
       return;
     }
     const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
@@ -3732,6 +3752,7 @@ export async function startApprovalServerWith(
     agentLabel = undefined;
     labelReady = refreshLabel();
     invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
+    follower = followerOf(agentUi);
     uiContext = buildUiContext();
     // Approvals, a held owner setup and held paid-action confirmations belong to the old agent.
     decided.clear();
@@ -3753,6 +3774,26 @@ export async function startApprovalServerWith(
   function agentChanged(res: ServerResponse): void {
     stamp(res);
     sendJson(res, 409, { status: 'agent_changed' });
+  }
+
+  /**
+   * U3-invite-b (06 §6, Decision 37; proposed): after a page read, one host pass for the open agent
+   * when one is due (every 5 s while a pairing is pending, else every 15 s) and no other process
+   * holds the lease. Not awaited by the read, but it holds the agent open like a read, so a switch
+   * or removal drains it first; a pass that lost its generation never starts. Never rejects.
+   */
+  function hostTick(): void {
+    const slot = host;
+    const bound = follower;
+    if (slot === undefined || bound === undefined) return;
+    void (async () => {
+      const hold = await slot.enter();
+      try {
+        if (hold.valid() && follower === bound) await bound.tick();
+      } finally {
+        hold.leave();
+      }
+    })().catch(() => undefined);
   }
 
   /** U3-g-b: true while the app host has no agent open (no agent yet, or a failed switch). */
@@ -3845,7 +3886,9 @@ export async function startApprovalServerWith(
           available: entry.available,
           removing: entry.removing,
           contacts: stats?.contacts ?? null,
-          running: stats?.running ?? false,
+          // U3-invite-b: during the host's own short pass the lease row is the app's, not an AI app's.
+          running:
+            (stats?.running ?? false) && !(entry.name === current && follower?.passing === true),
           // U3-f: from each AI app's `agentlink` entry only.
           apps: appsOf(entry.name),
         }),
