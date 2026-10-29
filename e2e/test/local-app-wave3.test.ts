@@ -448,8 +448,12 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
     expect(await readConversation(page, link, 'second-agent')).toContain(answer);
     await switchTo(page, link, 'work');
     await page.goto(new URL('/settings/messages', link).href);
-    await page.getByRole('button', { name: 'Refresh' }).waitFor();
-    expect(await page.locator('body').innerText()).not.toContain(hello);
+    await page.getByRole('heading', { name: 'Messages' }).first().waitFor();
+    await page.waitForTimeout(1500);
+    // `work` has no contacts: none of the other agents' conversations show here.
+    const empty = await page.locator('body').innerText();
+    expect(empty).not.toContain(hello);
+    expect(empty).not.toContain(answer);
 
     // None lost, none renamed: the configs are byte for byte what 0.4.3 left.
     for (const name of names) {
