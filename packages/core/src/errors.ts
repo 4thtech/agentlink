@@ -12,6 +12,8 @@ export type CoreErrorCode =
   | 'identity_exists'
   | 'identity_mismatch'
   | 'identity_revoked'
+  /** U3-e: an owner-signed carrier did not verify under the owner key it names. */
+  | 'owner_key_mismatch'
   | 'key_epoch_mismatch'
   | 'rotation_pending'
   | 'owner_keys_changed'

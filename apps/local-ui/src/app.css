@@ -32,3 +32,10 @@ body {
 main.al-shell-content:focus {
   outline: none;
 }
+
+/* U3-g (b11 §28): first run has no chrome; the page is one centred column. */
+main.al-first-run {
+  min-block-size: 100vh;
+  padding: var(--al-space-8) var(--al-space-5);
+  box-sizing: border-box;
+}

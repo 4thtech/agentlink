@@ -7,6 +7,7 @@
 import { constants } from 'node:fs';
 import {
   chmod,
+  lstat,
   mkdir,
   open,
   readdir,
@@ -15,6 +16,7 @@ import {
   unlink,
   type FileHandle,
 } from 'node:fs/promises';
+import type { Stats } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { NodeKeyStoreError } from './errors.js';
@@ -260,6 +262,60 @@ export function removeStaleTemps(
       if (entry.startsWith(prefix) && TEMP_SUFFIX.test(entry.slice(prefix.length))) {
         await unlink(join(realDir, entry));
       }
+    }
+  });
+}
+
+/**
+ * U3-e (04 §2.5 "Removing an agent" step 6): deletes `dir/name` and its temporary files, after the
+ * folder check, as a plain unlink (never through a link: `name` is a single path segment and a link
+ * or anything that is not a regular file of the process user refuses with `keystore_file_unsafe`).
+ * A file that is already gone is not an error. The directory entry is synced. The caller holds the
+ * lock and has checked `name`.
+ */
+export function removeKeystoreFile(
+  dir: string,
+  name: string,
+  options: KeystoreFsOptions = {},
+): Promise<void> {
+  return fixed(async () => {
+    if (name.length === 0 || name.includes('/') || name.includes('\\') || name.startsWith('.')) {
+      throw keystoreUnsafe();
+    }
+    const realDir = await checkedDir(dir, options);
+    if (realDir === null) return;
+    const path = join(realDir, name);
+    let st: Stats | undefined;
+    try {
+      st = await lstat(path);
+    } catch (error) {
+      if (errno(error) !== 'ENOENT') throw error;
+    }
+    if (st !== undefined) {
+      if (!st.isFile() || st.isSymbolicLink() || st.uid !== processUid(options)) {
+        throw keystoreUnsafe();
+      }
+      try {
+        await unlink(path);
+      } catch (error) {
+        if (errno(error) !== 'ENOENT') throw error;
+      }
+    }
+    const prefix = tempPrefix(name);
+    for (const entry of await readdir(realDir)) {
+      if (entry.startsWith(prefix) && TEMP_SUFFIX.test(entry.slice(prefix.length))) {
+        await unlink(join(realDir, entry)).catch((error: unknown) => {
+          if (errno(error) !== 'ENOENT') throw error;
+        });
+      }
+    }
+    const dirHandle = await open(realDir, O_RDONLY | O_DIRECTORY);
+    try {
+      await dirHandle.sync();
+    } catch (error) {
+      if (!['EINVAL', 'ENOTSUP', 'EPERM', 'EISDIR'].includes(errno(error) as string)) throw error;
+    } finally {
+      await dirHandle.close();
     }
   });
 }

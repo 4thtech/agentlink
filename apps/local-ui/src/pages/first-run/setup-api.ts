@@ -18,6 +18,10 @@ export type SetupProblem =
   | 'folder_not_empty'
   /** M1-UX-FIRSTRUN-V2: begin refused the Send folder (a link or not a folder); nothing began. */
   | 'folder_unavailable'
+  /** U3-d: the agent's name is not one core would sign (06 §2.1); nothing began. */
+  | 'label_invalid'
+  /** 409 `no_agent`: the app has no agent yet; setup comes first. */
+  | 'no_agent'
   | 'expired'
   | 'not_pending'
   | 'busy'
@@ -94,6 +98,7 @@ const FOLDER_REASONS: ReadonlySet<string> = new Set(['folder_not_empty', 'folder
 const COMPUTER_NAME = /^[A-Za-z0-9 ._-]{1,63}$/;
 
 const PROBLEMS: ReadonlySet<string> = new Set<SetupProblem>([
+  'label_invalid',
   'expired',
   'not_pending',
   'busy',
@@ -127,10 +132,16 @@ export interface SetupApiOptions {
   readonly token?: string;
 }
 
+/** U3-d: whether the server would sign this label (`GET /api/ui/agents/label-check`). */
+export type LabelCheckResult = { readonly kind: 'ok' } | { readonly kind: 'refused' } | SetupError;
+
 export interface SetupApi {
   status(): Promise<StatusResult>;
-  begin(): Promise<BeginResult>;
-  finish(body: Uint8Array): Promise<FinishResult>;
+  /** U3-g: the agent's name travels as the operation input `{label}` (U3-d; absent: no name). */
+  begin(label?: string): Promise<BeginResult>;
+  finish(body: Uint8Array, label?: string): Promise<FinishResult>;
+  /** U3-g: asked before Touch ID, so the gesture is only asked for a name that can be signed. */
+  labelCheck(label: string): Promise<LabelCheckResult>;
 }
 
 interface Answer {
@@ -142,6 +153,7 @@ const str = (value: unknown): string | undefined => (typeof value === 'string' ?
 
 /** A non-2xx or unknown answer as a fixed problem (never the body's text). */
 function problemOf(answer: Answer): SetupError {
+  if (str(answer.json?.['error']) === 'no_agent') return { kind: 'error', problem: 'no_agent' };
   const status = str(answer.json?.['status']);
   if (status === 'folder_refused') {
     const reason = str(answer.json?.['reason']);
@@ -201,6 +213,17 @@ function creationValues(value: unknown): CreationValues | undefined {
   return { rpId, rpName, userId, userName, challenge, prfSalt };
 }
 
+const INPUT_HEADER = 'X-AgentLink-Input';
+export const LABEL_CHECK_PATH = '/api/ui/agents/label-check';
+
+/** base64url without padding of the UTF-8 JSON of `value` (the operation input, 08 §1). */
+function inputOf(value: unknown): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 /** One same-origin call with the page's CSRF token; the copy of `body` sent is zeroed after. */
 async function request(
   doFetch: Fetch,
@@ -208,8 +231,10 @@ async function request(
   method: 'GET' | 'POST',
   path: string,
   body?: Uint8Array,
+  input?: unknown,
 ): Promise<Answer | 'offline'> {
   const headers = new Headers({ [CSRF_HEADER]: token ?? pageToken() });
+  if (input !== undefined) headers.set(INPUT_HEADER, inputOf(input));
   const init: RequestInit = { method, headers, credentials: 'same-origin', cache: 'no-store' };
   // The copy sent (for finish, it holds the PRF output; for the passkey switch, also the backup
   // code) is zeroed once fetch has it (IR-M1-11b-1-1 L-3); the caller zeroes its own buffer.
@@ -246,7 +271,8 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
     method: 'GET' | 'POST',
     path: string,
     body?: Uint8Array,
-  ): Promise<Answer | 'offline'> => request(doFetch, options.token, method, path, body);
+    input?: unknown,
+  ): Promise<Answer | 'offline'> => request(doFetch, options.token, method, path, body, input);
 
   return {
     async status() {
@@ -260,8 +286,29 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
       };
     },
 
-    async begin() {
-      const answer = await call('POST', BEGIN_PATH);
+    async labelCheck(label) {
+      let query: string;
+      try {
+        query = encodeURIComponent(label);
+      } catch {
+        return { kind: 'refused' }; // a lone surrogate is never a name core would sign
+      }
+      const answer = await call('GET', `${LABEL_CHECK_PATH}?label=${query}`);
+      if (answer === 'offline') return { kind: 'error', problem: 'offline' };
+      if (answer.status !== 200) return problemOf(answer);
+      const status = str(answer.json?.['status']);
+      if (status === 'ok') return { kind: 'ok' };
+      if (status === 'refused') return { kind: 'refused' };
+      return { kind: 'error', problem: 'unknown' };
+    },
+
+    async begin(label) {
+      const answer = await call(
+        'POST',
+        BEGIN_PATH,
+        undefined,
+        label === undefined ? undefined : { label },
+      );
       if (answer === 'offline') return { kind: 'error', problem: 'offline' };
       const status = str(answer.json?.['status']);
       if (status === 'owner_exists') return { kind: 'owner_exists' };
@@ -274,8 +321,13 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
       return problemOf(answer);
     },
 
-    async finish(body) {
-      const answer = await call('POST', FINISH_PATH, body);
+    async finish(body, label) {
+      const answer = await call(
+        'POST',
+        FINISH_PATH,
+        body,
+        label === undefined ? undefined : { label },
+      );
       if (answer === 'offline') return { kind: 'error', problem: 'offline' };
       const status = str(answer.json?.['status']);
       if (status === 'owner_exists') return { kind: 'owner_exists' };

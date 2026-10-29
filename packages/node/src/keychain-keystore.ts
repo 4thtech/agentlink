@@ -49,6 +49,7 @@ import {
   signTypedData,
   unwrapCek,
 } from '@4thtech-io/crypto/keystore';
+import { decodeStorageMark } from '@4thtech-io/core';
 import { NodeKeyStoreError } from './errors.js';
 import {
   createFileKeyStoreAgentWith,
@@ -58,6 +59,7 @@ import {
   type UnlockedFileAgent,
 } from './file-keystore.js';
 import {
+  agentEraseAccounts,
   assertAgentId,
   keychainAccount,
   osKeychain,
@@ -464,6 +466,68 @@ export async function createKeychainAgent(
     return agentId;
   } finally {
     wipe(seed, storeKey);
+  }
+}
+
+const eraseFailed = (): NodeKeyStoreError =>
+  new NodeKeyStoreError(
+    'keystore_erase_failed',
+    "AgentLink couldn't erase all of this agent's keys. Nothing else was changed. Try again.",
+  );
+
+/**
+ * U3-e (04 §2.5 "Removing an agent" step 6): erases one agent's items from the OS keychain. The list
+ * is agentEraseAccounts (keychain.ts): the seed, `store-key`, `policy-version`, `receipts-kept`,
+ * `storage-mark` and `s3:<id>` for each given id plus the id the agent's `storage-mark` names (read
+ * first; a damaged mark adds none). Never an owner account. Each account is deleted and then read
+ * back: the call resolves only when every one is gone, so a removal stopped part-way can run it
+ * again (an item already gone is not an error). Any failure is the fixed `keystore_erase_failed`.
+ */
+export async function eraseKeychainAgent(
+  keychain: KeychainBackend,
+  agentId: string,
+  storageIds: readonly string[],
+  { timeoutMs = KEYCHAIN_CALL_TIMEOUT_MS }: { readonly timeoutMs?: number } = {},
+): Promise<void> {
+  let accounts: string[];
+  try {
+    accounts = agentEraseAccounts(agentId, storageIds);
+  } catch {
+    throw eraseFailed();
+  }
+  const ids = [...storageIds];
+  try {
+    const mark = await guarded(
+      () => keychain.get(keychainAccount(agentId, 'storage-mark')),
+      timeoutMs,
+    );
+    if (mark !== null) {
+      try {
+        const active = decodeStorageMark(mark).active;
+        if (active !== null && !ids.includes(active)) ids.push(active);
+      } catch {
+        // A damaged mark names no id; the ids from the store still go.
+      } finally {
+        wipe(mark);
+      }
+    }
+    accounts = agentEraseAccounts(agentId, ids);
+  } catch {
+    throw eraseFailed();
+  }
+  // The seed last: until it goes, a stopped erase still leaves an agent its owner can retry.
+  const ordered = [...accounts.slice(1), accounts[0] as string];
+  for (const account of ordered) {
+    try {
+      await guarded(() => keychain.delete(account), timeoutMs);
+      const left = await guarded(() => keychain.get(account), timeoutMs);
+      if (left !== null) {
+        wipe(left);
+        throw eraseFailed();
+      }
+    } catch {
+      throw eraseFailed();
+    }
   }
 }
 

@@ -45,6 +45,9 @@ export const OWNER_ACTION_OPS: readonly string[] = Object.freeze([
   'credits.withdraw',
   // U3-d (D-138): the owner names an agent from the local app (create an agent, Rename).
   'agent.label',
+  // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
+  'app.connect',
+  'app.disconnect',
 ]);
 
 export const ownerOperationRefused = (): NodeKeyStoreError =>

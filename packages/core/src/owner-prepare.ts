@@ -20,6 +20,7 @@ import {
   ownerActionSchema,
   type PolicyRule,
   type AgentLabelParams,
+  type AppChangeParams,
   type ContactCheckParams,
   type ContactRule,
   type ContactRemoveParams,
@@ -39,7 +40,13 @@ export const PREPARED_OWNER_ACTION_LIFETIME_SECONDS = 600;
 
 /** The ops an owner surface can prepare here. */
 export type PreparableOp =
-  'policy.set' | 'contact.check' | 'contact.rename' | 'contact.remove' | 'agent.label';
+  | 'policy.set'
+  | 'contact.check'
+  | 'contact.rename'
+  | 'contact.remove'
+  | 'agent.label'
+  | 'app.connect'
+  | 'app.disconnect';
 
 const PREPARABLE: readonly string[] = [
   'policy.set',
@@ -48,6 +55,9 @@ const PREPARABLE: readonly string[] = [
   'contact.remove',
   // U3-d (D-138): the owner names this agent from the local app.
   'agent.label',
+  // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
+  'app.connect',
+  'app.disconnect',
 ];
 
 interface ParamsOf {
@@ -56,6 +66,8 @@ interface ParamsOf {
   readonly 'contact.rename': ContactRenameParams;
   readonly 'contact.remove': ContactRemoveParams;
   readonly 'agent.label': AgentLabelParams;
+  readonly 'app.connect': AppChangeParams;
+  readonly 'app.disconnect': AppChangeParams;
 }
 
 export interface OwnerActionBodyInput<O extends PreparableOp = PreparableOp> {
@@ -131,7 +143,9 @@ export type PrepareRefusal =
   | 'alias_invalid'
   | 'alias_taken'
   /** U3-d: the label is not 1 to 32 code points already in its own restricted form (06 §2.1). */
-  | 'label_invalid';
+  | 'label_invalid'
+  /** U3-f: the app is not in the fixed table, or `changeId` is not 64 lowercase hex. */
+  | 'change_invalid';
 
 export type PreparedOwnerAction =
   | {
