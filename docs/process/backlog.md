@@ -5500,6 +5500,112 @@ After the owner tested 0.4.4 on two Macs (29 Oct), the basics that did not work 
 - **Acceptance:**
   - A RED test reproduces the exact symptom (real folder / real browser, no fake of the failing step) before the fix: in a real browser, an arrived file shows the label and no animation, and the top bar never shows two contradicting statuses. Copy checked against 11 §5; screenshots at 1440 and 360, light and dark; reduced-motion and axe pass; changelog.d fragment.
 
+### Follow-ups from the 29 Oct reviews (CARDS-1029B)
+
+Small items the reviews of the 0.4.5 hotfix pull requests left over (all rated Low), plus two wave 4 placeholders from the owner's test. None blocks 0.4.5. Phrased as symptoms and fixes on this public repo.
+
+#### CHORE-RELEASE-NPMVIEW-SILENT · release: a registry outage looks like a green run with nothing to do (new, from the #693 audit, Low, sensitive path)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet build, Opus review · **Security:** S1 (`.github/**` path default; sensitive path, the owner's "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/release.yml` (the `release` step only)
+- **Depends on:** #693
+- **Spec:** `docs/process/release-and-deployment.md`; D-52
+- **Invariants:** —
+- **Scope:**
+  - The `release` step ignores errors from `npm view` (`|| true`). If the registry is down, the step ends green and nothing is published, with no sign that anything went wrong. Tell "version not on the registry yet" apart from "the lookup failed", and make the failure visible (a failed step or a clear warning).
+- **Acceptance:**
+  - A test or a dry run shows a lookup failure no longer ends as a silent green no-op; the "already published" case still skips cleanly; no other release step changes; Tali's "merge".
+
+#### CHORE-LOCALUI-PLAYWRIGHT-DEP · local app: declare the browser-test tool where it is used (new, from the #699 review, Low)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet build, Opus review · **Security:** S1 (`apps/local-ui/**` and root `package.json` path defaults) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/package.json`, `pnpm-lock.yaml`
+- **Depends on:** —
+- **Spec:** `docs/process/repo-reference.md`
+- **Invariants:** —
+- **Scope:**
+  - `playwright` is a development dependency of the repository root only, yet the browser tests in `apps/local-ui` import it. Declare it in `apps/local-ui` at the same version, so the package stands on its own. No new package and no `postinstall` script.
+- **Acceptance:**
+  - Install and the local-ui tests pass; the lockfile shows one version; a justification line in the PR.
+
+#### CHORE-CONTACTS-POLL-GUARD · local app: Contacts refresh paths skip the polling guard, and a stuck read pauses polling (new, from the #696 review, Low)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/index.tsx` (the two manual refresh paths near lines 845 and 893), tests
+- **Depends on:** HOTFIX-045-CONTACTS-REFRESH
+- **Spec:** 08 §1; B-11 Contacts
+- **Invariants:** —
+- **Scope:**
+  - Two manual refresh paths do not go through the guard that stops the poll from starting a read while another is running. The result is two reads at once for a moment; the list is never stale. Route both through the guard.
+  - A read that never returns keeps the guard closed, so polling stays paused until another trigger. Give the read a timeout so the guard opens again.
+- **Acceptance:**
+  - Tests first: a manual refresh during a poll starts no second read; a read that never answers is given up after the timeout and the next poll runs; polling still stops when nothing is pending and in a hidden tab; changelog.d fragment.
+
+#### W4-SWITCHER-STATUS · local app: the agent switcher shows both "not connected" and "stopped", and System moves into Settings (placeholder, wave 4, from the #697 review, Low)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · the top bar and agent switcher in `apps/local-ui/src/**` (to be decided)
+- **Depends on:** HOTFIX-045-TOPBAR
+- **Spec:** B-11 shell; 11 §5
+- **Invariants:** —
+- **Scope:**
+  - When the connection is down and the agent is stopped, the top bar shows only "Not connected". The switcher must show both facts in plain words.
+  - Wave 4 structure: move "Under the hood" (System) into Settings.
+- **Acceptance:**
+  - To be written when planned; starts with a RED test in a real browser for the down-and-stopped case; axe check passes.
+
+#### W4-AGENT-NAME-AT-CREATE · local app: ask for the agent's name on the first screen (placeholder, wave 4, owner test of 0.4.4: B8)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 (`packages/node/**` path default if agent creation changes there) · **Phase:** M1b
+- **Repo/path:** agentlink · first-run in `apps/local-ui/src/pages/first-run/`, agent creation and rename (to be decided)
+- **Depends on:** U3-d
+- **Spec:** USABILITY-WAVE-3 §7.1; 04 §2.5.1
+- **Invariants:** I-1, I-2, I-4
+- **Scope:**
+  - Agents created on 0.4.x were named after the computer (its hostname). Ask for the name on the first onboarding screen, and offer a rename to existing agents that still carry the computer's name.
+- **Acceptance:**
+  - To be written when planned; starts with a RED test in a real browser; the rename uses the existing signed rename path; threat note if creation code changes.
+
+#### CHORE-TOUCHID-SHEET-E2E · local app: a real-browser test of the Touch ID sheet (new, from the #701 review, Low)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (`e2e/**`, `apps/local-ui/**` path defaults) · **Phase:** M1b
+- **Repo/path:** agentlink · the journey end-to-end test, `e2e/**` or `apps/local-ui` browser tests
+- **Depends on:** HOTFIX-045-TOUCHID
+- **Spec:** 04 §2.5, §2.8; USABILITY-WAVE-3 §7.1
+- **Invariants:** —
+- **Scope:**
+  - The presence sheet change from HOTFIX-045-TOUCHID (the reason line and the one-time "Switch to Touch ID" step) is covered by page tests with a faked switch. Add one real-browser step to the journey test that shows the reason and takes the switch step.
+- **Acceptance:**
+  - The journey test passes in a real browser; no assertion weakened; the faked-switch tests stay.
+
+#### CHORE-AXE-PAUSED-ANIMATION · tests: the accessibility check can wait forever on a paused animation (new, from the #702 review, Low)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet build, Opus review · **Security:** S1 (`apps/local-ui/**` path default; test helper only) · **Phase:** M1b
+- **Repo/path:** agentlink · the axe test helper under `apps/local-ui` (test file only)
+- **Depends on:** —
+- **Spec:** B-11 accessibility rules
+- **Invariants:** —
+- **Scope:**
+  - The helper waits for finite animations to end before checking. An animation that is finite but paused never ends, so the wait would last until the test timeout. Bound the wait and report which animation was still running.
+- **Acceptance:**
+  - A test with a paused finite animation ends with a clear message within the bound; ordinary pages are checked as before; the timeout is not raised.
+
+#### CHORE-REVIEWGATE-RELEASE-PATHS · CI: keep review-gate, the audit rules and CODEOWNERS in step for the release paths (new, from the #704 audit, Low, sensitive path)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (`.github/**` and `docs/process/**` path defaults; sensitive path, the owner's "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/review-gate.yml`, `.github/CODEOWNERS`, `docs/process/audit-rules.md` §2.2
+- **Depends on:** #704
+- **Spec:** `docs/process/audit-rules.md` §2.2, §3.3, SC-6; D-52
+- **Invariants:** —
+- **Scope:**
+  - CODEOWNERS now lists `/tools/release/` and `/.changeset/`, but the class rules in review-gate and the table in audit-rules do not. Decide their class (the owner confirms), then add the same rows to review-gate and audit-rules in the same PR.
+  - State in audit-rules that the `main` ruleset does not require code-owner review: CODEOWNERS only notifies, it does not enforce.
+- **Acceptance:**
+  - The three files agree on the paths and the class; a review-gate test covers a change under each path; the "notice, not enforcement" sentence is in audit-rules; Tali's "merge".
+
+#### CHORE-REMOVE-SERVER-REALFOLDER · tests: prove Remove on a real folder at the server level too (new, from the #698 review, Low)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S2 (`packages/node/**` path default; test-only change) · **Phase:** M1b
+- **Repo/path:** agentlink · the server Remove tests under `packages/node` (test files only)
+- **Depends on:** HOTFIX-045-REMOVE
+- **Spec:** USABILITY-WAVE-3 §7.2; 04 §2.5.1
+- **Invariants:** I-7
+- **Scope:**
+  - HOTFIX-045-REMOVE proves the lock fix through the command-line test on a real folder. The server Remove tests still fake the folder delete. Add one server test that removes a real agent folder end to end. No production code changes.
+- **Acceptance:**
+  - The new test fails if the folder is left behind; existing tests are kept; no assertion weakened.
+
 ### Wave 4 placeholders (0.4.6, planned)
 
 Not started. These record what the 0.4.4 test left over, so nothing is lost. Each gets a full card when wave 4 is planned; the owner's decisions on the wave come first.
