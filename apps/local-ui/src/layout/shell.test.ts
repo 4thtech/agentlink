@@ -54,7 +54,6 @@ describe('top bar', () => {
     ['/settings/proofs', 'Proofs & credits'],
     ['/settings/passkeys', 'Passkeys'],
     ['/settings/appearance', 'Appearance'],
-    ['/first-run', 'Set up AgentLink'],
   ])('shows the page title for %s', (path, title) => {
     mount(path);
     expect(bar().querySelector('.al-topbar-title')?.textContent).toBe(title);

@@ -5,13 +5,15 @@
 //   and confirmed when the passkey can't protect approvals), and `done_unconfirmed` still shows the
 //   code plus the restart line;
 // - every fixed reason code in plain words; nothing from the server or the browser is shown;
-// - the recovery kit's "Later" path is remembered for the persistent banner;
-// - "Ready" hands back to the AI with a prompt to copy;
+// - the recovery kit stays "Later" (remembered for the persistent banner) when the backup code is saved;
+// - U3-g (b11 §28): the setup page starts at Welcome and the app pick; these tests go through them
+//   (first-run-v3.test.ts covers those screens) and end on Home;
 // - the default views use no web3 or key words (11 §5.1; UX north star).
 import { act, createElement as h, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RECOVERY_KIT_LATER_KEY, recoveryKitPending } from '../../states/index.js';
+import { createAppsApi, type AppsApi } from './apps-api.js';
 import { FirstRunPage, setupMessage, type FirstRunPageProps } from './index.js';
 import { encodeRegistration } from './passkey.js';
 import {
@@ -89,6 +91,7 @@ function fakeApi(
       const first = options.status ?? { kind: 'ok', owner: 'missing' };
       return Promise.resolve(statusCalls > 1 ? (options.statusAfter ?? first) : first);
     },
+    labelCheck: () => Promise.resolve({ kind: 'ok' }),
     begin: () => Promise.resolve(options.begin ?? { kind: 'ready', publicKey: VALUES }),
     finish: (body) => {
       finished.push(body.slice());
@@ -104,6 +107,14 @@ const BODY = encodeRegistration([
   new Uint8Array(32).fill(9),
 ]);
 
+/** No AI app found: the pick screen goes straight on (first-run-v3.test.ts covers the apps). */
+const NO_APPS: AppsApi = {
+  ...createAppsApi({ fetch: () => Promise.reject(new TypeError('not used')), token: 't' }),
+  list: () => Promise.resolve({ kind: 'ok', apps: [], desktopRunning: false }),
+  currentAgent: () => Promise.resolve({ kind: 'none' }),
+};
+let goHome = vi.fn();
+
 async function mount(
   api: SetupApi,
   passkey: FirstRunPageProps['createPasskey'] = () =>
@@ -111,9 +122,12 @@ async function mount(
   available = true,
   extra: Partial<FirstRunPageProps> = {},
 ): Promise<void> {
+  goHome = vi.fn();
   await act(async () => {
     const props: FirstRunPageProps = {
       api,
+      appsApi: NO_APPS,
+      goHome,
       createPasskey: passkey,
       passkeysAvailable: () => available,
       platform: 'other',
@@ -122,6 +136,14 @@ async function mount(
     };
     root.render(h(FirstRunPage as ComponentType<FirstRunPageProps>, props));
   });
+  // U3-g: setup starts at Welcome, then the app pick; go through both to the name screen.
+  if ([...host.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Get started')) {
+    await click('Get started');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await click('Continue');
+  }
 }
 
 function button(name: string): HTMLButtonElement {
@@ -144,13 +166,10 @@ const BANNED =
   /\b(wallet|gas|seed|transaction|chain|blockchain|hash|private key|owner key|address|0x[0-9a-f]+|localhost|prf|webauthn)\b/i;
 
 describe('first run: protect approvals (D-120 (1))', () => {
-  it('starts on step 1 with the LF-1 body, one primary action and the LF-3 list', async () => {
+  it('starts on "Set up your agent" with one primary action and says what one confirmation does', async () => {
     await mount(fakeApi());
-    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.protectTitle);
-    expect(text()).toContain(FIRST_RUN.protectBody('your passkey'));
-    expect(text()).toContain(FIRST_RUN.stepOf(1));
-    expect(text()).toContain(FIRST_RUN.untilBody);
-    expect(text()).toContain(FIRST_RUN.desktopTip);
+    expect(host.querySelector('h1')?.textContent).toBe('Set up your agent');
+    expect(text()).toContain(FIRST_RUN.foldersNote);
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     expect(button(FIRST_RUN.usePasskey).className).toContain('al-btn-primary');
     expect(text()).not.toMatch(BANNED);
@@ -173,7 +192,6 @@ describe('first run: protect approvals (D-120 (1))', () => {
     await mount(fakeApi());
     await click(FIRST_RUN.usePasskey);
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
-    expect(text()).toContain(FIRST_RUN.stepOf(2));
     expect(text()).toContain(FIRST_RUN.fingerprintLabel);
     expect(host.querySelector('.al-fp')?.textContent).toContain(FP);
     // The code is plain, readable text on the page (Q-130-1 stays open), never collapsed.
@@ -373,8 +391,9 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(writeText).toHaveBeenCalledWith(CODE);
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
     await click(FIRST_RUN.savedIt);
-    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.kitTitle);
-    expect(text()).toContain(FIRST_RUN.stepOf(3));
+    // U3-g: with no AI app chosen the end of first run is Home; the kit stays "Later".
+    expect(goHome).toHaveBeenCalledTimes(1);
+    expect(host.querySelector('h1')?.textContent).not.toBe(FIRST_RUN.backupTitle);
     // The code is gone from the page once the owner moves on.
     expect(text()).not.toContain('ABCD');
     expect(host.querySelector('input[autocomplete="new-password"]')).toBeNull();
@@ -393,7 +412,7 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     // Shown while the backup-code step is open (the save form holds it).
     expect(fields().some((v) => v.replaceAll(' ', '') === compact)).toBe(true);
     await click(FIRST_RUN.savedIt);
-    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.kitTitle);
+    expect(goHome).toHaveBeenCalledTimes(1);
     const html = document.documentElement.outerHTML;
     for (const part of [CODE, compact, ...CODE.split(' ')]) {
       expect(html).not.toContain(part);
@@ -554,39 +573,17 @@ describe('every fixed reason code has plain words', () => {
   });
 });
 
-describe('recovery kit "Later" and Ready (D-120 (2); UX audit 1c, 1d)', () => {
-  it('Later is remembered for the banner, then Ready hands back to the AI with a prompt to copy', async () => {
+describe('recovery kit "Later" and the end on Home (D-120 (2); U3-a, D-138; U3-g)', () => {
+  it('"I saved it" remembers the kit as later for the banner and lands on Home', async () => {
     await mount(fakeApi());
     await click(FIRST_RUN.usePasskey);
-    await click(FIRST_RUN.savedIt);
-    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.kitTitle);
-    expect(host.querySelector('details')).toBeNull();
-    expect(text()).not.toContain('ABCD');
     expect(recoveryKitPending()).toBe(false);
-    await click(FIRST_RUN.later);
+    await click(FIRST_RUN.savedIt);
     expect(recoveryKitPending()).toBe(true);
     expect(localStorage.getItem(RECOVERY_KIT_LATER_KEY)).toMatch(/^[0-9]+$/);
-    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.readyTitle);
-    expect(host.querySelector('.al-copy.is-hero')?.textContent).toContain(FIRST_RUN.readyPrompt);
-    expect(text()).toContain(FIRST_RUN.stepOf(4));
-    expect(text()).not.toMatch(BANNED);
+    expect(goHome).toHaveBeenCalledTimes(1);
+    expect(host.querySelector('details')).toBeNull();
     expect(text()).not.toContain('ABCD');
-  });
-});
-
-describe('first run finishes on Home (U3-a, D-138; 08 §1)', () => {
-  it('Ready offers one primary link, to Home, and nothing else to go to', async () => {
-    await mount(fakeApi());
-    await click(FIRST_RUN.usePasskey);
-    await click(FIRST_RUN.savedIt);
-    await click(FIRST_RUN.later);
-    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.readyTitle);
-    const links = [...host.querySelectorAll('a')];
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/settings/home']);
-    expect(links[0]?.textContent).toBe(FIRST_RUN.toHome);
-    expect(links[0]?.className).toContain('al-btn-primary');
-    // The prompt to copy stays.
-    expect(host.querySelector('.al-copy.is-hero')?.textContent).toContain(FIRST_RUN.readyPrompt);
     expect(text()).not.toMatch(BANNED);
   });
 });

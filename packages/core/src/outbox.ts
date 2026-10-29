@@ -47,6 +47,7 @@ import {
   parseEnvelopeText,
   type AgentCard,
   type Envelope,
+  type EnvelopeKeys,
 } from '@4thtech-io/crypto';
 import { isAllowedRelayUrl, payloadSchema, type Payload } from '@4thtech-io/types';
 import {
@@ -385,13 +386,21 @@ export class OutboxService {
     return out;
   }
 
-  /** Wraps `envelope` once per route (07 §4.1) and seals the outbox rows. Stores nothing. */
-  async prepareRows(envelope: Envelope, routes: readonly OutboxRoute[]): Promise<Row<'outbox'>[]> {
+  /**
+   * Wraps `envelope` once per route (07 §4.1) and seals the outbox rows. Stores nothing. `keys` seal
+   * the wraps: the agent's KeyStore by default; the owner session for an owner-authored carrier
+   * (U3-e `revoke`, whose `from` is the owner key).
+   */
+  async prepareRows(
+    envelope: Envelope,
+    routes: readonly OutboxRoute[],
+    keys: EnvelopeKeys = this.#ctx.keyStore,
+  ): Promise<Row<'outbox'>[]> {
     const transport = this.requireTransport();
     const wrapped = await transport.wrap(
       envelope,
       routes.map((r) => r.recipient),
-      this.#ctx.keyStore,
+      keys,
     );
     const now = nowOf(this.#ctx);
     const byKey = new Map(routes.map((r) => [r.recipient, r]));

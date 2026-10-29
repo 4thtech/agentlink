@@ -10,9 +10,10 @@ import { join } from 'node:path';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { deriveAgentId } from '@4thtech-io/crypto/keystore';
 import { afterAll, describe, expect, it } from 'vitest';
-import { KeychainKeyStore, createKeychainAgent } from './keychain-keystore.js';
+import { encodeStorageMark } from '@4thtech-io/core';
+import { KeychainKeyStore, createKeychainAgent, eraseKeychainAgent } from './keychain-keystore.js';
 import { withInterProcessLock } from './inter-process-lock.js';
-import { keychainAccount, osKeychain, probeKeychain } from './keychain.js';
+import { agentEraseAccounts, keychainAccount, osKeychain, probeKeychain } from './keychain.js';
 import { keychainPolicyMark } from './policy-mark.js';
 
 const required = process.env['AGENTLINK_REQUIRE_KEYCHAIN'] === '1';
@@ -77,6 +78,35 @@ describe.skipIf(!required)(`the OS keychain (${process.platform})`, () => {
       );
     } finally {
       await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('U3-e: the erase API deletes exactly the agent items and never the owner items', async () => {
+    const agentId = await createKeychainAgent(keychain);
+    created.push(agentId);
+    const other = await createKeychainAgent(keychain);
+    created.push(other);
+    // Owner-named items under the test service: the erase must leave them (04 §2.5 step 6).
+    const ownerAccounts = ['owner', 'owner-passkey', 'owner-next'];
+    try {
+      for (const account of ownerAccounts) await keychain.set(account, Uint8Array.from([7]));
+      const s3 = '0123456789abcdef';
+      for (const item of ['policy-version', 'receipts-kept', `s3:${s3}`] as const) {
+        await keychain.set(keychainAccount(agentId, item), Uint8Array.from([1]));
+      }
+      await keychain.set(keychainAccount(agentId, 'storage-mark'), encodeStorageMark(null));
+      await eraseKeychainAgent(keychain, agentId, [s3]);
+      for (const account of agentEraseAccounts(agentId, [s3])) {
+        expect(await keychain.get(account)).toBeNull();
+      }
+      for (const account of ownerAccounts) {
+        expect(await keychain.get(account)).toEqual(Uint8Array.from([7]));
+      }
+      expect(await keychain.get(keychainAccount(other, 'seed'))).not.toBeNull();
+      // Idempotent on the real keychain too.
+      await eraseKeychainAgent(keychain, agentId, [s3]);
+    } finally {
+      await Promise.allSettled(ownerAccounts.map((account) => keychain.delete(account)));
     }
   });
 });

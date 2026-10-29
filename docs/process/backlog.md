@@ -5535,7 +5535,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Tests first: a `RED (expected): <ID> …` commit with the red-run excerpt; metadata allowlist enforced (a hostile-names test: contact, file and subject names never appear); at most 200 per answer; answer under 20 KB; cursor behaviour; logs carry counts only; stale generation handled; independent review; Tali's "merge".
 
 #### U3-g · Welcome and first run v3 screens (new, USABILITY-WAVE-3, owner decision 2026-10-29)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 3
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 3
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/`, `apps/local-ui/src/pages/welcome/` (new)
 - **Depends on:** U3-brief, U3-d, U3-f
 - **Spec:** b11 §28 (U3-brief); D-116, D-137; 11 §5
