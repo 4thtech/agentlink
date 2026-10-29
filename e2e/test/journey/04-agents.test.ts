@@ -25,9 +25,22 @@ const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
 afterAll(() => ch.stop());
 
+/**
+ * W4-SHELL (b11 §34.2): the Agents page is no sidebar item; the agent switcher, top left, opens it
+ * ("Manage agents & apps"). An in-app move, never `goto`.
+ */
+async function openAgents(page: Page): Promise<void> {
+  await page
+    .getByRole('button', { name: /^Agent: / })
+    .first()
+    .click();
+  await page.getByRole('menuitem', { name: 'Manage agents & apps' }).click();
+  await page.getByRole('heading', { name: 'Agents', level: 1 }).first().waitFor();
+}
+
 /** Agents → Add agent → name → Add with Touch ID → Not now. */
 async function addAgent(page: Page, label: string): Promise<void> {
-  await navTo(page, 'Agents');
+  await openAgents(page);
   await page.getByRole('button', { name: 'Add agent' }).first().click();
   await page.getByLabel('Name your agent').fill(label);
   await page.getByRole('button', { name: 'Add with Touch ID' }).click();
@@ -47,7 +60,7 @@ function agentCard(page: Page, label: string) {
 
 /** Agents → the agent's More menu → Remove → type the name → Remove with Touch ID. */
 async function removeAgent(page: Page, label: string): Promise<void> {
-  await navTo(page, 'Agents');
+  await openAgents(page);
   await agentCard(page, label).getByRole('button', { name: 'More', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Remove' }).click();
   await page.getByRole('heading', { name: `Remove ${label}?` }).waitFor();
@@ -94,42 +107,38 @@ describe('chapter 4: agents', () => {
     await probe.check();
   }, 180_000);
 
-  // Gate: the wave-4 agent switcher (builder D, D3; W4-SWITCHER-STATUS) turns this on. Today the
-  // switcher has no per-agent icon, and switching reloads the page (api/generation.ts).
-  it.runIf(WAVE4)(
-    'the switcher lists every agent with its letter icon, and switching does not reload',
-    async (ctx) => {
-      const ready = ch.need(ctx);
-      if (ready === undefined) return;
-      const world = journeyWorld();
-      const pc = await world.computer();
-      const jp = await journeyPage(ready.browser);
-      await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
-      await addAgent(jp.page, 'Side project');
-      const probe = await jp.arm();
-      const { page } = jp;
+  // W4-SHELL (D1): the switcher lists every agent with its letter icon (Decision 44 B1), and a
+  // switch changes the agent in place (the generation guard swaps the views, no reload).
+  it('the switcher lists every agent with its letter icon, and switching does not reload', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
+    await addAgent(jp.page, 'Side project');
+    const probe = await jp.arm();
+    const { page } = jp;
 
-      await page
-        .getByRole('button', { name: /^Agent: / })
-        .first()
-        .click();
-      for (const [label, letter] of [
-        ['Ana', 'A'],
-        ['Side project', 'S'],
-      ] as const) {
-        const row = page.getByRole('menuitem').filter({ hasText: label }).first();
-        await row.waitFor();
-        expect((await row.innerText()).trim().startsWith(letter)).toBe(true);
-      }
-      await page.getByRole('menuitem').filter({ hasText: 'Side project' }).first().click();
-      await page
-        .getByRole('button', { name: /^Agent: Side project/ })
-        .first()
-        .waitFor();
-      await probe.check();
-    },
-    180_000,
-  );
+    await page
+      .getByRole('button', { name: /^Agent: / })
+      .first()
+      .click();
+    for (const [label, letter] of [
+      ['Ana', 'A'],
+      ['Side project', 'S'],
+    ] as const) {
+      const row = page.getByRole('menuitem').filter({ hasText: label }).first();
+      await row.waitFor();
+      expect((await row.innerText()).trim().startsWith(letter)).toBe(true);
+    }
+    await page.getByRole('menuitem').filter({ hasText: 'Side project' }).first().click();
+    await page
+      .getByRole('button', { name: /^Agent: Side project/ })
+      .first()
+      .waitFor();
+    await probe.check();
+  }, 180_000);
 
   // Gate: W4-RENAME-REACHES-CONTACTS (builder D, D2; the contact row is C2) turns this on. Today a
   // rename changes only the local label; the contact keeps the old name.
@@ -144,7 +153,7 @@ describe('chapter 4: agents', () => {
       const bProbe = await b.arm();
       const before = a.gestures.total();
 
-      await navTo(a.page, 'Agents');
+      await openAgents(a.page);
       await agentCard(a.page, 'Ana').getByRole('button', { name: 'Rename', exact: true }).click();
       await a.page.getByLabel('Name').fill('Ana Studio');
       await a.page.getByRole('button', { name: 'Save with Touch ID' }).click();

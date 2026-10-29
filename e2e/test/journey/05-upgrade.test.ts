@@ -91,13 +91,18 @@ describe('chapter 5: upgrade', () => {
     await jp.page.goto(await openedLink(pc));
     const probe = await jp.arm();
 
-    await navTo(jp.page, 'Agents');
+    // W4-SHELL: the Agents page opens from the switcher, top left; the history is in the Inbox.
+    await jp.page
+      .getByRole('button', { name: /^Agent: / })
+      .first()
+      .click();
+    await jp.page.getByRole('menuitem', { name: 'Manage agents & apps' }).click();
     await jp.page.getByText('work', { exact: true }).first().waitFor();
     const listed = await text(jp.page);
     for (const shown of ['Ana', 'work']) expect(listed).toContain(shown);
     expect((await pc.directory.list()).map((e) => e.name)).toEqual(names);
 
-    await navTo(jp.page, 'Messages');
+    await navTo(jp.page, 'Inbox');
     await jp.page.getByText('Bo', { exact: true }).first().click();
     await jp.page.getByText(REPLY).first().waitFor({ timeout: 30_000 });
 
