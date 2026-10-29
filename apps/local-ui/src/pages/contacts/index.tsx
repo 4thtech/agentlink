@@ -747,6 +747,8 @@ export function ContactsPage({
   const [highlight, setHighlight] = useState<number | undefined>(undefined);
   const [lastCreated, setLastCreated] = useState<number | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
+  // HOTFIX-045-CONTACTS-NEW: true while this page just started connecting to an invite.
+  const [connecting, setConnecting] = useState(false);
   const addButtonId = useId();
   const activity = usePulse(api);
   const { activitySort } = usePrefs();
@@ -793,15 +795,26 @@ export function ContactsPage({
   }, [api, tick]);
 
   // HOTFIX-045: while anything waits for its pairing, re-read every 5 s and when the tab comes back.
+  // HOTFIX-045-CONTACTS-NEW: also while an invite from this page is open or a connect just started, so
+  // a contact that was not in the list yet appears without a reload. There is no server push for
+  // contact changes, so this polls; it stops when none of the three holds.
   const anyPending = list.phase === 'ok' && list.contacts.some((c) => c.pairing === 'pending');
+  const watching = anyPending || rows.length > 0 || connecting;
+  // A connect that never shows a contact stops being watched after two minutes.
   useEffect(() => {
-    if (!anyPending) return undefined;
+    if (!connecting) return undefined;
+    const t = setTimeout(() => setConnecting(false), 120_000);
+    return () => clearTimeout(t);
+  }, [connecting]);
+  useEffect(() => {
+    if (!watching) return undefined;
     // Skips while a read is running (slow servers never pile up) and while the tab is hidden; coming
     // back fires focus and visibilitychange together, and the first one claims the single read.
     const bump = (): void => {
       if (inFlight.current || document.hidden) return;
       inFlight.current = true;
       background.current = true;
+      setRows(pendingInvites()); // lets expired invites drop out, which ends the watch
       setTick((n) => n + 1);
     };
     const timer = setInterval(bump, 5_000);
@@ -813,7 +826,7 @@ export function ContactsPage({
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', bump);
     };
-  }, [anyPending]);
+  }, [watching]);
 
   useEffect(() => {
     let live = true;
@@ -890,6 +903,7 @@ export function ContactsPage({
         returnFocus.current = true;
         setAdding(false);
         setNotice(connectingTo(name));
+        setConnecting(true);
         setTick((n) => n + 1);
       }}
       onClose={closeAdd}
