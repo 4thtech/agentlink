@@ -474,6 +474,109 @@ describe('unlocking with the passkey PRF (04 §2.3.1, §2.5)', () => {
   });
 });
 
+// HOTFIX-045-REMOVE: Try again of a removal with no agent open knows the owner only by the Nostr key
+// of its verified revoked entry. The same presence unlocks; the seed must derive that key exactly.
+describe('unlocking by the owner Nostr key, with no card (HOTFIX-045-REMOVE, 04 §2.5)', () => {
+  const action = (): JsonObject => ({
+    v: 1,
+    agent: agentId,
+    owner: encodeHex(owner.ownerNostr),
+    op: 'approval.decide',
+    params: { approvalId: id(2), actionDigest: '0'.repeat(64), decision: 'deny' },
+    nonce: encodeBase64url(randomBytes(16)),
+    issuedAt: 1,
+    expiresAt: 2,
+  });
+
+  it('unlocks with the owner code, derives exactly the stored owner, and wipes the code', async () => {
+    const secret = ownerCode();
+    const {
+      store,
+      session,
+      owner: derived,
+    } = await KeychainOwnerKeyStore.unlockForOwnerNostr(keychain, owner.ownerNostr, {
+      kind: 'passphrase',
+      secret,
+    });
+    expect(secret.every((b) => b === 0)).toBe(true);
+    expect(derived).toEqual(owner);
+    expect(await store.getPublicKeys()).toEqual(owner);
+    const body = action();
+    expect(ownerSigValid(body, await session.signOwnerAction(body))).toBe(true);
+    await store.close();
+  });
+
+  it('unlocks with the registered passkey for that owner, and wipes the PRF', async () => {
+    const auth = new VirtualPrfAuthenticator();
+    await register(auth);
+    const prf = auth.get(salt).prfOutput;
+    const { store, session } = await KeychainOwnerKeyStore.unlockForOwnerNostr(
+      keychain,
+      owner.ownerNostr,
+      { kind: 'passkey-prf', prfOutput: prf },
+    );
+    expect(prf.every((b) => b === 0)).toBe(true);
+    const body = action();
+    expect(ownerSigValid(body, await session.signOwnerAction(body))).toBe(true);
+    await store.close();
+  });
+
+  it('refuses another owner key, a wrong code, a wrong passkey and no presence', async () => {
+    const stranger = randomBytes(32);
+    await expect(
+      KeychainOwnerKeyStore.unlockForOwnerNostr(keychain, stranger, {
+        kind: 'passphrase',
+        secret: ownerCode(),
+      }),
+    ).rejects.toMatchObject({ code: 'presence_rejected' });
+    await expect(
+      KeychainOwnerKeyStore.unlockForOwnerNostr(keychain, owner.ownerNostr, {
+        kind: 'passphrase',
+        secret: encodeUtf8('AAAA BBBB CCCC DDDD EEEE FFFF'),
+      }),
+    ).rejects.toMatchObject({ code: 'presence_rejected' });
+    const auth = new VirtualPrfAuthenticator();
+    await register(auth);
+    // The registered passkey, but the entry names another owner.
+    await expect(
+      KeychainOwnerKeyStore.unlockForOwnerNostr(keychain, stranger, {
+        kind: 'passkey-prf',
+        prfOutput: auth.get(salt).prfOutput,
+      }),
+    ).rejects.toMatchObject({ code: 'presence_rejected' });
+    const other = new VirtualPrfAuthenticator();
+    other.create(owner.ownerNostr, salt);
+    await expect(
+      KeychainOwnerKeyStore.unlockForOwnerNostr(keychain, owner.ownerNostr, {
+        kind: 'passkey-prf',
+        prfOutput: other.get(salt).prfOutput,
+      }),
+    ).rejects.toMatchObject({ code: 'presence_rejected' });
+    await expect(
+      KeychainOwnerKeyStore.unlockForOwnerNostr(keychain, owner.ownerNostr, {
+        kind: 'passphrase',
+        secret: new Uint8Array(0),
+      }),
+    ).rejects.toMatchObject({ code: 'presence_required' });
+  });
+
+  it('refuses a planted owner-passkey blob of another owner sealed under that passkey', async () => {
+    const auth = new VirtualPrfAuthenticator();
+    const planted = await sealPasskeySeed(
+      auth.create(owner.ownerNostr, salt).prfOutput,
+      randomBytes(32),
+      auth.credentialId,
+    );
+    await keychain.set(OWNER_PASSKEY_ACCOUNT, planted);
+    await expect(
+      KeychainOwnerKeyStore.unlockForOwnerNostr(keychain, owner.ownerNostr, {
+        kind: 'passkey-prf',
+        prfOutput: auth.get(salt).prfOutput,
+      }),
+    ).rejects.toMatchObject({ code: 'presence_rejected' });
+  });
+});
+
 // --- The approval server on http://localhost:<port> (M1-31 deferred acceptance) --------------------
 
 function fakeSource(): ApprovalServerSource & {
