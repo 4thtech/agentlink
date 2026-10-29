@@ -88,6 +88,18 @@ export const RELATIVE_ESCAPES = [
   },
   {
     zone: 'e2e',
+    target: 'packages/node/dist/owner-passkey.js',
+    reason:
+      'HOTFIX-045-REMOVE-FIRSTRUN: encodePasskeyAssertion, the body the page sends for a passkey gesture (X-AgentLink-Presence: passkey); not exported by the package entry',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/src/passkey-authenticator.fixture.js',
+    reason:
+      'HOTFIX-045-REMOVE-FIRSTRUN: VirtualPrfAuthenticator, the virtual PRF passkey that stands in for Touch ID in the HTTP-level first-run and Remove test; a test fixture, never built',
+  },
+  {
+    zone: 'e2e',
     target: 'apps/cli/scripts/local-ui-embed.mjs',
     reason:
       'M1-11b-6 first-run smoke: the build script that lists the local app files, to compare with what the bundle embeds',

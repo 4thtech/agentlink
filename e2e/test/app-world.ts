@@ -248,6 +248,8 @@ export function uiDepsOf(
         ...(welcome.invite === undefined ? {} : { waitingInvite: welcome.invite }),
         // U3-g-c: the same harness desk as `ui` (list only on Welcome).
         aiApps: () => wiring.aiApps(),
+        // HOTFIX-045-REMOVE-FIRSTRUN: Remove works in the session first run started.
+        removal: uiRemovalPort({ home: pc.home, runtime: pc.runtime }),
       });
       if (server !== undefined) servers.push(server);
       return server;
