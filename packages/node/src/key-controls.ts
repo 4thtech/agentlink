@@ -105,8 +105,19 @@ const KIT_MODE = 0o600;
 const AGENT_NAME = /^[a-z][a-z0-9-]{0,31}$/;
 /** 04 §2.2: a `storage.set` id, 8 CSPRNG bytes as 16 lowercase hex. */
 const STORAGE_ID = /^[0-9a-f]{16}$/;
-/** The agent items a kit carries (04 §2.3.3), in kit order; `seed` and `store-key` are required. */
-const KIT_ITEMS = ['seed', 'store-key', 'policy-version', 'receipts-kept', 'storage-mark'] as const;
+/**
+ * The agent items a kit carries (04 §2.3.3), in kit order; `seed` and `store-key` are required.
+ * W4-RENAME-REACHES-CONTACTS (D-141): `key-epoch` is optional (absent: epoch 0), so a restored
+ * renamed agent opens its KeyStore at the epoch its store holds.
+ */
+const KIT_ITEMS = [
+  'seed',
+  'store-key',
+  'policy-version',
+  'receipts-kept',
+  'storage-mark',
+  'key-epoch',
+] as const;
 const REQUIRED_ITEMS: readonly string[] = ['seed', 'store-key'];
 
 // --- Fixed errors (I-7) ---------------------------------------------------------------------------

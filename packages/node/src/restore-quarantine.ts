@@ -172,8 +172,11 @@ export async function checkQuarantinedSnapshot(
     );
     const stored = parseJson(text) as { card?: { ownerNostr?: unknown } } | null;
     const named = stored?.card?.ownerNostr;
-    if (typeof named !== 'string' || !/^[0-9a-f]{64}$/.test(named)) return false;
-    if (!equalBytes(decodeHex(named, { length: 32 }), ownerNostr)) return false;
+    // A real card spells its owner keys `0x` + lowercase hex (04 §2.4.1); before W4-RENAME-REACHES-
+    // CONTACTS only the bare form was accepted, so a kit of a real agent was refused here.
+    if (typeof named !== 'string' || !/^(?:0x)?[0-9a-f]{64}$/.test(named)) return false;
+    const hex = named.startsWith('0x') ? named.slice(2) : named;
+    if (!equalBytes(decodeHex(hex, { length: 32 }), ownerNostr)) return false;
     file.state = 'checked';
     return true;
   } catch {
