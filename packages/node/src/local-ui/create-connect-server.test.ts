@@ -263,6 +263,8 @@ interface World {
   readonly desk: FakeDesk;
   /** Keys the directory made itself (never when the server passes its held keys). */
   readonly ownKeys: string[];
+  /** Faults the opened agents show: no first policy wired; core refusing one op. */
+  readonly faults: { noFirstPolicy?: boolean; refuseOp?: string };
   open(name: string): Promise<AppHostAgent | undefined>;
 }
 
@@ -272,6 +274,7 @@ function world(): World {
   const ids = new Map<string, string>();
   const clients = new Map<string, AgentLinkClient>();
   const ownKeys: string[] = [];
+  const faults: World['faults'] = {};
   const desk = new FakeDesk((name) => Promise.resolve(ids.get(name)));
   const directory: AgentDirectory = {
     list: () => Promise.resolve([...entries.values()]),
@@ -372,12 +375,32 @@ function world(): World {
         name,
         relays: ALPHA,
         identity: client.identity,
-        firstPolicy: { actions: client.ownerActions, home: join(dir, 'home') },
+        ...(faults.noFirstPolicy
+          ? {}
+          : {
+              firstPolicy: {
+                actions: {
+                  preparePolicyEdit: (patch: unknown, o?: never) =>
+                    client.ownerActions.preparePolicyEdit(patch, o),
+                  prepareLabel: (label: string) => client.ownerActions.prepareLabel(label),
+                  markAppNotApplied: (app: string, nonce: string) =>
+                    client.ownerActions.markAppNotApplied(app, nonce),
+                  apply: async (input: object) => {
+                    const op = (input as { body?: { op?: string } }).body?.op;
+                    if (op !== undefined && op === faults.refuseOp) {
+                      return { status: 'refused', op, reason: 'malformed' } as never;
+                    }
+                    return client.ownerActions.apply(input);
+                  },
+                },
+                home: join(dir, 'home'),
+              },
+            }),
       },
       close,
     };
   };
-  return { keychain, entries, ids, clients, directory, desk, ownKeys, open };
+  return { keychain, entries, ids, clients, directory, desk, ownKeys, faults, open };
 }
 
 interface Session {
@@ -740,6 +763,18 @@ describe('W4-ONE-TOUCH first run: one passkey create creates the owner, the agen
     expect(h.w.desk.writes).toBe(0);
   });
 
+  it('IR-W4-ONE-TOUCH (a): an agent that cannot take the plan signs nothing (fail closed, no fallback)', async () => {
+    const h = await harness();
+    const s = await h.session();
+    h.w.faults.noFirstPolicy = true;
+    const { finish } = await setUp(h, s);
+    expect(finish.status).toBe(500);
+    expect(json(finish)).toMatchObject({ status: 'failed', reason: 'internal' });
+    expect(h.w.entries.size).toBe(0);
+    expect(h.w.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
+    expect(h.w.desk.writes).toBe(0);
+  });
+
   it('Claude Desktop running refuses begin (quit_first) before any seed exists', async () => {
     const h = await harness();
     const s = await h.session();
@@ -861,6 +896,40 @@ describe('W4-ONE-TOUCH New agent: one gesture creates the agent and connects its
       true,
     );
     expect({ status: done.status, body: json(done) }).toEqual(sample.answer);
+  });
+
+  it('IR-W4-ONE-TOUCH (b): a label core would not sign is refused at begin, before any gesture or seed', async () => {
+    const { h, s, auth } = await owned();
+    const before = auth.gestures;
+    for (const label of ['', 'Work  agent', '<b>x</b>', 'a'.repeat(33)]) {
+      const res = await agentBegin(h, s, { label, app: 'claude-code' });
+      expect(res.status).toBe(400);
+      expect(json(res)['status']).toBe('label_invalid');
+    }
+    expect(auth.gestures).toBe(before);
+    expect([...h.w.entries.keys()]).toEqual(['default']);
+  });
+
+  it('IR-W4-ONE-TOUCH (b): a failed signing removes the half-created agent (keys and folder)', async () => {
+    const { h, s, auth } = await owned();
+    h.w.faults.refuseOp = 'agent.label';
+    const begun = json(
+      await agentBegin(h, s, { label: 'Work', app: 'claude-code' }),
+    ) as unknown as Begun;
+    const res = await agentFinish(
+      h,
+      s,
+      begun.nonce,
+      getResponse(auth, begun.publicKey, h.origin),
+      true,
+    );
+    expect(res.status).toBe(409);
+    expect(json(res)['status']).toBe('not_applied');
+    expect(h.w.entries.has('work')).toBe(false);
+    expect(h.w.desk.writes).toBe(0);
+    // The test directory's discardNew drops the folder; the keys the server stored are named in
+    // the folder's agentId, which is gone with it.
+    expect(h.w.ids.has('work')).toBe(false);
   });
 
   it('the backup code works too; a wrong code keeps the plan', async () => {

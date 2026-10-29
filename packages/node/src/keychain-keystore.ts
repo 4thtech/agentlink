@@ -13,6 +13,7 @@ import {
   decodeHex,
   decodeHex0x,
   directTransactionSnapshot,
+  encodeHex0x,
   dropRequestEpoch,
   dropRequestSnapshot,
   encodeHex,
@@ -495,10 +496,16 @@ async function storeNewKeychainAgent(
 export class HeldAgentSeed {
   #seed: Uint8Array | null;
   readonly agentId: string;
+  /** IR-W4-ONE-TOUCH L-1: the card's agent keys at epoch 0 (`0x` hex), for the plan's descriptor. */
+  readonly agentNostr: string;
+  readonly agentEnc: string;
 
   private constructor(seed: Uint8Array) {
     this.#seed = seed;
     this.agentId = deriveAgentId(seed);
+    const identity = derivePublicIdentity(seed, 0);
+    this.agentNostr = encodeHex0x(identity.agentNostr);
+    this.agentEnc = encodeHex0x(identity.agentEnc);
   }
 
   /** A fresh random seed (04 §2.1) and its agentId (04 §2.9). */

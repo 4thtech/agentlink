@@ -32,6 +32,7 @@ import {
 } from '@4thtech-io/core';
 import {
   KeyStoreError,
+  agentCardNameHash,
   agentFingerprint,
   canonicalize,
   concatBytes,
@@ -106,6 +107,12 @@ export interface CreateConnectPlanInput {
   readonly sendFolder?: string;
   /** The picked app's id and the `changeId` computed for this agentId; absent: no app.connect. */
   readonly app?: { readonly app: string; readonly changeId: string };
+  /**
+   * IR-W4-ONE-TOUCH L-1: the new agent's card keys (`0x` hex) from the seed held since begin; the
+   * card is then signed only with exactly these. Absent for an agent that already exists (its own
+   * KeyStore builds the card, and the agentEvm binds it).
+   */
+  readonly agentKeys?: { readonly agentNostr: string; readonly agentEnc: string };
   /** Unix seconds: every body's `issuedAt`. */
   readonly nowSeconds: number;
 }
@@ -123,13 +130,19 @@ export function buildCreateConnectPlan(input: CreateConnectPlanInput): CreateCon
     issuedAt: nowSeconds,
     expiresAt: nowSeconds + PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
   });
+  // IR-W4-ONE-TOUCH L-1: the whole descriptor the card must match when it is signed: the agent
+  // (and, for keys held since begin, its card keys), the owner, and the name (nameHash).
   const card = frozenCopy({
     kind: 'card',
     agentEvm: agentId,
+    ...(input.agentKeys === undefined
+      ? {}
+      : { agentNostr: input.agentKeys.agentNostr, agentEnc: input.agentKeys.agentEnc }),
     ownerEvm: encodeHex0x(owner.ownerEvm),
     ownerNostr: encodeHex0x(owner.ownerNostr),
     ownerEnc: encodeHex0x(owner.ownerEnc),
     name: label,
+    nameHash: encodeHex0x(agentCardNameHash(label)),
   });
   const policy =
     input.sendFolder === undefined
@@ -246,7 +259,11 @@ export class PlanOwnerSession implements OwnerSession {
         message['agentEvm'] !== card['agentEvm'] ||
         message['ownerEvm'] !== card['ownerEvm'] ||
         message['ownerNostr'] !== card['ownerNostr'] ||
-        message['ownerEnc'] !== card['ownerEnc']
+        message['ownerEnc'] !== card['ownerEnc'] ||
+        // IR-W4-ONE-TOUCH L-1: the name the plan showed, and the keys held since begin.
+        message['nameHash'] !== card['nameHash'] ||
+        (card['agentNostr'] !== undefined && message['agentNostr'] !== card['agentNostr']) ||
+        (card['agentEnc'] !== undefined && message['agentEnc'] !== card['agentEnc'])
       ) {
         throw ownerOperationRefused();
       }

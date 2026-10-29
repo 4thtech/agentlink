@@ -975,8 +975,6 @@ interface PlannedApp {
   readonly changeId: string;
   /** The desk that planned it (first run's or the open agent's), to plan again before writing. */
   readonly desk: { readonly plan: LocalUiAiApps['plan'] };
-  /** The app already runs this folder: nothing to sign or write for it. */
-  readonly already?: true;
 }
 
 /** W4-ONE-TOUCH (04 §2.8): New agent's held plan, in memory only. */
@@ -2927,8 +2925,8 @@ export async function startApprovalServerWith(
   /**
    * W4-ONE-TOUCH (04 §2.8 Begin): plans the picked AI app's change for `folder` and `agentId` with
    * `desk` (entry-only, the §2.5 "Writing AI app configs" rules are the desk's). A fixed refusal when
-   * Claude Desktop runs or the app can't be connected; an app that already runs `folder` needs no
-   * write (`already`).
+   * Claude Desktop runs or the app cannot be connected, including an entry that already names `folder`
+   * (IR-W4-ONE-TOUCH L-2).
    */
   const planApp = async (
     desk: { readonly plan: LocalUiAiApps['plan'] },
@@ -2951,31 +2949,9 @@ export async function startApprovalServerWith(
     const copy = (e: JsonObject | null): JsonObject | null =>
       e === null ? null : (parseJson(canonicalize(e)) as JsonObject);
     const name = String(planned.name);
-    if (planned.kind === 'disconnect') {
-      // The app already runs this folder: nothing to write, nothing to sign for it.
-      if (planned.oldAgent !== folder) return 'app_unavailable';
-      return {
-        planned: {
-          app,
-          name,
-          folder,
-          kind: 'connect',
-          identity: planned.identity,
-          changeId: '',
-          desk,
-          already: true,
-        },
-        shown: {
-          app,
-          name,
-          kind: 'connect',
-          path: String(planned.path),
-          oldEntry: copy(planned.oldEntry),
-          newEntry: copy(planned.oldEntry),
-          oldAgent: null,
-        },
-      };
-    }
+    // IR-W4-ONE-TOUCH L-2: an entry that already names the reserved folder (left over, while no such
+    // agent exists) is never claimed as a connection without a signed app.connect: refused.
+    if (planned.kind === 'disconnect') return 'app_unavailable';
     const change = changeOf(planned, app, folder, agentId);
     if (change === undefined) return 'app_unavailable';
     return {
@@ -3009,13 +2985,6 @@ export async function startApprovalServerWith(
       return 'changed';
     }
     if (fresh.status === 'quit_first') return 'quit_first';
-    if (planned.already === true) {
-      return fresh.status === 'change' &&
-        fresh.kind === 'disconnect' &&
-        fresh.oldAgent === planned.folder
-        ? { status: 'ok', fresh }
-        : 'changed';
-    }
     const change = changeOf(fresh, planned.app, planned.folder, agentId);
     if (
       change === undefined ||
@@ -3030,8 +2999,8 @@ export async function startApprovalServerWith(
 
   /**
    * W4-ONE-TOUCH (04 §2.8 steps 7 and 8): writes the AI app entry last, after the owner session is
-   * closed and its secrets wiped. `connected` only when the file was written (or already ran this
-   * folder); otherwise the stored `app.connect` is recorded as not applied (its nonce stays used)
+   * closed and its secrets wiped. `connected` only when the file was written; otherwise the stored
+   * `app.connect` is recorded as not applied (its nonce stays used)
    * and the agent stays as it is. Undefined when no app was picked.
    */
   const writeEntry = async (
@@ -3041,11 +3010,6 @@ export async function startApprovalServerWith(
     actions: FirstPolicyActions | undefined,
   ): Promise<'connected' | 'not_connected' | undefined> => {
     if (planned === undefined || plan === undefined) return undefined;
-    if (planned.already === true) {
-      return typeof (await recheckApp(planned, plan.agentId)) === 'object'
-        ? 'connected'
-        : 'not_connected';
-    }
     const nonce = plan.connect?.['nonce'];
     if (stored !== 'stored' || typeof nonce !== 'string') return 'not_connected';
     let written = false;
@@ -3305,8 +3269,12 @@ export async function startApprovalServerWith(
           owner: keys,
           label,
           folder,
+          // IR-W4-ONE-TOUCH L-1: the card keys held since begin (first run with no agent yet).
+          ...(agentSeed === undefined
+            ? {}
+            : { agentKeys: { agentNostr: agentSeed.agentNostr, agentEnc: agentSeed.agentEnc } }),
           ...(send === undefined ? {} : { sendFolder: send }),
-          ...(planned === undefined || planned.already === true
+          ...(planned === undefined
             ? {}
             : { app: { app: planned.app, changeId: planned.changeId } }),
           nowSeconds: Math.floor(now() / 1000),
@@ -3520,8 +3488,15 @@ export async function startApprovalServerWith(
         setup.firstCard,
         held.label ?? (created === undefined ? undefined : FIRST_AGENT_LABEL),
       );
-      const firstCard =
-        held.plan === undefined ? labelled : (plannedFirst(setup.firstCard, held.plan) ?? labelled);
+      // IR-W4-ONE-TOUCH (Opus a): with a plan, only the restricted plan session signs; when the agent
+      // cannot take the plan's parts, nothing is signed (fail closed, never a silent fallback).
+      const planned =
+        held.plan === undefined ? undefined : plannedFirst(setup.firstCard, held.plan);
+      if (held.plan !== undefined && planned === undefined) {
+        await answer(res, 500, 'failed', {}, { reason: 'internal' });
+        return;
+      }
+      const firstCard = planned ?? labelled;
       let result: Awaited<ReturnType<typeof completeOwnerSetup>>;
       try {
         result = await completeOwnerSetup(
@@ -3805,13 +3780,13 @@ export async function startApprovalServerWith(
       }));
       const plan = buildCreateConnectPlan({
         agentId: seed.agentId,
+        // IR-W4-ONE-TOUCH L-1: the card keys held since begin.
+        agentKeys: { agentNostr: seed.agentNostr, agentEnc: seed.agentEnc },
         owner: context.owner,
         label,
         folder,
         ...(send.status === 'ready' ? { sendFolder: send.folder } : {}),
-        ...(planned === undefined || planned.already === true
-          ? {}
-          : { app: { app: planned.app, changeId: planned.changeId } }),
+        ...(planned === undefined ? {} : { app: { app: planned.app, changeId: planned.changeId } }),
         nowSeconds: Math.floor(now() / 1000),
       });
       const statement: PlanStatement = {
