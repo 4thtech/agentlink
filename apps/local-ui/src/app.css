@@ -40,6 +40,13 @@ main.al-first-run {
   box-sizing: border-box;
 }
 
+/* W4-SHELL (b11 §34.2): the switcher's menu opens from the sidebar over the content, so the sidebar
+   stacks above it (the chrome material makes each its own layer). */
+.al-shell-main > .al-side {
+  position: relative;
+  z-index: 3;
+}
+
 /* W4-SHELL (b11 §34.6): the Settings sub-navigation in two groups, Settings and Advanced. */
 .al-subnav-group {
   display: flex;
