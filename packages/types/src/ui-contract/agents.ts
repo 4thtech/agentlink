@@ -185,9 +185,9 @@ export const AGENTS_OWNER = {
 } as const;
 
 /**
- * Remove (U3-e). The route is registered and answers 501 `not_available` until U3-e lands; the
- * documented answers are what the page maps (U3-e fills the node side of these when it replaces the
- * stub).
+ * Remove (U3-e). The real route answers `{status}` with these codes (the server's remove gate;
+ * `REMOVE_STATUS` in the node package). `stub` is the 501 `not_available` answer of a host without
+ * the removal seam: the page still maps it.
  */
 export const AGENTS_REMOVE = {
   input: { name: 'work', typedLabel: 'Work' } satisfies AgentsRemoveInput,
@@ -196,8 +196,10 @@ export const AGENTS_REMOVE = {
     { answer: { status: 200, body: { status: 'removed' } }, outcome: 'done' },
     { answer: { status: 409, body: { status: 'undeliverable' } }, outcome: 'contacts_unreachable' },
     { answer: { status: 409, body: { status: 'label_mismatch' } }, outcome: 'label_mismatch' },
-    { answer: { status: 409, body: { status: 'agent_removing' } }, outcome: 'agent_removing' },
-    { answer: { status: 409, body: { status: 'in_use' } }, outcome: 'in_use' },
     { answer: { status: 404, body: { status: 'unknown_agent' } }, outcome: 'unknown_agent' },
+    { answer: { status: 400, body: { status: 'invalid' } }, outcome: 'invalid' },
+    { answer: { status: 409, body: { status: 'in_use' } }, outcome: 'in_use' },
+    { answer: { status: 409, body: { status: 'agent_changed' } }, outcome: 'agent_changed' },
+    { answer: { status: 409, body: { status: 'busy' } }, outcome: 'busy' },
   ] satisfies readonly { answer: UiAnswer; outcome: string }[],
 } as const;
