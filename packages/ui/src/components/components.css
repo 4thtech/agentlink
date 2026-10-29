@@ -193,6 +193,18 @@ body {
   border-radius: var(--al-radius-md);
   background: var(--al-color-bg-sunken);
 }
+.al-input-wrap-multi {
+  height: auto;
+  align-items: stretch;
+}
+.al-textarea {
+  height: auto;
+  min-block-size: calc(var(--al-size-control-lg) * 2);
+  padding-block: var(--al-space-3);
+  resize: vertical;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
 .al-input-wrap:focus-within {
   outline: var(--al-focus-ring-width) solid var(--al-color-focus-ring);
   outline-offset: var(--al-focus-ring-offset);
@@ -234,6 +246,9 @@ body {
   }
   .al-input-wrap {
     height: var(--al-size-control-lg);
+  }
+  .al-input-wrap-multi {
+    height: auto;
   }
 }
 .al-switch-row {

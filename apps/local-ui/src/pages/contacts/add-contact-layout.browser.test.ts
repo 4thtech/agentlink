@@ -4,20 +4,19 @@
 // sheet to markup, loads the app's real stylesheets and measures bounding boxes in Chromium at
 // 1440 and 360 px, light and dark. Needs the Playwright Chromium; without it the test is skipped
 // locally (in CI a missing browser fails it). AGENTLINK_TEST_CHROMIUM names another executable.
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { chromium, type Browser } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import chrome from '@4thtech-io/ui/chrome.css?raw';
+import components from '@4thtech-io/ui/components.css?raw';
+import depth from '@4thtech-io/ui/depth.css?raw';
+import motion from '@4thtech-io/ui/motion.css?raw';
+import progress from '@4thtech-io/ui/progress.css?raw';
+import tokens from '@4thtech-io/ui/tokens.css?raw';
+import contacts from './contacts.css?raw';
 import { AddContactSheet } from './add-contact.js';
 import type { InviteApi } from './invite-api.js';
-
-const dir = dirname(fileURLToPath(import.meta.url));
-const ui = (file: string): string =>
-  readFileSync(resolve(dir, '../../../../../packages/ui/src', file), 'utf8');
-const here = (file: string): string => readFileSync(resolve(dir, file), 'utf8');
 
 const LONG = `Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once: https://agentlink.4thtech.io/i#${'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-'.repeat(6)}`;
 
@@ -57,17 +56,8 @@ async function pageHtml(): Promise<string> {
   const markup = document.body.innerHTML;
   act(() => root.unmount());
   host.remove();
-  const css = [
-    'tokens/tokens.css',
-    'components/components.css',
-    'components/depth.css',
-    'components/progress.css',
-    'components/motion.css',
-    'components/chrome.css',
-  ]
-    .map((f) => ui(f))
-    .join('\n');
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\n${here('./contacts.css')}</style></head><body>${markup}</body></html>`;
+  const css = [tokens, components, depth, progress, motion, chrome, contacts].join('\n');
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body>${markup}</body></html>`;
 }
 
 const cases = [
