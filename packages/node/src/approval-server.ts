@@ -800,6 +800,9 @@ const NO_AGENT_SOURCE: ApprovalServerSource = Object.freeze<ApprovalServerSource
  * `no_agent` after every guard and before any handler, presence check or agent is reached. The switch
  * kind keeps its own gate (it opens only a listed agent).
  */
+/** U3-g-b (IR-U3-g-b-1 H-1): marks the successful first-run finish that opened the first agent. */
+const GENERATION_ADOPTED_HEADER = 'X-AgentLink-Generation-Adopted';
+
 const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
   'GET /api/ui/first-run',
   'GET /api/ui/apps',
@@ -1168,6 +1171,10 @@ export async function startApprovalServerWith(
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
       // U3-d: create an agent and save a verified label, in the app host only.
       ...(options.host === undefined ? {} : { agentsManage }),
+      // U3-g-b (IR-U3-g-b-1 L): with no agent yet, the first-run page's owner state is the real one.
+      ...(agentUi === undefined && options.host?.firstRun !== undefined
+        ? { setupBlocked: () => setupBlockedNoAgent() }
+        : {}),
     });
   let uiContext: LocalUiContext = buildUiContext();
 
@@ -2625,6 +2632,15 @@ export async function startApprovalServerWith(
     return opened;
   };
 
+  /**
+   * U3-g-b: with no agent open, true when first run cannot set up an owner here (an owner or any
+   * agent folder exists): `GET /api/ui/first-run` then answers `set_up`. Rejects on errors.
+   */
+  const setupBlockedNoAgent = async (): Promise<boolean> => {
+    const firstRun = noAgentFirstRun();
+    return firstRun === undefined || (await ownerExistsFor({ kind: 'first', firstRun }));
+  };
+
   /** U3-d: the setup's first card with its first label, when `begin` was given one. */
   const withFirstLabel = (first: FirstAgentCard, label: string | undefined): FirstAgentCard => {
     const actions = labelActionsOf(first.firstPolicy?.actions);
@@ -2963,9 +2979,13 @@ export async function startApprovalServerWith(
           }
           created = undefined;
           await first.close().catch(() => undefined);
-          await host?.adoptFirst(first.name, requestHolds.get(req));
+          const adopted = (await host?.adoptFirst(first.name, requestHolds.get(req))) === true;
           // The answer names the agent now open, with the new generation (stamped below).
           await labelReady;
+          // IR-U3-g-b-1 H-1: the one answer whose new generation the page adopts instead of
+          // reloading (apps/local-ui generation.ts accepts it only on a 200 finish), so the one-time
+          // backup code stays on screen. Set nowhere else.
+          if (adopted) res.setHeader(GENERATION_ADOPTED_HEADER, '1');
         } else if (result.label === 'saved' && held.label !== undefined) {
           await labelSavedForOpen(held.label);
         }

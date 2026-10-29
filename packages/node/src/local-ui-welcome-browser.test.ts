@@ -293,16 +293,17 @@ describe('first run with no agent yet in a real browser (U3-g-b)', () => {
 
     // The next change the page sends (through the guarded fetch) carries generation 2: it reaches
     // the route (a U3-f stub today) instead of the `agent_changed` refusal.
-    const answer = await page.evaluate(async () => {
-      const csrf =
-        document.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content') ?? '';
+    // A string, as the page's own code (this package has no DOM types).
+    const answer = await page.evaluate<{ status: number; body: string }>(`(async () => {
+      const meta = document.querySelector('meta[name="agentlink-csrf"]');
+      const csrf = meta === null ? '' : meta.getAttribute('content');
       const res = await fetch('/api/ui/apps/apply', {
         method: 'POST',
         headers: { 'X-AgentLink-CSRF': csrf, 'Content-Type': 'application/octet-stream' },
         body: new Uint8Array(0),
       });
       return { status: res.status, body: await res.text() };
-    });
+    })()`);
     expect(answer.status).not.toBe(409);
     expect(answer.body).not.toContain('agent_changed');
     expect(answer.body).not.toContain('no_agent');
