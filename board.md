@@ -11,7 +11,7 @@ _Updated 2026-10-29 by @talirezun_
 |---|---|---|---|---|
 | M0-2 Repos, CI, branch protection | @talirezun | in-progress | main pushed; settings pending | 2026-10-12 |
 | M0-4 Decide D-11, D-12, D-14 | @talirezun | in-progress | — | 2026-10-12 |
-| Orchestrator waves | @talirezun (agents) | in-progress | usability wave 3 merged (#660–#691); 0.4.4 version PR #673 awaits owner approval | 2026-10-29 |
+| Orchestrator waves | @talirezun (agents) | in-progress | 0.4.4 on npm latest (usability wave 3); release-check fix #693 in review; 0.4.5 next with GitHub Release + desktop bundles | 2026-10-29 |
 | Cloud agent as 0.5.0 | @talirezun (agents) | ready | groundwork merged (D-131 spec #541, core M2-3a #548); starts after the visual refresh | 2026-10-27 |
 | Release 0.4.0 | @talirezun | done 27 Oct | npm latest 0.4.0; GitHub Release v0.4.0 with signed desktop bundles (macOS arm64/x64, Windows) | 2026-10-27 |
 
