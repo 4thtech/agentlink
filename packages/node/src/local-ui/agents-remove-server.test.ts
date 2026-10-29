@@ -773,8 +773,9 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
     for (const item of itemsOf(w.work.agentId)) keychain.items.delete(item);
     const ownerBefore = OWNER_ACCOUNTS.map((a) => keychain.items.get(a));
     const res = await remove(w, { name: 'work', typedLabel: 'Work' });
-    expect(res.json).not.toEqual({ status: 'removed' });
-    expect(res.status).not.toBe(200);
+    // The stored owner's seed does not derive the entry's key: one answer, presence_rejected.
+    expect(res.status).toBe(403);
+    expect(res.json).toEqual({ status: 'presence_rejected' });
     expect(w.log).not.toContain('removeFolder work');
     expect(w.revoked.get(w.work.agentId)).toBe(text);
     expect(OWNER_ACCOUNTS.map((a) => keychain.items.get(a))).toEqual(ownerBefore);

@@ -170,6 +170,56 @@ describe('the removal port (U3-e, 06 §6 "Open agents and removal")', () => {
     expect(await directory.read('work')).toBeUndefined();
   });
 
+  // HOTFIX-045-REMOVE (IR round 1): a 0.4.4 removal that crashed or failed can have left a stale
+  // `open.lock-journal`. Inside the exclusive hold that one name is removed; nothing else is.
+  it.each([0, 512])(
+    'a stale open.lock-journal (%d bytes) left by 0.4.4 no longer blocks the folder delete (HOTFIX-045-REMOVE)',
+    async (size) => {
+      const agentId = newId();
+      const paths = await writeAgentConfig(home, {
+        v: 1,
+        name: 'work',
+        agentId,
+        keyStore: 'keychain',
+        removing: true,
+      });
+      await writeFile(join(paths.dir, 'store.sqlite'), 'x', { mode: 0o600 });
+      holdAgentFolderShared(paths.dir).release();
+      await writeFile(join(paths.dir, 'open.lock-journal'), new Uint8Array(size), { mode: 0o600 });
+      const port = uiRemovalPort({ home });
+      const directory = agentDirectory(home);
+      await port.exclusive('work', () => directory.removeFolder('work'));
+      await expect(stat(paths.dir)).rejects.toThrow();
+    },
+  );
+
+  it.runIf(POSIX)(
+    'a link named open.lock-journal, or any other unknown file, still refuses the folder delete (HOTFIX-045-REMOVE)',
+    async () => {
+      const agentId = newId();
+      const paths = await writeAgentConfig(home, {
+        v: 1,
+        name: 'work',
+        agentId,
+        keyStore: 'keychain',
+        removing: true,
+      });
+      const target = join(home, 'elsewhere');
+      await writeFile(target, 'keep', { mode: 0o600 });
+      await symlink(target, join(paths.dir, 'open.lock-journal'));
+      const port = uiRemovalPort({ home });
+      const directory = agentDirectory(home);
+      await expect(port.exclusive('work', () => directory.removeFolder('work'))).rejects.toThrow();
+      expect((await lstat(join(paths.dir, 'open.lock-journal'))).isSymbolicLink()).toBe(true);
+      expect(await readFile(target, 'utf8')).toBe('keep');
+      expect((await stat(join(paths.dir, 'config.json'))).isFile()).toBe(true);
+      await rm(join(paths.dir, 'open.lock-journal'));
+      await writeFile(join(paths.dir, 'notes.txt'), 'x', { mode: 0o600 });
+      await expect(port.exclusive('work', () => directory.removeFolder('work'))).rejects.toThrow();
+      expect((await stat(join(paths.dir, 'notes.txt'))).isFile()).toBe(true);
+    },
+  );
+
   it('opens an agent only inside its own exclusive hold', async () => {
     const agentId = newId();
     await writeAgentConfig(home, { v: 1, name: 'work', agentId, keyStore: 'keychain' });

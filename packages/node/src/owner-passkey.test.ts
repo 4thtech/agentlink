@@ -560,6 +560,24 @@ describe('unlocking by the owner Nostr key, with no card (HOTFIX-045-REMOVE, 04 
     ).rejects.toMatchObject({ code: 'presence_required' });
   });
 
+  it('a damaged owner item (not 90 bytes) is presence_rejected, as documented', async () => {
+    const original = await keychain.get(OWNER_ACCOUNT);
+    if (original === null) throw new Error('unreachable');
+    try {
+      for (const bad of [original.slice(0, 89), new Uint8Array(91)]) {
+        await keychain.set(OWNER_ACCOUNT, bad);
+        await expect(
+          KeychainOwnerKeyStore.unlockForOwnerNostr(keychain, owner.ownerNostr, {
+            kind: 'passphrase',
+            secret: ownerCode(),
+          }),
+        ).rejects.toMatchObject({ code: 'presence_rejected' });
+      }
+    } finally {
+      await keychain.set(OWNER_ACCOUNT, original);
+    }
+  });
+
   it('refuses a planted owner-passkey blob of another owner sealed under that passkey', async () => {
     const auth = new VirtualPrfAuthenticator();
     const planted = await sealPasskeySeed(
