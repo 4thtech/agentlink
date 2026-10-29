@@ -8,7 +8,7 @@
 // Diff base: origin/wave-4 while the branch sits on top of it, else origin/main; `--base <ref>` overrides.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadWorkspace } from '../ci/select-affected.mjs';
 import { buildPlan, parseChanged, pickBase, summarize } from './plan.mjs';
@@ -47,19 +47,20 @@ function changedFiles(base) {
   return parseChanged(diff.out, untracked.out);
 }
 
-function run(step) {
-  // A pnpm run through `pnpm verify` hands us its own entry point; otherwise use `pnpm` on PATH.
+// The pnpm that started us (`pnpm verify` sets npm_execpath; pnpm 12 ships a native binary, older
+// ones a script), else `pnpm` on PATH.
+function pnpmCommand() {
   const exec = process.env.npm_execpath;
-  const viaNode = exec && /pnpm\.[cm]?js$/.test(exec);
+  if (!exec || !/^pnpm/.test(basename(exec))) return ['pnpm', []];
+  return /\.[cm]?js$/.test(exec) ? [process.execPath, [exec]] : [exec, []];
+}
+
+function run(step) {
+  const [pnpm, pnpmArgs] = pnpmCommand();
   const [cmd, args] =
     step.cmd === 'node'
       ? [process.execPath, step.args]
-      : viaNode
-        ? [
-            process.execPath,
-            [exec, ...(step.cmd === 'turbo' ? ['exec', 'turbo'] : []), ...step.args],
-          ]
-        : ['pnpm', [...(step.cmd === 'turbo' ? ['exec', 'turbo'] : []), ...step.args]];
+      : [pnpm, [...pnpmArgs, ...(step.cmd === 'turbo' ? ['exec', 'turbo'] : []), ...step.args]];
   console.log(`\n== ${step.label}`);
   const t = Date.now();
   const r = spawnSync(cmd, args, {
@@ -67,6 +68,7 @@ function run(step) {
     stdio: 'inherit',
     env: { ...process.env, ...step.env },
   });
+  if (r.error) console.error(`could not start ${cmd}: ${r.error.message}`);
   return { id: step.id, label: step.label, ok: r.status === 0, ms: Date.now() - t };
 }
 
