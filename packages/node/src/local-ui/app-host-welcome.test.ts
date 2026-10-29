@@ -55,6 +55,7 @@ import {
   type AppHostAgent,
 } from './app-host.js';
 import { createLocalUiRoutes } from './routes.js';
+import type { LocalUiAiApps, LocalUiAiAppView } from './context.js';
 import type { JoinCheck } from './join-desk.js';
 import { CoreError } from '@4thtech-io/core';
 
@@ -214,7 +215,7 @@ interface World {
   open(name: string): Promise<AppHostAgent | undefined>;
 }
 
-function world(): World {
+function world(agentDesk?: LocalUiAiApps): World {
   const keychain = new MapKeychain();
   const entries = new Map<string, AgentDirectoryEntry>();
   const ids = new Map<string, string>();
@@ -309,7 +310,7 @@ function world(): World {
       name,
       label: entry.label,
       source,
-      localUi: { client },
+      localUi: { client, ...(agentDesk === undefined ? {} : { aiApps: agentDesk }) },
       firstCard: {
         agent: agentId,
         name,
@@ -343,7 +344,14 @@ interface Harness {
 }
 
 async function harness(
-  options: { firstRun?: false; w?: World; waitingInvite?: string; checkInvite?: JoinCheck } = {},
+  options: {
+    firstRun?: false;
+    w?: World;
+    waitingInvite?: string;
+    checkInvite?: JoinCheck;
+    /** U3-g-c: the CLI's AI apps reader for the no-agent host (list only). */
+    aiAppsList?: Pick<LocalUiAiApps, 'list'>;
+  } = {},
 ): Promise<Harness> {
   const w = options.w ?? world();
   const opened: string[] = [];
@@ -372,6 +380,8 @@ async function harness(
             }),
         // U3-invite: `join` on a computer with no agent folder at all.
         ...(options.waitingInvite === undefined ? {} : { waitingInvite: options.waitingInvite }),
+        // U3-g-c: the AI apps reader, read-only, while no agent is open.
+        ...(options.aiAppsList === undefined ? {} : { aiAppsList: options.aiAppsList }),
       },
       onEvent: (event) => void events.push(event),
     },
@@ -860,4 +870,125 @@ describe('U3-invite: join with an empty agent folder ends on the waiting invite'
     expect(res.status).toBe(200);
     expect(JSON.parse((await h.get('/api/ui/join', s)).body)).toEqual({ state: 'none' });
   });
+});
+
+/** U3-g-c: a recording AI apps desk (the CLI's harness desk stands behind it in `ui`). */
+function recordingDesk(tag: string, calls: string[]): LocalUiAiApps {
+  const views: LocalUiAiAppView[] = [
+    {
+      app: 'claude-code',
+      name: 'Claude Code',
+      path: '~/.claude.json',
+      state: { kind: 'none' },
+      quitFirst: false,
+    },
+    {
+      app: 'cursor',
+      name: 'Cursor',
+      path: '~/.cursor/mcp.json',
+      state: { kind: 'foreign' },
+      quitFirst: false,
+    },
+  ];
+  return {
+    list: () => {
+      calls.push(`${tag} list`);
+      return Promise.resolve({ apps: views, desktopRunning: false });
+    },
+    plan: (app) => {
+      calls.push(`${tag} plan`);
+      return Promise.resolve({ status: 'not_found', app, name: '' });
+    },
+    agentIdOf: () => {
+      calls.push(`${tag} agentIdOf`);
+      return Promise.resolve(undefined);
+    },
+  };
+}
+
+const WELCOME_APPS = {
+  desktopRunning: false,
+  apps: [
+    {
+      app: 'claude-code',
+      name: 'Claude Code',
+      path: '~/.claude.json',
+      state: 'not_connected',
+      quitFirst: false,
+    },
+    {
+      app: 'cursor',
+      name: 'Cursor',
+      path: '~/.cursor/mcp.json',
+      state: 'not_ours',
+      quitFirst: false,
+    },
+  ],
+};
+
+describe('U3-g-c: Welcome lists the AI apps before the first agent exists', () => {
+  it('GET /api/ui/apps lists the detected apps with no agent open (entry-only, read-only)', async () => {
+    const calls: string[] = [];
+    const h = await harness({ aiAppsList: recordingDesk('welcome', calls) });
+    const s = await h.session();
+    const res = await h.get('/api/ui/apps', s);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual(WELCOME_APPS);
+    // Only the list was read: no plan, no agent lookup, no agent opened.
+    expect(calls).toEqual(['welcome list']);
+    expect(h.w.log).toEqual([]);
+  });
+
+  it('preview, apply and disconnect still answer no_agent before finish, and nothing is planned', async () => {
+    const calls: string[] = [];
+    const h = await harness({ aiAppsList: recordingDesk('welcome', calls) });
+    const s = await h.session();
+    const preview = await h.get('/api/ui/apps/preview?app=claude-code&agent=default', s);
+    expect(preview.status).toBe(409);
+    expect(JSON.parse(preview.body)).toEqual(NO_AGENT);
+    for (const path of ['/api/ui/apps/apply', '/api/ui/apps/disconnect']) {
+      const res = await h.post(path, s, new Uint8Array(0), {
+        'X-AgentLink-Input': input({ changeId: 'x'.repeat(43) }),
+      });
+      expect({ path, status: res.status, body: JSON.parse(res.body) as unknown }).toEqual({
+        path,
+        status: 409,
+        body: NO_AGENT,
+      });
+    }
+    expect(calls).toEqual([]);
+    expect(h.w.log).toEqual([]);
+  });
+
+  it('without the reader the list stays not_available (never another source)', async () => {
+    const h = await harness();
+    const s = await h.session();
+    const res = await h.get('/api/ui/apps', s);
+    expect(JSON.parse(res.body)).not.toEqual(NO_AGENT);
+    expect(JSON.parse(res.body)).not.toHaveProperty('apps');
+  });
+
+  it("after finish the host uses the first agent's full desk (preview reaches it), not the reader", async () => {
+    const welcomeCalls: string[] = [];
+    const agentCalls: string[] = [];
+    const h = await harness({
+      w: world(recordingDesk('agent', agentCalls)),
+      aiAppsList: recordingDesk('welcome', welcomeCalls),
+    });
+    const s = await h.session();
+    const { finish } = await firstRun(h, s);
+    expect(finish?.status).toBe(200);
+    const next = { ...s, generation: '2' };
+    const list = await h.get('/api/ui/apps', next);
+    expect(JSON.parse(list.body)).toEqual(WELCOME_APPS);
+    const preview = await h.get('/api/ui/apps/preview?app=claude-code&agent=default', next);
+    expect(JSON.parse(preview.body)).not.toEqual(NO_AGENT);
+    expect(agentCalls).toContain('agent list');
+    expect(agentCalls).toContain('agent agentIdOf');
+    expect(welcomeCalls.filter((c) => c !== 'welcome list')).toEqual([]);
+    // The first agent's desk answers the list now, not the no-agent reader.
+    const before = welcomeCalls.length;
+    await h.get('/api/ui/apps', next);
+    expect(welcomeCalls.length).toBe(before);
+  }, 60_000);
 });

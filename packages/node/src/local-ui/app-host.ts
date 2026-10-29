@@ -42,7 +42,7 @@
 // with `adoptFirst`: the generation increases first, the requests in flight drain, then the agent is
 // opened through the same `open` path as a switch. Nothing is signed here.
 import type { ApprovalServerSource } from '../approval-server.js';
-import type { LocalUiOptions } from './context.js';
+import type { LocalUiAiApps, LocalUiOptions } from './context.js';
 import type { AgentRemovalPort } from './api/agents-remove.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
 
@@ -147,6 +147,14 @@ export interface AppHostOptions {
    * `remove` when it closes. Absent: this host takes no handoff.
    */
   readonly handoff?: AppHostHandoffRecord;
+  /**
+   * U3-g-c (08 §1 "with no agent yet, Welcome"): the CLI's AI apps reader (the U3-f harness desk),
+   * LIST ONLY, for `GET /api/ui/apps` while no agent is open, so Welcome's "Pick your AI app" can list
+   * the apps on a computer with no agent yet. Entry-only, like the desk's list. It never plans or
+   * writes: preview, apply and disconnect stay refused with no agent open (`no_agent`), and once an
+   * agent is open its own full desk (`localUi.aiApps`) answers every AI apps route instead.
+   */
+  readonly aiAppsList?: Pick<LocalUiAiApps, 'list'>;
 }
 
 /** U3-invite: the handoff record (08 §4). The token is not the page's session token. */

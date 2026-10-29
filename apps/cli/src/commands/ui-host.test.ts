@@ -7,7 +7,11 @@ import type {
   ApprovalServerOptions,
   LocalUiAssets,
 } from '@4thtech-io/node';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { createAiAppsDesk } from '../harness/app-desk.js';
 import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
 import { openUiHostAgent, startUiWelcome, type UiHostDeps, type UiWelcomeDeps } from './ui-host.js';
 
@@ -199,5 +203,71 @@ describe('startUiWelcome (U3-g-b)', () => {
     const w = welcome(over);
     expect(await startUiWelcome(w.deps)).toBeUndefined();
     expect(w.started).toEqual([]);
+  });
+
+  // U3-g-c: Welcome's "Pick your AI app" lists the apps before the first agent exists.
+  it('U3-g-c: hands the host the harness reader, list only (no plan, no agent lookup)', async () => {
+    const calls: string[] = [];
+    const listed = { apps: [], desktopRunning: false };
+    const w = welcome();
+    await startUiWelcome({
+      ...w.deps,
+      aiApps: () => ({
+        list: () => {
+          calls.push('list');
+          return Promise.resolve(listed);
+        },
+        plan: () => Promise.reject(new Error('never')),
+        agentIdOf: () => Promise.reject(new Error('never')),
+      }),
+    });
+    const reader = w.started[0]?.host?.aiAppsList;
+    expect(reader).toBeDefined();
+    // Read-only: the host gets the list and nothing that plans or writes.
+    expect(Object.keys(reader ?? {})).toEqual(['list']);
+    await expect(reader?.list()).resolves.toBe(listed);
+    expect(calls).toEqual(['list']);
+    // No agent is open: the per-agent options carry no desk (apply and preview stay refused).
+    expect(w.started[0]?.localUi?.aiApps).toBeUndefined();
+  });
+
+  it('U3-g-c: the real harness desk lists a detected app entry-only (no other server shown)', async () => {
+    const home = await realpath(await mkdtemp(join(tmpdir(), 'agentlink-u3-g-c-')));
+    try {
+      const secret = 'other-server-value-u3gc';
+      await writeFile(
+        join(home, '.claude.json'),
+        `${JSON.stringify(
+          {
+            numStartups: 3,
+            mcpServers: {
+              'other-u3gc': { type: 'stdio', command: 'other-cmd-u3gc', env: { TOKEN: secret } },
+            },
+          },
+          null,
+          2,
+        )}\n`,
+        { mode: 0o600 },
+      );
+      const w = welcome();
+      await startUiWelcome({
+        ...w.deps,
+        aiApps: () =>
+          createAiAppsDesk({ home, env: {}, desktopRunning: () => Promise.resolve(false) }),
+      });
+      const listed = await w.started[0]?.host?.aiAppsList?.list();
+      const claude = listed?.apps.find((a) => a.app === 'claude-code');
+      expect(claude?.state).toEqual({ kind: 'none' });
+      expect(JSON.stringify(listed)).not.toContain(secret);
+      expect(JSON.stringify(listed)).not.toContain('other-');
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('U3-g-c: without a reader the host gets none', async () => {
+    const w = welcome();
+    await startUiWelcome(w.deps);
+    expect(w.started[0]?.host?.aiAppsList).toBeUndefined();
   });
 });
