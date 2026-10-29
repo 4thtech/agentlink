@@ -1190,6 +1190,81 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
     }
   }
 
+  /**
+   * HOTFIX-045-REMOVE (04 §2.5 "Removing an agent", Try again after step 6): unlocks the stored
+   * owner when no agent card is open and only the owner's Nostr key is known, from a signed
+   * `agent.revoke` the caller has verified (the owner's revoked list). The same presence as unlock:
+   * the owner code or passphrase on the `owner` item, or the localhost passkey's PRF output on the
+   * `owner-passkey` item (the caller has checked the assertion against `ownerNostr`). The seed must
+   * derive exactly `ownerNostr`; the other owner keys are derived from that seed, and the returned
+   * store expects exactly those keys from then on. A wrong secret, a damaged item and another owner
+   * are one answer, `presence_rejected`; `owner_missing` without an `owner` item. The presented
+   * bytes, the blob and the seed are wiped whether or not it unlocks.
+   */
+  static async unlockForOwnerNostr(
+    keychain: KeychainBackend,
+    ownerNostr: Uint8Array,
+    presence: OwnerPresence,
+    options: UnlockOptions & KeychainOwnerKeyStoreOptions = {},
+  ): Promise<{
+    readonly store: KeychainOwnerKeyStore;
+    readonly session: OwnerSession;
+    readonly owner: OwnerPublicKeys;
+  }> {
+    const proof = presenceProof(presence);
+    let blob: Uint8Array | null = null;
+    let seed: Uint8Array | undefined;
+    try {
+      if (!(ownerNostr instanceof Uint8Array) || ownerNostr.length !== 32) {
+        throw new CryptoInputError(
+          'invalid_argument',
+          'owner keystore: ownerNostr must be 32 bytes',
+        );
+      }
+      const ttlMs = options.ttlMs ?? OWNER_SESSION_DEFAULT_TTL_MS;
+      if (!Number.isInteger(ttlMs) || ttlMs < 1 || ttlMs > OWNER_SESSION_MAX_TTL_MS) {
+        throw new CryptoInputError(
+          'invalid_argument',
+          'owner keystore: ttlMs must be an integer from 1 to OWNER_SESSION_MAX_TTL_MS',
+        );
+      }
+      const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+      if (proof.kind === 'passphrase') {
+        blob = await readOwnerItem(keychain, timeoutMs);
+        if (blob === null) throw ownerMissing();
+        // A damaged item is the documented one answer above (IR round 1, L1).
+        if (blob.length !== ALKO_LENGTH) throw presenceRejected();
+        try {
+          seed = await openOwnerSeedWithoutCard(
+            blob,
+            { secret: proof.bytes, source: 'prompt' },
+            { fileKeystoreMachine: false },
+          );
+        } catch (error) {
+          if (error instanceof CryptoInputError) throw presenceRejected();
+          throw error;
+        }
+      } else {
+        blob = await guarded(() => keychain.get(OWNER_PASSKEY_ACCOUNT), timeoutMs);
+        if (blob === null) throw presenceRejected();
+        try {
+          seed = await openPasskeySeed(blob, proof.bytes, { expectedOwnerNostr: ownerNostr });
+        } catch (error) {
+          if (error instanceof CryptoInputError) throw presenceRejected();
+          throw error;
+        }
+      }
+      const owner = publicKeysOf(seed);
+      // The owner the signed entry names, and no other (the derivation binds the other two keys).
+      if (!equalBytes(owner.ownerNostr, ownerNostr)) throw presenceRejected();
+      const store = new KeychainOwnerKeyStore(keychain, ownerKeysCopy(owner), timeoutMs);
+      const session = store.#issue(seed, ttlMs);
+      return Object.freeze({ store, session, owner: ownerKeysCopy(owner) });
+    } finally {
+      wipe(proof.bytes, blob ?? undefined, seed);
+    }
+  }
+
   #endAll(): void {
     this.#generation += 1;
     const sessions = [...this.#sessions];

@@ -24,7 +24,9 @@ import {
   type RemovalAgent,
 } from '@4thtech-io/node';
 import {
+  checkAgentLockJournal,
   readAgentConfig,
+  removeStaleAgentLockJournal,
   readRevokedEntry,
   recordRevokedEntry,
   removeAgentFolderLock,
@@ -77,8 +79,13 @@ export function uiRemovalPort(options: UiRemovalOptions = {}): AgentRemovalPort 
     exclusive: async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
       const found = await configOf(name);
       if (held.has(name)) throw new RuntimeError('agent_open_failed');
+      // HOTFIX-045-REMOVE: a link or anything odd at `open.lock-journal` refuses before SQLite
+      // opens the lock (SQLite would unlink or read it itself).
+      await checkAgentLockJournal(home, name, check);
       try {
         return await withAgentFolderExclusive(found.paths.dir, async () => {
+          // HOTFIX-045-REMOVE: only under the exclusive hold, a journal 0.4.4 left behind goes.
+          await removeStaleAgentLockJournal(home, name, check);
           held.add(name);
           try {
             return await fn();

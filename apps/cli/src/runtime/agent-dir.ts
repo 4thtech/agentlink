@@ -505,6 +505,63 @@ export async function removeAgentFolderLock(
   }
 }
 
+/**
+ * HOTFIX-045-REMOVE: the rollback journal SQLite wrote next to `open.lock` while 0.4.4's removal held
+ * the folder lock exclusive. The lock db is never written (no table, no row), so the journal holds no
+ * page to roll back; 0.4.5 keeps the journal in memory, and a file at this name is a leftover of a
+ * 0.4.4 removal that failed or crashed.
+ */
+const AGENT_OPEN_LOCK_JOURNAL = `${AGENT_OPEN_LOCK_FILE}-journal`;
+
+/** The leftover journal's info in the agent's checked folder, or undefined when there is none. */
+async function lockJournalOf(
+  home: string,
+  name: string,
+  options: OwnerCheck,
+): Promise<{ readonly path: string; readonly info: Stats } | undefined> {
+  const found = await readAgentConfig(home, name, options);
+  if (found === undefined) throw new RuntimeError('agent_config_invalid');
+  const dir = await checkContained(home, name);
+  const path = join(dir, AGENT_OPEN_LOCK_JOURNAL);
+  const info = await lstatOrMissing(path);
+  return info === undefined ? undefined : { path, info };
+}
+
+/**
+ * HOTFIX-045-REMOVE: before the removal takes the folder lock, a leftover `open.lock-journal` must be
+ * a regular private file with one name; a link or anything else at that name refuses the removal
+ * (`agent_path_invalid`) before SQLite opens the lock.
+ */
+export async function checkAgentLockJournal(
+  home: string,
+  name: string,
+  options: OwnerCheck = {},
+): Promise<void> {
+  const journal = await lockJournalOf(home, name, options);
+  if (journal !== undefined) checkFileInfo(journal.info, expectedUid(options));
+}
+
+/**
+ * HOTFIX-045-REMOVE: called only while the removal holds the folder lock exclusive (ui-remove.ts),
+ * so no process can be using the journal: deletes exactly a leftover `open.lock-journal` (a regular
+ * private file with one name, in the agent folder's checked realpath) before the folder delete. Any
+ * other unknown file still refuses that delete (removeAgentFolder).
+ */
+export async function removeStaleAgentLockJournal(
+  home: string,
+  name: string,
+  options: OwnerCheck = {},
+): Promise<void> {
+  const journal = await lockJournalOf(home, name, options);
+  if (journal === undefined) return;
+  checkFileInfo(journal.info, expectedUid(options));
+  try {
+    await unlink(journal.path);
+  } catch (error) {
+    if (!isMissing(error)) throw new RuntimeError('agent_path_invalid');
+  }
+}
+
 /** True when the owner's revoked list has an entry for `agentId` (presence only; U3-e verifies). */
 export async function inRevokedList(home: string, agentId: string): Promise<boolean> {
   // `agentId` passed assertAgentId in parseAgentConfig: `0x` + 40 hex, safe as a file name.
