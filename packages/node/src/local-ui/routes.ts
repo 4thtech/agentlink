@@ -47,13 +47,14 @@ import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
 import { storageRoutes } from './api/storage.js';
-import { AGENTS_SWITCH_PATH, type LocalUiRoute } from './route-types.js';
+import { AGENTS_REMOVE_PATH, AGENTS_SWITCH_PATH, type LocalUiRoute } from './route-types.js';
 // The fixed path lives in reveal-path.ts so api/files-io.ts uses it without importing this file.
 import { REVEAL_PATH } from './reveal-path.js';
 // UX2-d1: the invite paths live in invite-paths.ts for the same reason.
 import { INVITE_ACCEPT_PATH, INVITE_CHECK_PATH, INVITE_CREATE_PATH } from './invite-paths.js';
 
 export {
+  AGENTS_REMOVE_PATH,
   AGENTS_SWITCH_PATH,
   INVITE_ACCEPT_PATH,
   INVITE_CHECK_PATH,
@@ -136,7 +137,17 @@ export class LocalUiRouteRegistry {
     if (stub !== undefined && (stub !== true || presence !== true || method !== 'POST')) {
       throw invalid('only a POST owner route can be a stub');
     }
-    if (presence === 'switch') {
+    if (presence === 'remove') {
+      // U3-e: removing an agent; the server's remove gate runs it (D-138).
+      if (method !== 'POST') throw invalid('a remove route is a POST');
+      if (route.path !== AGENTS_REMOVE_PATH) {
+        throw invalid('a remove route is only at its fixed path');
+      }
+      if (handler !== undefined) throw invalid('a remove route has no handler');
+      if (this.#entries.some((e) => e.route.presence === 'remove')) {
+        throw invalid('the remove route is already registered');
+      }
+    } else if (presence === 'switch') {
       // U3-c: switching the open agent; the server's switch gate runs it (D-138).
       if (method !== 'POST') throw invalid('a switch route is a POST');
       if (route.path !== AGENTS_SWITCH_PATH)

@@ -9,7 +9,7 @@
 // - Label-check, Add and Rename go through the real route handlers of api/agents-manage.ts, fed what
 //   the presence gate hands them (the JSON of X-AgentLink-Input); the context is a small fake of the
 //   agent's own state.
-// - Remove is registered at the sample path and still answers the 501 stub (U3-e).
+// - Remove is the real route at the sample path (U3-e); its documented statuses are the server's.
 import { encodeUtf8 } from '@4thtech-io/crypto';
 import {
   AGENTS_LABEL_CHECK,
@@ -33,6 +33,7 @@ import {
   type ApprovalServerInternals,
   type ApprovalServerSource,
 } from '../approval-server.js';
+import { REMOVE_STATUS, type RemoveOutcome } from './api/agents-remove.js';
 import type { AgentDirectory, AgentDirectoryEntry, AppHostAgent } from './app-host.js';
 import type { LocalUiContext } from './context.js';
 import type {
@@ -268,10 +269,14 @@ describe('contract (server): the real U3-d handlers answer the owner samples', (
     }
   });
 
-  it('remove is registered at the sample path and is still the 501 stub (U3-e)', async () => {
-    const remove = route('POST', AGENTS_REMOVE_PATH) as LocalUiOwnerRoute;
-    expect(remove.presence).toBe(true);
-    const answer = await ownerCall(AGENTS_REMOVE_PATH, AGENTS_REMOVE.input);
-    expect(answer.status).toBe(AGENTS_REMOVE.stub.status);
+  it('remove is the real route (presence "remove") and its statuses are the documented ones (U3-e)', () => {
+    const remove = route('POST', AGENTS_REMOVE_PATH) as { presence: unknown };
+    expect(remove.presence).toBe('remove');
+    for (const sample of AGENTS_REMOVE.documented) {
+      const word = (sample.answer.body as { status: string }).status;
+      // `busy` is answered by the owner gate (409); the rest are the remove route's own outcomes.
+      const expected = word === 'busy' ? 409 : REMOVE_STATUS[word as RemoveOutcome];
+      expect(sample.answer.status, word).toBe(expected);
+    }
   });
 });

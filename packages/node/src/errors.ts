@@ -66,7 +66,13 @@ export type NodeKeyStoreErrorCode =
   /** M1-8f: the file KeyStore opt-in was refused (a keychain works, or no interactive terminal). */
   | 'keystore_opt_in_refused'
   /** M1-8f: a new agent secret was refused (too short, invalid, the owner code, not confirmed). */
-  | 'keystore_passphrase_refused';
+  | 'keystore_passphrase_refused'
+  /**
+   * U3-e: an agent's keys were not all erased (04 §2.5 step 6): a backend call failed, an item is
+   * still there, or the request was refused (no verifying `agent.revoke`). Removal stops before the
+   * agent's folder is deleted.
+   */
+  | 'keystore_erase_failed';
 
 export class NodeKeyStoreError extends Error {
   readonly code: NodeKeyStoreErrorCode;

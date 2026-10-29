@@ -24,6 +24,7 @@ import { PublisherLease } from './publisher-lease.js';
 import { SendService, type SendMessageInput, type SendMessageResult } from './send.js';
 import type { TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
+import { AgentRemovalService } from './agent-removal.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import { savedNameOf } from './files/received.js';
@@ -170,6 +171,11 @@ export class AgentLinkClient {
   /** The `card-update` sender (M1-4d-f; 04 §3.4.1): the current card to contacts that lack it. */
   readonly cardUpdates: CardUpdateSender;
   /**
+   * U3-e: removing this agent from the local app (04 §2.5): what removal reads first, and the
+   * owner-signed `revoke` carriers to its contacts. The local app's removal only; never an MCP tool.
+   */
+  readonly removal: AgentRemovalService;
+  /**
    * Terms and commitments (M1-32; 06 §2.2a, 04 §3.4.2): propose, respond, the negotiations, the
    * commitment card, and the deferred-receipt lookup and part claim for M1-7g.
    */
@@ -247,6 +253,11 @@ export class AgentLinkClient {
     );
     this.requests = new RequestsQueue(ctx);
     this.outbox = new OutboxService(ctx, this.identity, this.contacts, transport);
+    this.removal = new AgentRemovalService(ctx, {
+      identity: this.identity,
+      contacts: this.contacts,
+      outbox: this.outbox,
+    });
     this.#send = new SendService(ctx, {
       identity: this.identity,
       contacts: this.contacts,

@@ -70,6 +70,42 @@ export function keychainAccount(agentId: string, item: KeychainItem): string {
   return item === 'seed' ? agentId : `${agentId}:${item}`;
 }
 
+/** U3-e: at most this many `s3:<id>` items are erased in one removal (own_storage holds one row). */
+export const MAX_ERASE_STORAGE_IDS = 64;
+
+/** The owner's keychain accounts (04 §2.2, §2.8): never part of an agent's erase list. */
+const OWNER_ACCOUNT_NAMES: readonly string[] = ['owner', 'owner-passkey', 'owner-next'];
+
+/**
+ * U3-e (04 §2.5 "Removing an agent" step 6): the exact keychain accounts of one agent's erase list,
+ * built from `agentId` alone: the seed `<agentId>`, then `<agentId>:store-key`, `policy-version`,
+ * `receipts-kept`, `storage-mark` and `<agentId>:s3:<id>` for each distinct id. Throws (fixed text)
+ * for an `agentId` that is not the 04 §2.9 form, an id that is not 16 lowercase hex or too many ids,
+ * so an owner account (`owner`, `owner-passkey`, `owner-next`) or another name can never be in it.
+ */
+export function agentEraseAccounts(agentId: string, storageIds: readonly string[]): string[] {
+  assertAgentId(agentId);
+  if (!Array.isArray(storageIds) || storageIds.length > MAX_ERASE_STORAGE_IDS) {
+    throw new CryptoInputError('invalid_argument', 'keychain: not a list of storage ids');
+  }
+  const items: KeychainItem[] = [...(FIXED_ITEMS as KeychainItem[])];
+  for (const id of storageIds) {
+    const item = `s3:${String(id)}` as const;
+    if (typeof id !== 'string' || !S3_ITEM.test(item)) {
+      throw new CryptoInputError('invalid_argument', 'keychain: not a storage id');
+    }
+    if (!items.includes(item)) items.push(item);
+  }
+  const accounts = items.map((item) => keychainAccount(agentId, item));
+  // Defence in depth: the accounts above are all `<agentId>` or `<agentId>:<item>`.
+  for (const account of accounts) {
+    if (OWNER_ACCOUNT_NAMES.includes(account) || !account.startsWith(agentId)) {
+      throw new CryptoInputError('invalid_argument', 'keychain: not an agent account');
+    }
+  }
+  return accounts;
+}
+
 type Binding = typeof import('@napi-rs/keyring');
 
 /**

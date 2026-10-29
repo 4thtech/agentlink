@@ -450,6 +450,46 @@ export interface StorageCredentialControl {
 }
 
 /**
+ * What KeyEraseControl.eraseAgentKeys erases (U3-e; 04 §2.5 "Removing an agent" step 6). Ids and
+ * the signed retirement only: no key, item value or path crosses it.
+ */
+export interface AgentKeyEraseRequest {
+  /** The agent's EVM address, `0x` + 40 lowercase hex (04 §2.9); any other form is refused. */
+  readonly agentId: string;
+  /**
+   * The `storage.set` ids whose `s3:<id>` items go (16 lowercase hex each; at most 64), read from
+   * the agent's store before it is deleted. The backend adds the id its `storage-mark` names.
+   */
+  readonly storageIds: readonly string[];
+  /**
+   * The exact text of the agent's signed `agent.revoke` (the owner's revoked-list entry). The keys of
+   * an agent are erased only once it is retired for good: a text that is not a verifying
+   * `agent.revoke` for `agentId` refuses the erase before anything is deleted.
+   */
+  readonly revoke: string;
+}
+
+/**
+ * Erasing one agent's keys when the owner removes it (U3-e; 04 §2.5 "Removing an agent" step 6;
+ * D-138; I-2, I-4, I-7). An owner-flow surface like the controls above: the local app's removal
+ * builds it, and no KeyStore, OwnerKeyStore, session or package entry reaches it.
+ *
+ * - The erase list is fixed and built inside from `agentId` alone: on the OS keychain the agent seed
+ *   (account `<agentId>`) and the items `<agentId>:store-key`, `policy-version`, `receipts-kept`,
+ *   `storage-mark` and `s3:<id>` for each id; on the file KeyStore the file `<agentId>.alks` and its
+ *   temporary files. Nothing else is ever deleted: never an owner item (`owner`, `owner-passkey`,
+ *   `owner-next`, `owner.alko`, `owner.alkp`) and never another agent's item; a request that names
+ *   anything else is refused.
+ * - It is idempotent: an item that is already gone is not an error, so a removal stopped part-way can
+ *   run it again. It resolves only when every listed item is gone; otherwise it rejects with a fixed
+ *   error, and the removal stops before the agent's folder is deleted.
+ * - Errors are fixed sentences that never contain an input (I-7).
+ */
+export interface KeyEraseControl {
+  eraseAgentKeys(request: AgentKeyEraseRequest): Promise<void>;
+}
+
+/**
  * A proof of owner presence (04 §2.5): what unlocks the owner key. It carries the secret that
  * unwraps the owner seed, so a process without the owner's input cannot make one that works.
  * The store wipes the bytes it is given, whether or not they unlock it, malformed proofs included.
