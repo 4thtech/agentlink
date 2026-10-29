@@ -110,6 +110,15 @@ export type {
   LocalUiOptions,
   LocalUiOwnerSetup,
 } from './local-ui/context.js';
+// U3-f (06 §7 "The app as a second path"): the AI apps seam the CLI implements over its harness
+// code (the one config writer); the routes, the changeId and the signing stay inside the package.
+export type {
+  LocalUiAiAppEntryState,
+  LocalUiAiAppPlan,
+  LocalUiAiApps,
+  LocalUiAiAppView,
+  LocalUiAiAppWrite,
+} from './local-ui/context.js';
 // U3-c (D-138, 08 §1): the app host's seams the CLI implements (the agent folders, opening an agent);
 // the generation, the switch gate and the route stubs stay inside the package.
 export type {

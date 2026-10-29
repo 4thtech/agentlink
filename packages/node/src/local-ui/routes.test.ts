@@ -475,8 +475,9 @@ describe('the switch route kind and the U3 stubs (U3-c, I-4)', () => {
       .routes()
       .filter((r) => r.presence === true && r.stub === true)
       .map((r) => r.path);
-    // U3-d replaced the stubs of POST /api/ui/agents and /api/ui/agents/label; U3-e the remove one.
-    expect(stubs).toEqual(['/api/ui/apps/apply', '/api/ui/apps/disconnect']);
+    // U3-d replaced the stubs of POST /api/ui/agents and /api/ui/agents/label; U3-e the remove one;
+    // U3-f those of POST /api/ui/apps/apply and /api/ui/apps/disconnect. No stubs remain.
+    expect(stubs).toEqual([]);
   });
 });
 

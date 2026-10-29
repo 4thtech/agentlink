@@ -8,6 +8,7 @@ import {
   readFile,
   readdir,
   realpath,
+  rename,
   rm,
   stat,
   symlink,
@@ -207,5 +208,31 @@ describe('writeConfigFile', () => {
       await code(writeConfigFile(home, ['.codex', 'config.toml'], before, 'x', { ...NOW })),
     ).toBe('unsafe_path');
     expect(await readdir(outside)).toEqual([]);
+  });
+
+  // U3-f (04 §2.5 "Writing AI app configs"): the app's writes keep the original mode on the backup,
+  // and the file written must be the very file that was read (device and inode), not a copy.
+  it.skipIf(!POSIX)('keepBackupMode: the backup keeps the original file mode', async () => {
+    await writeFile(join(home, '.claude.json'), '{"old":true}\n', { mode: 0o644 });
+    await chmod(join(home, '.claude.json'), 0o644);
+    const before = await readConfigFile(home, ['.claude.json']);
+    const result = await writeConfigFile(home, ['.claude.json'], before, '{"new":true}\n', {
+      ...NOW,
+      keepBackupMode: true,
+    });
+    expect((await stat(join(home, result.backup ?? ''))).mode & 0o777).toBe(0o644);
+    expect((await stat(join(home, '.claude.json'))).mode & 0o777).toBe(0o644);
+  });
+
+  it('records the file identity and refuses a file swapped for another with the same bytes', async () => {
+    await writeFile(join(home, '.claude.json'), 'same', { mode: 0o600 });
+    const before = await readConfigFile(home, ['.claude.json']);
+    expect(before.identity).toBeDefined();
+    await writeFile(join(home, 'swap'), 'same', { mode: 0o600 });
+    await rename(join(home, 'swap'), join(home, '.claude.json'));
+    expect(await code(writeConfigFile(home, ['.claude.json'], before, 'new', { ...NOW }))).toBe(
+      'changed',
+    );
+    expect(await readFile(join(home, '.claude.json'), 'utf8')).toBe('same');
   });
 });

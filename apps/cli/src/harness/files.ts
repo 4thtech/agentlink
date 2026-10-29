@@ -7,7 +7,8 @@
 //   link, FIFO or folder), owned by this user, and at most MAX_CONFIG_BYTES.
 // - A write happens only to the file that was shown: it is read again right before, and must be the
 //   same bytes. The new content goes to a fresh temporary file in the same folder (O_EXCL, no links
-//   followed), a backup of the old file is made first (never replacing an older backup), and the
+//   followed), a backup of the old file is made first (never replacing an older backup; 0600, or
+//   the original's mode for the app's writes, U3-f), and the
 //   temporary file is renamed over the config, so a failure leaves the original untouched. A file that
 //   did not exist is created without ever replacing one that appears meanwhile.
 //
@@ -37,6 +38,11 @@ export interface ConfigFile {
   readonly text: string | undefined;
   /** The mode of the existing file. */
   readonly mode: number | undefined;
+  /**
+   * U3-f (04 §2.5 "Writing AI app configs"): the existing file's identity on disk, as it was opened
+   * (`<dev>:<ino>`). A write refuses a file with another identity, even with the same bytes.
+   */
+  readonly identity?: string;
 }
 
 const codeOf = (error: unknown): unknown =>
@@ -157,7 +163,7 @@ export async function readConfigFile(
     }
     // A byte order mark would be dropped by a rewrite, unseen in the diff: refused instead.
     if (text.startsWith('\ufeff')) throw new HarnessError('unsupported_format');
-    return { bytes, text, mode: info.mode & 0o777 };
+    return { bytes, text, mode: info.mode & 0o777, identity: `${info.dev}:${info.ino}` };
   } finally {
     await handle.close();
   }
@@ -166,6 +172,11 @@ export async function readConfigFile(
 export interface WriteOptions extends FileOptions {
   /** Unix seconds, for the backup's name. */
   readonly now: number;
+  /**
+   * U3-f (04 §2.5, 06 §7 "The app as a second path"): the backup keeps the original file's mode.
+   * Default (`init`): the backup is 0600.
+   */
+  readonly keepBackupMode?: boolean;
 }
 
 async function ensureDirs(missing: readonly string[], uid: number | undefined): Promise<void> {
@@ -221,7 +232,9 @@ export async function writeConfigFile(
   const unchanged =
     before.bytes === undefined || now.bytes === undefined
       ? before.bytes === now.bytes
-      : before.bytes.equals(now.bytes);
+      : before.bytes.equals(now.bytes) &&
+        // The very file that was read (device and inode), when its identity was recorded.
+        (before.identity === undefined || before.identity === now.identity);
   if (!unchanged) throw new HarnessError('changed');
   await ensureDirs(missing, uid);
 
@@ -247,7 +260,9 @@ export async function writeConfigFile(
     for (let attempt = 0; attempt < 10 && backup === undefined; attempt += 1) {
       const candidate = `${name}.agentlink-backup-${options.now}${attempt === 0 ? '' : `-${attempt}`}`;
       try {
-        await writeNew(join(dir, candidate), before.bytes, 0o600);
+        const backupMode =
+          options.keepBackupMode === true && before.mode !== undefined ? before.mode : 0o600;
+        await writeNew(join(dir, candidate), before.bytes, backupMode);
         backup = candidate;
       } catch (error) {
         if (codeOf(error) !== 'EEXIST') throw new HarnessError('write_failed');

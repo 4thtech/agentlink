@@ -1211,6 +1211,8 @@ export async function startApprovalServerWith(
       ...(options.host === undefined ? {} : { agentsManage }),
       // U3-invite: the waiting invite, in the app host only.
       ...(joinDesk === undefined ? {} : { join: joinDesk }),
+      // U3-f: the CLI's harness desk (the one AI app config writer), when the caller wired it.
+      ...(agentUi?.aiApps === undefined ? {} : { aiApps: agentUi.aiApps }),
     });
   let uiContext: LocalUiContext = buildUiContext();
 
@@ -3575,6 +3577,16 @@ export async function startApprovalServerWith(
     if (slot === undefined) throw new Error('not the app host');
     const entries = (await slot.directory.list()).slice(0, MAX_LISTED_AGENTS);
     const current = slot.current;
+    // U3-f: the agent each AI app runs, from its `agentlink` entry only (the seam's entry-only view).
+    const apps = await (agentUi?.aiApps?.list() ?? Promise.resolve(undefined)).catch(
+      () => undefined,
+    );
+    const appsOf = (name: string): readonly string[] =>
+      Object.freeze(
+        (apps?.apps ?? []).flatMap((view) =>
+          view.state.kind === 'agent' && view.state.agent === name ? [view.app] : [],
+        ),
+      );
     const agents: LocalUiAgentView[] = [];
     for (const entry of entries) {
       const stats = entry.available
@@ -3590,8 +3602,8 @@ export async function startApprovalServerWith(
           removing: entry.removing,
           contacts: stats?.contacts ?? null,
           running: stats?.running ?? false,
-          // Card U3-f fills this from each AI app's `agentlink` entry only.
-          apps: [],
+          // U3-f: from each AI app's `agentlink` entry only.
+          apps: appsOf(entry.name),
         }),
       );
     }

@@ -16,7 +16,7 @@ import { explainJsonConflict, explainTomlConflict, type ConflictDifference } fro
 import { unifiedDiff } from './diff.js';
 import { HarnessError, type HarnessErrorCode } from './errors.js';
 import { readConfigFile, writeConfigFile, type ConfigFile, type FileOptions } from './files.js';
-import { addJsonMcpServer } from './json-config.js';
+import { addJsonMcpServer, type Plain } from './json-config.js';
 import { addTomlMcpServer, agentlinkTable } from './toml-config.js';
 
 export type HarnessId =
@@ -100,18 +100,51 @@ export interface HarnessDef {
   readonly installedMarks: readonly (readonly string[])[];
   /** The command name searched on PATH (none for a desktop app). */
   readonly binary?: string;
+  /**
+   * U3-f: how the `agentlink` entry is stored, for the app's entry-only view and its replace and
+   * remove (entry.ts): a JSON member under `key` built by `entry`, or Codex's TOML table.
+   */
+  readonly format:
+    | {
+        readonly kind: 'json';
+        readonly key: 'mcpServers' | 'mcp';
+        readonly entry: (args: readonly string[]) => Plain;
+      }
+    | { readonly kind: 'toml' };
   readonly edit: (
     text: string | undefined,
     args: readonly string[],
   ) => ReturnType<typeof addJsonMcpServer> | ReturnType<typeof addTomlMcpServer>;
 }
 
-const mcpArgs = (agent: string | undefined): string[] => [
+/** The entry's arguments: the default agent has no `--agent` (06 §7), any other one ends in it. */
+export const mcpArgs = (agent: string | undefined): string[] => [
   '-y',
   PACKAGE_NAME,
   'mcp',
   ...(agent === undefined ? [] : ['--agent', agent]),
 ];
+
+// The entries each harness gets (06 §7): one builder per form, shared by `edit` and `format`.
+const claudeCodeEntry = (args: readonly string[]): Plain => ({
+  type: 'stdio',
+  command: 'npx',
+  args: [...args],
+  env: {},
+});
+const stdioEntry = (args: readonly string[]): Plain => ({ command: 'npx', args: [...args] });
+const openCodeEntry = (args: readonly string[]): Plain => ({
+  type: 'local',
+  command: ['npx', ...args],
+  enabled: true,
+});
+const cursorEntry = (args: readonly string[]): Plain => ({
+  type: 'stdio',
+  command: 'npx',
+  args: [...args],
+});
+const json = (key: 'mcpServers' | 'mcp', entry: (args: readonly string[]) => Plain) =>
+  Object.freeze({ kind: 'json', key, entry }) as HarnessDef['format'];
 
 export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
   {
@@ -121,8 +154,8 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     parts: ['.claude.json'],
     installedMarks: [['.claude'], ['.claude.json']],
     binary: 'claude',
-    edit: (text, args) =>
-      addJsonMcpServer(text, { type: 'stdio', command: 'npx', args: [...args], env: {} }),
+    format: json('mcpServers', claudeCodeEntry),
+    edit: (text, args) => addJsonMcpServer(text, claudeCodeEntry(args)),
   },
   {
     // Claude desktop app (chat), not Claude Code: its own file, `claude_desktop_config.json` (06 §7,
@@ -143,7 +176,8 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
       },
     },
     installedMarks: [],
-    edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
+    format: json('mcpServers', stdioEntry),
+    edit: (text, args) => addJsonMcpServer(text, stdioEntry(args)),
   },
   {
     id: 'codex',
@@ -151,6 +185,7 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     parts: ['.codex', 'config.toml'],
     installedMarks: [['.codex']],
     binary: 'codex',
+    format: Object.freeze({ kind: 'toml' }),
     edit: (text, args) => addTomlMcpServer(text, agentlinkTable('npx', args)),
   },
   {
@@ -161,7 +196,8 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     // `gemini` binary on PATH or its settings file means Gemini CLI.
     installedMarks: [['.gemini', 'settings.json']],
     binary: 'gemini',
-    edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
+    format: json('mcpServers', stdioEntry),
+    edit: (text, args) => addJsonMcpServer(text, stdioEntry(args)),
   },
   {
     // https://opencode.ai/docs/mcp-servers/ (checked 2026-10-16): `mcp.<name>` with `type: "local"`,
@@ -171,8 +207,8 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     parts: ['.config', 'opencode', 'opencode.json'],
     installedMarks: [['.config', 'opencode']],
     binary: 'opencode',
-    edit: (text, args) =>
-      addJsonMcpServer(text, { type: 'local', command: ['npx', ...args], enabled: true }, 'mcp'),
+    format: json('mcp', openCodeEntry),
+    edit: (text, args) => addJsonMcpServer(text, openCodeEntry(args), 'mcp'),
   },
   {
     // https://antigravity.google/docs/mcp (checked 2026-10-16): global `~/.gemini/config/mcp_config.json`,
@@ -185,7 +221,8 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
       ['.gemini', 'config', 'mcp_config.json'],
     ],
     binary: 'antigravity',
-    edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
+    format: json('mcpServers', stdioEntry),
+    edit: (text, args) => addJsonMcpServer(text, stdioEntry(args)),
   },
   {
     // https://cursor.com/docs/context/mcp (checked 2026-10-22): global `~/.cursor/mcp.json`,
@@ -195,8 +232,8 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     parts: ['.cursor', 'mcp.json'],
     installedMarks: [['.cursor']],
     binary: 'cursor',
-    edit: (text, args) =>
-      addJsonMcpServer(text, { type: 'stdio', command: 'npx', args: [...args] }),
+    format: json('mcpServers', cursorEntry),
+    edit: (text, args) => addJsonMcpServer(text, cursorEntry(args)),
   },
   {
     // https://docs.devin.ai/windsurf/plugins/cascade/mcp (checked 2026-10-22; docs.windsurf.com
@@ -233,7 +270,8 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     },
     installedMarks: [],
     binary: 'windsurf',
-    edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
+    format: json('mcpServers', stdioEntry),
+    edit: (text, args) => addJsonMcpServer(text, stdioEntry(args)),
   },
 ]);
 
@@ -451,6 +489,30 @@ async function where(
     throw new HarnessError('unsafe_path');
   }
   return [config.dir, [config.name]];
+}
+
+/**
+ * U3-f: where a harness's config is read and written, with no `--config` (the app never takes a
+ * path from the page): the folder, the parts below it and the path as shown (`~/…`). Throws
+ * `unsupported_platform`, or `unsafe_path` for an environment folder outside the home folder;
+ * Claude Code with CLAUDE_CONFIG_DIR set is `unsupported_format` (planHarness refuses it the same
+ * way).
+ */
+export async function configLocation(
+  def: HarnessDef,
+  context: Omit<HarnessContext, 'config' | 'agent' | 'now'>,
+): Promise<{ readonly base: string; readonly parts: readonly string[]; readonly path: string }> {
+  if (def.id === 'claude-code' && (context.env['CLAUDE_CONFIG_DIR'] ?? '') !== '') {
+    throw new HarnessError('unsupported_format');
+  }
+  const full: HarnessContext = { ...context, now: 0 };
+  const envParts = await envConfigParts(def, full);
+  const [base, parts] = await where(def, full);
+  const path =
+    envParts !== undefined
+      ? `~/${envParts.join('/')}`
+      : displayPath(def, undefined, context.platform);
+  return Object.freeze({ base, parts, path });
 }
 
 /** Reads the harness's config and works out the exact change, without writing anything. */

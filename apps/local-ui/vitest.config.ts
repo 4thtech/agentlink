@@ -17,6 +17,7 @@ export default defineConfig({
         /proofs\.css/,
         /app\.css/,
         /compact\.css/,
+        /map\.css/,
         /welcome\.css/,
       ],
     },
