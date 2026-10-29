@@ -604,6 +604,9 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     // The answer carries the new generation and the agent's verified label.
     expect(finish?.headers['x-agentlink-generation']).toBe('2');
     expect(decodeURIComponent(String(finish?.headers['x-agentlink-agent']))).toBe('My agent');
+    // IR-U3-g-b-1 H-1: only this answer is marked, so the page adopts generation 2 (no reload).
+    expect(finish?.headers['x-agentlink-generation-adopted']).toBe('1');
+    expect(begin.headers['x-agentlink-generation-adopted']).toBeUndefined();
     // The card, its first policy and its first label are signed and verified by core.
     const client = h.w.clients.get('default');
     expect(await client?.identity.get()).toBeDefined();
@@ -673,6 +676,7 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     const { finish } = await firstRun(h, s);
     expect(finish?.status).toBe(500);
     expect(JSON.parse(finish?.body ?? '{}')).toMatchObject({ status: 'failed' });
+    expect(finish?.headers['x-agentlink-generation-adopted']).toBeUndefined();
     expect(h.w.log).toEqual([
       'create My agent as default',
       'open default',
@@ -720,6 +724,23 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     const begin = await h.post(BEGIN, s, new Uint8Array(0));
     expect(begin.status).toBe(409);
     expect(JSON.parse(begin.body)).toEqual({ status: 'owner_exists' });
+  });
+
+  it('GET /api/ui/first-run answers the real state: an owner without an agent folder is set_up', async () => {
+    const w = world();
+    w.keychain.items.set(OWNER_ACCOUNT, new Uint8Array([1, 2, 3]));
+    const h = await harness({ w });
+    const s = await h.session();
+    const state = await h.get('/api/ui/first-run', s);
+    expect(JSON.parse(state.body)).toEqual({ owner: 'set_up' });
+  });
+
+  it('GET /api/ui/first-run is set_up while any agent folder exists (first run is refused)', async () => {
+    const w = world();
+    w.entries.set('old', { name: 'old', label: 'Old', available: true, removing: true });
+    const h = await harness({ w });
+    const s = await h.session();
+    expect(JSON.parse((await h.get('/api/ui/first-run', s)).body)).toEqual({ owner: 'set_up' });
   });
 
   it('without host.firstRun no agent is created from the page (503 unavailable)', async () => {
