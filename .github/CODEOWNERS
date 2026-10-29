@@ -39,6 +39,11 @@
 /pnpm-workspace.yaml                            @talirezun @denisjazbec
 .npmrc                                          @talirezun @denisjazbec
 .pnpmfile.*                                     @talirezun @denisjazbec
+# Release tooling and Changesets configuration: release.yml runs tools/release/ scripts in jobs
+# holding the npm OIDC token (publish-preview, W4-NEXT-PREVIEW), and .changeset/ decides versions
+# and the snapshot scheme.
+/tools/release/                                 @talirezun @denisjazbec
+/.changeset/                                    @talirezun @denisjazbec
 
 # Agent rules and harness settings
 /AGENTS.md                                      @talirezun @denisjazbec

@@ -29,8 +29,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
+  # wave-4 (W4-NEXT-PREVIEW): release.yml's ci-green needs this commit's security-gate before it
+  # publishes a wave-4 snapshot to npm `next`.
   push:
-    branches: [main]
+    branches: [main, wave-4]
   merge_group:
   schedule:
     # Weekly full scan of main (Monday 05:23 UTC) to catch newly published

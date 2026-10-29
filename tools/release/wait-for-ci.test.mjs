@@ -593,3 +593,76 @@ describe('workflows that wait for CI', () => {
     });
   }
 });
+
+// W4-NEXT-PREVIEW: release.yml also runs for pushes to the `wave-4` integration branch, which
+// publishes snapshots to npm `next`. There only push runs on `wave-4` count, and "superseded"
+// means wave-4 moved on.
+describe('--branch (main by default, or a wave integration branch)', () => {
+  const w4run = (id, workflow, overrides = {}) =>
+    run(id, workflow, { head_branch: 'wave-4', ...overrides });
+  const w4Green = () =>
+    greenRoutes({
+      [runsPath('ci.yml')]: () => ({ workflow_runs: [w4run(11, 'ci.yml')] }),
+      [runsPath('security.yml')]: () => ({ workflow_runs: [w4run(22, 'security.yml')] }),
+    });
+
+  it('parses --branch, defaults to main and refuses anything but main or wave-<n>', () => {
+    expect(parseArgs(['--require', 'ci.yml:ci-gate']).branch).toBe('main');
+    expect(parseArgs(['--require', 'ci.yml:ci-gate', '--branch', 'wave-4']).branch).toBe('wave-4');
+    for (const bad of ['feature', 'wave-', 'wave-4/x', 'main ', '', 'refs/heads/main']) {
+      expect(() => parseArgs(['--require', 'ci.yml:ci-gate', '--branch', bad]), bad).toThrow(
+        /--branch/,
+      );
+    }
+  });
+
+  it('asks for and accepts only push runs on that branch', async () => {
+    const { api, seen } = fakeApi(w4Green());
+    const result = await checkOnce({
+      api,
+      repo: REPO,
+      sha: SHA,
+      require: REQUIRE,
+      branch: 'wave-4',
+    });
+    expect(result.state).toBe('green');
+    const runQueries = seen.filter((p) => p.includes('/runs?'));
+    expect(runQueries.length).toBe(2);
+    expect(runQueries.every((p) => p.includes('branch=wave-4'))).toBe(true);
+  });
+
+  it('a main run of the same commit does not satisfy wave-4, and the reverse', async () => {
+    const onWave = await checkOnce({
+      api: fakeApi(greenRoutes()).api,
+      repo: REPO,
+      sha: SHA,
+      require: REQUIRE,
+      branch: 'wave-4',
+    });
+    expect(onWave.state).toBe('pending');
+    const onMain = await checkOnce({
+      api: fakeApi(w4Green()).api,
+      repo: REPO,
+      sha: SHA,
+      require: REQUIRE,
+    });
+    expect(onMain.state).toBe('pending');
+  });
+
+  it('superseded on wave-4 compares against the head of wave-4, not main', async () => {
+    const clock = fakeClock();
+    const { api, seen } = fakeApi({
+      [runsPath('ci.yml')]: () => ({
+        workflow_runs: [w4run(11, 'ci.yml', { conclusion: 'cancelled' })],
+      }),
+      [jobsPath(11)]: () => ({ jobs: [] }),
+      [runsPath('security.yml')]: () => ({ workflow_runs: [w4run(22, 'security.yml')] }),
+      [jobsPath(22)]: () => ({ jobs: [job('security-gate', 'completed', 'success')] }),
+      [`/repos/${REPO}/commits/wave-4`]: () => ({ sha: HEAD }),
+      [comparePath(SHA, HEAD)]: () => ({ status: 'ahead' }),
+    });
+    const result = await waitForGreen(opts(api, clock, { supersededOk: true, branch: 'wave-4' }));
+    expect(result.superseded).toBe(true);
+    expect(seen).not.toContain(headPath);
+  });
+});

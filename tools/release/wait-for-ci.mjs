@@ -3,7 +3,12 @@
 // this exact `main` commit have finished, and fails unless every one of them succeeded.
 //
 //   node tools/release/wait-for-ci.mjs --require ci.yml:ci-gate --require security.yml:security-gate \
-//     [--timeout-minutes 45] [--interval-seconds 30] [--missing-grace-minutes 10] [--superseded-ok]
+//     [--timeout-minutes 45] [--interval-seconds 30] [--missing-grace-minutes 10] [--superseded-ok] \
+//     [--branch main]
+//
+// --branch (W4-NEXT-PREVIEW): the branch whose push runs count, `main` (default) or a wave
+// integration branch `wave-<n>`, whose green states release.yml publishes to npm `next`.
+// "Superseded" then means that branch moved on.
 //
 // Environment: GH_TOKEN (the job's GITHUB_TOKEN with `actions: read`), GITHUB_REPOSITORY,
 // GITHUB_SHA, GITHUB_API_URL (optional), GITHUB_OUTPUT (the step output file). Fails closed: a red,
@@ -24,6 +29,7 @@ import { pathToFileURL } from 'node:url';
 
 const WORKFLOW_FILE = /^[A-Za-z0-9_-]+\.ya?ml$/;
 const JOB_NAME = /^[A-Za-z0-9_. -]+$/;
+const BRANCH = /^(main|wave-[1-9][0-9]*)$/;
 
 export function parseArgs(argv) {
   const out = {
@@ -32,6 +38,7 @@ export function parseArgs(argv) {
     intervalMs: 30_000,
     missingGraceMs: 10 * 60_000,
     supersededOk: false,
+    branch: 'main',
   };
   const positive = (flag, value, unit) => {
     const n = Number(value);
@@ -56,6 +63,12 @@ export function parseArgs(argv) {
         out.require.push({ workflow, job });
         break;
       }
+      case '--branch':
+        if (!BRANCH.test(String(value ?? ''))) {
+          throw new Error(`--branch needs main or wave-<n>, got ${JSON.stringify(value)}`);
+        }
+        out.branch = value;
+        break;
       case '--timeout-minutes':
         out.timeoutMs = positive(flag, value, 60_000);
         break;
@@ -101,7 +114,7 @@ const CANCELLED_GATE = new Set(['cancelled', 'skipped']);
 // One look at every required gate. Returns
 // { state: 'green' | 'red' | 'cancelled' | 'pending', reasons, missing, cancelled }.
 // 'cancelled': no gate failed, and at least one required run was cancelled before its gate passed.
-export async function checkOnce({ api, repo, sha, require }) {
+export async function checkOnce({ api, repo, sha, require, branch = 'main' }) {
   const reasons = [];
   const missing = [];
   const cancelled = [];
@@ -109,12 +122,12 @@ export async function checkOnce({ api, repo, sha, require }) {
   let anyPending = false;
 
   for (const { workflow, job } of require) {
-    // Only push runs on `main`: pushing a new branch at the same commit starts another push run
+    // Only push runs on `branch`: pushing a new branch at the same commit starts another push run
     // whose gate is `ci-gate (push)`, which must neither satisfy nor block the release.
     const query = new URLSearchParams({
       head_sha: sha,
       event: 'push',
-      branch: 'main',
+      branch,
       per_page: '50',
     });
     const body = await api(`/repos/${repo}/actions/workflows/${workflow}/runs?${query}`);
@@ -122,7 +135,7 @@ export async function checkOnce({ api, repo, sha, require }) {
       (r) =>
         r?.head_sha === sha &&
         r?.event === 'push' &&
-        r?.head_branch === 'main' &&
+        r?.head_branch === branch &&
         r?.path === `.github/workflows/${workflow}`,
     );
     if (runs.length === 0) {
@@ -178,12 +191,12 @@ export async function checkOnce({ api, repo, sha, require }) {
 
 const SHA_RE = /^[0-9a-f]{40}$/;
 
-// The head of main when it has moved on to a descendant of `sha`, otherwise undefined.
+// The head of `branch` when it has moved on to a descendant of `sha`, otherwise undefined.
 // Throws when the head cannot be read (the caller retries, then fails closed).
-export async function supersededBy({ api, repo, sha }) {
-  const head = (await api(`/repos/${repo}/commits/main`))?.sha;
+export async function supersededBy({ api, repo, sha, branch = 'main' }) {
+  const head = (await api(`/repos/${repo}/commits/${branch}`))?.sha;
   if (typeof head !== 'string' || !SHA_RE.test(head)) {
-    throw new Error('could not read the head of main');
+    throw new Error(`could not read the head of ${branch}`);
   }
   if (head === sha) return undefined;
   // `ahead`: head contains this commit and more; anything else is not a supersede.
@@ -201,6 +214,7 @@ export async function waitForGreen({
   intervalMs,
   missingGraceMs,
   supersededOk = false,
+  branch = 'main',
   now = Date.now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   log = console.log,
@@ -210,19 +224,19 @@ export async function waitForGreen({
   for (;;) {
     const elapsed = now() - start;
     try {
-      const result = await checkOnce({ api, repo, sha, require });
+      const result = await checkOnce({ api, repo, sha, require, branch });
       last = result;
       for (const reason of result.reasons) log(reason);
       if (result.state === 'green') return { ok: true, reasons: result.reasons };
       if (result.state === 'red') return { ok: false, reasons: result.reasons };
       if (result.state === 'cancelled') {
-        const head = supersededOk ? await supersededBy({ api, repo, sha }) : undefined;
+        const head = supersededOk ? await supersededBy({ api, repo, sha, branch }) : undefined;
         if (head) {
           return {
             ok: false,
             superseded: true,
             head,
-            reasons: [...result.reasons, `main has moved on to ${head}`],
+            reasons: [...result.reasons, `${branch} has moved on to ${head}`],
           };
         }
         return {
@@ -230,7 +244,7 @@ export async function waitForGreen({
           reasons: [
             ...result.reasons,
             supersededOk
-              ? 'this commit was cancelled but main has not moved on past it'
+              ? `this commit was cancelled but ${branch} has not moved on past it`
               : `${result.cancelled.join(', ')} cancelled`,
           ],
         };
@@ -300,7 +314,9 @@ export async function run({ argv, env, api, log = console.log, writeOutput, now,
     if (args.supersededOk && !writeOutput) {
       throw new Error('--superseded-ok needs GITHUB_OUTPUT: the result must gate the next job');
     }
-    log(`Waiting for ${args.require.map((r) => `${r.workflow}:${r.job}`).join(', ')} on ${sha}`);
+    log(
+      `Waiting for ${args.require.map((r) => `${r.workflow}:${r.job}`).join(', ')} on ${sha} (${args.branch})`,
+    );
     const result = await waitForGreen({
       ...args,
       api: api ?? githubApi({ token, baseUrl }),
@@ -313,7 +329,7 @@ export async function run({ argv, env, api, log = console.log, writeOutput, now,
     if (result.superseded) {
       writeOutput('result=superseded');
       log(
-        `::notice::Superseded: CI of ${sha} was cancelled before it ran because main moved on to ${result.head}. Nothing is deployed or released for this commit; the newer commit's run (or the deploy catch-up) handles it.`,
+        `::notice::Superseded: CI of ${sha} was cancelled before it ran because ${args.branch} moved on to ${result.head}. Nothing is deployed or released for this commit; the newer commit's run (or the deploy catch-up) handles it.`,
       );
       return 0;
     }

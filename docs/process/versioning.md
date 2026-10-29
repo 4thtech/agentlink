@@ -74,6 +74,7 @@ Patch releases (`0.1.1`, …) fix defects in between. Work toward a milestone sh
 ## 4. Prereleases and promotion to `latest`
 
 1. **Prereleases.** In pre mode with tag `next` (`pnpm changeset pre enter next`), merging the Version packages PR publishes `x.y.z-next.N` to npm `next` automatically (job `publish-next`, environment `npm-next`, no reviewer), then the smoke test runs. A prerelease never moves `latest`.
+   **Wave preview (W4-NEXT-PREVIEW, owner Decision 44 A1).** Every green push to the `wave-4` integration branch publishes a Changesets snapshot `x.y.z-next.wave4.<UTC datetime>` to `next` (`release-and-deployment.md` §4.1). It is computed in the runner and never committed: no pre mode, no version bump and no changelog roll reach `wave-4` or `main`. The wave's changesets stay pending and are released from `main` as usual after the merge.
 2. **Promotion.** `latest` is production; only a deliberate stable release moves it (D-25, D-52). Promotion is a new stable publish, not a dist-tag move (`release-and-deployment.md` §4.1 says why):
    1. A PR runs `pnpm changeset pre exit`; between the last prerelease and it only fixes SHOULD merge.
    2. The next Version packages PR carries the stable versions and the rolled `CHANGELOG.md` (§5).
