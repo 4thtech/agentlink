@@ -399,7 +399,7 @@ describe('the top-bar switcher', () => {
     expect(triggerOf().textContent).toContain('Claude Code');
     expect(triggerOf().getAttribute('aria-expanded')).toBe('false');
     expect(triggerOf().getAttribute('aria-label')).toBe(
-      'Agent: Personal, Claude Code +1, Running. Switch agent.',
+      'Agent: Personal, Claude Code, Running. Switch agent.',
     );
   });
   it('opens a menu with every agent, its apps, Add agent and Manage agents', async () => {
