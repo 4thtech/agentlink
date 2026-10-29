@@ -272,7 +272,14 @@ async function createFor(name: string | undefined, routes: Routes = {}): Promise
   const calls = await openSheet({
     [`POST ${CREATE}`]: (c: Call) => {
       const label = (JSON.parse(c.body) as { label?: string }).label ?? null;
-      open = [{ inviteId: `id${String(open.length)}`.padEnd(22, 'A'), name: label, expiresAt: CREATED.expiresAt }, ...open];
+      open = [
+        {
+          inviteId: `id${String(open.length)}`.padEnd(22, 'A'),
+          name: label,
+          expiresAt: CREATED.expiresAt,
+        },
+        ...open,
+      ];
       return CREATED;
     },
     ...routes,
@@ -591,7 +598,11 @@ describe('W4-SHORT-INVITE: the long link under Advanced', () => {
 describe('W4-INVITES-LIST: open invites from the server', () => {
   const rowsEl = (): HTMLElement | null => document.querySelector('.ct-invites');
   const BO = { inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ', name: 'Bo', expiresAt: '2999-01-01T00:00:00Z' };
-  const NONE = { inviteId: 'BwcHBwcHBwcHBwcHBwcHBw', name: null, expiresAt: '2999-01-01T00:00:00Z' };
+  const NONE = {
+    inviteId: 'BwcHBwcHBwcHBwcHBwcHBw',
+    name: null,
+    expiresAt: '2999-01-01T00:00:00Z',
+  };
 
   it('shows the server rows on load: name or a neutral line, expiry, a Cancel each', async () => {
     open = [BO, NONE];

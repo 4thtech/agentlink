@@ -19,7 +19,6 @@ import {
   ContactName,
   EmptyState,
   Icon,
-  RingMeter,
   Sheet,
   Skeleton,
   SuccessMoment,
@@ -53,7 +52,7 @@ import {
 import { PAGE_TITLES } from '../../strings.js';
 import { AddContactSheet } from './add-contact.js';
 import { ADD_CONTACT_MARKER } from './add-contact-link.js';
-import { ADD_STRINGS as A, connectingTo, daysLeft, waitingToAccept } from './add-strings.js';
+import { ADD_STRINGS as A, connectingTo, expiresIn, waitingToAccept } from './add-strings.js';
 import {
   LIST_PATH,
   contactPath,
@@ -64,7 +63,13 @@ import {
   type CodeAnswer,
   type ContactRow,
 } from './data.js';
-import { createInviteApi, type InviteApi } from './invite-api.js';
+import {
+  INVITES_LIST_PATH,
+  createInviteApi,
+  parseOpenInvites,
+  type InviteApi,
+  type OpenInvite,
+} from './invite-api.js';
 import { isKept, keep, loadKept } from './kept.js';
 import {
   createOwnerClient,
@@ -73,7 +78,6 @@ import {
   type PasskeyInfo,
   type PresenceProof,
 } from './owner.js';
-import { addPendingInvite, pendingInvites, type PendingInvite } from './pending-invites.js';
 import { PresencePrompt } from './presence-prompt.js';
 import { useInviteFirst } from '../home/start-here-empty.js';
 import { START_STRINGS } from '../home/strings.js';
@@ -673,42 +677,56 @@ function hoodFields(c: ContactRow): unknown[] {
 const DAY_MS = 86_400_000;
 
 /**
- * UX2-d2 (b11 §21.3, Closing): the invites created here, as pending rows: the name and the days
- * left, never the link. The newest gets the 1.2 s highlight as the sheet leaves (a colour fade only).
+ * W4-INVITES-LIST (b11 §21.3, Closing): the open invites the server holds, as pending rows: the
+ * name (or a neutral line), the days left and Cancel. Never a link: a lost link is cancelled and a
+ * new one created. The newest gets the 1.2 s highlight as the sheet leaves (a colour fade only).
  */
 function PendingInvites({
   rows,
   highlight,
   now,
+  busy,
+  failed,
+  onCancel,
 }: {
-  rows: readonly PendingInvite[];
-  highlight: number | undefined;
+  rows: readonly OpenInvite[];
+  highlight: string | undefined;
   now: number;
+  busy: string | undefined;
+  failed: boolean;
+  onCancel: (inviteId: string) => void;
 }): ReactElement | null {
   if (rows.length === 0) return null;
   return (
-    <Surface as="ul" level={1} className="ct-list ct-invites" aria-label={A.pendingLabel}>
-      {rows.map((r) => {
-        const total = Math.max(1, Math.ceil((r.expiresAt - r.createdAt) / DAY_MS));
-        const left = Math.max(0, Math.ceil((r.expiresAt - now) / DAY_MS));
-        return (
-          <li key={r.id} className={`ct-invite${r.id === highlight ? ' is-new' : ''}`}>
-            <span className="al-avatar al-text-label" aria-hidden="true">
-              <Icon name="clock" size={14} />
-            </span>
-            <span className="ct-invite-main al-text-body">{waitingToAccept(r.name)}</span>
-            <RingMeter
-              label={A.daysLeftLabel}
-              value={left}
-              max={total}
-              text={daysLeft(left)}
-              countdown
-              size="sm"
-            />
-          </li>
-        );
-      })}
-    </Surface>
+    <>
+      <Surface as="ul" level={1} className="ct-list ct-invites" aria-label={A.pendingLabel}>
+        {rows.map((r) => {
+          const left = Math.max(0, Math.ceil((r.expiresAt - now) / DAY_MS));
+          return (
+            <li
+              key={r.inviteId}
+              className={`ct-invite${r.inviteId === highlight ? ' is-new' : ''}`}
+            >
+              <span className="al-avatar al-text-label" aria-hidden="true">
+                <Icon name="clock" size={14} />
+              </span>
+              <span className="ct-invite-main al-text-body">
+                {waitingToAccept(r.name ?? undefined)}
+                <span className="ct-invite-expiry al-text-caption al-muted">{expiresIn(left)}</span>
+              </span>
+              <Button size="sm" disabled={busy === r.inviteId} onClick={() => onCancel(r.inviteId)}>
+                {A.cancelInvite}
+              </Button>
+            </li>
+          );
+        })}
+      </Surface>
+      {failed ? (
+        <p className="al-text-body-sm" role="alert">
+          {A.cantCancel}
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -743,9 +761,11 @@ export function ContactsPage({
   const [kept, setKept] = useState(loadKept);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [adding, setAdding] = useState(openedForAdd);
-  const [rows, setRows] = useState<readonly PendingInvite[]>(() => pendingInvites());
-  const [highlight, setHighlight] = useState<number | undefined>(undefined);
-  const [lastCreated, setLastCreated] = useState<number | undefined>(undefined);
+  const [rows, setRows] = useState<readonly OpenInvite[]>([]);
+  const [highlight, setHighlight] = useState<string | undefined>(undefined);
+  const [justCreated, setJustCreated] = useState(false);
+  const [cancelling, setCancelling] = useState<string | undefined>(undefined);
+  const [cancelFailed, setCancelFailed] = useState(false);
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const addButtonId = useId();
   const activity = usePulse(api);
@@ -762,6 +782,16 @@ export function ContactsPage({
     const quiet = background.current;
     background.current = false;
     inFlight.current = true;
+    // W4-INVITES-LIST: the open invites are read wherever the contacts are; a failed read keeps
+    // the last good rows.
+    void api.get(INVITES_LIST_PATH).then(
+      (res) => {
+        if (!live || res.kind !== 'ok') return;
+        const read = parseOpenInvites(res.data);
+        if (read !== undefined) setRows(read);
+      },
+      () => undefined,
+    );
     void api
       .get(LIST_PATH)
       .then((res) => {
@@ -853,8 +883,8 @@ export function ContactsPage({
   const closeAdd = (): void => {
     returnFocus.current = true;
     setAdding(false);
-    setHighlight(lastCreated);
-    setLastCreated(undefined);
+    setHighlight(justCreated ? rows[0]?.inviteId : undefined);
+    setJustCreated(false);
   };
 
   const ready = list.phase === 'ok';
@@ -881,10 +911,9 @@ export function ContactsPage({
     <AddContactSheet
       invites={invites}
       passkey={passkey}
-      onCreated={(name, expiresAt) => {
-        const row = addPendingInvite(name, expiresAt);
-        setRows(pendingInvites());
-        setLastCreated(row.id);
+      onCreated={() => {
+        setJustCreated(true);
+        setTick((n) => n + 1);
       }}
       onConnected={(name) => {
         returnFocus.current = true;
@@ -901,7 +930,29 @@ export function ContactsPage({
         {notice}
       </p>
     );
-  const invitesList = <PendingInvites rows={rows} highlight={highlight} now={Date.now()} />;
+  const cancelInvite = (inviteId: string): void => {
+    if (cancelling !== undefined) return;
+    setCancelling(inviteId);
+    setCancelFailed(false);
+    void invites.cancel(inviteId).then((outcome) => {
+      setCancelling(undefined);
+      if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') {
+        setTick((n) => n + 1);
+        return;
+      }
+      setCancelFailed(true);
+    });
+  };
+  const invitesList = (
+    <PendingInvites
+      rows={rows}
+      highlight={highlight}
+      now={Date.now()}
+      busy={cancelling}
+      failed={cancelFailed}
+      onCancel={cancelInvite}
+    />
+  );
 
   const page = ((): ReactElement => {
     if (list.phase === 'not_set_up') {

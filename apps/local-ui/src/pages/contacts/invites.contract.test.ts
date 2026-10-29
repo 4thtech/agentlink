@@ -58,7 +58,8 @@ function answering(answer: InvitesAnswer) {
 }
 
 const shortAnswer = INVITE_CREATE.short.answer;
-const longLink = 'https://agentlink.4thtech.io/i#AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-SeCrEtPaYlOaD';
+const longLink =
+  'https://agentlink.4thtech.io/i#AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-SeCrEtPaYlOaD';
 const longAnswer: InvitesAnswer = {
   status: 200,
   body: {
