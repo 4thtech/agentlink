@@ -65,6 +65,10 @@ export default defineConfig({
           name: 'drop-worker',
           include: [DROP_WORKER],
           testTimeout: 20_000,
+          // Measured (CHORE-FLAKE-FILES-DROP-HOOK): the beforeAll of files-drop.worker.test.ts (a
+          // relay network, two cores, pairing) takes about 0.3 s locally, yet exceeded the 10 s hook
+          // default on CI run 40915089707 under load. 60 s as relay-io.test.ts; a hang still fails.
+          hookTimeout: 60_000,
         },
       },
     ],
