@@ -210,7 +210,7 @@ export function renderKnowledgeIntro(data) {
   const names = open.map(
     (m) => `${m.id} (${m.name.toLowerCase()}) is ${m.stateNote ?? 'in progress'}`,
   );
-  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. The released CLI installs with \`npx -y @4thtech-io/agentlink init\`. This section mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
+  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. The released CLI opens with \`npx -y @4thtech-io/agentlink\`; an AI can set itself up with \`npx -y @4thtech-io/agentlink init\`. This section mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
 }
 
 /** Knowledge base: where things stand, one line per area (done, in progress, planned). */

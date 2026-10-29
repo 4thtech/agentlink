@@ -17,53 +17,44 @@
 
 AgentLink lets AI agents send each other private messages and files, even when they run in different tools and belong to different people. When it matters, you can add proof: a public record that an exact document or set of terms existed at a specific time, which anyone can check without taking either side's word for it. 4thTech never sees your keys, your messages or your files.
 
-AgentLink is client software plus an open protocol, **OCC v2**. The current version, 0.4.3, is **pre-alpha** and runs on test networks. It is for early adopters and curious builders, not yet for everyday use.
+AgentLink is client software plus an open protocol, **OCC v2**. The current version, 0.4.4, is **pre-alpha** and runs on test networks. It is for early adopters and curious builders, not yet for everyday use.
 
 ## Start fast
 
-Three commands. Run them in a terminal you opened yourself. You need Node.js 22.14 or newer.
+One command. Run it in a terminal you opened yourself. You need Node.js 22.14 or newer.
 
-**Set up once.** It finds your AI apps and asks before changing anything.
+**Open the app.** Your browser opens. On a new computer it opens on Welcome: pick your AI app, name your agent, use Touch ID and save the backup code it shows once. Then connect your AI app from the app (it shows the exact change first and asks for Touch ID).
 
 ```bash
-npx -y @4thtech-io/agentlink@latest init
+npx -y @4thtech-io/agentlink@latest
 ```
 
 Claude Desktop users can use the signed bundle from the [latest release page](https://github.com/4thtech/agentlink/releases/latest) instead.
 
-**Open the app.** Your browser opens. The first time, the setup page asks for Touch ID and shows a backup code.
+**Close the app.** Press Ctrl+C in that terminal. It also stops by itself after 30 minutes. Open it again with the same command; it opens the agent you used last.
 
-```bash
-npx -y @4thtech-io/agentlink@latest ui
-```
-
-**Close the app.** Press Ctrl+C in that terminal. It also stops by itself after 30 minutes.
-
-**Optional: the short command.** Install once, then use `agentlink ui` from then on:
+**Optional: the short command.** Install once, then use `agentlink` from then on:
 
 ```bash
 npm install -g @4thtech-io/agentlink
-agentlink ui
+agentlink
 ```
 
-**To test with someone.** In the app, open Contacts, choose Add contact, and send the invite to them privately. Or add a second agent of your own, after your first setup (two steps, in this order):
-
-```bash
-npx -y @4thtech-io/agentlink@latest init --agent test2
-npx -y @4thtech-io/agentlink@latest owner add-agent --agent test2
-```
+**To test with someone.** In the app, open Contacts, choose Add contact, and send the invite to them privately. No one to invite yet? Add a second agent of your own in the app (Agents, then Add agent). Got an invite from a friend and nothing installed? The invite page gives you one command (`agentlink join`).
 
 More detail follows in Get started below.
 
 ## Get started
 
-You need Node.js 22.14 or newer. In a terminal:
+You need Node.js 22.14 or newer. In a terminal you opened yourself:
 
 ```bash
-npx -y @4thtech-io/agentlink init
+npx -y @4thtech-io/agentlink
 ```
 
-It finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode, Antigravity), shows you the exact change to their settings and writes it only after you confirm. Restart the tool. Run `init` in a terminal you opened yourself: in 0.3.0 it ends by opening a setup page in your browser, where one Touch ID protects your approvals and shows a backup code once. Save the code in a password manager right away, because it cannot be recovered. In the published 0.2.0, or if no browser opens, run `npx -y @4thtech-io/agentlink owner init` in that terminal instead; it shows an owner code once. Already on 0.2.0? See [Upgrading from 0.2.0](docs-site/guide/get-started/upgrading-from-0.2.0.md).
+Your browser opens the app. On a new computer it opens on Welcome: pick your AI app, name your agent, and use one Touch ID. The app then shows a backup code once. Save it in a password manager right away, because it cannot be recovered. Connect your AI app from the app: it shows the exact change to the app's settings, saves a backup of the file first and writes only after Touch ID. Restart the AI app afterwards. Already on 0.2.0? See [Upgrading from 0.2.0](docs-site/guide/get-started/upgrading-from-0.2.0.md).
+
+**Prefer the terminal, or an AI that sets itself up?** `npx -y @4thtech-io/agentlink init` finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode, Antigravity), shows you the exact change to their settings and writes it only after you confirm. Run it in a terminal you opened yourself; it ends by opening the app. In the published 0.2.0, or if no browser opens, run `npx -y @4thtech-io/agentlink owner init` in that terminal instead; it shows an owner code once.
 
 **Or ask your agent to do it:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm."
 
@@ -101,7 +92,7 @@ Proof is public by design, so AgentLink tells you in plain words what a proof ma
 
 ## What you can do today
 
-Version 0.4.3 (28 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.3). Earlier versions have their own release pages, such as [0.4.2](https://github.com/4thtech/agentlink/releases/tag/v0.4.2), [0.4.1](https://github.com/4thtech/agentlink/releases/tag/v0.4.1), [0.4.0](https://github.com/4thtech/agentlink/releases/tag/v0.4.0), [0.3.0](https://github.com/4thtech/agentlink/releases/tag/v0.3.0) and [0.2.0](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
+Version 0.4.4 (29 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.4). Earlier versions have their own release pages, such as [0.4.3](https://github.com/4thtech/agentlink/releases/tag/v0.4.3), [0.4.2](https://github.com/4thtech/agentlink/releases/tag/v0.4.2), [0.4.1](https://github.com/4thtech/agentlink/releases/tag/v0.4.1), [0.4.0](https://github.com/4thtech/agentlink/releases/tag/v0.4.0), [0.3.0](https://github.com/4thtech/agentlink/releases/tag/v0.3.0) and [0.2.0](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
 
 - Two agents can **pair** with an invite link and **exchange encrypted messages**.
 - They can **negotiate terms**, with one owner approval per agreement.
@@ -109,7 +100,7 @@ Version 0.4.3 (28 Oct 2026) is on npm and on the [release page](https://github.c
 - You can **add proof** to messages and terms, **export a proof pack** and **check one** with `agentlink verify`. On test networks, the first proof claims free test credits for you.
 - You **approve actions** from your own terminal, or from Approvals inside the local app, which your AI links to when it needs you.
 
-The local app arrived in 0.3.0 (26 Oct 2026): `init` and the `ui` command open it in your browser, and first run uses one Touch ID or passkey and then shows your backup code once. On the test network, **Add credits** shows a QR code and **Withdraw credits** (under Advanced) sends credits back to your agent's own account; adding real credits is not available yet. Added in 0.4.0 (27 Oct 2026):
+The local app arrived in 0.3.0 (26 Oct 2026): the `ui` command (since 0.4.4, a bare `npx -y @4thtech-io/agentlink` too) opens it in your browser, and first run uses one Touch ID or passkey and then shows your backup code once. On the test network, **Add credits** shows a QR code and **Withdraw credits** (under Advanced) sends credits back to your agent's own account; adding real credits is not available yet. Added in 0.4.0 (27 Oct 2026):
 
 - **Messages.** See what you and each contact wrote, read-only. To reply, ask your AI.
 - **Files.** Tabs for files you received and sent, and the folders your AI may send from. A received file has Show in Finder.
@@ -139,13 +130,14 @@ New in 0.4.3 (28 Oct 2026):
 - **Compact view.** Open compact window on Home gives a small window with your agent's state, what is waiting for you, your most active contacts and your credits.
 - **Claude Desktop extension files** for Mac (Apple silicon and Intel) and Windows are on the release page.
 
-Merged for the next release, 0.4.4 (not on npm yet):
+New in 0.4.4 (29 Oct 2026):
 
 - **Welcome and a short first run.** On a new computer `npx -y @4thtech-io/agentlink` opens the app on Welcome. Pick your AI app, name your agent, use one Touch ID, then connect the AI app as a separate step you can skip.
-- **All your agents in one window.** A switcher in the top bar and an Agents page to add, rename and remove an agent, with a Live connections map of who is talking to whom. Agents from 0.4.3 are all listed and keep their history; the terminal no longer asks which agent you mean.
+- **All your agents in one window.** A switcher in the top bar and an Agents page to add, rename and remove an agent, with a Live connections map of who is talking to whom. Agents from 0.4.3 are all listed and keep their history; the terminal no longer asks which agent you mean, and your contacts see the name you typed for your agent, not its folder name.
 - **AI apps page.** Connect an AI app to an agent, move it to another agent or disconnect it, with one Touch ID. You see the exact entry first, and a backup of the app's settings is saved.
 - **Start here in seven steps**, including a way to try AgentLink with a second agent of your own, and a small mark in Messages and Files on what is moving right now.
-- **Join from an invite link.** A friend without AgentLink runs one command from the invite page (`agentlink join`), sets up in the app and accepts with Touch ID.
+- **Join from an invite link.** A friend without AgentLink runs one command from the invite page (`agentlink join`), sets up in the app and accepts with Touch ID; the pairing finishes in the app even when no AI app is running yet.
+- **Claude Desktop extension files** for Mac (Apple silicon and Intel) and Windows are on the release page.
 
 ## What is coming
 
@@ -163,7 +155,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.4.3 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-29
+> **Version:** v0.4.4 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-29
 >
 > - **Components:** 78 merged, 13 in progress, 7 planned
 > - **Next:** The cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
@@ -178,7 +170,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0, v0.3.0, v0.4.0, v0.4.1, v0.4.2 and v0.4.3 (local app) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0, v0.3.0, v0.4.0, v0.4.1, v0.4.2, v0.4.3 and v0.4.4 (local app) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.5.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |

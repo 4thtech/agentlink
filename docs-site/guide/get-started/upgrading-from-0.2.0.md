@@ -1,19 +1,19 @@
 # Upgrading from 0.2.0
 
-*Applies to AgentLink 0.4.4 and 0.4.3 (released on 28 Oct 2026). `npx` gives you the newest version.*
+*Applies to AgentLink 0.4.4 (released 29 Oct 2026) and 0.4.3 (28 Oct 2026). `npx` gives you the newest version.*
 
-You already use AgentLink 0.2.0. Moving to 0.4.3 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.3)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
+You already use AgentLink 0.2.0. Moving to 0.4.4 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.4)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
 
 ## What to do
 
 1. Open a terminal window yourself (not one inside your AI app).
 2. Run `npx -y @4thtech-io/agentlink@latest init`. The `@latest` makes sure you get the newest version rather than one `npx` kept from before. It reuses the agent you already have and shows the exact change it wants to make to your AI app's settings. Nothing is written until you say yes. If your AI app's settings already have the `agentlink` entry, nothing needs to change.
 3. Restart your AI app, then ask it: "What's my AgentLink status?"
-4. To see the local app, run `npx -y @4thtech-io/agentlink ui` yourself. Your browser opens on Home. Press Ctrl+C when you are done. See [The local app](../local-app/README.md).
+4. To see the local app, run `npx -y @4thtech-io/agentlink` yourself (`ui` does the same). Your browser opens on Home. Press Ctrl+C when you are done. See [The local app](../local-app/README.md).
 
 ## What stays the same
 
-- **Your agent and your contacts.** `init` reuses the agent you have and never makes a second one by itself. The stored data is not migrated: 0.4.3 reads it as it is.
+- **Your agent and your contacts.** `init` reuses the agent you have and never makes a second one by itself. The stored data is not migrated: 0.4.4 reads it as it is.
 - **Your owner code.** If you set up an owner with 0.2.0, you keep using your owner code to approve. Nothing resets it. Keep it where you keep it now.
 - **Your rules.** They are not changed.
 
@@ -24,9 +24,9 @@ You already use AgentLink 0.2.0. Moving to 0.4.3 ([release notes](https://github
 - **New in 0.3.0.** The [local app](../local-app/README.md) with Activity, Proofs and credits (add test credits by QR code, withdraw credits), Contacts, Files and Rules, and a plainer approval page.
 - **New in 0.4.0.** Messages, Files tabs for what you received and sent, a status bar, a confirmation sheet for paid actions, and a notice when you paired twice with the same person.
 
-## Upgrading to 0.4.3
+## Upgrading to 0.4.3 and later
 
-The first time 0.4.3 runs, it upgrades your local data. After that, older versions can't open it, so you can't go back to 0.3.x. Your contacts, messages and files are kept.
+The first time 0.4.3 or a later version runs, it upgrades your local data. After that, older versions can't open it, so you can't go back to 0.3.x. Your contacts, messages and files are kept.
 
 ## Upgrading to 0.4.4
 
