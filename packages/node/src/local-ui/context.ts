@@ -519,10 +519,11 @@ export interface LocalUiContext {
    */
   readonly join?: JoinDesk;
   /**
-   * U3-invite-b (06 §6, 08 §4; proposed): one short pass for the join screen while it waits for the
-   * inviter's answer, only when no other process holds the agent's publisher lease (it takes the
-   * lease, fetches and processes, delivers due rows and releases it). In the app host only; never
-   * throws (local-ui/pairing-follow.ts).
+   * U3-invite-b (06 §6, 08 §4, Decision 37; proposed): one short pass for the join screen while it
+   * waits for the inviter's answer, only when no other process holds the agent's publisher lease (it
+   * takes the lease, fetches and processes, delivers due rows and releases it). In the app host
+   * only; never throws. The same follower also runs the server's after-read passes
+   * (local-ui/pairing-follow.ts).
    */
   readonly followPairing?: () => Promise<unknown>;
   /**

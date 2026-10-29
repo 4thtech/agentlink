@@ -1158,8 +1158,8 @@ export async function startApprovalServerWith(
   const joinDesk =
     options.host === undefined ? undefined : new JoinDesk(() => now(), internals.checkInvite);
   /**
-   * U3-invite-b (06 §6; proposed): the open agent's pairing follower, in the app host only; a fresh
-   * one per bound agent, so a switch never reaches the previous agent's client.
+   * U3-invite-b (06 §6, Decision 37; proposed): the open agent's pass follower, in the app host
+   * only; a fresh one per bound agent, so a switch never reaches the previous agent's client.
    */
   const followerOf = (bound: typeof agentUi): PairingFollower | undefined =>
     options.host === undefined || bound?.client === undefined
@@ -3423,6 +3423,8 @@ export async function startApprovalServerWith(
       } finally {
         hold?.leave();
       }
+      // U3-invite-b (Decision 37): a page is visible and reading; maybe one host pass after it.
+      hostTick();
       return;
     }
     const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
@@ -3768,6 +3770,26 @@ export async function startApprovalServerWith(
     sendJson(res, 409, { status: 'agent_changed' });
   }
 
+  /**
+   * U3-invite-b (06 §6, Decision 37; proposed): after a page read, one host pass for the open agent
+   * when one is due (every 5 s while a pairing is pending, else every 15 s) and no other process
+   * holds the lease. Not awaited by the read, but it holds the agent open like a read, so a switch
+   * or removal drains it first; a pass that lost its generation never starts. Never rejects.
+   */
+  function hostTick(): void {
+    const slot = host;
+    const bound = follower;
+    if (slot === undefined || bound === undefined) return;
+    void (async () => {
+      const hold = await slot.enter();
+      try {
+        if (hold.valid() && follower === bound) await bound.tick();
+      } finally {
+        hold.leave();
+      }
+    })().catch(() => undefined);
+  }
+
   /** U3-g-b: true while the app host has no agent open (no agent yet, or a failed switch). */
   function noAgentOpen(): boolean {
     return host !== undefined && host.current === undefined;
@@ -3858,7 +3880,9 @@ export async function startApprovalServerWith(
           available: entry.available,
           removing: entry.removing,
           contacts: stats?.contacts ?? null,
-          running: stats?.running ?? false,
+          // U3-invite-b: during the host's own short pass the lease row is the app's, not an AI app's.
+          running:
+            (stats?.running ?? false) && !(entry.name === current && follower?.passing === true),
           // U3-f: from each AI app's `agentlink` entry only.
           apps: appsOf(entry.name),
         }),

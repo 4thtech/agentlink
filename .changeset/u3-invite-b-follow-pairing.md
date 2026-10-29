@@ -1,6 +1,7 @@
 ---
 '@4thtech-io/agentlink': patch
+'@4thtech-io/core': patch
 '@4thtech-io/node': patch
 ---
 
-The local app finishes a pairing it accepted when no AI app is running (U3-invite-b, 06 §6, 08 §4): while the join screen waits for the inviter's answer, the app takes the agent's publisher lease only when no other process holds it, runs one short catch-up pass and releases it, so the screen moves on to "Connected with {name}." With an AI app's AgentLink server running, the app leaves the work to it.
+The local app keeps the open agent up to date when no AI app is running (U3-invite-b, Decision 37; 06 §6, 08 §4): while the app is open and no other process holds the agent's publisher lease, it takes the lease for one short pass (fetch, process, deliver due rows) and releases it. Passes run every 5 s while a pairing is pending on either side (the join screen, sent invites, Contacts-page accepts) and every 15 s otherwise while a page is visible, so pairings finish and messages arrive. An AI app's AgentLink server holding the lease always wins. New in core: `pairing.waiting()`.

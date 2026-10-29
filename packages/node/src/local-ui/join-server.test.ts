@@ -758,7 +758,9 @@ describe('the join screen follows the pairing (U3-invite-b (a))', () => {
 
   it('with an MCP server holding the lease, the host never fetches or publishes', async () => {
     const store = new MemoryStore();
-    const mcp = new PublisherLease({ store, now: () => 1_790_000_000 });
+    // The MCP server shares the host's clock and renews as it does every 20 s (07 §3.2).
+    let mcpNow = 1_790_000_000;
+    const mcp = new PublisherLease({ store, now: () => mcpNow });
     expect(await mcp.take()).toBe(true);
     const h = await harness({ waitingInvite: LINK, store, sync: answered });
     expect((await h.accept(INVITE_ID, world.code)).status).toBe(200);
@@ -767,7 +769,10 @@ describe('the join screen follows the pairing (U3-invite-b (a))', () => {
       expect(parse((await h.read()).body)).toMatchObject({ state: 'waiting_for_them' });
       await h.health();
       await h.agents();
+      await settle();
       h.advance(16_000);
+      mcpNow += 16;
+      expect(await mcp.renew()).toBe(true);
     }
     await settle();
     expect(h.core.synced).toHaveLength(0);
@@ -778,6 +783,8 @@ describe('the join screen follows the pairing (U3-invite-b (a))', () => {
     expect(listed.agents[0]?.running).toBe(true);
     // Once the MCP server stops (clean shutdown releases the lease), the host may follow.
     expect(await mcp.release()).toBe(true);
+    await settle();
+    h.advance(5_000);
     expect(parse((await h.read()).body)).toMatchObject({ state: 'connected' });
     expect(h.core.synced).toHaveLength(1);
   });
