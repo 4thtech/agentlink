@@ -1,4 +1,4 @@
-import { lstatSync, readdirSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Generated or untracked directories no workflow ever runs from; tools may rewrite them any time. */
@@ -31,9 +31,8 @@ export function walkFiles(dir) {
     let isFile = entry.isFile();
     if (entry.isSymbolicLink()) {
       try {
-        const s = lstatSync(full);
-        isDir = s.isDirectory();
-        isFile = s.isFile();
+        // Follow the link for files only; a symlinked directory is never descended (loops).
+        isFile = statSync(full).isFile();
       } catch (error) {
         if (error?.code === 'ENOENT') continue;
         throw error;

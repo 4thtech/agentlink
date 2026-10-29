@@ -37,6 +37,15 @@ describe('walkFiles', () => {
     expect(rel(d, walkFiles(d))).toEqual(['a.ts']);
   });
 
+  it('lists a symlink to a real file and does not follow a symlinked directory', () => {
+    const d = fixture();
+    mkdirSync(join(d, 'sub'));
+    writeFileSync(join(d, 'real.ts'), '');
+    symlinkSync(join(d, 'real.ts'), join(d, 'link.ts'));
+    symlinkSync(d, join(d, 'sub/loop'));
+    expect(rel(d, walkFiles(d))).toEqual(['link.ts', 'real.ts']);
+  });
+
   it('returns nothing for a directory that vanished', () => {
     expect(walkFiles(join(fixture(), 'missing'))).toEqual([]);
   });
