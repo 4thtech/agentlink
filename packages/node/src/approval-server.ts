@@ -1769,8 +1769,10 @@ export async function startApprovalServerWith(
    * operation: `userId` (needed to switch) is given only with an owner to bind it to.
    */
   async function passkeyInfo(res: ServerResponse): Promise<void> {
-    const context = noAgentOpen() ? undefined : await source.context();
-    if (context === undefined && !noAgentOpen()) {
+    // Read once: a switch between two reads must not turn a no-agent answer into a 503.
+    const none = noAgentOpen();
+    const context = none ? undefined : await source.context();
+    if (context === undefined && !none) {
       sendJson(res, 503, { status: 'needs_setup' });
       return;
     }

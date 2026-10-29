@@ -121,6 +121,10 @@ describe('HOTFIX-045-TOUCHID: the presence sheet says why and offers the switch'
       );
     });
     await act(async () => button(/^Switch to /).click());
+    // The switch's code field invites no autofill (11 §5, as the approval card).
+    const field = host.querySelector<HTMLInputElement>('input[type="password"]');
+    expect(field?.getAttribute('autocomplete')).toBe('off');
+    expect(field?.closest('form')?.getAttribute('autocomplete')).toBe('off');
     await type('ABCD-EFGH-IJKL');
     await act(async () => button(/^Switch to /).click());
     await flush();

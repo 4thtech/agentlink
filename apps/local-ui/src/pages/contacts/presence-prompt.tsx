@@ -177,14 +177,15 @@ export function PresencePrompt({
         </p>
       ) : null}
       {switching ? (
-        <form className="ct-presence-form" onSubmit={submitSwitch} autoComplete="on">
+        <form className="ct-presence-form" onSubmit={submitSwitch} autoComplete="off">
           <p className="al-text-body-sm al-muted">{PASSKEY_WHY.switchIntro(sensor)}</p>
+          {/* As the approval card's code field (11 §5): no autofill invitation. */}
           <TextField
             label={S.ownerCode}
             hint={EARLIER_OWNER_CODE_HINT}
-            name="backup-code"
+            name="owner-code"
             type="password"
-            autoComplete="current-password"
+            autoComplete="off"
             spellCheck={false}
             mono
             value={code}
