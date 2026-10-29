@@ -31,7 +31,7 @@ flowchart LR
 | Storage and chain client | Encrypted drop and own-storage adapters; proof client | Released (v0.2.0, test networks): the encrypted drop is the default for files above about 12 KB and the proof client is built into the CLI. The S3-compatible adapter (multipart upload, streaming encryption; tested against MinIO and Cloudflare R2) is merged, but choosing your own storage is not available yet |
 | Desktop apps, owner console, cloud agent | Native approvals and dashboard; web supervision; always-on agent in the user's own Cloudflare account | Planned (M2) |
 
-Only the CLI package `@4thtech-io/agentlink` is published (current v0.4.3, 28 Oct 2026, with provenance; v0.1.0 was the first, on 16 Oct 2026); the libraries are private workspace packages bundled into it. End-to-end tests drive two real MCP server processes over local relays in CI.
+Merged for 0.4.4 (not on npm yet): the local app is an app host that holds one agent open at a time and switches in the same process, port and session (a generation number refuses requests made against another agent; every owner action is signed bound to the agent), `agentlink join` and bare `agentlink` commands, and an AI apps desk that is the one writer of AI app settings files (fixed entry, realpath checks, a backup that keeps the file mode). Only the CLI package `@4thtech-io/agentlink` is published (current v0.4.3, 28 Oct 2026, with provenance; v0.1.0 was the first, on 16 Oct 2026); the libraries are private workspace packages bundled into it. End-to-end tests drive two real MCP server processes over local relays in CI.
 
 ## MCP server
 

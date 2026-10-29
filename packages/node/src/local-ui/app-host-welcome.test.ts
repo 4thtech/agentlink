@@ -17,6 +17,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   AgentLinkClient,
+  checkInviteLink,
+  decodeInviteLink,
   nostrTransport,
   type ApprovalChannel,
   type OwnerActionOutcome,
@@ -693,6 +695,37 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     expect(finish?.status).toBe(200);
     expect(h.w.log[0]).toBe(`create ${FIRST_AGENT_LABEL} as default`);
     expect(h.w.labels).toEqual([['default', FIRST_AGENT_LABEL]]);
+  }, 60_000);
+
+  it('U3-d-b: contacts see the name the owner typed ("Ana"), never the folder `default`', async () => {
+    const h = await harness();
+    const s = await h.session();
+    const { finish } = await firstRun(h, s, 'Ana');
+    expect(finish?.status).toBe(200);
+    expect(h.w.current).toEqual(['default']);
+    const client = h.w.clients.get('default');
+    if (client === undefined) throw new Error('no client');
+    // The card is signed over the typed label (nameHash) at creation, with one gesture.
+    expect((await client.identity.signedCard()).name).toBe('Ana');
+    const { inviteUrl } = await client.pairing.createInvite();
+    expect((await decodeInviteLink(inviteUrl)).name).toBe('Ana');
+    // What a peer sees after Accept step 1 (both card signatures and the nameHash checked).
+    const peer = await checkInviteLink(inviteUrl, NOW);
+    expect(peer.contact.display).toEqual({
+      name: 'Ana',
+      label: 'self-declared',
+      nameSource: 'counterparty',
+    });
+  }, 60_000);
+
+  it(`U3-d-b: with no label typed, contacts see "${FIRST_AGENT_LABEL}", not the folder`, async () => {
+    const h = await harness();
+    const s = await h.session();
+    const { finish } = await firstRun(h, s, undefined);
+    expect(finish?.status).toBe(200);
+    const client = h.w.clients.get('default');
+    if (client === undefined) throw new Error('no client');
+    expect((await client.identity.signedCard()).name).toBe(FIRST_AGENT_LABEL);
   }, 60_000);
 
   it('refuses a label that is not restricted before any seed or folder exists', async () => {

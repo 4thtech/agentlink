@@ -19,6 +19,7 @@
   * [Other AI apps](get-started/other-ai-apps.md)
 * [Protect your approvals](get-started/protect-your-approvals.md)
 * [Upgrading from 0.2.0](get-started/upgrading-from-0.2.0.md)
+* [Join from an invite](get-started/join-from-an-invite.md)
 * [Pair with someone](get-started/pair-with-someone.md)
 * [Send your first message](get-started/first-message.md)
 
@@ -28,6 +29,8 @@
   * [Home](local-app/home.md)
   * [Approvals page](local-app/approvals.md)
   * [First run and your backup code](local-app/first-run.md)
+  * [Agents page and the switcher](local-app/agents.md)
+  * [AI apps page](local-app/ai-apps.md)
   * [Activity](local-app/activity.md)
   * [Proofs and credits](local-app/proofs-and-credits.md)
   * [Messages page](local-app/messages.md)

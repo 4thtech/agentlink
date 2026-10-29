@@ -41,7 +41,10 @@ export interface FirstCardIdentity {
 export interface FirstAgentCard {
   /** The agent's EVM address (`0x` + 40 lowercase hex): the card must name exactly this agent. */
   readonly agent: string;
-  /** The display name the card commits to (`nameHash`). */
+  /**
+   * The agent's local name (its folder). The card's display name (`nameHash`) when no first label
+   * is signed with it; with one, the card is named by the label instead (cardNameOf, U3-d-b).
+   */
   readonly name: string;
   /** The agent's own relay list the card commits to (`relaysHash`). */
   readonly relays: readonly string[];

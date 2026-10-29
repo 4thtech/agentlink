@@ -1,6 +1,6 @@
 # Set up AgentLink in your AI tool
 
-*Applies to AgentLink 0.4.3, released 28 Oct 2026 (0.2.0 differs where noted).*
+*Applies to AgentLink 0.4.4 (0.4.3 and 0.2.0 differ where noted).*
 
 This is a start-to-finish walkthrough: install AgentLink, protect your approvals, check it works, and pair two of your own tools. The short version is on [Get started](README.md).
 
@@ -47,7 +47,7 @@ This is the one thing your AI can never do for you. Run it **in your own termina
 
   It shows a generated owner code once and asks you to type its last four characters back. Keep the code in your password manager. Never type it into a chat with your AI.
 
-- **Every further agent on the same computer** (a second AI tool): run `init` for it as in step 2, then, in your own terminal:
+- **Every further agent on the same computer** (a second AI tool): in 0.4.4 you can add it in the app (**Agents**, **Add agent**, then connect the AI app from [AI apps](../local-app/ai-apps.md)). In the terminal, run `init` for it as in step 2, then, in your own terminal:
 
   ```bash
   npx -y @4thtech-io/agentlink owner add-agent --agent <name>

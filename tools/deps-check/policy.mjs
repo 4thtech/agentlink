@@ -70,6 +70,24 @@ export const RELATIVE_ESCAPES = [
   },
   {
     zone: 'e2e',
+    target: 'packages/node/dist/agent-store.js',
+    reason:
+      'U3-k local app end-to-end: openAgentStoreWith on a keychain stand-in file in a temp folder, so the OS keychain is never touched; the package entry binds the OS keychain',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/dist/keychain-keystore.js',
+    reason:
+      'U3-k local app end-to-end: createKeychainAgent and openRecordedKeyStore on a keychain stand-in file in a temp folder, never the OS keychain',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/dist/owner-keystore.js',
+    reason:
+      'U3-k local app end-to-end: KeychainOwnerKeyStore on the keychain stand-in, as the approval server opens the owner store, never the OS keychain',
+  },
+  {
+    zone: 'e2e',
     target: 'apps/cli/scripts/local-ui-embed.mjs',
     reason:
       'M1-11b-6 first-run smoke: the build script that lists the local app files, to compare with what the bundle embeds',

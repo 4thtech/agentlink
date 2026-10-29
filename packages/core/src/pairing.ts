@@ -241,6 +241,21 @@ export class PairingService implements PairingHandler {
     this.#contacts = contacts;
   }
 
+  /**
+   * True while a pairing is pending on either side (U3-invite-b, Decision 37; 06 §6): a sent invite
+   * not used yet and not expired (the inviter waits for a handshake), or an accept staged and not
+   * expired (the invitee waits for the `handshake-ack`). Reads the store only: no sealed column is
+   * opened, nothing is written. The app host uses it to follow pairings more often (06 §6).
+   */
+  async waiting(): Promise<boolean> {
+    const now = nowOf(this.#ctx);
+    return this.#ctx.store.transaction(
+      (tx) =>
+        tx.select('invites').some((row) => row.used_at == null && row.expires_at > now) ||
+        tx.select('pairings').some((row) => row.expires_at > now),
+    );
+  }
+
   // --- A: create an invite -----------------------------------------------------------------------
 
   /** Creates a single-use invite (04 §3.6). Returns the link; stores proofKey, never the secret. */
