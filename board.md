@@ -11,7 +11,7 @@ _Updated 2026-10-29 by @talirezun_
 |---|---|---|---|---|
 | M0-2 Repos, CI, branch protection | @talirezun | in-progress | main pushed; settings pending | 2026-10-12 |
 | M0-4 Decide D-11, D-12, D-14 | @talirezun | in-progress | — | 2026-10-12 |
-| Orchestrator waves | @talirezun (agents) | in-progress | 0.4.5: all fixes merged or armed (last: #711 contacts, #712 remove after first run), then release; wave 4 (0.4.6) started on branch `wave-4`: specs D-139/140/141 merged, journey e2e #710, 6 builders (verify, shell, onboarding one Touch ID, short invites, inbox + save, renames) | 2026-10-29 |
+| Orchestrator waves | @talirezun (agents) | in-progress | 0.4.5 version PR #707 approved by Tali, merging, then npm publish + desktop approvals; wave 4 (0.4.6) on `wave-4`: journey e2e + pnpm verify merged; shell #715, inbox #714, renames #716 in review; onboarding and short invites building | 2026-10-29 |
 | Cloud agent as 0.5.0 | @talirezun (agents) | ready | groundwork merged (D-131 spec #541, core M2-3a #548); starts after the visual refresh | 2026-10-27 |
 | Release 0.4.0 | @talirezun | done 27 Oct | npm latest 0.4.0; GitHub Release v0.4.0 with signed desktop bundles (macOS arm64/x64, Windows) | 2026-10-27 |
 
