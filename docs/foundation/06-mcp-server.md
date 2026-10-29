@@ -40,7 +40,7 @@ Notation: `?` = optional. `Contact` = contact ID, display name or invite alias (
 | Tool | `readOnlyHint` | `destructiveHint` | `idempotentHint` | `openWorldHint` | Approval | Phase |
 |---|---|---|---|---|---|---|
 | `agentlink_status` | true | false | true | true | — | M1a (credits and prices M1b) |
-| `agentlink_create_invite` | false | false | false | true (from D-139) | — | M1a |
+| `agentlink_create_invite` | false | false | false | false | — | M1a |
 | `agentlink_accept_invite` | false | false | false | true | `contacts.acceptInvites` | M1a |
 | `agentlink_list_contacts` | true | false | true | false | — | M1a |
 | `agentlink_send` | false | false | false | true | `proofs.*` with `notarize` | M1a (`path` and `notarize` M1b) |
@@ -55,7 +55,7 @@ Notation: `?` = optional. `Contact` = contact ID, display name or invite alias (
 | `agentlink_export_proof_pack` | false (writes a file) | false | false | false | `proofs.allowKeyDisclosure` | M1b |
 | `agentlink_verify_proof_pack` | true | false | true | true | — | M1b |
 
-- `openWorldHint: true` means the tool reaches relays, the chain, storage or another party. `agentlink_create_invite` creates a local invite record and, from D-139, uploads the invite to the encrypted drop as ciphertext so the link can be short (04 §3.6.2); the link and its key never leave the device until the user shares the link.
+- `openWorldHint: true` means the tool reaches relays, the chain, storage or another party. `agentlink_create_invite` only creates a local invite record; nothing leaves the device until the user shares the link. (When short invite links ship, D-139, it also uploads the encrypted invite to the drop, and its `openWorldHint` becomes `true` in this table and in the code registry together, in the W4-SHORT-INVITE build; 04 §3.6.2.)
 - No tool is destructive: nothing is deleted through MCP (crypto-shredding runs in the core by policy, 04 §4).
 - `agentlink_inbox` is deliberately not read-only, so inbound text reaches the model only through a tool the harness does not auto-allow on its read-only hint. The session-start check (`agentlink_status`, §6.1) carries counts and contact names under the §2.1 name rule only.
 - No tool installs, changes or removes harness hooks or harness configuration; only `init` does, after the user confirms the diff (§7).
