@@ -106,6 +106,7 @@ export const FIRST_RUN = {
 export const SETUP_MESSAGES = {
   // b11 §28.3.
   cancelled: 'Not protected yet. Try again.',
+  no_agent: 'Set up your agent first.',
   label_invalid:
     "That name can't be used. Use letters, numbers, single spaces and . ' - up to 32 characters.",
   expired: 'This step took too long. Nothing changed. Try again.',

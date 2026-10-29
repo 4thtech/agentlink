@@ -780,6 +780,17 @@ describe('U3-g: the clients speak what the server parses', () => {
     expect(await apps.preview('claude-code', 'default')).toEqual({ kind: 'not_available' });
   });
 
+  it('a 409 no_agent is a plain "Set up your agent first." and a stay, never unknown or failed', async () => {
+    const fetch = (): Promise<Response> => Promise.resolve(json(409, { error: 'no_agent' }));
+    expect(await createSetupApi({ token: 't', fetch }).labelCheck('x')).toEqual({
+      kind: 'error',
+      problem: 'no_agent',
+    });
+    const apps = createAppsApi({ token: 't', fetch });
+    expect(await apps.list()).toEqual({ kind: 'not_available' });
+    expect(await apps.preview('claude-code', 'default')).toEqual({ kind: 'not_available' });
+  });
+
   it('apply sends only {changeId} in X-AgentLink-Input, the proof as the body, and maps the fixed answers', async () => {
     const seen: Headers[] = [];
     let status = 200;

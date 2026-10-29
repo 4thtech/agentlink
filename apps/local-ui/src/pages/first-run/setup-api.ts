@@ -20,6 +20,8 @@ export type SetupProblem =
   | 'folder_unavailable'
   /** U3-d: the agent's name is not one core would sign (06 §2.1); nothing began. */
   | 'label_invalid'
+  /** 409 `no_agent`: the app has no agent yet; setup comes first. */
+  | 'no_agent'
   | 'expired'
   | 'not_pending'
   | 'busy'
@@ -151,6 +153,7 @@ const str = (value: unknown): string | undefined => (typeof value === 'string' ?
 
 /** A non-2xx or unknown answer as a fixed problem (never the body's text). */
 function problemOf(answer: Answer): SetupError {
+  if (str(answer.json?.['error']) === 'no_agent') return { kind: 'error', problem: 'no_agent' };
   const status = str(answer.json?.['status']);
   if (status === 'folder_refused') {
     const reason = str(answer.json?.['reason']);

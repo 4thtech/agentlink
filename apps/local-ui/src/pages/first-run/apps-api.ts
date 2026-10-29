@@ -232,7 +232,9 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
     async list() {
       const answer = await get(APPS_PATH);
       if (answer === 'offline') return { kind: 'offline' };
-      if (answer.status === 501) return { kind: 'not_available' };
+      if (answer.status === 501 || answer.json?.['error'] === 'no_agent') {
+        return { kind: 'not_available' };
+      }
       if (answer.status === 401) return { kind: 'session_expired' };
       const list = answer.json?.['apps'];
       if (answer.status !== 200 || !Array.isArray(list)) return { kind: 'failed' };
@@ -258,7 +260,9 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
       const query = `app=${encodeURIComponent(app)}&agent=${encodeURIComponent(agent)}`;
       const answer = await get(`${APPS_PREVIEW_PATH}?${query}`);
       if (answer === 'offline') return { kind: 'offline' };
-      if (answer.status === 501) return { kind: 'not_available' };
+      if (answer.status === 501 || answer.json?.['error'] === 'no_agent') {
+        return { kind: 'not_available' };
+      }
       if (answer.status === 401) return { kind: 'session_expired' };
       const json = answer.json;
       if (answer.status !== 200 || json === undefined) return { kind: 'failed' };
