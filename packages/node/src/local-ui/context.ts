@@ -48,6 +48,7 @@ import type { FirstAgentCard } from '../owner-first-card.js';
 import type { SendFolderPlan } from '../owner-first-policy.js';
 import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
 import type { LocalUiInviteDesk } from './route-types.js';
+import type { JoinDesk } from './join-desk.js';
 
 /**
  * The local UI's built files (apps/local-ui, D-118), in memory, from the caller (the CLI embeds
@@ -402,6 +403,12 @@ export interface LocalUiContext {
    * config.json only after core applied the signed `agent.label` (07 §9.1).
    */
   readonly agentsManage?: LocalUiAgentsManage;
+  /**
+   * U3-invite (08 §4): the app host's waiting invite, for the join routes only (api/join.ts);
+   * absent outside the app host. It holds the link in memory and answers the screen only the state,
+   * the public inviteId and the display fields; it signs nothing.
+   */
+  readonly join?: JoinDesk;
 }
 
 /** U3-c: one agent in `GET /api/ui/agents`. Never a path, an agent ID or a key. */

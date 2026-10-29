@@ -251,6 +251,8 @@ import {
   type LocalUiOptions,
   type LocalUiOwnerSetup as LocalUiOwnerSetupOption,
 } from './local-ui/context.js';
+import { JoinDesk, type JoinCheck } from './local-ui/join-desk.js';
+import { JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
 import type {
   LocalUiInviteRoute,
   LocalUiReadRoute,
@@ -387,6 +389,12 @@ const MAX_INVITE_CREATE_BODY_BYTES = 1_024;
 /** UX2-d1: at most this many invites created per window, per server (a store and spam bound). */
 const INVITE_CREATE_LIMIT = 10;
 const INVITE_CREATE_WINDOW_MS = 10 * 60_000;
+/** U3-invite (08 §4): at most one handoff per this many ms (then 429 `wait`). */
+const HANDOFF_INTERVAL_MS = 5_000;
+/** U3-invite (08 §4; M1-UX-OPEN-APP rules): at most one join-screen open per this many ms. */
+const JOIN_OPEN_INTERVAL_MS = 30_000;
+/** U3-invite: the handoff token header (`agentlink join` only; never the page). */
+const HANDOFF_HEADER = 'x-agentlink-handoff';
 
 /** Longest `X-AgentLink-Input` (base64url JSON) a /api/ui/ owner route accepts (route-types.ts). */
 const MAX_INPUT_CHARS = LOCAL_UI_MAX_INPUT_CHARS;
@@ -545,7 +553,9 @@ export type ApprovalServerEvent =
         | 'too_large'
         | 'not_found'
         /** U3-c: a mutating request built against another generation (app host). */
-        | 'agent_changed';
+        | 'agent_changed'
+        /** U3-invite: a handoff the handoff gate refused (never which check, never the body). */
+        | 'handoff';
     }
   | {
       readonly kind: 'decision';
@@ -735,6 +745,8 @@ export interface ApprovalServerInternals {
   readonly hostname?: () => string;
   /** M1-UX-FIRSTRUN-V2-b: removes a setup's folders (tests: timing). Default: removeSetupFolders. */
   readonly removeSetupFolders?: (folders: SetupFolders | undefined) => Promise<void>;
+  /** U3-invite: Accept step 1 of the waiting invite. Default: core checkInviteLink. */
+  readonly checkInvite?: JoinCheck;
 }
 
 export interface ApprovalServer {
@@ -769,6 +781,12 @@ export interface ApprovalServer {
    * (`agentlink ui`). A fixed path; nothing from a caller reaches the link.
    */
   openHome(): Promise<boolean>;
+  /**
+   * U3-invite (08 §4): the same for the join screen (`/settings/join`), or for first run while no
+   * owner exists, so first run ends on "Accept {name}'s invite?". A fixed path: the invite never
+   * reaches the link.
+   */
+  openJoin(): Promise<boolean>;
   /** Raises the fixed OS notification for a new request and returns its approvalUrl. */
   notifyNewApproval(approvalId: string): Promise<string>;
   close(): Promise<void>;
@@ -1095,6 +1113,16 @@ export async function startApprovalServerWith(
   const invitesCreated: number[] = [];
   /** M1-11s-c: the one owner setup in progress, if any. */
   let pendingSetup: PendingSetup | undefined;
+  /** U3-invite (08 §4): the app host's waiting invite, in memory only; absent outside the host. */
+  const joinDesk =
+    options.host === undefined ? undefined : new JoinDesk(() => now(), internals.checkInvite);
+  /** U3-invite: the handoff token (32 random bytes), only with a handoff record to publish it in. */
+  const handoffToken =
+    options.host?.handoff === undefined ? undefined : encodeBase64url(randomBytes(32));
+  const handoffBytes = handoffToken === undefined ? undefined : encodeUtf8(handoffToken);
+  /** U3-invite: when the last handoff arrived and when the join screen was last opened (ms). */
+  let lastHandoffAt = Number.NEGATIVE_INFINITY;
+  let lastJoinOpenAt = Number.NEGATIVE_INFINITY;
   // U3-d (D-138; 08 §1; 04 §2.8 "From the local app"): create an agent and save a verified label.
   // Nothing here signs: the first parts are signed only by the owner gate's `addAgent`.
   const agentsManage: LocalUiAgentsManage = Object.freeze<LocalUiAgentsManage>({
@@ -1181,6 +1209,8 @@ export async function startApprovalServerWith(
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
       // U3-d: create an agent and save a verified label, in the app host only.
       ...(options.host === undefined ? {} : { agentsManage }),
+      // U3-invite: the waiting invite, in the app host only.
+      ...(joinDesk === undefined ? {} : { join: joinDesk }),
     });
   let uiContext: LocalUiContext = buildUiContext();
 
@@ -3021,7 +3051,8 @@ export async function startApprovalServerWith(
     const body = await boundedBody(
       req,
       res,
-      route.step === 'create' ? MAX_INVITE_CREATE_BODY_BYTES : MAX_INVITE_CHECK_BODY_BYTES,
+      // U3-invite: "Not now" carries `{}` only, as small as create.
+      route.step === 'check' ? MAX_INVITE_CHECK_BODY_BYTES : MAX_INVITE_CREATE_BODY_BYTES,
     );
     if (body === undefined) return;
     try {
@@ -3054,6 +3085,92 @@ export async function startApprovalServerWith(
     }
   }
 
+  /**
+   * U3-invite (08 §4): opens the join screen through the OS opener, or first run while no owner
+   * exists (it ends on the join screen). A fixed path and a one-shot session link; the invite is
+   * never in it. At most one open per JOIN_OPEN_INTERVAL_MS for a handoff (`limited`).
+   */
+  async function openJoinPage(limited: boolean): Promise<boolean> {
+    if (limited) {
+      if (now() - lastJoinOpenAt < JOIN_OPEN_INTERVAL_MS) return false;
+      lastJoinOpenAt = now();
+    }
+    const path = agentUi?.ownerSetup === undefined ? JOIN_PAGE_PATH : '/first-run';
+    return opener(`${origin}${path}?t=${mintLink()}`).catch(() => false);
+  }
+
+  /**
+   * U3-invite (08 §4 "An app host already running"): `POST /api/ui/join/handoff` from `agentlink
+   * join`, the handoff kind. Run before the session gate: the caller is a local process with the
+   * handoff token from the 0600 record, never the page. It refuses an Origin, any Sec-Fetch-*
+   * header, a cookie, a CSRF value, an operation input, a presence header and a query; takes at most
+   * one handoff per HANDOFF_INTERVAL_MS (counted before the token is checked, so the token cannot be
+   * guessed quickly); compares the token in constant time; parses exactly `{"invite":"<link>"}`; and
+   * hands the link to the join desk, which runs Accept step 1 and stores it in memory. Nothing is
+   * signed, written or logged; the body is wiped. The token grants nothing else.
+   */
+  async function handoffGate(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    const refuse = (status: number, error: string): void => {
+      req.resume();
+      emit({ kind: 'rejected', reason: 'handoff' });
+      sendJson(res, status, { error });
+    };
+    if (joinDesk === undefined || handoffBytes === undefined) return refuse(501, 'not_available');
+    if (
+      header(req, 'origin') !== undefined ||
+      Object.keys(req.headers).some((name) => name.startsWith('sec-fetch-')) ||
+      header(req, 'cookie') !== undefined ||
+      header(req, 'x-agentlink-csrf') !== undefined ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined ||
+      header(req, 'x-agentlink-generation') !== undefined
+    ) {
+      return refuse(403, 'refused');
+    }
+    if (url.search !== '') return refuse(400, 'invalid');
+    const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
+    if (type !== 'application/octet-stream') return refuse(415, 'content_type');
+    const at = now();
+    if (at - lastHandoffAt < HANDOFF_INTERVAL_MS) {
+      const retryAfter = Math.max(1, Math.ceil((lastHandoffAt + HANDOFF_INTERVAL_MS - at) / 1000));
+      res.setHeader('Retry-After', String(retryAfter));
+      return refuse(429, 'wait');
+    }
+    lastHandoffAt = at;
+    if (!matches(header(req, HANDOFF_HEADER), handoffBytes)) return refuse(401, 'refused');
+    const body = await boundedBody(req, res, MAX_INVITE_CHECK_BODY_BYTES);
+    if (body === undefined) return;
+    let link: unknown;
+    try {
+      let parsed: JsonValue;
+      try {
+        parsed = parseJson(decodeUtf8(body));
+      } catch {
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        Array.isArray(parsed) ||
+        Object.keys(parsed).length !== 1 ||
+        !('invite' in parsed)
+      ) {
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      link = (parsed as JsonObject)['invite'];
+    } finally {
+      wipe(body);
+    }
+    const offered = await joinDesk.offer(link);
+    if (offered === 'invite_waiting') return refuse(409, 'invite_waiting');
+    if (offered === 'expired') return refuse(400, 'expired');
+    if (offered !== 'stored') return refuse(400, 'invalid_invite');
+    const opened = await openJoinPage(true);
+    sendJson(res, 200, { status: 'waiting', opened });
+  }
+
   /** M1-11s-b: one /api/ui/ request (route registry, session, CSRF, presence gate). */
   async function handleUi(
     req: IncomingMessage,
@@ -3075,6 +3192,12 @@ export async function startApprovalServerWith(
       req.resume();
       reject(res, status, reason);
     };
+    if (found.route.presence === 'handoff') {
+      // U3-invite: a local process (`agentlink join`), never the page: its own gate, before the
+      // session gate; it refuses a session, a cookie, an Origin and fetch metadata (08 §4).
+      await handoffGate(req, res, url);
+      return;
+    }
     const cookie = cookieToken(req);
     if (matchIndex(cookie, sessions) < 0) return fail(401, 'token');
     if (!fetchSiteOk(req)) return fail(403, 'fetch_site');
@@ -3119,6 +3242,12 @@ export async function startApprovalServerWith(
     params: Readonly<Record<string, string>>,
     cookie: string,
   ): Promise<void> {
+    if (route.presence === 'handoff') {
+      // Never reached (handleUi runs the handoff gate first); fail closed.
+      req.resume();
+      sendResult(res, NOT_AVAILABLE);
+      return;
+    }
     if (route.presence === true && route.stub === true) {
       // U3-c: a reserved U3 route: refused before the presence gate; its handler never runs.
       req.resume();
@@ -3155,6 +3284,24 @@ export async function startApprovalServerWith(
       req.resume();
       finishOwner(res, 400, 'invalid');
       return;
+    }
+    if (route.precheck !== undefined) {
+      // U3-invite: a read-only refusal before the presence gate (nothing opened, nothing signed).
+      let refusal: LocalUiResult | undefined;
+      try {
+        refusal = await route.precheck(uiContext, {
+          params,
+          query: url.searchParams,
+          ...(input === undefined ? {} : { input }),
+        });
+      } catch {
+        refusal = { status: 500, body: { status: 'failed' } };
+      }
+      if (refusal !== undefined) {
+        req.resume();
+        sendResult(res, refusal);
+        return;
+      }
     }
     await ownerGate(req, res, (owner) =>
       route.handler(
@@ -3715,6 +3862,21 @@ export async function startApprovalServerWith(
 
   // Created last: binding the first agent clears state the gates above own.
   host = options.host === undefined ? undefined : new AppHostSlot(options.host, bindAgent);
+  // U3-invite (08 §4): the invite `agentlink join` started this host with, checked again (Accept
+  // step 1) and held in memory only; a link that fails is simply not held.
+  if (joinDesk !== undefined && options.host?.waitingInvite !== undefined) {
+    await joinDesk.offer(options.host.waitingInvite);
+  }
+  // U3-invite: the handoff record (0600, the CLI's), so a later `agentlink join` hands over here.
+  let handoffWritten = false;
+  if (handoffToken !== undefined && options.host?.handoff !== undefined) {
+    try {
+      await options.host.handoff.write({ pid: process.pid, port, handoffToken });
+      handoffWritten = true;
+    } catch {
+      // No record: `join` starts its own host instead (08 §4). Nothing is logged about it.
+    }
+  }
 
   dispatch = (req, res) => {
     handle(req, res).catch(() => {
@@ -3743,6 +3905,7 @@ export async function startApprovalServerWith(
     },
     openFirstRun: async () => opener(`${origin}/first-run?t=${mintLink()}`).catch(() => false),
     openHome: async () => opener(`${origin}/settings/home?t=${mintLink()}`).catch(() => false),
+    openJoin: () => openJoinPage(false),
     notifyNewApproval: async (approvalId: string) => {
       const url = approvalUrl(approvalId);
       await notifier(NOTIFICATION).catch(() => false);
@@ -3752,6 +3915,9 @@ export async function startApprovalServerWith(
       dropSetup();
       payHolds.clear();
       await folderRemoval;
+      // U3-invite: the handoff record goes first, so no `join` hands over to a closing host.
+      if (handoffWritten) await options.host?.handoff?.remove().catch(() => undefined);
+      joinDesk?.dismiss();
       await Promise.all(listeners.map(closeServer));
       // U3-c: the app host closes the agent it has open (whichever the owner switched to).
       await host?.close();

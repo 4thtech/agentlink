@@ -118,6 +118,9 @@ export type {
   AgentDirectoryStats,
   AppHostAgent,
   AppHostOptions,
+  // U3-invite (08 §4): the handoff record the CLI keeps at ~/.agentlink/app-host.json.
+  AppHostHandoffRecord,
+  AppHostHandoffRecordValue,
 } from './local-ui/app-host.js';
 // U3-e (04 §2.5 "Removing an agent"): the removal seam the CLI implements (the folder lock, the
 // agent opened for its removal, the revoked list). The KeyStore erase API stays inside the package.

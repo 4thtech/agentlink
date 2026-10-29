@@ -116,6 +116,32 @@ export interface AppHostOptions {
   open(name: string): Promise<AppHostAgent | undefined>;
   /** U3-e: removing an agent (agents-remove.ts); absent: the remove route answers `not_available`. */
   readonly removal?: AgentRemovalPort;
+  /**
+   * U3-invite (08 §4): the invite `agentlink join` checked before starting this host. The host runs
+   * Accept step 1 again and holds it in memory only as the waiting invite (local-ui/join-desk.ts).
+   * The link holds the invite secret: never log it, write it or put it in a URL (I-7).
+   */
+  readonly waitingInvite?: string;
+  /**
+   * U3-invite: the handoff record `~/.agentlink/app-host.json` (mode 0600; the CLI writes it): the
+   * server calls `write` once it listens, with its pid, port and a fresh 32-byte handoff token, and
+   * `remove` when it closes. Absent: this host takes no handoff.
+   */
+  readonly handoff?: AppHostHandoffRecord;
+}
+
+/** U3-invite: the handoff record (08 §4). The token is not the page's session token. */
+export interface AppHostHandoffRecordValue {
+  readonly pid: number;
+  readonly port: number;
+  /** 32 random bytes, base64url (43 characters). */
+  readonly handoffToken: string;
+}
+
+/** U3-invite: where the CLI keeps the handoff record (written 0600, removed at exit). */
+export interface AppHostHandoffRecord {
+  write(record: AppHostHandoffRecordValue): Promise<void>;
+  remove(): Promise<void>;
 }
 
 /** A request's place in the host: `valid` re-checks the generation, `leave` ends it. */

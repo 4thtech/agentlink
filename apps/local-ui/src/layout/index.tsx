@@ -124,6 +124,8 @@ export async function needsPasskeySwitch(): Promise<boolean> {
 }
 
 const FIRST_RUN_PATH = '/first-run';
+/** U3-invite: the join screen, in the same focused shell. */
+const JOIN_PATH = '/settings/join';
 
 /** UI-REFRESH-t: the first Tab stop. Focus goes to the page content (it is made focusable here). */
 function skipToContent(event: MouseEvent<HTMLAnchorElement>): void {
@@ -206,7 +208,8 @@ export function Layout({
       : {}),
   }));
   // U3-g (b11 §28): first run is a focused column, with no sidebar, top bar or status bar.
-  if (path === FIRST_RUN_PATH) {
+  // U3-invite (b11 §33.2): so is the join screen that ends it.
+  if (path === FIRST_RUN_PATH || path === JOIN_PATH) {
     return (
       <PrefsHood>
         <a href="#al-main" className="al-skip al-text-body-sm" onClick={skipToContent}>

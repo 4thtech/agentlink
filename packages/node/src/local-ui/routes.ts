@@ -51,7 +51,17 @@ import { AGENTS_REMOVE_PATH, AGENTS_SWITCH_PATH, type LocalUiRoute } from './rou
 // The fixed path lives in reveal-path.ts so api/files-io.ts uses it without importing this file.
 import { REVEAL_PATH } from './reveal-path.js';
 // UX2-d1: the invite paths live in invite-paths.ts for the same reason.
-import { INVITE_ACCEPT_PATH, INVITE_CHECK_PATH, INVITE_CREATE_PATH } from './invite-paths.js';
+import {
+  INVITE_ACCEPT_PATH,
+  INVITE_CHECK_PATH,
+  INVITE_CREATE_PATH,
+  JOIN_ACCEPT_PATH,
+  JOIN_DISMISS_PATH,
+  JOIN_HANDOFF_PATH,
+  JOIN_PATH,
+} from './invite-paths.js';
+// U3-invite: the join screen's routes and the handoff kind.
+import { joinRoutes } from './api/join.js';
 
 export {
   AGENTS_REMOVE_PATH,
@@ -59,12 +69,17 @@ export {
   INVITE_ACCEPT_PATH,
   INVITE_CHECK_PATH,
   INVITE_CREATE_PATH,
+  JOIN_ACCEPT_PATH,
+  JOIN_DISMISS_PATH,
+  JOIN_HANDOFF_PATH,
+  JOIN_PATH,
   REVEAL_PATH,
 };
-/** UX2-d1: the one path of each invite-kind step. */
+/** UX2-d1: the one path of each invite-kind step (U3-invite: `dismiss`, "Not now"). */
 const INVITE_STEP_PATHS: Readonly<Record<string, string>> = Object.freeze({
   create: INVITE_CREATE_PATH,
   check: INVITE_CHECK_PATH,
+  dismiss: JOIN_DISMISS_PATH,
 });
 export const LOCAL_UI_API_PREFIX = '/api/ui/';
 /** M1-11s-c: setup routes live only under the first-run page's API. */
@@ -137,7 +152,17 @@ export class LocalUiRouteRegistry {
     if (stub !== undefined && (stub !== true || presence !== true || method !== 'POST')) {
       throw invalid('only a POST owner route can be a stub');
     }
-    if (presence === 'remove') {
+    if (presence === 'handoff') {
+      // U3-invite: `agentlink join` to a running app host; the server's handoff gate runs it.
+      if (method !== 'POST') throw invalid('a handoff route is a POST');
+      if (route.path !== JOIN_HANDOFF_PATH) {
+        throw invalid('a handoff route is only at its fixed path');
+      }
+      if (handler !== undefined) throw invalid('a handoff route has no handler');
+      if (this.#entries.some((e) => e.route.presence === 'handoff')) {
+        throw invalid('the handoff route is already registered');
+      }
+    } else if (presence === 'remove') {
       // U3-e: removing an agent; the server's remove gate runs it (D-138).
       if (method !== 'POST') throw invalid('a remove route is a POST');
       if (route.path !== AGENTS_REMOVE_PATH) {
@@ -189,7 +214,9 @@ export class LocalUiRouteRegistry {
     } else if (presence === 'invite') {
       // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.
       if (method !== 'POST') throw invalid('an invite route is a POST');
-      if (step !== 'create' && step !== 'check') throw invalid('unknown invite step');
+      if (step !== 'create' && step !== 'check' && step !== 'dismiss') {
+        throw invalid('unknown invite step');
+      }
       if (route.path !== INVITE_STEP_PATHS[step]) {
         throw invalid('an invite route is only at its fixed path');
       }
@@ -282,6 +309,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     agentsRemoveRoutes,
     appsRoutes,
     flowRoutes,
+    // U3-invite: the waiting invite (read, accept, "Not now") and the handoff kind.
+    joinRoutes,
   ]) {
     for (const route of routes) registry.register(route);
   }

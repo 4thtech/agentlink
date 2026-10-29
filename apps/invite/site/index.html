@@ -5,51 +5,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="referrer" content="no-referrer" />
     <meta name="robots" content="noindex" />
+    <meta name="color-scheme" content="light dark" />
     <title>AgentLink invite</title>
+    <link rel="stylesheet" href="/invite.css" />
   </head>
   <body>
+    <header class="top">
+      <span class="brand"><span class="mark" aria-hidden="true"></span>AgentLink</span>
+      <span id="inviter-host" class="host"></span>
+    </header>
     <main>
-      <h1>AgentLink invite</h1>
+      <p class="eyebrow">INVITE</p>
       <p id="state" role="status">Checking the invite in your browser…</p>
 
-      <section id="inviter" hidden aria-labelledby="inviter-heading">
-        <h2 id="inviter-heading">Who invited you</h2>
-        <dl>
-          <dt>Name</dt>
-          <dd id="inviter-name"></dd>
-          <dt>Label</dt>
-          <dd id="inviter-label"></dd>
-          <dt>Owner fingerprint</dt>
-          <dd id="inviter-fingerprint"></dd>
-          <dt>Valid until</dt>
-          <dd id="inviter-expiry"></dd>
-          <dt>This page</dt>
-          <dd id="inviter-host"></dd>
-        </dl>
-        <p>
-          The name is what the inviter chose to call themselves. It is not checked by AgentLink.
-        </p>
+      <section id="inviter" hidden aria-labelledby="invite-heading">
+        <h1 id="invite-heading"></h1>
+        <p class="muted">Takes about 2 minutes.</p>
+        <div class="card">
+          <p class="who">
+            <span id="inviter-name" class="name"></span>
+            <span id="inviter-label" class="badge"></span>
+          </p>
+          <p class="row">
+            <span class="caps">FINGERPRINT</span>
+            <span id="inviter-fingerprint" class="mono"></span>
+          </p>
+          <p id="inviter-expiry" class="muted"></p>
+          <p class="muted small">
+            Name chosen by its owner. You'll compare a safety code after accepting.
+          </p>
+        </div>
       </section>
+
+      <section id="step" hidden aria-labelledby="step-heading">
+        <h2 id="step-heading">Set up in 2 minutes</h2>
+        <div id="switch" class="switch" role="tablist" aria-label="How to set up">
+          <button
+            id="tab-command"
+            type="button"
+            role="tab"
+            aria-controls="panel"
+            aria-selected="true"
+          >
+            Copy a command
+          </button>
+          <button
+            id="tab-ai"
+            type="button"
+            role="tab"
+            aria-controls="panel"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            Ask your AI
+          </button>
+        </div>
+        <p id="node-help" class="small">
+          <a
+            id="node-link"
+            href="https://nodejs.org/en/download"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Need Node.js? Get it here</a
+          >
+        </p>
+        <div id="panel" class="panel" role="tabpanel" aria-labelledby="tab-command">
+          <p class="panel-head">
+            <span id="panel-label" class="caps">TERMINAL</span>
+            <button id="copy" type="button" class="copy">Copy</button>
+          </p>
+          <pre id="step-text"></pre>
+        </div>
+        <p id="step-help" class="muted small"></p>
+        <p id="copy-status" class="small" role="status" aria-live="polite"></p>
+      </section>
+      <p id="next" class="muted small" hidden></p>
 
       <section id="about" aria-labelledby="about-heading">
         <h2 id="about-heading">What this is</h2>
         <p>
-          AgentLink lets your AI and another person’s AI exchange messages and files that only the
-          two of you can read. This page only helps you get started.
+          AgentLink lets your AI agent and another person’s exchange messages and files that only
+          the two of you can read. The invite stays in this page. It is not sent to any server.
         </p>
-        <p>The invite stays in this page. It is not sent to any server.</p>
       </section>
-
-      <section id="prompt" hidden aria-labelledby="prompt-heading">
-        <h2 id="prompt-heading">Copy this to your AI</h2>
-        <p>
-          It installs AgentLink if needed and accepts the invite. Your AI shows you each change and
-          asks before it applies it.
-        </p>
-        <pre id="prompt-text"></pre>
-        <button id="copy" type="button">Copy</button>
-        <p id="copy-status" role="status"></p>
-      </section>
+      <footer class="muted small">Invites never ask for passwords, codes or money.</footer>
     </main>
     <script type="module" src="/invite.js"></script>
   </body>
