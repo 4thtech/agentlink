@@ -20,6 +20,8 @@ export default defineConfig({
         /map\.css/,
         /moving\.css/,
         /welcome\.css/,
+        // The real-browser layout test reads the shared UI stylesheets as text (HOTFIX-045-PASTE-FIELD).
+        /ui\/src\/(components|tokens)\/.*\.css/,
       ],
     },
     // Loads the lazy parts once, so tests can render them synchronously (UI-REFRESH-u).
