@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import type { LocalUiContext } from './context.js';
 import type { LocalUiRoute } from './route-types.js';
 import {
+  AGENTS_REMOVE_PATH,
   AGENTS_SWITCH_PATH,
   INVITE_ACCEPT_PATH,
   INVITE_CHECK_PATH,
@@ -464,8 +465,48 @@ describe('the switch route kind and the U3 stubs (U3-c, I-4)', () => {
       .routes()
       .filter((r) => r.presence === true && r.stub === true)
       .map((r) => r.path);
-    // U3-d replaced the stubs of POST /api/ui/agents and /api/ui/agents/label; U3-f those of
-    // POST /api/ui/apps/apply and /api/ui/apps/disconnect.
-    expect(stubs).toEqual(['/api/ui/agents/remove']);
+    // U3-d replaced the stubs of POST /api/ui/agents and /api/ui/agents/label; U3-e the remove one;
+    // U3-f those of POST /api/ui/apps/apply and /api/ui/apps/disconnect. No stubs remain.
+    expect(stubs).toEqual([]);
+  });
+});
+
+// U3-e (D-138, 08 §1): removing an agent is the seventh named route kind `remove`: only POST, only
+// at its fixed path, no handler, once. U3-e replaces U3-c's stub (it is never registered twice).
+describe('the remove route kind (U3-e, I-4)', () => {
+  const answer = () => Promise.resolve({ status: 200, body: { status: 'ok' } });
+  const route = (over: Record<string, unknown>) =>
+    ({
+      method: 'POST',
+      path: AGENTS_REMOVE_PATH,
+      presence: 'remove',
+      ...over,
+    }) as unknown as LocalUiRoute;
+
+  it('the default registry has exactly one remove route, at the fixed path, with no handler', () => {
+    const removes = createLocalUiRoutes()
+      .routes()
+      .filter((r) => r.path === AGENTS_REMOVE_PATH);
+    expect(removes.map((r) => `${r.method} ${r.presence}`)).toEqual(['POST remove']);
+    expect(AGENTS_REMOVE_PATH).toBe('/api/ui/agents/remove');
+    expect('handler' in (removes[0] as object)).toBe(false);
+  });
+
+  it('no other path, method, handler or second route can use the remove kind', () => {
+    for (const path of ['/api/ui/agents', '/api/ui/agents/label', `${AGENTS_REMOVE_PATH}/x`]) {
+      expect(() => new LocalUiRouteRegistry().register(route({ path })), path).toThrow(/remove/);
+    }
+    for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) {
+      expect(() => new LocalUiRouteRegistry().register(route({ method })), method).toThrow(
+        /remove/,
+      );
+    }
+    expect(() => new LocalUiRouteRegistry().register(route({ handler: answer }))).toThrow(
+      /handler/,
+    );
+    const registry = new LocalUiRouteRegistry();
+    registry.register(route({}));
+    expect(() => registry.register(route({}))).toThrow(/remove/);
+    expect(registry.routes()).toHaveLength(1);
   });
 });

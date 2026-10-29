@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./ui-contract/*": {
+      "types": "./dist/ui-contract/*.d.ts",
+      "default": "./dist/ui-contract/*.js"
     }
   },
   "files": [

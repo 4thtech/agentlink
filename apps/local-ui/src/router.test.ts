@@ -35,6 +35,7 @@ const EXPECTED: ReadonlyArray<readonly [string, string]> = [
   ['/settings/activity', 'Activity'],
   ['/settings/messages', 'Messages'],
   ['/settings/contacts', 'Contacts'],
+  ['/settings/agents', 'Agents'],
   ['/settings/files', 'Files'],
   ['/settings/proofs', 'Proofs & credits'],
   ['/settings/rules', 'Rules'],
@@ -61,6 +62,7 @@ describe('routes', () => {
     '/settings/activity',
     '/settings/messages',
     '/settings/contacts',
+    '/settings/agents',
     '/settings/files',
     '/settings/proofs',
     '/settings/rules',
@@ -100,12 +102,13 @@ describe('nav', () => {
       'Activity',
       'Messages',
       'Contacts',
+      'Agents',
       'Files',
       'Proofs & credits',
       'Rules',
       'Settings',
     ]);
-    expect(NAV_ITEMS).toHaveLength(9);
+    expect(NAV_ITEMS).toHaveLength(10);
   });
 
   it('keeps every nav label in plain words', () => {

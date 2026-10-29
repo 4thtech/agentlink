@@ -7,8 +7,6 @@
 // it") → Recovery kit → Ready. The button names the platform. The backup code is never "password".
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 
-export const STEPS = ['Protect approvals', 'Backup code', 'Recovery kit', 'Ready'] as const;
-
 /** The platform the page runs on, for the button and the browser hint (11 §6.2.1). */
 export type Platform = 'mac' | 'windows' | 'other';
 
@@ -27,13 +25,10 @@ export const WORKING_BROWSER: Readonly<Record<Platform, string>> = {
 };
 
 export const FIRST_RUN = {
-  stepOf: (n: number): string => `Step ${String(n)} of ${String(STEPS.length)}`,
   loading: 'Checking this computer…',
 
-  protectTitle: 'Protect your approvals',
-  // 11 §6.2.1 (D-130 (1); D-67, D-68): the copy must not claim more.
-  protectBody: (sensor: string): string =>
-    `Approvals need you: each approval, or each list of approvals you review together, asks for ${sensor} (or your backup code), and only after you click Approve. Never give your backup code to your AI.`,
+  // U3-g (b11 §28.3): one screen names the agent and protects it.
+  protectTitle: 'Set up your agent',
   // 11 §6.2.1: the folders setup creates, shown before the gesture.
   foldersTitle: 'Your folders',
   folders: [
@@ -53,13 +48,7 @@ export const FIRST_RUN = {
   noPrf: (sensor: string, browser: string): string =>
     `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to use it, or continue with a backup code only.`,
   backupOnly: 'Continue with a backup code only',
-  // UX audit 1b: one neutral line instead of the amber box.
-  desktopTip: 'Tip: the desktop app (coming soon) protects approvals more strongly.',
   waiting: 'Waiting for your passkey…',
-  untilTitle: 'Until this is done',
-  // LF-3 (06 §3).
-  untilBody:
-    'Your agent can send and receive messages, but anything that needs you waits here: new contacts, proofs your rules ask about, folder access, document keys and accepting terms.',
 
   // 11 §5.5 "Backup code at first run" (D-130 (1)).
   backupTitle: 'Your backup code',
@@ -93,22 +82,10 @@ export const FIRST_RUN = {
   unconfirmed: "Setup finished, but we couldn't confirm one step. Your agent may need a restart.",
   unconfirmedTitle: 'Almost there.',
 
-  kitTitle: 'Save your recovery kit',
-  kitBody:
-    'If this computer is lost, the recovery kit brings your agent and its contacts back. Nobody else has a copy, including 4thTech.',
-  saveKit: 'Save kit',
-  saveKitSoon: 'Saving the kit from this page arrives in an update.',
-  later: 'Later',
-  laterNote: "We'll remind you until it's saved.",
-
-  readyTitle: "You're set",
-  readyBody: 'Go back to your AI app and say:',
-  readyPrompt: 'Create an AgentLink invite for a colleague.',
-  readyPromptTitle: 'Say this to your AI',
-  readyClose: 'You can close this tab.',
   // U3-a (D-138; 08 §1): the end of first run lands on Home.
   toHome: 'Go to Home',
-  readyRestart: "If your AI app doesn't see AgentLink yet, restart it first.",
+  // The recovery kit is put off ("Later", remembered for the banner) when the backup code is saved.
+  leaving: 'Opening Home…',
 
   alreadyTitle: 'Approvals are already protected on this computer',
   alreadyBody:
@@ -127,7 +104,11 @@ export const FIRST_RUN = {
  * (08 §1, M1-11s-c); nothing from the request or an error text is ever shown.
  */
 export const SETUP_MESSAGES = {
-  cancelled: "The passkey wasn't created. Nothing changed. Try again when you're ready.",
+  // b11 §28.3.
+  cancelled: 'Not protected yet. Try again.',
+  no_agent: 'Set up your agent first.',
+  label_invalid:
+    "That name can't be used. Use letters, numbers, single spaces and . ' - up to 32 characters.",
   expired: 'This step took too long. Nothing changed. Try again.',
   not_pending: 'This step took too long. Nothing changed. Try again.',
   busy: 'Another setup or approval is running. Wait a moment, then try again.',
@@ -207,7 +188,7 @@ export const UPGRADE_MESSAGES = {
   empty: 'Enter your backup code first.',
   presence_rejected: "That backup code didn't work. Check it and try again. Nothing changed.",
   presence_required: "Your browser didn't send the backup code. Nothing changed. Try again.",
-  cancelled: SETUP_MESSAGES.cancelled,
+  cancelled: "The passkey wasn't created. Nothing changed. Try again when you're ready.",
   unsupported: (browser: string): string =>
     `This passkey can't protect approvals here. Nothing changed. Keep approving with your backup code, or open this page in ${browser}.`,
   busy: SETUP_MESSAGES.busy,
@@ -216,4 +197,80 @@ export const UPGRADE_MESSAGES = {
   offline: SETUP_MESSAGES.offline,
   session_expired: SETUP_MESSAGES.session_expired,
   forbidden: SETUP_MESSAGES.forbidden,
+} as const;
+
+/** U3-g (b11 §28): Welcome, pick your AI app, name and protect, connect your AI app. */
+export const WELCOME = {
+  title: 'Private messages between AI agents. Only you and your contact can read them.',
+  start: 'Get started',
+  what: "What's AgentLink?",
+  /** The public docs; opens in a new tab and sends no data. */
+  whatHref: 'https://wiki.4thtech.io/products/agentlink',
+  /** The owner read failed. */
+  failed: "Couldn't start AgentLink. Close this tab and run it again.",
+} as const;
+
+export const PICK = {
+  title: 'Which AI app will you use?',
+  found: 'Found',
+  later: "I'll choose later",
+  next: 'Continue',
+  back: 'Back',
+  none: 'No AI app found yet. You can connect one later.',
+  lookFailed: "Couldn't look for AI apps. You can connect one later.",
+  loading: 'Looking for AI apps…',
+} as const;
+
+export const NAME = {
+  label: 'Name your agent',
+  hint: 'Shown to you and your contacts.',
+  /** The suggested name follows the chosen app; "My agent" with none (b11 §28.3). */
+  suggested: (app: string | undefined): string => (app === undefined ? 'My agent' : `${app} agent`),
+  empty: 'Give your agent a name.',
+  /** The name must be 1 to 32 characters (06 §6 label rule). */
+  tooLong: 'Use up to 32 characters.',
+  change: 'Change',
+  changeLabel: (app: string): string => `Change the AI app (${app})`,
+  setting: 'Setting up…',
+  backupInstead: 'Use a backup code instead',
+  back: 'Back',
+} as const;
+
+/** The most code points a name may have (06 §6; the server checks it again). */
+export const NAME_MAX = 32;
+
+/** b11 §30.3, §28.4: the connect step in the first-run shell. */
+export const CONNECT = {
+  title: (app: string, agent: string): string => `Connect ${app} to ${agent}`,
+  intro: (app: string): string => `This adds one entry to ${app}'s settings.`,
+  file: 'File',
+  adds: 'Adds',
+  entryRegion: 'The entry that will be added',
+  folder: (folder: string): string =>
+    `Agent folder: ${folder}. A backup of the file is saved first. Nothing else in it changes.`,
+  loading: 'Checking the settings…',
+  apply: (sensor: string): string => `Apply with ${sensor}`,
+  applyCode: 'Apply with my backup code',
+  later: 'Later',
+  connecting: 'Connecting…',
+  notYet: 'Not connected yet. Try again.',
+  tryAgain: 'Try again',
+  checkAgain: 'Check again',
+  quitFirst: (app: string): string => `Quit ${app} first.`,
+  quitNote: "AgentLink never closes it for you. When it's closed, check again.",
+  foreign: "This app already has an AgentLink entry we didn't write.",
+  foreignNote: 'AgentLink does not change it. You can connect this app later.',
+  unreadable: "Couldn't read its settings.",
+  couldntChange: (app: string): string => `Couldn't change ${app}'s settings. Nothing was changed.`,
+  changed: 'The settings changed since you looked. Review them again.',
+  reviewAgain: 'Review again',
+  moveNote: (app: string, from: string, to: string): string =>
+    `${app} will use ${to} instead of ${from}.`,
+  removed: 'Removed',
+  connected: (app: string): string => `${app} is connected.`,
+  restart: (app: string): string => `Restart ${app} to finish`,
+  restartNote: 'AgentLink never restarts it for you. Open it again when you are ready.',
+  alreadyDone: (app: string): string => `${app} already works with this agent.`,
+  codeLabel: 'Backup code',
+  presenceHint: 'Confirm it’s you. Never give your backup code to your AI.',
 } as const;

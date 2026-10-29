@@ -5,7 +5,7 @@
 // The same control conformance suite runs against the keychain backend (an in-memory keychain
 // double) and the file backend (a temporary `ALKS` directory), so both behave the same. Every Argon2id
 // runs at the 04 §2.8 floor (19 MiB, t = 2) to keep the suite fast.
-import { mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -452,6 +452,7 @@ function keychainImportBackend(): ImportBackend {
           ownerKeychain,
           ...(ownerStore === undefined ? {} : { ownerStore }),
           kdf: FAST,
+          revokedDir: join(root, 'revoked'),
         }),
         has: (agentId) =>
           Promise.resolve([...target.items.keys()].some((a) => a.startsWith(agentId))),
@@ -482,6 +483,7 @@ function fileImportBackend(): ImportBackend {
           ownerKeychain,
           ...(ownerStore === undefined ? {} : { ownerStore }),
           kdf: FAST,
+          revokedDir: join(root, 'revoked'),
         }),
         has: (agentId) =>
           stat(file(agentId)).then(
@@ -552,6 +554,33 @@ for (const backend of [keychainImportBackend(), fileImportBackend()]) {
       expect(equalBytes(items.get('storage-mark') as Uint8Array, encodeStorageMark(null))).toBe(
         true,
       );
+      handle.wipe();
+    });
+
+    it('U3-e: refuses an agent in the revoked list (verifying, other owner or damaged) and writes nothing', async () => {
+      const owner = await makeOwner();
+      const agent = await makeKeychainAgent(owner);
+      const { kit, code } = await exportKit(owner, agent);
+      const revoked = join(root, 'revoked');
+      await mkdir(revoked, { recursive: true, mode: 0o700 });
+      for (const entry of ['{"body":{},"sig":"00"}', 'not json at all', '']) {
+        await writeFile(join(revoked, `${agent.agentId}.json`), entry, { mode: 0o600 });
+        const target = backend.control({ ownerKeychain: new MemoryKeychain() });
+        const handle = await openKit(target.control, kit, code);
+        await expectCode(
+          target.control.importAgent(handle, agent.agentId),
+          'operation_not_allowed',
+        );
+        expect(await target.has(agent.agentId)).toBe(false);
+        handle.wipe();
+      }
+      // A link or a folder at that name refuses too (fail closed).
+      await rm(join(revoked, `${agent.agentId}.json`));
+      await mkdir(join(revoked, `${agent.agentId}.json`));
+      const target = backend.control({ ownerKeychain: new MemoryKeychain() });
+      const handle = await openKit(target.control, kit, code);
+      await expectCode(target.control.importAgent(handle, agent.agentId), 'operation_not_allowed');
+      expect(await target.has(agent.agentId)).toBe(false);
       handle.wipe();
     });
 

@@ -1,7 +1,8 @@
-// First run (d1 Local-firstrun with DESIGN-ADJ-1 (a); 02 J1 step 3; D-120; 08 §1): protect approvals
-// with a passkey that creates the owner key on this computer, see the owner fingerprint and the
-// collapsed backup owner code, put the recovery kit off ("Later", M1-11b-3 builds the kit step), then
-// hand back to the AI with a prompt to copy, and finish on Home (U3-a, D-138).
+// First run (d1 Local-firstrun with DESIGN-ADJ-1 (a); 02 J1 step 3; D-120; 08 §1; U3-g, b11 §28):
+// Welcome, pick your AI app, one screen that names the agent and protects approvals with a passkey
+// that creates the owner key on this computer (one gesture), the owner fingerprint and the backup
+// code, the recovery kit put off ("Later", M1-11b-3 builds the kit step), then "Connect your AI app"
+// as its own signed step that "Later" skips, and the end on Home (U3-a, D-138).
 //
 // The browser never signs: the passkey ceremony is the one gesture; the owner key is created, wrapped
 // and stored by the local server (setup routes, M1-11s-c). The owner code arrives once, lives only in
@@ -16,14 +17,28 @@
 // the clipboard warning; only "I saved it" moves on, and the code leaves the page then. Where the
 // browser reports no passkey with PRF, the page names a browser that works, or continues with a
 // backup code only. Q-130-1 (screen readers and the shown code) stays open: the code is plain text.
-import { Banner, Button, CopyPrompt, Fingerprint, TextField } from '@4thtech-io/ui';
-import { useCallback, useEffect, useState, type FormEvent, type ReactElement } from 'react';
+import { Banner, Button, CopyPrompt, Fingerprint, ProgressBar, TextField } from '@4thtech-io/ui';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactElement,
+} from 'react';
 import {
   LinkExpiredState,
   LoadingState,
   NotRunningState,
   rememberRecoveryKitLater,
 } from '../../states/index.js';
+import { passkeyProof as browserPasskeyProof } from '../contacts/owner.js';
+import type { PasskeyInfo, PresenceProof } from '../contacts/owner.js';
+import { WelcomeScreen, useTitleFocus } from '../welcome/index.js';
+import { createAppsApi, type AppsApi, type DetectedApp } from './apps-api.js';
+import { ConnectApp } from './connect-app.js';
+import { AppMark, PickApp, type PickList } from './pick-app.js';
 import {
   createSetupPasskey,
   createUpgradePasskey as browserUpgradePasskey,
@@ -47,11 +62,13 @@ import {
   type UpgradeResult,
   type UpgradeValues,
 } from './setup-api.js';
+import './first-run.css';
 import {
   FIRST_RUN as T,
+  NAME as N,
+  NAME_MAX,
   SENSOR,
   SETUP_MESSAGES,
-  STEPS,
   UPGRADE as U,
   UPGRADE_MESSAGES,
   WORKING_BROWSER,
@@ -60,6 +77,11 @@ import {
 
 /** U3-a (D-138; 08 §1): first run, and the passkey switch on this page, finish on Home. */
 const HOME = '/settings/home';
+
+/** Home, with a full load: the shell then reads the new owner and agent fresh. */
+function openHome(): void {
+  window.location.assign(HOME);
+}
 
 export interface FirstRunPageProps {
   /** Test seams; the page uses the real server and browser by default. */
@@ -79,6 +101,12 @@ export interface FirstRunPageProps {
     values: UpgradeValues,
     options: PasskeyOptions,
   ) => Promise<UpgradePasskeyResult>;
+  /** U3-g: the AI apps (pick, connect). Default: the app's own server calls. */
+  readonly appsApi?: AppsApi;
+  /** U3-g: one passkey gesture for the connect step. Default: the browser's. */
+  readonly passkeyProof?: (info: PasskeyInfo) => Promise<PresenceProof | undefined>;
+  /** U3-g: where first run ends. Default: Home, with a full load. */
+  readonly goHome?: () => void;
 }
 
 interface Done {
@@ -93,12 +121,29 @@ interface Done {
 
 type View =
   | { readonly k: 'loading' }
+  /** U3-g (b11 §28.1): no owner yet. */
+  | { readonly k: 'welcome' }
+  /** U3-g (b11 §28.2): which AI app. */
+  | { readonly k: 'pick' }
   | {
+      /** U3-g (b11 §28.3): name the agent and protect approvals, one gesture. */
       readonly k: 'protect';
       readonly working: boolean;
       readonly message?: string;
+      /** The name's own problem, shown under the field. */
+      readonly fieldError?: string;
       /** M1-UX-PRF-MATRIX: the browser reports no passkey with PRF here. */
       readonly noPrf?: boolean;
+    }
+  /** U3-g: the backup code is saved; deciding between "Connect your AI app" and Home. */
+  | { readonly k: 'leaving' }
+  | {
+      /** U3-g (b11 §28.4): connect the chosen AI app, a separate signed step. */
+      readonly k: 'connect';
+      readonly appId: string;
+      readonly appName: string;
+      readonly folder: string;
+      readonly label: string;
     }
   | { readonly k: 'unsupported' }
   | {
@@ -114,9 +159,7 @@ type View =
   | { readonly k: 'expired' }
   | { readonly k: 'down' }
   | { readonly k: 'stuck'; readonly message: string }
-  | { readonly k: 'done'; readonly done: Done }
-  | { readonly k: 'kit'; readonly done: Done }
-  | { readonly k: 'ready'; readonly done: Done };
+  | { readonly k: 'done'; readonly done: Done };
 
 /** A fixed problem code in plain words (never server or browser text). */
 export function setupMessage(problem: SetupError | { readonly problem: 'cancelled' }): string {
@@ -124,21 +167,6 @@ export function setupMessage(problem: SetupError | { readonly problem: 'cancelle
     return SETUP_MESSAGES.wait('retryAfter' in problem ? (problem.retryAfter ?? 1) : 1);
   }
   return SETUP_MESSAGES[problem.problem];
-}
-
-function Steps({ current }: { current: 1 | 2 | 3 | 4 }): ReactElement {
-  return (
-    <nav aria-label="Setup steps">
-      <ol className="al-text-label">
-        {STEPS.map((name, i) => (
-          <li key={name} aria-current={i + 1 === current ? 'step' : undefined}>
-            {i + 1 < current ? `✓ ${name}` : `${String(i + 1)} ${name}`}
-          </li>
-        ))}
-      </ol>
-      <p className="al-text-label al-muted">{T.stepOf(current)}</p>
-    </nav>
-  );
 }
 
 /** The once-shown backup code: readable text, a real save form, Copy, and "I saved it". */
@@ -228,6 +256,123 @@ function sendLine(outcome: SendFolderOutcome): string | undefined {
   return undefined;
 }
 
+/**
+ * U3-g (b11 §28.3): name the agent and protect approvals on one screen. The name is a plain text
+ * field (any text up to 32 characters; the server checks it again before Touch ID); the one primary
+ * button is the one gesture. Enter in the field does not submit: focus moves to the button.
+ */
+function NameStep({
+  view,
+  name,
+  app,
+  noPrf,
+  label,
+  platform,
+  onName,
+  onChange,
+  onBack,
+  onGo,
+}: {
+  view: Extract<View, { k: 'protect' }>;
+  name: string;
+  app: DetectedApp | undefined;
+  noPrf: boolean;
+  label: string;
+  platform: Platform;
+  onName: (value: string) => void;
+  onChange: () => void;
+  onBack: () => void;
+  onGo: (withoutPasskey: boolean) => void;
+}): ReactElement {
+  const title = useTitleFocus<HTMLHeadingElement>();
+  const press = (event: KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    document.getElementById('fr-go')?.focus();
+  };
+  return (
+    <section className="fr-card" aria-labelledby="fr-h">
+      <h1 id="fr-h" ref={title} tabIndex={-1} className="al-text-title-1">
+        {T.protectTitle}
+      </h1>
+      {app === undefined ? null : (
+        <div className="fr-chosen">
+          <div className="fr-chosen-name">
+            <AppMark name={app.name} />
+            <span className="al-text-body">{app.name}</span>
+          </div>
+          <Button variant="ghost" size="sm" aria-label={N.changeLabel(app.name)} onClick={onChange}>
+            {N.change}
+          </Button>
+        </div>
+      )}
+      <TextField
+        label={N.label}
+        hint={N.hint}
+        name="agent-name"
+        type="text"
+        autoComplete="off"
+        spellCheck={false}
+        value={name}
+        readOnly={view.working}
+        {...(view.fieldError === undefined ? {} : { error: view.fieldError })}
+        onChange={(event) => onName(event.currentTarget.value)}
+        onKeyDown={press}
+        onFocus={(event) => {
+          // Selected on open: the suggested name is replaced by typing.
+          event.currentTarget.select();
+        }}
+      />
+      {noPrf ? (
+        <Banner tone="warning">{T.noPrf(SENSOR[platform], WORKING_BROWSER[platform])}</Banner>
+      ) : null}
+      {view.message === undefined ? null : <Banner tone="warning">{view.message}</Banner>}
+      <div className="fr-actions">
+        {view.working ? (
+          <ProgressBar label={N.setting} indeterminate />
+        ) : (
+          <Button
+            id="fr-go"
+            variant="primary"
+            size="lg"
+            icon="key-round"
+            onClick={() => onGo(noPrf)}
+          >
+            {view.message !== undefined ? T.tryAgain : noPrf ? T.backupOnly : label}
+          </Button>
+        )}
+        {noPrf || view.working ? null : (
+          <Button variant="ghost" size="sm" onClick={() => onGo(true)}>
+            {N.backupInstead}
+          </Button>
+        )}
+        <p className="al-text-caption al-muted" role="status" aria-live="polite">
+          {view.working ? T.waiting : T.passkeyNote}
+        </p>
+      </div>
+      <aside className="fr-folders" aria-labelledby="fr-folders">
+        <p id="fr-folders" className="al-text-label al-muted">
+          {T.foldersTitle}
+        </p>
+        <dl className="al-text-body">
+          {T.folders.map(([what, where]) => (
+            <div key={where}>
+              <dt className="al-text-body-sm al-muted">{what}</dt>
+              <dd className="al-text-code">{where}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="al-text-body-sm al-muted">{T.foldersNote}</p>
+      </aside>
+      <div>
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          {N.back}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 export function FirstRunPage({
   api: given,
   createPasskey = createSetupPasskey,
@@ -236,14 +381,36 @@ export function FirstRunPage({
   prfSupport = browserPrfSupport,
   upgradeApi: givenUpgrade,
   createUpgradePasskey = browserUpgradePasskey,
+  appsApi: givenApps,
+  passkeyProof = browserPasskeyProof,
+  goHome = openHome,
 }: FirstRunPageProps = {}): ReactElement {
   const [api] = useState<SetupApi>(() => given ?? createSetupApi());
   const [upgradeApi] = useState<UpgradeApi>(() => givenUpgrade ?? createUpgradeApi());
+  const [appsApi] = useState<AppsApi>(() => givenApps ?? createAppsApi());
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [view, setView] = useState<View>({ k: 'loading' });
   // M1-UX-FIRSTRUN-V2-c: the backup code as typed, only while the switch is on screen.
   const [code, setCode] = useState('');
   const sensor = SENSOR[platform];
+  // U3-g: what the person chose before the one gesture. Nothing here is sent until they press it.
+  const [list, setList] = useState<PickList>({ k: 'loading' });
+  const [choice, setChoice] = useState('');
+  const [name, setName] = useState('');
+  const [edited, setEdited] = useState(false);
+  const [noPrfHere, setNoPrfHere] = useState(false);
+  const asked = useRef(false);
+  const backupTitle = useTitleFocus<HTMLHeadingElement>(view.k);
+  const mounted = useRef(true);
+  const picked = choice !== '' ? choice : list.k === 'ok' ? (list.apps[0]?.id ?? 'later') : 'later';
+  const chosenApp: DetectedApp | undefined =
+    list.k === 'ok' ? list.apps.find((a) => a.id === picked) : undefined;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   /**
    * M1-UX-FIRSTRUN-V2-c: an owner exists. Without a usable passkey (and with passkeys in this
@@ -282,7 +449,9 @@ export function FirstRunPage({
           void prfSupport()
             .catch((): PrfSupport => 'unknown')
             .then((prf) => {
-              if (live) setView({ k: 'protect', working: false, noPrf: prf === 'no' });
+              if (!live) return;
+              setNoPrfHere(prf === 'no');
+              setView({ k: 'welcome' });
             });
         }
       } else if (result.problem === 'session_expired') setView({ k: 'expired' });
@@ -294,25 +463,65 @@ export function FirstRunPage({
     };
   }, [api, available, prfSupport, existingOwner]);
 
+  /** U3-g (b11 §28.2): the look for AI apps runs once, when the pick screen first opens. */
+  const toPick = useCallback((): void => {
+    setView({ k: 'pick' });
+    if (asked.current) return;
+    asked.current = true;
+    void appsApi.list().then((result) => {
+      if (!mounted.current) return;
+      if (result.kind === 'ok') setList({ k: 'ok', apps: result.apps });
+      else if (result.kind === 'session_expired') setView({ k: 'expired' });
+      else if (result.kind === 'offline') setView({ k: 'down' });
+      else setList({ k: 'unavailable' });
+    });
+  }, [appsApi]);
+
+  /** U3-g (b11 §28.3): the suggested name follows the app until the person edits it. */
+  const toName = (): void => {
+    if (!edited) setName(N.suggested(chosenApp?.name));
+    setView({ k: 'protect', working: false, noPrf: noPrfHere });
+  };
+
   const protect = useCallback(
     async (noPrf: boolean) => {
+      const label = name.trim();
       // The same protect view, with the PRF hint kept for "Try again".
-      const again = (message: string): void =>
-        setView({ k: 'protect', working: false, message, noPrf });
+      const again = (message?: string, fieldError?: string): void =>
+        setView({
+          k: 'protect',
+          working: false,
+          noPrf,
+          ...(message === undefined ? {} : { message }),
+          ...(fieldError === undefined ? {} : { fieldError }),
+        });
+      const problem = (error: SetupError): void => {
+        if (error.problem === 'session_expired') return setView({ k: 'expired' });
+        if (error.problem === 'label_invalid')
+          return again(undefined, SETUP_MESSAGES.label_invalid);
+        again(setupMessage(error));
+      };
+      const size = [...label].length;
+      if (size === 0) return again(undefined, N.empty);
+      if (size > NAME_MAX) return again(undefined, N.tooLong);
       setView({ k: 'protect', working: true, noPrf });
-      const begun = await api.begin();
-      if (begun.kind === 'owner_exists') return existingOwner();
-      if (begun.kind === 'error') {
-        if (begun.problem === 'session_expired') return setView({ k: 'expired' });
-        return again(setupMessage(begun));
+      // The server says whether it would sign this name before Touch ID is asked for.
+      const checked = await api.labelCheck(label);
+      if (checked.kind === 'refused') return again(undefined, SETUP_MESSAGES.label_invalid);
+      if (checked.kind === 'error') {
+        if (checked.problem === 'offline') return setView({ k: 'down' });
+        return problem(checked);
       }
+      const begun = await api.begin(label);
+      if (begun.kind === 'owner_exists') return existingOwner();
+      if (begun.kind === 'error') return problem(begun);
       // Without PRF here, any passkey: the gesture proves presence, the backup code approves.
       const made = await createPasskey(begun.publicKey, { platform: !noPrf });
       if (made.kind === 'unsupported') return setView({ k: 'unsupported' });
       if (made.kind === 'cancelled') return again(SETUP_MESSAGES.cancelled);
       let finished;
       try {
-        finished = await api.finish(made.body);
+        finished = await api.finish(made.body, label);
       } finally {
         made.body.fill(0);
       }
@@ -343,7 +552,7 @@ export function FirstRunPage({
           // Something may have been kept: never offer "try again" over it (08 §1).
           return setView({ k: 'stuck', message: setupMessage(finished) });
         }
-        return again(setupMessage(finished));
+        return problem(finished);
       }
       return setView({
         k: 'done',
@@ -357,7 +566,7 @@ export function FirstRunPage({
         },
       });
     },
-    [api, createPasskey, existingOwner],
+    [api, createPasskey, existingOwner, name],
   );
 
   /**
@@ -419,17 +628,25 @@ export function FirstRunPage({
     [createUpgradePasskey, upgradeApi, platform],
   );
 
-  // The owner code is dropped from state when the owner leaves the step that shows it.
-  const toKit = (done: Done): void =>
+  // The owner code is dropped from state when the owner leaves the step that shows it. The recovery
+  // kit is put off ("Later", remembered for the banner); with an AI app chosen and an agent folder
+  // to connect it to, "Connect your AI app" follows, otherwise Home.
+  const leave = async (): Promise<void> => {
+    rememberRecoveryKitLater();
+    setView({ k: 'leaving' });
+    const app = chosenApp;
+    if (app === undefined) return goHome();
+    const agent = await appsApi.currentAgent();
+    if (!mounted.current) return;
+    if (agent.kind !== 'ok') return goHome();
     setView({
-      k: 'kit',
-      done: {
-        confirmed: done.confirmed,
-        passkey: done.passkey,
-        fingerprint: done.fingerprint,
-        sendFolder: done.sendFolder,
-      },
+      k: 'connect',
+      appId: app.id,
+      appName: app.name,
+      folder: agent.folder,
+      label: name.trim(),
     });
+  };
   const label =
     platform === 'mac' ? T.useTouchId : platform === 'windows' ? T.useWindowsHello : T.usePasskey;
 
@@ -524,7 +741,6 @@ export function FirstRunPage({
     case 'unsupported':
       return (
         <section aria-labelledby="fr-h">
-          <Steps current={1} />
           <h1 id="fr-h" className="al-text-title-1">
             {T.unsupportedTitle}
           </h1>
@@ -532,51 +748,51 @@ export function FirstRunPage({
           <CopyPrompt command={T.unsupportedCommand} />
         </section>
       );
+    case 'welcome':
+      return <WelcomeScreen onStart={toPick} />;
+    case 'pick':
+      return (
+        <PickApp
+          list={list}
+          choice={picked}
+          onChoose={setChoice}
+          onContinue={toName}
+          onBack={() => setView({ k: 'welcome' })}
+        />
+      );
+    case 'leaving':
+      return <LoadingState text={T.leaving} />;
+    case 'connect':
+      return (
+        <ConnectApp
+          appsApi={appsApi}
+          appId={view.appId}
+          appName={view.appName}
+          folder={view.folder}
+          agentLabel={view.label}
+          sensor={sensor}
+          passkeyProof={passkeyProof}
+          onDone={goHome}
+        />
+      );
     case 'protect': {
       const noPrf = view.noPrf === true;
       return (
-        <section aria-labelledby="fr-h">
-          <Steps current={1} />
-          <h1 id="fr-h" className="al-text-display">
-            {T.protectTitle}
-          </h1>
-          <p className="al-text-body-lg al-muted">{T.protectBody(sensor)}</p>
-          <aside className="al-card" aria-labelledby="fr-folders">
-            <p id="fr-folders" className="al-text-label al-muted">
-              {T.foldersTitle}
-            </p>
-            <dl className="al-text-body">
-              {T.folders.map(([what, where]) => (
-                <div key={where}>
-                  <dt className="al-text-body-sm al-muted">{what}</dt>
-                  <dd className="al-text-code">{where}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="al-text-body-sm al-muted">{T.foldersNote}</p>
-          </aside>
-          {noPrf ? (
-            <Banner tone="warning">{T.noPrf(SENSOR[platform], WORKING_BROWSER[platform])}</Banner>
-          ) : null}
-          {view.message === undefined ? null : <Banner tone="warning">{view.message}</Banner>}
-          <Button
-            variant="primary"
-            size="lg"
-            icon="key-round"
-            disabled={view.working}
-            onClick={() => void protect(noPrf)}
-          >
-            {view.message !== undefined ? T.tryAgain : noPrf ? T.backupOnly : label}
-          </Button>
-          <p className="al-text-caption al-muted" role="status" aria-live="polite">
-            {view.working ? T.waiting : T.passkeyNote}
-          </p>
-          <p className="al-text-body-sm al-muted">{T.desktopTip}</p>
-          <aside className="al-card" aria-label={T.untilTitle}>
-            <p className="al-text-label al-muted">{T.untilTitle}</p>
-            <p className="al-text-body">{T.untilBody}</p>
-          </aside>
-        </section>
+        <NameStep
+          view={view}
+          name={name}
+          app={chosenApp}
+          noPrf={noPrf}
+          label={label}
+          platform={platform}
+          onName={(value) => {
+            setName(value);
+            setEdited(true);
+          }}
+          onChange={toPick}
+          onBack={toPick}
+          onGo={(withoutPasskey) => void protect(withoutPasskey)}
+        />
       );
     }
     case 'done': {
@@ -584,8 +800,7 @@ export function FirstRunPage({
       const line = sendLine(done.sendFolder);
       return (
         <section aria-labelledby="fr-h">
-          <Steps current={2} />
-          <h1 id="fr-h" className="al-text-display">
+          <h1 id="fr-h" ref={backupTitle} tabIndex={-1} className="al-text-display">
             {T.backupTitle}
           </h1>
           {done.confirmed ? null : (
@@ -607,51 +822,10 @@ export function FirstRunPage({
             code={done.ownerCode ?? ''}
             computer={done.computerName ?? ''}
             sensor={done.passkey ? sensor : SENSOR.other}
-            onSaved={() => toKit(done)}
+            onSaved={() => void leave()}
           />
         </section>
       );
     }
-    case 'kit':
-      return (
-        <section aria-labelledby="fr-h">
-          <Steps current={3} />
-          <h1 id="fr-h" className="al-text-display">
-            {T.kitTitle}
-          </h1>
-          <p className="al-text-body-lg al-muted">{T.kitBody}</p>
-          <Button variant="primary" size="lg" disabled aria-describedby="fr-kit-soon">
-            {T.saveKit}
-          </Button>
-          <p id="fr-kit-soon" className="al-text-caption al-muted">
-            {T.saveKitSoon}
-          </p>
-          <Button
-            onClick={() => {
-              rememberRecoveryKitLater();
-              setView({ k: 'ready', done: view.done });
-            }}
-          >
-            {T.later}
-          </Button>
-          <p className="al-text-caption al-muted">{T.laterNote}</p>
-        </section>
-      );
-    case 'ready':
-      return (
-        <section aria-labelledby="fr-h">
-          <Steps current={4} />
-          <h1 id="fr-h" className="al-text-display">
-            {T.readyTitle}
-          </h1>
-          <p className="al-text-body-lg al-muted">{T.readyBody}</p>
-          <CopyPrompt size="hero" title={T.readyPromptTitle} prompt={T.readyPrompt} />
-          <p className="al-text-body">{T.readyRestart}</p>
-          <a className="al-btn al-btn-primary al-btn-lg" href={HOME}>
-            {T.toHome}
-          </a>
-          <p className="al-text-body al-muted">{T.readyClose}</p>
-        </section>
-      );
   }
 }

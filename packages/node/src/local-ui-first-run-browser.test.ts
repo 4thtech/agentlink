@@ -166,7 +166,7 @@ async function pageWithAuthenticator(): Promise<Page> {
 }
 
 describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
-  it('passkey-first setup, fingerprint, backup code, Later, and Ready hands back to the AI', async (ctx) => {
+  it('Welcome, pick, name with one gesture, backup code, and Home (U3-g; M1-11b-1, D-120)', async (ctx) => {
     const files = appAssets();
     if (browser === undefined && process.env['CI'] !== undefined) throw launchError;
     if (browser === undefined || files === undefined) {
@@ -248,11 +248,77 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     await page.goto(opened[0] ?? '');
     await page.goto(`${server.origin}/first-run`);
 
-    await page.getByRole('heading', { name: 'Protect your approvals' }).waitFor();
-    expect(await page.locator('main').innerText()).toContain('~/AgentLink/Send');
+    // U3-g (b11 §28): what the page asks of the real server, as the server parses it.
+    const asked: { method: string; url: string; input: string | null }[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/api/ui/')) {
+        asked.push({
+          method: request.method(),
+          url: new URL(request.url()).pathname + new URL(request.url()).search,
+          input: request.headers()['x-agentlink-input'] ?? null,
+        });
+      }
+    });
+
+    // Welcome: one sentence and one button; nothing is asked of the setup routes yet.
+    await page.getByRole('button', { name: 'Get started' }).waitFor();
+    expect(await page.locator('h1').innerText()).toContain('Private messages between AI agents.');
+    // The one fade-in has to be over before colours are measured.
+    await page.evaluate(
+      'Promise.all(document.getAnimations().map((a) => a.finished)).then(() => true)',
+    );
     expect(await axeViolations(page)).toEqual([]);
+    await page.getByRole('button', { name: 'Get started' }).click();
+
+    // Pick your AI app: the app list is not available from this server (U3-f's route is a stub
+    // here), so the page says so in plain words and goes on.
+    await page.getByRole('heading', { name: 'Which AI app will you use?' }).waitFor();
+    await page.getByText("Couldn't look for AI apps. You can connect one later.").waitFor();
+    expect(asked.some((a) => a.url === '/api/ui/apps')).toBe(true);
+    expect(await axeViolations(page)).toEqual([]);
+    await page.getByRole('button', { name: 'Continue' }).click();
+
+    // Name and protect, one gesture.
+    await page.getByRole('heading', { name: 'Set up your agent' }).waitFor();
+    expect(await page.locator('main').innerText()).toContain('~/AgentLink/Send');
+    expect(await page.getByLabel('Name your agent').inputValue()).toBe('My agent');
+    expect(await axeViolations(page)).toEqual([]);
+    // The server refuses a label that is not its own restricted form, before any Touch ID.
+    const refused = await page.evaluate(async () => {
+      const doc = (
+        globalThis as unknown as {
+          document: { querySelector(q: string): { getAttribute(n: string): string | null } | null };
+        }
+      ).document;
+      const token = doc.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content');
+      const res = await fetch('/api/ui/agents/label-check?label=Work%20%20agent', {
+        headers: { 'X-AgentLink-CSRF': token ?? '' },
+      });
+      return { status: res.status, body: (await res.json()) as unknown };
+    });
+    expect(refused).toEqual({
+      status: 200,
+      body: { status: 'refused', reason: 'label_invalid' },
+    });
+    await page.getByLabel('Name your agent').fill('Home base');
     await page.getByRole('button', { name: /^Use (Touch ID|Windows Hello|a passkey)$/ }).click();
     await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
+
+    // The label was checked, then carried by begin and finish exactly as the server parses it
+    // (X-AgentLink-Input = base64url JSON {label}); the first agent.label is stored and verified.
+    const labelInput = Buffer.from(JSON.stringify({ label: 'Home base' })).toString('base64url');
+    expect(
+      asked.find((a) => a.url.startsWith('/api/ui/agents/label-check?label=Home')),
+    ).toBeDefined();
+    for (const step of ['begin', 'finish']) {
+      const call = asked.find((a) => a.url === `/api/ui/first-run/owner/${step}`);
+      expect(call?.method).toBe('POST');
+      expect(call?.input).toBe(labelInput);
+    }
+    expect(await client.ownerActions.loadLabel()).toEqual({
+      status: 'verified',
+      label: 'Home base',
+    });
 
     // The same gesture signed the first policy: the real Send folder is allowed.
     const policy = await client.ownerActions.loadPolicy();
@@ -280,19 +346,12 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     );
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).not.toBeNull();
 
+    // "I saved it": no AI app was chosen, so the end of first run is Home, with the kit put off.
     await page.getByRole('button', { name: 'I saved it' }).click();
-    await page.getByRole('heading', { name: 'Save your recovery kit' }).waitFor();
-    expect(await axeViolations(page)).toEqual([]);
-    await page.getByRole('button', { name: 'Later' }).click();
-    await page.getByRole('heading', { name: "You're set" }).waitFor();
-    expect(await axeViolations(page)).toEqual([]);
+    await page.waitForURL(`${server.origin}/settings/home`);
     expect(await page.evaluate(() => localStorage.getItem('agentlink.recoveryKit.later'))).toMatch(
       /^[0-9]+$/,
     );
-    const prompt = await page.locator('.al-copy.is-hero').innerText();
-    expect(prompt).toContain('Create an AgentLink invite for a colleague.');
-    const body = await page.locator('main').innerText();
-    expect(body).not.toMatch(/\b(wallet|gas|seed|transaction|chain|hash|0x[0-9a-f]+)\b/i);
 
     // A second visit: approvals are already protected; setup is never offered again.
     await page.goto(`${server.origin}/first-run`);

@@ -1,0 +1,331 @@
+/* Agents (U3-h, b11 §29): the Agents page, the top-bar switcher and its menu. Design tokens only, no
+   inline styles (CSP). At 600 px and under the switcher is the agent's initial in a circle and the
+   menu rises from the bottom as a sheet. */
+.ag-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+  max-width: 960px;
+}
+.ag-page h1,
+.ag-page p {
+  margin: 0;
+}
+.ag-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-4);
+  align-items: center;
+  justify-content: space-between;
+}
+.ag-head-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+  align-items: center;
+}
+.ag-live:empty {
+  display: none;
+}
+.ag-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+}
+.ag-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+  padding: var(--al-space-4) var(--al-space-5);
+  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.ag-row:last-child {
+  border-bottom: 0;
+}
+.ag-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+  align-items: center;
+}
+.ag-label {
+  overflow-wrap: anywhere;
+}
+.ag-open {
+  padding: 0 var(--al-space-2);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-sm);
+}
+.ag-works {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+  align-items: center;
+}
+.ag-app {
+  display: inline-flex;
+  gap: var(--al-space-2);
+  align-items: center;
+}
+.ag-app-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-muted);
+}
+.ag-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-2);
+  align-items: center;
+  margin-top: var(--al-space-2);
+}
+.ag-warn {
+  display: inline-flex;
+  gap: var(--al-space-2);
+  align-items: center;
+  color: var(--al-color-status-warning-fg);
+}
+.ag-row-removing .ag-label {
+  opacity: 0.7;
+}
+.ag-error,
+.ag-error-box p {
+  color: var(--al-color-status-danger-fg);
+}
+.ag-error-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+  align-items: flex-start;
+}
+.ag-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--al-color-fg-link);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ag-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ag-rename,
+.ag-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.ag-sheet-body p,
+.ag-rename p {
+  margin: 0;
+}
+.ag-goes {
+  margin: 0;
+  padding-left: var(--al-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.ag-check {
+  display: flex;
+  gap: var(--al-space-3);
+  align-items: center;
+}
+.ag-tidy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-4) var(--al-space-5);
+  margin-bottom: var(--al-space-5);
+}
+.ag-tidy p {
+  margin: 0;
+}
+
+/* Menus: the row's overflow menu and the switcher's menu. */
+.ag-menu-wrap,
+.ag-switch {
+  position: relative;
+  display: inline-flex;
+}
+.ag-menu {
+  position: absolute;
+  top: calc(100% + var(--al-space-2));
+  right: 0;
+  z-index: 30;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--al-space-2);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-raised);
+  box-shadow: var(--al-shadow-3);
+}
+.ag-switch-menu {
+  left: 0;
+  right: auto;
+  width: 340px;
+  max-width: calc(100vw - 2 * var(--al-space-4));
+  max-height: 360px;
+  overflow-y: auto;
+}
+.ag-menu-item {
+  display: flex;
+  gap: var(--al-space-3);
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: var(--al-space-2) var(--al-space-3);
+  border: 0;
+  border-radius: var(--al-radius-md);
+  background: none;
+  color: var(--al-color-fg-default);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ag-menu-item:hover,
+.ag-menu-item:focus-visible {
+  background: var(--al-color-bg-sunken);
+}
+.ag-menu-item[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: default;
+}
+.ag-danger {
+  color: var(--al-color-status-danger-fg);
+}
+.ag-menu-check {
+  display: inline-flex;
+  width: 16px;
+  flex: none;
+}
+.ag-menu-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+  min-width: 0;
+}
+.ag-menu-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+  align-items: center;
+}
+.ag-menu-apps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+}
+.ag-menu-connect {
+  padding-left: calc(var(--al-space-3) + 16px + var(--al-space-3));
+  color: var(--al-color-fg-link);
+  min-height: 28px;
+}
+.ag-menu-sep {
+  height: 1px;
+  margin: var(--al-space-2) 0;
+  background: var(--al-color-border-subtle);
+}
+.ag-switch-find {
+  padding: var(--al-space-2);
+}
+
+/* The trigger in the top bar. */
+.ag-switch-btn {
+  display: inline-flex;
+  gap: var(--al-space-2);
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--al-space-3);
+  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  border-radius: var(--al-radius-md);
+  background: none;
+  color: var(--al-color-fg-default);
+  font: inherit;
+  cursor: pointer;
+}
+.ag-switch-btn:hover {
+  background: var(--al-color-bg-sunken);
+}
+.ag-switch-note {
+  white-space: nowrap;
+}
+.ag-initial {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--al-color-accent-subtle);
+  font-weight: var(--al-font-weight-semibold);
+}
+
+@media (max-width: 600px) {
+  .ag-switch-btn {
+    padding: 0;
+    border: 0;
+    min-width: 44px;
+    min-height: 44px;
+    gap: var(--al-space-1);
+  }
+  .ag-initial {
+    display: inline-flex;
+  }
+  .ag-switch-label,
+  .ag-switch-app,
+  .ag-switch-btn > .al-icon {
+    display: none;
+  }
+  .ag-switch-note {
+    display: none;
+  }
+  .ag-switch-menu {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: auto;
+    max-width: none;
+    max-height: 70vh;
+    border-radius: var(--al-radius-lg) var(--al-radius-lg) 0 0;
+  }
+  .ag-switch-menu .ag-menu-item {
+    min-height: 56px;
+  }
+  .ag-page .ag-actions .al-btn {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ag-menu {
+    animation: ag-menu-in var(--al-duration-fast) var(--al-easing-enter);
+  }
+  @keyframes ag-menu-in {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}

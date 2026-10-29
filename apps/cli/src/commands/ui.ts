@@ -36,6 +36,7 @@ import { checkOwnerTerminal } from '../runtime/guards.js';
 import { appServes, chooseCurrentAgent } from './current-agent.js';
 import { nodeOwnerDeps } from './owner/deps.js';
 import { openUiHostAgent, withoutAssets, type UiHostDeps } from './ui-host.js';
+import { uiRemovalPort } from './ui-remove.js';
 
 /** How long `ui` serves the pages at most (proposed: 30 minutes, as for the first-run step). */
 export const UI_WAIT_MS = 30 * 60_000;
@@ -203,6 +204,8 @@ export function nodeUiDeps(): UiDeps {
               close: () => agent.close(),
             },
             open: (other) => openUiHostAgent(hostDeps, other),
+            // U3-e: removing an agent (the folder lock, its own open, the revoked list).
+            removal: uiRemovalPort(),
           },
           // Fixed values only (ApprovalServerEvent, I-7).
           onEvent: (event) => {
