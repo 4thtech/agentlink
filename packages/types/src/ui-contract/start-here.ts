@@ -82,11 +82,56 @@ const listAnswer = (d: StartHereDesk): UiAnswer<unknown> => ({
   body: { switchable: true, ...d, agents: d.agents.map((a) => ({ ...a, apps: [...a.apps] })) },
 });
 
-/** GET /api/ui/apps today: the U3-c stub (U3-f replaces it). Start here reads it as no AI app. */
+/** GET /api/ui/apps with no AI apps desk (outside the CLI host): `not_available`. Read as no AI app. */
 export const START_HERE_APPS_STUB = {
   status: 501,
   body: { error: 'not_available' },
 } as const satisfies UiAnswer;
+
+/** One detected app as the AI apps desk (the CLI's harness seam) gives it to the handler. */
+export interface AiAppView {
+  readonly app: string;
+  readonly name: string;
+  readonly path: string;
+  readonly state:
+    | { readonly kind: 'none' }
+    | { readonly kind: 'agent'; readonly agent: string }
+    | { readonly kind: 'foreign' }
+    | { readonly kind: 'unreadable' };
+  readonly quitFirst: boolean;
+}
+
+/** The desk worlds behind the real `GET /api/ui/apps` answers below (U3-f). */
+export const START_HERE_AI_APP_VIEWS = [
+  {
+    app: 'cursor',
+    name: 'Cursor',
+    path: '~/.cursor/mcp.json',
+    state: { kind: 'agent', agent: 'work' },
+    quitFirst: false,
+  },
+  {
+    app: 'codex',
+    name: 'Codex',
+    path: '~/.codex/config.toml',
+    state: { kind: 'agent', agent: 'other' },
+    quitFirst: false,
+  },
+  {
+    app: 'claude-code',
+    name: 'Claude Code',
+    path: '~/.claude.json',
+    state: { kind: 'foreign' },
+    quitFirst: false,
+  },
+  {
+    app: 'claude-desktop',
+    name: 'Claude Desktop',
+    path: '~/Library/Application Support/Claude/claude_desktop_config.json',
+    state: { kind: 'none' },
+    quitFirst: true,
+  },
+] as const satisfies readonly AiAppView[];
 
 interface AgentCase {
   readonly title: string;
@@ -98,6 +143,8 @@ interface AgentCase {
   readonly signal: StartHereSignal | null;
   /** False when the real server cannot give this apps answer (a failure); node skips it. */
   readonly appsFromServer: boolean;
+  /** The AI apps desk the real handler reads; absent: no desk (the stub answer). */
+  readonly aiApps?: readonly AiAppView[];
 }
 
 const agentCase = (
@@ -115,6 +162,47 @@ const agentCase = (
     appsFromServer: true,
   };
 };
+
+/**
+ * The real `GET /api/ui/apps` body for `START_HERE_AI_APP_VIEWS` (U3-f, 08 §1): an entry counts only
+ * when `state === 'connected' && agent === <the open agent>`, shown by its `name`. `agent` is present
+ * only for a connected entry. The node test asserts the real handler answers exactly this.
+ */
+export const START_HERE_APPS_LIST_BODY = {
+  desktopRunning: false,
+  apps: [
+    {
+      app: 'cursor',
+      name: 'Cursor',
+      path: '~/.cursor/mcp.json',
+      state: 'connected',
+      agent: 'work',
+      quitFirst: false,
+    },
+    {
+      app: 'codex',
+      name: 'Codex',
+      path: '~/.codex/config.toml',
+      state: 'connected',
+      agent: 'other',
+      quitFirst: false,
+    },
+    {
+      app: 'claude-code',
+      name: 'Claude Code',
+      path: '~/.claude.json',
+      state: 'not_ours',
+      quitFirst: false,
+    },
+    {
+      app: 'claude-desktop',
+      name: 'Claude Desktop',
+      path: '~/Library/Application Support/Claude/claude_desktop_config.json',
+      state: 'not_connected',
+      quitFirst: true,
+    },
+  ],
+} as const;
 
 /** The agent signal from the real agents read plus the apps stub. */
 export const START_HERE_AGENT_CASES: readonly AgentCase[] = [
@@ -162,6 +250,18 @@ export const START_HERE_AGENT_CASES: readonly AgentCase[] = [
     { named: true, connected: false, appName: null, running: false },
   ),
   {
+    title:
+      'the real AI apps list says Cursor runs this agent: connected even when the agents row has none',
+    desk: desk([row({ name: 'work', label: 'Work', labelled: true, current: true })]),
+    agentsAnswer: listAnswer(
+      desk([row({ name: 'work', label: 'Work', labelled: true, current: true })]),
+    ),
+    appsAnswer: { status: 200, body: START_HERE_APPS_LIST_BODY },
+    signal: { named: true, connected: true, appName: 'Cursor', running: false },
+    appsFromServer: true,
+    aiApps: START_HERE_AI_APP_VIEWS,
+  },
+  {
     title: 'outside the app host the card still works: no one to name, connect from what is read',
     desk: null,
     agentsAnswer: { status: 200, body: { switchable: false, agents: [] } },
@@ -181,11 +281,7 @@ export const START_HERE_AGENT_CASES: readonly AgentCase[] = [
   },
 ];
 
-/**
- * The AI apps list shape of U3-f (08 §1), documented until U3-f replaces the stub: an entry counts
- * only when `state === 'connected' && agent === <the open agent>`, shown by its `name`. U3-f's
- * builder adds the node side of these samples.
- */
+/** The same body, as the page reads it. */
 export const START_HERE_APPS_LIST = {
   agents: {
     switchable: true,
@@ -195,27 +291,7 @@ export const START_HERE_APPS_LIST = {
     agents: [row({ name: 'work', label: 'Work', labelled: true, current: true })],
   },
   connected: {
-    apps: {
-      desktopRunning: false,
-      apps: [
-        {
-          app: 'cursor',
-          name: 'Cursor',
-          path: '~/.cursor/mcp.json',
-          state: 'connected',
-          agent: 'work',
-          quitFirst: false,
-        },
-        {
-          app: 'codex',
-          name: 'Codex',
-          path: '~/.codex/config.toml',
-          state: 'connected',
-          agent: 'other',
-          quitFirst: false,
-        },
-      ] satisfies readonly AppsListEntry[],
-    },
+    apps: START_HERE_APPS_LIST_BODY,
     appName: 'Cursor',
   },
   /** Answers that are "not done": no answer, the stub body, an empty list, junk. */

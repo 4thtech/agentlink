@@ -10,6 +10,7 @@ import {
   START_HERE_APPS_STUB,
   START_HERE_MESSAGES_PATH,
   START_HERE_REPLY_CASES,
+  type AiAppView,
   type StartHereConversation,
   type StartHereDesk,
   type UiAnswer,
@@ -30,8 +31,17 @@ const read = (path: string): LocalUiReadRoute => {
 function context(
   desk: StartHereDesk | null,
   conversations: readonly StartHereConversation[] = [],
+  aiApps?: readonly AiAppView[],
 ): LocalUiContext {
   return {
+    aiApps:
+      aiApps === undefined
+        ? undefined
+        : {
+            list: () => Promise.resolve({ apps: aiApps, desktopRunning: false }),
+            plan: () => Promise.reject(new Error('unused')),
+            agentIdOf: () => Promise.resolve(undefined),
+          },
     agents: desk === null ? undefined : { list: () => Promise.resolve(desk) },
     client: {
       agentId: 'a',
@@ -55,7 +65,7 @@ async function answer(path: string, ctx: LocalUiContext): Promise<UiAnswer> {
 describe('contract (server): the real agents and apps reads answer the Start here samples', () => {
   for (const sample of START_HERE_AGENT_CASES) {
     it(sample.title, async () => {
-      const ctx = context(sample.desk);
+      const ctx = context(sample.desk, [], sample.aiApps);
       expect(await answer(START_HERE_AGENTS_PATH, ctx)).toEqual(sample.agentsAnswer);
       if (sample.appsFromServer) {
         expect(await answer(START_HERE_APPS_PATH, ctx)).toEqual(sample.appsAnswer);
@@ -63,7 +73,7 @@ describe('contract (server): the real agents and apps reads answer the Start her
     });
   }
 
-  it('GET /api/ui/apps is still the U3-c stub (U3-f fills it)', async () => {
+  it('GET /api/ui/apps with no AI apps desk is the not_available answer', async () => {
     expect(await answer(START_HERE_APPS_PATH, context(null))).toEqual(START_HERE_APPS_STUB);
   });
 });

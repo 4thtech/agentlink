@@ -44,6 +44,8 @@ export interface UiAnswer<B = UiWordBody> {
 export interface AgentsListRow {
   readonly name: string;
   readonly label: string;
+  /** A verified `agent.label` exists (U3-j). */
+  readonly labelled: boolean;
   readonly current: boolean;
   readonly available: boolean;
   readonly removing: boolean;
@@ -92,6 +94,7 @@ export const AGENTS_LIST = {
         {
           name: 'default',
           label: 'Personal',
+          labelled: true,
           current: true,
           available: true,
           removing: false,
@@ -102,6 +105,7 @@ export const AGENTS_LIST = {
         {
           name: 'work',
           label: 'Work',
+          labelled: false,
           current: false,
           available: true,
           removing: false,
