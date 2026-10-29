@@ -36,7 +36,8 @@
   stroke-dashoffset: 3;
 }
 .mv-run {
-  animation: mv-travel 1.2s var(--al-ease-standard, ease-out) 1 forwards;
+  animation: mv-travel calc(var(--al-duration-moment) * 2.5) var(--al-ease-standard, ease-out) 1
+    forwards;
 }
 @keyframes mv-travel {
   from {

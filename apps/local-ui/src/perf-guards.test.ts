@@ -71,7 +71,8 @@ describe('Moving-row mark (U3-map-2, b11 §32.1, §32.4)', () => {
       for (const p of props) expect(['stroke-dashoffset']).toContain(p);
     }
     expect(text).not.toMatch(/infinite/);
-    expect(text).toMatch(/mv-travel 1\.2s [^;]* 1 forwards/);
+    // 1.2 s from the moment token (480 ms x 2.5); the motion lint refuses a literal duration.
+    expect(text).toMatch(/mv-travel calc\(var\(--al-duration-moment\) \* 2\.5\) [^;]* 1 forwards/);
   });
   it('draws no travelling dash under reduced motion', () => {
     expect(text).toMatch(/prefers-reduced-motion: reduce\) \{ \.mv-dash \{ display: none/);
