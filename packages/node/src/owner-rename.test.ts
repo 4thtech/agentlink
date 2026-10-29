@@ -249,83 +249,88 @@ describe('RenameCardSession: exactly one card, for this agent, epoch and name', 
 });
 
 describe('a renamed agent restored from a recovery kit (D-141; 04 §2.3.3; Fable M1)', () => {
-  it('rename → export kit → restore on a clean machine → opens at its epoch and can send', async () => {
-    const w = await world();
-    expect((await rename(w, 'Home')).status).toBe('signed');
-    const storePath = join(dir, 'agent.sqlite');
-    // Export: the owner's export session, the agent's items and a snapshot of its store.
-    const exportSession = await w.owner.unlockForExport({
-      kind: 'passphrase',
-      secret: w.code.slice(),
-    });
-    const exporter = createKeyExportControl({
-      owner: w.owner,
-      itemsOf: () => keychain,
-      storePathOf: () => storePath,
-      agentlinkDir: join(dir, '.agentlink'),
-      kdf: KDF,
-    });
-    const kitPath = join(dir, 'backup.alkk');
-    const snapPath = join(dir, 'snap.sqlite');
-    const code = await exporter.sealRecoveryKit(exportSession, {
-      kitId: 'AAAAAAAAAAAAAAAAAAAAAA',
-      createdAt: now,
-      contents: 'full',
-      agents: [{ agentId: w.agentId, name: 'helper' }],
-      snapshots: async () => {
-        const db = new Database(storePath);
-        db.prepare('VACUUM INTO ?').run(snapPath);
-        db.close();
-        const bytes = new Uint8Array(await readFile(snapPath));
-        return { length: bytes.length, chunks: [bytes] };
-      },
-      path: kitPath,
-    });
-    await exportSession.close();
+  // `withItem` false: a kit made before `key-epoch` was carried; the epoch comes from the snapshot.
+  it.each([true, false])(
+    'rename → export kit (key-epoch item: %s) → restore on a clean machine → opens at its epoch and can send',
+    async (withItem) => {
+      const w = await world();
+      expect((await rename(w, 'Home')).status).toBe('signed');
+      if (!withItem) await keychain.delete(keychainAccount(w.agentId, 'key-epoch'));
+      const storePath = join(dir, 'agent.sqlite');
+      // Export: the owner's export session, the agent's items and a snapshot of its store.
+      const exportSession = await w.owner.unlockForExport({
+        kind: 'passphrase',
+        secret: w.code.slice(),
+      });
+      const exporter = createKeyExportControl({
+        owner: w.owner,
+        itemsOf: () => keychain,
+        storePathOf: () => storePath,
+        agentlinkDir: join(dir, '.agentlink'),
+        kdf: KDF,
+      });
+      const kitPath = join(dir, 'backup.alkk');
+      const snapPath = join(dir, 'snap.sqlite');
+      const code = await exporter.sealRecoveryKit(exportSession, {
+        kitId: 'AAAAAAAAAAAAAAAAAAAAAA',
+        createdAt: now,
+        contents: 'full',
+        agents: [{ agentId: w.agentId, name: 'helper' }],
+        snapshots: async () => {
+          const db = new Database(storePath);
+          db.prepare('VACUUM INTO ?').run(snapPath);
+          db.close();
+          const bytes = new Uint8Array(await readFile(snapPath));
+          return { length: bytes.length, chunks: [bytes] };
+        },
+        path: kitPath,
+      });
+      await exportSession.close();
 
-    // Restore on a clean machine: a new keychain, the kit's items, the checked store.
-    const target = new MapKeychain();
-    const importer = createKeyImportControl({
-      backend: 'keychain',
-      keychain: target,
-      ownerKeychain: new MapKeychain(),
-      kdf: KDF,
-      revokedDir: join(dir, 'revoked'),
-    });
-    const quarantine = createRestoreQuarantine(join(dir, 'q'));
-    const handle = await importer.openRecoveryKit(
-      new Uint8Array(await readFile(kitPath)),
-      { secret: code.slice(), source: 'prompt' },
-      { createStoreSink: quarantine.createStoreSink },
-    );
-    await importer.importAgent(handle, w.agentId);
-    const restoredPath = join(dir, 'restored.sqlite');
-    await installRestoredStore(handle, w.agentId, restoredPath);
-    handle.wipe();
-    expect(target.items.get(keychainAccount(w.agentId, 'key-epoch'))).toEqual(
-      Uint8Array.from('1', (c) => c.charCodeAt(0)),
-    );
+      // Restore on a clean machine: a new keychain, the kit's items, the checked store.
+      const target = new MapKeychain();
+      const importer = createKeyImportControl({
+        backend: 'keychain',
+        keychain: target,
+        ownerKeychain: new MapKeychain(),
+        kdf: KDF,
+        revokedDir: join(dir, 'revoked'),
+      });
+      const quarantine = createRestoreQuarantine(join(dir, 'q'));
+      const handle = await importer.openRecoveryKit(
+        new Uint8Array(await readFile(kitPath)),
+        { secret: code.slice(), source: 'prompt' },
+        { createStoreSink: quarantine.createStoreSink },
+      );
+      await importer.importAgent(handle, w.agentId);
+      const restoredPath = join(dir, 'restored.sqlite');
+      await installRestoredStore(handle, w.agentId, restoredPath);
+      handle.wipe();
+      expect(target.items.get(keychainAccount(w.agentId, 'key-epoch'))).toEqual(
+        Uint8Array.from('1', (c) => c.charCodeAt(0)),
+      );
 
-    const store = await openAgentStoreWith('keychain', w.agentId, restoredPath, {
-      keychain: target,
-    });
-    closers.push(() => store.close());
-    const keyStore = await openRecordedKeyStore('keychain', w.agentId, { keychain: target });
-    closers.push(() => keyStore.close());
-    // Without the kit's key-epoch the KeyStore would open at 0 and the client refuse to open.
-    const client = await AgentLinkClient.create({
-      keyStore,
-      store: store.store,
-      cipher: store.cipher,
-      approvals,
-      clock: () => now,
-      policyMark: store.policyMark,
-    });
-    expect((await keyStore.getPublicBundle()).keyEpoch).toBe(1);
-    const card = await client.identity.signedCard();
-    expect(card.card.keyEpoch).toBe(1);
-    expect(card.name).toBe('Home');
-    expect(await client.identity.sendState()).toBe('ready');
-    await expect(client.identity.assertCanSend()).resolves.toBeUndefined();
-  });
+      const store = await openAgentStoreWith('keychain', w.agentId, restoredPath, {
+        keychain: target,
+      });
+      closers.push(() => store.close());
+      const keyStore = await openRecordedKeyStore('keychain', w.agentId, { keychain: target });
+      closers.push(() => keyStore.close());
+      // Without the kit's key-epoch the KeyStore would open at 0 and the client refuse to open.
+      const client = await AgentLinkClient.create({
+        keyStore,
+        store: store.store,
+        cipher: store.cipher,
+        approvals,
+        clock: () => now,
+        policyMark: store.policyMark,
+      });
+      expect((await keyStore.getPublicBundle()).keyEpoch).toBe(1);
+      const card = await client.identity.signedCard();
+      expect(card.card.keyEpoch).toBe(1);
+      expect(card.name).toBe('Home');
+      expect(await client.identity.sendState()).toBe('ready');
+      await expect(client.identity.assertCanSend()).resolves.toBeUndefined();
+    },
+  );
 });

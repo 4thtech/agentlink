@@ -119,7 +119,11 @@ async function makeSnapshot(
   const store = await SqliteStore.open(path);
   const cipher = await createAgentStoreCipher(storeKey);
   const row = await sampleRow('identity', 0, cipher);
-  const card = JSON.stringify({ card: { ownerNostr: ownerHex }, cardSig: 'x', cardAgentSig: null });
+  const card = JSON.stringify({
+    card: { ownerNostr: ownerHex, keyEpoch: row.key_epoch },
+    cardSig: 'x',
+    cardAgentSig: null,
+  });
   const sealedCard = await cipher.seal(
     { table: 'identity', column: 'agent_card_json', rowKey: rowKeyOf([rowAgentId]) },
     card,
