@@ -34,7 +34,7 @@ function mountAt(path: string): void {
 
 /** Path, the page's own heading (today's page), and the title in the top bar. */
 const EXPECTED: ReadonlyArray<readonly [string, string, string]> = [
-  ['/inbox', 'Messages', 'Inbox'],
+  ['/inbox', 'Inbox', 'Inbox'],
   ['/contacts', 'Contacts', 'Contacts'],
   ['/', 'Approvals', 'Approvals'],
   ['/first-run', 'Set up AgentLink', 'Set up AgentLink'],

@@ -44,7 +44,7 @@ const PAGES = [
   { path: '/settings/home', title: 'Home' },
   { path: '/settings/activity', title: 'Activity' },
   // W4-SHELL: the two destinations (today's pages until their builders replace the bodies).
-  { path: '/inbox', title: 'Messages' },
+  { path: '/inbox', title: 'Inbox' },
   { path: '/contacts', title: 'Contacts' },
   { path: '/settings/files', title: 'Files' },
   { path: '/settings/proofs', title: 'Proofs & credits' },
@@ -482,12 +482,12 @@ async function timedNav(page: Page, label: string, title: string): Promise<numbe
 
 /**
  * The nav order a route-change pass walks: W4-SHELL (Decision 40) has two sidebar items, the Inbox
- * (today's Messages page) and Contacts; the walk goes there and back again.
+ * and Contacts; the walk goes there and back again.
  */
 const NAV_WALK: readonly (readonly [string, string])[] = [
-  ['Inbox', 'Messages'],
+  ['Inbox', 'Inbox'],
   ['Contacts', 'Contacts'],
-  ['Inbox', 'Messages'],
+  ['Inbox', 'Inbox'],
 ];
 
 beforeAll(async () => {
@@ -724,7 +724,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         // Scrolling Activity (200 rows) and Messages (60 conversations, 200 messages).
         for (const [path, title, open200] of [
           ['/settings/activity', 'Activity', false],
-          ['/inbox', 'Messages', true],
+          ['/inbox', 'Inbox', true],
         ] as const) {
           await page.goto(origin + path);
           await settle(page, title);

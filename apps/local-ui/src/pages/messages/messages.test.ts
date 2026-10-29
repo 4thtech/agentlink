@@ -507,7 +507,8 @@ describe('copy', () => {
       "Nothing yet. When your AI and Marko's agent exchange messages, they show here.",
     );
     expect(S.reply).toBe('To reply, ask your AI.');
-    expect(S.noContacts).toBe('Messages appear here once you have a contact.');
+    // W4-SHELL (owner, 29 Oct): the page reached by Inbox is the Inbox; no separate "Messages" name.
+    expect(S.noContacts).toBe('Conversations appear here once you have a contact.');
   });
 });
 
