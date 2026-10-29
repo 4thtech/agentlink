@@ -33,6 +33,7 @@ import {
   encodeBase64url,
   encodeHex,
   encodeUtf8,
+  ownerPrfSalt,
   randomBytes,
   taggedHash,
   type EnvelopeKeys,
@@ -53,7 +54,9 @@ import {
 import { createKeychainAgent, openRecordedKeyStore } from '../keychain-keystore.js';
 import { keychainAccount, type KeychainBackend } from '../keychain.js';
 import { initOwnerWith } from '../owner-init.js';
-import { KeychainOwnerKeyStore } from '../owner-keystore.js';
+import { KeychainOwnerKeyStore, OWNER_PASSKEY_ACCOUNT } from '../owner-keystore.js';
+import { encodePasskeyAssertion, registerOwnerPasskey } from '../owner-passkey.js';
+import { VirtualPrfAuthenticator } from '../passkey-authenticator.fixture.js';
 import type { OwnerTerminal } from '../owner-terminal.js';
 import {
   removeStatement,
@@ -268,8 +271,11 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => s.close()));
 });
 
-/** `solo`: a computer with one agent (HOTFIX-045-REMOVE B2): only `work` is listed and opens. */
-async function world(options: { solo?: boolean } = {}): Promise<World> {
+/**
+ * `solo`: a computer with one agent (HOTFIX-045-REMOVE B2): only `work` is listed and opens.
+ * `noneOpen`: the host starts with no agent open (HOTFIX-045-TOUCHID).
+ */
+async function world(options: { solo?: boolean; noneOpen?: true } = {}): Promise<World> {
   const work = await makeAgent('work');
   const other = await makeAgent('default');
   const agents = new Map([
@@ -415,15 +421,16 @@ async function world(options: { solo?: boolean } = {}): Promise<World> {
     },
   };
   const opened: string[] = [];
-  const initial = hostAgent('work');
+  // HOTFIX-045-TOUCHID: `noneOpen` starts the host with no agent open (as after a failed removal).
+  const initial = options.noneOpen === true ? undefined : hostAgent('work');
   const server = await startApprovalServerWith(
     {
-      source: initial.source,
+      source: initial?.source ?? sourceOf(work),
       localUi: { assets: bundle() },
       onEvent: (event) => events.push(event),
       host: {
         directory,
-        initial,
+        ...(initial === undefined ? {} : { initial }),
         open: (name) => Promise.resolve(entries.has(name) ? hostAgent(name) : undefined),
         removal: port,
       },
@@ -470,7 +477,7 @@ async function world(options: { solo?: boolean } = {}): Promise<World> {
 async function remove(
   w: World,
   input: unknown,
-  options: { presence?: string; generation?: string } = {},
+  options: { presence?: string; generation?: string; passkey?: Uint8Array } = {},
 ): Promise<Response & { json: Record<string, unknown> }> {
   const cookie = await w.cookie();
   const csrf = await w.csrf(cookie);
@@ -483,8 +490,9 @@ async function remove(
       'Content-Type': 'application/octet-stream',
       'X-AgentLink-Generation': options.generation ?? '1',
       'X-AgentLink-Input': encodeBase64url(encodeUtf8(JSON.stringify(input))),
+      ...(options.passkey === undefined ? {} : { 'X-AgentLink-Presence': 'passkey' }),
     },
-    body: encodeUtf8(options.presence ?? code),
+    body: options.passkey ?? encodeUtf8(options.presence ?? code),
   });
   return { ...res, json: JSON.parse(res.body) as Record<string, unknown> };
 }
@@ -868,4 +876,50 @@ describe('the statement before the gesture (04 §2.5, 11 §5)', () => {
 
 beforeEach(() => {
   keychain.failDelete = undefined;
+});
+
+// HOTFIX-045-TOUCHID: Remove with no agent open (the host after a failed removal, or a Mac whose
+// current agent did not open) is confirmed with Touch ID: the page's passkey read answers from the
+// owner store (on main it was 409 `no_agent`, so the sheet asked for the backup code), and the
+// removal completes with the passkey assertion through the unchanged central presence gate.
+describe('HOTFIX-045-TOUCHID: Remove with no agent open, with Touch ID', () => {
+  afterEach(async () => {
+    await keychain.delete(OWNER_PASSKEY_ACCOUNT);
+  });
+
+  it('offers the passkey and removes with it (200 removed)', async () => {
+    const salt = ownerPrfSalt();
+    const auth = new VirtualPrfAuthenticator();
+    await registerOwnerPasskey(
+      keychain,
+      owner,
+      encodeUtf8(code),
+      auth.create(owner.ownerNostr, salt),
+    );
+    const w = await world({ noneOpen: true });
+    const cookie = await w.cookie();
+    const csrf = await w.csrf(cookie);
+    const read = await send(w.server.port, '/api/owner/passkey', {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': 'same-origin' },
+    });
+    expect(read.status).toBe(200);
+    const passkey = (JSON.parse(read.body) as { passkey: Record<string, unknown> }).passkey;
+    expect(passkey['registered']).toBe(true);
+    expect(passkey['credentialId']).toBe(encodeBase64url(auth.credentialId));
+    expect(w.log.filter((l) => l.startsWith('open '))).toEqual([]);
+    const res = await remove(
+      w,
+      { name: 'work', typedLabel: 'Work' },
+      {
+        generation: (await generationOf(w)) ?? '0',
+        passkey: encodePasskeyAssertion(auth.get(salt)),
+      },
+    );
+    expect(res.json).toEqual({ status: 'removed' });
+    expect(itemsOf(w.work.agentId)).toEqual([]);
+    expect(w.log).toContain('removeFolder work');
+    const recorded = w.revoked.get(w.work.agentId) ?? '';
+    const ownerHex = `0x${encodeHex(owner.ownerNostr)}`;
+    expect(verifyRevokedEntry(recorded, w.work.agentId, ownerHex).ok).toBe(true);
+  });
 });

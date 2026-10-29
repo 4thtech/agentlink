@@ -26,6 +26,7 @@ import {
   encodeBase64url,
   encodeHex,
   encodeUtf8,
+  ownerPrfSalt,
   sha256,
   type JsonObject,
   type JsonValue,
@@ -39,7 +40,9 @@ import {
   type ApprovalServerSource,
 } from '../approval-server.js';
 import { ownerSigValid, ownerWorld, send, type OwnerWorld } from '../approval-ui.fixture.js';
-import { KeychainOwnerKeyStore } from '../owner-keystore.js';
+import { KeychainOwnerKeyStore, OWNER_PASSKEY_ACCOUNT } from '../owner-keystore.js';
+import { encodePasskeyAssertion, encodePasskeyRegistration } from '../owner-passkey.js';
+import { VirtualPrfAuthenticator } from '../passkey-authenticator.fixture.js';
 import type { AgentDirectory, AppHostAgent, AppHostHandoffRecordValue } from './app-host.js';
 import type { LocalUiAssets } from './context.js';
 import {
@@ -395,7 +398,11 @@ async function harness(opts: Options = {}) {
         }),
         body: encodeUtf8('{}'),
       }),
-    accept: (inviteId: string, presence: string | undefined, extra: Record<string, string> = {}) =>
+    accept: (
+      inviteId: string,
+      presence: string | Uint8Array | undefined,
+      extra: Record<string, string> = {},
+    ) =>
       send(port, JOIN_ACCEPT_PATH, {
         method: 'POST',
         headers: pageHeaders({
@@ -404,7 +411,20 @@ async function harness(opts: Options = {}) {
           'X-AgentLink-Input': encodeBase64url(encodeUtf8(JSON.stringify({ inviteId }))),
           ...extra,
         }),
-        ...(presence === undefined ? {} : { body: encodeUtf8(presence) }),
+        ...(presence === undefined
+          ? {}
+          : { body: typeof presence === 'string' ? encodeUtf8(presence) : presence }),
+      }),
+    /** HOTFIX-045-TOUCHID: the presence sheet's passkey read and the switch's registration. */
+    passkeyInfo: () => send(port, '/api/owner/passkey', { headers: pageHeaders() }),
+    registerPasskey: (body: Uint8Array) =>
+      send(port, '/api/owner/passkey', {
+        method: 'POST',
+        headers: pageHeaders({
+          'Content-Type': 'application/octet-stream',
+          'X-AgentLink-Generation': '1',
+        }),
+        body,
       }),
   };
 }
@@ -889,4 +909,54 @@ describe('the host passes for the open agent (Decision 37 (b), (c))', () => {
     expect(h.core.maxActive).toBe(1);
     expect(await h.leaseHolder()).toBeUndefined();
   });
+});
+
+// HOTFIX-045-TOUCHID: the owner's 0.4.4 case on the second Mac. The owner was set up before 0.3.0,
+// so this computer had no `owner-passkey` item (Touch ID was switched on only on the other Mac); an
+// agent is open and an invite waits. On main the passkey read said only `registered: false` and the
+// accept sheet silently asked for the backup code. Now the read says why and carries the values to
+// switch; the switch (backup code once + one touch, the existing registration) runs from the sheet;
+// then Accept is confirmed with Touch ID: one approval.decide signed by the owner key. Real host,
+// real owner store and central presence gate; only the authenticator is virtual.
+describe('HOTFIX-045-TOUCHID: Accept on a computer without Touch ID set up yet', () => {
+  afterEach(async () => {
+    await world.keychain.delete(OWNER_PASSKEY_ACCOUNT);
+  });
+
+  it('says why, switches once in the flow, then Accept with Touch ID signs (200)', async () => {
+    const h = await harness({ waitingInvite: LINK, sync: () => Promise.resolve() });
+    expect(await world.keychain.get(OWNER_PASSKEY_ACCOUNT)).toBeNull();
+    const info = async (): Promise<Record<string, unknown>> => {
+      const res = await h.passkeyInfo();
+      expect(res.status).toBe(200);
+      return (JSON.parse(res.body) as { passkey: Record<string, unknown> }).passkey;
+    };
+    // 1. The sheet's read: why Touch ID isn't offered, with the values to switch here.
+    const before = await info();
+    expect(before['registered']).toBe(false);
+    expect(before['reason']).toBe('not_set_up_here');
+    expect(before['userId']).toBe(encodeBase64url(world.owner.ownerNostr));
+    // 2. "Switch to Touch ID": the backup code once and one touch (the existing registration).
+    const salt = ownerPrfSalt();
+    const auth = new VirtualPrfAuthenticator();
+    const register = await h.registerPasskey(
+      encodePasskeyRegistration(encodeUtf8(world.code), auth.create(world.owner.ownerNostr, salt)),
+    );
+    expect(register.status).toBe(200);
+    expect(parse(register.body)).toEqual({ status: 'registered' });
+    expect(h.core.applied).toEqual([]);
+    const after = await info();
+    expect(after['registered']).toBe(true);
+    expect(after['credentialId']).toBe(encodeBase64url(auth.credentialId));
+    // 3. Accept with Touch ID: one approval.decide by the owner key.
+    const res = await h.accept(INVITE_ID, encodePasskeyAssertion(auth.get(salt)), {
+      'X-AgentLink-Presence': 'passkey',
+    });
+    expect(res.status).toBe(200);
+    expect(parse(res.body)).toMatchObject({ status: 'pending' });
+    expect(h.core.applied).toHaveLength(1);
+    const decide = h.core.applied[0] as { body: JsonObject; sig: string };
+    expect(decide.body['op']).toBe('approval.decide');
+    expect(ownerSigValid(world.owner, decide.body, decide.sig)).toBe(true);
+  }, 60_000);
 });

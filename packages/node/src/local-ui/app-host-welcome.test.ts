@@ -45,7 +45,7 @@ import {
 import { createKeychainAgent, openRecordedKeyStore } from '../keychain-keystore.js';
 import type { KeychainBackend } from '../keychain.js';
 import { TEST_APP } from '../local-ui-app.fixture.js';
-import { OWNER_ACCOUNT } from '../owner-keystore.js';
+import { OWNER_ACCOUNT, OWNER_PASSKEY_ACCOUNT } from '../owner-keystore.js';
 import { defaultOwnerFiles, encodeSetupRegistration } from '../owner-setup.js';
 import {
   FIRST_AGENT_LABEL,
@@ -990,5 +990,99 @@ describe('U3-g-c: Welcome lists the AI apps before the first agent exists', () =
     const before = welcomeCalls.length;
     await h.get('/api/ui/apps', next);
     expect(welcomeCalls.length).toBe(before);
+  }, 60_000);
+});
+
+// HOTFIX-045-TOUCHID (0.4.4 owner test): with no agent open, `GET /api/owner/passkey` was refused
+// (409 `no_agent`; 503 `needs_setup` without the host) although this computer's owner had Touch ID,
+// so every presence sheet fell back to the backup code. The passkey data comes from the owner store
+// (the `owner-passkey` item), not from an open agent; when Touch ID can't be used the answer says why
+// in a fixed code. Real approval server, real owner store on the test keychain, real first run.
+describe('HOTFIX-045-TOUCHID: Touch ID with no agent open', () => {
+  /** First run (owner + passkey + first agent), then a new host on the same computer, none open. */
+  async function ownerThenNoAgent(dropPasskey = false): Promise<{
+    h: Harness;
+    s: Awaited<ReturnType<Harness['session']>>;
+  }> {
+    const w = world();
+    const first = await harness({ w });
+    const s1 = await first.session();
+    const { finish } = await firstRun(first, s1);
+    expect(finish?.status).toBe(200);
+    expect(w.keychain.items.has(OWNER_ACCOUNT)).toBe(true);
+    expect(w.keychain.items.has(OWNER_PASSKEY_ACCOUNT)).toBe(true);
+    await first.server.close();
+    servers.splice(servers.indexOf(first.server), 1);
+    // An owner set up before 0.3.0 (or Touch ID set up on another Mac): no `owner-passkey` here.
+    if (dropPasskey) w.keychain.items.delete(OWNER_PASSKEY_ACCOUNT);
+    const h = await harness({ w, firstRun: false });
+    const s = await h.session();
+    return { h, s };
+  }
+
+  it('offers the registered passkey (200, registered) instead of refusing', async () => {
+    const { h, s } = await ownerThenNoAgent();
+    const logged = h.w.log.length;
+    const res = await h.get('/api/owner/passkey', s);
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body) as { passkey: Record<string, unknown> };
+    expect(body.passkey['registered']).toBe(true);
+    expect(body.passkey['rpId']).toBe('localhost');
+    expect(typeof body.passkey['credentialId']).toBe('string');
+    expect(typeof body.passkey['prfSalt']).toBe('string');
+    expect(typeof body.passkey['userId']).toBe('string');
+    expect(body.passkey).not.toHaveProperty('reason');
+    // Reading the public passkey data opened no agent.
+    expect(h.w.log.slice(logged)).toEqual([]);
+  }, 60_000);
+
+  it('says why when this computer has no passkey (not_set_up_here), never a silent refusal', async () => {
+    const { h, s } = await ownerThenNoAgent(true);
+    const res = await h.get('/api/owner/passkey', s);
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body) as { passkey: Record<string, unknown> };
+    expect(body.passkey['registered']).toBe(false);
+    expect(body.passkey['reason']).toBe('not_set_up_here');
+    expect(body.passkey).not.toHaveProperty('credentialId');
+  }, 60_000);
+
+  it('with no owner at all it is still owner setup (503 needs_setup), not no_agent', async () => {
+    const h = await harness();
+    const s = await h.session();
+    const res = await h.get('/api/owner/passkey', s);
+    expect(res.status).toBe(503);
+    expect(JSON.parse(res.body)).toEqual({ status: 'needs_setup' });
+  });
+
+  it('with an agent open and no passkey here, the reason comes with the values to switch', async () => {
+    const w = world();
+    const h = await harness({ w });
+    const s = await h.session();
+    const { finish } = await firstRun(h, s);
+    expect(finish?.status).toBe(200);
+    w.keychain.items.delete(OWNER_PASSKEY_ACCOUNT);
+    const res = await h.get('/api/owner/passkey', s);
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body) as { passkey: Record<string, unknown> };
+    expect(body.passkey['registered']).toBe(false);
+    expect(body.passkey['reason']).toBe('not_set_up_here');
+    expect(typeof body.passkey['userId']).toBe('string');
+  }, 60_000);
+
+  it('the guards are unchanged with no agent open (session, CSRF, fetch metadata)', async () => {
+    const { h, s } = await ownerThenNoAgent();
+    expect((await send(h.port, '/api/owner/passkey')).status).toBe(401);
+    const noCsrf = await send(h.port, '/api/owner/passkey', {
+      headers: { Cookie: s.cookie, 'Sec-Fetch-Site': 'same-origin' },
+    });
+    expect(noCsrf.status).toBe(403);
+    const crossSite = await send(h.port, '/api/owner/passkey', {
+      headers: { Cookie: s.cookie, 'X-AgentLink-CSRF': s.csrf, 'Sec-Fetch-Site': 'cross-site' },
+    });
+    expect(crossSite.status).toBe(403);
+    // Registering a passkey still needs an open agent's owner: no switch without one.
+    const register = await h.post('/api/owner/passkey', s, encodeUtf8('1234'));
+    expect(register.status).toBe(409);
+    expect(JSON.parse(register.body)).toEqual(NO_AGENT);
   }, 60_000);
 });

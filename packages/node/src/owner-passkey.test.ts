@@ -791,11 +791,26 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
         rpId: 'localhost',
         userId: encodeBase64url(owner.ownerNostr),
         prfSalt: encodeBase64url(salt),
+        // HOTFIX-045-TOUCHID: why the passkey can't be used, in a fixed code.
+        reason: 'not_set_up_here',
       },
     });
     // Viewing needs the session like every API call.
     const anonymous = await send(h.port, '/api/owner/passkey');
     expect(anonymous.status).toBe(401);
+  });
+
+  it('HOTFIX-045-TOUCHID: says other_owner when the stored passkey is not the open agent owner', async () => {
+    const h = await harness();
+    const auth = new VirtualPrfAuthenticator();
+    expect((await registerVia(h, code, auth.create(owner.ownerNostr, salt))).status).toBe(200);
+    const otherNostr = new Uint8Array(32).fill(7);
+    (h.source as { context: ApprovalServerSource['context'] }).context = () =>
+      Promise.resolve({ agent: agentId, owner: { ...owner, ownerNostr: otherNostr } });
+    const info = JSON.parse((await passkeyInfo(h)).body) as { passkey: Record<string, unknown> };
+    expect(info.passkey['registered']).toBe(false);
+    expect(info.passkey['reason']).toBe('other_owner');
+    expect(info.passkey).not.toHaveProperty('credentialId');
   });
 
   it('registers a PRF passkey and approves with it on that origin', async () => {

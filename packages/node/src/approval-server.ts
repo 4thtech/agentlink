@@ -205,7 +205,12 @@ import {
 } from './pay-confirm.js';
 import { takeReviewedRules } from './local-ui/api/rules.js';
 import { grouped } from './owner-init.js';
-import { KeychainOwnerKeyStore, newOwnerSeed, ownerFingerprintText } from './owner-keystore.js';
+import {
+  KeychainOwnerKeyStore,
+  newOwnerSeed,
+  ownerFingerprintText,
+  ownerItemPresent,
+} from './owner-keystore.js';
 import {
   MAX_SETUP_REGISTRATION_BYTES,
   SETUP_HOLD_MS,
@@ -1753,22 +1758,57 @@ export async function startApprovalServerWith(
     }
   }
 
-  /** GET /api/owner/passkey: the public data the page needs for the WebAuthn ceremony. */
+  /**
+   * GET /api/owner/passkey: the public data the page needs for the WebAuthn ceremony.
+   *
+   * HOTFIX-045-TOUCHID: in the app host with no agent open, the owner store answers (the
+   * `owner-passkey` item's public header), so a presence sheet still offers the passkey; the gate
+   * verifies every assertion against the owner of the operation, as before. When the passkey can't
+   * be used, `reason` says why in a fixed code: `not_set_up_here` (this computer has none: an owner
+   * set up before 0.3.0, or one switched on another computer) or `other_owner` (the stored passkey
+   * belongs to another owner than the open agent's card). Registering stays an open agent's
+   * operation: `userId` (needed to switch) is given only with an owner to bind it to.
+   */
   async function passkeyInfo(res: ServerResponse): Promise<void> {
-    const context = await source.context();
-    if (context === undefined) {
+    // Read once: a switch between two reads must not turn a no-agent answer into a 503.
+    const none = noAgentOpen();
+    const context = none ? undefined : await source.context();
+    if (context === undefined && !none) {
       sendJson(res, 503, { status: 'needs_setup' });
       return;
     }
     const stored = await readOwnerPasskeyHeader(keychainOf());
+    const prfSalt = encodeBase64url(ownerPrfSalt());
+    if (context === undefined) {
+      if (stored !== null) {
+        sendJson(res, 200, {
+          passkey: {
+            registered: true,
+            rpId: PASSKEY_RP_ID,
+            userId: encodeBase64url(stored.ownerNostr),
+            prfSalt,
+            credentialId: encodeBase64url(stored.credentialId),
+          },
+        });
+      } else if (await ownerItemPresent(keychainOf())) {
+        sendJson(res, 200, {
+          passkey: { registered: false, rpId: PASSKEY_RP_ID, prfSalt, reason: 'not_set_up_here' },
+        });
+      } else {
+        sendJson(res, 503, { status: 'needs_setup' });
+      }
+      return;
+    }
     const usable = stored !== null && equalBytes(stored.ownerNostr, context.owner.ownerNostr);
     sendJson(res, 200, {
       passkey: {
         registered: usable,
         rpId: PASSKEY_RP_ID,
         userId: encodeBase64url(context.owner.ownerNostr),
-        prfSalt: encodeBase64url(ownerPrfSalt()),
-        ...(usable ? { credentialId: encodeBase64url(stored.credentialId) } : {}),
+        prfSalt,
+        ...(usable
+          ? { credentialId: encodeBase64url(stored.credentialId) }
+          : { reason: stored === null ? 'not_set_up_here' : 'other_owner' }),
       },
     });
   }
@@ -3745,7 +3785,9 @@ export async function startApprovalServerWith(
     }
     const hold = host === undefined ? undefined : await host.enter();
     try {
-      if (noAgentOpen()) {
+      // HOTFIX-045-TOUCHID: the passkey's public data is the owner's, not an agent's: it answers
+      // with no agent open too (after the same session, fetch-metadata and CSRF gates above).
+      if (noAgentOpen() && !passkeyRoute) {
         noAgent(res);
         return;
       }
