@@ -5633,7 +5633,7 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
   - To be written when planned; full threat note, Fable 5.1 audit.
 
 #### W4-ONE-TOUCH · onboarding: one Touch ID creates an agent and connects its AI app (wave 4, owner decision W5, D-140)
-- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Status:** in review, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/api/{first-run,agents,apps}.ts`, `owner-setup*.ts`, `owner-add-agent*.ts`, `owner-first-*.ts`; `apps/local-ui/src/pages/{welcome,first-run,agents,apps}/**`; `e2e/test/journey/01-*`
 - **Depends on:** the W4-ONE-TOUCH spec PR (#706)
 - **Spec:** D-140; 04 §2.3.1, §2.5, §2.5.1, §2.8 ("Create an agent and connect its AI app with one gesture"); 06 §7; 08 §1; 11 §5.8

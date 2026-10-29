@@ -439,6 +439,22 @@ export async function createKeychainAgent(
   { timeoutMs = KEYCHAIN_CALL_TIMEOUT_MS }: { readonly timeoutMs?: number } = {},
 ): Promise<string> {
   const seed = randomBytes(MASTER_SEED_LENGTH);
+  try {
+    return await storeNewKeychainAgent(keychain, seed, timeoutMs);
+  } finally {
+    wipe(seed);
+  }
+}
+
+/**
+ * The keychain side of createKeychainAgent for a given seed (not modified; the caller wipes it): a
+ * new random store key; both items are written only when neither exists and removed on failure.
+ */
+async function storeNewKeychainAgent(
+  keychain: KeychainBackend,
+  seed: Uint8Array,
+  timeoutMs: number,
+): Promise<string> {
   const storeKey = randomBytes(32);
   try {
     const agentId = deriveAgentId(seed);
@@ -465,7 +481,64 @@ export async function createKeychainAgent(
     }
     return agentId;
   } finally {
-    wipe(seed, storeKey);
+    wipe(storeKey);
+  }
+}
+
+/**
+ * W4-ONE-TOUCH (D-140; 04 §2.8 "Create an agent and connect its AI app with one gesture"; proposed,
+ * owner confirms at merge): a new agent's seed held in this process's memory between `begin` and
+ * `finish`, so the AI app change binds its agentId before the gesture. It is made here (CSPRNG,
+ * 04 §2.1), never leaves this object, is stored at most once (createKeychainAgent's rules) and is
+ * wiped on store, on `wipe` and whenever its holder drops it. Only the agentId is public.
+ */
+export class HeldAgentSeed {
+  #seed: Uint8Array | null;
+  readonly agentId: string;
+
+  private constructor(seed: Uint8Array) {
+    this.#seed = seed;
+    this.agentId = deriveAgentId(seed);
+  }
+
+  /** A fresh random seed (04 §2.1) and its agentId (04 §2.9). */
+  static create(): HeldAgentSeed {
+    return new HeldAgentSeed(randomBytes(MASTER_SEED_LENGTH));
+  }
+
+  /** True until it is stored or wiped. */
+  get held(): boolean {
+    return this.#seed !== null;
+  }
+
+  /**
+   * Stores the seed as a new keychain agent (the seed and a new store key, never over an existing
+   * item) and returns its agentId; the seed is wiped whatever the outcome. A second call rejects.
+   */
+  async store(
+    keychain: KeychainBackend,
+    { timeoutMs = KEYCHAIN_CALL_TIMEOUT_MS }: { readonly timeoutMs?: number } = {},
+  ): Promise<string> {
+    const seed = this.#seed;
+    this.#seed = null;
+    if (seed === null) {
+      throw new NodeKeyStoreError(
+        'identity_exists',
+        'The new agent was already stored or dropped.',
+      );
+    }
+    try {
+      return await storeNewKeychainAgent(keychain, seed, timeoutMs);
+    } finally {
+      wipe(seed);
+    }
+  }
+
+  /** Wipes the seed (idempotent). */
+  wipe(): void {
+    const seed = this.#seed;
+    this.#seed = null;
+    if (seed !== null) wipe(seed);
   }
 }
 

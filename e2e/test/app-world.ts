@@ -157,7 +157,11 @@ export function startServerOf(
         ? options
         : {
             ...options,
-            host: { ...host, firstRun: { home: pc.home, ownerFiles: defaultOwnerFiles(pc.home) } },
+            // W4-ONE-TOUCH: the CLI's first-run desk (`aiApps`) is kept.
+            host: {
+              ...host,
+              firstRun: { ...host.firstRun, home: pc.home, ownerFiles: defaultOwnerFiles(pc.home) },
+            },
           };
     return startApprovalServerWith(
       {

@@ -46,6 +46,7 @@ import {
 import type { FirstAgentCard } from './owner-first-card.js';
 import {
   signFirstParts,
+  type FirstConnectResult,
   type FirstLabelResult,
   type FirstPartsResult,
 } from './owner-first-label.js';
@@ -326,6 +327,8 @@ export type FirstCardOutcome =
       readonly sendFolder?: SendFolderResult;
       /** U3-d: the first label, when the card carried `firstLabel`. */
       readonly label?: FirstLabelResult;
+      /** W4-ONE-TOUCH: the first app.connect, when the card carried `firstConnect`. */
+      readonly connect?: FirstConnectResult;
     }
   /** No verified card naming this owner is stored: the caller rolls the new owner back. */
   | { readonly kind: 'not_signed' }
@@ -371,7 +374,7 @@ export async function signFirstCardWith(
   } catch {
     // Decided below from what core stored, never from the error (whose text is not shown).
   }
-  const { sendFolder, label } = parts;
+  const { sendFolder, label, connect } = parts;
   let stored: Awaited<ReturnType<FirstAgentCard['identity']['get']>>;
   try {
     stored = await first.identity.get();
@@ -384,6 +387,8 @@ export async function signFirstCardWith(
       card: stored.card,
       ...(sendFolder === undefined ? {} : { sendFolder }),
       ...(label === undefined ? {} : { label }),
+      // W4-ONE-TOUCH: a firstConnect that was not reached is not stored.
+      ...(first.firstConnect === undefined ? {} : { connect: connect ?? 'not_stored' }),
     };
   }
   return { kind: 'not_signed' };
