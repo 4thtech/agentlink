@@ -20,6 +20,8 @@ export interface UiAnswer<B = unknown> {
 export interface AgentsListRow {
   readonly name: string;
   readonly label: string;
+  /** A verified `agent.label` exists (U3-d); false for an agent shown under its folder name. */
+  readonly labelled: boolean;
   readonly current: boolean;
   readonly available: boolean;
   readonly removing: boolean;
@@ -60,6 +62,7 @@ export interface AppsListEntry {
 
 const row = (over: Partial<AgentsListRow> & { name: string }): AgentsListRow => ({
   label: over.name,
+  labelled: false,
   current: false,
   available: true,
   removing: false,
@@ -93,6 +96,8 @@ interface AgentCase {
   readonly appsAnswer: UiAnswer<unknown>;
   /** The signal, or null for "no signal" (never "done"). */
   readonly signal: StartHereSignal | null;
+  /** False when the real server cannot give this apps answer (a failure); node skips it. */
+  readonly appsFromServer: boolean;
 }
 
 const agentCase = (
@@ -101,19 +106,36 @@ const agentCase = (
   signal: StartHereSignal,
 ): AgentCase => {
   const d = desk(agents);
-  return { title, desk: d, agentsAnswer: listAnswer(d), appsAnswer: START_HERE_APPS_STUB, signal };
+  return {
+    title,
+    desk: d,
+    agentsAnswer: listAnswer(d),
+    appsAnswer: START_HERE_APPS_STUB,
+    signal,
+    appsFromServer: true,
+  };
 };
 
 /** The agent signal from the real agents read plus the apps stub. */
 export const START_HERE_AGENT_CASES: readonly AgentCase[] = [
   agentCase(
     'a new agent with a label and no AI app: named, not connected',
-    [row({ name: 'work', label: 'Work', current: true })],
+    [row({ name: 'work', label: 'Work', labelled: true, current: true })],
     { named: true, connected: false, appName: null, running: false },
   ),
   agentCase(
     'an unlabeled leftover agent is not named',
     [row({ name: 'default', label: 'default', current: true })],
+    { named: false, connected: false, appName: null, running: false },
+  ),
+  agentCase(
+    'a verified label that equals the folder name still counts as named',
+    [row({ name: 'work', label: 'work', labelled: true, current: true })],
+    { named: true, connected: false, appName: null, running: false },
+  ),
+  agentCase(
+    'a label text that differs from the folder name is not named without a verified label',
+    [row({ name: 'work', label: 'Work', labelled: false, current: true })],
     { named: false, connected: false, appName: null, running: false },
   ),
   agentCase(
@@ -133,11 +155,20 @@ export const START_HERE_AGENT_CASES: readonly AgentCase[] = [
     { named: true, connected: false, appName: null, running: false },
   ),
   {
-    title: 'outside the app host there is no signal, never "done"',
+    title: 'outside the app host the card still works: no one to name, connect from what is read',
     desk: null,
     agentsAnswer: { status: 200, body: { switchable: false, agents: [] } },
     appsAnswer: START_HERE_APPS_STUB,
+    signal: { named: true, connected: false, appName: null, running: false },
+    appsFromServer: true,
+  },
+  {
+    title: 'a failed AI apps read is no signal (the step says it could not check), never "none"',
+    desk: desk([row({ name: 'work', label: 'Work', labelled: true, current: true })]),
+    agentsAnswer: listAnswer(desk([row({ name: 'work', label: 'Work', labelled: true, current: true })])),
+    appsAnswer: { status: 503, body: { error: 'unavailable' } },
     signal: null,
+    appsFromServer: false,
   },
 ];
 
@@ -152,7 +183,7 @@ export const START_HERE_APPS_LIST = {
     generation: 1,
     current: 'work',
     label: 'Work',
-    agents: [row({ name: 'work', label: 'Work', current: true })],
+    agents: [row({ name: 'work', label: 'Work', labelled: true, current: true })],
   },
   connected: {
     apps: {

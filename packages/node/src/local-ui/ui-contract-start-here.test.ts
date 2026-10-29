@@ -57,7 +57,9 @@ describe('contract (server): the real agents and apps reads answer the Start her
     it(sample.title, async () => {
       const ctx = context(sample.desk);
       expect(await answer(START_HERE_AGENTS_PATH, ctx)).toEqual(sample.agentsAnswer);
-      expect(await answer(START_HERE_APPS_PATH, ctx)).toEqual(sample.appsAnswer);
+      if (sample.appsFromServer) {
+        expect(await answer(START_HERE_APPS_PATH, ctx)).toEqual(sample.appsAnswer);
+      }
     });
   }
 
