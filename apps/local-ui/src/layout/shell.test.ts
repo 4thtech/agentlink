@@ -54,7 +54,6 @@ describe('top bar', () => {
     ['/settings/proofs', 'Proofs & credits'],
     ['/settings/passkeys', 'Passkeys'],
     ['/settings/appearance', 'Appearance'],
-    ['/first-run', 'Set up AgentLink'],
   ])('shows the page title for %s', (path, title) => {
     mount(path);
     expect(bar().querySelector('.al-topbar-title')?.textContent).toBe(title);
@@ -193,7 +192,7 @@ describe('navigation', () => {
     mount('/');
     expect(wrap().dataset['active']).toBe('1');
     mount('/settings/rules');
-    expect(wrap().dataset['active']).toBe('7');
+    expect(wrap().dataset['active']).toBe('8');
   });
 
   it('has Appearance in the Settings sub-navigation, which is sticky chrome', () => {

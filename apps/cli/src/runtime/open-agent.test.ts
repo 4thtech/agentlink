@@ -18,7 +18,7 @@ import { createLogger } from '@4thtech-io/log';
 import type { AgentStore, KeyStoreBackendKind, KeychainProbe } from '@4thtech-io/node';
 import { AgentFolderLockError, withAgentFolderExclusive } from '@4thtech-io/node';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { writeAgentConfig } from './agent-dir.js';
+import { recordRevokedEntry, writeAgentConfig } from './agent-dir.js';
 import { RUNTIME_MESSAGES } from './errors.js';
 import { NO_AGENT_MESSAGE, openAgent, type RuntimeDeps } from './open-agent.js';
 
@@ -320,5 +320,54 @@ describe('openAgent holds the shared agent folder lock (U3-c)', () => {
       ),
     );
     expect(code).toBe('agent_open_failed');
+  });
+});
+
+// U3-e GAP A (04 §2.5 step 3, D-58): a retired agent is never opened as usable, by any process
+// (`agentlink mcp`, CLI commands, a leftover AI app entry); only its own removal opens it.
+describe('openAgent refuses a retired agent (U3-e)', () => {
+  it('refuses an agent marked removing in config.json, before any key or store is opened', async () => {
+    const agentId = newAgentId();
+    await writeAgentConfig(home, {
+      v: 1,
+      name: 'work',
+      agentId,
+      keyStore: 'keychain',
+      removing: true,
+    });
+    const { deps, rec } = processDeps(new Disk());
+    const result = await open(deps, 'work');
+    expect(result).toMatchObject({ status: 'needs_setup', reason: 'agent_removing' });
+    if (result.status === 'needs_setup') expect(result.message).not.toContain(agentId);
+    expect(rec.keyStores).toEqual([]);
+    expect(rec.stores).toEqual([]);
+  });
+
+  it('refuses an agent in the owner revoked list even without the mark, and holds no lock', async () => {
+    const { agentId, paths } = await initAgent('work');
+    await recordRevokedEntry(home, agentId, 'any text: damaged or not, it counts');
+    const { deps, rec } = processDeps(new Disk());
+    expect(await open(deps, 'work')).toMatchObject({
+      status: 'needs_setup',
+      reason: 'agent_removing',
+    });
+    expect(rec.keyStores).toEqual([]);
+    expect(await withAgentFolderExclusive(paths.dir, () => 'taken')).toBe('taken');
+  });
+
+  it("the removal's own open (with its folder lock) still opens the retired agent", async () => {
+    const { agentId } = await initAgent('work');
+    await recordRevokedEntry(home, agentId, 'x');
+    const { deps } = processDeps(new Disk());
+    const result = await openAgent({
+      home,
+      deps,
+      clock: () => NOW,
+      logger: silent,
+      agent: 'work',
+      folderLock: () => ({ release: () => undefined }),
+    });
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') await result.agent.close();
   });
 });

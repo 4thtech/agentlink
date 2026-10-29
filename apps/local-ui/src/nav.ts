@@ -1,6 +1,7 @@
 // The sidebar, nine items (D-120, D-133, UI-REFRESH-f): Home, Approvals, Activity, Messages, Contacts, Files, Proofs & credits, Rules and
 // Settings (Backup, Passkeys, Appearance, Advanced in a sub-navigation). Before: the settings pages (d1/screens/local). M1-11b-2: Approvals
 // (`/`) is a page of this app now.
+import { AGENTS_PATH } from './pages/agents/data.js';
 import { PAGE_TITLES } from './strings.js';
 
 export const SETTINGS_LABEL = 'Settings';
@@ -38,6 +39,13 @@ export const NAV_ITEMS: readonly AppNavItem[] = [
     label: PAGE_TITLES.contacts,
     icon: 'users',
     path: '/settings/contacts',
+    routed: true,
+  },
+  {
+    id: 'agents',
+    label: PAGE_TITLES.agents,
+    icon: 'identity-registered',
+    path: AGENTS_PATH,
     routed: true,
   },
   { id: 'files', label: PAGE_TITLES.files, icon: 'folder', path: '/settings/files', routed: true },

@@ -120,6 +120,13 @@ export type {
   AppHostFirstRun,
   AppHostOptions,
 } from './local-ui/app-host.js';
+// U3-e (04 §2.5 "Removing an agent"): the removal seam the CLI implements (the folder lock, the
+// agent opened for its removal, the revoked list). The KeyStore erase API stays inside the package.
+export type {
+  AgentRemovalPort,
+  RemovalAgent,
+  RevokedListEntry,
+} from './local-ui/api/agents-remove.js';
 // U3-c (06 §6): the shared agent folder lock every process holds while an agent is open, and the
 // read-only look at an agent's store for the Agents list (clear columns only, no key).
 export {

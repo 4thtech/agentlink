@@ -5,10 +5,12 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { StorageCredential } from './credential-digest.js';
 import type {
+  AgentKeyEraseRequest,
   DisplayCode,
   EnvelopeKeys,
   ImportAgentOptions,
   ImportedAgentKeys,
+  KeyEraseControl,
   KeyExportControl,
   KeyImportControl,
   KeyStore,
@@ -63,7 +65,8 @@ type DeepKeys<T, D extends number = 6> = [D] extends [never]
 type SecretName =
   `${string}${'seed' | 'Seed' | 'item' | 'Item' | 'privateKey' | 'secretKey' | 'kek'}${string}`;
 
-type ControlSurface = KeyExportControl | KeyImportControl | StorageCredentialControl;
+type ControlSurface =
+  KeyExportControl | KeyImportControl | StorageCredentialControl | KeyEraseControl;
 
 describe('the controls carry no raw seed (M1-9i-b2 acceptance; 04 §2.3.3)', () => {
   it('no parameter or result of any control method names a seed, an item or a secret key', () => {
@@ -104,6 +107,24 @@ describe('the controls carry no raw seed (M1-9i-b2 acceptance; 04 §2.3.3)', () 
     type Owned = keyof KeyStore | keyof OwnerKeyStore | keyof OwnerSession | keyof EnvelopeKeys;
     expectTypeOf<Extract<MethodNames<ControlSurface>, Owned>>().toEqualTypeOf<never>();
     expectTypeOf<'sealRecoveryKit' | 'importAgent' | 'writeCredential'>().not.toExtend<Owned>();
+  });
+});
+
+describe('KeyEraseControl (U3-e; 04 §2.5 "Removing an agent" step 6)', () => {
+  it('has the one method eraseAgentKeys(request): ids and the signed retirement in, nothing out', () => {
+    expectTypeOf<MethodNames<KeyEraseControl>>().toEqualTypeOf<'eraseAgentKeys'>();
+    expectTypeOf<Params<KeyEraseControl, 'eraseAgentKeys'>>().toEqualTypeOf<
+      [AgentKeyEraseRequest]
+    >();
+    expectTypeOf<Result<KeyEraseControl, 'eraseAgentKeys'>>().toEqualTypeOf<void>();
+    expectTypeOf<keyof AgentKeyEraseRequest>().toEqualTypeOf<'agentId' | 'storageIds' | 'revoke'>();
+    expectTypeOf<AgentKeyEraseRequest['storageIds']>().toEqualTypeOf<readonly string[]>();
+    expectTypeOf<Extract<DeepKeys<KeyEraseControl>, SecretName>>().toEqualTypeOf<never>();
+  });
+
+  it('is on no KeyStore, OwnerKeyStore or session (the agent path cannot erase keys)', () => {
+    type Owned = keyof KeyStore | keyof OwnerKeyStore | keyof OwnerSession | keyof EnvelopeKeys;
+    expectTypeOf<'eraseAgentKeys'>().not.toExtend<Owned>();
   });
 });
 

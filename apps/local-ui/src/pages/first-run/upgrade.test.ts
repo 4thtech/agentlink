@@ -59,6 +59,10 @@ function existingOwner(): SetupApi & { calls: string[] } {
   return {
     calls,
     status: () => Promise.resolve({ kind: 'ok', owner: 'set_up' }),
+    labelCheck: () => {
+      calls.push('labelCheck');
+      return Promise.resolve({ kind: 'ok' });
+    },
     begin: () => {
       calls.push('begin');
       return Promise.resolve({ kind: 'owner_exists' });

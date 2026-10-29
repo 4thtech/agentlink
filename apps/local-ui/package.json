@@ -26,6 +26,7 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@4thtech-io/types": "workspace:*",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "axe-core": "4.14.0",

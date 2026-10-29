@@ -5,6 +5,7 @@ import { HOOD_STRINGS, Icon, LiveDot, Switch, type LiveDotState } from '@4thtech
 import type { ReactElement } from 'react';
 import { setPref, usePrefs, type ThemePref } from '../prefs/index.js';
 import { SHELL_STRINGS as S } from '../strings.js';
+import { AgentSwitcher } from './agent-switcher.js';
 import type { ConnectionState } from './index.js';
 
 const CHIP: Readonly<Record<ConnectionState, { state: LiveDotState; label?: string }>> = {
@@ -34,6 +35,7 @@ export function TopBarControls({ connection }: { connection: ConnectionState }):
   const theme = THEME_NAME[prefs.theme];
   return (
     <>
+      <AgentSwitcher />
       <span title={HOOD_STRINGS.tooltip}>
         <Switch
           label={HOOD_STRINGS.title}

@@ -16,7 +16,7 @@
 import { homedir } from 'node:os';
 import { isatty } from 'node:tty';
 import { join } from 'node:path';
-import { unlink } from 'node:fs/promises';
+import { lstat, unlink } from 'node:fs/promises';
 import {
   CryptoInputError,
   KeyStoreError,
@@ -43,6 +43,7 @@ import {
   listAgentFiles,
   readKeystoreFile,
   readPassphraseFile,
+  removeKeystoreFile,
   removeStaleTemps,
   writeKeystoreFile,
   type KeystoreFsOptions,
@@ -294,6 +295,50 @@ export async function importAgentFile(
       wipe(sealed, back ?? undefined);
     }
   });
+}
+
+/**
+ * U3-e (04 §2.5 "Removing an agent" step 6): erases a file-KeyStore agent's keys, which is its one
+ * file `<agentId>.alks` (every item of the agent is inside it) with its temporary files, under the
+ * agent's lock. The name is built here from a checked `agentId`, so `owner.alko`, `owner.alkp` or
+ * another agent's file can never be named. A file already gone is not an error; the call resolves
+ * only when the file is gone. Any failure is the fixed `keystore_erase_failed`.
+ */
+export async function eraseFileAgent(
+  dir: string,
+  agentId: string,
+  fs: KeystoreFsOptions = {},
+): Promise<void> {
+  const failed = (): NodeKeyStoreError =>
+    new NodeKeyStoreError(
+      'keystore_erase_failed',
+      "AgentLink couldn't erase all of this agent's keys. Nothing else was changed. Try again.",
+    );
+  try {
+    assertAgentId(agentId);
+  } catch {
+    throw failed();
+  }
+  const name = agentFile(agentId);
+  if (name === OWNER_FILE || !/^0x[0-9a-f]{40}\.alks$/.test(name)) throw failed();
+  try {
+    // No keystore folder at all: nothing of this agent is left to erase.
+    const missing = await lstat(dir).then(
+      () => false,
+      (error: unknown) => (error as { code?: unknown }).code === 'ENOENT',
+    );
+    if (missing) return;
+    await withAgentLock(dir, agentId, async () => {
+      await removeKeystoreFile(dir, name, fs);
+      const left = await readKeystoreFile(dir, name, fs);
+      if (left !== null) {
+        wipe(left);
+        throw failed();
+      }
+    });
+  } catch {
+    throw failed();
+  }
 }
 
 export interface CreateFileAgentOptions {

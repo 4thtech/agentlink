@@ -53,7 +53,10 @@ const PAGES = [
   { path: '/settings/appearance', title: 'Appearance' },
   { path: '/settings/advanced', title: 'Advanced' },
   { path: '/settings/about', title: 'About' },
-  { path: '/first-run', title: 'Protect your approvals' },
+  {
+    path: '/first-run',
+    title: 'Private messages between AI agents. Only you and your contact can read them.',
+  },
 ] as const;
 
 interface Mode {
