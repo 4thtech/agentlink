@@ -45,6 +45,10 @@
 #                   failed after the publish and `latest` was rolled back), publish-latest finishes them:
 #                   the same health check, then it moves `latest`, then the GitHub Release, smoke-latest
 #                   and the desktop jobs. Same approval click, DEPLOY_FREEZE check and rollback on failure.
+#                   Only on a re-run of the same run (`github.run_attempt` > 1), and only a version whose
+#                   npm tarball is one this run packed (registry dist.integrity = sha512 of a tarball in the
+#                   run's `pack` artifact); anything else fails closed. Use "Re-run failed jobs": a full
+#                   re-run packs again, and a rebuilt tarball that differs fails the check.
 #   smoke-latest    runs the CLI from npm in a job without credentials.
 #   freeze          sets DEPLOY_FREEZE when a publish failed after publishing or smoke-latest failed.
 #   rollback-latest after a failed smoke-latest: moves `latest` back. It needs the `npm-publish`
@@ -697,12 +701,18 @@ jobs:
       # below exactly like a fresh publish: the same health check, then `latest` is moved, then the GitHub
       # Release and the desktop jobs. A version the owner deprecated is never promoted again. Registry
       # reads only; this run waited for the owner's approval click and re-checked DEPLOY_FREEZE above.
+      # Fable audit of #693: only on a re-run of this run (run_attempt > 1), so a later run on another
+      # commit cannot promote a version and point the GitHub Release at the wrong commit; and only when
+      # npm's dist.integrity for the version equals a tarball in this run's `pack` artifact, so a version
+      # published from anywhere else is never promoted. Any mismatch fails the step (no promotion).
       - name: Settle what this run releases (new publish, or a re-run of an already-published version)
         id: release
         shell: bash
         env:
           PUBLISHED: ${{ steps.publish.outputs.published }}
           PUBLISHED_PACKAGES: ${{ steps.publish.outputs.published-packages }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          PACK_ARTIFACT_ID: ${{ needs.pack.outputs.pack-dir-artifact-id }}
         run: |
           set -euo pipefail
           if [ "$PUBLISHED" = "true" ]; then
@@ -717,7 +727,34 @@ jobs:
           name_re='^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$'
           stable_re='^[0-9]+\.[0-9]+\.[0-9]+$'
           resume='[]'
+          [[ "$RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Unexpected run attempt."; exit 1; }
+          rerun=false
+          if [ "$RUN_ATTEMPT" -le 1 ]; then
+            echo "First attempt of this run: nothing already published is finished here (only a re-run of the same run does that)."
+          else
+            # The tarballs this run packed: the `pack` artifact, which the publish step above downloaded to
+            # $RUNNER_TEMP/changeset-pack-<artifact id>-<timestamp>/ (changesets/action publish, pinned).
+            # A version is finished only if npm serves exactly one of them (registry dist.integrity).
+            [[ "$PACK_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Unexpected pack artifact id."; exit 1; }
+            shopt -s nullglob
+            pack_dirs=("$RUNNER_TEMP/changeset-pack-$PACK_ARTIFACT_ID-"*/)
+            shopt -u nullglob
+            if [ "${#pack_dirs[@]}" -ne 1 ]; then
+              echo "::error::Expected one downloaded pack artifact of this run, found ${#pack_dirs[@]}; nothing is finished."
+              exit 1
+            fi
+            built=""
+            while IFS= read -r -d '' tarball; do
+              built+="sha512-$(openssl dgst -sha512 -binary "$tarball" | openssl base64 -A)"$'\n'
+            done < <(find "${pack_dirs[0]}" -type f -name '*.tgz' -print0)
+            if [ -z "$built" ]; then
+              echo "::error::The pack artifact of this run holds no tarball; nothing is finished."
+              exit 1
+            fi
+            rerun=true
+          fi
           while IFS= read -r -d '' manifest; do
+            [ "$rerun" = "true" ] || break
             name="$(jq -r 'select(.private != true) | .name // empty' "$manifest")"
             [ -n "$name" ] || continue
             [[ "$name" =~ $name_re ]] || { echo "::error file=$manifest::Unexpected package name."; exit 1; }
@@ -735,6 +772,11 @@ jobs:
             if [ -n "$deprecated" ]; then
               echo "::notice::$name@$version is deprecated; it is not moved to latest."
               continue
+            fi
+            integrity="$(cd "$RUNNER_TEMP" && npm view "$name@$version" dist.integrity 2> /dev/null || true)"
+            if [ -z "$integrity" ] || ! grep -qxF -- "$integrity" <<< "$built"; then
+              echo "::error::$name@$version on npm is not the package this run built (integrity differs); nothing is moved to latest."
+              exit 1
             fi
             resume="$(jq -c --arg n "$name" --arg v "$version" '. + [{name: $n, version: $v}]' <<< "$resume")"
           done < <(git ls-files -z -- ':(glob)**/package.json')
