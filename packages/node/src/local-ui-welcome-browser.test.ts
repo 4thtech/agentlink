@@ -230,7 +230,11 @@ function noAgentWorld(keychain: KeychainBackend) {
 describe('first run with no agent yet in a real browser (U3-g-b)', () => {
   it('after Touch ID the backup code stays on screen and the next change carries the new generation', async (ctx) => {
     const files = appAssets();
-    if (browser === undefined && process.env['CI'] !== undefined) throw launchError;
+    // Only the Linux `checks` job installs Playwright's Chromium; node-os (macOS, Windows) has none
+    // (CI-WELCOME-BROWSER-OS), so a missing browser fails the test on Linux CI only.
+    if (browser === undefined && process.env['CI'] !== undefined && process.platform === 'linux') {
+      throw launchError;
+    }
     if (browser === undefined || files === undefined) {
       ctx.skip();
       return;
