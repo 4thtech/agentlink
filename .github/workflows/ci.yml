@@ -662,7 +662,7 @@ jobs:
         shell: bash
         run: pnpm exec turbo run build --filter='@4thtech-io/node...'
 
-      # M1-8e, M1-11a, M1-11b-1, M1-PAY-CONFIRM-b: the real-browser tests need Playwright's Chromium,
+      # M1-8e, M1-11a, M1-11b-1, M1-PAY-CONFIRM-b, U3-g-b (CHORE-OSMATRIX-BROWSER-EXCLUDE): the real-browser tests need Playwright's Chromium,
       # which only the `checks` job installs (and there a missing browser fails the test). They are
       # excluded here only.
       - name: Run the @4thtech-io/node tests
