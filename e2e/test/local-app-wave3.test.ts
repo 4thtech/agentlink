@@ -243,6 +243,9 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     };
     const secondSees = await until('the second agent is paired', () => complete(mcpSecond), 60_000);
     const firstSees = await until('the first agent is paired', () => complete(mcpFirst), 60_000);
+    // Each side sees the name the owner typed, not the folder (U3-d-b).
+    expect(secondSees['name']).toBe('Home base');
+    expect(firstSees['name']).toBe('Second agent');
     // Two agents of one owner: the same owner fingerprint on both sides.
     expect(secondSees['ownerFingerprint']).toBe(firstSees['ownerFingerprint']);
 
@@ -364,10 +367,14 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
       },
       60_000,
     );
-    expect(contacts['name']).toBe('default');
+    // Contacts see the name the friend typed, not the folder (U3-d-b).
+    expect(contacts['name']).toBe('Friend agent');
 
     // A message goes both ways.
-    const sent = await inviter.call('agentlink_send', { to: 'default', text: 'Welcome aboard' });
+    const sent = await inviter.call('agentlink_send', {
+      to: 'Friend agent',
+      text: 'Welcome aboard',
+    });
     expect(sent.structured['status']).toBe('ok');
     await until(
       'the friend gets it',
@@ -445,9 +452,9 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
 
     // Switching shows each agent's history.
     await switchTo(page, link, 'second-agent', 'Second agent');
-    expect(await readConversation(page, link, 'default')).toContain(hello);
+    expect(await readConversation(page, link, 'Home base')).toContain(hello);
     await switchTo(page, link, 'default', 'Home base');
-    expect(await readConversation(page, link, 'second-agent')).toContain(answer);
+    expect(await readConversation(page, link, 'Second agent')).toContain(answer);
     await switchTo(page, link, 'work');
     await page.goto(new URL('/settings/messages', link).href);
     await page.getByRole('heading', { name: 'Messages' }).first().waitFor();
