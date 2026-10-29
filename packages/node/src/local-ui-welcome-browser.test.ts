@@ -276,6 +276,11 @@ describe('first run with no agent yet in a real browser (U3-g-b)', () => {
     });
     await page.goto(opened[0] ?? '');
     expect(new URL(page.url()).pathname).toBe('/first-run');
+    // U3-g (b11 §28): Welcome, pick your AI app, then name and protect with one gesture.
+    await page.getByRole('button', { name: 'Get started' }).click();
+    await page.getByRole('heading', { name: 'Which AI app will you use?' }).waitFor();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByRole('heading', { name: 'Set up your agent' }).waitFor();
     await page.getByRole('button', { name: /^Use (Touch ID|Windows Hello|a passkey)$/ }).click();
     await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
     const loadsAfterFinish = loads;

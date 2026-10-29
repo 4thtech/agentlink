@@ -854,6 +854,9 @@ const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
   'GET /api/ui/health',
   'POST /api/ui/first-run/owner/begin',
   'POST /api/ui/first-run/owner/finish',
+  // U3-e: removal leaves no agent open after `undeliverable` ("Remove anyway?") or when none is
+  // left; the remove kind keeps its own gate (owner presence, typed label) and needs no open agent.
+  'POST /api/ui/agents/remove',
 ]);
 
 /** U3-c: the switch body is `{"name":"<32 chars>","generation":<16 digits>}`. */

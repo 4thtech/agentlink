@@ -456,6 +456,8 @@ const SETUP_TIME = new Set([
   `POST ${FINISH}`,
   // The switch kind keeps its own gate (U3-c): it answers `unknown_agent` here, never opens one.
   'POST /api/ui/agents/switch',
+  // U3-e: the remove kind keeps its own gate; it needs no open agent (Remove anyway, 04 §2.5).
+  'POST /api/ui/agents/remove',
 ]);
 
 describe('U3-g-b: ui with no agent at all serves Welcome', () => {
@@ -539,6 +541,14 @@ describe('U3-g-b: agent routes are refused while no agent is open', () => {
     }
     expect(h.w.log).toEqual([]);
     expect(h.events.some((e) => e.kind === 'rejected' && e.reason === 'no_agent')).toBe(true);
+  });
+
+  it('the remove kind is not refused as no_agent (U3-e: Remove anyway runs with none open)', async () => {
+    const h = await harness();
+    const s = await h.session();
+    const res = await h.post('/api/ui/agents/remove', s, encodeUtf8('{}'));
+    expect(JSON.parse(res.body)).not.toEqual(NO_AGENT);
+    expect(h.w.log).toEqual([]);
   });
 
   it('the approval API is refused the same way', async () => {
