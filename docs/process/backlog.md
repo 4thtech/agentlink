@@ -5644,16 +5644,17 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
 - **Acceptance:**
   - RED tests first: one gesture on first run and on New agent (journey gesture counter); a plan cannot be extended, split or replayed; a file changed between begin and finish is refused before signing; `created_not_connected` records the `app.connect` as not applied; the reservation is released on every unused end; full threat note, Fable 5.1 audit.
 
-#### W4-RENAME-REACHES-CONTACTS · agents: contacts keep seeing an agent's old name after a rename (placeholder, owner test of 0.4.4: B10)
-- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
-- **Repo/path:** agentlink · agent card signing and card updates (to be decided)
-- **Depends on:** owner decision W6 (renames reach contacts: yes with signed card updates, or no)
-- **Spec:** 06 §6; 04 §2.5.1
-- **Invariants:** I-1, I-2, I-7
+#### W4-RENAME-REACHES-CONTACTS · agents: renames reach contacts through a signed card update (owner test of 0.4.4: B10; D-141)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus + Fable 5.1 review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/{identity,card-update}.ts` rename path; node `local-ui/api/agents*.ts` label route; contacts store columns; local-ui Contacts/Messages note (C2)
+- **Depends on:** owner decision W6 (decided yes, Decision 43); D-141 (Q1 and Q2 decided, Decision 46); merge order D2 (core/server) before C2 (was-name row)
+- **Spec:** D-141; 04 §2.5.1, §2.6, §3.4.1; 06 §6; 07 §3, §4.3; 08 §1; 11 §5.8
+- **Invariants:** I-1, I-2, I-4, I-7
 - **Scope:**
-  - A contact still shows the agent's old name after the agent was renamed, because the name in the signed card is fixed at creation. If decided yes: sign the card again with the new name, send a signed update to every contact, and show "new name (was old name)" once.
+  - A rename whose label differs from the card's name is a rotation under the same gesture as `agent.label` (card first, then label); the existing `card-update` sender carries it; 3 rotating renames per agent per 24 h; catch-up resend to a contact still using a superseded key; `former_name` columns; "{new} (was {old})" once, with no safety-code or key warning.
+  - Agents renamed before D-141: a one-time "Contacts still see {cardName}" note with "Update contacts" (the same owner gesture); never an automatic re-publish (Decision 46).
 - **Acceptance:**
-  - To be written when planned; spec edits marked "proposed, owner confirms at merge"; full threat note, Fable 5.1 audit.
+  - RED tests first: one gesture renames and rotates; a label equal to the card's name does not rotate; the 4th rename in 24 h is refused before the gesture; the contact applies only the highest epoch whatever the arrival order; the was-note shows once and keeps the last seen name over two renames; a rename while an MCP server runs the agent never sends under the old epoch; the safety code and "Safety code checked" stay after a rename; an upgraded agent with label ≠ card name is not re-published until "Update contacts"; no MCP tool reaches the route; full threat note, Fable 5.1 audit.
 
 #### W4-CONTACTS-BY-PERSON · local app: group contacts by person and fix the wrong "second connection" notice (placeholder, owner test of 0.4.4: B11)
 - **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b

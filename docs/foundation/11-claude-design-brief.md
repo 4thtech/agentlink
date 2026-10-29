@@ -385,6 +385,9 @@ Local app pages that hold several agents and connect AI apps (08 §1; design b11
 | AI app change | "Review change" · "Apply with Touch ID" · "Restart {app} to finish" |
 | Move | "{app} will use {newLabel} instead of {oldLabel}" |
 | Create and connect (D-140; proposed, owner confirms at merge) | "Connect to {app}" (prefilled with the detected app) · "Not now" · "Use Touch ID"; after it: "{label} is ready in {app}. Restart {app} to finish."; if the entry could not be written: "{label} is ready. {app} isn't connected yet." · "Connect" |
+| Rename (D-141; proposed, owner confirms at merge) | "Rename" · "Your contacts will see the new name." · "Rename with Touch ID"; after it: "Renamed. Your contacts will see {label} next time they're online."; over the limit: "You can rename {label} again at {time}." |
+| A contact renamed (D-141; proposed, owner confirms at merge) | "{new} (was {old})", once; with your own name for them: "Now calls itself {new} (was {old})"; Activity: "{old} is now called {new}". Both names follow the name rule (§5.2); the identity label stays as it was. A rename never changes the safety code or "Safety code checked" and shows no "key changed" or compare-again warning (04 §2.6); a name that now collides with another contact's shows the owner fingerprint, as today |
+| Renamed before D-141 (D-141; proposed, owner confirms at merge) | "Contacts still see {cardName}" · "Update contacts" |
 | Claude Desktop open | "Quit Claude Desktop first" |
 | Switcher | "Add agent" · "Manage agents"; on an approval page opened by an AI app: "Open the AgentLink app to switch" |
 | Agent in use | "Quit the AI app that uses {label} first." |
