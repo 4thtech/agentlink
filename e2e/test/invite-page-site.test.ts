@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { INSTALL_AND_ACCEPT_TEMPLATE } from '@4thtech-io/invite';
+import { INSTALL_AND_ACCEPT_TEMPLATE, NODE_DOWNLOAD_URL } from '@4thtech-io/invite';
 import { CSP, headersFor } from './invite/headers.js';
 
 const site = (path: string): string =>
@@ -61,8 +61,20 @@ describe('the pages', () => {
         expect(html).not.toMatch(/\sstyle\s*=/i);
         expect(html).not.toMatch(/\son[a-z]+\s*=/i);
         expect(html).not.toMatch(/javascript:/i);
-        expect(html).not.toMatch(/https?:\/\//i);
-        expect(html).not.toMatch(/<(iframe|object|embed|form|img|link|base)\b/i);
+        // U3-invite: the one outside URL is the fixed Node.js download link (08 §4), a plain
+        // navigation in a new tab with no opener and no referrer; it carries nothing.
+        expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([
+          NODE_DOWNLOAD_URL,
+        ]);
+        const anchors = [...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0]);
+        expect(anchors).toHaveLength(1);
+        expect(anchors[0]).toMatch(/\bhref="https:\/\/nodejs\.org\/en\/download"/);
+        expect(anchors[0]).toMatch(/\btarget="_blank"/);
+        expect(anchors[0]).toMatch(/\brel="noopener noreferrer"/);
+        // One first-party style file (CSP style-src 'self').
+        const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((m) => m[0]);
+        expect(links).toEqual(['<link rel="stylesheet" href="/invite.css" />']);
+        expect(html).not.toMatch(/<(iframe|object|embed|form|img|base)\b/i);
       });
 
       it('has no analytics and no tracking', () => {
@@ -73,35 +85,41 @@ describe('the pages', () => {
         expect(html).toMatch(/<meta name="referrer" content="no-referrer"\s*\/?>/);
       });
 
-      it('has the elements the script fills, and the prompt section apart from the inviter', () => {
+      it('has the elements the script fills, and the step section apart from the inviter', () => {
         for (const id of [
           'state',
           'inviter',
+          'invite-heading',
           'inviter-name',
           'inviter-label',
           'inviter-fingerprint',
           'inviter-expiry',
           'inviter-host',
-          'prompt',
-          'prompt-heading',
-          'prompt-text',
+          'step',
+          'step-heading',
+          'tab-command',
+          'tab-ai',
+          'step-text',
           'copy',
+          'next',
         ]) {
           expect(html, id).toMatch(new RegExp(`id="${id}"`));
         }
         const inviter = /<section id="inviter"[\s\S]*?<\/section>/.exec(html)?.[0] ?? '';
-        const prompt = /<section id="prompt"[\s\S]*?<\/section>/.exec(html)?.[0] ?? '';
+        const step = /<section id="step"[\s\S]*?<\/section>/.exec(html)?.[0] ?? '';
         expect(inviter).not.toBe('');
-        expect(prompt).not.toBe('');
-        expect(inviter).not.toContain('prompt-text');
-        expect(prompt).not.toContain('inviter-');
+        expect(step).not.toBe('');
+        expect(inviter).not.toContain('step-text');
+        expect(step).not.toContain('inviter-');
+        expect(step).not.toContain('id="next"');
         // Sections are siblings, never nested.
-        expect(html.indexOf(prompt)).toBeGreaterThan(html.indexOf(inviter) + inviter.length - 1);
+        expect(html.indexOf(step)).toBeGreaterThan(html.indexOf(inviter) + inviter.length - 1);
       });
 
       it('starts with the invite parts hidden', () => {
         expect(html).toMatch(/<section id="inviter" hidden/);
-        expect(html).toMatch(/<section id="prompt" hidden/);
+        expect(html).toMatch(/<section id="step" hidden/);
+        expect(html).toMatch(/<p id="next"[^>]* hidden/);
       });
     });
   }
@@ -115,7 +133,7 @@ describe('the pages', () => {
       .map(String)
       .filter((f) => statSync(site(f)).isFile())
       .sort();
-    expect(files).toEqual(['_headers', 'i/index.html', 'index.html']);
+    expect(files).toEqual(['_headers', 'i/index.html', 'index.html', 'invite.css']);
     expect(existsSync(site('invite.js'))).toBe(false); // built, never committed
   });
 });

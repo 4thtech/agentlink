@@ -183,6 +183,11 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/apps/apply',
       '/api/ui/apps/disconnect',
       '/api/ui/flow',
+      // U3-invite: the join screen and the handoff kind (local-ui/join-server.test.ts).
+      '/api/ui/join',
+      '/api/ui/join/accept',
+      '/api/ui/join/dismiss',
+      '/api/ui/join/handoff',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
@@ -330,7 +335,12 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
     const routes = createLocalUiRoutes().routes();
     expect(
       routes.filter((r) => r.presence === 'invite').map((r) => `${r.method} ${r.path}`),
-    ).toEqual([`POST ${INVITE_CREATE_PATH}`, `POST ${INVITE_CHECK_PATH}`]);
+      // U3-invite: "Not now" on the join screen is the invite kind too (no presence, signs nothing).
+    ).toEqual([
+      `POST ${INVITE_CREATE_PATH}`,
+      `POST ${INVITE_CHECK_PATH}`,
+      'POST /api/ui/join/dismiss',
+    ]);
     expect(routes.find((r) => r.path === INVITE_ACCEPT_PATH)).toMatchObject({
       method: 'POST',
       presence: true,
@@ -507,5 +517,63 @@ describe('the remove route kind (U3-e, I-4)', () => {
     registry.register(route({}));
     expect(() => registry.register(route({}))).toThrow(/remove/);
     expect(registry.routes()).toHaveLength(1);
+  });
+});
+
+// U3-invite (08 §4): the handoff is the eighth named kind: only POST, only at its fixed path, no
+// handler, once. The join screen's accept is an ordinary presence route; "Not now" the invite kind.
+describe('the handoff route kind and the join routes (U3-invite, I-4)', () => {
+  const HANDOFF = '/api/ui/join/handoff';
+  const route = (over: Record<string, unknown>): LocalUiRoute =>
+    ({ method: 'POST', path: HANDOFF, presence: 'handoff', ...over }) as unknown as LocalUiRoute;
+
+  it('the default registry has one handoff route with no handler; accept needs presence', () => {
+    const routes = createLocalUiRoutes().routes();
+    const handoffs = routes.filter((r) => r.presence === 'handoff');
+    expect(handoffs.map((r) => `${r.method} ${r.path}`)).toEqual([`POST ${HANDOFF}`]);
+    expect('handler' in (handoffs[0] as object)).toBe(false);
+    expect(routes.find((r) => r.path === '/api/ui/join/accept')).toMatchObject({
+      method: 'POST',
+      presence: true,
+    });
+    expect(routes.find((r) => r.path === '/api/ui/join')).toMatchObject({
+      method: 'GET',
+      presence: false,
+    });
+    expect(routes.find((r) => r.path === '/api/ui/join/dismiss')).toMatchObject({
+      presence: 'invite',
+      step: 'dismiss',
+    });
+  });
+
+  it('no other path, method, handler or second route can use the handoff kind', () => {
+    for (const path of ['/api/ui/join', '/api/ui/join/accept', `${HANDOFF}/x`, '/api/ui/invites']) {
+      expect(() => new LocalUiRouteRegistry().register(route({ path })), path).toThrow(/handoff/);
+    }
+    for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) {
+      expect(() => new LocalUiRouteRegistry().register(route({ method })), method).toThrow(
+        /handoff/,
+      );
+    }
+    expect(() =>
+      new LocalUiRouteRegistry().register(route({ handler: () => Promise.resolve() })),
+    ).toThrow(/handler/);
+    const registry = new LocalUiRouteRegistry();
+    registry.register(route({}));
+    expect(() => registry.register(route({}))).toThrow(/handoff/);
+    expect(registry.routes()).toHaveLength(1);
+  });
+
+  it('the dismiss step is only at its fixed path', () => {
+    const answer = () => Promise.resolve({ status: 200, body: {} });
+    expect(() =>
+      new LocalUiRouteRegistry().register({
+        method: 'POST',
+        path: '/api/ui/invites',
+        presence: 'invite',
+        step: 'dismiss',
+        handler: answer,
+      } as never),
+    ).toThrow(/invite/);
   });
 });

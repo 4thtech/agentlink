@@ -50,6 +50,8 @@ describe('--help (06 §8)', () => {
       'status',
       'invite',
       'accept',
+      // U3-invite (06 §8): the invite page's one command.
+      'join',
       'contacts',
       'requests',
       'policy',
@@ -106,7 +108,9 @@ describe('--help (06 §8)', () => {
     const commandLines = help.split('\n').filter((line) => line.startsWith('  agentlink '));
     // M1-9m: `policy` show, allow-folder, remove-folder; M1-9m-b: recover; M1-9h: credits and
     // verify; M1-29: init --hook. M1-36c: `contacts --verify` and `policy set` are not listed. M1-36b-2-c: policy allow-send-folder.
-    expect(commandLines).toHaveLength(26);
+    // U3-invite: `agentlink join '<invite link>'`.
+    expect(help).toContain("agentlink join '<invite link>'");
+    expect(commandLines).toHaveLength(27);
   });
 
   it('prints help for --help, -h and help', async () => {

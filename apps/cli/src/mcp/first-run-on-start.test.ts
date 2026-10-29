@@ -56,6 +56,7 @@ function fakeServer(opens: boolean | 'throws' = true): FakeServer {
       return Promise.resolve(opens);
     },
     openHome: () => Promise.resolve(true),
+    openJoin: () => Promise.resolve(true),
     notifyNewApproval: (id) => Promise.resolve(`${ORIGIN}/approve/${id}`),
     close: () => Promise.resolve(),
   };
