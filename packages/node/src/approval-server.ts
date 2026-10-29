@@ -156,6 +156,7 @@ import {
   KeyStoreError,
   canonicalizeToBytes,
   decodeBase64url,
+  decodeHex,
   decodeUtf8,
   encodeBase64url,
   encodeHex,
@@ -1878,6 +1879,13 @@ export async function startApprovalServerWith(
     gate: {
       readonly context?: () => Promise<ApprovalContext | undefined>;
       readonly carriers?: true;
+      /**
+       * HOTFIX-045-REMOVE (GAP B only): the owner is known only by this 32-byte Nostr key, from a
+       * verified revoked-list entry, because no agent card can be read. No context is read; the
+       * stored owner is unlocked by that key (KeychainOwnerKeyStore.unlockForOwnerNostr), with the
+       * same presence, and its other keys come from the unlocked seed.
+       */
+      readonly ownerNostr?: Uint8Array;
     } = {},
   ): Promise<void> {
     const wait = waitSeconds();
@@ -1920,8 +1928,11 @@ export async function startApprovalServerWith(
       }
       busy = true;
       try {
-        const context = await (gate.context ?? (() => source.context()))();
-        if (context === undefined) {
+        const byNostr = gate.ownerNostr;
+        const context =
+          byNostr === undefined ? await (gate.context ?? (() => source.context()))() : undefined;
+        const expectedNostr = byNostr ?? context?.owner.ownerNostr;
+        if (expectedNostr === undefined) {
           finishOwner(res, 503, 'needs_setup');
           return;
         }
@@ -1930,7 +1941,7 @@ export async function startApprovalServerWith(
           try {
             const stored = await readOwnerPasskeyHeader(keychainOf());
             if (stored === null) throw new KeyStoreError('presence_rejected', 'presence');
-            assertPasskeyAssertion(stored, context.owner, assertion);
+            assertPasskeyAssertion(stored, { ownerNostr: expectedNostr }, assertion);
           } catch {
             presenceFailed();
             finishOwner(res, 403, 'presence_rejected');
@@ -1940,18 +1951,42 @@ export async function startApprovalServerWith(
         } else {
           presence = { kind: 'passphrase', secret: body };
         }
-        let store: PromptingOwnerKeyStore;
-        try {
-          store = await openOwnerStore(context.owner);
-        } catch {
-          finishOwner(res, 503, 'needs_setup');
-          return;
-        }
-        try {
-          let session: OwnerSession;
+        let store: { lock(): Promise<void>; close(): Promise<void> };
+        let session: OwnerSession;
+        let ownerKeys: OwnerPublicKeys;
+        if (context === undefined) {
+          // HOTFIX-045-REMOVE (GAP B): no card; the stored owner must be the one `byNostr` names.
+          try {
+            // unlockForOwnerNostr wipes the presented bytes, whether or not they unlock.
+            const unlocked = await KeychainOwnerKeyStore.unlockForOwnerNostr(
+              keychainOf(),
+              expectedNostr,
+              presence,
+              { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
+            );
+            ({ store, session, owner: ownerKeys } = unlocked);
+          } catch (error) {
+            if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+              presenceFailed();
+              finishOwner(res, 403, 'presence_rejected');
+            } else if (error instanceof NodeKeyStoreError && error.code === 'owner_missing') {
+              finishOwner(res, 503, 'needs_setup');
+            } else {
+              finishOwner(res, 500, 'failed');
+            }
+            return;
+          }
+        } else {
+          let opened: PromptingOwnerKeyStore;
+          try {
+            opened = await openOwnerStore(context.owner);
+          } catch {
+            finishOwner(res, 503, 'needs_setup');
+            return;
+          }
           try {
             // unlock wipes the presented bytes, whether or not they unlock.
-            session = await store.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
+            session = await opened.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
           } catch (error) {
             if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
               presenceFailed();
@@ -1959,8 +1994,14 @@ export async function startApprovalServerWith(
             } else {
               finishOwner(res, 500, 'failed');
             }
+            await opened.lock().catch(() => undefined);
+            await opened.close().catch(() => undefined);
             return;
           }
+          store = opened;
+          ownerKeys = context.owner;
+        }
+        try {
           presenceSucceeded();
           let used = false;
           // U3-e: open only between this gesture's signed `agent.revoke` and the end of `run`.
@@ -2003,8 +2044,9 @@ export async function startApprovalServerWith(
               },
               // U3-d (04 §2.8 "From the local app"): Add an agent, in the app host only. The same
               // one owner operation: exactly the new agent's first card, first policy and first
-              // label, for that agent only (signNewAgent); never `sign` as well.
-              ...(host === undefined
+              // label, for that agent only (signNewAgent); never `sign` as well. Never on the
+              // HOTFIX-045-REMOVE path (no card): only the removal's own revoke is signed there.
+              ...(host === undefined || byNostr !== undefined
                 ? {}
                 : {
                     addAgent: async (review: OwnerReview, agent: LocalUiNewAgent) => {
@@ -2026,7 +2068,7 @@ export async function startApprovalServerWith(
                       }
                       for (const line of review.lines) assertPrintable(line, 'A review line');
                       if (!stillCurrent(req)) throw new AgentChanged();
-                      return signNewAgent(session, context.owner, agent.first, agent.plan);
+                      return signNewAgent(session, ownerKeys, agent.first, agent.plan);
                     },
                   }),
             });
@@ -4071,10 +4113,6 @@ export async function startApprovalServerWith(
           ? { backend: 'keychain', keychain: keychainOf() }
           : { backend: 'file', keystoreDir: keys.keystoreDir },
       );
-      // GAP B: the owner context of the agent the app has open (the same owner), read before it may
-      // be closed; used only to finish a retired agent whose store no longer opens.
-      const openSource = source;
-      const openContext = (): Promise<ApprovalContext | undefined> => openSource.context();
       // (1) The app's own shared lock goes first, then the lock is taken exclusive.
       const closed = await slot.closeForRemoval(input.name);
       wasOpen = closed.closed;
@@ -4090,18 +4128,15 @@ export async function startApprovalServerWith(
             recorded?.kind === 'entry'
               ? verifyRevokedEntry(recorded.text, keys.agentId)
               : undefined;
-          // The owner of the gesture: the agent that is open now (the same owner) signed that entry.
-          const context = await openContext().catch(() => undefined);
-          if (
-            recorded?.kind !== 'entry' ||
-            checked?.ok !== true ||
-            context === undefined ||
-            encodeHex(context.owner.ownerNostr) !== checked.owner
-          ) {
+          if (recorded?.kind !== 'entry' || checked?.ok !== true) {
             finishRemove('failed');
             return;
           }
           const text = recorded.text;
+          // HOTFIX-045-REMOVE (B2): the owner of the gesture is the owner who signed that entry,
+          // checked against the owner stored on this computer when presence unlocks it
+          // (KeychainOwnerKeyStore.unlockForOwnerNostr). It never depends on an agent being open:
+          // after the first failure on a one-agent computer, none is.
           const ownerNostr = checked.owner;
           await ownerGate(
             req,
@@ -4130,7 +4165,7 @@ export async function startApprovalServerWith(
                 throw error;
               }
             },
-            { context: () => Promise.resolve(context) },
+            { ownerNostr: decodeHex(ownerNostr) },
           );
           return;
         }

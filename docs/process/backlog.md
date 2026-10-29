@@ -5442,7 +5442,7 @@ After the owner tested 0.4.4 on two Macs (29 Oct), the basics that did not work 
   - A failing queue run is cited; the OS-matrix job is green on all operating systems; the browser tests still run in the Linux job; no required check is removed or loosened; Tali's "merge".
 
 #### HOTFIX-045-REMOVE · local app: Remove agent never finishes, and Try again fails on a one-agent Mac (new, 0.4.5, owner test of 0.4.4: B1 and B2)
-- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#698) · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/runtime/agent-folder-lock.ts`, `apps/cli/src/runtime/agent-dir.ts` (folder removal, retry path), tests
 - **Depends on:** U3-e (shipped in 0.4.4)
 - **Spec:** USABILITY-WAVE-3 §7.2; 04 §2.5, §2.5.1 (as amended by U3-spec-04); 07 §9.1
