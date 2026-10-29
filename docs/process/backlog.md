@@ -5585,7 +5585,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Ticks from reads only (never from local assumptions); screenshot review at 1440 and 360, light and dark; a11y; independent review.
 
 #### U3-map · live map on the Agents page, on the shared pulse module (new, USABILITY-WAVE-3, owner decision 2026-10-29)
-- **Status:** backlog · **Size:** L · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 3
+- **Status:** in review · **Size:** L · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 3
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/agents/map/` (new, plugs into U3-h's List and Map control), `apps/local-ui/src/pages/pulse/`
 - **Depends on:** U3-brief §32, U3-flow, U3-h; UX2-pulse-shared (this card builds it if not yet built)
 - **Spec:** USABILITY-WAVE-3 §4.1; b11 §24, §32

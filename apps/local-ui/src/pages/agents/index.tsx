@@ -13,6 +13,7 @@ import {
   type ComponentType,
   type ReactElement,
 } from 'react';
+import { lazyPart } from '../../lazy/index.js';
 import { navigate } from '../../router.js';
 import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import { AppMark } from './app-mark.js';
@@ -26,8 +27,16 @@ import { markAgentsOpened } from './tidy.js';
 import './agents.css';
 
 /** The Map view (card U3-map). It is given the same rows as the list and renders them its own way. */
-export type AgentsMapView = ComponentType<{ readonly agents: readonly AgentRow[] }>;
-let mapView: AgentsMapView | undefined;
+export type AgentsMapView = ComponentType<{
+  readonly agents: readonly AgentRow[];
+  /** "+N more agents" shows the List. */
+  readonly onShowList?: () => void;
+  /** Another agent's box: switch to it. */
+  readonly onSwitch?: (row: AgentRow) => void;
+}>;
+// The map is fetched on first use (b11 §32.4: lazy-loaded), never with the list.
+const lazyMap = lazyPart(async () => (await import('./map/index.js')).AgentsMap);
+let mapView: AgentsMapView | undefined = lazyMap.Part;
 export function setAgentsMapView(view: AgentsMapView | undefined): void {
   mapView = view;
 }
@@ -253,7 +262,7 @@ export function AgentsPage({
           MapView === undefined ? (
             <p className="al-text-body al-muted">{S.mapSoon}</p>
           ) : (
-            <MapView agents={rows} />
+            <MapView agents={rows} onShowList={() => setView('list')} onSwitch={doSwitch} />
           )
         ) : state.kind === 'loading' && list === undefined ? (
           <Skeleton loading lines={3}>

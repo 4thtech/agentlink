@@ -1,0 +1,373 @@
+/* Live connections (U3-map, b11 §32). Design tokens only, no inline styles (CSP). Fixed two-column
+   layout, no physics. Motion is stroke-dashoffset and transform only, never loops except a file in
+   progress, and is off under reduced motion (a static arrowhead and the word "now" show instead).
+   Streams use the success colour and no orange. At 600 px and under there are no lines: each agent
+   is a card, its contacts are 44 px rows, and the stream is a 2 px segment at the row's left edge. */
+.mp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.mp h2,
+.mp p,
+.mp ul {
+  margin: 0;
+}
+.mp-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+.mp-announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.mp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.mp-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--al-color-fg-default);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.mp-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  max-height: 640px;
+  overflow: auto;
+}
+.mp-dim {
+  opacity: 0.6;
+}
+.mp-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px minmax(0, 1fr);
+  grid-template-rows: 72px auto;
+  grid-template-areas:
+    'cur lines con'
+    'oth lines con';
+  column-gap: 0;
+  row-gap: 12px;
+}
+.mp-cur {
+  grid-area: cur;
+  list-style: none;
+  padding: 0;
+}
+.mp-others {
+  grid-area: oth;
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-self: start;
+}
+.mp-lines {
+  grid-area: lines;
+  align-self: start;
+  overflow: visible;
+}
+.mp-contacts {
+  grid-area: con;
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-self: start;
+}
+.mp-empty {
+  display: block;
+}
+.mp-agent,
+.mp-contact,
+.mp-more-btn {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  font: inherit;
+  color: var(--al-color-fg-default);
+  background: var(--al-color-bg-surface);
+  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  cursor: pointer;
+}
+.mp-agent {
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--al-space-1);
+  height: 72px;
+  padding: 0 var(--al-space-4);
+  border-radius: var(--al-radius-lg);
+  overflow: hidden;
+}
+.mp-agent-open {
+  border-color: var(--al-color-border-strong);
+}
+.mp-agent-head {
+  display: flex;
+  gap: var(--al-space-3);
+  align-items: center;
+  min-width: 0;
+}
+.mp-agent-label,
+.mp-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-agent-sub {
+  display: flex;
+  gap: var(--al-space-2);
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.mp-agent-hint {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp-contact,
+.mp-more-btn {
+  position: relative;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--al-space-3);
+  height: 44px;
+  padding: 0 var(--al-space-4);
+  border-radius: var(--al-radius-md);
+  overflow: hidden;
+}
+.mp-more-btn {
+  justify-content: flex-start;
+}
+.mp-agent:hover,
+.mp-contact:hover,
+.mp-more-btn:hover {
+  background: var(--al-color-bg-sunken);
+}
+.mp-agent:focus-visible,
+.mp-contact:focus-visible,
+.mp-more-btn:focus-visible {
+  outline: 2px solid var(--al-color-border-strong);
+  outline-offset: 2px;
+}
+.mp-word {
+  display: inline-flex;
+  gap: var(--al-space-2);
+  align-items: center;
+  white-space: nowrap;
+}
+.mp-moving .mp-word {
+  color: var(--al-color-fg-default);
+}
+.mp-file {
+  display: none;
+}
+/* The moving-row mark: a short dash, the same shape as the stream. */
+.mp-mark {
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--al-color-status-success-icon);
+}
+.mp-bar {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: var(--al-color-border-subtle);
+}
+.mp-note {
+  margin: 0;
+}
+
+/* The picture. */
+.mp-line {
+  fill: none;
+  stroke: var(--al-color-fg-muted);
+  stroke-linecap: round;
+}
+.mp-w1 {
+  stroke-width: 1px;
+}
+.mp-w2 {
+  stroke-width: 2px;
+}
+.mp-w3 {
+  stroke-width: 3px;
+}
+/* Solid when both ways; dashed when one way (shape, not colour); plain when the way is not known. */
+.mp-out,
+.mp-in {
+  stroke-dasharray: 6 4;
+}
+.mp-live {
+  stroke: var(--al-color-status-success-icon);
+}
+.mp-head {
+  fill: var(--al-color-fg-muted);
+}
+.mp-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14px;
+  cursor: pointer;
+  pointer-events: stroke;
+}
+.mp-stream {
+  fill: none;
+  stroke: var(--al-color-status-success-icon);
+  stroke-width: 3px;
+  stroke-linecap: round;
+  stroke-dasharray: 12 100;
+  stroke-dashoffset: 6;
+  pointer-events: none;
+}
+.mp-stream-run {
+  stroke-dashoffset: 12;
+  animation: mp-travel 1.2s var(--al-ease-standard, ease-out) 1 forwards;
+}
+@keyframes mp-travel {
+  from {
+    stroke-dashoffset: 12;
+  }
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+.mp-now-line {
+  fill: var(--al-color-fg-default);
+  font-size: 11px;
+}
+
+/* A file in progress: an indeterminate bar (the store keeps no byte counts, so no percentage). */
+.mp-moving .mp-file {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 100%;
+  gap: 2px;
+}
+
+/* 360: no lines, one column, 44 px rows, a 2 px moving segment at the row's left edge. */
+@media (max-width: 600px) {
+  .mp-canvas {
+    padding: var(--al-space-4) 16px;
+    max-height: none;
+  }
+  .mp-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas: 'cur' 'con' 'oth';
+  }
+  .mp-lines {
+    display: none;
+  }
+  .mp-moving::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2px;
+    height: 12px;
+    background: var(--al-color-status-success-icon);
+  }
+  .mp-streaming::before {
+    animation: mp-edge 1.2s var(--al-ease-standard, ease-out) 1 forwards;
+  }
+}
+@keyframes mp-edge {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(32px);
+  }
+}
+
+/* Reduced motion: nothing travels; the arrowhead, the colour and the word "now" stay. */
+@media (prefers-reduced-motion: reduce) {
+  .mp-stream-run,
+  .mp-streaming::before {
+    animation: none;
+  }
+  .mp-stream {
+    display: none;
+  }
+}
+:root[data-motion='reduced'] .mp-stream-run,
+:root[data-motion='reduced'] .mp-streaming::before {
+  animation: none;
+}
+:root[data-motion='reduced'] .mp-stream {
+  display: none;
+}
+
+/* Reduced transparency: solid surfaces. */
+@media (prefers-reduced-transparency: reduce) {
+  .mp-canvas,
+  .mp-agent,
+  .mp-contact,
+  .mp-more-btn {
+    background: var(--al-color-bg-surface);
+    opacity: 1;
+  }
+}
+/* Increased contrast: lines one pixel heavier, box edges strong. */
+@media (prefers-contrast: more) {
+  .mp-w1 {
+    stroke-width: 2px;
+  }
+  .mp-w2 {
+    stroke-width: 3px;
+  }
+  .mp-w3 {
+    stroke-width: 4px;
+  }
+  .mp-agent,
+  .mp-contact,
+  .mp-more-btn {
+    border-color: var(--al-color-border-strong);
+  }
+}
+@media (forced-colors: active) {
+  .mp-line,
+  .mp-head {
+    stroke: CanvasText;
+    fill: none;
+  }
+  .mp-head {
+    fill: CanvasText;
+  }
+  .mp-stream,
+  .mp-live {
+    stroke: Highlight;
+  }
+  .mp-mark {
+    background: Highlight;
+  }
+}

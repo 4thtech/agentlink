@@ -5,12 +5,7 @@
 // (apps/local-ui/src/pages/agents/map/contract.test.ts) reads the same samples, so neither side can
 // drift alone. Nothing but the allowlisted metadata may leave: the world's hostile `text` field must
 // not appear.
-import {
-  FLOW_NOW,
-  FLOW_PATH,
-  FLOW_REQUESTS,
-  FLOW_WORLD,
-} from '@4thtech-io/types/ui-contract/flow';
+import { FLOW_NOW, FLOW_PATH, FLOW_REQUESTS, FLOW_WORLD } from '@4thtech-io/types/ui-contract/flow';
 import { describe, expect, it, vi } from 'vitest';
 import type { LocalUiContext, LocalUiReadClient } from './context.js';
 import type { LocalUiReadRoute, LocalUiResult } from './route-types.js';

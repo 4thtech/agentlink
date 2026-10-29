@@ -158,9 +158,11 @@ describe('the map: boxes and words', () => {
   });
 
   it('no content and no hover preview: no title attribute, no tooltip', async () => {
-    setWorld(1, [[1, 5, 'active_now']], [
-      { contactId: ref(1), direction: 'in', kind: 'message', state: 'received', at: NOW - 1 },
-    ]);
+    setWorld(
+      1,
+      [[1, 5, 'active_now']],
+      [{ contactId: ref(1), direction: 'in', kind: 'message', state: 'received', at: NOW - 1 }],
+    );
     await mount();
     expect(host.querySelector('[title]')).toBeNull();
     expect(host.querySelector('[role="tooltip"]')).toBeNull();
@@ -169,7 +171,10 @@ describe('the map: boxes and words', () => {
 
 describe('the map: scale', () => {
   it('top 12 contacts and "+N more"', async () => {
-    setWorld(15, Array.from({ length: 15 }, (_, i) => [i + 1, 3, 'today'] as [number, number, string]));
+    setWorld(
+      15,
+      Array.from({ length: 15 }, (_, i) => [i + 1, 3, 'today'] as [number, number, string]),
+    );
     await mount();
     expect(text()).toContain('+4 more');
     expect(host.querySelectorAll('.mp-contact').length).toBe(12);
@@ -179,7 +184,9 @@ describe('the map: scale', () => {
     setWorld(0, []);
     const many = [
       AGENTS[0] as AgentRow,
-      ...Array.from({ length: 9 }, (_, i) => agent(`x${String(i)}`, { label: `Agent ${String(i)}` })),
+      ...Array.from({ length: 9 }, (_, i) =>
+        agent(`x${String(i)}`, { label: `Agent ${String(i)}` }),
+      ),
     ];
     const onShowList = vi.fn();
     await mount({ onShowList }, many);
@@ -229,7 +236,14 @@ describe('the map: streams', () => {
   ];
 
   it('a stream runs only for the last minute, with words and direction', async () => {
-    setWorld(2, [[1, 5, 'active_now'], [2, 4, 'active_now']], flow);
+    setWorld(
+      2,
+      [
+        [1, 5, 'active_now'],
+        [2, 4, 'active_now'],
+      ],
+      flow,
+    );
     await mount();
     expect(host.querySelectorAll('.mp-stream').length).toBe(2);
     expect(host.querySelector('.mp-stream-run')).not.toBeNull();
@@ -248,7 +262,14 @@ describe('the map: streams', () => {
 
   it('reduced motion: no travelling dash, the word "now" is shown instead', async () => {
     document.documentElement.setAttribute('data-motion', 'reduced');
-    setWorld(2, [[1, 5, 'active_now'], [2, 4, 'active_now']], flow);
+    setWorld(
+      2,
+      [
+        [1, 5, 'active_now'],
+        [2, 4, 'active_now'],
+      ],
+      flow,
+    );
     await mount();
     expect(host.querySelector('.mp-stream-run')).toBeNull();
     expect(host.querySelectorAll('.mp-stream').length).toBe(2);
@@ -274,10 +295,15 @@ describe('the map: states and clicks', () => {
   });
 
   it('"+N more" opens Contacts; another agent switches', async () => {
-    setWorld(14, Array.from({ length: 14 }, (_, i) => [i + 1, 3, 'today'] as [number, number, string]));
+    setWorld(
+      14,
+      Array.from({ length: 14 }, (_, i) => [i + 1, 3, 'today'] as [number, number, string]),
+    );
     const onSwitch = vi.fn();
     await mount({ onSwitch });
-    const other = buttons().find((b) => /Work/.test(b.textContent ?? '') && b.classList.contains('mp-agent'));
+    const other = buttons().find(
+      (b) => /Work/.test(b.textContent ?? '') && b.classList.contains('mp-agent'),
+    );
     await act(async () => other?.click());
     expect(onSwitch).toHaveBeenCalledWith(expect.objectContaining({ name: 'work' }));
     const more = buttons().find((b) => /\+3 more/.test(b.textContent ?? ''));

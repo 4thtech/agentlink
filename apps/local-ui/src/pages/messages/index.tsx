@@ -439,6 +439,19 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
     };
   }, [loadList]);
 
+  // U3-map: `?contact=<id>` (the Agents map's click) opens that conversation once the list is read.
+  // Only an ID the list itself holds is used; anything else is ignored.
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current || view.state !== 'ready') return;
+    deepLinked.current = true;
+    const wanted = new URLSearchParams(location.search).get('contact');
+    if (wanted !== null && view.list.some((c) => c.contactId === wanted)) {
+      lastOpened.current = wanted;
+      setSelected(wanted);
+    }
+  }, [view]);
+
   const opened = useCallback((contactId: string, lastInAt: number): void => {
     setSeen(markSeen(contactId, lastInAt));
   }, []);
