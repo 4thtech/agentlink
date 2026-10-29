@@ -67,6 +67,32 @@ export const CONTACTS_STRINGS = {
   failed: "That didn't work. Nothing was changed. Try again in a minute.",
 } as const;
 
+/** First letter up, for a sensor name that starts a sentence ("your passkey" → "Your passkey"). */
+const cap = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/**
+ * HOTFIX-045-TOUCHID (11 §5, §6.2.1; copy proposed, owner confirms at merge): why a presence sheet
+ * asks for the backup code instead of Touch ID, and the one-time switch inside the sheet. `sensor` is
+ * the platform's name for it (first-run strings.ts SENSOR); `browser` one that works (WORKING_BROWSER).
+ */
+export const PASSKEY_WHY = {
+  not_set_up_here: (sensor: string): string =>
+    `${cap(sensor)} isn't set up for AgentLink on this computer yet, so this asks for your backup code.`,
+  other_owner: (sensor: string): string =>
+    `${cap(sensor)} on this computer was set up for a different owner, so this asks for your backup code.`,
+  browser: (sensor: string, browser: string): string =>
+    `This browser can't use ${sensor} for AgentLink. Enter your backup code, or open AgentLink in ${browser}.`,
+  unknown: (sensor: string): string =>
+    `Couldn't check ${sensor} just now, so this asks for your backup code.`,
+  switchIntro: (sensor: string): string =>
+    `Enter your backup code once, then touch ${sensor}. After that, confirm here with ${sensor}. Your backup code keeps working.`,
+  switchCancel: 'Not now',
+  switched: (sensor: string): string => `${cap(sensor)} is on. Now confirm with ${sensor}.`,
+  switchCancelled: "The switch didn't happen. Nothing changed. You can still use your backup code.",
+  switchUnsupported: (sensor: string, browser: string): string =>
+    `${cap(sensor)} can't protect approvals in this browser. Nothing changed. Keep using your backup code, or open AgentLink in ${browser}.`,
+} as const;
+
 /** Under the hood labels and values (B-11 §16). */
 export const HOOD = {
   fingerprint: 'Fingerprint',

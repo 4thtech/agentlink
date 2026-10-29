@@ -1022,6 +1022,7 @@ describe('HOTFIX-045-TOUCHID: Touch ID with no agent open', () => {
 
   it('offers the registered passkey (200, registered) instead of refusing', async () => {
     const { h, s } = await ownerThenNoAgent();
+    const logged = h.w.log.length;
     const res = await h.get('/api/owner/passkey', s);
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body) as { passkey: Record<string, unknown> };
@@ -1032,7 +1033,7 @@ describe('HOTFIX-045-TOUCHID: Touch ID with no agent open', () => {
     expect(typeof body.passkey['userId']).toBe('string');
     expect(body.passkey).not.toHaveProperty('reason');
     // Reading the public passkey data opened no agent.
-    expect(h.w.log.filter((l) => l.startsWith('open'))).toEqual(['open slug-of-label']);
+    expect(h.w.log.slice(logged)).toEqual([]);
   }, 60_000);
 
   it('says why when this computer has no passkey (not_set_up_here), never a silent refusal', async () => {

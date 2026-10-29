@@ -222,3 +222,75 @@ export async function passkeyProof(info: PasskeyInfo): Promise<PresenceProof | u
     return undefined;
   }
 }
+
+// --- HOTFIX-045-TOUCHID: why the passkey can't be used, and the values to switch to one ---------
+//
+// `GET /api/owner/passkey` answers from the owner store, with or without an open agent. When the
+// passkey can't be used it names why in a fixed code (`reason`); the page shows that in plain words
+// instead of falling back to the backup code silently. `switchTo` is present only when this owner
+// can switch here (the server gives `userId`, the owner the new passkey is bound to).
+
+/** Why the passkey isn't offered (strings.ts PASSKEY_WHY). */
+export type PasskeyUnavailableReason = 'browser' | 'not_set_up_here' | 'other_owner' | 'unknown';
+
+/** The public values of the one-time switch (first-run setup-api.ts UpgradeValues). */
+export interface PasskeySwitchValues {
+  readonly rpId: 'localhost';
+  readonly userId: string;
+  readonly prfSalt: string;
+}
+
+export type PasskeyStatus =
+  | { readonly kind: 'ready'; readonly info: PasskeyInfo }
+  | {
+      readonly kind: 'unavailable';
+      readonly reason: PasskeyUnavailableReason;
+      readonly switchTo?: PasskeySwitchValues;
+    };
+
+const REASONS: ReadonlySet<string> = new Set(['not_set_up_here', 'other_owner']);
+
+/** Reads the passkey state; any failure is `unknown` (the backup code still works). */
+export async function readPasskeyStatus(options: OwnerClientOptions = {}): Promise<PasskeyStatus> {
+  if (!canPasskey()) return { kind: 'unavailable', reason: 'browser' };
+  const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+  try {
+    const res = await doFetch('/api/owner/passkey', {
+      method: 'GET',
+      headers: { [CSRF_HEADER]: options.token ?? pageToken() },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (res.status !== 200) return { kind: 'unavailable', reason: 'unknown' };
+    const out = (await res.json()) as { passkey?: Record<string, unknown> };
+    const p = out.passkey;
+    if (p === undefined || p['rpId'] !== 'localhost') {
+      return { kind: 'unavailable', reason: 'unknown' };
+    }
+    const prfSalt = p['prfSalt'];
+    const credentialId = p['credentialId'];
+    const userId = p['userId'];
+    if (typeof prfSalt !== 'string' || !B64URL.test(prfSalt)) {
+      return { kind: 'unavailable', reason: 'unknown' };
+    }
+    if (p['registered'] === true) {
+      return typeof credentialId === 'string' && B64URL.test(credentialId)
+        ? { kind: 'ready', info: { credentialId, prfSalt } }
+        : { kind: 'unavailable', reason: 'unknown' };
+    }
+    const reason = p['reason'];
+    const why: PasskeyUnavailableReason =
+      typeof reason === 'string' && REASONS.has(reason)
+        ? (reason as PasskeyUnavailableReason)
+        : 'unknown';
+    const canSwitch =
+      why === 'not_set_up_here' && typeof userId === 'string' && B64URL.test(userId);
+    return {
+      kind: 'unavailable',
+      reason: why,
+      ...(canSwitch ? { switchTo: { rpId: 'localhost', userId, prfSalt } } : {}),
+    };
+  } catch {
+    return { kind: 'unavailable', reason: 'unknown' };
+  }
+}
