@@ -79,6 +79,7 @@ function main() {
   const plan = buildPlan({
     files,
     workspace: loadWorkspace(root),
+    allBrowsers: process.argv.join(' ').includes('--browsers all'),
     journey: existsSync(join(root, 'e2e/test/journey')),
     wave3: existsSync(join(root, 'e2e/test/local-app-wave3.test.ts')),
     exists: (f) => existsSync(join(root, f)),

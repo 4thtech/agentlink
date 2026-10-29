@@ -62,7 +62,7 @@ Run it before you push. It lists the files you changed (committed against the me
 3. `node tools/deps-check/index.mjs`;
 4. the journey e2e (`CI=1`, `e2e/test/journey` and `test/local-app-wave3.test.ts`, whichever exist) when `@4thtech-io/e2e` is selected.
 
-It ends with a block of at most 30 lines (base, scope, each step with its time, PASS or FAIL): paste it into the PR. A change under `tools/`, `.github/`, a shared package or a root file is a full run, as in CI. It does not replace the CI-only jobs (vectors, keychain, relays, MinIO, bundle check).
+It ends with a block of at most 30 lines (base, scope, each step with its time, PASS or FAIL): paste it into the PR. A change under `tools/`, `.github/`, a shared package or a root file is a full run, as in CI. Browser tests run in Chromium only (`VERIFY_BROWSERS=chromium`, read by `packages/types/vitest.config.ts`; CI never sets it); `pnpm verify --browsers all` keeps the full matrix. It does not replace the CI-only jobs (vectors, keychain, relays, MinIO, bundle check).
 
 ## Architecture boundary guards (M0-10)
 

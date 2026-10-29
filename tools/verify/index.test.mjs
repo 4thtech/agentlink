@@ -112,6 +112,13 @@ describe('buildPlan', () => {
     const none = buildPlan({ files, workspace: ws, journey: false, wave3: false });
     expect(none.steps.some((s) => s.id === 'journey')).toBe(false);
   });
+  it('limits browser tests to Chromium unless all browsers are asked for', () => {
+    const files = ['apps/local-ui/src/a.ts'];
+    const local = buildPlan({ files, workspace: ws, ...have });
+    expect(local.steps.find((s) => s.id === 'turbo').env).toEqual({ VERIFY_BROWSERS: 'chromium' });
+    const all = buildPlan({ files, workspace: ws, ...have, allBrowsers: true });
+    expect(all.steps.find((s) => s.id === 'turbo').env).toEqual({});
+  });
   it('treats an empty diff as a full run', () => {
     expect(buildPlan({ files: [], workspace: ws, ...have }).scope).toBe('full');
   });

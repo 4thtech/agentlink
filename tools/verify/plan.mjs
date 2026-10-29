@@ -32,6 +32,7 @@ export function buildPlan({
   workspace,
   journey = false,
   wave3 = false,
+  allBrowsers = false,
   exists = () => true,
 }) {
   const sel = selectAffected({ files, workspace });
@@ -42,6 +43,8 @@ export function buildPlan({
       label: `turbo ${TASKS.join(' ')}`,
       cmd: 'turbo',
       args: ['run', ...TASKS, ...filters],
+      // Chromium only locally; `--browsers all` keeps the CI matrix (packages/types/vitest.config.ts).
+      env: allBrowsers ? {} : { VERIFY_BROWSERS: 'chromium' },
     },
   ];
   // Prettier skips prose (`*.md`) and everything in .prettierignore; deleted files are gone.
