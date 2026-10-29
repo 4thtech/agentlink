@@ -37,6 +37,7 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/settings/messages', page: lazyPage('/settings/messages') },
   { path: '/settings/contacts', page: lazyPage('/settings/contacts') },
   { path: '/settings/agents', page: lazyPage('/settings/agents') },
+  { path: '/settings/apps', page: lazyPage('/settings/apps') },
   { path: '/settings/files', page: lazyPage('/settings/files') },
   { path: '/settings/proofs', page: lazyPage('/settings/proofs') },
   { path: '/settings/rules', page: lazyPage('/settings/rules') },
