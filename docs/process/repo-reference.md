@@ -50,7 +50,19 @@ pnpm test             # unit tests (all packages); packages/types also runs in C
 pnpm test:e2e         # multi-agent end-to-end (requires testnet RPC + relays)
 pnpm lint && pnpm typecheck
 pnpm vectors:check    # crypto + EIP-712 test vectors across runtimes
+pnpm verify           # the local gate: what CI's `checks` runs for the packages your change affects (W4-VERIFY)
 ```
+
+### `pnpm verify` (the local gate)
+
+Run it before you push. It lists the files you changed (committed against the merge base with `origin/wave-4`, or `origin/main` when the branch is not on `wave-4`, plus uncommitted and untracked files; `--base <ref>` overrides) and picks the packages with `tools/ci/select-affected.mjs`, the same rules as CI. Then, stopping at the first red step:
+
+1. one `turbo run build typecheck lint check test` call with the affected `--filter`s (no filter on a global trigger or an empty diff);
+2. `prettier --check` on the changed files (prose and `.prettierignore` paths are skipped);
+3. `node tools/deps-check/index.mjs`;
+4. the journey e2e (`CI=1`, `e2e/test/journey` and `test/local-app-wave3.test.ts`, whichever exist) when `@4thtech-io/e2e` is selected.
+
+It ends with a block of at most 30 lines (base, scope, each step with its time, PASS or FAIL): paste it into the PR. A change under `tools/`, `.github/`, a shared package or a root file is a full run, as in CI. It does not replace the CI-only jobs (vectors, keychain, relays, MinIO, bundle check).
 
 ## Architecture boundary guards (M0-10)
 
