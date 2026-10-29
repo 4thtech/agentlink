@@ -728,6 +728,18 @@ describe('W4-ONE-TOUCH first run: one passkey create creates the owner, the agen
     expect(await storeState(h, 'default')).toEqual({ app: false, nonces: 3 });
   });
 
+  it('IR-W4-ONE-TOUCH L-2: an entry that already names the reserved folder is never claimed as connected', async () => {
+    const h = await harness();
+    const s = await h.session();
+    // A leftover `agentlink` entry for `default` (an earlier install), but no agent folder yet.
+    h.w.desk.entry = { agent: 'default' };
+    const res = await firstRunBegin(h, s, { label: 'A', app: 'claude-code' });
+    expect(res.status).toBe(409);
+    expect(json(res)['status']).toBe('app_unavailable');
+    expect(h.w.entries.size).toBe(0);
+    expect(h.w.desk.writes).toBe(0);
+  });
+
   it('Claude Desktop running refuses begin (quit_first) before any seed exists', async () => {
     const h = await harness();
     const s = await h.session();
