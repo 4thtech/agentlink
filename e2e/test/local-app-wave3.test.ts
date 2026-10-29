@@ -345,7 +345,9 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
     expect(text).toContain('Self-declared');
     expect(text).toContain('After you connect, compare the safety code with Ana.');
     expect(text).not.toContain(inviteUrl.split('#')[1] ?? '?');
-    await page.getByRole('button', { name: 'Accept with Touch ID' }).click();
+    await page
+      .getByRole('button', { name: /^Accept with (Touch ID|Windows Hello|your passkey)$/ })
+      .click();
     await page.getByText("Waiting for Ana's agent to answer.").waitFor();
 
     // The friend's AI app starts the agent; its sync brings Ana's answer, then the safety code.
