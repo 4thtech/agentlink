@@ -250,7 +250,8 @@
 }
 .mp-stream-run {
   stroke-dashoffset: 12;
-  animation: mp-travel calc(var(--al-duration-moment) * 2.5) var(--al-ease-standard, ease-out) 1 forwards;
+  animation: mp-travel calc(var(--al-duration-moment) * 2.5) var(--al-ease-standard, ease-out) 1
+    forwards;
 }
 @keyframes mp-travel {
   from {
@@ -297,7 +298,8 @@
     background: var(--al-color-status-success-icon);
   }
   .mp-streaming::before {
-    animation: mp-edge calc(var(--al-duration-moment) * 2.5) var(--al-ease-standard, ease-out) 1 forwards;
+    animation: mp-edge calc(var(--al-duration-moment) * 2.5) var(--al-ease-standard, ease-out) 1
+      forwards;
   }
 }
 @keyframes mp-edge {
