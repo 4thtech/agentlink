@@ -42,7 +42,10 @@ describe('file.save schema (W4-FILES-SAVE)', () => {
 
   it('accepts exactly {agent, envelopeId, fileIndex}, in the union and signed', () => {
     expectRoundTrip(fileSaveActionSchema, saveAction());
-    expectRoundTrip(fileSaveActionSchema, saveAction({ agent: AGENT_EVM, envelopeId: ENVELOPE, fileIndex: 15 }));
+    expectRoundTrip(
+      fileSaveActionSchema,
+      saveAction({ agent: AGENT_EVM, envelopeId: ENVELOPE, fileIndex: 15 }),
+    );
     expectRoundTrip(ownerActionSchema, saveAction());
     expectRoundTrip(signedOwnerActionSchema, signed(saveAction()));
   });

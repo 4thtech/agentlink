@@ -12,7 +12,7 @@
 //   envelope and index from the signed body. The result carries the saved name only, never a path.
 // - A file already saved is answered `already_saved` before anything is applied (no second copy, the
 //   nonce stays unused).
-import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
+import { encodeHex, type JsonObject } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
 import { FakeClock, passphrase, seed } from '../testing/fixtures.js';
@@ -60,7 +60,10 @@ async function send(a: FileAgent, b: FileAgent, name: string, size: number): Pro
 }
 
 /** Signs a prepared body with `owner` (the owner surface's one-use signature, as the gate does). */
-async function signBody(body: JsonObject, owner = ownerB): Promise<{ body: JsonObject; sig: string }> {
+async function signBody(
+  body: JsonObject,
+  owner = ownerB,
+): Promise<{ body: JsonObject; sig: string }> {
   const session = await owner.unlock(passphrase());
   try {
     return { body, sig: await session.signOwnerAction(body) };
@@ -75,8 +78,11 @@ async function prepared(b: FileAgent, itemId: string): Promise<JsonObject> {
   return p.body as unknown as JsonObject;
 }
 
-const nonceRows = (agent: FileAgent) =>
-  agent.store.transaction((tx) => tx.select('owner_action_nonces'));
+/** The nonce rows of this path's op (the agents' setup records others, such as their first policy). */
+const nonceRows = async (agent: FileAgent) =>
+  (await agent.store.transaction((tx) => tx.select('owner_action_nonces'))).filter(
+    (r) => r.op === 'file.save',
+  );
 
 describe('file.save: prepare (W4-FILES-SAVE)', () => {
   it('builds the body from the item ID alone: this agent, the envelope and the index', async () => {
@@ -151,10 +157,19 @@ describe('file.save: saveReceivedFile (W4-FILES-SAVE)', () => {
     const envelopeId = await send(a, b, 'brief.txt', 1_000);
     const body = await prepared(b, `${envelopeId}.00`);
 
-    const byStranger = await b.client.saveReceivedFile(await signBody(body, stranger));
+    const byStranger = await b.client.saveReceivedFile(
+      await signBody(
+        { ...body, owner: encodeHex((await stranger.getPublicKeys()).ownerNostr) },
+        stranger,
+      ),
+    );
     expect(byStranger).toMatchObject({ status: 'refused' });
 
-    const forA = { ...body, agent: a.id, params: { ...(body['params'] as JsonObject), agent: a.id } };
+    const forA = {
+      ...body,
+      agent: a.id,
+      params: { ...(body['params'] as JsonObject), agent: a.id },
+    };
     expect(await b.client.saveReceivedFile(await signBody(forA))).toMatchObject({
       status: 'refused',
     });
@@ -179,7 +194,10 @@ describe('file.save: saveReceivedFile (W4-FILES-SAVE)', () => {
     expect(await b.client.ownerActions.loadLabel()).toEqual({ status: 'none' });
     expect(await nonceRows(b)).toEqual([]);
     for (const junk of [null, 'x', 42, {}, { body: {}, sig: 'x' }]) {
-      expect(await b.client.saveReceivedFile(junk)).toEqual({ status: 'refused', reason: 'malformed' });
+      expect(await b.client.saveReceivedFile(junk)).toEqual({
+        status: 'refused',
+        reason: 'malformed',
+      });
     }
   });
 
@@ -194,7 +212,9 @@ describe('file.save: saveReceivedFile (W4-FILES-SAVE)', () => {
     );
     expect(out).toEqual({ status: 'not_found' });
     // And another index of B's message.
-    const other = await b.client.saveReceivedFile(await signBody(await prepared(b, `${envelopeId}.03`)));
+    const other = await b.client.saveReceivedFile(
+      await signBody(await prepared(b, `${envelopeId}.03`)),
+    );
     expect(other).toEqual({ status: 'not_found' });
     expect(b.inbox.files().size).toBe(0);
   });
@@ -203,7 +223,9 @@ describe('file.save: saveReceivedFile (W4-FILES-SAVE)', () => {
     const { a, b } = await agents();
     b.inbox.plantSymlink('brief.txt');
     const envelopeId = await send(a, b, 'brief.txt', 1_000);
-    const out = await b.client.saveReceivedFile(await signBody(await prepared(b, `${envelopeId}.00`)));
+    const out = await b.client.saveReceivedFile(
+      await signBody(await prepared(b, `${envelopeId}.00`)),
+    );
     expect(out).toEqual({ status: 'saved', name: 'brief (1).txt' });
     expect(b.inbox.entries.get('brief.txt')?.kind).toBe('symlink');
     expect(b.inbox.writes).not.toContain('brief.txt');

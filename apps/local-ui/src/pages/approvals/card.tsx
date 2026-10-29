@@ -382,11 +382,17 @@ export function SingleApproval({
   sheet,
   onDecided,
   onLeft,
+  passkeyLabel,
 }: {
   item: ApprovalItem;
   owner: OwnerState;
   client: ApprovalsClient;
   sheet: SheetOptions;
+  /**
+   * W4-INBOX: the passkey button's words for both decisions ("Confirm with your passkey" in the
+   * Inbox, after Approve or Deny was clicked); the default names the decision.
+   */
+  passkeyLabel?: string;
   /** An applied decision (approve or deny); never called for a refused or failed attempt. */
   onDecided?: () => void;
   /** The decided card has collapsed out; the page keeps this line in its place. */
@@ -470,7 +476,9 @@ export function SingleApproval({
           {step === undefined ? null : (
             <OwnerStep
               passkey={owner.passkey !== undefined}
-              passkeyLabel={step === 'approve' ? S.approveWithPasskey : S.denyWithPasskey}
+              passkeyLabel={
+                passkeyLabel ?? (step === 'approve' ? S.approveWithPasskey : S.denyWithPasskey)
+              }
               codeSubmit={step === 'approve' ? S.confirmApproval : S.confirmDenial}
               label={step === 'approve' ? S.confirmApproval : S.confirmDenial}
               onPasskey={async () => {

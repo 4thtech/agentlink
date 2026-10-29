@@ -21,6 +21,7 @@ import {
   type PolicyRule,
   type AgentLabelParams,
   type AppChangeParams,
+  type FileSaveParams,
   type ContactCheckParams,
   type ContactRule,
   type ContactRemoveParams,
@@ -46,7 +47,8 @@ export type PreparableOp =
   | 'contact.remove'
   | 'agent.label'
   | 'app.connect'
-  | 'app.disconnect';
+  | 'app.disconnect'
+  | 'file.save';
 
 const PREPARABLE: readonly string[] = [
   'policy.set',
@@ -58,6 +60,8 @@ const PREPARABLE: readonly string[] = [
   // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
   'app.connect',
   'app.disconnect',
+  // W4-FILES-SAVE: the owner saves one received file into the Inbox folder from the local app.
+  'file.save',
 ];
 
 interface ParamsOf {
@@ -68,6 +72,7 @@ interface ParamsOf {
   readonly 'agent.label': AgentLabelParams;
   readonly 'app.connect': AppChangeParams;
   readonly 'app.disconnect': AppChangeParams;
+  readonly 'file.save': FileSaveParams;
 }
 
 export interface OwnerActionBodyInput<O extends PreparableOp = PreparableOp> {
@@ -145,7 +150,9 @@ export type PrepareRefusal =
   /** U3-d: the label is not 1 to 32 code points already in its own restricted form (06 §2.1). */
   | 'label_invalid'
   /** U3-f: the app is not in the fixed table, or `changeId` is not 64 lowercase hex. */
-  | 'change_invalid';
+  | 'change_invalid'
+  /** W4-FILES-SAVE: not a received item ID `<envelope ID>.<index>` (index 00 to 15). */
+  | 'item_invalid';
 
 export type PreparedOwnerAction =
   | {

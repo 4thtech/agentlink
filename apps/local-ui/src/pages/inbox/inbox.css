@@ -1,0 +1,192 @@
+/* Inbox (W4-INBOX; b11 §34.4; D-116): styled from d2 console/negotiation-thread--waiting-for-approval
+   (the thread on the left, the approval card on the right, accent border on what waits for you) and
+   console/home--approvals-waiting ("Needs you" on top). Tokens only; no inline styles (08 §4 CSP).
+   Depth: rows and messages on a solid level 1 surface (the Surface component); the approval card has
+   the accent border of the D2 card. Motion: none in this file; inbound text never moves (I-5). */
+.ib-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-6);
+}
+.ib-head h1 {
+  margin: 0;
+}
+.ib-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.ib-section-title {
+  margin: 0;
+  color: var(--al-color-fg-muted);
+  text-transform: uppercase;
+}
+.ib-needs,
+.ib-messages,
+.ib-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.ib-list ul {
+  gap: 0;
+}
+.ib-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+  min-width: 0;
+}
+.ib-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  min-width: 0;
+  cursor: pointer;
+}
+.ib-row > .al-btn {
+  align-self: flex-start;
+}
+.ib-row-head,
+.ib-msg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-3);
+  margin: 0;
+}
+.ib-kicker {
+  margin: 0 0 var(--al-space-2);
+  color: var(--al-color-accent-default);
+  text-transform: uppercase;
+}
+.ib-approval {
+  border: var(--al-border-width-thin) solid var(--al-color-accent-default);
+  border-radius: var(--al-radius-lg);
+  padding: var(--al-space-4);
+  min-width: 0;
+}
+.ib-approval .al-approval {
+  box-shadow: none;
+}
+.ib-conv {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  width: 100%;
+  padding: var(--al-space-4) var(--al-space-5);
+  border: 0;
+  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ib-list li:last-child .ib-conv {
+  border-bottom: 0;
+}
+.ib-conv:hover {
+  background: var(--al-color-bg-sunken);
+}
+.ib-conv > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ib-new {
+  color: var(--al-color-fg-default);
+  font-weight: 600;
+}
+.ib-thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+}
+.ib-thread-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-4);
+}
+.ib-thread-head h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ib-thread-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-6);
+  align-items: flex-start;
+}
+.ib-thread-main {
+  flex: 2 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.ib-thread-aside {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.ib-msg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+  min-width: 0;
+}
+.ib-msg.is-out {
+  border-left: var(--al-border-width-thick) solid var(--al-color-border-strong);
+}
+.ib-msg .al-untrusted,
+.ib-msg .al-untrusted-body,
+.ib-row .al-untrusted,
+.ib-row .al-untrusted-body {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.ib-preview .al-untrusted-body {
+  max-height: 4.5em;
+  overflow: hidden;
+}
+.ib-file {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.ib-file-state {
+  margin: 0;
+}
+.ib-save {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--al-space-2);
+}
+.ib-save .al-step {
+  align-self: stretch;
+}
+.ib-reply {
+  margin: 0;
+}
+.ib-save .al-btn,
+.ib-msg .al-btn {
+  transition: none;
+}
+/* A phone: the card's own surface already pads; the accent frame stays thin. */
+@media (max-width: 719px) {
+  .ib-approval {
+    padding: var(--al-space-2);
+  }
+}

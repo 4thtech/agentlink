@@ -75,11 +75,16 @@ const ok = (body: unknown): Answer => ({ status: 200, body });
 const AT = 1_792_000_000;
 const ENV_IN = 'AQEBAQEBAQEBAQEBAQEBAQ';
 const ENV_FILE = 'BwcHBwcHBwcHBwcHBwcHBw';
-const MARKO = { contactId: '0x' + '11'.repeat(20), name: 'Marko', lastAt: AT + 50, lastInAt: AT + 50 };
+const MARKO = {
+  contactId: '0x' + '11'.repeat(20),
+  name: 'Marko',
+  lastAt: AT + 50,
+  lastInAt: AT + 50,
+};
 const ANA = { contactId: '0x' + '22'.repeat(20), name: 'Ana', lastAt: AT + 10, lastInAt: 0 };
 const APPROVAL_ID = `apr_${'A'.repeat(22)}`;
 
-const approval = (who = 'Marko (self-declared)') => ({
+const approval = (who = '\u201cMarko\u201d (self-declared)') => ({
   approvalId: APPROVAL_ID,
   summary: 'Accept terms from Marko: Logo design',
   actionDigest: 'a'.repeat(64),
@@ -213,14 +218,21 @@ describe('the Inbox home', () => {
     expect(text()).not.toContain(S.allCaughtUp);
     for (const el of host.querySelectorAll('*')) {
       if (el.children.length === 0 && el.textContent === 'Hello from Marko') {
-        expect(el.closest('.al-untrusted'), 'inbound text outside the untrusted container').not.toBeNull();
+        expect(
+          el.closest('.al-untrusted'),
+          'inbound text outside the untrusted container',
+        ).not.toBeNull();
       }
     }
   });
 
   it('opening the conversation marks it seen; back on the Inbox it is All caught up', async () => {
     await mount(base());
-    await click(button(/Hello from Marko/, needsYou() ?? host));
+    // A click on the message itself opens the conversation (as the journey does).
+    const leaf = [...(needsYou()?.querySelectorAll<HTMLElement>('*') ?? [])].find(
+      (el) => el.children.length === 0 && el.textContent === 'Hello from Marko',
+    );
+    await click(leaf);
     expect(host.querySelector('h2')?.textContent).toContain('Marko');
     expect(new URLSearchParams(location.search).get('c')).toBe(MARKO.contactId);
     // The sidebar's Inbox link (the router's navigate event) goes back to the list.
@@ -262,9 +274,13 @@ describe('Needs you: an approval is a card with inline Touch ID (the existing ap
         authenticatorData: new Uint8Array([3]).buffer,
         userHandle: new Uint8Array([4]).buffer,
       },
-      getClientExtensionResults: () => ({ prf: { results: { first: new Uint8Array(32).fill(9).buffer } } }),
+      getClientExtensionResults: () => ({
+        prf: { results: { first: new Uint8Array(32).fill(9).buffer } },
+      }),
     };
-    const credentials = { get: vi.fn(() => Promise.resolve(credential)) } as unknown as CredentialsContainer;
+    const credentials = {
+      get: vi.fn(() => Promise.resolve(credential)),
+    } as unknown as CredentialsContainer;
     const s = await mount(
       base({
         [APPROVALS]: [ok({ approvals: [approval()] }), ok({ approvals: [] })],

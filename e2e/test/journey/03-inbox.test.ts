@@ -113,14 +113,18 @@ describe('chapter 3: inbox', () => {
     await until('the file reaches Bo', () => inboxHas(mcpB, FILE_NAME), 30_000);
     await navTo(b.page, 'Files');
     await b.page.getByText(FILE_NAME).first().waitFor({ timeout: 30_000 });
-    await b.page.getByText(/Arrived · not saved/).first().waitFor();
+    await b.page
+      .getByText(/Arrived · not saved/)
+      .first()
+      .waitFor();
     expect(await text(b.page)).not.toContain('Ask your AI to fetch it');
     expect(await b.page.locator('[role="progressbar"]').count()).toBe(0);
 
     // Traversal: the route takes only `{id}`; anything else is refused before presence, no gesture.
     const before0 = b.gestures.total();
     const refusedStatuses = await b.page.evaluate(async () => {
-      const csrf = document.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content') ?? '';
+      const csrf =
+        document.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content') ?? '';
       const b64 = (v: unknown): string =>
         btoa(JSON.stringify(v)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       const out: number[] = [];
@@ -155,7 +159,10 @@ describe('chapter 3: inbox', () => {
     const before1 = b.gestures.total();
     await b.page.getByRole('button', { name: 'Save to Inbox' }).first().click();
     await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
-    await b.page.getByText(/Inbox folder can't take files/).first().waitFor({ timeout: 30_000 });
+    await b.page
+      .getByText(/Inbox folder can't take files/)
+      .first()
+      .waitFor({ timeout: 30_000 });
     expect(b.gestures.total() - before1).toBe(1);
     expect(readdirSync(planted)).toEqual([]);
 

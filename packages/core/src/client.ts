@@ -28,6 +28,7 @@ import { AgentRemovalService } from './agent-removal.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import { savedNameOf } from './files/received.js';
+import { saveReceivedFile, type SaveReceivedFileResult } from './files/save.js';
 import type { FilesPlatform } from './files/platform.js';
 import { FilesView } from './files/view.js';
 import { FilesIoView, MessagesView } from './ui-messages.js';
@@ -438,6 +439,19 @@ export class AgentLinkClient {
    */
   fetchFile(input: FetchFileInput): Promise<FetchFileResult> {
     return this.#files.fetch(input);
+  }
+
+  /**
+   * W4-FILES-SAVE (04 §2.5.1 `file.save`; 08 §1): saves one received file from the local app with
+   * an owner-signed `file.save` (files/save.ts): only that op, verified and nonce-recorded by
+   * `ownerActions.apply`, then the same fetch as `fetchFile` with the signed envelope and index. A file
+   * already saved is answered before anything is applied. Never a path in the result.
+   */
+  saveReceivedFile(signed: unknown): Promise<SaveReceivedFileResult> {
+    return saveReceivedFile(
+      { ownerActions: this.ownerActions, filesIo: this.filesIo, fetcher: this.#files },
+      signed,
+    );
   }
 
   /**
