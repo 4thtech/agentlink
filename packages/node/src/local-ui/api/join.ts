@@ -47,6 +47,8 @@ const INVALID = fixed(400, 'invalid');
 export const INVITE_CHANGED = fixed(409, 'invite_changed');
 const EXPIRED = fixed(400, 'expired');
 const BUSY = fixed(409, 'busy');
+/** The rules refuse new contacts: nothing is signed (the same word as the invites accept route). */
+const POLICY_DENIED = fixed(409, 'policy_denied');
 /** The public invite ID: 16 bytes in base64url. */
 const INVITE_ID = /^[A-Za-z0-9_-]{22}$/;
 
@@ -70,17 +72,22 @@ async function readJoin(context: LocalUiContext, request: LocalUiRequest): Promi
 }
 
 /** Before the presence gate: the shape, and the ID against the shown invite (read only). */
-function precheckAccept(
+async function precheckAccept(
   context: LocalUiContext,
   request: LocalUiRequest,
 ): Promise<LocalUiResult | undefined> {
-  if (context.join === undefined) return Promise.resolve(NOT_AVAILABLE);
-  if ([...request.query.keys()].length > 0) return Promise.resolve(INVALID);
+  if (context.join === undefined) return NOT_AVAILABLE;
+  if ([...request.query.keys()].length > 0) return INVALID;
   const inviteId = inviteIdOf(request.input);
-  if (inviteId === undefined) return Promise.resolve(INVALID);
-  return context.join
-    .view(context.client)
-    .then((view) => (view.inviteId === inviteId ? undefined : INVITE_CHANGED));
+  if (inviteId === undefined) return INVALID;
+  const view = await context.join.view(context.client);
+  if (view.inviteId !== inviteId) return INVITE_CHANGED;
+  // The rules refuse new contacts (`contacts.acceptInvites: deny`): say so before presence, so the
+  // screen can show "Your rules don't allow new contacts." The route checks again after presence.
+  if (context.invites !== undefined && (await context.invites.decision()) === 'deny') {
+    return POLICY_DENIED;
+  }
+  return undefined;
 }
 
 async function acceptJoin(

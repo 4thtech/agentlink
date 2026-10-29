@@ -13,7 +13,7 @@
 // octet-stream. The invite is only in that body: never in the URL, a query, a header, the record, a
 // log or an error. Any failure is a plain outcome word; nothing here prints.
 import { constants } from 'node:fs';
-import { lstat, mkdir, open, rename, unlink } from 'node:fs/promises';
+import { mkdir, open, rename, unlink } from 'node:fs/promises';
 import { request } from 'node:http';
 import { join } from 'node:path';
 import process from 'node:process';
@@ -76,18 +76,17 @@ const ownUid = (): number | undefined =>
 /** Reads the record, or undefined (missing, a link, not private, not ours, oversized, malformed). */
 export async function readAppHostRecord(home: string): Promise<AppHostRecord | undefined> {
   try {
-    const path = recordPath(home);
-    const before = await lstat(path);
-    if (!before.isFile()) return undefined;
-    if (POSIX && ((before.mode & 0o077) !== 0 || before.uid !== ownUid())) return undefined;
-    if (before.size > MAX_RECORD_BYTES) return undefined;
+    // Opened first, never following a link; every check is on the open handle (fstat), so nothing
+    // can be swapped between a check and the read.
     const handle = await open(
-      path,
+      recordPath(home),
       constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0),
     );
     try {
       const info = await handle.stat();
-      if (!info.isFile() || info.ino !== before.ino || info.dev !== before.dev) return undefined;
+      if (!info.isFile()) return undefined;
+      if (POSIX && ((info.mode & 0o077) !== 0 || info.uid !== ownUid())) return undefined;
+      if (info.size > MAX_RECORD_BYTES) return undefined;
       const buffer = Buffer.alloc(MAX_RECORD_BYTES + 1);
       const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
       if (bytesRead > MAX_RECORD_BYTES) return undefined;

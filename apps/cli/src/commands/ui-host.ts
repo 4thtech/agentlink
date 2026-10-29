@@ -25,6 +25,7 @@ import type {
   ApprovalServerOptions,
   ApprovalServerSource,
   AppHostAgent,
+  AppHostHandoffRecord,
   LocalUiAssets,
   LocalUiOptions,
 } from '@4thtech-io/node';
@@ -98,9 +99,13 @@ export interface UiWelcomeDeps {
   /** Starts the approval server (startApprovalServer). */
   startServer(
     options: ApprovalServerOptions,
-  ): Promise<Pick<ApprovalServer, 'openFirstRun' | 'close'>>;
+  ): Promise<Pick<ApprovalServer, 'openFirstRun' | 'openJoin' | 'close'>>;
   /** Fixed-value events (I-7). */
   readonly onEvent?: (event: ApprovalServerEvent) => void;
+  /** U3-invite: the canonical link `join` checked (held in memory by the host only). */
+  readonly waitingInvite?: string;
+  /** U3-invite: the handoff record (~/.agentlink/app-host.json, 0600). */
+  readonly handoff?: AppHostHandoffRecord;
 }
 
 /** U3-g-b: the running no-agent app host: it always opens on the first-run page (Welcome). */
@@ -138,12 +143,18 @@ export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServ
       open: (name) => deps.open(name),
       // The real home and owner files (no override).
       firstRun: {},
+      // U3-invite (08 §4): the invite `join` checked, held in memory by the host only.
+      ...(deps.waitingInvite === undefined ? {} : { waitingInvite: deps.waitingInvite }),
+      // U3-invite: the 0600 handoff record, so a later `join` hands over here.
+      ...(deps.handoff === undefined ? {} : { handoff: deps.handoff }),
     },
     ...(deps.onEvent === undefined ? {} : { onEvent: deps.onEvent }),
   });
   return Object.freeze<UiWelcomeServer>({
     page: 'first-run',
-    open: () => server.openFirstRun(),
+    // U3-invite: openJoin goes to first run while no owner exists; first run then ends on the
+    // waiting invite (the link is never in the URL).
+    open: () => (deps.waitingInvite === undefined ? server.openFirstRun() : server.openJoin()),
     close: () => server.close(),
   });
 }

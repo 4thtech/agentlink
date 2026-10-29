@@ -17,7 +17,7 @@ export const JOIN_COMMAND_TEMPLATE = "npx -y @4thtech-io/agentlink join '{invite
 
 /** U3-invite: the sentence for an AI app that can run commands on this computer (08 §4). */
 export const ASK_AI_TEMPLATE =
-  "Set up AgentLink for me and open an invite. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then run `npx -y @4thtech-io/agentlink join '{inviteUrl}'`, which opens the AgentLink app so I can finish there. Never ask me for a code or passphrase, and don't accept the invite for me.";
+  "Set up AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then show me this command so I can run it myself in my own terminal, and don't run it for me: `npx -y @4thtech-io/agentlink join '{inviteUrl}'`. It opens the AgentLink app, where I accept the invite. Never ask me for a code or passphrase.";
 
 /**
  * The longest command the page offers (08 §4): `cmd.exe` takes at most 8 191 characters, so above

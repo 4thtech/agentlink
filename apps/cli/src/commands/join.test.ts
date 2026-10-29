@@ -19,7 +19,13 @@ import {
 } from '../dispatch.js';
 import type { AppHostRecord, HandoffOutcome } from '../runtime/app-host-record.js';
 import type { TerminalContext } from '../runtime/guards.js';
-import { JOIN_TEXT, joinLinkOf, joinPatternMatchesShippedHost, joinStep, type JoinDeps } from './join.js';
+import {
+  JOIN_TEXT,
+  joinLinkOf,
+  joinPatternMatchesShippedHost,
+  joinStep,
+  type JoinDeps,
+} from './join.js';
 import type { UiDeps } from './ui.js';
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };

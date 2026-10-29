@@ -112,7 +112,7 @@ export interface UiDeps {
    * U3-g-b: with no agent at all, starts the app host with no agent open (Welcome and first run);
    * undefined when it cannot (an agent folder exists, no usable keychain, no app in this build).
    */
-  startWelcome?(): Promise<UiServer | undefined>;
+  startWelcome?(options?: { readonly invite?: string }): Promise<UiServer | undefined>;
   /** The longest serve time, in milliseconds. */
   readonly waitMs: number;
   /** Calls `stop` on Ctrl+C; returns the unsubscribe. */
@@ -161,10 +161,11 @@ export async function serveUi(
     if (chosen !== undefined && chosen !== DEFAULT_AGENT_NAME) agent = chosen;
   }
   const startOptions = join === undefined ? {} : { invite: join.invite };
-  // U3-g-b (08 §1): no agent at all: the app opens on Welcome, with no agent open yet.
+  // U3-g-b (08 §1): no agent at all: the app opens on Welcome, with no agent open yet. U3-invite:
+  // with an invite, first run then ends on "Accept {name}'s invite?" (08 §4).
   let server: UiServer | undefined =
     none && deps.startWelcome !== undefined
-      ? await deps.startWelcome().catch(() => undefined)
+      ? await deps.startWelcome(startOptions).catch(() => undefined)
       : undefined;
   server ??= await deps.start(agent, startOptions).catch(() => undefined);
   if (server === undefined) {
@@ -216,7 +217,8 @@ export function nodeUiDeps(): UiDeps {
       now: Math.floor(Date.now() / 1000),
     }),
     // U3-g-b: the no-agent app host (Welcome); first run creates the first agent from the page.
-    startWelcome: () => {
+    // U3-invite: it also holds the waiting invite (`join`) and the handoff record.
+    startWelcome: (welcomeOptions = {}) => {
       const directory = agentDirectory(homedir());
       const hostDeps: UiHostDeps = {
         owner,
@@ -235,6 +237,11 @@ export function nodeUiDeps(): UiDeps {
         onEvent: (event) => {
           logger.debug('approval ui event', { ...event });
           logOwnerSetupEvent(logger, event);
+        },
+        ...(welcomeOptions.invite === undefined ? {} : { waitingInvite: welcomeOptions.invite }),
+        handoff: {
+          write: (record) => writeAppHostRecord(homedir(), record),
+          remove: () => removeAppHostRecord(homedir()),
         },
       });
     },

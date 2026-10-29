@@ -118,6 +118,10 @@ describe('startUiWelcome (U3-g-b)', () => {
               log.push('openFirstRun');
               return Promise.resolve(true);
             },
+            openJoin: () => {
+              log.push('openJoin');
+              return Promise.resolve(true);
+            },
             close: () => {
               log.push('close');
               return Promise.resolve();

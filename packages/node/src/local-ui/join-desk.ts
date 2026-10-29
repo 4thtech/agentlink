@@ -104,10 +104,15 @@ export class JoinDesk {
     return Math.floor(this.#nowMs() / 1000);
   }
 
-  /** True while an invite is shown: waiting for the owner and not expired. */
+  /**
+   * True while an invite is shown: waiting for the owner and not expired, or being accepted right
+   * now (IR-U3-invite-SEC-4 (a): a handoff never replaces an invite while its accept is in flight).
+   */
   shown(): boolean {
     const held = this.#held;
-    return held !== undefined && held.phase === 'waiting' && held.expiresAt > this.#nowSeconds();
+    if (held === undefined) return false;
+    if (held.phase === 'connecting') return true;
+    return held.phase === 'waiting' && held.expiresAt > this.#nowSeconds();
   }
 
   /**

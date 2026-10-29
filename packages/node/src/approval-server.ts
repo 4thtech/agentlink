@@ -875,6 +875,10 @@ const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
   // U3-e: removal leaves no agent open after `undeliverable` ("Remove anyway?") or when none is
   // left; the remove kind keeps its own gate (owner presence, typed label) and needs no open agent.
   'POST /api/ui/agents/remove',
+  // U3-invite (08 §4): the waiting invite is the host's, not an agent's: its read and "Not now"
+  // answer during first run on a computer with no agent yet. Accepting needs the agent.
+  'GET /api/ui/join',
+  'POST /api/ui/join/dismiss',
 ]);
 
 /** U3-c: the switch body is `{"name":"<32 chars>","generation":<16 digits>}`. */
@@ -3264,8 +3268,27 @@ export async function startApprovalServerWith(
       if (now() - lastJoinOpenAt < JOIN_OPEN_INTERVAL_MS) return false;
       lastJoinOpenAt = now();
     }
-    const path = agentUi?.ownerSetup === undefined ? JOIN_PAGE_PATH : '/first-run';
+    const path = (await ownerExistsNow()) ? JOIN_PAGE_PATH : '/first-run';
     return opener(`${origin}${path}?t=${mintLink()}`).catch(() => false);
+  }
+
+  /**
+   * U3-invite (IR-U3-invite-2): whether an owner EXISTS on this computer, for where the join screen
+   * opens: with none yet, first run (Welcome) runs first and ends on the waiting invite. An open
+   * agent with an owner setup to do, or no agent open with first run still possible, means no owner
+   * yet; any error means the owner is assumed to exist (the join screen, which says what to do).
+   */
+  async function ownerExistsNow(): Promise<boolean> {
+    try {
+      const setup = agentUi?.ownerSetup;
+      if (setup !== undefined) return await ownerExistsAnywhere(setup);
+      if (host !== undefined && host.current === undefined && noAgentFirstRun() !== undefined) {
+        return await setupBlockedNoAgent();
+      }
+      return true;
+    } catch {
+      return true;
+    }
   }
 
   /**

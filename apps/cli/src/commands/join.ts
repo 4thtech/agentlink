@@ -61,10 +61,22 @@ export const JOIN_TEXT = Object.freeze({
     "You must do this yourself: run the command from the invite page in your own terminal. It opens AgentLink in your browser so you can accept the invite there. Don't let your AI accept it for you.",
 });
 
-/** 08 §4: the shipped host's prefix and 1 to 21 846 base64url characters, nothing else. */
-const CANONICAL = new RegExp(
-  `^${INVITE_LINK_PREFIX.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}[A-Za-z0-9_-]{1,${String(INVITE_MAX_PAYLOAD_CHARS)}}$`,
-);
+/**
+ * 08 §4: the shipped host's prefix and 1 to 21 846 base64url characters, nothing else. A literal
+ * (every dot escaped); `joinPatternMatchesShippedHost` keeps it equal to core's INVITE_LINK_PREFIX
+ * and INVITE_MAX_PAYLOAD_CHARS, and a test checks that.
+ */
+const CANONICAL = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,21846}$/;
+
+/** True when the literal pattern is exactly the shipped prefix and payload cap (tests). */
+export function joinPatternMatchesShippedHost(): boolean {
+  const max = 'A'.repeat(INVITE_MAX_PAYLOAD_CHARS);
+  return (
+    CANONICAL.test(`${INVITE_LINK_PREFIX}${max}`) &&
+    !CANONICAL.test(`${INVITE_LINK_PREFIX}${max}A`) &&
+    !CANONICAL.test(`${INVITE_LINK_PREFIX.replace('.4thtech', 'x4thtech')}A`)
+  );
+}
 
 /**
  * The canonical link from the raw arguments, or undefined. Exactly one argument; one surrounding
