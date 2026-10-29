@@ -736,7 +736,11 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
     expect(wrong.json).toEqual({ status: 'presence_rejected' });
     expect(w.log).not.toContain('removeFolder work');
     // No presence at all is refused the same way, before anything.
-    const none = await remove(w, { name: 'work', typedLabel: 'Work' }, { generation, presence: '' });
+    const none = await remove(
+      w,
+      { name: 'work', typedLabel: 'Work' },
+      { generation, presence: '' },
+    );
     expect(none.status).toBe(403);
     expect(none.json).toEqual({ status: 'presence_required' });
     expect(w.log).not.toContain('removeFolder work');
