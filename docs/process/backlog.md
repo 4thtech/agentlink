@@ -5470,7 +5470,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Tests first: a `RED (expected): <ID> …` commit with the red-run excerpt; stale generation refused on every mutating route (tests switch mid-request); switch closes the old agent and opens the new one in the same process, port and session; stubs for every U3 route registered and refused with `not_available`; `app.json` 0600 and trusted for nothing but order; the folder rules stay in `agent-dir.ts`; no secret in logs; per-platform keychain behaviour recorded; Fable 5.1 audit; Opus independent review; Tali's "merge".
 
 #### U3-b · CLI: no picker, bare command opens the app, `ui` with no agent opens Welcome (new, USABILITY-WAVE-3, owner decision 2026-10-29)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 2
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 2
 - **Repo/path:** agentlink · `apps/cli/src/commands/ui.ts`, `apps/cli/src/commands/init.ts`, `apps/cli/src/commands/agent-choice.ts`, `apps/cli/src/dispatch.ts`
 - **Depends on:** U3-c
 - **Spec:** USABILITY-WAVE-3 §7.4; 06 §8

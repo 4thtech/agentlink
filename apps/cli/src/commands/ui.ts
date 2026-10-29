@@ -11,6 +11,9 @@
 //   no link exists. Handing an agent the session link would let it use the page (G-1).
 // - Not an MCP tool: no tool returns or opens this page (I-4).
 //
+// U3-b (USABILITY-WAVE-3 §7.4): it never asks which agent: the last used one (app.json), else the one an
+// AI app serves (default first), else the first by name (current-agent.ts). `--agent` stays, as Advanced.
+//
 // U3-c (D-138, 08 §1): the served process is the app host. It starts with this agent and switches
 // between the owner's agents in the same process, port and session (ui-host.ts; node app-host.ts);
 // a switch signs nothing and takes no owner presence. Its server closes whichever agent is open.
@@ -27,11 +30,10 @@ import { createUiApprovalSource } from '../approval/ui-source.js';
 import { EXIT_FAILED, EXIT_OK, type CommandContext, type CommandHandler } from '../dispatch.js';
 import { localUiOptions, logOwnerSetupEvent } from '../mcp/local-ui-wiring.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
-import { agentDirectory, listAgentNames } from '../runtime/agent-dir.js';
+import { agentDirectory } from '../runtime/agent-dir.js';
 import { DEFAULT_AGENT_NAME } from '../runtime/agent-name.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
-import { AGENT_CHOICE_TEXT, pickAgent, selectAgent } from './agent-choice.js';
-import { sharedLineReader } from './init.js';
+import { appServes, chooseCurrentAgent } from './current-agent.js';
 import { nodeOwnerDeps } from './owner/deps.js';
 import { openUiHostAgent, withoutAssets, type UiHostDeps } from './ui-host.js';
 
@@ -48,9 +50,6 @@ export const UI_TEXT = Object.freeze({
   /** `prefix`: the command as this run was started (M1-36a), never a typed value. */
   notReady: (prefix: string): string =>
     `AgentLink isn't set up here yet. Run \`${prefix} init\` in your own terminal first.`,
-  /** M1-UX-MULTI-AGENT: no `--agent` and several agents here: the names follow on the next line. */
-  moreThanOne: (prefix: string): string =>
-    `This computer has more than one AgentLink agent. Run \`${prefix} ui --agent <name>\` with the agent you want to open.`,
   agentRun: (prefix: string): string =>
     `You must do this yourself: run \`${prefix} ui\` in your own terminal. It opens your AgentLink pages in your browser. Don't let your AI open them or run this for you.`,
 });
@@ -81,10 +80,12 @@ export interface UiServer {
 export interface UiDeps {
   /** Opens the agent and starts the server; undefined when the agent is not set up here. */
   start(name: string | undefined): Promise<UiServer | undefined>;
-  /** M1-UX-MULTI-AGENT: the local agent names on this computer (absent: not looked for). */
+  /** U3-b: the local agent names on this computer (absent: not looked for). */
   agents?(): Promise<readonly string[]>;
-  /** Reads one typed line (for the numbered pick). */
-  readLine?(): Promise<string>;
+  /** U3-b: the last used agent (app.json), if any. */
+  lastUsed?(): Promise<string | undefined>;
+  /** U3-b: whether an AI app already starts this agent. */
+  serves?(name: string): Promise<boolean>;
   /** The longest serve time, in milliseconds. */
   readonly waitMs: number;
   /** Calls `stop` on Ctrl+C; returns the unsubscribe. */
@@ -104,20 +105,17 @@ export async function uiStep(
   }
   let agent = context.parsed.agent;
   if (agent === undefined && deps.agents !== undefined) {
-    const selection = selectAgent(await deps.agents().catch(() => []));
-    if (selection.kind === 'one') agent = selection.name;
-    else if (selection.kind === 'choose') {
-      const picked =
-        deps.readLine === undefined
-          ? undefined
-          : await pickAgent((text) => output.print(text), selection.names, deps.readLine);
-      if (picked === undefined) {
-        output.printError(UI_TEXT.moreThanOne(prefix));
-        output.printError(AGENT_CHOICE_TEXT.namesLine(selection.names));
-        return EXIT_FAILED;
-      }
-      agent = picked;
-    }
+    // U3-b (USABILITY-WAVE-3 §7.4): never asked. The last used agent, else the one an AI app
+    // serves (`default` first), else the first by name.
+    const names = await deps.agents().catch(() => []);
+    const last = await deps.lastUsed?.().catch(() => undefined);
+    const chosen = await chooseCurrentAgent(
+      names,
+      last,
+      (name) => deps.serves?.(name) ?? Promise.resolve(false),
+    );
+    // `default` is opened the way every command without `--agent` opens it.
+    if (chosen !== undefined && chosen !== DEFAULT_AGENT_NAME) agent = chosen;
   }
   const server = await deps.start(agent).catch(() => undefined);
   if (server === undefined) {
@@ -153,8 +151,15 @@ export function nodeUiDeps(): UiDeps {
   const owner = nodeOwnerDeps();
   const logger: Logger = createLogger({ name: 'ui' });
   return Object.freeze<UiDeps>({
-    agents: () => listAgentNames(homedir()),
-    readLine: sharedLineReader(),
+    // U3-b: no agent that is being removed; the rest through the AgentDirectory seam.
+    agents: async () =>
+      (await agentDirectory(homedir()).list()).filter((e) => !e.removing).map((e) => e.name),
+    lastUsed: () => agentDirectory(homedir()).readCurrent(),
+    serves: appServes({
+      home: homedir(),
+      env: process.env,
+      now: Math.floor(Date.now() / 1000),
+    }),
     start: async (name) => {
       // U3-c: the folders only through the AgentDirectory seam; a `removing` agent never opens.
       const directory = agentDirectory(homedir());
