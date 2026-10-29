@@ -778,6 +778,24 @@ export function ContactsPage({
     };
   }, [api, tick]);
 
+  // HOTFIX-045: while anything waits for its pairing, re-read every 5 s and when the tab comes back.
+  const anyPending = list.phase === 'ok' && list.contacts.some((c) => c.pairing === 'pending');
+  useEffect(() => {
+    if (!anyPending) return undefined;
+    const bump = (): void => setTick((n) => n + 1);
+    const timer = setInterval(bump, 5_000);
+    const onVisible = (): void => {
+      if (document.visibilityState !== 'hidden') bump();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', bump);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', bump);
+    };
+  }, [anyPending]);
+
   useEffect(() => {
     let live = true;
     void owner.passkey().then((info) => {
