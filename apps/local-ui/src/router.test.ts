@@ -36,6 +36,7 @@ const EXPECTED: ReadonlyArray<readonly [string, string]> = [
   ['/settings/messages', 'Messages'],
   ['/settings/contacts', 'Contacts'],
   ['/settings/agents', 'Agents'],
+  ['/settings/apps', 'AI apps'],
   ['/settings/files', 'Files'],
   ['/settings/proofs', 'Proofs & credits'],
   ['/settings/rules', 'Rules'],
@@ -63,6 +64,7 @@ describe('routes', () => {
     '/settings/messages',
     '/settings/contacts',
     '/settings/agents',
+    '/settings/apps',
     '/settings/files',
     '/settings/proofs',
     '/settings/rules',
@@ -130,11 +132,12 @@ describe('nav', () => {
     expect(host.querySelector('main h1')?.textContent).toBe('Files');
   });
 
-  it('shows a Settings sub-navigation with Backup, Passkeys, Appearance, Advanced and About', () => {
+  it('shows a Settings sub-navigation with AI apps, Backup, Passkeys, Appearance, Advanced and About', () => {
     mountAt('/settings/passkeys');
     const sub = host.querySelector('nav[aria-label="Settings"]');
     expect(sub).not.toBeNull();
     expect([...(sub?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual([
+      'AI apps',
       'Backup',
       'Passkeys',
       'Appearance',

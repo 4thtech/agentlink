@@ -246,6 +246,16 @@ describe('Review change: the exact entry, then Touch ID', () => {
     await mountPage();
     await click(button(card('cursor'), 'Review change'));
     await click(button(sheet(), 'Apply with Touch ID'));
+    // After the write the file says Cursor runs the open agent (the page reads it again).
+    answers['GET /api/ui/apps'] = {
+      status: 200,
+      body: {
+        ...APPS_LIST.answer.body,
+        apps: APPS_LIST.answer.body.apps.map((a) =>
+          a.app === 'cursor' ? { ...a, state: 'connected', agent: 'personal' } : a,
+        ),
+      },
+    };
     await enterCode();
     const post = calls.find((c) => c.method === 'POST' && c.url === '/api/ui/apps/apply');
     expect(post).toBeDefined();
