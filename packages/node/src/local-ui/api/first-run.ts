@@ -14,7 +14,10 @@ export type FirstRunOwnerState = 'missing' | 'set_up' | 'unknown';
 export async function firstRunStatus(context: LocalUiContext): Promise<LocalUiResult> {
   let owner: FirstRunOwnerState;
   try {
-    owner = (await context.ownerContext()) === undefined ? 'missing' : 'set_up';
+    // U3-g-b: with no agent yet, the real state (an owner or an agent folder elsewhere is set_up).
+    const blocked = context.setupBlocked;
+    if (blocked !== undefined) owner = (await blocked()) ? 'set_up' : 'missing';
+    else owner = (await context.ownerContext()) === undefined ? 'missing' : 'set_up';
   } catch {
     owner = 'unknown';
   }
