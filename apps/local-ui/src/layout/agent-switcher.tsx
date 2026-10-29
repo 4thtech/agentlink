@@ -2,7 +2,7 @@
 // works from; a menu of the other agents (each with its AI apps), Add agent and Manage agents.
 // Switching needs no Touch ID (it only changes what you look at): one POST, then every page reloads
 // for that agent. Labels are text only (I-5). At 360 the trigger is the agent's initial in a circle.
-import { Icon, LiveDot, TextField } from '@4thtech-io/ui';
+import { Icon, LiveDot, TextField, type LiveDotState } from '@4thtech-io/ui';
 import { createPortal } from 'react-dom';
 import { useCallback, useMemo, useRef, useState, type ReactElement } from 'react';
 import { navigate } from '../router.js';
@@ -11,7 +11,6 @@ import type { AgentsApi } from '../pages/agents/api.js';
 import {
   AGENTS_APPS_PATH,
   AGENTS_PATH,
-  appsText,
   orderAgents,
   shortLabel,
   stateWord,
@@ -24,8 +23,16 @@ import '../pages/agents/agents.css';
 
 const MANY = 8;
 
+/** The top bar's one status (HOTFIX-045): the app's connection, merged with the open agent's. */
+export interface SwitcherChip {
+  readonly state: LiveDotState;
+  readonly label?: string;
+}
+
 export interface AgentSwitcherProps {
   readonly api?: AgentsApi;
+  /** The connection chip. The switcher shows exactly one chip: this one, or "Not running" for the open agent. */
+  readonly chip?: SwitcherChip;
   /** Reloads every page after a switch (default: the browser reload). */
   readonly reload?: () => void;
 }
@@ -37,8 +44,29 @@ function Dot({ row }: { row: AgentRow }): ReactElement {
   return <LiveDot state={row.running ? 'connected' : 'not-running'} label={stateWord(row)} />;
 }
 
+function Chip({ chip }: { chip: SwitcherChip | undefined }): ReactElement | null {
+  if (chip === undefined) return null;
+  return (
+    <LiveDot state={chip.state} {...(chip.label === undefined ? {} : { label: chip.label })} />
+  );
+}
+
+/** One truthful state: a connection that is not up wins; otherwise the open agent's own. */
+function merged(
+  chip: SwitcherChip | undefined,
+  row: AgentRow | undefined,
+): SwitcherChip | undefined {
+  if (chip === undefined)
+    return row === undefined
+      ? undefined
+      : { state: row.running ? 'connected' : 'not-running', label: stateWord(row) };
+  if (chip.state !== 'connected' || row === undefined || row.running) return chip;
+  return { state: 'not-running', label: stateWord(row) };
+}
+
 export function AgentSwitcher({
   api,
+  chip,
   reload = defaultReload,
 }: AgentSwitcherProps): ReactElement | null {
   const { state, reload: reread, switchTo } = useAgents(api, reload);
@@ -57,21 +85,27 @@ export function AgentSwitcher({
   const current = rows.find((r) => r.current);
 
   if (list === undefined) {
-    if (state.kind !== 'error') return null;
+    if (state.kind !== 'error') return <Chip chip={chip} />;
     return (
-      <span className="ag-switch-note al-text-body-sm">
-        {S.loadError}{' '}
-        <button type="button" className="ag-link" onClick={reread}>
-          {S.tryAgain}
-        </button>
-      </span>
+      <>
+        <span className="ag-switch-note al-text-body-sm">
+          {S.loadError}{' '}
+          <button type="button" className="ag-link" onClick={reread}>
+            {S.tryAgain}
+          </button>
+        </span>
+        <Chip chip={chip} />
+      </>
     );
   }
   if (!list.switchable) {
     return (
-      <span className="ag-switch-note al-text-body-sm al-muted" title={S.openApp}>
-        {S.openApp}
-      </span>
+      <>
+        <span className="ag-switch-note al-text-body-sm al-muted" title={S.openApp}>
+          {S.openApp}
+        </span>
+        <Chip chip={chip} />
+      </>
     );
   }
 
@@ -86,8 +120,9 @@ export function AgentSwitcher({
         });
 
   const label = current?.label ?? list.label ?? S.switcherLabel;
-  const apps = current === undefined ? S.notConnected : appsText(current);
-  const word = current === undefined ? S.notRunning : stateWord(current);
+  const apps = current === undefined ? S.notConnected : (current.apps[0] ?? S.notConnected);
+  const one = merged(chip, current);
+  const word = one?.label ?? (current === undefined ? S.notRunning : stateWord(current));
   const many = usable.length > MANY;
   // At 600 px and under the menu is a bottom sheet: outside the top bar, whose blur would make it
   // position against the bar instead of the screen.
@@ -122,10 +157,10 @@ export function AgentSwitcher({
         </span>
         <span className="ag-switch-label al-text-label">{shortLabel(label)}</span>
         {usable.length > 1 ? <Icon name="chevron-down" size={14} /> : null}
-        {current === undefined ? null : <Dot row={current} />}
+        <Chip chip={one} />
         <span className="ag-switch-app">
           {current !== undefined && current.apps.length > 0 ? (
-            <AppMark name={appsText(current)} />
+            <AppMark name={current.apps[0] ?? ''} />
           ) : (
             <span className="al-text-body-sm al-muted">{S.noAiApp}</span>
           )}

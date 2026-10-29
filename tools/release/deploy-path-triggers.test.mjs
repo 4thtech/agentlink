@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { walkFiles } from './walk-files.mjs';
 import { commandLines, runScripts } from './workflow-run-steps.mjs';
 
 // CHORE-DEPLOY-PATH-TRIGGERS: a workflow with an `on.push.paths` filter must start when any
@@ -63,10 +64,7 @@ function referencedFiles(source, repoRoot = root) {
     const full = resolve(repoRoot, path);
     if (!full.startsWith(`${repoRoot}/`) || full.endsWith('.md') || !existsSync(full)) return;
     if (statSync(full).isDirectory()) {
-      for (const entry of readdirSync(full, { recursive: true })) {
-        const child = join(full, String(entry));
-        if (statSync(child).isFile()) found.add(relative(repoRoot, child));
-      }
+      for (const child of walkFiles(full)) found.add(relative(repoRoot, child));
     } else found.add(relative(repoRoot, full));
   };
   for (const { script } of runScripts(source)) {

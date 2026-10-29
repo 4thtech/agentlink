@@ -172,12 +172,6 @@
 .ct-qr {
   margin: 0;
 }
-.ct-paste {
-  inline-size: 100%;
-  min-block-size: calc(var(--al-size-control-lg) * 2);
-  resize: vertical;
-  overflow-wrap: anywhere;
-}
 /* The ready text: a recessed well that wraps and never scrolls sideways. */
 .ct-invite-well {
   padding: var(--al-space-4);
