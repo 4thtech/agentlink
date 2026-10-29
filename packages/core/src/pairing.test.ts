@@ -260,6 +260,36 @@ describe('two clients pair (04 §3.6)', () => {
   });
 });
 
+describe('pairing.waiting (U3-invite-b, Decision 37; 06 §6)', () => {
+  it('is true while a pairing is pending on either side, false once it completed', async () => {
+    expect(await a.client.pairing.waiting()).toBe(false);
+    expect(await b.client.pairing.waiting()).toBe(false);
+    const invite = await a.client.pairing.createInvite();
+    // A sent invite not used yet (the inviter side).
+    expect(await a.client.pairing.waiting()).toBe(true);
+    const accepted = await b.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('test: not accepted');
+    // An accept waiting for its ack (the invitee side).
+    expect(await b.client.pairing.waiting()).toBe(true);
+    await deliver(a, accepted.handshake.envelope);
+    expect(await a.client.pairing.waiting()).toBe(false);
+    await deliver(b, await lastSent(a, 'handshake-ack'));
+    expect(await b.client.pairing.waiting()).toBe(false);
+  });
+
+  it('an expired invite or staged accept no longer counts', async () => {
+    const invite = await a.client.pairing.createInvite({ expiresInDays: 1 });
+    const c = await agent(3, ownerC, 'carol');
+    const other = await a.client.pairing.createInvite({ expiresInDays: 1 });
+    const accepted = await c.client.pairing.acceptInvite({ link: other.inviteUrl, allowed: true });
+    expect(accepted.status).toBe('pending');
+    expect(invite.expiresAt).toBeGreaterThan(clock.t);
+    clock.t += 8 * 86_400;
+    expect(await a.client.pairing.waiting()).toBe(false);
+    expect(await c.client.pairing.waiting()).toBe(false);
+  });
+});
+
 describe('MITM and the commitment (04 §3.6.1)', () => {
   it('a third client that swaps the invite: both pairings complete, with different codes', async () => {
     const m = await agent(9, ownerM, 'mallory');
