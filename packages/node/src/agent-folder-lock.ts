@@ -10,7 +10,8 @@
 // advisory locks, LockFileEx on Windows) that the OS drops when the holder exits or crashes, so a dead
 // process never leaves the agent "in use". Shared holders never block each other; an exclusive take
 // is refused while any shared holder is alive, in this process or another. Nothing is ever written to
-// the file.
+// the file, and nothing else is created in the folder (the exclusive hold keeps its journal in
+// memory: HOTFIX-045-REMOVE).
 //
 // Folder rules (04 §4, 06 §6): the caller passes the agent folder's checked realpath
 // (agent-dir.ts readAgentConfig). The lock file is created with mode 0600 and must be a regular file
@@ -116,8 +117,16 @@ export async function withAgentFolderExclusive<T>(
   const db = openLockDb(dir);
   try {
     try {
+      // HOTFIX-045-REMOVE: SQLite's default rollback journal writes `open.lock-journal` into the
+      // agent folder for as long as the exclusive lock is held, and the removal deletes that folder
+      // under this lock (agent-dir.ts removeAgentFolder refuses any file it does not know). An
+      // in-memory journal writes no file; the OS file lock, and so the exclusivity, is unchanged.
+      // Set here only: while a removal holds the lock, this pragma is itself SQLITE_BUSY (`in_use`).
+      const mode: unknown = db.pragma('journal_mode = MEMORY', { simple: true });
+      if (mode !== 'memory') throw new AgentFolderLockError('lock_failed');
       db.prepare('BEGIN EXCLUSIVE').run();
     } catch (error) {
+      if (error instanceof AgentFolderLockError) throw error;
       throw new AgentFolderLockError(isBusy(error) ? 'in_use' : 'lock_failed');
     }
     try {

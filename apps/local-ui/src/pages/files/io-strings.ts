@@ -15,9 +15,7 @@ export const FILES_IO_STRINGS = {
     folders: 'waiting',
   },
   // Stepped bars on rows in flight (no byte progress is served, so no determinate bar).
-  progressArriving: 'File arriving',
   progressSending: 'File sending',
-  arrivingSteps: ['Arrived', 'Saved'],
   sendingSteps: ['Waiting to send', 'Sent', 'Delivered'],
   // Under the hood: what the lists hold, nothing private.
   hoodFiles: 'Files listed',

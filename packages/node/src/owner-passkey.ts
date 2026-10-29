@@ -285,7 +285,10 @@ export function authenticatorDataOk(authenticatorData: Uint8Array): boolean {
 }
 
 /** The checks on any assertion for this owner, before a PRF output is used. */
-function assertionFitsOwner(assertion: PasskeyAssertion, owner: OwnerPublicKeys): boolean {
+function assertionFitsOwner(
+  assertion: PasskeyAssertion,
+  owner: Pick<OwnerPublicKeys, 'ownerNostr'>,
+): boolean {
   return (
     authenticatorDataOk(assertion.authenticatorData) &&
     equalBytes(assertion.userHandle, owner.ownerNostr)
@@ -327,7 +330,8 @@ export function readOwnerPasskeyItem(
  */
 export function assertPasskeyAssertion(
   header: PasskeyBlobHeader,
-  owner: OwnerPublicKeys,
+  // HOTFIX-045-REMOVE: only the owner's Nostr key is checked (the passkey's user.id).
+  owner: Pick<OwnerPublicKeys, 'ownerNostr'>,
   assertion: PasskeyAssertion,
 ): void {
   if (

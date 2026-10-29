@@ -1,7 +1,7 @@
-// UI-REFRESH-f: the right end of the top bar (B-11 §3): the Under the hood switch, the live status
-// chip and the theme control, in that order. The chip is a LiveDot (shape and word); it is not a live
+// UI-REFRESH-f: the right end of the top bar (B-11 §3): the Under the hood switch, the one
+// status chip (inside the agent switcher: HOTFIX-045) and the theme control, in that order. The chip is a LiveDot (shape and word); it is not a live
 // region, the status bar announces changes. Words follow 11 §5.
-import { HOOD_STRINGS, Icon, LiveDot, Switch, type LiveDotState } from '@4thtech-io/ui';
+import { HOOD_STRINGS, Icon, Switch, type LiveDotState } from '@4thtech-io/ui';
 import type { ReactElement } from 'react';
 import { setPref, usePrefs, type ThemePref } from '../prefs/index.js';
 import { SHELL_STRINGS as S } from '../strings.js';
@@ -35,7 +35,7 @@ export function TopBarControls({ connection }: { connection: ConnectionState }):
   const theme = THEME_NAME[prefs.theme];
   return (
     <>
-      <AgentSwitcher />
+      <AgentSwitcher chip={chip} />
       <span title={HOOD_STRINGS.tooltip}>
         <Switch
           label={HOOD_STRINGS.title}
@@ -43,7 +43,6 @@ export function TopBarControls({ connection }: { connection: ConnectionState }):
           onChange={(on) => setPref('hood', on)}
         />
       </span>
-      <LiveDot state={chip.state} {...(chip.label === undefined ? {} : { label: chip.label })} />
       <button
         type="button"
         className="al-btn al-btn-ghost al-btn-sm al-topbar-theme"
