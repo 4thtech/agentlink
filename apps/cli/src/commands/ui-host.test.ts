@@ -7,7 +7,7 @@ import type {
   ApprovalServerOptions,
   LocalUiAssets,
 } from '@4thtech-io/node';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -232,20 +232,28 @@ describe('startUiWelcome (U3-g-b)', () => {
   });
 
   it('U3-g-c: the real harness desk lists a detected app entry-only (no other server shown)', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'agentlink-u3-g-c-'));
+    const home = await realpath(await mkdtemp(join(tmpdir(), 'agentlink-u3-g-c-')));
     try {
-      const secret = 'sk-other-server-secret-u3gc';
+      const secret = 'other-server-value-u3gc';
       await writeFile(
         join(home, '.claude.json'),
-        JSON.stringify({
-          mcpServers: { 'other-u3gc': { command: 'other-cmd-u3gc', env: { TOKEN: secret } } },
-        }),
+        `${JSON.stringify(
+          {
+            numStartups: 3,
+            mcpServers: {
+              'other-u3gc': { type: 'stdio', command: 'other-cmd-u3gc', env: { TOKEN: secret } },
+            },
+          },
+          null,
+          2,
+        )}\n`,
         { mode: 0o600 },
       );
       const w = welcome();
       await startUiWelcome({
         ...w.deps,
-        aiApps: () => createAiAppsDesk({ home, env: {}, platform: 'linux' }),
+        aiApps: () =>
+          createAiAppsDesk({ home, env: {}, desktopRunning: () => Promise.resolve(false) }),
       });
       const listed = await w.started[0]?.host?.aiAppsList?.list();
       const claude = listed?.apps.find((a) => a.app === 'claude-code');

@@ -246,6 +246,7 @@ import {
   type LocalUiAgentView,
   type LocalUiAgentsList,
   type LocalUiAgentsManage,
+  type LocalUiAiApps,
   type LocalUiNewAgent,
   type LocalUiAssets,
   type LocalUiContext,
@@ -881,6 +882,22 @@ const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
   'POST /api/ui/join/dismiss',
 ]);
 
+/**
+ * U3-g-c: a read-only desk over the host's AI apps reader: `list` only (bound once, so nothing else
+ * of the caller's object is reachable); `plan` refuses and `agentIdOf` knows no agent.
+ */
+function listOnlyAiApps(
+  reader: { readonly list: LocalUiAiApps['list'] } | undefined,
+): LocalUiAiApps | undefined {
+  if (reader === undefined) return undefined;
+  const list = reader.list.bind(reader);
+  return Object.freeze<LocalUiAiApps>({
+    list: () => list(),
+    plan: () => Promise.reject(new Error('No agent is open.')),
+    agentIdOf: () => Promise.resolve(undefined),
+  });
+}
+
 /** U3-c: the switch body is `{"name":"<32 chars>","generation":<16 digits>}`. */
 const MAX_SWITCH_BODY_BYTES = 128;
 /** U3-c: the most agents `GET /api/ui/agents` lists (b11 §29 shows search above 8). */
@@ -1102,6 +1119,8 @@ export async function startApprovalServerWith(
   // U3-c: the per-agent pieces; the app host rebinds them on a switch (bindAgent).
   let source: ApprovalServerSource = options.source;
   let agentUi: Omit<LocalUiOptions, 'assets'> | undefined = options.localUi;
+  /** U3-g-c: the app host's list-only AI apps reader, for while no agent is open (read-only). */
+  const noAgentAiApps: LocalUiAiApps | undefined = listOnlyAiApps(options.host?.aiAppsList);
   let agentLabel: string | undefined;
   /** U3-c: the app host, when this server is one (created once every gate below exists). */
   let host: AppHostSlot | undefined = undefined;
@@ -1256,9 +1275,26 @@ export async function startApprovalServerWith(
         ? { setupBlocked: () => setupBlockedNoAgent() }
         : {}),
       // U3-f: the CLI's harness desk (the one AI app config writer), when the caller wired it.
-      ...(agentUi?.aiApps === undefined ? {} : { aiApps: agentUi.aiApps }),
+      // U3-g-c: with no agent open, the host's list-only reader (Welcome's "Pick your AI app").
+      ...aiAppsPart(),
     });
   let uiContext: LocalUiContext = buildUiContext();
+
+  /**
+   * U3-g-c: the AI apps desk the routes see: the open agent's own (U3-f), else, while no agent is
+   * open, the host's list-only reader. Only `GET /api/ui/apps` is reached then (NO_AGENT_ROUTES);
+   * the reader's plan refuses anyway (defence in depth) and it knows no agent.
+   */
+  function aiAppsDesk(): LocalUiAiApps | undefined {
+    if (agentUi !== undefined) return agentUi.aiApps;
+    return noAgentAiApps;
+  }
+
+  /** U3-g-c: the context's `aiApps` field (absent when there is no desk). */
+  function aiAppsPart(): { readonly aiApps?: LocalUiAiApps } {
+    const desk = aiAppsDesk();
+    return desk === undefined ? {} : { aiApps: desk };
+  }
 
   /** U3-d: reads the open agent's verified label (core loadLabel); the folder name otherwise. */
   async function refreshLabel(): Promise<void> {
@@ -3819,9 +3855,7 @@ export async function startApprovalServerWith(
     const entries = (await slot.directory.list()).slice(0, MAX_LISTED_AGENTS);
     const current = slot.current;
     // U3-f: the agent each AI app runs, from its `agentlink` entry only (the seam's entry-only view).
-    const apps = await (agentUi?.aiApps?.list() ?? Promise.resolve(undefined)).catch(
-      () => undefined,
-    );
+    const apps = await (aiAppsDesk()?.list() ?? Promise.resolve(undefined)).catch(() => undefined);
     const appsOf = (name: string): readonly string[] =>
       Object.freeze(
         (apps?.apps ?? []).flatMap((view) =>

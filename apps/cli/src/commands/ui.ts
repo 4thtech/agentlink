@@ -30,6 +30,7 @@ import { homedir } from 'node:os';
 import process from 'node:process';
 import { createLogger, type Logger } from '@4thtech-io/log';
 import { probeOsKeychain, selectKeyStoreBackend, startApprovalServer } from '@4thtech-io/node';
+import { createAiAppsDesk } from '../harness/app-desk.js';
 import { embeddedLocalUiAssets } from '../mcp/local-ui-assets.js';
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import { EXIT_FAILED, EXIT_OK, type CommandContext, type CommandHandler } from '../dispatch.js';
@@ -243,6 +244,8 @@ export function nodeUiDeps(): UiDeps {
           write: (record) => writeAppHostRecord(homedir(), record),
           remove: () => removeAppHostRecord(homedir()),
         },
+        // U3-g-c: the same harness desk as an open agent's (U3-f), listed read-only on Welcome.
+        aiApps: () => createAiAppsDesk({ home: homedir(), env: process.env }),
       });
     },
     start: async (name, startOptions = {}) => {

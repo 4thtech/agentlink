@@ -883,7 +883,13 @@ const WELCOME_APPS = {
       state: 'not_connected',
       quitFirst: false,
     },
-    { app: 'cursor', name: 'Cursor', path: '~/.cursor/mcp.json', state: 'not_ours', quitFirst: false },
+    {
+      app: 'cursor',
+      name: 'Cursor',
+      path: '~/.cursor/mcp.json',
+      state: 'not_ours',
+      quitFirst: false,
+    },
   ],
 };
 
@@ -929,7 +935,7 @@ describe('U3-g-c: Welcome lists the AI apps before the first agent exists', () =
     expect(JSON.parse(res.body)).not.toHaveProperty('apps');
   });
 
-  it('after finish the host uses the first agent\'s full desk (preview reaches it), not the reader', async () => {
+  it("after finish the host uses the first agent's full desk (preview reaches it), not the reader", async () => {
     const welcomeCalls: string[] = [];
     const agentCalls: string[] = [];
     const h = await harness({

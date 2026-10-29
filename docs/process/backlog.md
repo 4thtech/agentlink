@@ -5555,6 +5555,15 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Scope:** with no agent folder at all, `agentlink ui` (and bare `agentlink`) starts the app host with no open agent and opens the first-run page (Welcome); it serves only the setup-time reads (`GET /api/ui/first-run`, `/api/ui/apps`, `/api/ui/agents/label-check`, `/api/ui/agents`, `/api/ui/health`) and first run's `begin`/`finish`; every other route and the approval API answer the fixed 409 `no_agent` after every guard. `finish {label}` (default "My agent") creates the first agent folder (named `default`, as `init` names it, D5; decided 2026-10-29; later agents use the label slug) and the owner with one gesture, all or nothing, and opens that agent in the same host (generation raised; no restart, no new link).
 - **Acceptance:** tests first (`RED (expected): U3-g-b`): `ui` with zero agents serves Welcome; agent routes are refused with no agent; first run creates and opens the agent; an AI-run `ui` prints its fixed line and opens nothing (D-39); agents marked removing (or revoked) are never opened and block the no-agent setup; contract tests against the real app host.
 
+#### U3-g-c · Welcome lists AI apps before the first agent exists (bug from U3-k, 2026-10-29)
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** independent review (app host) · **Phase:** M1b · **Build group:** 4
+- **Repo/path:** agentlink · `packages/node/src/local-ui/app-host.ts`, `packages/node/src/approval-server.ts`, `apps/cli/src/commands/{ui,ui-host}.ts`
+- **Depends on:** U3-g-b (no-agent host), U3-f (harness desk)
+- **Spec:** 08 §1 "App host" ("with no agent yet, Welcome"); 06 §7; 04 §2.5; D-138
+- **Invariants:** I-4, I-7
+- **Scope:** the no-agent host gets the CLI harness desk's list only (`AppHostOptions.aiAppsList`), so `GET /api/ui/apps` lists the detected apps, entry-only, on Welcome; preview, apply and disconnect stay `409 no_agent` until `finish` opens the first agent, whose own full desk then answers them. No logging.
+- **Acceptance:** tests first (`RED (expected): U3-g-c`): the Welcome host lists the apps with no agent; preview/apply/disconnect answer `no_agent` and plan nothing; after `finish` the agent's desk answers; the CLI passes the list only, entry-only over a real desk; flip the U3-k e2e `it.fails` once both have landed.
+
 #### U3-h · switcher, Agents page, Add, Rename, Remove sheets (new, USABILITY-WAVE-3, owner decision 2026-10-29)
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Audit:** none beyond the independent review · **Phase:** M1b · **Build group:** 2 (list and switch) and 3 (sheets)
 - **Repo/path:** agentlink · `apps/local-ui/src/layout/top-bar.tsx`, `apps/local-ui/src/pages/agents/` (new; owns the List and Map control, U3-map plugs into it)

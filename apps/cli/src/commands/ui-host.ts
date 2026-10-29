@@ -18,6 +18,13 @@
 // agent (AgentDirectory `create`) and opens it in the same host. Only when the OS keychain can hold a
 // new agent (07 §9.4; a file-KeyStore setup stays `agentlink init` in the terminal) and this build
 // has the app. Nothing here signs or holds a secret.
+//
+// U3-g-c (08 §1 "with no agent yet, Welcome"; 06 §7; proposed, owner confirms at merge): the no-agent
+// host also gets the CLI's harness desk (harness/app-desk.ts, the U3-f seam), LIST ONLY, so
+// Welcome's "Pick your AI app" lists the detected apps before the first agent exists. Entry-only
+// (the desk's list: only AgentLink's own entry, a foreign one is just "not ours"); nothing is
+// logged. Preview, apply and disconnect stay refused with no agent open; once first run's `finish`
+// opens the first agent, that agent's own full desk (localUiOptions) answers them.
 import type {
   AgentDirectory,
   ApprovalServer,
@@ -26,6 +33,7 @@ import type {
   ApprovalServerSource,
   AppHostAgent,
   AppHostHandoffRecord,
+  LocalUiAiApps,
   LocalUiAssets,
   LocalUiOptions,
 } from '@4thtech-io/node';
@@ -106,6 +114,8 @@ export interface UiWelcomeDeps {
   readonly waitingInvite?: string;
   /** U3-invite: the handoff record (~/.agentlink/app-host.json, 0600). */
   readonly handoff?: AppHostHandoffRecord;
+  /** U3-g-c: the CLI's harness desk (createAiAppsDesk); the host gets its `list` only. */
+  readonly aiApps?: () => LocalUiAiApps;
 }
 
 /** U3-g-b: the running no-agent app host: it always opens on the first-run page (Welcome). */
@@ -134,6 +144,10 @@ export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServ
   if (!(await deps.keychainUsable().catch(() => false))) return undefined;
   const assets = deps.assets();
   if (assets.files.has('index.html') !== true) return undefined;
+  // U3-g-c: read-only: only the desk's list reaches the host (never its plan or agent lookup).
+  const desk = deps.aiApps?.();
+  const aiAppsList: Pick<LocalUiAiApps, 'list'> | undefined =
+    desk === undefined ? undefined : Object.freeze({ list: () => desk.list() });
   const server = await deps.startServer({
     source: NO_AGENT_SOURCE,
     // The app's files only: no agent client, no owner setup of an agent (first run makes one).
@@ -147,6 +161,8 @@ export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServ
       ...(deps.waitingInvite === undefined ? {} : { waitingInvite: deps.waitingInvite }),
       // U3-invite: the 0600 handoff record, so a later `join` hands over here.
       ...(deps.handoff === undefined ? {} : { handoff: deps.handoff }),
+      // U3-g-c: Welcome's "Pick your AI app" (GET /api/ui/apps) with no agent yet.
+      ...(aiAppsList === undefined ? {} : { aiAppsList }),
     },
     ...(deps.onEvent === undefined ? {} : { onEvent: deps.onEvent }),
   });
