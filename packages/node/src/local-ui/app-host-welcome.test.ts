@@ -1061,7 +1061,7 @@ describe('HOTFIX-045-TOUCHID: Touch ID with no agent open', () => {
     const { finish } = await firstRun(h, s);
     expect(finish?.status).toBe(200);
     w.keychain.items.delete(OWNER_PASSKEY_ACCOUNT);
-    const res = await h.get('/api/owner/passkey', { ...s, generation: '2' });
+    const res = await h.get('/api/owner/passkey', s);
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body) as { passkey: Record<string, unknown> };
     expect(body.passkey['registered']).toBe(false);
