@@ -1232,7 +1232,8 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
       if (proof.kind === 'passphrase') {
         blob = await readOwnerItem(keychain, timeoutMs);
         if (blob === null) throw ownerMissing();
-        if (blob.length !== ALKO_LENGTH) throw ownerMismatch();
+        // A damaged item is the documented one answer above (IR round 1, L1).
+        if (blob.length !== ALKO_LENGTH) throw presenceRejected();
         try {
           seed = await openOwnerSeedWithoutCard(
             blob,
