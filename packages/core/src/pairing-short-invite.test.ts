@@ -44,7 +44,10 @@ interface Seen {
 function fakeDrop() {
   const objects = new Map<string, Uint8Array>();
   const seen: Seen[] = [];
-  const state = { mode: 'ok' as 'ok' | 'down' | 'busy' | 'refuse', onUpload: (): void => {} };
+  const state = {
+    mode: 'ok' as 'ok' | 'down' | 'busy' | 'refuse',
+    onUpload: async (): Promise<void> => {},
+  };
   const fetch = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
     const body = request.method === 'GET' ? '' : await request.text();
@@ -53,7 +56,7 @@ function fakeDrop() {
     if (state.mode === 'busy') return new Response('{}', { status: 503 });
     const id = /^\/v1\/i\/([A-Za-z0-9_-]{22})$/.exec(url.pathname)?.[1];
     if (request.method === 'POST' && url.pathname === '/v1/invite') {
-      state.onUpload();
+      await state.onUpload();
       if (state.mode === 'refuse') return new Response('{"error":"limit"}', { status: 429 });
       const parsed = JSON.parse(body) as { lookupId: string; object: string; expiresAt: number };
       objects.set(parsed.lookupId, decodeBase64url(parsed.object));
@@ -63,7 +66,10 @@ function fakeDrop() {
       const obj = objects.get(id);
       return obj === undefined
         ? new Response('{"error":"not_found"}', { status: 404 })
-        : new Response(obj, { status: 200, headers: { 'content-type': 'application/octet-stream' } });
+        : new Response(obj as Uint8Array<ArrayBuffer>, {
+            status: 200,
+            headers: { 'content-type': 'application/octet-stream' },
+          });
     }
     if (request.method === 'DELETE' && id !== undefined) {
       if (state.mode === 'refuse') return new Response('{}', { status: 503 });
@@ -108,8 +114,7 @@ async function agent(n: number, name: string, drop: ReturnType<typeof fakeDrop> 
   return { client, store, lines };
 }
 
-const inviteRows = (a: { store: MemoryStore }) =>
-  a.store.transaction((tx) => tx.select('invites'));
+const inviteRows = (a: { store: MemoryStore }) => a.store.transaction((tx) => tx.select('invites'));
 
 beforeEach(() => clearShortInviteCache());
 
@@ -135,19 +140,18 @@ describe('create: short by default (04 §3.6.2 Create)', () => {
   it('records the lookup ID and drop key epoch, sealed, BEFORE the upload is sent', async () => {
     const drop = fakeDrop();
     const a = await agent(32, 'Ana', drop);
-    let atUpload: unknown[] = [];
-    drop.state.onUpload = () => {
-      // Read synchronously from the memory store's committed state at the moment of the upload.
-      void inviteRows(a).then((rows) => {
-        atUpload = rows;
-      });
+    // The drop reads the store while it handles the upload: the row is already committed, with
+    // the lookup ID and epoch recorded.
+    const atUpload: { lookup: unknown; epoch: unknown }[] = [];
+    drop.state.onUpload = async () => {
+      for (const r of await inviteRows(a)) {
+        atUpload.push({ lookup: r.drop_lookup_id, epoch: r.drop_key_epoch });
+      }
     };
-    let rowsSeen: unknown[] = [];
-    const origFetch = drop.fetch;
-    void origFetch;
     const created = await a.client.pairing.createInvite();
-    rowsSeen = atUpload;
-    expect(rowsSeen).toHaveLength(1);
+    expect(atUpload).toHaveLength(1);
+    expect(atUpload[0]?.lookup).not.toBeNull();
+    expect(atUpload[0]?.epoch).not.toBeNull();
     const rows = await inviteRows(a);
     const row = rows[0]!;
     expect(row.drop_lookup_id).not.toBeNull();
@@ -259,7 +263,10 @@ describe('accept a short link (B)', () => {
     const [open] = await a.client.pairing.openInvites();
     await a.client.pairing.cancelInvite(open!.inviteId);
     if (started.status !== 'pending') throw new Error('test: not started');
-    await a.client.envelopes.receive({ envelope: started.handshake.envelope, giftWrapId: giftWrapId() });
+    await a.client.envelopes.receive({
+      envelope: started.handshake.envelope,
+      giftWrapId: giftWrapId(),
+    });
     const reports = await a.client.envelopes.processReceived();
     expect(JSON.stringify(reports)).toContain('invite_expired');
     expect(await a.store.transaction((tx) => tx.count('contacts'))).toBe(0);
@@ -281,12 +288,12 @@ describe('open invites (W4-INVITES-LIST)', () => {
       expect(JSON.stringify(item)).not.toContain('#');
     }
     expect(list.find((i) => i.label === 'Bo')?.expiresAt).toBe(one.expiresAt);
-    clock.advance(2 * 86_400 * 1000);
+    clock.t += 2 * 86_400;
     expect(await a.client.pairing.openInvites()).toHaveLength(1);
     // Expired invites' objects are deleted by the sweep.
     await a.client.pairing.sweepInviteObjects();
     expect(drop.objects.size).toBe(1);
-    clock.advance(-2 * 86_400 * 1000);
+    clock.t -= 2 * 86_400;
   });
 
   it('cancel refuses an unknown or malformed id', async () => {

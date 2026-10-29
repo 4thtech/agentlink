@@ -21,7 +21,7 @@ const json = (status: number, body: unknown, headers: Record<string, string> = {
     headers: { 'content-type': 'application/json', ...headers },
   });
 const octets = (bytes: Uint8Array, headers: Record<string, string> = {}): Response =>
-  new Response(bytes, {
+  new Response(bytes as Uint8Array<ArrayBuffer>, {
     status: 200,
     headers: { 'content-type': 'application/octet-stream', ...headers },
   });
@@ -128,7 +128,9 @@ describe('putInvite / deleteInvite (07 §5.4)', () => {
   });
 
   it('deletes with a signed DELETE /v1/i/{lookupId} at the recorded epoch; 404 is done', async () => {
-    const h = harness((r) => (r.method === 'DELETE' ? new Response(null, { status: 204 }) : json(500, {})));
+    const h = harness((r) =>
+      r.method === 'DELETE' ? new Response(null, { status: 204 }) : json(500, {}),
+    );
     await h.adapter.deleteInvite(ID, 2);
     expect(h.seen[0]?.method).toBe('DELETE');
     expect(h.seen[0]?.url).toBe(`${ORIGIN}/v1/i/${ID}`);
@@ -172,21 +174,36 @@ describe('fetchInviteObject (04 §3.6.2 steps 2–4)', () => {
   });
 
   it('maps 404 to not_found, 429/503 to retryable, and 3xx or any other status to a failure', async () => {
-    const run = (res: Response) => fetchInviteObject({ endpoint: ORIGIN, fetch: async () => res }, ID);
+    const run = (res: Response) =>
+      fetchInviteObject({ endpoint: ORIGIN, fetch: async () => res }, ID);
     expect((await errorOf(run(json(404, { error: 'not_found' })))).code).toBe('not_found');
     expect((await errorOf(run(json(429, {}, { 'retry-after': '9' })))).code).toBe('rate_limited');
     expect((await errorOf(run(json(503, {})))).code).toBe('unavailable');
-    const redirect = new Response(null, { status: 302, headers: { location: 'https://evil.test/' } });
+    const redirect = new Response(null, {
+      status: 302,
+      headers: { location: 'https://evil.test/' },
+    });
     expect((await errorOf(run(redirect))).code).toBe('download_failed');
     expect((await errorOf(run(json(500, {})))).code).toBe('download_failed');
-    const opaque = { ...new Response(null), status: 0, type: 'opaqueredirect' } as unknown as Response;
+    const opaque = {
+      ...new Response(null),
+      status: 0,
+      type: 'opaqueredirect',
+    } as unknown as Response;
     expect((await errorOf(run(opaque))).code).toBe('download_failed');
   });
 
   it('accepts only application/octet-stream', async () => {
     const e = await errorOf(
       fetchInviteObject(
-        { endpoint: ORIGIN, fetch: async () => new Response(obj, { status: 200, headers: { 'content-type': 'text/html' } }) },
+        {
+          endpoint: ORIGIN,
+          fetch: async () =>
+            new Response(obj as Uint8Array<ArrayBuffer>, {
+              status: 200,
+              headers: { 'content-type': 'text/html' },
+            }),
+        },
         ID,
       ),
     );

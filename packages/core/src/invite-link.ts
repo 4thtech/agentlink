@@ -18,6 +18,13 @@
 //     strict invite schema (unknown keys refused).
 // Nothing hashes, signs or compares the compressed bytes or the payload text (04 §3.6, not canonical).
 //
+// Link format 2 (W4-SHORT-INVITE, D-139, 04 §3.6.2): `https://agentlink.4thtech.io/i#2.<43>` carries
+// only the 32-byte link secret K. `.` is not a base64url character, so the `2.` prefix alone tells
+// the formats apart. Resolving one fetches the `ALI1` object under the lookup ID derived from K (the
+// caller's fetcher gets that 22-character ID only, never K), opens it, and runs the D-69 steps 2-4 on
+// the payload inside, exactly as for a format 1 link. A resolved link is kept in this process's
+// memory (bounded, short-lived) so the page's check, the accept and the approval action fetch it once.
+//
 // This module imports only @4thtech-io/crypto, @4thtech-io/types and the core's errors, so the vector
 // harness runs it from source in Node, browsers and workerd (test-vectors/harness/suites/invite-link.ts).
 import {
@@ -26,7 +33,10 @@ import {
   decodeUtf8,
   encodeBase64url,
   encodeUtf8,
+  openShortInvite,
   parseReceivedJson,
+  shortInviteLookupId,
+  wipe,
 } from '@4thtech-io/crypto';
 import { inviteSchema, type Invite } from '@4thtech-io/types';
 import { CoreError } from './errors.js';
@@ -41,6 +51,10 @@ export const INVITE_MAX_PAYLOAD_CHARS = 21_846;
 export const INVITE_INFLATE_SLICE_BYTES = 1_024;
 
 const PAYLOAD = /^[A-Za-z0-9_-]+$/;
+/** Link format 2: `2.` and 43 characters of strict base64url whose last one has zero trailing bits. */
+const SHORT = /^2\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
+/** `2.` plus the 43-character secret (04 §3.6.2). */
+export const SHORT_INVITE_LINK_CHARS = 45;
 
 const invalid = (): CoreError => new CoreError('invite_invalid', 'The invite link is not valid.');
 
@@ -163,30 +177,142 @@ async function deflateRaw(input: Uint8Array): Promise<Uint8Array> {
   return out;
 }
 
-/**
- * Encodes a schema-valid invite as its canonical link. The JSON is compact (JCS: no whitespace,
- * non-ASCII unescaped). Refuses an invite whose JSON exceeds 16 384 bytes or whose payload exceeds
- * 21 846 characters, so every link it returns decodes (04 §3.6).
- */
-export async function encodeInviteLink(invite: Invite): Promise<string> {
+/** The D-69 payload bytes P of a schema-valid invite: `deflateRaw(utf8(JCS(invite)))` (04 §3.6). */
+export async function encodeInvitePayload(invite: Invite): Promise<Uint8Array> {
   const parsed = inviteSchema.safeParse(invite);
   if (!parsed.success) throw invalid();
   const json = encodeUtf8(canonicalize(parsed.data));
   if (json.length > INVITE_MAX_JSON_BYTES) {
     throw new CoreError('invite_too_large', 'The invite is too large to share as a link.');
   }
-  const payload = encodeBase64url(await deflateRaw(json));
-  if (payload.length > INVITE_MAX_PAYLOAD_CHARS) {
+  const payload = await deflateRaw(json);
+  if (encodeBase64url(payload).length > INVITE_MAX_PAYLOAD_CHARS) {
     throw new CoreError('invite_too_large', 'The invite is too large to share as a link.');
   }
-  return `${INVITE_LINK_PREFIX}${payload}`;
+  return payload;
+}
+
+/** The format 2 link of the 32-byte link secret K (04 §3.6.2). Never log it (I-7). */
+export function encodeShortInviteLink(secret: Uint8Array): string {
+  if (!(secret instanceof Uint8Array) || secret.length !== 32) throw invalid();
+  return `${INVITE_LINK_PREFIX}2.${encodeBase64url(secret)}`;
 }
 
 /**
- * Decodes a full canonical link or a bare payload into a strictly valid invite (04 §3.6 steps 1-4).
- * Signatures, hashes and expiry are not checked here (Accept step 1, the pairing service).
+ * The link secret K of a format 2 link (the full link or the bare `2.<43>`), or undefined when the
+ * input is not format 2. A string that starts as format 2 but breaks any rule of 04 §3.6.2 step 1 is
+ * refused with `invite_invalid`, as is anything that is neither format (04 §3.6 step 1).
  */
-export async function decodeInviteLink(link: unknown): Promise<Invite> {
+export function shortInviteSecretOf(link: unknown): Uint8Array | undefined {
+  if (typeof link !== 'string') throw invalid();
+  const code = link.startsWith(INVITE_LINK_PREFIX) ? link.slice(INVITE_LINK_PREFIX.length) : link;
+  if (!code.startsWith('2.')) {
+    // Format 1 has the same step 1 shape; anything else is neither format (04 §3.6 step 1).
+    if (code.length > INVITE_MAX_PAYLOAD_CHARS || !PAYLOAD.test(code)) throw invalid();
+    return undefined;
+  }
+  if (code.length !== SHORT_INVITE_LINK_CHARS || !SHORT.test(code)) throw invalid();
+  try {
+    return decodeBase64url(code.slice(2), { length: 32 });
+  } catch {
+    throw invalid();
+  }
+}
+
+/**
+ * Fetches the `ALI1` object stored under `lookupId` (22 characters of base64url) from the configured
+ * drop, never from anything in the link. Throws core's `invite_unavailable` (404),
+ * `invite_fetch_failed` (retryable) or `invite_invalid` (a response that is not an object).
+ */
+export type ShortInviteFetch = (lookupId: string) => Promise<Uint8Array>;
+
+const CACHE_MAX = 32;
+const CACHE_MS = 15 * 60 * 1000;
+/** lookupId → the resolved format 1 link: memory only, for this process (04 §3.6.2 step 3). */
+const resolved = new Map<string, { readonly link: string; readonly at: number }>();
+
+/** Forgets every resolved short link (tests, and a host that wants none kept). */
+export function clearShortInviteCache(): void {
+  resolved.clear();
+}
+
+/**
+ * The format 1 link of `link`: itself for format 1 (unchecked here: the decoder checks it), or the
+ * resolved invite for format 2 (fetched once, opened, then decoded by the D-69 steps). Without a
+ * fetcher a format 2 link is refused as damaged, as releases before D-139 do.
+ */
+export async function resolveInviteLink(
+  link: unknown,
+  fetchObject?: ShortInviteFetch,
+): Promise<string> {
+  const secret = shortInviteSecretOf(link);
+  if (secret === undefined) return link as string;
+  try {
+    const lookupId = encodeBase64url(shortInviteLookupId(secret));
+    const now = Date.now();
+    const hit = resolved.get(lookupId);
+    if (hit !== undefined && now - hit.at < CACHE_MS) return hit.link;
+    resolved.delete(lookupId);
+    if (fetchObject === undefined) throw invalid();
+    let object: Uint8Array;
+    try {
+      object = await fetchObject(lookupId);
+    } catch (error) {
+      if (
+        error instanceof CoreError &&
+        (error.code === 'invite_unavailable' ||
+          error.code === 'invite_fetch_failed' ||
+          error.code === 'invite_invalid')
+      ) {
+        throw error;
+      }
+      throw new CoreError('invite_fetch_failed', 'The invite could not be fetched. Try again.');
+    }
+    if (!(object instanceof Uint8Array)) throw invalid();
+    const payload = await openShortInvite(secret, object);
+    if (payload === undefined) throw invalid();
+    const long = `${INVITE_LINK_PREFIX}${encodeBase64url(payload)}`;
+    // Steps 2-4 of the D-69 decoder on P: a payload that is not a valid invite is damaged.
+    await decodeFormatOne(long);
+    resolved.set(lookupId, { link: long, at: now });
+    while (resolved.size > CACHE_MAX) {
+      const oldest = resolved.keys().next().value;
+      if (oldest === undefined) break;
+      resolved.delete(oldest);
+    }
+    return long;
+  } finally {
+    wipe(secret);
+  }
+}
+
+/** Options of decodeInviteLink: how a format 2 link is fetched (absent: refused as damaged). */
+export interface DecodeInviteOptions {
+  readonly fetchShortInvite?: ShortInviteFetch;
+}
+
+/**
+ * Encodes a schema-valid invite as its canonical link. The JSON is compact (JCS: no whitespace,
+ * non-ASCII unescaped). Refuses an invite whose JSON exceeds 16 384 bytes or whose payload exceeds
+ * 21 846 characters, so every link it returns decodes (04 §3.6).
+ */
+export async function encodeInviteLink(invite: Invite): Promise<string> {
+  return `${INVITE_LINK_PREFIX}${encodeBase64url(await encodeInvitePayload(invite))}`;
+}
+
+/**
+ * Decodes a full canonical link or a bare payload, of either link format, into a strictly valid
+ * invite (04 §3.6 steps 1-4; §3.6.2 for format 2). Signatures, hashes and expiry are not checked here
+ * (Accept step 1, the pairing service).
+ */
+export async function decodeInviteLink(
+  link: unknown,
+  options: DecodeInviteOptions = {},
+): Promise<Invite> {
+  return decodeFormatOne(await resolveInviteLink(link, options.fetchShortInvite));
+}
+
+async function decodeFormatOne(link: unknown): Promise<Invite> {
   // Step 1: bound the input before parsing it; exactly the prefix plus the payload, or the payload.
   if (
     typeof link !== 'string' ||

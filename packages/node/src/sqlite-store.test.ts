@@ -443,8 +443,8 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     // add a migration with the next version instead (07 §3.7: forward migrations only).
     const digestOf = (i: number) =>
       encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-    expect(STORE_SCHEMA_VERSION).toBe(7);
-    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(STORE_SCHEMA_VERSION).toBe(8);
+    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     // Version 1 (G-9) is unchanged by D-72.
     expect(digestOf(0)).toMatchInlineSnapshot(
       `"6a2a36755c97cca746bdfe0b166c409cf1a067b1fd526011470446c0bb7dfd1b"`,
@@ -531,6 +531,37 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     expect(v7.every((st) => st.includes('"local_owner_actions"'))).toBe(true);
     expect(v7[0]).toMatch(/^CREATE TABLE "local_owner_actions" \(/);
     expect(digestOf(6)).toBe('4a2c345f5568856e05a29aeef0996efa642dbdeb2c50fe09bffb894ef709a32a');
+    // Version 8 (W4-SHORT-INVITE, D-139): three nullable invites columns, appended.
+    const v8 = MIGRATIONS[7]?.statements ?? [];
+    expect(v8.map((st) => /^ALTER TABLE "invites" ADD COLUMN "(\w+)" /.exec(st)?.[1])).toEqual([
+      'drop_lookup_id',
+      'drop_key_epoch',
+      'cancelled_at',
+    ]);
+    expect(digestOf(7)).toBe('ff5840bf7d82d7a4c9a78f4e79f2bec15e4556122cf366296522dbc84db3c57f');
+  });
+
+  it('migrates a version 7 file to version 8 (W4-SHORT-INVITE): invites kept, drop columns null', async () => {
+    const raw = new Database(path());
+    for (const m of MIGRATIONS.slice(0, 7)) {
+      for (const statement of m.statements) raw.prepare(statement).run();
+    }
+    raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+    raw.pragma('user_version = 7');
+    raw
+      .prepare(
+        'INSERT INTO "invites" ("invite_id", "proof_key", "expires_at", "created_at") ' +
+          'VALUES (?, ?, 2, 1)',
+      )
+      .run('AAAAAAAAAAAAAAAAAAAAAA', 'x');
+    raw.close();
+    const v8 = await SqliteStore.open(path());
+    expect(v8.schemaVersion).toBe(8);
+    const [row] = await v8.transaction((tx) => tx.select('invites'));
+    expect(row?.drop_lookup_id).toBeNull();
+    expect(row?.drop_key_epoch).toBeNull();
+    expect(row?.cancelled_at).toBeNull();
+    await v8.close();
   });
 
   it('migrates a version 6 file to version 7 (U3-d): every row kept, local_owner_actions added', async () => {
@@ -548,7 +579,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       .run('AAAAAAAAAAAAAAAAAAAAAA', 'policy.set', 'ab'.repeat(32));
     raw.close();
     const v7 = await SqliteStore.open(path());
-    expect(v7.schemaVersion).toBe(7);
+    expect(v7.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     expect(await v7.transaction((tx) => tx.select('owner_action_nonces'))).toHaveLength(1);
     expect(await v7.transaction((tx) => tx.select('local_owner_actions'))).toEqual([]);
     await v7.transaction((tx) =>

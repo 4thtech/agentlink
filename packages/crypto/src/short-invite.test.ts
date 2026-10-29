@@ -16,7 +16,13 @@ import {
 } from './index.js';
 
 const K = new Uint8Array(32).map((_, i) => i + 1);
-const subtle = globalThis.crypto.subtle;
+/** WebCrypto's AES-GCM, typed locally (the package has no DOM lib). */
+interface Subtle {
+  importKey(f: 'raw', k: Uint8Array, a: 'AES-GCM', x: false, u: string[]): Promise<unknown>;
+  encrypt(p: object, k: unknown, d: Uint8Array): Promise<ArrayBuffer>;
+  decrypt(p: object, k: unknown, d: Uint8Array): Promise<ArrayBuffer>;
+}
+const subtle = (globalThis as unknown as { crypto: { subtle: Subtle } }).crypto.subtle;
 
 async function rawOpen(key: Uint8Array, object: Uint8Array, lookupId: Uint8Array) {
   const k = await subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
@@ -90,8 +96,8 @@ describe('ALI1 v1 objects', () => {
     const two = await sealShortInvite(K, p);
     expect([...one.object.subarray(0, 5)]).toEqual([0x41, 0x4c, 0x49, 0x31, 1]);
     expect(one.object.subarray(5, 17)).not.toEqual(two.object.subarray(5, 17));
-    // 4 + 2000 → padded to 3 072; object = 17 + 3 072 + 16.
-    expect(one.object.length).toBe(17 + 3072 + 16);
+    // 4 + 2000 → padded to 2 048; object = 17 + 2 048 + 16.
+    expect(one.object.length).toBe(17 + 2048 + 16);
     expect(await openShortInvite(K, one.object)).toEqual(p);
   });
 
@@ -108,7 +114,9 @@ describe('ALI1 v1 objects', () => {
 
   it('refuses to seal an empty or oversized payload', async () => {
     await expect(sealShortInvite(K, new Uint8Array(0))).rejects.toThrow();
-    await expect(sealShortInvite(K, new Uint8Array(SHORT_INVITE_MAX_PAYLOAD + 1))).rejects.toThrow();
+    await expect(
+      sealShortInvite(K, new Uint8Array(SHORT_INVITE_MAX_PAYLOAD + 1)),
+    ).rejects.toThrow();
   });
 
   it('another secret, another lookupId (AAD), a changed header or byte all fail closed', async () => {

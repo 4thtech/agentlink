@@ -82,8 +82,16 @@ export {
   INVITE_LINK_PREFIX,
   INVITE_MAX_JSON_BYTES,
   INVITE_MAX_PAYLOAD_CHARS,
+  SHORT_INVITE_LINK_CHARS,
+  clearShortInviteCache,
   decodeInviteLink,
   encodeInviteLink,
+  encodeInvitePayload,
+  encodeShortInviteLink,
+  resolveInviteLink,
+  shortInviteSecretOf,
+  type DecodeInviteOptions,
+  type ShortInviteFetch,
 } from './invite-link.js';
 // UX2-d1: the accept-invite approval action and the share text, one for every surface.
 export {
