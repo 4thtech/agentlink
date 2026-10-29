@@ -5632,6 +5632,18 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
 - **Acceptance:**
   - To be written when planned; full threat note, Fable 5.1 audit.
 
+#### W4-ONE-TOUCH · onboarding: one Touch ID creates an agent and connects its AI app (wave 4, owner decision W5, D-140)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/{first-run,agents,apps}.ts`, `owner-setup*.ts`, `owner-add-agent*.ts`, `owner-first-*.ts`; `apps/local-ui/src/pages/{welcome,first-run,agents,apps}/**`; `e2e/test/journey/01-*`
+- **Depends on:** the W4-ONE-TOUCH spec PR (#706)
+- **Spec:** D-140; 04 §2.3.1, §2.5, §2.5.1, §2.8 ("Create an agent and connect its AI app with one gesture"); 06 §7; 08 §1; 11 §5.8
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - Begin creates the agent's keys in memory (at most 120 s, one page session, replaced only within the same session), reserves the folder name and computes the `changeId` for the new agent ID; one plan-bound challenge covers card, policy, label and `app.connect` (plus the owner on first run); finish takes only the nonce and the presence proof; the config entry is written last, after the owner key is wiped.
+  - A wrong owner code does not consume the plan; a failed entry write keeps the agent and answers `created_not_connected` with Connect.
+- **Acceptance:**
+  - RED tests first: one gesture on first run and on New agent (journey gesture counter); a plan cannot be extended, split or replayed; a file changed between begin and finish is refused before signing; `created_not_connected` records the `app.connect` as not applied; the reservation is released on every unused end; full threat note, Fable 5.1 audit.
+
 #### W4-RENAME-REACHES-CONTACTS · agents: contacts keep seeing an agent's old name after a rename (placeholder, owner test of 0.4.4: B10)
 - **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
 - **Repo/path:** agentlink · agent card signing and card updates (to be decided)
