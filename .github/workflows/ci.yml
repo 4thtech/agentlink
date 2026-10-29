@@ -667,7 +667,7 @@ jobs:
       # excluded here only.
       - name: Run the @4thtech-io/node tests
         shell: bash
-        run: pnpm --filter @4thtech-io/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts --exclude src/local-ui-first-run-browser.test.ts --exclude src/local-ui-passkey-upgrade-browser.test.ts --exclude src/approval-pay-confirm-browser.test.ts
+        run: pnpm --filter @4thtech-io/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts --exclude src/local-ui-first-run-browser.test.ts --exclude src/local-ui-passkey-upgrade-browser.test.ts --exclude src/approval-pay-confirm-browser.test.ts --exclude src/local-ui-welcome-browser.test.ts
 
   # M1-5b-b: the Node relay connector's Docker suite (packages/node/src/relay-docker.test.ts): the
   # pool and the outbox against real relays, strfry and rnostr, pinned by digest in the test file.
