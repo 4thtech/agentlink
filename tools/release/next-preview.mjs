@@ -10,6 +10,10 @@
 //         main would otherwise go to `latest` through publish-latest);
 //       - wave-4: `.changeset/pre.json` in any mode (snapshots are refused in pre mode, and a
 //         pre-mode file on wave-4 would reach main with the merge).
+//   node tools/release/next-preview.mjs pending [--root <dir>]
+//       Prints `pending=true` or `pending=false` (a step output line): whether `.changeset/` holds a
+//       changeset (`*.md` other than README.md). `changeset version --snapshot` exits 1 without one,
+//       so pack-preview checks first and publishes nothing for such a commit.
 //   node tools/release/next-preview.mjs prepare-plan --in <plan.json> --out <plan.json>
 //       pack-preview, before packing: the `changeset publish-plan` output with every release
 //       moved to the `next` dist-tag (the CLI has no --tag for a plan, and artifact mode refuses
@@ -104,6 +108,15 @@ function* manifests(dir) {
   }
 }
 
+/** True when `.changeset/` holds at least one changeset (any `*.md` except README.md). */
+export function hasPendingChangesets(root) {
+  const dir = join(root, '.changeset');
+  if (!existsSync(dir)) return false;
+  return readdirSync(dir, { withFileTypes: true }).some(
+    (e) => e.isFile() && e.name.endsWith('.md') && e.name.toLowerCase() !== 'readme.md',
+  );
+}
+
 /** Problems that forbid a release from `lane` in the tree at `root` (empty when clean). */
 export function checkTree({ root, lane }) {
   if (!LANES.has(lane))
@@ -150,6 +163,10 @@ export function run(argv, log = console.log) {
   try {
     const { command, opts } = parse(argv);
     switch (command) {
+      case 'pending': {
+        log(`pending=${hasPendingChangesets(resolve(opts.root ?? '.'))}`);
+        return 0;
+      }
       case 'check-tree': {
         const root = resolve(opts.root ?? '.');
         const problems = checkTree({ root, lane: opts.lane });

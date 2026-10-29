@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   checkTree,
+  hasPendingChangesets,
   isPreviewVersion,
   PREVIEW_BRANCH,
   PREVIEW_TAG,
@@ -197,6 +198,26 @@ describe('checkTree (no pre-mode file or snapshot version leaks into main)', () 
   });
 });
 
+describe('pending changesets (snapshot versioning exits 1 without one)', () => {
+  it('is false for an empty .changeset folder or only README.md and config.json', () => {
+    expect(hasPendingChangesets(tree())).toBe(false);
+    const dir = tree();
+    writeFileSync(join(dir, '.changeset/README.md'), '# Changesets\n');
+    expect(hasPendingChangesets(dir)).toBe(false);
+    expect(hasPendingChangesets(mkdtempSync(join(tmpdir(), 'w4np-none-')))).toBe(false);
+  });
+
+  it('is true with a changeset file, and the command line prints a step output line', () => {
+    const dir = tree();
+    writeFileSync(join(dir, '.changeset/brave-cats.md'), '---\n"x": patch\n---\n\nx\n');
+    expect(hasPendingChangesets(dir)).toBe(true);
+    const out = (root) =>
+      execFileSync('node', [script, 'pending', '--root', root], { encoding: 'utf8' }).trim();
+    expect(out(dir)).toBe('pending=true');
+    expect(out(tree())).toBe('pending=false');
+  });
+});
+
 describe('the command line plan steps', () => {
   it('prepare-plan writes the next-tagged plan; verify-plan prints the packages as JSON', () => {
     const dir = mkdtempSync(join(tmpdir(), 'w4np-plan-'));
@@ -324,6 +345,20 @@ describe('release.yml: the preview lane', () => {
     expect(pack).toMatch(/node apps\/cli\/scripts\/check-embedded-ui\.mjs/);
     expect(pack).toMatch(/next-preview\.mjs prepare-plan/);
     expect(pack).toMatch(/pnpm exec changeset pack --from-publish-plan/);
+    // Without a pending changeset `changeset version --snapshot` exits 1: check first, then skip.
+    expect(pack).toMatch(/next-preview\.mjs pending >> "\$GITHUB_OUTPUT"/);
+    for (const step of [
+      'Version as a preview snapshot',
+      'Build',
+      'Check the CLI embeds the local UI',
+      'Plan the snapshot publish',
+    ]) {
+      const at = pack.indexOf(`- name: ${step}`);
+      expect(at, step).toBeGreaterThan(0);
+      expect(pack.slice(at).split('\n')[1], step).toBe(
+        "        if: steps.pending.outputs.pending == 'true'",
+      );
+    }
     // Snapshot first, build second: the CLI must embed the version it is published as.
     expect(pack.indexOf('--snapshot next')).toBeLessThan(pack.indexOf('pnpm build'));
   });

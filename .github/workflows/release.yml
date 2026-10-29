@@ -564,20 +564,36 @@ jobs:
       - name: Check that no M1a vector suite is pending
         run: node tools/vectors/check-pending.mjs --gate M1a
 
+      # `changeset version --snapshot` exits 1 when no changeset is pending: such a commit has
+      # nothing to preview, so every later step is skipped and publish-preview does not run.
+      - name: Check for pending changesets
+        id: pending
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/release/next-preview.mjs pending >> "$GITHUB_OUTPUT"
+          if ! grep -qx 'pending=true' "$GITHUB_OUTPUT"; then
+            echo "::notice::Nothing to publish: no pending changeset on wave-4."
+          fi
+
       # Versions every package with a pending changeset as x.y.z-next.wave4.<UTC datetime>
       # (.changeset/config.json `snapshot`). Only in this runner's checkout; nothing is pushed.
       - name: Version as a preview snapshot (never committed)
+        if: steps.pending.outputs.pending == 'true'
         run: pnpm exec changeset version --snapshot next
 
       - name: Build
+        if: steps.pending.outputs.pending == 'true'
         run: pnpm build
 
       - name: Check the CLI embeds the local UI
+        if: steps.pending.outputs.pending == 'true'
         run: node apps/cli/scripts/check-embedded-ui.mjs
 
       # The plan lists versions not yet on npm. prepare-plan moves every entry to `next` and refuses
       # anything but an @4thtech-io/* preview snapshot (a stable version never leaves wave-4).
       - name: Plan the snapshot publish on the next dist-tag
+        if: steps.pending.outputs.pending == 'true'
         id: plan
         shell: bash
         run: |
@@ -588,7 +604,7 @@ jobs:
             --out "$RUNNER_TEMP/publish-plan.next.json"
           count="$(jq '[.plan[][]] | length' "$RUNNER_TEMP/publish-plan.next.json")"
           if [ "$count" = "0" ]; then
-            echo "::notice::Nothing to publish: no pending changeset on wave-4."
+            echo "::notice::Nothing to publish: every snapshot version is already on npm."
             echo "publish=false" >> "$GITHUB_OUTPUT"
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
