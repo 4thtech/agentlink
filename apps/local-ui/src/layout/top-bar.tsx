@@ -97,7 +97,7 @@ export function AccountMenu(): ReactElement {
             className="ag-menu-item"
             onClick={() => {
               close(false);
-              openGoTo();
+              openGoTo(trigger.current);
             }}
           >
             <span>{S.goTo}</span>

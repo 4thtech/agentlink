@@ -338,4 +338,57 @@ describe('Cmd+K (b11 §34.8)', () => {
     expect(document.querySelector('[role="dialog"][aria-label="Go to"]')).toBeNull();
     expect(location.pathname).toBe('/contacts');
   });
+
+  it('is a dialog with a combobox and a listbox, never a menu', async () => {
+    serve({ current: 'default', generation: 3, switches: [] });
+    await mountAt('/inbox');
+    await press({ key: 'k', metaKey: true });
+    const dialog = document.querySelector('[role="dialog"][aria-label="Go to"]') as HTMLElement;
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.closest('[role="menu"]')).toBeNull();
+    expect(dialog.querySelector('[role="menu"], [role="menuitem"]')).toBeNull();
+    const field = dialog.querySelector('input[role="combobox"]') as HTMLInputElement;
+    const list = dialog.querySelector('[role="listbox"]') as HTMLElement;
+    expect(field.getAttribute('aria-controls')).toBe(list.id);
+    expect(field.getAttribute('aria-activedescendant')).toBe(
+      list.querySelector('[role="option"][aria-selected="true"]')?.id,
+    );
+  });
+
+  it('traps focus while open and gives it back to the avatar button on close', async () => {
+    serve({ current: 'default', generation: 3, switches: [] });
+    await mountAt('/inbox');
+    const avatar = host.querySelector<HTMLButtonElement>(
+      'button[aria-label="Settings and more"]',
+    ) as HTMLButtonElement;
+    avatar.focus();
+    await click(avatar);
+    await click(menuItems().find((m) => m.textContent?.startsWith('Go to')));
+    const dialog = document.querySelector('[role="dialog"][aria-label="Go to"]') as HTMLElement;
+    const field = dialog.querySelector('input') as HTMLInputElement;
+    expect(document.activeElement).toBe(field);
+    for (const shiftKey of [false, true]) {
+      await act(async () => {
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true }));
+      });
+      expect(document.activeElement).toBe(field);
+    }
+    await act(async () => {
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await settle();
+    expect(document.querySelector('[role="dialog"][aria-label="Go to"]')).toBeNull();
+    expect(document.activeElement).toBe(avatar);
+  });
+
+  it('gives focus back to what had it when opened with the keys', async () => {
+    serve({ current: 'default', generation: 3, switches: [] });
+    await mountAt('/inbox');
+    const link = host.querySelector<HTMLAnchorElement>('nav a[href="/contacts"]') as HTMLElement;
+    link.focus();
+    await press({ key: 'k', metaKey: true });
+    expect(document.activeElement?.tagName).toBe('INPUT');
+    await press({ key: 'Escape' });
+    expect(document.activeElement).toBe(link);
+  });
 });
