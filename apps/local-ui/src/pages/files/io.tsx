@@ -39,6 +39,7 @@ import {
   type ReceivedItem,
   type SentItem,
 } from './io-api.js';
+import { MovingMark, type FileMarker, type Moving } from '../moving/index.js';
 import { AddContactAction, useInviteFirst } from '../home/start-here-empty.js';
 import { START_STRINGS } from '../home/strings.js';
 import { FILES_IO_STRINGS as IO, asOf } from './strings.js';
@@ -483,10 +484,13 @@ function ReceivedRow({
   item,
   reveal,
   arrived,
+  moving,
 }: {
   readonly item: ReceivedItem;
   readonly reveal: Reveal;
   readonly arrived: boolean;
+  /** A file is arriving now (U3-map-2, b11 §32.1). */
+  readonly moving?: Moving | undefined;
 }): ReactElement {
   return (
     <Row arrived={arrived}>
@@ -495,6 +499,7 @@ function ReceivedRow({
         <When at={item.at} />
         <span>{sizeText(item.size)}</span>
         {item.proof ? <ProofBadge state="recorded" /> : null}
+        {moving === undefined ? null : <MovingMark moving={moving} />}
       </p>
       {arrived ? <SuccessMoment kind="file" /> : null}
       {item.state === 'not_saved' ? (
@@ -525,7 +530,14 @@ function ReceivedRow({
   );
 }
 
-function SentRow({ item }: { readonly item: SentItem }): ReactElement {
+function SentRow({
+  item,
+  moving,
+}: {
+  readonly item: SentItem;
+  /** A file is leaving now (U3-map-2, b11 §32.1). */
+  readonly moving?: Moving | undefined;
+}): ReactElement {
   const quiet = receiptGaveUp(item);
   return (
     <Row arrived={false}>
@@ -539,6 +551,7 @@ function SentRow({ item }: { readonly item: SentItem }): ReactElement {
         </span>
         <When at={item.at} />
         <span>{sizeText(item.size)}</span>
+        {moving === undefined ? null : <MovingMark moving={moving} />}
       </p>
       {item.status === 'queued' ? (
         <ProgressBar label={IO.progressSending} steps={IO.sendingSteps} current={0} />
@@ -610,14 +623,21 @@ export function ReceivedPanel({
   get,
   reveal,
   onWaiting,
+  marks,
 }: {
   readonly get: Getter;
   readonly reveal: Reveal;
   readonly onWaiting?: (n: number) => void;
+  /** Which received rows have a file arriving now (U3-map-2). */
+  readonly marks?: FileMarker;
 }): ReactElement {
   const feed = useFeed(get, RECEIVED_PATH, parseReceived);
   useWaiting(feed.state, (i: ReceivedItem) => i.state === 'not_saved', onWaiting);
   const items = feed.state.phase === 'ok' ? feed.state.items : [];
+  const moving = marks?.(
+    'in',
+    items.map((i) => ({ id: i.id, who: i.from, at: i.at })),
+  );
   return (
     <>
       <FeedFrame
@@ -626,7 +646,13 @@ export function ReceivedPanel({
         empty={{ title: IO.receivedEmptyTitle, hint: IO.receivedEmptyHint, icon: 'inbox' }}
         note={<UntrustedNote />}
         row={(item, arrived) => (
-          <ReceivedRow key={item.id} item={item} reveal={reveal} arrived={arrived} />
+          <ReceivedRow
+            key={item.id}
+            item={item}
+            reveal={reveal}
+            arrived={arrived}
+            moving={moving?.get(item.id)}
+          />
         )}
       />
       {feed.state.phase === 'ok' ? (
@@ -644,19 +670,26 @@ export function ReceivedPanel({
 export function SentPanel({
   get,
   onWaiting,
+  marks,
 }: {
   readonly get: Getter;
   readonly onWaiting?: (n: number) => void;
+  /** Which sent rows have a file leaving now (U3-map-2). */
+  readonly marks?: FileMarker;
 }): ReactElement {
   const feed = useFeed(get, SENT_PATH, parseSent, sentInFlight);
   useWaiting(feed.state, (i: SentItem) => i.status === 'queued', onWaiting);
   const items = feed.state.phase === 'ok' ? feed.state.items : [];
+  const moving = marks?.(
+    'out',
+    items.map((i) => ({ id: i.id, who: i.to, at: i.at })),
+  );
   return (
     <>
       <FeedFrame
         feed={feed}
         empty={{ title: IO.sentEmptyTitle, hint: IO.sentEmptyHint, icon: 'arrow-right' }}
-        row={(item) => <SentRow key={item.id} item={item} />}
+        row={(item) => <SentRow key={item.id} item={item} moving={moving?.get(item.id)} />}
       />
       {feed.state.phase === 'ok' ? (
         <UnderTheHood
