@@ -5409,7 +5409,7 @@ After the owner tested 0.4.4 on two Macs (29 Oct), the basics that did not work 
 **Day 0 (stabilise before any feature work):** the three CHORE-FLAKE and OS-matrix cards below, plus the release-check fix (#693), land first; no feature work until three green merge-queue runs in a row.
 
 #### CHORE-FLAKE-TERMS-FLOW · core: the terms-flow test fails now and then in the merge queue (new, 0.4.5 day 0)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S0 (test-only) · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S2 (packages/core path default; test-only change) · **Phase:** M1b
 - **Repo/path:** agentlink · the terms-flow test under `packages/core` (test file only)
 - **Depends on:** —
 - **Spec:** M0-10e (test timeout policy)
@@ -5420,7 +5420,7 @@ After the owner tested 0.4.4 on two Macs (29 Oct), the basics that did not work 
   - A failing CI run or a loop run that reproduces the failure is cited before the fix; the test then passes many runs in a row; no assertion weakened and the timeout is not raised.
 
 #### CHORE-FLAKE-SB-CONTRAST · local app: the status-bar contrast test is unstable (new, 0.4.5 day 0)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S0 (test and styling only) · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (apps/local-ui path default) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui` (the `.al-sb-state` contrast check and its test)
 - **Depends on:** —
 - **Spec:** `docs/design/README.md`; B-11 accessibility rules
@@ -5431,7 +5431,7 @@ After the owner tested 0.4.4 on two Macs (29 Oct), the basics that did not work 
   - A failing CI run is cited before the fix; the contrast ratio still meets the existing threshold in light and dark; the threshold is not lowered and no assertion is removed.
 
 #### CHORE-OSMATRIX-BROWSER-EXCLUDE · CI: skip the browser tests on operating systems that have no browser (new, 0.4.5 day 0, sensitive path)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet build, Opus review · **Security:** S0 (sensitive path `.github/**`: the owner's "merge") · **Phase:** M1b
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet build, Opus review · **Security:** S1 (`.github/**` path default; sensitive path, the owner's "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · `.github/workflows/ci.yml` (the OS-matrix node job's test command only)
 - **Depends on:** #691 (welcome browser test skip)
 - **Spec:** `docs/process/repo-reference.md`; D-52
@@ -5495,7 +5495,7 @@ After the owner tested 0.4.4 on two Macs (29 Oct), the basics that did not work 
 - **Spec:** B-11 shell and Files; 11 §5
 - **Invariants:** —
 - **Scope:**
-  - Symptom (files): after a file arrives, its bar keeps animating as if it were still working. Fix: show a plain label, "Arrived, not saved", with no moving bar. Saving from the app is not part of this card (W4-FILES-SAVE).
+  - Symptom (files): after a file arrives, its bar keeps animating as if it were still working. Fix: show the 11 §5 label "Not saved yet. Ask your AI to fetch it.", with no moving bar. Saving from the app is not part of this card (W4-FILES-SAVE).
   - Symptom (top bar): "Not running" is shown next to "Connected", with a "+4" and the computer's name where the agent's name should be. Minimal fix: one merged status for the agent, the agent's own name, and "Under the hood" moved into Settings. The larger redesign is wave 4.
 - **Acceptance:**
   - A RED test reproduces the exact symptom (real folder / real browser, no fake of the failing step) before the fix: in a real browser, an arrived file shows the label and no animation, and the top bar never shows two contradicting statuses. Copy checked against 11 §5; screenshots at 1440 and 360, light and dark; reduced-motion and axe pass; changelog.d fragment.
