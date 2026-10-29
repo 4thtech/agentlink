@@ -10,6 +10,12 @@ import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
+// `pnpm verify` (the local gate) sets VERIFY_BROWSERS=chromium to skip Firefox and WebKit; CI never
+// sets it, so the full matrix runs there. `pnpm verify --browsers all` leaves it unset.
+const BROWSERS = (['chromium', 'firefox', 'webkit'] as const).filter(
+  (b) => process.env.VERIFY_BROWSERS !== 'chromium' || b === 'chromium',
+);
+
 const INCLUDE = ['src/**/*.test.ts'];
 // Five runtimes run at once on a small CI runner next to the other packages' tests; the default 5 s
 // timed out on the largest envelope test. Same assertions, only more time.
@@ -38,11 +44,10 @@ export default defineConfig({
             headless: true,
             // Failure screenshots would be written next to the tests.
             screenshotFailures: false,
-            instances: [
-              { browser: 'chromium', provide: { typesRuntime: 'chromium' } },
-              { browser: 'firefox', provide: { typesRuntime: 'firefox' } },
-              { browser: 'webkit', provide: { typesRuntime: 'webkit' } },
-            ],
+            instances: BROWSERS.map((browser) => ({
+              browser,
+              provide: { typesRuntime: browser },
+            })),
           },
         },
       },
