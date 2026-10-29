@@ -26,10 +26,15 @@ let host: HTMLElement;
 let root: Root;
 let pairing: 'pending' | 'complete';
 let reads: number;
+let mode: 'ok' | 'fail' | 'slow';
+let release: (() => void) | undefined;
 
 const api = {
-  get: async () => {
+  get: async (path: string) => {
+    if (path !== '/api/ui/contacts') return { kind: 'error', status: 404 };
     reads += 1;
+    if (mode === 'fail') return { kind: 'error', status: 500 };
+    if (mode === 'slow') await new Promise<void>((r) => (release = r));
     return { kind: 'ok', data: { status: 'ok', contacts: [{ ...base, pairing }] } };
   },
   post: async () => ({ kind: 'error', status: 404 }),
@@ -44,6 +49,8 @@ async function flush(ms: number): Promise<void> {
 beforeEach(async () => {
   vi.useFakeTimers();
   pairing = 'pending';
+  mode = 'ok';
+  release = undefined;
   reads = 0;
   host = document.createElement('div');
   document.body.append(host);
@@ -84,5 +91,43 @@ describe('HOTFIX-045-CONTACTS-REFRESH', () => {
     const settled = reads;
     await flush(20_000);
     expect(reads).toBe(settled);
+  });
+
+  it('skips a tick while a read is still running', async () => {
+    mode = 'slow';
+    await flush(5_100);
+    const started = reads;
+    await flush(20_000);
+    expect(reads).toBe(started);
+    mode = 'ok';
+    release?.();
+    await flush(5_100);
+    expect(reads).toBeGreaterThan(started);
+  });
+
+  it('keeps the last good list and keeps polling when a background read fails', async () => {
+    mode = 'fail';
+    await flush(5_100);
+    expect(host.textContent).toContain(S.waiting);
+    const failed = reads;
+    mode = 'ok';
+    pairing = 'complete';
+    await flush(5_100);
+    expect(reads).toBeGreaterThan(failed);
+    expect(host.textContent).not.toContain(S.waiting);
+  });
+
+  it('pauses while the tab is hidden and re-reads once on return', async () => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    const before = reads;
+    await flush(20_000);
+    expect(reads).toBe(before);
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('focus'));
+    });
+    await flush(0);
+    expect(reads).toBe(before + 1);
   });
 });

@@ -753,26 +753,40 @@ export function ContactsPage({
   const inviteFirst = useInviteFirst();
   const returnFocus = useRef(false);
 
+  // HOTFIX-045: one read at a time; a background read (the poll) never replaces a good list with an error.
+  const inFlight = useRef(false);
+  const background = useRef(false);
+
   useEffect(() => {
     let live = true;
-    void api.get(LIST_PATH).then((res) => {
-      if (!live) return;
-      if (res.kind === 'error' && res.status === 409) {
-        setList({ phase: 'not_set_up' });
-        return;
-      }
-      const answer = res.kind === 'ok' ? parseList(res.data) : ({ kind: 'error' } as const);
-      if (answer.kind !== 'ok') {
-        setList({ phase: 'error' });
-        return;
-      }
-      setList({ phase: 'ok', contacts: answer.contacts });
-      setSelected((current) =>
-        current !== undefined && answer.contacts.some((c) => c.ref === current)
-          ? current
-          : answer.contacts[0]?.ref,
-      );
-    });
+    const quiet = background.current;
+    background.current = false;
+    inFlight.current = true;
+    void api
+      .get(LIST_PATH)
+      .then((res) => {
+        inFlight.current = false;
+        if (!live) return;
+        if (quiet && !(res.kind === 'ok' && parseList(res.data).kind === 'ok')) return;
+        if (res.kind === 'error' && res.status === 409) {
+          setList({ phase: 'not_set_up' });
+          return;
+        }
+        const answer = res.kind === 'ok' ? parseList(res.data) : ({ kind: 'error' } as const);
+        if (answer.kind !== 'ok') {
+          setList({ phase: 'error' });
+          return;
+        }
+        setList({ phase: 'ok', contacts: answer.contacts });
+        setSelected((current) =>
+          current !== undefined && answer.contacts.some((c) => c.ref === current)
+            ? current
+            : answer.contacts[0]?.ref,
+        );
+      })
+      .catch(() => {
+        inFlight.current = false;
+      });
     return () => {
       live = false;
     };
@@ -782,11 +796,16 @@ export function ContactsPage({
   const anyPending = list.phase === 'ok' && list.contacts.some((c) => c.pairing === 'pending');
   useEffect(() => {
     if (!anyPending) return undefined;
-    const bump = (): void => setTick((n) => n + 1);
-    const timer = setInterval(bump, 5_000);
-    const onVisible = (): void => {
-      if (document.visibilityState !== 'hidden') bump();
+    // Skips while a read is running (slow servers never pile up) and while the tab is hidden; coming
+    // back fires focus and visibilitychange together, and the first one claims the single read.
+    const bump = (): void => {
+      if (inFlight.current || document.hidden) return;
+      inFlight.current = true;
+      background.current = true;
+      setTick((n) => n + 1);
     };
+    const timer = setInterval(bump, 5_000);
+    const onVisible = (): void => bump();
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', bump);
     return () => {
