@@ -676,6 +676,9 @@ function hoodFields(c: ContactRow): unknown[] {
 
 const DAY_MS = 86_400_000;
 
+/** W4-INVITES-LIST: how long Contacts keeps following after Connect (the inviter's answer). */
+const FOLLOW_AFTER_CONNECT_MS = 120_000;
+
 /**
  * W4-INVITES-LIST (b11 §21.3, Closing): the open invites the server holds, as pending rows: the
  * name (or a neutral line), the days left and Cancel. Never a link: a lost link is cancelled and a
@@ -776,6 +779,7 @@ export function ContactsPage({
   // HOTFIX-045: one read at a time; a background read (the poll) never replaces a good list with an error.
   const inFlight = useRef(false);
   const background = useRef(false);
+  const [connectingSince, setConnectingSince] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     let live = true;
@@ -823,7 +827,15 @@ export function ContactsPage({
   }, [api, tick]);
 
   // HOTFIX-045: while anything waits for its pairing, re-read every 5 s and when the tab comes back.
-  const anyPending = list.phase === 'ok' && list.contacts.some((c) => c.pairing === 'pending');
+  // W4-INVITES-LIST: an open invite waits too (the new contact appears when the other side accepts),
+  // and so does this page for two minutes after Connect (the pairing is not a contact until the
+  // inviter answers).
+  const connecting =
+    connectingSince !== undefined && Date.now() - connectingSince < FOLLOW_AFTER_CONNECT_MS;
+  const anyPending =
+    (list.phase === 'ok' && list.contacts.some((c) => c.pairing === 'pending')) ||
+    rows.length > 0 ||
+    connecting;
   useEffect(() => {
     if (!anyPending) return undefined;
     // Skips while a read is running (slow servers never pile up) and while the tab is hidden; coming
@@ -919,6 +931,7 @@ export function ContactsPage({
         returnFocus.current = true;
         setAdding(false);
         setNotice(connectingTo(name));
+        setConnectingSince(Date.now());
         setTick((n) => n + 1);
       }}
       onClose={closeAdd}

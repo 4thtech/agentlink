@@ -5611,7 +5611,7 @@ Small items the reviews of the 0.4.5 hotfix pull requests left over (all rated L
 Not started. These record what the 0.4.4 test left over, so nothing is lost. Each gets a full card when wave 4 is planned; the owner's decisions on the wave come first.
 
 #### W4-INVITES-LIST · local app: a lost invite link cannot be shown again (placeholder, owner test of 0.4.4: B4)
-- **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** TBD · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (wave 4, 0.4.6) · **Size:** M · **Tier:** TBD · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · local app invites list and its route (to be decided)
 - **Depends on:** W4-SHORT-INVITE
 - **Spec:** 08 §1; 04 §2.5.1
@@ -5622,7 +5622,7 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
   - To be written when planned; starts with a RED test in a real browser across a reload.
 
 #### W4-SHORT-INVITE · invites: much shorter invite links (placeholder, owner test of 0.4.4: B9, Decision 41)
-- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Status:** in review (wave 4, 0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
 - **Repo/path:** agentlink · invite creation, the encrypted drop and the join flow (to be decided)
 - **Depends on:** —
 - **Spec:** Decision 41; 04 §2.8; D-48
