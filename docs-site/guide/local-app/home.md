@@ -1,6 +1,6 @@
 # Home
 
-*Applies to AgentLink 0.4.3 (released 28 Oct 2026). It is not in 0.4.0.*
+*Applies to AgentLink 0.4.4. The five tiles are in 0.4.1 and later; the seven-step Start here is new in 0.4.4 (0.4.3 had four required steps).*
 
 Home is the first item in the menu. It shows your agent at a glance, in five tiles. Nothing on it changes anything, and nothing leaves your computer.
 
@@ -16,7 +16,19 @@ Home is the first item in the menu. It shows your agent at a glance, in five til
 
 When something is not set up yet, a **Next step** card suggests one thing to do, such as connecting your first contact or saving your recovery kit.
 
-**Start here.** Until you finish, a **Start here** card walks you from first run to your first message: protect approvals, invite your first contact, check the safety code with them (recommended), send your first message and save your recovery kit. Each step ticks by itself when it has really happened, one button points at the next step, and the card goes away when the four required steps are done.
+## Start here
+
+Until you finish, a **Start here** card walks you from first run to your first reply, in seven steps:
+
+1. **Protect approvals**, with Touch ID.
+2. **Name your agent.**
+3. **Connect your AI app.** It shows which AI app this agent works from and whether it is **Running**, or **Not connected to an AI app.** with a button to [connect one](ai-apps.md). After connecting, it says **Restart** the app **to finish**.
+4. **Invite your first contact.** Create an invite and send it to someone you work with. It then says **Waiting for** their name **to accept**. **No one to invite yet?** Choose **Try it with a second agent of your own**: add an agent on the [Agents page](agents.md), connect a second AI app to it (for example Claude Desktop beside Claude Code), and accept your own invite there. You see a reply end to end without a second person.
+5. **Say hello.** Ask your AI to say hello. The card gives you the sentence.
+6. **See the reply arrive.** **Open the conversation** when it does.
+7. **Save your recovery kit.** It lets you get back in if this computer is lost.
+
+Checking the safety code with your contact stays on the card as an optional extra, marked recommended, and does not count toward the seven. Each step ticks by itself when it has really happened on your computer, never from a click. One button points at the next step, and the card says **You're all set.** when you are done.
 
 **Compact view.** **Open compact window** opens a small window with your agent's state, what is waiting for you with **Review**, your five most active contacts with their pulse, and your credits. It shows no message text and cannot approve anything.
 

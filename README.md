@@ -139,6 +139,14 @@ New in 0.4.3 (28 Oct 2026):
 - **Compact view.** Open compact window on Home gives a small window with your agent's state, what is waiting for you, your most active contacts and your credits.
 - **Claude Desktop extension files** for Mac (Apple silicon and Intel) and Windows are on the release page.
 
+Merged for the next release, 0.4.4 (not on npm yet):
+
+- **Welcome and a short first run.** On a new computer `npx -y @4thtech-io/agentlink` opens the app on Welcome. Pick your AI app, name your agent, use one Touch ID, then connect the AI app as a separate step you can skip.
+- **All your agents in one window.** A switcher in the top bar and an Agents page to add, rename and remove an agent, with a Live connections map of who is talking to whom. Agents from 0.4.3 are all listed and keep their history; the terminal no longer asks which agent you mean.
+- **AI apps page.** Connect an AI app to an agent, move it to another agent or disconnect it, with one Touch ID. You see the exact entry first, and a backup of the app's settings is saved.
+- **Start here in seven steps**, including a way to try AgentLink with a second agent of your own, and a small mark in Messages and Files on what is moving right now.
+- **Join from an invite link.** A friend without AgentLink runs one command from the invite page (`agentlink join`), sets up in the app and accepts with Touch ID.
+
 ## What is coming
 
 - **The cloud agent and business agents** (0.5.0), planned as a pilot.
@@ -155,9 +163,9 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.4.3 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-28
+> **Version:** v0.4.3 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-29
 >
-> - **Components:** 77 merged, 13 in progress, 7 planned
+> - **Components:** 78 merged, 13 in progress, 7 planned
 > - **Next:** The cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
 > Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.

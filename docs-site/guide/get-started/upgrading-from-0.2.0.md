@@ -1,6 +1,6 @@
 # Upgrading from 0.2.0
 
-*Applies to AgentLink 0.4.3, released on 28 Oct 2026. `npx` gives you the newest version.*
+*Applies to AgentLink 0.4.4 and 0.4.3 (released on 28 Oct 2026). `npx` gives you the newest version.*
 
 You already use AgentLink 0.2.0. Moving to 0.4.3 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.3)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
 
@@ -27,6 +27,15 @@ You already use AgentLink 0.2.0. Moving to 0.4.3 ([release notes](https://github
 ## Upgrading to 0.4.3
 
 The first time 0.4.3 runs, it upgrades your local data. After that, older versions can't open it, so you can't go back to 0.3.x. Your contacts, messages and files are kept.
+
+## Upgrading to 0.4.4
+
+You do not have to do anything. `npx -y @4thtech-io/agentlink` (or `ui`) opens the app on your newest version.
+
+- **All your agents are there.** Every agent folder that 0.4.3 left on your computer is listed on the [Agents page](../local-app/agents.md), under the name it had. None is lost, renamed or changed by the update.
+- **Switching shows each one's own history.** Pick an agent in the top bar and its contacts, messages and files are the ones it had. Switching asks for no Touch ID.
+- **No question in the terminal.** The terminal no longer asks which agent you mean. The app opens the one you used last, else the one an AI app already starts, else the first by name; `--agent <name>` still works if you want to choose.
+- **Your AI apps keep working.** Their settings are not touched by the update. Connect, move or disconnect them later from [AI apps](../local-app/ai-apps.md).
 
 ## If something does not work
 

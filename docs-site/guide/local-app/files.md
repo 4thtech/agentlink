@@ -1,10 +1,12 @@
 # Files page
 
-*Applies to AgentLink 0.4.3 (released 28 Oct 2026). The Received and Sent tabs are not in 0.3.0; the Send folders tab is.*
+*Applies to AgentLink 0.4.4. The Received and Sent tabs are in 0.4.0 and later, the moving mark is new in 0.4.4; neither is in 0.3.0. The Send folders tab is.*
 
 The Files page has three tabs: **Received**, **Sent** and **Send folders**. Received and Sent list your files. Send folders is where you allow a folder. Your AI can send a file only from a folder you have allowed, and that tab shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [owner code](../help/glossary.md).
 
 <figure><img src="../.gitbook/assets/local-files--list.png" alt="Three allowed folders; the last one opens at another location."><figcaption><p>Files, with made-up folders. The last folder is a link to somewhere else.</p></figcaption></figure>
+
+A file that is being sent or received right now shows the same small mark as in [Messages](messages.md#moving-right-now) on its row, for about a minute. It shows a word and a direction only.
 
 ## Received and Sent
 

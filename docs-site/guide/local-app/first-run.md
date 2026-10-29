@@ -1,17 +1,21 @@
 # First run and your backup code
 
-*Applies to AgentLink 0.4.3 (released 28 Oct 2026).*
+*Applies to AgentLink 0.4.4. In 0.4.3 this was one page with a single setup button and no Welcome or AI app steps.*
 
-First run is the page that sets you up as the owner of your agent. It takes one touch.
+First run is the short path that sets you up as the owner of your agent. It takes one touch.
 
 ## Steps
 
-1. Open it with `npx -y @4thtech-io/agentlink init`, or `npx -y @4thtech-io/agentlink ui` if you have not set up yet. Run them in a terminal you opened yourself.
-2. The page first lists the folders it will create in your home folder: `AgentLink/Send`, `AgentLink/Inbox` and `AgentLink/Proofs`. If `AgentLink/Send` already holds files, or is not a plain folder, it asks you to fix that first.
-3. Press the one button, for example **Use Touch ID**. This one confirmation protects your approvals, sets up your agent and lets your AI send files from `AgentLink/Send`, and nothing else.
-4. The page shows your **backup code** once. Press **Save in my password manager**, then **I saved it**.
-5. **Save your recovery kit** (step 3 of 4 on the page). The kit brings your agent and its contacts back if this computer is lost. Saving the kit from this page arrives in an update, so for now press **Later**; the page says it will remind you until it is saved.
-6. **You're set.** The page shows what to say to your AI. Press **Go to Home** to open the app on [Home](home.md).
+1. Open a terminal yourself (not one inside your AI app) and run `npx -y @4thtech-io/agentlink`. On a new computer nothing else needs to be set up first: your browser opens on **Welcome**. (`npx -y @4thtech-io/agentlink ui` does the same.) Keep the terminal window open while you use the app; it stops by itself after 30 minutes.
+2. **Welcome.** Press **Get started**.
+3. **Which AI app will you use?** AgentLink looks in the usual places on your computer for the AI apps it can connect to. Pick yours, or **I'll choose later**. If it finds none or can't look, press **Continue**: you connect one afterwards from [AI apps](ai-apps.md). Nothing is written here; the choice only suggests a name.
+4. **Set up your agent.** Give it a name you will recognise. It is suggested from your AI app, for example **Claude Code agent**, and you can change it. The page lists the folders it will create in your home folder: `AgentLink/Send`, `AgentLink/Inbox` and `AgentLink/Proofs`. If `AgentLink/Send` already holds files, or is not a plain folder, it asks you to fix that first.
+5. Press the one button, for example **Use Touch ID**. This one confirmation creates your agent, makes you its owner, protects your approvals and lets your AI send files from `AgentLink/Send`, and nothing else. If anything goes wrong, nothing is kept and you can start again.
+6. **Your backup code** is shown once. Press **Save in my password manager**, then **I saved it**.
+7. If you picked an AI app, **Connect** it to your agent. The page shows the exact entry it will add to the app's settings, saves a backup of the file first, and asks for Touch ID (**Apply with Touch ID**). Restart the AI app afterwards. Press **Later** to skip it; you can do it any time from [AI apps](ai-apps.md). Setting up never changes an AI app's settings by itself.
+8. The page ends on [Home](home.md), where [Start here](home.md#start-here) shows what is left. Your recovery kit, which brings your agent and its contacts back if this computer is lost, is put off until you save it from there.
+
+Coming from an invite link? The same steps run, and the page ends on **Accept** the inviter's **invite?** See [Join from an invite](../get-started/join-from-an-invite.md).
 
 ## What the backup code is for
 
@@ -19,7 +23,7 @@ The backup code approves things when Touch ID is not available, for example in a
 
 ## If you set up before 0.3.0
 
-*Applies to AgentLink 0.4.3 (released 28 Oct 2026); switching to Touch ID is not in 0.3.0.*
+*Applies to AgentLink 0.4.3 (released 28 Oct 2026) and later; switching to Touch ID is not in 0.3.0.*
 
 If you set up AgentLink in the terminal before the local app, your approvals use a code. The local app now offers **Switch to Touch ID** (**Switch to Windows Hello** or **Switch to a passkey** on other computers), and shows a reminder on each page.
 
