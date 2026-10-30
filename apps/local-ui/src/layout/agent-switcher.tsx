@@ -20,7 +20,7 @@ import {
   type LiveAgent,
   type LiveState,
 } from '../api/live.js';
-import { AGENTS_PATH, NEW_AGENT_PATH } from '../nav.js';
+import { AGENTS_PATH } from '../nav.js';
 import { navigate } from '../router.js';
 import type { AgentsApi } from '../pages/agents/api.js';
 import { AGENTS_STRINGS as A } from '../pages/agents/strings.js';
@@ -265,7 +265,7 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
             type="button"
             role="menuitem"
             className="al-mitem"
-            onClick={() => go(NEW_AGENT_PATH)}
+            onClick={() => go(`${AGENTS_PATH}?add=1`)}
           >
             <ShellIcon name="plus" size={16} />
             {CHIP_STRINGS.addAgent}

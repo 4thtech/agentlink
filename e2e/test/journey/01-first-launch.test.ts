@@ -101,7 +101,8 @@ describe('chapter 1: onboarding', () => {
     await page.waitForURL((url) => url.pathname === '/');
     expect(await text(page)).not.toContain('Which AI app do you use?');
     await page.getByRole('heading', { name: 'People' }).first().waitFor();
-    expect(await text(page)).toContain('No one here yet.');
+    // W4-WIRE: Home shows once its Get started read has answered too (its skeleton until then).
+    await page.getByText('No one here yet.').first().waitFor();
     // W4-WIRE: Home carries the Get started card (one of the three ways back), counted from real
     // state: the AI app is connected; inviting someone is next, on the Invite screen.
     await page.getByRole('heading', { name: 'Get started · 1 of 3 done' }).waitFor();

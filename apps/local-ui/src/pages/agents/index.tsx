@@ -140,8 +140,8 @@ export function AgentsPage({
   }, [latest]);
 
   const [panel, setPanel] = useState<{ name: string; panel: Panel } | undefined>(undefined);
-  // `?add=1` (an older link; W4-WIRE: the chip's "Add agent" now opens Get started) opens Add here,
-  // also when the page is already open; it is then taken off the address, so the next one is a change.
+  // `?add=1` (the agent chip's "Add agent") opens Add here, also when the page is already open;
+  // it is then taken off the address, so the next "Add agent" is a change again.
   const search = useSyncExternalStore(subscribePath, () => location.search);
   const [adding, setAdding] = useState(false);
   useEffect(() => {

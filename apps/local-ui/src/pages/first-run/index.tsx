@@ -42,6 +42,7 @@ import {
 } from 'react';
 import { lazyPart } from '../../lazy/index.js';
 import { INVITE_PATH } from '../../nav.js';
+import { createInviteApi, type InviteApi } from '../contacts/invite-api.js';
 import { navigate } from '../../router.js';
 import {
   LinkExpiredState,
@@ -117,6 +118,26 @@ import {
  * first use so the first load of the app does not carry it.
  */
 const INVITE_PANEL = lazyPart(async () => (await import('../invite/invite-panel.js')).InvitePanel);
+
+/** W4-WIRE: the invite calls of step 4, with the cancels still on their way. */
+function trackCancels(base: InviteApi): { api: InviteApi; settled: () => Promise<void> } {
+  const inFlight = new Set<Promise<unknown>>();
+  const api: InviteApi = {
+    ...base,
+    cancel: (id) => {
+      const sent = base.cancel(id);
+      inFlight.add(sent);
+      void sent.finally(() => inFlight.delete(sent)).catch(() => undefined);
+      return sent;
+    },
+  };
+  const settled = (): Promise<void> =>
+    Promise.race([
+      Promise.allSettled([...inFlight]).then(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  return { api, settled };
+}
 
 /** U3-a (D-138; 08 §1): first run, and the passkey switch on this page, finish on Home. */
 const HOME = '/settings/home';
@@ -532,6 +553,15 @@ export function FirstRunPage({
   useEffect(() => {
     if (invitePanel === undefined) void INVITE_PANEL.load().catch(() => undefined);
   }, [invitePanel]);
+  // A link that never left step 4 is cancelled when the panel goes (U4's rule). "Go to Home" is a
+  // full load, which would cut that cancel off: the panel goes first, its cancel is answered (at
+  // most 1.5 s), then Home opens.
+  const stepInvites = useMemo(() => trackCancels(createInviteApi()), []);
+  const [inviteGone, setInviteGone] = useState(false);
+  const leaveInvite = (): void => {
+    setInviteGone(true);
+    window.setTimeout(() => void stepInvites.settled().then(goHome), 0);
+  };
   const [list, setList] = useState<PickList>(() =>
     memory.apps === undefined
       ? { k: 'loading' }
@@ -942,8 +972,10 @@ export function FirstRunPage({
     return frame(
       <InviteStep
         inviteHref={INVITE_PATH}
-        onHome={goHome}
-        panel={invitePanel ?? <INVITE_PANEL.Part />}
+        onHome={invitePanel === undefined ? leaveInvite : goHome}
+        panel={
+          invitePanel ?? (inviteGone ? <></> : <INVITE_PANEL.Part invites={stepInvites.api} />)
+        }
       />,
     );
   }
