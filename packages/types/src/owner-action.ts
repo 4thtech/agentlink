@@ -13,6 +13,7 @@ import {
   BACKUP_KIT_CONTENTS,
   BACKUP_KIT_ID_BYTES,
   BYTE_LENGTHS,
+  MAX_FILES_PER_PAYLOAD,
   PROTOCOL_VERSION,
   REVOKE_REASONS,
   STORAGE_ID_BYTES,
@@ -161,6 +162,22 @@ export const appChangeParamsSchema = z.strictObject({
  */
 export const agentResumeParamsSchema = z.strictObject({
   agent: evmAddress,
+});
+
+/**
+ * `file.save` params (W4-FILES-SAVE; 04 §2.5.1; proposed, owner confirms at merge): this agent, and
+ * one file of one received message: the 16-byte envelope ID and the file's index in its `files[]`
+ * (0 to MAX_FILES_PER_PAYLOAD − 1). Never a name, a folder or a path: the core saves with its own
+ * fetch into the Inbox folder of the rules in force (04 §4).
+ */
+export const fileSaveParamsSchema = z.strictObject({
+  agent: evmAddress,
+  envelopeId: base64url(BYTE_LENGTHS.id),
+  fileIndex: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_FILES_PER_PAYLOAD - 1),
 });
 
 // --- own storage and the recovery kit (M1-9i-a, D-115) --------------------------------------------
@@ -467,6 +484,17 @@ export const agentResumeActionSchema = z
   .refine(expiring, EXPIRING_MSG)
   .refine(selfBound, SELF_BOUND_MSG);
 
+/** Saves one received file into the Inbox folder (W4-FILES-SAVE). Own machine only: no envelope. */
+export const fileSaveActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('file.save'),
+    params: fileSaveParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG)
+  .refine(selfBound, SELF_BOUND_MSG);
+
 /** `agent.revoke`: `expiresAt` is exactly 0 (permanent; the core skips expiry and lifetime checks). */
 export const agentRevokeActionSchema = z.strictObject({
   ...head,
@@ -497,6 +525,7 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   appConnectActionSchema,
   appDisconnectActionSchema,
   agentResumeActionSchema,
+  fileSaveActionSchema,
   agentRevokeActionSchema,
 ]);
 
@@ -545,6 +574,7 @@ export type CreditsDepositParams = z.infer<typeof creditsDepositParamsSchema>;
 export type AgentLabelParams = z.infer<typeof agentLabelParamsSchema>;
 export type AppChangeParams = z.infer<typeof appChangeParamsSchema>;
 export type AgentResumeParams = z.infer<typeof agentResumeParamsSchema>;
+export type FileSaveParams = z.infer<typeof fileSaveParamsSchema>;
 export type AgentLabelAction = z.infer<typeof agentLabelActionSchema>;
 export type SignedAgentLabel = z.infer<typeof signedAgentLabelSchema>;
 export type CreditsWithdrawParams = z.infer<typeof creditsWithdrawParamsSchema>;

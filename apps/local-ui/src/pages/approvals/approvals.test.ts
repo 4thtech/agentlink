@@ -495,7 +495,7 @@ describe('one request: its own Approve or Deny, then presence', () => {
 });
 
 describe('/approve/<id>: the deep link renders inside the app shell', () => {
-  it('the router shows the one request with Approvals current in the sidebar', async () => {
+  it('the router shows the one request with Home current in the section menu (W4-SHELL-V2)', async () => {
     const srv = server({
       [PASSKEY]: [PASSKEY_NONE],
       [`/api/approvals/${id('A')}`]: [ok({ approval: item('A') })],
@@ -506,7 +506,9 @@ describe('/approve/<id>: the deep link renders inside the app shell', () => {
     await flush();
     expect(srv.calls.some((c) => c.url === `/api/approvals/${id('A')}`)).toBe(true);
     expect(cardOf('A')?.querySelector('h2')?.textContent).toBe('Headline A');
-    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Approvals');
+    expect(
+      host.querySelector('nav.al-rail a[aria-current="page"]')?.getAttribute('aria-label'),
+    ).toBe('Home');
     expect(host.querySelector('main h1')?.textContent).toBe(S.appTitle);
   });
 

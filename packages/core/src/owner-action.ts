@@ -320,8 +320,10 @@ export function verifyOwnerAction(
     case 'app.connect':
     case 'app.disconnect':
     case 'agent.resume':
+    case 'file.save':
     case 'agent.revoke':
       // agent.resume (W4-PAUSE): the pause row is the store side's (`not_paused`).
+      // file.save (W4-FILES-SAVE): the received file is the store side's (core fetchFile).
       // agent.label (U3-d): the restricted-label rule and the store record are the store side's;
       // app.connect and app.disconnect (U3-f): the recomputed changeId is the owner surface's.
       // Their rules need the store (cancel: an approved row; policy.set: the version above, already

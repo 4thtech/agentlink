@@ -40,7 +40,8 @@ export const FILES_IO_STRINGS = {
   to: 'To',
   savedAs: 'Saved as',
   mayHaveMoved: 'You may have moved or renamed it since, so it might not be there now.',
-  notSaved: 'Not saved yet. Ask your AI to fetch it.',
+  // W4-FILES-SAVE (11 §5.7): a fixed label; "Save to Inbox" sits beside it.
+  notSaved: 'Arrived · not saved',
   expired: 'Expired. It can no longer be fetched.',
   deleted: 'Deleted from this computer.',
   statusSent: 'Sent',

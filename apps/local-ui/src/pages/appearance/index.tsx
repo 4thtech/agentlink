@@ -1,5 +1,7 @@
 // UI-REFRESH-e: Settings › Appearance (B-11 §16 row 20). Every choice applies at once and is kept in
 // this browser. Each group has a visible label, linked to it (UI-REFRESH-t). The route and the nav entry come with UI-REFRESH-f.
+// W4-SHELL-V2: the same morph as the top bar switch (one setting, kept by the app).
+import { toggleHood } from '../../layout/hood.js';
 import { PreviewTile, Segmented, Switch } from '@4thtech-io/ui';
 import { useId, type ReactElement } from 'react';
 import {
@@ -65,7 +67,7 @@ export function AppearancePage(): ReactElement {
         label={S.hoodLabel}
         description={S.hoodHint}
         checked={prefs.hood}
-        onChange={(on) => setPref('hood', on)}
+        onChange={(on) => toggleHood(on)}
       />
       <PreviewTile />
     </main>

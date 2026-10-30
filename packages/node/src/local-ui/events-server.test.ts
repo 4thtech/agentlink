@@ -189,6 +189,8 @@ async function harness() {
     ],
   ]);
   let statsReads = 0;
+  /** While set, every stats read waits for it (a slow host read). */
+  let gate: Promise<void> | undefined;
   const entries = new Map<string, AgentDirectoryEntry>([
     ['default', { name: 'default', label: 'Personal', available: true, removing: false }],
     ['work', { name: 'work', label: 'Work', available: true, removing: false }],
@@ -209,9 +211,10 @@ async function harness() {
   const directory: AgentDirectory = {
     list: () => Promise.resolve([...entries.values()]),
     read: (name) => Promise.resolve(entries.get(name)),
-    stats: (name) => {
+    stats: async (name) => {
       statsReads += 1;
-      return Promise.resolve(stats.get(name));
+      await gate;
+      return stats.get(name);
     },
     writeLabel: () => Promise.reject(new Error('no')),
     markRemoving: () => Promise.reject(new Error('no')),
@@ -265,6 +268,17 @@ async function harness() {
     csrf,
     get statsReads() {
       return statsReads;
+    },
+    /** Holds every stats read until the returned function is called. */
+    hold(): () => void {
+      let open: () => void = () => undefined;
+      gate = new Promise((resolve) => {
+        open = resolve;
+      });
+      return () => {
+        gate = undefined;
+        open();
+      };
     },
     async stream(extra: Record<string, string> = {}, path?: string): Promise<Stream> {
       const s = await openStream(port, headers(extra), path);
@@ -323,6 +337,29 @@ describe('GET /api/ui/events: the gate (04 §2.5, 08 §1)', () => {
     const fifth = await send(h.port, '/api/ui/events', h.headers());
     expect(fifth.status).toBe(429);
     expect(JSON.parse(fifth.body)).toEqual({ error: 'busy' });
+  });
+
+  it('a client that disconnects while the host read is pending frees its slot', async () => {
+    const h = await harness();
+    const release = h.hold();
+    const pending = Array.from({ length: 4 }, () => {
+      const req = httpRequest({
+        host: '127.0.0.1',
+        port: h.port,
+        path: '/api/ui/events',
+        headers: { Host: `localhost:${String(h.port)}`, ...h.headers() },
+        setHost: false,
+      });
+      req.on('error', () => undefined);
+      req.end();
+      return req;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    for (const req of pending) req.destroy();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    for (let i = 0; i < 4; i += 1) expect((await h.stream()).status).toBe(200);
   });
 
   it('ends open streams when the host stops', async () => {

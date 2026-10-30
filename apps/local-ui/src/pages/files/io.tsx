@@ -43,6 +43,14 @@ import { MovingMark, type FileMarker, type Moving } from '../moving/index.js';
 import { AddContactAction, useInviteFirst } from '../home/start-here-empty.js';
 import { START_STRINGS } from '../home/strings.js';
 import { FILES_IO_STRINGS as IO, asOf } from './strings.js';
+import { SaveFile, type PasskeyReader } from '../inbox/save.js';
+import type { SaveApi } from '../inbox/save-api.js';
+
+/** W4-FILES-SAVE: what a Received row needs for "Save to Inbox"; absent: no Save action. */
+export interface SaveSupport {
+  readonly api: SaveApi;
+  readonly passkey: PasskeyReader;
+}
 
 export type FilesTab = 'received' | 'sent' | 'folders';
 const TABS: readonly (readonly [FilesTab, string])[] = [
@@ -485,10 +493,14 @@ function ReceivedRow({
   reveal,
   arrived,
   moving,
+  save,
+  onSaved,
 }: {
   readonly item: ReceivedItem;
   readonly reveal: Reveal;
   readonly arrived: boolean;
+  readonly save?: SaveSupport | undefined;
+  readonly onSaved?: () => void;
   /** A file is arriving now (U3-map-2, b11 §32.1). */
   readonly moving?: Moving | undefined;
 }): ReactElement {
@@ -515,6 +527,15 @@ function ReceivedRow({
       ) : null}
       {item.state === 'not_saved' ? (
         <p className="fl-state al-text-body-sm al-muted">{IO.notSaved}</p>
+      ) : null}
+      {/* W4-FILES-SAVE: a file that arrived is saved from here with the owner's presence. */}
+      {item.state === 'not_saved' && save !== undefined ? (
+        <SaveFile
+          id={item.id}
+          api={save.api}
+          passkey={save.passkey}
+          {...(onSaved === undefined ? {} : { onSaved })}
+        />
       ) : null}
       {item.state === 'expired' ? (
         <p className="fl-state al-text-body-sm al-muted">{IO.expired}</p>
@@ -623,9 +644,12 @@ export function ReceivedPanel({
   reveal,
   onWaiting,
   marks,
+  save,
 }: {
   readonly get: Getter;
   readonly reveal: Reveal;
+  /** W4-FILES-SAVE: "Save to Inbox" on a file that arrived. */
+  readonly save?: SaveSupport;
   readonly onWaiting?: (n: number) => void;
   /** Which received rows have a file arriving now (U3-map-2). */
   readonly marks?: FileMarker;
@@ -651,6 +675,8 @@ export function ReceivedPanel({
             reveal={reveal}
             arrived={arrived}
             moving={moving?.get(item.id)}
+            save={save}
+            onSaved={feed.retry}
           />
         )}
       />

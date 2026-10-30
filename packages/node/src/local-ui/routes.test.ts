@@ -167,6 +167,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/health',
       // MSG-FILES-IO-h: Show in Finder (api/files-io-reveal.test.ts).
       '/api/ui/files/received/reveal',
+      // W4-FILES-SAVE: Save to Inbox (api/files-save.test.ts).
+      '/api/ui/files/save',
       // UX2-d1: create, check and accept an invite (api/invites.test.ts).
       '/api/ui/invites',
       '/api/ui/invites/check',
@@ -199,6 +201,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // W4-PAUSE: Pause (its own kind) and Resume (local-ui/agents-pause-server.test.ts).
       '/api/ui/agents/pause',
       '/api/ui/agents/resume',
+      // W4-SHELL-V2: the app's UI settings (local-ui/ui-settings-server.test.ts).
+      '/api/ui/ui-settings',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

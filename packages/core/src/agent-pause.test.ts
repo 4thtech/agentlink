@@ -141,6 +141,9 @@ describe('while paused the core refuses relay and sending paths before any effec
     await rejectsPaused(() => a.client.notarize({} as never));
     await rejectsPaused(() => a.client.acknowledge({} as never));
     await rejectsPaused(() => a.client.sendCardUpdates());
+    // W4-FILES-SAVE: the app's Save is a file fetch too; refused before any nonce is recorded.
+    await rejectsPaused(() => a.client.saveReceivedFile({}));
+    expect(await nonceRows(a)).toEqual([]);
     // No idempotency result is kept (07 §3.3): the same clientRequestId works after resume.
     expect(await a.store.transaction((tx) => tx.select('idempotency'))).toEqual([]);
   });

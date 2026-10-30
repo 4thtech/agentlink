@@ -1409,6 +1409,97 @@ body {
 .al-agent-switch span {
   flex: 1;
 }
+/* W4-SHELL (Decision 44 B1): an agent's letter icon, until an icon set exists. Token pairs only. */
+.al-agent-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: var(--al-border-width-thin) solid transparent;
+  font-family: var(--al-font-family-sans);
+  font-size: 12px;
+  font-weight: var(--al-font-weight-semibold);
+  line-height: 1;
+  user-select: none;
+}
+.al-agent-icon.is-lg {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+}
+.al-agent-icon.is-accent {
+  background: var(--al-color-accent-subtle);
+  color: var(--al-color-accent-fg);
+  border-color: var(--al-color-commitment-border);
+}
+.al-agent-icon.is-info {
+  background: var(--al-color-status-info-bg);
+  color: var(--al-color-status-info-fg);
+  border-color: var(--al-color-status-info-border);
+}
+.al-agent-icon.is-proof {
+  background: var(--al-color-proof-bg);
+  color: var(--al-color-proof-fg);
+  border-color: var(--al-color-proof-border);
+}
+.al-agent-icon.is-teal {
+  background: var(--al-color-diff-added-bg);
+  color: var(--al-color-diff-added-fg);
+  border-color: var(--al-color-diff-added-border);
+}
+.al-agent-icon.is-amber {
+  background: var(--al-color-diff-changed-bg);
+  color: var(--al-color-diff-changed-fg);
+  border-color: var(--al-color-diff-changed-border);
+}
+.al-agent-icon.is-neutral {
+  background: var(--al-color-status-neutral-bg);
+  color: var(--al-color-status-neutral-fg);
+  border-color: var(--al-color-status-neutral-border);
+}
+/* W4-SHELL-V2 (prototype v23): the live dot in the icon's corner. Filled for Working and Ready, a
+   ring for Not running, Idle and Paused, a dashed ring for Not set up. The icon positions it. */
+.al-agent-icon {
+  position: relative;
+}
+.al-agent-icon-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--al-color-border-strong);
+  background: var(--al-color-bg-surface);
+  box-shadow: 0 0 0 2px var(--al-color-bg-surface);
+}
+.al-agent-icon-dot.is-working,
+.al-agent-icon-dot.is-ready {
+  border-color: var(--al-color-status-success-icon);
+  background: var(--al-color-status-success-icon);
+}
+.al-agent-icon-dot.is-paused {
+  border-color: var(--al-color-fg-muted);
+}
+.al-agent-icon-dot.is-none {
+  border-style: dashed;
+}
+/* W4-SHELL: the agent switcher's place at the top of the sidebar, under the mark. */
+.al-side-top {
+  display: flex;
+  min-width: 0;
+}
+.al-topbar-start {
+  display: flex;
+  align-items: center;
+  flex: none;
+  min-width: 0;
+}
 .al-nav {
   display: flex;
   align-items: center;

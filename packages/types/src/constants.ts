@@ -189,6 +189,9 @@ export const OWNER_ACTION_OPS = freeze([
   // W4-PAUSE (D-143 (5); proposed, owner confirms at merge): Resume ends a pause from the local app.
   'agent.resume',
   'agent.revoke',
+  // W4-FILES-SAVE (proposed, owner confirms at merge): the owner saves one received file into the
+  // Inbox folder from the local app; local only, no envelope carries it.
+  'file.save',
 ] as const);
 export type OwnerActionOp = (typeof OWNER_ACTION_OPS)[number];
 
@@ -284,6 +287,8 @@ export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   // W4-PAUSE (D-143 (5)): a local owner action, applied within seconds on the agent's own machine.
   'agent.resume': 600,
   'agent.revoke': null,
+  // W4-FILES-SAVE: a local owner action, applied within seconds on the agent's own machine.
+  'file.save': 600,
 } as const);
 
 /**

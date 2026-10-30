@@ -16,7 +16,6 @@ import {
   navTo,
   pairedOwners,
   text,
-  WAVE4,
   type JourneyComputer,
   type JourneyWorld,
 } from './world.js';
@@ -91,13 +90,19 @@ describe('chapter 5: upgrade', () => {
     await jp.page.goto(await openedLink(pc));
     const probe = await jp.arm();
 
-    await navTo(jp.page, 'Agents');
+    // W4-SHELL-V2: the Agents page opens from the agent chip's dropdown, top left; the history is on
+    // today's Messages page (Go to), until Home (U3) holds it.
+    await jp.page
+      .getByRole('button', { name: /^Agent: / })
+      .first()
+      .click();
+    await jp.page.getByRole('menuitem', { name: 'Manage agents' }).click();
     await jp.page.getByText('work', { exact: true }).first().waitFor();
     const listed = await text(jp.page);
     for (const shown of ['Ana', 'work']) expect(listed).toContain(shown);
     expect((await pc.directory.list()).map((e) => e.name)).toEqual(names);
 
-    await navTo(jp.page, 'Messages');
+    await navTo(jp.page, 'Inbox');
     await jp.page.getByText('Bo', { exact: true }).first().click();
     await jp.page.getByText(REPLY).first().waitFor({ timeout: 30_000 });
 
@@ -113,36 +118,41 @@ describe('chapter 5: upgrade', () => {
     expect(ended.code).toBe(0);
   }, 240_000);
 
-  // Gate: the wave-4 shell (builder D, D1) and Inbox (builder B) turn this on. Today the app lands
-  // on the old Home and the history is on the Messages page.
-  it.runIf(WAVE4)(
-    'a 0.4.3 home lands on the Inbox; the switcher lists every agent; the history is in the Inbox',
-    async (ctx) => {
-      const ready = ch.need(ctx);
-      if (ready === undefined) return;
-      const world = journeyWorld();
-      const { pc } = await oldHome(ready, world);
-      pc.opened.length = 0;
-      const run = runUi(pc, ready.files);
-      ch.closers.push(async () => {
-        run.deps.stop();
-        await run.done;
-      });
-      const jp = await journeyPage(ready.browser);
-      await jp.page.goto(await openedLink(pc));
-      const probe = await jp.arm();
-      await jp.page.getByRole('heading', { name: 'Inbox' }).first().waitFor();
-      await jp.page.getByText(REPLY).first().waitFor({ timeout: 30_000 });
-      await jp.page.getByText(HELLO).first().waitFor({ timeout: 30_000 });
-      await jp.page
-        .getByRole('button', { name: /^Agent: / })
-        .first()
-        .click();
-      for (const label of ['Ana', 'work']) {
-        await jp.page.getByRole('menuitem').filter({ hasText: label }).first().waitFor();
-      }
-      await probe.check();
-    },
-    240_000,
-  );
+  // W4-SHELL-V2 (U1): the shell part is built (lands on Home, the live dropdown lists every agent);
+  // the history moves into Home with U3, until then it is on today's Messages page.
+  it('a 0.4.3 home lands on Home; the live agent dropdown lists every agent; the history is kept', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const { pc } = await oldHome(ready, world);
+    pc.opened.length = 0;
+    const run = runUi(pc, ready.files);
+    ch.closers.push(async () => {
+      run.deps.stop();
+      await run.done;
+    });
+    const jp = await journeyPage(ready.browser);
+    await jp.page.goto(await openedLink(pc));
+    const probe = await jp.arm();
+    await jp.page
+      .getByRole('navigation', { name: 'Sections' })
+      .getByRole('link', { name: /^Home/ })
+      .and(jp.page.locator('[aria-current="page"]'))
+      .first()
+      .waitFor();
+    expect(new URL(jp.page.url()).pathname).toBe('/');
+    await jp.page
+      .getByRole('button', { name: /^Agent: / })
+      .first()
+      .click();
+    await jp.page.getByText('Your agents · live').first().waitFor();
+    for (const label of ['Ana', 'work']) {
+      await jp.page.getByRole('menuitemradio').filter({ hasText: label }).first().waitFor();
+    }
+    await jp.page.keyboard.press('Escape');
+    await navTo(jp.page, 'Inbox');
+    await jp.page.getByText('Bo', { exact: true }).first().click();
+    await jp.page.getByText(REPLY).first().waitFor({ timeout: 30_000 });
+    await probe.check();
+  }, 240_000);
 });

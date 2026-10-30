@@ -1,20 +1,37 @@
-// The shared frame: sidebar, content and status bar from the design system's AppShell. Content
-// switches by route; the layout itself never changes (d1/screens/local). Nine sidebar items; the
-// Settings item opens a sub-navigation (Backup, Passkeys, Appearance, Advanced) above its page (D-120).
-// UI-REFRESH-f: a top bar with the page title and the global controls; the preferences reach every
-// page through PrefsHood (the Under the hood switch).
-import { AppShell, type NavItem } from '@4thtech-io/ui';
-import { useEffect, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react';
-import { NAV_ITEMS, SETTINGS_LABEL, SETTINGS_PAGES } from '../nav.js';
-import { PrefsHood } from '../prefs/index.js';
-import { PAGE_TITLES, SHELL_STRINGS } from '../strings.js';
-import { TopBarControls } from './top-bar.js';
-import { useUnseenMessages } from '../pages/messages/badge.js';
+// W4-SHELL-V2 (Decisions 49–51; W4 UX v2 "three layers"; prototype v23 A4/A8/A9/A10/A11): the shared
+// frame. One top bar across the window (the mark, the agent chip with its live dropdown, Go to, the
+// "?" Help menu and the Under the hood switch); under it, while Under the hood is on, the live status
+// strip; then the section menu (a minimized rail, or a sheet on a phone) beside the page; the status
+// bar at the bottom (the connection in words, the version). Same routes in both layers: turning
+// Under the hood on or off morphs the same screen in place (a View Transition, U0), never another
+// route tree. Get started (`/start/<step>`) and the join screen are a focused column with no chrome.
+// Shortcuts: Cmd+K (Go to), Cmd+Shift+U (Under the hood), Cmd+/ (shortcuts); Ctrl elsewhere.
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type MouseEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
+import { getLive } from '../api/live.js';
+import { SETTINGS_PAGES, sectionOf } from '../nav.js';
+import {
+  PrefsHood,
+  getPrefs,
+  setMenuExpanded,
+  startUiSettings,
+  useMenuExpanded,
+  usePrefs,
+} from '../prefs/index.js';
+import { SHELL_STRINGS } from '../strings.js';
+import { GoTo } from './go-to.js';
+import { TopBar, shortcutKeys } from './top-bar.js';
 import { useApprovalsWaiting } from '../pages/approvals/badge.js';
 import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js';
 import { createUpgradeApi } from '../pages/first-run/setup-api.js';
 import type { Platform } from '../pages/first-run/strings.js';
-import { StartHereContext, startHereShown } from '../pages/home/start-here-context.js';
+import { StartHereContext } from '../pages/home/start-here-context.js';
 import type { StartHereReads } from '../pages/home/start-here.js';
 import { useStartHere } from '../pages/home/use-start-here.js';
 import { SwitchToPasskeyBanner } from '../states/index.js';
@@ -22,6 +39,12 @@ import type { ApiResult } from '../api/client.js';
 import { TidyNote } from '../pages/agents/tidy-note.js';
 import { subscribeHealth } from './health-feed.js';
 import { readHealth as defaultReadHealth, type HealthState } from './health.js';
+import { VT_CLASS } from '@4thtech-io/ui';
+import { morph, toggleHood } from './hood.js';
+import { SectionRail, SectionSheet } from './section-menu.js';
+import { ShellDialogs, openShellDialog } from './shell-dialogs.js';
+import { StatusStrip } from './status-strip.js';
+import './shell.css';
 
 /**
  * What the status bar shows. "Connected" appears only when the local server's health read says the
@@ -89,28 +112,15 @@ export function useHealth(
   return version;
 }
 
-// "Paused" means the user paused AgentLink, so it is never used for an unknown state.
-const SHELL_STATE = {
-  unknown: 'checking',
-  connected: 'connected',
-  offline: 'disconnected',
-  paused: 'paused',
-  not_running: 'not-running',
-  needs_setup: 'needs-setup',
-} as const;
-
-function inSettings(path: string): boolean {
-  return SETTINGS_PAGES.some((p) => p.path === path);
-}
-
-/** The title in the top bar: the nav or Settings entry of the path, else the app's name. */
-function pageTitleOf(path: string): string {
-  if (path === '/first-run') return PAGE_TITLES.firstRun;
-  const item = NAV_ITEMS.find((i) => i.path === path && i.label !== SETTINGS_LABEL);
-  if (item !== undefined) return item.label;
-  const page = SETTINGS_PAGES.find((p) => p.path === path);
-  return page === undefined ? SHELL_STRINGS.appName : page.label;
-}
+/** The status bar's words; "Paused" means the user paused AgentLink, never an unknown state. */
+const STATUS: Readonly<Record<ConnectionState, readonly [cls: string, word: string]>> = {
+  unknown: ['checking', 'Checking…'],
+  connected: ['connected', 'Connected'],
+  offline: ['disconnected', 'Not connected'],
+  paused: ['paused', 'Paused'],
+  not_running: ['not-running', 'Not running'],
+  needs_setup: ['needs-setup', 'Needs setup'],
+};
 
 /**
  * M1-UX-FIRSTRUN-V2-c: true when the owner exists but approves only with the backup code (no
@@ -123,9 +133,10 @@ export async function needsPasskeySwitch(): Promise<boolean> {
   return info.kind === 'ok' && !info.registered;
 }
 
-const FIRST_RUN_PATH = '/first-run';
-/** U3-invite: the join screen, in the same focused shell. */
-const JOIN_PATH = '/settings/join';
+/** Get started and the join screen: a focused column with no chrome (b11 §28, §33.2). */
+export function isFocusedPath(path: string): boolean {
+  return path.startsWith('/start/') || path === '/first-run' || path === '/settings/join';
+}
 
 /** UI-REFRESH-t: the first Tab stop. Focus goes to the page content (it is made focusable here). */
 function skipToContent(event: MouseEvent<HTMLAnchorElement>): void {
@@ -136,6 +147,28 @@ function skipToContent(event: MouseEvent<HTMLAnchorElement>): void {
   main.focus();
 }
 
+export { toggleHood };
+
+/** Cmd+Shift+U and Cmd+/ (Ctrl elsewhere); Cmd+K belongs to Go to (go-to.tsx). */
+function useShellKeys(): void {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const mod = event.metaKey || event.ctrlKey;
+      if (!mod || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (event.shiftKey && key === 'u') {
+        event.preventDefault();
+        toggleHood(!getPrefs().hood);
+      } else if (!event.shiftKey && key === '/') {
+        event.preventDefault();
+        openShellDialog('shortcuts');
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+}
+
 export interface LayoutProps {
   readonly path: string;
   readonly children?: ReactNode;
@@ -143,9 +176,9 @@ export interface LayoutProps {
   readonly nextStep?: () => Promise<boolean>;
   /** The platform the next step names. Default: detected from the browser. */
   readonly platform?: Platform;
-  /** Test seam: the Messages badge count. Default: read from the local app. */
+  /** Test seam: the Messages badge count (kept for the page tests; Home shows approvals). */
   readonly unseenMessages?: () => Promise<number>;
-  /** Test seam: the Approvals badge count. Default: read from the local app. */
+  /** Test seam: the approvals waiting count. Default: read from the local app. */
   readonly waitingApprovals?: () => Promise<number>;
   /** Test seam: the health read (M1-11s-a-d). Default: GET /api/ui/health. */
   readonly readHealth?: () => Promise<ApiResult<unknown>>;
@@ -158,22 +191,26 @@ export function Layout({
   children,
   nextStep = needsPasskeySwitch,
   platform: givenPlatform,
-  unseenMessages,
   waitingApprovals,
   readHealth,
   startHere,
 }: LayoutProps): ReactElement {
+  const focused = isFocusedPath(path);
   const connection = useConnectionState();
   const version = useHealth(readHealth);
-  const unseen = useUnseenMessages(path, unseenMessages);
   const waiting = useApprovalsWaiting(path, waitingApprovals);
-  const settings = inSettings(path);
-  // UX2-g: one Start here model for the shell: the Home dot, the card and the empty states.
-  const start = useStartHere(startHere, path !== FIRST_RUN_PATH, path);
+  const { hood } = usePrefs();
+  const expanded = useMenuExpanded();
+  useShellKeys();
+  useEffect(() => {
+    void startUiSettings();
+  }, []);
+  // UX2-g: one Start here model for the shell: the card and the empty states.
+  const start = useStartHere(startHere, !focused, path);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [switchNeeded, setSwitchNeeded] = useState(false);
   useEffect(() => {
-    if (path === FIRST_RUN_PATH) {
+    if (focused) {
       setSwitchNeeded(false);
       return undefined;
     }
@@ -190,26 +227,18 @@ export function Layout({
     return () => {
       live = false;
     };
-  }, [path, nextStep]);
-  const nav: NavItem[] = NAV_ITEMS.map((item) => ({
-    icon: item.icon,
-    label: item.label,
-    href: item.path,
-    active: item.routed && (item.label === SETTINGS_LABEL ? settings : item.path === path),
-    // UI-REFRESH-o-d: the same shared tick badge as Approvals, read as "3 new".
-    ...(item.id === 'messages' && unseen > 0
-      ? { count: unseen, countLabel: SHELL_STRINGS.messagesNew }
-      : {}),
-    // UX2-g (B-11 §27.4): a dot on Home while Start here is shown; it goes with the card.
-    ...(item.id === 'home' && startHereShown(start) ? { dotLabel: SHELL_STRINGS.homeSetup } : {}),
-    // UI-REFRESH-o-b: the shared tick badge; it counts down as requests are decided.
-    ...(item.id === 'approvals' && waiting > 0
-      ? { count: waiting, countLabel: SHELL_STRINGS.approvalsWaiting }
-      : {}),
-  }));
-  // U3-g (b11 §28): first run is a focused column, with no sidebar, top bar or status bar.
-  // U3-invite (b11 §33.2): so is the join screen that ends it.
-  if (path === FIRST_RUN_PATH || path === JOIN_PATH) {
+  }, [path, nextStep, focused]);
+  const facts = useCallback(
+    () => ({
+      ...(version === undefined ? {} : { version }),
+      connection: (STATUS[connection] ?? STATUS.unknown)[1],
+      hood: getPrefs().hood,
+      agents: getLive().agents.length,
+    }),
+    [version, connection],
+  );
+
+  if (focused) {
     return (
       <PrefsHood>
         <a href="#al-main" className="al-skip al-text-body-sm" onClick={skipToContent}>
@@ -221,40 +250,64 @@ export function Layout({
       </PrefsHood>
     );
   }
+  const [statusClass, statusWord] = STATUS[connection];
+  const settings = sectionOf(path) === 'settings';
   return (
     <PrefsHood>
       <a href="#al-main" className="al-skip al-text-body-sm" onClick={skipToContent}>
         {SHELL_STRINGS.skipToContent}
       </a>
-      <AppShell
-        nav={nav}
-        pageTitle={pageTitleOf(path)}
-        topBarEnd={<TopBarControls connection={connection} />}
-        connection={SHELL_STATE[connection]}
-        {...(version === undefined ? {} : { version })}
-      >
-        {switchNeeded && path !== FIRST_RUN_PATH ? (
-          <SwitchToPasskeyBanner platform={platform} />
-        ) : null}
-        {settings ? (
-          <nav aria-label="Settings" className="al-subnav al-chrome">
-            {SETTINGS_PAGES.map((p) => (
-              <a
-                key={p.path}
-                href={p.path}
-                className={p.path === path ? 'is-active' : undefined}
-                aria-current={p.path === path ? 'page' : undefined}
-              >
-                {p.label}
-              </a>
-            ))}
-          </nav>
-        ) : null}
-        <StartHereContext.Provider value={start}>
-          {path === '/settings/home' ? <TidyNote /> : null}
-          {children}
-        </StartHereContext.Provider>
-      </AppShell>
+      <div className="al-app" data-hood={hood ? 'on' : 'off'}>
+        <TopBar connection={connection} onHood={toggleHood} />
+        {hood ? <StatusStrip connection={connection} /> : null}
+        <SectionSheet path={path} hood={hood} />
+        <div className="al-app-body">
+          <SectionRail
+            path={path}
+            hood={hood}
+            expanded={expanded}
+            onToggle={() => morph(() => setMenuExpanded(!expanded))}
+            waiting={waiting}
+          />
+          <main className={`al-shell-content al-app-main ${VT_CLASS.main}`} id="al-main">
+            <div className="al-route">
+              {switchNeeded ? <SwitchToPasskeyBanner platform={platform} /> : null}
+              {settings ? (
+                <nav aria-label={SHELL_STRINGS.settingsNav} className="al-subnav">
+                  {SETTINGS_PAGES.map((p) => (
+                    <a
+                      key={p.path}
+                      href={p.path}
+                      className={p.path === path ? 'is-active' : undefined}
+                      aria-current={p.path === path ? 'page' : undefined}
+                    >
+                      {p.label}
+                    </a>
+                  ))}
+                </nav>
+              ) : null}
+              <StartHereContext.Provider value={start}>
+                {/* The one-time Tidy up note (b11 §29.7), on Home. */}
+                {path === '/' ? <TidyNote /> : null}
+                {children}
+              </StartHereContext.Provider>
+            </div>
+          </main>
+        </div>
+        <footer className="al-statusbar al-chrome al-text-code">
+          {/* One polite live region: announced when the state changes, never per poll (B-11 §15). */}
+          <span className="al-sb-item" role="status" aria-live="polite" aria-atomic="true">
+            <span key={connection} className="al-sb-state">
+              <span className={`al-dot is-${statusClass}`} aria-hidden="true" />
+              {statusWord}
+            </span>
+          </span>
+          <span className="al-sb-spacer" />
+          {version === undefined ? null : <span className="al-sb-item">{version}</span>}
+        </footer>
+      </div>
+      <GoTo onHood={toggleHood} />
+      <ShellDialogs keys={shortcutKeys} facts={facts} />
     </PrefsHood>
   );
 }

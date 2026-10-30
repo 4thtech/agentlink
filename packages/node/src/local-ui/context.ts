@@ -40,6 +40,7 @@ import type {
   SendState,
   PauseReading,
   PreparedOwnerAction,
+  SaveReceivedFileResult,
   PreparedPolicyEdit,
   ProofListItem,
   ReceivedFileItem,
@@ -54,6 +55,7 @@ import type { FirstAgentCard } from '../owner-first-card.js';
 import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
 import type { LocalUiInviteDesk } from './route-types.js';
 import type { JoinDesk } from './join-desk.js';
+import type { LocalUiSettingsDesk } from './api/ui-settings.js';
 
 /**
  * The local UI's built files (apps/local-ui, D-118), in memory, from the caller (the CLI embeds
@@ -280,6 +282,12 @@ export interface LocalUiReadClient {
     received(query: PageQuery): Promise<Page<ReceivedFileItem>>;
     sent(query: PageQuery): Promise<Page<SentFileItem>>;
     savedName(itemId: string): Promise<string | null>;
+    /**
+     * W4-FILES-SAVE: core's prepare helper (optional so page fakes without it stay valid) for the unsigned `file.save` of one received item, by its
+     * ID only (core `ownerActions.prepareFileSave`). Writes nothing (I-4): the body changes nothing
+     * until the gate's one-use `sign` signed it and the save port's core verified and applied it.
+     */
+    prepareSave?(itemId: string): Promise<PreparedOwnerAction>;
   };
   /**
    * U3-d (D-138; 04 §2.5.1 `agent.label`): the agent's verified label (core `loadLabel`: the stored
@@ -370,6 +378,8 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       received: (query: PageQuery) => client.filesIo.received(query),
       sent: (query: PageQuery) => client.filesIo.sent(query),
       savedName: (itemId: string) => client.filesIo.savedName(itemId),
+      // W4-FILES-SAVE: the unsigned `file.save` (prepare only).
+      prepareSave: (itemId: string) => client.ownerActions.prepareFileSave(itemId),
     }),
     // U3-d: the verified label and the unsigned `agent.label` (reads and prepare only).
     agent: Object.freeze({
@@ -417,6 +427,27 @@ export function creditsPort(client: AgentLinkClient): LocalUiCreditsPort {
   return Object.freeze<LocalUiCreditsPort>({
     addReceivedFunds: (signed) => client.proofs.addReceivedFunds(signed),
     withdrawCredits: (signed) => client.proofs.withdrawCredits(signed),
+  });
+}
+
+/** W4-FILES-SAVE: how a save ended (core `saveReceivedFile`): never a path; the name is untrusted. */
+export type LocalUiFileSaveResult = SaveReceivedFileResult;
+
+/**
+ * W4-FILES-SAVE (04 §2.5.1 `file.save`, §4; 08 §1): saving one received file, for the save owner
+ * route only. It takes an owner-signed object that the route's one-use owner operation produced (the
+ * presence gate ran first); core takes only a `file.save`, verifies the owner signature, agent,
+ * freshness and nonce again, records the nonce, and only then saves with its own fetch (local
+ * decrypt, SSRF-safe download, Inbox folder only). Nothing else of the client is reachable through it.
+ */
+export interface LocalUiFileSavePort {
+  save(signed: { readonly body: JsonObject; readonly sig: string }): Promise<LocalUiFileSaveResult>;
+}
+
+/** The save port over `client` (a fresh frozen object of one bound method). */
+export function fileSavePort(client: AgentLinkClient): LocalUiFileSavePort {
+  return Object.freeze<LocalUiFileSavePort>({
+    save: (signed) => client.saveReceivedFile(signed),
   });
 }
 
@@ -541,6 +572,11 @@ export function inviteAcceptPort(client: AgentLinkClient): LocalUiInviteAcceptPo
 
 export interface LocalUiContext {
   /**
+   * W4-SHELL-V2 (08 §1, proposed): the app host's UI settings (Under the hood, the section menu),
+   * for api/ui-settings.ts only; absent outside the app host. Allowlisted booleans only.
+   */
+  readonly uiSettings?: LocalUiSettingsDesk;
+  /**
    * U3-g-b: present only while the app host has no agent yet: true when first run cannot set up an
    * owner here (an owner or any agent folder exists). `GET /api/ui/first-run` answers from it.
    */
@@ -549,6 +585,8 @@ export interface LocalUiContext {
   readonly client: LocalUiReadClient | undefined;
   /** M1-11c-a4c: the credits moves for the owner routes; undefined when not set up. */
   readonly credits?: LocalUiCreditsPort;
+  /** W4-FILES-SAVE: saving a received file, for the save owner route; undefined when not set up. */
+  readonly fileSave?: LocalUiFileSavePort;
   /**
    * UX2-d1: accepting an invite, for the accept owner route only; undefined when not set up. Its
    * pairing step runs only after core used an owner-signed, applied approval (I-4).
