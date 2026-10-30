@@ -26,11 +26,17 @@ let host: HTMLElement;
 let root: Root;
 let pairing: 'pending' | 'complete';
 let reads: number;
+let inviteReads: number;
+let openInvites: unknown[];
 let mode: 'ok' | 'fail' | 'slow';
 let release: (() => void) | undefined;
 
 const api = {
   get: async (path: string) => {
+    if (path === '/api/ui/invites') {
+      inviteReads += 1;
+      return { kind: 'ok', data: { invites: openInvites } };
+    }
     if (path !== '/api/ui/contacts') return { kind: 'error', status: 404 };
     reads += 1;
     if (mode === 'fail') return { kind: 'error', status: 500 };
@@ -52,6 +58,8 @@ beforeEach(async () => {
   mode = 'ok';
   release = undefined;
   reads = 0;
+  inviteReads = 0;
+  openInvites = [];
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -83,6 +91,28 @@ describe('HOTFIX-045-CONTACTS-REFRESH', () => {
     await flush(0);
     expect(reads).toBeGreaterThan(before);
     expect(host.textContent).not.toContain(S.waiting);
+  });
+
+  it('keeps polling while an invite is open, so the new contact appears by itself (W4-INVITES-LIST)', async () => {
+    pairing = 'complete';
+    openInvites = [
+      { inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ', name: 'Bo', expiresAt: '2027-01-15T08:00:00Z' },
+    ];
+    act(() => root.unmount());
+    root = createRoot(host);
+    await act(async () => {
+      root.render(createElement<ContactsPageProps>(ContactsPage, { api }));
+    });
+    await flush(0);
+    const before = reads;
+    await flush(5_000);
+    await flush(5_000);
+    expect(reads).toBeGreaterThanOrEqual(before + 2);
+    openInvites = [];
+    await flush(5_000);
+    const settled = reads;
+    await flush(15_000);
+    expect(reads).toBe(settled);
   });
 
   it('stops polling once nothing is pending', async () => {
@@ -129,5 +159,14 @@ describe('HOTFIX-045-CONTACTS-REFRESH', () => {
     });
     await flush(0);
     expect(reads).toBe(before + 1);
+  });
+
+  // W4-INVITES-LIST: the open invites are read wherever the page refreshes the contacts.
+  it('reads the open invites on load and with every refresh, no more often than the contacts', async () => {
+    expect(inviteReads).toBe(reads);
+    expect(inviteReads).toBeGreaterThan(0);
+    await flush(5_100);
+    expect(inviteReads).toBe(reads);
+    expect(reads).toBeGreaterThan(1);
   });
 });

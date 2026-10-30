@@ -11,7 +11,9 @@
 // - the URL is https, at most 512 characters, without credentials or fragment, in its WHATWG-serialised form (the Worker
 //   compares `u` with the URL as its runtime serialises it, 07 §5.4);
 // - the body is the drop's signed JSON (at most 1024 bytes, strict JSON, an object with v: 1, a
-//   16-byte base64url nonce and an integer ts), and `createdAt` equals its `ts`.
+//   16-byte base64url nonce and an integer ts), and `createdAt` equals its `ts`. W4-SHORT-INVITE:
+//   a POST to exactly the path `/v1/invite` (no query) may carry up to 24 KiB, the drop Worker's
+//   invite cap, since its body holds the `ALI1` object (07 §5.4).
 // Anything else is refused with one fixed error that names no input (I-7). Each request field is
 // read once and the snapshot is what is checked and signed.
 import { assertBytes } from './bytes.js';
@@ -33,6 +35,9 @@ export const DROP_REQUEST_REFUSED = 'signDropRequest: not a drop request this ke
 
 /** Largest signed drop body (upload, commit, DELETE), as the drop Worker reads it (M1-27a). */
 const MAX_SIGNED_BODY = 1024;
+/** W4-SHORT-INVITE: the largest `POST /v1/invite` body, as the drop Worker reads it (07 §5.4). */
+const MAX_INVITE_BODY = 24 * 1024;
+const INVITE_PATH = '/v1/invite';
 const REQUEST_KEYS = ['body', 'method', 'url'];
 
 function refused(): CryptoInputError {
@@ -56,8 +61,22 @@ interface ParsedUrl {
   readonly username: string;
   readonly password: string;
   readonly hash: string;
+  readonly pathname: string;
+  readonly search: string;
 }
 type UrlConstructor = new (url: string) => ParsedUrl;
+
+/** True for exactly `https://<host>/v1/invite` with no query (the URL is canonical already). */
+function isInviteUrl(url: string): boolean {
+  const Url = (globalThis as { URL?: UrlConstructor }).URL;
+  if (typeof Url !== 'function') return false;
+  try {
+    const parsed = new Url(url);
+    return parsed.pathname === INVITE_PATH && parsed.search === '';
+  } catch {
+    return false;
+  }
+}
 
 function isCanonicalUrl(url: string): boolean {
   // dropAuthEvent's own URL rules (at most 512 printable ASCII characters), applied here so every
@@ -82,8 +101,8 @@ function isCanonicalUrl(url: string): boolean {
 }
 
 /** The `ts` of a drop signed body, or null when the body is not one. */
-function bodyTimestamp(body: Uint8Array): number | null {
-  if (body.length > MAX_SIGNED_BODY) return null;
+function bodyTimestamp(body: Uint8Array, max: number): number | null {
+  if (body.length > max) return null;
   let value: unknown;
   try {
     value = parseJson(decodeUtf8(body), { integersOnly: true });
@@ -122,7 +141,9 @@ export function dropRequestSnapshot(request: unknown, createdAt: unknown): DropA
   if (typeof createdAt !== 'number' || !Number.isSafeInteger(createdAt) || createdAt < 0) {
     throw refused();
   }
-  if (bodyTimestamp(snapshot.body) !== createdAt) throw refused();
+  const max =
+    snapshot.method === 'POST' && isInviteUrl(snapshot.url) ? MAX_INVITE_BODY : MAX_SIGNED_BODY;
+  if (bodyTimestamp(snapshot.body, max) !== createdAt) throw refused();
   return snapshot;
 }
 

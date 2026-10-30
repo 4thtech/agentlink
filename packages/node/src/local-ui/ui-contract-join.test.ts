@@ -204,6 +204,8 @@ describe('contract (server): the real accept handler answers the started sample'
       join: desk,
       client: { agentId: JOIN_WORLD.agentId, contacts: { list: () => Promise.resolve([]) } },
       invites: {
+        resolve: (link: string) => Promise.resolve(link),
+        list: () => Promise.resolve([]),
         check: () => Promise.resolve(contact),
         decision: () => Promise.resolve('approval'),
         action: () =>

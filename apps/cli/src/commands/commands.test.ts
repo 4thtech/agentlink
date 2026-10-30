@@ -775,6 +775,27 @@ describe('accept and invite argument checks', () => {
     expect(h.asked).toEqual([]);
   });
 
+  it('invite --long asks core for the long link (D-139 (7)); plain invite never does', async () => {
+    const inputs: unknown[] = [];
+    const f = fakeAgent({
+      pairing: {
+        createInvite: (input: unknown) => {
+          inputs.push(input);
+          return Promise.resolve({
+            inviteUrl: 'https://agentlink.4thtech.io/i#AAAA',
+            format: 'long',
+            ownerFingerprint: {},
+            expiresAt: 1_800_600_000,
+          });
+        },
+      },
+    });
+    const h = harness(f);
+    expect((await h.run(['invite', '--long'], PIPED)).code).toBe(EXIT_OK);
+    expect((await h.run(['invite'], PIPED)).code).toBe(EXIT_OK);
+    expect(inputs).toEqual([{ long: true }, {}]);
+  });
+
   it('prints core fixed text for an expected core refusal and a generic line for anything else', async () => {
     const refusing = fakeAgent({
       pairing: {
