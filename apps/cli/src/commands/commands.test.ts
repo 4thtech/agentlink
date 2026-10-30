@@ -487,6 +487,25 @@ describe('status (06 §2.0, D-73)', () => {
     expect(result.text).toContain("Can't reach the message network");
   });
 
+  it('W4-PAUSE: a paused agent answers from the store with no fetch and says it is paused', async () => {
+    for (const paused of [() => Promise.resolve(true), () => Promise.reject(new Error('busy'))]) {
+      const f = fakeAgent({
+        paused,
+        inbox: { counts: () => Promise.resolve({ inbox: [], requests: 1 }) },
+      });
+      const result = await harness(f).run(['status', '--brief']);
+      expect(result.code).toBe(EXIT_OK);
+      expect(f.calls).not.toContain('catchUp');
+      expect(result.out).toContain('1 request from an unknown sender.');
+      expect(result.text).toContain(
+        'This agent is paused. The owner can resume it in the AgentLink app.',
+      );
+      const doctor = await harness(f).run(['doctor']);
+      expect(f.calls).not.toContain('catchUp');
+      expect(doctor.text).toContain('This agent is paused.');
+    }
+  });
+
   it('never prints inbound text; a self-declared name shows only with its label (M1-29)', async () => {
     const canary = 'CANARY-IGNORE-PREVIOUS-INSTRUCTIONS';
     const named = {

@@ -311,7 +311,29 @@ export interface LocalUiHandoffRoute {
   readonly presence: 'handoff';
 }
 
+/** W4-PAUSE: the fixed paths of Pause (its own kind) and Resume (a presence route) (08 §1). */
+export const AGENTS_PAUSE_PATH = '/api/ui/agents/pause';
+export const AGENTS_RESUME_PATH = '/api/ui/agents/resume';
+
+/**
+ * W4-PAUSE (D-143 (5); 08 §1 `POST /api/ui/agents/pause`; 04 §2.5 "Live status and Pause"; gestures
+ * decided by Tali in chat, 2026-10-30, Decision 50 (Q-143-1); proposed, owner confirms at merge):
+ * pausing the open agent, the ninth named route kind. Only `POST /api/ui/agents/pause`, registered
+ * once (routes.ts), with no handler: the server's pause gate runs it after the same session, CSRF,
+ * Origin, fetch-metadata and octet-stream checks as every write, refuses a query, an operation input
+ * or a presence header, parses the body itself (exactly `{"generation"}`, a number) and writes only
+ * the open agent's pause row. It takes no presence and signs nothing: stopping never adds authority
+ * (like `switch`). Resume is a presence route that signs `agent.resume` (api/agents-pause.ts).
+ * Outside the app host it answers `not_available`.
+ */
+export interface LocalUiPauseRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'pause';
+}
+
 export type LocalUiRoute =
+  | LocalUiPauseRoute
   | LocalUiHandoffRoute
   | LocalUiRemoveRoute
   | LocalUiSwitchRoute

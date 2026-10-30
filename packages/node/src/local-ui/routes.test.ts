@@ -196,6 +196,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/invites/cancel',
       // W4-LIVE-STATUS: the live event stream (local-ui/events-server.test.ts).
       '/api/ui/events',
+      // W4-PAUSE: Pause (its own kind) and Resume (local-ui/agents-pause-server.test.ts).
+      '/api/ui/agents/pause',
+      '/api/ui/agents/resume',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

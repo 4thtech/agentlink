@@ -267,6 +267,7 @@ import {
   creditsPort,
   inviteAcceptPort,
   inviteDesk,
+  pauseDesk,
   readOnlyClient,
   type LocalUiAgentView,
   type LocalUiAgentsList,
@@ -286,6 +287,7 @@ import type {
   LocalUiReadRoute,
   LocalUiRoute,
   LocalUiSwitchRoute,
+  LocalUiPauseRoute,
   LocalUiCreateAgentStep,
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
@@ -732,6 +734,8 @@ export type ApprovalServerEvent =
     }
   /** U3-c: a switch of the open agent in the app host (fixed outcome only, never a name). */
   | { readonly kind: 'switch'; readonly outcome: AppHostSwitchOutcome }
+  /** W4-PAUSE: a pause of the open agent (fixed outcome only, never a name; I-7). */
+  | { readonly kind: 'pause'; readonly outcome: 'paused' | 'already' | 'failed' }
   /** U3-e: removing an agent (fixed outcome and step only, never a name, label or ID; I-7). */
   | { readonly kind: 'remove'; readonly outcome: RemoveOutcome; readonly step?: RemovalStep }
   | { readonly kind: 'closed' };
@@ -950,6 +954,8 @@ function listOnlyAiApps(
 
 /** U3-c: the switch body is `{"name":"<32 chars>","generation":<16 digits>}`. */
 const MAX_SWITCH_BODY_BYTES = 128;
+/** W4-PAUSE: the pause body is exactly `{"generation":<number>}`. */
+const MAX_PAUSE_BODY_BYTES = 64;
 /** U3-c: the most agents `GET /api/ui/agents` lists (b11 §29 shows search above 8). */
 const MAX_LISTED_AGENTS = 200;
 
@@ -4493,6 +4499,13 @@ export async function startApprovalServerWith(
       liveEvents.poke();
       return;
     }
+    if (route.presence === 'pause') {
+      // W4-PAUSE (D-143 (5)): pausing has its own gate; it carries the generation in its body.
+      await pauseGate(req, res, url);
+      // The streams show `paused` at once.
+      liveEvents.poke();
+      return;
+    }
     // U3-c: the generation, before any presence check; held until the request is answered.
     const hold = mutatingHold(req, res);
     if (hold === false) return;
@@ -4517,7 +4530,7 @@ export async function startApprovalServerWith(
     req: IncomingMessage,
     res: ServerResponse,
     url: URL,
-    route: Exclude<LocalUiRoute, LocalUiReadRoute | LocalUiSwitchRoute>,
+    route: Exclude<LocalUiRoute, LocalUiReadRoute | LocalUiSwitchRoute | LocalUiPauseRoute>,
     params: Readonly<Record<string, string>>,
     cookie: string,
   ): Promise<void> {
@@ -4953,6 +4966,8 @@ export async function startApprovalServerWith(
           lastSeen: stats?.lastSeen ?? [],
           configured: appsOf(entry.name),
           detected,
+          // W4-PAUSE (08 §1 "Per agent state"): `paused` wins over every live state.
+          paused: stats?.paused === true,
         },
         at,
       );
@@ -5124,6 +5139,86 @@ export async function startApprovalServerWith(
             ? 503
             : 409;
     finishSwitch(status, outcome);
+  }
+
+  /**
+   * W4-PAUSE (D-143 (5); 08 §1 `POST /api/ui/agents/pause` `{generation}`; 04 §2.5 "Live status and
+   * Pause"), the pause kind. The caller checked the session, CSRF, Origin, fetch metadata and the
+   * octet-stream type. No query, operation input or presence header; the body is exactly
+   * `{"generation": <number>}`, the open agent's generation (else 409 `agent_changed`). No owner
+   * presence, nothing signed (Decision 50, Q-143-1: stopping never adds authority): the open
+   * agent's core writes its one pause row. A second pause answers the same. Outside the app host it
+   * answers `not_available`. Fixed codes only.
+   */
+  async function pauseGate(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    const finish = (status: number, body: Record<string, string>): void => {
+      stamp(res);
+      sendJson(res, status, body);
+    };
+    if (host === undefined) {
+      req.resume();
+      sendResult(res, NOT_AVAILABLE);
+      return;
+    }
+    // U3-g-b: like every agent-scoped route, refused while no agent is open.
+    if (noAgentOpen()) {
+      req.resume();
+      noAgent(res);
+      return;
+    }
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      finish(400, { status: 'invalid' });
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_PAUSE_BODY_BYTES);
+    if (body === undefined) return;
+    let generation: unknown;
+    try {
+      const parsed = parseJson(decodeUtf8(body));
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error();
+      const keys = Object.keys(parsed);
+      if (keys.length !== 1 || keys[0] !== 'generation') throw new Error();
+      ({ generation } = parsed as { generation?: unknown });
+    } catch {
+      finish(400, { status: 'invalid' });
+      return;
+    }
+    if (typeof generation !== 'number' || !Number.isSafeInteger(generation) || generation < 1) {
+      finish(400, { status: 'invalid' });
+      return;
+    }
+    // The page guard (08 §1): the agent the page shows must still be the open one.
+    const hold = host.enterMutating(String(generation));
+    if (hold === undefined) {
+      emit({ kind: 'rejected', reason: 'agent_changed' });
+      agentChanged(res);
+      return;
+    }
+    try {
+      const client = agentUi?.client;
+      if (noAgentOpen() || client === undefined) {
+        noAgent(res);
+        return;
+      }
+      let outcome: 'paused' | 'already';
+      try {
+        outcome = await pauseDesk(client).pause();
+      } catch {
+        // The error could carry a store path (I-7): never logged or returned.
+        emit({ kind: 'pause', outcome: 'failed' });
+        finish(503, { status: 'unavailable' });
+        return;
+      }
+      emit({ kind: 'pause', outcome });
+      finish(200, { status: 'paused' });
+    } finally {
+      hold.leave();
+    }
   }
 
   /** U3-e: one removal at a time. */

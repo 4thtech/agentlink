@@ -79,6 +79,9 @@ const V9_CONTACTS_COLUMNS: readonly string[] = [
 /** Tables added by version 10 (W4-LIVE-STATUS, D-143): the MCP session heartbeat (07 §3.2). */
 const V10_TABLES: readonly TableName[] = ['mcp_sessions', 'mcp_last_seen'];
 
+/** Tables added by version 11 (W4-PAUSE, D-143 (5)): the owner's pause of the agent (07 §3.2). */
+const V11_TABLES: readonly TableName[] = ['agent_pause'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -186,7 +189,8 @@ function v9Statements(): readonly string[] {
  * 7 adds `local_owner_actions` (U3-d, D-138; a new table, existing rows untouched), version 8 adds the
  * invites drop columns (W4-SHORT-INVITE, D-139; nullable, null on existing rows), version 9 adds the
  * contacts former-name columns (W4-RENAME-REACHES-CONTACTS, D-141; nullable, null on existing rows),
- * version 10 adds `mcp_sessions` and `mcp_last_seen` (W4-LIVE-STATUS, D-143; new tables only). A later
+ * version 10 adds `mcp_sessions` and `mcp_last_seen` (W4-LIVE-STATUS, D-143; new tables only),
+ * version 11 adds `agent_pause` (W4-PAUSE, D-143 (5); a new table, no row: not paused). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -201,7 +205,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V3_TABLES.includes(t) &&
           !V5_TABLES.includes(t) &&
           !V7_TABLES.includes(t) &&
-          !V10_TABLES.includes(t),
+          !V10_TABLES.includes(t) &&
+          !V11_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -215,6 +220,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 8, statements: Object.freeze(v8Statements()) }),
   Object.freeze({ version: 9, statements: Object.freeze(v9Statements()) }),
   Object.freeze({ version: 10, statements: createSchemaStatements(V10_TABLES) }),
+  Object.freeze({ version: 11, statements: createSchemaStatements(V11_TABLES) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

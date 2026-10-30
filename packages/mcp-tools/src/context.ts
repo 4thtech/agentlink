@@ -404,6 +404,11 @@ export interface ProofPlatformTools {
 export interface ToolClient {
   /** The agent's identity, or undefined when it has none yet (needs `agentlink init`). */
   self(): Promise<SelfView | undefined>;
+  /**
+   * W4-PAUSE (06 §6 "Paused agents"): whether the owner paused this agent (core `paused`, which is
+   * true when the pause row cannot be read). Absent only in a double that does not need it.
+   */
+  paused?(): Promise<boolean>;
   /** The fetch-only catch-up (M1-7h, D-73): fetches and stores, processes nothing (06 §2.0). */
   catchUp(budgetMs: number): Promise<Counts>;
   /** The same counts from the store only (no relay traffic). */
@@ -554,6 +559,7 @@ export function coreToolClient(
         ),
       };
     },
+    paused: () => client.paused(),
     async catchUp(budgetMs) {
       const { inbox, requests, incomplete } = await client.catchUp({ budgetMs });
       return { inbox, requests, incomplete };

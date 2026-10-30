@@ -38,6 +38,7 @@ import type {
   LabelReading,
   RenameAllowance,
   SendState,
+  PauseReading,
   PreparedOwnerAction,
   PreparedPolicyEdit,
   ProofListItem,
@@ -295,6 +296,13 @@ export interface LocalUiReadClient {
     renameAllowance?(): Promise<RenameAllowance>;
     /** D-141: whether the agent can send (an unfinished rotation is `rotation_pending`; read). */
     sendState?(): Promise<SendState>;
+    /** W4-PAUSE (D-143 (5)): the agent's pause row (core `pause.read`; `unreadable` is paused). */
+    pauseState?(): Promise<PauseReading>;
+    /**
+     * W4-PAUSE: core's unsigned `agent.resume` for this agent (`not_paused` while not paused).
+     * Writes nothing: it changes nothing until the gate's one-use `sign` signed it and core applied it.
+     */
+    prepareResume?(): Promise<PreparedOwnerAction>;
   };
   /**
    * W4-RENAME-REACHES-CONTACTS (D-141; 07 §3 "Former name", 08 §1): the page showed a contact's
@@ -371,6 +379,9 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       cardName: () => client.identity.cardName(),
       renameAllowance: () => client.identity.renameAllowance(),
       sendState: () => client.identity.sendState(),
+      // W4-PAUSE: the pause row and the unsigned `agent.resume` (read and prepare only).
+      pauseState: () => client.pause.read(),
+      prepareResume: () => client.ownerActions.prepareResume(),
     }),
     // D-141: the contact's former-name note was shown (display state only).
     contactNames: Object.freeze({
@@ -407,6 +418,19 @@ export function creditsPort(client: AgentLinkClient): LocalUiCreditsPort {
     addReceivedFunds: (signed) => client.proofs.addReceivedFunds(signed),
     withdrawCredits: (signed) => client.proofs.withdrawCredits(signed),
   });
+}
+
+/**
+ * W4-PAUSE (D-143 (5); 08 §1 `POST /api/ui/agents/pause`): the pause kind's one write over `client`
+ * (a fresh frozen object): core `pause.pause`, which writes only the agent's pause row and signs
+ * nothing. Only the server's pause gate holds it; no page handler reaches it.
+ */
+export interface LocalUiPauseDesk {
+  pause(): Promise<'paused' | 'already'>;
+}
+
+export function pauseDesk(client: AgentLinkClient): LocalUiPauseDesk {
+  return Object.freeze<LocalUiPauseDesk>({ pause: () => client.pause.pause() });
 }
 
 /**

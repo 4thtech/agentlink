@@ -11,7 +11,14 @@
 //   verifies and applies it.
 // - `GET /api/ui/agents` shows a paused agent's state as `paused` (the allowlist of 08 §1).
 import { encodeUtf8 } from '@4thtech-io/crypto';
-import { AGENTS_WORLD, OCTET_STREAM } from '@4thtech-io/types/ui-contract/agents';
+import {
+  AGENTS_PAUSE,
+  AGENTS_PAUSE_PATH as SAMPLE_PAUSE_PATH,
+  AGENTS_RESUME,
+  AGENTS_RESUME_PATH as SAMPLE_RESUME_PATH,
+  AGENTS_WORLD,
+  OCTET_STREAM,
+} from '@4thtech-io/types/ui-contract/agents';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   startApprovalServerWith,
@@ -308,6 +315,30 @@ const request = (input?: unknown) => ({
   params: {},
   query: new URLSearchParams(),
   ...(input === undefined ? {} : { input: input as never }),
+});
+
+describe('contract (server): the Pause and Resume samples U5 builds on', () => {
+  it('the paths are the shared ones', () => {
+    expect(AGENTS_PAUSE_PATH).toBe(SAMPLE_PAUSE_PATH);
+    expect(AGENTS_RESUME_PATH).toBe(SAMPLE_RESUME_PATH);
+  });
+
+  it('pause answers the samples: accepted, stale, invalid', async () => {
+    const h = await host();
+    const generation = await h.generation();
+    expect(await h.pause({ generation: generation + 98 })).toEqual(AGENTS_PAUSE.stale.answer);
+    expect(await h.pause({ generation, extra: 1 })).toEqual(AGENTS_PAUSE.invalid.answer);
+    expect(await h.pause({ generation })).toEqual(AGENTS_PAUSE.accepted.answer);
+  });
+
+  it('resume answers the samples: resumed and not_paused', async () => {
+    const paused = { paused: true } as { paused: boolean; applied?: string };
+    const s = signer();
+    const done = await resumeRoute().handler(world(paused), request(AGENTS_RESUME.input), s.operation);
+    expect(plain(done)).toEqual(AGENTS_RESUME.resumed.answer);
+    const refusal = await resumeRoute().precheck?.(world({ paused: false }), request(AGENTS_RESUME.input));
+    expect(plain(refusal)).toEqual(AGENTS_RESUME.notPaused.answer);
+  });
 });
 
 describe('resume (presence; signs agent.resume, 04 §2.5.1)', () => {

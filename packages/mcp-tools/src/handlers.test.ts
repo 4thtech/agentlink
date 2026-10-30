@@ -452,6 +452,8 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
     };
     const services: Record<string, unknown> = {
       identity: { get: () => Promise.resolve({ agentId: A, card }) },
+      // W4-PAUSE: the pause read (a store read only).
+      paused: () => Promise.resolve(false),
       catchUp: () => Promise.resolve({ partial: false, inbox: [], requests: 0 }),
       inbox: { counts: () => Promise.resolve({ inbox: [], requests: 0 }) },
       contacts: { list: () => Promise.resolve([]) },
@@ -493,6 +495,7 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
       'contacts',
       'identity',
       'ownerActions',
+      'paused',
       'terms',
     ]);
     expect(touched.filter((t) => t.startsWith('approvalService.'))).toEqual([

@@ -9,11 +9,12 @@
  * `files.saved_name`. Version 7 (U3-d, D-138) adds `local_owner_actions` (07 §3.4). Version 8
  * (W4-SHORT-INVITE, D-139) adds `invites.drop_lookup_id`, `drop_key_epoch` and `cancelled_at`.
  * Version 9 (W4-RENAME-REACHES-CONTACTS, D-141) adds the contacts former-name columns (07 §3).
- * Version 10 (W4-LIVE-STATUS, D-143) adds `mcp_sessions` and `mcp_last_seen` (07 §3.2). An
+ * Version 10 (W4-LIVE-STATUS, D-143) adds `mcp_sessions` and `mcp_last_seen` (07 §3.2).
+ * Version 11 (W4-PAUSE, D-143 (5)) adds `agent_pause` (07 §3.2). An
  * older build refuses a newer store (`store_schema_newer`), so an upgrade
  * cannot be rolled back.
  */
-export const STORE_SCHEMA_VERSION = 10;
+export const STORE_SCHEMA_VERSION = 11;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;

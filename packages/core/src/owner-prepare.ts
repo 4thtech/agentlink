@@ -20,6 +20,7 @@ import {
   ownerActionSchema,
   type PolicyRule,
   type AgentLabelParams,
+  type AgentResumeParams,
   type AppChangeParams,
   type ContactCheckParams,
   type ContactRule,
@@ -46,7 +47,8 @@ export type PreparableOp =
   | 'contact.remove'
   | 'agent.label'
   | 'app.connect'
-  | 'app.disconnect';
+  | 'app.disconnect'
+  | 'agent.resume';
 
 const PREPARABLE: readonly string[] = [
   'policy.set',
@@ -58,6 +60,8 @@ const PREPARABLE: readonly string[] = [
   // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
   'app.connect',
   'app.disconnect',
+  // W4-PAUSE (D-143 (5)): the owner resumes a paused agent from the local app.
+  'agent.resume',
 ];
 
 interface ParamsOf {
@@ -68,6 +72,7 @@ interface ParamsOf {
   readonly 'agent.label': AgentLabelParams;
   readonly 'app.connect': AppChangeParams;
   readonly 'app.disconnect': AppChangeParams;
+  readonly 'agent.resume': AgentResumeParams;
 }
 
 export interface OwnerActionBodyInput<O extends PreparableOp = PreparableOp> {
@@ -145,7 +150,9 @@ export type PrepareRefusal =
   /** U3-d: the label is not 1 to 32 code points already in its own restricted form (06 §2.1). */
   | 'label_invalid'
   /** U3-f: the app is not in the fixed table, or `changeId` is not 64 lowercase hex. */
-  | 'change_invalid';
+  | 'change_invalid'
+  /** W4-PAUSE: Resume for an agent that is not paused (refused before the gesture). */
+  | 'not_paused';
 
 export type PreparedOwnerAction =
   | {

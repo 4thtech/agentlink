@@ -84,7 +84,10 @@ export type CoreErrorCode =
   | 'storage_unavailable'
   | 'storage_failed'
   | 'file_download_failed'
-  | 'inbox_unavailable';
+  | 'inbox_unavailable'
+  // W4-PAUSE (D-143 (5); 06 §6 "Paused agents"): the owner paused this agent (or its pause row
+  // cannot be read: fail closed); nothing was sent, fetched or kept.
+  | 'agent_paused';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

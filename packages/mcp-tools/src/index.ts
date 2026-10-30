@@ -20,6 +20,7 @@ import { getProofHandler } from './get-proof.js';
 import { inboxHandler } from './inbox.js';
 import { matchesSchema } from './input.js';
 import { notarizeHandler } from './notarize.js';
+import { agentPaused, agentPausedOutput, PAUSE_REFUSED_TOOLS } from './pause.js';
 import { proposeTermsHandler } from './propose-terms.js';
 import { respondToTermsHandler } from './respond-to-terms.js';
 import { listContactsHandler } from './list-contacts.js';
@@ -108,6 +109,10 @@ export async function callTool(
         ? notAvailable()
         : fail('needs_setup', env.needsSetup.message, TOOL_TEXT.setupFollowNextStep);
     return finalizeResult(output, origins);
+  }
+  // W4-PAUSE (06 §6 "Paused agents"): a sending or fetching tool is refused before its handler.
+  if (PAUSE_REFUSED_TOOLS.has(tool.name) && (await agentPaused(env.client))) {
+    return finalizeResult(agentPausedOutput(), origins);
   }
   // M1-36i-e: one time budget per call; the time the handler spends counts against the wait.
   // Monotonic (performance.now): a wall clock that jumps back can never give the wait more time.

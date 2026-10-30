@@ -292,6 +292,8 @@ export class OutboxService {
   readonly #identity: IdentityService;
   readonly #contacts: ContactBook;
   readonly #transport: Transport | undefined;
+  /** W4-PAUSE: the agent's pause row; while paused (or unreadable) nothing is published. */
+  readonly #pause: { paused(): Promise<boolean> } | undefined;
   #transportClosed = false;
   /** The agent's own relays, the only ones where NIP-42 AUTH may be signed (07 §4.3). */
   #ownRelays: ReadonlySet<string> = new Set();
@@ -301,10 +303,12 @@ export class OutboxService {
     identity: IdentityService,
     contacts: ContactBook,
     transport: TransportFactory | undefined,
+    pause?: { paused(): Promise<boolean> },
   ) {
     this.#ctx = ctx;
     this.#identity = identity;
     this.#contacts = contacts;
+    this.#pause = pause;
     this.#transport =
       transport === undefined
         ? undefined
@@ -446,6 +450,8 @@ export class OutboxService {
    */
   async processDue(): Promise<OutboxSummary> {
     this.requireTransport();
+    // W4-PAUSE: a paused agent signs and publishes nothing (staged pairing messages wait too).
+    if (this.#pause !== undefined && (await this.#pause.paused())) return this.#run(undefined);
     await this.enqueueStaged();
     return this.#run(undefined);
   }
@@ -457,6 +463,12 @@ export class OutboxService {
 
   async #run(envelopeId: string | undefined): Promise<OutboxSummary> {
     const transport = this.requireTransport();
+    // W4-PAUSE (06 §6 "Paused agents"): while the owner has paused the agent (or its pause row cannot
+    // be read: fail closed) no row is published; queued rows keep their state and deadlines and go
+    // out at the first pass after a verified `agent.resume`.
+    if (this.#pause !== undefined && (await this.#pause.paused())) {
+      return { sent: 0, retrying: 0, notDelivered: 0, failed: 0, nextAttemptAt: undefined, notices: [] };
+    }
     try {
       this.#ownRelays = new Set(checkList((await this.#identity.signedCard()).relays));
     } catch {

@@ -9,8 +9,12 @@
 // takes it here). `mcp_last_seen` gives "last seen" per AI app. Only the app id (an id of the 06 §7
 // table, else `other`) and times leave this file: never a pid, a session ID or a holder ID (I-7).
 //
-// Only columns the store keeps in clear are read (07 §3): `contacts.status`, `identity.agent_id` and
-// the heartbeat tables. No KeyStore, store key or cipher is opened, nothing encrypted is read,
+// W4-PAUSE (D-143 (5); 07 §3.2 `agent_pause`; 08 §1 "Per agent state"): `paused` when the agent's
+// pause row exists (display only: the agent's own processes enforce the pause, fail closed). A store
+// from before version 11 (no pause table) is not paused.
+//
+// Only columns the store keeps in clear are read (07 §3): `contacts.status`, `identity.agent_id`,
+// `agent_pause` and the heartbeat tables. No KeyStore, store key or cipher is opened, nothing encrypted is read,
 // nothing is written. The database is opened read-only (SQLITE_OPEN_READONLY) with `fileMustExist`;
 // any failure (no store yet, a busy or damaged file) answers undefined and the page shows the agent
 // without the numbers; a store from before version 10 (no heartbeat tables) reads as no sessions.
@@ -47,6 +51,8 @@ export interface AgentStorePeek {
   readonly sessions: readonly AgentLiveSession[];
   /** One entry per app id, sorted by app id. */
   readonly lastSeen: readonly AgentLastSeen[];
+  /** W4-PAUSE: present (true) only while the agent's pause row exists. */
+  readonly paused?: true;
 }
 
 export interface PeekOptions {
@@ -85,12 +91,25 @@ export function peekAgentStore(
       running: live.sessions.length > 0,
       sessions: live.sessions,
       lastSeen: live.lastSeen,
+      ...(readPaused(db) ? { paused: true as const } : {}),
     });
   } catch {
     return undefined;
   } finally {
     db.close();
   }
+}
+
+/** W4-PAUSE: whether the pause row exists; false for a store from before version 11. */
+function readPaused(db: Database.Database): boolean {
+  const has = db
+    .prepare("SELECT count(*) AS n FROM sqlite_schema WHERE type = 'table' AND name = 'agent_pause'")
+    .get() as { n?: unknown } | undefined;
+  if (has?.n !== 1) return false;
+  const rows = db.prepare('SELECT count(*) AS n FROM agent_pause').get() as
+    | { n?: unknown }
+    | undefined;
+  return typeof rows?.n === 'number' && rows.n > 0;
 }
 
 /** The heartbeat tables, or none when they do not exist (a store from before version 10). */

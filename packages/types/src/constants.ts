@@ -186,6 +186,8 @@ export const OWNER_ACTION_OPS = freeze([
   'agent.label',
   'app.connect',
   'app.disconnect',
+  // W4-PAUSE (D-143 (5); proposed, owner confirms at merge): Resume ends a pause from the local app.
+  'agent.resume',
   'agent.revoke',
 ] as const);
 export type OwnerActionOp = (typeof OWNER_ACTION_OPS)[number];
@@ -279,6 +281,8 @@ export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   'agent.label': 600,
   'app.connect': 600,
   'app.disconnect': 600,
+  // W4-PAUSE (D-143 (5)): a local owner action, applied within seconds on the agent's own machine.
+  'agent.resume': 600,
   'agent.revoke': null,
 } as const);
 

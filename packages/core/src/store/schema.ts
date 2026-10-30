@@ -381,6 +381,17 @@ export const TABLES = {
     columns: { app: text, last_seen_at: int },
     primaryKey: ['app'],
   },
+  // 07 §3.2 (06 §6 "Paused agents"; D-143 (5), W4-PAUSE; schema version 11; proposed, owner confirms
+  // at merge): one row at most, present only while the owner has paused the agent. slot is the fixed
+  // single-row key; paused_at is when the pause began (unix seconds). Written by the app's Pause
+  // (no presence, nothing signed); deleted only by a verified `agent.resume` (04 §2.5.1). Every
+  // process reads it before a send, a fetch and every loop step, and a row that cannot be read
+  // counts as paused (fail closed). In clear: no secret, path, name or content.
+  agent_pause: {
+    columns: { slot: oneOf(SINGLETON_SLOT), paused_at: int },
+    primaryKey: ['slot'],
+    maxRows: 1,
+  },
   // 07 §3.3. approval_id is the empty string for a call without one, so it is `text`.
   idempotency: {
     columns: {

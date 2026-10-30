@@ -42,6 +42,7 @@ import {
 import type { InboxPageQuery, PageFile, PageItem, ToolContext } from './context.js';
 import { fail, invalidArgument, ok, type HandlerOutput } from './result.js';
 import { copy, UNTRUSTED_FOOTER } from './strings/index.js';
+import { agentPaused } from './pause.js';
 import { addressLabel } from './terms-common.js';
 import { noOwnerResult } from './text.js';
 import {
@@ -310,11 +311,14 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
 
   // M1-5g: seconds a relay returned at its cap. A count only; it reaches the user as fixed text.
   let incomplete = 0;
-  try {
-    incomplete = (await client.syncInbox(INBOX_SYNC_BUDGET_MS))?.incomplete ?? 0;
-  } catch {
-    // Offline or no relay: the stored items still answer. The error text is never logged (I-5).
-    logger.info('inbox sync unavailable; stored items used');
+  // W4-PAUSE (06 §6 "Paused agents"): a paused agent answers from the store, with no relay fetch.
+  if (!(await agentPaused(client))) {
+    try {
+      incomplete = (await client.syncInbox(INBOX_SYNC_BUDGET_MS))?.incomplete ?? 0;
+    } catch {
+      // Offline or no relay: the stored items still answer. The error text is never logged (I-5).
+      logger.info('inbox sync unavailable; stored items used');
+    }
   }
 
   // After the sync, so offers it just processed count. A failed read lists none (fail closed).

@@ -62,6 +62,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         // W4-LIVE-STATUS (D-143; 07 §3.2, schema 10): the MCP session heartbeat.
         'mcp_sessions',
         'mcp_last_seen',
+        // W4-PAUSE (D-143 (5); 07 §3.2, schema 11): the owner's pause of the agent.
+        'agent_pause',
         'idempotency',
         'owner_action_nonces',
         'revoked_agents',
