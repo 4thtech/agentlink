@@ -180,7 +180,9 @@ describe('create: short by default (04 §3.6.2 Create)', () => {
       expect(created.format).toBe('long');
       expect(created.inviteUrl.startsWith(INVITE_LINK_PREFIX)).toBe(true);
       expect(created.inviteUrl).not.toMatch(SHORT);
-      // A DELETE for the recorded lookup ID was attempted (the upload outcome may be ambiguous).
+      // A DELETE for the recorded lookup ID was attempted (the upload outcome may be ambiguous);
+      // it runs in the background (O-L1), so this waits for the sweep in flight.
+      await a.client.pairing.sweepInviteObjects();
       expect(drop.seen.some((s) => s.method === 'DELETE' && s.path.startsWith('/v1/i/'))).toBe(
         true,
       );
@@ -197,15 +199,22 @@ describe('create: short by default (04 §3.6.2 Create)', () => {
       const pending = a.client.pairing.createInvite().finally(() => {
         settled = true;
       });
+      // The upload is sent (after real crypto work), then the drop goes silent.
+      while (!drop.seen.some((s) => s.path === '/v1/invite')) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      await vi.advanceTimersByTimeAsync(9_000);
+      expect(settled).toBe(false);
       // Long before safe-fetch's 60 s, and without waiting for the (also hung) object DELETE.
-      await vi.advanceTimersByTimeAsync(10_500);
+      await vi.advanceTimersByTimeAsync(1_500);
       expect(settled).toBe(true);
       const created = await pending;
       expect(created.format).toBe('long');
       expect(created.inviteUrl.startsWith(INVITE_LINK_PREFIX)).toBe(true);
       // The sweep was still started for the recorded object (the outcome is ambiguous).
-      await vi.advanceTimersByTimeAsync(0);
-      expect(drop.seen.some((s) => s.method === 'DELETE')).toBe(true);
+      while (!drop.seen.some((s) => s.method === 'DELETE')) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
     } finally {
       vi.useRealTimers();
     }

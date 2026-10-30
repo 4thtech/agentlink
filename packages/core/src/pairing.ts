@@ -167,6 +167,26 @@ const RULE_ERRORS: ReadonlySet<CoreErrorCode> = new Set([
   'repair_epoch_lower',
 ]);
 
+/**
+ * `work`, or a rejection once `ms` have passed (and `abort` is aborted, so the guarded fetch gives
+ * the request up too). A late outcome of `work` is ignored.
+ */
+async function withDeadline<T>(work: Promise<T>, ms: number, abort: AbortController): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  work.catch(() => undefined);
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      abort.abort();
+      reject(new Error('deadline'));
+    }, ms);
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function classify(error: unknown, contactId: string | undefined): PairingOutcome {
   if (!(error instanceof CoreError) || error.code === 'store_unreadable') throw error;
   const contact = contactId === undefined ? {} : { contactId };
@@ -231,6 +251,11 @@ export interface OpenInvite {
 }
 
 /** Retry delays for a failed drop object delete (04 §3.6.2: retried with backoff). */
+/**
+ * O-L1: the short invite upload is given up after this (then the format 1 link), well before the
+ * guarded fetch's own 60 s, so Create never waits on a drop that does not answer (04 §3.6.2).
+ */
+export const INVITE_UPLOAD_TIMEOUT_MS = 10_000;
 const DELETE_BACKOFF_BASE_MS = 30_000;
 const DELETE_BACKOFF_MAX_MS = 60 * 60 * 1000;
 
@@ -344,14 +369,18 @@ export class PairingService implements PairingHandler {
     return resolveInviteLink(link, this.#fetchShort);
   }
 
-  #dropAdapter(): DropAdapter | undefined {
+  #dropAdapter(signal?: AbortSignal): DropAdapter | undefined {
     const drop = this.#drop;
     if (drop === undefined) return undefined;
+    const dropFetch = drop.fetch;
     try {
       return createDropAdapter({
         ...(drop.endpoint === undefined ? {} : { endpoint: drop.endpoint }),
         signer: this.#ctx.keyStore,
-        fetch: drop.fetch,
+        fetch:
+          signal === undefined
+            ? dropFetch
+            : (request: Request) => dropFetch(new Request(request, { signal })),
         now: () => new Date(nowOf(this.#ctx) * 1000),
         logger: this.#ctx.log,
       });
@@ -394,7 +423,9 @@ export class PairingService implements PairingHandler {
     const inviteId = randomBytes(INVITE_ID_BYTES);
     const secret = randomBytes(SECRET_BYTES);
     const nonceA = randomBytes(NONCE_BYTES);
-    const adapter = input.long === true ? undefined : this.#dropAdapter();
+    // The upload's requests carry this signal: aborted at the deadline (O-L1).
+    const uploadAbort = new AbortController();
+    const adapter = input.long === true ? undefined : this.#dropAdapter(uploadAbort.signal);
     let proofKey: Uint8Array | undefined;
     let linkSecret: Uint8Array | undefined;
     try {
@@ -452,20 +483,28 @@ export class PairingService implements PairingHandler {
       let format: CreatedInvite['format'] = 'long';
       if (sealed !== undefined && adapter !== undefined && linkSecret !== undefined) {
         try {
-          await adapter.putInvite({
-            lookupId: sealed.lookupId,
-            object: sealed.object,
-            expiresAt: new Date(expiresAt * 1000),
-            epoch: sealed.epoch,
-          });
+          await withDeadline(
+            adapter.putInvite({
+              lookupId: sealed.lookupId,
+              object: sealed.object,
+              expiresAt: new Date(expiresAt * 1000),
+              epoch: sealed.epoch,
+            }),
+            INVITE_UPLOAD_TIMEOUT_MS,
+            uploadAbort,
+          );
           inviteUrl = encodeShortInviteLink(linkSecret);
           format = 'short';
         } catch {
           // The drop refused or could not be reached (D-139 (7)): the same invite as a format 1
-          // link. The upload's outcome may be ambiguous, so the recorded object is deleted anyway.
+          // link. The upload's outcome may be ambiguous, so the recorded object is deleted anyway,
+          // in the background: the link is returned now (O-L1). The sweep never throws; the catch
+          // logs a fixed message only (I-7).
           ctx.log.info('invite drop unavailable, long link');
           this.#orphans.add(id);
-          await this.sweepInviteObjects();
+          this.sweepInviteObjects().catch(() => {
+            ctx.log.info('invite drop sweep failed');
+          });
         }
       }
       ctx.log.info('invite created', { expiresAt, format });
