@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/core",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "private": true,
   "description": "AgentLinkClient, policies, approvals, KeyStore and Store interfaces.",
   "license": "MIT",

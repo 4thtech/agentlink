@@ -48,6 +48,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // U3-d: removes the keychain items of an agent the app just created (agentId-derived names
       // only; never the owner's items), when it could not be completed.
       'discardNewOsKeychainAgent',
+      // W4-RENAME-REACHES-CONTACTS (D-141): an opaque token of a KeyStore this package opened; only
+      // this package turns it into an epoch control (key-epoch.ts), for the app host's rename.
+      'epochKeysOf',
       // M1-9x: a store-only boolean (owner item present); no bytes, no secret, nothing unlocked.
       'hasOwnerOnMachine',
       // M1-9z: a store-only boolean (a leftover owner-code change); nothing unlocked.

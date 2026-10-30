@@ -23,6 +23,14 @@
 //   card, the agent must not send (sendState `rotation_pending`, L-1); on open, a pending card the
 //   owner signed for exactly the KeyStore's epoch finishes the rotation (finishPendingRotation).
 //
+// - A rename is a rotation (W4-RENAME-REACHES-CONTACTS, D-141; 04 §2.6): `rotate({name})` issues the
+//   card for keyEpoch + 1 with the new `nameHash` and stores the new name with it at commit. The
+//   pending card carries its name, so an interrupted rename finishes on open like any rotation. At
+//   most RENAMES_PER_DAY renames (cards whose `nameHash` differs from the card before) per rolling
+//   24 h, counted from the card history in the store (a cost bound, not a security boundary, 04
+//   §2.5.1): the next is refused (`rename_limited`) before anything is signed, and a rename is
+//   refused while an earlier rotation is unfinished (`rotation_pending`).
+//
 // I-4, D-54: the owner key unlocks only with presence collected by an owner surface (an interactive
 // prompt, a passkey or a native window). The core never takes presence: owner flows (the CLI's own
 // terminal, the local UI) hand it an OwnerSession that they unlocked, and no MCP tool reaches these
@@ -44,6 +52,7 @@ import {
   verifyCardOwnerSig,
   verifyCardPop,
   type AgentCard,
+  type JsonValue,
   type KeyEpochControl,
   type OwnerPublicKeys,
   type OwnerSession,
@@ -68,6 +77,7 @@ import {
 import { STORAGE_PREFIX_BYTES } from './constants.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
+import { isRestrictedAlias } from './names.js';
 import { SINGLETON_SLOT, type Row, type Sealed } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -126,10 +136,26 @@ export interface InitIdentityInput {
   readonly expiresAt?: number;
 }
 
+/** W4-RENAME-REACHES-CONTACTS (D-141; decided by Tali, Decision 46): renames per rolling window. */
+export const RENAMES_PER_DAY = 3;
+/** The rolling window of the rename limit, in seconds (24 h). */
+export const RENAME_WINDOW_SECONDS = 86_400;
+
+/** Whether a rename may rotate now (04 §2.5.1): how many are left, or when one is allowed again. */
+export type RenameAllowance =
+  | { readonly status: 'ok'; readonly left: number }
+  | { readonly status: 'limited'; readonly retryAt: number };
+
 export interface RotateIdentityInput {
   readonly owner: OwnerSession;
   readonly ownerKeys: OwnerPublicKeys;
   readonly expiresAt?: number;
+  /**
+   * W4-RENAME-REACHES-CONTACTS (D-141): the card's new self-declared name (the owner's new label).
+   * Absent or equal to the stored name: the name stays. A different name is a rename: limited to
+   * RENAMES_PER_DAY per rolling 24 h and refused while a rotation is unfinished.
+   */
+  readonly name?: string;
   /**
    * The agent KeyStore backend's epoch control (M1-1g-d), held by the owner flow, never by
    * MCP-reachable code (I-4). Needed when the KeyStore is still at the stored epoch; when it is
@@ -453,10 +479,21 @@ export class IdentityService {
     if (oldStored === undefined) {
       throw new CoreError('store_unreadable', 'The stored identity could not be read.');
     }
+    const key = [old.agentId];
+    const storedName = await open(ctx, 'identity', 'name', key, current.row.name);
+    // D-141: a different name is a rename. Checked before any key is previewed or anything signed.
+    const name = input.name === undefined ? storedName : checkRenameName(input.name);
+    const renamed = name !== storedName;
+    if (renamed) {
+      const allowance = renameAllowanceOf(oldStored, nowOf(ctx));
+      if (allowance.status === 'limited') throw renameLimited();
+    }
     const bundle = await ctx.keyStore.getPublicBundle();
     if (bundle.agentId !== old.agentId) {
       throw new CoreError('identity_mismatch', 'The keys do not belong to this agent.');
     }
+    // D-141 (08 §1): a rename is refused while an earlier rotation is unfinished.
+    if (renamed && bundle.keyEpoch !== old.keyEpoch) throw rotationPending();
     let next: PublicIdentity;
     let control: KeyEpochControl | undefined;
     if (bundle.keyEpoch === old.keyEpoch + 1) {
@@ -480,8 +517,6 @@ export class IdentityService {
     if (!sameOwnerKeys(old.card, ownerKeyFields(input.ownerKeys))) {
       throw new CoreError('owner_keys_changed', 'The owner keys differ from the current card.');
     }
-    const key = [old.agentId];
-    const name = await open(ctx, 'identity', 'name', key, current.row.name);
     const relays = checkStoredRelays(
       await open(ctx, 'identity', 'relays', key, current.row.relays),
     );
@@ -489,7 +524,8 @@ export class IdentityService {
     // The session signs the card first, and its signature must recover to the stored owner keys:
     // that is what binds the session handed to advanceEpoch to this agent's owner.
     const signed = await this.#issue(next, input, name, relays, now);
-    const text = storedCardText(signed);
+    // D-141: a renaming pending card carries its name, so finishing it on open stores that name.
+    const text = renamed ? pendingCardText(signed, name) : storedCardText(signed);
     // M1-4d-f: the current card joins the history. A card stored before M1-4d-d gets its `cardPop`
     // now, while the KeyStore is still at its epoch (04 §2.9); after the advance it no longer can.
     const oldCardPop =
@@ -543,19 +579,46 @@ export class IdentityService {
       ownCardText({ ...signed, cardPop }, history),
     );
 
-    // 3. Commit the card and key_epoch, and clear the pending card.
+    // 3. Commit the card and key_epoch (and a new name), and clear the pending card.
+    const sealedName = renamed ? await seal(ctx, 'identity', 'name', key, name) : undefined;
     const patch = {
       agent_card_json: sealedCard,
       pending_card_json: null,
       key_epoch: next.keyEpoch,
       updated_at: now,
+      ...(sealedName === undefined ? {} : { name: sealedName }),
     };
     await ctx.store.transaction((tx) => {
       assertNotRevoked(tx, old.agentId);
       if (tx.update('identity', where, patch) !== 1) throw concurrentRotation();
     });
-    ctx.log.info('identity rotated', { keyEpoch: next.keyEpoch });
+    ctx.log.info(renamed ? 'identity renamed' : 'identity rotated', { keyEpoch: next.keyEpoch });
     return this.#view({ ...current.row, ...patch }, false);
+  }
+
+  /**
+   * D-141: the self-declared name in the agent's current card (what contacts see), or undefined
+   * before init. The owner chose it; shown as plain text only.
+   */
+  async cardName(): Promise<string | undefined> {
+    const got = await readIdentity(this.#ctx);
+    if (got === undefined) return undefined;
+    return open(this.#ctx, 'identity', 'name', [got.row.agent_id], got.row.name);
+  }
+
+  /**
+   * D-141 (Decision 46): whether a rename may rotate now: at most RENAMES_PER_DAY cards whose
+   * `nameHash` differs from the card before, issued in the last RENAME_WINDOW_SECONDS, counted from
+   * the card history in the store. The owner flow asks before the gesture; rotate refuses too.
+   */
+  async renameAllowance(): Promise<RenameAllowance> {
+    const got = await readIdentity(this.#ctx);
+    if (got === undefined) return { status: 'ok', left: RENAMES_PER_DAY };
+    const stored = await openOwnCard(this.#ctx, got.row);
+    if (stored === undefined) {
+      throw new CoreError('store_unreadable', 'The stored identity could not be read.');
+    }
+    return renameAllowanceOf(stored, nowOf(this.#ctx));
   }
 
   /** Builds and signs a card: owner first, then agent; both verified before anything is stored. */
@@ -611,6 +674,74 @@ export class IdentityService {
   }
 }
 
+/** The rename limit over the own card history (oldest first, then the current card). */
+function renameAllowanceOf(stored: OwnStoredCard, now: number): RenameAllowance {
+  const cards = [...stored.history.map((h) => h.card), stored.card];
+  const since = now - RENAME_WINDOW_SECONDS;
+  const renames: number[] = [];
+  for (let i = 1; i < cards.length; i += 1) {
+    const card = cards[i] as AgentCard;
+    const before = cards[i - 1] as AgentCard;
+    if (card.nameHash !== before.nameHash && card.issuedAt > since) renames.push(card.issuedAt);
+  }
+  if (renames.length < RENAMES_PER_DAY) {
+    return { status: 'ok', left: RENAMES_PER_DAY - renames.length };
+  }
+  // Allowed again once the oldest rename that keeps the count at the limit leaves the window.
+  const sorted = renames.sort((a, b) => a - b);
+  const oldest = sorted[sorted.length - RENAMES_PER_DAY] as number;
+  return { status: 'limited', retryAt: oldest + RENAME_WINDOW_SECONDS };
+}
+
+/**
+ * A new card name from a rename: the owner's label, so the label rule (06 §6; 04 §2.5.1 `label_invalid`):
+ * already its own restricted form (06 §2.1), 1 to 32 code points; then the card name rule.
+ */
+function checkRenameName(name: unknown): string {
+  if (!isRestrictedAlias(name)) {
+    throw new CoreError('name_invalid', 'The display name is not valid.');
+  }
+  return checkName(name);
+}
+
+function renameLimited(): CoreError {
+  return new CoreError(
+    'rename_limited',
+    'This agent was renamed too often today. Try again later.',
+  );
+}
+
+function rotationPending(): CoreError {
+  return new CoreError(
+    'rotation_pending',
+    'An earlier change of this agent is not finished yet. Try again shortly.',
+  );
+}
+
+/** A pending card with the name it commits to (D-141): the stored-card fields plus `name`. */
+function pendingCardText(signed: StoredCard, name: string): string {
+  return canonicalize({
+    card: signed.card as unknown as JsonValue,
+    cardSig: signed.cardSig,
+    cardAgentSig: signed.cardAgentSig,
+    cardPop: signed.cardPop,
+    name,
+  });
+}
+
+/** The name a pending card text carries (D-141), or undefined (a rotation that keeps the name). */
+function pendingNameOf(text: string): string | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (typeof value !== 'object' || value === null) return undefined;
+  const name = (value as Record<string, unknown>)['name'];
+  return name === undefined ? undefined : checkName(name);
+}
+
 function nextEpochMismatch(): CoreError {
   return new CoreError(
     'key_epoch_mismatch',
@@ -656,10 +787,13 @@ async function usablePendingCard(
   sealed: Sealed,
   bundle: PublicIdentity,
   now: number,
-): Promise<StoredCard | undefined> {
+): Promise<(StoredCard & { readonly name?: string }) | undefined> {
   const key = [row.agent_id];
   try {
-    const pending = parseStoredCard(await open(ctx, 'identity', 'pending_card_json', key, sealed));
+    const text = await open(ctx, 'identity', 'pending_card_json', key, sealed);
+    const pending = parseStoredCard(text);
+    // D-141: a renaming pending card names its new name, and its nameHash must commit to it.
+    const name = pendingNameOf(text);
     const current = parseStoredCard(
       await open(ctx, 'identity', 'agent_card_json', key, row.agent_card_json),
     ).card;
@@ -672,9 +806,12 @@ async function usablePendingCard(
       (pending.card.expiresAt === 0 || pending.card.expiresAt > now) &&
       sameAgentKeys(bundle, pending.card) &&
       sameOwnerKeys(current, pending.card) &&
-      pending.card.nameHash === current.nameHash &&
+      (name === undefined
+        ? pending.card.nameHash === current.nameHash
+        : pending.card.nameHash === encodeHex0x(agentCardNameHash(name))) &&
       pending.card.relaysHash === current.relaysHash;
-    return usable ? pending : undefined;
+    if (!usable) return undefined;
+    return name === undefined ? pending : { ...pending, name };
   } catch (error) {
     if (error instanceof CoreError) return undefined;
     throw error;
@@ -731,8 +868,13 @@ async function finishIfUsable(ctx: CoreContext): Promise<void> {
     'identity',
     'agent_card_json',
     [row.agent_id],
-    ownCardText({ ...pending, cardPop }, history),
+    ownCardText({ ...storedOf(pending), cardPop }, history),
   );
+  // D-141: an interrupted rename stores its name with the card.
+  const sealedName =
+    pending.name === undefined
+      ? undefined
+      : await seal(ctx, 'identity', 'name', [row.agent_id], pending.name);
   const finished = await ctx.store.transaction((tx) => {
     if (isRevoked(tx, row)) return false;
     // Exactly the row and the pending card that were verified; otherwise another flow moved on.
@@ -748,6 +890,7 @@ async function finishIfUsable(ctx: CoreContext): Promise<void> {
       pending_card_json: null,
       key_epoch: bundle.keyEpoch,
       updated_at: now,
+      ...(sealedName === undefined ? {} : { name: sealedName }),
     };
     return tx.update('identity', where, patch) === 1;
   });

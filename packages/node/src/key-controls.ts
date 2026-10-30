@@ -96,8 +96,10 @@ import {
 import {
   checkQuarantinedSnapshot,
   discardQuarantineSync,
+  checkedSnapshotKeyEpoch,
   isQuarantineSink,
 } from './restore-quarantine.js';
+import { encodeKeyEpoch } from './key-epoch.js';
 
 const { O_WRONLY, O_CREAT, O_EXCL, O_NOFOLLOW } = constants;
 const KIT_MODE = 0o600;
@@ -105,8 +107,19 @@ const KIT_MODE = 0o600;
 const AGENT_NAME = /^[a-z][a-z0-9-]{0,31}$/;
 /** 04 §2.2: a `storage.set` id, 8 CSPRNG bytes as 16 lowercase hex. */
 const STORAGE_ID = /^[0-9a-f]{16}$/;
-/** The agent items a kit carries (04 §2.3.3), in kit order; `seed` and `store-key` are required. */
-const KIT_ITEMS = ['seed', 'store-key', 'policy-version', 'receipts-kept', 'storage-mark'] as const;
+/**
+ * The agent items a kit carries (04 §2.3.3), in kit order; `seed` and `store-key` are required.
+ * W4-RENAME-REACHES-CONTACTS (D-141): `key-epoch` is optional (absent: epoch 0), so a restored
+ * renamed agent opens its KeyStore at the epoch its store holds.
+ */
+const KIT_ITEMS = [
+  'seed',
+  'store-key',
+  'policy-version',
+  'receipts-kept',
+  'storage-mark',
+  'key-epoch',
+] as const;
 const REQUIRED_ITEMS: readonly string[] = ['seed', 'store-key'];
 
 // --- Fixed errors (I-7) ---------------------------------------------------------------------------
@@ -607,6 +620,15 @@ export function createKeyImportControl(options: KeyImportControlOptions): KeyImp
       }
       const mark = encodeStorageMark(null);
       entries.push({ name: STORAGE_MARK_ITEM, value: mark });
+      // W4-RENAME-REACHES-CONTACTS (D-141; 04 §2.3.3): a kit made before `key-epoch` was carried has
+      // none; the epoch then comes from the verified snapshot's identity row (equal to its card's),
+      // so a renamed agent still opens its KeyStore at the epoch its store holds.
+      if (!agent.items.some((item) => item.name === 'key-epoch')) {
+        const epoch = checkedSnapshotKeyEpoch(agent.store);
+        if (epoch !== undefined && epoch > 0) {
+          entries.push({ name: 'key-epoch', value: encodeKeyEpoch(epoch) });
+        }
+      }
       if (backend === 'keychain') {
         await writeKeychainItems(keychain as KeychainBackend, agentId, entries);
         return Object.freeze({ unlockCode: undefined });
