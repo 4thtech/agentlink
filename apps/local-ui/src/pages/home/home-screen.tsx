@@ -86,6 +86,8 @@ export interface HomeScreenProps {
   readonly pollMs?: number;
   /** U2's "Get started · n of 3 done" card, on top while setup is not done. */
   readonly getStarted?: ReactNode;
+  /** Why nothing can be approved here yet (owner not set up, no passkeys in this browser). */
+  readonly ownerNotice?: ReactNode;
   /** U4's pending invite rows; otherwise the server's open invites, each with Cancel. */
   readonly pendingRows?: ReactNode;
   /** K3's "Saved to <folder>" note for every person's Files. */
@@ -590,6 +592,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
       >
         <div className="hm-stack">
           {props.getStarted ?? null}
+          {props.ownerNotice ?? null}
           <HomeApprovals
             items={approvals}
             owner={owner}

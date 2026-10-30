@@ -573,9 +573,17 @@ export function ApprovalsPage({
   platform,
   reducedMotion,
 }: ApprovalsPageProps): ReactElement {
+  // The owner's state, as the list showed it: not set up yet (nothing can be approved, with the
+  // reason) or no passkeys in this browser (the backup code is the way).
+  const approvals = useMemo(() => client ?? createApprovalsClient(), [client]);
+  const passkeys = canPasskey ?? browserPasskeys();
+  const owner = useOwner(approvals, passkeys);
   return (
     <HomeScreen
-      {...(client === undefined ? {} : { approvalsClient: client })}
+      approvalsClient={approvals}
+      {...(owner === undefined
+        ? {}
+        : { ownerNotice: <OwnerPanel owner={owner} canPasskey={passkeys} /> })}
       {...(payConfirm === undefined ? {} : { payConfirm })}
       {...(canPasskey === undefined ? {} : { canPasskey })}
       {...(platform === undefined ? {} : { platform })}

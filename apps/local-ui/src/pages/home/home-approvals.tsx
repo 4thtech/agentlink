@@ -143,6 +143,7 @@ export function HomeApprovals({
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [reviewing, setReviewing] = useState(false);
+  const [kept, setKept] = useState<readonly ApprovalItem[]>([]);
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const sorted = [...items].sort(byExpiry);
   const ids = sorted.map((i) => i.approvalId).join(' ');
@@ -165,6 +166,28 @@ export function HomeApprovals({
   }
   const more = sorted.slice(1);
   const bulk = pro ? more.filter((i) => picked.has(i.approvalId) && pickable(i)) : [];
+  // Before presence, read the list again: what is no longer waiting, or changed, is left out and
+  // said (04 §2.5.2, as the review-together list did); only the rest goes to the gesture.
+  const startReview = async (): Promise<void> => {
+    setNotice(undefined);
+    const live = await client.list();
+    if (live.kind !== 'ok') {
+      setNotice(A.notRunning);
+      return;
+    }
+    const digests = new Map(live.items.map((i) => [i.approvalId, i.actionDigest]));
+    const keep = bulk.filter((i) => digests.get(i.approvalId) === i.actionDigest && pickable(i));
+    const dropped = bulk.length - keep.length;
+    if (dropped === 1) setNotice(A.droppedOne);
+    else if (dropped > 1) setNotice(fmt(A.droppedMany, { count: dropped }));
+    if (keep.length === 0) {
+      setNotice(A.nothingLeft);
+      onChanged();
+      return;
+    }
+    setKept(keep);
+    setReviewing(true);
+  };
   const decided = (): void => {
     announceDecided(1);
     onChanged();
@@ -232,16 +255,16 @@ export function HomeApprovals({
           {pro ? (
             <div className="hm-ap-bar">
               {bulk.length > 0 && !reviewing ? (
-                <Button variant="primary" size="sm" onClick={() => setReviewing(true)}>
+                <Button variant="primary" size="sm" onClick={() => void startReview()}>
                   {fmt(S.approveSelected, { count: bulk.length })}
                 </Button>
               ) : null}
               <span className="hm-ap-note al-text-body-sm">{S.paidAlone}</span>
             </div>
           ) : null}
-          {reviewing && bulk.length > 0 ? (
+          {reviewing && kept.length > 0 ? (
             <BulkReview
-              picks={bulk}
+              picks={kept}
               owner={owner}
               client={client}
               onBack={() => setReviewing(false)}
