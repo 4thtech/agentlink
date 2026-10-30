@@ -24,10 +24,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPayConfirmClient } from '../../pay-confirm/index.js';
 import { getPrefs, PREFS_KEY, resetPrefsForTests } from '../../prefs/index.js';
 import { ApprovePage } from '../approve/index.js';
-import approvalsCss from './approvals.css?raw';
+import pageCss from './approvals.css?raw';
+import boardCss from './board.css?raw';
+
+// W4-HOME: the list's own rules moved to board.css; the page's stylesheet is both files.
+const approvalsCss = `${pageCss}\n${boardCss}`;
 import { APPROVED_HOLD_MS } from './card.js';
 import { createApprovalsClient } from './client.js';
-import { ApprovalsBoard, type ApprovalsPageProps } from './index.js';
+import { ApprovalsBoard } from './board.js';
+import type { ApprovalsPageProps } from './index.js';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

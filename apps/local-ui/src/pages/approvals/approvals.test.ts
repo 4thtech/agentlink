@@ -13,7 +13,8 @@ import { PAY_CONFIRM_STRINGS as P } from '@4thtech-io/ui';
 import { createPayConfirmClient } from '../../pay-confirm/index.js';
 import { AppRoutes } from '../../router.js';
 import { ApprovePage } from '../approve/index.js';
-import { ApprovalsBoard, type ApprovalsPageProps } from './index.js';
+import { ApprovalsBoard } from './board.js';
+import type { ApprovalsPageProps } from './index.js';
 import { createApprovalsClient } from './client.js';
 import { APPROVAL_STRINGS as S } from './strings.js';
 

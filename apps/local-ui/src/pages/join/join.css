@@ -25,26 +25,11 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
-.jn-who {
-  display: grid;
-  gap: var(--al-space-2);
-  padding: var(--al-space-5);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  border-radius: var(--al-radius-md);
-  background: var(--al-color-bg-sunken);
-}
 .jn-badge {
   border: var(--al-border-width-thin) dashed var(--al-color-border-default);
   border-radius: var(--al-radius-sm);
   padding-inline: var(--al-space-2);
   color: var(--al-color-fg-muted);
-}
-.jn-caps {
-  letter-spacing: 0.08em;
-  color: var(--al-color-fg-muted);
-}
-.jn-mono {
-  font-family: var(--al-font-family-mono);
 }
 .jn-actions {
   display: flex;

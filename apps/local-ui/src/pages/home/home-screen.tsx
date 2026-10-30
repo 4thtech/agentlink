@@ -165,8 +165,15 @@ function Avatar({
   readonly small?: boolean;
 }): ReactElement {
   const letter = [...name.trim()][0]?.toUpperCase() ?? '?';
+  // A tint picked from the name, so a person keeps their colour (no image, no key).
+  let tint = 0;
+  for (const ch of name) tint = (tint * 31 + (ch.codePointAt(0) ?? 0)) % 4;
   return (
-    <span className={small ? 'al-avatar' : 'al-avatar hm-avatar'} aria-hidden="true">
+    <span
+      className={small ? 'al-avatar' : 'al-avatar hm-avatar'}
+      data-tint={String(tint)}
+      aria-hidden="true"
+    >
       {letter}
     </span>
   );

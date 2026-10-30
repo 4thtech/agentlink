@@ -228,27 +228,6 @@
   }
 }
 
-/* Pending invites: the name and the days left. The new row's highlight fades its colour only
-   (opacity), so it is the same with reduced motion: nothing moves. */
-.ct-invite {
-  position: relative;
-  isolation: isolate;
-  display: flex;
-  gap: var(--al-space-4);
-  align-items: center;
-  padding: var(--al-space-4) var(--al-space-5);
-  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-subtle);
-}
-.ct-invite:last-child {
-  border-bottom: 0;
-}
-.ct-invite-main {
-  flex: 1;
-  min-inline-size: 0;
-}
-.ct-invite-expiry {
-  display: block;
-}
 .ct-advanced {
   display: grid;
   gap: var(--al-space-3);
@@ -257,15 +236,6 @@
   cursor: pointer;
   color: var(--al-color-fg-muted);
   padding-block: var(--al-space-2);
-}
-.ct-invite.is-new::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--al-color-accent-subtle);
-  pointer-events: none;
-  animation: ct-highlight calc(var(--al-duration-moment) * 2.5) var(--al-easing-exit) forwards;
 }
 @keyframes ct-highlight {
   from {

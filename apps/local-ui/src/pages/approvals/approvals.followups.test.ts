@@ -25,7 +25,8 @@ import { ApprovePage } from '../approve/index.js';
 import { announceDecided, announceWaiting } from './badge.js';
 import { APPROVED_HOLD_MS, approvalHoodFields } from './card.js';
 import { createApprovalsClient, type ApprovalItem } from './client.js';
-import { ApprovalsBoard, type ApprovalsPageProps } from './index.js';
+import { ApprovalsBoard } from './board.js';
+import type { ApprovalsPageProps } from './index.js';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

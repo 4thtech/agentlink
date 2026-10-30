@@ -11,6 +11,7 @@ export default defineConfig({
         /home\.css/,
         /contacts\.css/,
         /approvals\.css/,
+        /board\.css/,
         /activity\.css/,
         /pulse\.css/,
         /about\.css/,

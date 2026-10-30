@@ -82,13 +82,6 @@
   color: var(--al-color-fg-muted);
 }
 
-/* Name and protect. */
-.fr-chosen {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-4);
-  justify-content: space-between;
-}
 .fr-chosen-name {
   display: flex;
   align-items: center;
@@ -97,14 +90,6 @@
   overflow-wrap: anywhere;
 }
 /* W4-ONE-TOUCH: "Connect to {app}" (prefilled), the same checkbox pattern as the Agents sheet. */
-.fr-connect {
-  cursor: pointer;
-  gap: var(--al-space-3);
-}
-.fr-connect input {
-  flex: none;
-  margin: 0;
-}
 .fr-actions {
   display: grid;
   gap: var(--al-space-4);
@@ -112,16 +97,6 @@
 }
 .fr-actions .al-btn-lg {
   inline-size: 100%;
-}
-.fr-folders {
-  display: grid;
-  gap: var(--al-space-3);
-  padding: var(--al-space-5);
-  border-radius: var(--al-radius-md);
-  background: var(--al-color-bg-sunken);
-}
-.fr-folders dl {
-  margin: 0;
 }
 
 /* Connect your AI app: the exact entry. */
