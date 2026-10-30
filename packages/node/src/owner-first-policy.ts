@@ -31,6 +31,7 @@ import { lstat, mkdir, readdir, realpath, rmdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { POLICY_DEFAULTS_EFFECTIVE } from '@4thtech-io/core';
+import { AUTO_SAVE_DEFAULTS } from '@4thtech-io/types';
 import {
   canonicalize,
   encodeHex,
@@ -191,14 +192,20 @@ export function firstPolicyDocument(folder: string): JsonObject {
   return parseJson(expectedPolicyJcs(folder)) as JsonObject;
 }
 
-/** JCS of the 06 §3 defaults with only `files.allowedFolders` = [folder]. */
+/**
+ * JCS of the 06 §3 defaults with only `files.allowedFolders` = [folder]. `files.autoSave` is the
+ * defaults too: every policy.set this core signs carries it (D-142, 06 §3).
+ */
 function expectedPolicyJcs(folder: string): string {
   const effective = POLICY_DEFAULTS_EFFECTIVE;
   // Always 'defaults' (core constant); anything else matches no body, so nothing is signed.
   if (effective.mode !== 'defaults') return '';
   const defaults = parseJson(canonicalize(effective.policy as unknown as JsonObject)) as JsonObject;
   const files = defaults['files'] as JsonObject;
-  return canonicalize({ ...defaults, files: { ...files, allowedFolders: [folder] } });
+  return canonicalize({
+    ...defaults,
+    files: { ...files, allowedFolders: [folder], autoSave: { ...AUTO_SAVE_DEFAULTS } },
+  });
 }
 
 const BODY_KEYS = 'agent,expiresAt,issuedAt,nonce,op,owner,params,v';

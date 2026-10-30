@@ -29,12 +29,36 @@ export interface OutgoingFile {
   open(): Promise<ReadableStream<Uint8Array> | Uint8Array>;
 }
 
+/**
+ * A fixed code a platform's file operation may carry as `saveError` on the error it throws
+ * (W4-AUTO-SAVE, 04 §4.1): the write failed for lack of space. Never a path or a name.
+ */
+export type InboxSaveError = 'disk_full';
+
+/**
+ * The OS "downloaded from the internet" mark on a saved file (D-142, 04 §4.1): set and read back
+ * (`marked`); the OS has no common mark (`unsupported`: Linux, an accepted residual); or setting or
+ * reading it failed (`failed`: for example a FAT or exFAT volume or some network shares).
+ */
+export type QuarantineMark = 'marked' | 'unsupported' | 'failed';
+
 /** The inbox folder (`files.inboxFolder`) as the platform resolved it. */
 export interface InboxFolder {
   /** Its realpath (absolute). */
   readonly realpath: string;
   /** Operations on names directly inside it (see the header). */
   readonly ops: TempFileOps;
+  /** W4-AUTO-SAVE: free bytes on the folder's volume (for the 1 GiB reserve, 04 §4.1). */
+  freeBytes?(): Promise<number>;
+  /**
+   * W4-AUTO-SAVE: sets the quarantine mark on `name` (the hidden temporary file directly inside the
+   * folder) and reads it back. The mark never carries a link, a host or a referrer (I-7).
+   */
+  mark?(name: string): Promise<QuarantineMark>;
+  /** W4-AUTO-SAVE: true when `name` is a regular file directly inside the folder (no link followed). */
+  isSavedFile?(name: string): Promise<boolean>;
+  /** W4-AUTO-SAVE: releases the held folder handle; the core calls it once the save ended. */
+  close?(): Promise<void>;
 }
 
 /** The drop's configuration (D-48). The core signs every request with the KeyStore's drop key. */
@@ -60,6 +84,10 @@ export interface FilesPlatform {
   readonly drop?: DropConfig;
   /** Downloads a payload `url` under the SSRF rules (04 §4), stopping at the cap it is given. */
   download(url: string): CiphertextSource;
-  /** Resolves `files.inboxFolder` (a policy path, `~` allowed) for one save. */
-  inbox(folder: string): Promise<InboxFolder>;
+  /**
+   * Resolves `files.inboxFolder` (a policy path, `~` allowed) for one save, under the folder rules of
+   * 04 §4.1; `allowedFolders` are the policy's send folders, which the Inbox folder must not equal,
+   * be inside or contain.
+   */
+  inbox(folder: string, allowedFolders?: readonly string[]): Promise<InboxFolder>;
 }

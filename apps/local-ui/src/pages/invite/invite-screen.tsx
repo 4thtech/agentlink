@@ -1,0 +1,94 @@
+// W4-PEOPLE-INVITE: the Invite screen (prototype v23 A5, "Invite from Home"): a way back Home, the
+// title and one line, the invite panel, "See what they'll see" (a still preview of the friend's
+// screen, A6) and Done. Rendered in place by People (`/contacts?invite`) until Home takes it.
+import { Button } from '@4thtech-io/ui';
+import { useId, useState, type ReactElement } from 'react';
+import { FingerprintIcon } from './icons.js';
+import { InvitePanel, type InvitePanelProps } from './invite-panel.js';
+import { useOwnName } from './own-name.js';
+import { INVITE_STRINGS as S, invitesYou, letterOf } from './strings.js';
+import './invite.css';
+
+export interface InviteScreenProps extends InvitePanelProps {
+  /** Your name as the friend sees it in the preview; by default the open agent's name. */
+  readonly sender?: string;
+  readonly onDone: () => void;
+  /** Where the back link goes (Home by default). */
+  readonly backHref?: string;
+}
+
+/** A still picture of the friend's screen: not interactive, read as one figure. */
+export function TheirView({ sender }: { sender: string }): ReactElement {
+  const who = sender === '' ? 'Your agent' : sender;
+  return (
+    <figure className="inv-theirs al-reveal" aria-label={S.theirsLabel}>
+      <div className="inv-friend-card">
+        <div className="inv-friend-who">
+          <span className="inv-avatar inv-avatar--me" aria-hidden="true">
+            {letterOf(who)}
+          </span>
+          <span className="inv-badge al-text-caption">{S.nameBySender}</span>
+        </div>
+        <p className="inv-friend-title">{invitesYou(who)}</p>
+        <p className="al-text-body-sm al-muted">{S.acceptBody(who)}</p>
+        <span className="inv-fake-primary" aria-hidden="true">
+          <FingerprintIcon />
+          Accept with Touch ID
+        </span>
+        <p className="al-text-caption al-muted inv-center">{S.noAgentLinkYet}</p>
+      </div>
+    </figure>
+  );
+}
+
+export function InviteScreen({
+  sender: givenSender,
+  onDone,
+  backHref = '/',
+  ...panel
+}: InviteScreenProps): ReactElement {
+  const sender = useOwnName(givenSender);
+  const [theirs, setTheirs] = useState(false);
+  const theirsId = useId();
+  return (
+    <div className="inv-screen al-reveal">
+      <a className="inv-back" href={backHref}>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+        {S.back}
+      </a>
+      <div className="inv-head">
+        <h1 className="inv-title">{S.title}</h1>
+        <p className="inv-intro al-muted">{S.intro}</p>
+      </div>
+      <InvitePanel {...panel} />
+      <div className="inv-foot">
+        <button
+          type="button"
+          className="inv-link-button"
+          aria-expanded={theirs}
+          aria-controls={theirsId}
+          onClick={() => setTheirs((on) => !on)}
+        >
+          {theirs ? S.hideTheirs : S.seeTheirs}
+        </button>
+        <Button size="lg" className="al-press" onClick={onDone}>
+          {S.done}
+        </Button>
+      </div>
+      <div id={theirsId}>{theirs ? <TheirView sender={sender} /> : null}</div>
+    </div>
+  );
+}

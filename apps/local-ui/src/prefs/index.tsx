@@ -4,7 +4,12 @@
 import { HoodProvider } from '@4thtech-io/ui';
 import { useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
 import { getPrefs, subscribePrefs, type Prefs } from './store.js';
-import { getMenuExpanded, subscribeMenuExpanded } from './ui-settings.js';
+import {
+  getMenuExpanded,
+  subscribeMenuExpanded,
+  subscribeUiSettingsSettled,
+  uiSettingsSettled,
+} from './ui-settings.js';
 
 export * from './store.js';
 export * from './ui-settings.js';
@@ -15,6 +20,11 @@ export function usePrefs(): Prefs {
 
 export function useMenuExpanded(): boolean {
   return useSyncExternalStore(subscribeMenuExpanded, getMenuExpanded, getMenuExpanded);
+}
+
+/** W4-SHELL-LIVE: whether the app's settings are read (Under the hood and the menu hold). */
+export function useUiSettingsSettled(): boolean {
+  return useSyncExternalStore(subscribeUiSettingsSettled, uiSettingsSettled, uiSettingsSettled);
 }
 
 export function PrefsHood({ children }: { children?: ReactNode }): ReactElement {

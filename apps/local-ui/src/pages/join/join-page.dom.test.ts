@@ -6,6 +6,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { PresenceProof } from '../contacts/owner.js';
 import { endFirstRun } from '../first-run/index.js';
 import type { JoinAcceptOutcome, JoinApi, JoinRead, JoinState } from './api.js';
@@ -20,6 +21,8 @@ const INVITE = {
   expiresAt: Date.UTC(2027, 0, 15),
 };
 
+const MARKO_REF = '0x7f3a19c200000000000000000000000000000001';
+
 function fakeApi(states: JoinState[], accept: JoinAcceptOutcome = { kind: 'pending' }) {
   const calls = { accepted: [] as { id: string; proof: PresenceProof }[], dismissed: 0, reads: 0 };
   let at = 0;
@@ -30,7 +33,14 @@ function fakeApi(states: JoinState[], accept: JoinAcceptOutcome = { kind: 'pendi
       const answer: JoinRead =
         state === 'none'
           ? { kind: 'ok', state }
-          : { kind: 'ok', state, invite: INVITE, agent: 'Claude Code agent' };
+          : {
+              kind: 'ok',
+              state,
+              invite: INVITE,
+              agent: 'Claude Code agent',
+              // W4-PEOPLE-INVITE (IR SEC-1 L3): connected names the new contact's ref.
+              ...(state === 'connected' ? { contactRef: MARKO_REF } : {}),
+            };
       return Promise.resolve(answer);
     },
     accept: (id, proof) => {
@@ -86,16 +96,51 @@ const click = async (label: string): Promise<void> => {
 };
 const PASSKEY = () => Promise.resolve({ credentialId: 'c', prfSalt: 's' });
 
-describe('the waiting card (b11 §33.2)', () => {
-  it('shows who it is as text, For: the agent, and the safety-code line, never a code', async () => {
+/** This app's contacts and the safety code, for the Connected moment. */
+function contactsApi(): ApiClient & { paths: string[] } {
+  const paths: string[] = [];
+  const answer = (path: string): unknown =>
+    path === '/api/ui/contacts'
+      ? {
+          status: 'ok',
+          contacts: [
+            {
+              ref: MARKO_REF,
+              name: 'Marko',
+              nameSource: 'counterparty',
+              fingerprint: '7F3A19C2AB12CD34',
+              label: 'self-declared',
+              status: 'active',
+              pairing: 'complete',
+              since: 1_800_000_000,
+            },
+          ],
+        }
+      : { status: 'ok', code: '4821 0937 5512' };
+  return {
+    paths,
+    get: <T>(path: string) => {
+      paths.push(path);
+      return Promise.resolve({ kind: 'ok', status: 200, data: answer(path) } as ApiResult<T>);
+    },
+    post: () => Promise.resolve({ kind: 'error', status: 500 }),
+    owner: () => Promise.resolve({ kind: 'error', status: 500 }),
+  };
+}
+
+describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
+  it('shows who invites you as text, For: the agent, and the fingerprint line, never a code', async () => {
     const { api } = fakeApi(['waiting']);
     await render({ api, passkey: PASSKEY });
-    expect(host.querySelector('h1')?.textContent).toBe("Accept Marko's invite?");
+    expect(host.querySelector('h1')?.textContent).toBe('Marko invites you to connect your AIs');
     expect(text()).toContain("Check it's Marko: 7F3A·19C2");
-    expect(text()).toContain('“Marko”');
-    expect(text()).toContain('Self-declared');
+    expect(text()).toContain('Name set by the sender');
+    expect(text()).toContain(
+      "Your AI and Marko's agent can then send each other messages and files. Encrypted end to end. You approve anything that matters.",
+    );
     expect(text()).toContain('For: Claude Code agent');
-    expect(text()).toContain('After you connect, compare the safety code with Marko.');
+    expect(text()).not.toMatch(/\d{4} \d{4} \d{4}/);
+    // IR-1 low (c): the owner sees what Touch ID signs before the gesture.
     expect(text()).toContain(
       'Accept an invite from Marko (Self-declared, owner 7F3A·19C2) for Claude Code agent',
     );
@@ -135,7 +180,7 @@ describe('the waiting card (b11 §33.2)', () => {
     await click('Accept with Touch ID');
     expect(calls.accepted).toEqual([]);
     expect(text()).toContain('Not accepted yet. Try again.');
-    expect(host.querySelector('h1')?.textContent).toBe("Accept Marko's invite?");
+    expect(host.querySelector('h1')?.textContent).toBe('Marko invites you to connect your AIs');
   });
 
   it('no passkey: the backup code prompt', async () => {
@@ -168,13 +213,18 @@ describe('the waiting card (b11 §33.2)', () => {
     expect(text()).toContain('The invite on this screen changed.');
   });
 
-  it('Not now forgets the invite and goes to Home', async () => {
+  it('Not now forgets the invite here and says nothing was shared; the link still works', async () => {
     const { api, calls } = fakeApi(['waiting']);
     const go = vi.fn();
     await render({ api, passkey: PASSKEY, go });
     await click('Not now');
     expect(calls.dismissed).toBe(1);
-    expect(go).toHaveBeenCalledWith('/settings/home');
+    expect(go).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="status"]')?.textContent).toBe(
+      'No problem. Nothing was shared. The link works until 15 Jan.',
+    );
+    await click('Go to Home');
+    expect(go).toHaveBeenCalledWith('/');
   });
 });
 
@@ -193,14 +243,20 @@ describe('the other states (b11 §33.2)', () => {
     );
   });
 
-  it('connected: "Connected with {name}." then the safety-code step on Contacts', async () => {
+  it('connected: the Connected moment with the 12-digit safety code, then Done goes Home', async () => {
     const { api } = fakeApi(['connected']);
+    const contacts = contactsApi();
     const go = vi.fn();
-    await render({ api, go });
-    expect(host.querySelector('h1')?.textContent).toBe('Connected with Marko.');
-    expect(host.querySelector('[role="status"]')?.textContent).toBe('Connected with Marko.');
-    await click('Compare the safety code with Marko');
-    expect(go).toHaveBeenCalledWith('/settings/contacts');
+    await render({ api, go, contacts });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(host.querySelector('h1')?.textContent).toBe('You and Marko are connected');
+    // The code of exactly the contact the server named: no lookup by fingerprint in the list.
+    expect(contacts.paths).toEqual([`/api/ui/contacts/${MARKO_REF}/safety-code`]);
+    expect(text()).toContain('4821');
+    await click('Done');
+    expect(go).toHaveBeenCalledWith('/');
   });
 
   it('expired, own and already accepted: one sentence each and Go to Home', async () => {

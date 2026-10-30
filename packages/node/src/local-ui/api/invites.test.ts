@@ -111,6 +111,7 @@ function desk(over: Partial<LocalUiInviteDesk> = {}): {
       create: (input) => {
         created.push(input);
         return Promise.resolve<CreatedInvite>({
+          inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
           inviteUrl: LINK,
           format: 'long',
           ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },
@@ -153,9 +154,26 @@ describe('create an invite (UX2-d1, decision 1.1)', () => {
         ownerFingerprint: 'EF56·7890',
         expiresAt: '2026-11-04T10:00:00Z',
         format: 'long',
+        // W4-PEOPLE-INVITE (IR-1 M): the public ID of this invite, so the page cancels only its own.
+        inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
       },
     });
     expect(d.created).toEqual([{}]);
+  });
+
+  it('answers nothing usable when core gives an invite ID of another shape (fail closed)', async () => {
+    const d = desk({
+      create: () =>
+        Promise.resolve<CreatedInvite>({
+          inviteId: 'not an id/../x',
+          inviteUrl: LINK,
+          format: 'long',
+          ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },
+          expiresAt: 1_793_786_400,
+        }),
+    });
+    const result = await inviteCreateRoute.handler(context(), {}, d.desk);
+    expect(result.status).not.toBe(200);
   });
 
   it('passes the optional name as the invite label (a suggested alias in core)', async () => {
@@ -558,5 +576,33 @@ describe('one invite size bound for check and accept (IR UX2-d1 L)', () => {
     const w = acceptWorld();
     expect(await run(w, tooLong)).toEqual({ status: 400, body: { error: 'invalid_invite' } });
     expect(w.seen.checked).toHaveLength(0);
+  });
+});
+
+// W4-PAUSE fix round (IR-W4-PAUSE-1; 06 §6 "Paused agents", 08 §1): core refuses invites while the
+// agent is paused, and the app answers one clean fixed code (never a 500); nothing is signed.
+describe('a paused agent: create, check and accept answer agent_paused (W4-PAUSE)', () => {
+  const PAUSED = { status: 409, body: { error: 'agent_paused' } };
+
+  it('create', async () => {
+    const d = desk({ create: () => Promise.reject(coreError('agent_paused')) });
+    expect(await inviteCreateRoute.handler(context(), {}, d.desk)).toEqual(PAUSED);
+  });
+
+  it('check', async () => {
+    const d = desk({ check: () => Promise.reject(coreError('agent_paused')) });
+    expect(await inviteCheckRoute.handler(context(), { invite: LINK }, d.desk)).toEqual(PAUSED);
+  });
+
+  it('accept: refused at resolve or at check, before anything is signed', async () => {
+    for (const port of [
+      { resolve: () => Promise.reject(coreError('agent_paused')) },
+      { check: () => Promise.reject(coreError('agent_paused')) },
+    ]) {
+      const w = acceptWorld({ port });
+      expect(await run(w, { invite: LINK })).toEqual(PAUSED);
+      expect(w.seen.signed).toEqual([]);
+      expect(w.seen.applied).toEqual([]);
+    }
   });
 });

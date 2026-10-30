@@ -29,6 +29,7 @@ import {
   text,
   WAVE4,
 } from './world.js';
+import { skipGetStartedIfShown } from './helpers-wizard.js';
 
 const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
@@ -65,6 +66,8 @@ describe('chapter 4: agents', () => {
     await firstRunWithTouchId(jp, first.link, 'Ana');
     await first.stop();
     await jp.page.goto(await startUi(pc, ready.files, ch.closers));
+    // W4-WIZARD: no AI app is connected here, so the launch opens Get started; skip it.
+    await skipGetStartedIfShown(jp.page);
     // W4-SHELL-V2: the app opens on Home (the section marked current).
     await jp.page
       .getByRole('navigation', { name: 'Sections' })

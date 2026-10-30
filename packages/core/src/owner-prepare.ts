@@ -14,6 +14,7 @@
 // agent's own card. No MCP tool calls these helpers or returns a prepared body.
 import { canonicalize, encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import {
+  AUTO_SAVE_DEFAULTS,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   PROTOCOL_VERSION,
   compareUsd,
@@ -290,6 +291,9 @@ export function mergePolicyPatch(base: Policy, patch: PolicyPatch): Policy {
       into[field] = clone(v);
     }
   }
+  // D-142 (06 §3): every policy.set this core signs carries `files.autoSave`; a base signed before
+  // D-142 has none and is read with the defaults, so the complete document gets them.
+  if (out.files.autoSave === undefined) out.files.autoSave = clone(AUTO_SAVE_DEFAULTS);
   return out;
 }
 
@@ -416,6 +420,15 @@ export const CONTACT_RULE_FIELD_LOOSENING: {
         ),
     },
   },
+  // D-142: "Ask before saving" turned off for a contact: its files are saved automatically again.
+  files: {
+    code: 'limits_raised',
+    fields: {
+      askBeforeSaving: (b, n, c) =>
+        ruleOf(b, c)?.files?.askBeforeSaving === true &&
+        ruleOf(n, c)?.files?.askBeforeSaving !== true,
+    },
+  },
   receipts: {
     code: 'contact_receipts_public',
     fields: {
@@ -501,6 +514,20 @@ export const POLICY_FIELD_LOOSENING: {
       'files.defaultExpiryDays',
       (p) => p.files.defaultExpiryDays,
     ),
+    // D-142: turning auto-save on or raising one of its limits lets contacts put more on the disk
+    // without a gesture. A policy signed before D-142 reads as the defaults.
+    autoSave: (b, n) => {
+      const was = b.files.autoSave ?? AUTO_SAVE_DEFAULTS;
+      const now = n.files.autoSave ?? AUTO_SAVE_DEFAULTS;
+      return when(
+        (now.on && !was.on) ||
+          now.perContactFilesPerDay > was.perContactFilesPerDay ||
+          now.perContactMBPerDay > was.perContactMBPerDay ||
+          now.totalFilesPerDay > was.totalFilesPerDay ||
+          now.totalMBPerDay > was.totalMBPerDay,
+        { code: 'limits_raised', fields: ['files.autoSave'] },
+      );
+    },
     deleteAfter: (b, n) =>
       when(b.files.deleteAfter === 'receipt' && n.files.deleteAfter === 'expiry', {
         code: 'retention_longer',

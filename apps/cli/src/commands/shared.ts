@@ -7,7 +7,7 @@
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import process from 'node:process';
-import { CoreError } from '@4thtech-io/core';
+import { AGENT_PAUSED_TEXT, CoreError } from '@4thtech-io/core';
 import { NodeKeyStoreError, NodeStoreError } from '@4thtech-io/node';
 import type { CommandContext } from '../dispatch.js';
 import { EXIT_FAILED } from '../dispatch.js';
@@ -187,6 +187,8 @@ export function printAll(context: CommandContext, lines: readonly string[]): voi
  * value; undefined for any other error (its text could carry a value, I-5).
  */
 export function fixedErrorText(error: unknown): string | undefined {
+  // W4-PAUSE (06 §6): the CLI's sending commands refuse with the tools' fixed sentence.
+  if (error instanceof CoreError && error.code === 'agent_paused') return AGENT_PAUSED_TEXT;
   if (
     error instanceof CoreError ||
     error instanceof RuntimeError ||

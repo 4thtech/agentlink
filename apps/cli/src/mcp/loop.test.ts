@@ -727,3 +727,41 @@ describe('agentlink://inbox resource (M1-9r, optional notifications)', () => {
     await client.close();
   });
 });
+
+describe('W4-AUTO-SAVE: the lease holder saves received files automatically (D-142, 04 §4.1)', () => {
+  it('runs the automatic save after each pass, only while holding; a failure logs a code only', async () => {
+    const s = stubClient();
+    const run = vi.fn(() => Promise.reject(new Error(`boom ${CANARY}`)));
+    const client: LoopClient = { ...s.client, autoSave: { run } };
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    timers.fire(0);
+    await flush();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(lines.some((l) => l.includes('auto-save failed'))).toBe(true);
+    expect(lines.join('\n')).not.toContain('CANARY');
+    s.lease.available = false;
+    timers.fire(LEASE_INTERVAL_MS);
+    await flush();
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(run).toHaveBeenCalledTimes(1); // not holding: no automatic save
+    await loop.stop();
+  });
+
+  it('a lease that cannot be taken never saves', async () => {
+    const s = stubClient();
+    s.lease.available = false;
+    const run = vi.fn(() => Promise.resolve({}));
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client: { ...s.client, autoSave: { run } }, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    expect(run).not.toHaveBeenCalled();
+    await loop.stop();
+  });
+});

@@ -28,6 +28,7 @@ import type { TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
 import { AgentRemovalService } from './agent-removal.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
+import { AutoSaver, type AutoSavePause } from './files/auto-save.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import { savedNameOf } from './files/received.js';
 import { saveReceivedFile, type SaveReceivedFileResult } from './files/save.js';
@@ -136,6 +137,11 @@ export interface AgentLinkClientOptions {
    */
   readonly files?: FilesPlatform;
   /**
+   * W4-AUTO-SAVE (D-142): the agent's pause state for the automatic save. Absent (W4-PAUSE, D-143):
+   * the agent's own pause row, fail closed. A runtime passes one only to replace it (tests).
+   */
+  readonly autoSavePause?: AutoSavePause;
+  /**
    * The chains for proofs (M1-7g; 07 §6.2, §6.3): read clients, chain-state ports and submitters,
    * built by the runtime from the shipped chain list. Without it, the proof calls return
    * `PROOFS_UNAVAILABLE` and `proof` envelopes are stored but not acted on.
@@ -200,6 +206,11 @@ export class AgentLinkClient {
   readonly messages: MessagesView;
   /** The local app's Files Received and Sent (MSG-FILES-IO-a): read-only, store only. */
   readonly filesIo: FilesIoView;
+  /**
+   * W4-AUTO-SAVE (D-142, 04 §4.1): received files saved automatically. The background loop of the
+   * lease holder calls `run`; the local app reads and dismisses the one-time notice. No MCP tool.
+   */
+  readonly autoSave: AutoSaver;
   /** The activity feed (M1-11r-a, M1-11r-d; the local UI): messages, files, approvals, proofs, blocks, rules. */
   readonly activity: ActivityService;
   readonly #send: SendService;
@@ -223,12 +234,15 @@ export class AgentLinkClient {
     files: FilesPlatform | undefined,
     proofs: ProofsPlatform | undefined,
     ownStorageKeys: OwnStorageKeys | undefined,
+    autoSavePause?: AutoSavePause,
   ) {
     this.agentId = agentId;
     this.#ctx = ctx;
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
-    this.pairing = new PairingService(ctx, this.identity, this.contacts, files?.drop);
+    this.pause = new AgentPause({ store: ctx.store, now: () => nowOf(ctx) });
+    // W4-PAUSE (IR-W4-PAUSE-1): invites refuse while paused (CLI and app routes alike).
+    this.pairing = new PairingService(ctx, this.identity, this.contacts, files?.drop, this.pause);
     this.ownerActions = new OwnerActions(
       ctx,
       this.identity,
@@ -260,7 +274,6 @@ export class AgentLinkClient {
       this.idempotency,
     );
     this.requests = new RequestsQueue(ctx);
-    this.pause = new AgentPause({ store: ctx.store, now: () => nowOf(ctx) });
     // W4-PAUSE: nothing is published while the agent is paused (queued rows wait).
     this.outbox = new OutboxService(ctx, this.identity, this.contacts, transport, this.pause);
     this.removal = new AgentRemovalService(ctx, {
@@ -278,6 +291,11 @@ export class AgentLinkClient {
       ...(files === undefined ? {} : { files }),
     });
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
+    // W4-PAUSE x W4-AUTO-SAVE (D-143 (5), D-142): by default auto-save reads this agent's own pause
+    // row (fail closed: an unreadable row counts as paused), so no runtime can forget to wire it.
+    this.autoSave = new AutoSaver(ctx, this.#files, () => ownerActions.loadPolicy(), {
+      pause: autoSavePause ?? { paused: () => this.pause.paused() },
+    });
     this.#filesPlatform = files;
     this.files = new FilesView(ctx, files, () => ownerActions.loadPolicy());
     this.fileLinks = new FileLinks(
@@ -685,6 +703,7 @@ export class AgentLinkClient {
       options.files,
       options.proofs,
       options.ownStorageKeys,
+      options.autoSavePause,
     );
   }
 }

@@ -17,16 +17,31 @@
 // the clipboard warning; only "I saved it" moves on, and the code leaves the page then. Where the
 // browser reports no passkey with PRF, the page names a browser that works, or continues with a
 // backup code only. Q-130-1 (screen readers and the shown code) stays open: the code is plain text.
+//
+// W4-WIZARD (W4 UX v2 layer 1; artboards A1 to A3): first run is Get started, four steps, each its
+// own route (`/start/app` → `/start/connect` → `/start/connected` → `/start/invite`), with a progress
+// bar and "Skip to Home" on every step (pages/start/wizard.tsx). Step 1 picks the AI app (found on
+// this computer or not yet); step 2 is the one Touch ID (D-140) and then the backup code, still shown
+// once; step 3 is Connected ✓ (or E1: the agent is kept and Connect is offered); step 4 invites
+// someone. The same steps serve an owner who has one already: New agent when no agent is open (or
+// `?add=agent`), else Connect another AI app (the signed AI apps step with the exact entry). The page
+// mounts again on every step, so the non-secret choices live in pages/start/store.ts; the backup
+// code never leaves this component's state.
 import { Banner, Button, CopyPrompt, Fingerprint, ProgressBar, TextField } from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type FormEvent,
   type KeyboardEvent,
   type ReactElement,
+  type ReactNode,
 } from 'react';
+import { INTERIM_PEOPLE_PATH } from '../../nav.js';
+import { navigate } from '../../router.js';
 import {
   LinkExpiredState,
   LoadingState,
@@ -35,10 +50,30 @@ import {
 } from '../../states/index.js';
 import { passkeyProof as browserPasskeyProof } from '../contacts/owner.js';
 import type { PasskeyInfo, PresenceProof } from '../contacts/owner.js';
-import { WelcomeScreen, useTitleFocus } from '../welcome/index.js';
+import { useTitleFocus } from '../welcome/index.js';
+import { CreateAgentGate } from '../apps/create-agent-gate.js';
+import type { CreateAgentApi } from '../apps/create-agent-api.js';
+import { readAgentSignal } from '../home/start-here-api.js';
+import type { AgentSignal } from '../home/start-here.js';
+import { markLeavingStart } from '../start/guard.js';
+import { markAutoShown, rememberWizard, wizardMemory, type WizardOutcome } from '../start/store.js';
+import { CONNECT_STEP as S, PICK_STEP as P, type StepId } from '../start/strings.js';
+import {
+  AgentCard,
+  BackButton,
+  ConnectedStep,
+  FingerprintGlyph,
+  InviteStep,
+  PickStep,
+  WizardFrame,
+  appTiles,
+  defaultChoice,
+  stepOf,
+  stepPath,
+} from '../start/wizard.js';
 import { createAppsApi, type AppsApi, type DetectedApp } from './apps-api.js';
 import { ConnectApp } from './connect-app.js';
-import { AppMark, PickApp, type PickList } from './pick-app.js';
+import type { PickList } from './pick-app.js';
 import {
   createSetupPasskey,
   createUpgradePasskey as browserUpgradePasskey,
@@ -65,7 +100,6 @@ import {
 import './first-run.css';
 import { createJoinApi, type JoinRead } from '../join/api.js';
 import {
-  CREATED as C,
   FIRST_RUN as T,
   NAME as N,
   NAME_MAX,
@@ -97,6 +131,8 @@ export function endFirstRun(read: () => Promise<JoinRead>): Promise<void> {
     .catch((): JoinRead => ({ kind: 'failed' }))
     .then((answer) => {
       const waiting = answer.kind === 'ok' && answer.state !== 'none';
+      // IR-W4-WIZARD-1: this full load ends Get started; its open-on-launch check keeps Home.
+      markLeavingStart();
       window.location.assign(waiting ? JOIN : HOME);
     });
 }
@@ -125,6 +161,17 @@ export interface FirstRunPageProps {
   readonly passkeyProof?: (info: PasskeyInfo) => Promise<PresenceProof | undefined>;
   /** U3-g: where first run ends. Default: Home, with a full load. */
   readonly goHome?: () => void;
+  /** W4-WIZARD test seams: the step (default: from the path), how a step opens (default: the app's
+   *  router), "Skip to Home", New agent's server calls, U4's invite panel, the open agent's signal. */
+  readonly step?: StepId;
+  readonly go?: (path: string, replace?: boolean) => void;
+  readonly onSkip?: () => void;
+  readonly createAgentApi?: CreateAgentApi;
+  readonly invitePanel?: ReactNode;
+  readonly readSignal?: () => Promise<AgentSignal | undefined>;
+  /** U3-invite: whether `agentlink join` left an invite waiting, and how its screen opens. */
+  readonly readJoin?: () => Promise<JoinRead>;
+  readonly openJoin?: () => void;
 }
 
 interface Done {
@@ -141,10 +188,8 @@ interface Done {
 
 type View =
   | { readonly k: 'loading' }
-  /** U3-g (b11 §28.1): no owner yet. */
-  | { readonly k: 'welcome' }
-  /** U3-g (b11 §28.2): which AI app. */
-  | { readonly k: 'pick' }
+  /** W4-WIZARD: the step the path names, for the mode (pick, New agent, Connect another app). */
+  | { readonly k: 'step' }
   | {
       /** U3-g (b11 §28.3): name the agent and protect approvals, one gesture. */
       readonly k: 'protect';
@@ -164,15 +209,6 @@ type View =
       readonly appName: string;
       readonly folder: string;
       readonly label: string;
-    }
-  | {
-      /**
-       * W4-ONE-TOUCH (11 §5.8): after the backup code: "{label} is ready in {app}. Restart {app}
-       * to finish.", or, when the entry could not be written, "… isn't connected yet." with Connect.
-       */
-      readonly k: 'created';
-      readonly label: string;
-      readonly app: { readonly id: string; readonly name: string; readonly connected: boolean };
     }
   | { readonly k: 'unsupported' }
   | {
@@ -286,90 +322,95 @@ function sendLine(outcome: SendFolderOutcome): string | undefined {
 }
 
 /**
- * U3-g (b11 §28.3): name the agent and protect approvals on one screen. The name is a plain text
- * field (any text up to 32 characters; the server checks it again before Touch ID); the one primary
- * button is the one gesture. Enter in the field does not submit: focus moves to the button.
+ * W4-WIZARD (A1 step 2, "Confirm it's you"): the agent card with its suggested name ("Change name"
+ * opens the field), and one primary button for the one gesture (D-140: it creates the owner and the
+ * agent and connects the picked app). The backup code stays the alternative. Enter in the field does
+ * not submit: focus moves to the button.
  */
-function NameStep({
+function ConnectFirstStep({
   view,
   name,
-  app,
+  appName,
   noPrf,
-  label,
+  sensorWords,
   platform,
   onName,
-  onChange,
   onBack,
   onGo,
-  connect,
-  onConnect,
 }: {
   view: Extract<View, { k: 'protect' }>;
   name: string;
-  app: DetectedApp | undefined;
+  /** The picked app's name; undefined when it is not on this computer (no app is connected). */
+  appName: string | undefined;
   noPrf: boolean;
-  label: string;
+  sensorWords: string;
   platform: Platform;
   onName: (value: string) => void;
-  onChange: () => void;
   onBack: () => void;
   onGo: (withoutPasskey: boolean) => void;
-  /** W4-ONE-TOUCH: whether the one gesture also connects the chosen app. */
-  connect: boolean;
-  onConnect: (value: boolean) => void;
 }): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
+  const [renaming, setRenaming] = useState(false);
+  const editing = renaming || view.fieldError !== undefined;
   const press = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
     document.getElementById('fr-go')?.focus();
   };
+  const shown = name.trim() === '' ? N.suggested(appName) : name.trim();
   return (
-    <section className="fr-card" aria-labelledby="fr-h">
-      <h1 id="fr-h" ref={title} tabIndex={-1} className="al-text-title-1">
-        {T.protectTitle}
-      </h1>
-      {app === undefined ? null : (
-        <div className="fr-chosen">
-          {/* W4-ONE-TOUCH (D-140; 11 §5.8): "Connect to {app}" is prefilled; unticking it is
-              "Not now" and leaves the app out of the one gesture. */}
-          <label className="fr-chosen-name fr-connect">
-            <input
-              type="checkbox"
-              checked={connect}
+    <section className="st-screen st-w-560" aria-labelledby="fr-h">
+      <BackButton onBack={onBack} label={S.back} />
+      <div className="st-intro">
+        <span className="st-eyebrow">
+          {appName === undefined ? T.protectTitle : S.eyebrow(appName)}
+        </span>
+        <h1 id="fr-h" ref={title} tabIndex={-1} className="st-title">
+          {S.title}
+        </h1>
+        <p className="st-lead">{S.body(appName ?? T.yourAiApp)}</p>
+      </div>
+      <AgentCard
+        name={shown}
+        line={appName === undefined ? T.noAppYet : S.worksIn(appName)}
+        action={
+          editing ? null : (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={S.renameLabel(shown)}
               disabled={view.working}
-              onChange={(event) => onConnect(event.currentTarget.checked)}
-            />
-            <AppMark name={app.name} />
-            <span className="al-text-body">{N.connectTo(app.name)}</span>
-          </label>
-          <Button variant="ghost" size="sm" aria-label={N.changeLabel(app.name)} onClick={onChange}>
-            {N.change}
-          </Button>
-        </div>
-      )}
-      <TextField
-        label={N.label}
-        hint={N.hint}
-        name="agent-name"
-        type="text"
-        autoComplete="off"
-        spellCheck={false}
-        value={name}
-        readOnly={view.working}
-        {...(view.fieldError === undefined ? {} : { error: view.fieldError })}
-        onChange={(event) => onName(event.currentTarget.value)}
-        onKeyDown={press}
-        onFocus={(event) => {
-          // Selected on open: the suggested name is replaced by typing.
-          event.currentTarget.select();
-        }}
+              onClick={() => setRenaming(true)}
+            >
+              {S.rename}
+            </Button>
+          )
+        }
       />
+      {editing ? (
+        <TextField
+          label={N.label}
+          hint={N.hint}
+          name="agent-name"
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          value={name}
+          readOnly={view.working}
+          {...(view.fieldError === undefined ? {} : { error: view.fieldError })}
+          onChange={(event) => onName(event.currentTarget.value)}
+          onKeyDown={press}
+          onFocus={(event) => {
+            // Selected on open: the suggested name is replaced by typing.
+            event.currentTarget.select();
+          }}
+        />
+      ) : null}
       {noPrf ? (
         <Banner tone="warning">{T.noPrf(SENSOR[platform], WORKING_BROWSER[platform])}</Banner>
       ) : null}
       {view.message === undefined ? null : <Banner tone="warning">{view.message}</Banner>}
-      <div className="fr-actions">
+      <div className="st-actions">
         {view.working ? (
           <ProgressBar label={N.setting} indeterminate />
         ) : (
@@ -377,10 +418,11 @@ function NameStep({
             id="fr-go"
             variant="primary"
             size="lg"
-            icon="key-round"
+            className="st-go al-press"
             onClick={() => onGo(noPrf)}
           >
-            {view.message !== undefined ? T.tryAgain : noPrf ? T.backupOnly : label}
+            {noPrf ? null : <FingerprintGlyph />}
+            {view.message !== undefined ? T.tryAgain : noPrf ? T.backupOnly : sensorWords}
           </Button>
         )}
         {noPrf || view.working ? null : (
@@ -388,31 +430,60 @@ function NameStep({
             {N.backupInstead}
           </Button>
         )}
-        <p className="al-text-caption al-muted" role="status" aria-live="polite">
-          {view.working ? T.waiting : T.passkeyNote}
+        <p className="st-note" role="status" aria-live="polite">
+          {view.working
+            ? T.waiting
+            : appName === undefined
+              ? T.passkeyNote
+              : S.restartNote(appName)}
         </p>
       </div>
-      <aside className="fr-folders" aria-labelledby="fr-folders">
-        <p id="fr-folders" className="al-text-label al-muted">
-          {T.foldersTitle}
-        </p>
-        <dl className="al-text-body">
+      {/* D-130 (2): what the one confirmation also sets up, before it is given. */}
+      <details className="st-folders">
+        <summary className="st-note">{T.foldersTitle}</summary>
+        <dl>
           {T.folders.map(([what, where]) => (
             <div key={where}>
-              <dt className="al-text-body-sm al-muted">{what}</dt>
+              <dt className="st-note">{what}</dt>
               <dd className="al-text-code">{where}</dd>
             </div>
           ))}
         </dl>
-        <p className="al-text-body-sm al-muted">{T.foldersNote}</p>
-      </aside>
-      <div>
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          {N.back}
-        </Button>
-      </div>
+        <p className="st-note">{T.foldersNote}</p>
+      </details>
     </section>
   );
+}
+
+/** W4-WIZARD: what Get started does here, decided from the real state at load (never a flag). */
+type Mode =
+  /** No owner yet: the one gesture creates the owner, the agent and the app's entry (D-140). */
+  | { readonly k: 'first' }
+  /** An owner and no open agent, or "Add agent": New agent's one gesture (create + connect). */
+  | { readonly k: 'add' }
+  /** An owner and an open agent: connect another AI app to it (the signed AI apps step). */
+  | { readonly k: 'more'; readonly folder: string };
+
+/** The path the page is on, kept current as the app moves between the steps. */
+function useStartPath(): string {
+  return useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener('popstate', onChange);
+      window.addEventListener('agentlink:navigate', onChange);
+      return () => {
+        window.removeEventListener('popstate', onChange);
+        window.removeEventListener('agentlink:navigate', onChange);
+      };
+    },
+    () => location.pathname,
+  );
+}
+
+/** "Add agent" reuses the steps: `/start/app?add=agent`. */
+// IR-W4-WIZARD-SEC-1 L2: `add` (value `agent`) is the only query key Get started reads; any other
+// key or value is ignored and never reaches a request.
+function wantsNewAgent(): boolean {
+  return new URLSearchParams(location.search).get('add') === 'agent';
 }
 
 export function FirstRunPage({
@@ -426,57 +497,121 @@ export function FirstRunPage({
   appsApi: givenApps,
   passkeyProof = browserPasskeyProof,
   goHome = openHome,
+  step: givenStep,
+  go = (path: string, replace?: boolean) => navigate(path, replace === true),
+  onSkip,
+  createAgentApi,
+  invitePanel,
+  readSignal = readAgentSignal,
+  readJoin = () => createJoinApi().read(),
+  openJoin = () => window.location.assign(JOIN),
 }: FirstRunPageProps = {}): ReactElement {
   const [api] = useState<SetupApi>(() => given ?? createSetupApi());
   const [upgradeApi] = useState<UpgradeApi>(() => givenUpgrade ?? createUpgradeApi());
   const [appsApi] = useState<AppsApi>(() => givenApps ?? createAppsApi());
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
+  const path = useStartPath();
+  const step: StepId = givenStep ?? stepOf(path);
   const [view, setView] = useState<View>({ k: 'loading' });
+  const [mode, setMode] = useState<Mode | undefined>(undefined);
   // M1-UX-FIRSTRUN-V2-c: the backup code as typed, only while the switch is on screen.
   const [code, setCode] = useState('');
   const sensor = SENSOR[platform];
-  // U3-g: what the person chose before the one gesture. Nothing here is sent until they press it.
-  const [list, setList] = useState<PickList>({ k: 'loading' });
-  const [choice, setChoice] = useState('');
-  const [name, setName] = useState('');
-  const [edited, setEdited] = useState(false);
-  // W4-ONE-TOUCH (D-140): "Connect to {app}" is prefilled; unticked means "Not now".
-  const [connectApp, setConnectApp] = useState(true);
+  // What the person chose on earlier steps (kept in memory while the steps change; no secret).
+  const memory = wizardMemory();
+  const [list, setList] = useState<PickList>(() =>
+    memory.apps === undefined
+      ? { k: 'loading' }
+      : memory.apps === 'unavailable'
+        ? { k: 'unavailable' }
+        : { k: 'ok', apps: memory.apps },
+  );
+  const [choice, setChoiceState] = useState(memory.choice ?? '');
+  const [name, setNameState] = useState(memory.name ?? '');
   const [noPrfHere, setNoPrfHere] = useState(false);
-  const asked = useRef(false);
   const backupTitle = useTitleFocus<HTMLHeadingElement>(view.k);
   const mounted = useRef(true);
-  const picked = choice !== '' ? choice : list.k === 'ok' ? (list.apps[0]?.id ?? 'later') : 'later';
+  const tiles = useMemo(
+    () =>
+      list.k === 'loading'
+        ? ('loading' as const)
+        : appTiles(
+            list.k === 'ok' ? list.apps : undefined,
+            mode?.k === 'more' ? mode.folder : undefined,
+          ),
+    [list, mode],
+  );
+  const picked = choice !== '' ? choice : tiles === 'loading' ? '' : defaultChoice(tiles);
+  const pickedTile = tiles === 'loading' ? undefined : tiles.find((t) => t.id === picked);
+  // Only an app found on this computer is connected; a "Not found yet" pick creates the agent alone.
   const chosenApp: DetectedApp | undefined =
     list.k === 'ok' ? list.apps.find((a) => a.id === picked) : undefined;
+  const setChoice = (id: string): void => {
+    setChoiceState(id);
+    rememberWizard({ choice: id });
+  };
+  const setName = (value: string): void => {
+    setNameState(value);
+    rememberWizard({ name: value });
+  };
   useEffect(() => {
     mounted.current = true;
+    // Get started is open: the app does not open it again by itself in this page's life.
+    markAutoShown();
     return () => {
       mounted.current = false;
     };
   }, []);
 
+  /** The look for AI apps runs once per page life (kept while the steps change). */
+  const lookForApps = useCallback((): void => {
+    if (wizardMemory().apps !== undefined) return;
+    rememberWizard({ apps: 'unavailable' });
+    void appsApi.list().then((result) => {
+      if (result.kind === 'ok') rememberWizard({ apps: result.apps });
+      else rememberWizard({ apps: undefined });
+      if (!mounted.current) return;
+      if (result.kind === 'ok') setList({ k: 'ok', apps: result.apps });
+      else if (result.kind === 'session_expired') setView({ k: 'expired' });
+      else if (result.kind === 'offline') setView({ k: 'down' });
+      else setList({ k: 'unavailable' });
+    });
+  }, [appsApi]);
+
   /**
    * M1-UX-FIRSTRUN-V2-c: an owner exists. Without a usable passkey (and with passkeys in this
-   * browser) the page offers the switch; otherwise approvals are already protected. A failed read
-   * never offers setup.
+   * browser) the page offers the switch first. Otherwise Get started goes on for this owner: New
+   * agent when no agent is open (or "Add agent"), else Connect another AI app. `race`: the owner
+   * appeared while this page was setting one up: say so and never offer setup.
    */
   const existingOwner = useCallback(
-    async (isLive: () => boolean = () => true): Promise<void> => {
+    async (isLive: () => boolean = () => true, race = false): Promise<void> => {
       const info = await upgradeApi.info();
       if (!isLive()) return;
-      if (info.kind !== 'ok' || info.registered || !available()) {
-        if (info.kind === 'error' && info.problem === 'session_expired') {
-          setView({ k: 'expired' });
-        } else setView({ k: 'already' });
+      if (info.kind === 'error' && info.problem === 'session_expired') {
+        setView({ k: 'expired' });
         return;
       }
-      const prf = await prfSupport().catch((): PrfSupport => 'unknown');
-      if (isLive()) {
-        setView({ k: 'upgrade', values: info.values, working: false, noPrf: prf === 'no' });
+      if (race) {
+        setView({ k: 'already' });
+        return;
       }
+      if (info.kind === 'ok' && !info.registered && available()) {
+        const prf = await prfSupport().catch((): PrfSupport => 'unknown');
+        if (isLive()) {
+          setView({ k: 'upgrade', values: info.values, working: false, noPrf: prf === 'no' });
+        }
+        return;
+      }
+      const agent = await appsApi.currentAgent();
+      if (!isLive()) return;
+      if (agent.kind === 'ok' && !wantsNewAgent()) {
+        setMode({ k: 'more', folder: agent.folder });
+      } else setMode({ k: 'add' });
+      lookForApps();
+      setView({ k: 'step' });
     },
-    [upgradeApi, available, prfSupport],
+    [upgradeApi, available, prfSupport, appsApi, lookForApps],
   );
 
   useEffect(() => {
@@ -495,7 +630,9 @@ export function FirstRunPage({
             .then((prf) => {
               if (!live) return;
               setNoPrfHere(prf === 'no');
-              setView({ k: 'welcome' });
+              setMode({ k: 'first' });
+              lookForApps();
+              setView({ k: 'step' });
             });
         }
       } else if (result.problem === 'session_expired') setView({ k: 'expired' });
@@ -505,31 +642,30 @@ export function FirstRunPage({
     return () => {
       live = false;
     };
-  }, [api, available, prfSupport, existingOwner]);
+  }, [api, available, prfSupport, existingOwner, lookForApps]);
 
-  /** U3-g (b11 §28.2): the look for AI apps runs once, when the pick screen first opens. */
-  const toPick = useCallback((): void => {
-    setView({ k: 'pick' });
-    if (asked.current) return;
-    asked.current = true;
-    void appsApi.list().then((result) => {
-      if (!mounted.current) return;
-      if (result.kind === 'ok') setList({ k: 'ok', apps: result.apps });
-      else if (result.kind === 'session_expired') setView({ k: 'expired' });
-      else if (result.kind === 'offline') setView({ k: 'down' });
-      else setList({ k: 'unavailable' });
-    });
-  }, [appsApi]);
+  // The look's answer, when it arrived while another step was on screen.
+  useEffect(() => {
+    if (list.k !== 'loading') return undefined;
+    const known = wizardMemory().apps;
+    if (known !== undefined && known !== 'unavailable') setList({ k: 'ok', apps: known });
+    return undefined;
+  }, [list, view]);
 
-  /** U3-g (b11 §28.3): the suggested name follows the app until the person edits it. */
-  const toName = (): void => {
-    if (!edited) setName(N.suggested(chosenApp?.name));
-    setView({ k: 'protect', working: false, noPrf: noPrfHere });
+  const toStep = (next: StepId, replace = false): void => go(stepPath(next), replace);
+
+  /** Step 1 → 2: the name follows the app until the person edits it. */
+  const toConnect = (): void => {
+    if (pickedTile === undefined) return;
+    // Remembered for the next step's page (this one is about to leave).
+    rememberWizard({ choice: pickedTile.id });
+    toStep('connect');
   };
+
+  const label = name.trim() === '' ? N.suggested(pickedTile?.name) : name.trim();
 
   const protect = useCallback(
     async (noPrf: boolean) => {
-      const label = name.trim();
       // The same protect view, with the PRF hint kept for "Try again".
       const again = (message?: string, fieldError?: string): void =>
         setView({
@@ -556,11 +692,11 @@ export function FirstRunPage({
         if (checked.problem === 'offline') return setView({ k: 'down' });
         return problem(checked);
       }
-      // W4-ONE-TOUCH (D-140): with the app picked and "Connect to {app}" ticked, the same one
-      // gesture also connects it; begin fixes the plan, finish carries only its nonce.
-      const app = chosenApp !== undefined && connectApp ? chosenApp : undefined;
+      // W4-ONE-TOUCH (D-140): the picked app (found on this computer) is connected by the same one
+      // gesture; begin fixes the plan, finish carries only its nonce.
+      const app = chosenApp;
       const begun = await api.begin(label, app?.id);
-      if (begun.kind === 'owner_exists') return existingOwner();
+      if (begun.kind === 'owner_exists') return existingOwner(undefined, true);
       if (begun.kind === 'error') return problem(begun);
       // Without PRF here, any passkey: the gesture proves presence, the backup code approves.
       const made = await createPasskey(begun.publicKey, { platform: !noPrf });
@@ -572,7 +708,7 @@ export function FirstRunPage({
       } finally {
         made.body.fill(0);
       }
-      if (finished.kind === 'owner_exists') return existingOwner();
+      if (finished.kind === 'owner_exists') return existingOwner(undefined, true);
       if (finished.kind === 'error') {
         if (finished.problem === 'session_expired') return setView({ k: 'expired' });
         if (finished.problem === 'offline') {
@@ -616,7 +752,7 @@ export function FirstRunPage({
         },
       });
     },
-    [api, createPasskey, existingOwner, name, chosenApp, connectApp],
+    [api, createPasskey, existingOwner, label, chosenApp],
   );
 
   /**
@@ -678,21 +814,29 @@ export function FirstRunPage({
     [createUpgradePasskey, upgradeApi, platform],
   );
 
+  /** The connect step ends: remember the outcome (no secret) and open Connected. */
+  const finishStep = (outcome: WizardOutcome): void => {
+    rememberWizard({ outcome });
+    setView({ k: 'step' });
+    toStep('connected');
+  };
+
   // The owner code is dropped from state when the owner leaves the step that shows it. The recovery
-  // kit is put off ("Later", remembered for the banner); with an AI app chosen and an agent folder
-  // to connect it to, "Connect your AI app" follows, otherwise Home.
-  // W4-ONE-TOUCH (D-140): the app was part of the one gesture; "Not now" (or no app) goes Home.
+  // kit is put off ("Later", remembered for the banner). W4-WIZARD: then Connected (A2).
   const leave = (done: Done): void => {
     rememberRecoveryKitLater();
     // The backup code leaves the page now, whichever screen comes next (L-3).
-    if (done.app === undefined) {
-      setView({ k: 'leaving' });
-      return goHome();
-    }
-    setView({ k: 'created', label: name.trim(), app: done.app });
+    setView({ k: 'leaving' });
+    // U3-invite (08 §4, b11 §33.2): an invite left waiting by `agentlink join` comes first.
+    void readJoin()
+      .catch((): JoinRead => ({ kind: 'failed' }))
+      .then((answer) => {
+        if (answer.kind === 'ok' && answer.state !== 'none') return openJoin();
+        finishStep({ label, ...(done.app === undefined ? {} : { app: done.app }) });
+      });
   };
 
-  /** W4-ONE-TOUCH (04 §2.8 "created_not_connected"): Connect, the ordinary signed AI apps step. */
+  /** E1 (04 §2.8 "created_not_connected"): Connect, the ordinary signed AI apps step. */
   const connectNow = async (app: { readonly id: string; readonly name: string }): Promise<void> => {
     setView({ k: 'leaving' });
     const agent = await appsApi.currentAgent();
@@ -703,36 +847,118 @@ export function FirstRunPage({
       appId: app.id,
       appName: app.name,
       folder: agent.folder,
-      label: name.trim(),
+      label: wizardMemory().outcome?.label ?? label,
     });
   };
-  const label =
-    platform === 'mac' ? T.useTouchId : platform === 'windows' ? T.useWindowsHello : T.usePasskey;
+
+  // Each step opens its own view once the mode is known (a direct visit to a later step without its
+  // earlier choices goes back to step 1; Connected without an outcome reads the real state).
+  useEffect(() => {
+    // Back to step 1 (the browser's Back, or "Back"): the pick shows again.
+    // IR-W4-WIZARD-SEC-1 L1: leaving step 2 while the backup code shows (Back/Forward, a typed
+    // address) is "I saved it" without the click: the code leaves the state and the page, never
+    // hidden to come back; the kit is put off as with the click.
+    if (view.k === 'done' && step !== 'connect') {
+      rememberRecoveryKitLater();
+      rememberWizard({
+        outcome: { label, ...(view.done.app === undefined ? {} : { app: view.done.app }) },
+      });
+      setView({ k: 'step' });
+      return;
+    }
+    if (step === 'app' && view.k === 'protect' && !view.working) {
+      setView({ k: 'step' });
+      return;
+    }
+    if (view.k !== 'step' || mode === undefined) return;
+    if (step === 'connect') {
+      if (wizardMemory().choice === undefined) return toStep('app', true);
+      if (mode.k === 'first') setView({ k: 'protect', working: false, noPrf: noPrfHere });
+    }
+  }, [view, mode, step, noPrfHere]);
+
+  // Connected (A2), opened without this page's outcome (a reload, a deep link): from the real state.
+  const [derived, setDerived] = useState<WizardOutcome | 'none' | undefined>(undefined);
+  useEffect(() => {
+    if (step !== 'connected' || wizardMemory().outcome !== undefined) return undefined;
+    let live = true;
+    void readSignal().then(
+      (signal) => {
+        if (!live) return;
+        if (signal?.connected === true && signal.appName !== null) {
+          setDerived({ label: '', app: { id: '', name: signal.appName, connected: true } });
+        } else {
+          setDerived('none');
+          toStep('app', true);
+        }
+      },
+      () => {
+        if (live) setDerived('none');
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [step]);
+
+  const sensorWords = S.connect(sensor);
+  const frame = (body: ReactElement, at: StepId = step): ReactElement => (
+    <WizardFrame step={at} {...(onSkip === undefined ? {} : { onSkip })}>
+      {body}
+    </WizardFrame>
+  );
+
+  // Steps 3 and 4 need no owner read: they show what happened, or the real state.
+  if (step === 'connected' && view.k !== 'connect' && view.k !== 'leaving') {
+    const outcome = wizardMemory().outcome ?? (typeof derived === 'object' ? derived : undefined);
+    if (outcome === undefined) return frame(<LoadingState text={T.loading} />);
+    const app = outcome.app;
+    return frame(
+      <ConnectedStep
+        label={outcome.label}
+        {...(app === undefined ? {} : { app })}
+        onInvite={() => toStep('invite')}
+        onHome={goHome}
+        {...(app === undefined || app.connected || app.id === ''
+          ? {}
+          : { onConnect: () => void connectNow(app) })}
+      />,
+    );
+  }
+  if (step === 'invite') {
+    return frame(
+      <InviteStep
+        inviteHref={INTERIM_PEOPLE_PATH}
+        onHome={goHome}
+        {...(invitePanel === undefined ? {} : { panel: invitePanel })}
+      />,
+    );
+  }
 
   switch (view.k) {
     case 'loading':
-      return <LoadingState text={T.loading} />;
+      return frame(<LoadingState text={T.loading} />);
     case 'expired':
       return <LinkExpiredState />;
     case 'down':
       return <NotRunningState />;
     case 'stuck':
-      return (
-        <section aria-labelledby="fr-h">
-          <h1 id="fr-h" className="al-text-title-1">
+      return frame(
+        <section className="st-screen st-w-560" aria-labelledby="fr-h">
+          <h1 id="fr-h" className="st-title-2">
             {T.protectTitle}
           </h1>
           <Banner tone="warning">{view.message}</Banner>
-        </section>
+        </section>,
       );
     case 'upgrade': {
       const { values, noPrf } = view;
-      return (
-        <section aria-labelledby="fr-h">
-          <h1 id="fr-h" className="al-text-display">
+      return frame(
+        <section className="st-screen st-w-560" aria-labelledby="fr-h">
+          <h1 id="fr-h" className="st-title-2">
             {U.title(platform)}
           </h1>
-          <p className="al-text-body-lg al-muted">{U.body(sensor)}</p>
+          <p className="st-lead">{U.body(sensor)}</p>
           {noPrf ? (
             <Banner tone="warning">{U.noPrf(SENSOR[platform], WORKING_BROWSER[platform])}</Banner>
           ) : null}
@@ -767,62 +993,53 @@ export function FirstRunPage({
               icon="key-round"
               disabled={view.working}
             >
-              {noPrf ? T.usePasskey : label}
+              {noPrf ? T.usePasskey : platformButton(platform)}
             </Button>
           </form>
-          <p className="al-text-caption al-muted" role="status" aria-live="polite">
+          <p className="st-note" role="status" aria-live="polite">
             {view.working ? T.waiting : T.passkeyNote}
           </p>
-        </section>
+        </section>,
       );
     }
     case 'upgraded':
-      return (
-        <section aria-labelledby="fr-h">
-          <h1 id="fr-h" className="al-text-display">
+      return frame(
+        <section className="st-screen st-w-560" aria-labelledby="fr-h">
+          <h1 id="fr-h" className="st-title-2">
             {U.doneTitle(platform)}
           </h1>
-          <p className="al-text-body-lg al-muted">{U.doneBody(sensor)}</p>
-          <a className="al-btn al-btn-primary al-btn-lg" href={HOME}>
-            {U.toHome}
-          </a>
-        </section>
+          <p className="st-lead">{U.doneBody(sensor)}</p>
+          <div className="st-actions">
+            <a className="al-btn al-btn-primary al-btn-lg" href={HOME}>
+              {U.toHome}
+            </a>
+          </div>
+        </section>,
       );
     case 'already':
-      return (
-        <section aria-labelledby="fr-h">
-          <h1 id="fr-h" className="al-text-title-1">
+      return frame(
+        <section className="st-screen st-w-560" aria-labelledby="fr-h">
+          <h1 id="fr-h" className="st-title-2">
             {T.alreadyTitle}
           </h1>
-          <p className="al-text-body al-muted">{T.alreadyBody}</p>
-        </section>
+          <p className="st-lead">{T.alreadyBody}</p>
+        </section>,
       );
     case 'unsupported':
-      return (
-        <section aria-labelledby="fr-h">
-          <h1 id="fr-h" className="al-text-title-1">
+      return frame(
+        <section className="st-screen st-w-560" aria-labelledby="fr-h">
+          <h1 id="fr-h" className="st-title-2">
             {T.unsupportedTitle}
           </h1>
-          <p className="al-text-body al-muted">{T.unsupportedBody}</p>
+          <p className="st-lead">{T.unsupportedBody}</p>
           <CopyPrompt command={T.unsupportedCommand} />
-        </section>
-      );
-    case 'welcome':
-      return <WelcomeScreen onStart={toPick} />;
-    case 'pick':
-      return (
-        <PickApp
-          list={list}
-          choice={picked}
-          onChoose={setChoice}
-          onContinue={toName}
-          onBack={() => setView({ k: 'welcome' })}
-        />
+        </section>,
       );
     case 'leaving':
-      return <LoadingState text={T.leaving} />;
+      return frame(<LoadingState text={T.leaving} />);
     case 'connect':
-      return (
+      // E1: Connect after created_not_connected (the AI apps step, with the exact entry).
+      return frame(
         <ConnectApp
           appsApi={appsApi}
           appId={view.appId}
@@ -832,36 +1049,37 @@ export function FirstRunPage({
           sensor={sensor}
           passkeyProof={passkeyProof}
           onDone={goHome}
-        />
+          onConnected={() =>
+            finishStep({
+              label: view.label,
+              app: { id: view.appId, name: view.appName, connected: true },
+            })
+          }
+        />,
+        'connect',
       );
     case 'protect': {
       const noPrf = view.noPrf === true;
-      return (
-        <NameStep
+      return frame(
+        <ConnectFirstStep
           view={view}
-          name={name}
-          app={chosenApp}
+          name={name === '' ? label : name}
+          appName={chosenApp?.name}
           noPrf={noPrf}
-          label={label}
+          sensorWords={sensorWords}
           platform={platform}
-          onName={(value) => {
-            setName(value);
-            setEdited(true);
-          }}
-          onChange={toPick}
-          onBack={toPick}
+          onName={setName}
+          onBack={() => toStep('app')}
           onGo={(withoutPasskey) => void protect(withoutPasskey)}
-          connect={connectApp}
-          onConnect={setConnectApp}
-        />
+        />,
       );
     }
     case 'done': {
       const { done } = view;
       const line = sendLine(done.sendFolder);
-      return (
-        <section aria-labelledby="fr-h">
-          <h1 id="fr-h" ref={backupTitle} tabIndex={-1} className="al-text-display">
+      return frame(
+        <section className="st-screen st-w-560" aria-labelledby="fr-h">
+          <h1 id="fr-h" ref={backupTitle} tabIndex={-1} className="st-title-2">
             {T.backupTitle}
           </h1>
           {done.confirmed ? null : (
@@ -869,54 +1087,121 @@ export function FirstRunPage({
               {T.unconfirmed}
             </Banner>
           )}
-          <p className="al-text-body-lg al-muted">
-            {done.passkey ? T.doneBody : T.doneNoPasskeyBody}
-          </p>
+          <p className="st-lead">{done.passkey ? T.doneBody : T.doneNoPasskeyBody}</p>
           {line === undefined ? null : (
             <Banner tone={done.sendFolder === 'allowed' ? 'success' : 'warning'}>{line}</Banner>
           )}
           <p className="al-text-body">
             <Fingerprint value={done.fingerprint} prefix={T.fingerprintLabel} />
           </p>
-          <p className="al-text-caption al-muted">{T.fingerprintNote}</p>
+          <p className="st-note">{T.fingerprintNote}</p>
           <BackupCode
             code={done.ownerCode ?? ''}
             computer={done.computerName ?? ''}
             sensor={done.passkey ? sensor : SENSOR.other}
             onSaved={() => leave(done)}
           />
-        </section>
+        </section>,
+        'connect',
       );
     }
-    case 'created': {
-      const { app } = view;
-      return (
-        <section className="fr-card" aria-labelledby="fr-h">
-          <div className="fr-chosen-name">
-            <AppMark name={app.name} />
-            <span className="al-text-body">{app.name}</span>
-          </div>
-          <h1 id="fr-h" ref={backupTitle} tabIndex={-1} className="al-text-title-1" role="status">
-            {app.connected ? C.ready(view.label, app.name) : C.notConnected(view.label, app.name)}
-          </h1>
-          <div className="fr-actions">
-            {app.connected ? (
-              <Button variant="primary" size="lg" onClick={goHome}>
-                {C.next}
-              </Button>
-            ) : (
-              <>
-                <Button variant="primary" size="lg" onClick={() => void connectNow(app)}>
-                  {C.connect}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={goHome}>
-                  {C.later}
-                </Button>
-              </>
-            )}
-          </div>
-        </section>
-      );
-    }
+    case 'step':
+      break;
   }
+
+  // view 'step': the mode decides what this step shows.
+  if (mode === undefined) return frame(<LoadingState text={T.loading} />);
+  const eyebrow =
+    mode.k === 'first' ? P.eyebrow : mode.k === 'add' ? P.eyebrowAdd : P.eyebrowConnect;
+  if (step === 'app') {
+    return frame(
+      <PickStep
+        tiles={tiles}
+        choice={picked}
+        onChoose={setChoice}
+        onContinue={toConnect}
+        eyebrow={eyebrow}
+        lookFailed={list.k === 'unavailable'}
+        mac={platform === 'mac'}
+      />,
+    );
+  }
+  // Step 2 for an owner who has one already: New agent, or Connect another AI app.
+  const appName = pickedTile?.name ?? '';
+  if (mode.k === 'add') {
+    return frame(
+      <section className="st-screen st-w-560" aria-labelledby="fr-h">
+        <BackButton onBack={() => toStep('app')} label={S.back} />
+        <div className="st-intro">
+          <span className="st-eyebrow">{S.eyebrow(appName)}</span>
+          <h1 id="fr-h" className="st-title">
+            {S.title}
+          </h1>
+          <p className="st-lead">{S.body(appName)}</p>
+        </div>
+        <AgentCard name={label} line={S.worksIn(appName)} />
+        <CreateAgentGate
+          label={label}
+          summary=""
+          app={chosenApp ?? null}
+          goLabel={sensorWords}
+          {...(createAgentApi === undefined ? {} : { api: createAgentApi })}
+          appsApi={appsApi}
+          onCancel={() => toStep('app')}
+          onDone={(created) =>
+            finishStep({
+              label: created.label,
+              ...(created.app === undefined ? {} : { app: created.app }),
+            })
+          }
+        />
+        <p className="st-note">{S.restartNote(appName)}</p>
+      </section>,
+    );
+  }
+  // First run's step 2 is the protect view (set by the effect above, or between steps): wait.
+  if (mode.k === 'first') return frame(<LoadingState text={T.loading} />);
+  const folder = mode.folder;
+  if (chosenApp === undefined) {
+    // "Not found yet": nothing on this computer to connect; say what to do, then back or Home.
+    return frame(
+      <section className="st-screen st-w-560" aria-labelledby="fr-h">
+        <BackButton onBack={() => toStep('app')} label={S.back} />
+        <div className="st-intro">
+          <span className="st-eyebrow">{S.eyebrow(appName)}</span>
+          <h1 id="fr-h" className="st-title-2">
+            {T.notFoundTitle(appName)}
+          </h1>
+          <p className="st-lead">{T.notFoundBody(appName)}</p>
+        </div>
+      </section>,
+    );
+  }
+  return frame(
+    <ConnectApp
+      appsApi={appsApi}
+      appId={chosenApp.id}
+      appName={chosenApp.name}
+      folder={folder}
+      agentLabel={folder}
+      sensor={sensor}
+      passkeyProof={passkeyProof}
+      onDone={goHome}
+      onConnected={() =>
+        finishStep({
+          label: folder,
+          app: { id: chosenApp.id, name: chosenApp.name, connected: true },
+        })
+      }
+    />,
+  );
+}
+
+/** The upgrade button's words for the platform. */
+function platformButton(platform: Platform): string {
+  return platform === 'mac'
+    ? T.useTouchId
+    : platform === 'windows'
+      ? T.useWindowsHello
+      : T.usePasskey;
 }

@@ -131,6 +131,13 @@ async function mount(routes: Routes): Promise<Call[]> {
 
 const text = (): string => host.textContent ?? '';
 
+/** W4-PEOPLE-INVITE: Rename and Remove sit in the person ⋯ menu. */
+async function openMenu(): Promise<void> {
+  await act(async () => {
+    host.querySelector<HTMLButtonElement>('button[aria-label^="More for"]')?.click();
+  });
+}
+
 function button(label: string): HTMLButtonElement {
   const found = [...host.querySelectorAll('button')].find(
     (b) => (b.textContent ?? '').trim() === label,
@@ -334,6 +341,7 @@ describe('ContactsPage: rename and remove', () => {
       [`/api/ui/contacts/${ANA}/rename-check?alias=Ana%20K`]: { status: 'ok' },
       [`POST /api/ui/contacts/${ANA}/rename`]: { status: 'done' },
     });
+    await openMenu();
     await click(S.rename);
     await type('input[name="alias"]', 'Ana K');
     await click(S.saveName);
@@ -351,6 +359,7 @@ describe('ContactsPage: rename and remove', () => {
         reason: 'alias_taken',
       },
     });
+    await openMenu();
     await click(S.rename);
     await type('input[name="alias"]', 'Marko');
     await click(S.saveName);
@@ -364,6 +373,7 @@ describe('ContactsPage: rename and remove', () => {
       [LIST]: { status: 'ok', contacts: [ana] },
       [`POST /api/ui/contacts/${ANA}/remove`]: { status: 'done' },
     });
+    await openMenu();
     await click(S.remove);
     expect(posts(calls)).toHaveLength(0);
     expect(text()).toContain(S.removeExplain);
@@ -374,6 +384,7 @@ describe('ContactsPage: rename and remove', () => {
 
   it('Cancel at the presence step sends nothing', async () => {
     const calls = await mount({ [LIST]: { status: 'ok', contacts: [ana] } });
+    await openMenu();
     await click(S.remove);
     await click(S.removeContact);
     await click(S.cancel);

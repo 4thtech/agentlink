@@ -22,7 +22,8 @@
 //   inviter's agent answers; the safety code follows as on Contacts.
 //
 // W4-SHORT-INVITE and W4-INVITES-LIST (D-139; 04 §3.6.2; 08 §1):
-// - create takes `{"long": true}` from Advanced only (D-139 (7)) and answers the link `format`;
+// - create takes `{"long": true}` from Advanced only (D-139 (7)) and answers the link `format` and
+//   (W4-PEOPLE-INVITE) the invite's public `inviteId`;
 // - `GET /api/ui/invites` (a read) answers the open invites: ID, name (the invite label) and expiry,
 //   never a link, a secret or a lookup ID;
 // - `POST /api/ui/invites/cancel`, the invite kind, step `cancel`, body exactly `{"inviteId"}`: core
@@ -119,6 +120,8 @@ const UNAVAILABLE_INVITE = fixed(400, 'unavailable_invite');
 /** W4-SHORT-INVITE: the drop could not be reached; retryable. */
 const TRY_AGAIN = fixed(503, 'try_again');
 const NOT_FOUND = fixed(404, 'not_found');
+/** W4-PAUSE (06 §6, 08 §1): the owner paused the agent; invites wait until Resume. */
+const AGENT_PAUSED = fixed(409, 'agent_paused');
 /** An invite ID (16 bytes, base64url), as Cancel names it. */
 const INVITE_ID = /^[A-Za-z0-9_-]{22}$/;
 
@@ -148,6 +151,7 @@ const CANNOT_PAIR_CODES: ReadonlySet<string> = new Set([
 function inviteRefusal(error: unknown): LocalUiResult | undefined {
   if (!(error instanceof CoreError)) return undefined;
   const code: string = error.code;
+  if (code === 'agent_paused') return AGENT_PAUSED;
   if (code === 'invite_expired') return EXPIRED;
   if (code === 'invite_unavailable') return UNAVAILABLE_INVITE;
   if (code === 'invite_fetch_failed') return TRY_AGAIN;
@@ -237,13 +241,14 @@ async function createInvite(
     });
   } catch (error) {
     if (error instanceof CoreError) {
+      if (error.code === 'agent_paused') return AGENT_PAUSED;
       if (error.code === 'name_invalid') return INVALID_LABEL;
       if (error.code === 'identity_missing') return UI_NOT_SET_UP;
       if (CANNOT_SEND_CODES.has(error.code)) return CANNOT_SEND;
     }
     return UNAVAILABLE;
   }
-  const { inviteUrl, expiresAt, format } = created;
+  const { inviteId, inviteUrl, expiresAt, format } = created;
   const short: unknown = created.ownerFingerprint.short;
   const when = rfc3339(expiresAt);
   if (
@@ -252,7 +257,9 @@ async function createInvite(
     typeof short !== 'string' ||
     !FINGERPRINT.test(short) ||
     when === undefined ||
-    (format !== 'short' && format !== 'long')
+    (format !== 'short' && format !== 'long') ||
+    typeof inviteId !== 'string' ||
+    !INVITE_ID.test(inviteId)
   ) {
     return UNAVAILABLE;
   }
@@ -265,6 +272,9 @@ async function createInvite(
       ownerFingerprint: short,
       expiresAt: when,
       format,
+      // W4-PEOPLE-INVITE: the public ID of this invite (as the open list shows it), so the page
+      // cancels exactly the invite it made. Never a secret or a lookup ID.
+      inviteId,
     }),
   });
 }

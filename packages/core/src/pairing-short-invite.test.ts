@@ -368,6 +368,23 @@ describe('open invites (W4-INVITES-LIST)', () => {
     clock.t -= 2 * 86_400;
   });
 
+  // W4-PEOPLE-INVITE (IR-W4-PEOPLE-INVITE-1 M): create answers its own public invite ID, so the app
+  // cancels exactly the invite it made (never one found by diffing the open list).
+  it('create answers the public invite ID of the invite it made (short and long), never its secret', async () => {
+    const drop = fakeDrop();
+    const a = await agent(53, 'Ana', drop);
+    const short = await a.client.pairing.createInvite({ label: 'Bo' });
+    const long = await a.client.pairing.createInvite({ long: true });
+    expect(short.inviteId).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(long.inviteId).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(short.inviteId).not.toBe(long.inviteId);
+    const open = await a.client.pairing.openInvites();
+    expect(open.find((i) => i.inviteId === short.inviteId)?.label).toBe('Bo');
+    expect(open.some((i) => i.inviteId === long.inviteId)).toBe(true);
+    expect(short.inviteUrl).not.toContain(short.inviteId);
+    expect(await a.client.pairing.cancelInvite(short.inviteId)).toBe('cancelled');
+  });
+
   it('cancel refuses an unknown or malformed id', async () => {
     const a = await agent(52, 'Ana', undefined);
     expect(await a.client.pairing.cancelInvite('nope')).toBe('not_found');

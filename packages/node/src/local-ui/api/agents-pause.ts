@@ -66,11 +66,16 @@ function agentOf(context: LocalUiContext): Agent | LocalUiResult {
 const isResult = (value: unknown): value is LocalUiResult =>
   typeof value === 'object' && value !== null && 'status' in value && 'body' in value;
 
-/** `not_paused` when the pause row is absent; an unreadable row counts as paused (fail closed). */
+/**
+ * `not_paused` when the pause row is absent. An unreadable row still counts as paused for the agent
+ * (fail closed), but Resume cannot delete it, so it is `unavailable` before the gesture
+ * (IR-W4-PAUSE-SEC-1 L-1: no Touch ID asked for nothing).
+ */
 async function pausedRefusal(agent: Agent): Promise<LocalUiResult | undefined> {
   try {
     const reading = await (agent.pauseState as NonNullable<Agent['pauseState']>)();
-    return reading.status === 'running' ? NOT_PAUSED : undefined;
+    if (reading.status === 'running') return NOT_PAUSED;
+    return reading.status === 'paused' ? undefined : UI_UNAVAILABLE;
   } catch {
     return UI_UNAVAILABLE;
   }
@@ -142,7 +147,13 @@ async function resumeAgent(
   if (signatures.length !== 1 || first === undefined || first.kind !== 'owner-action') {
     return NOT_APPLIED;
   }
-  const outcome = await context.applyOwnerAction(first.signed);
+  let outcome: Awaited<ReturnType<LocalUiContext['applyOwnerAction']>>;
+  try {
+    outcome = await context.applyOwnerAction(first.signed);
+  } catch {
+    // A store error after the gesture (the error could carry a path, I-7): a fixed answer.
+    return UI_UNAVAILABLE;
+  }
   if (outcome.status !== 'applied') {
     return outcome.status === 'refused' && outcome.reason === 'not_paused'
       ? NOT_PAUSED

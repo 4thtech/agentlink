@@ -108,6 +108,11 @@ export interface CreateInviteInput {
 }
 
 export interface CreatedInvite {
+  /**
+   * W4-PEOPLE-INVITE: the invite's public 16-byte ID (base64url), as `openInvites` lists it and
+   * `cancelInvite` takes it. Never the secret.
+   */
+  readonly inviteId: string;
   /** The link to share. It carries the invite secret: never log it (I-7). */
   readonly inviteUrl: string;
   /**
@@ -337,6 +342,8 @@ const same = (a: unknown, b: unknown): boolean =>
   canonicalize(a as JsonValue) === canonicalize(b as JsonValue);
 
 export class PairingService implements PairingHandler {
+  /** W4-PAUSE: the agent's pause; invites refuse while paused. */
+  readonly #pause: { assertRunning(): Promise<void> } | undefined;
   readonly #ctx: CoreContext;
   readonly #identity: IdentityService;
   readonly #contacts: ContactBook;
@@ -353,7 +360,9 @@ export class PairingService implements PairingHandler {
     identity: IdentityService,
     contacts: ContactBook,
     drop?: DropConfig,
+    pause?: { assertRunning(): Promise<void> },
   ) {
+    this.#pause = pause;
     this.#ctx = ctx;
     this.#identity = identity;
     this.#contacts = contacts;
@@ -367,6 +376,8 @@ export class PairingService implements PairingHandler {
    * every surface signs over the same action.
    */
   async resolveInviteLink(link: string): Promise<string> {
+    // W4-PAUSE (06 §6 "Paused agents"): no invite fetch while the agent is paused (fail closed).
+    await this.#pause?.assertRunning();
     return resolveInviteLink(link, this.#fetchShort);
   }
 
@@ -411,6 +422,8 @@ export class PairingService implements PairingHandler {
 
   /** Creates a single-use invite (04 §3.6). Returns the link; stores proofKey, never the secret. */
   async createInvite(input: CreateInviteInput = {}): Promise<CreatedInvite> {
+    // W4-PAUSE: no invite (and no drop upload) while the agent is paused.
+    await this.#pause?.assertRunning();
     const ctx = this.#ctx;
     await this.#identity.assertCanSend();
     const days = input.expiresInDays ?? INVITE_DEFAULT_EXPIRY_DAYS;
@@ -509,7 +522,13 @@ export class PairingService implements PairingHandler {
         }
       }
       ctx.log.info('invite created', { expiresAt, format });
-      return { inviteUrl, format, ownerFingerprint: fingerprintOf(own.card), expiresAt };
+      return {
+        inviteId: id,
+        inviteUrl,
+        format,
+        ownerFingerprint: fingerprintOf(own.card),
+        expiresAt,
+      };
     } finally {
       wipe(secret);
       wipe(nonceA);
@@ -646,6 +665,8 @@ export class PairingService implements PairingHandler {
    * the pairing stays `pending` until the inviter's verified `handshake-ack`.
    */
   async acceptInvite(input: AcceptInviteInput): Promise<AcceptInviteResult> {
+    // W4-PAUSE: no accept (check or pairing) while the agent is paused.
+    await this.#pause?.assertRunning();
     const ctx = this.#ctx;
     const now = nowOf(ctx);
     // Step 1, shared with checkInviteLink (one implementation for every surface).

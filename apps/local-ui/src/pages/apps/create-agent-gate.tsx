@@ -48,6 +48,8 @@ export function CreateAgentGate({
   onCancel,
   api: givenApi,
   appsApi: givenApps,
+  app: givenApp,
+  goLabel,
 }: {
   label: string;
   /** The statement line ("Add {label}"). */
@@ -57,6 +59,13 @@ export function CreateAgentGate({
   /** Test seams; the app's own server calls by default. */
   api?: CreateAgentApi;
   appsApi?: AppsApi;
+  /**
+   * W4-WIZARD: the AI app picked in Get started (null: none). When given, the gate connects exactly
+   * that app and shows no "Connect to {app}" choice; when absent, it offers the first free app.
+   */
+  app?: DetectedApp | null;
+  /** W4-WIZARD: the one button's words ("Connect with Touch ID"). */
+  goLabel?: string;
 }): ReactElement {
   const [api] = useState<CreateAgentApi>(() => givenApi ?? createAgentApi());
   const [appsApi] = useState<AppsApi>(() => givenApps ?? createAppsApi());
@@ -73,6 +82,10 @@ export function CreateAgentGate({
   const useLabel = C.usePasskey;
 
   useEffect(() => {
+    if (givenApp !== undefined) {
+      setFree(givenApp ?? undefined);
+      return undefined;
+    }
     let live = true;
     void appsApi.list().then((result) => {
       if (!live || result.kind !== 'ok') return;
@@ -83,7 +96,7 @@ export function CreateAgentGate({
     return () => {
       live = false;
     };
-  }, [appsApi]);
+  }, [appsApi, givenApp]);
 
   const app = free !== undefined && connect ? free : undefined;
 
@@ -165,8 +178,8 @@ export function CreateAgentGate({
 
   return (
     <div className="ag-sheet-body">
-      <p className="al-text-title-3">{summary}</p>
-      {free === undefined ? null : (
+      {summary === '' ? null : <p className="al-text-title-3">{summary}</p>}
+      {free === undefined || givenApp !== undefined ? null : (
         <label className="ag-check">
           <input
             type="checkbox"
@@ -214,7 +227,7 @@ export function CreateAgentGate({
             disabled={working}
             onClick={() => void withPasskey()}
           >
-            {useLabel}
+            {goLabel ?? useLabel}
           </Button>
           <Button variant="ghost" size="sm" disabled={working} onClick={() => setUseCode(true)}>
             {NAME.backupInstead}

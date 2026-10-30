@@ -45,6 +45,11 @@ export interface JoinView {
   readonly inviter?: JoinInviter;
   /** RFC 3339 UTC, no fraction. */
   readonly expiresAt?: string;
+  /**
+   * W4-PEOPLE-INVITE: only when `connected`, the new contact's ref (its lower-case ID, as the
+   * contacts routes take it), so the screen reads that contact's safety code and no other.
+   */
+  readonly contactRef?: string;
 }
 
 export type JoinOffer = 'stored' | 'invite_waiting' | 'invalid_invite' | 'expired';
@@ -66,6 +71,8 @@ interface Held {
 /** The longest link the handoff and `join` take: 04 §3.6's payload cap after the fixed prefix. */
 const CANONICAL_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,21846}$/;
 const FINGERPRINT = /^[0-9A-F]{4}·[0-9A-F]{4}$/;
+/** A contact's ref as the contacts routes take it (api/contacts.ts REF). */
+const CONTACT_REF = /^0x[0-9a-f]{40}$/;
 const MAX_NAME_CHARS = 128;
 
 /** True for the canonical invite link of 08 §4, and nothing else (no bare payload here). */
@@ -205,6 +212,8 @@ export class JoinDesk {
     else if (contact) state = 'already_accepted';
     else if (held.expiresAt <= this.#nowSeconds()) state = 'expired';
     else state = 'waiting';
-    return Object.freeze({ state, ...base });
+    const ref =
+      state === 'connected' && CONTACT_REF.test(held.contactId) ? held.contactId : undefined;
+    return Object.freeze({ state, ...base, ...(ref === undefined ? {} : { contactRef: ref }) });
   }
 }

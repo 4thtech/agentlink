@@ -5,7 +5,8 @@
 // assertion or the backup code) before the handler runs. The handler then:
 // 1. reads only `{id}` from the input, the received item's ID `<envelope ID>.<index>`. Never a name,
 //    a folder or a path; anything else is 400 `bad_request` (also in the precheck, before presence);
-// 2. answers 409 `already_saved` for a file already saved (also before presence: nothing signed);
+// 2. answers 409 `already_saved` for a file already saved, and 404 `not_found` for an ID that names
+//    no received file of this agent (SEC-L1; also before presence: nothing signed);
 // 3. asks core to prepare the unsigned `file.save` for this agent from that ID, checks it is exactly
 //    that op for that file, and signs it once with this request's presence (fixed review text, never
 //    the sender's file name);
@@ -79,6 +80,9 @@ async function check(
   if (client === undefined) return NOT_SET_UP;
   try {
     if ((await client.filesIo.savedName(item.id)) !== null) return ALREADY_SAVED;
+    // SEC-L1: only a file this agent received; never ask for presence for anything else.
+    const isReceived = client.filesIo.isReceived;
+    if (isReceived !== undefined && !(await isReceived(item.id))) return NOT_FOUND;
   } catch {
     return UNAVAILABLE;
   }

@@ -46,6 +46,33 @@ import type { TransportFactory } from './transport.js';
 // limit takes 2.8 s and the "per record state" test (three full setups) 1.1 s, yet a loaded CI runner
 // (a 790 s unit run) timed that test out at the 20 s default, a slowdown of 18x or more. 60 s is above
 // the worst observed slowdown with room to spare; tests with their own limit keep it.
+// W4-TERMS-FLOW-FLAKE: the card checks (owner, agent and card-pop signatures) are pure, deterministic
+// verdicts over (card, signature), and core re-runs them on every read of a stored contact card
+// (about a third of the property test's time). Memoise exactly those three, keyed on the full
+// input: each distinct (card, signature) pair is still verified for real once, and a changed card
+// or signature is never served a cached verdict. Ordering, signing and receive are untouched.
+vi.mock('@4thtech-io/crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@4thtech-io/crypto')>();
+  const memo = (fn: (card: unknown, sig: unknown) => boolean) => {
+    const seen = new Map<string, boolean>();
+    return (card: unknown, sig: unknown): boolean => {
+      const key = JSON.stringify([card, sig]);
+      let verdict = seen.get(key);
+      if (verdict === undefined) {
+        verdict = fn(card, sig);
+        seen.set(key, verdict);
+      }
+      return verdict;
+    };
+  };
+  return {
+    ...actual,
+    verifyCardOwnerSig: memo(actual.verifyCardOwnerSig),
+    verifyCardAgentSig: memo(actual.verifyCardAgentSig),
+    verifyCardPop: memo(actual.verifyCardPop),
+  };
+});
+
 vi.setConfig({ testTimeout: 60_000 });
 
 let clock: FakeClock;
@@ -1782,100 +1809,107 @@ describe('M1-32-b: the chain on receive never depends on arrival order or create
     expect(await unread()).toBe(2);
   });
 
-  it('property: a chain arriving in any order and any sync split (same second included) always ends in the same state', async () => {
-    const a = await openAgent(1, ownerA, 'alice');
-    const b = await openAgent(2, ownerB, 'bob');
-    await pair(a, b);
-    const rnd = prng(0x3132_6262);
-    let reordered = 0;
-    let rounds = 0;
-    for (let round = 0; round < 24; round += 1) {
-      clock.t += 7_200;
-      const base = clock.t;
-      // A random chain: A's versions, sometimes with B's counter in between (B must hold A's
-      // newest first, which itself arrives in a random order).
-      const v1 = ok(
-        await a.client.proposeTerms({ to: b.id, terms: input({ subject: `r${round}` }) }),
-      );
-      const termsId = v1.termsId;
-      let head = v1.envelopeId;
-      let headIsOwn = true;
-      const toB: string[] = [v1.envelopeId];
-      const sentByA: string[] = [v1.envelopeId];
-      const phases = 1 + rnd(3);
-      for (let phase = 0; phase < phases; phase += 1) {
-        const versions = 1 + rnd(4);
-        for (let k = 0; k < versions; k += 1) {
-          // The same second, later or earlier: the signed createdAt never decides.
-          clock.t = base + rnd(3);
-          const subject = `r${round} p${phase} k${k}`;
-          const r = headIsOwn
-            ? ok(
-                await a.client.proposeTerms({
-                  to: b.id,
-                  terms: input({ subject }),
-                  revises: head,
-                }),
-              )
-            : ok(
-                await a.client.respondToTerms({
-                  envelopeId: head,
-                  decision: 'counter',
-                  terms: input({ subject }),
-                }),
-              );
-          head = r.envelopeId!;
-          headIsOwn = true;
-          toB.push(head);
-          sentByA.push(head);
+  // W4-TERMS-FLOW-FLAKE: the 24 rounds ran as one 180 s test (about 20 s alone, over 180 s on a loaded
+  // runner). The same 24 rounds now run as four independent slices of 6 with their own seeds (the
+  // first keeps the original seed), each under the ordinary 60 s test timeout. A slice is
+  // self-contained (own agents, own pairing), so a slow runner no longer stacks them into one test.
+  it.each([0x3132_6262, 0x3132_6263, 0x3132_6264, 0x3132_6265])(
+    'property: a chain arriving in any order and any sync split (same second included) always ends in the same state (seed %#x)',
+    async (seed) => {
+      const a = await openAgent(1, ownerA, 'alice');
+      const b = await openAgent(2, ownerB, 'bob');
+      await pair(a, b);
+      const rnd = prng(seed);
+      let reordered = 0;
+      let rounds = 0;
+      for (let round = 0; round < 6; round += 1) {
+        clock.t += 7_200;
+        const base = clock.t;
+        // A random chain: A's versions, sometimes with B's counter in between (B must hold A's
+        // newest first, which itself arrives in a random order).
+        const v1 = ok(
+          await a.client.proposeTerms({ to: b.id, terms: input({ subject: `r${round}` }) }),
+        );
+        const termsId = v1.termsId;
+        let head = v1.envelopeId;
+        let headIsOwn = true;
+        const toB: string[] = [v1.envelopeId];
+        const sentByA: string[] = [v1.envelopeId];
+        const phases = 1 + rnd(3);
+        for (let phase = 0; phase < phases; phase += 1) {
+          const versions = 1 + rnd(4);
+          for (let k = 0; k < versions; k += 1) {
+            // The same second, later or earlier: the signed createdAt never decides.
+            clock.t = base + rnd(3);
+            const subject = `r${round} p${phase} k${k}`;
+            const r = headIsOwn
+              ? ok(
+                  await a.client.proposeTerms({
+                    to: b.id,
+                    terms: input({ subject }),
+                    revises: head,
+                  }),
+                )
+              : ok(
+                  await a.client.respondToTerms({
+                    envelopeId: head,
+                    decision: 'counter',
+                    terms: input({ subject }),
+                  }),
+                );
+            head = r.envelopeId!;
+            headIsOwn = true;
+            toB.push(head);
+            sentByA.push(head);
+          }
+          // What B has not seen, in a random permutation and random sync batches.
+          const order = [...toB];
+          for (let i = order.length - 1; i > 0; i -= 1) {
+            const j = rnd(i + 1);
+            [order[i], order[j]] = [order[j]!, order[i]!];
+          }
+          if (order.join() !== toB.join()) reordered += 1;
+          clock.t = base + 10;
+          while (order.length > 0) {
+            await deliverInOrder(a, b, order.splice(0, 1 + rnd(order.length)));
+          }
+          toB.length = 0;
+          // Converged: everything A sent is taken and open, and A's last envelope is B's newest.
+          const chain = await chainOf(b, a.id, termsId);
+          expect(chain?.newestEnvelopeId).toBe(head);
+          for (const id of sentByA) {
+            expect(await inRow(b, id)).toMatchObject({ state: 'ok' });
+          }
+          expect(chain!.items.every((i) => i.endsWith(':open'))).toBe(true);
+          if (phase < phases - 1 && rnd(2) === 0) {
+            // B counters the newest; A receives it and answers with its next version.
+            const c = ok(
+              await b.client.respondToTerms({
+                envelopeId: head,
+                decision: 'counter',
+                terms: input({ subject: `r${round} b${phase}` }),
+              }),
+            );
+            await deliver(b, a);
+            head = c.envelopeId!;
+            headIsOwn = false;
+          }
         }
-        // What B has not seen, in a random permutation and random sync batches.
-        const order = [...toB];
-        for (let i = order.length - 1; i > 0; i -= 1) {
-          const j = rnd(i + 1);
-          [order[i], order[j]] = [order[j]!, order[i]!];
+        // Every older version from A is superseded on B; the newest one is acceptable.
+        for (const id of sentByA.slice(0, -1)) {
+          expect(await b.client.respondToTerms({ envelopeId: id, decision: 'accept' })).toEqual({
+            status: 'rejected',
+            code: 'TERMS_SUPERSEDED',
+          });
         }
-        if (order.join() !== toB.join()) reordered += 1;
-        clock.t = base + 10;
-        while (order.length > 0) {
-          await deliverInOrder(a, b, order.splice(0, 1 + rnd(order.length)));
-        }
-        toB.length = 0;
-        // Converged: everything A sent is taken and open, and A's last envelope is B's newest.
-        const chain = await chainOf(b, a.id, termsId);
-        expect(chain?.newestEnvelopeId).toBe(head);
-        for (const id of sentByA) {
-          expect(await inRow(b, id)).toMatchObject({ state: 'ok' });
-        }
-        expect(chain!.items.every((i) => i.endsWith(':open'))).toBe(true);
-        if (phase < phases - 1 && rnd(2) === 0) {
-          // B counters the newest; A receives it and answers with its next version.
-          const c = ok(
-            await b.client.respondToTerms({
-              envelopeId: head,
-              decision: 'counter',
-              terms: input({ subject: `r${round} b${phase}` }),
-            }),
-          );
-          await deliver(b, a);
-          head = c.envelopeId!;
-          headIsOwn = false;
-        }
+        pending(await b.client.respondToTerms({ envelopeId: head, decision: 'accept' }));
+        rounds += 1;
       }
-      // Every older version from A is superseded on B; the newest one is acceptable.
-      for (const id of sentByA.slice(0, -1)) {
-        expect(await b.client.respondToTerms({ envelopeId: id, decision: 'accept' })).toEqual({
-          status: 'rejected',
-          code: 'TERMS_SUPERSEDED',
-        });
-      }
-      pending(await b.client.respondToTerms({ envelopeId: head, decision: 'accept' }));
-      rounds += 1;
-    }
-    expect(rounds).toBe(24);
-    // Not vacuous: many phases arrived out of order.
-    expect(reordered).toBeGreaterThan(5);
-  }, 180_000);
+      expect(rounds).toBe(6);
+      // Not vacuous: phases arrived out of order in every slice.
+      expect(reordered).toBeGreaterThan(1);
+    },
+  );
 });
 
 describe('M1-32-b: proposeTerms and respondToTerms honour clientRequestId (IR-M1-9q-1 F-2; 06 §1 rule 6, 07 §3.3)', () => {

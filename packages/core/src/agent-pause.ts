@@ -28,8 +28,12 @@ export interface AgentPauseOptions {
   readonly now: () => number;
 }
 
+/** The fixed sentence of 06 §6 (the tools and the CLI show the same). */
+export const AGENT_PAUSED_TEXT =
+  'This agent is paused. The owner can resume it in the AgentLink app.';
+
 /** The fixed refusal of every sending or fetching core path while paused. */
-export const agentPaused = (): CoreError => new CoreError('agent_paused', 'This agent is paused.');
+export const agentPaused = (): CoreError => new CoreError('agent_paused', AGENT_PAUSED_TEXT);
 
 const isTime = (v: unknown): v is number =>
   typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
