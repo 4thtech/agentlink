@@ -123,7 +123,14 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     await page.goto(await openedLink(pc));
     // W4-WIZARD: Get started opens on the app pick; Claude Code is found on this computer.
     await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
-    await page.getByRole('button', { name: /^Claude CodeFound on this/ }).waitFor();
+    await page
+      .getByRole('button', { name: /^Claude Code/ })
+      .first()
+      .waitFor();
+    await page
+      .getByText(/^Found on this (Mac|computer)$/)
+      .first()
+      .waitFor();
     await page.getByRole('button', { name: 'Continue with Claude Code' }).waitFor();
   }, 120_000);
 

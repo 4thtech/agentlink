@@ -56,10 +56,8 @@ const PAGES = [
   { path: '/settings/appearance', title: 'Appearance' },
   { path: '/advanced/network', title: 'Advanced' },
   { path: '/advanced/diagnostics', title: 'About' },
-  {
-    path: '/start/app',
-    title: 'Private messages between AI agents. Only you and your contact can read them.',
-  },
+  // W4-WIZARD: Get started opens on step 1, the AI app pick.
+  { path: '/start/app', title: 'Which AI app do you use?' },
 ] as const;
 
 interface Mode {
@@ -160,7 +158,11 @@ async function open(mode: Mode): Promise<{ ctx: BrowserContext; page: Page }> {
   }, hood);
   await page.route('**/api/**', (route) => {
     const url = new URL(route.request().url());
-    const body = ROUTES[url.pathname];
+    // W4-WIZARD: the app opens Get started by itself while no owner exists; these pages are of an
+    // owner's app, so only Get started itself reads "no owner yet" (its first step is a page here).
+    const onStart = new URL(route.request().frame().url()).pathname.startsWith('/start/');
+    const body =
+      url.pathname === '/api/ui/first-run' && !onStart ? { owner: 'set_up' } : ROUTES[url.pathname];
     return route.fulfill({
       status: body === undefined ? 404 : 200,
       contentType: 'application/json',
