@@ -78,6 +78,14 @@ const V9_CONTACTS_COLUMNS: readonly string[] = [
 
 /** Tables added by version 10 (W4-LIVE-STATUS, D-143): the MCP session heartbeat (07 §3.2). */
 const V10_TABLES: readonly TableName[] = ['mcp_sessions', 'mcp_last_seen'];
+/** Files columns and tables added by version 11 (W4-AUTO-SAVE, D-142): automatic saving (04 §4.1). */
+const V11_FILES_COLUMNS: readonly string[] = [
+  'auto_save',
+  'auto_reason',
+  'auto_tries',
+  'auto_next_at',
+];
+const V11_TABLES: readonly TableName[] = ['auto_save_log', 'auto_save_state'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -96,7 +104,9 @@ function without(spec: TableSpec, columns: readonly string[]): TableSpec {
 function v1Spec(table: TableName): TableSpec {
   const spec = tableSpec(table);
   if (table === 'envelopes') return without(spec, V2_ENVELOPE_COLUMNS);
-  if (table === 'files') return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS]);
+  if (table === 'files') {
+    return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS, ...V11_FILES_COLUMNS]);
+  }
   if (table === 'invites') return without(spec, V8_INVITES_COLUMNS);
   if (table === 'contacts') return without(spec, V9_CONTACTS_COLUMNS);
   return spec;
@@ -177,6 +187,22 @@ function v9Statements(): readonly string[] {
 }
 
 /**
+ * Version 11 (W4-AUTO-SAVE, D-142; 04 §4.1; proposed, owner confirms at merge): the `files.auto_*`
+ * columns, appended and null on every existing row (those files arrived before automatic saving and
+ * keep the save-on-request rule), and the `auto_save_log` and `auto_save_state` tables. A store that
+ * already has an identity (an agent that updates) gets the one-time notice row (`show`, 08 §1); a new
+ * store is empty here, so a new agent never shows it.
+ */
+function v11Statements(): readonly string[] {
+  return [
+    ...addFilesColumns(V11_FILES_COLUMNS),
+    ...createSchemaStatements(V11_TABLES),
+    `INSERT INTO "auto_save_state" ("slot", "notice", "paused_reason", "paused_at") ` +
+      `SELECT 'current', 'show', NULL, NULL WHERE EXISTS (SELECT 1 FROM "identity")`,
+  ];
+}
+
+/**
  * The forward migrations, oldest first; the last one's version is STORE_SCHEMA_VERSION. Version 1
  * is the G-9 schema, version 2 adds D-72's columns and table, version 3 adds the `publisher_lease`
  * and `outbox_staged` tables (M1-7k-b; new tables only, so existing rows are untouched), version 4
@@ -186,7 +212,8 @@ function v9Statements(): readonly string[] {
  * 7 adds `local_owner_actions` (U3-d, D-138; a new table, existing rows untouched), version 8 adds the
  * invites drop columns (W4-SHORT-INVITE, D-139; nullable, null on existing rows), version 9 adds the
  * contacts former-name columns (W4-RENAME-REACHES-CONTACTS, D-141; nullable, null on existing rows),
- * version 10 adds `mcp_sessions` and `mcp_last_seen` (W4-LIVE-STATUS, D-143; new tables only). A later
+ * version 10 adds `mcp_sessions` and `mcp_last_seen` (W4-LIVE-STATUS, D-143; new tables only), version
+ * 11 adds the auto-save columns and tables (W4-AUTO-SAVE, D-142; nullable, null on existing rows). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -201,7 +228,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V3_TABLES.includes(t) &&
           !V5_TABLES.includes(t) &&
           !V7_TABLES.includes(t) &&
-          !V10_TABLES.includes(t),
+          !V10_TABLES.includes(t) &&
+          !V11_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -215,6 +243,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 8, statements: Object.freeze(v8Statements()) }),
   Object.freeze({ version: 9, statements: Object.freeze(v9Statements()) }),
   Object.freeze({ version: 10, statements: createSchemaStatements(V10_TABLES) }),
+  Object.freeze({ version: 11, statements: Object.freeze(v11Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

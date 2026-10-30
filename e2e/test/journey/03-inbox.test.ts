@@ -114,6 +114,14 @@ describe('chapter 3: inbox', () => {
     const inboxFolder = join(pcB.home, 'AgentLink', 'Inbox');
     const sha = (bytes: Uint8Array): string => encodeHex(sha256(bytes));
 
+    // A link in place of the Inbox folder, pointing into a hidden folder, before the file arrives:
+    // the automatic save (W4-AUTO-SAVE, D-142) refuses the folder, so the file waits for Save.
+    const planted = join(pcB.home, '.agentlink', 'planted-inbox');
+    await mkdir(planted, { recursive: true });
+    await mkdir(inboxFolder, { recursive: true });
+    await rename(inboxFolder, `${inboxFolder}-real`);
+    await symlink(planted, inboxFolder);
+
     const file = await sendable(pcA);
     await mcpA.call('agentlink_send', { to: 'Bo', text: 'The brief', path: file.path });
     await until('the file reaches Bo', () => inboxHas(mcpB, FILE_NAME), 30_000);
@@ -161,12 +169,8 @@ describe('chapter 3: inbox', () => {
     expect(refusedStatuses).toEqual([400, 400, 400, 400]);
     expect(b.gestures.total()).toBe(before0);
 
-    // A link in place of the Inbox folder, pointing into a hidden folder: refused, nothing written.
-    const planted = join(pcB.home, '.agentlink', 'planted-inbox');
-    await mkdir(planted, { recursive: true });
-    await mkdir(inboxFolder, { recursive: true });
-    await rename(inboxFolder, `${inboxFolder}-real`);
-    await symlink(planted, inboxFolder);
+    // Save into the linked folder: refused, nothing written.
+    expect(readdirSync(planted)).toEqual([]);
     const before1 = b.gestures.total();
     await b.page.getByRole('button', { name: 'Save to Inbox' }).first().click();
     await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
@@ -189,7 +193,8 @@ describe('chapter 3: inbox', () => {
     expect(b.gestures.total() - before2).toBe(1);
     expect(existsSync(outside)).toBe(false);
     expect(lstatSync(join(inboxFolder, FILE_NAME)).isSymbolicLink()).toBe(true);
-    const savedName = 'brief (1).txt';
+    // 04 §4.1 (D-142): the next free name is "{stem} (2){ext}".
+    const savedName = 'brief (2).txt';
     expect(sha(readFileSync(join(inboxFolder, savedName)))).toBe(sha(file.bytes));
     expect(await text(b.page)).toContain(savedName);
     // Saved once: no Save button for it any more.

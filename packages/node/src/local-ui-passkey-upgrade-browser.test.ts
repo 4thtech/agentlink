@@ -199,10 +199,10 @@ describe('a 0.2.0 owner switches to a passkey in the local app (M1-UX-FIRSTRUN-V
     await page.goto(`${server.origin}/settings/activity`);
     await page.getByRole('heading', { level: 1 }).first().waitFor();
     expect(await page.getByRole('link', { name: SWITCH }).count()).toBe(0);
+    // W4-WIZARD: with the passkey on, Get started goes on for this owner (no switch offered).
     await page.goto(`${server.origin}/first-run`);
-    await page
-      .getByRole('heading', { name: 'Approvals are already protected on this computer' })
-      .waitFor();
+    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
+    expect(await page.getByLabel('Backup code').count()).toBe(0);
 
     // The backup code keeps approving (it is the recovery way when the passkey isn't there).
     source.add(1);

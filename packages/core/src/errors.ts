@@ -84,7 +84,11 @@ export type CoreErrorCode =
   | 'storage_unavailable'
   | 'storage_failed'
   | 'file_download_failed'
-  | 'inbox_unavailable';
+  | 'inbox_unavailable'
+  // W4-AUTO-SAVE (D-142, 04 §4.1): the Inbox folder's volume is (almost) full, or it cannot hold the
+  // OS quarantine mark an automatic save needs.
+  | 'disk_full'
+  | 'folder_cannot_mark';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

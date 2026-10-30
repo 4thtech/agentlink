@@ -97,6 +97,12 @@ export const FIRST_RUN = {
   unsupportedCommand: 'agentlink owner init',
   tryAgain: 'Try again',
   startAgain: 'Start again',
+  /** W4-WIZARD: step 2 without an app found on this computer. */
+  yourAiApp: 'your AI app',
+  noAppYet: 'Connect an AI app later',
+  notFoundTitle: (app: string): string => `${app} isn't on this computer yet`,
+  notFoundBody: (app: string): string =>
+    `Install ${app}, then come back to Get started. Nothing changed. You can pick another AI app.`,
 } as const;
 
 /**

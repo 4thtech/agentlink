@@ -161,6 +161,10 @@ async function insertFile(
     deleted_at: file.deleted === true ? file.createdAt + DAY : null,
     delete_after: 'expiry' as const,
     saved_name: null,
+    auto_save: null,
+    auto_reason: null,
+    auto_tries: null,
+    auto_next_at: null,
   };
   await a.store.transaction((tx) => {
     tx.insert('envelopes', {

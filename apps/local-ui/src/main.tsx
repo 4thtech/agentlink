@@ -13,6 +13,7 @@ import { installGenerationGuard } from './api/generation.js';
 import { applyOs } from './layout/os.js';
 import { prefetchPages } from './lazy/pages.js';
 import { initPrefs } from './prefs/index.js';
+import { StartGate } from './pages/start/gate.js';
 import { AppRoutes } from './router.js';
 
 // Before the first paint: the stored display settings, and the platform for the chrome material.
@@ -25,7 +26,10 @@ const container = document.getElementById('root');
 if (container !== null) {
   createRoot(container).render(
     <StrictMode>
-      <AppRoutes />
+      {/* W4-WIZARD: an entry on Home waits for the open-on-launch check (no Home flash). */}
+      <StartGate>
+        <AppRoutes />
+      </StartGate>
     </StrictMode>,
   );
   // The other pages arrive while the browser is idle (the first load carries none of them).

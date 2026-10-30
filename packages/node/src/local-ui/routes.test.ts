@@ -147,6 +147,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/files/folders',
       // MSG-FILES-IO-d: Files, Received and Sent (api/files-io.test.ts).
       '/api/ui/files/received',
+      // W4-AUTO-SAVE: the one-time notice's dismiss (api/files-io-auto-save.test.ts).
+      '/api/ui/files/auto-save-notice/dismiss',
       '/api/ui/files/sent',
       '/api/ui/contacts',
       '/api/ui/contacts/:ref/safety-code',
