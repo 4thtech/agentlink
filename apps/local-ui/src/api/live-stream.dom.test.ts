@@ -19,6 +19,7 @@ import {
   agoText,
   createSseParser,
   getLive,
+  LIVE_ANSWER_MS,
   liveMode,
   resetLiveForTests,
   subscribeLive,
@@ -33,8 +34,8 @@ interface Stream {
 }
 
 interface Server {
-  /** How each events request is answered: a stream, a status, a thrown error, or no body. */
-  events: 'stream' | number | 'throw' | 'no-body';
+  /** How each events request is answered: a stream, a status, a thrown error, no body, or never. */
+  events: 'stream' | number | 'throw' | 'no-body' | 'hang';
   readonly streams: Stream[];
   agentReads: number;
   generation: number;
@@ -93,6 +94,13 @@ function serve(over: Partial<Server> = {}): Server {
       if (s.events === 'throw') throw new TypeError('network');
       if (typeof s.events === 'number') return json({ error: 'busy' }, s.events);
       if (s.events === 'no-body') return new Response(null, { status: 200 });
+      if (s.events === 'hang') {
+        return new Promise<Response>((_, fail) => {
+          init?.signal?.addEventListener('abort', () => {
+            fail(new DOMException('aborted', 'AbortError'));
+          });
+        });
+      }
       const encoder = new TextEncoder();
       let controller!: ReadableStreamDefaultController<Uint8Array>;
       const body = new ReadableStream<Uint8Array>({
@@ -407,6 +415,26 @@ describe('the shared live subscription over the events stream', () => {
     document.dispatchEvent(new Event('visibilitychange'));
     await flush();
     expect(s.agentReads).toBe(hidden + 1);
+  });
+
+  // W4-WIRE-3 (owner walkthrough 30 Oct): a stream that never answers (the host dropped it before its
+  // first byte) is given up after LIVE_ANSWER_MS and counts as a failure, so the page falls back to
+  // polling instead of keeping the status it loaded with.
+  it('a stream that never answers is a failure after LIVE_ANSWER_MS; three of them fall back to polling', async () => {
+    const s = serve({ events: 'hang' });
+    subscribeLive(() => undefined, { random: () => 0.5 });
+    await flush();
+    const tries = (): number => s.requests.filter((p) => p === EVENTS_PATH).length;
+    expect(tries()).toBe(1);
+    await flush(LIVE_ANSWER_MS - 100);
+    expect(tries()).toBe(1);
+    await flush(100 + 1_000);
+    expect(tries()).toBe(2);
+    await flush(LIVE_ANSWER_MS * 2 + 3_000);
+    expect(liveMode()).toBe('poll');
+    const reads = s.agentReads;
+    await flush(LIVE_POLL_MS + 10);
+    expect(s.agentReads).toBe(reads + 1);
   });
 
   it('a busy answer (429) polls instead of retrying at once', async () => {
