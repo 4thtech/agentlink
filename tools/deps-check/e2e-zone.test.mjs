@@ -106,7 +106,7 @@ describe('deps-check repository scan covers e2e/', () => {
   // package's tests at once; there this file took 52 s and this test exceeded 20 s twice. Same
   // assertion, the 120 s timeout policy.test.mjs already uses for the scan.
   it('reports the real repository clean', { timeout: 120_000 }, () => {
-    expect(runChecks(REPO).problems).toEqual([]);
+    expect(runChecks(REPO, { cache: true }).problems).toEqual([]);
   });
 });
 
