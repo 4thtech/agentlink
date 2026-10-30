@@ -76,6 +76,9 @@ const V9_CONTACTS_COLUMNS: readonly string[] = [
   'declared_name',
 ];
 
+/** Tables added by version 10 (W4-LIVE-STATUS, D-143): the MCP session heartbeat (07 §3.2). */
+const V10_TABLES: readonly TableName[] = ['mcp_sessions', 'mcp_last_seen'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -182,7 +185,8 @@ function v9Statements(): readonly string[] {
  * 6 adds `files.saved_name` (MSG-FILES-IO-b; a nullable sealed column, null on existing rows), version
  * 7 adds `local_owner_actions` (U3-d, D-138; a new table, existing rows untouched), version 8 adds the
  * invites drop columns (W4-SHORT-INVITE, D-139; nullable, null on existing rows), version 9 adds the
- * contacts former-name columns (W4-RENAME-REACHES-CONTACTS, D-141; nullable, null on existing rows). A later
+ * contacts former-name columns (W4-RENAME-REACHES-CONTACTS, D-141; nullable, null on existing rows),
+ * version 10 adds `mcp_sessions` and `mcp_last_seen` (W4-LIVE-STATUS, D-143; new tables only). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -196,7 +200,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V2_TABLES.includes(t) &&
           !V3_TABLES.includes(t) &&
           !V5_TABLES.includes(t) &&
-          !V7_TABLES.includes(t),
+          !V7_TABLES.includes(t) &&
+          !V10_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -209,6 +214,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 7, statements: createSchemaStatements(V7_TABLES) }),
   Object.freeze({ version: 8, statements: Object.freeze(v8Statements()) }),
   Object.freeze({ version: 9, statements: Object.freeze(v9Statements()) }),
+  Object.freeze({ version: 10, statements: createSchemaStatements(V10_TABLES) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

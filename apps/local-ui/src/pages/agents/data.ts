@@ -33,13 +33,22 @@ export interface AgentsList {
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
+/**
+ * W4-LIVE-STATUS (D-143, 08 §1): an AI app that runs this agent. The read now carries
+ * `{app, state, ...}` per detected app; one runs this agent unless it is `not_set_up`. A plain id
+ * (the earlier form) still reads as one. The live words come with U1-b.
+ */
+function appIdOf(a: unknown): string[] {
+  if (typeof a === 'string') return [a];
+  if (isObject(a) && typeof a['app'] === 'string' && a['state'] !== 'not_set_up') return [a['app']];
+  return [];
+}
+
 function parseRow(v: unknown): AgentRow | undefined {
   if (!isObject(v) || typeof v['name'] !== 'string' || typeof v['label'] !== 'string') {
     return undefined;
   }
-  const apps = Array.isArray(v['apps'])
-    ? v['apps'].filter((a): a is string => typeof a === 'string')
-    : [];
+  const apps = Array.isArray(v['apps']) ? v['apps'].flatMap(appIdOf) : [];
   const contacts = v['contacts'];
   return {
     name: v['name'],

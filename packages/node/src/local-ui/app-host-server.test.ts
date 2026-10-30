@@ -96,6 +96,8 @@ const without = (headers: Record<string, string>, name: string): Record<string, 
 
 const json = (value: unknown): Uint8Array => encodeUtf8(JSON.stringify(value));
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+/** W4-LIVE-STATUS: when the `work` agent's Codex session started (unix seconds). */
+const WORK_STARTED = Math.floor(Date.now() / 1000) - 5;
 
 interface Agents {
   readonly log: string[];
@@ -176,11 +178,20 @@ function agents(): Agents {
   const directory: AgentDirectory = {
     list: () => Promise.resolve([...entries.values()]),
     read: (name) => Promise.resolve(entries.get(name)),
+    // W4-LIVE-STATUS (D-143): `work` has a live MCP session of Codex (started 5 s ago).
     stats: (name) =>
       Promise.resolve(
         name === 'old'
           ? undefined
-          : { contacts: name === 'work' ? 3 : 1, running: name === 'work' },
+          : {
+              contacts: name === 'work' ? 3 : 1,
+              running: name === 'work',
+              sessions:
+                name === 'work'
+                  ? [{ app: 'codex', startedAt: WORK_STARTED, lastToolAt: null }]
+                  : [],
+              lastSeen: [],
+            },
       ),
     writeLabel: () => Promise.reject(new Error('not in U3-c')),
     markRemoving: () => Promise.reject(new Error('not in U3-c')),
@@ -354,8 +365,13 @@ describe('GET /api/ui/agents (U3-c)', () => {
           removing: false,
           contacts: 1,
           running: false,
-          // U3-f: from each AI app's `agentlink` entry only.
-          apps: ['claude-code'],
+          // W4-LIVE-STATUS (08 §1): per detected AI app; the entry says only what is set up.
+          state: 'offline',
+          apps: [
+            { app: 'claude-code', state: 'not_running' },
+            { app: 'codex', state: 'not_set_up' },
+            { app: 'cursor', state: 'not_set_up' },
+          ],
         },
         {
           name: 'work',
@@ -365,8 +381,14 @@ describe('GET /api/ui/agents (U3-c)', () => {
           available: true,
           removing: false,
           contacts: 3,
+          // W4-LIVE-STATUS: Running is a live MCP session row, never the lease.
           running: true,
-          apps: ['codex'],
+          state: 'ready',
+          apps: [
+            { app: 'claude-code', state: 'not_set_up' },
+            { app: 'codex', state: 'ready', since: WORK_STARTED },
+            { app: 'cursor', state: 'not_set_up' },
+          ],
         },
         {
           name: 'old',
@@ -377,7 +399,12 @@ describe('GET /api/ui/agents (U3-c)', () => {
           removing: true,
           contacts: null,
           running: false,
-          apps: [],
+          state: 'offline',
+          apps: [
+            { app: 'claude-code', state: 'not_set_up' },
+            { app: 'codex', state: 'not_set_up' },
+            { app: 'cursor', state: 'not_set_up' },
+          ],
         },
       ],
     });

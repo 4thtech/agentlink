@@ -51,6 +51,15 @@ export interface McpServerOptions {
    * agentlink_notarize is listed and accepted. Default: the default surface, where it is neither.
    */
   readonly advanced?: boolean;
+  /**
+   * W4-LIVE-STATUS (06 §6): the MCP session heartbeat. `initialized` gets the client's
+   * `clientInfo.name` once, when the server has answered `initialize` (it maps it to an id and keeps
+   * nothing else); `toolCall` runs at the start and end of every tool call.
+   */
+  readonly heartbeat?: {
+    initialized(clientName: unknown): void;
+    toolCall(clientName: unknown): void;
+  };
 }
 
 export function createMcpServer(
@@ -65,18 +74,30 @@ export function createMcpServer(
   const surface = options.advanced === true ? 'advanced' : 'default';
   const tools = toolsFor(surface).map(toMcpTool);
   server.setRequestHandler(ListToolsRequestSchema, () => ({ tools }));
+  const heartbeat = options.heartbeat;
+  if (heartbeat !== undefined) {
+    server.oninitialized = () => {
+      heartbeat.initialized(server.getClientVersion()?.name);
+    };
+  }
   server.setRequestHandler(
     CallToolRequestSchema,
     async (request, extra): Promise<CallToolResult> => {
       const clientName = server.getClientVersion()?.name;
-      const finished = await callTool(request.params.name, request.params.arguments, env, {
-        signal: extra.signal,
-        surface,
-        approvalWaitMs: options.approvalWaitMs?.(clientName) ?? 0,
-        ...(options.approvalWaitIntervalMs === undefined
-          ? {}
-          : { approvalWaitIntervalMs: options.approvalWaitIntervalMs }),
-      });
+      heartbeat?.toolCall(clientName);
+      let finished: Awaited<ReturnType<typeof callTool>>;
+      try {
+        finished = await callTool(request.params.name, request.params.arguments, env, {
+          signal: extra.signal,
+          surface,
+          approvalWaitMs: options.approvalWaitMs?.(clientName) ?? 0,
+          ...(options.approvalWaitIntervalMs === undefined
+            ? {}
+            : { approvalWaitIntervalMs: options.approvalWaitIntervalMs }),
+        });
+      } finally {
+        heartbeat?.toolCall(clientName);
+      }
       return {
         content: [{ type: 'text', text: finished.text }],
         structuredContent: { ...finished.structured },

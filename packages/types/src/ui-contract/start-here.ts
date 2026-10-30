@@ -9,6 +9,7 @@
 //
 // apps/local-ui may not import packages/node (package layering, tools/deps-check); both may import
 // this subpath of @4thtech-io/types. Names and IDs here are filler.
+import type { LiveAgentState, LiveAppRecord } from './live.js';
 
 /** A status and a JSON body, as the server answers. */
 export interface UiAnswer<B = unknown> {
@@ -27,7 +28,14 @@ export interface AgentsListRow {
   readonly removing: boolean;
   readonly contacts: number | null;
   readonly running: boolean;
-  readonly apps: readonly string[];
+  /** W4-LIVE-STATUS (D-143): the agent's live state (ui-contract/live.ts). */
+  readonly state: LiveAgentState;
+  readonly lastSeenAt?: number;
+  /**
+   * W4-LIVE-STATUS: per AI app its state; an app that runs this agent (an entry or a live session)
+   * is any state but `not_set_up`.
+   */
+  readonly apps: readonly LiveAppRecord[];
 }
 
 export const START_HERE_AGENTS_PATH = '/api/ui/agents';
@@ -68,6 +76,7 @@ const row = (over: Partial<AgentsListRow> & { name: string }): AgentsListRow => 
   removing: false,
   contacts: 0,
   running: false,
+  state: 'offline',
   apps: [],
   ...over,
 });
@@ -79,7 +88,11 @@ const desk = (agents: readonly AgentsListRow[]): StartHereDesk => {
 
 const listAnswer = (d: StartHereDesk): UiAnswer<unknown> => ({
   status: 200,
-  body: { switchable: true, ...d, agents: d.agents.map((a) => ({ ...a, apps: [...a.apps] })) },
+  body: {
+    switchable: true,
+    ...d,
+    agents: d.agents.map((a) => ({ ...a, apps: a.apps.map((app) => ({ ...app })) })),
+  },
 });
 
 /** GET /api/ui/apps with no AI apps desk (outside the CLI host): `not_available`. Read as no AI app. */
@@ -227,7 +240,7 @@ export const START_HERE_AGENT_CASES: readonly AgentCase[] = [
     { named: false, connected: false, appName: null, running: false },
   ),
   agentCase(
-    'an AI app id and a running lease: connected with the fixed app name, running',
+    'an AI app with a live session: connected with the fixed app name, running',
     [
       row({
         name: 'work',
@@ -235,16 +248,17 @@ export const START_HERE_AGENT_CASES: readonly AgentCase[] = [
         labelled: true,
         current: true,
         running: true,
-        apps: ['claude-code'],
+        state: 'ready',
+        apps: [{ app: 'claude-code', state: 'ready', since: 1_800_000_000 }],
       }),
-      row({ name: 'other', label: 'Other', apps: ['codex'] }),
+      row({ name: 'other', label: 'Other', apps: [{ app: 'codex', state: 'not_running' }] }),
     ],
     { named: true, connected: true, appName: 'Claude Code', running: true },
   ),
   agentCase(
     'follows the OPEN agent, not the first one in the list',
     [
-      row({ name: 'a', label: 'A', apps: ['codex'] }),
+      row({ name: 'a', label: 'A', apps: [{ app: 'codex', state: 'not_running' }] }),
       row({ name: 'b', label: 'B', labelled: true, current: true }),
     ],
     { named: true, connected: false, appName: null, running: false },

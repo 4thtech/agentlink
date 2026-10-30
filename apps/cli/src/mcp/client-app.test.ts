@@ -37,7 +37,7 @@ describe('mcpAppIdFor (06 §6)', () => {
     ['over 64 characters', 'claude-code'.padEnd(65, 'x')],
     ['not a string', 42],
     ['undefined', undefined],
-    ['an object', { toLowerCase: () => 'claude-code' }],
+    ['an object', { toLowerCase: (): string => 'claude-code' }],
   ])('%s is `other`', (_label, name) => {
     expect(mcpAppIdFor(name)).toBe('other');
   });

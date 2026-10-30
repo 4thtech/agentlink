@@ -59,6 +59,9 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'rate_counters',
         'publisher_lease',
         'outbox_staged',
+        // W4-LIVE-STATUS (D-143; 07 §3.2, schema 10): the MCP session heartbeat.
+        'mcp_sessions',
+        'mcp_last_seen',
         'idempotency',
         'owner_action_nonces',
         'revoked_agents',
@@ -118,7 +121,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   });
 
   it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 9): four nullable columns, appended last', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(9);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(9);
     expect(Object.keys(TABLES.contacts.columns).slice(-4)).toEqual([
       'former_name',
       'name_changed_at',

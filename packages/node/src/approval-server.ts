@@ -323,6 +323,8 @@ import {
   createLocalUiRoutes,
 } from './local-ui/routes.js';
 import { createHealthReader } from './local-ui/api/health.js';
+import { LiveEvents, type LiveEventSink } from './local-ui/api/events.js';
+import { LiveStatusTracker, liveAgentRecord } from './local-ui/live-status.js';
 import {
   checkGesture,
   signGesture,
@@ -567,11 +569,19 @@ export interface ApprovalServerSource {
   apply(signed: { readonly body: JsonObject; readonly sig: string }): Promise<OwnerActionOutcome>;
 }
 
+/** W4-LIVE-STATUS: the event hub reuses an AI apps list this long (config files, not sessions). */
+const APPS_LIST_REUSE_MS = 10_000;
+
+/** The AI apps seam's list answer. */
+type AiAppsListing = Awaited<ReturnType<LocalUiAiApps['list']>>;
+
 /** Structured events, fixed values only: never a token, URL, secret, ID or request text (I-7). */
 export type ApprovalServerEvent =
   | { readonly kind: 'listening' }
   /** The machine has no IPv6 loopback: the server listens on 127.0.0.1 only (M1-31). */
   | { readonly kind: 'ipv6_unavailable' }
+  /** W4-LIVE-STATUS: an event stream opened or was refused (`busy`); the open count only (I-7). */
+  | { readonly kind: 'events'; readonly outcome: 'opened' | 'busy'; readonly open: number }
   | {
       readonly kind: 'rejected';
       readonly reason:
@@ -792,6 +802,8 @@ export interface ApprovalServerInternals {
   readonly removeSetupFolders?: (folders: SetupFolders | undefined) => Promise<void>;
   /** U3-invite: Accept step 1 of the waiting invite. Default: core checkInviteLink. */
   readonly checkInvite?: JoinCheck;
+  /** W4-LIVE-STATUS: the live event hub's read interval (tests: shorter). Default 2 s. */
+  readonly liveEvents?: { readonly readIntervalMs?: number };
 }
 
 export interface ApprovalServer {
@@ -1264,6 +1276,36 @@ export async function startApprovalServerWith(
   const links: { readonly bytes: Uint8Array; readonly expiresAt: number }[] = [];
   /** Live session secrets (the cookie values), oldest first. */
   const sessions: Uint8Array[] = [];
+  /** W4-LIVE-STATUS: keeps each AI app's `since` while its state holds (live-status.ts). */
+  const liveTracker = new LiveStatusTracker();
+  /** W4-LIVE-STATUS: the last AI apps list, reused by the event hub's 2 s reads. */
+  let appsCache:
+    | {
+        readonly desk: LocalUiAiApps | undefined;
+        readonly at: number;
+        readonly list: AiAppsListing | undefined;
+      }
+    | undefined;
+  /**
+   * W4-LIVE-STATUS (08 §1 `GET /api/ui/events`): the live event hub. It reads the host's agents list
+   * (read-only peeks, no lock, never the lease) every 2 s while a stream is open.
+   */
+  const liveEvents = new LiveEvents({
+    read: async () => {
+      if (host === undefined) return undefined;
+      const list = await listAgents(APPS_LIST_REUSE_MS);
+      return {
+        generation: list.generation,
+        current: list.current,
+        agents: list.agents.map(liveAgentRecord),
+      };
+    },
+    now,
+    sessionLive: (session) => matchIndex(session, sessions) >= 0,
+    ...(internals.liveEvents?.readIntervalMs === undefined
+      ? {}
+      : { readIntervalMs: internals.liveEvents.readIntervalMs }),
+  });
   const csrf = encodeBase64url(randomBytes(32));
   const csrfBytes = encodeUtf8(csrf);
   const decided = new Set<string>();
@@ -4412,6 +4454,17 @@ export async function startApprovalServerWith(
     const { route, params } = found;
     if (route.presence && originHeader === undefined) return fail(403, 'origin');
     if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
+    if (!route.presence && route.stream === true) {
+      // W4-LIVE-STATUS (08 §1): the event stream, after the same read gate; like every
+      // agent-scoped read (U3-g-b), refused while no agent is open.
+      if (noAgentRefused(route)) {
+        req.resume();
+        noAgent(res);
+        return;
+      }
+      await eventsGate(req, res, url, cookie as string);
+      return;
+    }
     if (!route.presence) {
       req.resume();
       // U3-c: a read waits for a switch in progress and keeps the agent open while it runs.
@@ -4436,6 +4489,8 @@ export async function startApprovalServerWith(
     if (route.presence === 'switch') {
       // U3-c: switching the open agent has its own gate; it carries the generation in its body.
       await switchGate(req, res, url);
+      // W4-LIVE-STATUS (08 §1): the streams read at once after a switch.
+      liveEvents.poke();
       return;
     }
     // U3-c: the generation, before any presence check; held until the request is answered.
@@ -4451,6 +4506,9 @@ export async function startApprovalServerWith(
       await ownerRoute(req, res, url, route, params, cookie as string);
     } finally {
       hold?.leave();
+      // W4-LIVE-STATUS: an owner operation may change what the streams show (a label, an entry).
+      appsCache = undefined;
+      liveEvents.poke();
     }
   }
 
@@ -4861,25 +4919,43 @@ export async function startApprovalServerWith(
     return hold;
   }
 
-  /** `GET /api/ui/agents` in the app host: names, labels and counts, never a path or an ID. */
-  async function listAgents(): Promise<LocalUiAgentsList> {
+  /**
+   * `GET /api/ui/agents` in the app host: names, labels and counts, never a path or an ID.
+   * W4-LIVE-STATUS (D-143): Running and each AI app's state come from the live MCP session rows
+   * (agent-peek.ts, read only); the AI app entries say only what is set up (live-status.ts).
+   * `appsMaxAgeMs` lets the event hub reuse a recent AI apps list instead of reading every config
+   * file every 2 s.
+   */
+  async function listAgents(appsMaxAgeMs = 0): Promise<LocalUiAgentsList> {
     const slot = host;
     if (slot === undefined) throw new Error('not the app host');
     const entries = (await slot.directory.list()).slice(0, MAX_LISTED_AGENTS);
     const current = slot.current;
     // U3-f: the agent each AI app runs, from its `agentlink` entry only (the seam's entry-only view).
-    const apps = await (aiAppsDesk()?.list() ?? Promise.resolve(undefined)).catch(() => undefined);
+    const apps = await aiAppsList(appsMaxAgeMs);
+    const detected = (apps?.apps ?? []).map((view) => view.app);
     const appsOf = (name: string): readonly string[] =>
       Object.freeze(
         (apps?.apps ?? []).flatMap((view) =>
           view.state.kind === 'agent' && view.state.agent === name ? [view.app] : [],
         ),
       );
+    const at = Math.floor(now() / 1000);
     const agents: LocalUiAgentView[] = [];
     for (const entry of entries) {
       const stats = entry.available
         ? await slot.directory.stats(entry.name).catch(() => undefined)
         : undefined;
+      const live = liveTracker.status(
+        entry.name,
+        {
+          sessions: stats?.sessions ?? [],
+          lastSeen: stats?.lastSeen ?? [],
+          configured: appsOf(entry.name),
+          detected,
+        },
+        at,
+      );
       agents.push(
         Object.freeze<LocalUiAgentView>({
           name: entry.name,
@@ -4892,20 +4968,94 @@ export async function startApprovalServerWith(
           available: entry.available,
           removing: entry.removing,
           contacts: stats?.contacts ?? null,
-          // U3-invite-b: during the host's own short pass the lease row is the app's, not an AI app's.
-          running:
-            (stats?.running ?? false) && !(entry.name === current && follower?.passing === true),
-          // U3-f: from each AI app's `agentlink` entry only.
-          apps: appsOf(entry.name),
+          // W4-LIVE-STATUS: a live MCP session row, never the lease (so the host's own pairing
+          // pass, which takes the lease, never shows as an AI app).
+          running: (stats?.sessions ?? []).length > 0,
+          ...live,
         }),
       );
     }
+    liveTracker.forget(entries.map((entry) => entry.name));
     return Object.freeze<LocalUiAgentsList>({
       generation: slot.generation,
       current: current ?? null,
       label: current === undefined ? null : (agentLabel ?? current),
       agents: Object.freeze(agents),
     });
+  }
+
+  /** The AI apps list, reused for `maxAgeMs` (the event hub's reads); undefined when unreadable. */
+  async function aiAppsList(maxAgeMs: number): Promise<AiAppsListing | undefined> {
+    const desk = aiAppsDesk();
+    const at = now();
+    if (
+      maxAgeMs > 0 &&
+      appsCache !== undefined &&
+      appsCache.desk === desk &&
+      at - appsCache.at < maxAgeMs
+    ) {
+      return appsCache.list;
+    }
+    const list = await (desk?.list() ?? Promise.resolve(undefined)).catch(() => undefined);
+    appsCache = { desk, at, list };
+    return list;
+  }
+
+  /**
+   * W4-LIVE-STATUS (08 §1 `GET /api/ui/events`): the stream, after the read gate of handleUi
+   * (session, CSRF, Host, Origin when present, fetch metadata, loopback). Also requires
+   * `Accept: text/event-stream` and no query; app host only. Records counts only (I-7).
+   */
+  async function eventsGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    cookie: string,
+  ): Promise<void> {
+    req.resume();
+    const accept = (header(req, 'accept') ?? '').toLowerCase();
+    if (
+      url.search !== '' ||
+      !accept.split(',').some((part) => part.split(';')[0]?.trim() === 'text/event-stream')
+    ) {
+      sendJson(res, 400, { error: 'bad_request' });
+      return;
+    }
+    if (host === undefined) {
+      sendResult(res, NOT_AVAILABLE);
+      return;
+    }
+    // The stream headers go out only once the hub takes the stream; `busy` is a plain JSON answer.
+    let started = false;
+    const sink: LiveEventSink = {
+      write: (chunk) => {
+        if (!started) {
+          started = true;
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff',
+          });
+        }
+        res.write(chunk);
+      },
+      end: () => {
+        res.end();
+      },
+      get buffered() {
+        return res.writableLength;
+      },
+      onClose: (fn) => {
+        res.once('close', fn);
+      },
+    };
+    const opened = await liveEvents.open(sink, cookie, header(req, 'last-event-id'));
+    if (opened === 'busy') {
+      emit({ kind: 'events', outcome: 'busy', open: liveEvents.size });
+      sendJson(res, 429, { error: 'busy' });
+      return;
+    }
+    emit({ kind: 'events', outcome: 'opened', open: liveEvents.size });
   }
 
   /**
@@ -5217,6 +5367,8 @@ export async function startApprovalServerWith(
       // U3-invite: the handoff record goes first, so no `join` hands over to a closing host.
       if (handoffWritten) await options.host?.handoff?.remove().catch(() => undefined);
       joinDesk?.dismiss();
+      // W4-LIVE-STATUS: every event stream ends when the host stops.
+      liveEvents.close();
       await Promise.all(listeners.map(closeServer));
       // U3-c: the app host closes the agent it has open (whichever the owner switched to).
       await host?.close();

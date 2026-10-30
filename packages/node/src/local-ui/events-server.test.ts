@@ -131,6 +131,10 @@ function openStream(
   });
 }
 
+/** A copy of `headers` without `name`. */
+const without = (headers: Record<string, string>, name: string): Record<string, string> =>
+  Object.fromEntries(Object.entries(headers).filter(([key]) => key !== name));
+
 const dataOf = (text: string, event: string): Record<string, unknown>[] =>
   text
     .split('\n\n')
@@ -279,10 +283,8 @@ describe('GET /api/ui/events: the gate (04 §2.5, 08 §1)', () => {
       expect(res.headers['content-type'] ?? '').not.toContain('text/event-stream');
       expect(res.headers['access-control-allow-origin']).toBeUndefined();
     };
-    const { Cookie: _cookie, ...noCookie } = h.headers();
-    await refused(noCookie, 401);
-    const { 'X-AgentLink-CSRF': _csrf, ...noCsrf } = h.headers();
-    await refused(noCsrf, 403);
+    await refused(without(h.headers(), 'Cookie'), 401);
+    await refused(without(h.headers(), 'X-AgentLink-CSRF'), 403);
     await refused(h.headers({ Host: 'evil.example:80' }), 403);
     await refused(h.headers({ Host: `127.0.0.1:${String(h.port)}` }), 403);
     await refused(h.headers({ 'Sec-Fetch-Site': 'cross-site' }), 403);
@@ -292,7 +294,11 @@ describe('GET /api/ui/events: the gate (04 §2.5, 08 §1)', () => {
 
   it('requires Accept: text/event-stream and refuses any query parameter', async () => {
     const h = await harness();
-    const noAccept = await send(h.port, '/api/ui/events', h.headers({ Accept: 'application/json' }));
+    const noAccept = await send(
+      h.port,
+      '/api/ui/events',
+      h.headers({ Accept: 'application/json' }),
+    );
     expect(noAccept.status).toBe(400);
     expect(JSON.parse(noAccept.body)).toEqual({ error: 'bad_request' });
     const query = await send(h.port, '/api/ui/events?since=1', h.headers());
@@ -343,7 +349,8 @@ describe('GET /api/ui/events: what it carries (08 §1)', () => {
       agents: [
         {
           name: 'default',
-          label: 'Personal',
+          // U3-d: the open agent shows its verified label, else its folder name.
+          label: 'default',
           current: true,
           removing: false,
           state: 'offline',
@@ -411,8 +418,7 @@ describe('GET /api/ui/events: what it carries (08 §1)', () => {
       sessions: [{ app: 'codex', startedAt: NOW - 5, lastToolAt: NOW - 1 }],
       lastSeen: [],
     });
-    const { Accept: _a, ...headers } = h.headers();
-    const res = await send(h.port, '/api/ui/agents', headers);
+    const res = await send(h.port, '/api/ui/agents', without(h.headers(), 'Accept'));
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body) as { agents: Record<string, unknown>[] };
     expect(body.agents[1]).toEqual({

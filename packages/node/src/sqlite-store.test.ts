@@ -557,6 +557,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       'mcp_last_seen',
     ]);
     expect(v10.some((s) => s.startsWith('ALTER TABLE'))).toBe(false);
+    expect(digestOf(9)).toBe('40536c0d6cf98abd567807603de2ee761e454fbff14896e232e2f1dba63a5257');
   });
 
   it('migrates a version 9 file to version 10 (D-143): rows kept, the heartbeat tables empty', async () => {

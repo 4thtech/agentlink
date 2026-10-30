@@ -177,8 +177,18 @@ describe('MCP session heartbeat: write, beat, stamp, exit', () => {
       const base = { app: 'codex', agent_id: AGENT, started_at: clock.t - 100, last_tool_at: null };
       tx.insert('mcp_sessions', { ...base, session_id: 'expired', pid: 11, beat_until: clock.t });
       tx.insert('mcp_sessions', { ...base, session_id: 'gone', pid: 12, beat_until: clock.t + 30 });
-      tx.insert('mcp_sessions', { ...base, session_id: 'alive', pid: 13, beat_until: clock.t + 30 });
-      tx.insert('mcp_sessions', { ...base, session_id: 'pid-one', pid: 1, beat_until: clock.t + 30 });
+      tx.insert('mcp_sessions', {
+        ...base,
+        session_id: 'alive',
+        pid: 13,
+        beat_until: clock.t + 30,
+      });
+      tx.insert('mcp_sessions', {
+        ...base,
+        session_id: 'pid-one',
+        pid: 1,
+        beat_until: clock.t + 30,
+      });
       tx.insert('mcp_sessions', {
         ...base,
         session_id: 'other-agent',
@@ -252,7 +262,7 @@ describe('mcpSessionLive: the reader rule (06 §6 "Read", 04 §2.5)', () => {
     expect(mcpSessionLive(row({ pid: 2 ** 31 - 1 }), now, AGENT, alive)).toBe(true);
   });
 
-  it("ignores a row of another agent", () => {
+  it('ignores a row of another agent', () => {
     expect(mcpSessionLive(row({ agent_id: OTHER_AGENT }), now, AGENT, alive)).toBe(false);
   });
 });

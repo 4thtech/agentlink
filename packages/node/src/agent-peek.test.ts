@@ -74,7 +74,7 @@ function seed(
         s.id ?? `s${String(i)}`,
         s.app ?? 'codex',
         s.agentId ?? AGENT,
-        s.pid ?? process.pid,
+        'pid' in s ? s.pid : process.pid,
         s.startedAt ?? NOW - 5,
         s.beatUntil ?? NOW + 30,
         s.lastToolAt ?? null,
@@ -127,7 +127,9 @@ describe('peekAgentStore (U3-c)', () => {
 describe('peekAgentStore: live MCP sessions (W4-LIVE-STATUS, 06 §6 "Read")', () => {
   it('a live row is Running, with its app id and times; never its pid or session id', () => {
     seed(['active'], undefined, {
-      sessions: [{ id: 'SESSION-SECRET', app: 'claude-code', startedAt: NOW - 50, lastToolAt: NOW - 3 }],
+      sessions: [
+        { id: 'SESSION-SECRET', app: 'claude-code', startedAt: NOW - 50, lastToolAt: NOW - 3 },
+      ],
       lastSeen: [['claude-code', NOW - 2]],
     });
     const peek = peekAgentStore(path, NOW);

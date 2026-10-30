@@ -7,6 +7,7 @@
 // `LocalUiOwnerOperation` that the central presence gate hands to a `presence: true` route
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
+import type { LiveAgentState, LiveAppRecord } from './live-status.js';
 import {
   CoreError,
   acceptInviteAction,
@@ -591,10 +592,16 @@ export interface LocalUiAgentView {
   readonly removing: boolean;
   /** Active contacts; null when the store cannot be read just now. */
   readonly contacts: number | null;
-  /** An AI app is running this agent (the publisher lease row, read only, 06 §6). */
+  /** W4-LIVE-STATUS (D-143): an MCP session row of this agent is live (never the lease, 06 §6). */
   readonly running: boolean;
-  /** The AI app ids whose `agentlink` entry runs this agent (U3-f: from the entry only). */
-  readonly apps: readonly string[];
+  /**
+   * W4-LIVE-STATUS (D-143; 08 §1 "Live AI-app status"): the agent's live state, its newest last seen
+   * while not live, and per AI app (detected, with an entry, or with a live session) its state.
+   * Built through the one allowlist (live-status.ts liveAgentRecord).
+   */
+  readonly state: LiveAgentState;
+  readonly lastSeenAt?: number;
+  readonly apps: readonly LiveAppRecord[];
 }
 
 /** U3-c: the body of `GET /api/ui/agents` in the app host. */

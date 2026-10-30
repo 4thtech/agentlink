@@ -6,12 +6,7 @@
 // server in events-server.test.ts.
 import { describe, expect, it } from 'vitest';
 import type { LiveAgentRecord } from '../live-status.js';
-import {
-  LIVE_EVENTS_LIMITS,
-  LiveEvents,
-  type LiveEventSink,
-  type LiveSnapshot,
-} from './events.js';
+import { LIVE_EVENTS_LIMITS, LiveEvents, type LiveEventSink, type LiveSnapshot } from './events.js';
 
 const NOW_MS = 1_800_000_000_000;
 
