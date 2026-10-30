@@ -180,6 +180,16 @@ describe('chapter 2: contacts and invites', () => {
     // Both pages show the Connected moment with the safety code, with no navigation (A7).
     await seesConnected(b.page, 'Ana');
     await seesConnected(a.page, 'Bo');
+    // W4-WIRE-3 (owner walkthrough 30 Oct): the accepted invite leaves the pending list at once, no
+    // reload. The first link was copied (it may have gone to someone), so it stays as the one
+    // unnamed row with Cancel invite: the "Someone" row of the walkthrough was that second link.
+    await eventually(
+      'the accepted invite leaves the pending list',
+      async () => !(await text(a.page)).includes('Waiting for Bo to accept'),
+      20_000,
+    );
+    await a.page.getByText('Waiting for them to accept').first().waitFor();
+    expect(await a.page.getByRole('button', { name: 'Cancel invite' }).count()).toBe(1);
     await aProbe.check();
   }, 180_000);
 

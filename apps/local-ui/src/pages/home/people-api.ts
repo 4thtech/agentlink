@@ -15,7 +15,13 @@ import type { ApiClient } from '../../api/client.js';
 import { cleanName } from './person-name.js';
 import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
 import { INVITES_LIST_PATH, parseOpenInvites, type OpenInvite } from '../contacts/invite-api.js';
-import { parseReceived, parseSent, type ReceivedItem, type SentItem } from '../files/io-api.js';
+import {
+  parseInboxFolder,
+  parseReceived,
+  parseSent,
+  type ReceivedItem,
+  type SentItem,
+} from '../files/io-api.js';
 import {
   createMessagesApi,
   type Conversation,
@@ -56,6 +62,8 @@ export interface HomeData {
   readonly sent: ReadonlyMap<string, SentItem>;
   /** Invites that wait to be accepted, soonest to expire first. */
   readonly invites: readonly OpenInvite[];
+  /** W4-WIRE-3: the Inbox folder received files are saved to (`~/AgentLink/Inbox`), when known. */
+  readonly inboxFolder?: string;
 }
 
 /** A received or sent file's item ID: `<envelope ID>.<two-digit index>`. */
@@ -115,6 +123,7 @@ export function createPeopleApi(api: ApiClient): PeopleApi {
       const list = contacts.kind === 'ok' ? parseList(contacts.data) : undefined;
       const rec = received.kind === 'ok' ? parseReceived(received.data) : undefined;
       const out = sent.kind === 'ok' ? parseSent(sent.data) : undefined;
+      const inboxFolder = received.kind === 'ok' ? parseInboxFolder(received.data) : undefined;
       return {
         ok: true,
         data: {
@@ -129,6 +138,7 @@ export function createPeopleApi(api: ApiClient): PeopleApi {
           invites: ((invites.kind === 'ok' ? parseOpenInvites(invites.data) : undefined) ?? [])
             .map((i) => (i.name === null ? i : { ...i, name: cleanName(i.name) }))
             .sort((a, b) => a.expiresAt - b.expiresAt),
+          ...(inboxFolder === undefined ? {} : { inboxFolder }),
         },
       };
     },

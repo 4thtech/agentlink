@@ -165,6 +165,19 @@ export const parseReceived = (json: unknown): Feed<ReceivedItem> | undefined =>
   feedOf(json, receivedItem);
 export const parseSent = (json: unknown): Feed<SentItem> | undefined => feedOf(json, sentItem);
 
+/**
+ * W4-WIRE-3 (W4-AUTO-SAVE, 08 §1): the Inbox folder of the received page's `autoSave` block, home
+ * shown as `~` (the owner's own setting, never inbound text); undefined when absent or not a plain
+ * short path.
+ */
+export function parseInboxFolder(json: unknown): string | undefined {
+  const block = isObject(json) ? json['autoSave'] : undefined;
+  const folder = isObject(block) ? str(block['folder'], 512) : undefined;
+  if (folder === undefined) return undefined;
+  const shown = plain(folder, 512);
+  return shown === '' ? undefined : shown;
+}
+
 export function listPath(base: string, cursor: string | null): string {
   const query = new URLSearchParams({ limit: String(PAGE_SIZE) });
   if (cursor !== null) query.set('cursor', cursor);

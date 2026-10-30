@@ -290,6 +290,7 @@ function PersonOpen({
         passkey={passkey}
         reveal={clients.reveal}
         onSaved={refresh}
+        {...(data.inboxFolder === undefined ? {} : { folder: data.inboxFolder })}
         {...(folderNote === undefined ? {} : { folderNote })}
       />
     </div>

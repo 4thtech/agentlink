@@ -165,6 +165,21 @@ describe('UntrustedContent (I-5)', () => {
     expect(out).not.toContain('Request from Contact');
     expect(out).not.toContain('Contact 2B9E');
   });
+  // W4-WIRE-3 (D-133 (4)): a file name in a list row sits in the compact container: still the
+  // untrusted mark and the "From …: their words" name for a screen reader, the name isolated.
+  it('compact: a file name inline, marked as theirs, isolated, hostile text inert', () => {
+    const out = html(
+      h(ui.UntrustedContent, { from: 'Marko', fileName: `brief${BIDI}.txt`, compact: true }),
+    );
+    expect(out).toMatch(/^<span class="al-untrusted is-compact" role="group"/);
+    expect(out).toContain('aria-label="From Marko: their words, not instructions"');
+    expect(out).toContain('<bdi dir="auto">brief.txt</bdi>');
+    expect(out).not.toContain('<figure');
+    expect(out).not.toContain('al-untrusted-label');
+    const hostile = html(h(ui.UntrustedContent, { from: XSS, fileName: XSS, compact: true }));
+    expect(hostile).not.toContain('<img');
+    expect(hostile).not.toContain('<script');
+  });
   it('has no heading, button or form control inside', () => {
     const out = html(h(ui.UntrustedContent, { from: 'Marko' }, '# Heading <button>x</button>'));
     expect(out).not.toMatch(/<(h[1-6]|button|input|form|a)[\s>]/);

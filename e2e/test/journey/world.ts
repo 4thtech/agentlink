@@ -184,7 +184,8 @@ export async function goTo(page: Page, name: string): Promise<void> {
     .getByRole('button', { name: /^Go to/ })
     .first()
     .click();
-  const field = page.getByRole('combobox');
+  // W4-WIRE-3: the dialog's own field (a page such as the fleet table has comboboxes of its own).
+  const field = page.getByRole('dialog', { name: /^Go to/ }).getByRole('combobox');
   await field.fill(name);
   await page
     .getByRole('option', { name: new RegExp(`^${name}`) })
@@ -204,6 +205,11 @@ export async function navTo(page: Page, label: string): Promise<void> {
   }
   // The item's name may carry a count after the label ("Home, 2 waiting for you").
   const name = new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(,|\\s|$)`);
+  // W4-WIRE-3: on a phone (600 px and under) the sections sit in the section bar's sheet.
+  const bar = page.locator('.al-topnav-btn');
+  if ((await bar.isVisible()) && (await bar.getAttribute('aria-expanded')) !== 'true') {
+    await bar.click();
+  }
   await page
     .getByRole('navigation', { name: 'Sections' })
     .getByRole('link', { name })

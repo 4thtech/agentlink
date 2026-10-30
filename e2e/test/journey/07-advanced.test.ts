@@ -16,8 +16,10 @@ import { skipGetStartedIfShown } from './helpers-wizard.js';
 import {
   chapter,
   firstRunWithTouchId,
+  goTo,
   journeyPage,
   journeyWorld,
+  navTo,
   startUi,
   startUiRun,
   text,
@@ -132,4 +134,43 @@ describe('chapter 7: advanced', () => {
     expect((await layoutShiftScore(page)) - shiftedBefore).toBeLessThanOrEqual(CLS_BUDGET);
     await probe.check();
   }, 240_000);
+
+  // W4-WIRE-3 (owner walkthrough 30 Oct): on a phone (375 px) every section is one tap from the
+  // section bar's sheet, Activity included, with Under the hood off and on; and Go to reaches it too.
+  it('375 px: the section sheet and Go to reach Activity, Agents and Settings', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
+    const { page } = jp;
+    await skipGetStartedIfShown(page);
+    await page.setViewportSize({ width: 375, height: 812 });
+    const probe = await jp.arm();
+    const viaSheet = async (label: string, heading: string): Promise<void> => {
+      await page.locator('.al-topnav-btn').click();
+      await sections(page).getByRole('link', { name: label, exact: true }).click();
+      await page.getByRole('heading', { name: heading, level: 1 }).first().waitFor();
+      expect(await sections(page).count()).toBe(0);
+    };
+    await viaSheet('Activity', 'Activity');
+    await viaSheet('Agents', 'Agents');
+    await page.getByRole('switch', { name: /Under the hood/ }).click();
+    await viaSheet('Activity', 'Activity');
+    await viaSheet('Settings', 'Settings');
+    // Go to (the search button on a phone) reaches Activity as well, also from the fleet table,
+    // whose own filters are comboboxes too (the walkthrough's helper picked theirs).
+    await viaSheet('Agents', 'Agents');
+    await goTo(page, 'Activity');
+    await page.getByRole('heading', { name: 'Activity', level: 1 }).first().waitFor();
+    // navTo opens the sheet itself on a phone.
+    await navTo(page, 'Home');
+    await page.locator('.al-topnav-btn').getByText('Home').waitFor();
+    // Nothing on the page is wider than the phone.
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await probe.check();
+  }, 180_000);
 });
