@@ -25,6 +25,25 @@ let fetchImpl: UiSettingsFetch | undefined;
 /** The hood value the app is known to hold (undefined: none yet or unknown). */
 let synced: boolean | undefined;
 let unsubscribe: (() => void) | undefined;
+/** W4-SHELL-LIVE: the first read is done (or given up on), so Under the hood and the menu hold. */
+let settled = false;
+const settledListeners = new Set<() => void>();
+
+/** Marks the first read done (also after the shell's short wait); the shell then shows the body. */
+export function settleUiSettings(): void {
+  if (settled) return;
+  settled = true;
+  for (const l of settledListeners) l();
+}
+
+export function uiSettingsSettled(): boolean {
+  return settled;
+}
+
+export function subscribeUiSettingsSettled(listener: () => void): () => void {
+  settledListeners.add(listener);
+  return () => settledListeners.delete(listener);
+}
 
 function token(): string {
   if (typeof document === 'undefined') return '';
@@ -100,6 +119,7 @@ export async function startUiSettings(seam?: { fetch?: UiSettingsFetch }): Promi
     menuExpanded = stored.menuExpanded;
     for (const l of menuListeners) l();
   }
+  settleUiSettings();
 }
 
 /** Turns Under the hood on or off (saved by the app). */
@@ -131,5 +151,7 @@ export function resetUiSettingsForTests(): void {
   fetchImpl = undefined;
   synced = undefined;
   menuExpanded = false;
+  settled = false;
   for (const l of menuListeners) l();
+  for (const l of settledListeners) l();
 }
