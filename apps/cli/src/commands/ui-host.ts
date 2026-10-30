@@ -25,8 +25,15 @@
 // (the desk's list: only AgentLink's own entry, a foreign one is just "not ours"); nothing is
 // logged. Preview, apply and disconnect stay refused with no agent open; once first run's `finish`
 // opens the first agent, that agent's own full desk (localUiOptions) answers them.
+//
+// HOTFIX-045-REMOVE-FIRSTRUN (04 §2.5 "Removing an agent"; 06 §6): the no-agent host gets the same
+// removal port as the host `ui` starts for an existing agent (ui-remove.ts uiRemovalPort), so Remove
+// works in the session first run started. It is required here so no host is started without it.
+// The route, its gates (session, Host, Origin, CSRF, fetch metadata, generation, owner presence and
+// the signed `agent.revoke`) and the port are unchanged: the server's remove gate runs them.
 import type {
   AgentDirectory,
+  AgentRemovalPort,
   ApprovalServer,
   ApprovalServerEvent,
   ApprovalServerOptions,
@@ -73,8 +80,12 @@ export async function openUiHostAgent(
   if (opened?.status !== 'ok') return undefined;
   const { agent } = opened;
   try {
-    // The app's files are the server's and never change on a switch.
-    const localUi = withoutAssets(await deps.localUi(agent));
+    // The app's files are the server's and never change on a switch. W4-RENAME-REACHES-CONTACTS
+    // (D-141): the host's agent also gets its key-items token, for the rename gesture only.
+    const localUi = {
+      ...withoutAssets(await deps.localUi(agent)),
+      ...(agent.epochKeys === undefined ? {} : { epochKeys: agent.epochKeys }),
+    };
     const source = createUiApprovalSource(
       // The host owns the agent's lifetime; the source never closes it.
       { ...agent, close: () => Promise.resolve() },
@@ -104,6 +115,8 @@ export interface UiWelcomeDeps {
   assets(): LocalUiAssets;
   /** Opens an agent for the host (openUiHostAgent): the first agent, once first run created it. */
   open(name: string): Promise<AppHostAgent | undefined>;
+  /** HOTFIX-045-REMOVE-FIRSTRUN: removing an agent (uiRemovalPort), as in the agent host. */
+  readonly removal: AgentRemovalPort;
   /** Starts the approval server (startApprovalServer). */
   startServer(
     options: ApprovalServerOptions,
@@ -155,6 +168,9 @@ export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServ
     host: {
       directory: deps.directory,
       open: (name) => deps.open(name),
+      // HOTFIX-045-REMOVE-FIRSTRUN: Remove in this session (the folder lock, its own open, the
+      // revoked list), the same port the agent host gets.
+      removal: deps.removal,
       // The real home and owner files (no override). W4-ONE-TOUCH (D-140): the desk's plan for
       // first run's own setup gate only, so one gesture creates the agent and connects its app.
       firstRun: desk === undefined ? {} : { aiApps: Object.freeze({ plan: desk.plan.bind(desk) }) },

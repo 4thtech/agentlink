@@ -402,6 +402,7 @@ export class OwnerActions {
     const contactId = body.params.contact;
     let sealedAlias: Sealed | undefined;
     let othersSnapshot = '';
+    let keepDeclared: { readonly name: Sealed; readonly sealed: Sealed } | undefined;
     if (body.op === 'contact.rename') {
       if (!isRestrictedAlias(body.params.alias)) return this.#report(refused(op, 'alias_invalid'));
       const wanted = foldName(body.params.alias);
@@ -413,6 +414,18 @@ export class OwnerActions {
       }
       othersSnapshot = await this.#ctx.store.transaction((tx) => activeOthers(tx, contactId));
       sealedAlias = await seal(this.#ctx, 'contacts', 'name', [contactId], body.params.alias);
+      // D-141: a row from before store version 9 shown by its own name keeps that name as its
+      // self-declared name before the alias replaces it, so a later rename can say "was {old}".
+      const current = await this.#ctx.store.transaction((tx) =>
+        tx.get('contacts', { contact_id: contactId }),
+      );
+      if (current?.name_source === 'counterparty' && current.declared_name === null) {
+        const own = await open(this.#ctx, 'contacts', 'name', [contactId], current.name);
+        keepDeclared = {
+          name: current.name,
+          sealed: await seal(this.#ctx, 'contacts', 'declared_name', [contactId], own),
+        };
+      }
     }
     const now = base.now;
     const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
@@ -424,11 +437,19 @@ export class OwnerActions {
       if (sealedAlias !== undefined) {
         // The uniqueness check above read these rows; any change since refuses the object.
         if (activeOthers(tx, contactId) !== othersSnapshot) return refused(op, 'store_changed');
+        if (keepDeclared !== undefined && row.name !== keepDeclared.name) {
+          return refused(op, 'store_changed');
+        }
         tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
         tx.update(
           'contacts',
           { contact_id: contactId, status: row.status },
-          { name: sealedAlias, name_source: 'owner', updated_at: now },
+          {
+            name: sealedAlias,
+            name_source: 'owner',
+            updated_at: now,
+            ...(keepDeclared === undefined ? {} : { declared_name: keepDeclared.sealed }),
+          },
         );
         return { status: 'applied', op };
       }

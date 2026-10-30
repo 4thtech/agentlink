@@ -14,10 +14,12 @@ import {
   addAgentToOwner,
   changeOwnerCode,
   decideReviewedApprovals,
+  epochKeysOf,
   initOwner,
   performOwnerOperation,
   type AddAgentOptions,
   type AddAgentResult,
+  type AgentEpochKeys,
   type AgentStore,
   type ChangeOwnerCodeOptions,
   type ChangeOwnerCodeResult,
@@ -47,6 +49,12 @@ export interface OwnerAgent {
   readonly store: Store;
   /** Opens the sealed `approvals.action_json` (07 §3.1). */
   readonly cipher: StoreCipher;
+  /**
+   * W4-RENAME-REACHES-CONTACTS (D-141): the opaque key-items token of the agent's KeyStore
+   * (@4thtech-io/node epochKeysOf), for the app host's rename gesture only (ui-host.ts). Absent for a
+   * KeyStore the node package did not open.
+   */
+  readonly epochKeys?: AgentEpochKeys;
   close(): Promise<void>;
 }
 
@@ -103,8 +111,14 @@ async function openWithStore(
   name: string | undefined,
 ): Promise<OpenOwnerAgentResult> {
   let opened: AgentStore | undefined;
+  let keys: AgentEpochKeys | undefined;
   const deps: RuntimeDeps = {
     ...nodeRuntimeDeps,
+    openKeyStore: async (backend, agentId) => {
+      const keyStore = await nodeRuntimeDeps.openKeyStore(backend, agentId);
+      keys = epochKeysOf(keyStore);
+      return keyStore;
+    },
     openStore: async (backend, agentId, path) => {
       opened = await nodeRuntimeDeps.openStore(backend, agentId, path);
       return opened;
@@ -130,6 +144,7 @@ async function openWithStore(
       client: result.agent.client,
       store: store.store,
       cipher: store.cipher,
+      ...(keys === undefined ? {} : { epochKeys: keys }),
       close: () => result.agent.close(),
     }),
   };

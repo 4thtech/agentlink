@@ -31,6 +31,9 @@
 // M1-UX3-DUP-CONTACTS: a newer active contact with the same owner as an older active one also
 // carries `olderSameOwner`, that older contact's ref (a ref the list already shows); the full owner
 // fingerprint is only a grouping key here and never leaves.
+// W4-RENAME-REACHES-CONTACTS (D-141; 08 §1): a contact whose card-update changed its name, with the
+// note not seen yet, also carries `formerName`, core's restricted form of the name the owner last saw
+// (the seen mark is api/contacts-renamed.ts). The label and "Safety code checked" stay as core says.
 import type { ContactView, PreparedOwnerAction } from '@4thtech-io/core';
 import type { JsonObject, JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiContext } from '../context.js';
@@ -70,6 +73,25 @@ const NOT_SIGNED = fixed(409, 'refused');
 const NOT_APPLIED = fixed(409, 'not_applied');
 const DONE: LocalUiResult = Object.freeze({ status: 200, body: Object.freeze({ status: 'done' }) });
 
+/**
+ * D-141 (07 §3 "Former name"): `formerName` while core says a note is due, only as core's restricted
+ * form (the name rule, 06 §2.1) and only as short plain text; never the raw name.
+ */
+function formerNameOf(view: ContactView): {
+  readonly formerName?: string;
+  readonly newName?: string;
+} {
+  const plain = (name: unknown): name is string =>
+    typeof name === 'string' && name.length > 0 && name.length <= MAX_NAME_CHARS;
+  const former: unknown = view.nameChange?.formerName;
+  if (!plain(former)) return {};
+  // Under the owner's alias the row's name stays the alias: the note reads "Now calls itself
+  // {newName} (was {formerName})", so the contact's own new name (restricted) comes with it.
+  if (view.display.nameSource !== 'owner') return { formerName: former };
+  const own: unknown = view.nameChange?.newName;
+  return plain(own) ? { formerName: former, newName: own } : {};
+}
+
 function row(view: ContactView): JsonObject | undefined {
   if (typeof view.id !== 'string' || !REF.test(view.id)) return undefined;
   if (!STATUS.has(view.status) || !PAIRING.has(view.pairing)) return undefined;
@@ -92,6 +114,8 @@ function row(view: ContactView): JsonObject | undefined {
     status: view.status,
     pairing: view.pairing,
     since: view.createdAt,
+    // W4-RENAME-REACHES-CONTACTS (D-141; 08 §1): the unseen former name, as core restricted it.
+    ...formerNameOf(view),
   };
 }
 

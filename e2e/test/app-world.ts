@@ -29,7 +29,9 @@ import {
 } from '../../packages/node/dist/approval-server.js';
 import {
   createKeychainAgent,
+  epochKeysOf,
   openRecordedKeyStore,
+  type AgentEpochKeys,
 } from '../../packages/node/dist/keychain-keystore.js';
 import { KeychainOwnerKeyStore } from '../../packages/node/dist/owner-keystore.js';
 import {
@@ -201,8 +203,15 @@ export function uiDepsOf(
   const owner = {
     open: async (name?: string) => {
       let opened: Awaited<ReturnType<typeof openAgentStoreWith>> | undefined;
+      // W4-RENAME-REACHES-CONTACTS: the host's agent gets its key-items token (as openWithStore).
+      let epochKeys: AgentEpochKeys | undefined;
       const deps: RuntimeDeps = {
         ...pc.runtime,
+        openKeyStore: async (backend, agentId) => {
+          const keyStore = await pc.runtime.openKeyStore(backend, agentId);
+          epochKeys = epochKeysOf(keyStore);
+          return keyStore;
+        },
         openStore: async (backend, agentId, path) => {
           opened = await pc.runtime.openStore(backend, agentId, path);
           return opened;
@@ -224,6 +233,7 @@ export function uiDepsOf(
           client: result.agent.client,
           store: opened.store,
           cipher: opened.cipher,
+          ...(epochKeys === undefined ? {} : { epochKeys }),
           close: () => result.agent.close(),
         }),
       };
@@ -252,6 +262,8 @@ export function uiDepsOf(
         ...(welcome.invite === undefined ? {} : { waitingInvite: welcome.invite }),
         // U3-g-c: the same harness desk as `ui` (list only on Welcome).
         aiApps: () => wiring.aiApps(),
+        // HOTFIX-045-REMOVE-FIRSTRUN: Remove works in the session first run started.
+        removal: uiRemovalPort({ home: pc.home, runtime: pc.runtime }),
       });
       if (server !== undefined) servers.push(server);
       return server;

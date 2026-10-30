@@ -13,10 +13,12 @@ import {
   CryptoInputError,
   credentialDigest,
   encodeHex,
+  encodeHex0x,
   encodeUtf8,
   equalBytes,
   type Argon2idParams,
   type KeyImportControl,
+  type OwnerPublicKeys,
   type OwnerSession,
   type RecoveryKitExportRequest,
   type RecoveryKitImport,
@@ -32,7 +34,12 @@ import {
   type RecoveryKitStoreSink,
   type RecoveryKitStoreSource,
 } from '@4thtech-io/crypto/keystore';
-import { encodeStorageMark, rowKeyOf } from '@4thtech-io/core';
+import {
+  AgentLinkClient,
+  encodeStorageMark,
+  rowKeyOf,
+  type ApprovalChannel,
+} from '@4thtech-io/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createKeyExportControl,
@@ -43,7 +50,8 @@ import {
 import { unlockFileAgent, fileKeychain, writeAgentFile, OWNER_FILE } from './file-keystore.js';
 import { generateSecretCode, newKeystoreKek } from '@4thtech-io/crypto/keystore';
 import { withInterProcessLock, type LockHold } from './inter-process-lock.js';
-import { createKeychainAgent } from './keychain-keystore.js';
+import { openAgentStoreWith } from './agent-store.js';
+import { createKeychainAgent, openRecordedKeyStore } from './keychain-keystore.js';
 import { keychainAccount, type KeychainBackend } from './keychain.js';
 import {
   KeychainOwnerKeyStore,
@@ -91,6 +99,7 @@ afterEach(async () => {
 interface Owner {
   readonly seed: Uint8Array;
   readonly nostr: Uint8Array;
+  readonly keys: OwnerPublicKeys;
   readonly code: Uint8Array;
   readonly keychain: MemoryKeychain;
   readonly store: KeychainOwnerKeyStore;
@@ -102,12 +111,15 @@ async function makeOwner(keychain = new MemoryKeychain()): Promise<Owner> {
   const code = generateSecretCode();
   await storeOwnerSeed(keychain, seed, { secret: code, secretKind: 1 }, { kdf: FAST });
   const store = await KeychainOwnerKeyStore.open(keychain, keys);
-  return { seed, nostr: keys.ownerNostr, code, keychain, store };
+  return { seed, nostr: keys.ownerNostr, keys, code, keychain, store };
 }
 
 const presence = (owner: Owner) => ({ kind: 'passphrase' as const, secret: owner.code.slice() });
 
-/** A real store snapshot (`VACUUM INTO`) whose identity row is `agentId` and card names `ownerHex`. */
+/**
+ * A store snapshot (`VACUUM INTO`) whose identity row is `agentId` and whose hand-built card names
+ * `ownerHex`, in the card spelling (`0x` + lowercase hex, 04 §2.4.1).
+ */
 async function makeSnapshot(
   agentId: string,
   storeKey: Uint8Array,
@@ -119,7 +131,11 @@ async function makeSnapshot(
   const store = await SqliteStore.open(path);
   const cipher = await createAgentStoreCipher(storeKey);
   const row = await sampleRow('identity', 0, cipher);
-  const card = JSON.stringify({ card: { ownerNostr: ownerHex }, cardSig: 'x', cardAgentSig: null });
+  const card = JSON.stringify({
+    card: { ownerNostr: ownerHex, keyEpoch: row.key_epoch },
+    cardSig: 'x',
+    cardAgentSig: null,
+  });
   const sealedCard = await cipher.seal(
     { table: 'identity', column: 'agent_card_json', rowKey: rowKeyOf([rowAgentId]) },
     card,
@@ -138,11 +154,57 @@ async function makeSnapshot(
 
 const source = (bytes: Uint8Array) => ({ length: bytes.length, chunks: [bytes] });
 
+const noApprovals: ApprovalChannel = {
+  request: (request) => Promise.resolve({ approvalId: request.approvalId }),
+  status: () => Promise.resolve({ state: 'pending' }),
+};
+
+/**
+ * A snapshot whose card the real identity path issued (`identity.init`, the card's owner fields from
+ * `ownerKeyFields`), signed by `cardOwner`, so the stored card has exactly the spelling real agents
+ * store. The agent's items stay in `keychain`.
+ */
+async function makeIssuedSnapshot(
+  cardOwner: Owner,
+  keychain: MemoryKeychain,
+  agentId: string,
+): Promise<Uint8Array> {
+  const dir = await mkdtemp(join(root, 'issued-'));
+  const path = join(dir, 'store.sqlite');
+  const store = await openAgentStoreWith('keychain', agentId, path, { keychain });
+  const keyStore = await openRecordedKeyStore('keychain', agentId, { keychain });
+  const session = await cardOwner.store.unlock(presence(cardOwner));
+  try {
+    const client = await AgentLinkClient.create({
+      keyStore,
+      store: store.store,
+      cipher: store.cipher,
+      approvals: noApprovals,
+      policyMark: store.policyMark,
+    });
+    await client.identity.init({
+      owner: session,
+      ownerKeys: cardOwner.keys,
+      name: 'helper',
+      relays: ['wss://relay.agentlink.dev', 'wss://nos.lol'],
+    });
+  } finally {
+    await session.close();
+    await keyStore.close();
+    await store.close();
+  }
+  const out = join(dir, 'snap.sqlite');
+  const db = new Database(path);
+  db.prepare('VACUUM INTO ?').run(out);
+  db.close();
+  return new Uint8Array(await readFile(out));
+}
+
 /** A keychain agent with a store file and an exportable snapshot. */
 async function makeKeychainAgent(owner: Owner, keychain = new MemoryKeychain()) {
   const agentId = await createKeychainAgent(keychain);
   const storeKey = (await keychain.get(keychainAccount(agentId, 'store-key'))) as Uint8Array;
-  const snapshot = await makeSnapshot(agentId, storeKey, encodeHex(owner.nostr));
+  const snapshot = await makeSnapshot(agentId, storeKey, encodeHex0x(owner.nostr));
   const dir = await mkdtemp(join(root, 'agent-'));
   return { agentId, keychain, storeKey, snapshot, storePath: join(dir, 'store.sqlite') };
 }
@@ -767,18 +829,21 @@ describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
   });
 
   /** A kit sealed directly, with a snapshot whose identity or card does not match. */
-  async function mismatchKit(kind: 'agent_id' | 'owner') {
+  async function mismatchKit(kind: 'agent_id' | 'owner' | 'bare_hex') {
     const owner = await makeOwner();
     const keychain = new MemoryKeychain();
     const agentId = await createKeychainAgent(keychain);
     const seed = (await keychain.get(agentId)) as Uint8Array;
     const storeKey = (await keychain.get(keychainAccount(agentId, 'store-key'))) as Uint8Array;
     const otherId = deriveAgentId(crypto.getRandomValues(new Uint8Array(32)));
-    const otherOwner = encodeHex(crypto.getRandomValues(new Uint8Array(32)));
+    const otherOwner = encodeHex0x(crypto.getRandomValues(new Uint8Array(32)));
     const snapshot =
       kind === 'agent_id'
-        ? await makeSnapshot(agentId, storeKey, encodeHex(owner.nostr), otherId)
-        : await makeSnapshot(agentId, storeKey, otherOwner);
+        ? await makeSnapshot(agentId, storeKey, encodeHex0x(owner.nostr), otherId)
+        : kind === 'owner'
+          ? await makeSnapshot(agentId, storeKey, otherOwner)
+          : // The right owner in a spelling no card has (bare hex): refused too (04 §2.4.1).
+            await makeSnapshot(agentId, storeKey, encodeHex(owner.nostr));
     const parts: Uint8Array[] = [];
     const code = await sealRecoveryKit(
       {
@@ -810,7 +875,41 @@ describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
     return { kit, code };
   }
 
-  for (const kind of ['agent_id', 'owner'] as const) {
+  // HOTFIX-KIT-RESTORE: the stored card comes from the real issue path, so its ownerNostr has the
+  // card spelling (`0x` + hex). Hand-built cards in bare hex hid that the check refused every real kit.
+  it('restores a kit whose stored card the real identity path issued (card spelling 0x)', async () => {
+    const owner = await makeOwner();
+    const keychain = new MemoryKeychain();
+    const agentId = await createKeychainAgent(keychain);
+    const storeKey = (await keychain.get(keychainAccount(agentId, 'store-key'))) as Uint8Array;
+    const snapshot = await makeIssuedSnapshot(owner, keychain, agentId);
+    const agent = { agentId, keychain, storeKey, snapshot, storePath: join(root, 'unused.sqlite') };
+    const { kit, code } = await exportKit(owner, agent);
+    for (const backend of [keychainImportBackend(), fileImportBackend()]) {
+      const target = backend.control({ ownerKeychain: new MemoryKeychain() });
+      const handle = await openKit(target.control, kit, code.slice());
+      expect(handle.agents.map((a) => a.agentId)).toEqual([agentId]);
+      handle.wipe();
+    }
+  });
+
+  it('refuses a kit whose issued stored card names another owner (one generic error)', async () => {
+    const owner = await makeOwner();
+    const other = await makeOwner();
+    const keychain = new MemoryKeychain();
+    const agentId = await createKeychainAgent(keychain);
+    const storeKey = (await keychain.get(keychainAccount(agentId, 'store-key'))) as Uint8Array;
+    const snapshot = await makeIssuedSnapshot(other, keychain, agentId);
+    const agent = { agentId, keychain, storeKey, snapshot, storePath: join(root, 'unused.sqlite') };
+    const { kit, code } = await exportKit(owner, agent);
+    for (const backend of [keychainImportBackend(), fileImportBackend()]) {
+      const target = backend.control({ ownerKeychain: new MemoryKeychain() });
+      await expectCode(openKit(target.control, kit, code.slice()), 'open_failed');
+      expect(await readdir(join(root, 'q')).catch(() => [])).toEqual([]);
+    }
+  });
+
+  for (const kind of ['agent_id', 'owner', 'bare_hex'] as const) {
     it(`snapshot mismatch (${kind}): one generic error, quarantine emptied, nothing written`, async () => {
       const { kit, code } = await mismatchKit(kind);
       for (const backend of [keychainImportBackend(), fileImportBackend()]) {
