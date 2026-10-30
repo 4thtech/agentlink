@@ -91,6 +91,8 @@ export const HOME_STRINGS = {
   showInFolder: 'Show in folder',
   arrivedNotSaved: 'Arrived · not saved',
   savedAs: 'Saved as',
+  savedTo: 'Saved to {folder}',
+  savedToInbox: 'Saved to your Inbox folder',
   expired: 'Expired. It can no longer be saved.',
   fileWaiting: 'Waiting to send',
   fileSent: 'Sent',

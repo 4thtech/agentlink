@@ -274,13 +274,19 @@ describe('chapter 3: inbox', () => {
     await a.page.getByText('Sent', { exact: true }).first().waitFor({ timeout: 30_000 });
 
     // A file: W4-AUTO-SAVE (D-142) saves a paired contact's file by itself; Ana's Files on Home
-    // shows "Saved as" and Show in Finder / Explorer / folder, with no Touch ID. (Save with one
-    // Touch ID, when the automatic save cannot run, is the test above.)
+    // shows one light row (W4-WIRE-3): the name, "Saved to ~/AgentLink/Inbox" and Show in Finder /
+    // Explorer / folder, with no Touch ID and no message box around the name. (Save with one Touch
+    // ID, when the automatic save cannot run, is the test above.)
     const file = await sendable(pcA);
     const before = b.gestures.total();
     await mcpA.call('agentlink_send', { to: 'Bo', text: 'The brief', path: file.path });
     await b.page.getByText(FILE_NAME).first().waitFor({ timeout: 30_000 });
-    await eventually('the file is saved', async () => (await text(b.page)).includes('Saved as'));
+    await eventually('the file is saved', async () =>
+      (await text(b.page)).includes('Saved to ~/AgentLink/Inbox'),
+    );
+    expect(
+      await b.page.locator('.hm-file figure.al-untrusted').filter({ hasText: FILE_NAME }).count(),
+    ).toBe(0);
     expect(await b.page.locator('[role="progressbar"]').count()).toBe(0);
     expect(b.gestures.total() - before).toBe(0);
     await b.page

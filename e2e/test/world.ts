@@ -16,7 +16,7 @@
 import type { Logger } from '@4thtech-io/log';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { createMcpCommand } from '../../apps/cli/dist/mcp/command.js';
+import { createMcpCommand, processHeartbeat } from '../../apps/cli/dist/mcp/command.js';
 import { createPackVerifier } from '../../apps/cli/dist/runtime/pack-verifier.js';
 import { nodeProofs } from '../../apps/cli/dist/runtime/proofs.js';
 import { openAgent, type RuntimeDeps } from '../../apps/cli/dist/runtime/index.js';
@@ -48,6 +48,8 @@ export async function startInProcess(
     version: '0.0.0-e2e',
     logger,
     loop: LOOP,
+    // W4-WIRE-3: the session row `agentlink mcp` writes (06 §6 heartbeat).
+    heartbeat: processHeartbeat,
   });
   const done = handler({
     command: 'mcp',

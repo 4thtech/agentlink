@@ -226,6 +226,16 @@ export function stdioTransport(io?: StdioSource): Transport {
 }
 
 /** The production `agentlink mcp` handler: stdio, the real runtime, the local approval UI. */
+/**
+ * W4-LIVE-STATUS (06 §6): this process's session row; other processes' pids get signal 0 only.
+ * W4-WIRE-3: exported so every host of `createMcpCommand` (the e2e harnesses too) writes the same
+ * row as `agentlink mcp`; without it no row is written and the app shows the AI app Not running.
+ */
+export const processHeartbeat: NonNullable<McpCommandDeps['heartbeat']> = Object.freeze({
+  session: (agent: OpenedAgent) =>
+    agent.client.mcpSession({ pid: process.pid, pidAlive: (pid: number) => pidAlive(pid) }),
+});
+
 export const mcpCommand = (version: string): CommandHandler => {
   // The approval source reads the agent's store and opens its sealed rows (M1-11a ui-source.ts),
   // so the store the runtime opens is kept here, as the owner commands do (commands/owner/deps.ts).
@@ -246,11 +256,7 @@ export const mcpCommand = (version: string): CommandHandler => {
       }),
     transport: () => stdioTransport(),
     version,
-    // W4-LIVE-STATUS (06 §6): this process's session row; other processes' pids get signal 0 only.
-    heartbeat: {
-      session: (agent) =>
-        agent.client.mcpSession({ pid: process.pid, pidAlive: (pid) => pidAlive(pid) }),
-    },
+    heartbeat: processHeartbeat,
     approvalUi: (agent, logger) => {
       const store = opened;
       return createApprovalUi({

@@ -2,19 +2,22 @@
 // ux-inventory §9 item 3; 11 §5.7). Received and sent, newest first, from the same pages as the
 // conversation:
 //
-// - received: "Saved as <name>" with Show in Finder (macOS) / Show in Explorer (Windows) / Show in
-//   folder (Linux and others), or "Arrived · not saved" with Save to Inbox (#714's signed
-//   `file.save`, one presence step) until K3's auto-save lands, or Expired;
+// - received: one light row (W4-WIRE-3; 11 §5.7): "<name> · Saved to ~/AgentLink/Inbox" with Show in
+//   Finder (macOS) / Show in Explorer (Windows) / Show in folder (Linux and others), plus "Saved as
+//   <name>" only when the saved name differs; or "Arrived · not saved" with Save to Inbox (#714's
+//   signed `file.save`, one presence step), or Expired;
 // - sent: "To <name>" and its delivery word.
 //
 // Show in Finder and Save send only the item's ID (04 §4; files-api.ts reveal, inbox/save-api.ts):
-// never a name, a folder or a path, and no answer carries one. The other party's file names show
-// only inside the untrusted container (I-5). `folderNote` is K3's "Saved to <folder>" slot.
-import { Button, Icon, UntrustedContent } from '@4thtech-io/ui';
+// never a name, a folder or a path, and no answer carries one. The other party's file names are
+// untrusted (I-5): plain React text, cleaned of hidden and direction characters, capped, isolated in a
+// `<bdi dir="auto">`, in the mono name style the Files page uses (not the message box: a file name
+// has no instructions to frame). The folder is the owner's own setting. `folderNote` is K3's slot.
+import { Button, Icon } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { detectOs } from '../../layout/os.js';
 import type { RevealOutcome } from '../files/files-api.js';
-import type { ReceivedItem, SentItem } from '../files/io-api.js';
+import { plain, type ReceivedItem, type SentItem } from '../files/io-api.js';
 import { sizeText } from '../files/io.js';
 import type { MessageItem } from '../messages/api.js';
 import type { SaveApi } from '../inbox/save-api.js';
@@ -78,6 +81,15 @@ function ShowIn({ id, reveal }: { readonly id: string; readonly reveal: Reveal }
   );
 }
 
+/** A file name another party chose (I-5): plain text, at most 80 characters, isolated. */
+function FileName({ name }: { readonly name: string }): ReactElement {
+  return (
+    <code className="hm-file-own al-text-code">
+      <bdi dir="auto">{plain(name, 80)}</bdi>
+    </code>
+  );
+}
+
 interface FileRow {
   readonly id: string;
   readonly out: boolean;
@@ -103,12 +115,14 @@ export function filesOf(
 
 function ReceivedState({
   file,
+  folder,
   save,
   passkey,
   reveal,
   onSaved,
 }: {
   readonly file: ReceivedItem | undefined;
+  readonly folder: string | undefined;
   readonly save: SaveApi;
   readonly passkey: PasskeyReader;
   readonly reveal: Reveal;
@@ -118,9 +132,13 @@ function ReceivedState({
   if (file.state === 'saved') {
     return (
       <div className="hm-file-state hm-f">
-        <span className="al-text-body-sm">{S.savedAs}</span>
-        {file.savedName === null ? null : (
-          <UntrustedContent from={file.from} fileName={file.savedName} className="hm-file-name" />
+        <span className="al-text-body-sm">
+          {folder === undefined ? S.savedToInbox : fmt(S.savedTo, { folder })}
+        </span>
+        {file.savedName === null || file.savedName === file.name ? null : (
+          <span className="al-text-body-sm">
+            {S.savedAs} <FileName name={file.savedName} />
+          </span>
         )}
         <ShowIn id={file.id} reveal={reveal} />
       </div>
@@ -153,6 +171,7 @@ export function PersonFiles({
   passkey,
   reveal,
   onSaved,
+  folder,
   folderNote,
 }: {
   readonly name: string;
@@ -163,6 +182,8 @@ export function PersonFiles({
   readonly passkey: PasskeyReader;
   readonly reveal: Reveal;
   readonly onSaved: () => void;
+  /** W4-WIRE-3: the Inbox folder (`~/AgentLink/Inbox`) a saved file's row names, when known. */
+  readonly folder?: string;
   /** K3 (W4-AUTO-SAVE): "Saved to <folder>" and its Show in Finder, at the end of the title row. */
   readonly folderNote?: ReactNode;
 }): ReactElement {
@@ -183,11 +204,7 @@ export function PersonFiles({
               <li key={`${row.out ? 'o' : 'i'}-${row.id}`} className="hm-file hm-f">
                 <Icon name="file" size={18} />
                 <div className="hm-file-main hm-c">
-                  {row.out ? (
-                    <code className="hm-file-own al-text-code">{row.name}</code>
-                  ) : (
-                    <UntrustedContent from={name} fileName={row.name} className="hm-file-name" />
-                  )}
+                  <FileName name={row.name} />
                   <span className="hm-file-meta al-text-body-sm">{meta}</span>
                 </div>
                 {row.out ? (
@@ -199,6 +216,7 @@ export function PersonFiles({
                 ) : (
                   <ReceivedState
                     file={received.get(row.id)}
+                    folder={folder}
                     save={save}
                     passkey={passkey}
                     reveal={reveal}
