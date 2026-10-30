@@ -195,8 +195,8 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     expect(statSync(backup).mode & 0o777).toBe(claude.mode);
 
     // A second agent of the person's own, with one Touch ID.
-    await page.goto(new URL('/settings/agents', link).href);
-    await page.getByRole('button', { name: 'Add agent' }).click();
+    // W4-AGENTS: Add opens from `?add=1` (the agent chip's Add agent); New agent is Get started.
+    await page.goto(new URL('/agents?add=1', link).href);
     await page.getByLabel('Name your agent').fill('Second agent');
     await page.getByRole('button', { name: 'Add with Touch ID' }).click();
     await page.getByRole('button', { name: 'Confirm with your passkey' }).click();

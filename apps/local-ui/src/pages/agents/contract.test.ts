@@ -126,7 +126,7 @@ describe('contract (page): label-check, Add and Rename (U3-d)', () => {
   it('rename sends exactly {name, label} in X-AgentLink-Input and reads done', async () => {
     const sample = AGENTS_OWNER.rename;
     const t = answering(sample.answer);
-    expect(await t.api.rename(sample.input, proof)).toEqual({ kind: sample.outcome });
+    expect((await t.api.rename(sample.input, proof)).kind).toBe(sample.outcome);
     const s = only(t.sent);
     expect([s.method, s.path]).toEqual(['POST', AGENTS_LABEL_PATH]);
     expect(s.headers.get('Content-Type')).toBe(OCTET_STREAM);

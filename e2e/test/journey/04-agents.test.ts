@@ -1,11 +1,20 @@
 // W4-JOURNEY-E2E chapter 4, Agents (WAVE-4 build plan §1 steps 7–8; b11 §34.2 switcher; D-138
-// labels; W4-RENAME-REACHES-CONTACTS). One owner with two agents on computer A; for the contact's
-// view, computer B paired with A. See world.ts for the gesture counter and the no-reload probe.
+// labels; W4-RENAME-REACHES-CONTACTS; W4-AGENTS: Pause one click, Resume with Touch ID, D-143). One
+// owner with two agents on computer A; for the contact's view, computer B paired with A. See world.ts
+// for the gesture counter and the no-reload probe.
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { until } from '../app-world.js';
+import {
+  CLS_BUDGET,
+  emulateReducedMotion,
+  expectFadesOnly,
+  layoutShiftScore,
+  observeLayoutShift,
+} from '../helpers/motion.js';
+import { addAgent, agentCard, labelled, openAgents, removeAgent } from './helpers-agents.js';
 import {
   CONFIRM_PASSKEY,
   chapter,
@@ -26,53 +35,19 @@ const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
 afterAll(() => ch.stop());
 
-/**
- * W4-SHELL-V2: the agent chip's dropdown, top left, opens the Agents page ("Manage agents"; Agents
- * is also a section of the menu). An in-app move, never `goto`.
- */
-async function openAgents(page: Page): Promise<void> {
-  await page
-    .getByRole('button', { name: /^Agent: / })
-    .first()
-    .click();
-  await page.getByRole('menuitem', { name: 'Manage agents' }).click();
-  await page.getByRole('heading', { name: 'Agents', level: 1 }).first().waitFor();
-}
-
-/** Agents → Add agent → name → Add with Touch ID → Not now. */
-async function addAgent(page: Page, label: string): Promise<void> {
+/** Agents → Pause on Ana's card → the sheet's Pause; Ana reads Paused (one click, no Touch ID). */
+async function pauseAna(page: Page): Promise<void> {
   await openAgents(page);
-  await page.getByRole('button', { name: 'Add agent' }).first().click();
-  await page.getByLabel('Name your agent').fill(label);
-  await page.getByRole('button', { name: 'Add with Touch ID' }).click();
-  await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
-  await page.getByText('Connect an AI app to it?').waitFor();
-  await page.getByRole('button', { name: 'Not now' }).click();
-}
-
-/** The agent's card on the Agents page: the nearest box around its name with one More button. */
-function agentCard(page: Page, label: string) {
-  return page
-    .getByRole('main')
-    .getByText(label, { exact: true })
+  await agentCard(page, 'Ana')
+    .getByText(/^(Offline|Ready|Working|Idle)/)
     .first()
-    .locator('xpath=ancestor::*[count(.//button[normalize-space()="More"])=1][1]');
-}
-
-/** Agents → the agent's More menu → Remove → type the name → Remove with Touch ID. */
-async function removeAgent(page: Page, label: string): Promise<void> {
-  await openAgents(page);
-  await agentCard(page, label).getByRole('button', { name: 'More', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Remove' }).click();
-  await page.getByRole('heading', { name: `Remove ${label}?` }).waitFor();
-  await page.getByLabel(`Type ${label} to confirm`).fill(label);
-  await page.getByRole('button', { name: 'Remove with Touch ID' }).click();
-  const confirm = page.getByRole('button', { name: CONFIRM_PASSKEY });
-  const done = page.getByText(`${label} was removed.`).first();
-  await Promise.race([confirm.waitFor().then(() => confirm.click()), done.waitFor()]).catch(
-    () => undefined,
-  );
-  await done.waitFor({ timeout: 30_000 });
+    .waitFor();
+  await agentCard(page, 'Ana').getByRole('button', { name: 'Pause', exact: true }).click();
+  const sheet = page.getByRole('dialog', { name: labelled('Pause ', 'Ana', '?') });
+  await sheet.getByText('Nothing is deleted.', { exact: false }).waitFor();
+  await sheet.getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.getByText('Ana is paused').first().waitFor();
+  await agentCard(page, 'Ana').getByText('Paused', { exact: true }).first().waitFor();
 }
 
 describe('chapter 4: agents', () => {
@@ -148,6 +123,107 @@ describe('chapter 4: agents', () => {
     await probe.check();
   }, 180_000);
 
+  // W4-AGENTS (D-143 (5), 08 §1 "Pause an agent"): Pause is one click with no Touch ID; the open
+  // agent shows Paused on its card and in a banner with "Resume with Touch ID". Reduced motion keeps
+  // fades only, and the page does not shift while its live status settles.
+  it('pauses the open agent in one click, with no Touch ID and no reload', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
+    const { page } = jp;
+    const probe = await jp.arm();
+    const before = jp.gestures.total();
+
+    await pauseAna(page);
+    expect(jp.gestures.total() - before).toBe(0);
+    await page.getByRole('button', { name: 'Resume with Touch ID' }).first().waitFor();
+
+    // Reduced motion: fades only; no layout shift on the Agents page while it settles.
+    await emulateReducedMotion(page);
+    await observeLayoutShift(page);
+    const shifted = await layoutShiftScore(page);
+    await agentCard(page, 'Ana').getByRole('button', { name: 'AI apps', exact: true }).click();
+    await page.getByText('Quit the AI app first, then open it again.').first().waitFor();
+    await expectFadesOnly(page);
+    await page.waitForTimeout(1_000);
+    expect((await layoutShiftScore(page)) - shifted).toBeLessThanOrEqual(CLS_BUDGET);
+    await probe.check();
+  }, 180_000);
+
+  // W4-AGENTS + W4-PAUSE (#735): Resume signs `agent.resume` (04 §2.5.1) with one Touch ID.
+  it('resumes the paused agent with one Touch ID, with no reload', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
+    const { page } = jp;
+    const probe = await jp.arm();
+    await pauseAna(page);
+    const before = jp.gestures.total();
+    await page.getByRole('button', { name: 'Resume with Touch ID' }).first().click();
+    await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    await eventually(
+      'Ana resumed',
+      async () => !(await text(page)).includes('Ana is paused'),
+      30_000,
+    );
+    expect(jp.gestures.total() - before).toBe(1);
+    await probe.check();
+  }, 180_000);
+
+  // 08 §1: Pause and Resume act on the open agent; on another agent's card the app switches to it
+  // first (no reload: the views mount again) and then asks: "Pause Work?", or Resume's Touch ID.
+  it('Pause and Resume on another agent switch to it first, then ask', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
+    await addAgent(jp.page, 'Work');
+    const { page } = jp;
+    const probe = await jp.arm();
+
+    await openAgents(page);
+    await agentCard(page, 'Work').getByRole('button', { name: 'Pause', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: labelled('Pause ', 'Work', '?') });
+    // The switch mounts the views again; the page's own read then opens the sheet.
+    await sheet.waitFor();
+    await page
+      .getByRole('button', { name: /^Agent: Work/ })
+      .first()
+      .waitFor();
+    await sheet.getByRole('button', { name: 'Pause', exact: true }).click();
+    await page.getByText('Work is paused').first().waitFor();
+
+    // Back to Ana; Resume on Work's card opens Work and asks for Touch ID once.
+    await agentCard(page, 'Ana').getByRole('button', { name: 'Switch', exact: true }).click();
+    await page
+      .getByRole('button', { name: /^Agent: Ana/ })
+      .first()
+      .waitFor();
+    // The switch mounts the views again: wait until the Agents page itself shows Ana open (its own
+    // read), so Resume is pressed on the page for the agent open now, not on the one being replaced.
+    await agentCard(page, 'Ana').getByText('Open', { exact: true }).waitFor();
+    await agentCard(page, 'Work').getByText('Paused', { exact: true }).first().waitFor();
+    const before = jp.gestures.total();
+    await agentCard(page, 'Work').getByRole('button', { name: 'Resume', exact: true }).click();
+    // Switch to Work, its own read, then the Resume gate (Touch ID).
+    await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    await eventually(
+      'Work resumed',
+      async () => !(await text(page)).includes('Work is paused'),
+      30_000,
+    );
+    expect(jp.gestures.total() - before).toBe(1);
+    await probe.check();
+  }, 240_000);
+
   // Gate: W4-RENAME-REACHES-CONTACTS (builder D, D2; the contact row is C2) turns this on. Today a
   // rename changes only the local label; the contact keeps the old name.
   it.runIf(WAVE4)(
@@ -164,7 +240,7 @@ describe('chapter 4: agents', () => {
       await openAgents(a.page);
       await agentCard(a.page, 'Ana').getByRole('button', { name: 'Rename', exact: true }).click();
       await a.page.getByLabel('Name').fill('Ana Studio');
-      await a.page.getByRole('button', { name: 'Save with Touch ID' }).click();
+      await a.page.getByRole('button', { name: 'Rename with Touch ID' }).click();
       await a.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
       await a.page.getByText('Ana Studio').first().waitFor();
       expect(a.gestures.total() - before).toBe(1);
