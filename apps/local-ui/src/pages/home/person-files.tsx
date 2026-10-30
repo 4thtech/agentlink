@@ -10,10 +10,11 @@
 //
 // Show in Finder and Save send only the item's ID (04 §4; files-api.ts reveal, inbox/save-api.ts):
 // never a name, a folder or a path, and no answer carries one. The other party's file names are
-// untrusted (I-5): plain React text, cleaned of hidden and direction characters, capped, isolated in a
-// `<bdi dir="auto">`, in the mono name style the Files page uses (not the message box: a file name
-// has no instructions to frame). The folder is the owner's own setting. `folderNote` is K3's slot.
-import { Button, Icon } from '@4thtech-io/ui';
+// untrusted (I-5, D-133 (4)): only inside the untrusted container, in its compact inline form (the
+// dashed edge and mark, not the message box), as plain React text cleaned of hidden and direction
+// characters, capped and isolated in a `<bdi dir="auto">`. The folder ("Saved to …") is the owner's
+// own setting, outside the container. `folderNote` is K3's slot.
+import { Button, Icon, UntrustedContent } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { detectOs } from '../../layout/os.js';
 import type { RevealOutcome } from '../files/files-api.js';
@@ -81,8 +82,16 @@ function ShowIn({ id, reveal }: { readonly id: string; readonly reveal: Reveal }
   );
 }
 
-/** A file name another party chose (I-5): plain text, at most 80 characters, isolated. */
-function FileName({ name }: { readonly name: string }): ReactElement {
+/**
+ * A file name. Another party's (`from`) sits only inside the compact untrusted container (D-133 (4),
+ * I-5): plain text, at most 80 characters, isolated. Your own is plain mono text.
+ */
+function FileName({ name, from }: { readonly name: string; readonly from?: string }): ReactElement {
+  if (from !== undefined) {
+    return (
+      <UntrustedContent from={from} fileName={plain(name, 80)} compact className="hm-file-own" />
+    );
+  }
   return (
     <code className="hm-file-own al-text-code">
       <bdi dir="auto">{plain(name, 80)}</bdi>
@@ -137,7 +146,7 @@ function ReceivedState({
         </span>
         {file.savedName === null || file.savedName === file.name ? null : (
           <span className="al-text-body-sm">
-            {S.savedAs} <FileName name={file.savedName} />
+            {S.savedAs} <FileName name={file.savedName} from={file.from} />
           </span>
         )}
         <ShowIn id={file.id} reveal={reveal} />
@@ -204,7 +213,7 @@ export function PersonFiles({
               <li key={`${row.out ? 'o' : 'i'}-${row.id}`} className="hm-file hm-f">
                 <Icon name="file" size={18} />
                 <div className="hm-file-main hm-c">
-                  <FileName name={row.name} />
+                  <FileName name={row.name} {...(row.out ? {} : { from: name })} />
                   <span className="hm-file-meta al-text-body-sm">{meta}</span>
                 </div>
                 {row.out ? (

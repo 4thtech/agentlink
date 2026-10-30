@@ -5117,7 +5117,7 @@ export async function startApprovalServerWith(
         // W4-WIRE-3: "gone" is the connection, never `req.destroyed`: Node destroys a request once
         // its (empty) GET body is read, which a slow first read always outlasts; counting that
         // dropped every such stream before its first byte, and the page kept its load-time status.
-        if (res.destroyed || res.writableEnded || req.socket.destroyed) fn();
+        if (res.destroyed || res.writableEnded || req.socket?.destroyed !== false) fn();
         else res.once('close', fn);
       },
     };

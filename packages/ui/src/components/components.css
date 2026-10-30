@@ -675,6 +675,18 @@ body {
   background: var(--al-color-untrusted-bg);
   overflow: hidden;
 }
+/* W4-WIRE-3 (D-133 (4)): a file name inline in a list row, still marked as theirs. */
+.al-untrusted.is-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-1);
+  max-width: 100%;
+  padding: 0 var(--al-space-2);
+  border-width: var(--al-border-width-thin);
+  border-radius: var(--al-radius-sm);
+  color: var(--al-color-untrusted-fg);
+  overflow-wrap: anywhere;
+}
 .al-untrusted-label {
   display: flex;
   align-items: center;
