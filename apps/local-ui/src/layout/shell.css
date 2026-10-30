@@ -15,6 +15,12 @@
   display: flex;
   min-width: 0;
 }
+/* W4-SHELL-LIVE: hidden until the app's settings are read (at most 300 ms), so neither the strip nor
+   the menu moves the page when they land. */
+.al-app-body[hidden],
+.al-statusbar[hidden] {
+  display: none;
+}
 .al-app-main {
   /* Grows into the room beside the rail and never wider than it (no sideways scroll at 360). */
   flex: 1 1 0%;
@@ -106,7 +112,11 @@
   align-items: center;
   gap: 10px;
   min-height: 44px;
+  /* W4-SHELL-LIVE: a floor for the width, so the status arriving or changing ("Ready in Claude Code",
+     "Offline · last seen 3 min ago") does not move the chevron or reflow the bar (CLS ≤ 0.01). */
+  min-width: 200px;
   max-width: 280px;
+  box-sizing: border-box;
   padding: 4px 10px 4px 4px;
   border: var(--al-border-width-thin) solid var(--al-color-border-default);
   border-radius: var(--al-radius-full);
@@ -129,6 +139,7 @@
 }
 .al-chip-text {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
   line-height: 16px;
@@ -141,6 +152,8 @@
   text-overflow: ellipsis;
 }
 .al-chip-status {
+  /* The status line is there before the first answer, so the name never moves up when it comes. */
+  min-height: 16px;
   font-size: 12px;
   color: var(--al-color-fg-muted);
   white-space: nowrap;
@@ -149,6 +162,7 @@
 }
 .al-chip-chev {
   flex: none;
+  margin-left: auto;
   color: var(--al-color-fg-subtle);
 }
 .al-chip-chev.is-open,
@@ -321,6 +335,10 @@
 .al-ldot.is-none {
   border-style: dashed;
 }
+/* Working: the U0 pulse in the place of the dot (same 8 px box). */
+.al-ldot-pulse {
+  flex: none;
+}
 
 /* The Under the hood switch, top right. */
 .al-hood-switch {
@@ -375,6 +393,9 @@
   align-items: center;
   gap: 22px;
   width: max-content;
+  /* A fixed height: the strip is there at once, its items fill it when the first answer comes. */
+  box-sizing: border-box;
+  min-height: 34px;
   margin: 0;
   padding: 8px clamp(16px, 4vw, 40px);
   list-style: none;
@@ -529,7 +550,13 @@
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+  /* W4-SHELL-LIVE: on a phone the chip fills the rest of its row, so its width never follows the
+     status words (a longer status would wrap it to a row of its own and move the page). */
+  .al-chip-wrap {
+    flex: 1 1 200px;
+  }
   .al-chip {
+    width: 100%;
     max-width: 100%;
   }
   .al-app-main {
