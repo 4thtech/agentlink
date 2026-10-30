@@ -301,6 +301,42 @@ describe('the shared live subscription over the events stream', () => {
     expect(getLive().agents.map((a) => a.label)).toEqual(['Personal', 'Side project']);
   });
 
+  it('a read asked for while one is in flight runs after it (IR-1 L1)', async () => {
+    const s = serve();
+    subscribeLive(() => undefined);
+    await flush();
+    const reads = s.agentReads;
+    // Two announcements in one turn: the second arrives while the first read is in flight.
+    window.dispatchEvent(new Event('agentlink:agents-changed'));
+    s.records = [record(), record({ name: 'side', label: 'Side project', current: false })];
+    window.dispatchEvent(new Event('agentlink:agents-changed'));
+    await flush();
+    await flush();
+    expect(s.agentReads).toBe(reads + 2);
+    expect(getLive().list?.agents.map((a) => a.name)).toEqual(['default', 'side']);
+  });
+
+  it('an agent that arrives only on the stream reaches the list (IR-1 L2)', async () => {
+    const s = serve();
+    subscribeLive(() => undefined);
+    await flush();
+    const reads = s.agentReads;
+    s.records = [record(), record({ name: 'side', label: 'Side project', current: false })];
+    s.streams[0]?.push(
+      block('B.1', 'agents', {
+        agents: [record({ name: 'side', label: 'Side project', current: false })],
+        at: NOW,
+      }),
+    );
+    await flush();
+    expect(s.agentReads).toBe(reads + 1);
+    expect(getLive().list?.agents.map((a) => a.name)).toEqual(['default', 'side']);
+    // A known agent's change reads nothing.
+    s.streams[0]?.push(block('B.2', 'agents', { agents: [record()], at: NOW }));
+    await flush();
+    expect(s.agentReads).toBe(reads + 1);
+  });
+
   it('reconnects with Last-Event-ID after the stream ends and applies the replay', async () => {
     const s = serve();
     subscribeLive(() => undefined);

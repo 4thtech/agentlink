@@ -347,6 +347,7 @@ let appNames: ReadonlyMap<string, string> | undefined;
 let namesRead: Promise<void> | undefined;
 let mode: LiveMode = 'idle';
 let inFlight = false;
+let readAgain = false;
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
 let retryTimer: ReturnType<typeof setTimeout> | undefined;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -409,8 +410,14 @@ function announce(): void {
 
 /** Reads the agents now (shared: one read in flight at a time). */
 export async function readNow(): Promise<void> {
-  if (inFlight) return;
+  // A read asked for while one is in flight is not lost: it runs once that one is done (the answer
+  // in flight may predate the change that asked, IR-W4-SHELL-LIVE-1 L1).
+  if (inFlight) {
+    readAgain = true;
+    return;
+  }
   inFlight = true;
+  readAgain = false;
   try {
     const answer = await createApiClient().get(AGENTS_READ);
     const list = answer.kind === 'ok' ? parseAgents(answer.data) : undefined;
@@ -426,7 +433,12 @@ export async function readNow(): Promise<void> {
     }
   } finally {
     inFlight = false;
-    schedulePoll();
+    if (readAgain && listeners.size > 0) {
+      readAgain = false;
+      void readNow();
+    } else {
+      schedulePoll();
+    }
   }
 }
 
@@ -455,7 +467,14 @@ function onStreamEvent(e: SseEvent): void {
     const gone = Array.isArray(data['gone'])
       ? data['gone'].filter((n): n is string => typeof n === 'string')
       : [];
-    upsert(parseRecords(data['agents']), gone);
+    const next = parseRecords(data['agents']);
+    upsert(next, gone);
+    // An agent the list does not hold yet (added in another window): read the list, so switching
+    // to it and its label work (IR-W4-SHELL-LIVE-1 L2).
+    const listed = snapshot.list?.agents;
+    if (listed !== undefined && next.some((r) => !listed.some((a) => a.name === r.name))) {
+      void readNow();
+    }
   } else if (e.event !== 'generation') {
     return; // An event this page does not know.
   }
@@ -659,6 +678,7 @@ export function resetLiveForTests(): void {
   listeners.clear();
   if (typeof document !== 'undefined') stopAll();
   inFlight = false;
+  readAgain = false;
   api = undefined;
   random = Math.random;
   records = [];
