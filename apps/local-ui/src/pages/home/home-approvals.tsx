@@ -145,7 +145,13 @@ export function HomeApprovals({
   const [reviewing, setReviewing] = useState(false);
   const [kept, setKept] = useState<readonly ApprovalItem[]>([]);
   const [notice, setNotice] = useState<string | undefined>(undefined);
-  const sorted = [...items].sort(byExpiry);
+  // A decided card stays (its Approved moment, the pay sheet's Done) until it has collapsed out,
+  // even when the list read meanwhile no longer holds it; then the list is read again.
+  const [held, setHeld] = useState<ReadonlyMap<string, ApprovalItem>>(new Map());
+  const listed = new Set(items.map((i) => i.approvalId));
+  const sorted = [...items, ...[...held.values()].filter((i) => !listed.has(i.approvalId))].sort(
+    byExpiry,
+  );
   const ids = sorted.map((i) => i.approvalId).join(' ');
 
   useEffect(() => {
@@ -188,8 +194,16 @@ export function HomeApprovals({
     setKept(keep);
     setReviewing(true);
   };
-  const decided = (): void => {
+  const decided = (item: ApprovalItem): void => {
     announceDecided(1);
+    setHeld((h) => new Map(h).set(item.approvalId, item));
+  };
+  const left = (item: ApprovalItem): void => {
+    setHeld((h) => {
+      const next = new Map(h);
+      next.delete(item.approvalId);
+      return next;
+    });
     onChanged();
   };
 
@@ -204,7 +218,8 @@ export function HomeApprovals({
         sheet={sheet}
         passkeyLabel={A.confirmPasskey}
         compact
-        onDecided={decided}
+        onDecided={() => decided(first)}
+        onLeft={() => left(first)}
       />
       {more.length === 0 ? null : (
         <button
@@ -247,7 +262,8 @@ export function HomeApprovals({
                   sheet={sheet}
                   passkeyLabel={A.confirmPasskey}
                   compact
-                  onDecided={decided}
+                  onDecided={() => decided(item)}
+                  onLeft={() => left(item)}
                 />
               </div>
             </div>

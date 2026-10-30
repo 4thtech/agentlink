@@ -319,19 +319,28 @@ describe('the confirmation sheet in the app (M1-PAY-CONFIRM-b, M1-11b-2; Chromiu
     const { server, source, page } = await registered(ctx);
     source.addFree(1);
     source.addPaid(2);
+    source.addFree(3);
     await page.goto(server.origin + '/');
     await page
       // W4-SHELL-V2: the waiting list and one request sit inside Home (the section menu).
       .locator('nav.al-rail a[aria-current="page"][href="/"]')
       .waitFor();
-    // Rule 7: the paid request has no list choice; the free one does.
+    // W4-HOME: the card on top, the others under "+2 more waiting"; Under the hood adds the bulk
+    // review. Rule 7: the paid request can never be picked; a free one can.
+    await page.locator(`[data-approval="${id(1)}"]`).waitFor();
     await page
-      .locator(`input[name="choice-${id(1)}"]`)
+      .getByRole('switch', { name: /Under the hood/ })
       .first()
-      .waitFor();
-    expect(await page.locator(`input[name="choice-${id(2)}"]`).count()).toBe(0);
+      .click();
+    await page.getByRole('button', { name: '+2 more waiting' }).click();
+    await page.getByRole('checkbox').first().waitFor();
+    expect(await page.getByRole('checkbox').count()).toBe(1);
     const paidCard = page.locator(`[data-approval="${id(2)}"]`);
+    await page.getByText('Costs money · approve one at a time').first().waitFor();
+    await paidCard.locator('details > summary').click();
     await paidCard.getByText(T.paidAlone).waitFor();
+    // Details (and its Under the hood panel) fade in: check once settled.
+    await page.waitForTimeout(600);
     expect(await axeViolations(page)).toEqual([]);
 
     await paidCard.getByRole('button', { name: 'Approve', exact: true }).click();

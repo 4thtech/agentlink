@@ -818,3 +818,17 @@
 :root[data-motion='reduced'] .hm-chev {
   transition: none;
 }
+
+/* The facts behind Details sit on the surface colour, so their small text keeps its contrast on
+   the warning-toned card. */
+.hm-approvals .al-approval-details[open] .al-hood,
+.hm-approvals .al-approval-details[open] .al-approval-rows,
+.hm-approvals .al-approval-details[open] .al-note,
+.hm-approvals .al-approval-details[open] .al-approval-foot {
+  background: var(--al-color-bg-surface);
+  border-radius: var(--al-radius-sm);
+  padding: var(--al-space-2) var(--al-space-3);
+}
+.hm-approvals .al-hood-row dt {
+  color: var(--al-color-fg-muted);
+}
