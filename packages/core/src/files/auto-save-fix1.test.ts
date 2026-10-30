@@ -103,7 +103,13 @@ describe('one save per file across processes (IR L1)', () => {
     const fetched = await other.fetchFile({ envelopeId });
     expect(fetched).toMatchObject({ status: 'ok', name: 'shared.txt' });
     release?.();
-    await auto;
+    // The automatic save finds the other process's record at the move: it counts as saved (from the
+    // record), with no second copy.
+    expect((await auto).saved).toBe(1);
+    const row = await w.b.store.transaction((tx) =>
+      tx.get('files', { envelope_id: envelopeId, idx: 0 }),
+    );
+    expect(row?.auto_save).toBe('saved');
     expect([...w.b.inbox.files().keys()]).toEqual(['shared.txt']);
     expect([...w.b.inbox.entries.keys()].filter((n) => n.startsWith('.'))).toEqual([]);
     const again = await w.b.client.fetchFile({ envelopeId });
