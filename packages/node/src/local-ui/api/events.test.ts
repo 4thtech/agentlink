@@ -381,4 +381,45 @@ describe('the live event hub (08 §1 GET /api/ui/events)', () => {
       expect(sink.text).not.toContain(secret);
     }
   });
+
+  it('a busy open drives no host read, and opens waiting on a read hold their slot', async () => {
+    let reads = 0;
+    let release: () => void = () => undefined;
+    const hub = new LiveEvents({
+      read: () => {
+        reads += 1;
+        return new Promise((resolve) => {
+          release = () => {
+            resolve({ generation: 1, current: 'default', agents: [agent('default')] });
+          };
+        });
+      },
+      now: () => NOW_MS,
+      sessionLive: () => true,
+      boot: () => 'BOOTboot',
+      timers: { setInterval: () => 0, clearInterval: () => undefined },
+    });
+    // Ten opens of one session while the first read is pending: only 4 can ever be taken.
+    const opens = Array.from({ length: 10 }, () => hub.open(new Sink(), 's1'));
+    await Promise.resolve();
+    release();
+    const results = await Promise.all(opens);
+    expect(results.filter((r) => r === 'ok')).toHaveLength(4);
+    expect(reads).toBe(1);
+    // Full: further opens answer busy before any read.
+    expect(await hub.open(new Sink(), 's1')).toBe('busy');
+    expect(reads).toBe(1);
+  });
+
+  it('a reader that left while its open waited for the read frees its slot at once', async () => {
+    const w = world();
+    const gone = new Sink();
+    let left = false;
+    gone.onClose = (fn) => {
+      if (left) fn();
+    };
+    left = true;
+    expect(await w.hub.open(gone, 's1')).toBe('ok');
+    expect(w.hub.size).toBe(0);
+  });
 });
