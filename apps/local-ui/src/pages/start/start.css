@@ -1,0 +1,442 @@
+/* W4-WIZARD: Get started (artboards A1 to A3). Tokens only; no keyframes here: motion comes from the
+   U0 kit (al-reveal, al-pop, al-draw, al-press), which turns into fades under reduced motion. Sizes
+   are fixed per screen so nothing shifts while an answer arrives (CLS). 16 px gutter at 360. */
+.st-wizard {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100dvh;
+  inline-size: 100%;
+  background: var(--al-color-bg-canvas);
+  color: var(--al-color-fg-default);
+}
+.st-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3) var(--al-space-6);
+  padding: var(--al-space-6) clamp(16px, 4vw, 40px);
+  border-block-end: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.st-head-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--al-space-3) var(--al-space-6);
+}
+.st-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-4);
+}
+.st-segs {
+  display: inline-flex;
+  gap: var(--al-space-2);
+}
+.st-seg {
+  inline-size: 24px;
+  block-size: 4px;
+  border-radius: 2px;
+  background: var(--al-color-border-default);
+}
+.st-seg[data-state='done'] {
+  background: var(--al-color-status-success-icon);
+}
+.st-seg[data-state='current'] {
+  background: var(--al-color-accent-default);
+}
+.st-eyebrow {
+  font-family: var(--al-font-family-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--al-color-fg-subtle);
+}
+.st-skip {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  padding: 0 var(--al-space-2);
+  color: var(--al-color-fg-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.st-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px clamp(16px, 4vw, 40px);
+}
+.st-screen {
+  inline-size: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-8);
+}
+.st-w-640 {
+  max-inline-size: 640px;
+}
+.st-w-600 {
+  max-inline-size: 600px;
+}
+.st-w-560 {
+  max-inline-size: 560px;
+}
+.st-w-520 {
+  max-inline-size: 520px;
+}
+.st-center {
+  align-items: center;
+  text-align: center;
+}
+.st-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.st-title,
+.st-title-2 {
+  margin: 0;
+  font-weight: var(--al-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+.st-title {
+  font-size: 40px;
+  line-height: 44px;
+  letter-spacing: -0.025em;
+}
+.st-title-2 {
+  font-size: 28px;
+  line-height: 34px;
+  letter-spacing: -0.02em;
+}
+.st-title:focus,
+.st-title-2:focus {
+  outline: none;
+}
+.st-lead {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--al-color-fg-muted);
+}
+.st-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--al-color-fg-subtle);
+}
+@media (max-width: 480px) {
+  .st-title {
+    font-size: 32px;
+    line-height: 36px;
+  }
+}
+
+/* Step 1: the app tiles. */
+.st-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--al-space-4);
+  min-block-size: 128px;
+}
+.st-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--al-space-3);
+  min-block-size: 128px;
+  margin: 1px;
+  padding: var(--al-space-6);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-surface);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.st-tile[data-selected='true'] {
+  margin: 0;
+  border: 2px solid var(--al-color-accent-default);
+  background: var(--al-color-bg-raised);
+}
+.st-tile:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.st-tile:focus-visible,
+.st-back:focus-visible,
+.st-skip:focus-visible,
+.st-card-hide:focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}
+.st-tile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+  inline-size: 100%;
+}
+.st-tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-muted);
+}
+.st-tile-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 22px;
+  block-size: 22px;
+  border-radius: 9999px;
+  background: var(--al-color-accent-default);
+  color: var(--al-color-fg-on-accent);
+}
+.st-tile-name {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: var(--al-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+.st-tile-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  font-size: 13px;
+  color: var(--al-color-fg-subtle);
+}
+.st-tile-state.is-found {
+  color: var(--al-color-status-success-fg);
+}
+.st-dot {
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+.st-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--al-space-5);
+}
+.st-actions .al-btn-primary,
+.st-row .al-btn-lg {
+  min-block-size: 48px;
+}
+
+/* Step 2: back, the agent card, Connect with Touch ID. */
+.st-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  min-block-size: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--al-color-fg-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.st-agent {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-5);
+  padding: var(--al-space-6);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-surface);
+}
+.st-agent-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: 9999px;
+  background: var(--al-color-accent-subtle);
+  color: var(--al-color-accent-hover);
+  font-size: 18px;
+  font-weight: var(--al-font-weight-semibold);
+}
+.st-agent-words {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-inline-size: 0;
+}
+.st-agent-name {
+  font-weight: var(--al-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+.st-go {
+  gap: var(--al-space-3);
+  min-block-size: 48px;
+}
+
+/* Step 2: what the one confirmation also sets up (D-130 (2)), folded under the button. */
+.st-folders {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.st-folders summary {
+  display: flex;
+  align-items: center;
+  min-block-size: 44px;
+  cursor: pointer;
+}
+.st-folders dl {
+  display: grid;
+  gap: var(--al-space-2);
+  margin: 0;
+}
+.st-folders dl div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+}
+.st-folders dd {
+  margin: 0;
+}
+
+/* Step 3: the Connected ✓ moment. */
+.st-done {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 72px;
+  block-size: 72px;
+  border: var(--al-border-width-thin) solid var(--al-color-status-success-border);
+  border-radius: 9999px;
+  background: var(--al-color-status-success-bg);
+  color: var(--al-color-status-success-icon);
+}
+.st-done.is-pending {
+  border-color: var(--al-color-border-default);
+  background: var(--al-color-bg-surface);
+  color: var(--al-color-fg-muted);
+}
+.st-delay-1 {
+  animation-delay: 140ms;
+}
+.st-delay-2 {
+  animation-delay: 220ms;
+}
+.st-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-4);
+  justify-content: center;
+}
+.st-row.st-end {
+  justify-content: flex-end;
+}
+.st-then {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  padding: var(--al-space-3) var(--al-space-5);
+  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-surface);
+  font-size: 13px;
+  color: var(--al-color-fg-muted);
+  text-align: start;
+}
+
+/* Step 4: the invite panel slot. */
+.st-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  padding: var(--al-space-7);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-surface);
+}
+.st-panel .al-btn {
+  align-self: flex-start;
+  gap: var(--al-space-3);
+}
+
+/* The Home card (A4): "Get started · n of 3 done". */
+.st-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  padding: var(--al-space-5) var(--al-space-6);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-surface);
+}
+.st-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+}
+.st-card-head h2 {
+  flex: 1;
+  margin: 0;
+  font-weight: var(--al-font-weight-medium);
+}
+.st-card-hide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border: 0;
+  border-radius: var(--al-radius-sm);
+  background: transparent;
+  color: var(--al-color-fg-subtle);
+  cursor: pointer;
+}
+.st-card-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.st-card-bar .st-seg {
+  inline-size: auto;
+}
+.st-card-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-3) var(--al-space-7);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.st-card-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  color: var(--al-color-fg-muted);
+}
+.st-card-steps .st-ok {
+  color: var(--al-color-status-success-icon);
+}
+.st-card-steps a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  font-weight: var(--al-font-weight-medium);
+}
