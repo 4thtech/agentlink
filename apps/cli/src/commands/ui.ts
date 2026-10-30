@@ -233,6 +233,8 @@ export function nodeUiDeps(): UiDeps {
           selectKeyStoreBackend(await probeOsKeychain(), { fileOptIn: false }).ok,
         assets: () => embeddedLocalUiAssets(),
         open: (name) => openUiHostAgent(hostDeps, name),
+        // HOTFIX-045-REMOVE-FIRSTRUN: Remove works in the session first run started.
+        removal: uiRemovalPort(),
         startServer: (options) => startApprovalServer(options),
         // Fixed values only (ApprovalServerEvent, I-7).
         onEvent: (event) => {

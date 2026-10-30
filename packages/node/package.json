@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/node",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "private": true,
   "description": "Node implementations: keychain KeyStore, SQLite Store, local approval server.",
   "license": "MIT",
