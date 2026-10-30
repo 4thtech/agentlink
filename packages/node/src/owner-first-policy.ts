@@ -183,6 +183,14 @@ export function keepsFolder(result: SendFolderResult | undefined): boolean {
   return result !== undefined && result.status !== 'not_allowed';
 }
 
+/**
+ * W4-ONE-TOUCH: the first rules document (the 06 §3 defaults with only `files.allowedFolders` =
+ * [folder]), as the plan fixed at begin carries it in its `policy.set` body.
+ */
+export function firstPolicyDocument(folder: string): JsonObject {
+  return parseJson(expectedPolicyJcs(folder)) as JsonObject;
+}
+
 /** JCS of the 06 §3 defaults with only `files.allowedFolders` = [folder]. */
 function expectedPolicyJcs(folder: string): string {
   const effective = POLICY_DEFAULTS_EFFECTIVE;
@@ -276,13 +284,19 @@ export async function signFirstPolicy(
   const { actions } = first.firstPolicy;
   let body: JsonObject;
   try {
-    const prepared = await actions.preparePolicyEdit(
-      { files: { allowedFolders: [plan.folder] } },
-      { baseVersion: 0 },
-    );
-    if (prepared.status !== 'prepared') return failed;
-    // A plain copy, read once: what is checked is what is signed and applied.
-    body = parseJson(canonicalize(prepared.body as unknown as JsonObject)) as JsonObject;
+    // W4-ONE-TOUCH: the body fixed at begin (in the challenge), checked below like a prepared one.
+    const fixedBody = first.firstPolicy.body;
+    if (fixedBody !== undefined) {
+      body = parseJson(canonicalize(fixedBody)) as JsonObject;
+    } else {
+      const prepared = await actions.preparePolicyEdit(
+        { files: { allowedFolders: [plan.folder] } },
+        { baseVersion: 0 },
+      );
+      if (prepared.status !== 'prepared') return failed;
+      // A plain copy, read once: what is checked is what is signed and applied.
+      body = parseJson(canonicalize(prepared.body as unknown as JsonObject)) as JsonObject;
+    }
   } catch {
     return failed;
   }

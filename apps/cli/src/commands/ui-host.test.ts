@@ -151,6 +151,25 @@ describe('startUiWelcome (U3-g-b)', () => {
     expect(w.log).toEqual(['openFirstRun', 'close']);
   });
 
+  it("W4-ONE-TOUCH: first run's setup gate gets the desk's plan only; the routes get its list only", async () => {
+    const w = welcome();
+    const planned: [string, string][] = [];
+    const desk = {
+      list: () => Promise.resolve({ apps: [], desktopRunning: false }),
+      plan: (app: string, agent: string) => {
+        planned.push([app, agent]);
+        return Promise.resolve({ status: 'not_found', app, name: '' } as const);
+      },
+      agentIdOf: () => Promise.resolve('0xnever'),
+    };
+    await startUiWelcome({ ...w.deps, aiApps: () => desk });
+    const host = w.started[0]?.host;
+    expect(Object.keys(host?.firstRun?.aiApps ?? {})).toEqual(['plan']);
+    expect(Object.keys(host?.aiAppsList ?? {})).toEqual(['list']);
+    await host?.firstRun?.aiApps?.plan('claude-code', 'default');
+    expect(planned).toEqual([['claude-code', 'default']]);
+  });
+
   it('U3-invite: with an invite, the host holds it and the handoff record, and open goes to openJoin', async () => {
     const w = welcome();
     const log = w.log;

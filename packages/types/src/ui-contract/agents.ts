@@ -18,6 +18,12 @@ export interface AgentsSwitchBody {
 /** `POST /api/ui/agents` input (X-AgentLink-Input): exactly `{label}`. */
 export interface AgentsAddInput {
   readonly label: string;
+  /** W4-ONE-TOUCH (D-140): the AI app the same gesture connects (an id of 06 §7). */
+  readonly app?: string;
+}
+/** W4-ONE-TOUCH (D-140): `POST /api/ui/agents` input: exactly `{nonce}` (the begin nonce). */
+export interface AgentsAddFinishInput {
+  readonly nonce: string;
 }
 /** `POST /api/ui/agents/label` input: exactly `{name, label}`. */
 export interface AgentsRenameInput {
@@ -166,13 +172,59 @@ export const AGENTS_OWNER = {
     answer: { status: 200, body: { status: 'done', label: 'Home' } } satisfies UiAnswer,
     outcome: 'done',
   },
+  /**
+   * W4-ONE-TOUCH (D-140; 08 §1): two calls and one gesture. `begin` (`POST /api/ui/agents/begin`,
+   * no presence) answers the statement, the nonce and the plan-bound challenge; `finish`
+   * (`POST /api/ui/agents`) takes only the nonce and the proof. The values are shapes: the real
+   * nonce, fingerprints and challenge are the server's.
+   */
   add: {
-    input: { label: 'Home' } satisfies AgentsAddInput,
+    beginPath: '/api/ui/agents/begin',
+    input: { label: 'Home', app: 'claude-code' } satisfies AgentsAddInput,
+    begin: {
+      status: 200,
+      body: {
+        status: 'ready',
+        nonce: 'N'.repeat(43),
+        statement: {
+          label: 'Home',
+          agentFingerprint: '1A2B·3C4D',
+          ownerFingerprint: '7F3A·19C2',
+          folder: 'home',
+          app: {
+            app: 'claude-code',
+            name: 'Claude Code',
+            kind: 'connect',
+            path: '~/.claude.json',
+            oldEntry: null,
+            newEntry: {
+              command: 'npx',
+              args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'home'],
+            },
+            oldAgent: null,
+          },
+        },
+        expiresInMs: 120000,
+        publicKey: {
+          rpId: 'localhost',
+          challenge: 'C'.repeat(43),
+          allowCredentials: ['Q3JlZA'],
+          userVerification: 'required',
+          timeoutMs: 120000,
+          prfSalt: 'U2FsdA',
+        },
+      },
+    } satisfies UiAnswer,
+    finishInput: { nonce: 'N'.repeat(43) } satisfies AgentsAddFinishInput,
     answer: {
       status: 200,
-      body: { status: 'done', name: 'home', label: 'Home' },
+      body: { status: 'done', name: 'home', label: 'Home', app: 'claude-code' },
     } satisfies UiAnswer,
     outcome: 'done',
+    notConnected: {
+      status: 200,
+      body: { status: 'created_not_connected', name: 'home', label: 'Home', app: 'claude-code' },
+    } satisfies UiAnswer,
   },
   refusals: [
     {

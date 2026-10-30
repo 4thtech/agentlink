@@ -153,7 +153,13 @@ function noAgentWorld(keychain: KeychainBackend) {
     },
     create: async (_label, options) => {
       const name = options?.name ?? 'slug';
-      ids.set(name, await createKeychainAgent(keychain));
+      // W4-ONE-TOUCH (04 §2.8 step 2): the keys the server held since begin, as the CLI stores them.
+      ids.set(
+        name,
+        options?.createKeys === undefined
+          ? await createKeychainAgent(keychain)
+          : await options.createKeys(),
+      );
       entries.set(name, { name, label: name, available: true, removing: false });
       return name;
     },

@@ -74,7 +74,7 @@ import {
   type SendFolderResult,
 } from './owner-first-policy.js';
 import { signFirstCardWith, type FirstAgentCard } from './owner-init.js';
-import type { FirstLabelResult } from './owner-first-label.js';
+import type { FirstConnectResult, FirstLabelResult } from './owner-first-label.js';
 import {
   OWNER_ACCOUNT,
   OWNER_NEXT_ACCOUNT,
@@ -433,6 +433,11 @@ export interface OwnerSetupResult {
    * then shown by its folder name and can be renamed.
    */
   readonly label?: FirstLabelResult;
+  /**
+   * W4-ONE-TOUCH (D-140): the first `app.connect`, when the first card carried `firstConnect`:
+   * `stored` once core stored it (the caller writes the entry last, after the owner is wiped).
+   */
+  readonly connect?: FirstConnectResult;
 }
 
 const ownerExists = (): NodeKeyStoreError =>
@@ -550,6 +555,7 @@ export async function completeOwnerSetup(
         passkey: withPasskey,
         ...(policy === undefined ? {} : { sendFolder: policy }),
         ...(outcome.label === undefined ? {} : { label: outcome.label }),
+        ...(outcome.connect === undefined ? {} : { connect: outcome.connect }),
       });
     }
     if (outcome.kind === 'unknown') {

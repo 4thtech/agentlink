@@ -155,8 +155,9 @@ export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServ
     host: {
       directory: deps.directory,
       open: (name) => deps.open(name),
-      // The real home and owner files (no override).
-      firstRun: {},
+      // The real home and owner files (no override). W4-ONE-TOUCH (D-140): the desk's plan for
+      // first run's own setup gate only, so one gesture creates the agent and connects its app.
+      firstRun: desk === undefined ? {} : { aiApps: Object.freeze({ plan: desk.plan.bind(desk) }) },
       // U3-invite (08 §4): the invite `join` checked, held in memory by the host only.
       ...(deps.waitingInvite === undefined ? {} : { waitingInvite: deps.waitingInvite }),
       // U3-invite: the 0600 handoff record, so a later `join` hands over here.

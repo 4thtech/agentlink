@@ -45,7 +45,6 @@ export interface AgentsApi {
   /** GET label-check: whether the server would sign this label (before Touch ID). */
   labelCheck(label: string): Promise<'ok' | 'refused' | 'unavailable'>;
   switchTo(name: string, generation: number): Promise<SwitchOutcome>;
-  add(input: { label: string }, proof: PresenceProof): Promise<OwnerOutcome>;
   rename(input: { name: string; label: string }, proof: PresenceProof): Promise<OwnerOutcome>;
   remove(
     input: { name: string; typedLabel: string; anyway?: boolean },
@@ -196,7 +195,6 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
       if (res.status === 409) return { kind: 'agent_changed' };
       return { kind: 'failed' };
     },
-    add: (input, proof) => owner(AGENTS, { label: input.label }, proof),
     rename: (input, proof) =>
       owner(`${AGENTS}/label`, { name: input.name, label: input.label }, proof),
     remove: (input, proof) =>

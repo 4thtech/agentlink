@@ -11,9 +11,10 @@ const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
 afterAll(() => ch.stop());
 
-// Gate: W4-ONE-TOUCH (builder A) turns this on. Today first run takes two gestures (the AI app is a
-// separate signed step after the agent exists) and ends on Home, not the Inbox.
-describe.runIf(WAVE4)('chapter 1: onboarding', () => {
+// W4-ONE-TOUCH (builder A) turned this on: one gesture creates the owner and the agent and connects
+// the AI app. Only the very end (the empty Inbox) waits for the Inbox page (builders D1/B), so it
+// alone stays behind the JOURNEY_WAVE4 gate.
+describe('chapter 1: onboarding', () => {
   it('fresh home → "Connect your AI app" → one Touch ID creates the agent and connects Claude Code', async (ctx) => {
     const ready = ch.need(ctx);
     if (ready === undefined) return;
@@ -64,9 +65,14 @@ describe.runIf(WAVE4)('chapter 1: onboarding', () => {
       (settingsBefore['mcpServers'] as Record<string, unknown>)['other'],
     );
 
-    // The app opens on the empty Inbox, with no reload since Welcome.
-    await page.getByRole('heading', { name: 'Inbox' }).first().waitFor();
-    expect(await text(page)).toContain('All caught up');
+    // No reload since Welcome (the finish answer's new generation is adopted in place).
     await probe.check();
+
+    // The app opens on the empty Inbox (gated until the Inbox page lands: D1/B).
+    if (WAVE4) {
+      await page.getByRole('button', { name: 'Continue' }).click();
+      await page.getByRole('heading', { name: 'Inbox' }).first().waitFor();
+      expect(await text(page)).toContain('All caught up');
+    }
   }, 180_000);
 });

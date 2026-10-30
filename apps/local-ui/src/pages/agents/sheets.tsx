@@ -7,10 +7,12 @@ import { useId, useState, type FormEvent, type ReactElement } from 'react';
 import { navigate } from '../../router.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import { AppMark } from './app-mark.js';
-import type { AgentsApi, OwnerOutcome } from './api.js';
+import type { AgentsApi } from './api.js';
 import { AGENTS_APPS_PATH, type AgentRow } from './data.js';
 import { gateMessage, OwnerGate, RETRY_IN_PLACE, usePasskey } from './owner-gate.js';
 import { AGENTS_STRINGS as S } from './strings.js';
+import { CreateAgentGate, type CreatedAgent } from '../apps/create-agent-gate.js';
+import { CREATED } from '../first-run/strings.js';
 
 /** The label rule the person sees: 1 to 32 characters, no control characters (06 §6). */
 export const LABEL_MAX = 32;
@@ -155,43 +157,20 @@ export function AddSheet({
   /** After a successful add: the label, and whether to switch to it. */
   onAdded: (label: string, switchToIt: boolean) => void;
 }): ReactElement {
-  const passkey = usePasskey(owner);
+  void owner;
   const [text, setText] = useState<string>(S.addDefaultName);
   const [switchToIt, setSwitchToIt] = useState(false);
   const [step, setStep] = useState<'name' | 'presence' | 'added'>('name');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  // W4-ONE-TOUCH (D-140): what the one gesture created (and the app it connected, if any).
+  const [created, setCreated] = useState<CreatedAgent | undefined>(undefined);
   const switchId = useId();
   const label = text.trim();
   const taken = existing.some((r) => r.label === label);
-
-  const send = (proof: PresenceProof): void => {
-    if (busy) return;
-    setBusy(true);
-    setError(undefined);
-    void api.add({ label }, proof).then((outcome: OwnerOutcome) => {
-      setBusy(false);
-      if (outcome.kind === 'done') {
-        onChanged();
-        onAdded(label, switchToIt);
-        setStep('added');
-        return;
-      }
-      const said = gateMessage(outcome);
-      if (said !== undefined) return setError(said);
-      if (outcome.kind === 'agent_changed') {
-        onChanged();
-        return setError(S.agentChanged);
-      }
-      setError(
-        outcome.kind === 'label_invalid' || outcome.kind === 'invalid'
-          ? S.labelInvalid
-          : outcome.kind === 'not_applied'
-            ? S.notAdded
-            : S.addFailed,
-      );
-      if (!RETRY_IN_PLACE.has(outcome.kind)) setStep('name');
-    });
+  const toApps = (): void => {
+    onClose();
+    navigate(AGENTS_APPS_PATH);
   };
 
   return (
@@ -199,31 +178,46 @@ export function AddSheet({
       {step === 'added' ? (
         <div className="ag-sheet-body">
           <p className="al-text-body" role="status">
-            {label}
+            {created?.app === undefined
+              ? label
+              : created.app.connected
+                ? CREATED.ready(created.label, created.app.name)
+                : CREATED.notConnected(created.label, created.app.name)}
           </p>
-          <p className="al-text-title-3">{S.addedPrompt}</p>
-          <div className="ag-actions">
-            <Button
-              variant="primary"
-              onClick={() => {
-                onClose();
-                navigate(AGENTS_APPS_PATH);
-              }}
-            >
-              {S.connectApp}
-            </Button>
-            <Button variant="ghost" onClick={onClose}>
-              {S.notNow}
-            </Button>
-          </div>
+          {created?.app?.connected === true ? (
+            <div className="ag-actions">
+              <Button variant="primary" onClick={onClose}>
+                {CREATED.next}
+              </Button>
+            </div>
+          ) : (
+            <>
+              {created?.app === undefined ? (
+                <p className="al-text-title-3">{S.addedPrompt}</p>
+              ) : null}
+              <div className="ag-actions">
+                <Button variant="primary" onClick={toApps}>
+                  {created?.app === undefined ? S.connectApp : CREATED.connect}
+                </Button>
+                <Button variant="ghost" onClick={onClose}>
+                  {S.notNow}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       ) : step === 'presence' ? (
-        <OwnerGate
+        // W4-ONE-TOUCH (D-140): one screen, one gesture: the agent and, with "Connect to {app}"
+        // ticked, its AI app (create-agent-gate.tsx).
+        <CreateAgentGate
+          label={label}
           summary={S.addStatement(label)}
-          passkey={passkey}
-          busy={busy}
-          error={error}
-          onProof={send}
+          onDone={(made) => {
+            setCreated(made);
+            onChanged();
+            onAdded(made.label, switchToIt);
+            setStep('added');
+          }}
           onCancel={() => setStep('name')}
         />
       ) : (

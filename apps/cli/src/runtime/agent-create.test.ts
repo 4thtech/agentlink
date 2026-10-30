@@ -160,4 +160,33 @@ describe('agentDirectory create and discardNew (U3-d)', () => {
     await expect(directory.discardNew?.(name ?? '')).rejects.toBeDefined();
     expect(await readdir(join(home, '.agentlink', 'agents'))).toEqual(['personal']);
   });
+
+  it('W4-ONE-TOUCH: create stores the keys the app held since begin (createKeys), never new ones', async () => {
+    const made: string[] = [];
+    const held = newId();
+    const directory = agentDirectory(home, {
+      createAgent: () => {
+        const id = newId();
+        made.push(id);
+        return Promise.resolve(id);
+      },
+    });
+    const name = await directory.create?.('Work', {
+      name: 'work',
+      createKeys: () => Promise.resolve(held),
+    });
+    expect(name).toBe('work');
+    expect(made).toEqual([]);
+    expect((await readAgentConfig(home, 'work'))?.config.agentId).toBe(held);
+  });
+
+  it('W4-ONE-TOUCH: nameFor gives the slug create would use, never a taken or reserved name', async () => {
+    await writeAgentConfig(home, { v: 1, name: 'work', agentId: newId(), keyStore: 'keychain' });
+    const directory = agentDirectory(home, { createAgent: () => Promise.resolve(newId()) });
+    expect(await directory.nameFor?.('Work', [])).toBe('work-2');
+    expect(await directory.nameFor?.('Work', ['work-2'])).toBe('work-3');
+    expect(await directory.nameFor?.('Home base', [])).toBe('home-base');
+    // Nothing was created.
+    expect(await readdir(join(home, '.agentlink', 'agents'))).toEqual(['work']);
+  });
 });

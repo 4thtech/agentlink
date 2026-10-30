@@ -13,12 +13,10 @@
 //   agent by its verified label, else its folder name, never the unsigned label in config.json
 //   ("Rename Personal to Home", b11 §29.5). After core verified and applied it, config.json's label
 //   is written (07 §9.1). The folder name, AI app entries and identity stay the same.
-// - `POST /api/ui/agents` `{label}` (presence; also signs the first `agent.label`): the server
-//   creates a keychain agent whose folder name is a slug of the label, then the gate's one owner
-//   operation signs exactly its first card, its first policy (the 06 §3 defaults with the Send
-//   folder, when ready) and its first label, for that agent only. All or nothing: unless every part
-//   is in force, exactly what this request created is removed again; the owner item is never
-//   touched. The new agent does not become the open one.
+// - W4-ONE-TOUCH (D-140): `POST /api/ui/agents/begin` `{label, app?}` and `POST /api/ui/agents`
+//   `{nonce}` (the create-agent kind, run by the server's createAgentGate; owner-add-agent-plan.ts):
+//   one gesture creates the agent (its first card, first policy and first label) and, with an app
+//   picked, signs its first `app.connect` and writes that app's entry last. No handler here.
 //
 // The generation of the page (08 §1) is checked by the server before the presence gate and again
 // right before the handler runs; it is a page guard only, never part of a signed object. Refusals are
@@ -31,6 +29,7 @@ import {
   UI_INVALID_QUERY,
   UI_NOT_SET_UP,
   UI_UNAVAILABLE,
+  type LocalUiCreateAgentRoute,
   type LocalUiOwnerOperation,
   type LocalUiOwnerRoute,
   type LocalUiReadRoute,
@@ -38,6 +37,7 @@ import {
   type LocalUiResult,
   type LocalUiRoute,
 } from '../route-types.js';
+import { CREATE_AGENT_PATHS } from '../route-types.js';
 
 /** 06 §6 agent-name rule (the folder name). */
 const AGENT_NAME = /^[a-z][a-z0-9-]{0,31}$/;
@@ -156,32 +156,6 @@ async function renameAgent(
   return { status: 200, body: { status: 'done', label } };
 }
 
-/** POST /api/ui/agents `{label}`: add an agent (card, first policy and first label, one gesture). */
-async function addAgent(
-  context: LocalUiContext,
-  request: LocalUiRequest,
-  owner: LocalUiOwnerOperation,
-): Promise<LocalUiResult> {
-  const manage = context.agentsManage;
-  if (manage === undefined || owner.addAgent === undefined) return NOT_AVAILABLE;
-  const input = inputWith(request.input, ['label']);
-  if (input === undefined) return INVALID;
-  const { label } = input;
-  if (!isAgentLabelText(label)) return LABEL_INVALID;
-  const created = await manage.create(label).catch(() => undefined);
-  if (created === undefined) return UI_UNAVAILABLE;
-  let ok = false;
-  try {
-    const outcome = await owner.addAgent({ lines: [`Add a new agent: ${label}`] }, created);
-    ok = outcome.status === 'done';
-  } finally {
-    // All or nothing: a new agent that is not complete is removed again.
-    await manage.settle(created, ok);
-  }
-  if (!ok) return NOT_APPLIED;
-  return { status: 200, body: { status: 'done', name: created.name, label } };
-}
-
 const labelCheckRoute: LocalUiReadRoute = Object.freeze({
   method: 'GET',
   path: '/api/ui/agents/label-check',
@@ -189,11 +163,21 @@ const labelCheckRoute: LocalUiReadRoute = Object.freeze({
   handler: labelCheck,
 });
 
-const addRoute: LocalUiOwnerRoute = Object.freeze({
+// W4-ONE-TOUCH (D-140; 08 §1): New agent is two calls and one gesture, run by the server's
+// create-agent gate (approval-server.ts createAgentGate; owner-add-agent-plan.ts): begin creates the
+// keys in memory and fixes the plan; finish takes only the nonce and the presence proof.
+const beginRoute: LocalUiCreateAgentRoute = Object.freeze({
   method: 'POST',
-  path: '/api/ui/agents',
-  presence: true,
-  handler: addAgent,
+  path: CREATE_AGENT_PATHS.begin,
+  presence: 'create-agent',
+  step: 'begin',
+});
+
+const addRoute: LocalUiCreateAgentRoute = Object.freeze({
+  method: 'POST',
+  path: CREATE_AGENT_PATHS.finish,
+  presence: 'create-agent',
+  step: 'finish',
 });
 
 const renameRoute: LocalUiOwnerRoute = Object.freeze({
@@ -205,6 +189,7 @@ const renameRoute: LocalUiOwnerRoute = Object.freeze({
 
 export const agentsManageRoutes: readonly LocalUiRoute[] = Object.freeze([
   labelCheckRoute,
+  beginRoute,
   addRoute,
   renameRoute,
 ]);
