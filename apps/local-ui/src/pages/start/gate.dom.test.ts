@@ -67,4 +67,10 @@ describe('the end of first run marks its own load', () => {
     await endFirstRun(() => Promise.resolve({ kind: 'failed' }));
     expect(sessionStorage.getItem(START_LEAVING_KEY)).not.toBeNull();
   });
+
+  it('W4-WIRE (U2 low): an ending on the waiting invite (/settings/join) leaves no mark', async () => {
+    sessionStorage.removeItem(START_LEAVING_KEY);
+    await endFirstRun(() => Promise.resolve({ kind: 'ok', state: 'waiting' }));
+    expect(sessionStorage.getItem(START_LEAVING_KEY)).toBeNull();
+  });
 });

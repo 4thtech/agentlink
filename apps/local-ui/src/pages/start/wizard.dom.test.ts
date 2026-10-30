@@ -495,6 +495,16 @@ describe('W4-WIZARD step 3 opened from the real state, and step 4 (A2, A3)', () 
     await mount({ invitePanel: h('div', { id: 'u4-panel' }, 'panel') });
     expect(host.querySelector('#u4-panel')).not.toBeNull();
   });
+
+  it("W4-WIRE: step 4 is U4's invite panel by default (no link away to People)", async () => {
+    history.replaceState(null, '', '/start/invite');
+    await mount();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(host.querySelector('.inv-panel')).not.toBeNull();
+    expect(host.querySelector('a[href="/contacts"]')).toBeNull();
+  });
 });
 
 describe('W4-WIZARD: the same steps for an owner who has one already', () => {

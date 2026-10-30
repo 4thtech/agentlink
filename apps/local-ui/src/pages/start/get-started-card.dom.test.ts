@@ -71,6 +71,12 @@ describe('W4-WIZARD: the Get started card (A4)', () => {
     expect(host.querySelector('a')?.getAttribute('href')).toBe('/start/app');
   });
 
+  it('W4-WIRE: links Invite someone to the Invite screen (/contacts?invite)', async () => {
+    await mount(state({ contacts: [] }));
+    const link = [...host.querySelectorAll('a')].find((a) => a.textContent === CARD.invite);
+    expect(link?.getAttribute('href')).toBe('/contacts?invite');
+  });
+
   it('hides when the person hides it, and stays hidden in this browser', async () => {
     await mount(state());
     await act(async () => {

@@ -71,6 +71,10 @@ describe('chapter 7: advanced', () => {
     ).toBe(0);
 
     // Under the hood: the Advanced group appears; the same app, the same document.
+    // W4-WIRE (U1): turning it on moves nothing in the shell (the agent chip once shifted ~0.023).
+    await observeLayoutShift(page);
+    await page.waitForTimeout(500);
+    const beforeHood = await layoutShiftScore(page);
     await page.getByRole('switch', { name: /Under the hood/ }).click();
     await sections(page)
       .getByRole('link', { name: /Live activity/ })
@@ -88,7 +92,7 @@ describe('chapter 7: advanced', () => {
     // Shifts count from the Advanced pages on: the shell's live status strip fills in first.
     await page.getByRole('region', { name: 'Live status' }).getByText('AgentLink').waitFor();
     await page.waitForTimeout(1500);
-    await observeLayoutShift(page);
+    expect((await layoutShiftScore(page)) - beforeHood).toBeLessThanOrEqual(0.01);
     // The observer replays earlier shifts (the shell's own, when the switch turned): count the walk.
     const shiftedBefore = await layoutShiftScore(page);
     await sections(page)
