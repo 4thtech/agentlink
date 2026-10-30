@@ -166,6 +166,61 @@ describe('startViewTransition with browser support', () => {
     expect(to.hasAttribute(VT_SHARED_ATTR)).toBe(false);
   });
 
+  it('an interrupted run never strips the shared name a newer run claimed', async () => {
+    const to = document.body.appendChild(document.createElement('div'));
+    startViewTransition(() => {}, { to: () => to });
+    const second = startViewTransition(() => {}, { to: () => to });
+    // The first, skipped run settles after the second one named the same element.
+    started[0]?.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(to.hasAttribute(VT_SHARED_ATTR)).toBe(true);
+    started[1]?.resolve();
+    await second.finished;
+    expect(to.hasAttribute(VT_SHARED_ATTR)).toBe(false);
+  });
+
+  it('an interrupted run never strips the name of a newer run that starts from its target', async () => {
+    const row = document.body.appendChild(document.createElement('li'));
+    let seen = false;
+    startViewTransition(() => {}, { to: () => row });
+    // The next run starts from the same element; the browser defers its update past a microtask.
+    doc().startViewTransition = vi.fn((cb: () => void) => {
+      const t = {
+        finished: new Promise<void>(() => undefined),
+        ready: Promise.resolve(),
+        updateCallbackDone: Promise.resolve(),
+        skipTransition: vi.fn(),
+      };
+      void Promise.resolve()
+        .then(() => Promise.resolve())
+        .then(() => {
+          seen = row.hasAttribute(VT_SHARED_ATTR);
+          cb();
+        });
+      return t;
+    });
+    startViewTransition(() => {}, { from: row });
+    started[0]?.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(seen).toBe(true);
+  });
+
+  it('rethrows an update that throws inside the transition, like the direct path', () => {
+    const boom = new Error('update failed');
+    const from = document.body.appendChild(document.createElement('div'));
+    expect(() =>
+      startViewTransition(
+        () => {
+          throw boom;
+        },
+        { from },
+      ),
+    ).toThrow(boom);
+    expect(from.hasAttribute(VT_SHARED_ATTR)).toBe(false);
+    expect(started[0]?.skipTransition).toHaveBeenCalled();
+  });
+
   it('skip() skips the transition it started', () => {
     const run = startViewTransition(() => {});
     run.skip();

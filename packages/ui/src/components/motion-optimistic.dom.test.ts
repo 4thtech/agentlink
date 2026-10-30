@@ -77,6 +77,18 @@ describe('useOptimisticItems', () => {
     expect(rows()).toEqual(['hi:confirmed', 'sent:confirmed']);
   });
 
+  it('forgets a local item once it is confirmed, so it never comes back stale', () => {
+    act(() => root.render(h(List, { confirmed: [] })));
+    act(() => {
+      api.add({ id: 'm', text: 'local copy' });
+    });
+    act(() => root.render(h(List, { confirmed: [{ id: 'm', text: 'sent' }] })));
+    expect(rows()).toEqual(['sent:confirmed']);
+    // The confirmed list later drops it (deleted elsewhere): the old local copy must not reappear.
+    act(() => root.render(h(List, { confirmed: [] })));
+    expect(rows()).toEqual([]);
+  });
+
   it('keeps a failed item with a failed state, and dismiss removes it', () => {
     act(() => root.render(h(List, { confirmed: [] })));
     let handle!: OptimisticHandle;

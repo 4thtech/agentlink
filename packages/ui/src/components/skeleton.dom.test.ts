@@ -4,7 +4,7 @@
 // status with a spoken label and aria-busy; blocks are aria-hidden; sizes come from classes and data
 // attributes, never an inline style (08 §4 CSP). The shimmer is opacity only and stops under reduced
 // motion (both switches).
-import { act, createElement as h } from 'react';
+import { act, createElement as h, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import motionCss from './motion.css?raw';
@@ -92,12 +92,12 @@ describe('SkeletonGate', () => {
         h(SkeletonGate, { loading: true, label: 'Loading people', skeleton: h(SkeletonList) }, 'x'),
       ),
     );
-    expect(host.querySelector('.al-skel-gate')).toBeNull();
+    expect(host.querySelector('[role="status"]')).toBeNull();
     expect(host.textContent).toBe('');
     act(() => vi.advanceTimersByTime(SKELETON_DELAY_MS - 10));
-    expect(host.querySelector('.al-skel-gate')).toBeNull();
+    expect(host.querySelector('[role="status"]')).toBeNull();
     act(() => vi.advanceTimersByTime(20));
-    const gate = host.querySelector('.al-skel-gate') as HTMLElement;
+    const gate = host.querySelector('.al-skel-gate[role="status"]') as HTMLElement;
     expect(gate.getAttribute('role')).toBe('status');
     expect(gate.getAttribute('aria-busy')).toBe('true');
     expect(gate.textContent).toBe('Loading people');
@@ -109,7 +109,7 @@ describe('SkeletonGate', () => {
     act(() => root.render(h(SkeletonGate, { loading: true, skeleton: h(SkeletonRow) }, 'Ana')));
     act(() => vi.advanceTimersByTime(100));
     act(() => root.render(h(SkeletonGate, { loading: false, skeleton: h(SkeletonRow) }, 'Ana')));
-    expect(host.querySelector('.al-skel-gate')).toBeNull();
+    expect(host.querySelector('[role="status"]')).toBeNull();
     expect(host.textContent).toBe('Ana');
     expect(host.querySelector('.al-skel-reveal')).toBeNull();
   });
@@ -121,6 +121,41 @@ describe('SkeletonGate', () => {
     act(() => root.render(h(SkeletonGate, { loading: false, skeleton: h(SkeletonRow) }, 'Ana')));
     // The skeleton has been up past its 500 ms minimum: it leaves on the next tick.
     act(() => vi.advanceTimersByTime(1));
+    expect(host.querySelector('.al-skel-reveal')?.textContent).toBe('Ana');
+  });
+
+  it('keeps one wrapper element, so the content never remounts when the reveal settles', () => {
+    vi.useFakeTimers();
+    let mounts = 0;
+    function Child(): ReturnType<typeof h> {
+      useEffect(() => {
+        mounts += 1;
+      }, []);
+      return h('span', null, 'Ana');
+    }
+    const gate = (loading: boolean): ReturnType<typeof h> =>
+      h(SkeletonGate, { loading, skeleton: h(SkeletonRow) }, h(Child));
+    act(() => root.render(gate(false)));
+    const outer = host.firstElementChild;
+    expect(mounts).toBe(1);
+    // A short reload (under the delay) keeps the same wrapper and the same mounted content.
+    act(() => root.render(gate(true)));
+    act(() => vi.advanceTimersByTime(100));
+    act(() => root.render(gate(false)));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(host.firstElementChild).toBe(outer);
+    expect(mounts).toBe(1);
+    // A long one shows the skeleton; afterwards the content mounts once and stays mounted.
+    act(() => root.render(gate(true)));
+    act(() => vi.advanceTimersByTime(1000));
+    act(() => root.render(gate(false)));
+    act(() => vi.advanceTimersByTime(1));
+    act(() => vi.advanceTimersByTime(1000));
+    const after = mounts;
+    act(() => root.render(gate(false)));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(host.firstElementChild).toBe(outer);
+    expect(mounts).toBe(after);
     expect(host.querySelector('.al-skel-reveal')?.textContent).toBe('Ana');
   });
 });

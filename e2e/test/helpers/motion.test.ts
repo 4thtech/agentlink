@@ -127,6 +127,20 @@ describe('reduced motion', () => {
     await expect(expectFadesOnly(page)).resolves.toBeUndefined();
   });
 
+  it('a reveal still fades under reduced motion (al-fade-in, opacity only)', async () => {
+    await emulateReducedMotion(page);
+    await page.evaluate(() => {
+      const p = document.createElement('p');
+      p.className = 'al-reveal';
+      p.textContent = 'Invite link ready';
+      document.querySelector('main')?.append(p);
+    });
+    const running = await runningAnimations(page);
+    const reveal = running.find((a) => a.name === 'al-fade-in' && a.target === 'p');
+    expect(reveal?.properties).toEqual(['opacity']);
+    await expect(expectFadesOnly(page)).resolves.toBeUndefined();
+  });
+
   it('a page change moves normally and only fades under reduced motion', async () => {
     await emulateReducedMotion(page);
     await startPageChange(page);
