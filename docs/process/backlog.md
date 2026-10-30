@@ -5742,15 +5742,15 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 - **Source:** orchestrator follow-ups (W4-HOME and W4-SHELL-V2 reviews)
 - **Acceptance:** nothing imports the removed files and no app renders them; build, tests and the CSS budget pass; the approval card, bulk flow and their browser tests are unchanged
 
-#### W4-KIT-RESTORE-EPOCH · backup: check the kit's key epoch when restoring (new, #720 L1, #716 SEC L1)
+#### W4-KIT-RESTORE-EPOCH · backup: validate the key epoch when restoring (new, #720, #716)
 - **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/node/src/key-controls.ts` (restore), `packages/node/src/key-epoch.ts`
+- **Repo/path:** agentlink · `packages/node` (restore)
 - **Depends on:** none
 - **Spec:** 04 §2.3.3, §2.6; D-141
 - **Invariants:** I-1, I-2
-- **Source:** HOTFIX-KIT-RESTORE L1 (#720); IR-W4-RENAME-1 SEC L1 (#716). The other HOTFIX-KIT-RESTORE finding (L2) was checked on 30 Oct 2026 (Fable): no bug.
-- **Scope:** a kit that carries a `key-epoch` item is validated with `decodeKeyEpoch` at import and must equal the verified snapshot's epoch; a mismatch refuses the restore with a message that names only steps that exist. Optional: rename `FinishSteps.ownerNostr` to `ownerHex` for clarity.
-- **Acceptance:** RED tests first: a kit with a malformed or different epoch is refused before anything is written; a kit made before `key-epoch` was carried and a kit with an equal epoch still restore; the refusal text mentions no command that does not exist
+- **Source:** #720; #716
+- **Scope:** validate the kit's key epoch at import and require agreement with the snapshot; refusal text names only steps that exist.
+- **Acceptance:** RED tests first: a kit whose epoch is invalid or disagrees with the snapshot is refused before anything is written; valid kits (with or without an epoch) still restore
 
 #### W4-SAVE-LOWS · files: save precheck, failure codes and a sharper K3 test (new, #714 lows, K3 low)
 - **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Opus review · **Phase:** M1b
@@ -5782,15 +5782,15 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 - **Scope:** `cancelInvite` starts `sweepInviteObjects` without awaiting it and ignores its failure, as `createInvite` does.
 - **Acceptance:** RED test first: Cancel returns while a slow sweep is still running and a failing sweep does not fail Cancel; the invite is marked cancelled before the sweep starts
 
-#### W4-RENAME-LOWS · contacts: renaming back, and safe display of the old and new name (new, IR-W4-RENAME-1 #716)
+#### W4-RENAME-LOWS · contacts: rename display edge cases and doc text (new, #716)
 - **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/core/src/contacts.ts`; the local-ui rename notice (U3, U5)
+- **Repo/path:** agentlink · `packages/core`; the local-ui rename notice
 - **Depends on:** W4-WIRE
 - **Spec:** 06 §2.1; 08 §1; 11 §5.8; D-141
 - **Invariants:** I-5
-- **Source:** IR-W4-RENAME-1 L (rename back), SEC L2 (display). SEC L3 (D-141 in the decision log, "a rename is a rotation, 3 per 24 h" in 04) is already on `wave-4`, not carded.
-- **Scope:** a contact that renames A to B and back to A before the note was seen shows no "A (was A)" note; the former and new names render only as text nodes inside a bidi isolate, like other peer-chosen names.
-- **Acceptance:** RED test first: A to B to A with the note unseen clears the note; DOM test: a name with bidi controls renders isolated and as text; no new string breaks 11 §5
+- **Source:** #716
+- **Scope:** rename display edge cases (a name changed and changed back shows a correct notice) and safe rendering of the names shown; doc text kept in step with the decision log.
+- **Acceptance:** RED tests first for the display cases; DOM test for safe rendering; no new string breaks 11 §5
 
 #### W4-HOME-RETRY · messages: a real Retry for "Not delivered" (new, W4-HOME #731)
 - **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (a resend must not weaken idempotency) · **Phase:** M1b
