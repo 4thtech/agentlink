@@ -20,6 +20,7 @@ import { IdempotencyService } from './idempotency.js';
 import { PairingService } from './pairing.js';
 import { RequestsQueue } from './requests.js';
 import { OutboxService } from './outbox.js';
+import { McpSession } from './mcp-session.js';
 import { PublisherLease } from './publisher-lease.js';
 import { SendService, type SendMessageInput, type SendMessageResult } from './send.js';
 import type { TransportFactory } from './transport.js';
@@ -480,6 +481,24 @@ export class AgentLinkClient {
    */
   publisherLease(): PublisherLease {
     return new PublisherLease({ store: this.#ctx.store, now: this.#ctx.now });
+  }
+
+  /**
+   * W4-LIVE-STATUS (D-143; 06 §6 "MCP session heartbeat"): this process's MCP session row, with its
+   * own random session ID. Only `agentlink mcp` creates one, once at start, and starts it when it
+   * answers `initialize`; creating it writes nothing. Status, not authority (07 §3.2).
+   */
+  mcpSession(options: {
+    readonly pid: number;
+    readonly pidAlive?: (pid: number) => boolean;
+  }): McpSession {
+    return new McpSession({
+      store: this.#ctx.store,
+      now: this.#ctx.now,
+      agentId: this.agentId,
+      pid: options.pid,
+      ...(options.pidAlive === undefined ? {} : { pidAlive: options.pidAlive }),
+    });
   }
 
   /**

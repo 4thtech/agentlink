@@ -31,7 +31,7 @@ import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { createLogger, type Logger } from '@4thtech-io/log';
-import { startApprovalServer, type AgentStore } from '@4thtech-io/node';
+import { pidAlive, startApprovalServer, type AgentStore } from '@4thtech-io/node';
 import { approvalNextStep } from '../approval/next-step.js';
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import { EXIT_OK, type CommandHandler } from '../dispatch.js';
@@ -49,7 +49,13 @@ import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
 import { approvalWaitMsFor } from './approval-wait.js';
 import { openFirstRunOnStart, type DisplayEnv } from './first-run-on-start.js';
 import { firstRunReady, localUiOptions, logOwnerSetupEvent } from './local-ui-wiring.js';
-import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
+import { McpHeartbeat, type HeartbeatSession } from './heartbeat.js';
+import {
+  attachInboxResource,
+  BackgroundLoop,
+  type BackgroundLoopOptions,
+  type LoopTimers,
+} from './loop.js';
 import { createMcpServer } from './server.js';
 
 export interface McpCommandDeps {
@@ -77,6 +83,14 @@ export interface McpCommandDeps {
   readonly firstRunAvailable?: (agent: OpenedAgent) => Promise<boolean>;
   /** M1-11b-8: where the display check looks (default: this process's env and platform). */
   readonly display?: { readonly env: DisplayEnv; readonly platform: string };
+  /**
+   * W4-LIVE-STATUS (06 §6 "MCP session heartbeat"): the session row of an opened agent (core
+   * `McpSession`) and the beat timers (tests). Without it, no row is written.
+   */
+  readonly heartbeat?: {
+    readonly session: (agent: OpenedAgent) => HeartbeatSession | undefined;
+    readonly timers?: LoopTimers;
+  };
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -125,11 +139,16 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
         ? agentToolContext(opened.agent, logger, deps.clock, approvalUi)
         : { needsSetup: { message: opened.message }, logger };
 
+    // W4-LIVE-STATUS: every server of a set-up agent, lease holder or not, keeps a session row.
+    const session = agent === undefined ? undefined : deps.heartbeat?.session(agent);
+    const heartbeat =
+      session === undefined ? undefined : new McpHeartbeat(session, deps.heartbeat?.timers);
     // M1-36j (D4): only with the approval page can a call wait for the owner's decision.
     // M1-36h: `--advanced` (the user's own harness config) serves the Advanced tool surface.
     const server = createMcpServer(env, deps.version, {
       ...(approvalUi === undefined ? {} : { approvalWaitMs: approvalWaitMsFor }),
       ...(parsed.values['advanced'] === true ? { advanced: true } : {}),
+      ...(heartbeat === undefined ? {} : { heartbeat }),
     });
     const loop =
       agent === undefined
@@ -166,6 +185,8 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
       // approval server, whose source reads the same store (M1-11a-b). A first-run open still
       // under way finishes first (it never throws).
       await loop?.stop();
+      // W4-LIVE-STATUS (06 §6 "Exit"): the session row goes after the lease, before the agent.
+      await heartbeat?.stop();
       await firstRun;
       await approvalUi?.close();
       await agent?.close();
@@ -225,6 +246,11 @@ export const mcpCommand = (version: string): CommandHandler => {
       }),
     transport: () => stdioTransport(),
     version,
+    // W4-LIVE-STATUS (06 §6): this process's session row; other processes' pids get signal 0 only.
+    heartbeat: {
+      session: (agent) =>
+        agent.client.mcpSession({ pid: process.pid, pidAlive: (pid) => pidAlive(pid) }),
+    },
     approvalUi: (agent, logger) => {
       const store = opened;
       return createApprovalUi({

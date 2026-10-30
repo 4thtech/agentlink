@@ -297,6 +297,18 @@ export {
   type OutboxPeer,
   type OutboxRoute,
 } from './outbox.js';
+// W4-LIVE-STATUS (D-143): the MCP session heartbeat (07 §3.2 `mcp_sessions`, `mcp_last_seen`; 06 §6).
+export {
+  MCP_SESSION_BEAT_SECONDS,
+  MCP_SESSION_FUTURE_LIMIT_SECONDS,
+  MCP_SESSION_TTL_SECONDS,
+  McpSession,
+  OTHER_APP,
+  mcpAppId,
+  mcpPidValid,
+  mcpSessionLive,
+  type McpSessionOptions,
+} from './mcp-session.js';
 // M1-7k-b: the per-agent publisher lease (07 §3.2 `publisher_lease`; 06 §6).
 export {
   PublisherLease,

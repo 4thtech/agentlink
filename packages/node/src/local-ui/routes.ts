@@ -24,6 +24,7 @@
 import { activityRoutes } from './api/activity.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
 import { agentsRoutes } from './api/agents.js';
+import { eventsRoutes } from './api/events.js';
 import { agentsManageRoutes } from './api/agents-manage.js';
 import { contactNamesRoutes } from './api/contacts-renamed.js';
 import { agentsRemoveRoutes } from './api/agents-remove.js';
@@ -348,6 +349,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     [filesSaveRoute],
     // W4-RENAME-REACHES-CONTACTS: the seen mark of a contact's former-name note.
     contactNamesRoutes,
+    // W4-LIVE-STATUS (D-143): the live AI app status stream (its own events gate in the server).
+    eventsRoutes,
     uiSettingsRoutes,
   ]) {
     for (const route of routes) registry.register(route);

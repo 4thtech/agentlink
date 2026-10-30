@@ -357,6 +357,30 @@ export const TABLES = {
     columns: { envelope_id: id, failures: int, failed_at: int },
     primaryKey: ['envelope_id'],
   },
+  // 07 §3.2 (06 §6 "MCP session heartbeat"; D-143, W4-LIVE-STATUS; schema version 10; proposed, owner
+  // confirms at merge). One row per running `agentlink mcp` process, lease holder or not:
+  // session_id is 16 random bytes, base64url, chosen per process; app an id of the 06 §7 table or
+  // `other` (never the client's own name); pid read only by a reader on this machine (signal 0) and
+  // never put in an answer, event, log or error. Status, not authority: nothing reads these rows to
+  // authorise anything. In clear (no secret, path, client-sent name or content).
+  mcp_sessions: {
+    columns: {
+      session_id: id,
+      app: text,
+      agent_id: id,
+      pid: int,
+      started_at: int,
+      beat_until: int,
+      last_tool_at: opt('int'),
+    },
+    primaryKey: ['session_id'],
+  },
+  // 07 §3.2 (D-143; schema version 10): when each AI app id last ran this agent, so "last seen"
+  // outlives the session row. At most one row per id.
+  mcp_last_seen: {
+    columns: { app: text, last_seen_at: int },
+    primaryKey: ['app'],
+  },
   // 07 §3.3. approval_id is the empty string for a call without one, so it is `text`.
   idempotency: {
     columns: {
