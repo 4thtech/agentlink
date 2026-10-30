@@ -50,7 +50,7 @@ import {
 import { joinStep } from '../../apps/cli/dist/commands/join.js';
 import { uiRemovalPort } from '../../apps/cli/dist/commands/ui-remove.js';
 import { createAiAppsDesk } from '../../apps/cli/dist/harness/app-desk.js';
-import { createMcpCommand } from '../../apps/cli/dist/mcp/command.js';
+import { createMcpCommand, processHeartbeat } from '../../apps/cli/dist/mcp/command.js';
 import { localUiOptions, type LocalUiWiringDeps } from '../../apps/cli/dist/mcp/local-ui-wiring.js';
 import {
   agentDirectory,
@@ -382,6 +382,8 @@ export async function startAiAppMcp(pc: Computer, agent: string | undefined): Pr
     version: '0.0.0-e2e',
     logger: createLogger({ name: 'u3k-mcp', level: 'error', sink: () => undefined }),
     loop: { syncIntervalMs: 500, leaseIntervalMs: 1_000 },
+    // W4-WIRE-3: the heartbeat `agentlink mcp` writes (06 §6), so the app sees this AI app run.
+    heartbeat: processHeartbeat,
   });
   const done = handler({
     command: 'mcp',
@@ -389,7 +391,9 @@ export async function startAiAppMcp(pc: Computer, agent: string | undefined): Pr
     output: { print: () => undefined, printError: () => undefined },
     terminal: { stdinIsTTY: false, stdoutIsTTY: false, env: {} },
   } as never);
-  const client = new Client({ name: 'agentlink-e2e', version: '0' });
+  // W4-WIRE-3: the name Claude Code sends in `initialize` (client-app.ts), as the AI app of these
+  // computers (fakeClaudeCode) is Claude Code.
+  const client = new Client({ name: 'claude-code', version: '0' });
   await client.connect(clientSide);
   await client.listTools();
   return {

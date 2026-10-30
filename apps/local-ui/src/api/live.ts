@@ -32,6 +32,11 @@ const APPS_READ = '/api/ui/apps';
 export const LIVE_POLL_MS = 5_000;
 /** The fallback tries the stream again this often (08 §1). */
 export const LIVE_STREAM_RETRY_MS = 60_000;
+/**
+ * W4-WIRE-3: a stream with no answer after this long is given up and counts as a failure (the host
+ * answers at once, `retry:` first), so a stream that never starts falls back to polling.
+ */
+export const LIVE_ANSWER_MS = 15_000;
 const BACKOFF_FIRST_MS = 1_000;
 const BACKOFF_MAX_MS = 30_000;
 /** Three failures within this window fall back to polling. */
@@ -538,6 +543,9 @@ async function openStream(): Promise<void> {
   const headers = new Headers({ 'X-AgentLink-CSRF': pageToken(), Accept: EVENTS_ACCEPT });
   if (lastEventId !== undefined) headers.set('Last-Event-ID', lastEventId);
   let res: Response;
+  const answer = setTimeout(() => {
+    if (stream === controller) controller.abort();
+  }, LIVE_ANSWER_MS);
   try {
     res = await globalThis.fetch(EVENTS_PATH, {
       method: 'GET',
@@ -549,6 +557,8 @@ async function openStream(): Promise<void> {
   } catch {
     if (stream === controller) failed();
     return;
+  } finally {
+    clearTimeout(answer);
   }
   if (stream !== controller) return;
   // No stream here (an older app, an approval page) or too many open: poll instead.

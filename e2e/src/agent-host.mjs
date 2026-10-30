@@ -14,7 +14,11 @@
 import process from 'node:process';
 import { nostrTransport } from '@4thtech-io/core';
 import { createLogger } from '@4thtech-io/log';
-import { createMcpCommand, stdioTransport } from '../../apps/cli/dist/mcp/command.js';
+import {
+  createMcpCommand,
+  processHeartbeat,
+  stdioTransport,
+} from '../../apps/cli/dist/mcp/command.js';
 import { BackgroundLoop } from '../../apps/cli/dist/mcp/loop.js';
 import { nodeRuntimeDeps, openAgent } from '../../apps/cli/dist/runtime/index.js';
 import { localRelayConnector, relayMapFromEnv } from './local-connector.mjs';
@@ -51,6 +55,8 @@ if (mode === 'mcp') {
     version: '0.0.0-e2e',
     logger,
     loop: LOOP,
+    // W4-WIRE-3: the session row `agentlink mcp` writes (06 §6 heartbeat).
+    heartbeat: processHeartbeat,
   });
   process.exitCode = await handler({
     command: 'mcp',
