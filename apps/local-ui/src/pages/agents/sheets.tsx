@@ -30,6 +30,21 @@ interface Shared {
 
 // ------------------------------------------------------------------------------------------ Rename
 
+/** The time a rename is allowed again: today's time, or the date and time when further off. */
+export function retryTime(retryAt: number, now: number = Date.now()): string {
+  const at = new Date(retryAt * 1000);
+  const soon = retryAt * 1000 - now < 20 * 3600 * 1000;
+  return soon
+    ? at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : at.toLocaleString([], {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+}
+
 export function RenameEditor({
   row,
   api,
@@ -37,11 +52,14 @@ export function RenameEditor({
   onDone,
   onCancel,
   onChanged,
+  onRenamed,
 }: Shared & {
   row: AgentRow;
   onDone: () => void;
   onCancel: () => void;
   onChanged: () => void;
+  /** W4-AGENTS (D-141): the new label, and whether contacts will be told. */
+  onRenamed?: (label: string, told: boolean) => void;
 }): ReactElement {
   const passkey = usePasskey(owner);
   const [text, setText] = useState(row.label);
@@ -58,6 +76,7 @@ export function RenameEditor({
     void api.rename({ name: row.name, label }, proof).then((outcome) => {
       setBusy(false);
       if (outcome.kind === 'done') {
+        onRenamed?.(label, outcome.contacts !== undefined && outcome.contacts > 0);
         onChanged();
         onDone();
         return;
@@ -67,6 +86,19 @@ export function RenameEditor({
       if (outcome.kind === 'agent_changed') {
         onChanged();
         return setError(S.agentChanged);
+      }
+      // D-141 (11 §5.8): three renames a day; the time of the next one.
+      if (outcome.kind === 'rename_limited') {
+        setStep('edit');
+        return setError(
+          outcome.retryAt === undefined
+            ? S.renameFailed
+            : S.renameLimited(row.label, retryTime(outcome.retryAt)),
+        );
+      }
+      if (outcome.kind === 'rotation_pending') {
+        setStep('edit');
+        return setError(S.renamePending);
       }
       setError(
         outcome.kind === 'label_invalid' || outcome.kind === 'invalid'
@@ -104,6 +136,7 @@ export function RenameEditor({
   };
   return (
     <form className="ag-rename" onSubmit={submit}>
+      <p className="al-text-body-sm al-muted">{S.renameHint}</p>
       <TextField
         label={S.renameField}
         name="agent-label"
@@ -126,7 +159,7 @@ export function RenameEditor({
           icon="approval"
           disabled={labelProblem(text) || unchanged}
         >
-          {S.saveTouchId}
+          {S.renameTouchId}
         </Button>
         <Button variant="ghost" onClick={onCancel}>
           {S.cancel}

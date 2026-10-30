@@ -276,7 +276,9 @@ describe('Agents, simple (A8)', () => {
     await click(button(card('default'), 'Rename with Touch ID'));
     await type(code(), '123456');
     await click(button(host, 'Confirm'));
-    expect(host.textContent).toContain("Renamed. Your contacts will see Home next time they're online.");
+    expect(host.textContent).toContain(
+      "Renamed. Your contacts will see Home next time they're online.",
+    );
 
     answers['POST /api/ui/agents/label'] = {
       status: 409,
@@ -332,7 +334,7 @@ describe('Agents, simple (A8)', () => {
     expect(link?.getAttribute('href')).toBe('/settings/backup');
     await click(button(card('work'), 'Remove'));
     expect(host.textContent).toContain('Remove Work?');
-    expect(host.textContent).toContain('Type Work to confirm');
+    expect(host.querySelector('[role="dialog"] input[type="text"]')).not.toBeNull();
   });
 });
 

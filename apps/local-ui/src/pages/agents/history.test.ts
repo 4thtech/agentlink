@@ -47,7 +47,8 @@ describe('the session heartbeat history', () => {
     const samples = historyOf('default', 'claude-code');
     expect(samples).toHaveLength(HISTORY_MAX);
     expect(samples[0]?.at).toBe(1_000 + 5 * 5_000);
-    expect(samples.at(-1)?.state).toBe(HISTORY_MAX % 2 === 0 ? 'working' : 'ready');
+    const last = HISTORY_MAX + 4;
+    expect(samples.at(-1)?.state).toBe(last % 2 === 0 ? 'ready' : 'working');
   });
 
   it('records a state change of the agent once, with its time', () => {

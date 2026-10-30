@@ -10,6 +10,7 @@ import {
   parseAgents,
   relativeTime,
   type AgentRow,
+  type AppLive,
 } from './data.js';
 
 const NOW = 1_800_000_000;
@@ -45,12 +46,12 @@ describe('parseAgents: the live fields (K1)', () => {
     expect(row?.paused).toBe(false);
     // `apps` keeps the apps that run this agent (not "not set up"), as before.
     expect(row?.apps).toEqual(['claude-code', 'codex']);
-    expect(row?.appStates.map((a) => [a.id, a.state])).toEqual([
+    expect(row?.appStates?.map((a) => [a.id, a.state])).toEqual([
       ['claude-code', 'working'],
       ['codex', 'not_running'],
       ['cursor', 'not_set_up'],
     ]);
-    expect(row?.appStates[1]?.lastSeenAt).toBe(NOW - 300);
+    expect(row?.appStates?.[1]?.lastSeenAt).toBe(NOW - 300);
   });
 
   it('reads a paused agent', () => {
@@ -67,7 +68,7 @@ describe('parseAgents: the live fields (K1)', () => {
       wire({ name: 'c', state: 'dancing', lastSeenAt: -5 }),
     ]);
     expect(a?.state).toBe('ready');
-    expect(a?.appStates.map((x) => x.state)).toEqual(['ready']);
+    expect(a?.appStates?.map((x) => x.state)).toEqual(['ready']);
     expect(b?.state).toBe('offline');
     expect(c?.state).toBe('offline');
     expect(c?.lastSeenAt).toBeUndefined();
@@ -79,7 +80,7 @@ describe('the words (08 §1)', () => {
     ...(parsed([wire()])[0] as AgentRow),
     ...over,
   });
-  const app = (name: string, state: AgentRow['appStates'][number]['state'], lastSeenAt?: number) => ({
+  const app = (name: string, state: AppLive['state'], lastSeenAt?: number) => ({
     id: name.toLowerCase().replace(/ /g, '-'),
     name,
     state,
@@ -95,9 +96,9 @@ describe('the words (08 §1)', () => {
   });
 
   it('an agent: Working in, Ready in (and n more), Idle, Offline · last seen, Paused', () => {
-    expect(agentLine(row({ state: 'working', appStates: [app('Claude Code', 'working')] }), NOW)).toBe(
-      'Working in Claude Code',
-    );
+    expect(
+      agentLine(row({ state: 'working', appStates: [app('Claude Code', 'working')] }), NOW),
+    ).toBe('Working in Claude Code');
     expect(
       agentLine(
         row({
@@ -138,7 +139,12 @@ describe('the words (08 §1)', () => {
 
 describe('the fleet table: search, filter, sort by activity', () => {
   const rows = parsed([
-    wire({ name: 'a', label: 'Tali agent', state: 'ready', apps: [{ app: 'cursor', state: 'ready' }] }),
+    wire({
+      name: 'a',
+      label: 'Tali agent',
+      state: 'ready',
+      apps: [{ app: 'cursor', state: 'ready' }],
+    }),
     wire({
       name: 'b',
       label: 'Work agent',
@@ -156,7 +162,10 @@ describe('the fleet table: search, filter, sort by activity', () => {
     }),
   ]).map((r) => ({
     ...r,
-    appStates: r.appStates.map((a) => ({ ...a, name: a.id === 'claude-code' ? 'Claude Code' : a.id })),
+    appStates: (r.appStates ?? []).map((a) => ({
+      ...a,
+      name: a.id === 'claude-code' ? 'Claude Code' : a.id,
+    })),
   }));
   const names = (q: Parameters<typeof fleetRows>[1]) => fleetRows(rows, q).map((r) => r.name);
   const base = { q: '', status: 'all', app: 'all', sort: 'activity' } as const;

@@ -4,6 +4,7 @@
 // for the gesture counter and the no-reload probe.
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { until } from '../app-world.js';
 import {
@@ -32,6 +33,21 @@ import {
 const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
 afterAll(() => ch.stop());
+
+/** Agents → Pause on Ana's card → the sheet's Pause; Ana reads Paused (one click, no Touch ID). */
+async function pauseAna(page: Page): Promise<void> {
+  await openAgents(page);
+  await agentCard(page, 'Ana')
+    .getByText(/^(Offline|Ready|Working|Idle)/)
+    .first()
+    .waitFor();
+  await agentCard(page, 'Ana').getByRole('button', { name: 'Pause', exact: true }).click();
+  const sheet = page.getByRole('dialog', { name: 'Pause Ana?' });
+  await sheet.getByText('Nothing is deleted.', { exact: false }).waitFor();
+  await sheet.getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.getByText('Ana is paused').first().waitFor();
+  await agentCard(page, 'Ana').getByText('Paused', { exact: true }).first().waitFor();
+}
 
 describe('chapter 4: agents', () => {
   // Passes today (0.4.5: HOTFIX-045-REMOVE): a real agent folder, the real folder lock, no faked rm.
@@ -105,9 +121,9 @@ describe('chapter 4: agents', () => {
   }, 180_000);
 
   // W4-AGENTS (D-143 (5), 08 §1 "Pause an agent"): Pause is one click with no Touch ID; the open
-  // agent shows Paused everywhere; Resume asks for Touch ID once (it signs agent.resume). Reduced
-  // motion keeps fades only, and the page does not shift while its live status settles.
-  it('pauses the open agent in one click and resumes it with one Touch ID, with no reload', async (ctx) => {
+  // agent shows Paused on its card and in a banner with "Resume with Touch ID". Reduced motion keeps
+  // fades only, and the page does not shift while its live status settles.
+  it('pauses the open agent in one click, with no Touch ID and no reload', async (ctx) => {
     const ready = ch.need(ctx);
     if (ready === undefined) return;
     const world = journeyWorld();
@@ -118,24 +134,9 @@ describe('chapter 4: agents', () => {
     const probe = await jp.arm();
     const before = jp.gestures.total();
 
-    await openAgents(page);
-    await agentCard(page, 'Ana').getByText(/^(Offline|Ready|Working|Idle)/).first().waitFor();
-    await agentCard(page, 'Ana').getByRole('button', { name: 'Pause', exact: true }).click();
-    const sheet = page.getByRole('dialog', { name: 'Pause Ana?' });
-    await sheet.getByText('Nothing is deleted.', { exact: false }).waitFor();
-    await sheet.getByRole('button', { name: 'Pause', exact: true }).click();
-    await page.getByText('Ana is paused').first().waitFor();
-    await agentCard(page, 'Ana').getByText('Paused', { exact: true }).first().waitFor();
+    await pauseAna(page);
     expect(jp.gestures.total() - before).toBe(0);
-
-    await page.getByRole('button', { name: 'Resume with Touch ID' }).first().click();
-    await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
-    await eventually(
-      'Ana resumed',
-      async () => !(await text(page)).includes('Ana is paused'),
-      30_000,
-    );
-    expect(jp.gestures.total() - before).toBe(1);
+    await page.getByRole('button', { name: 'Resume with Touch ID' }).first().waitFor();
 
     // Reduced motion: fades only; no layout shift on the Agents page while it settles.
     await emulateReducedMotion(page);
@@ -148,6 +149,35 @@ describe('chapter 4: agents', () => {
     expect((await layoutShiftScore(page)) - shifted).toBeLessThanOrEqual(CLS_BUDGET);
     await probe.check();
   }, 180_000);
+
+  // Gate: W4-PAUSE (K2, PR #735) turns this on. Resume signs `agent.resume` (04 §2.5.1), and the
+  // owner key's allowlist (packages/node owner-allowlist.ts OWNER_ACTION_OPS) does not list it yet,
+  // so the real app answers 409 `refused` after the gesture.
+  it.runIf(WAVE4)(
+    'resumes the paused agent with one Touch ID, with no reload',
+    async (ctx) => {
+      const ready = ch.need(ctx);
+      if (ready === undefined) return;
+      const world = journeyWorld();
+      const pc = await world.computer();
+      const jp = await journeyPage(ready.browser);
+      await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
+      const { page } = jp;
+      const probe = await jp.arm();
+      await pauseAna(page);
+      const before = jp.gestures.total();
+      await page.getByRole('button', { name: 'Resume with Touch ID' }).first().click();
+      await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+      await eventually(
+        'Ana resumed',
+        async () => !(await text(page)).includes('Ana is paused'),
+        30_000,
+      );
+      expect(jp.gestures.total() - before).toBe(1);
+      await probe.check();
+    },
+    180_000,
+  );
 
   // Gate: W4-RENAME-REACHES-CONTACTS (builder D, D2; the contact row is C2) turns this on. Today a
   // rename changes only the local label; the contact keeps the old name.

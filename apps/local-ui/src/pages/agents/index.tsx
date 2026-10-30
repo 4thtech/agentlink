@@ -1,32 +1,51 @@
-// U3-h: the Agents page (b11 §29.2). Every agent of this owner with the AI apps it works from, its
-// contacts, and Switch, Rename, Connect and Remove. A List and Map control (the Map is plugged in by
-// card U3-map through `setAgentsMapView`); the map is only a view of the list, actions live here.
-// Labels are rendered as text only (I-5). Nothing here signs: owner actions go to the server behind
-// the presence gate (sheets.tsx).
-import { Button, EmptyState, Icon, LiveDot, Segmented, Skeleton, Surface } from '@4thtech-io/ui';
+// W4-AGENTS (W4 UX v2 "three layers", A8 and A11; was U3-h, b11 §29.2): the Agents section. One
+// route, two layers: simple, a card per agent with its live line and its actions; Under the hood,
+// the same route as a fleet table (Decision 47: the screen morphs in place, never another route
+// tree). `/agents/<name>` is one agent's own page. The live state comes from the one shared live
+// store (api/live.ts), so the page updates by itself; actions go through the owner client and the
+// presence gate (the page never signs). Pause, Resume and the AI apps act on the open agent only;
+// on another agent the page switches to it first and carries on after the switch (intent.ts).
+// Labels are rendered as text only, in their own bidi run (I-5).
+import {
+  Button,
+  EmptyState,
+  SkeletonGate,
+  SkeletonList,
+  SkeletonTable,
+  Surface,
+  useHood,
+} from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ComponentType,
   type ReactElement,
 } from 'react';
+import { getLive, subscribeLive } from '../../api/live.js';
 import { lazyPart } from '../../lazy/index.js';
-import { navigate } from '../../router.js';
+import { agentNameOf } from '../../nav.js';
+import type { AppsApi } from '../apps/api.js';
 import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
-import { AppMark } from './app-mark.js';
 import { createAgentsApi, type AgentsApi } from './api.js';
-import { AGENTS_APPS_PATH, orderAgents, stateWord, tidyCandidates, type AgentRow } from './data.js';
-import { Menu } from './menu.js';
-import { AddSheet, RemoveSheet, RenameEditor } from './sheets.js';
+import { orderAgents, stateOf, tidyCandidates, type AgentRow, type AgentsList } from './data.js';
+import { AgentDetail } from './detail.js';
+import { createDetailApi, type DetailApi } from './detail-api.js';
+import { Fleet, fleetSummary } from './fleet.js';
+import { recordLive } from './history.js';
+import { forgetIntent, rememberIntent, takeIntent, type IntentAction } from './intent.js';
+import { PausedBanner, PauseSheet, ResumeGate } from './parts.js';
+import { AddSheet, RemoveSheet } from './sheets.js';
+import { AgentCard, type Panel } from './simple.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 import { announceAgentsChanged, listOf, useAgents } from './use-agents.js';
 import { markAgentsOpened } from './tidy.js';
 import './agents.css';
 
-/** The Map view (card U3-map). It is given the same rows as the list and renders them its own way. */
+/** The Map view (card U3-map): the same rows, drawn its own way; Under the hood only. */
 export type AgentsMapView = ComponentType<{
   readonly agents: readonly AgentRow[];
   /** "+N more agents" shows the List. */
@@ -41,9 +60,16 @@ export function setAgentsMapView(view: AgentsMapView | undefined): void {
   mapView = view;
 }
 
+/** "New agent" reuses the Get started steps (U2): `/start/app?add=agent`. */
+export const NEW_AGENT_PATH = '/start/app?add=agent';
+
 export interface AgentsPageProps {
   readonly api?: AgentsApi;
   readonly owner?: OwnerClient;
+  /** The AI apps client of the change panel (tests). */
+  readonly apps?: AppsApi;
+  /** The fetch of the agent page's reads (tests). */
+  readonly fetch?: typeof fetch;
   /**
    * Runs after a switch the server took. Default: nothing; W4-SHELL: the generation guard swaps
    * every view for the agent that is open now, with no reload (router.tsx).
@@ -51,164 +77,75 @@ export interface AgentsPageProps {
   readonly reload?: () => void;
 }
 
-const connectHref = (name: string): string =>
-  `${AGENTS_APPS_PATH}?agent=${encodeURIComponent(name)}`;
-
-function AppsLine({ row }: { row: AgentRow }): ReactElement {
-  if (row.apps.length === 0) {
-    return (
-      <p className="ag-works al-text-body-sm al-muted">
-        <Icon name="circle" size={12} />
-        <span>{S.notConnected}</span>
-      </p>
-    );
-  }
-  return (
-    <p className="ag-works al-text-body-sm">
-      <span className="al-muted">{S.worksFrom}</span>
-      {row.apps.map((app) => (
-        <AppMark key={app} name={app} />
-      ))}
-    </p>
-  );
+const NAV_EVENTS = ['popstate', 'agentlink:navigate'] as const;
+function subscribePath(on: () => void): () => void {
+  for (const e of NAV_EVENTS) window.addEventListener(e, on);
+  return () => {
+    for (const e of NAV_EVENTS) window.removeEventListener(e, on);
+  };
 }
+const pathNow = (): string => location.pathname.replace(/\/+$/, '') || '/';
 
-function RowMenu({
-  row,
-  onRemove,
-}: {
-  row: AgentRow;
-  onRemove: (row: AgentRow) => void;
-}): ReactElement {
-  const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const close = useCallback((restore: boolean): void => {
-    setOpen(false);
-    if (restore) trigger.current?.focus();
+/** Seconds now, ticking every 30 s so "5 min ago" stays true. */
+function useNow(): number {
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 30_000);
+    return () => clearInterval(t);
   }, []);
-  return (
-    <span className="ag-menu-wrap">
-      <button
-        ref={trigger}
-        type="button"
-        className="al-btn al-btn-ghost al-btn-sm"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <Icon name="ellipsis" size={16} />
-        <span className="ag-sr">{S.more}</span>
-      </button>
-      {open ? (
-        <Menu label={S.more} onClose={close} triggerRef={trigger}>
-          <button
-            type="button"
-            role="menuitem"
-            className="ag-menu-item ag-danger"
-            onClick={() => {
-              close(false);
-              onRemove(row);
-            }}
-          >
-            {S.remove}
-          </button>
-        </Menu>
-      ) : null}
-    </span>
-  );
-}
-
-function Row({
-  row,
-  tidy,
-  renaming,
-  rename,
-  onRenameStart,
-  onRenameEnd,
-  onSwitch,
-  onRemove,
-}: {
-  row: AgentRow;
-  tidy: boolean;
-  renaming: boolean;
-  rename: (done: () => void, cancel: () => void) => ReactElement;
-  onRenameStart: () => void;
-  onRenameEnd: () => void;
-  onSwitch: (row: AgentRow) => void;
-  onRemove: (row: AgentRow) => void;
-}): ReactElement {
-  if (row.removing) {
-    return (
-      <li className="ag-row ag-row-removing" data-agent={row.name}>
-        <div className="ag-row-head">
-          <span className="al-text-title-3 ag-label">{row.label}</span>
-          <span className="ag-warn al-text-label">
-            <Icon name="triangle-alert" size={14} />
-            {S.removalNotFinished}
-          </span>
-        </div>
-        <p className="al-text-body-sm al-muted">{S.removalReason}</p>
-        <div className="ag-actions">
-          <Button variant="secondary" onClick={() => onRemove(row)}>
-            {S.tryAgain}
-          </Button>
-        </div>
-      </li>
-    );
-  }
-  const none = row.apps.length === 0;
-  return (
-    <li className="ag-row" data-agent={row.name}>
-      <div className="ag-row-head">
-        <span className="al-text-title-3 ag-label">{row.label}</span>
-        {row.current ? <span className="ag-open al-text-label">{S.open}</span> : null}
-        <LiveDot state={row.running ? 'connected' : 'not-running'} label={stateWord(row)} />
-      </div>
-      <AppsLine row={row} />
-      <p className="al-text-body-sm al-muted">
-        {S.contactsCount(row.contacts)}
-        {tidy ? ` · ${S.noAppNoContacts}` : ''}
-      </p>
-      {renaming ? (
-        rename(onRenameEnd, onRenameEnd)
-      ) : (
-        <div className="ag-actions">
-          {row.current ? null : (
-            <Button variant="secondary" onClick={() => onSwitch(row)}>
-              {S.switch}
-            </Button>
-          )}
-          <Button variant="ghost" onClick={onRenameStart}>
-            {S.rename}
-          </Button>
-          <Button
-            variant={none ? 'primary' : 'ghost'}
-            onClick={() => navigate(connectHref(row.name))}
-          >
-            {none ? S.connectApp : S.connect}
-          </Button>
-          <RowMenu row={row} onRemove={onRemove} />
-        </div>
-      )}
-    </li>
-  );
+  return now;
 }
 
 export function AgentsPage({
   api: givenApi,
   owner: givenOwner,
+  apps,
+  fetch: givenFetch,
   reload,
 }: AgentsPageProps = {}): ReactElement {
   const api = useMemo(() => givenApi ?? createAgentsApi(), [givenApi]);
   const owner = useMemo(() => givenOwner ?? createOwnerClient(), [givenOwner]);
-  const { state, reload: reread, switchTo } = useAgents(api, reload);
-  const list = listOf(state);
-  const [view, setView] = useState<'list' | 'map'>('list');
-  const [renaming, setRenaming] = useState<string | undefined>(undefined);
-  const [adding, setAdding] = useState(
-    () => new URLSearchParams(location.search).get('add') === '1',
+  const detailApi: DetailApi = useMemo(
+    () => createDetailApi(givenFetch === undefined ? {} : { fetch: givenFetch }),
+    [givenFetch],
   );
-  const [removing, setRemoving] = useState<AgentRow | undefined>(undefined);
+  const hood = useHood();
+  const now = useNow();
+  const path = useSyncExternalStore(subscribePath, pathNow);
+  const detailName = agentNameOf(path);
+
+  // The page's own read (actions, the switch) and the shared live store (updates by itself). Each
+  // live answer is recorded for the agent page's history before the views draw it.
+  const { state, reload: reread, switchTo } = useAgents(api, reload);
+  const subscribe = useCallback(
+    (on: () => void) =>
+      subscribeLive(
+        () => {
+          const l = getLive().list;
+          if (l !== undefined) recordLive(l);
+          on();
+        },
+        { api },
+      ),
+    [api],
+  );
+  const live = useSyncExternalStore(subscribe, getLive);
+  const list: AgentsList | undefined = live.list ?? listOf(state);
+
+  const [panel, setPanel] = useState<{ name: string; panel: Panel } | undefined>(undefined);
+  // `?add=1` (the agent chip's "Add agent") opens Add here, also when the page is already open;
+  // it is then taken off the address, so the next "Add agent" is a change again.
+  const search = useSyncExternalStore(subscribePath, () => location.search);
+  const [adding, setAdding] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(search).get('add') !== '1') return;
+    setAdding(true);
+    history.replaceState(history.state, '', location.pathname);
+  }, [search]);
+  const [removeQueue, setRemoveQueue] = useState<readonly AgentRow[]>([]);
+  const [pausing, setPausing] = useState<AgentRow | undefined>(undefined);
+  const [resuming, setResuming] = useState(false);
+  const [cardName, setCardName] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -218,118 +155,305 @@ export function AgentsPage({
   const rows = useMemo(() => orderAgents(list?.agents ?? []), [list]);
   const tidy = useMemo(() => new Set(tidyCandidates(rows).map((r) => r.name)), [rows]);
   const generation = list?.generation;
+  const open = rows.find((r) => r.current);
+  const labelOf = useCallback(
+    (folder: string): string => rows.find((r) => r.name === folder)?.label ?? folder,
+    [rows],
+  );
 
-  const doSwitch = (row: AgentRow): void => {
-    setNotice(undefined);
-    void switchTo(row.name).then((outcome) => {
-      if (outcome.kind === 'agent_changed') setNotice(S.agentChanged);
-    });
-  };
-  const changed = (): void => {
+  const changed = useCallback((): void => announceAgentsChanged(), []);
+  const agentChanged = useCallback((): void => {
+    setNotice(S.agentChanged);
     announceAgentsChanged();
-  };
-  const MapView = mapView;
+  }, []);
 
-  return (
-    <main className="ag-page">
-      <div className="ag-head">
-        <h1 className="al-text-h1">{S.title}</h1>
-        <div className="ag-head-tools">
-          <Segmented
-            label={S.viewLabel}
-            variant="tabs"
-            idPrefix="ag-view"
-            panelId="ag-panel"
-            value={view}
-            onChange={(v) => setView(v === 'map' ? 'map' : 'list')}
-            options={[
-              { value: 'list', label: S.list },
-              { value: 'map', label: S.map },
-            ]}
+  // What to do once another agent is open (a switch-first press); taken once per page mount, on
+  // the first list read here (the page that pressed never takes its own).
+  const intentChecked = useRef(false);
+  const act = useCallback((action: IntentAction, row: AgentRow): void => {
+    if (action === 'pause') setPausing(row);
+    else if (action === 'resume') setResuming(true);
+    else setPanel({ name: row.name, panel: 'apps' });
+  }, []);
+  useEffect(() => {
+    if (intentChecked.current || list === undefined) return;
+    intentChecked.current = true;
+    const action = takeIntent(list.current);
+    const row = list.agents.find((r) => r.current);
+    if (action !== undefined && row !== undefined) act(action, row);
+  }, [list, act]);
+
+  // D-141: "Contacts still see {cardName}" for the open agent, read once.
+  useEffect(() => {
+    let live = true;
+    void api.cardName().then((out) => {
+      if (live && out.kind === 'differs') setCardName(out.cardName);
+    });
+    return () => {
+      live = false;
+    };
+  }, [api]);
+
+  const doSwitch = useCallback(
+    (row: AgentRow): void => {
+      setNotice(undefined);
+      void switchTo(row.name).then((outcome) => {
+        if (outcome.kind === 'agent_changed') setNotice(S.agentChanged);
+        if (outcome.kind !== 'done') forgetIntent();
+      });
+    },
+    [switchTo],
+  );
+  /** Pause, Resume and AI apps on another agent: switch to it first (08 §1). */
+  const firstOpen = useCallback(
+    (row: AgentRow, action: IntentAction): void => {
+      if (row.current) return act(action, row);
+      rememberIntent({ name: row.name, action });
+      setNotice(S.switching(row.label));
+      doSwitch(row);
+    },
+    [act, doSwitch],
+  );
+
+  const onPause = (row: AgentRow): void => firstOpen(row, 'pause');
+  const onResume = (row: AgentRow): void => firstOpen(row, 'resume');
+  const onAppsElsewhere = (row: AgentRow): void => firstOpen(row, 'apps');
+  const onRenamed = (label: string, told: boolean): void => {
+    setNotice(told ? S.renamedTold(label) : undefined);
+  };
+
+  const pausedOpen = open !== undefined && stateOf(open) === 'paused' ? open : undefined;
+  const banner =
+    pausedOpen === undefined ? null : (
+      <PausedBanner row={pausedOpen} resuming={resuming} onResume={() => setResuming(true)}>
+        {resuming ? (
+          <ResumeGate
+            row={pausedOpen}
+            api={api}
+            owner={owner}
+            onCancel={() => setResuming(false)}
+            onResumed={() => {
+              setResuming(false);
+              changed();
+            }}
+            onAgentChanged={() => {
+              setResuming(false);
+              agentChanged();
+            }}
           />
+        ) : null}
+      </PausedBanner>
+    );
+  // The Resume gate of an agent that is not shown as paused (an intent, or a stale read).
+  const resumeLoose =
+    resuming && pausedOpen === undefined && open !== undefined ? (
+      <ResumeGate
+        row={open}
+        api={api}
+        owner={owner}
+        onCancel={() => setResuming(false)}
+        onResumed={() => {
+          setResuming(false);
+          changed();
+        }}
+        onAgentChanged={() => {
+          setResuming(false);
+          agentChanged();
+        }}
+      />
+    ) : null;
+
+  const loading = list === undefined && state.kind === 'loading';
+  const failed = list === undefined && state.kind === 'error';
+  const detail = detailName === undefined ? undefined : rows.find((r) => r.name === detailName);
+  const MapView = mapView;
+  const [view, setView] = useState<'list' | 'map'>('list');
+
+  let body: ReactElement;
+  if (failed) {
+    body = (
+      <Surface as="section" level={1} className="ag-error-box">
+        <p className="al-text-body" role="alert">
+          {S.loadError}
+        </p>
+        <Button variant="secondary" onClick={reread}>
+          {S.tryAgain}
+        </Button>
+      </Surface>
+    );
+  } else if (detailName !== undefined) {
+    body =
+      detail === undefined ? (
+        list === undefined ? (
+          <SkeletonGate loading skeleton={<SkeletonList rows={4} />} label={S.loading} />
+        ) : (
+          <div className="ag-detail">
+            <a className="ag-back al-text-body-sm" href="/agents">
+              {S.backToAgents}
+            </a>
+            <p className="al-text-body">{S.noSuchAgent}</p>
+          </div>
+        )
+      ) : (
+        <AgentDetail
+          row={detail}
+          now={now}
+          detailApi={detailApi}
+          owner={owner}
+          {...(apps === undefined ? {} : { apps })}
+          labelOf={labelOf}
+          banner={detail.current ? banner : null}
+          onPause={onPause}
+          onResume={onResume}
+          onSwitch={doSwitch}
+          onAppsElsewhere={onAppsElsewhere}
+          onChanged={changed}
+          onAgentChanged={agentChanged}
+        />
+      );
+  } else {
+    const head = (
+      <div className="ag-head">
+        <div className="ag-head-text">
+          <h1 className="al-text-h1">
+            {S.title}
+            {hood && list !== undefined ? <span className="ag-count">{rows.length}</span> : null}
+          </h1>
+          <p className="al-text-body-sm al-muted">
+            {hood && list !== undefined ? fleetSummary(rows) : S.intro}
+          </p>
+        </div>
+        <div className="ag-head-tools">
+          {hood && MapView !== undefined ? (
+            <span className="ag-views">
+              <Button
+                variant={view === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                aria-pressed={view === 'list'}
+                onClick={() => setView('list')}
+              >
+                {S.list}
+              </Button>
+              <Button
+                variant={view === 'map' ? 'secondary' : 'ghost'}
+                size="sm"
+                aria-pressed={view === 'map'}
+                onClick={() => setView('map')}
+              >
+                {S.map}
+              </Button>
+            </span>
+          ) : null}
           {list?.switchable === false ? null : (
-            <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>
-              {S.add}
-            </Button>
+            <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
+              {S.newAgent}
+            </a>
           )}
         </div>
       </div>
+    );
+    const content =
+      list !== undefined && rows.length === 0 ? (
+        <EmptyState
+          title={S.empty}
+          action={
+            <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
+              {S.newAgent}
+            </a>
+          }
+        />
+      ) : hood && view === 'map' && MapView !== undefined ? (
+        <MapView agents={rows} onShowList={() => setView('list')} onSwitch={doSwitch} />
+      ) : hood ? (
+        <Fleet
+          rows={rows}
+          now={now}
+          onPause={onPause}
+          onResume={onResume}
+          onRemove={(picked) => setRemoveQueue(picked)}
+        />
+      ) : (
+        <div className="ag-cards">
+          {rows.map((row) => (
+            <AgentCard
+              key={row.name}
+              row={row}
+              tidy={tidy.has(row.name)}
+              actions={{
+                api,
+                owner,
+                ...(apps === undefined ? {} : { apps }),
+                now,
+                labelOf,
+                cardName,
+                panel,
+                setPanel,
+                onPause,
+                onResume,
+                onSwitch: doSwitch,
+                onRemove: (r) => setRemoveQueue([r]),
+                onAppsElsewhere,
+                onRenamed,
+                onCardUpdated: (told) => {
+                  setCardName(undefined);
+                  setNotice(told && open !== undefined ? S.renamedTold(open.label) : undefined);
+                  changed();
+                },
+                onChanged: changed,
+                onAgentChanged: agentChanged,
+              }}
+            />
+          ))}
+        </div>
+      );
+    body = (
+      <>
+        {head}
+        {banner}
+        {resumeLoose}
+        {state.kind === 'error' && list !== undefined ? (
+          <p className="al-text-body-sm" role="alert">
+            {S.loadError}{' '}
+            <button type="button" className="ag-link" onClick={reread}>
+              {S.tryAgain}
+            </button>
+          </p>
+        ) : null}
+        <SkeletonGate
+          loading={loading}
+          skeleton={hood ? <SkeletonTable rows={4} columns={5} /> : <SkeletonList rows={3} />}
+          label={S.loading}
+        >
+          {list === undefined ? null : content}
+        </SkeletonGate>
+      </>
+    );
+  }
 
-      <div className="ag-live" role="status" aria-live="polite">
+  const removing = removeQueue[0];
+  return (
+    <main className="ag-page" data-layer={hood ? 'pro' : 'simple'}>
+      <div className="ag-live al-text-body-sm" role="status" aria-live="polite">
         {notice}
       </div>
+      {body}
 
-      <div id="ag-panel" role="tabpanel" aria-labelledby={`ag-view-tab-${view}`}>
-        {view === 'map' ? (
-          MapView === undefined ? (
-            <p className="al-text-body al-muted">{S.mapSoon}</p>
-          ) : (
-            <MapView agents={rows} onShowList={() => setView('list')} onSwitch={doSwitch} />
-          )
-        ) : state.kind === 'loading' && list === undefined ? (
-          <Skeleton loading lines={3}>
-            <span />
-          </Skeleton>
-        ) : state.kind === 'error' && list === undefined ? (
-          <Surface as="section" level={1} className="ag-error-box">
-            <p className="al-text-body" role="alert">
-              {S.loadError}
-            </p>
-            <Button variant="secondary" onClick={reread}>
-              {S.tryAgain}
-            </Button>
-          </Surface>
-        ) : list !== undefined && rows.length === 0 ? (
-          <EmptyState
-            title={S.empty}
-            action={
-              <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>
-                {S.add}
-              </Button>
-            }
-          />
-        ) : (
-          <>
-            {state.kind === 'error' ? (
-              <p className="al-text-body-sm" role="alert">
-                {S.loadError}{' '}
-                <button type="button" className="ag-link" onClick={reread}>
-                  {S.tryAgain}
-                </button>
-              </p>
-            ) : null}
-            <ul className="ag-list">
-              {rows.map((row) => (
-                <Row
-                  key={row.name}
-                  row={row}
-                  tidy={tidy.has(row.name)}
-                  renaming={renaming === row.name}
-                  onRenameStart={() => setRenaming(row.name)}
-                  onRenameEnd={() => setRenaming(undefined)}
-                  rename={(done, cancel) =>
-                    generation === undefined ? (
-                      <span />
-                    ) : (
-                      <RenameEditor
-                        row={row}
-                        api={api}
-                        owner={owner}
-                        onDone={done}
-                        onCancel={cancel}
-                        onChanged={changed}
-                      />
-                    )
-                  }
-                  onSwitch={doSwitch}
-                  onRemove={setRemoving}
-                />
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
-
+      {pausing !== undefined && generation !== undefined ? (
+        <PauseSheet
+          row={pausing}
+          generation={generation}
+          api={api}
+          onClose={() => setPausing(undefined)}
+          onPaused={() => {
+            setPausing(undefined);
+            changed();
+          }}
+          onAgentChanged={() => {
+            setPausing(undefined);
+            agentChanged();
+          }}
+        />
+      ) : null}
       {adding && generation !== undefined ? (
         <AddSheet
           api={api}
@@ -352,21 +476,22 @@ export function AgentsPage({
       ) : null}
       {removing !== undefined && generation !== undefined ? (
         <RemoveSheet
+          key={removing.name}
           row={removing}
           api={api}
           owner={owner}
           onClose={() => {
-            setRemoving(undefined);
+            setRemoveQueue([]);
             reread();
           }}
           onChanged={changed}
           onRemoved={(label) => {
-            setRemoving(undefined);
+            setRemoveQueue((q) => q.slice(1));
             setNotice(S.removed(label));
           }}
           onAgentChanged={() => {
-            setRemoving(undefined);
-            setNotice(S.agentChanged);
+            setRemoveQueue([]);
+            agentChanged();
             reread();
           }}
         />

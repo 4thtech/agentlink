@@ -318,7 +318,6 @@ const MOTION_LIBRARIES = [
 ];
 const LEGACY_APP_KEYFRAMES = [
   'apps/local-ui/src/pages/activity/activity.css | al-activity-fade',
-  'apps/local-ui/src/pages/agents/agents.css | ag-menu-in',
   'apps/local-ui/src/pages/agents/map/map.css | mp-edge',
   'apps/local-ui/src/pages/agents/map/map.css | mp-travel',
   'apps/local-ui/src/pages/contacts/contacts.css | ct-breathe',
