@@ -5,7 +5,10 @@
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { announcePasskeyRegistered } from '../pages/first-run/setup-api.js';
+import {
+  announcePasskeyRegistered,
+  resetPasskeyRegisteredForTests,
+} from '../pages/first-run/setup-api.js';
 import { resetPrefsForTests } from '../prefs/index.js';
 import { Layout, setConnectionState } from './index.js';
 
@@ -32,6 +35,7 @@ const banner = (): Element | null => host.querySelector('main a[href="/first-run
 
 describe('W4-WIRE: the "Switch to Touch ID" next step', () => {
   it('leaves at registration, on the same page, with no re-read', async () => {
+    resetPasskeyRegisteredForTests();
     let reads = 0;
     await act(async () => {
       root.render(
@@ -58,5 +62,31 @@ describe('W4-WIRE: the "Switch to Touch ID" next step', () => {
     act(() => announcePasskeyRegistered());
     expect(banner()).toBeNull();
     expect(reads).toBe(before);
+  });
+
+  it('stays gone when a read that started before registration answers after it (slow CI)', async () => {
+    resetPasskeyRegisteredForTests();
+    let answer: (needed: boolean) => void = () => undefined;
+    await act(async () => {
+      root.render(
+        h(
+          Layout,
+          {
+            path: '/contacts',
+            nextStep: () => new Promise<boolean>((r) => (answer = r)),
+            unseenMessages: async () => 0,
+            readHealth: () => new Promise<never>(() => undefined),
+          },
+          h('p', null, 'page'),
+        ),
+      );
+    });
+    act(() => announcePasskeyRegistered());
+    await act(async () => {
+      answer(true);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(banner()).toBeNull();
+    resetPasskeyRegisteredForTests();
   });
 });
