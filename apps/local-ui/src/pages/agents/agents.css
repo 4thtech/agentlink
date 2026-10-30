@@ -120,6 +120,7 @@
 }
 .ag-chip-name {
   color: var(--al-color-fg-default);
+  white-space: nowrap;
 }
 .ag-adot {
   flex: none;
@@ -190,6 +191,9 @@
   gap: var(--al-space-3);
   padding: var(--al-space-5);
   align-items: flex-start;
+}
+.ag-page a.al-btn {
+  text-decoration: none;
 }
 .ag-link {
   border: 0;
@@ -264,12 +268,19 @@
   width: 18px;
   height: 18px;
 }
+.ag-fleet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
 .ag-agent-cell,
 .ag-cell-apps {
   display: inline-flex;
-  flex-wrap: wrap;
   gap: var(--al-space-2);
   align-items: center;
+}
+.ag-cell-apps {
+  flex-wrap: wrap;
 }
 .ag-rowlink {
   min-height: 44px;
@@ -338,13 +349,15 @@
   display: inline-flex;
   gap: 2px;
   align-items: flex-end;
+  justify-content: flex-end;
+  overflow: hidden;
   width: 96px;
   height: 20px;
   flex: none;
 }
 .ag-bar {
-  flex: 1 1 0;
-  min-width: 2px;
+  flex: none;
+  width: 3px;
   height: 2px;
   border-radius: 1px;
   background: var(--al-color-border-strong);

@@ -88,7 +88,7 @@ export function Fleet({
   const single = picked.length === 1 ? picked[0] : undefined;
 
   return (
-    <>
+    <div className="ag-fleet">
       <div className="ag-filters">
         <span className="ag-field ag-field-grow">
           <label htmlFor={`${id}-q`} className="al-text-label al-muted">
@@ -271,6 +271,6 @@ export function Fleet({
           <p className="al-text-body-sm al-muted ag-empty">{S.noMatch}</p>
         ) : null}
       </div>
-    </>
+    </div>
   );
 }
