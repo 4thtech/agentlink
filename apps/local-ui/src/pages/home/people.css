@@ -1,7 +1,7 @@
 /* W4-HOME: Home simple and pro (prototype v23 A4, A10; D-116: styled from the approved design with
    the design tokens). Motion only through U0's classes (al-expand, al-reveal, al-pop, al-press,
-   al-optimistic, the shared element); transitions here are colour and transform only, and reduced
-   motion turns them off. Classes only, no inline styles (08 §4 CSP). */
+   al-optimistic, the shared element); the one transition here is the chevron's turn (transform),
+   off under reduced motion. Classes only, no inline styles (08 §4 CSP). */
 
 .hm-page {
   display: flex;
@@ -272,7 +272,6 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--al-duration-fast) var(--al-easing-standard);
 }
 .hm-row:hover {
   background: var(--al-color-bg-raised);
@@ -812,12 +811,10 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hm-chev,
-  .hm-row {
+  .hm-chev {
     transition: none;
   }
 }
-:root[data-motion='reduced'] .hm-chev,
-:root[data-motion='reduced'] .hm-row {
+:root[data-motion='reduced'] .hm-chev {
   transition: none;
 }
