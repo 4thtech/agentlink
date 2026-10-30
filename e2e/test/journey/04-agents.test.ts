@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { until } from '../app-world.js';
+import { fakeClaudeCode, startAiAppMcp, until } from '../app-world.js';
 import {
   CLS_BUDGET,
   emulateReducedMotion,
@@ -120,6 +120,59 @@ describe('chapter 4: agents', () => {
       .getByRole('button', { name: /^Agent: Side project/ })
       .first()
       .waitFor();
+    await probe.check();
+  }, 180_000);
+
+  // W4-WIRE-3 (D-143; 06 §6 "MCP session heartbeat"; owner walkthrough 30 Oct): Claude Code's MCP
+  // session, run through `agentlink mcp`'s own command and heartbeat, shows in the agent chip and the
+  // dropdown as Ready, then Working after a tool call, then Not running once it ends, with no reload.
+  it('Claude Code shows Ready, Working, then Not running as its MCP session runs and ends', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    await fakeClaudeCode(pc.home);
+    const jp = await journeyPage(ready.browser);
+    await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
+    const probe = await jp.arm();
+    const { page } = jp;
+    const chip = page.locator('.al-chip-status').first();
+    const appWord = async (): Promise<string> => {
+      await page
+        .getByRole('button', { name: /^Agent: / })
+        .first()
+        .click();
+      const line = page.locator('.al-am-app').filter({ hasText: 'Claude Code' }).first();
+      const word = (await line.locator('.al-am-app-word').innerText()).trim();
+      await page.keyboard.press('Escape');
+      return word;
+    };
+    await eventually('Offline before', async () => (await chip.innerText()).startsWith('Offline'));
+
+    const mcp = await startAiAppMcp(pc, undefined);
+    ch.closers.push(() => mcp.close());
+    await eventually(
+      'Ready in Claude Code',
+      async () => (await chip.innerText()).trim() === 'Ready in Claude Code',
+      20_000,
+    );
+    expect(await appWord()).toBe('Ready');
+
+    await mcp.call('agentlink_status');
+    await eventually(
+      'Working in Claude Code',
+      async () => (await chip.innerText()).trim() === 'Working in Claude Code',
+      20_000,
+    );
+    expect(await appWord()).toBe('Working');
+
+    await mcp.close();
+    await eventually(
+      'Offline after',
+      async () => (await chip.innerText()).startsWith('Offline'),
+      20_000,
+    );
+    expect(await appWord()).toMatch(/^Not running/);
     await probe.check();
   }, 180_000);
 

@@ -362,6 +362,26 @@ describe('GET /api/ui/events: the gate (04 §2.5, 08 §1)', () => {
     for (let i = 0; i < 4; i += 1) expect((await h.stream()).status).toBe(200);
   });
 
+  // W4-WIRE-3 (owner walkthrough 30 Oct): the host's first read takes real time (it reads every
+  // agent's store and the AI app configs). By then Node has consumed the empty GET body and marked
+  // the request destroyed; that must not count as the reader going away, or the stream is dropped
+  // before its first byte and the page waits forever with the status it loaded ("Offline").
+  it('a stream whose first host read is slow still answers with its snapshot', async () => {
+    const h = await harness();
+    const release = h.hold();
+    const opening = h.stream();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    release();
+    const s = await Promise.race([
+      opening,
+      new Promise<never>((_, fail) =>
+        setTimeout(() => fail(new Error('the stream never answered')), 2_000),
+      ),
+    ]);
+    expect(s.status).toBe(200);
+    await s.until((t) => t.includes('event: snapshot'));
+  });
+
   it('ends open streams when the host stops', async () => {
     const h = await harness();
     const s = await h.stream();

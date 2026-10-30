@@ -317,6 +317,54 @@ describe('Home simple (A4)', () => {
     expect(byText('button', label)).toBeTruthy();
   });
 
+  // W4-WIRE-3 (owner walkthrough 30 Oct; 11 §5.7 "Saved to {folder}"; I-5): a received file is one
+  // light row, "name · Saved to ~/AgentLink/Inbox · Show in Finder". The name another party chose is
+  // plain text isolated in a <bdi> (no message box around it); "Saved as" only when the name changed.
+  it('shows a received file as a light row: its name, Saved to the Inbox folder, Show in Finder', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    const received = (savedName: string) =>
+      ok({
+        items: [
+          {
+            id: `${ENV_FILE}.00`,
+            from: 'Denis',
+            at: AT + 40,
+            name: 'logo-sketch-v1.png',
+            size: 1_200_000,
+            state: 'saved',
+            savedName,
+            savedBy: 'auto',
+            proof: false,
+          },
+        ],
+        autoSave: { on: true, folder: '~/AgentLink/Inbox', notice: false },
+      });
+    await render(base({ [RECEIVED]: received('logo-sketch-v1.png') }));
+    await click(row('Denis'));
+    const file = q('.hm-file');
+    expect(file).toBeTruthy();
+    expect(file?.querySelector('figure.al-untrusted')).toBeNull();
+    const name = file?.querySelector('bdi');
+    expect(name?.textContent).toBe('logo-sketch-v1.png');
+    expect(name?.getAttribute('dir')).toBe('auto');
+    expect(file?.textContent).toContain('Saved to ~/AgentLink/Inbox');
+    expect(file?.textContent).not.toContain(S.savedAs);
+    expect(byText('button', S.showInFinder)).toBeTruthy();
+
+    // A name that changed on saving (taken, or cleaned) also says what it was saved as.
+    root.render(h('div'));
+    await settle();
+    await render(base({ [RECEIVED]: received('logo-sketch-v1 (2).png') }));
+    await click(row('Denis'));
+    const renamed = q('.hm-file');
+    expect(renamed?.querySelector('figure.al-untrusted')).toBeNull();
+    expect(renamed?.textContent).toContain(`${S.savedAs} logo-sketch-v1 (2).png`);
+    expect([...(renamed?.querySelectorAll('bdi') ?? [])].map((b) => b.textContent)).toEqual([
+      'logo-sketch-v1.png',
+      'logo-sketch-v1 (2).png',
+    ]);
+  });
+
   it('offers Save to Inbox for a file that arrived and is not saved', async () => {
     await render(
       base({
