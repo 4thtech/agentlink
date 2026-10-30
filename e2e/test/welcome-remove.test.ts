@@ -132,7 +132,7 @@ describe('Remove in the session first run started (HOTFIX-045-REMOVE-FIRSTRUN)',
     const label = { 'X-AgentLink-Input': input({ label: 'Ana' }) };
     const begin = await post('/api/ui/first-run/owner/begin', new Uint8Array(0), label);
     expect(begin.status).toBe(200);
-    const { publicKey } = JSON.parse(begin.body) as {
+    const { publicKey, nonce } = JSON.parse(begin.body) as {
       publicKey: { rpId: string; userId: string; challenge: string; prfSalt: string };
     };
     const salt = decodeBase64url(publicKey.prfSalt);
@@ -153,7 +153,8 @@ describe('Remove in the session first run started (HOTFIX-045-REMOVE-FIRSTRUN)',
         clientDataJSON,
         prfOutput: created.prfOutput,
       }),
-      label,
+      // W4-ONE-TOUCH (04 §2.8): finish carries only the begin nonce.
+      { 'X-AgentLink-Input': input({ nonce }) },
     );
     expect(finish.status).toBe(200);
     const listed = await pc.directory.list();
