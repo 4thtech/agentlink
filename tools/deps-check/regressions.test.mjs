@@ -12,6 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { checkManifest, checkSource, runChecks, specProblem } from './check.mjs';
@@ -865,6 +866,44 @@ describe('W4-DEPS-CHECK-FLAKE: the per-file result cache never changes the repor
     writeFileSync(join(root, 'packages/core/src/a.ts'), `export * from 'viem';\n`);
     const { problems } = runChecks(root, { cache: true });
     expect(problems.some((problem) => problem.includes('viem'))).toBe(true);
+  });
+
+  const plant = (root, replace) => {
+    const cacheDir = join(root, 'node_modules', '.cache', 'deps-check');
+    const [name] = readdirSync(cacheDir);
+    const file = join(cacheDir, name);
+    writeFileSync(file, JSON.stringify(replace(JSON.parse(readFileSync(file, 'utf8')))));
+  };
+
+  it.each([
+    ['null', null],
+    ['a number', 7],
+    ['a list', []],
+  ])('rescans when the cache file holds %s instead of an object', (_label, value) => {
+    const root = repo({ 'packages/core/src/a.ts': `export * from 'viem';\n` });
+    runChecks(root, { cache: true });
+    plant(root, () => value);
+    const { problems } = runChecks(root, { cache: true });
+    expect(problems.some((problem) => problem.includes('viem'))).toBe(true);
+  });
+
+  it('the gating CLI never reads an existing cache when CI is set (planted clean entries)', () => {
+    const root = repo({ 'packages/core/src/a.ts': `export * from 'viem';\n` });
+    runChecks(root, { cache: true });
+    plant(root, (entries) => Object.fromEntries(Object.keys(entries).map((key) => [key, []])));
+    // the planted cache really would hide the violation for a cache-reading run
+    expect(runChecks(root, { cache: true }).problems.some((p) => p.includes('viem'))).toBe(false);
+    const cli = join(dirname(fileURLToPath(import.meta.url)), 'index.mjs');
+    let stderr = '';
+    try {
+      execFileSync('node', [cli, root], {
+        env: { ...process.env, CI: '1' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      stderr = String(error.stderr);
+    }
+    expect(stderr).toContain('viem');
   });
 
   it('ignores a damaged or hand-edited cache entry', () => {
