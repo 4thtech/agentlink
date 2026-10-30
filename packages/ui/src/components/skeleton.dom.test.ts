@@ -133,13 +133,17 @@ describe('the skeleton stylesheet', () => {
     expect(flat).toMatch(
       /\.al-skel \{[^}]*animation: al-skel-shimmer var\(--al-duration-shimmer\) var\(--al-easing-standard\) infinite/,
     );
-    expect(flat).toMatch(/@keyframes al-skel-shimmer \{ 0%, 100% \{ opacity: 0\.45; \} 50% \{ opacity: 0\.9; \} \}/);
+    expect(flat).toMatch(
+      /@keyframes al-skel-shimmer \{ 0%, 100% \{ opacity: 0\.45; \} 50% \{ opacity: 0\.9; \} \}/,
+    );
   });
 
   it('holds still at 0.7 under reduced motion, for both switches', () => {
     expect(flat).toMatch(
       /@media \(prefers-reduced-motion: reduce\) \{[^@]*\.al-skel \{ animation: none; opacity: 0\.7; \}/,
     );
-    expect(flat).toMatch(/:root\[data-motion='reduced'\] \.al-skel \{ animation: none; opacity: 0\.7; \}/);
+    expect(flat).toMatch(
+      /:root\[data-motion='reduced'\] \.al-skel \{ animation: none; opacity: 0\.7; \}/,
+    );
   });
 });

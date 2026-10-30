@@ -138,8 +138,10 @@ describe('reduced motion', () => {
     await emulateReducedMotion(page, false);
     await startPageChange(page);
     const normal = await runningAnimations(page);
-    expect(normal.some((a) => a.pseudo?.includes('view-transition') && a.properties.includes('transform'))).toBe(
-      true,
-    );
+    expect(
+      normal.some(
+        (a) => a.pseudo?.includes('view-transition') && a.properties.includes('transform'),
+      ),
+    ).toBe(true);
   });
 });

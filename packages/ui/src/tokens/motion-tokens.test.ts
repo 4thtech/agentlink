@@ -4,7 +4,7 @@
 // inside 150 to 350 ms (W4 UX v2, "Motion and perceived speed"); the spring is a CSS `linear()` curve
 // that starts at 0 and ends at exactly 1, so a filled animation rests where it should.
 import { describe, expect, it } from 'vitest';
-import css from './tokens.css?raw';
+import rawCss from './tokens.css?raw';
 import { motionTokens, scalarTokens } from './index.js';
 
 const d1 = import.meta.glob(
@@ -16,6 +16,9 @@ const source = JSON.parse(d1['../../../../docs/design/d1/tokens/tokens.source.js
   duration: { tokens: { name: string; value: string }[] };
   easing: { tokens: { name: string; value: string }[] };
 };
+
+// Prettier wraps the long linear() value over several lines; compare it on one line.
+const css = rawCss.replace(/\(\s+/g, '(').replace(/,\s+/g, ', ').replace(/\s+\)/g, ')');
 
 const W4 = {
   'al-duration-press': '150ms',

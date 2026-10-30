@@ -228,7 +228,9 @@ describe('the view-transition stylesheet', () => {
 
   it('names the fixed regions and the shared element by class and attribute, never inline', () => {
     for (const [region, cls] of Object.entries(VT_CLASS)) {
-      expect(flat, region).toMatch(new RegExp(`\\.${cls} \\{ view-transition-name: al-${region}; \\}`));
+      expect(flat, region).toMatch(
+        new RegExp(`\\.${cls} \\{ view-transition-name: al-${region}; \\}`),
+      );
     }
     expect(flat).toContain(`[${VT_SHARED_ATTR}] { view-transition-name: al-shared; }`);
   });
@@ -245,10 +247,14 @@ describe('the view-transition stylesheet', () => {
     ]) {
       expect(flat).toMatch(scope);
     }
-    expect(flat).toMatch(/:root\[data-motion='reduced'\]::view-transition-new\(\*\) \{ animation: al-fade-in var\(--al-duration-fade\)/);
+    expect(flat).toMatch(
+      /:root\[data-motion='reduced'\]::view-transition-new\(\*\) \{ animation: al-fade-in var\(--al-duration-fade\)/,
+    );
   });
 
   it('enters a route with a fade-up where the browser has no View Transitions', () => {
-    expect(flat).toMatch(/@supports not \(view-transition-name: none\) \{ \.al-route \{ animation: al-enter/);
+    expect(flat).toMatch(
+      /@supports not \(view-transition-name: none\) \{ \.al-route \{ animation: al-enter/,
+    );
   });
 });

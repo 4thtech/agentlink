@@ -384,8 +384,7 @@
   animation: al-out var(--al-duration-exit) var(--al-easing-exit) both;
 }
 ::view-transition-new(al-main) {
-  animation: al-in var(--al-duration-slow) var(--al-easing-overshoot) var(--al-duration-press)
-    both;
+  animation: al-in var(--al-duration-slow) var(--al-easing-overshoot) var(--al-duration-press) both;
 }
 ::view-transition-new(al-strip) {
   animation: al-strip-in var(--al-duration-reveal) var(--al-easing-overshoot) both;

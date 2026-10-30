@@ -33,5 +33,7 @@ import { scalarTokens } from './data.js';
 export const motionTokens = Object.fromEntries(
   Object.entries(scalarTokens).filter(([name]) => /^al-(duration|easing)-/.test(name)),
 ) as {
-  readonly [K in Extract<ScalarTokenName, `al-duration-${string}` | `al-easing-${string}`>]: (typeof scalarTokens)[K];
+  readonly [
+    K in Extract<ScalarTokenName, `al-duration-${string}` | `al-easing-${string}`>
+  ]: (typeof scalarTokens)[K];
 };

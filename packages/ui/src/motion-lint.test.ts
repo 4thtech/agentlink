@@ -347,7 +347,9 @@ describe('the W4 motion kit is the only source of motion', () => {
         ...pkg['peerDependencies'],
         ...pkg['optionalDependencies'],
       });
-      const found = deps.filter((d) => MOTION_LIBRARIES.includes(d) || d.startsWith('@react-spring/'));
+      const found = deps.filter(
+        (d) => MOTION_LIBRARIES.includes(d) || d.startsWith('@react-spring/'),
+      );
       expect(found, file).toEqual([]);
     }
   });
