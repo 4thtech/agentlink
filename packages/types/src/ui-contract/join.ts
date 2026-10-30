@@ -34,6 +34,11 @@ export interface JoinReadBody {
   readonly inviteId?: string;
   readonly inviter?: JoinInviterBody;
   readonly expiresAt?: string;
+  /**
+   * W4-PEOPLE-INVITE: only when `connected`, the new contact's ref (its ID, as the contacts routes
+   * use it), so the screen reads that contact's safety code and no other.
+   */
+  readonly contactRef?: string;
 }
 
 export interface JoinAnswer<B = unknown> {
@@ -83,6 +88,19 @@ export const JOIN_READ = {
       },
     } satisfies JoinAnswer<JoinReadBody>,
     outcome: 'waiting',
+  },
+  connected: {
+    answer: {
+      status: 200,
+      body: {
+        state: 'connected',
+        inviteId: JOIN_WORLD.inviteId,
+        inviter: JOIN_WORLD.inviter,
+        expiresAt: '2027-01-15T08:00:00Z',
+        contactRef: JOIN_WORLD.contactId,
+      },
+    } satisfies JoinAnswer<JoinReadBody>,
+    outcome: 'connected',
   },
 } as const;
 

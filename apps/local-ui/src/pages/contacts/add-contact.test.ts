@@ -42,6 +42,7 @@ const CREATED = {
   ownerFingerprint: '7F3A·19C2',
   expiresAt: '2026-11-04T12:00:00Z',
   format: 'long',
+  inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
 };
 const CHECKED = {
   status: 'ok',
@@ -290,15 +291,18 @@ async function createFor(name: string | undefined, routes: Routes = {}): Promise
 }
 
 describe('UX2-d2: where the sheet opens', () => {
-  it('puts Add contact in the title row: secondary with contacts, primary when the list is empty', async () => {
+  // W4-PEOPLE-INVITE: Invite someone (the Invite screen) is the one primary action; Add contact
+  // (the sheet, for a pasted invite too) stays beside it as secondary.
+  it('puts Add contact in the title row, secondary beside the primary Invite someone', async () => {
     await mount();
     const add = button(A.addContact);
     expect(add.closest('.ct-title-row')).not.toBeNull();
     expect(add.className).toContain('al-btn-secondary');
+    expect(button('Invite someone').className).toContain('al-btn-primary');
     act(() => root.unmount());
     root = createRoot(host);
     await mount({ [`GET ${LIST}`]: { status: 'ok', contacts: [] } });
-    expect(button(A.addContact).className).toContain('al-btn-primary');
+    expect(button(A.addContact).className).toContain('al-btn-secondary');
   });
 
   it('opens a labelled region, not a modal, and focuses its first field', async () => {
@@ -569,6 +573,7 @@ describe('W4-SHORT-INVITE: the long link under Advanced', () => {
         inviteUrl: SHORT,
         shareText: `Add my AI agent on AgentLink: ${SHORT}`,
         format: 'short',
+        inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
       },
     });
     expect(sheet()?.textContent).toContain(SHORT);
@@ -611,12 +616,12 @@ describe('W4-INVITES-LIST: open invites from the server', () => {
     expect(el?.querySelectorAll('li').length).toBe(2);
     expect(el?.textContent).toContain(waitingToAccept('Bo'));
     expect(el?.textContent).toContain(waitingToAccept(undefined));
-    expect(el?.textContent).toMatch(/Expires in [\d,]+ days/);
+    // W4-PEOPLE-INVITE: the rows are PendingInviteRow (prototype v23 A4).
+    expect(el?.textContent).toMatch(/link works [\d,]+ more days/);
     const cancels = [...(el?.querySelectorAll('button') ?? [])].filter(
-      (b) => (b.textContent ?? '').trim() === 'Cancel',
+      (b) => (b.textContent ?? '').trim() === 'Cancel invite',
     );
     expect(cancels.length).toBe(2);
-    expect(A.cancelInvite).toBe('Cancel');
   });
 
   it('shows nothing when there are none, and when the list cannot be read', async () => {
@@ -665,8 +670,12 @@ describe('W4-INVITES-LIST: open invites from the server', () => {
     expect(calls.filter((c) => c.method === 'GET' && c.url === CREATE).length).toBeGreaterThan(
       reads,
     );
-    expect(rowsEl()?.querySelectorAll('li').length).toBe(1);
-    expect(rowsEl()?.textContent).not.toContain('Bo');
+    // The cancelled row stays for this visit and says the link no longer works (A4).
+    expect(rowsEl()?.querySelectorAll('li').length).toBe(2);
+    expect(rowsEl()?.querySelector('li')?.textContent).toContain(
+      'Invite cancelled. The link no longer works.',
+    );
+    expect(rowsEl()?.querySelector('li')?.querySelector('button')).toBeNull();
   });
 
   it('drops a row the server no longer has (not found) without an error', async () => {

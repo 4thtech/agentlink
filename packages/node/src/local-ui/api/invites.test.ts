@@ -111,6 +111,7 @@ function desk(over: Partial<LocalUiInviteDesk> = {}): {
       create: (input) => {
         created.push(input);
         return Promise.resolve<CreatedInvite>({
+          inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
           inviteUrl: LINK,
           format: 'long',
           ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },
@@ -153,9 +154,26 @@ describe('create an invite (UX2-d1, decision 1.1)', () => {
         ownerFingerprint: 'EF56·7890',
         expiresAt: '2026-11-04T10:00:00Z',
         format: 'long',
+        // W4-PEOPLE-INVITE (IR-1 M): the public ID of this invite, so the page cancels only its own.
+        inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
       },
     });
     expect(d.created).toEqual([{}]);
+  });
+
+  it('answers nothing usable when core gives an invite ID of another shape (fail closed)', async () => {
+    const d = desk({
+      create: () =>
+        Promise.resolve<CreatedInvite>({
+          inviteId: 'not an id/../x',
+          inviteUrl: LINK,
+          format: 'long',
+          ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },
+          expiresAt: 1_793_786_400,
+        }),
+    });
+    const result = await inviteCreateRoute.handler(context(), {}, d.desk);
+    expect(result.status).not.toBe(200);
   });
 
   it('passes the optional name as the invite label (a suggested alias in core)', async () => {
