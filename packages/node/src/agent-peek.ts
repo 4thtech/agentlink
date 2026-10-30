@@ -103,12 +103,13 @@ export function peekAgentStore(
 /** W4-PAUSE: whether the pause row exists; false for a store from before version 11. */
 function readPaused(db: Database.Database): boolean {
   const has = db
-    .prepare("SELECT count(*) AS n FROM sqlite_schema WHERE type = 'table' AND name = 'agent_pause'")
+    .prepare(
+      "SELECT count(*) AS n FROM sqlite_schema WHERE type = 'table' AND name = 'agent_pause'",
+    )
     .get() as { n?: unknown } | undefined;
   if (has?.n !== 1) return false;
   const rows = db.prepare('SELECT count(*) AS n FROM agent_pause').get() as
-    | { n?: unknown }
-    | undefined;
+    { n?: unknown } | undefined;
   return typeof rows?.n === 'number' && rows.n > 0;
 }
 

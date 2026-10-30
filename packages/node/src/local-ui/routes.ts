@@ -207,7 +207,8 @@ export class LocalUiRouteRegistry {
     } else if (presence === 'pause') {
       // W4-PAUSE: pausing the open agent; the server's pause gate runs it (D-143 (5)).
       if (method !== 'POST') throw invalid('a pause route is a POST');
-      if (route.path !== AGENTS_PAUSE_PATH) throw invalid('a pause route is only at its fixed path');
+      if (route.path !== AGENTS_PAUSE_PATH)
+        throw invalid('a pause route is only at its fixed path');
       if (handler !== undefined) throw invalid('a pause route has no handler');
       if (this.#entries.some((e) => e.route.presence === 'pause')) {
         throw invalid('the pause route is already registered');

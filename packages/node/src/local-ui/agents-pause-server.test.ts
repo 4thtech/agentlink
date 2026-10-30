@@ -126,7 +126,11 @@ async function host(options: { host?: false } = {}) {
       ...(options.host === false
         ? {}
         : {
-            host: { directory, initial: agent(first), open: (name) => Promise.resolve(agent(name)) },
+            host: {
+              directory,
+              initial: agent(first),
+              open: (name) => Promise.resolve(agent(name)),
+            },
           }),
     },
     internals,
@@ -301,7 +305,10 @@ function signer() {
       review.push(shown);
       for (const r of reqs) signed.push(r.action);
       return Promise.resolve(
-        reqs.map((r) => ({ kind: 'owner-action', signed: { body: r.action, sig: 'ab'.repeat(64) } })),
+        reqs.map((r) => ({
+          kind: 'owner-action',
+          signed: { body: r.action, sig: 'ab'.repeat(64) },
+        })),
       );
     },
   } as unknown as LocalUiOwnerOperation;
@@ -309,7 +316,7 @@ function signer() {
 }
 
 const plain = (result: LocalUiResult | undefined) =>
-  result === undefined ? undefined : JSON.parse(JSON.stringify(result)) as unknown;
+  result === undefined ? undefined : (JSON.parse(JSON.stringify(result)) as unknown);
 
 const request = (input?: unknown) => ({
   params: {},
@@ -334,9 +341,16 @@ describe('contract (server): the Pause and Resume samples U5 builds on', () => {
   it('resume answers the samples: resumed and not_paused', async () => {
     const paused = { paused: true } as { paused: boolean; applied?: string };
     const s = signer();
-    const done = await resumeRoute().handler(world(paused), request(AGENTS_RESUME.input), s.operation);
+    const done = await resumeRoute().handler(
+      world(paused),
+      request(AGENTS_RESUME.input),
+      s.operation,
+    );
     expect(plain(done)).toEqual(AGENTS_RESUME.resumed.answer);
-    const refusal = await resumeRoute().precheck?.(world({ paused: false }), request(AGENTS_RESUME.input));
+    const refusal = await resumeRoute().precheck?.(
+      world({ paused: false }),
+      request(AGENTS_RESUME.input),
+    );
     expect(plain(refusal)).toEqual(AGENTS_RESUME.notPaused.answer);
   });
 });

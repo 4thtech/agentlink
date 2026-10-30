@@ -127,7 +127,8 @@ describe('W4-PAUSE: sending and fetching tools refuse while paused (06 §6)', ()
   it('read tools are not refused', async () => {
     const client = fake('yes');
     for (const name of ['agentlink_list_contacts', 'agentlink_get_approval']) {
-      const input = name === 'agentlink_get_approval' ? { approvalId: `apr_${'A'.repeat(22)}` } : {};
+      const input =
+        name === 'agentlink_get_approval' ? { approvalId: `apr_${'A'.repeat(22)}` } : {};
       const result = await callTool(name, input, context(client));
       expect(result.structured['code'], name).not.toBe('AGENT_PAUSED');
     }

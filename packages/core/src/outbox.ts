@@ -467,7 +467,14 @@ export class OutboxService {
     // be read: fail closed) no row is published; queued rows keep their state and deadlines and go
     // out at the first pass after a verified `agent.resume`.
     if (this.#pause !== undefined && (await this.#pause.paused())) {
-      return { sent: 0, retrying: 0, notDelivered: 0, failed: 0, nextAttemptAt: undefined, notices: [] };
+      return {
+        sent: 0,
+        retrying: 0,
+        notDelivered: 0,
+        failed: 0,
+        nextAttemptAt: undefined,
+        notices: [],
+      };
     }
     try {
       this.#ownRelays = new Set(checkList((await this.#identity.signedCard()).relays));

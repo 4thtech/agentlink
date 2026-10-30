@@ -29,8 +29,7 @@ export interface AgentPauseOptions {
 }
 
 /** The fixed refusal of every sending or fetching core path while paused. */
-export const agentPaused = (): CoreError =>
-  new CoreError('agent_paused', 'This agent is paused.');
+export const agentPaused = (): CoreError => new CoreError('agent_paused', 'This agent is paused.');
 
 const isTime = (v: unknown): v is number =>
   typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
