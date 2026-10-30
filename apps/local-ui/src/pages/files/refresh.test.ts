@@ -170,7 +170,10 @@ describe('progress on rows in flight', () => {
     });
     const [first, second] = [...host.querySelectorAll('.fl-item')];
     expect(bar(first)).toBeNull();
-    expect(first?.textContent).toContain('Not saved yet. Ask your AI to fetch it.');
+    // W4-FILES-SAVE: the fixed line is "Arrived · not saved", with the Save action beside it.
+    expect(first?.textContent).toContain('Arrived · not saved');
+    expect(first?.textContent).not.toContain('Ask your AI to fetch it');
+    expect(first?.querySelector('button')?.textContent).toContain('Save to Inbox');
     expect(bar(second)).toBeNull();
   });
 

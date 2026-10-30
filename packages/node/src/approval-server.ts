@@ -274,6 +274,7 @@ import {
 } from './owner-passkey.js';
 import {
   creditsPort,
+  fileSavePort,
   inviteAcceptPort,
   inviteDesk,
   readOnlyClient,
@@ -1354,6 +1355,9 @@ export async function startApprovalServerWith(
       client: agentUi?.client === undefined ? undefined : readOnlyClient(agentUi.client),
       // M1-11c-a4c: for the presence routes only; core re-verifies the owner signature (I-4).
       ...(agentUi?.client === undefined ? {} : { credits: creditsPort(agentUi.client) }),
+      // W4-FILES-SAVE: for the save owner route only; core takes only a `file.save` and re-verifies
+      // the owner signature before it saves (I-4).
+      ...(agentUi?.client === undefined ? {} : { fileSave: fileSavePort(agentUi.client) }),
       // UX2-d1: accepting an invite, for the accept owner route; it pairs only after core used an
       // owner-signed, applied approval (I-4).
       ...(agentUi?.client === undefined ? {} : { invites: inviteAcceptPort(agentUi.client) }),
