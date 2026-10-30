@@ -14,6 +14,7 @@ import {
   INBOX_RESOURCE_URI,
   LEASE_INTERVAL_MS,
   PARTIAL_RETRY_MS,
+  PAUSE_CHECK_MS,
   SYNC_INTERVAL_MS,
   type LoopClient,
   type LoopLease,
@@ -567,6 +568,116 @@ describe('background loop with live subscriptions (M1-9s)', () => {
     await flush();
     expect(s.sync).toHaveBeenCalledTimes(2);
     expect(s.subscribe).toHaveBeenCalledTimes(2);
+    await loop.stop();
+  });
+});
+
+// W4-PAUSE (D-143 (5); 06 §6 "Paused agents"): while the agent is paused the lease holder keeps the
+// lease and idles: no fetch, no outbox publish, no subscription, no processing. A pause takes effect
+// within one pause check (5 s) for a subscription already open; resume runs the usual look-back and
+// subscribes again. A pause state that cannot be read counts as paused (fail closed).
+describe('background loop while the agent is paused (W4-PAUSE)', () => {
+  function pausable(initial: boolean | 'throws') {
+    const s = liveStubClient();
+    const state = { paused: initial };
+    const paused = vi.fn(() =>
+      state.paused === 'throws'
+        ? Promise.reject(new Error('SQLITE_CORRUPT'))
+        : Promise.resolve(state.paused),
+    );
+    return { ...s, state, paused, client: { ...s.client, paused } };
+  }
+
+  it('paused from the start: holds the lease and idles (no fetch, publish or subscription)', async () => {
+    const s = pausable(true);
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    expect(loop.holding).toBe(true);
+    timers.fire(0); // the start-up pass
+    await flush();
+    expect(s.sync).not.toHaveBeenCalled();
+    expect(s.deliver).not.toHaveBeenCalled();
+    expect(s.subscribe).not.toHaveBeenCalled();
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(s.sync).not.toHaveBeenCalled();
+    expect(s.deliver).not.toHaveBeenCalled();
+    expect(loop.holding).toBe(true);
+    await loop.stop();
+  });
+
+  it('fails closed: a pause state that cannot be read idles the loop', async () => {
+    const s = pausable('throws');
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    timers.fire(0);
+    await flush();
+    expect(s.sync).not.toHaveBeenCalled();
+    expect(s.deliver).not.toHaveBeenCalled();
+    expect(s.subscribe).not.toHaveBeenCalled();
+    await loop.stop();
+  });
+
+  it('a pause closes the open subscription within one 5 s check; resume looks back and subscribes again', async () => {
+    const s = pausable(false);
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    timers.fire(0);
+    await flush();
+    expect(loop.live).toBe(true);
+    expect(s.sync).toHaveBeenCalledTimes(1);
+    expect(PAUSE_CHECK_MS).toBeLessThanOrEqual(5_000);
+
+    s.state.paused = true;
+    timers.fire(PAUSE_CHECK_MS);
+    await flush();
+    expect(s.subs[0]?.closed).toBe(true);
+    expect(loop.live).toBe(false);
+    expect(loop.holding).toBe(true); // keeps the lease and idles
+    const delivered = s.deliver.mock.calls.length;
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(s.sync).toHaveBeenCalledTimes(1);
+    expect(s.deliver).toHaveBeenCalledTimes(delivered);
+    expect(s.subscribe).toHaveBeenCalledTimes(1);
+
+    s.state.paused = false;
+    timers.fire(PAUSE_CHECK_MS);
+    await flush();
+    timers.fire(0); // the resume pass, at once
+    await flush();
+    expect(s.sync).toHaveBeenCalledTimes(2); // the usual look-back from the last sync time
+    expect(s.subscribe).toHaveBeenCalledTimes(2);
+    expect(s.deliver.mock.calls.length).toBeGreaterThan(delivered);
+    expect(loop.live).toBe(true);
+    await loop.stop();
+  });
+
+  it('what the subscription processes while a pause is noticed is not delivered', async () => {
+    const s = pausable(false);
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client: s.client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    timers.fire(0);
+    await flush();
+    s.state.paused = true;
+    timers.fire(PAUSE_CHECK_MS);
+    await flush();
+    const delivered = s.deliver.mock.calls.length;
+    s.subs[0]?.onProcessed?.({ stored: 1, reports: [{}] });
+    await flush();
+    expect(s.deliver).toHaveBeenCalledTimes(delivered);
     await loop.stop();
   });
 });

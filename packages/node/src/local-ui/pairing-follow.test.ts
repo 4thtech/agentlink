@@ -60,3 +60,32 @@ describe('the invite sweep never blocks a pass (O-L3)', () => {
     expect(calls.release).toBe(1);
   });
 });
+
+// W4-PAUSE (D-143 (5); 06 §6 "Paused agents"; 08 §1 "What stops"): the host's pairing passes skip a
+// paused agent before the lease is even taken; a pause state that cannot be read counts as paused.
+describe('a paused agent gets no host pass (W4-PAUSE)', () => {
+  const cases: readonly [string, () => Promise<boolean>][] = [
+    ['paused', () => Promise.resolve(true)],
+    ['unreadable pause state (fail closed)', () => Promise.reject(new Error('SQLITE_BUSY'))],
+  ];
+  for (const [label, paused] of cases) {
+    it(`${label}: no lease, no fetch, no publish, no sweep`, async () => {
+      const { c, calls } = client(() => Promise.resolve());
+      const follower = pairingFollower({ ...c, paused }, { nowMs: () => 0 });
+      expect(await follower.follow()).toBe('paused');
+      expect(await follower.tick()).toBe('paused');
+      expect(calls).toEqual({ take: 0, release: 0, sync: 0, sweep: 0 });
+      expect(follower.passing).toBe(false);
+    });
+  }
+
+  it('not paused: the pass runs as before', async () => {
+    const { c, calls } = client(() => Promise.resolve());
+    const follower = pairingFollower(
+      { ...c, paused: () => Promise.resolve(false) },
+      { nowMs: () => 0 },
+    );
+    expect(await follower.follow()).toBe('ran');
+    expect(calls.sync).toBe(1);
+  });
+});

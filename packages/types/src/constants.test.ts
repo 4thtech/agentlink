@@ -175,6 +175,8 @@ describe('constants (04, 05, 06)', () => {
         'agent.label',
         'app.connect',
         'app.disconnect',
+        // W4-PAUSE (D-143 (5)): Resume is a local owner action.
+        'agent.resume',
       ].sort(),
     );
     expect(APPROVAL_DECISIONS).toEqual(['approve', 'deny']);
@@ -253,6 +255,7 @@ describe('constants (04, 05, 06)', () => {
       'agent.label': 600,
       'app.connect': 600,
       'app.disconnect': 600,
+      'agent.resume': 600,
       'agent.revoke': null,
     });
     expect(LATER_OP_DEFAULT_LIFETIME_SECONDS).toBe(600);
