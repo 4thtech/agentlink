@@ -4,7 +4,7 @@
 // the list catches up keeps it shown as confirmed; fail() keeps it, marked failed, for a retry;
 // dismiss() removes it. Rendering (dimmed while pending, the failed word) is the caller's, with the
 // kit's `.al-optimistic[data-state]` styles.
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export type OptimisticState = 'confirmed' | 'pending' | 'failed';
 
@@ -46,6 +46,14 @@ export function useOptimisticItems<T extends { id: string }>(
       dismiss: () => setLocal((prev) => prev.filter((e) => e.item.id !== item.id)),
     };
   }, []);
+  // Once the confirmed list holds an id, the local copy is done: forget it, so it can never come
+  // back stale if the confirmed list later drops that id.
+  useEffect(() => {
+    const ids = new Set(confirmed.map((c) => c.id));
+    setLocal((prev) =>
+      prev.some((e) => ids.has(e.item.id)) ? prev.filter((e) => !ids.has(e.item.id)) : prev,
+    );
+  }, [confirmed]);
   const items = useMemo(() => mergeOptimistic(confirmed, local), [confirmed, local]);
   return { items, add };
 }

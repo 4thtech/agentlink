@@ -52,7 +52,12 @@ function installFake(): void {
       reject,
     };
     started.push(t);
-    cb();
+    // Like the browser: an update that throws never escapes startViewTransition itself.
+    try {
+      cb();
+    } catch {
+      // reported through updateCallbackDone in a real browser
+    }
     return t;
   });
 }

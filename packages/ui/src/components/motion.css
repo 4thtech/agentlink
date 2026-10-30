@@ -334,7 +334,7 @@
 .al-skel-table[data-cols='7'] .al-skel-trow {
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
-.al-skel-gate {
+.al-skel-gate[data-state='skeleton'] {
   display: grid;
   gap: var(--al-space-5);
 }
@@ -536,6 +536,20 @@
   .al-press:active {
     transform: none;
   }
+  /* Fades only (owner): the kit's moments still fade; the check draw stays instant. */
+  .al-reveal,
+  .al-expand,
+  .al-menu,
+  .al-slide-in,
+  .al-pop,
+  .al-crossfade,
+  .al-skel-reveal,
+  .al-route {
+    animation: al-fade-in var(--al-duration-fade) var(--al-easing-standard) both !important;
+  }
+  .al-optimistic {
+    transition: opacity var(--al-duration-fade) var(--al-easing-standard) !important;
+  }
 }
 :root[data-motion='reduced']::view-transition-group(*) {
   animation: none !important;
@@ -556,4 +570,17 @@
 }
 :root[data-motion='reduced'] .al-press:active {
   transform: none;
+}
+:root[data-motion='reduced'] .al-reveal,
+:root[data-motion='reduced'] .al-expand,
+:root[data-motion='reduced'] .al-menu,
+:root[data-motion='reduced'] .al-slide-in,
+:root[data-motion='reduced'] .al-pop,
+:root[data-motion='reduced'] .al-crossfade,
+:root[data-motion='reduced'] .al-skel-reveal,
+:root[data-motion='reduced'] .al-route {
+  animation: al-fade-in var(--al-duration-fade) var(--al-easing-standard) both !important;
+}
+:root[data-motion='reduced'] .al-optimistic {
+  transition: opacity var(--al-duration-fade) var(--al-easing-standard) !important;
 }

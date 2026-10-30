@@ -4,7 +4,7 @@
 // bordered list and the pro table. Sizes come from classes and data attributes, never an inline style
 // (08 §4 CSP). The shimmer is opacity only and holds still under reduced motion (motion.css). The
 // older single-block `Skeleton` of progress.tsx (B-11 §15.1) stays for its current callers.
-import { useRef, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { PROGRESS_MIN_SHOWN_MS, PROGRESS_STRINGS, useDelayedShow } from './progress.js';
 import { cx } from './util.js';
 
@@ -130,8 +130,10 @@ export interface SkeletonGateProps {
 }
 
 /**
- * Nothing while loading is short; after `delayMs` the skeleton as a busy status (at least 500 ms once
- * shown); then the content, with a short fade only if a skeleton was on screen.
+ * Nothing while the first load is short; after `delayMs` the skeleton as a busy status (at least
+ * 500 ms once shown); then the content, with a short fade only if a skeleton was on screen. One
+ * wrapper element throughout, and content once shown stays mounted through a short reload, so the
+ * children never remount for a reveal.
  */
 export function SkeletonGate({
   loading,
@@ -139,23 +141,30 @@ export function SkeletonGate({
   label = PROGRESS_STRINGS.loading,
   delayMs = SKELETON_DELAY_MS,
   children,
-}: SkeletonGateProps): ReactElement | null {
+}: SkeletonGateProps): ReactElement {
   const shown = useDelayedShow(loading, delayMs, PROGRESS_MIN_SHOWN_MS);
-  const wasShown = useRef(false);
-  if (shown) {
-    wasShown.current = true;
-    return (
-      <div key="skeleton" className="al-skel-gate" role="status" aria-busy="true">
-        {skeleton}
-        <span className="al-visually-hidden">{label}</span>
-      </div>
-    );
-  }
-  if (loading) return null;
-  if (!wasShown.current) return <>{children}</>;
+  // Set from effects, never during render.
+  const [revealed, setRevealed] = useState(false);
+  const [hadContent, setHadContent] = useState(!loading);
+  useEffect(() => {
+    if (shown) setRevealed(true);
+  }, [shown]);
+  useEffect(() => {
+    if (!loading) setHadContent(true);
+  }, [loading]);
+  const content = !shown && (!loading || hadContent);
   return (
-    <div key="content" className="al-skel-reveal">
-      {children}
+    <div
+      className="al-skel-gate"
+      data-state={shown ? 'skeleton' : content ? 'content' : 'waiting'}
+      role={shown ? 'status' : undefined}
+      aria-busy={shown ? 'true' : undefined}
+    >
+      {shown ? skeleton : null}
+      {shown ? <span className="al-visually-hidden">{label}</span> : null}
+      {content ? (
+        <div className={cx('al-skel-content', revealed && 'al-skel-reveal')}>{children}</div>
+      ) : null}
     </div>
   );
 }

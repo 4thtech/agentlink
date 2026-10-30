@@ -59,66 +59,121 @@ export function viewTransitionsSupported(): boolean {
 
 let running: BrowserTransition | null = null;
 
+/**
+ * Which run named an element last. A run only clears a name it still owns, so a skipped run that
+ * settles late never strips the name a newer run put on the same element (IR-W4-MOTION-KIT-1 L1).
+ */
+const owners = new WeakMap<Element, symbol>();
+function claim(el: Element, run: symbol): void {
+  owners.set(el, run);
+  el.setAttribute(VT_SHARED_ATTR, '');
+}
+function release(el: Element | null, run: symbol): void {
+  if (el === null || owners.get(el) !== run) return;
+  owners.delete(el);
+  el.removeAttribute(VT_SHARED_ATTR);
+}
+
 const quiet = (p: Promise<unknown> | undefined): void => {
   p?.then(undefined, () => undefined);
 };
 
+const NOT_RUN: ViewTransitionRun = {
+  supported: false,
+  finished: Promise.resolve(),
+  skip: () => undefined,
+};
+
 /**
  * Run `update` inside a View Transition when the browser has one, else run it at once. The update
- * must change the DOM synchronously (React callers use `useViewTransition`, which flushes).
+ * must change the DOM synchronously (React callers use `useViewTransition`, which flushes). An update
+ * that throws is rethrown, as on the direct path: synchronously when the browser runs it at once,
+ * else as an uncaught error from a microtask.
  */
 export function startViewTransition(
   update: () => void,
   options: ViewTransitionOptions = {},
 ): ViewTransitionRun {
   const { from = null, to } = options;
+  const run = Symbol('view-transition');
   let target: Element | null = null;
   const apply = (): void => {
-    from?.removeAttribute(VT_SHARED_ATTR);
+    release(from, run);
     update();
     const next = to?.() ?? null;
     if (next !== null && typeof document !== 'undefined') {
       // One shared name on the page at a time, or the browser skips the whole transition.
       for (const el of document.querySelectorAll(`[${VT_SHARED_ATTR}]`)) {
-        if (el !== next) el.removeAttribute(VT_SHARED_ATTR);
+        if (el !== next) {
+          owners.delete(el);
+          el.removeAttribute(VT_SHARED_ATTR);
+        }
       }
-      next.setAttribute(VT_SHARED_ATTR, '');
+      claim(next, run);
       target = next;
     }
   };
   const cleanup = (): void => {
-    target?.removeAttribute(VT_SHARED_ATTR);
+    release(target, run);
+    release(from, run);
     target = null;
-  };
-  const direct = (): ViewTransitionRun => {
-    from?.removeAttribute(VT_SHARED_ATTR);
-    apply();
-    cleanup();
-    return { supported: false, finished: Promise.resolve(), skip: () => undefined };
   };
 
   const start = api();
-  if (start === null) return direct();
+  if (start === null) {
+    try {
+      apply();
+    } finally {
+      cleanup();
+    }
+    return NOT_RUN;
+  }
   running?.skipTransition();
   running = null;
-  from?.setAttribute(VT_SHARED_ATTR, '');
+  if (from !== null) claim(from, run);
   let transition: BrowserTransition;
   let applied = false;
+  let failed = false;
+  let failure: unknown;
   try {
     transition = start(() => {
       applied = true;
-      apply();
+      try {
+        apply();
+      } catch (error) {
+        failed = true;
+        failure = error;
+        throw error;
+      }
     });
-  } catch {
-    if (applied) {
+  } catch (error) {
+    cleanup();
+    if (applied) throw failed ? failure : error;
+    // The browser refused before running the update: run it directly.
+    try {
+      apply();
+    } finally {
       cleanup();
-      return { supported: false, finished: Promise.resolve(), skip: () => undefined };
     }
-    return direct();
+    return NOT_RUN;
+  }
+  if (failed) {
+    // The browser ran the update at once and it threw: end the transition, rethrow.
+    transition.skipTransition();
+    quiet(transition.ready);
+    quiet(transition.updateCallbackDone);
+    quiet(transition.finished);
+    cleanup();
+    throw failure;
   }
   running = transition;
   quiet(transition.ready);
-  quiet(transition.updateCallbackDone);
+  // A later (deferred) update that throws surfaces as an uncaught error, never silently.
+  Promise.resolve(transition.updateCallbackDone).then(undefined, (error: unknown) => {
+    queueMicrotask(() => {
+      throw error;
+    });
+  });
   const done = (): void => {
     cleanup();
     if (running === transition) running = null;
