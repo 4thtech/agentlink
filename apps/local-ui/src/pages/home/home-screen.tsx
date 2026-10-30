@@ -167,7 +167,7 @@ function Avatar({
   const letter = [...name.trim()][0]?.toUpperCase() ?? '?';
   // A tint picked from the name, so a person keeps their colour (no image, no key).
   let tint = 0;
-  for (const ch of name) tint = (tint * 31 + (ch.codePointAt(0) ?? 0)) % 4;
+  for (const ch of name) tint = (tint * 31 + (ch.codePointAt(0) ?? 0)) % 2;
   return (
     <span
       className={small ? 'al-avatar' : 'al-avatar hm-avatar'}

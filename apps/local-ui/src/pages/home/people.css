@@ -216,18 +216,14 @@
   height: 40px;
   font-weight: var(--al-font-weight-semibold);
 }
-/* Per-person tints (the design's avatar colours), from the status palette. */
-.al-avatar[data-tint='1'] {
+/* Per-person tints, the prototype's blue and violet (the info and proof tokens). */
+.al-avatar[data-tint='0'] {
   background: var(--al-color-status-info-bg);
   color: var(--al-color-status-info-fg);
 }
-.al-avatar[data-tint='2'] {
-  background: var(--al-color-status-success-bg);
-  color: var(--al-color-status-success-fg);
-}
-.al-avatar[data-tint='3'] {
-  background: var(--al-color-accent-subtle);
-  color: var(--al-color-accent-default);
+.al-avatar[data-tint='1'] {
+  background: var(--al-color-proof-bg);
+  color: var(--al-color-proof-fg);
 }
 .hm-avatar.is-pending {
   border-style: dashed;
