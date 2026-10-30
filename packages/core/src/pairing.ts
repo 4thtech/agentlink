@@ -1014,7 +1014,12 @@ export class PairingService implements PairingHandler {
         if (!inbound.claim(tx)) return 'claimed_elsewhere';
         if (context.invite !== undefined) {
           const current = tx.get('invites', { invite_id: context.invite });
-          if (current === undefined || current.expires_at <= context.now) {
+          // O-L2: re-checked at commit, so a Cancel after the checks above still refuses it.
+          if (
+            current === undefined ||
+            current.expires_at <= context.now ||
+            current.cancelled_at != null
+          ) {
             throw new CoreError('pairing_expired', 'The pairing has expired.');
           }
           if (current.used_at !== null) return 'invite_used';
