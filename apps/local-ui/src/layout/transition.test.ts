@@ -113,8 +113,8 @@ describe('route transitions', () => {
 
   it('is not called for the /settings redirect', () => {
     act(() => navigate('/settings'));
-    expect(location.pathname).toBe('/settings/apps');
-    expect(title()).toBe('AI apps');
+    expect(location.pathname).toBe('/settings/backup');
+    expect(title()).toBe('Backup');
     // At most the one call for the click itself; the redirect (a replace) adds none.
     expect(svt.mock.calls.length).toBeLessThanOrEqual(1);
   });

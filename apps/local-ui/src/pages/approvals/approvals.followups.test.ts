@@ -659,8 +659,9 @@ describe('(d) a denied card leaves like an approved one (UI-REFRESH-o-c)', () =>
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     reduced();
     const navCount = (): string | null | undefined =>
-      [...host.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')]
-        .find((a) => a.getAttribute('href') === '/inbox')
+      // W4-SHELL-V2: the badge sits on Home in the section menu.
+      [...host.querySelectorAll<HTMLAnchorElement>('nav.al-rail a')]
+        .find((a) => a.getAttribute('href') === '/')
         ?.querySelector('.al-count-in')?.textContent;
     const { props } = pageProps({
       [LIST]: [
@@ -726,8 +727,9 @@ describe('(d) a denied card leaves like an approved one (UI-REFRESH-o-c)', () =>
 
 describe('(c) the sidebar Approvals badge', () => {
   const navLink = (): HTMLAnchorElement | null =>
-    [...host.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')].find(
-      (a) => a.getAttribute('href') === '/inbox',
+    // W4-SHELL-V2: the badge sits on Home in the section menu.
+    [...host.querySelectorAll<HTMLAnchorElement>('nav.al-rail a')].find(
+      (a) => a.getAttribute('href') === '/',
     ) ?? null;
 
   function mountLayout(
@@ -884,7 +886,7 @@ describe('axe (WCAG 2.1 A/AA; colour contrast is a visual check, jsdom has no la
       ),
     );
     await flush();
-    expect(host.querySelector('.al-nav .al-count')).not.toBeNull();
+    expect(host.querySelector('.al-rail-item .al-count')).not.toBeNull();
     expect(host.querySelector('.al-hood')).not.toBeNull();
     expect((await run()).violations.map((v) => v.id)).toEqual([]);
   });

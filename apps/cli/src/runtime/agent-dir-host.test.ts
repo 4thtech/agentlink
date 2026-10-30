@@ -28,6 +28,8 @@ import {
   parseAgentConfig,
   readAgentConfig,
   readAppCurrent,
+  readUiSettingsFile,
+  writeUiSettingsFile,
   removeAgentFolder,
   writeAgentConfig,
   writeAgentLabel,
@@ -242,6 +244,73 @@ describe('app.json (U3-c, 07 §9.1)', () => {
       );
       expect(await readFile(target, 'utf8')).toBe('{"v":1,"current":"work"}');
     }
+  });
+});
+
+describe('ui-settings.json (W4-SHELL-V2; 08 §1, proposed)', () => {
+  const path = (): string => join(home, '.agentlink/ui-settings.json');
+
+  it('writes {v:1,settings} with mode 0600, atomically, and reads it back', async () => {
+    expect(await readUiSettingsFile(home)).toBeUndefined();
+    await writeUiSettingsFile(home, { underTheHood: true });
+    expect(JSON.parse(await readFile(path(), 'utf8'))).toEqual({
+      v: 1,
+      settings: { underTheHood: true },
+    });
+    if (POSIX) expect((await stat(path())).mode & 0o777).toBe(0o600);
+    expect(await readUiSettingsFile(home)).toEqual({ underTheHood: true });
+    await writeUiSettingsFile(home, { underTheHood: false, menuExpanded: true });
+    expect(await readUiSettingsFile(home)).toEqual({ underTheHood: false, menuExpanded: true });
+    // No temporary file is left behind.
+    expect((await readdir(join(home, '.agentlink'))).filter((f) => f.endsWith('.tmp'))).toEqual(
+      [],
+    );
+  });
+
+  it('writes only allowlisted booleans', async () => {
+    for (const bad of [{ theme: 'dark' }, { underTheHood: 'yes' }, { path: '/etc/passwd' }]) {
+      expect(
+        codeOf(await writeUiSettingsFile(home, bad as never).catch((e: unknown) => e)),
+      ).toBe('agent_config_invalid');
+    }
+    expect(await readUiSettingsFile(home)).toBeUndefined();
+  });
+
+  it('ignores a malformed, oversized, unknown, linked or loose file', async () => {
+    await writeUiSettingsFile(home, { underTheHood: true });
+    for (const text of [
+      '{',
+      '[]',
+      '{"v":2,"settings":{"underTheHood":true}}',
+      '{"v":1,"settings":{"underTheHood":"yes"}}',
+      '{"v":1,"settings":{"theme":"dark"}}',
+      '{"v":1,"settings":{},"x":1}',
+      `{"v":1,"settings":{"underTheHood":true},"pad":"${'a'.repeat(300)}"}`,
+    ]) {
+      await writeFile(path(), text, { mode: 0o600 });
+      expect(await readUiSettingsFile(home), text).toBeUndefined();
+    }
+    if (POSIX) {
+      await writeFile(path(), '{"v":1,"settings":{"underTheHood":true}}', { mode: 0o600 });
+      await chmod(path(), 0o644);
+      expect(await readUiSettingsFile(home)).toBeUndefined();
+      await rm(path());
+      const target = join(home, 'elsewhere.json');
+      await writeFile(target, '{"v":1,"settings":{"underTheHood":true}}', { mode: 0o600 });
+      await symlink(target, path());
+      expect(await readUiSettingsFile(home)).toBeUndefined();
+      // A link is never written through.
+      expect(
+        codeOf(await writeUiSettingsFile(home, { menuExpanded: true }).catch((e: unknown) => e)),
+      ).toBe('agent_path_invalid');
+      expect(await readFile(target, 'utf8')).toBe('{"v":1,"settings":{"underTheHood":true}}');
+    }
+  });
+
+  it('the app host directory reads and writes it', async () => {
+    const directory = agentDirectory(home);
+    await directory.writeUiSettings?.({ menuExpanded: true });
+    expect(await directory.readUiSettings?.()).toEqual({ menuExpanded: true });
   });
 });
 

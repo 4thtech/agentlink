@@ -188,6 +188,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/join/accept',
       '/api/ui/join/dismiss',
       '/api/ui/join/handoff',
+      // W4-SHELL-V2: the app's UI settings (local-ui/ui-settings-server.test.ts).
+      '/api/ui/ui-settings',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

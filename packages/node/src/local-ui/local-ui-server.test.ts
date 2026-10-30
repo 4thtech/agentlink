@@ -378,7 +378,8 @@ describe('the app pages and the existing approval page (M1-11s-b)', () => {
       '/first-run/x',
       '/first-run/',
       '/approvals',
-      '/activity',
+      // W4-SHELL-V2: /activity is a page now (ui-settings-server.test.ts); nothing beside it is.
+      '/activityx',
       '/favicon.ico',
     ]) {
       const res = await send(h.port, path, { headers: { Cookie: cookie } });

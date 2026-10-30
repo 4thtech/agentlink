@@ -6,7 +6,13 @@ import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import css from './components.css?raw';
-import { AGENT_ICON_TONES, AgentIcon, agentIconTone, agentInitial } from './agent-icon.js';
+import {
+  AGENT_DOT_STATES,
+  AGENT_ICON_TONES,
+  AgentIcon,
+  agentIconTone,
+  agentInitial,
+} from './agent-icon.js';
 
 const html = (el: Parameters<typeof renderToStaticMarkup>[0]): string => renderToStaticMarkup(el);
 
@@ -64,5 +70,19 @@ describe('AgentIcon (W4-SHELL, Decision 44 B1)', () => {
     }
     expect(css).toMatch(/\.al-agent-icon\.is-lg\s*\{/);
     expect(html(h(AgentIcon, { label: 'A', seed: 'a', size: 'lg' }))).toContain('is-lg');
+  });
+
+  it('W4-SHELL-V2: draws the live dot in the corner only when asked, one class per state', () => {
+    expect(html(h(AgentIcon, { label: 'Work' }))).not.toContain('al-agent-icon-dot');
+    for (const dot of AGENT_DOT_STATES) {
+      const out = html(h(AgentIcon, { label: 'Work', seed: 'work', size: 'lg', dot }));
+      expect(out).toContain(`al-agent-icon-dot is-${dot}`);
+      // Still decoration only: the whole icon stays hidden, and the letter is still the text.
+      expect(out).toMatch(/^<span[^>]*aria-hidden="true"/);
+      expect(out.replace(/<[^>]+>/g, '')).toBe('W');
+    }
+    for (const rule of ['.al-agent-icon-dot', '.al-agent-icon-dot.is-ready', '.al-agent-icon-dot.is-none']) {
+      expect(css).toContain(rule);
+    }
   });
 });

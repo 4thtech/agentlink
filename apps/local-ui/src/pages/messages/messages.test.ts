@@ -13,7 +13,6 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient, ApiResult } from '../../api/client.js';
-import { Layout } from '../../layout/index.js';
 import { MessagesPage } from './index.js';
 import messagesCss from './messages.css?raw';
 import { countUnseen, loadSeen, markSeen, SEEN_KEY } from './seen.js';
@@ -512,34 +511,5 @@ describe('copy', () => {
   });
 });
 
-describe('the sidebar item', () => {
-  // W4-SHELL: the count sits on the Inbox item (the Inbox holds the conversations).
-  it('shows the count of contacts with something new next to the Inbox, and nothing at zero', async () => {
-    const none = async (): Promise<boolean> => false;
-    await act(async () => {
-      root.render(
-        h(Layout, {
-          path: '/inbox',
-          nextStep: none,
-          unseenMessages: async () => 2,
-          waitingApprovals: async () => 0,
-        }),
-      );
-    });
-    const link = [...host.querySelectorAll('nav[aria-label="Main"] a')].find((a) =>
-      a.textContent?.includes('Inbox'),
-    );
-    expect(link?.querySelector('.al-nav-count .al-count-in')?.textContent).toBe('2');
-    await act(async () => {
-      root.render(
-        h(Layout, {
-          path: '/inbox',
-          nextStep: none,
-          unseenMessages: async () => 0,
-          waitingApprovals: async () => 0,
-        }),
-      );
-    });
-    expect(host.querySelector('nav[aria-label="Main"] .al-nav-count')).toBeNull();
-  });
-});
+// W4-SHELL-V2: the section menu has no Inbox item; Home (U3) shows who has something new.
+

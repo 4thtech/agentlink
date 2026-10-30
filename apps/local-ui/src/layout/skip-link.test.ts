@@ -52,10 +52,10 @@ describe('skip to content', () => {
     expect(skip()?.textContent).toBe('Skip to content');
   });
 
-  it('is the first tab stop, before the sidebar', () => {
+  it('is the first tab stop, before the top bar and the section menu', () => {
     const first = host.querySelector(TABBABLE);
     expect(first).toBe(skip());
-    const side = host.querySelector('nav.al-side') as HTMLElement;
+    const side = host.querySelector('header.al-top') as HTMLElement;
     expect(skip().compareDocumentPosition(side) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

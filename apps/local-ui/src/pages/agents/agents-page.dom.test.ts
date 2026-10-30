@@ -3,7 +3,6 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { AgentSwitcher } from '../../layout/agent-switcher.js';
 import { createOwnerClient } from '../contacts/owner.js';
 import { createAgentsApi } from './api.js';
 import { AgentsPage, type AgentsPageProps } from './index.js';
@@ -383,94 +382,5 @@ describe('Add', () => {
   });
 });
 
-describe('the top-bar switcher', () => {
-  const mountSwitcher = async (reload = vi.fn<() => void>()) => {
-    await act(async () => {
-      root.render(createElement(AgentSwitcher, { api: api(), reload }));
-    });
-    await settle();
-    return reload;
-  };
-  const triggerOf = (): HTMLButtonElement =>
-    host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!;
-  it('shows the open agent, its AI app and an accessible name', async () => {
-    await mountSwitcher();
-    expect(triggerOf().textContent).toContain('Personal');
-    expect(triggerOf().textContent).toContain('Claude Code');
-    expect(triggerOf().getAttribute('aria-expanded')).toBe('false');
-    expect(triggerOf().getAttribute('aria-label')).toBe(
-      'Agent: Personal, Claude Code, Running. Switch agent.',
-    );
-  });
-  it('opens a menu with every agent, its apps, New agent and Manage agents & apps', async () => {
-    await mountSwitcher();
-    await click(triggerOf());
-    const menu = host.querySelector('[role="menu"]')!;
-    expect(menu).toBeTruthy();
-    for (const s of [
-      'Personal',
-      'Work',
-      'Codex',
-      'Second agent',
-      'Not connected to an AI app',
-      'Removal not finished',
-      'New agent',
-      'Manage agents & apps',
-    ]) {
-      expect(menu.textContent).toContain(s);
-    }
-    expect(triggerOf().getAttribute('aria-expanded')).toBe('true');
-  });
-  it('switching needs no Touch ID: one POST, then the views follow (W4-SHELL: no reload)', async () => {
-    answers['POST /api/ui/agents/switch'] = {
-      status: 200,
-      body: { status: 'done', generation: 8, current: 'work' },
-    };
-    const reload = await mountSwitcher();
-    await click(triggerOf());
-    await click(
-      [...host.querySelectorAll('[role="menuitem"]')].find((m) => m.textContent?.includes('Codex')),
-    );
-    const posts = calls.filter((c) => c.method === 'POST');
-    expect(posts).toHaveLength(1);
-    expect(posts[0]?.headers.get('X-AgentLink-Input')).toBeNull();
-    expect(JSON.parse(posts[0]!.body)).toEqual({ name: 'work', generation: 7 });
-    expect(reload).toHaveBeenCalledTimes(1);
-  });
-  it('closes on Escape and gives focus back to the trigger', async () => {
-    await mountSwitcher();
-    await click(triggerOf());
-    await act(async () => {
-      host
-        .querySelector('[role="menu"]')!
-        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    });
-    expect(host.querySelector('[role="menu"]')).toBeNull();
-    expect(document.activeElement).toBe(triggerOf());
-  });
-  it('with one agent: still New agent and Manage agents & apps', async () => {
-    answers['GET /api/ui/agents'] = { status: 200, body: list([FOUR[0]]) };
-    await mountSwitcher();
-    await click(triggerOf());
-    const menu = host.querySelector('[role="menu"]')!;
-    expect(menu.textContent).toContain('New agent');
-    expect(menu.textContent).toContain('Manage agents & apps');
-  });
-  it('is not a menu when the page is bound to an AI app (not switchable)', async () => {
-    answers['GET /api/ui/agents'] = { status: 200, body: { switchable: false, agents: [] } };
-    await mountSwitcher();
-    expect(host.querySelector('button[aria-haspopup="menu"]')).toBeNull();
-    expect(host.textContent).toContain('Open the AgentLink app to switch.');
-  });
-  it('says "No AI app" in the bar for an agent with none', async () => {
-    answers['GET /api/ui/agents'] = {
-      status: 200,
-      body: list([agent('second', 'Second agent', { current: true })], {
-        current: 'second',
-        label: 'Second agent',
-      }),
-    };
-    await mountSwitcher();
-    expect(triggerOf().textContent).toContain('No AI app');
-  });
-});
+// W4-SHELL-V2: the top-bar agent chip and its live dropdown are tested with the shell
+// (layout/w4-shell-v2.dom.test.ts).
