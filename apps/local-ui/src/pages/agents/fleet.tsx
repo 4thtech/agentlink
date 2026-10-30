@@ -20,15 +20,16 @@ import {
   type FleetStatus,
 } from './data.js';
 import { AppDot } from './parts.js';
+import { LIVE_WORDS as W } from '../../api/live.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
 const STATUSES: readonly { value: FleetStatus; label: string }[] = [
   { value: 'all', label: S.allStatuses },
-  { value: 'working', label: S.working },
-  { value: 'ready', label: S.ready },
-  { value: 'idle', label: S.idle },
-  { value: 'offline', label: S.offline },
-  { value: 'paused', label: S.paused },
+  { value: 'working', label: W.working },
+  { value: 'ready', label: W.ready },
+  { value: 'idle', label: W.idle },
+  { value: 'offline', label: W.offline },
+  { value: 'paused', label: W.paused },
 ];
 const SORTS: readonly { value: FleetSort; label: string }[] = [
   { value: 'activity', label: S.sortActivity },

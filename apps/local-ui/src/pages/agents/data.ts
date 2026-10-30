@@ -3,6 +3,9 @@
 // rendered as text, and it is never used to authorise anything (the agent name and the generation
 // travel with each request).
 import type { AgentDotState } from '@4thtech-io/ui';
+// W4-SHELL-LIVE (U1-b): the live words and relative times are the shared store's; this page
+// uses them as they are. Read at call time only (api/live.ts imports this module too).
+import { agoText, LIVE_WORDS as W } from '../../api/live.js';
 import { appNameOf } from './app-names.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
@@ -210,12 +213,7 @@ export function stateWord(row: AgentRow): string {
 
 /** "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago" (11 §5: relative, plain). */
 export function relativeTime(at: number, now: number): string {
-  const s = Math.max(0, now - at);
-  if (s < 60) return S.justNow;
-  if (s < 3600) return S.minAgo(Math.floor(s / 60));
-  if (s < 86_400) return S.hAgo(Math.floor(s / 3600));
-  const days = Math.floor(s / 86_400);
-  return days === 1 ? S.yesterday : S.daysAgo(days);
+  return agoText(at, now);
 }
 
 /** The live state of a row (an older row without one: from `running`). */
@@ -255,35 +253,35 @@ function liveApps(row: AgentRow): AppLive[] {
 export function agentLine(row: AgentRow, now: number): string {
   if (row.removing) return S.removalNotFinished;
   const state = stateOf(row);
-  if (state === 'paused') return S.paused;
+  if (state === 'paused') return W.paused;
   const live = liveApps(row);
   const [first] = live;
-  if (state === 'working' && first !== undefined) return S.workingIn(first.name);
+  if (state === 'working' && first !== undefined) return W.workingIn(first.name);
   if (state === 'ready' && first !== undefined) {
-    return live.length > 1 ? S.readyInMore(first.name, live.length - 1) : S.readyIn(first.name);
+    return live.length > 1 ? W.readyInMore(first.name, live.length - 1) : W.readyIn(first.name);
   }
-  if (state === 'idle') return S.idle;
-  if (state === 'ready' || state === 'working') return S.ready;
+  if (state === 'idle') return W.idle;
+  if (state === 'ready' || state === 'working') return W.ready;
   return row.lastSeenAt === undefined
-    ? S.offline
-    : S.offlineSeen(relativeTime(row.lastSeenAt, now));
+    ? W.offline
+    : W.lastSeen(W.offline, relativeTime(row.lastSeenAt, now));
 }
 
 /** One AI app's word: "Working", "Ready", "Idle", "Not running · last seen {time}", "Not set up". */
 export function appWord(app: AppLive, now: number): string {
   switch (app.state) {
     case 'working':
-      return S.working;
+      return W.working;
     case 'ready':
-      return S.ready;
+      return W.ready;
     case 'idle':
-      return S.idle;
+      return W.idle;
     case 'not_set_up':
-      return S.notSetUp;
+      return W.none;
     case 'not_running':
       return app.lastSeenAt === undefined
-        ? S.notRunning
-        : S.notRunningSeen(relativeTime(app.lastSeenAt, now));
+        ? W.off
+        : W.lastSeen(W.off, relativeTime(app.lastSeenAt, now));
   }
 }
 

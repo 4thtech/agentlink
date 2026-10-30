@@ -14,6 +14,7 @@ import { agentLine, appWord, dotOf, stateOf, type AgentRow } from './data.js';
 import type { DetailApi, PeopleRead, RulesRead } from './detail-api.js';
 import { historyOf, stateChangesOf } from './history.js';
 import { BackupPanel } from './simple.js';
+import { LIVE_WORDS as W } from '../../api/live.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
 const PEOPLE_SHOWN = 12;
@@ -231,16 +232,16 @@ export function AgentDetail({
                   <span className="al-muted">{clock(c.at)}</span>
                   <span>
                     {c.state === 'paused'
-                      ? S.paused
+                      ? W.paused
                       : c.state === 'working' && c.app !== undefined
-                        ? S.workingIn(c.app)
+                        ? W.workingIn(c.app)
                         : c.state === 'ready' && c.app !== undefined
-                          ? S.readyIn(c.app)
+                          ? W.readyIn(c.app)
                           : c.state === 'idle'
-                            ? S.idle
+                            ? W.idle
                             : c.state === 'ready'
-                              ? S.ready
-                              : S.offline}
+                              ? W.ready
+                              : W.offline}
                   </span>
                 </li>
               ))}

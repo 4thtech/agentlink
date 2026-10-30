@@ -91,7 +91,7 @@ describe('the words (08 §1)', () => {
     expect(relativeTime(NOW - 10, NOW)).toBe('just now');
     expect(relativeTime(NOW - 5 * 60, NOW)).toBe('5 min ago');
     expect(relativeTime(NOW - 3 * 3600, NOW)).toBe('3 h ago');
-    expect(relativeTime(NOW - 30 * 3600, NOW)).toBe('yesterday');
+    expect(relativeTime(NOW - 30 * 3600, NOW)).toBe('1 day ago');
     expect(relativeTime(NOW - 4 * 86400, NOW)).toBe('4 days ago');
   });
 

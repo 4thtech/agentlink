@@ -117,20 +117,24 @@ export function AgentsPage({
   // The page's own read (actions, the switch) and the shared live store (updates by itself). Each
   // live answer is recorded for the agent page's history before the views draw it.
   const { state, reload: reread, switchTo } = useAgents(api, reload);
-  const subscribe = useCallback(
-    (on: () => void) =>
-      subscribeLive(
-        () => {
-          const l = getLive().list;
-          if (l !== undefined) recordLive(l);
-          on();
-        },
-        { api },
-      ),
-    [api],
-  );
+  // The shared live store keeps the stream (or the poll) running and announces changes, so the
+  // page's own read follows; in polling mode the store's own read is the newest. Whichever answer
+  // arrived last is shown, and each one is recorded for the agent page's history first.
+  const subscribe = useCallback((on: () => void) => subscribeLive(on, { api }), [api]);
   const live = useSyncExternalStore(subscribe, getLive);
-  const list: AgentsList | undefined = live.list ?? listOf(state);
+  const own = listOf(state);
+  const [latest, setLatest] = useState<AgentsList | undefined>(undefined);
+  useEffect(() => {
+    if (live.list === undefined) return;
+    recordLive(live.list);
+    setLatest(live.list);
+  }, [live.list]);
+  useEffect(() => {
+    if (own === undefined) return;
+    recordLive(own);
+    setLatest(own);
+  }, [own]);
+  const list: AgentsList | undefined = latest ?? own ?? live.list;
 
   const [panel, setPanel] = useState<{ name: string; panel: Panel } | undefined>(undefined);
   // `?add=1` (the agent chip's "Add agent") opens Add here, also when the page is already open;

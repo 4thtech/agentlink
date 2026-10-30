@@ -153,34 +153,28 @@ describe('chapter 4: agents', () => {
     await probe.check();
   }, 180_000);
 
-  // Gate: W4-PAUSE (K2, PR #735) turns this on. Resume signs `agent.resume` (04 §2.5.1), and the
-  // owner key's allowlist (packages/node owner-allowlist.ts OWNER_ACTION_OPS) does not list it yet,
-  // so the real app answers 409 `refused` after the gesture.
-  it.runIf(WAVE4)(
-    'resumes the paused agent with one Touch ID, with no reload',
-    async (ctx) => {
-      const ready = ch.need(ctx);
-      if (ready === undefined) return;
-      const world = journeyWorld();
-      const pc = await world.computer();
-      const jp = await journeyPage(ready.browser);
-      await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
-      const { page } = jp;
-      const probe = await jp.arm();
-      await pauseAna(page);
-      const before = jp.gestures.total();
-      await page.getByRole('button', { name: 'Resume with Touch ID' }).first().click();
-      await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
-      await eventually(
-        'Ana resumed',
-        async () => !(await text(page)).includes('Ana is paused'),
-        30_000,
-      );
-      expect(jp.gestures.total() - before).toBe(1);
-      await probe.check();
-    },
-    180_000,
-  );
+  // W4-AGENTS + W4-PAUSE (#735): Resume signs `agent.resume` (04 §2.5.1) with one Touch ID.
+  it('resumes the paused agent with one Touch ID, with no reload', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
+    const { page } = jp;
+    const probe = await jp.arm();
+    await pauseAna(page);
+    const before = jp.gestures.total();
+    await page.getByRole('button', { name: 'Resume with Touch ID' }).first().click();
+    await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    await eventually(
+      'Ana resumed',
+      async () => !(await text(page)).includes('Ana is paused'),
+      30_000,
+    );
+    expect(jp.gestures.total() - before).toBe(1);
+    await probe.check();
+  }, 180_000);
 
   // Gate: W4-RENAME-REACHES-CONTACTS (builder D, D2; the contact row is C2) turns this on. Today a
   // rename changes only the local label; the contact keeps the old name.
