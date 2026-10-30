@@ -16,6 +16,7 @@ import { FirstRunPage, type FirstRunPageProps } from '../first-run/index.js';
 import { encodeRegistration } from '../first-run/passkey.js';
 import type { FinishResult, SetupApi, StatusResult } from '../first-run/setup-api.js';
 import { resetAutoShown, resetWizard, wasAutoShown } from './store.js';
+import { RECOVERY_KIT_LATER_KEY } from '../../states/index.js';
 import {
   CONNECTED_STEP,
   CONNECT_STEP,
@@ -343,6 +344,8 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     expect(host.querySelector('.st-done.al-pop')).not.toBeNull();
     expect(host.querySelector('.al-draw path')).not.toBeNull();
     expect(text()).toContain(CONNECTED_STEP.restart('Claude Code'));
+    // IR-W4-WIZARD-1 L: the focused title is not inside a live region too (one announcement).
+    expect(host.querySelector('[role="status"] h1')).toBeNull();
   });
 
   it('an invite left waiting by `agentlink join` opens its screen after the backup code (U3-invite)', async () => {
@@ -407,6 +410,50 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     history.replaceState(null, '', '/start/connect');
     const { went } = await mount();
     expect(went[0]).toBe('/start/app (replace)');
+  });
+});
+
+describe('IR-W4-WIZARD-SEC-1 L1: leaving the backup code without "I saved it"', () => {
+  it('a path change away from step 2 drops the code (and records the kit as later), never hides it', async () => {
+    // One mount followed by in-place path changes (Back/Forward, a typed address).
+    const props: FirstRunPageProps = {
+      api: fakeSetup(),
+      appsApi: fakeApps(),
+      createPasskey: () => Promise.resolve({ kind: 'ok', body: BODY.slice() }),
+      passkeysAvailable: () => true,
+      platform: 'mac',
+      prfSupport: () => Promise.resolve('yes'),
+      goHome: vi.fn(),
+      readSignal: () => Promise.resolve(undefined),
+      readJoin: () => Promise.resolve({ kind: 'failed' } as const),
+      go: (path: string) => {
+        history.pushState(null, '', path);
+        window.dispatchEvent(new Event('agentlink:navigate'));
+      },
+    };
+    await act(async () => {
+      root.render(h(FirstRunPage as ComponentType<FirstRunPageProps>, props));
+    });
+    await settle();
+    await click(PICK_STEP.next('Claude Code'));
+    await click(CONNECT_STEP.connect('Touch ID'));
+    expect(h1()).toBe('Your backup code');
+    await act(async () => {
+      history.pushState(null, '', '/start/connected');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      await Promise.resolve();
+    });
+    await settle();
+    expect(document.body.innerHTML).not.toContain('UVWX');
+    expect(localStorage.getItem(RECOVERY_KIT_LATER_KEY)).toMatch(/^[0-9]+$/);
+    // Back to step 2: the code does not come back.
+    await act(async () => {
+      history.pushState(null, '', '/start/connect');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      await Promise.resolve();
+    });
+    await settle();
+    expect(document.body.innerHTML).not.toContain('UVWX');
   });
 });
 

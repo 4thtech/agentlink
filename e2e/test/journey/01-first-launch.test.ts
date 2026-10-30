@@ -8,8 +8,8 @@ import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fakeClaudeCode } from '../app-world.js';
 import { emulateReducedMotion, expectStableLayout, observeLayoutShift } from '../helpers/motion.js';
-import { CONNECT_WITH } from './helpers-wizard.js';
-import { chapter, journeyPage, journeyWorld, startUi, text, WAVE4 } from './world.js';
+import { CONNECT_WITH, getStartedWithTouchId } from './helpers-wizard.js';
+import { chapter, journeyPage, journeyWorld, startUi, startUiRun, text, WAVE4 } from './world.js';
 
 const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
@@ -98,5 +98,36 @@ describe('chapter 1: onboarding', () => {
       await page.waitForURL((url) => url.pathname === '/');
       expect(await text(page)).not.toContain('Which AI app do you use?');
     }
+  }, 180_000);
+
+  // IR-W4-WIZARD-1 H: the app opens Get started by itself only while setup is incomplete, on the
+  // real entry path (`agentlink ui` opens the session link, which lands on /settings/home); and the
+  // load that Get started itself ended on Home never loops back.
+  it('no AI app yet: "Go to Home" stays on Home; the next launch opens Get started by itself', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    const { page } = jp;
+
+    // First run with no AI app on this computer: the agent is ready, nothing is connected.
+    const first = await startUiRun(pc, ready.files, ch.closers);
+    await page.goto(first.link);
+    await getStartedWithTouchId(page, 'Solo');
+    await page.getByRole('heading', { name: 'Solo is ready' }).waitFor();
+    await page.getByRole('button', { name: 'Go to Home' }).click();
+    await page.waitForURL((url) => url.pathname === '/');
+    // Give the check every chance to run: it must not send the person back.
+    await page.waitForTimeout(1500);
+    expect(new URL(page.url()).pathname).toBe('/');
+    await first.stop();
+
+    // The next launch, like the real app: the session link → /settings/home → Get started.
+    const again = await startUiRun(pc, ready.files, ch.closers);
+    expect(new URL(again.link).pathname).toBe('/settings/home');
+    await page.goto(again.link);
+    await page.waitForURL((url) => url.pathname === '/start/app');
+    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
   }, 180_000);
 });

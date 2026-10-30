@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { ContactRow } from '../contacts/data.js';
-import { openStartIfIncomplete, shouldOpenStart } from './guard.js';
+import { markLeavingStart, openStartIfIncomplete, shouldOpenStart } from './guard.js';
 import {
   parseAgentOpen,
   readSetupState,
@@ -21,6 +21,7 @@ const SET_UP: SetupState = {
   agent: true,
   appConnected: true,
   contacts: [],
+  waiting: 0,
 };
 const contact = (over: Partial<ContactRow> = {}): ContactRow => ({
   ref: `0x${'1'.repeat(40)}`,
@@ -209,6 +210,34 @@ describe('openStartIfIncomplete: the open-on-launch check', () => {
     // A waiting approval keeps Home.
     expect(shouldOpenStart('/', { ...SET_UP, owner: 'missing', waiting: 1 })).toBe(false);
     expect(shouldOpenStart('/', { ...SET_UP, owner: 'missing', waiting: 0 })).toBe(true);
+    // IR-W4-WIZARD-1 L: an unanswered approvals read may hide a waiting approval: Home stays.
+    expect(shouldOpenStart('/', { ...SET_UP, owner: 'missing', waiting: undefined })).toBe(false);
+  });
+
+  it('IR-W4-WIZARD-1 H: the real entry path /settings/home (the session link lands there) is Home', async () => {
+    resetAutoShown();
+    const go = vi.fn();
+    expect(
+      await openStartIfIncomplete({ path: () => '/settings/home', read: incomplete, go }),
+    ).toBe(true);
+    expect(go).toHaveBeenCalledWith('/start/app');
+    expect(shouldOpenStart('/settings/home', { ...SET_UP, appConnected: false })).toBe(true);
+  });
+
+  it('IR-W4-WIZARD-1 H: a load that Get started itself ended ("Go to Home") never loops back', async () => {
+    resetAutoShown();
+    sessionStorage.clear();
+    markLeavingStart();
+    const go = vi.fn();
+    expect(
+      await openStartIfIncomplete({ path: () => '/settings/home', read: incomplete, go }),
+    ).toBe(false);
+    expect(go).not.toHaveBeenCalled();
+    // The mark is used once: the next launch decides from the state again.
+    resetAutoShown();
+    expect(
+      await openStartIfIncomplete({ path: () => '/settings/home', read: incomplete, go }),
+    ).toBe(true);
   });
 
   it('after Skip to Home (or Get started opened), it never opens by itself again', async () => {
