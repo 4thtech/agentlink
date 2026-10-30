@@ -1,0 +1,73 @@
+/* Live activity stream (W4-SETTINGS-ADVANCED): a mono log in a sunken well, newest line on top.
+   Tokens only; no motion of its own (a new line just appears; the live dot is the U0 Pulse). */
+.ls-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  max-inline-size: 960px;
+  margin-inline: auto;
+}
+.ls-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+}
+.ls-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+  flex: 1 1 320px;
+}
+.ls-title h1,
+.ls-title p {
+  margin: 0;
+}
+.ls-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--al-color-fg-subtle);
+}
+.ls-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+.ls-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  color: var(--al-color-fg-muted);
+}
+.ls-log {
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-sunken);
+  padding: var(--al-space-2) 0;
+  min-block-size: 160px;
+  overflow-x: auto;
+}
+.ls-empty {
+  margin: 0;
+  padding: var(--al-space-3) var(--al-space-4);
+}
+.ls-line {
+  display: flex;
+  gap: var(--al-space-4);
+  padding: 2px var(--al-space-4);
+  white-space: nowrap;
+}
+.ls-time {
+  color: var(--al-color-border-strong);
+}
+.ls-kind {
+  min-inline-size: 9ch;
+  color: var(--al-color-status-info-fg);
+}
+.ls-line[data-kind='heartbeat'] .ls-kind {
+  color: var(--al-color-status-success-fg);
+}
+.ls-text {
+  color: var(--al-color-fg-default);
+}

@@ -58,9 +58,10 @@ describe('Relays & network', () => {
     expect(host.textContent).toContain(S.unknown);
     expect(host.textContent ?? '').not.toMatch(/\bms\b|wss?:|https?:/);
   });
-  it('shows a skeleton while the first answer is on its way', async () => {
+  it('shows neither facts nor a false "no answer" while the first answer is on its way', async () => {
     await mount(() => new Promise(() => undefined));
-    expect(host.querySelector('.al-skeleton, [aria-busy="true"]')).not.toBeNull();
+    expect(host.querySelector('dl')).toBeNull();
+    expect(host.textContent).not.toContain(S.unknown);
   });
   it('uses plain words (11 §5)', () => {
     expect(lintVocabulary(JSON.stringify(S))).toEqual([]);

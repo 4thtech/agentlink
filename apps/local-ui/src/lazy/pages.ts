@@ -14,7 +14,9 @@ const agents = part(async () => (await import('../pages/agents/index.js')).Agent
 const rules = part(async () => (await import('../pages/rules/index.js')).RulesPage);
 const proofs = part(async () => (await import('../pages/proofs/index.js')).ProofsPage);
 const advanced = part(async () => (await import('../pages/advanced/index.js')).AdvancedPage);
-const about = part(async () => (await import('../pages/about/index.js')).AboutPage);
+const diagnostics = part(
+  async () => (await import('../pages/about/diagnostics.js')).DiagnosticsPage,
+);
 
 /**
  * W4-SHELL-V2: every lazy page by path. Same routes in both layers; the section builders replace the
@@ -23,15 +25,20 @@ const about = part(async () => (await import('../pages/about/index.js')).AboutPa
 export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   '/agents': agents,
   '/activity': activity,
+  '/activity/live': part(async () => (await import('../pages/activity/live.js')).LiveActivityPage),
   // Interim: today's Messages and Contacts pages (U3, U4 fold them into Home).
   '/inbox': part(async () => (await import('../pages/messages/index.js')).MessagesPage),
   '/contacts': part(async () => (await import('../pages/contacts/index.js')).ContactsPage),
   // Settings (A9).
+  '/settings': part(async () => (await import('../pages/settings/index.js')).SettingsPage),
   '/settings/backup': part(async () => (await import('../pages/backup/index.js')).BackupPage),
   '/settings/apps': part(async () => (await import('../pages/apps/index.js')).AppsPage),
   '/settings/files': part(async () => (await import('../pages/files/index.js')).FilesPage),
   '/settings/appearance': part(
     async () => (await import('../pages/appearance/index.js')).AppearancePage,
+  ),
+  '/settings/notifications': part(
+    async () => (await import('../pages/notifications/index.js')).NotificationsPage,
   ),
   '/settings/rules': rules,
   '/settings/proofs': proofs,
@@ -39,7 +46,7 @@ export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   '/advanced/rules': rules,
   '/advanced/proofs': proofs,
   '/advanced/network': advanced,
-  '/advanced/diagnostics': about,
+  '/advanced/diagnostics': diagnostics,
   // U3-invite: "Accept {name}'s invite?" (b11 §33.2), in the focused shell.
   '/settings/join': part(async () => (await import('../pages/join/index.js')).JoinPage),
 };
