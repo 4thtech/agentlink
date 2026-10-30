@@ -1,5 +1,5 @@
 // W4-AUTO-SAVE: the Node side of the Inbox folder writing rules (D-142; 04 §4.1; proposed, owner
-// confirms at merge). Used by the CLI's files platform (apps/cli runtime/files.ts) for every save,
+// confirms at merge). Used by the CLI's files platform (apps/cli/src/runtime/files.ts) for every save,
 // automatic or not.
 //
 // - inboxFolderProblem: the folder rules of 04 §4.1 checked on the folder's realpath (hidden and
@@ -30,7 +30,7 @@ import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 
 /** Why a folder is refused (fixed codes, never a path). */
 export type InboxFolderProblem =
-  'not_a_folder' | 'not_owned' | 'shared_writable' | 'home_or_root' | 'send_folder';
+  'not_a_folder' | 'not_owned' | 'shared_writable' | 'home_or_root' | 'os_folder' | 'send_folder';
 
 export interface InboxFolderRulesInput {
   /** The folder's realpath. */
@@ -56,6 +56,32 @@ function sameOrInside(child: string, parent: string, platform: NodeJS.Platform):
   return rel === '' || (!rel.startsWith('..') && !p.isAbsolute(rel));
 }
 
+/**
+ * OS and app folders (04 §4.1, IR-W4-AUTO-SAVE-SEC-1 L1): macOS `~/Library`, `/Library`, `/System`,
+ * `/Applications`; Windows `AppData` (the per-user Startup folder is inside it), `Program Files`,
+ * `Program Files (x86)`, `ProgramData` (the all-users Startup folder) and `Windows` on the folder's
+ * drive and from the environment. Linux `~/.config` and `~/.local` are hidden folders (refused before).
+ */
+function osFolders(real: string, home: string, platform: NodeJS.Platform): string[] {
+  if (platform === 'win32') {
+    const drive = path.win32.parse(real).root;
+    const env = ['ProgramFiles', 'ProgramFiles(x86)', 'ProgramData', 'SystemRoot', 'APPDATA']
+      .map((k) => process.env[k])
+      .filter((v): v is string => typeof v === 'string' && v.length > 0);
+    return [
+      path.win32.join(home, 'AppData'),
+      ...['Program Files', 'Program Files (x86)', 'ProgramData', 'Windows'].map((d) =>
+        path.win32.join(drive, d),
+      ),
+      ...env,
+    ];
+  }
+  if (platform === 'darwin') {
+    return [path.posix.join(home, 'Library'), '/Library', '/System', '/Applications'];
+  }
+  return [];
+}
+
 /** The folder rules of 04 §4.1 on a resolved folder; undefined when it passes. */
 export async function inboxFolderProblem(
   input: InboxFolderRulesInput,
@@ -72,6 +98,9 @@ export async function inboxFolderProblem(
   const real = input.realpath;
   if (p.parse(real).root === real || p.dirname(real) === real) return 'home_or_root';
   if (sameOrInside(input.home, real, platform)) return 'home_or_root'; // the home itself or above it
+  if (osFolders(real, input.home, platform).some((os) => sameOrInside(real, os, platform))) {
+    return 'os_folder';
+  }
   for (const send of input.sendFolders) {
     if (sameOrInside(real, send, platform) || sameOrInside(send, real, platform)) {
       return 'send_folder';

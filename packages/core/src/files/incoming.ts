@@ -126,7 +126,25 @@ async function freeName(ops: TempFileOps, base: string): Promise<string> {
 interface WriteState {
   diskFull: boolean;
   cannotMark: boolean;
+  /** Another process recorded this file as saved meanwhile (IR-W4-AUTO-SAVE-1 L1). */
+  savedElsewhere: boolean;
+  /** The name the file got when the first pick was taken at the move (IR SEC L2). */
+  finalName?: string;
 }
+
+/** What the move needs besides the folder (fix round 1). */
+interface MoveOptions {
+  /** The sanitised base name, for a new free name when the picked one was taken at the move. */
+  readonly base: string;
+  /**
+   * Right before the move: false when another process recorded this file as saved since this save
+   * began (the store is shared; the in-memory lock is per process). The temporary file is removed.
+   */
+  readonly stillUnsaved: () => Promise<boolean>;
+}
+
+/** Moves tried with a fresh free name after the picked name was taken at the move. */
+const MOVE_RETRIES = 3;
 
 const isDiskFull = (error: unknown): boolean =>
   typeof error === 'object' &&
@@ -139,7 +157,12 @@ const isDiskFull = (error: unknown): boolean =>
  * that fails stops an automatic save (the sink then removes the temporary file); a requested save
  * keeps the mark where possible (04 §4.1).
  */
-function markedOps(inbox: InboxFolder, requireMark: boolean, state: WriteState): TempFileOps {
+function markedOps(
+  inbox: InboxFolder,
+  requireMark: boolean,
+  state: WriteState,
+  move: MoveOptions,
+): TempFileOps {
   const ops = inbox.ops;
   return Object.freeze<TempFileOps>({
     async create(name) {
@@ -174,7 +197,29 @@ function markedOps(inbox: InboxFolder, requireMark: boolean, state: WriteState):
         state.cannotMark = true;
         throw inboxUnavailable();
       }
-      await ops.rename(from, to);
+      if (!(await move.stillUnsaved())) {
+        state.savedElsewhere = true;
+        throw inboxUnavailable();
+      }
+      try {
+        await ops.rename(from, to);
+        return;
+      } catch (error) {
+        // The name was taken between the pick and the move (the move never replaces): a fresh free
+        // name, with the bytes already verified in the temporary file (no second download).
+        let last: unknown = error;
+        for (let attempt = 0; attempt < MOVE_RETRIES; attempt += 1) {
+          const next = await freeName(ops, move.base);
+          try {
+            await ops.rename(from, next);
+            state.finalName = next;
+            return;
+          } catch (retryError) {
+            last = retryError;
+          }
+        }
+        throw last;
+      }
     },
     remove: (name) => ops.remove(name),
     list: () => ops.list(),
@@ -428,17 +473,29 @@ export class FileFetcher {
     }
 
     // A free, safe name inside the Inbox folder (resolved above).
+    const base = savedFileName(entry.name);
     let name: string;
     try {
-      name = await freeName(ops, savedFileName(entry.name));
+      name = await freeName(ops, base);
     } catch {
       throw inboxUnavailable();
     }
-    const savedTo = placeIn(folder, name, flavor);
-    const state: WriteState = { diskFull: false, cannotMark: false };
+    placeIn(folder, name, flavor);
+    const state: WriteState = { diskFull: false, cannotMark: false, savedElsewhere: false };
+    // The record as this save found it: a different one at the move means another process saved it.
+    const startRecord = keyRow?.saved_name ?? null;
+    const stillUnsaved = async (): Promise<boolean> => {
+      const current = await ctx.store.transaction((tx) =>
+        tx.get('files', { envelope_id: envelopeId, idx: index }),
+      );
+      return (current?.saved_name ?? null) === startRecord;
+    };
     let sink;
     try {
-      sink = await createTempFileSink(markedOps(inbox, auto !== undefined, state), name);
+      sink = await createTempFileSink(
+        markedOps(inbox, auto !== undefined, state, { base, stillUnsaved }),
+        name,
+      );
     } catch (error) {
       if (isDiskFull(error)) throw diskFull();
       throw inboxUnavailable();
@@ -460,10 +517,40 @@ export class FileFetcher {
         maxPlaintextBytes: limits.maxReceiveBytes,
       });
       ctx.log.info('file saved', { size: done.plaintextSize });
-      if (keyRow !== undefined) await this.#recordSavedName(envelopeId, index, keyRow.sha256, name);
-      return { status: 'ok', savedTo, name, size: done.plaintextSize, integrity: 'verified' };
+      const finalName = state.finalName ?? name;
+      const savedTo = placeIn(folder, finalName, flavor);
+      if (keyRow !== undefined) {
+        await this.#recordSavedName(envelopeId, index, keyRow.sha256, finalName, startRecord);
+      }
+      return {
+        status: 'ok',
+        savedTo,
+        name: finalName,
+        size: done.plaintextSize,
+        integrity: 'verified',
+      };
     } catch (error) {
       // decryptDownload has discarded the quarantine file. Fixed codes only (I-7).
+      if (state.savedElsewhere) {
+        // Another process saved this file meanwhile: answered from its record, no second copy.
+        const row = await ctx.store.transaction((tx) =>
+          tx.get('files', { envelope_id: envelopeId, idx: index }),
+        );
+        const known =
+          row?.saved_name == null
+            ? undefined
+            : await this.#stillSaved(inbox, envelopeId, index, row.saved_name);
+        if (known !== undefined) {
+          return {
+            status: 'ok',
+            savedTo: placeIn(folder, known, flavor),
+            name: known,
+            size: entry.size,
+            integrity: 'verified',
+          };
+        }
+        throw inboxUnavailable();
+      }
       if (state.cannotMark) {
         ctx.log.warn('file not saved', { code: 'folder_cannot_mark' });
         throw new CoreError('folder_cannot_mark', 'The Inbox folder cannot mark downloaded files.');
@@ -524,13 +611,17 @@ export class FileFetcher {
     index: number,
     sha256: string,
     name: string,
+    startRecord: Row<'files'>['saved_name'],
   ): Promise<void> {
     const ctx = this.#ctx;
     try {
       const sealed = await seal(ctx, 'files', 'saved_name', [envelopeId, index], name);
       await ctx.store.transaction((tx) => {
         const key = { envelope_id: envelopeId, idx: index };
-        if (tx.get('files', key)?.sha256 !== sha256) return;
+        const row = tx.get('files', key);
+        if (row?.sha256 !== sha256) return;
+        // Only over the record this save found: another process's newer record is kept.
+        if ((row.saved_name ?? null) !== startRecord) return;
         tx.update('files', key, { saved_name: sealed });
       });
     } catch {

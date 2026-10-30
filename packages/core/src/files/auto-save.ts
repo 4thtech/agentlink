@@ -259,7 +259,7 @@ export class AutoSaver {
     for (let start = 0; start < candidates.length; start += AUTO_SAVE_CONCURRENCY) {
       const batch = candidates.slice(start, start + AUTO_SAVE_CONCURRENCY);
       const outcomes = await Promise.all(
-        batch.map((c) => this.#saveOne(c, rules, doc, now, maxReceiveBytes)),
+        batch.map((c) => this.#saveOne(c, rules, now, maxReceiveBytes)),
       );
       let pause: PauseReason | undefined;
       for (const outcome of outcomes) {
@@ -290,7 +290,6 @@ export class AutoSaver {
   async #saveOne(
     candidate: Candidate,
     rules: AutoSavePolicy,
-    doc: PolicyDocument,
     now: number,
     maxReceiveBytes: number,
   ): Promise<'saved' | 'retry' | Reason | 'skip'> {
@@ -354,15 +353,25 @@ export class AutoSaver {
     }
 
     // Checked again inside the file's lock, right before the download.
-    const stillAllowed = async (): Promise<boolean> =>
-      ctx.store.transaction((tx) => {
+    // Checked again inside the file's lock, right before the download (IR-W4-AUTO-SAVE-1 L2,
+    // SEC-1 L3): the pause, the rules in force read again, and the sender in the store.
+    const stillAllowed = async (): Promise<boolean> => {
+      if (this.#pause !== undefined && (await this.#pause.paused())) return false;
+      const fresh = await this.#loadPolicy();
+      const freshRules = autoSaveOf(fresh);
+      if (freshRules === undefined || !freshRules.on || fresh.mode === 'fail_closed') return false;
+      const nowDoc = fresh.policy;
+      return ctx.store.transaction((tx) => {
         const current = tx.get('files', key);
         if (current?.auto_save !== 'pending' || current.saved_name !== null) return false;
         const sender = senderCheckTx(tx, current);
         return (
-          sender !== null && allowedContact(doc, sender.contact) && !askBeforeSaving(doc, contact)
+          sender !== null &&
+          allowedContact(nowDoc, sender.contact) &&
+          !askBeforeSaving(nowDoc, sender.contact)
         );
       });
+    };
 
     let result: FetchFileResult;
     try {

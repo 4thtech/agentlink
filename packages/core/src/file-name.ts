@@ -139,7 +139,9 @@ const RISKY_EXTENSIONS: ReadonlySet<string> = new Set([
 
 /** True when `name` (already sanitised) gets `.download` before it is saved (04 §4.1). */
 export function needsDownloadSuffix(name: string): boolean {
-  const lower = name.toLowerCase();
+  // Folded through upper case first, so a long s (U+017F), a Kelvin sign (U+212A) or a dotless i
+  // (U+0131), which some file systems and shells treat as their ASCII letter, compare as it.
+  const lower = name.toUpperCase().toLowerCase();
   if (RISKY_NAMES.has(lower)) return true;
   const dot = lower.lastIndexOf('.');
   return dot > 0 && RISKY_EXTENSIONS.has(lower.slice(dot));

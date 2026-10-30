@@ -167,7 +167,7 @@ describe('a name taken at the move (SEC L2)', () => {
     const own = new MemoryOwnStorage();
     let downloads = 0;
     let planted = false;
-    let inboxRef: FileAgent['inbox'] | undefined;
+    const ref: { inbox?: FileAgent['inbox'] } = {};
     const w = await world(
       {
         download: (url) => {
@@ -178,7 +178,7 @@ describe('a name taken at the move (SEC L2)', () => {
           mark: () => {
             if (!planted) {
               planted = true;
-              inboxRef?.plantFolder('race.bin');
+              ref.inbox?.plantFolder('race.bin');
             }
             return Promise.resolve('marked');
           },
@@ -186,7 +186,7 @@ describe('a name taken at the move (SEC L2)', () => {
       },
       own,
     );
-    inboxRef = w.b.inbox;
+    ref.inbox = w.b.inbox;
     const envelopeId = await send(w, 'race.bin', 20_000);
     const result = await w.b.client.fetchFile({ envelopeId });
     expect(result).toMatchObject({ status: 'ok', name: 'race (2).bin' });
