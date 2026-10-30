@@ -187,7 +187,7 @@ function base(over: Answers = {}): Answers {
       items: [
         msg(ENV_OUT3, 'Tali will look at the terms tonight.', AT + 60, { status: 'not_delivered' }),
         msg(ENV_OUT2, 'One more thing.', AT + 55, { status: 'queued' }),
-        msg(ENV_OUT1, 'Sending the brief.', AT + 20, {
+        msg(ENV_OUT1, 'Sending the brief.', AT + 45, {
           status: 'sent',
           receipt: true,
           proof: true,
@@ -389,6 +389,53 @@ describe('Home simple (A4)', () => {
     expect(post?.method).toBe('POST');
   });
 
+  it('shows only the stretch both boxes cover: a reply older than the other side’s oldest loaded message waits for Load earlier (IR-W4-HOME-1)', async () => {
+    await render(
+      base({
+        [box(DENIS, 'out')]: ok({
+          items: [
+            msg(ENV_OUT3, 'Newest from us.', AT + 60, { status: 'sent' }),
+            msg(ENV_OUT1, 'An old reply from long ago.', AT - 100, { status: 'sent' }),
+          ],
+        }),
+        [box(DENIS, 'in', 'cur-in-1')]: ok({ items: [msg(ENV_OLD, 'Hi, Denis here.', AT - 200)] }),
+      }),
+    );
+    await click(row('Denis'));
+    // The inbox still has older messages (it has `next`), so nothing older than its oldest loaded
+    // message shows yet: a gap would hide their side of that stretch.
+    expect(host.textContent).toContain('Newest from us.');
+    expect(host.textContent).not.toContain('An old reply from long ago.');
+    await click(byText('button', S.loadEarlier));
+    const text = host.textContent ?? '';
+    expect(text).toContain('An old reply from long ago.');
+    expect(text.indexOf('Hi, Denis here.')).toBeLessThan(
+      text.indexOf('An old reply from long ago.'),
+    );
+  });
+
+  it('their messages appear without motion; your Copy is announced (UI-REFRESH-k; a11y)', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    await render(base());
+    await click(row('Denis'));
+    const inbound = all('.hm-msg.is-in');
+    expect(inbound.length).toBeGreaterThan(0);
+    for (const m of inbound) expect(m.classList.contains('al-reveal')).toBe(false);
+    await click(all('button').find((b) => b.getAttribute('aria-label') === S.copyLabel));
+    const live = all('[aria-live="polite"]').map((e) => e.textContent ?? '');
+    expect(live.some((t) => t.includes(S.copied))).toBe(true);
+  });
+
+  it('shows names with no direction-changing or invisible characters, isolated (Fable g)', async () => {
+    const SPOOF = { ...ANA, name: 'An\u202Ea\u200B' };
+    await render(base({ [MESSAGES]: ok({ conversations: [DENIS, SPOOF] }) }));
+    expect(host.textContent).not.toMatch(/[\u202A-\u202E\u2066-\u2069\u200B-\u200F]/);
+    const names = all('bdi.hm-name');
+    expect(names.length).toBeGreaterThanOrEqual(2);
+    for (const n of names) expect(n.getAttribute('dir')).toBe('auto');
+  });
+
   it('shows a skeleton shaped like Home while it loads (after ~300 ms)', async () => {
     vi.useFakeTimers();
     try {
@@ -411,6 +458,53 @@ describe('Home simple (A4)', () => {
 
 describe('Home pro (A10, Under the hood on)', () => {
   beforeEach(() => setPref('hood', true));
+
+  it('People is a table to assistive technology: rows and cells', async () => {
+    await render(base());
+    const table = q('[role="table"]');
+    expect(table).toBeTruthy();
+    const rows = all('[role="table"] [role="row"]');
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+    expect(all('[role="columnheader"]').map((e) => e.textContent)).toContain(S.colPerson);
+    expect(all('[role="cell"]').length).toBeGreaterThan(0);
+  });
+
+  it('the card on top can be picked for the bulk approve when it is a free plain request', async () => {
+    await render(
+      base({
+        [APPROVALS]: ok({ approvals: [approval(APR_FREE), approval(APR_PAID, { paid: true })] }),
+      }),
+    );
+    const top = all('input[type="checkbox"]');
+    expect(top).toHaveLength(1);
+    expect(top[0]?.getAttribute('aria-label')).toContain('Request B');
+  });
+
+  it('a bulk answer that applied nothing says the requests changed', async () => {
+    const s = await render(
+      base({
+        [APPROVALS]: ok({ approvals: [approval(APR_FREE), approval(`apr_${'D'.repeat(22)}`)] }),
+        '/api/approvals/review': ok({ status: 'changed' }),
+      }),
+    );
+    for (const b of all('input[type="checkbox"]')) await click(b);
+    await click(byText('button', fmtCount(S.moreWaiting, 1)));
+    for (const b of all('input[type="checkbox"]').filter((x) => !(x as HTMLInputElement).checked)) {
+      await click(b);
+    }
+    await click(byText('button', fmtCount(S.approveSelected, 2)));
+    const field = q<HTMLInputElement>('input[type="password"]');
+    expect(field).toBeTruthy();
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      set?.call(field, 'CODE CODE CODE');
+      field?.dispatchEvent(new Event('input', { bubbles: true }));
+      field?.form?.requestSubmit();
+    });
+    await settle();
+    expect(s.calls.some((c) => c.url === '/api/approvals/review')).toBe(true);
+    expect(host.textContent).toContain('A request in this list changed.');
+  });
 
   it('shows People as a table with search and the agent filter; search filters', async () => {
     await render(base());

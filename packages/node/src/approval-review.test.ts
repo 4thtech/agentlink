@@ -219,6 +219,37 @@ describe('review together: one owner code entry, exactly the listed items (D-68,
     ).toEqual([id(2), id(5)]);
   });
 
+  // IR-W4-HOME-SEC-1 (f): the wire form the app sends, written out by hand. Home's bulk approve
+  // only sends `a` items; this pins what the server does today with a mixed list that holds a `d`
+  // item (one signed batch with each item's own decision), so a change to it is seen.
+  it('a raw X-AgentLink-Items list mixing `a` and `d` items signs exactly those decisions', async () => {
+    const h = await harness();
+    for (const n of [1, 2, 3]) h.source.add(n);
+    const digest = async (n: number): Promise<string> =>
+      (await h.source.get(id(n)))?.actionDigest ?? '';
+    const raw = [`${id(1)}:${await digest(1)}:a`, `${id(2)}:${await digest(2)}:d`].join(',');
+    const res = await review(h, raw, world.code);
+    expect(res.status).toBe(200);
+    expect(json(res)).toEqual({
+      status: 'applied',
+      items: [
+        { approvalId: id(1), decision: 'approve' },
+        { approvalId: id(2), decision: 'deny' },
+      ],
+    });
+    const signed = h.source.applied[0];
+    expect(signed?.body['op']).toBe('approval.decideBatch');
+    expect(
+      (signed?.body['params'] as { items: { approvalId: string; decision: string }[] }).items.map(
+        (x) => [x.approvalId, x.decision],
+      ),
+    ).toEqual([
+      [id(1), 'approve'],
+      [id(2), 'deny'],
+    ]);
+    expect(h.source.pending(3)).toBe(true);
+  });
+
   it('signs a single listed item as approval.decide, never a batch of one', async () => {
     const h = await harness();
     h.source.add(1);

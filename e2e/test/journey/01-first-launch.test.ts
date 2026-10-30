@@ -5,15 +5,14 @@
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fakeClaudeCode } from '../app-world.js';
-import { chapter, journeyPage, journeyWorld, startUi, text, TOUCH_ID, WAVE4 } from './world.js';
+import { chapter, journeyPage, journeyWorld, startUi, text, TOUCH_ID } from './world.js';
 
 const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
 afterAll(() => ch.stop());
 
 // W4-ONE-TOUCH (builder A) turned this on: one gesture creates the owner and the agent and connects
-// the AI app. Only the very end (the empty Inbox) waits for the Inbox page (builders D1/B), so it
-// alone stays behind the JOURNEY_WAVE4 gate.
+// the AI app. W4-HOME un-gated the very end: the app opens on Home.
 describe('chapter 1: onboarding', () => {
   it('fresh home → "Connect your AI app" → one Touch ID creates the agent and connects Claude Code', async (ctx) => {
     const ready = ch.need(ctx);
@@ -68,11 +67,9 @@ describe('chapter 1: onboarding', () => {
     // No reload since Welcome (the finish answer's new generation is adopted in place).
     await probe.check();
 
-    // The app opens on the empty Inbox (gated until the Inbox page lands: D1/B).
-    if (WAVE4) {
-      await page.getByRole('button', { name: 'Continue' }).click();
-      await page.getByRole('heading', { name: 'Inbox' }).first().waitFor();
-      expect(await text(page)).toContain('All caught up');
-    }
+    // W4-HOME (un-gated): the app opens on Home, with no one in People yet.
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByRole('heading', { name: 'People' }).first().waitFor();
+    expect(await text(page)).toContain('No one here yet.');
   }, 180_000);
 });
