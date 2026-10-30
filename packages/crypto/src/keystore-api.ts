@@ -323,7 +323,7 @@ export interface RecoveryKitExportRequest {
  * only, paired with the OwnerKeyStore whose sessions it accepts. The agent KeyStore gains no method.
  *
  * sealRecoveryKit reads the owner seed and each agent's items (`seed`, `store-key` and those of
- * `policy-version`, `receipts-kept` and `storage-mark` that exist; never `s3:*`, D-115 D) inside the
+ * `policy-version`, `receipts-kept`, `storage-mark` and `key-epoch` that exist; never `s3:*`, D-115 D) inside the
  * backend, seals them with the snapshots as `ALKK` v1 under a new generated recovery code
  * (sealRecoveryKit of @4thtech-io/crypto/keystore) and returns that code, for display only. The
  * owner signs and the core applies one `backup.export` per included agent before this is called

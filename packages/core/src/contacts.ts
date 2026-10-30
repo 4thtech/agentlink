@@ -66,7 +66,7 @@ import { openOwnCard, readIdentity } from './identity.js';
 import { restrictName } from './names.js';
 import { parseOwnerActionText } from './owner-action.js';
 import { verifyPairingTranscript, type PairingTranscript } from './safety-code.js';
-import type { Row } from './store/schema.js';
+import type { Row, Sealed } from './store/schema.js';
 import {
   openStoredPairingMessage,
   ownKids,
@@ -106,6 +106,20 @@ export interface ContactView {
    * `handshake` and `handshake-ack` (04 §2.5.1, §3.6.1, G-28; M1-7c-b).
    */
   readonly safetyCodeChecked: boolean;
+  /**
+   * W4-RENAME-REACHES-CONTACTS (D-141; 07 §3 "Former name", 08 §1): present while a `card-update`
+   * changed the contact's own name and the owner has not seen the note yet. `formerName` is the name
+   * the owner last saw, under the name rule (restrictName, like `display`), never the raw text. Display
+   * state only: it changes neither the identity label nor "Safety code checked" (04 §2.6). Absent for
+   * Also for a contact shown by the owner's own alias: the alias stays and the note reads "Now calls
+   * itself {newName} (was {formerName})" (08 §1).
+   */
+  readonly nameChange?: {
+    readonly formerName: string;
+    /** The contact's own new name, restricted (for an aliased contact: "Now calls itself {new}"). */
+    readonly newName: string;
+    readonly at: number;
+  };
   readonly createdAt: number;
   readonly updatedAt: number;
 }
@@ -444,9 +458,64 @@ export class ContactBook {
       status: row.status,
       pairing: row.pairing,
       safetyCodeChecked,
+      ...(await this.#nameChange(row, short)),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  /** D-141: the unseen former-name note of a contact shown by its own name, if any. */
+  async #nameChange(
+    row: Row<'contacts'>,
+    short: string,
+  ): Promise<{
+    readonly nameChange?: {
+      readonly formerName: string;
+      readonly newName: string;
+      readonly at: number;
+    };
+  }> {
+    if (row.name_change_seen !== 0 || row.former_name === null || row.name_changed_at === null) {
+      return {};
+    }
+    const former = await open(
+      this.#ctx,
+      'contacts',
+      'former_name',
+      [row.contact_id],
+      row.former_name,
+    );
+    const key = [row.contact_id];
+    const declared =
+      row.declared_name !== null
+        ? await open(this.#ctx, 'contacts', 'declared_name', key, row.declared_name)
+        : row.name_source === 'counterparty'
+          ? await open(this.#ctx, 'contacts', 'name', key, row.name)
+          : undefined;
+    if (declared === undefined) return {};
+    return {
+      nameChange: {
+        formerName: restrictName(former, short),
+        newName: restrictName(declared, short),
+        at: row.name_changed_at,
+      },
+    };
+  }
+
+  /**
+   * D-141 (07 §3, 08 §1): the local app showed the contact's former-name note; it is not shown again.
+   * Display state only (nothing is decided from it). True when a note was due.
+   */
+  async markNameChangeSeen(id: string): Promise<boolean> {
+    const now = nowOf(this.#ctx);
+    return this.#ctx.store.transaction(
+      (tx) =>
+        tx.update(
+          'contacts',
+          { contact_id: id, name_change_seen: 0 },
+          { name_change_seen: 1, updated_at: now },
+        ) === 1,
+    );
   }
 
   /** Contacts that are not removed, oldest first. */
@@ -774,6 +843,8 @@ export class ContactBook {
     };
     const sealedCard = await seal(ctx, 'contacts', 'agent_card_json', ckey, storedCardText(signed));
     const sealedName = await seal(ctx, 'contacts', 'name', ckey, staged.name);
+    // D-141: the self-declared name, kept also under an owner alias.
+    const sealedDeclared = await seal(ctx, 'contacts', 'declared_name', ckey, staged.name);
     const sealedRelays = await seal(
       ctx,
       'contacts',
@@ -875,6 +946,10 @@ export class ContactBook {
           nostr_keys: JSON.stringify([current.agent_nostr]),
           status: 'active',
           created_at: now,
+          former_name: null,
+          name_changed_at: null,
+          name_change_seen: null,
+          declared_name: sealedDeclared,
         };
         tx.insert('contacts', written);
       } else {
@@ -886,6 +961,11 @@ export class ContactBook {
           name_source: existing.name_source,
           nostr_keys: withKey(parseKeyList(existing.nostr_keys), current.agent_nostr),
           status: existing.status === 'removed' ? ('active' as const) : existing.status,
+          // D-141: a new pairing starts without a former-name note.
+          former_name: null,
+          name_changed_at: null,
+          name_change_seen: null,
+          declared_name: sealedDeclared,
         };
         const where = {
           contact_id: id,
@@ -1016,9 +1096,39 @@ export class ContactBook {
     const sealedCard = await seal(ctx, 'contacts', 'agent_card_json', key, storedCardText(update));
     const name = await seal(ctx, 'contacts', 'name', key, checked.name);
     const relays = await seal(ctx, 'contacts', 'relays', key, canonicalize([...checked.relays]));
+    // D-141 (07 §3 "Former name"): the contact's own name before, read now and checked unchanged at
+    // apply time: `declared_name`, else (a row from before version 9) its shown name when that is its
+    // own. Under an owner alias the alias stays and the note reads "Now calls itself …".
+    const declared = await seal(ctx, 'contacts', 'declared_name', key, checked.name);
+    const before = await ctx.store.transaction((tx) => tx.get('contacts', { contact_id: id }));
+    let formerSealed: Sealed | undefined;
+    const oldName =
+      before === undefined
+        ? undefined
+        : before.declared_name !== null
+          ? await open(ctx, 'contacts', 'declared_name', key, before.declared_name)
+          : before.name_source === 'counterparty'
+            ? await open(ctx, 'contacts', 'name', key, before.name)
+            : undefined;
+    if (oldName !== undefined) {
+      const short = formatFingerprint(decodeHex(fingerprint, { length: 32 }), 'short');
+      // Equal under the name rule (06 §2.1): no note is due.
+      if (restrictName(oldName, short) !== restrictName(checked.name, short)) {
+        formerSealed = await seal(ctx, 'contacts', 'former_name', key, oldName);
+      }
+    }
     const apply = (tx: StoreTx): Row<'contacts'> => {
       const existing = tx.get('contacts', { contact_id: id });
       if (existing === undefined || existing.status === 'removed') return notFound();
+      // The name read above is still the stored one (another update would change the note).
+      if (
+        before !== undefined &&
+        (existing.name !== before.name ||
+          existing.name_source !== before.name_source ||
+          existing.declared_name !== before.declared_name)
+      ) {
+        throw new CoreError('contact_conflict', 'The contact changed meanwhile. Try again.');
+      }
       if (isRevoked(tx, id, existing)) {
         throw new CoreError('contact_revoked', 'That agent has been revoked.');
       }
@@ -1030,6 +1140,17 @@ export class ContactBook {
       }
       assertKeyFree(tx, id, nostr, ownKeys);
       const ownerName = existing.name_source === 'owner';
+      // D-141: an earlier change the owner has not seen yet keeps its former name, so the note names
+      // the name the owner last saw.
+      const unseen = existing.name_change_seen === 0 && existing.former_name !== null;
+      const note =
+        formerSealed === undefined
+          ? {}
+          : {
+              former_name: unseen ? existing.former_name : formerSealed,
+              name_changed_at: now,
+              name_change_seen: 0 as const,
+            };
       const patch = {
         // L-4: a name the owner chose is kept.
         name: ownerName ? existing.name : name,
@@ -1039,6 +1160,8 @@ export class ContactBook {
         key_epoch: card.keyEpoch,
         nostr_keys: withKey(parseKeyList(existing.nostr_keys), nostr),
         updated_at: now,
+        declared_name: declared,
+        ...note,
       };
       if (tx.update('contacts', { contact_id: id, key_epoch: existing.key_epoch }, patch) !== 1) {
         throw new CoreError('contact_conflict', 'The contact changed meanwhile. Try again.');

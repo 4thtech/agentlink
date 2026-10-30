@@ -238,6 +238,7 @@ import {
   type FirstPolicyActions,
 } from './owner-first-card.js';
 import { signNewAgent } from './owner-add-agent.js';
+import { signRename } from './owner-rename.js';
 import {
   CREATE_CONNECT_HOLD_MS,
   CREATE_CONNECT_NONCE_BYTES,
@@ -289,6 +290,7 @@ import type {
   LocalUiCreateAgentStep,
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
+  LocalUiRenameRequest,
   LocalUiResult,
   LocalUiRevealRoute,
   LocalUiSetupStep,
@@ -325,6 +327,7 @@ import { createHealthReader } from './local-ui/api/health.js';
 import {
   checkGesture,
   signGesture,
+  type OwnerReview,
   type OwnerSignRequest,
   type PromptingOwnerKeyStore,
 } from './owner-operation.js';
@@ -2043,6 +2046,7 @@ export async function startApprovalServerWith(
         }
         let store: { lock(): Promise<void>; close(): Promise<void> };
         let session: OwnerSession;
+        let ownerKeys: OwnerPublicKeys;
         if (context === undefined) {
           // HOTFIX-045-REMOVE (GAP B): no card; the stored owner must be the one `byNostr` names.
           try {
@@ -2053,7 +2057,7 @@ export async function startApprovalServerWith(
               presence,
               { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
             );
-            ({ store, session } = unlocked);
+            ({ store, session, owner: ownerKeys } = unlocked);
           } catch (error) {
             if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
               presenceFailed();
@@ -2088,12 +2092,15 @@ export async function startApprovalServerWith(
             return;
           }
           store = opened;
+          ownerKeys = context.owner;
         }
         try {
           presenceSucceeded();
           let used = false;
           // U3-e: open only between this gesture's signed `agent.revoke` and the end of `run`.
           let carriersOpen = false;
+          // D-141: the agent this gesture renames is the one open now (stillCurrent fences a switch).
+          const renameUi = agentUi;
           let result: LocalUiResult;
           try {
             const owner: LocalUiOwnerOperation = Object.freeze<LocalUiOwnerOperation>({
@@ -2132,6 +2139,44 @@ export async function startApprovalServerWith(
               },
               // W4-ONE-TOUCH: Add an agent is no longer an ordinary owner route; its first parts
               // are signed only by the create-agent gate (createAgentGate, 04 §2.8).
+              // W4-RENAME-REACHES-CONTACTS (D-141; 04 §2.5.1 `agent.label`, §2.6): a rename that
+              // rotates, in the app host only and with the open agent's key items. The same one
+              // owner operation: exactly the open agent's next card, then exactly the prepared
+              // `agent.label` (signRename); never `sign` as well. Never on the HOTFIX-045-REMOVE path.
+              ...(host === undefined ||
+              byNostr !== undefined ||
+              renameUi?.client === undefined ||
+              renameUi.epochKeys === undefined
+                ? {}
+                : {
+                    renameAgent: async (review: OwnerReview, request: LocalUiRenameRequest) => {
+                      if (used) {
+                        throw new NodeKeyStoreError(
+                          'owner_operation_invalid',
+                          'One owner operation signs once.',
+                        );
+                      }
+                      used = true;
+                      if (!stillCurrent(req)) throw new AgentChanged();
+                      const client = renameUi.client;
+                      const epochKeys = renameUi.epochKeys;
+                      if (client === undefined || epochKeys === undefined) {
+                        throw new NodeKeyStoreError('owner_operation_invalid', 'Not here.');
+                      }
+                      return signRename(session, ownerKeys, {
+                        agent: client.agentId,
+                        client: {
+                          identity: client.identity,
+                          sendCardUpdates: () => client.sendCardUpdates(),
+                          contacts: client.contacts,
+                        },
+                        epochKeys,
+                        review,
+                        label: request.label,
+                        labelBody: request.labelBody,
+                      });
+                    },
+                  }),
             });
             if (!stillCurrent(req)) throw new AgentChanged();
             result = await run(owner);

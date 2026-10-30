@@ -1,5 +1,20 @@
 # @4thtech-io/node
 
+## 0.4.5
+
+### Patch Changes
+
+- b91274b: HOTFIX-045-CONTACTS-NEW: Contacts also re-reads every 5 s while an invite from this page is open or a connect just started, so a new contact appears without a reload.
+- 91f161d: HOTFIX-045-CONTACTS-REFRESH: Contacts re-reads every 5 s and on tab focus while a pairing is pending, so it no longer stays on Waiting after pairing finished.
+- 0b263dd: HOTFIX-045-PASTE-FIELD: in Add contact, the paste box is a proper multi-line field, so its text no longer overlaps the label and the hint.
+- ba0a770: HOTFIX-045-REMOVE-FIRSTRUN: Remove works in the app session that first run started. The no-agent app host (`startUiWelcome`) now gets the same removal port (`uiRemovalPort`) as the host `agentlink ui` starts for an existing agent, so `POST /api/ui/agents/remove` no longer answers 501 there until the app is restarted. Same route, same gates (session, Host, Origin, CSRF, fetch metadata, generation, owner presence, signed `agent.revoke`).
+- 62191d7: HOTFIX-045-REMOVE: Remove finishes, and Try again works with no agent open. The agent folder lock's exclusive hold now keeps SQLite's journal in memory, so it no longer writes `open.lock-journal` into the folder the removal deletes under that lock (the delete refused the unknown file, so every removal ended "Removal not finished"). Try again of a removal whose keys are already gone takes the owner from the verified revoked-list entry and unlocks the owner stored on this computer by that key (`KeychainOwnerKeyStore.unlockForOwnerNostr`), with the same presence and a signed `agent.revoke`, instead of reading the owner from an open agent (none is open on a one-agent computer).
+- f3273a2: HOTFIX-045-TOPBAR: the app's top bar shows one status chip and no "+N" AI-app chip, and a received file that is not saved shows a fixed "Not saved yet" line instead of an endless stepped bar.
+- 532c070: HOTFIX-045-TOUCHID: `GET /api/owner/passkey` answers from the owner store with no agent open in the app host (it was refused with `409 no_agent`, so every presence sheet fell back to the backup code). When the passkey can't be used the answer carries a fixed `reason` (`not_set_up_here` or `other_owner`); the local app's presence sheet says why in plain words and, for an owner without a passkey on this computer, offers a one-time "Switch to Touch ID" inside the sheet (the existing `POST /api/owner/passkey` registration; the operation is then confirmed with its own gesture). Registering still needs an open agent; every route gate is unchanged.
+- @4thtech-io/core@0.4.5
+  - @4thtech-io/crypto@0.4.5
+  - @4thtech-io/transport-nostr@0.4.5
+
 ## 0.4.4
 
 ### Patch Changes
