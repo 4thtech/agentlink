@@ -5,6 +5,7 @@
 // - `GET /api/ui/messages`: the people (every contact that is not removed) with their last activity;
 // - `GET /api/ui/contacts`: the contact facts for the pro layer (fingerprint, identity, paired);
 // - `GET /api/ui/files/received` and `/sent`: each file's state (Saved as, Arrived · not saved);
+// - `GET /api/ui/invites`: the invites that wait to be accepted (name and expiry, never a link);
 // - per person, the newest page each way (`/api/ui/messages/<id>?box=in|out`): the last message,
 //   its delivery word, the proofs and the files. A person's pages are read again only when their
 //   last activity changed or a message still waits to send, so polling stays cheap.
@@ -12,6 +13,7 @@
 // Reading here never writes and never marks anything read for the AI.
 import type { ApiClient } from '../../api/client.js';
 import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
+import { INVITES_LIST_PATH, parseOpenInvites, type OpenInvite } from '../contacts/invite-api.js';
 import { parseReceived, parseSent, type ReceivedItem, type SentItem } from '../files/io-api.js';
 import {
   createMessagesApi,
@@ -51,6 +53,8 @@ export interface HomeData {
   readonly contacts: ReadonlyMap<string, ContactRow>;
   readonly received: ReadonlyMap<string, ReceivedItem>;
   readonly sent: ReadonlyMap<string, SentItem>;
+  /** Invites that wait to be accepted, soonest to expire first. */
+  readonly invites: readonly OpenInvite[];
 }
 
 /** A received or sent file's item ID: `<envelope ID>.<two-digit index>`. */
@@ -99,11 +103,12 @@ export function createPeopleApi(api: ApiClient): PeopleApi {
   return {
     messages,
     async load() {
-      const [people, contacts, received, sent] = await Promise.all([
+      const [people, contacts, received, sent, invites] = await Promise.all([
         messages.conversations(),
         api.get<unknown>(LIST_PATH),
         api.get<unknown>(RECEIVED_LIST),
         api.get<unknown>(SENT_LIST),
+        api.get<unknown>(INVITES_LIST_PATH),
       ]);
       if (!people.ok) return { ok: false, problem: people.problem };
       const list = contacts.kind === 'ok' ? parseList(contacts.data) : undefined;
@@ -118,6 +123,9 @@ export function createPeopleApi(api: ApiClient): PeopleApi {
           ),
           received: new Map((rec?.items ?? []).map((f) => [f.id, f] as const)),
           sent: new Map((out?.items ?? []).map((f) => [f.id, f] as const)),
+          invites: [
+            ...((invites.kind === 'ok' ? parseOpenInvites(invites.data) : undefined) ?? []),
+          ].sort((a, b) => a.expiresAt - b.expiresAt),
         },
       };
     },

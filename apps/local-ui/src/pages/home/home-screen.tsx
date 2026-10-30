@@ -49,7 +49,7 @@ import {
 } from '../approvals/client.js';
 import { ADD_CONTACT_MARKER } from '../contacts/add-contact-link.js';
 import type { ContactRow } from '../contacts/data.js';
-import { pendingInvites } from '../contacts/pending-invites.js';
+import { createInviteApi, type InviteApi, type OpenInvite } from '../contacts/invite-api.js';
 import { createFilesApi } from '../files/files-api.js';
 import type { Conversation as Person, MessagesApi, Problem } from '../messages/api.js';
 import { createSaveApi, type SaveApi } from '../inbox/save-api.js';
@@ -86,7 +86,7 @@ export interface HomeScreenProps {
   readonly pollMs?: number;
   /** U2's "Get started · n of 3 done" card, on top while setup is not done. */
   readonly getStarted?: ReactNode;
-  /** U4's pending invite rows (with Cancel); today's rows otherwise. */
+  /** U4's pending invite rows; otherwise the server's open invites, each with Cancel. */
   readonly pendingRows?: ReactNode;
   /** K3's "Saved to <folder>" note for every person's Files. */
   readonly folderNote?: ReactNode;
@@ -107,6 +107,7 @@ interface Clients {
   readonly approvals: ApprovalsClient;
   readonly save: SaveApi;
   readonly reveal: Reveal;
+  readonly invites: InviteApi;
 }
 
 function useClients(props: HomeScreenProps): Clients {
@@ -125,6 +126,7 @@ function useClients(props: HomeScreenProps): Clients {
       approvals: approvalsClient ?? createApprovalsClient(withKeys),
       save: createSaveApi(withKeys),
       reveal: (id: string) => files.reveal(id),
+      invites: createInviteApi(opts),
     };
   }, [givenFetch, token, credentials, approvalsClient]);
 }
@@ -290,6 +292,73 @@ function PersonOpen({
   );
 }
 
+const DAY_MS = 86_400_000;
+
+/** An invite that waits to be accepted: who, how long the link works, and Cancel. Never the link. */
+function PendingInviteRow({
+  invite,
+  pro,
+  agent,
+  api,
+  onCancelled,
+}: {
+  readonly invite: OpenInvite;
+  readonly pro: boolean;
+  readonly agent: string;
+  readonly api: InviteApi;
+  readonly onCancelled: () => void;
+}): ReactElement {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const left = Math.max(0, Math.ceil((invite.expiresAt - Date.now()) / DAY_MS));
+  const name = invite.name ?? undefined;
+  return (
+    <div className="hm-invite-row">
+      <span className="hm-avatar is-pending" aria-hidden="true">
+        {name === undefined ? (
+          <Icon name="clock" size={16} />
+        ) : (
+          ([...name][0]?.toUpperCase() ?? '?')
+        )}
+      </span>
+      <span className="hm-row-main">
+        {name === undefined ? null : <bdi className="hm-name">{name}</bdi>}
+        <span className="hm-sub al-text-body-sm">
+          {name === undefined ? S.waitingToAcceptNoName : fmt(S.waitingToAccept, { name })}
+          {' · '}
+          {left === 1 ? S.linkWorksOneDay : fmt(S.linkWorksDays, { count: left })}
+        </span>
+        {pro ? (
+          <span className="hm-mono hm-cell-time">
+            {invite.inviteId} · {S.approvalExpires} {exactTime(Math.floor(invite.expiresAt / 1000))}
+            {agent === '' ? '' : ` · ${agent}`}
+          </span>
+        ) : null}
+        {failed ? (
+          <span role="alert" className="hm-inline-error al-text-body-sm">
+            {S.cantCancel}
+          </span>
+        ) : null}
+      </span>
+      <Button
+        size="sm"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          setFailed(false);
+          void api.cancel(invite.inviteId).then((outcome) => {
+            setBusy(false);
+            if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') onCancelled();
+            else setFailed(true);
+          });
+        }}
+      >
+        {S.cancelInvite}
+      </Button>
+    </div>
+  );
+}
+
 /** The pro table's last message: your AI's words as text, theirs in the untrusted container. */
 function LastText({
   person,
@@ -441,7 +510,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   const people = (data?.people ?? []).filter(
     (p) => !pro || (otherAgent === undefined && (q === '' || p.name.toLowerCase().includes(q))),
   );
-  const pending = props.pendingRows === undefined && !pro ? pendingInvites() : [];
+  const pending = props.pendingRows === undefined ? (data?.invites ?? []) : [];
   const now = Date.now();
 
   const peopleHead = (
@@ -691,19 +760,14 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                 ) : null}
                 {props.pendingRows ??
                   pending.map((invite) => (
-                    <div key={invite.id} className="hm-invite-row">
-                      <span className="hm-avatar is-pending" aria-hidden="true">
-                        {[...(invite.name ?? '?')][0]?.toUpperCase() ?? '?'}
-                      </span>
-                      <span className="hm-row-main">
-                        <bdi className="hm-name">{invite.name ?? ''}</bdi>
-                        <span className="hm-sub al-text-body-sm">
-                          {invite.name === undefined
-                            ? S.waitingToAcceptNoName
-                            : fmt(S.waitingToAccept, { name: invite.name })}
-                        </span>
-                      </span>
-                    </div>
+                    <PendingInviteRow
+                      key={invite.inviteId}
+                      invite={invite}
+                      pro={pro}
+                      agent={agentLabel}
+                      api={clients.invites}
+                      onCancelled={refresh}
+                    />
                   ))}
               </div>
             )}

@@ -372,6 +372,23 @@ describe('Home simple (A4)', () => {
     expect(host.textContent).toMatch(/backup code/i);
   });
 
+  it('lists invites that wait to be accepted, never the link, with Cancel', async () => {
+    const expires = new Date(Date.now() + 6.5 * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
+    const s = await render(
+      base({
+        '/api/ui/invites': ok({
+          invites: [{ inviteId: 'inv_5d21aaaaaaaaaaaa', name: 'Marko', expiresAt: expires }],
+        }),
+        '/api/ui/invites/cancel': ok({ status: 'cancelled' }),
+      }),
+    );
+    expect(host.textContent).toContain('Waiting for Marko to accept · link works 7 more days');
+    expect(host.textContent).not.toMatch(/https?:\/\//);
+    await click(byText('button', S.cancelInvite));
+    const post = s.calls.find((c) => c.url === '/api/ui/invites/cancel');
+    expect(post?.method).toBe('POST');
+  });
+
   it('shows a skeleton shaped like Home while it loads (after ~300 ms)', async () => {
     vi.useFakeTimers();
     try {

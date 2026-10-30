@@ -137,9 +137,13 @@ export const HOME_STRINGS = {
   paidAlone: 'Approvals that cost money are always approved one at a time.',
   approvedSelected: 'Approved {count}.',
 
-  // Pending invites (U4 adds Cancel and the days left).
+  // Invites that wait to be accepted (W4-INVITES-LIST: the server's list, Cancel).
   waitingToAccept: 'Waiting for {name} to accept',
   waitingToAcceptNoName: 'Waiting for them to accept',
+  linkWorksDays: 'link works {count} more days',
+  linkWorksOneDay: 'link works 1 more day',
+  cancelInvite: 'Cancel invite',
+  cantCancel: "Couldn't cancel the invite. Try again in a minute.",
 } as const;
 
 /** `{name}`-style slots filled with plain text. */
