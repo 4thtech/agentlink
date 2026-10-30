@@ -6,6 +6,7 @@ import { AGENTS_LIST } from '@4thtech-io/types/ui-contract/agents';
 import { APPS_LIST } from '@4thtech-io/types/ui-contract/apps';
 import { describe, expect, it } from 'vitest';
 import { createAgentsApi } from './api.js';
+import { appNameOf } from './app-names.js';
 
 const withApps = (apps: string[]) => ({
   ...AGENTS_LIST.answer.body,
@@ -49,5 +50,12 @@ describe('app ids become app names in the Agents list', () => {
     const t = api({ '/api/ui/agents': AGENTS_LIST.answer });
     await t.agents.list();
     expect(t.urls).toEqual(['/api/ui/agents']);
+  });
+});
+
+describe('W4-LIVE-STATUS: an AI app outside the fixed table (Q-143-4, Decision 50)', () => {
+  it('shows `other` as "Another AI app", never the raw id', () => {
+    expect(appNameOf('other')).toBe('Another AI app');
+    expect(appNameOf('other', new Map([['codex', 'Codex']]))).toBe('Another AI app');
   });
 });

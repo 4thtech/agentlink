@@ -443,8 +443,8 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     // add a migration with the next version instead (07 §3.7: forward migrations only).
     const digestOf = (i: number) =>
       encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-    expect(STORE_SCHEMA_VERSION).toBe(9);
-    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(STORE_SCHEMA_VERSION).toBe(10);
+    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     // Version 1 (G-9) is unchanged by D-72.
     expect(digestOf(0)).toMatchInlineSnapshot(
       `"6a2a36755c97cca746bdfe0b166c409cf1a067b1fd526011470446c0bb7dfd1b"`,
@@ -550,6 +550,50 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       'declared_name',
     ]);
     expect(digestOf(8)).toBe('1966a9af7c3f60389de97963606d0b694e5b7d5489aec1554cd5f4efd817726a');
+    // Version 10 (W4-LIVE-STATUS, D-143; 07 §3.2): the MCP session heartbeat tables, new tables only.
+    const v10 = MIGRATIONS[9]?.statements ?? [];
+    expect(v10.filter((s) => s.startsWith('CREATE TABLE')).map((s) => s.split('"')[1])).toEqual([
+      'mcp_sessions',
+      'mcp_last_seen',
+    ]);
+    expect(v10.some((s) => s.startsWith('ALTER TABLE'))).toBe(false);
+    expect(digestOf(9)).toBe('40536c0d6cf98abd567807603de2ee761e454fbff14896e232e2f1dba63a5257');
+  });
+
+  it('migrates a version 9 file to version 10 (D-143): rows kept, the heartbeat tables empty', async () => {
+    const raw = new Database(path());
+    for (const m of MIGRATIONS.slice(0, 9)) {
+      for (const statement of m.statements) raw.prepare(statement).run();
+    }
+    raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+    raw.pragma('user_version = 9');
+    raw
+      .prepare(
+        'INSERT INTO "invites" ("invite_id", "proof_key", "expires_at", "created_at") ' +
+          'VALUES (?, ?, 2, 1)',
+      )
+      .run('AAAAAAAAAAAAAAAAAAAAAA', 'x');
+    raw.close();
+    const v10 = await SqliteStore.open(path());
+    expect(v10.schemaVersion).toBe(10);
+    expect(await v10.transaction((tx) => tx.select('invites'))).toHaveLength(1);
+    expect(await v10.transaction((tx) => tx.select('mcp_sessions'))).toEqual([]);
+    await v10.transaction((tx) => {
+      tx.insert('mcp_sessions', {
+        session_id: 'AAAAAAAAAAAAAAAAAAAAAA',
+        app: 'codex',
+        agent_id: 'x',
+        pid: 4242,
+        started_at: 1,
+        beat_until: 46,
+        last_tool_at: null,
+      });
+      tx.insert('mcp_last_seen', { app: 'codex', last_seen_at: 1 });
+    });
+    expect(await v10.transaction((tx) => tx.select('mcp_last_seen'))).toEqual([
+      { app: 'codex', last_seen_at: 1 },
+    ]);
+    await v10.close();
   });
 
   it('migrates a version 7 file to version 8 (W4-SHORT-INVITE): invites kept, drop columns null', async () => {
@@ -600,7 +644,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       .run();
     raw.close();
     const v9 = await SqliteStore.open(path());
-    expect(v9.schemaVersion).toBe(9);
+    expect(v9.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     const [row] = await v9.transaction((tx) => tx.select('contacts'));
     expect(row?.contact_id).toBe('c1');
     expect(row?.former_name).toBeNull();
@@ -619,7 +663,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     await v9.close();
     // Idempotent: the user_version runner applies nothing on a second open; the rows stay as written.
     const again = await SqliteStore.open(path());
-    expect(again.schemaVersion).toBe(9);
+    expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     const [kept] = await again.transaction((tx) => tx.select('contacts'));
     expect(kept?.name_change_seen).toBe(0);
     expect(await again.transaction((tx) => tx.select('invites'))).toHaveLength(1);

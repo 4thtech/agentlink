@@ -41,6 +41,7 @@
 // (AgentDirectory `create`), signs its first parts with the owner's one gesture, and hands it here
 // with `adoptFirst`: the generation increases first, the requests in flight drain, then the agent is
 // opened through the same `open` path as a switch. Nothing is signed here.
+import type { AgentStorePeek } from '../agent-peek.js';
 import type { UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { ApprovalServerSource } from '../approval-server.js';
 import type { LocalUiAiApps, LocalUiOptions } from './context.js';
@@ -64,7 +65,12 @@ export interface AgentDirectoryEntry {
 /** What the Agents list shows of an agent's store (clear columns only, node agent-peek.ts). */
 export interface AgentDirectoryStats {
   readonly contacts: number;
+  /** W4-LIVE-STATUS: a live MCP session row exists (never the lease). */
   readonly running: boolean;
+  /** W4-LIVE-STATUS (D-143): the live MCP sessions (app id and times only; never a pid or ID). */
+  readonly sessions?: AgentStorePeek['sessions'];
+  /** W4-LIVE-STATUS: when each AI app id last ran this agent. */
+  readonly lastSeen?: AgentStorePeek['lastSeen'];
 }
 
 /**

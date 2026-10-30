@@ -152,7 +152,14 @@ export {
   type AgentFolderLock,
   type AgentFolderLockErrorCode,
 } from './agent-folder-lock.js';
-export { peekAgentStore, type AgentStorePeek } from './agent-peek.js';
+export {
+  peekAgentStore,
+  type AgentLastSeen,
+  type AgentLiveSession,
+  type AgentStorePeek,
+} from './agent-peek.js';
+// W4-LIVE-STATUS (04 §2.5): the signal-0 check of an MCP session row's pid.
+export { pidAlive } from './pid-alive.js';
 // M1-11s-a-d: the caller's health source for the status bar's health read.
 export type { LocalUiHealthSnapshot, LocalUiHealthSource } from './local-ui/api/health.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key

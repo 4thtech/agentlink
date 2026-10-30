@@ -5679,7 +5679,7 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
   - To be written when planned; full threat note, Fable 5.1 audit.
 
 #### W4-LIVE-STATUS · local app: live AI-app status, with a heartbeat per MCP process and a live event stream (wave 4, owner Decision 49, D-143)
-- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (the new local route) · **Phase:** M1b
+- **Status:** in review, wave 4 (0.4.6); the page switch to the stream is U1-b · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (the new local route) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core/src/store/schema.ts` and migration (`mcp_sessions`, `mcp_last_seen`), `packages/core/src/constants.ts`; `apps/cli/src/mcp/**` (initialize, beat timer, tool-call stamp, exit); `packages/node/src/agent-peek.ts`, `packages/node/src/approval-server.ts` and `packages/node/src/local-ui/api/agents*.ts` (states, `GET /api/ui/events`); `packages/types/src/ui-contract/*`; `apps/local-ui/src/{layout/agent-switcher.tsx,pages/agents/**,pages/apps/**}` and one shared live hook
 - **Depends on:** the W4-LIVE-STATUS spec PR; absorbs the status part of W4-SWITCHER-STATUS
 - **Spec:** D-143; 04 §2.5 ("Live status and Pause"), §4; 06 §6 ("MCP session heartbeat"); 07 §3.2; 08 §1 (`GET /api/ui/agents`, `GET /api/ui/events`, "Live AI-app status"); 11 §5

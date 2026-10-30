@@ -9,6 +9,7 @@
 //
 // apps/local-ui may not import packages/node (package layering, tools/deps-check); both may import
 // this subpath of @4thtech-io/types. Names and labels here are filler, never a real agent.
+import type { LiveAgentState, LiveAppRecord } from './live.js';
 
 /** `POST /api/ui/agents/switch`: an octet-stream body of this JSON; the generation is a number. */
 export interface AgentsSwitchBody {
@@ -56,8 +57,12 @@ export interface AgentsListRow {
   readonly available: boolean;
   readonly removing: boolean;
   readonly contacts: number | null;
+  /** W4-LIVE-STATUS (D-143): a live MCP session row of this agent (never the lease). */
   readonly running: boolean;
-  readonly apps: readonly string[];
+  /** W4-LIVE-STATUS: the live state, last seen and per AI app state (ui-contract/live.ts). */
+  readonly state: LiveAgentState;
+  readonly lastSeenAt?: number;
+  readonly apps: readonly LiveAppRecord[];
 }
 export interface AgentsListBody {
   readonly switchable: true;
@@ -108,6 +113,7 @@ export const AGENTS_LIST = {
           removing: false,
           contacts: 1,
           running: false,
+          state: 'offline',
           apps: [],
         },
         {
@@ -119,6 +125,7 @@ export const AGENTS_LIST = {
           removing: false,
           contacts: 1,
           running: false,
+          state: 'offline',
           apps: [],
         },
       ],
