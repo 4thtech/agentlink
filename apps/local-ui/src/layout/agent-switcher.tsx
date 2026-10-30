@@ -1,272 +1,287 @@
-// U3-h: the top-bar agent switcher (b11 §29.1). The open agent's label, a live dot and the AI app it
-// works from; a menu of the other agents (each with its AI apps), Add agent and Manage agents.
-// Switching needs no Touch ID (it only changes what you look at): one POST, then every page reloads
-// for that agent. Labels are text only (I-5). At 360 the trigger is the agent's initial in a circle.
-import { Icon, LiveDot, TextField, type LiveDotState } from '@4thtech-io/ui';
-import { createPortal } from 'react-dom';
-import { useCallback, useMemo, useRef, useState, type ReactElement } from 'react';
-import { navigate } from '../router.js';
-import { AppMark } from '../pages/agents/app-mark.js';
-import type { AgentsApi } from '../pages/agents/api.js';
+// W4-SHELL-V2 (W4 UX v2 Layer 2 "Agent dropdown, kept, made live"; prototype v23 A4): the agent chip
+// at the top left and its live dropdown. The chip shows the open agent's letter icon with a live dot,
+// its name and one plain status ("Ready in Claude Code"; a connection that is not up wins: one truthful
+// status, HOTFIX-045). The dropdown, "Your agents · live": per agent its letter icon and dot, its
+// status and, per AI app, a dot and a word (Working / Ready / Not running / Not set up / Paused); then
+// "Another AI app", the detected AI apps that serve no agent, each with Connect (kept from #715); then
+// Add agent and Manage agents. It follows the shared live store (api/live.ts), so it updates by
+// itself (W4-SHELL-LIVE: over the events stream, so quitting or starting an AI app shows within
+// seconds; per AI app Working with the U0 pulse / Ready / Idle / Not running · last seen / Not set up
+// in the words of 08 §1). Switching needs no Touch ID (it only changes what you look at) and never
+// reloads the page.
+// Labels and app names are text only (I-5).
+import { AgentIcon, Pulse, type AgentDotState, type LiveDotState } from '@4thtech-io/ui';
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
+import type { ReactElement } from 'react';
 import {
-  AGENTS_APPS_PATH,
-  AGENTS_PATH,
-  orderAgents,
-  shortLabel,
-  stateWord,
-  type AgentRow,
-} from '../pages/agents/data.js';
-import { Menu } from '../pages/agents/menu.js';
-import { AGENTS_STRINGS as S } from '../pages/agents/strings.js';
-import { listOf, useAgents } from '../pages/agents/use-agents.js';
-import '../pages/agents/agents.css';
+  getLive,
+  subscribeLive,
+  switchAgent,
+  type LiveAgent,
+  type LiveState,
+} from '../api/live.js';
+import { AGENTS_PATH, NEW_AGENT_PATH } from '../nav.js';
+import { navigate } from '../router.js';
+import type { AgentsApi } from '../pages/agents/api.js';
+import { AGENTS_STRINGS as A } from '../pages/agents/strings.js';
+import { createAppsApi, type AppsApi } from '../pages/apps/api.js';
+import { APPS_PAGE_PATH } from '../pages/apps/data.js';
+import { ShellIcon } from './shell-icons.js';
+import { ShellMenu } from './shell-menu.js';
+import { VT_CLASS } from '@4thtech-io/ui';
 
-const MANY = 8;
-
-/** The top bar's one status (HOTFIX-045): the app's connection, merged with the open agent's. */
+/** The top bar's one status for the connection (HOTFIX-045), when it is not up. */
 export interface SwitcherChip {
   readonly state: LiveDotState;
   readonly label?: string;
 }
 
-export interface AgentSwitcherProps {
-  readonly api?: AgentsApi;
-  /** The connection chip. The switcher shows exactly one chip: this one, or "Not running" for the open agent. */
-  readonly chip?: SwitcherChip;
-  /** Reloads every page after a switch (default: the browser reload). */
-  readonly reload?: () => void;
+export const CHIP_STRINGS = {
+  menu: 'Your agents · live',
+  menuName: 'Agents',
+  anotherApp: 'Another AI app',
+  connect: 'Connect',
+  connectApp: (app: string): string => `Connect ${app}`,
+  addAgent: 'Add agent',
+  manageAgents: 'Manage agents',
+  chipPrefix: 'Agent: ',
+  openApp: 'Open the AgentLink app to see your agents.',
+} as const;
+
+const DOT: Readonly<Record<LiveState, AgentDotState>> = {
+  working: 'working',
+  ready: 'ready',
+  idle: 'idle',
+  off: 'off',
+  none: 'none',
+  paused: 'paused',
+  removing: 'off',
+};
+
+/** The words of a connection that is not up (the chip says it instead of the agent's status). */
+function connectionWord(chip: SwitcherChip | undefined): string | undefined {
+  if (chip === undefined || chip.state === 'connected' || chip.state === 'checking') {
+    return undefined;
+  }
+  if (chip.label !== undefined) return chip.label;
+  if (chip.state === 'paused') return 'Paused';
+  if (chip.state === 'needs-setup') return 'Needs setup';
+  return 'Not running';
 }
 
-const defaultReload = (): void => window.location.reload();
-const initialOf = (label: string): string => ([...label.trim()][0] ?? '?').toUpperCase();
-
-function Dot({ row }: { row: AgentRow }): ReactElement {
-  return <LiveDot state={row.running ? 'connected' : 'not-running'} label={stateWord(row)} />;
-}
-
-function Chip({ chip }: { chip: SwitcherChip | undefined }): ReactElement | null {
-  if (chip === undefined) return null;
-  return (
-    <LiveDot state={chip.state} {...(chip.label === undefined ? {} : { label: chip.label })} />
+function useLive(api: AgentsApi | undefined): ReturnType<typeof getLive> {
+  return useSyncExternalStore(
+    useCallback((on) => subscribeLive(on, api === undefined ? undefined : { api }), [api]),
+    getLive,
+    getLive,
   );
 }
 
-/** One truthful state: a connection that is not up wins; otherwise the open agent's own. */
-function merged(
-  chip: SwitcherChip | undefined,
-  row: AgentRow | undefined,
-): SwitcherChip | undefined {
-  if (chip === undefined)
-    return row === undefined
-      ? undefined
-      : { state: row.running ? 'connected' : 'not-running', label: stateWord(row) };
-  if (chip.state !== 'connected' || row === undefined || row.running) return chip;
-  return { state: 'not-running', label: stateWord(row) };
+/** The detected AI apps that serve no agent yet ("Another AI app"). */
+function useFreeApps(appsApi: AppsApi | undefined): {
+  readonly names: readonly { readonly app: string; readonly name: string }[];
+  readonly reread: () => void;
+} {
+  const [client] = useState<AppsApi>(() => appsApi ?? createAppsApi());
+  const [names, setNames] = useState<readonly { app: string; name: string }[]>([]);
+  const live = useRef(true);
+  const reread = useCallback(() => {
+    void client.list().then((result) => {
+      if (!live.current || result.kind !== 'ok') return;
+      setNames(
+        result.list.apps
+          .filter((a) => a.state === 'not_connected' && a.agent === undefined)
+          .map((a) => ({ app: a.app, name: a.name })),
+      );
+    });
+  }, [client]);
+  useEffect(() => {
+    live.current = true;
+    reread();
+    return () => {
+      live.current = false;
+    };
+  }, [reread]);
+  return { names, reread };
 }
 
-export function AgentSwitcher({
-  api,
-  chip,
-  reload = defaultReload,
-}: AgentSwitcherProps): ReactElement | null {
-  const { state, reload: reread, switchTo } = useAgents(api, reload);
-  const list = listOf(state);
+/** A live dot; Working pulses (the U0 Pulse: a still dot with reduced motion). */
+export function LiveDot({ state }: { readonly state: LiveState }): ReactElement {
+  if (state === 'working') return <Pulse tone="success" className="al-ldot-pulse" />;
+  return <span className={`al-ldot is-${state}`} aria-hidden="true" />;
+}
+
+function AppLine({ app }: { app: LiveAgent['apps'][number] }): ReactElement {
+  return (
+    <span className="al-am-app">
+      <LiveDot state={app.state} />
+      <span className="al-am-app-name">{app.app}</span>
+      <span className={`al-am-app-word is-${app.state}`}>{app.word}</span>
+    </span>
+  );
+}
+
+export interface AgentSwitcherProps {
+  readonly api?: AgentsApi;
+  /** The AI apps read, for "Another AI app" (default: GET /api/ui/apps). */
+  readonly appsApi?: AppsApi;
+  /** The connection; when it is not up the chip says that instead of the agent's status. */
+  readonly chip?: SwitcherChip;
+}
+
+export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): ReactElement {
+  const live = useLive(api);
+  const free = useFreeApps(appsApi);
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
   const trigger = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
   const close = useCallback((restore: boolean): void => {
     setOpen(false);
-    setQuery('');
     if (restore) trigger.current?.focus();
   }, []);
 
-  const rows = useMemo(() => orderAgents(list?.agents ?? []), [list]);
-  const usable = rows.filter((r) => !r.removing);
-  const current = rows.find((r) => r.current);
+  const list = live.list;
+  const agents = live.agents;
+  const current = agents.find((a) => a.current);
+  const label = current?.label ?? list?.label ?? A.switcherLabel;
+  const seed = current?.name ?? label;
+  const down = connectionWord(chip);
+  const status = down ?? current?.statusText ?? (list === undefined ? '' : A.notRunning);
+  const dot: AgentDotState | undefined =
+    down !== undefined ? 'off' : current === undefined ? undefined : DOT[current.state];
 
-  if (list === undefined) {
-    if (state.kind !== 'error') return <Chip chip={chip} />;
+  if (list !== undefined && !list.switchable) {
     return (
-      <>
-        <span className="ag-switch-note al-text-body-sm">
-          {S.loadError}{' '}
-          <button type="button" className="ag-link" onClick={reread}>
-            {S.tryAgain}
-          </button>
-        </span>
-        <Chip chip={chip} />
-      </>
-    );
-  }
-  if (!list.switchable) {
-    return (
-      <>
-        <span className="ag-switch-note al-text-body-sm al-muted" title={S.openApp}>
-          {S.openApp}
-        </span>
-        <Chip chip={chip} />
-      </>
+      <div className="al-chip-wrap">
+        <span className="al-chip is-static al-text-body-sm al-muted">{CHIP_STRINGS.openApp}</span>
+      </div>
     );
   }
 
-  const shownRows =
-    query.trim() === ''
-      ? rows
-      : rows.filter((r) => {
-          const q = query.trim().toLowerCase();
-          return (
-            r.label.toLowerCase().includes(q) || r.apps.some((a) => a.toLowerCase().includes(q))
-          );
-        });
-
-  const label = current?.label ?? list.label ?? S.switcherLabel;
-  const apps = current === undefined ? S.notConnected : (current.apps[0] ?? S.notConnected);
-  const one = merged(chip, current);
-  const word = one?.label ?? (current === undefined ? S.notRunning : stateWord(current));
-  const many = usable.length > MANY;
-  // At 600 px and under the menu is a bottom sheet: outside the top bar, whose blur would make it
-  // position against the bar instead of the screen.
-  const place = (menu: ReactElement): ReactElement =>
-    typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 600px)').matches
-      ? createPortal(menu, document.body)
-      : menu;
-
-  const choose = (row: AgentRow): void => {
+  const go = (to: string): void => {
     close(false);
-    if (row.current || row.removing) return;
-    void switchTo(row.name);
+    navigate(to);
+  };
+  const choose = (agent: LiveAgent): void => {
+    close(false);
+    if (agent.current || agent.removing) return;
+    void switchAgent(agent.name);
   };
 
   return (
-    <div className="ag-switch">
+    <div className="al-chip-wrap">
       <button
         ref={trigger}
         type="button"
-        className="ag-switch-btn"
+        className={`al-chip al-press ${VT_CLASS.chip}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={S.switcherName(label, apps, word)}
-        title={label}
         onClick={() => {
-          if (!open) reread();
+          if (!open) free.reread();
           setOpen((v) => !v);
         }}
       >
-        <span className="ag-initial" aria-hidden="true">
-          {initialOf(label)}
+        <AgentIcon label={label} seed={seed} size="lg" {...(dot === undefined ? {} : { dot })} />
+        <span className="al-chip-text">
+          {/* The name is the visible text (WCAG 2.5.3), after a word for screen readers. */}
+          <span className="al-sr-only">{CHIP_STRINGS.chipPrefix}</span>
+          <span className="al-chip-name">{label}</span>{' '}
+          <span className="al-chip-status">{status}</span>
         </span>
-        <span className="ag-switch-label al-text-label">{shortLabel(label)}</span>
-        {usable.length > 1 ? <Icon name="chevron-down" size={14} /> : null}
-        <Chip chip={one} />
-        <span className="ag-switch-app">
-          {current !== undefined && current.apps.length > 0 ? (
-            <AppMark name={current.apps[0] ?? ''} />
-          ) : (
-            <span className="al-text-body-sm al-muted">{S.noAiApp}</span>
-          )}
-        </span>
+        <ShellIcon
+          name="chev-d"
+          size={16}
+          className={open ? 'al-chip-chev is-open' : 'al-chip-chev'}
+        />
       </button>
-      {open
-        ? place(
-            <Menu
-              label={S.switcherLabel}
-              onClose={close}
-              triggerRef={trigger}
-              className="ag-switch-menu"
-            >
-              {many ? (
-                <div className="ag-switch-find">
-                  <TextField
-                    label={S.findAgent}
-                    name="find-agent"
-                    type="search"
-                    autoComplete="off"
-                    value={query}
-                    onChange={(e) => setQuery(e.currentTarget.value)}
-                  />
-                </div>
+      {open ? (
+        <ShellMenu
+          label={CHIP_STRINGS.menuName}
+          onClose={close}
+          triggerRef={trigger}
+          className="al-shell-menu al-agent-menu al-menu"
+        >
+          <span className="al-menu-head" role="presentation">
+            {CHIP_STRINGS.menu}
+          </span>
+          {agents.map((agent) => (
+            <div key={agent.name} className="al-am-row">
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-checked={agent.current}
+                {...(agent.apps.length > 0
+                  ? { 'aria-describedby': `${menuId}-${agent.name}` }
+                  : {})}
+                className="al-mitem al-am-item"
+                aria-disabled={agent.removing ? 'true' : undefined}
+                onClick={() => choose(agent)}
+              >
+                <AgentIcon label={agent.label} seed={agent.name} size="lg" dot={DOT[agent.state]} />
+                <span className="al-am-main">
+                  <span className="al-am-name">{agent.label}</span>
+                  <span className="al-am-status">{agent.statusText}</span>
+                </span>
+                {agent.current ? (
+                  <ShellIcon name="check" size={16} className="al-am-check" />
+                ) : null}
+              </button>
+              {agent.apps.length > 0 ? (
+                <span id={`${menuId}-${agent.name}`} className="al-am-apps">
+                  {agent.apps.map((app) => (
+                    <AppLine key={app.app} app={app} />
+                  ))}
+                </span>
               ) : null}
-              {shownRows.map((row) => (
-                <div
-                  key={row.name}
-                  className={row.removing ? 'ag-menu-row is-removing' : 'ag-menu-row'}
-                >
+            </div>
+          ))}
+          {free.names.length > 0 ? (
+            <>
+              <div className="al-menu-sep" role="separator" />
+              <span className="al-menu-head" role="presentation">
+                {CHIP_STRINGS.anotherApp}
+              </span>
+              {free.names.map((a) => (
+                <div key={a.app} className="al-am-free" data-free-app={a.app}>
+                  <span className="al-am-app">
+                    <span className="al-ldot is-none" aria-hidden="true" />
+                    <span className="al-am-app-name">{a.name}</span>
+                  </span>
                   <button
                     type="button"
                     role="menuitem"
-                    className="ag-menu-item"
-                    aria-disabled={row.removing ? 'true' : undefined}
-                    aria-current={row.current ? 'true' : undefined}
-                    onClick={() => choose(row)}
+                    className="al-mitem al-am-connect"
+                    aria-label={CHIP_STRINGS.connectApp(a.name)}
+                    onClick={() => go(APPS_PAGE_PATH)}
                   >
-                    <span className="ag-menu-check" aria-hidden="true">
-                      {row.current ? <Icon name="check" size={14} /> : null}
-                    </span>
-                    <span className="ag-menu-main">
-                      <span className="ag-menu-top">
-                        <span className="al-text-body ag-label">{row.label}</span>
-                        {row.removing ? (
-                          <span className="ag-warn al-text-label">
-                            <Icon name="triangle-alert" size={12} />
-                            {S.removalNotFinished}
-                          </span>
-                        ) : (
-                          <Dot row={row} />
-                        )}
-                      </span>
-                      {row.removing ? null : row.apps.length > 0 ? (
-                        <span className="ag-menu-apps">
-                          {row.apps.map((a) => (
-                            <AppMark key={a} name={a} />
-                          ))}
-                        </span>
-                      ) : (
-                        <span className="al-text-body-sm al-muted">{S.notConnected}</span>
-                      )}
-                    </span>
+                    {CHIP_STRINGS.connect}
                   </button>
-                  {!row.removing && row.apps.length === 0 ? (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="ag-menu-item ag-menu-connect"
-                      onClick={() => {
-                        close(false);
-                        navigate(`${AGENTS_APPS_PATH}?agent=${encodeURIComponent(row.name)}`);
-                      }}
-                    >
-                      {S.connect}
-                    </button>
-                  ) : null}
                 </div>
               ))}
-              <div className="ag-menu-sep" role="separator" />
-              <button
-                type="button"
-                role="menuitem"
-                className="ag-menu-item"
-                onClick={() => {
-                  close(false);
-                  navigate(`${AGENTS_PATH}?add=1`);
-                }}
-              >
-                <Icon name="plus" size={14} />
-                <span>{S.add}</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="ag-menu-item"
-                onClick={() => {
-                  close(false);
-                  navigate(AGENTS_PATH);
-                }}
-              >
-                {S.manage}
-              </button>
-            </Menu>,
-          )
-        : null}
+            </>
+          ) : null}
+          <div className="al-menu-sep" role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            className="al-mitem"
+            // W4-WIRE-2 (Decision 52 (2)): Get started's add mode, starting with "Name your agent".
+            onClick={() => go(NEW_AGENT_PATH)}
+          >
+            <ShellIcon name="plus" size={16} />
+            {CHIP_STRINGS.addAgent}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="al-mitem"
+            onClick={() => go(AGENTS_PATH)}
+          >
+            <ShellIcon name="settings" size={16} />
+            {CHIP_STRINGS.manageAgents}
+          </button>
+        </ShellMenu>
+      ) : null}
     </div>
   );
 }

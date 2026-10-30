@@ -155,6 +155,25 @@ describe('startUiWelcome (U3-g-b)', () => {
     expect(w.log).toEqual(['openFirstRun', 'close']);
   });
 
+  it("W4-ONE-TOUCH: first run's setup gate gets the desk's plan only; the routes get its list only", async () => {
+    const w = welcome();
+    const planned: [string, string][] = [];
+    const desk = {
+      list: () => Promise.resolve({ apps: [], desktopRunning: false }),
+      plan: (app: string, agent: string) => {
+        planned.push([app, agent]);
+        return Promise.resolve({ status: 'not_found', app, name: '' } as const);
+      },
+      agentIdOf: () => Promise.resolve('0xnever'),
+    };
+    await startUiWelcome({ ...w.deps, aiApps: () => desk });
+    const host = w.started[0]?.host;
+    expect(Object.keys(host?.firstRun?.aiApps ?? {})).toEqual(['plan']);
+    expect(Object.keys(host?.aiAppsList ?? {})).toEqual(['list']);
+    await host?.firstRun?.aiApps?.plan('claude-code', 'default');
+    expect(planned).toEqual([['claude-code', 'default']]);
+  });
+
   // HOTFIX-045-REMOVE-FIRSTRUN: before this, the host first run started had no removal port, so
   // Remove answered 501 in that session until `agentlink ui` restarted.
   it('HOTFIX-045-REMOVE-FIRSTRUN: hands the host the removal port, so Remove works in this session', async () => {

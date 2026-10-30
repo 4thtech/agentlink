@@ -1,4 +1,5 @@
-// U3-h: Rename (inline on the row), Add an agent and Remove an agent (b11 §29.3 to §29.5). Each is an
+// U3-h: Rename (inline on the row) and Remove an agent (b11 §29.4, §29.5). W4-WIRE-2: Add an agent
+// (§29.3) is Get started's add mode now (`/start/app?add=agent`, Decision 52 (2)). Each is an
 // owner operation behind the presence gate: the page sends one request with the proof and the
 // server signs. The routes of U3-d and U3-e may still be stubs (501): that reads as a plain
 // "not done" sentence and nothing is claimed. Labels are rendered as text only (I-5).
@@ -7,8 +8,8 @@ import { useId, useState, type FormEvent, type ReactElement } from 'react';
 import { navigate } from '../../router.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import { AppMark } from './app-mark.js';
-import type { AgentsApi, OwnerOutcome } from './api.js';
-import { AGENTS_APPS_PATH, type AgentRow } from './data.js';
+import type { AgentsApi } from './api.js';
+import type { AgentRow } from './data.js';
 import { gateMessage, OwnerGate, RETRY_IN_PLACE, usePasskey } from './owner-gate.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
@@ -28,6 +29,21 @@ interface Shared {
 
 // ------------------------------------------------------------------------------------------ Rename
 
+/** The time a rename is allowed again: today's time, or the date and time when further off. */
+export function retryTime(retryAt: number, now: number = Date.now()): string {
+  const at = new Date(retryAt * 1000);
+  const soon = retryAt * 1000 - now < 20 * 3600 * 1000;
+  return soon
+    ? at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : at.toLocaleString([], {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+}
+
 export function RenameEditor({
   row,
   api,
@@ -35,11 +51,14 @@ export function RenameEditor({
   onDone,
   onCancel,
   onChanged,
+  onRenamed,
 }: Shared & {
   row: AgentRow;
   onDone: () => void;
   onCancel: () => void;
   onChanged: () => void;
+  /** W4-AGENTS (D-141): the new label, and whether contacts will be told. */
+  onRenamed?: (label: string, told: boolean) => void;
 }): ReactElement {
   const passkey = usePasskey(owner);
   const [text, setText] = useState(row.label);
@@ -56,6 +75,7 @@ export function RenameEditor({
     void api.rename({ name: row.name, label }, proof).then((outcome) => {
       setBusy(false);
       if (outcome.kind === 'done') {
+        onRenamed?.(label, outcome.contacts !== undefined && outcome.contacts > 0);
         onChanged();
         onDone();
         return;
@@ -65,6 +85,19 @@ export function RenameEditor({
       if (outcome.kind === 'agent_changed') {
         onChanged();
         return setError(S.agentChanged);
+      }
+      // D-141 (11 §5.8): three renames a day; the time of the next one.
+      if (outcome.kind === 'rename_limited') {
+        setStep('edit');
+        return setError(
+          outcome.retryAt === undefined
+            ? S.renameFailed
+            : S.renameLimited(row.label, retryTime(outcome.retryAt)),
+        );
+      }
+      if (outcome.kind === 'rotation_pending') {
+        setStep('edit');
+        return setError(S.renamePending);
       }
       setError(
         outcome.kind === 'label_invalid' || outcome.kind === 'invalid'
@@ -102,6 +135,7 @@ export function RenameEditor({
   };
   return (
     <form className="ag-rename" onSubmit={submit}>
+      <p className="al-text-body-sm al-muted">{S.renameHint}</p>
       <TextField
         label={S.renameField}
         name="agent-label"
@@ -124,7 +158,7 @@ export function RenameEditor({
           icon="approval"
           disabled={labelProblem(text) || unchanged}
         >
-          {S.saveTouchId}
+          {S.renameTouchId}
         </Button>
         <Button variant="ghost" onClick={onCancel}>
           {S.cancel}
@@ -136,146 +170,6 @@ export function RenameEditor({
         </p>
       )}
     </form>
-  );
-}
-
-// -------------------------------------------------------------------------------------------- Add
-
-export function AddSheet({
-  api,
-  owner,
-  existing,
-  onClose,
-  onChanged,
-  onAdded,
-}: Shared & {
-  existing: readonly AgentRow[];
-  onClose: () => void;
-  onChanged: () => void;
-  /** After a successful add: the label, and whether to switch to it. */
-  onAdded: (label: string, switchToIt: boolean) => void;
-}): ReactElement {
-  const passkey = usePasskey(owner);
-  const [text, setText] = useState<string>(S.addDefaultName);
-  const [switchToIt, setSwitchToIt] = useState(false);
-  const [step, setStep] = useState<'name' | 'presence' | 'added'>('name');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
-  const switchId = useId();
-  const label = text.trim();
-  const taken = existing.some((r) => r.label === label);
-
-  const send = (proof: PresenceProof): void => {
-    if (busy) return;
-    setBusy(true);
-    setError(undefined);
-    void api.add({ label }, proof).then((outcome: OwnerOutcome) => {
-      setBusy(false);
-      if (outcome.kind === 'done') {
-        onChanged();
-        onAdded(label, switchToIt);
-        setStep('added');
-        return;
-      }
-      const said = gateMessage(outcome);
-      if (said !== undefined) return setError(said);
-      if (outcome.kind === 'agent_changed') {
-        onChanged();
-        return setError(S.agentChanged);
-      }
-      setError(
-        outcome.kind === 'label_invalid' || outcome.kind === 'invalid'
-          ? S.labelInvalid
-          : outcome.kind === 'not_applied'
-            ? S.notAdded
-            : S.addFailed,
-      );
-      if (!RETRY_IN_PLACE.has(outcome.kind)) setStep('name');
-    });
-  };
-
-  return (
-    <Sheet open title={S.addTitle} onClose={onClose} closeLabel={S.close} className="ag-sheet">
-      {step === 'added' ? (
-        <div className="ag-sheet-body">
-          <p className="al-text-body" role="status">
-            {label}
-          </p>
-          <p className="al-text-title-3">{S.addedPrompt}</p>
-          <div className="ag-actions">
-            <Button
-              variant="primary"
-              onClick={() => {
-                onClose();
-                navigate(AGENTS_APPS_PATH);
-              }}
-            >
-              {S.connectApp}
-            </Button>
-            <Button variant="ghost" onClick={onClose}>
-              {S.notNow}
-            </Button>
-          </div>
-        </div>
-      ) : step === 'presence' ? (
-        <OwnerGate
-          summary={S.addStatement(label)}
-          passkey={passkey}
-          busy={busy}
-          error={error}
-          onProof={send}
-          onCancel={() => setStep('name')}
-        />
-      ) : (
-        <form
-          className="ag-sheet-body"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (labelProblem(text) || busy) return;
-            setError(undefined);
-            setBusy(true);
-            void api.labelCheck(label).then((checked) => {
-              setBusy(false);
-              if (checked === 'refused') return setError(S.labelInvalid);
-              setStep('presence');
-            });
-          }}
-        >
-          <TextField
-            label={S.addField}
-            name="new-agent-label"
-            type="text"
-            maxLength={LABEL_MAX}
-            autoComplete="off"
-            value={text}
-            onChange={(e) => setText(e.currentTarget.value)}
-            {...(taken ? { hint: 'You already have an agent with this name.' } : {})}
-          />
-          <label className="ag-check" htmlFor={switchId}>
-            <input
-              id={switchId}
-              type="checkbox"
-              checked={switchToIt}
-              onChange={(e) => setSwitchToIt(e.currentTarget.checked)}
-            />
-            <span>{S.switchToIt}</span>
-          </label>
-          <div className="ag-actions">
-            <Button type="submit" variant="primary" icon="approval" disabled={labelProblem(text)}>
-              {S.addTouchId}
-            </Button>
-            <Button variant="ghost" onClick={onClose}>
-              {S.cancel}
-            </Button>
-          </div>
-          {error === undefined ? null : (
-            <p className="al-text-body-sm ag-error" role="alert">
-              {error}
-            </p>
-          )}
-        </form>
-      )}
-    </Sheet>
   );
 }
 

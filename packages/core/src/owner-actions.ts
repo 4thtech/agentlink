@@ -37,6 +37,7 @@ import {
   approvalIdSchema,
   contactRenameParamsSchema,
   evmAddress,
+  fileSaveParamsSchema,
   policyPatchSchema,
   policySchema,
   signedOwnerActionSchema,
@@ -91,6 +92,9 @@ import type { StoreTx } from './store/store.js';
  * the highest applied version (0 when none was ever applied) or throws; `raise` sets the mark to
  * max(mark, version) under the inter-process lock (06 §6), never lowers it, and returns the new mark.
  */
+
+/** A received item ID (core ui-messages.ts): `<envelope ID>.<index>`, the index 00 to 15. */
+const FILE_ITEM_ID = /^([A-Za-z0-9_-]{22})\.(0[0-9]|1[0-5])$/;
 export interface PolicyVersionMark {
   read(): Promise<number>;
   raise(version: number): Promise<number>;
@@ -345,6 +349,10 @@ export class OwnerActions {
       case 'app.connect':
       case 'app.disconnect':
         return this.#applyAppChange(value, base);
+      case 'agent.resume':
+        return this.#applyResume(value, base);
+      case 'file.save':
+        return this.#applyFileSave(value, base);
       case 'credits.deposit':
       case 'credits.withdraw':
       case 'agent.revoke': {
@@ -402,6 +410,7 @@ export class OwnerActions {
     const contactId = body.params.contact;
     let sealedAlias: Sealed | undefined;
     let othersSnapshot = '';
+    let keepDeclared: { readonly name: Sealed; readonly sealed: Sealed } | undefined;
     if (body.op === 'contact.rename') {
       if (!isRestrictedAlias(body.params.alias)) return this.#report(refused(op, 'alias_invalid'));
       const wanted = foldName(body.params.alias);
@@ -413,6 +422,18 @@ export class OwnerActions {
       }
       othersSnapshot = await this.#ctx.store.transaction((tx) => activeOthers(tx, contactId));
       sealedAlias = await seal(this.#ctx, 'contacts', 'name', [contactId], body.params.alias);
+      // D-141: a row from before store version 9 shown by its own name keeps that name as its
+      // self-declared name before the alias replaces it, so a later rename can say "was {old}".
+      const current = await this.#ctx.store.transaction((tx) =>
+        tx.get('contacts', { contact_id: contactId }),
+      );
+      if (current?.name_source === 'counterparty' && current.declared_name === null) {
+        const own = await open(this.#ctx, 'contacts', 'name', [contactId], current.name);
+        keepDeclared = {
+          name: current.name,
+          sealed: await seal(this.#ctx, 'contacts', 'declared_name', [contactId], own),
+        };
+      }
     }
     const now = base.now;
     const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
@@ -424,11 +445,19 @@ export class OwnerActions {
       if (sealedAlias !== undefined) {
         // The uniqueness check above read these rows; any change since refuses the object.
         if (activeOthers(tx, contactId) !== othersSnapshot) return refused(op, 'store_changed');
+        if (keepDeclared !== undefined && row.name !== keepDeclared.name) {
+          return refused(op, 'store_changed');
+        }
         tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
         tx.update(
           'contacts',
           { contact_id: contactId, status: row.status },
-          { name: sealedAlias, name_source: 'owner', updated_at: now },
+          {
+            name: sealedAlias,
+            name_source: 'owner',
+            updated_at: now,
+            ...(keepDeclared === undefined ? {} : { declared_name: keepDeclared.sealed }),
+          },
         );
         return { status: 'applied', op };
       }
@@ -550,6 +579,40 @@ export class OwnerActions {
   }
 
   /**
+   * `agent.resume` (W4-PAUSE, D-143 (5); 04 §2.5.1; 06 §6 "Paused agents"; proposed, owner confirms
+   * at merge): ends a pause of this agent. The object checks and the nonce first (another owner,
+   * another agent in the body or in `params.agent`, a replay, an expired object or one outliving
+   * 600 s is refused and writes nothing). Then, in one store transaction, the nonce is checked again
+   * and the pause row must exist (`not_paused` otherwise, with the nonce left unused); the nonce row
+   * is recorded and the pause row deleted. The nonce row (`op`, `action_hash`, `applied_at`) is the
+   * record, as for `contact.remove`: there is nothing else to keep. No envelope carries it.
+   */
+  async #applyResume(value: unknown, base: OwnerActionCheckContext): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    const { body } = signed;
+    if (body.op !== 'agent.resume' || body.params.agent !== base.agent) {
+      return this.#report(refused(body.op, 'agent_mismatch'));
+    }
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) {
+        return refused('agent.resume', 'nonce_used');
+      }
+      if (tx.get('agent_pause', { slot: SINGLETON_SLOT }) === undefined) {
+        return refused('agent.resume', 'not_paused');
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      tx.delete('agent_pause', { slot: SINGLETON_SLOT });
+      return { status: 'applied', op: 'agent.resume' };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
    * The agent's label (U3-d; 04 §2.5.1 "Labels and AI app connections"): the stored `agent.label`,
    * re-verified on every load (encoding, `sig`, `agent` and `params.agent` against this agent,
    * `owner` against its card, the schema and the restricted-label rule; the 600 s lifetime is not
@@ -588,6 +651,49 @@ export class OwnerActions {
       return { status: 'unverified' };
     }
     return { status: 'verified', label: body.params.label };
+  }
+
+  /**
+   * W4-ONE-TOUCH (D-140; 04 §2.8 "Failure in the middle"; proposed, owner confirms at merge): records
+   * that the stored `app.connect` with `nonce` for `app` was never applied, because the AI app's
+   * config entry could not be written after it was stored. Its `app:<id>` record is removed, so
+   * nothing can infer a connection from it; its nonce row stays, so the signed object can never be
+   * applied later. Only that exact object (op, app, nonce) is removed; anything else is left alone
+   * and the answer is false. Connection state is read only from the config file's entry (08 §1).
+   */
+  async markAppNotApplied(app: string, nonce: string): Promise<boolean> {
+    const record = `app:${app}`;
+    try {
+      const row = await this.#ctx.store.transaction((tx) =>
+        tx.get('local_owner_actions', { record }),
+      );
+      if (row === undefined || row.op !== 'app.connect') return false;
+      const text = await open(
+        this.#ctx,
+        'local_owner_actions',
+        'signed_json',
+        [record],
+        row.signed_json,
+      );
+      const parsed = signedOwnerActionSchema.safeParse(JSON.parse(text));
+      if (
+        !parsed.success ||
+        parsed.data.body.op !== 'app.connect' ||
+        parsed.data.body.params.app !== app ||
+        parsed.data.body.nonce !== nonce
+      ) {
+        return false;
+      }
+      return await this.#ctx.store.transaction((tx) => {
+        if (tx.get('owner_action_nonces', { nonce }) === undefined) return false;
+        const now = tx.get('local_owner_actions', { record });
+        if (now === undefined || now.applied_at !== row.applied_at) return false;
+        tx.delete('local_owner_actions', { record });
+        return true;
+      });
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -696,6 +802,30 @@ export class OwnerActions {
       }
       tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
       return { status: 'applied', op: 'backup.export' };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * `file.save` (W4-FILES-SAVE; 04 §2.5.1; proposed, owner confirms at merge): the object checks and
+   * the nonce, then the nonce row alone, in one store transaction, as `backup.export`. The row is the
+   * audit record of the save; the caller (the client's saveReceivedFile) saves the file with core's
+   * own fetch only after this applied, with the envelope and index of the signed body.
+   */
+  async #applyFileSave(value: unknown, base: OwnerActionCheckContext): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    if (signed.body.op !== 'file.save') return this.#report(refused(signed.body.op, 'malformed'));
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) {
+        return refused('file.save', 'nonce_used');
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      return { status: 'applied', op: 'file.save' };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
   }
@@ -1300,6 +1430,53 @@ export class OwnerActions {
     const params = appChangeParamsSchema.safeParse({ app, agent: signer.agent, changeId });
     if (!params.success) return refuse('change_invalid');
     return this.#build(signer, op, { app: params.data.app, agent: signer.agent, changeId });
+  }
+
+  /**
+   * The unsigned `agent.resume` for this agent (W4-PAUSE, D-143 (5); 04 §2.5.1): `params.agent` is
+   * this agent's `agentId`, never a value from the page. Refused with `not_paused` when the pause row
+   * is absent, so the page asks for Touch ID only when there is a pause to end (08 §1). A row that
+   * cannot be read is prepared (the agent counts as paused; apply checks the row again). Writes
+   * nothing.
+   */
+  async prepareResume(): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'agent.resume', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    let paused: boolean;
+    try {
+      paused = await this.#ctx.store.transaction(
+        (tx) => tx.get('agent_pause', { slot: SINGLETON_SLOT }) !== undefined,
+      );
+    } catch {
+      paused = true;
+    }
+    if (!paused) return refuse('not_paused');
+    return this.#build(signer, 'agent.resume', { agent: signer.agent });
+  }
+
+  /**
+   * The unsigned `file.save` for one received file (W4-FILES-SAVE; 04 §2.5.1): from the item ID
+   * `<envelope ID>.<index>` (index two digits, 00 to 15) alone; `params.agent` is this agent's
+   * agentId, never a value from the page. A malformed ID is `item_invalid`. Whether the message was
+   * received and the file can be fetched is core fetchFile's check after the owner signed. Writes
+   * nothing.
+   */
+  async prepareFileSave(itemId: string): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'file.save', reason }) as const;
+    const m = typeof itemId === 'string' ? FILE_ITEM_ID.exec(itemId) : null;
+    if (m === null) return refuse('item_invalid');
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    const params = fileSaveParamsSchema.safeParse({
+      agent: signer.agent,
+      envelopeId: m[1],
+      fileIndex: Number(m[2]),
+    });
+    if (!params.success) return refuse('item_invalid');
+    return this.#build(signer, 'file.save', params.data);
   }
 
   /**

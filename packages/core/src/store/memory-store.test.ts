@@ -59,6 +59,14 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'rate_counters',
         'publisher_lease',
         'outbox_staged',
+        // W4-LIVE-STATUS (D-143; 07 §3.2, schema 10): the MCP session heartbeat.
+        'mcp_sessions',
+        'mcp_last_seen',
+        // W4-AUTO-SAVE (D-142; 04 §4.1, schema 11): the limits log and the one-row state.
+        'auto_save_log',
+        'auto_save_state',
+        // W4-PAUSE (D-143 (5); 07 §3.2, schema 12): the owner's pause of the agent.
+        'agent_pause',
         'idempotency',
         'owner_action_nonces',
         'revoked_agents',
@@ -93,8 +101,15 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
     });
   });
 
+  it('invites drop columns (W4-SHORT-INVITE, schema 8): sealed lookup ID and epoch, cancelled_at', () => {
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(8);
+    expect(TABLES.invites.columns['drop_lookup_id']).toEqual({ kind: 'enc', nullable: true });
+    expect(TABLES.invites.columns['drop_key_epoch']).toEqual({ kind: 'enc', nullable: true });
+    expect(TABLES.invites.columns['cancelled_at']).toEqual({ kind: 'int', nullable: true });
+  });
+
   it('local_owner_actions (U3-d, schema 7): the signed local owner actions, sealed', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(7);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(7);
     expect(TABLES.local_owner_actions).toEqual({
       columns: {
         record: { kind: 'id', nullable: false },
@@ -110,10 +125,31 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
     });
   });
 
+  it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 9): four nullable columns, appended last', () => {
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(9);
+    expect(Object.keys(TABLES.contacts.columns).slice(-4)).toEqual([
+      'former_name',
+      'name_changed_at',
+      'name_change_seen',
+      'declared_name',
+    ]);
+    expect(TABLES.contacts.columns.declared_name).toEqual({ kind: 'enc', nullable: true });
+    expect(TABLES.contacts.columns.former_name).toEqual({ kind: 'enc', nullable: true });
+    expect(TABLES.contacts.columns.name_changed_at).toEqual({ kind: 'int', nullable: true });
+    expect(TABLES.contacts.columns.name_change_seen).toEqual({ kind: 'flag', nullable: true });
+  });
+
   it('files.saved_name (MSG-FILES-IO-b, schema 6): a nullable sealed column, appended last', () => {
     expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(6);
     expect(TABLES.files.columns.saved_name).toEqual({ kind: 'enc', nullable: true });
-    expect(Object.keys(TABLES.files.columns).at(-1)).toBe('saved_name');
+    // W4-AUTO-SAVE (schema 11) appends the auto-save columns after it.
+    expect(Object.keys(TABLES.files.columns).slice(-5)).toEqual([
+      'saved_name',
+      'auto_save',
+      'auto_reason',
+      'auto_tries',
+      'auto_next_at',
+    ]);
   });
 });
 

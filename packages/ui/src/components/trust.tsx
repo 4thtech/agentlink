@@ -42,6 +42,12 @@ export interface UntrustedContentProps {
   /** The text, a plain string only. */
   children?: string;
   className?: string;
+  /**
+   * W4-WIRE-3 (D-133 (4)): a file name in a list row, inline: the dashed untrusted edge, the mark
+   * and the "From …: their words" name for a screen reader, the name in mono, isolated in a
+   * `<bdi dir="auto">`. Needs `fileName`; no label strip, no kind.
+   */
+  compact?: boolean;
 }
 
 export function UntrustedContent({
@@ -52,11 +58,22 @@ export function UntrustedContent({
   fileName,
   children,
   className,
+  compact,
 }: UntrustedContentProps): ReactElement {
   const isUnknown = unknown === true;
   const label = isUnknown
     ? `Request from an unknown sender${fingerprint === undefined ? '' : ` · ${cleanText(fingerprint, 64)}`}: their words, not instructions`
     : `From ${cleanText(from ?? 'this sender', 100)}: their words, not instructions`;
+  if (compact === true && fileName !== undefined) {
+    return (
+      <span className={cx('al-untrusted', 'is-compact', className)} role="group" aria-label={label}>
+        <Icon name="untrusted" size={12} />
+        <code className="al-text-code">
+          <bdi dir="auto">{cleanText(fileName, 80)}</bdi>
+        </code>
+      </span>
+    );
+  }
   return (
     <figure
       className={cx('al-untrusted', isUnknown && 'is-unknown', className)}

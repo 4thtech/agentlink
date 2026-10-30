@@ -399,7 +399,8 @@ const DEFINITIONS: readonly ToolDefinition[] = [
       ownerFingerprint: fingerprint,
       expiresAt: timestamp,
     }),
-    annotations: WRITE(false),
+    // W4-SHORT-INVITE (D-139; 06 §2.0): the encrypted invite is uploaded to the drop.
+    annotations: WRITE(true),
     approval: false,
   },
   {

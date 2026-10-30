@@ -25,6 +25,9 @@ export {
   type KeychainKeyStoreOptions,
   type OpenAgentKeyStoreOptions,
 } from './keychain-keystore.js';
+// W4-RENAME-REACHES-CONTACTS (D-141): the opaque key-items token of a KeyStore this package opened,
+// for the app host's rename gesture (LocalUiOptions `epochKeys`). The control itself is not exported.
+export { epochKeysOf, type AgentEpochKeys } from './key-epoch.js';
 // M1-8f (04 §2.8, D-54): the passphrase-locked file KeyStore for headless machines. Only the unlock
 // and passphrase-change entry points and an opaque handle: no kek, file reader, directory or KDF seam.
 export {
@@ -149,7 +152,14 @@ export {
   type AgentFolderLock,
   type AgentFolderLockErrorCode,
 } from './agent-folder-lock.js';
-export { peekAgentStore, type AgentStorePeek } from './agent-peek.js';
+export {
+  peekAgentStore,
+  type AgentLastSeen,
+  type AgentLiveSession,
+  type AgentStorePeek,
+} from './agent-peek.js';
+// W4-LIVE-STATUS (04 §2.5): the signal-0 check of an MCP session row's pid.
+export { pidAlive } from './pid-alive.js';
 // M1-11s-a-d: the caller's health source for the status bar's health read.
 export type { LocalUiHealthSnapshot, LocalUiHealthSource } from './local-ui/api/health.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key
@@ -194,6 +204,17 @@ export {
   type AllowedPathErrorCode,
   type AllowedPathOptions,
 } from './allowed-path.js';
+// W4-AUTO-SAVE (D-142, 04 §4.1): the Inbox folder rules, the held directory, the quarantine mark and
+// the free-space read, for the files platform's every save.
+export {
+  freeBytes,
+  inboxFolderProblem,
+  openInboxDir,
+  quarantineMark,
+  type InboxDir,
+  type InboxFolderProblem,
+  type InboxFolderRulesInput,
+} from './inbox-folder.js';
 // M1-36b-2-c: the Send folder for an agent that already has its card (`policy allow-send-folder`
 // †). The owner signs through the given owner operation (performOwnerOperation); the folder checks
 // and the byte-exact policy check stay inside.

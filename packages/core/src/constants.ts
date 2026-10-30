@@ -6,10 +6,16 @@
 /**
  * The logical schema version of 07 §3 that this code implements (forward migrations only, §3.7).
  * Version 5 (M1-9i-a, D-115) adds `own_storage` (07 §3.4). Version 6 (MSG-FILES-IO-b) adds
- * `files.saved_name`. Version 7 (U3-d, D-138) adds `local_owner_actions` (07 §3.4). An older build refuses a newer store (`store_schema_newer`), so an upgrade
+ * `files.saved_name`. Version 7 (U3-d, D-138) adds `local_owner_actions` (07 §3.4). Version 8
+ * (W4-SHORT-INVITE, D-139) adds `invites.drop_lookup_id`, `drop_key_epoch` and `cancelled_at`.
+ * Version 9 (W4-RENAME-REACHES-CONTACTS, D-141) adds the contacts former-name columns (07 §3).
+ * Version 10 (W4-LIVE-STATUS, D-143) adds `mcp_sessions` and `mcp_last_seen` (07 §3.2). Version 11
+ * (W4-AUTO-SAVE, D-142) adds the `files.auto_*` columns, `auto_save_log` and `auto_save_state`.
+ * Version 12 (W4-PAUSE, D-143 (5)) adds `agent_pause` (07 §3.2). An
+ * older build refuses a newer store (`store_schema_newer`), so an upgrade
  * cannot be rolled back.
  */
-export const STORE_SCHEMA_VERSION = 7;
+export const STORE_SCHEMA_VERSION = 12;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;
@@ -34,6 +40,13 @@ export const STAGED_MAX_AGE_SECONDS = 86_400;
 export const PUBLISHER_LEASE_SECONDS = 60;
 /** publisher_lease: the holder renews, and a non-holder tries to take it, every 20 s. */
 export const PUBLISHER_LEASE_RENEW_SECONDS = 20;
+
+/** mcp_sessions: every process beats every 15 s (06 §6 "MCP session heartbeat"; D-143). */
+export const MCP_SESSION_BEAT_SECONDS = 15;
+/** mcp_sessions: beat_until = now + 45 s; a row past it is not live. */
+export const MCP_SESSION_TTL_SECONDS = 45;
+/** mcp_sessions: a beat_until further ahead than this is from a clock that went back: not live. */
+export const MCP_SESSION_FUTURE_LIMIT_SECONDS = 90;
 
 /** seen: a row is older than 7 days before it may be pruned (and see the cursor bound). */
 export const SEEN_MIN_RETENTION_SECONDS = 604_800;

@@ -63,6 +63,8 @@ export type OwnerActionRefusal =
   | 'alias_taken'
   // U3-d (D-138): an `agent.label` whose label is not its own restricted form (06 §2.1)
   | 'label_invalid'
+  // W4-PAUSE (D-143 (5)): an `agent.resume` for an agent that is not paused
+  | 'not_paused'
   | 'pairing_unavailable'
   | 'credential_missing'
   | 'credential_mismatch'
@@ -317,7 +319,11 @@ export function verifyOwnerAction(
     case 'agent.label':
     case 'app.connect':
     case 'app.disconnect':
+    case 'agent.resume':
+    case 'file.save':
     case 'agent.revoke':
+      // agent.resume (W4-PAUSE): the pause row is the store side's (`not_paused`).
+      // file.save (W4-FILES-SAVE): the received file is the store side's (core fetchFile).
       // agent.label (U3-d): the restricted-label rule and the store record are the store side's;
       // app.connect and app.disconnect (U3-f): the recomputed changeId is the owner surface's.
       // Their rules need the store (cancel: an approved row; policy.set: the version above, already

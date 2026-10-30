@@ -111,10 +111,10 @@ describe('route transitions', () => {
     expect(svt).not.toHaveBeenCalled();
   });
 
-  it('is not called for the /settings redirect', () => {
-    act(() => navigate('/settings'));
-    expect(location.pathname).toBe('/settings/activity');
-    expect(title()).toBe('Activity');
+  it('is not called for a redirect', () => {
+    act(() => navigate('/settings/passkeys'));
+    expect(location.pathname).toBe('/settings/backup');
+    expect(title()).toBe('Backup & Touch ID');
     // At most the one call for the click itself; the redirect (a replace) adds none.
     expect(svt.mock.calls.length).toBeLessThanOrEqual(1);
   });
@@ -133,6 +133,6 @@ describe('route transitions', () => {
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
     expect(svt).not.toHaveBeenCalled();
-    expect(title()).toBe('Backup');
+    expect(title()).toBe('Backup & Touch ID');
   });
 });

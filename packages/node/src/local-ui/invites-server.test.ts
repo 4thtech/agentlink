@@ -150,11 +150,17 @@ async function harness(): Promise<Harness> {
       createInvite: (input: unknown) => {
         core.created.push(input);
         return Promise.resolve({
+          inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
           inviteUrl: LINK,
+          format: 'long',
           ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },
           expiresAt: 1_793_786_400,
         });
       },
+      // W4-SHORT-INVITE: a format 1 link resolves to itself.
+      resolveInviteLink: (link: string) => Promise.resolve(link),
+      openInvites: () => Promise.resolve([]),
+      cancelInvite: () => Promise.resolve('not_found'),
       acceptInvite: async ({ link, allowed }: { link: string; allowed?: boolean }) => {
         // The real codec runs first, as core's accept step 1 does.
         await decodeInviteLink(link);

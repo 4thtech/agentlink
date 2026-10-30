@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 // U3-h (b11 §29.2 to §29.8): the Agents page, the Rename, Add and Remove sheets, and the switcher.
+// W4-AGENTS: the cards of the simple layer (agents-v2.dom.test.ts has Pause, the fleet and the page).
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { AgentSwitcher } from '../../layout/agent-switcher.js';
+import { resetLiveForTests } from '../../api/live.js';
 import { createOwnerClient } from '../contacts/owner.js';
 import { createAgentsApi } from './api.js';
+import { CreateAgentGate } from '../apps/create-agent-gate.js';
 import { AgentsPage, type AgentsPageProps } from './index.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -26,9 +28,9 @@ const FOUR = [
     current: true,
     contacts: 4,
     running: true,
-    apps: ['Claude Code', 'Claude Desktop'],
+    apps: ['claude-code', 'claude-desktop'],
   }),
-  agent('work', 'Work', { contacts: 1, apps: ['Codex'] }),
+  agent('work', 'Work', { contacts: 1, apps: ['codex'] }),
   agent('second', 'Second agent'),
   agent('old', 'Old test', { removing: true }),
 ];
@@ -79,7 +81,8 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   calls = [];
-  history.replaceState(null, '', '/settings/agents');
+  resetLiveForTests();
+  history.replaceState(null, '', '/agents');
   answers = {
     'GET /api/ui/agents': { status: 200, body: list(FOUR) },
     'GET /api/owner/passkey': { status: 200, body: NO_PASSKEY },
@@ -91,6 +94,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  resetLiveForTests();
   vi.restoreAllMocks();
 });
 
@@ -129,6 +133,8 @@ async function type(el: HTMLInputElement, value: string): Promise<void> {
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+/** Text without the bidi isolates the page puts around labels (U+2068, U+2069). */
+const plain = (el: Element): string => (el.textContent ?? '').replace(/[\u2068\u2069]/g, '');
 const code = (): HTMLInputElement =>
   host.querySelector<HTMLInputElement>('input[name="owner-code"]')!;
 
@@ -139,7 +145,7 @@ describe('the Agents page', () => {
     expect(host.querySelectorAll('[data-agent]')).toHaveLength(4);
     const personal = rowOf('default');
     expect(personal.textContent).toContain('Open');
-    expect(personal.textContent).toContain('Works from');
+    expect(personal.textContent).toContain('Ready in Claude Code and 1 more');
     expect(personal.textContent).toContain('Claude Code');
     expect(personal.textContent).toContain('Claude Desktop');
     expect(personal.textContent).toContain('4 contacts');
@@ -147,22 +153,21 @@ describe('the Agents page', () => {
     expect(button(rowOf('work'), 'Switch')).toBeDefined();
     expect(rowOf('work').textContent).toContain('1 contact');
   });
-  it('shows "Not connected to an AI app" with Connect, and Removal not finished with Try again', async () => {
+  it('an agent with no AI app reads Offline with its AI apps panel; Removal not finished with Try again', async () => {
     await mountPage();
     const second = rowOf('second');
-    expect(second.textContent).toContain('Not connected to an AI app');
-    expect(button(second, 'Connect an AI app')).toBeDefined();
+    expect(second.textContent).toContain('Offline');
+    await click(button(second, 'AI apps'));
+    expect(rowOf('second').textContent).toContain('No AI app is set up for this agent yet.');
     const old = rowOf('old');
     expect(old.textContent).toContain('Removal not finished');
     expect(old.textContent).toContain('Removing it stopped part-way. Nothing else was affected.');
     expect(button(old, 'Try again')).toBeDefined();
     expect(button(old, 'Switch')).toBeUndefined();
   });
-  it('has the List and Map control, List selected', async () => {
+  it('has no List and Map control in the simple layer (it lives Under the hood)', async () => {
     await mountPage();
-    const tabs = [...host.querySelectorAll('[role="tab"]')];
-    expect(tabs.map((t) => t.textContent)).toEqual(['List', 'Map']);
-    expect(tabs[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(button(host, 'Map')).toBeUndefined();
   });
   it('renders a label as text, never as markup', async () => {
     answers['GET /api/ui/agents'] = {
@@ -171,21 +176,22 @@ describe('the Agents page', () => {
     };
     await mountPage();
     expect(host.querySelector('img')).toBeNull();
-    expect(host.textContent).toContain('<img src=x onerror=alert(1)>');
+    expect(plain(host)).toContain('<img src=x onerror=alert(1)>');
   });
-  it('says what to do with no agents, and offers Add agent', async () => {
+  it('says what to do with no agents, and offers New agent (Get started)', async () => {
     answers['GET /api/ui/agents'] = {
       status: 200,
       body: list([], { current: null, label: null }),
     };
     await mountPage();
-    expect(host.textContent).toContain('No agents left. Add one to keep using AgentLink.');
-    expect(button(host, 'Add agent')).toBeDefined();
+    expect(plain(host)).toContain('No agents left. Add one to keep using AgentLink.');
+    const links = [...host.querySelectorAll('a')].filter((a) => a.textContent === 'New agent');
+    expect(links.map((a) => a.getAttribute('href'))).toContain('/start/app?add=agent');
   });
   it('says "Couldn\'t load your agents." with Try again when the read fails', async () => {
     answers['GET /api/ui/agents'] = { status: 500, body: {} };
     await mountPage();
-    expect(host.textContent).toContain("Couldn't load your agents.");
+    expect(plain(host)).toContain("Couldn't load your agents.");
     expect(button(host, 'Try again')).toBeDefined();
   });
   it('marks the Tidy up agents "No AI app, no contacts"', async () => {
@@ -211,8 +217,9 @@ describe('the Agents page', () => {
       calls.filter((c) => c.url === '/api/ui/agents' && c.method === 'GET').length;
     const before = reads();
     await click(button(rowOf('work'), 'Switch'));
-    expect(host.textContent).toContain('You switched agents. Nothing was changed.');
-    expect(reads()).toBe(before + 1);
+    expect(plain(host)).toContain('You switched agents. Nothing was changed.');
+    // The page's read and the shared live store's read.
+    expect(reads()).toBeGreaterThan(before);
   });
 });
 
@@ -224,8 +231,8 @@ describe('Rename', () => {
     const field = rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!;
     expect(field.maxLength).toBe(32);
     await type(field, 'Home');
-    await click(button(rowOf('work'), 'Save with Touch ID'));
-    expect(host.textContent).toContain('Rename Work to Home');
+    await click(button(rowOf('work'), 'Rename with Touch ID'));
+    expect(plain(host)).toContain('Rename Work to Home');
     await type(code(), '123456');
     await click(button(host, 'Confirm'));
     const post = calls.find((c) => c.url === '/api/ui/agents/label')!;
@@ -237,10 +244,10 @@ describe('Rename', () => {
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
-    await click(button(rowOf('work'), 'Save with Touch ID'));
+    await click(button(rowOf('work'), 'Rename with Touch ID'));
     await type(code(), '123456');
     await click(button(host, 'Confirm'));
-    expect(host.textContent).toContain('Not renamed yet. Try again.');
+    expect(plain(host)).toContain('Not renamed yet. Try again.');
     expect(rowOf('work')).toBeTruthy();
   });
 });
@@ -254,19 +261,14 @@ describe('label check and removal states', () => {
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
-    await click(button(rowOf('work'), 'Save with Touch ID'));
-    expect(host.textContent).toContain("That name can't be used.");
+    await click(button(rowOf('work'), 'Rename with Touch ID'));
+    expect(plain(host)).toContain("That name can't be used.");
     expect(host.querySelector('input[name="owner-code"]')).toBeNull();
   });
   it('closes the Remove sheet on agent_removing: the agent shows as Removal not finished', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 409, body: { status: 'agent_removing' } };
     await mountPage();
-    await click(button(rowOf('work'), 'More'));
-    await click(
-      [...host.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
-        (m) => m.textContent === 'Remove',
-      ),
-    );
+    await click(button(rowOf('work'), 'Remove'));
     const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
@@ -279,12 +281,7 @@ describe('label check and removal states', () => {
 describe('Remove', () => {
   const open = async (name: string): Promise<HTMLElement> => {
     await mountPage();
-    await click(button(rowOf(name), 'More'));
-    await click(
-      [...host.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
-        (m) => m.textContent === 'Remove',
-      ),
-    );
+    await click(button(rowOf(name), 'Remove'));
     return host.querySelector<HTMLElement>('[role="dialog"]')!;
   };
   const confirmTyped = async (sheet: HTMLElement): Promise<void> => {
@@ -295,12 +292,12 @@ describe('Remove', () => {
   };
   it('names what goes and keeps the button off until the exact label is typed', async () => {
     const sheet = await open('work');
-    expect(sheet.textContent).toContain('Remove Work?');
-    expect(sheet.textContent).toContain("Work's keys and settings");
-    expect(sheet.textContent).toContain('Its entry in Codex');
-    expect(sheet.textContent).toContain('Your 1 contact will be told Work is retired.');
-    expect(sheet.textContent).toContain("This can't be undone.");
-    expect(sheet.textContent).toContain('Agent folder: work');
+    expect(plain(sheet)).toContain('Remove Work?');
+    expect(plain(sheet)).toContain("Work's keys and settings");
+    expect(plain(sheet)).toContain('Its entry in Codex');
+    expect(plain(sheet)).toContain('Your 1 contact will be told Work is retired.');
+    expect(plain(sheet)).toContain("This can't be undone.");
+    expect(plain(sheet)).toContain('Agent folder: work');
     expect(button(sheet, 'Export history first')).toBeDefined();
     expect(button(sheet, 'Remove with Touch ID')!.disabled).toBe(true);
     const field = sheet.querySelector<HTMLInputElement>('input[type="text"]')!;
@@ -318,14 +315,14 @@ describe('Remove', () => {
       atob(post.headers.get('X-AgentLink-Input')!.replace(/-/g, '+').replace(/_/g, '/')),
     );
     expect(sent).toEqual({ name: 'work', typedLabel: 'Work' });
-    expect(host.textContent).toContain('Quit any AI app that uses Work first.');
+    expect(plain(host)).toContain('Quit any AI app that uses Work first.');
     expect(button(host, 'Check again')).toBeDefined();
   });
   it('reads "not available" gracefully and never says it was removed', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 501, body: {} };
     const sheet = await open('work');
     await confirmTyped(sheet);
-    expect(host.textContent).toContain("Couldn't finish removing Work. Nothing else was changed.");
+    expect(plain(host)).toContain("Couldn't finish removing Work. Nothing else was changed.");
     expect(host.textContent).not.toContain('Work was removed.');
   });
   it('offers Remove anyway when contacts cannot be told, with Not now', async () => {
@@ -335,7 +332,7 @@ describe('Remove', () => {
     };
     const sheet = await open('work');
     await confirmTyped(sheet);
-    expect(host.textContent).toContain("Remove anyway? Contacts can't be told now.");
+    expect(plain(host)).toContain("Remove anyway? Contacts can't be told now.");
     expect(button(host, 'Remove anyway')).toBeDefined();
     expect(button(host, 'Not now')).toBeDefined();
   });
@@ -344,133 +341,108 @@ describe('Remove', () => {
     const sheet = await open('work');
     await confirmTyped(sheet);
     expect(host.querySelector('[role="dialog"]')).toBeNull();
-    expect(host.textContent).toContain('You switched agents. Nothing was changed.');
+    expect(plain(host)).toContain('You switched agents. Nothing was changed.');
   });
   it('after a removal the sheet closes and a note names it', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 200, body: { status: 'done' } };
     const sheet = await open('work');
     await confirmTyped(sheet);
     expect(host.querySelector('[role="dialog"]')).toBeNull();
-    expect(host.textContent).toContain('Work was removed.');
+    expect(plain(host)).toContain('Work was removed.');
   });
 });
+
+const backupCode = (): HTMLInputElement =>
+  host.querySelector<HTMLInputElement>('input[name="backup-code"]')!;
 
 describe('Add', () => {
-  it('asks for a name (40 characters, prefilled) and posts it behind presence', async () => {
-    answers['POST /api/ui/agents'] = { status: 200, body: { status: 'done' } };
-    await mountPage();
-    await click(button(host, 'Add agent'));
-    const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
-    expect(sheet.textContent).toContain('Add an agent');
-    const field = sheet.querySelector<HTMLInputElement>('input[type="text"]')!;
-    expect(field.maxLength).toBe(32);
-    expect(field.value).toBe('Second agent');
-    await click(button(sheet, 'Add with Touch ID'));
-    await type(code(), '123456');
-    await click(button(host, 'Confirm'));
-    expect(calls.some((c) => c.url === '/api/ui/agents' && c.method === 'POST')).toBe(true);
-    expect(host.textContent).toContain('Connect an AI app to it?');
+  // W4-ONE-TOUCH (D-140): one screen and one gesture (pages/apps/create-agent-gate.tsx); its calls go
+  // through the page's own fetch.
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchFn);
+    answers['GET /api/ui/apps'] = { status: 200, body: { desktopRunning: false, apps: [] } };
   });
-  it('says "Couldn\'t add it. Nothing was saved. Try again." when it is not available yet', async () => {
-    answers['POST /api/ui/agents'] = { status: 501, body: {} };
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  const READY = {
+    status: 200,
+    body: {
+      status: 'ready',
+      nonce: 'N'.repeat(43),
+      statement: {
+        label: 'Second agent',
+        agentFingerprint: '1A2B·3C4D',
+        ownerFingerprint: '7F3A·19C2',
+        folder: 'second-agent',
+      },
+      expiresInMs: 120000,
+      publicKey: {
+        rpId: 'localhost',
+        challenge: 'C'.repeat(43),
+        allowCredentials: [],
+        userVerification: 'required',
+        timeoutMs: 120000,
+        prfSalt: 'U2FsdA',
+      },
+    },
+  };
+  // W4-WIRE-2 (Decision 52 (2)): New agent is Get started's add mode (`/start/app?add=agent`, its
+  // own "Name your agent" step); the quick Add sheet is retired. The one-gesture gate keeps its
+  // contract: begin, then the backup code finishes with only the nonce.
+  async function mountGate(onDone = vi.fn()): Promise<Mock> {
+    await act(async () => {
+      root.render(
+        createElement(CreateAgentGate, {
+          label: 'Second agent',
+          summary: '',
+          onDone,
+          onCancel: () => undefined,
+        }),
+      );
+    });
+    await settle();
+    return onDone;
+  }
+  it('`?add=1` (an older Add agent link) opens no sheet on Agents', async () => {
+    history.replaceState(null, '', '/agents?add=1');
     await mountPage();
-    await click(button(host, 'Add agent'));
-    const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
-    await click(button(sheet, 'Add with Touch ID'));
-    await type(code(), '123456');
-    await click(button(host, 'Confirm'));
-    expect(host.textContent).toContain("Couldn't add it. Nothing was saved. Try again.");
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(plain(host)).not.toContain('Add an agent');
+    expect([...host.querySelectorAll('button')].map((b) => b.textContent)).not.toContain(
+      'Add with Touch ID',
+    );
+  });
+  it('the gate: begin, then the backup code finishes with only the nonce', async () => {
+    answers['POST /api/ui/agents/begin'] = READY;
+    answers['POST /api/ui/agents'] = {
+      status: 200,
+      body: { status: 'done', name: 'second-agent', label: 'Second agent' },
+    };
+    const onDone = await mountGate();
+    await click(button(host, 'Use a backup code instead'));
+    await type(backupCode(), '123456');
+    await click(button(host, 'Confirm with my backup code'));
+    await settle();
+    const begin = calls.find((c) => c.url === '/api/ui/agents/begin' && c.method === 'POST');
+    const finish = calls.find((c) => c.url === '/api/ui/agents' && c.method === 'POST');
+    expect(begin?.body).toBe('');
+    expect(finish?.body).toBe('123456');
+    expect(finish?.headers.get('X-AgentLink-Input')).not.toContain('123456');
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ label: 'Second agent' }));
+  });
+  it('a refused begin says why and creates nothing', async () => {
+    answers['POST /api/ui/agents/begin'] = { status: 409, body: { status: 'busy' } };
+    const onDone = await mountGate();
+    await click(button(host, 'Use a backup code instead'));
+    await type(backupCode(), '123456');
+    await click(button(host, 'Confirm with my backup code'));
+    await settle();
+    expect(calls.some((c) => c.url === '/api/ui/agents' && c.method === 'POST')).toBe(false);
+    expect(plain(host)).toContain('Another setup or approval is running.');
+    expect(onDone).not.toHaveBeenCalled();
   });
 });
 
-describe('the top-bar switcher', () => {
-  const mountSwitcher = async (reload = vi.fn<() => void>()) => {
-    await act(async () => {
-      root.render(createElement(AgentSwitcher, { api: api(), reload }));
-    });
-    await settle();
-    return reload;
-  };
-  const triggerOf = (): HTMLButtonElement =>
-    host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!;
-  it('shows the open agent, its AI app and an accessible name', async () => {
-    await mountSwitcher();
-    expect(triggerOf().textContent).toContain('Personal');
-    expect(triggerOf().textContent).toContain('Claude Code');
-    expect(triggerOf().getAttribute('aria-expanded')).toBe('false');
-    expect(triggerOf().getAttribute('aria-label')).toBe(
-      'Agent: Personal, Claude Code, Running. Switch agent.',
-    );
-  });
-  it('opens a menu with every agent, its apps, Add agent and Manage agents', async () => {
-    await mountSwitcher();
-    await click(triggerOf());
-    const menu = host.querySelector('[role="menu"]')!;
-    expect(menu).toBeTruthy();
-    for (const s of [
-      'Personal',
-      'Work',
-      'Codex',
-      'Second agent',
-      'Not connected to an AI app',
-      'Removal not finished',
-      'Add agent',
-      'Manage agents',
-    ]) {
-      expect(menu.textContent).toContain(s);
-    }
-    expect(triggerOf().getAttribute('aria-expanded')).toBe('true');
-  });
-  it('switching needs no Touch ID: one POST, then every page reloads', async () => {
-    answers['POST /api/ui/agents/switch'] = {
-      status: 200,
-      body: { status: 'done', generation: 8, current: 'work' },
-    };
-    const reload = await mountSwitcher();
-    await click(triggerOf());
-    await click(
-      [...host.querySelectorAll('[role="menuitem"]')].find((m) => m.textContent?.includes('Codex')),
-    );
-    const posts = calls.filter((c) => c.method === 'POST');
-    expect(posts).toHaveLength(1);
-    expect(posts[0]?.headers.get('X-AgentLink-Input')).toBeNull();
-    expect(JSON.parse(posts[0]!.body)).toEqual({ name: 'work', generation: 7 });
-    expect(reload).toHaveBeenCalledTimes(1);
-  });
-  it('closes on Escape and gives focus back to the trigger', async () => {
-    await mountSwitcher();
-    await click(triggerOf());
-    await act(async () => {
-      host
-        .querySelector('[role="menu"]')!
-        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    });
-    expect(host.querySelector('[role="menu"]')).toBeNull();
-    expect(document.activeElement).toBe(triggerOf());
-  });
-  it('with one agent: still Add agent and Manage agents', async () => {
-    answers['GET /api/ui/agents'] = { status: 200, body: list([FOUR[0]]) };
-    await mountSwitcher();
-    await click(triggerOf());
-    const menu = host.querySelector('[role="menu"]')!;
-    expect(menu.textContent).toContain('Add agent');
-    expect(menu.textContent).toContain('Manage agents');
-  });
-  it('is not a menu when the page is bound to an AI app (not switchable)', async () => {
-    answers['GET /api/ui/agents'] = { status: 200, body: { switchable: false, agents: [] } };
-    await mountSwitcher();
-    expect(host.querySelector('button[aria-haspopup="menu"]')).toBeNull();
-    expect(host.textContent).toContain('Open the AgentLink app to switch.');
-  });
-  it('says "No AI app" in the bar for an agent with none', async () => {
-    answers['GET /api/ui/agents'] = {
-      status: 200,
-      body: list([agent('second', 'Second agent', { current: true })], {
-        current: 'second',
-        label: 'Second agent',
-      }),
-    };
-    await mountSwitcher();
-    expect(triggerOf().textContent).toContain('No AI app');
-  });
-});
+// W4-SHELL-V2: the top-bar agent chip and its live dropdown are tested with the shell
+// (layout/w4-shell-v2.dom.test.ts).

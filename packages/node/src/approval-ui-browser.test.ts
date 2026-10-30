@@ -5,8 +5,8 @@
 // real owner store and real owner signatures. The passkey is set up where the app offers it: the
 // first-run page, with the backup code once (M1-UX-FIRSTRUN-V2-c).
 //
-// Covered: J4 end to end with the passkey; review together signs exactly the selected items with
-// one passkey gesture; a commitment cannot be selected and "Remember for this contact" is absent
+// Covered: J4 end to end with the passkey; review together (W4-HOME: Home's bulk approve under
+// Under the hood) signs exactly the picked items with one passkey gesture; a commitment cannot be selected and "Remember for this contact" is absent
 // from the batch view; injected HTML and script in request text render inert; a PRF-less
 // authenticator, or a browser with no passkeys at all, falls back to the backup code; the session
 // link is single-use; wrong codes back off; the page loads nothing from the removed page.
@@ -161,6 +161,23 @@ async function setUpPasskey(page: Page, origin: string): Promise<void> {
 }
 
 const card = (page: Page, n: number) => page.locator(`[data-approval="${id(n)}"]`);
+/**
+ * W4-HOME: `/` is Home. The soonest request is the card on top; the others open under "+N more
+ * waiting"; Under the hood adds the bulk review, where only free plain requests can be picked.
+ */
+async function homeBulk(page: Page, waiting: number): Promise<void> {
+  await card(page, 1).waitFor();
+  await page
+    .getByRole('switch', { name: /Under the hood/ })
+    .first()
+    .click();
+  await page.getByRole('button', { name: `+${String(waiting - 1)} more waiting` }).click();
+}
+const pick = (page: Page, n: number) =>
+  page.getByRole('checkbox', {
+    name: `Select Send a message to Contact ${String(n)}`,
+    exact: true,
+  });
 const CODE_LABEL = 'Backup code or owner passphrase';
 /** The wrong-code backoff's free attempts (approval-server.ts), pinned. */
 const FREE_ATTEMPTS = 3;
@@ -232,30 +249,31 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     for (const n of [1, 2, 3, 4]) source.add(n);
     source.add(5, { commitment: true, summary: 'Answer their terms · Ana · Free' });
     await page.goto(`${server.origin}/`);
-    await page.getByText('Waiting for you (5)').waitFor();
+    await homeBulk(page, 5);
 
-    // The commitment is listed but cannot be selected (D-31, 04 §2.5.2).
+    // The commitment is listed but cannot be picked (D-31, 04 §2.5.2).
     const terms = card(page, 5);
-    await terms.getByText('Terms are approved one at a time.').waitFor();
-    expect(await terms.locator('input[type=radio]').count()).toBe(0);
+    await terms.waitFor();
+    await page.getByText('Kind Terms').first().waitFor();
+    expect(await page.getByRole('checkbox', { name: /Answer their terms/ }).count()).toBe(0);
     // "Remember for this contact" is never part of the batch view (06 §3, 11 §6.2.1).
     expect(await page.getByText('Remember for this contact').count()).toBe(0);
 
-    await card(page, 1).getByLabel('Approve', { exact: true }).check();
-    await card(page, 3).getByLabel('Approve', { exact: true }).check();
-    await card(page, 4).getByLabel('Deny', { exact: true }).check();
-    // 2 is left at Later.
-    expect(await card(page, 2).getByLabel('Later', { exact: true }).isChecked()).toBe(true);
+    // W4-HOME: Home's bulk review approves the picked requests (Deny is each card's own button).
+    await pick(page, 2).check();
+    await pick(page, 4).check();
+    // 3 is left unpicked.
+    expect(await pick(page, 3).isChecked()).toBe(false);
     const before = await signCounts();
-    await page.getByRole('button', { name: 'Approve 2 and deny 1' }).click();
+    await page.getByRole('button', { name: 'Approve 2 selected' }).click();
     await page
-      .getByText('This covers exactly these 3. Anything new waits for your next review.')
+      .getByText('This covers exactly these 2. Anything new waits for your next review.')
       .waitFor();
     expect(source.applied).toEqual([]);
     await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
-    await page.getByText('Done: approved 2 and denied 1.').waitFor();
+    await page.getByText('Approved 2.').waitFor();
 
-    // One gesture (sign count + 1), one signed object, exactly the selected items.
+    // One gesture (sign count + 1), one signed object, exactly the picked items.
     const after = await signCounts();
     expect((after[0] ?? 0) - (before[0] ?? 0)).toBe(1);
     expect(source.applied).toHaveLength(1);
@@ -266,11 +284,11 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     const items = (signed.body['params'] as { items: { approvalId: string; decision: string }[] })
       .items;
     expect(items.map((i) => [i.approvalId, i.decision])).toEqual([
-      [id(1), 'approve'],
-      [id(3), 'approve'],
-      [id(4), 'deny'],
+      [id(2), 'approve'],
+      [id(4), 'approve'],
     ]);
-    expect(source.pending(2)).toBe(true);
+    expect(source.pending(1)).toBe(true);
+    expect(source.pending(3)).toBe(true);
     expect(source.pending(5)).toBe(true);
   }, 120_000);
 
@@ -278,19 +296,19 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     needBrowser(() => ctx.skip());
     const { source, link } = await start();
     const page = await pageWithoutPasskeys();
-    for (const n of [1, 2, 3]) source.add(n);
+    for (const n of [1, 2, 3, 4]) source.add(n);
     await page.goto(await link());
-    await page.getByText('Waiting for you (3)').waitFor();
-    for (const n of [1, 2, 3]) await card(page, n).getByLabel('Approve', { exact: true }).check();
-    source.remove(2);
-    await page.getByRole('button', { name: 'Approve 3' }).click();
+    await homeBulk(page, 4);
+    for (const n of [2, 3, 4]) await pick(page, n).check();
+    source.remove(3);
+    await page.getByRole('button', { name: 'Approve 3 selected' }).click();
     await page.getByText('1 request is no longer waiting and was left out.').waitFor();
     await page.getByText('This covers exactly these 2.', { exact: false }).waitFor();
     await page.getByLabel(CODE_LABEL).fill(world.code);
     await page.getByRole('button', { name: 'Confirm', exact: true }).click();
-    await page.getByText('Done: approved 2.').waitFor();
+    await page.getByText('Approved 2.').waitFor();
     const items = (source.applied[0]?.body['params'] as { items: { approvalId: string }[] }).items;
-    expect(items.map((i) => i.approvalId)).toEqual([id(1), id(3)]);
+    expect(items.map((i) => i.approvalId)).toEqual([id(2), id(4)]);
   }, 120_000);
 
   it('renders injected HTML and script in contact names, file names and summaries inert', async (ctx) => {
@@ -313,7 +331,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
       },
     });
     await page.goto(await link());
-    await page.getByText('Waiting for you (1)').waitFor();
+    await card(page, 1).waitFor();
     await page.goto(server.approvalUrl(id(1)));
     await card(page, 1).getByText(`Denis ${XSS}`).waitFor();
     await card(page, 1)
@@ -321,6 +339,9 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
       .waitFor();
     for (const view of ['/', `/approve/${id(1)}`]) {
       await page.goto(`${server.origin}${view}`);
+      // Home's compact card folds the AI's words behind Details.
+      const details = card(page, 1).locator('details > summary');
+      if (view === '/') await details.click();
       await card(page, 1).getByText(`/tmp/${XSS}.pdf`).waitFor();
       expect(await page.evaluate(() => (globalThis as { __xss?: unknown }).__xss)).toBeUndefined();
       expect(await page.locator('main img').count()).toBe(0);
@@ -342,15 +363,17 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
 
     source.add(1);
     source.add(2);
+    source.add(3);
     await page.goto(`${server.origin}/`);
-    await card(page, 1).getByLabel('Approve', { exact: true }).check();
-    await card(page, 2).getByLabel('Deny', { exact: true }).check();
-    await page.getByRole('button', { name: 'Approve 1 and deny 1' }).click();
+    await homeBulk(page, 3);
+    await pick(page, 2).check();
+    await pick(page, 3).check();
+    await page.getByRole('button', { name: 'Approve 2 selected' }).click();
     await page.getByLabel(CODE_LABEL).waitFor();
     expect(await page.getByRole('button', { name: 'Confirm with your passkey' }).count()).toBe(0);
     await page.getByLabel(CODE_LABEL).fill(world.code);
     await page.getByRole('button', { name: 'Confirm', exact: true }).click();
-    await page.getByText('Done: approved 1 and denied 1.').waitFor();
+    await page.getByText('Approved 2.').waitFor();
     expect(source.applied).toHaveLength(1);
   }, 120_000);
 
@@ -376,7 +399,10 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     const url = await link();
     const first = await pageWithoutPasskeys();
     await first.goto(url);
-    await first.getByText('Nothing is waiting for you.').waitFor();
+    // W4-HOME: Home, with nothing waiting (no approval card).
+    await first.getByRole('heading', { name: 'Home', level: 1 }).waitFor({ state: 'attached' });
+    await first.getByRole('heading', { name: 'People' }).waitFor();
+    expect(await first.getByRole('region', { name: 'Waiting for your approval' }).count()).toBe(0);
     expect(new URL(first.url()).search).toBe('');
     const second = await pageWithoutPasskeys();
     const res = await second.goto(url);
@@ -461,7 +487,8 @@ describe('the approvals as the owner sees them (M1-11a-ux; Chromium)', () => {
       await page.goto(`${server.origin}${view}`);
       const box = card(page, 1);
       await box.getByRole('heading', { name: HEADLINE }).waitFor();
-      await box.getByText(WHO).waitFor();
+      // Home's compact card says who on its one line; `/approve/<id>` in its facts.
+      await box.getByText(WHO, { exact: false }).first().waitFor();
       const html = await page.content();
       expect(html, view).not.toContain(INVITE);
       expect(html, view).not.toContain('inviteUrl');

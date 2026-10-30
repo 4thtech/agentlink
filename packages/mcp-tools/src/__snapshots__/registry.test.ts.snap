@@ -353,7 +353,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
     "annotations": {
       "destructiveHint": false,
       "idempotentHint": false,
-      "openWorldHint": false,
+      "openWorldHint": true,
       "readOnlyHint": false,
     },
     "approval": false,

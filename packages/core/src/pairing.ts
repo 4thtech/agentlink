@@ -32,8 +32,10 @@ import {
   encodeHex,
   formatFingerprint,
   decodeHex,
+  generateShortInviteSecret,
   pairingProof,
   randomBytes,
+  sealShortInvite,
   safetyCodeCommit,
   verifyCardPop,
   verifyPairingProof,
@@ -47,6 +49,13 @@ import {
   type Invite,
   type Payload,
 } from '@4thtech-io/types';
+import {
+  DROP_DEFAULT_ENDPOINT,
+  StorageError,
+  createDropAdapter,
+  fetchInviteObject,
+  type DropAdapter,
+} from '@4thtech-io/storage';
 import { agentNostrKey, checkName, checkReceivedCard, ownerFingerprintHex } from './card.js';
 import type { ContactBook, StagedPairing } from './contacts.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
@@ -61,7 +70,16 @@ import {
 } from './envelopes.js';
 import { CoreError, type CoreErrorCode } from './errors.js';
 import type { IdentityService } from './identity.js';
-import { decodeInviteLink, encodeInviteLink } from './invite-link.js';
+import type { DropConfig } from './files/platform.js';
+import {
+  clearShortInviteCache,
+  decodeInviteLink,
+  encodeInviteLink,
+  encodeInvitePayload,
+  encodeShortInviteLink,
+  resolveInviteLink,
+  type ShortInviteFetch,
+} from './invite-link.js';
 import { restrictName } from './names.js';
 import { verifyPairingTranscript, type PairingTranscript } from './safety-code.js';
 import type { Row } from './store/schema.js';
@@ -82,11 +100,26 @@ export interface CreateInviteInput {
   readonly label?: string;
   /** Whole days, 1 to 7 (default 7, 04 §3.6). */
   readonly expiresInDays?: number;
+  /**
+   * W4-SHORT-INVITE (D-139 (7)): the format 1 long link, uploading nothing to the drop. Only the
+   * owner's surfaces set it (Advanced in the app, `agentlink invite --long`); no MCP argument does.
+   */
+  readonly long?: boolean;
 }
 
 export interface CreatedInvite {
+  /**
+   * W4-PEOPLE-INVITE: the invite's public 16-byte ID (base64url), as `openInvites` lists it and
+   * `cancelInvite` takes it. Never the secret.
+   */
+  readonly inviteId: string;
   /** The link to share. It carries the invite secret: never log it (I-7). */
   readonly inviteUrl: string;
+  /**
+   * W4-SHORT-INVITE: `short` (link format 2, the invite on the drop) or `long` (format 1: asked for,
+   * no drop configured, or the automatic fallback when the drop refused or could not be reached).
+   */
+  readonly format: 'short' | 'long';
   /** The inviter's own owner fingerprint (06 §2.1): display only. */
   readonly ownerFingerprint: { readonly short: string; readonly long: string };
   readonly expiresAt: number;
@@ -139,6 +172,26 @@ const RULE_ERRORS: ReadonlySet<CoreErrorCode> = new Set([
   'repair_owner_changed',
   'repair_epoch_lower',
 ]);
+
+/**
+ * `work`, or a rejection once `ms` have passed (and `abort` is aborted, so the guarded fetch gives
+ * the request up too). A late outcome of `work` is ignored.
+ */
+async function withDeadline<T>(work: Promise<T>, ms: number, abort: AbortController): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  work.catch(() => undefined);
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      abort.abort();
+      reject(new Error('deadline'));
+    }, ms);
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function classify(error: unknown, contactId: string | undefined): PairingOutcome {
   if (!(error instanceof CoreError) || error.code === 'store_unreadable') throw error;
@@ -194,13 +247,63 @@ interface StepOne {
   readonly contact: PendingContact;
 }
 
+/** W4-INVITES-LIST (08 §1): one open invite as the owner's list shows it; never the link. */
+export interface OpenInvite {
+  /** The invite's public 16-byte ID (base64url): what Cancel names. Not a secret on its own. */
+  readonly inviteId: string;
+  /** The name the invite was created for (06 §2.1: a suggested alias), or null. */
+  readonly label: string | null;
+  readonly expiresAt: number;
+}
+
+/** Retry delays for a failed drop object delete (04 §3.6.2: retried with backoff). */
+/**
+ * O-L1: the short invite upload is given up after this (then the format 1 link), well before the
+ * guarded fetch's own 60 s, so Create never waits on a drop that does not answer (04 §3.6.2).
+ */
+export const INVITE_UPLOAD_TIMEOUT_MS = 10_000;
+const DELETE_BACKOFF_BASE_MS = 30_000;
+const DELETE_BACKOFF_MAX_MS = 60 * 60 * 1000;
+
+/**
+ * The short-invite fetcher over a drop configuration (04 §3.6.2 steps 2-4): the URL is built by
+ * the storage client from the configured drop origin and the derived lookup ID only. A 404 is
+ * `invite_unavailable`; 429, 503, a timeout or a network failure is `invite_fetch_failed`; a
+ * response that is not an invite object is `invite_invalid` ("damaged").
+ */
+export function shortInviteFetcher(drop: DropConfig | undefined): ShortInviteFetch | undefined {
+  if (drop === undefined) return undefined;
+  const endpoint = drop.endpoint ?? DROP_DEFAULT_ENDPOINT;
+  return async (lookupId) => {
+    try {
+      return await fetchInviteObject({ endpoint, fetch: drop.fetch }, lookupId);
+    } catch (error) {
+      const code = error instanceof StorageError ? error.code : undefined;
+      if (code === 'not_found') {
+        throw new CoreError('invite_unavailable', 'The invite is no longer available.');
+      }
+      if (code === 'too_large' || code === 'invalid_response' || code === 'invalid_argument') {
+        throw new CoreError('invite_invalid', 'The invite link is not valid.');
+      }
+      throw new CoreError('invite_fetch_failed', 'The invite could not be fetched. Try again.');
+    }
+  };
+}
+
 /**
  * Accept step 1 (04 §3.6): the one D-69 codec and the strict schema, the expiry, both card
  * signatures, the name and relays against the card and the relay URL rule (04 §4). No agent, no
  * store. Throws core's fixed errors only; none carries anything from the link (I-5, I-7).
  */
-async function acceptStepOne(link: string, now: number): Promise<StepOne> {
-  const invite = await decodeInviteLink(link);
+async function acceptStepOne(
+  link: string,
+  now: number,
+  fetchShortInvite: ShortInviteFetch | undefined,
+): Promise<StepOne> {
+  const invite = await decodeInviteLink(
+    link,
+    fetchShortInvite === undefined ? {} : { fetchShortInvite },
+  );
   // B's expiry check is advisory (A enforces the expiry it stored, 04 §3.6).
   if (invite.expiresAt <= now) {
     throw new CoreError('invite_expired', 'The invite has expired. Ask for a new one.');
@@ -218,12 +321,20 @@ async function acceptStepOne(link: string, now: number): Promise<StepOne> {
   return { invite, checked, contact: pendingContact(checked.card, checked.name) };
 }
 
-/** U3-invite: Accept step 1 only, for `agentlink join` and the app host's waiting invite. */
+/**
+ * U3-invite: Accept step 1 only, for `agentlink join` and the app host's waiting invite. A format 2
+ * link is resolved through `options.drop` (04 §3.6.2), once per process.
+ */
 export async function checkInviteLink(
   link: string,
   nowSeconds: number,
+  options: { readonly drop?: DropConfig } = {},
 ): Promise<CheckedInviteLink> {
-  const { invite, contact } = await acceptStepOne(link, nowSeconds);
+  const { invite, contact } = await acceptStepOne(
+    link,
+    nowSeconds,
+    shortInviteFetcher(options.drop),
+  );
   return { inviteId: invite.inviteId, contact, expiresAt: invite.expiresAt };
 }
 
@@ -231,14 +342,63 @@ const same = (a: unknown, b: unknown): boolean =>
   canonicalize(a as JsonValue) === canonicalize(b as JsonValue);
 
 export class PairingService implements PairingHandler {
+  /** W4-PAUSE: the agent's pause; invites refuse while paused. */
+  readonly #pause: { assertRunning(): Promise<void> } | undefined;
   readonly #ctx: CoreContext;
   readonly #identity: IdentityService;
   readonly #contacts: ContactBook;
+  readonly #drop: DropConfig | undefined;
+  readonly #fetchShort: ShortInviteFetch | undefined;
+  /** Invites whose drop object must go although the invite is open (a fallback after an upload). */
+  readonly #orphans = new Set<string>();
+  /** Failed deletes: when to try again (memory only; the drop's hard expiry is the backstop). */
+  readonly #retry = new Map<string, { failures: number; nextAt: number }>();
+  #sweeping: Promise<void> | undefined;
 
-  constructor(ctx: CoreContext, identity: IdentityService, contacts: ContactBook) {
+  constructor(
+    ctx: CoreContext,
+    identity: IdentityService,
+    contacts: ContactBook,
+    drop?: DropConfig,
+    pause?: { assertRunning(): Promise<void> },
+  ) {
+    this.#pause = pause;
     this.#ctx = ctx;
     this.#identity = identity;
     this.#contacts = contacts;
+    this.#drop = drop;
+    this.#fetchShort = shortInviteFetcher(drop);
+  }
+
+  /**
+   * W4-SHORT-INVITE: the format 1 link of `link` (itself, or a short link resolved once through
+   * this agent's drop; 04 §3.6.2). Surfaces that build the accept approval action call it first, so
+   * every surface signs over the same action.
+   */
+  async resolveInviteLink(link: string): Promise<string> {
+    // W4-PAUSE (06 §6 "Paused agents"): no invite fetch while the agent is paused (fail closed).
+    await this.#pause?.assertRunning();
+    return resolveInviteLink(link, this.#fetchShort);
+  }
+
+  #dropAdapter(signal?: AbortSignal): DropAdapter | undefined {
+    const drop = this.#drop;
+    if (drop === undefined) return undefined;
+    const dropFetch = drop.fetch;
+    try {
+      return createDropAdapter({
+        ...(drop.endpoint === undefined ? {} : { endpoint: drop.endpoint }),
+        signer: this.#ctx.keyStore,
+        fetch:
+          signal === undefined
+            ? dropFetch
+            : (request: Request) => dropFetch(new Request(request, { signal })),
+        now: () => new Date(nowOf(this.#ctx) * 1000),
+        logger: this.#ctx.log,
+      });
+    } catch {
+      return undefined;
+    }
   }
 
   /**
@@ -251,7 +411,9 @@ export class PairingService implements PairingHandler {
     const now = nowOf(this.#ctx);
     return this.#ctx.store.transaction(
       (tx) =>
-        tx.select('invites').some((row) => row.used_at == null && row.expires_at > now) ||
+        tx
+          .select('invites')
+          .some((row) => row.used_at == null && row.cancelled_at == null && row.expires_at > now) ||
         tx.select('pairings').some((row) => row.expires_at > now),
     );
   }
@@ -260,6 +422,8 @@ export class PairingService implements PairingHandler {
 
   /** Creates a single-use invite (04 §3.6). Returns the link; stores proofKey, never the secret. */
   async createInvite(input: CreateInviteInput = {}): Promise<CreatedInvite> {
+    // W4-PAUSE: no invite (and no drop upload) while the agent is paused.
+    await this.#pause?.assertRunning();
     const ctx = this.#ctx;
     await this.#identity.assertCanSend();
     const days = input.expiresInDays ?? INVITE_DEFAULT_EXPIRY_DAYS;
@@ -273,11 +437,15 @@ export class PairingService implements PairingHandler {
     const inviteId = randomBytes(INVITE_ID_BYTES);
     const secret = randomBytes(SECRET_BYTES);
     const nonceA = randomBytes(NONCE_BYTES);
+    // The upload's requests carry this signal: aborted at the deadline (O-L1).
+    const uploadAbort = new AbortController();
+    const adapter = input.long === true ? undefined : this.#dropAdapter(uploadAbort.signal);
     let proofKey: Uint8Array | undefined;
+    let linkSecret: Uint8Array | undefined;
     try {
       proofKey = derivePairingProofKey(secret);
       const id = encodeBase64url(inviteId);
-      const inviteUrl = await encodeInviteLink({
+      const invite: Invite = {
         v: 1,
         inviteId: id,
         secret: encodeBase64url(secret),
@@ -288,8 +456,22 @@ export class PairingService implements PairingHandler {
         name: own.name,
         relays: [...own.relays],
         expiresAt,
-      });
+      };
+      const longUrl = await encodeInviteLink(invite);
       const key = [id];
+      // W4-SHORT-INVITE (04 §3.6.2 Create): seal the payload under a fresh link secret and record
+      // the lookup ID and drop key epoch, sealed, before the upload is sent.
+      let sealed: { lookupId: string; object: Uint8Array; epoch: number } | undefined;
+      if (adapter !== undefined) {
+        try {
+          const epoch = await adapter.inviteEpoch();
+          linkSecret = generateShortInviteSecret();
+          const object = await sealShortInvite(linkSecret, await encodeInvitePayload(invite));
+          sealed = { lookupId: encodeBase64url(object.lookupId), object: object.object, epoch };
+        } catch {
+          sealed = undefined; // the key is unavailable: nothing was recorded or sent; long link
+        }
+      }
       const row: Row<'invites'> = {
         invite_id: id,
         proof_key: await seal(ctx, 'invites', 'proof_key', key, encodeBase64url(proofKey)),
@@ -298,16 +480,179 @@ export class PairingService implements PairingHandler {
         expires_at: expiresAt,
         used_at: null,
         created_at: now,
+        drop_lookup_id:
+          sealed === undefined
+            ? null
+            : await seal(ctx, 'invites', 'drop_lookup_id', key, sealed.lookupId),
+        drop_key_epoch:
+          sealed === undefined
+            ? null
+            : await seal(ctx, 'invites', 'drop_key_epoch', key, String(sealed.epoch)),
+        cancelled_at: null,
       };
       await ctx.store.transaction((tx) => {
         tx.insert('invites', row);
       });
-      ctx.log.info('invite created', { expiresAt });
-      return { inviteUrl, ownerFingerprint: fingerprintOf(own.card), expiresAt };
+      let inviteUrl = longUrl;
+      let format: CreatedInvite['format'] = 'long';
+      if (sealed !== undefined && adapter !== undefined && linkSecret !== undefined) {
+        try {
+          await withDeadline(
+            adapter.putInvite({
+              lookupId: sealed.lookupId,
+              object: sealed.object,
+              expiresAt: new Date(expiresAt * 1000),
+              epoch: sealed.epoch,
+            }),
+            INVITE_UPLOAD_TIMEOUT_MS,
+            uploadAbort,
+          );
+          inviteUrl = encodeShortInviteLink(linkSecret);
+          format = 'short';
+        } catch {
+          // The drop refused or could not be reached (D-139 (7)): the same invite as a format 1
+          // link. The upload's outcome may be ambiguous, so the recorded object is deleted anyway,
+          // in the background: the link is returned now (O-L1). The sweep never throws; the catch
+          // logs a fixed message only (I-7).
+          ctx.log.info('invite drop unavailable, long link');
+          this.#orphans.add(id);
+          this.sweepInviteObjects().catch(() => {
+            ctx.log.info('invite drop sweep failed');
+          });
+        }
+      }
+      ctx.log.info('invite created', { expiresAt, format });
+      return {
+        inviteId: id,
+        inviteUrl,
+        format,
+        ownerFingerprint: fingerprintOf(own.card),
+        expiresAt,
+      };
     } finally {
       wipe(secret);
       wipe(nonceA);
       if (proofKey !== undefined) wipe(proofKey);
+      if (linkSecret !== undefined) wipe(linkSecret);
+    }
+  }
+
+  // --- A: open invites, cancel, and the drop objects (W4-INVITES-LIST, W4-SHORT-INVITE) ----------
+
+  /**
+   * The open invites (not used, not cancelled, not expired), newest first: ID, label and expiry
+   * only. Never a link, a secret or a lookup ID (I-1, I-7).
+   */
+  async openInvites(): Promise<readonly OpenInvite[]> {
+    const ctx = this.#ctx;
+    const now = nowOf(ctx);
+    const rows = await ctx.store.transaction((tx) =>
+      tx
+        .select('invites')
+        .filter((r) => r.used_at == null && r.cancelled_at == null && r.expires_at > now),
+    );
+    rows.sort((a, b) => b.created_at - a.created_at || (a.invite_id < b.invite_id ? -1 : 1));
+    const out: OpenInvite[] = [];
+    for (const row of rows) {
+      let label: string | null = null;
+      if (row.label != null) {
+        try {
+          label = await open(ctx, 'invites', 'label', [row.invite_id], row.label);
+        } catch {
+          label = null;
+        }
+      }
+      out.push({ inviteId: row.invite_id, label, expiresAt: row.expires_at });
+    }
+    return out;
+  }
+
+  /**
+   * Cancels an open invite (04 §3.6.2: an owner action on the local page or the CLI; no MCP tool
+   * cancels). A later answer is refused, and a short link's drop object is deleted (retried with
+   * backoff; never blocking). `not_found` for an unknown, used, cancelled or expired invite.
+   */
+  async cancelInvite(inviteId: string): Promise<'cancelled' | 'not_found'> {
+    const ctx = this.#ctx;
+    if (typeof inviteId !== 'string' || !/^[A-Za-z0-9_-]{22}$/.test(inviteId)) return 'not_found';
+    const now = nowOf(ctx);
+    const done = await ctx.store.transaction((tx) => {
+      const row = tx.get('invites', { invite_id: inviteId });
+      if (
+        row === undefined ||
+        row.used_at != null ||
+        row.cancelled_at != null ||
+        row.expires_at <= now
+      ) {
+        return false;
+      }
+      tx.update('invites', { invite_id: inviteId, cancelled_at: null }, { cancelled_at: now });
+      return true;
+    });
+    if (!done) return 'not_found';
+    ctx.log.info('invite cancelled');
+    await this.sweepInviteObjects();
+    return 'cancelled';
+  }
+
+  /**
+   * Deletes the drop object of every short invite that completed, was cancelled or expired (and of
+   * a fallback whose upload outcome was ambiguous), with a DELETE signed at the recorded epoch. A
+   * deleted object's columns are cleared. A failure is retried later with backoff; nothing here
+   * throws or blocks a pairing (04 §3.6.2). The host calls it now and then (06 §6 follow).
+   */
+  async sweepInviteObjects(): Promise<void> {
+    if (this.#sweeping !== undefined) return this.#sweeping;
+    this.#sweeping = this.#sweep().finally(() => {
+      this.#sweeping = undefined;
+    });
+    return this.#sweeping;
+  }
+
+  async #sweep(): Promise<void> {
+    const ctx = this.#ctx;
+    const adapter = this.#dropAdapter();
+    if (adapter === undefined) return;
+    const now = nowOf(ctx);
+    const nowMs = now * 1000;
+    let rows: Row<'invites'>[];
+    try {
+      rows = await ctx.store.transaction((tx) =>
+        tx
+          .select('invites')
+          .filter(
+            (r) =>
+              r.drop_lookup_id != null &&
+              (r.used_at != null ||
+                r.cancelled_at != null ||
+                r.expires_at <= now ||
+                this.#orphans.has(r.invite_id)),
+          ),
+      );
+    } catch {
+      return;
+    }
+    for (const row of rows) {
+      const id = row.invite_id;
+      const wait = this.#retry.get(id);
+      if (wait !== undefined && wait.nextAt > nowMs) continue;
+      try {
+        const key = [id];
+        const lookupId = await open(ctx, 'invites', 'drop_lookup_id', key, row.drop_lookup_id!);
+        const epochText = await open(ctx, 'invites', 'drop_key_epoch', key, row.drop_key_epoch!);
+        await adapter.deleteInvite(lookupId, Number(epochText));
+        await ctx.store.transaction((tx) => {
+          tx.update('invites', { invite_id: id }, { drop_lookup_id: null, drop_key_epoch: null });
+        });
+        this.#orphans.delete(id);
+        this.#retry.delete(id);
+        ctx.log.debug('invite drop object deleted');
+      } catch {
+        const failures = (wait?.failures ?? 0) + 1;
+        const delay = Math.min(DELETE_BACKOFF_BASE_MS * 2 ** (failures - 1), DELETE_BACKOFF_MAX_MS);
+        this.#retry.set(id, { failures, nextAt: nowMs + delay });
+        ctx.log.info('invite drop object delete failed', { failures });
+      }
     }
   }
 
@@ -320,10 +665,12 @@ export class PairingService implements PairingHandler {
    * the pairing stays `pending` until the inviter's verified `handshake-ack`.
    */
   async acceptInvite(input: AcceptInviteInput): Promise<AcceptInviteResult> {
+    // W4-PAUSE: no accept (check or pairing) while the agent is paused.
+    await this.#pause?.assertRunning();
     const ctx = this.#ctx;
     const now = nowOf(ctx);
     // Step 1, shared with checkInviteLink (one implementation for every surface).
-    const { invite, checked, contact } = await acceptStepOne(input.link, now);
+    const { invite, checked, contact } = await acceptStepOne(input.link, now, this.#fetchShort);
     const self = await ctx.keyStore.getPublicBundle();
     if (checked.card.agentEvm === self.agentId) {
       throw new CoreError('contact_is_self', 'An agent cannot add itself as a contact.');
@@ -395,6 +742,8 @@ export class PairingService implements PairingHandler {
         tx.insert('envelopes', row);
       });
       ctx.log.info('pairing started', { role: 'invitee' });
+      // F-L1: the resolved link (it carries the pairing secret) is not kept after a used accept.
+      clearShortInviteCache(input.link);
       return {
         status: 'pending',
         contact,
@@ -465,7 +814,13 @@ export class PairingService implements PairingHandler {
   }
 
   async handle(inbound: InboundPairing): Promise<PairingOutcome> {
-    if (inbound.payload.type === 'handshake') return this.#onHandshake(inbound);
+    if (inbound.payload.type === 'handshake') {
+      const outcome = await this.#onHandshake(inbound);
+      // W4-SHORT-INVITE: a completed invite's drop object goes now (never awaited: a failed DELETE
+      // never blocks the pairing; 04 §3.6.2).
+      void this.sweepInviteObjects().catch(() => undefined);
+      return outcome;
+    }
     if (inbound.payload.type === 'handshake-ack') return this.#onAck(inbound);
     return drop('type_unhandled', inbound.contactId);
   }
@@ -515,6 +870,8 @@ export class PairingService implements PairingHandler {
     }
     const now = nowOf(ctx);
     if (invite.expires_at <= now) return drop('invite_expired', contactId);
+    // W4-SHORT-INVITE: the owner cancelled it (04 §3.6.2); an answer is refused as for an expiry.
+    if (invite.cancelled_at != null) return drop('invite_expired', contactId);
     // The sender is the card's agent (the transport already checked the seal key, 04 §3.5).
     if (envelope.from !== agentNostrKey(body.card as AgentCard)) {
       return drop('pairing_invalid', contactId);
@@ -720,7 +1077,12 @@ export class PairingService implements PairingHandler {
         if (!inbound.claim(tx)) return 'claimed_elsewhere';
         if (context.invite !== undefined) {
           const current = tx.get('invites', { invite_id: context.invite });
-          if (current === undefined || current.expires_at <= context.now) {
+          // O-L2: re-checked at commit, so a Cancel after the checks above still refuses it.
+          if (
+            current === undefined ||
+            current.expires_at <= context.now ||
+            current.cancelled_at != null
+          ) {
             throw new CoreError('pairing_expired', 'The pairing has expired.');
           }
           if (current.used_at !== null) return 'invite_used';

@@ -13,13 +13,17 @@
 //
 // Rename and Remove ask for owner presence (the passkey, or the owner code). Every change is one POST
 // to a presence route; the page never signs (owner.ts).
+//
+// W4-PEOPLE-INVITE (prototype v23 A4, A5, A7): "Invite someone" opens the Invite screen in place
+// (`?invite` too); open invites are PendingInviteRow rows that say so once cancelled; Rename, Check
+// safety code and Remove sit in the person ⋯ menu; and when an open invite is answered (or a pasted
+// one connects), the new contact arrives with the Connected moment and its safety code.
 import {
   Banner,
   Button,
   ContactName,
   EmptyState,
   Icon,
-  RingMeter,
   Sheet,
   Skeleton,
   SuccessMoment,
@@ -51,9 +55,8 @@ import {
   type Pulse,
 } from '../pulse/index.js';
 import { PAGE_TITLES } from '../../strings.js';
-import { AddContactSheet } from './add-contact.js';
 import { ADD_CONTACT_MARKER } from './add-contact-link.js';
-import { ADD_STRINGS as A, connectingTo, daysLeft, waitingToAccept } from './add-strings.js';
+import { connectingTo } from './add-strings.js';
 import {
   LIST_PATH,
   contactPath,
@@ -64,7 +67,13 @@ import {
   type CodeAnswer,
   type ContactRow,
 } from './data.js';
-import { createInviteApi, type InviteApi } from './invite-api.js';
+import {
+  INVITES_LIST_PATH,
+  createInviteApi,
+  parseOpenInvites,
+  type InviteApi,
+  type OpenInvite,
+} from './invite-api.js';
 import { isKept, keep, loadKept } from './kept.js';
 import {
   createOwnerClient,
@@ -73,9 +82,14 @@ import {
   type PasskeyInfo,
   type PresenceProof,
 } from './owner.js';
-import { addPendingInvite, pendingInvites, type PendingInvite } from './pending-invites.js';
 import { PresencePrompt } from './presence-prompt.js';
 import { useInviteFirst } from '../home/start-here-empty.js';
+import { ConnectedMoment, type ConnectedMomentProps } from '../invite/connected.js';
+import { useOwnName } from '../invite/own-name.js';
+import { InviteScreen, PasteScreen } from '../invite/invite-screen.js';
+import { PendingInviteRow, type CancelResult } from '../invite/pending-row.js';
+import { PersonMenu } from '../invite/person-menu.js';
+import { INVITE_STRINGS as I, PASTE_STRINGS as PS } from '../invite/strings.js';
 import { START_STRINGS } from '../home/strings.js';
 import {
   CONTACTS_STRINGS as S,
@@ -545,16 +559,20 @@ function Detail({
           <ContactName {...nameInput(contact)} label={labelKind(contact)} showLabel />
         </h2>
         {pending === undefined && !renaming && !confirmRemove && !confirmOlder ? (
-          <div className="ct-actions">
-            <Button variant="ghost" size="sm" onClick={() => setRenaming(true)}>
-              {S.rename}
-            </Button>
-            {contact.status === 'revoked' ? null : (
-              <Button variant="ghost" size="sm" onClick={() => setConfirmRemove(true)}>
-                {S.remove}
-              </Button>
-            )}
-          </div>
+          <PersonMenu
+            name={name}
+            onRename={() => setRenaming(true)}
+            {...(compare
+              ? {
+                  onCheck: () => {
+                    setMismatch(false);
+                    setSkipped(false);
+                    setCodeTick((n) => n + 1);
+                  },
+                }
+              : {})}
+            {...(contact.status === 'revoked' ? {} : { onRemove: () => setConfirmRemove(true) })}
+          />
         ) : null}
       </div>
       <p className="al-text-body-sm al-muted">
@@ -670,46 +688,60 @@ function hoodFields(c: ContactRow): unknown[] {
   ];
 }
 
-const DAY_MS = 86_400_000;
+/** W4-INVITES-LIST: how long Contacts keeps following after Connect (the inviter's answer). */
+const FOLLOW_AFTER_CONNECT_MS = 120_000;
 
 /**
- * UX2-d2 (b11 §21.3, Closing): the invites created here, as pending rows: the name and the days
- * left, never the link. The newest gets the 1.2 s highlight as the sheet leaves (a colour fade only).
+ * W4-INVITES-LIST (b11 §21.3, Closing), W4-PEOPLE-INVITE (A4): the open invites the server holds,
+ * and the ones cancelled in this visit, as PendingInviteRow rows. Never a link: a lost link is
+ * cancelled and a new one made. The newest gets the 1.2 s highlight (a colour only).
  */
 function PendingInvites({
   rows,
+  cancelled,
   highlight,
   now,
+  onCancel,
 }: {
-  rows: readonly PendingInvite[];
-  highlight: number | undefined;
+  rows: readonly OpenInvite[];
+  cancelled: readonly OpenInvite[];
+  highlight: string | undefined;
   now: number;
+  onCancel: (inviteId: string) => Promise<CancelResult>;
 }): ReactElement | null {
-  if (rows.length === 0) return null;
+  const gone = cancelled.filter((c) => !rows.some((r) => r.inviteId === c.inviteId));
+  if (rows.length === 0 && gone.length === 0) return null;
+  const done = new Set(cancelled.map((c) => c.inviteId));
   return (
-    <Surface as="ul" level={1} className="ct-list ct-invites" aria-label={A.pendingLabel}>
-      {rows.map((r) => {
-        const total = Math.max(1, Math.ceil((r.expiresAt - r.createdAt) / DAY_MS));
-        const left = Math.max(0, Math.ceil((r.expiresAt - now) / DAY_MS));
-        return (
-          <li key={r.id} className={`ct-invite${r.id === highlight ? ' is-new' : ''}`}>
-            <span className="al-avatar al-text-label" aria-hidden="true">
-              <Icon name="clock" size={14} />
-            </span>
-            <span className="ct-invite-main al-text-body">{waitingToAccept(r.name)}</span>
-            <RingMeter
-              label={A.daysLeftLabel}
-              value={left}
-              max={total}
-              text={daysLeft(left)}
-              countdown
-              size="sm"
-            />
-          </li>
-        );
-      })}
+    <Surface as="ul" level={1} className="ct-list ct-invites" aria-label={I.pendingLabel}>
+      {[...gone, ...rows].map((r) => (
+        <PendingInviteRow
+          key={r.inviteId}
+          invite={r}
+          now={now}
+          cancelled={done.has(r.inviteId)}
+          highlight={r.inviteId === highlight}
+          onCancel={onCancel}
+        />
+      ))}
     </Surface>
   );
+}
+
+/** The Connected moment with your own letter (the open agent's name, read only while it shows). */
+function OwnMoment(props: Omit<ConnectedMomentProps, 'me'>): ReactElement {
+  const me = useOwnName(undefined);
+  return <ConnectedMoment {...props} me={me} />;
+}
+
+/** The newest contact that was not there before and is now paired (the Connected moment). */
+function arrival(
+  before: ReadonlySet<string>,
+  contacts: readonly ContactRow[],
+): ContactRow | undefined {
+  return contacts
+    .filter((c) => !before.has(c.ref) && c.status === 'active' && c.pairing === 'complete')
+    .sort((a, b) => b.since - a.since)[0];
 }
 
 export interface ContactsPageProps {
@@ -717,9 +749,19 @@ export interface ContactsPageProps {
   readonly api?: ApiClient;
   readonly owner?: OwnerClient;
   readonly invites?: InviteApi;
+  /** How often the page reads again while something waits (5 s; tests use less). */
+  readonly pollMs?: number;
 }
 
-/** True once, when the page was opened through the Add contact link (b11 §21.1). */
+/** W4-PEOPLE-INVITE: `?invite` opens the Invite screen; the marker leaves the address at once. */
+export const INVITE_MARKER = 'invite';
+function openedForInvite(): boolean {
+  if (typeof location === 'undefined' || location.search !== `?${INVITE_MARKER}`) return false;
+  history.replaceState(history.state, '', location.pathname + location.hash);
+  return true;
+}
+
+/** True once, when the page was opened through an older Add contact link (b11 §21.1). */
 function openedForAdd(): boolean {
   if (typeof location === 'undefined' || location.search !== `?${ADD_CONTACT_MARKER}`) return false;
   // Drop the marker at once: the address holds nothing about the sheet afterwards.
@@ -731,6 +773,7 @@ export function ContactsPage({
   api: givenApi,
   owner: givenOwner,
   invites: givenInvites,
+  pollMs = 5_000,
 }: ContactsPageProps = {}): ReactElement {
   const api = useMemo(() => givenApi ?? createApiClient(), [givenApi]);
   const owner = useMemo(() => givenOwner ?? createOwnerClient(), [givenOwner]);
@@ -742,28 +785,45 @@ export function ContactsPage({
   const [removed, setRemoved] = useState(false);
   const [kept, setKept] = useState(loadKept);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [adding, setAdding] = useState(openedForAdd);
-  const [rows, setRows] = useState<readonly PendingInvite[]>(() => pendingInvites());
-  const [highlight, setHighlight] = useState<number | undefined>(undefined);
-  const [lastCreated, setLastCreated] = useState<number | undefined>(undefined);
+  const [rows, setRows] = useState<readonly OpenInvite[]>([]);
+  const [highlight, setHighlight] = useState<string | undefined>(undefined);
+  const [justCreated, setJustCreated] = useState(false);
+  const [cancelledRows, setCancelledRows] = useState<readonly OpenInvite[]>([]);
+  // W4-WIRE: the old Add contact marker opens the Invite screen too (the sheet is no way in now).
+  const [inviting, setInviting] = useState(() => openedForInvite() || openedForAdd());
+  // The Connected moment: the contacts known before, and whether an arrival is expected (an open
+  // invite, or a pasted one that is connecting).
+  const known = useRef<ReadonlySet<string> | undefined>(undefined);
+  const expecting = useRef(false);
+  const [arrived, setArrived] = useState<ContactRow | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
-  // HOTFIX-045-CONTACTS-NEW: true while this page just started connecting to an invite.
-  const [connecting, setConnecting] = useState(false);
-  const addButtonId = useId();
   const activity = usePulse(api);
   const { activitySort } = usePrefs();
   const inviteFirst = useInviteFirst();
-  const returnFocus = useRef(false);
 
   // HOTFIX-045: one read at a time; a background read (the poll) never replaces a good list with an error.
   const inFlight = useRef(false);
   const background = useRef(false);
+  const [connectingSince, setConnectingSince] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     let live = true;
     const quiet = background.current;
     background.current = false;
     inFlight.current = true;
+    // W4-INVITES-LIST: the open invites are read wherever the contacts are; a failed read keeps
+    // the last good rows.
+    void api.get(INVITES_LIST_PATH).then(
+      (res) => {
+        if (!live || res.kind !== 'ok') return;
+        const read = parseOpenInvites(res.data);
+        if (read !== undefined) {
+          setRows(read);
+          if (read.length > 0) expecting.current = true;
+        }
+      },
+      () => undefined,
+    );
     void api
       .get(LIST_PATH)
       .then((res) => {
@@ -780,6 +840,16 @@ export function ContactsPage({
           return;
         }
         setList({ phase: 'ok', contacts: answer.contacts });
+        // A new paired contact while an invite was open (or a pasted one was connecting).
+        const before = known.current;
+        known.current = new Set(answer.contacts.map((c) => c.ref));
+        if (before !== undefined && expecting.current) {
+          const fresh = arrival(before, answer.contacts);
+          if (fresh !== undefined) {
+            expecting.current = false;
+            setArrived(fresh);
+          }
+        }
         setSelected((current) =>
           current !== undefined && answer.contacts.some((c) => c.ref === current)
             ? current
@@ -795,29 +865,26 @@ export function ContactsPage({
   }, [api, tick]);
 
   // HOTFIX-045: while anything waits for its pairing, re-read every 5 s and when the tab comes back.
-  // HOTFIX-045-CONTACTS-NEW: also while an invite from this page is open or a connect just started, so
-  // a contact that was not in the list yet appears without a reload. There is no server push for
-  // contact changes, so this polls; it stops when none of the three holds.
-  const anyPending = list.phase === 'ok' && list.contacts.some((c) => c.pairing === 'pending');
-  const watching = anyPending || rows.length > 0 || connecting;
-  // A connect that never shows a contact stops being watched after two minutes.
+  // W4-INVITES-LIST: an open invite waits too (the new contact appears when the other side accepts),
+  // and so does this page for two minutes after Connect (the pairing is not a contact until the
+  // inviter answers).
+  const connecting =
+    connectingSince !== undefined && Date.now() - connectingSince < FOLLOW_AFTER_CONNECT_MS;
+  const anyPending =
+    (list.phase === 'ok' && list.contacts.some((c) => c.pairing === 'pending')) ||
+    rows.length > 0 ||
+    connecting;
   useEffect(() => {
-    if (!connecting) return undefined;
-    const t = setTimeout(() => setConnecting(false), 120_000);
-    return () => clearTimeout(t);
-  }, [connecting]);
-  useEffect(() => {
-    if (!watching) return undefined;
+    if (!anyPending) return undefined;
     // Skips while a read is running (slow servers never pile up) and while the tab is hidden; coming
     // back fires focus and visibilitychange together, and the first one claims the single read.
     const bump = (): void => {
       if (inFlight.current || document.hidden) return;
       inFlight.current = true;
       background.current = true;
-      setRows(pendingInvites()); // lets expired invites drop out, which ends the watch
       setTick((n) => n + 1);
     };
-    const timer = setInterval(bump, 5_000);
+    const timer = setInterval(bump, pollMs);
     const onVisible = (): void => bump();
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', bump);
@@ -826,7 +893,7 @@ export function ContactsPage({
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', bump);
     };
-  }, [watching]);
+  }, [anyPending, pollMs]);
 
   useEffect(() => {
     let live = true;
@@ -837,13 +904,6 @@ export function ContactsPage({
       live = false;
     };
   }, [owner]);
-
-  // Focus goes back to Add contact when the sheet closes (b11 §21.6).
-  useEffect(() => {
-    if (adding || !returnFocus.current) return;
-    returnFocus.current = false;
-    document.getElementById(addButtonId)?.focus();
-  }, [adding]);
 
   // The highlight lasts 1.2 s (b11 §21.3); only its colour fades, so it is the same when reduced.
   useEffect(() => {
@@ -858,18 +918,19 @@ export function ContactsPage({
     setTick((n) => n + 1);
   }, []);
 
-  const openAdd = (): void => {
+  // IR-W4-WIRE-2X-1: "Have an invite link? Paste it" opens a paste screen that makes no invite.
+  const [pasting, setPasting] = useState(false);
+  const openPaste = (): void => {
     setSheetOpen(false);
     setNotice(undefined);
-    setAdding(true);
+    setInviting(false);
+    setPasting(true);
   };
-  const closeAdd = (): void => {
-    returnFocus.current = true;
-    setAdding(false);
-    setHighlight(lastCreated);
-    setLastCreated(undefined);
+  const openInvite = (): void => {
+    setSheetOpen(false);
+    setNotice(undefined);
+    setInviting(true);
   };
-
   const ready = list.phase === 'ok';
   const empty = ready && list.contacts.length === 0;
   // Start here step 2 not done yet: the empty state carries the one Add contact (b11 §27.4), and it
@@ -878,44 +939,77 @@ export function ContactsPage({
   const title = (
     <div className="ct-title-row">
       <h1 className="al-text-title-1">{PAGE_TITLES.contacts}</h1>
-      {ready && !inviteInEmpty ? (
-        <Button
-          id={addButtonId}
-          variant={empty && rows.length === 0 ? 'primary' : 'secondary'}
-          icon="user-plus"
-          onClick={openAdd}
-        >
-          {A.addContact}
-        </Button>
+      {ready ? (
+        <div className="ct-actions">
+          <Button
+            variant={inviteInEmpty ? 'secondary' : 'primary'}
+            icon="user-plus"
+            className="al-press"
+            onClick={openInvite}
+          >
+            {I.title}
+          </Button>
+          <button type="button" className="inv-link-button" onClick={openPaste}>
+            {PS.open}
+          </button>
+        </div>
       ) : null}
     </div>
   );
-  const sheet = adding ? (
-    <AddContactSheet
-      invites={invites}
-      passkey={passkey}
-      onCreated={(name, expiresAt) => {
-        const row = addPendingInvite(name, expiresAt);
-        setRows(pendingInvites());
-        setLastCreated(row.id);
-      }}
-      onConnected={(name) => {
-        returnFocus.current = true;
-        setAdding(false);
-        setNotice(connectingTo(name));
-        setConnecting(true);
-        setTick((n) => n + 1);
-      }}
-      onClose={closeAdd}
-    />
-  ) : null;
+  // W4-WIRE-2 (Decision 52 (3)): the Add contact sheet is retired. Invite someone opens the Invite
+  // screen, and its "Have an invite link? Paste it" accepts an invite someone sent.
+  const accepted = (name: string): void => {
+    setInviting(false);
+    setPasting(false);
+    setNotice(connectingTo(name));
+    setConnectingSince(Date.now());
+    expecting.current = true;
+    setTick((n) => n + 1);
+  };
   const status =
     notice === undefined ? null : (
       <p className="al-text-body" role="status">
         {notice}
       </p>
     );
-  const invitesList = <PendingInvites rows={rows} highlight={highlight} now={Date.now()} />;
+  const cancelInvite = async (inviteId: string): Promise<CancelResult> => {
+    const outcome = await invites.cancel(inviteId);
+    if (outcome.kind === 'cancelled') {
+      const row = rows.find((r) => r.inviteId === inviteId);
+      if (row !== undefined) setCancelledRows((list) => [...list, row]);
+      setTick((n) => n + 1);
+      return 'cancelled';
+    }
+    if (outcome.kind === 'not_found') {
+      setTick((n) => n + 1);
+      return 'gone';
+    }
+    return 'failed';
+  };
+  const invitesList = (
+    <PendingInvites
+      rows={rows}
+      cancelled={cancelledRows}
+      highlight={highlight}
+      now={Date.now()}
+      onCancel={cancelInvite}
+    />
+  );
+  const moment =
+    arrived === undefined ? null : (
+      <div className="inv-connected-card">
+        <OwnMoment
+          name={shownName(arrived)}
+          contactRef={arrived.ref}
+          api={api}
+          headingLevel={2}
+          onDone={() => {
+            setArrived(undefined);
+            setSelected(arrived.ref);
+          }}
+        />
+      </div>
+    );
 
   const page = ((): ReactElement => {
     if (list.phase === 'not_set_up') {
@@ -959,8 +1053,13 @@ export function ContactsPage({
                 title={START_STRINGS.emptyContacts}
                 prompt={S.emptyPrompt}
                 action={
-                  <Button id={addButtonId} variant="primary" icon="user-plus" onClick={openAdd}>
-                    {A.addContact}
+                  <Button
+                    variant="primary"
+                    icon="user-plus"
+                    className="al-press"
+                    onClick={openInvite}
+                  >
+                    {START_STRINGS.addContact}
                   </Button>
                 }
               />
@@ -1014,7 +1113,6 @@ export function ContactsPage({
             onSelect={(ref) => {
               setRemoved(false);
               setSelected(ref);
-              setAdding(false);
               setSheetOpen(true);
             }}
           />
@@ -1045,10 +1143,54 @@ export function ContactsPage({
     );
   })();
 
+  if (pasting) {
+    return (
+      <>
+        {arrived === undefined ? (
+          <PasteScreen
+            invites={invites}
+            passkey={passkey}
+            onConnected={accepted}
+            onDone={() => setPasting(false)}
+          />
+        ) : (
+          moment
+        )}
+      </>
+    );
+  }
+
+  if (inviting) {
+    // The Invite screen in place of the list (A5). Done (or Home) brings the list back, with the
+    // new pending row read from the server.
+    return (
+      <>
+        {arrived === undefined ? (
+          <InviteScreen
+            invites={invites}
+            paste={{ passkey, onConnected: accepted, onOpen: openPaste }}
+            onCreated={() => {
+              expecting.current = true;
+              setJustCreated(true);
+            }}
+            onDone={() => {
+              setInviting(false);
+              setHighlight(justCreated ? rows[0]?.inviteId : undefined);
+              setJustCreated(false);
+              setTick((n) => n + 1);
+            }}
+          />
+        ) : (
+          moment
+        )}
+      </>
+    );
+  }
+
   return (
     <>
+      {moment}
       {page}
-      {sheet}
     </>
   );
 }

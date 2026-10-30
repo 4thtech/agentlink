@@ -23,6 +23,9 @@
 // - Passes never overlap: one at a time per follower (and one follower per open agent).
 // - `passing` is true during a pass, so the app shows the agent as its own, not as "Running" in an
 //   AI app, while the host briefly holds the lease row.
+// - W4-PAUSE (D-143 (5); 06 §6 "Paused agents"; 08 §1 "What stops"): a paused agent gets no pass:
+//   the pause row is read first, before the lease is taken, and a row that cannot be read counts as
+//   paused (fail closed). The answer is `paused`; nothing is fetched, processed or published.
 // - Never throws and logs nothing: a failed pass only means the next one tries again (I-5, I-7: no
 //   error text, relay URL or holder ID leaves here).
 
@@ -31,11 +34,20 @@ export interface PairingFollowClient {
   publisherLease(): { take(): Promise<boolean>; release(): Promise<boolean> };
   syncInbox(options?: { readonly budgetMs?: number }): Promise<unknown>;
   readonly outbox: { processDue(): Promise<unknown> };
-  readonly pairing: { waiting(): Promise<boolean> };
+  readonly pairing: {
+    waiting(): Promise<boolean>;
+    /** W4-SHORT-INVITE (04 §3.6.2): deletes drop objects of completed, cancelled or expired invites. */
+    sweepInviteObjects?(): Promise<void>;
+  };
+  /** W4-PAUSE: whether the owner paused the agent (core `paused`). Absent: never paused. */
+  paused?(): Promise<boolean>;
 }
 
-/** `ran`: one pass under the lease; `held`: another process holds it; `busy` / `soon`: skipped. */
-export type PairingFollowResult = 'ran' | 'held' | 'busy' | 'soon';
+/**
+ * `ran`: one pass under the lease; `held`: another process holds it; `busy` / `soon`: skipped;
+ * `paused` (W4-PAUSE): the owner paused the agent, so nothing ran.
+ */
+export type PairingFollowResult = 'ran' | 'held' | 'busy' | 'soon' | 'paused';
 
 export interface PairingFollowOptions {
   /** The clock in milliseconds. */
@@ -91,6 +103,14 @@ export function pairingFollower(
     try {
       await client.syncInbox({ budgetMs });
       await client.outbox.processDue();
+      // W4-SHORT-INVITE (O-L3): the drop-object sweep runs in the background, never holding the
+      // pass or the lease (core dedupes a sweep in flight). A failed DELETE is retried with backoff
+      // on a later pass; nothing is logged (I-7).
+      try {
+        client.pairing.sweepInviteObjects?.().catch(() => undefined);
+      } catch {
+        // A sweep that throws synchronously is the same as one that failed.
+      }
     } catch {
       // The next pass tries again.
     } finally {
@@ -100,10 +120,21 @@ export function pairingFollower(
     return 'ran';
   };
 
+  /** W4-PAUSE: fail closed; a client without the read is never paused. */
+  const paused = async (): Promise<boolean> => {
+    if (client.paused === undefined) return false;
+    try {
+      return await client.paused();
+    } catch {
+      return true;
+    }
+  };
+
   const run = async (due: () => Promise<boolean>): Promise<PairingFollowResult> => {
     if (inFlight) return 'busy';
     inFlight = true;
     try {
+      if (await paused()) return 'paused';
       if (!(await due())) return 'soon';
       lastAt = options.nowMs();
       return await pass();

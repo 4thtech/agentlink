@@ -13,6 +13,7 @@
 import {
   KeyStoreError,
   encodeHex0x,
+  type JsonObject,
   type NostrEvent,
   type OwnerPublicKeys,
   type OwnerSession,
@@ -60,6 +61,26 @@ export interface FirstAgentCard {
    * same gesture (owner-first-label.ts). Omitted: no label is signed (the folder name is shown).
    */
   readonly firstLabel?: FirstLabel;
+  /**
+   * W4-ONE-TOUCH (D-140; 04 §2.8 "Create an agent and connect its AI app with one gesture"): the
+   * agent's first `app.connect`, fixed at begin, signed last in the same gesture and only after the
+   * card, the rules (when given) and the label are stored and verified. Omitted: no app is connected.
+   */
+  readonly firstConnect?: FirstConnect;
+  /**
+   * W4-ONE-TOUCH: the plan fixed at begin (owner-add-agent-plan.ts): the ordered unsigned bodies the
+   * one gesture may sign. With it, the owner session signs exactly these bodies, in order, each once
+   * and byte for byte, and refuses anything else (the restricted session of 04 §2.8).
+   */
+  readonly plan?: readonly JsonObject[];
+}
+
+/** W4-ONE-TOUCH: the first `app.connect` of an agent created on the same screen (04 §2.8). */
+export interface FirstConnect {
+  /** The unsigned `app.connect` body fixed at begin (04 §2.5.1), for exactly this agent. */
+  readonly body: JsonObject;
+  /** Verifies, nonce-checks and stores one SignedOwnerAction in this agent's store (core apply). */
+  apply(input: object): Promise<OwnerActionOutcome>;
 }
 
 /** What the first rules need of core's OwnerActions (`client.ownerActions`). */
@@ -73,6 +94,11 @@ export interface FirstPolicyActions {
    * the first rules (first run with a name, Add an agent). Absent: no first label can be signed.
    */
   prepareLabel?(label: string): Promise<PreparedOwnerAction>;
+  /**
+   * W4-ONE-TOUCH (04 §2.8 "Failure in the middle"): records a stored `app.connect` as not applied
+   * (core `markAppNotApplied`) when its config entry could not be written. Absent: not recorded.
+   */
+  markAppNotApplied?(app: string, nonce: string): Promise<boolean>;
 }
 
 /** U3-d: the first-label actions of `actions`, when it can prepare one (core OwnerActions can). */
@@ -92,6 +118,11 @@ export interface FirstPolicy {
   readonly actions: FirstPolicyActions;
   /** The home folder the Send folder is created in; default the OS user's (tests only). */
   readonly home?: string;
+  /**
+   * W4-ONE-TOUCH: the unsigned first `policy.set` fixed at begin. With it, exactly this body is
+   * signed (after the same checks), never a newly prepared one.
+   */
+  readonly body?: JsonObject;
 }
 
 /**

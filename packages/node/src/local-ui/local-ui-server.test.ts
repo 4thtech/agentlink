@@ -378,7 +378,8 @@ describe('the app pages and the existing approval page (M1-11s-b)', () => {
       '/first-run/x',
       '/first-run/',
       '/approvals',
-      '/activity',
+      // W4-SHELL-V2: /activity is a page now (ui-settings-server.test.ts); nothing beside it is.
+      '/activityx',
       '/favicon.ico',
     ]) {
       const res = await send(h.port, path, { headers: { Cookie: cookie } });
@@ -917,6 +918,10 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
       'agentId',
       // U3-f: the unsigned app.connect / app.disconnect (prepare only).
       'apps',
+      // W4-AUTO-SAVE: the one-time notice (display state only).
+      'autoSaveNotice',
+      // W4-RENAME-REACHES-CONTACTS: the former-name note's seen mark only (display state).
+      'contactNames',
       'contacts',
       'files',
       'filesIo',

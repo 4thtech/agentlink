@@ -13,7 +13,8 @@ import { PAY_CONFIRM_STRINGS as P } from '@4thtech-io/ui';
 import { createPayConfirmClient } from '../../pay-confirm/index.js';
 import { AppRoutes } from '../../router.js';
 import { ApprovePage } from '../approve/index.js';
-import { ApprovalsPage, type ApprovalsPageProps } from './index.js';
+import { ApprovalsBoard } from './board.js';
+import type { ApprovalsPageProps } from './index.js';
 import { createApprovalsClient } from './client.js';
 import { APPROVAL_STRINGS as S } from './strings.js';
 
@@ -156,7 +157,7 @@ async function mount(answers: Record<string, Answer[]>, over: Partial<ApprovalsP
   const payConfirm = createPayConfirmClient({ fetch: srv.fetch, token: 't0ken' });
   act(() =>
     root.render(
-      createElement<ApprovalsPageProps>(ApprovalsPage, {
+      createElement<ApprovalsPageProps>(ApprovalsBoard, {
         client,
         payConfirm,
         canPasskey: false,
@@ -464,7 +465,7 @@ describe('one request: its own Approve or Deny, then presence', () => {
     });
     act(() =>
       root.render(
-        createElement<ApprovalsPageProps>(ApprovalsPage, {
+        createElement<ApprovalsPageProps>(ApprovalsBoard, {
           client: createApprovalsClient({ fetch: srv.fetch, token: 't', credentials }),
           canPasskey: true,
         }),
@@ -495,7 +496,7 @@ describe('one request: its own Approve or Deny, then presence', () => {
 });
 
 describe('/approve/<id>: the deep link renders inside the app shell', () => {
-  it('the router shows the one request with Approvals current in the sidebar', async () => {
+  it('the router shows the one request with Home current in the section menu (W4-SHELL-V2)', async () => {
     const srv = server({
       [PASSKEY]: [PASSKEY_NONE],
       [`/api/approvals/${id('A')}`]: [ok({ approval: item('A') })],
@@ -506,7 +507,9 @@ describe('/approve/<id>: the deep link renders inside the app shell', () => {
     await flush();
     expect(srv.calls.some((c) => c.url === `/api/approvals/${id('A')}`)).toBe(true);
     expect(cardOf('A')?.querySelector('h2')?.textContent).toBe('Headline A');
-    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Approvals');
+    expect(
+      host.querySelector('nav.al-rail a[aria-current="page"]')?.getAttribute('aria-label'),
+    ).toBe('Home');
     expect(host.querySelector('main h1')?.textContent).toBe(S.appTitle);
   });
 

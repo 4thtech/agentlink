@@ -14,13 +14,16 @@
 // agent's own card. No MCP tool calls these helpers or returns a prepared body.
 import { canonicalize, encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import {
+  AUTO_SAVE_DEFAULTS,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   PROTOCOL_VERSION,
   compareUsd,
   ownerActionSchema,
   type PolicyRule,
   type AgentLabelParams,
+  type AgentResumeParams,
   type AppChangeParams,
+  type FileSaveParams,
   type ContactCheckParams,
   type ContactRule,
   type ContactRemoveParams,
@@ -46,7 +49,9 @@ export type PreparableOp =
   | 'contact.remove'
   | 'agent.label'
   | 'app.connect'
-  | 'app.disconnect';
+  | 'app.disconnect'
+  | 'agent.resume'
+  | 'file.save';
 
 const PREPARABLE: readonly string[] = [
   'policy.set',
@@ -58,6 +63,10 @@ const PREPARABLE: readonly string[] = [
   // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
   'app.connect',
   'app.disconnect',
+  // W4-PAUSE (D-143 (5)): the owner resumes a paused agent from the local app.
+  'agent.resume',
+  // W4-FILES-SAVE: the owner saves one received file into the Inbox folder from the local app.
+  'file.save',
 ];
 
 interface ParamsOf {
@@ -68,6 +77,8 @@ interface ParamsOf {
   readonly 'agent.label': AgentLabelParams;
   readonly 'app.connect': AppChangeParams;
   readonly 'app.disconnect': AppChangeParams;
+  readonly 'agent.resume': AgentResumeParams;
+  readonly 'file.save': FileSaveParams;
 }
 
 export interface OwnerActionBodyInput<O extends PreparableOp = PreparableOp> {
@@ -145,7 +156,11 @@ export type PrepareRefusal =
   /** U3-d: the label is not 1 to 32 code points already in its own restricted form (06 §2.1). */
   | 'label_invalid'
   /** U3-f: the app is not in the fixed table, or `changeId` is not 64 lowercase hex. */
-  | 'change_invalid';
+  | 'change_invalid'
+  /** W4-PAUSE: Resume for an agent that is not paused (refused before the gesture). */
+  | 'not_paused'
+  /** W4-FILES-SAVE: not a received item ID `<envelope ID>.<index>` (index 00 to 15). */
+  | 'item_invalid';
 
 export type PreparedOwnerAction =
   | {
@@ -276,6 +291,9 @@ export function mergePolicyPatch(base: Policy, patch: PolicyPatch): Policy {
       into[field] = clone(v);
     }
   }
+  // D-142 (06 §3): every policy.set this core signs carries `files.autoSave`; a base signed before
+  // D-142 has none and is read with the defaults, so the complete document gets them.
+  if (out.files.autoSave === undefined) out.files.autoSave = clone(AUTO_SAVE_DEFAULTS);
   return out;
 }
 
@@ -402,6 +420,15 @@ export const CONTACT_RULE_FIELD_LOOSENING: {
         ),
     },
   },
+  // D-142: "Ask before saving" turned off for a contact: its files are saved automatically again.
+  files: {
+    code: 'limits_raised',
+    fields: {
+      askBeforeSaving: (b, n, c) =>
+        ruleOf(b, c)?.files?.askBeforeSaving === true &&
+        ruleOf(n, c)?.files?.askBeforeSaving !== true,
+    },
+  },
   receipts: {
     code: 'contact_receipts_public',
     fields: {
@@ -487,6 +514,20 @@ export const POLICY_FIELD_LOOSENING: {
       'files.defaultExpiryDays',
       (p) => p.files.defaultExpiryDays,
     ),
+    // D-142: turning auto-save on or raising one of its limits lets contacts put more on the disk
+    // without a gesture. A policy signed before D-142 reads as the defaults.
+    autoSave: (b, n) => {
+      const was = b.files.autoSave ?? AUTO_SAVE_DEFAULTS;
+      const now = n.files.autoSave ?? AUTO_SAVE_DEFAULTS;
+      return when(
+        (now.on && !was.on) ||
+          now.perContactFilesPerDay > was.perContactFilesPerDay ||
+          now.perContactMBPerDay > was.perContactMBPerDay ||
+          now.totalFilesPerDay > was.totalFilesPerDay ||
+          now.totalMBPerDay > was.totalMBPerDay,
+        { code: 'limits_raised', fields: ['files.autoSave'] },
+      );
+    },
     deleteAfter: (b, n) =>
       when(b.files.deleteAfter === 'receipt' && n.files.deleteAfter === 'expiry', {
         code: 'retention_longer',

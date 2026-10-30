@@ -25,6 +25,8 @@ import {
 } from './apps-api.js';
 import { FirstRunPage, type FirstRunPageProps } from './index.js';
 import { CONNECT, NAME, PICK, SETUP_MESSAGES, WELCOME } from './strings.js';
+import { resetAutoShown, resetWizard } from '../start/store.js';
+import { CONNECTED_STEP, CONNECT_STEP, PICK_STEP } from '../start/strings.js';
 import { encodeRegistration } from './passkey.js';
 import {
   createSetupApi,
@@ -102,31 +104,46 @@ afterEach(() => {
 
 interface SetupCalls {
   begun: string[];
-  finished: { label: string; body: Uint8Array }[];
+  /** W4-ONE-TOUCH: the app each begin carried (undefined: none, "Not now"). */
+  apps: (string | undefined)[];
+  finished: { nonce: string; body: Uint8Array }[];
   checked: string[];
 }
+
+/** W4-ONE-TOUCH: the begin nonce the fake server answers. */
+const NONCE = 'N'.repeat(43);
 
 function fakeSetup(
   o: {
     check?: (label: string) => 'ok' | 'refused';
     status?: StatusResult;
     finish?: FinishResult;
+    /** W4-ONE-TOUCH: whether the app's entry is written (false: created_not_connected). */
+    connected?: boolean;
   } = {},
 ): SetupApi & SetupCalls {
-  const calls: SetupCalls = { begun: [], finished: [], checked: [] };
+  const calls: SetupCalls = { begun: [], apps: [], finished: [], checked: [] };
+  let picked: string | undefined;
   return Object.assign(calls, {
     status: () => Promise.resolve(o.status ?? ({ kind: 'ok', owner: 'missing' } as StatusResult)),
     labelCheck: (label: string) => {
       calls.checked.push(label);
       return Promise.resolve({ kind: o.check?.(label) ?? 'ok' } as const);
     },
-    begin: (label: string): Promise<BeginResult> => {
+    begin: (label: string, app?: string): Promise<BeginResult> => {
       calls.begun.push(label);
-      return Promise.resolve({ kind: 'ready', publicKey: VALUES });
+      calls.apps.push(app);
+      picked = app;
+      return Promise.resolve({ kind: 'ready', publicKey: VALUES, nonce: NONCE });
     },
-    finish: (body: Uint8Array, label: string): Promise<FinishResult> => {
-      calls.finished.push({ label, body: body.slice() });
-      return Promise.resolve(o.finish ?? FINISHED);
+    finish: (body: Uint8Array, nonce: string): Promise<FinishResult> => {
+      calls.finished.push({ nonce, body: body.slice() });
+      const done = o.finish ?? FINISHED;
+      return Promise.resolve(
+        picked === undefined || done.kind !== 'done'
+          ? done
+          : { ...done, app: picked, connected: o.connected ?? true },
+      );
     },
   });
 }
@@ -180,6 +197,9 @@ async function mount(
   extra: Partial<FirstRunPageProps> = {},
 ): Promise<{ home: ReturnType<typeof vi.fn> }> {
   const home = vi.fn();
+  resetWizard();
+  resetAutoShown();
+  history.replaceState(null, '', '/start/app');
   await act(async () => {
     const props: FirstRunPageProps = {
       api: setup,
@@ -190,6 +210,7 @@ async function mount(
       prfSupport: () => Promise.resolve('yes'),
       passkeyProof: () => Promise.resolve({ kind: 'passkey', body: new Uint8Array([1, 2, 3]) }),
       goHome: home,
+      readJoin: () => Promise.resolve({ kind: 'failed' }),
       ...extra,
     };
     root.render(h(FirstRunPage as ComponentType<FirstRunPageProps>, props));
@@ -213,9 +234,11 @@ async function click(name: string): Promise<void> {
   });
 }
 async function settle(): Promise<void> {
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 0));
-  });
+  for (let i = 0; i < 3; i++) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
 }
 function field(): HTMLInputElement {
   const input = host.querySelector<HTMLInputElement>('input[type="text"]');
@@ -230,77 +253,37 @@ async function type(value: string): Promise<void> {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
-async function pickRadio(name: string): Promise<void> {
-  const label = [...host.querySelectorAll('label')].find((l) => l.textContent?.includes(name));
-  const radio = label?.querySelector<HTMLInputElement>('input[type="radio"]');
-  if (radio === undefined || radio === null) throw new Error(`no radio ${name}`);
-  await act(async () => {
-    radio.click();
-  });
-}
-
-describe('U3-g: Welcome (b11 §28.1)', () => {
-  it('shows one sentence and one primary button while no owner exists, and calls nothing yet', async () => {
+// W4-WIZARD: first run is Get started (pages/start). Step 1 picks the app with tiles (no Welcome
+// screen, no radio list); step 2 is "Confirm it's you" with the name behind "Change name"; step 3 is
+// Connected. start/wizard.dom.test.ts covers the frame and the steps; these keep the U3-g and
+// W4-ONE-TOUCH rules on the new screens.
+describe('W4-WIZARD (was U3-g Welcome and pick): step 1', () => {
+  it('opens on the app pick while no owner exists, and calls nothing yet', async () => {
     const setup = fakeSetup();
-    const apps = fakeApps();
-    await mount(setup, apps);
-    expect(host.querySelector('h1')?.textContent).toBe(
-      'Private messages between AI agents. Only you and your contact can read them.',
-    );
+    await mount(setup, fakeApps());
+    await settle();
+    expect(h1()).toBe(PICK_STEP.title);
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
-    expect(button('Get started').className).toContain('al-btn-primary');
     expect(setup.begun).toEqual([]);
-    const link = [...host.querySelectorAll('a')].find((a) => a.textContent === "What's AgentLink?");
-    expect(link?.getAttribute('target')).toBe('_blank');
-    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
-    expect(link?.getAttribute('href')).toMatch(/^https:\/\//);
+    expect(setup.checked).toEqual([]);
   });
 
-  it('is not shown when an owner exists', async () => {
-    await mount(fakeSetup({ status: { kind: 'ok', owner: 'set_up' } }), fakeApps());
-    expect(h1()).not.toContain('Private messages');
-    expect(buttonNames()).not.toContain('Get started');
-  });
-});
-
-describe('U3-g: pick your AI app (b11 §28.2)', () => {
-  it('lists the found apps as a radio group, the first preselected, "I\'ll choose later" last', async () => {
+  it('lists the found apps first ("Found on this Mac"), then the known ones not found yet', async () => {
     await mount(fakeSetup(), fakeApps());
-    await click('Get started');
     await settle();
-    expect(h1()).toBe('Which AI app will you use?');
-    const group = host.querySelector('[role="radiogroup"]');
-    expect(group).not.toBeNull();
-    const radios = [...host.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
-    expect(
-      radios.map((r) => r.closest('label')?.querySelector('.fr-app-name')?.textContent),
-    ).toEqual(['Claude Code', 'Claude Desktop', 'Codex', "I'll choose later"]);
-    expect(radios.map((r) => r.checked)).toEqual([true, false, false, false]);
-    expect(text().match(/Found/g)).toHaveLength(3);
-    expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
-    expect(button('Continue').className).toContain('al-btn-primary');
+    const names = [...host.querySelectorAll('.st-tile-name')].map((n) => n.textContent);
+    expect(names).toEqual(['Claude Code', 'Claude Desktop', 'Codex', 'Cursor']);
+    expect(text().match(/Found on this Mac/g)).toHaveLength(3);
+    expect(button(PICK_STEP.next('Claude Code')).className).toContain('al-btn-primary');
   });
 
-  it('says so when none is found and still goes on', async () => {
-    await mount(fakeSetup(), fakeApps({ list: { kind: 'ok', apps: [], desktopRunning: false } }));
-    await click('Get started');
-    await settle();
-    expect(text()).toContain('No AI app found yet. You can connect one later.');
-    expect(host.querySelector('[role="radiogroup"]')).toBeNull();
-    await click('Continue');
-    expect(h1()).toBe('Set up your agent');
-    expect(field().value).toBe('My agent');
-  });
-
-  it('handles the look being unavailable or failing: a plain line and Continue enabled', async () => {
+  it('handles the look being unavailable or failing: a plain line, and the tiles still work', async () => {
     for (const list of [{ kind: 'not_available' }, { kind: 'failed' }] as const) {
+      resetWizard();
       await mount(fakeSetup(), fakeApps({ list }));
-      await click('Get started');
       await settle();
-      expect(text()).toContain("Couldn't look for AI apps. You can connect one later.");
-      expect(button('Continue').disabled).toBe(false);
-      await click('Continue');
-      expect(field().value).toBe('My agent');
+      expect(text()).toContain(PICK_STEP.lookFailed);
+      expect(button(PICK_STEP.next('Claude Code')).disabled).toBe(false);
       act(() => root.unmount());
       root = createRoot(host);
     }
@@ -312,22 +295,13 @@ describe('U3-g: pick your AI app (b11 §28.2)', () => {
       fakeSetup(),
       fakeApps({ list: { kind: 'ok', apps: [hostile], desktopRunning: false } }),
     );
-    await click('Get started');
     await settle();
     expect(host.querySelector('img')).toBeNull();
     expect(text()).toContain('<img src=x onerror=alert(1)>');
   });
-
-  it('Back returns to Welcome', async () => {
-    await mount(fakeSetup(), fakeApps());
-    await click('Get started');
-    await settle();
-    await click('Back');
-    expect(button('Get started')).toBeDefined();
-  });
 });
 
-describe('U3-g: name and protect on one screen (b11 §28.3)', () => {
+describe('W4-WIZARD (was U3-g name and protect): step 2', () => {
   const toName = async (
     setup = fakeSetup(),
     apps = fakeApps(),
@@ -338,73 +312,46 @@ describe('U3-g: name and protect on one screen (b11 §28.3)', () => {
     home: ReturnType<typeof vi.fn>;
   }> => {
     const { home } = await mount(setup, apps, extra);
-    await click('Get started');
     await settle();
-    await click('Continue');
+    await click(PICK_STEP.next('Claude Code'));
+    await settle();
+    await click(CONNECT_STEP.rename);
     return { setup, apps, home };
   };
+  const GO = CONNECT_STEP.connect('Touch ID');
 
-  it('prefills "{App} agent" from the chosen app, selected, with Touch ID as the one primary', async () => {
+  it('suggests "{App} agent" from the chosen app, with Touch ID as the one primary', async () => {
     await toName();
-    expect(h1()).toBe('Set up your agent');
+    expect(h1()).toBe(CONNECT_STEP.title);
     expect(field().value).toBe('Claude Code agent');
-    expect(host.querySelector('label')?.textContent).toBe('Name your agent');
+    expect([...host.querySelectorAll('label')].map((l) => l.textContent)).toContain(
+      'Name your agent',
+    );
     expect(text()).toContain('Shown to you and your contacts.');
-    expect(text()).toContain('Claude Code');
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
-    expect(button('Use Touch ID').className).toContain('al-btn-primary');
+    expect(button(GO).className).toContain('al-btn-primary');
     expect(buttonNames()).toContain('Use a backup code instead');
-    expect(buttonNames()).toContain('Change');
-  });
-
-  it('follows the app until the person edits the name; an edited name is never overwritten', async () => {
-    await toName();
-    await click('Change');
-    await pickRadio('Codex');
-    await click('Continue');
-    expect(field().value).toBe('Codex agent');
-    await type('Work agent');
-    await click('Change');
-    await pickRadio('Claude Desktop');
-    await click('Continue');
-    expect(field().value).toBe('Work agent');
-  });
-
-  it('"I\'ll choose later" suggests "My agent"', async () => {
-    await mount(fakeSetup(), fakeApps());
-    await click('Get started');
-    await settle();
-    await pickRadio("I'll choose later");
-    await click('Continue');
-    expect(field().value).toBe('My agent');
   });
 
   it('Back keeps the typed name', async () => {
     await toName();
     await type('Home base');
-    await click('Back');
-    await click('Continue');
-    expect(field().value).toBe('Home base');
-  });
-
-  it('refuses an empty name inline and starts nothing', async () => {
-    const { setup } = await toName();
-    await type('   ');
-    await click('Use Touch ID');
-    expect(text()).toContain('Give your agent a name.');
-    expect(setup.checked).toEqual([]);
-    expect(setup.begun).toEqual([]);
+    await click(CONNECT_STEP.back);
+    await settle();
+    await click(PICK_STEP.next('Claude Code'));
+    await settle();
+    expect(text()).toContain('Home base');
   });
 
   it('refuses more than 32 code points before asking the server', async () => {
     const { setup } = await toName();
     await type('a'.repeat(33));
-    await click('Use Touch ID');
+    await click(GO);
     expect(setup.begun).toEqual([]);
     expect(host.querySelector('[role="alert"], .is-error')).not.toBeNull();
     // 32 code points (emoji count once) pass the local check.
     await type('😀'.repeat(32));
-    await click('Use Touch ID');
+    await click(GO);
     expect(setup.checked).toEqual(['😀'.repeat(32)]);
   });
 
@@ -414,7 +361,7 @@ describe('U3-g: name and protect on one screen (b11 §28.3)', () => {
       createPasskey: created,
     });
     await type('Work  agent');
-    await click('Use Touch ID');
+    await click(GO);
     expect(setup.checked).toEqual(['Work  agent']);
     expect(setup.begun).toEqual([]);
     expect(created).not.toHaveBeenCalled();
@@ -422,16 +369,33 @@ describe('U3-g: name and protect on one screen (b11 §28.3)', () => {
     expect(text()).toContain("That name can't be used.");
   });
 
-  it('one gesture: check, begin and finish carry the same trimmed label; the browser sends the creation response only', async () => {
+  it('one gesture: check and begin carry the trimmed label and the app; finish only the nonce and the creation response', async () => {
     const { setup } = await toName();
     await type('  Personal  ');
-    await click('Use Touch ID');
+    await click(GO);
     expect(setup.checked).toEqual(['Personal']);
     expect(setup.begun).toEqual(['Personal']);
+    expect(setup.apps).toEqual(['claude-code']);
     expect(setup.finished).toHaveLength(1);
-    expect(setup.finished[0]?.label).toBe('Personal');
+    expect(setup.finished[0]?.nonce).toBe(NONCE);
     expect(setup.finished[0]?.body).toEqual(BODY);
     expect(h1()).toBe('Your backup code');
+  });
+
+  it('W4-ONE-TOUCH: Claude Desktop running refuses before the gesture, in plain words; nothing is created', async () => {
+    const setup = fakeSetup();
+    setup.begin = (label: string, appId?: string): Promise<BeginResult> => {
+      setup.begun.push(label);
+      setup.apps.push(appId);
+      return Promise.resolve({ kind: 'error', problem: 'quit_first' });
+    };
+    const created = vi.fn<() => Promise<{ kind: 'cancelled' }>>();
+    await toName(setup, fakeApps(), { createPasskey: created });
+    await click(GO);
+    expect(text()).toContain('Quit Claude Desktop first.');
+    expect(created).not.toHaveBeenCalled();
+    expect(setup.finished).toHaveLength(0);
+    expect(buttonNames()).toContain('Try again');
   });
 
   it('Enter in the field does not submit; focus moves to the button', async () => {
@@ -442,7 +406,7 @@ describe('U3-g: name and protect on one screen (b11 §28.3)', () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     });
     expect(setup.begun).toEqual([]);
-    expect(document.activeElement).toBe(button('Use Touch ID'));
+    expect(document.activeElement).toBe(button(GO));
   });
 
   it('a cancelled Touch ID says "Not protected yet. Try again." and keeps the text', async () => {
@@ -450,7 +414,7 @@ describe('U3-g: name and protect on one screen (b11 §28.3)', () => {
       createPasskey: () => Promise.resolve({ kind: 'cancelled' }),
     });
     await type('Mine');
-    await click('Use Touch ID');
+    await click(GO);
     expect(text()).toContain('Not protected yet. Try again.');
     expect(field().value).toBe('Mine');
     expect(setup.finished).toHaveLength(0);
@@ -465,36 +429,61 @@ describe('U3-g: name and protect on one screen (b11 §28.3)', () => {
   });
 });
 
-describe('U3-g: the end of first run (b11 §28.3, §28.4)', () => {
-  async function toBackupCode(apps: AppsApi, setup = fakeSetup(), extra = {}) {
+describe('W4-WIZARD (was U3-g the end of first run): step 3 and E1', () => {
+  const GO = CONNECT_STEP.connect('Touch ID');
+  async function toBackupCode(apps: AppsApi, setup = fakeSetup({ connected: false }), extra = {}) {
     const { home } = await mount(setup, apps, extra);
-    await click('Get started');
     await settle();
-    await click('Continue');
-    await click('Use Touch ID');
+    await click(PICK_STEP.next('Claude Code'));
+    await settle();
+    await click(GO);
     expect(h1()).toBe('Your backup code');
     return { home, setup };
   }
-
-  it('with no app chosen, "I saved it" lands on Home and remembers the kit as later', async () => {
-    const { home } = await mount(
-      fakeSetup(),
-      fakeApps({ list: { kind: 'ok', apps: [], desktopRunning: false } }),
-    );
-    await click('Get started');
-    await settle();
-    await click('Continue');
-    await click('Use Touch ID');
+  /** E1: the not-connected step, then Connect (the signed AI apps step). */
+  async function toConnect(apps: AppsApi, extra = {}): Promise<ReturnType<typeof vi.fn>> {
+    const { home } = await toBackupCode(apps, fakeSetup({ connected: false }), extra);
     await click('I saved it');
+    await settle();
+    await click(CONNECTED_STEP.connect('Claude Code'));
+    await settle();
+    return home;
+  }
+
+  it('W4-ONE-TOUCH: connected in the same gesture: Connected to Claude Code, no second signed step', async () => {
+    const apps = fakeApps();
+    const { home } = await toBackupCode(apps, fakeSetup());
+    await click('I saved it');
+    await settle();
+    expect(h1()).toBe(CONNECTED_STEP.title('Claude Code'));
+    expect(text()).toContain(CONNECTED_STEP.restart('Claude Code'));
+    expect(apps.previews).toEqual([]);
+    expect(apps.applied).toEqual([]);
+    await click(CONNECTED_STEP.home);
     expect(home).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem(RECOVERY_KIT_LATER_KEY)).toMatch(/^[0-9]+$/);
   });
 
-  it('with an app chosen, "I saved it" opens "Connect your AI app" with the exact entry', async () => {
+  it('E1 created_not_connected: "{label} is ready", Connect, and Go to Home writes nothing', async () => {
     const apps = fakeApps();
     const { home } = await toBackupCode(apps);
     await click('I saved it');
     await settle();
+    expect(h1()).toBe(CONNECTED_STEP.notConnectedTitle('Claude Code agent'));
+    expect(buttonNames()).toContain(CONNECTED_STEP.connect('Claude Code'));
+    await click(CONNECTED_STEP.home);
+    expect(apps.applied).toEqual([]);
+    expect(home).toHaveBeenCalledTimes(1);
+  });
+
+  it('"I saved it" remembers the kit as later', async () => {
+    await toBackupCode(fakeApps());
+    await click('I saved it');
+    expect(localStorage.getItem(RECOVERY_KIT_LATER_KEY)).toMatch(/^[0-9]+$/);
+  });
+
+  it('E1 Connect shows the exact entry before anything is written', async () => {
+    const apps = fakeApps();
+    const home = await toConnect(apps);
     expect(apps.previews).toEqual([['claude-code', 'default']]);
     expect(h1()).toBe('Connect Claude Code to Claude Code agent');
     expect(text()).toContain("This adds one entry to Claude Code's settings.");
@@ -513,34 +502,19 @@ describe('U3-g: the end of first run (b11 §28.3, §28.4)', () => {
     expect(home).not.toHaveBeenCalled();
   });
 
-  it('Apply with Touch ID is its own signed step: one apply with the change ID and the proof', async () => {
+  it('Apply with Touch ID is its own signed step: one apply with the change ID and the proof, then Connected', async () => {
     const apps = fakeApps();
-    await toBackupCode(apps);
-    await click('I saved it');
-    await settle();
+    await toConnect(apps);
     await click('Apply with Touch ID');
     await settle();
     expect(apps.applied).toEqual([CHANGE.changeId]);
     expect(apps.proofs[0]?.kind).toBe('passkey');
-    expect(text()).toContain('Restart Claude Code to finish');
-  });
-
-  it('after applying, Go to Home lands on Home', async () => {
-    const apps = fakeApps();
-    const { home } = await toBackupCode(apps);
-    await click('I saved it');
-    await settle();
-    await click('Apply with Touch ID');
-    await settle();
-    await click('Go to Home');
-    expect(home).toHaveBeenCalledTimes(1);
+    expect(h1()).toBe(CONNECTED_STEP.title('Claude Code'));
   });
 
   it('Later writes nothing and lands on Home', async () => {
     const apps = fakeApps();
-    const { home } = await toBackupCode(apps);
-    await click('I saved it');
-    await settle();
+    const home = await toConnect(apps);
     await click('Later');
     expect(apps.applied).toEqual([]);
     expect(home).toHaveBeenCalledTimes(1);
@@ -548,9 +522,7 @@ describe('U3-g: the end of first run (b11 §28.3, §28.4)', () => {
 
   it('a cancelled Touch ID keeps the card open: "Not connected yet. Try again."', async () => {
     const apps = fakeApps();
-    await toBackupCode(apps, fakeSetup(), { passkeyProof: () => Promise.resolve(undefined) });
-    await click('I saved it');
-    await settle();
+    await toConnect(apps, { passkeyProof: () => Promise.resolve(undefined) });
     await click('Apply with Touch ID');
     await settle();
     expect(text()).toContain('Not connected yet. Try again.');
@@ -562,38 +534,23 @@ describe('U3-g: the end of first run (b11 §28.3, §28.4)', () => {
     const quit = { kind: 'status', status: 'quit_first' } as const;
     let calls = 0;
     const apps = fakeApps({
-      list: {
-        kind: 'ok',
-        apps: [app('claude-desktop', 'Claude Desktop', { quitFirst: true })],
-        desktopRunning: true,
-      },
       preview: () => {
         calls += 1;
-        return calls === 1
-          ? quit
-          : {
-              kind: 'change',
-              change: { ...CHANGE, app: 'claude-desktop', name: 'Claude Desktop' },
-            };
+        return calls === 1 ? quit : { kind: 'change', change: CHANGE };
       },
     });
-    await toBackupCode(apps);
-    await click('I saved it');
-    await settle();
-    expect(text()).toContain('Quit Claude Desktop first.');
+    await toConnect(apps);
+    expect(text()).toContain('Quit Claude Code first.');
     expect(buttonNames()).not.toContain('Apply with Touch ID');
     expect(buttonNames()).toContain('Later');
     await click('Check again');
     await settle();
     expect(button('Apply with Touch ID')).toBeDefined();
-    expect(text()).not.toContain('Quit Claude Desktop first.');
   });
 
   it('an entry we did not write is never overwritten', async () => {
     const apps = fakeApps({ preview: { kind: 'status', status: 'conflict' } });
-    await toBackupCode(apps);
-    await click('I saved it');
-    await settle();
+    await toConnect(apps);
     expect(text()).toContain("This app already has an AgentLink entry we didn't write.");
     expect(buttonNames()).not.toContain('Apply with Touch ID');
     expect(buttonNames()).toContain('Later');
@@ -601,9 +558,7 @@ describe('U3-g: the end of first run (b11 §28.3, §28.4)', () => {
 
   it('a refused write says nothing was changed', async () => {
     const apps = fakeApps({ apply: { kind: 'refused', reason: 'write_failed' } });
-    await toBackupCode(apps);
-    await click('I saved it');
-    await settle();
+    await toConnect(apps);
     await click('Apply with Touch ID');
     await settle();
     expect(text()).toContain("Couldn't change Claude Code's settings. Nothing was changed.");
@@ -612,41 +567,38 @@ describe('U3-g: the end of first run (b11 §28.3, §28.4)', () => {
   });
 
   it('the connect step is skipped (Home) when the preview is not available yet', async () => {
-    const apps = fakeApps({ preview: { kind: 'not_available' } });
-    const { home } = await toBackupCode(apps);
-    await click('I saved it');
-    await settle();
+    const home = await toConnect(fakeApps({ preview: { kind: 'not_available' } }));
     expect(home).toHaveBeenCalledTimes(1);
   });
 
   it('there is no connect step without an open agent folder (outside the app host)', async () => {
     const apps = fakeApps({ agent: undefined });
-    const { home } = await toBackupCode(apps);
-    await click('I saved it');
-    await settle();
+    const home = await toConnect(apps);
     expect(apps.previews).toEqual([]);
     expect(home).toHaveBeenCalledTimes(1);
   });
 
   it('uses no wallet, key, seed or chain words on any screen', async () => {
     const BANNED = /\b(wallet|gas|seed|transaction|chain|blockchain|private key|0x[0-9a-f]+)\b/i;
-    await mount(fakeSetup(), fakeApps());
+    await mount(fakeSetup({ connected: false }), fakeApps());
+    await settle();
     const seen = [text()];
-    await click('Get started');
+    await click(PICK_STEP.next('Claude Code'));
     await settle();
     seen.push(text());
-    await click('Continue');
-    seen.push(text());
-    await click('Use Touch ID');
+    await click(GO);
     seen.push(text());
     await click('I saved it');
+    await settle();
+    seen.push(text());
+    await click(CONNECTED_STEP.connect('Claude Code'));
     await settle();
     seen.push(text());
     for (const screen of seen) expect(screen).not.toMatch(BANNED);
   });
 });
 
-describe('U3-g: accessibility', () => {
+describe('W4-WIZARD (was U3-g): accessibility', () => {
   async function violations(): Promise<string[]> {
     const result = await axe.run(host, {
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
@@ -655,17 +607,19 @@ describe('U3-g: accessibility', () => {
     return result.violations.map((v) => v.id);
   }
 
-  it('axe finds nothing on Welcome, Pick, Name, Backup code and Connect', async () => {
-    await mount(fakeSetup(), fakeApps());
-    expect(await violations()).toEqual([]);
-    await click('Get started');
+  it('axe finds nothing on Pick, Confirm, Backup code, Connected and Connect', async () => {
+    await mount(fakeSetup({ connected: false }), fakeApps());
     await settle();
     expect(await violations()).toEqual([]);
-    await click('Continue');
+    await click(PICK_STEP.next('Claude Code'));
+    await settle();
     expect(await violations()).toEqual([]);
-    await click('Use Touch ID');
+    await click(CONNECT_STEP.connect('Touch ID'));
     expect(await violations()).toEqual([]);
     await click('I saved it');
+    await settle();
+    expect(await violations()).toEqual([]);
+    await click(CONNECTED_STEP.connect('Claude Code'));
     await settle();
     expect(h1()).toBe('Connect Claude Code to Claude Code agent');
     expect(await violations()).toEqual([]);
@@ -673,19 +627,11 @@ describe('U3-g: accessibility', () => {
 
   it('moves focus to the title on each screen', async () => {
     await mount(fakeSetup(), fakeApps());
-    await click('Get started');
     await settle();
     expect(document.activeElement).toBe(host.querySelector('h1'));
-    await click('Continue');
+    await click(PICK_STEP.next('Claude Code'));
+    await settle();
     expect(document.activeElement).toBe(host.querySelector('h1'));
-  });
-
-  it('has a reduced-motion rule for the Welcome fade', async () => {
-    const css = (await import('../welcome/welcome.css?raw')).default;
-    expect(css.replace(/\/\*[\s\S]*?\*\//g, '')).toMatch(
-      /prefers-reduced-motion: reduce\)\s*\{[\s\S]*?animation:\s*none/,
-    );
-    expect(css).toMatch(/\[data-motion='reduced'\]/);
   });
 });
 
@@ -695,7 +641,7 @@ describe('U3-g: the clients speak what the server parses', () => {
   const json = (status: number, body: unknown): Response =>
     new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-  it('begin and finish carry {label} as base64url JSON in X-AgentLink-Input; the body stays octet-stream', async () => {
+  it('W4-ONE-TOUCH: begin carries {label, app}, finish only {nonce}, as base64url JSON in X-AgentLink-Input; bodies stay octet-stream', async () => {
     const seen: { path: string; input: string | null; type: string | null }[] = [];
     const api = createSetupApi({
       token: 't',
@@ -708,20 +654,53 @@ describe('U3-g: the clients speak what the server parses', () => {
         });
         return Promise.resolve(
           String(path).endsWith('begin')
-            ? json(200, { status: 'ready', publicKey: VALUES })
-            : json(400, { status: 'label_invalid' }),
+            ? json(200, {
+                status: 'ready',
+                publicKey: VALUES,
+                nonce: NONCE,
+                statement: { app: { app: 'claude-code', name: 'Claude Code', kind: 'connect' } },
+              })
+            : json(409, { status: 'changed' }),
         );
       },
     });
-    await api.begin('Claude Code agent');
-    const refused = await api.finish(BODY.slice(), 'Claude Code agent');
-    const expected = btoa(JSON.stringify({ label: 'Claude Code agent' }))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-    expect(seen.map((s) => s.input)).toEqual([expected, expected]);
+    const begun = await api.begin('Claude Code agent', 'claude-code');
+    expect(begun).toMatchObject({
+      kind: 'ready',
+      nonce: NONCE,
+      app: { id: 'claude-code', name: 'Claude Code', kind: 'connect' },
+    });
+    const refused = await api.finish(BODY.slice(), NONCE);
+    const b64 = (value: unknown): string =>
+      btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    expect(seen.map((s) => s.input)).toEqual([
+      b64({ label: 'Claude Code agent', app: 'claude-code' }),
+      b64({ nonce: NONCE }),
+    ]);
     expect(seen.every((s) => s.type === 'application/octet-stream')).toBe(true);
-    expect(refused).toEqual({ kind: 'error', problem: 'label_invalid' });
+    expect(refused).toEqual({ kind: 'error', problem: 'changed' });
+  });
+
+  it('W4-ONE-TOUCH: finish reads created_not_connected as done with the app not connected', async () => {
+    const api = createSetupApi({
+      token: 't',
+      fetch: () =>
+        Promise.resolve(
+          json(200, {
+            status: 'created_not_connected',
+            ownerCode: 'ABCD EFGH IJKL MNOP QRST UVWX',
+            fingerprint: '7F3A·19C2',
+            passkey: true,
+            app: 'claude-code',
+          }),
+        ),
+    });
+    expect(await api.finish(BODY.slice(), NONCE)).toMatchObject({
+      kind: 'done',
+      confirmed: true,
+      app: 'claude-code',
+      connected: false,
+    });
   });
 
   it('labelCheck sends the label as the one query parameter and reads ok or refused', async () => {

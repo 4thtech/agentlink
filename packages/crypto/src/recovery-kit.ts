@@ -54,13 +54,18 @@ export const RECOVERY_KIT_LIMITS = Object.freeze({
   maxStoreBytes: 1_073_741_824,
   maxKitBytes: 4_294_967_296,
 });
-/** The KeyStore items a kit carries per agent, in kit order (04 §2.3.3; never `s3:*`, D-115 D). */
+/**
+ * The KeyStore items a kit carries per agent, in kit order (04 §2.3.3; never `s3:*`, D-115 D).
+ * W4-RENAME-REACHES-CONTACTS (D-141): `key-epoch`, optional and last, so a restored agent that was
+ * renamed (rotated) opens at its epoch; a kit without it (every earlier kit) reads as epoch 0.
+ */
 export const RECOVERY_KIT_ITEM_NAMES = Object.freeze([
   'seed',
   'store-key',
   'policy-version',
   'receipts-kept',
   'storage-mark',
+  'key-epoch',
 ] as const);
 export type RecoveryKitItemName = (typeof RECOVERY_KIT_ITEM_NAMES)[number];
 export type RecoveryKitContents = 'full' | 'identity';
@@ -483,7 +488,7 @@ function checkInput(input: RecoveryKitInput): CheckedAgent[] {
     }
     if (items.length !== agent.items.length) {
       throw argument(
-        'items must be seed, store-key, policy-version, receipts-kept or storage-mark',
+        'items must be seed, store-key, policy-version, receipts-kept, storage-mark or key-epoch',
       );
     }
     if (items[0]?.name !== 'seed' || items[1]?.name !== 'store-key') {

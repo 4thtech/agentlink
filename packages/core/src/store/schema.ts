@@ -95,6 +95,11 @@ export const TABLES = {
   // sender lookup), key_epoch, nostr_keys (every agentNostr of a stored card, oldest first: superseded
   // keys, 04 §3.1.1 step 7, and the revoked set, §3.4), updated_at. Status `removed` is a tombstone
   // (02 F-14): the keys stay so later envelopes from them are dropped.
+  // W4-RENAME-REACHES-CONTACTS (D-141; 07 §3 "Former name", store version 9, appended): former_name
+  // (`enc`, the name the owner last saw before a card-update changed it), name_changed_at and
+  // name_change_seen (null or 1: no note due; 0: the note is due), and declared_name (`enc`, the
+  // contact's own self-declared name, kept also while the owner's alias is shown, so the note can read
+  // "Now calls itself {new} (was {old})"; null on rows from before version 9). Display state only.
   contacts: {
     columns: {
       contact_id: id,
@@ -117,6 +122,10 @@ export const TABLES = {
       safety_code_checked: flag,
       created_at: int,
       updated_at: int,
+      former_name: opt('enc'),
+      name_changed_at: opt('int'),
+      name_change_seen: opt('flag'),
+      declared_name: opt('enc'),
     },
     primaryKey: ['contact_id'],
     unique: [{ columns: ['agent_nostr'] }],
@@ -151,6 +160,12 @@ export const TABLES = {
       expires_at: int,
       used_at: opt('int'),
       created_at: int,
+      // W4-SHORT-INVITE (D-139, 04 §3.6.2; schema version 8): a short link's drop object, recorded
+      // before its upload so the inviter can delete it on completion, cancel or expiry; null once
+      // deleted, and for a format 1 invite. Never the link secret or the invite key.
+      drop_lookup_id: opt('enc'),
+      drop_key_epoch: opt('enc'),
+      cancelled_at: opt('int'),
     },
     primaryKey: ['invite_id'],
   },
@@ -183,6 +198,12 @@ export const TABLES = {
   // saved_name (MSG-FILES-IO-b, schema version 6): the single file name fetchFile placed in the
   // Inbox folder, sealed like `name`; never a path. Null until a fetch saved the file, and on every
   // row stored before version 6. It goes with the row when retention deletes it.
+  // auto_save, auto_reason, auto_tries, auto_next_at (W4-AUTO-SAVE, D-142, schema version 11;
+  // proposed, owner confirms at merge): a received file's automatic save (04 §4.1). `pending` from
+  // ingest until the core saved it (`saved`) or it waits for Save (`waiting`, with a fixed reason, or
+  // none when the agent was paused). auto_tries counts failed downloads (at most 3 retries);
+  // auto_next_at is the arrival time at ingest, then the time of the next retry. Null on outbound rows
+  // and on every row stored before version 11: those arrived before automatic saving.
   files: {
     columns: {
       envelope_id: id,
@@ -197,6 +218,19 @@ export const TABLES = {
       deleted_at: opt('int'),
       delete_after: optOneOf('expiry', 'receipt'),
       saved_name: opt('enc'),
+      auto_save: optOneOf('pending', 'saved', 'waiting'),
+      auto_reason: optOneOf(
+        'limit_contact',
+        'limit_today',
+        'ask_before_saving',
+        'auto_save_off',
+        'disk_full',
+        'folder_unavailable',
+        'folder_cannot_mark',
+        'download_failed',
+      ),
+      auto_tries: opt('int'),
+      auto_next_at: opt('int'),
     },
     primaryKey: ['envelope_id', 'idx'],
   },
@@ -341,6 +375,64 @@ export const TABLES = {
   outbox_staged: {
     columns: { envelope_id: id, failures: int, failed_at: int },
     primaryKey: ['envelope_id'],
+  },
+  // 07 §3.2 (06 §6 "MCP session heartbeat"; D-143, W4-LIVE-STATUS; schema version 10; proposed, owner
+  // confirms at merge). One row per running `agentlink mcp` process, lease holder or not:
+  // session_id is 16 random bytes, base64url, chosen per process; app an id of the 06 §7 table or
+  // `other` (never the client's own name); pid read only by a reader on this machine (signal 0) and
+  // never put in an answer, event, log or error. Status, not authority: nothing reads these rows to
+  // authorise anything. In clear (no secret, path, client-sent name or content).
+  mcp_sessions: {
+    columns: {
+      session_id: id,
+      app: text,
+      agent_id: id,
+      pid: int,
+      started_at: int,
+      beat_until: int,
+      last_tool_at: opt('int'),
+    },
+    primaryKey: ['session_id'],
+  },
+  // 07 §3.2 (D-143; schema version 10): when each AI app id last ran this agent, so "last seen"
+  // outlives the session row. At most one row per id.
+  mcp_last_seen: {
+    columns: { app: text, last_seen_at: int },
+    primaryKey: ['app'],
+  },
+  // 04 §4.1 (W4-AUTO-SAVE, D-142; schema version 11; proposed, owner confirms at merge): the rolling
+  // 24-hour auto-save limits, one reservation per file the core started to save automatically: the
+  // contact, the time and the declared size. Counts and bytes only: never a name, folder or link.
+  // Rows older than 24 hours are pruned.
+  auto_save_log: {
+    columns: { envelope_id: id, idx: int, contact_id: id, at: int, bytes: int },
+    primaryKey: ['envelope_id', 'idx'],
+  },
+  // 04 §4.1, 08 §1 (D-142; schema version 11): at most one row. notice: the one-time "now saved
+  // automatically" notice of an agent that updated (`show` until the owner dismisses it, Decision
+  // 51); the version 11 migration writes `show` only into a store that already has an identity, so a
+  // new agent never shows it. paused_reason and paused_at: auto-save paused for the folder (disk
+  // full, cannot mark, unavailable), checked again at most once per 10 minutes.
+  auto_save_state: {
+    columns: {
+      slot: oneOf(SINGLETON_SLOT),
+      notice: optOneOf('show', 'dismissed'),
+      paused_reason: optOneOf('disk_full', 'folder_cannot_mark', 'folder_unavailable'),
+      paused_at: opt('int'),
+    },
+    primaryKey: ['slot'],
+    maxRows: 1,
+  },
+  // 07 §3.2 (06 §6 "Paused agents"; D-143 (5), W4-PAUSE; schema version 12; proposed, owner confirms
+  // at merge): one row at most, present only while the owner has paused the agent. slot is the fixed
+  // single-row key; paused_at is when the pause began (unix seconds). Written by the app's Pause
+  // (no presence, nothing signed); deleted only by a verified `agent.resume` (04 §2.5.1). Every
+  // process reads it before a send, a fetch and every loop step, and a row that cannot be read
+  // counts as paused (fail closed). In clear: no secret, path, name or content.
+  agent_pause: {
+    columns: { slot: oneOf(SINGLETON_SLOT), paused_at: int },
+    primaryKey: ['slot'],
+    maxRows: 1,
   },
   // 07 §3.3. approval_id is the empty string for a call without one, so it is `text`.
   idempotency: {

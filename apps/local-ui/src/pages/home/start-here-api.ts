@@ -79,7 +79,13 @@ export function parseAgentSignal(agents: unknown, apps: unknown): AgentSignal | 
   if (row === undefined) return undefined;
   const names: string[] = [];
   if (Array.isArray(row['apps'])) {
-    for (const a of row['apps'] as unknown[]) addApp(names, a);
+    for (const a of row['apps'] as unknown[]) {
+      // W4-LIVE-STATUS (D-143): `{app, state}` per detected app; it runs this agent unless
+      // `not_set_up`. A plain id (the earlier form) still counts.
+      if (isRecord(a)) {
+        if (a['state'] !== 'not_set_up') addApp(names, a['app']);
+      } else addApp(names, a);
+    }
   }
   collectApps(apps, current, names);
   return {

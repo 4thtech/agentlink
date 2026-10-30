@@ -1,0 +1,403 @@
+/* W4-HOME: Home simple and pro (prototype v23 A4, A10; D-116: the approved design with the tokens).
+   Shared classes carry type, buttons, avatars and menus (al-text-label, al-text-code, al-btn,
+   al-avatar, al-shell-menu, al-mitem) so Home stays inside the CSS budget; motion only through
+   U0's classes. Classes only, no inline styles (08 §4 CSP). */
+
+.hm-c,
+.hm-f {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hm-f {
+  flex-flow: row wrap;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+.hm-page,
+.hm-stack,
+.hm-skeleton {
+  gap: var(--al-space-5);
+}
+.hm-people,
+.hm-thread,
+.hm-msgs,
+.hm-menu-panel,
+.hm-ap-bulk,
+.hm-approvals {
+  gap: var(--al-space-3);
+}
+.hm-open {
+  gap: var(--al-space-4);
+  padding: var(--al-space-1) var(--al-space-4) var(--al-space-5);
+  border-top: 1px solid var(--al-color-border-subtle);
+}
+.hm-files,
+.hm-ap-body {
+  gap: var(--al-space-2);
+}
+.hm-msg,
+.hm-row-main,
+.hm-file-main {
+  gap: 2px;
+}
+.hm-kicker {
+  margin: 0;
+  color: var(--al-color-fg-subtle);
+}
+.hm-ellipsis,
+.hm-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hm-name {
+  font-size: var(--al-text-body-lg-size);
+  font-weight: var(--al-font-weight-semibold);
+}
+.hm-notice,
+.hm-inline-note,
+.hm-ap-done,
+.hm-sub,
+.hm-msg-who,
+.hm-file-meta,
+.hm-note,
+.hm-cell-time,
+.hm-cell-muted,
+.hm-dl-hint {
+  margin: 0;
+  color: var(--al-color-fg-subtle);
+}
+.hm-skel-invite,
+.hm-invite {
+  min-height: 64px;
+  box-sizing: border-box;
+}
+.hm-invite,
+.hm-invite-sm {
+  text-decoration: none;
+}
+
+/* Rows of controls. */
+
+.hm-people-head,
+.hm-open-head,
+.hm-files-head {
+  justify-content: space-between;
+}
+.hm-open-head > .hm-kicker {
+  flex: 1 1 0;
+}
+.hm-tools {
+  flex: 1 1 420px;
+  justify-content: flex-end;
+}
+.hm-search {
+  flex: 1 1 160px;
+}
+.hm-search,
+.hm-agent,
+.hm-rename {
+  height: 36px;
+}
+.hm-rename {
+  flex: 1 1 180px;
+}
+
+/* The approval card on top, in the warning tone of the approved design. */
+.hm-approvals {
+  display: flex;
+  flex-direction: column;
+  padding: var(--al-space-4);
+  border-radius: var(--al-radius-md);
+  border: 1px solid var(--al-color-status-warning-border);
+  background: var(--al-color-status-warning-bg);
+}
+.hm-approvals .al-approval {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+.hm-approvals .al-approval h2 {
+  margin: 0;
+  font-size: var(--al-text-body-size);
+}
+.hm-approvals .al-approval-actions {
+  display: flex;
+}
+.hm-approvals .al-approval-actions .al-btn {
+  height: 36px;
+  min-height: 36px;
+}
+.hm-approvals
+  .al-approval-details[open]
+  :is(.al-hood, .al-approval-rows, .al-note, .al-approval-foot) {
+  background: var(--al-color-bg-surface);
+  padding: var(--al-space-2) var(--al-space-3);
+}
+.hm-ap-meta,
+.hm-msg-meta {
+  overflow-wrap: anywhere;
+}
+.hm-ap-meta,
+.hm-ap-more,
+.hm-ap-note,
+.hm-problem,
+.hm-dl.is-failed,
+.hm-cell[data-delivery='not_delivered'] {
+  color: var(--al-color-status-warning-fg);
+}
+.hm-ap-meta {
+  margin: 0;
+  gap: 0 var(--al-space-4);
+}
+.hm-ap-more {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.hm-ap-item {
+  display: flex;
+  gap: var(--al-space-3);
+  padding-top: var(--al-space-3);
+}
+.hm-ap-body {
+  flex: 1;
+}
+
+/* People. */
+.hm-list,
+.hm-file-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-surface);
+  overflow: hidden;
+}
+:is(.hm-person, .hm-invite-row, .hm-nomatch, .hm-file)
+  + :is(.hm-person, .hm-invite-row, .hm-nomatch, .hm-file) {
+  border-top: 1px solid var(--al-color-border-subtle);
+}
+.hm-row,
+.hm-row-toggle {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hm-row {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  padding: var(--al-space-4);
+}
+.hm-row-main {
+  flex: 1;
+}
+/* W4-WIRE: the chevron turns as the row opens (transform only; reduced motion: at once, kit). */
+.hm-chev {
+  flex: none;
+  transition: transform var(--al-duration-fast) var(--al-easing-standard);
+}
+.hm-chev.is-open {
+  transform: rotate(90deg);
+}
+.hm-invite-row,
+.hm-nomatch {
+  padding: var(--al-space-4);
+}
+.hm-avatar {
+  width: 40px;
+  height: 40px;
+  font-weight: var(--al-font-weight-semibold);
+}
+/* Per-person tints, the prototype's blue and violet (the info and proof tokens). */
+.al-avatar[data-tint='0'] {
+  background: var(--al-color-status-info-bg);
+  color: var(--al-color-status-info-fg);
+}
+.al-avatar[data-tint='1'] {
+  background: var(--al-color-proof-bg);
+  color: var(--al-color-proof-fg);
+}
+.hm-avatar.is-pending {
+  border-style: dashed;
+}
+
+/* The People table (pro): a grid; the toggle is stretched over its row. */
+.hm-prow {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.5fr) minmax(0, 1.1fr) minmax(0, 1.8fr) minmax(0, 1.1fr)
+    56px 48px 20px;
+  align-items: center;
+  gap: var(--al-space-3);
+  padding: var(--al-space-3) var(--al-space-4);
+  font-size: var(--al-text-body-sm-size);
+}
+.hm-prow-head {
+  border-bottom: 1px solid var(--al-color-border-default);
+  color: var(--al-color-fg-subtle);
+}
+.hm-row-toggle {
+  padding: 0;
+  flex-wrap: nowrap;
+}
+.hm-row-toggle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.hm-row-toggle .hm-name {
+  font-size: inherit;
+}
+.hm-cell,
+.hm-cell-last {
+  color: var(--al-color-fg-muted);
+}
+.hm-cell[data-delivery='sent'],
+.hm-dl.is-sent,
+.hm-copied,
+.hm-v.is-proof,
+.hm-facts dd.is-checked {
+  color: var(--al-color-status-success-fg);
+}
+.hm-untrusted-line {
+  display: flex;
+  align-items: center;
+  border-width: 1px;
+}
+.hm-untrusted-line .al-untrusted-label span {
+  display: none;
+}
+.hm-untrusted-line .al-untrusted-body {
+  min-width: 0;
+  padding: 0 var(--al-space-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The ⋯ menu. */
+.hm-menu-wrap {
+  position: relative;
+}
+.hm-menu-btn {
+  width: 36px;
+  padding: 0;
+}
+.hm-danger,
+.hm-inline-error,
+.hm-remove > span {
+  color: var(--al-color-status-danger-fg);
+}
+.hm-menu-panel {
+  flex-basis: 100%;
+}
+.hm-menu-panel:empty,
+.hm-file-problem:empty {
+  display: none;
+}
+.hm-inline p {
+  margin: 0;
+  flex-basis: 100%;
+}
+.hm-remove > span {
+  flex: 1 1 240px;
+}
+
+/* Contact facts and message details (pro). */
+.hm-facts,
+.hm-msg-meta {
+  margin: 0;
+  color: var(--al-color-fg-subtle);
+}
+.hm-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-2) var(--al-space-6);
+}
+.hm-facts dd {
+  margin: 0;
+  color: var(--al-color-fg-muted);
+  overflow-wrap: anywhere;
+}
+.hm-msg-meta {
+  gap: 2px var(--al-space-4);
+}
+.hm-v {
+  color: var(--al-color-fg-muted);
+}
+
+/* The conversation. */
+.hm-msgs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hm-msg {
+  max-width: 560px;
+  width: 100%;
+}
+.hm-msg.is-in {
+  align-self: flex-end;
+}
+.hm-bubble {
+  padding: var(--al-space-3);
+  border-radius: var(--al-radius-md);
+  border: 1px solid var(--al-color-border-default);
+  background: var(--al-color-bg-raised);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hm-msg-actions,
+.hm-sub,
+.hm-msg-who,
+.hm-problem {
+  font-size: var(--al-text-caption-size);
+}
+.hm-msg-actions {
+  min-height: 28px;
+}
+.hm-dl.is-waiting,
+.hm-file {
+  color: var(--al-color-fg-muted);
+}
+.hm-copy {
+  min-height: 28px;
+}
+
+/* Files. */
+.hm-file {
+  padding: var(--al-space-3);
+}
+.hm-file-main {
+  flex: 1 1 180px;
+}
+.hm-file-own {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .hm-prow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 20px;
+  }
+  .hm-opt {
+    display: none !important;
+  }
+}

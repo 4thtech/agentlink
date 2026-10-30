@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { NodeKeyStoreError } from './errors.js';
 import { performOwnerOperation } from './index.js';
 import type { KeychainBackend } from './keychain.js';
-import { OWNER_OPERATION_REFUSED, allowedTypedData } from './owner-allowlist.js';
+import { OWNER_ACTION_OPS, OWNER_OPERATION_REFUSED, allowedTypedData } from './owner-allowlist.js';
 import { initOwnerWith } from './owner-init.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
 import { runOwnerGesture, runOwnerOperation, type OwnerSignRequest } from './owner-operation.js';
@@ -371,6 +371,8 @@ describe('EIP-712 and owner-action allowlist (M1-8h; 04 §2.4, §2.5.1)', () => 
       // M1-9za: the owner renames or removes a contact.
       ['contact.rename', { contact: AGENT, alias: 'Tali laptop' }],
       ['contact.remove', { contact: AGENT }],
+      // W4-PAUSE (D-143 (5)): Resume ends a pause (U5 real-app journey found it missing).
+      ['agent.resume', { agent: AGENT }],
     ];
     for (const [op, params] of ops) {
       const run = scripted([code]);
@@ -383,5 +385,31 @@ describe('EIP-712 and owner-action allowlist (M1-8h; 04 §2.4, §2.5.1)', () => 
       expect(out.kind, op).toBe('owner-action');
     }
     await store.close();
+  });
+});
+
+describe('the owner-action op allowlist is exactly the ops owner flows sign', () => {
+  it('lists exactly these ops (a new op is a reviewed change here)', () => {
+    expect([...OWNER_ACTION_OPS].sort()).toEqual(
+      [
+        'approval.decide',
+        'approval.decideBatch',
+        'approval.cancel',
+        'policy.set',
+        'agent.revoke',
+        'contact.check',
+        'contact.rename',
+        'contact.remove',
+        'credits.deposit',
+        'credits.withdraw',
+        'agent.label',
+        'app.connect',
+        'app.disconnect',
+        'file.save',
+        'agent.resume',
+      ].sort(),
+    );
+    // Pausing signs nothing: there is no pause op.
+    expect(OWNER_ACTION_OPS.filter((op) => /pause/.test(op))).toEqual([]);
   });
 });

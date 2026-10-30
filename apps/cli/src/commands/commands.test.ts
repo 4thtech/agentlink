@@ -487,6 +487,25 @@ describe('status (06 §2.0, D-73)', () => {
     expect(result.text).toContain("Can't reach the message network");
   });
 
+  it('W4-PAUSE: a paused agent answers from the store with no fetch and says it is paused', async () => {
+    for (const paused of [() => Promise.resolve(true), () => Promise.reject(new Error('busy'))]) {
+      const f = fakeAgent({
+        paused,
+        inbox: { counts: () => Promise.resolve({ inbox: [], requests: 1 }) },
+      });
+      const result = await harness(f).run(['status', '--brief']);
+      expect(result.code).toBe(EXIT_OK);
+      expect(f.calls).not.toContain('catchUp');
+      expect(result.out).toContain('1 request from an unknown sender.');
+      expect(result.text).toContain(
+        'This agent is paused. The owner can resume it in the AgentLink app.',
+      );
+      const doctor = await harness(f).run(['doctor']);
+      expect(f.calls).not.toContain('catchUp');
+      expect(doctor.text).toContain('This agent is paused.');
+    }
+  });
+
   it('never prints inbound text; a self-declared name shows only with its label (M1-29)', async () => {
     const canary = 'CANARY-IGNORE-PREVIOUS-INSTRUCTIONS';
     const named = {
@@ -773,6 +792,47 @@ describe('accept and invite argument checks', () => {
     expect(ok.out).toContain('agentlink://invite/AAAA');
     expect(ok.out.join('\n')).toMatch(/until \d{1,2} \w{3} 2027/);
     expect(h.asked).toEqual([]);
+  });
+
+  it('invite --long asks core for the long link (D-139 (7)); plain invite never does', async () => {
+    const inputs: unknown[] = [];
+    const f = fakeAgent({
+      pairing: {
+        createInvite: (input: unknown) => {
+          inputs.push(input);
+          return Promise.resolve({
+            inviteUrl: 'https://agentlink.4thtech.io/i#AAAA',
+            format: 'long',
+            ownerFingerprint: {},
+            expiresAt: 1_800_600_000,
+          });
+        },
+      },
+    });
+    const h = harness(f);
+    expect((await h.run(['invite', '--long'], PIPED)).code).toBe(EXIT_OK);
+    expect((await h.run(['invite'], PIPED)).code).toBe(EXIT_OK);
+    expect(inputs).toEqual([{ long: true }, {}]);
+  });
+
+  it('W4-PAUSE (IR-W4-PAUSE-1): invite and accept refuse while paused with the fixed paused text', async () => {
+    const PAUSED = 'This agent is paused. The owner can resume it in the AgentLink app.';
+    // Core's own refusal (any message): the CLI prints the one fixed sentence (06 §6).
+    const paused = (): Promise<never> => Promise.reject(new CoreError('agent_paused', 'paused'));
+    const f = fakeAgent({
+      pairing: {
+        createInvite: paused,
+        resolveInviteLink: paused,
+        acceptInvite: paused,
+      },
+    });
+    const h = harness(f);
+    const invite = await h.run(['invite'], PIPED);
+    expect(invite.code).toBe(EXIT_FAILED);
+    expect(invite.err).toEqual([PAUSED]);
+    const accept = await h.run(['accept', 'https://agentlink.4thtech.io/i#AAAA']);
+    expect(accept.code).toBe(EXIT_FAILED);
+    expect(accept.err).toEqual([PAUSED]);
   });
 
   it('prints core fixed text for an expected core refusal and a generic line for anything else', async () => {

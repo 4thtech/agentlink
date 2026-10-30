@@ -35,6 +35,20 @@ export interface Limits {
   readonly maxExpirySeconds: number;
   /** Lifetime of a signed PUT target (not configurable). */
   readonly uploadTargetSeconds: number;
+  /** Largest short-invite object (`ALI1`, 04 §3.6.2; not configurable). */
+  readonly inviteMaxSize: number;
+  /** Downloads per invite object (D-139 (7); not configurable). */
+  readonly inviteDownloadLimit: number;
+  /** Invite uploads per drop key per hour. */
+  readonly inviteKeyUploadsPerHour: number;
+  /** Invite uploads per drop key in any rolling 24 hours. */
+  readonly inviteKeyUploadsPerDay: number;
+  /** Live invite objects per drop key. */
+  readonly inviteKeyLive: number;
+  /** Unauthenticated invite fetches per IP (IPv6 /64) in any rolling hour, 404s included. */
+  readonly inviteIpFetchesPerHour: number;
+  /** Invite fetches for the whole drop per hour (global ceiling). */
+  readonly inviteFetchesPerHour: number;
 }
 
 export const DEFAULTS: Limits = Object.freeze({
@@ -51,9 +65,19 @@ export const DEFAULTS: Limits = Object.freeze({
   downloadLimit: 16,
   maxExpirySeconds: 7 * 86_400,
   uploadTargetSeconds: 15 * 60,
+  inviteMaxSize: 17_441,
+  inviteDownloadLimit: 8,
+  inviteKeyUploadsPerHour: 20,
+  inviteKeyUploadsPerDay: 100,
+  inviteKeyLive: 50,
+  inviteIpFetchesPerHour: 30,
+  inviteFetchesPerHour: 20_000,
 });
 
-type Overridable = Exclude<keyof Limits, 'maxExpirySeconds' | 'uploadTargetSeconds'>;
+type Overridable = Exclude<
+  keyof Limits,
+  'maxExpirySeconds' | 'uploadTargetSeconds' | 'inviteMaxSize' | 'inviteDownloadLimit'
+>;
 
 /** Environment name, then the inclusive bounds of an override. */
 const OVERRIDES: Readonly<Record<Overridable, readonly [string, number, number]>> = {
@@ -68,7 +92,15 @@ const OVERRIDES: Readonly<Record<Overridable, readonly [string, number, number]>
   globalBytesPerDay: ['DROP_GLOBAL_BYTES_PER_DAY', 1, 10 * 1024 * GiB],
   globalUploadsPerHour: ['DROP_GLOBAL_UPLOADS_PER_HOUR', 1, 1_000_000],
   downloadLimit: ['DROP_DOWNLOAD_LIMIT', 1, 100],
+  inviteKeyUploadsPerHour: ['DROP_INVITE_KEY_UPLOADS_PER_HOUR', 1, 1_000],
+  inviteKeyUploadsPerDay: ['DROP_INVITE_KEY_UPLOADS_PER_DAY', 1, 10_000],
+  inviteKeyLive: ['DROP_INVITE_KEY_LIVE', 1, 1_000],
+  inviteIpFetchesPerHour: ['DROP_INVITE_IP_FETCHES_PER_HOUR', 1, 100_000],
+  inviteFetchesPerHour: ['DROP_INVITE_FETCHES_PER_HOUR', 1, 1_000_000],
 };
+
+/** The invite host (08 §4): the only origin the invite page fetches invite objects from. */
+const DEFAULT_INVITE_ORIGINS: readonly string[] = ['https://agentlink.4thtech.io'];
 
 export interface DropConfig {
   readonly limits: Limits;
@@ -76,6 +108,8 @@ export interface DropConfig {
   readonly urlKey: Uint8Array;
   /** Origins allowed to fetch objects from a browser (08 §7). Exact `https://host[:port]` only. */
   readonly corsOrigins: readonly string[];
+  /** Origins allowed to fetch invite objects (`GET /v1/i/{lookupId}`, 08 §4); the invite host. */
+  readonly inviteOrigins: readonly string[];
 }
 
 const ORIGIN =
@@ -85,6 +119,17 @@ function parseInteger(text: string, min: number, max: number): number | null {
   if (!/^(0|[1-9]\d{0,15})$/.test(text)) return null;
   const value = Number(text);
   return Number.isSafeInteger(value) && value >= min && value <= max ? value : null;
+}
+
+/** A comma-separated list of exact `https://host[:port]` origins; empty means none. */
+function parseOrigins(raw: unknown, fallback: readonly string[]): string[] | null {
+  if (raw === undefined) return [...fallback];
+  if (typeof raw !== 'string') return null;
+  const origins = raw
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin !== '');
+  return origins.some((origin) => !ORIGIN.test(origin)) ? null : origins;
 }
 
 /** The drop's configuration from its Worker environment, or null when any value is invalid. */
@@ -108,20 +153,14 @@ export function readConfig(env: Readonly<Record<string, unknown>>): DropConfig |
     limits[field] = value;
   }
 
-  let corsOrigins: string[] = [];
-  const rawOrigins = env.DROP_CORS_ORIGINS;
-  if (rawOrigins !== undefined) {
-    if (typeof rawOrigins !== 'string') return null;
-    corsOrigins = rawOrigins
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter((origin) => origin !== '');
-    if (corsOrigins.some((origin) => !ORIGIN.test(origin))) return null;
-  }
+  const corsOrigins = parseOrigins(env.DROP_CORS_ORIGINS, []);
+  const inviteOrigins = parseOrigins(env.DROP_INVITE_ORIGINS, DEFAULT_INVITE_ORIGINS);
+  if (corsOrigins === null || inviteOrigins === null) return null;
 
   return Object.freeze({
     limits: Object.freeze(limits) as unknown as Limits,
     urlKey,
     corsOrigins: Object.freeze(corsOrigins),
+    inviteOrigins: Object.freeze(inviteOrigins),
   });
 }

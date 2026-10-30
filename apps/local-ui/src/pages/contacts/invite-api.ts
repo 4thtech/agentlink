@@ -16,10 +16,16 @@ import type { PresenceProof } from './owner.js';
 export const INVITE_CREATE_PATH = '/api/ui/invites';
 export const INVITE_CHECK_PATH = '/api/ui/invites/check';
 export const INVITE_ACCEPT_PATH = '/api/ui/invites/accept';
+export const INVITE_CANCEL_PATH = '/api/ui/invites/cancel';
+/** The open invites are read with a GET on the create path (W4-INVITES-LIST). */
+export const INVITES_LIST_PATH = '/api/ui/invites';
 
 /** The one invite link form the server answers (core INVITE_LINK_PREFIX). */
 const LINK_PREFIX = 'https://agentlink.4thtech.io/i#';
 const PAYLOAD = /^[A-Za-z0-9_-]{1,8192}$/;
+/** The short link form (04 §3.6.2): the canonical host, `2.` and 43 base64url characters. */
+const SHORT_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#2\.[A-Za-z0-9_-]{43}$/;
+const INVITE_ID = /^[A-Za-z0-9_-]{16,64}$/;
 const FINGERPRINT = /^[0-9A-F]{4}·[0-9A-F]{4}$/;
 const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const MAX_SHARE_CHARS = 10_000;
@@ -33,7 +39,23 @@ export interface CreatedInvite {
   readonly shareText: string;
   /** Unix milliseconds. */
   readonly expiresAt: number;
+  /** `long` when asked for, or when the service fell back to it: the sheet works the same. */
+  readonly format: 'short' | 'long';
+  /** W4-PEOPLE-INVITE: this invite's public ID (as the open list shows it): cancel only this one. */
+  readonly inviteId: string;
 }
+
+/** One open invite from the server: never a link. */
+export interface OpenInvite {
+  readonly inviteId: string;
+  readonly name: string | null;
+  /** Unix milliseconds. */
+  readonly expiresAt: number;
+}
+
+export type CancelOutcome = {
+  readonly kind: 'cancelled' | 'not_found' | 'session_expired' | 'offline' | 'failed';
+};
 
 export interface CheckedInvite {
   /** The inviter's own name: untrusted, shown only through the name rule as text (I-5). */
@@ -47,12 +69,12 @@ export type CreateOutcome =
   | { readonly kind: 'ok'; readonly invite: CreatedInvite }
   | { readonly kind: 'invalid_name' | 'not_set_up' | 'session_expired' | 'offline' | 'failed' };
 
-export type InviteRefusal = 'expired' | 'own' | 'damaged' | 'cant_use';
+export type InviteRefusal = 'expired' | 'own' | 'damaged' | 'cant_use' | 'unavailable';
 
 export type CheckOutcome =
   | { readonly kind: 'ok'; readonly invite: CheckedInvite }
   | { readonly kind: 'refused'; readonly why: InviteRefusal }
-  | { readonly kind: 'not_set_up' | 'session_expired' | 'offline' | 'failed' };
+  | { readonly kind: 'not_set_up' | 'session_expired' | 'offline' | 'failed' | 'try_again' };
 
 export type AcceptOutcome =
   | { readonly kind: 'pending' }
@@ -60,6 +82,7 @@ export type AcceptOutcome =
   | { readonly kind: 'refused'; readonly why: InviteRefusal }
   | {
       readonly kind:
+        | 'try_again'
         | 'presence_rejected'
         | 'presence_required'
         | 'busy'
@@ -72,7 +95,8 @@ export type AcceptOutcome =
     };
 
 export interface InviteApi {
-  create(label: string | undefined): Promise<CreateOutcome>;
+  create(label: string | undefined, options?: { readonly long?: boolean }): Promise<CreateOutcome>;
+  cancel(inviteId: string): Promise<CancelOutcome>;
   check(invite: string): Promise<CheckOutcome>;
   accept(invite: string, proof: PresenceProof): Promise<AcceptOutcome>;
 }
@@ -106,13 +130,39 @@ function timeOf(value: unknown): number | undefined {
 function created(json: Record<string, unknown>): CreatedInvite | undefined {
   const { inviteUrl, shareText } = json;
   const expiresAt = timeOf(json['expiresAt']);
+  const format = json['format'];
+  const inviteId = json['inviteId'];
+  if (format !== 'short' && format !== 'long') return undefined;
+  if (typeof inviteId !== 'string' || !INVITE_ID.test(inviteId)) return undefined;
   if (typeof inviteUrl !== 'string' || !inviteUrl.startsWith(LINK_PREFIX)) return undefined;
-  if (!PAYLOAD.test(inviteUrl.slice(LINK_PREFIX.length))) return undefined;
+  if (
+    format === 'short'
+      ? !SHORT_LINK.test(inviteUrl)
+      : !PAYLOAD.test(inviteUrl.slice(LINK_PREFIX.length))
+  ) {
+    return undefined;
+  }
   if (typeof shareText !== 'string' || shareText.length > MAX_SHARE_CHARS) return undefined;
   // The share text is our template around this very link (11 §6.1 J7): nothing else is sent.
   if (!shareText.endsWith(inviteUrl)) return undefined;
   if (expiresAt === undefined) return undefined;
-  return { inviteUrl, shareText, expiresAt };
+  return { inviteUrl, shareText, expiresAt, format, inviteId };
+}
+
+/** The open invites, read through an allowlist; a row of another shape is left out. */
+export function parseOpenInvites(data: unknown): readonly OpenInvite[] | undefined {
+  if (!isObject(data) || !Array.isArray(data['invites'])) return undefined;
+  const out: OpenInvite[] = [];
+  for (const item of data['invites'] as unknown[]) {
+    if (!isObject(item)) continue;
+    const { inviteId, name } = item;
+    const expiresAt = timeOf(item['expiresAt']);
+    if (typeof inviteId !== 'string' || !INVITE_ID.test(inviteId)) continue;
+    if (expiresAt === undefined) continue;
+    if (name !== null && (typeof name !== 'string' || name.length > MAX_NAME_CHARS)) continue;
+    out.push({ inviteId, name, expiresAt });
+  }
+  return out;
 }
 
 function checked(json: Record<string, unknown>): CheckedInvite | undefined {
@@ -134,6 +184,7 @@ function refusal(error: unknown): InviteRefusal | undefined {
   if (error === 'own_invite') return 'own';
   if (error === 'invalid_invite' || error === 'invalid') return 'damaged';
   if (error === 'cannot_pair') return 'cant_use';
+  if (error === 'unavailable_invite') return 'unavailable';
   return undefined;
 }
 
@@ -177,8 +228,11 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
   const encode = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
 
   return {
-    async create(label) {
-      const body = encode(label === undefined ? {} : { label });
+    async create(label, options) {
+      const body = encode({
+        ...(label === undefined ? {} : { label }),
+        ...(options?.long === true ? { long: true } : {}),
+      });
       const answer = await call(INVITE_CREATE_PATH, { headers: inviteHeaders(), body });
       if (answer.kind === 'offline') return { kind: 'offline' };
       const { status, json } = answer;
@@ -189,6 +243,18 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
       if (status === 401) return { kind: 'session_expired' };
       if (json['error'] === 'invalid_label') return { kind: 'invalid_name' };
       if (json['error'] === 'not_set_up') return { kind: 'not_set_up' };
+      return { kind: 'failed' };
+    },
+
+    async cancel(inviteId) {
+      if (!INVITE_ID.test(inviteId)) return { kind: 'failed' };
+      const body = encode({ inviteId });
+      const answer = await call(INVITE_CANCEL_PATH, { headers: inviteHeaders(), body });
+      if (answer.kind === 'offline') return { kind: 'offline' };
+      const { status, json } = answer;
+      if (status === 200 && json['status'] === 'cancelled') return { kind: 'cancelled' };
+      if (status === 401) return { kind: 'session_expired' };
+      if (status === 404 && json['error'] === 'not_found') return { kind: 'not_found' };
       return { kind: 'failed' };
     },
 
@@ -203,6 +269,7 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
       }
       if (status === 401) return { kind: 'session_expired' };
       if (json['error'] === 'not_set_up') return { kind: 'not_set_up' };
+      if (json['error'] === 'try_again') return { kind: 'try_again' };
       const why = refusal(json['error']);
       return why === undefined ? { kind: 'failed' } : { kind: 'refused', why };
     },
@@ -232,6 +299,7 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
             : 30;
         return { kind: 'wait', seconds };
       }
+      if (json['error'] === 'try_again') return { kind: 'try_again' };
       if (gate === 'needs_setup' || json['error'] === 'not_set_up') return { kind: 'not_set_up' };
       const why = refusal(json['error']);
       if (why !== undefined) return { kind: 'refused', why };

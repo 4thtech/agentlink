@@ -181,6 +181,11 @@ export type InboxPage =
  * used owner approval (I-4).
  */
 export interface InviteTools {
+  /**
+   * W4-SHORT-INVITE (04 §3.6.2): the format 1 link of a link (a short link fetched once from the
+   * configured drop). Absent in a double: the link is used as given.
+   */
+  resolve?(link: string): Promise<string>;
   /** A single-use invite (04 §3.6); the link carries the secret and is never logged. */
   create(input: { label?: string; expiresInDays?: number }): Promise<CreatedInvite>;
   /** Step 1 of accept: decodes and checks the link, stores nothing (06 §2.1 name rule applies). */
@@ -399,6 +404,11 @@ export interface ProofPlatformTools {
 export interface ToolClient {
   /** The agent's identity, or undefined when it has none yet (needs `agentlink init`). */
   self(): Promise<SelfView | undefined>;
+  /**
+   * W4-PAUSE (06 §6 "Paused agents"): whether the owner paused this agent (core `paused`, which is
+   * true when the pause row cannot be read). Absent only in a double that does not need it.
+   */
+  paused?(): Promise<boolean>;
   /** The fetch-only catch-up (M1-7h, D-73): fetches and stores, processes nothing (06 §2.0). */
   catchUp(budgetMs: number): Promise<Counts>;
   /** The same counts from the store only (no relay traffic). */
@@ -549,6 +559,7 @@ export function coreToolClient(
         ),
       };
     },
+    paused: () => client.paused(),
     async catchUp(budgetMs) {
       const { inbox, requests, incomplete } = await client.catchUp({ budgetMs });
       return { inbox, requests, incomplete };
@@ -670,6 +681,7 @@ const OFFLINE_CODES: ReadonlySet<string> = new Set(['transport_unavailable']);
 
 function coreInviteTools(client: AgentLinkClient): InviteTools {
   return Object.freeze<InviteTools>({
+    resolve: (link) => client.pairing.resolveInviteLink(link),
     create: (input) => client.pairing.createInvite(input),
     async check(link) {
       return (await client.pairing.acceptInvite({ link })).contact;

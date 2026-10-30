@@ -16,6 +16,8 @@ export type CoreErrorCode =
   | 'owner_key_mismatch'
   | 'key_epoch_mismatch'
   | 'rotation_pending'
+  /** W4-RENAME-REACHES-CONTACTS (D-141): more than RENAMES_PER_DAY renames in 24 h. */
+  | 'rename_limited'
   | 'owner_keys_changed'
   | 'card_invalid'
   | 'card_owner_signature_invalid'
@@ -69,6 +71,10 @@ export type CoreErrorCode =
   | 'invite_invalid'
   | 'invite_too_large'
   | 'invite_expired'
+  // W4-SHORT-INVITE (04 §3.6.2): a short link's object is gone (expired, used, cancelled, deleted
+  // or never existed; the drop does not say which), or the drop could not be reached (retryable).
+  | 'invite_unavailable'
+  | 'invite_fetch_failed'
   | 'invite_options_invalid'
   | 'safety_code_unavailable'
   // Files (04 §4, 06 §2.3, 07 §5; M1-7f)
@@ -78,7 +84,14 @@ export type CoreErrorCode =
   | 'storage_unavailable'
   | 'storage_failed'
   | 'file_download_failed'
-  | 'inbox_unavailable';
+  | 'inbox_unavailable'
+  // W4-AUTO-SAVE (D-142, 04 §4.1): the Inbox folder's volume is (almost) full, or it cannot hold the
+  // OS quarantine mark an automatic save needs.
+  | 'disk_full'
+  | 'folder_cannot_mark'
+  // W4-PAUSE (D-143 (5); 06 §6 "Paused agents"): the owner paused this agent (or its pause row
+  // cannot be read: fail closed); nothing was sent, fetched or kept.
+  | 'agent_paused';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

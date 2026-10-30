@@ -17,6 +17,9 @@
 //   route (`presence: true`, with a handler that never runs): the server answers it 501
 //   `not_available` before the presence gate. This file registers every U3 route of 08 §1 now, so the
 //   later cards only replace the stubs in their own api/ files.
+// - W4-PAUSE (D-143 (5), 08 §1): a `presence: 'pause'` route is only a POST at AGENTS_PAUSE_PATH with
+//   no handler, registered once; the server's pause gate runs it. Resume (AGENTS_RESUME_PATH) is a
+//   `presence: true` route like every other change.
 // - A path is fixed segments `[a-z0-9-]` and `:name` parameters; a parameter matches only
 //   `[A-Za-z0-9_-]{1,128}` (no dot, no percent-escape, no slash), so no handler sees `..` or an
 //   encoded separator. Duplicates throw.
@@ -24,8 +27,12 @@
 import { activityRoutes } from './api/activity.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
 import { agentsRoutes } from './api/agents.js';
+import { eventsRoutes } from './api/events.js';
 import { agentsManageRoutes } from './api/agents-manage.js';
+import { contactNamesRoutes } from './api/contacts-renamed.js';
 import { agentsRemoveRoutes } from './api/agents-remove.js';
+// W4-PAUSE: Pause (its own kind) and Resume (presence; signs `agent.resume`).
+import { agentsPauseRoutes } from './api/agents-pause.js';
 import { appsRoutes } from './api/apps.js';
 import { flowRoutes } from './api/flow.js';
 import { advancedRoutes } from './api/advanced.js';
@@ -35,6 +42,7 @@ import { contactsRoutes } from './api/contacts.js';
 import { filesRoutes } from './api/files.js';
 // MSG-FILES-IO-d: Files, Received and Sent (read-only); MSG-FILES-IO-h: Show in Finder.
 import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
+import { filesSaveRoute } from './api/files-save.js';
 import { firstRunRoutes } from './api/first-run.js';
 // M1-11s-a-d: the status bar's health read (read-only).
 import { healthRoutes } from './api/health.js';
@@ -47,12 +55,23 @@ import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
 import { storageRoutes } from './api/storage.js';
-import { AGENTS_REMOVE_PATH, AGENTS_SWITCH_PATH, type LocalUiRoute } from './route-types.js';
+import {
+  AGENTS_PAUSE_PATH,
+  AGENTS_REMOVE_PATH,
+  AGENTS_RESUME_PATH,
+  AGENTS_SWITCH_PATH,
+  CREATE_AGENT_PATHS,
+  UI_SETTINGS_WRITE_PATH,
+  type LocalUiRoute,
+} from './route-types.js';
+// W4-SHELL-V2: the app's own UI settings (read, and the ui-settings kind).
+import { uiSettingsRoutes } from './api/ui-settings.js';
 // The fixed path lives in reveal-path.ts so api/files-io.ts uses it without importing this file.
 import { REVEAL_PATH } from './reveal-path.js';
 // UX2-d1: the invite paths live in invite-paths.ts for the same reason.
 import {
   INVITE_ACCEPT_PATH,
+  INVITE_CANCEL_PATH,
   INVITE_CHECK_PATH,
   INVITE_CREATE_PATH,
   JOIN_ACCEPT_PATH,
@@ -64,7 +83,9 @@ import {
 import { joinRoutes } from './api/join.js';
 
 export {
+  AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
+  AGENTS_RESUME_PATH,
   AGENTS_SWITCH_PATH,
   INVITE_ACCEPT_PATH,
   INVITE_CHECK_PATH,
@@ -80,6 +101,7 @@ const INVITE_STEP_PATHS: Readonly<Record<string, string>> = Object.freeze({
   create: INVITE_CREATE_PATH,
   check: INVITE_CHECK_PATH,
   dismiss: JOIN_DISMISS_PATH,
+  cancel: INVITE_CANCEL_PATH,
 });
 export const LOCAL_UI_API_PREFIX = '/api/ui/';
 /** M1-11s-c: setup routes live only under the first-run page's API. */
@@ -162,6 +184,16 @@ export class LocalUiRouteRegistry {
       if (this.#entries.some((e) => e.route.presence === 'handoff')) {
         throw invalid('the handoff route is already registered');
       }
+    } else if (presence === 'ui-settings') {
+      // W4-SHELL-V2: the app's own UI settings; the server's ui-settings gate runs it (no presence).
+      if (method !== 'PUT') throw invalid('a ui-settings route is a PUT');
+      if (route.path !== UI_SETTINGS_WRITE_PATH) {
+        throw invalid('a ui-settings route is only at its fixed path');
+      }
+      if (typeof handler !== 'function') throw invalid('a ui-settings route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'ui-settings')) {
+        throw invalid('the ui-settings route is already registered');
+      }
     } else if (presence === 'remove') {
       // U3-e: removing an agent; the server's remove gate runs it (D-138).
       if (method !== 'POST') throw invalid('a remove route is a POST');
@@ -171,6 +203,15 @@ export class LocalUiRouteRegistry {
       if (handler !== undefined) throw invalid('a remove route has no handler');
       if (this.#entries.some((e) => e.route.presence === 'remove')) {
         throw invalid('the remove route is already registered');
+      }
+    } else if (presence === 'pause') {
+      // W4-PAUSE: pausing the open agent; the server's pause gate runs it (D-143 (5)).
+      if (method !== 'POST') throw invalid('a pause route is a POST');
+      if (route.path !== AGENTS_PAUSE_PATH)
+        throw invalid('a pause route is only at its fixed path');
+      if (handler !== undefined) throw invalid('a pause route has no handler');
+      if (this.#entries.some((e) => e.route.presence === 'pause')) {
+        throw invalid('the pause route is already registered');
       }
     } else if (presence === 'switch') {
       // U3-c: switching the open agent; the server's switch gate runs it (D-138).
@@ -203,6 +244,17 @@ export class LocalUiRouteRegistry {
       if (this.#entries.some((e) => e.route.presence === 'pay-confirm' && e.route.step === step)) {
         throw invalid('this pay-confirm step is already registered');
       }
+    } else if (presence === 'create-agent') {
+      // W4-ONE-TOUCH (D-140): New agent with one gesture; the server's create-agent gate runs it.
+      if (method !== 'POST') throw invalid('a create-agent route is a POST');
+      if (handler !== undefined) throw invalid('a create-agent route has no handler');
+      if (step !== 'begin' && step !== 'finish') throw invalid('unknown create-agent step');
+      if (route.path !== CREATE_AGENT_PATHS[step]) {
+        throw invalid('a create-agent route is only at its fixed path');
+      }
+      if (this.#entries.some((e) => e.route.presence === 'create-agent' && e.route.step === step)) {
+        throw invalid('this create-agent step is already registered');
+      }
     } else if (presence === 'reveal') {
       // MSG-FILES-IO-h: Show in Finder only; the server's reveal gate runs it (D-134).
       if (method !== 'POST') throw invalid('a reveal route is a POST');
@@ -214,7 +266,7 @@ export class LocalUiRouteRegistry {
     } else if (presence === 'invite') {
       // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.
       if (method !== 'POST') throw invalid('an invite route is a POST');
-      if (step !== 'create' && step !== 'check' && step !== 'dismiss') {
+      if (step !== 'create' && step !== 'check' && step !== 'dismiss' && step !== 'cancel') {
         throw invalid('unknown invite step');
       }
       if (route.path !== INVITE_STEP_PATHS[step]) {
@@ -311,6 +363,15 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     flowRoutes,
     // U3-invite: the waiting invite (read, accept, "Not now") and the handoff kind.
     joinRoutes,
+    // W4-FILES-SAVE: "Save to Inbox" (owner presence, one signed `file.save`).
+    [filesSaveRoute],
+    // W4-RENAME-REACHES-CONTACTS: the seen mark of a contact's former-name note.
+    contactNamesRoutes,
+    // W4-LIVE-STATUS (D-143): the live AI app status stream (its own events gate in the server).
+    eventsRoutes,
+    // W4-PAUSE (D-143 (5)): Pause and Resume.
+    agentsPauseRoutes,
+    uiSettingsRoutes,
   ]) {
     for (const route of routes) registry.register(route);
   }

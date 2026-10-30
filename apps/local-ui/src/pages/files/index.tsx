@@ -37,6 +37,7 @@ import {
   type FilesApi,
   type PasskeyInfo,
 } from './files-api.js';
+import { createSaveApi } from '../inbox/save-api.js';
 import { FilesSkeleton, FilesTabs, ReceivedPanel, SentPanel, type FilesTab } from './io.js';
 import {
   FILES_IO_STRINGS as IO,
@@ -547,8 +548,25 @@ function FileLists({
     [givenFetch, token],
   );
   const marks = useFileMarks(client);
+  // W4-FILES-SAVE: Save to Inbox with the owner's presence; only the item's ID is sent.
+  const save = useMemo(
+    () => ({
+      api: createSaveApi({
+        ...(givenFetch === undefined ? {} : { fetch: givenFetch }),
+        ...(token === undefined ? {} : { token }),
+      }),
+      passkey: () => api.passkey(),
+    }),
+    [givenFetch, token, api],
+  );
   return tab === 'received' ? (
-    <ReceivedPanel get={api.get} reveal={api.reveal} onWaiting={onReceived} marks={marks} />
+    <ReceivedPanel
+      get={api.get}
+      reveal={api.reveal}
+      onWaiting={onReceived}
+      marks={marks}
+      save={save}
+    />
   ) : (
     <SentPanel get={api.get} onWaiting={onSent} marks={marks} />
   );

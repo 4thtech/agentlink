@@ -16,9 +16,11 @@
 import {
   CoreError,
   INVITE_LINK_PREFIX,
+  McpSession,
   MemoryStore,
   PublisherLease,
   encodeInviteLink,
+  mcpSessionLive,
   type OwnerActionOutcome,
 } from '@4thtech-io/core';
 import {
@@ -185,6 +187,10 @@ async function harness(opts: Options = {}) {
   const client = {
     agentId: opts.agentId ?? world.agentId,
     pairing: {
+      // W4-SHORT-INVITE: a format 1 link resolves to itself.
+      resolveInviteLink: (link: string) => Promise.resolve(link),
+      openInvites: () => Promise.resolve([]),
+      cancelInvite: () => Promise.resolve('not_found'),
       acceptInvite: ({ link, allowed }: { link: string; allowed?: boolean }) => {
         core.accepted.push({ link, allowed: allowed === true });
         if (allowed === true) core.pending = true;
@@ -272,8 +278,17 @@ async function harness(opts: Options = {}) {
       Promise.resolve([{ name: 'default', label: 'Personal', available: true, removing: false }]),
     read: () =>
       Promise.resolve({ name: 'default', label: 'Personal', available: true, removing: false }),
-    // As agent-peek reads it: a live lease row counts as an AI app running the agent.
-    stats: async () => ({ contacts: 0, running: (await leaseHolder()) !== undefined }),
+    // As agent-peek reads it (D-143): a live MCP session row (never the lease) counts as an AI app
+    // running the agent; the host's own pass takes the lease and writes no session row.
+    stats: async () => {
+      const rows = await store.transaction((tx) => tx.select('mcp_sessions'));
+      const sessions = rows
+        .filter((r) =>
+          mcpSessionLive(r, Math.floor(clock / 1000), opts.agentId ?? world.agentId, () => true),
+        )
+        .map((r) => ({ app: r.app, startedAt: r.started_at, lastToolAt: r.last_tool_at }));
+      return { contacts: 0, running: sessions.length > 0, sessions, lastSeen: [] };
+    },
     writeLabel: () => Promise.resolve(),
     markRemoving: () => Promise.reject(new Error('never')),
     removeFolder: () => Promise.reject(new Error('never')),
@@ -695,13 +710,19 @@ describe('POST /api/ui/join/accept (08 §4)', () => {
       { link: LINK, allowed: true },
     ]);
     expect(parse((await h.read()).body)).toMatchObject({ state: 'waiting_for_them' });
+    expect(parse((await h.read()).body)).not.toHaveProperty('contactRef');
     // A second accept finds no invite to take: nothing more is signed.
     const again = await h.accept(INVITE_ID, world.code);
     expect(again.status).toBe(409);
     expect(h.core.applied).toHaveLength(1);
     // Connected once the inviter's agent answered (the contact exists).
     h.core.contacts.push({ id: CONTACT_ID, status: 'active' });
-    expect(parse((await h.read()).body)).toMatchObject({ state: 'connected' });
+    // W4-PEOPLE-INVITE (IR SEC-1 L3): connected names the new contact's ref (its ID, as the
+    // contacts routes use it), so the screen reads that contact's safety code and no other.
+    expect(parse((await h.read()).body)).toMatchObject({
+      state: 'connected',
+      contactRef: CONTACT_ID.toLowerCase(),
+    });
     // After accept, a new handoff is taken (the shown invite was answered).
     expect((await h.handoff({ invite: OTHER_LINK })).status).toBe(200);
     expectNoLink(h, res.body);
@@ -782,6 +803,14 @@ describe('the join screen follows the pairing (U3-invite-b (a))', () => {
     let mcpNow = 1_790_000_000;
     const mcp = new PublisherLease({ store, now: () => mcpNow });
     expect(await mcp.take()).toBe(true);
+    // D-143: the same MCP server keeps its session row (06 §6), beating as it does every 15 s.
+    const session = new McpSession({
+      store,
+      now: () => mcpNow,
+      agentId: world.agentId,
+      pid: process.pid,
+    });
+    expect(await session.start('claude-code')).toBe(true);
     const h = await harness({ waitingInvite: LINK, store, sync: answered });
     expect((await h.accept(INVITE_ID, world.code)).status).toBe(200);
     const publishedByAccept = h.core.published;
@@ -793,6 +822,7 @@ describe('the join screen follows the pairing (U3-invite-b (a))', () => {
       h.advance(16_000);
       mcpNow += 16;
       expect(await mcp.renew()).toBe(true);
+      expect(await session.beat()).toBe(true);
     }
     await settle();
     expect(h.core.synced).toHaveLength(0);
@@ -803,6 +833,7 @@ describe('the join screen follows the pairing (U3-invite-b (a))', () => {
     expect(listed.agents[0]?.running).toBe(true);
     // Once the MCP server stops (clean shutdown releases the lease), the host may follow.
     expect(await mcp.release()).toBe(true);
+    expect(await session.end()).toBe(true);
     await settle();
     h.advance(5_000);
     expect(parse((await h.read()).body)).toMatchObject({ state: 'connected' });

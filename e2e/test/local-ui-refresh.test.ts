@@ -27,6 +27,12 @@ import { gzipSync } from 'node:zlib';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ROUTES } from './fixtures/local-ui-refresh.js';
+import {
+  emulateReducedMotion,
+  expectFadesOnly,
+  expectStableLayout,
+  observeLayoutShift,
+} from './helpers/motion.js';
 
 const DIST = fileURLToPath(new URL('../../apps/local-ui/dist/', import.meta.url));
 // axe-core (devDependency of this package) as a script for the page.
@@ -39,24 +45,29 @@ const AXE = readFileSync(
 const BASELINE_040 = { jsGzip: 131_357, cssGzip: 12_685 } as const;
 const BUDGET = { cssGzip: 15 * 1024, jsGzip: 10 * 1024 } as const; // plan §7
 
+// W4-SHELL-V2: the sections (today's pages until their builders replace the bodies), Settings,
+// Advanced and Get started.
 const PAGES = [
-  { path: '/', title: 'Approvals' },
-  { path: '/settings/home', title: 'Home' },
-  { path: '/settings/activity', title: 'Activity' },
-  { path: '/settings/messages', title: 'Messages' },
-  { path: '/settings/contacts', title: 'Contacts' },
+  { path: '/', title: 'Home' },
+  { path: '/agents', title: 'Agents' },
+  { path: '/activity', title: 'Activity' },
+  // Interim: today's Messages and Contacts pages (U3, U4 fold them into Home).
+  { path: '/inbox', title: 'Inbox' },
+  { path: '/contacts', title: 'Contacts' },
   { path: '/settings/files', title: 'Files' },
   { path: '/settings/proofs', title: 'Proofs & credits' },
   { path: '/settings/rules', title: 'Rules' },
-  { path: '/settings/backup', title: 'Backup' },
-  { path: '/settings/passkeys', title: 'Passkeys' },
+  { path: '/settings', title: 'Settings' },
+  { path: '/activity/live', title: 'Live activity stream' },
+  { path: '/settings/backup', title: 'Backup & Touch ID' },
+  { path: '/settings/notifications', title: 'Notifications' },
   { path: '/settings/appearance', title: 'Appearance' },
-  { path: '/settings/advanced', title: 'Advanced' },
-  { path: '/settings/about', title: 'About' },
-  {
-    path: '/first-run',
-    title: 'Private messages between AI agents. Only you and your contact can read them.',
-  },
+  { path: '/advanced/network', title: 'Relays & network' },
+  { path: '/advanced/diagnostics', title: 'Diagnostics' },
+  // W4-WIRE (U6 low): the Connections map is checked like every Advanced page.
+  { path: '/advanced/map', title: 'Connections map' },
+  // W4-WIZARD: Get started opens on step 1, the AI app pick.
+  { path: '/start/app', title: 'Which AI app do you use?' },
 ] as const;
 
 interface Mode {
@@ -157,7 +168,11 @@ async function open(mode: Mode): Promise<{ ctx: BrowserContext; page: Page }> {
   }, hood);
   await page.route('**/api/**', (route) => {
     const url = new URL(route.request().url());
-    const body = ROUTES[url.pathname];
+    // W4-WIZARD: the app opens Get started by itself while no owner exists; these pages are of an
+    // owner's app, so only Get started itself reads "no owner yet" (its first step is a page here).
+    const onStart = new URL(route.request().frame().url()).pathname.startsWith('/start/');
+    const body =
+      url.pathname === '/api/ui/first-run' && !onStart ? { owner: 'set_up' } : ROUTES[url.pathname];
     return route.fulfill({
       status: body === undefined ? 404 : 200,
       contentType: 'application/json',
@@ -479,17 +494,14 @@ async function timedNav(page: Page, label: string, title: string): Promise<numbe
   return page.evaluate(() => (window as unknown as { __nav: Promise<number> }).__nav);
 }
 
-/** The nav order a route-change pass walks (every sidebar item, then back to Home). */
+/**
+ * The order a route-change pass walks in the section menu (W4-SHELL-V2, Decision 48): Agents and
+ * Activity, there and back again.
+ */
 const NAV_WALK: readonly (readonly [string, string])[] = [
-  ['Approvals', 'Approvals'],
+  ['Agents', 'Agents'],
   ['Activity', 'Activity'],
-  ['Messages', 'Messages'],
-  ['Contacts', 'Contacts'],
-  ['Files', 'Files'],
-  ['Proofs & credits', 'Proofs & credits'],
-  ['Rules', 'Rules'],
-  ['Settings', 'Backup'],
-  ['Home', 'Home'],
+  ['Agents', 'Agents'],
 ];
 
 beforeAll(async () => {
@@ -579,8 +591,8 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     const tooMany: string[] = [];
     const misplaced: string[] = [];
     try {
-      await page.goto(`${origin}/settings/home`);
-      await settle(page, 'Home');
+      await page.goto(`${origin}/activity`);
+      await settle(page, 'Activity');
       layout.push(...(await layoutKeyframes(page)));
       for (const p of PAGES) {
         await page.goto(origin + p.path);
@@ -612,7 +624,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         }
       }
       // With a Sheet open: the chrome plus the overlay, never more than five.
-      await page.goto(`${origin}/settings/contacts`);
+      await page.goto(`${origin}/contacts`);
       await settle(page, 'Contacts');
       await page.getByRole('button', { name: /Ana/ }).first().click();
       await page.getByRole('dialog').first().waitFor();
@@ -635,7 +647,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     for (const mode of MODES.filter((m) => m.reduced || m.contrast || m.forcedColors)) {
       const { ctx, page } = await open(mode);
       try {
-        await page.goto(`${origin}/settings/activity`);
+        await page.goto(`${origin}/activity`);
         await settle(page, 'Activity');
         solid[mode.name] = (await motionAndDepth(page)).backdrop.length;
       } finally {
@@ -656,8 +668,8 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       const plain: Record<string, number> = {};
       const throttled: Record<string, number> = {};
       try {
-        await page.goto(`${origin}/settings/home`);
-        await settle(page, 'Home');
+        await page.goto(`${origin}/activity`);
+        await settle(page, 'Activity');
         // One warm-up pass: the first visit of a page loads its fonts.
         for (const [label, title] of NAV_WALK) await timedNav(page, label, title);
         // Three passes; the median per page (one GC pause on a shared runner is not the app).
@@ -714,8 +726,8 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         out['firstRender'] = first;
 
         // Route changes.
-        await page.goto(`${origin}/settings/home`);
-        await settle(page, 'Home');
+        await page.goto(`${origin}/activity`);
+        await settle(page, 'Activity');
         await startRecorder(page);
         for (const [label, title] of NAV_WALK) {
           await timedNav(page, label, title);
@@ -725,8 +737,8 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
 
         // Scrolling Activity (200 rows) and Messages (60 conversations, 200 messages).
         for (const [path, title, open200] of [
-          ['/settings/activity', 'Activity', false],
-          ['/settings/messages', 'Messages', true],
+          ['/activity', 'Activity', false],
+          ['/inbox', 'Inbox', true],
         ] as const) {
           await page.goto(origin + path);
           await settle(page, title);
@@ -749,7 +761,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         }
 
         // Sheet open and close (Contacts detail).
-        await page.goto(`${origin}/settings/contacts`);
+        await page.goto(`${origin}/contacts`);
         await settle(page, 'Contacts');
         await startRecorder(page);
         for (let i = 0; i < 3; i++) {
@@ -784,13 +796,118 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     240_000,
   );
 
+  // W4-SHELL-V2 (W4 UI re-brief, acceptance of every UI unit): the shell keeps its layout still
+  // (CLS ≤ 0.01) while it loads and settles, and under reduced motion every shell move is a fade
+  // (the agent menu, Help, the rail expanding, the Under the hood morph): no pulse, nothing moves.
+  it('shell motion: CLS ≤ 0.01 on load; reduced motion fades only (menu, Help, rail, morph)', async () => {
+    const { ctx, page } = await open(MODES[0] as Mode);
+    try {
+      await observeLayoutShift(page);
+      await page.goto(`${origin}/agents`);
+      await settle(page, 'Agents');
+      await page.waitForTimeout(600);
+      report['shellCls'] = await expectStableLayout(page);
+
+      await emulateReducedMotion(page);
+      await page.locator('button.al-chip').first().click();
+      await expectFadesOnly(page);
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Help' }).first().click();
+      await expectFadesOnly(page);
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Expand menu' }).first().click();
+      await expectFadesOnly(page);
+      await page
+        .getByRole('switch', { name: /Under the hood/ })
+        .first()
+        .click();
+      await expectFadesOnly(page);
+      await page.locator('[aria-label="Live status"]').first().waitFor();
+    } finally {
+      await ctx.close();
+    }
+  }, 60_000);
+
+  // W4-SHELL-LIVE (U1-b; follow-up of W4-SHELL-V2: the top bar shifted ~0.023 when Under the hood
+  // turned on): the app's own Under the hood value turns it on after load (this browser had it off),
+  // and the live status of the AI apps changes while nobody touches the page (Claude Code quits).
+  // Neither moves the page: the strip, the chip and the menu keep their places (CLS ≤ 0.01).
+  for (const width of [1280, 360]) {
+    it(`shell live: Under the hood from the app and an AI app quitting keep CLS ≤ 0.01 (${width})`, async () => {
+      const { ctx, page } = await open({ ...(MODES[0] as Mode), width });
+      try {
+        let reads = 0;
+        const agents = (): unknown => {
+          reads += 1;
+          const running = reads <= 1;
+          return {
+            switchable: true,
+            generation: 1,
+            current: 'default',
+            label: "Tali's agent",
+            agents: [
+              {
+                name: 'default',
+                label: "Tali's agent",
+                labelled: true,
+                current: true,
+                available: true,
+                removing: false,
+                contacts: 2,
+                running,
+                state: running ? 'ready' : 'offline',
+                ...(running ? {} : { lastSeenAt: Math.floor(Date.now() / 1000) - 180 }),
+                apps: [
+                  running
+                    ? { app: 'claude-code', state: 'ready', since: 1_800_000_000 }
+                    : {
+                        app: 'claude-code',
+                        state: 'not_running',
+                        lastSeenAt: Math.floor(Date.now() / 1000) - 180,
+                      },
+                ],
+              },
+            ],
+          };
+        };
+        const json = (body: unknown, status = 200) => ({
+          status,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        });
+        await page.route('**/api/ui/agents', (route) => route.fulfill(json(agents())));
+        await page.route('**/api/ui/ui-settings', (route) =>
+          route.fulfill(json({ underTheHood: true })),
+        );
+        // No stream here: the live store falls back to its 5 s read, a change with no input.
+        await page.route('**/api/ui/events', (route) => route.fulfill(json({ error: 'x' }, 404)));
+        await observeLayoutShift(page);
+        await page.goto(`${origin}/agents`);
+        await settle(page, 'Agents');
+        await page.locator('[aria-label="Live status"] li').first().waitFor();
+        await page.waitForFunction(
+          () => {
+            const status = document.querySelector('button.al-chip .al-chip-status')?.textContent;
+            return status !== undefined && status !== '' && !status.includes('Ready');
+          },
+          undefined,
+          { timeout: 15_000 },
+        );
+        await page.waitForTimeout(300);
+        report[`shellLiveCls${width}`] = await expectStableLayout(page);
+      } finally {
+        await ctx.close();
+      }
+    }, 60_000);
+  }
+
   it('keyboard: nav, Under the hood switch, Sheets (inert background), Approvals', async () => {
     const { ctx, page } = await open(MODES[0] as Mode);
     const kb: Record<string, unknown> = {};
     try {
       // Approvals: nothing autofocused on an Approve; the controls are reachable by Tab.
       await page.goto(`${origin}/`);
-      await settle(page, 'Approvals');
+      await settle(page, 'Home');
       kb['approvalsFocusOnLoad'] = await page.evaluate(() => {
         const a = document.activeElement;
         if (!a || a === document.body || a === document.documentElement) return '(body)';
@@ -825,8 +942,8 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       const reached = navNames.filter((n) => stops.some((s) => s.includes(n)));
       kb['navReached'] = reached;
 
-      // Under the hood switch: reachable and toggles with Space.
-      await page.goto(`${origin}/settings/activity`);
+      // Under the hood (W4-SHELL-V2: the switch top right): reachable by Tab, toggles with Space.
+      await page.goto(`${origin}/activity`);
       await settle(page, 'Activity');
       const sw = page.getByRole('switch', { name: /Under the hood/i }).first();
       const hasSwitch = (await sw.count()) > 0;
@@ -840,6 +957,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         if (found) {
           const before = await sw.getAttribute('aria-checked');
           await page.keyboard.press('Space');
+          await page.waitForTimeout(100);
           toggled = (await sw.getAttribute('aria-checked')) !== before;
           await page.keyboard.press('Space');
         }
@@ -848,7 +966,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       kb['hoodSwitch'] = { present: hasSwitch, toggledBySpace: toggled };
 
       // Sheet: focus moves in, background inert, Escape closes and focus returns.
-      await page.goto(`${origin}/settings/contacts`);
+      await page.goto(`${origin}/contacts`);
       await settle(page, 'Contacts');
       const row = page.getByRole('button', { name: /Ana/ }).first();
       await row.focus();

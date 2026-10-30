@@ -2,8 +2,17 @@
 // is a red case here, in deps-check and, where the form is visible to ESLint, in ESLint too.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { checkManifest, checkSource, runChecks, specProblem } from './check.mjs';
@@ -818,5 +827,94 @@ describe('M1-5b-b: relay sockets only in packages/node', () => {
   it('allows ws as a runtime dependency of packages/node only', () => {
     expect(manifest('packages/node', { dependencies: { ws: '8.22.0' } })).toEqual([]);
     expect(manifest('packages/core', { dependencies: { ws: '8.22.0' } })).not.toEqual([]);
+  });
+});
+
+describe('W4-DEPS-CHECK-FLAKE: the per-file result cache never changes the report', () => {
+  const dirs = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+  const repo = (files) => {
+    const root = mkdtempSync(join(tmpdir(), 'deps-check-cache-'));
+    dirs.push(root);
+    const all = {
+      'packages/core/package.json': JSON.stringify({ name: '@4thtech-io/core' }),
+      ...files,
+    };
+    for (const [path, content] of Object.entries(all)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), content);
+    }
+    return root;
+  };
+
+  it('reports the same problems cold, warm and without the cache', () => {
+    const root = repo({
+      'packages/core/src/a.ts': `export * from 'viem';\n`,
+      'packages/core/src/b.ts': `export const b = 1;\n`,
+    });
+    const plain = runChecks(root);
+    expect(plain.problems.some((problem) => problem.includes('viem'))).toBe(true);
+    expect(runChecks(root, { cache: true })).toEqual(plain);
+    expect(runChecks(root, { cache: true })).toEqual(plain);
+  });
+
+  it('re-checks a file whose text changed after a clean cached run', () => {
+    const root = repo({ 'packages/core/src/a.ts': `export const a = 1;\n` });
+    expect(runChecks(root, { cache: true }).problems).toEqual([]);
+    writeFileSync(join(root, 'packages/core/src/a.ts'), `export * from 'viem';\n`);
+    const { problems } = runChecks(root, { cache: true });
+    expect(problems.some((problem) => problem.includes('viem'))).toBe(true);
+  });
+
+  const plant = (root, replace) => {
+    const cacheDir = join(root, 'node_modules', '.cache', 'deps-check');
+    const [name] = readdirSync(cacheDir);
+    const file = join(cacheDir, name);
+    writeFileSync(file, JSON.stringify(replace(JSON.parse(readFileSync(file, 'utf8')))));
+  };
+
+  it.each([
+    ['null', null],
+    ['a number', 7],
+    ['a list', []],
+  ])('rescans when the cache file holds %s instead of an object', (_label, value) => {
+    const root = repo({ 'packages/core/src/a.ts': `export * from 'viem';\n` });
+    runChecks(root, { cache: true });
+    plant(root, () => value);
+    const { problems } = runChecks(root, { cache: true });
+    expect(problems.some((problem) => problem.includes('viem'))).toBe(true);
+  });
+
+  it('the gating CLI never reads an existing cache when CI is set (planted clean entries)', () => {
+    const root = repo({ 'packages/core/src/a.ts': `export * from 'viem';\n` });
+    runChecks(root, { cache: true });
+    plant(root, (entries) => Object.fromEntries(Object.keys(entries).map((key) => [key, []])));
+    // the planted cache really would hide the violation for a cache-reading run
+    expect(runChecks(root, { cache: true }).problems.some((p) => p.includes('viem'))).toBe(false);
+    const cli = join(dirname(fileURLToPath(import.meta.url)), 'index.mjs');
+    let stderr = '';
+    try {
+      execFileSync('node', [cli, root], {
+        env: { ...process.env, CI: '1' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      stderr = String(error.stderr);
+    }
+    expect(stderr).toContain('viem');
+  });
+
+  it('ignores a damaged or hand-edited cache entry', () => {
+    const root = repo({ 'packages/core/src/a.ts': `export * from 'viem';\n` });
+    runChecks(root, { cache: true });
+    const cacheDir = join(root, 'node_modules', '.cache', 'deps-check');
+    const [name] = readdirSync(cacheDir);
+    const entries = JSON.parse(readFileSync(join(cacheDir, name), 'utf8'));
+    for (const key of Object.keys(entries)) entries[key] = 'not a list';
+    writeFileSync(join(cacheDir, name), JSON.stringify(entries));
+    const { problems } = runChecks(root, { cache: true });
+    expect(problems.some((problem) => problem.includes('viem'))).toBe(true);
   });
 });

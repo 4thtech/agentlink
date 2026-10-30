@@ -45,6 +45,8 @@ interface QuarantinedFile {
   readonly path: string;
   state: SinkState;
   handle: FileHandle | undefined;
+  /** W4-RENAME-REACHES-CONTACTS: the checked snapshot's `identity.key_epoch` (its card's epoch). */
+  keyEpoch?: number;
 }
 
 /** Every quarantine sink this module made, by identity (a look-alike sink is never one). */
@@ -158,23 +160,32 @@ export async function checkQuarantinedSnapshot(
     db.pragma('query_only = ON');
     db.pragma('trusted_schema = OFF');
     if (db.pragma('application_id', { simple: true }) !== STORE_APPLICATION_ID) return false;
-    const rows = db.prepare('SELECT agent_id, agent_card_json FROM identity').all() as {
+    const rows = db.prepare('SELECT agent_id, agent_card_json, key_epoch FROM identity').all() as {
       agent_id: unknown;
       agent_card_json: unknown;
+      key_epoch: unknown;
     }[];
     if (rows.length !== 1) return false;
-    const row = rows[0] as { agent_id: unknown; agent_card_json: unknown };
+    const row = rows[0] as { agent_id: unknown; agent_card_json: unknown; key_epoch: unknown };
     if (row.agent_id !== agentId || typeof row.agent_card_json !== 'string') return false;
     cipher = await createAgentStoreCipher(storeKey);
     const text = await cipher.open(
       { table: 'identity', column: 'agent_card_json', rowKey: rowKeyOf([agentId]) },
       row.agent_card_json as Sealed,
     );
-    const stored = parseJson(text) as { card?: { ownerNostr?: unknown } } | null;
+    const stored = parseJson(text) as {
+      card?: { ownerNostr?: unknown; keyEpoch?: unknown };
+    } | null;
     const named = stored?.card?.ownerNostr;
     // The card spelling of ownerNostr: `0x` + 64 lowercase hex (04 §2.4.1); anything else throws.
     if (typeof named !== 'string') return false;
     if (!equalBytes(decodeHex0x(named, { length: 32 }), ownerNostr)) return false;
+    // W4-RENAME-REACHES-CONTACTS (D-141): the epoch the store's card is at, for a kit without the
+    // `key-epoch` item (kits made before it): the row and its card must agree.
+    const epoch = row.key_epoch;
+    if (typeof epoch !== 'number' || !Number.isSafeInteger(epoch) || epoch < 0) return false;
+    if (stored?.card?.keyEpoch !== epoch) return false;
+    file.keyEpoch = epoch;
     file.state = 'checked';
     return true;
   } catch {
@@ -183,6 +194,20 @@ export async function checkQuarantinedSnapshot(
     cipher?.close();
     db?.close();
   }
+}
+
+/**
+ * W4-RENAME-REACHES-CONTACTS (D-141; 04 §2.3.3): the key epoch of a checked quarantined snapshot
+ * (its identity row, equal to its card's), or undefined for a sink this module did not check.
+ */
+export function checkedSnapshotKeyEpoch(
+  sink: RecoveryKitStoreSink | undefined,
+): number | undefined {
+  if (sink === undefined) return undefined;
+  const file = SINKS.get(sink);
+  if (file === undefined || (file.state !== 'checked' && file.state !== 'installed'))
+    return undefined;
+  return file.keyEpoch;
 }
 
 /** The handle's store sink of `agentId`, if any (public facts only). */

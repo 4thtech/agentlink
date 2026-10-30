@@ -300,3 +300,74 @@ describe('motion lint on fixtures', () => {
     expect(run(`@media (prefers-reduced-motion: no-preference) { ${base} }`)).toEqual([]);
   });
 });
+
+// W4-MOTION-KIT: motion and loading come only from the kit (W4 UI re-brief, rules for every UI
+// unit): no motion library anywhere, no new keyframes in the app's stylesheets (the ones below
+// predate the kit; a page card deletes its entry when it moves to the kit, and a stale entry fails),
+// and the kit itself names its curves by token, never a literal cubic-bezier() or linear().
+const MOTION_LIBRARIES = [
+  'framer-motion',
+  'motion',
+  'gsap',
+  'react-spring',
+  'animejs',
+  'popmotion',
+  'react-transition-group',
+  'react-motion',
+  '@formkit/auto-animate',
+];
+const LEGACY_APP_KEYFRAMES = [
+  'apps/local-ui/src/pages/activity/activity.css | al-activity-fade',
+  'apps/local-ui/src/pages/agents/map/map.css | mp-edge',
+  'apps/local-ui/src/pages/agents/map/map.css | mp-travel',
+  'apps/local-ui/src/pages/contacts/contacts.css | ct-breathe',
+  'apps/local-ui/src/pages/contacts/contacts.css | ct-dup-in',
+  'apps/local-ui/src/pages/home/home.css | hm-start-fade',
+  'apps/local-ui/src/pages/home/home.css | hm-start-pop',
+  'apps/local-ui/src/pages/moving/moving.css | mv-travel',
+  'apps/local-ui/src/pages/welcome/welcome.css | wl-in',
+];
+
+const manifests = import.meta.glob('../../../{apps,packages}/*/package.json', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>;
+
+describe('the W4 motion kit is the only source of motion', () => {
+  it('no app or package depends on a motion library', () => {
+    expect(Object.keys(manifests).length).toBeGreaterThan(5);
+    for (const [file, text] of Object.entries(manifests)) {
+      const pkg = JSON.parse(text) as Record<string, Record<string, string> | undefined>;
+      const deps = Object.keys({
+        ...pkg['dependencies'],
+        ...pkg['devDependencies'],
+        ...pkg['peerDependencies'],
+        ...pkg['optionalDependencies'],
+      });
+      const found = deps.filter(
+        (d) => MOTION_LIBRARIES.includes(d) || d.startsWith('@react-spring/'),
+      );
+      expect(found, file).toEqual([]);
+    }
+  });
+
+  it('the app stylesheets add no keyframes beyond the legacy list', () => {
+    const found: string[] = [];
+    for (const [file, css] of Object.entries(sheets)) {
+      if (!file.startsWith('apps/')) continue;
+      const text = css.replace(/\/\*[\s\S]*?\*\//g, '');
+      for (const m of text.matchAll(/@keyframes\s+([\w-]+)/g)) found.push(`${file} | ${m[1]}`);
+    }
+    expect(found.sort()).toEqual([...LEGACY_APP_KEYFRAMES].sort());
+  });
+
+  it('the kit stylesheet names every curve by token', () => {
+    const motion = (sheets['packages/ui/src/components/motion.css'] ?? '').replace(
+      /\/\*[\s\S]*?\*\//g,
+      '',
+    );
+    expect(motion).not.toMatch(/cubic-bezier\(|linear\(/);
+    expect(motion).toContain('var(--al-easing-spring)');
+  });
+});

@@ -147,6 +147,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/files/folders',
       // MSG-FILES-IO-d: Files, Received and Sent (api/files-io.test.ts).
       '/api/ui/files/received',
+      // W4-AUTO-SAVE: the one-time notice's dismiss (api/files-io-auto-save.test.ts).
+      '/api/ui/files/auto-save-notice/dismiss',
       '/api/ui/files/sent',
       '/api/ui/contacts',
       '/api/ui/contacts/:ref/safety-code',
@@ -167,6 +169,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/health',
       // MSG-FILES-IO-h: Show in Finder (api/files-io-reveal.test.ts).
       '/api/ui/files/received/reveal',
+      // W4-FILES-SAVE: Save to Inbox (api/files-save.test.ts).
+      '/api/ui/files/save',
       // UX2-d1: create, check and accept an invite (api/invites.test.ts).
       '/api/ui/invites',
       '/api/ui/invites/check',
@@ -188,6 +192,19 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/join/accept',
       '/api/ui/join/dismiss',
       '/api/ui/join/handoff',
+      // W4-RENAME-REACHES-CONTACTS: "Contacts still see" and the former-name seen mark.
+      '/api/ui/agents/card-name',
+      '/api/ui/contacts/:ref/name-seen',
+      // W4-INVITES-LIST: the open invites (a read) and Cancel (api/invites-short.test.ts).
+      '/api/ui/invites',
+      '/api/ui/invites/cancel',
+      // W4-LIVE-STATUS: the live event stream (local-ui/events-server.test.ts).
+      '/api/ui/events',
+      // W4-PAUSE: Pause (its own kind) and Resume (local-ui/agents-pause-server.test.ts).
+      '/api/ui/agents/pause',
+      '/api/ui/agents/resume',
+      // W4-SHELL-V2: the app's UI settings (local-ui/ui-settings-server.test.ts).
+      '/api/ui/ui-settings',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
@@ -198,6 +215,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       (r) =>
         r.presence !== 'setup' &&
         r.presence !== 'pay-confirm' &&
+        // W4-ONE-TOUCH: New agent's two routes are covered in create-connect-server.test.ts.
+        r.presence !== 'create-agent' &&
         r.path !== '/api/ui/first-run' &&
         !built.has(r.path),
     );
@@ -339,6 +358,8 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
     ).toEqual([
       `POST ${INVITE_CREATE_PATH}`,
       `POST ${INVITE_CHECK_PATH}`,
+      // W4-INVITES-LIST: Cancel an open invite (no presence, signs nothing).
+      'POST /api/ui/invites/cancel',
       'POST /api/ui/join/dismiss',
     ]);
     expect(routes.find((r) => r.path === INVITE_ACCEPT_PATH)).toMatchObject({

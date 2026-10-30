@@ -1,11 +1,24 @@
 // @vitest-environment jsdom
-// M1-11s-a: every route renders its stub inside the shared layout, the nav marks the active item
-// and a nav click changes the page without a reload.
+// M1-11s-a: every route renders its page inside the shared layout, the menu marks the current
+// section and a click changes the page without a reload.
+// W4-SHELL-V2 (Decisions 49–51): the sections Home (`/`), Agents (`/agents`, `/agents/<name>`),
+// Activity (`/activity`, `/activity/live`) and Settings (`/settings/<page>`); Advanced
+// (`/advanced/<page>`) while Under the hood is on; Get started (`/start/<step>`) in the focused shell.
+// Same routes in both layers. Old paths redirect. All routes point at today's pages; the section
+// builders replace the page bodies in their own folders and never touch the router or the menu.
 import { createElement as h, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setConnectionState } from './layout/index.js';
-import { NAV_ITEMS } from './nav.js';
+import {
+  ADVANCED_SECTIONS,
+  REDIRECTS,
+  SECTIONS,
+  SETTINGS_PAGES,
+  goToEntries,
+  sectionOf,
+  titleOf,
+} from './nav.js';
 import { AppRoutes, ROUTES } from './router.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -28,140 +41,203 @@ function mountAt(path: string): void {
   act(() => root.render(h(AppRoutes)));
 }
 
-const EXPECTED: ReadonlyArray<readonly [string, string]> = [
-  ['/', 'Approvals'],
-  ['/first-run', 'Set up AgentLink'],
-  ['/settings/home', 'Home'],
-  ['/settings/activity', 'Activity'],
-  ['/settings/messages', 'Messages'],
-  ['/settings/contacts', 'Contacts'],
-  ['/settings/agents', 'Agents'],
-  ['/settings/apps', 'AI apps'],
-  ['/settings/files', 'Files'],
-  ['/settings/proofs', 'Proofs & credits'],
-  ['/settings/rules', 'Rules'],
-  ['/settings/backup', 'Backup'],
-  ['/settings/passkeys', 'Passkeys'],
-  ['/settings/advanced', 'Advanced'],
-  // UI-REFRESH-f: Appearance (Home sits at /settings/home until M1-11b-2 moves it to /, D-135).
-  ['/settings/appearance', 'Appearance'],
-  // UI-REFRESH-n: About.
-  ['/settings/about', 'About'],
-  // U3-invite: the join screen, in the first-run shell (no sidebar).
-  ['/settings/join', 'AgentLink'],
+const rail = (): Element | null => host.querySelector('nav.al-rail');
+const currentSection = (): string | null | undefined =>
+  host.querySelector('nav.al-rail a[aria-current="page"]')?.getAttribute('aria-label');
+
+/** Path, the page's own heading (today's page), and the section marked current. */
+const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
+  ['/', 'Home', 'Home'],
+  ['/agents', 'Agents', 'Agents'],
+  ['/activity', 'Activity', 'Activity'],
+  ['/activity/live', 'Live activity stream', null],
+  ['/inbox', 'Inbox', 'Home'],
+  ['/contacts', 'Contacts', 'Home'],
+  ['/settings', 'Settings', 'Settings'],
+  ['/settings/backup', 'Backup & Touch ID', 'Settings'],
+  ['/settings/apps', 'AI apps', 'Settings'],
+  ['/settings/files', 'Files', 'Settings'],
+  ['/settings/appearance', 'Appearance', 'Settings'],
+  ['/settings/notifications', 'Notifications', 'Settings'],
+  ['/settings/rules', 'Rules', 'Settings'],
+  ['/settings/proofs', 'Proofs & credits', 'Settings'],
+  ['/advanced/rules', 'Rules', null],
+  ['/advanced/proofs', 'Proofs & credits', null],
+  ['/advanced/network', 'Relays & network', null],
+  ['/advanced/diagnostics', 'Diagnostics', null],
+  ['/advanced/map', 'Connections map', null],
+];
+const FOCUSED = [
+  '/start/app',
+  '/start/connect',
+  '/start/connected',
+  '/start/invite',
+  '/settings/join',
 ];
 
 describe('routes', () => {
   it('declares exactly the shell routes', () => {
-    expect(ROUTES.map((r) => r.path).sort()).toEqual(EXPECTED.map(([p]) => p).sort());
+    expect(ROUTES.map((r) => r.path).sort()).toEqual(
+      [...EXPECTED.map(([p]) => p), ...FOCUSED].sort(),
+    );
   });
 
-  // Built pages test their own content (pages/<page>/*.test.tsx).
-  // M1-11b-1: /first-run is a real page now (pages/first-run/first-run.test.ts).
-  // M1-11b-2: Approvals (`/`) is a real page now (pages/approvals/approvals.test.ts).
-  const BUILT: ReadonlySet<string> = new Set([
-    '/',
-    '/settings/home',
-    '/settings/activity',
-    '/settings/messages',
-    '/settings/contacts',
-    '/settings/agents',
-    '/settings/apps',
-    '/settings/files',
-    '/settings/proofs',
-    '/settings/rules',
-    '/settings/appearance',
-    '/settings/about',
-  ]);
-  const STUBS = EXPECTED.filter(([p]) => p !== '/first-run' && p !== '/settings/join');
-  it('U3-invite: /settings/join renders in the focused first-run shell, with no sidebar', () => {
-    mountAt('/settings/join');
-    expect(host.querySelector('nav[aria-label="Main"]')).toBeNull();
+  it.each(EXPECTED)('%s renders its page inside the layout', (path, heading, section) => {
+    mountAt(path);
+    expect(rail()).not.toBeNull();
+    expect(host.querySelector('header.al-top')).not.toBeNull();
+    expect(host.querySelector('footer.al-statusbar')).not.toBeNull();
+    expect(host.querySelector('main h1')?.textContent).toBe(heading);
+    if (section !== null) expect(currentSection()).toBe(section);
+  });
+
+  it.each(FOCUSED)('%s renders in the focused shell: no top bar, menu or status bar', (path) => {
+    mountAt(path);
+    expect(rail()).toBeNull();
+    expect(host.querySelector('header.al-top')).toBeNull();
     expect(host.querySelector('main.al-first-run')).not.toBeNull();
   });
-  it.each(STUBS)('%s renders its page inside the layout', (path, title) => {
-    mountAt(path);
-    expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
-    expect(host.querySelector('footer.al-statusbar')).not.toBeNull();
-    const main = host.querySelector('main');
-    expect(main?.querySelector('h1')?.textContent).toBe(title);
-    if (!BUILT.has(path)) {
-      expect(main?.querySelector('.al-empty')?.textContent).toContain('available yet');
-    }
+
+  it('shows one agent at /agents/<name> on the Agents page (W4-AGENTS: its own page)', () => {
+    mountAt('/agents/work');
+    expect(location.pathname).toBe('/agents/work');
+    // The Agents page draws the agent's page (its heading is the agent's label once read).
+    expect(host.querySelector('main.ag-page')).not.toBeNull();
+    expect(currentSection()).toBe('Agents');
   });
 
   it('shows the not-found state for an unknown path, still in the layout', () => {
     mountAt('/settings/nope');
-    expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
+    expect(rail()).not.toBeNull();
+    expect(host.querySelector('main .al-empty')).not.toBeNull();
+    mountAt('/agents/Not_A_Name');
     expect(host.querySelector('main .al-empty')).not.toBeNull();
   });
 
-  it('sends /settings to Activity', () => {
-    mountAt('/settings');
-    expect(location.pathname).toBe('/settings/activity');
-    expect(host.querySelector('main h1')?.textContent).toBe('Activity');
+  it('shows Home at / (every approval link points there; the approval card sits on top), with Home current', () => {
+    mountAt('/');
+    expect(location.pathname).toBe('/');
+    expect(host.querySelector('main h1')?.textContent).toBe('Home');
+    expect(currentSection()).toBe('Home');
+  });
+
+  it('keeps /approve/<id> unchanged, with Home current', () => {
+    mountAt(`/approve/apr_${'A'.repeat(22)}`);
+    expect(location.pathname).toBe(`/approve/apr_${'A'.repeat(22)}`);
+    expect(currentSection()).toBe('Home');
+  });
+
+  it('shows not-found for an /approve path that is not an approval ID', () => {
+    mountAt('/approve/nope');
+    expect(host.querySelector('main .al-empty')).not.toBeNull();
+  });
+
+  it.each([
+    ['/first-run', '/start/app'],
+    ['/start', '/start/app'],
+    ['/settings/home', '/'],
+    ['/settings/agents', '/agents'],
+    ['/settings/activity', '/activity'],
+    ['/settings/advanced', '/advanced/network'],
+    ['/settings/about', '/advanced/diagnostics'],
+    ['/settings/messages', '/inbox'],
+    ['/settings/contacts', '/contacts'],
+    ['/settings/storage', '/settings/files'],
+    ['/settings/passkeys', '/settings/backup'],
+    ['/advanced', '/advanced/network'],
+  ])('keeps the old path %s working: it goes to %s', (from, to) => {
+    expect(REDIRECTS[from]).toBe(to);
+    mountAt(from);
+    expect(location.pathname).toBe(to);
   });
 });
 
-describe('nav', () => {
-  it('lists Home first, then Approvals and the settings pages', () => {
-    expect(NAV_ITEMS.map((i) => i.label)).toEqual([
-      'Home',
-      'Approvals',
-      'Activity',
-      'Messages',
-      'Contacts',
-      'Agents',
-      'Files',
-      'Proofs & credits',
-      'Rules',
-      'Settings',
+describe('the sections (nav.ts)', () => {
+  it('Home, Agents, Activity, Settings; Advanced holds six pages', () => {
+    expect(SECTIONS.map((s) => [s.label, s.path])).toEqual([
+      ['Home', '/'],
+      ['Agents', '/agents'],
+      ['Activity', '/activity'],
+      ['Settings', '/settings'],
     ]);
-    expect(NAV_ITEMS).toHaveLength(10);
+    expect(ADVANCED_SECTIONS.map((s) => [s.label, s.path])).toEqual([
+      ['Live activity', '/activity/live'],
+      ['Rules', '/advanced/rules'],
+      ['Proofs & credits', '/advanced/proofs'],
+      ['Relays & network', '/advanced/network'],
+      ['Diagnostics', '/advanced/diagnostics'],
+      ['Connections map', '/advanced/map'],
+    ]);
   });
 
-  it('keeps every nav label in plain words', () => {
-    // 11 §5: no wallet, gas, seed phrase or transaction words in the default UI.
-    const text = [
-      ...NAV_ITEMS.map((i) => i.label),
-      'Backup',
-      'Passkeys',
+  it('Settings (A9) in order, ending with Advanced', () => {
+    expect(SETTINGS_PAGES.map((p) => p.label)).toEqual([
+      'Backup & Touch ID',
+      'AI apps',
+      'Files folder',
       'Appearance',
+      'Notifications',
+      'Rules',
+      'Proofs & credits',
       'Advanced',
-      'About',
+    ]);
+  });
+
+  it('keeps every label in plain words (11 §5)', () => {
+    const text = [
+      ...SECTIONS.map((s) => s.label),
+      ...ADVANCED_SECTIONS.map((s) => s.label),
+      ...SETTINGS_PAGES.map((p) => p.label),
+      ...goToEntries(true).map((e) => e.label),
     ].join(' ');
     expect(text).not.toMatch(/wallet|gas|seed|transaction|chain|address|hash/i);
   });
 
-  it('redirects the old storage path to Files', () => {
-    mountAt('/settings/storage');
-    expect(location.pathname).toBe('/settings/files');
-    expect(host.querySelector('main h1')?.textContent).toBe('Files');
+  it('names the section of a path, and its title', () => {
+    expect(sectionOf('/')).toBe('home');
+    expect(sectionOf('/agents/work')).toBe('agents');
+    expect(sectionOf('/activity/live')).toBe('live');
+    expect(sectionOf('/settings/rules')).toBe('settings');
+    expect(sectionOf('/advanced/network')).toBe('network');
+    expect(titleOf('/settings/rules')).toBe('Rules');
+    expect(titleOf('/start/connect')).toBe('Get started');
+    expect(titleOf('/agents/work')).toBe('Agents');
   });
 
-  it('shows a Settings sub-navigation with AI apps, Backup, Passkeys, Appearance, Advanced and About', () => {
-    mountAt('/settings/passkeys');
-    const sub = host.querySelector('nav[aria-label="Settings"]');
-    expect(sub).not.toBeNull();
-    expect([...(sub?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual([
-      'AI apps',
-      'Backup',
-      'Passkeys',
-      'Appearance',
-      'Advanced',
-      'About',
-    ]);
-    expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Passkeys');
-    expect(
-      host.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.textContent,
-    ).toContain('Settings');
-  });
-
-  it('has no Settings sub-navigation on other pages', () => {
+  it('shows the Settings sub-navigation on a Settings page only', () => {
     mountAt('/settings/rules');
+    const sub = host.querySelector('nav[aria-label="Settings"]');
+    expect([...(sub?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual(
+      SETTINGS_PAGES.map((p) => p.label),
+    );
+    expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Rules');
+    mountAt('/agents');
     expect(host.querySelector('nav[aria-label="Settings"]')).toBeNull();
   });
 
+  it('changes page on a click without a reload and moves the current mark', () => {
+    mountAt('/');
+    const link = host.querySelector<HTMLAnchorElement>('nav.al-rail a[href="/activity"]');
+    act(() => {
+      link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    });
+    expect(location.pathname).toBe('/activity');
+    expect(host.querySelector('main h1')?.textContent).toBe('Activity');
+    expect(currentSection()).toBe('Activity');
+    expect(host.querySelectorAll('nav.al-rail [aria-current="page"]')).toHaveLength(1);
+  });
+
+  it('follows the browser back button', () => {
+    mountAt('/activity');
+    act(() => {
+      history.pushState(null, '', '/settings/backup');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(host.querySelector('main h1')?.textContent).toBe('Backup & Touch ID');
+  });
+});
+
+describe('the status bar (kept)', () => {
   it('shows Checking… (never Connected or Paused) before the server reports', () => {
     mountAt('/settings/rules');
     const bar = host.querySelector('footer.al-statusbar')?.textContent ?? '';
@@ -190,72 +266,17 @@ describe('nav', () => {
     expect(host.querySelector('footer.al-statusbar')?.textContent).toContain('Connected');
     act(() => setConnectionState('unknown'));
   });
-
-  it('marks only the active item with aria-current', () => {
-    mountAt('/settings/rules');
-    const current = host.querySelectorAll('nav a[aria-current="page"]');
-    expect(current).toHaveLength(1);
-    expect(current[0]?.textContent).toContain('Rules');
-    expect(host.querySelectorAll('nav a.is-active')).toHaveLength(1);
-  });
-
-  it('changes page on a click without a reload and moves the active mark', () => {
-    mountAt('/settings/activity');
-    const link = host.querySelector<HTMLAnchorElement>('nav a[href="/settings/files"]');
-    expect(link).not.toBeNull();
-    act(() => {
-      link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
-    });
-    expect(location.pathname).toBe('/settings/files');
-    expect(host.querySelector('main h1')?.textContent).toBe('Files');
-    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Files');
-  });
-
-  it('follows the browser back button', () => {
-    mountAt('/settings/activity');
-    act(() => {
-      history.pushState(null, '', '/settings/backup');
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    });
-    expect(host.querySelector('main h1')?.textContent).toBe('Backup');
-  });
-
-  // M1-11b-2: Approvals lives in this app now; `/approve/<id>` renders inside the same layout.
-  it('routes the Approvals link inside the app, Approvals current', () => {
-    mountAt('/settings/activity');
-    const link = host.querySelector<HTMLAnchorElement>('nav a[href="/"]');
-    expect(link?.textContent).toContain('Approvals');
-    const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
-    act(() => {
-      link?.dispatchEvent(event);
-    });
-    expect(event.defaultPrevented).toBe(true);
-    expect(location.pathname).toBe('/');
-    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Approvals');
-  });
-
-  it('marks Approvals current on a deep link to one request', () => {
-    mountAt(`/approve/apr_${'A'.repeat(22)}`);
-    expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
-    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Approvals');
-    expect(host.querySelector('main h1')?.textContent).toBe('Approvals');
-  });
-
-  it('shows not-found for an /approve path that is not an approval ID', () => {
-    mountAt('/approve/nope');
-    expect(host.querySelector('main .al-empty')).not.toBeNull();
-  });
 });
 
 describe('compact view route (UX2-h)', () => {
-  it('serves /settings/compact without the shell, so a small window has no sidebar', () => {
+  it('serves /settings/compact without the shell, so a small window has no menu', () => {
     mountAt('/settings/compact');
-    expect(host.querySelector('nav[aria-label="Main"]')).toBeNull();
+    expect(rail()).toBeNull();
     expect(host.querySelector('footer.al-statusbar')).toBeNull();
   });
 
-  it('adds no route to the shell list or the navigation', () => {
+  it('adds no route to the shell list or the menu', () => {
     expect(ROUTES.some((r) => r.path.includes('compact'))).toBe(false);
-    expect(NAV_ITEMS.some((i) => i.path.includes('compact'))).toBe(false);
+    expect(SECTIONS.some((s) => s.path.includes('compact'))).toBe(false);
   });
 });

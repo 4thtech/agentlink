@@ -29,7 +29,9 @@ import {
 } from '../../packages/node/dist/approval-server.js';
 import {
   createKeychainAgent,
+  epochKeysOf,
   openRecordedKeyStore,
+  type AgentEpochKeys,
 } from '../../packages/node/dist/keychain-keystore.js';
 import { KeychainOwnerKeyStore } from '../../packages/node/dist/owner-keystore.js';
 import {
@@ -48,7 +50,7 @@ import {
 import { joinStep } from '../../apps/cli/dist/commands/join.js';
 import { uiRemovalPort } from '../../apps/cli/dist/commands/ui-remove.js';
 import { createAiAppsDesk } from '../../apps/cli/dist/harness/app-desk.js';
-import { createMcpCommand } from '../../apps/cli/dist/mcp/command.js';
+import { createMcpCommand, processHeartbeat } from '../../apps/cli/dist/mcp/command.js';
 import { localUiOptions, type LocalUiWiringDeps } from '../../apps/cli/dist/mcp/local-ui-wiring.js';
 import {
   agentDirectory,
@@ -157,7 +159,11 @@ export function startServerOf(
         ? options
         : {
             ...options,
-            host: { ...host, firstRun: { home: pc.home, ownerFiles: defaultOwnerFiles(pc.home) } },
+            // W4-ONE-TOUCH: the CLI's first-run desk (`aiApps`) is kept.
+            host: {
+              ...host,
+              firstRun: { ...host.firstRun, home: pc.home, ownerFiles: defaultOwnerFiles(pc.home) },
+            },
           };
     return startApprovalServerWith(
       {
@@ -197,8 +203,15 @@ export function uiDepsOf(
   const owner = {
     open: async (name?: string) => {
       let opened: Awaited<ReturnType<typeof openAgentStoreWith>> | undefined;
+      // W4-RENAME-REACHES-CONTACTS: the host's agent gets its key-items token (as openWithStore).
+      let epochKeys: AgentEpochKeys | undefined;
       const deps: RuntimeDeps = {
         ...pc.runtime,
+        openKeyStore: async (backend, agentId) => {
+          const keyStore = await pc.runtime.openKeyStore(backend, agentId);
+          epochKeys = epochKeysOf(keyStore);
+          return keyStore;
+        },
         openStore: async (backend, agentId, path) => {
           opened = await pc.runtime.openStore(backend, agentId, path);
           return opened;
@@ -220,6 +233,7 @@ export function uiDepsOf(
           client: result.agent.client,
           store: opened.store,
           cipher: opened.cipher,
+          ...(epochKeys === undefined ? {} : { epochKeys }),
           close: () => result.agent.close(),
         }),
       };
@@ -368,6 +382,8 @@ export async function startAiAppMcp(pc: Computer, agent: string | undefined): Pr
     version: '0.0.0-e2e',
     logger: createLogger({ name: 'u3k-mcp', level: 'error', sink: () => undefined }),
     loop: { syncIntervalMs: 500, leaseIntervalMs: 1_000 },
+    // W4-WIRE-3: the heartbeat `agentlink mcp` writes (06 §6), so the app sees this AI app run.
+    heartbeat: processHeartbeat,
   });
   const done = handler({
     command: 'mcp',
@@ -375,7 +391,9 @@ export async function startAiAppMcp(pc: Computer, agent: string | undefined): Pr
     output: { print: () => undefined, printError: () => undefined },
     terminal: { stdinIsTTY: false, stdoutIsTTY: false, env: {} },
   } as never);
-  const client = new Client({ name: 'agentlink-e2e', version: '0' });
+  // W4-WIRE-3: the name Claude Code sends in `initialize` (client-app.ts), as the AI app of these
+  // computers (fakeClaudeCode) is Claude Code.
+  const client = new Client({ name: 'claude-code', version: '0' });
   await client.connect(clientSide);
   await client.listTools();
   return {
@@ -521,6 +539,8 @@ export function runJoin(
       terminal: { stdinIsTTY: true, stdoutIsTTY: true, env: {} },
     } as never,
     {
+      // A format 1 link resolves to itself (W4-SHORT-INVITE).
+      resolve: (l) => Promise.resolve(l),
       check: (l, now) => checkInviteLink(l, now),
       now: () => Math.floor(Date.now() / 1000),
       // No app host is running on this computer: `join` starts its own.

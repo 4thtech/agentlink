@@ -222,7 +222,7 @@ describe('Compact: layout (b11 §25.1)', () => {
     await mount(props);
     expect(block('contacts')?.textContent).toContain('No contacts yet.');
     act(() => find('Add contact').click());
-    expect(openMain).toHaveBeenCalledWith('/settings/contacts?add-contact');
+    expect(openMain).toHaveBeenCalledWith('/contacts?invite'); // W4-WIRE: the Invite screen
   });
 
   it('a failed pulse read keeps the contacts, flat and without a word', async () => {

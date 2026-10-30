@@ -133,6 +133,10 @@ async function insertFile(
     deleted_at: deletedAt,
     delete_after: null,
     saved_name: null,
+    auto_save: null,
+    auto_reason: null,
+    auto_tries: null,
+    auto_next_at: null,
   };
   await agent.store.transaction((tx) => tx.insert('files', row));
 }

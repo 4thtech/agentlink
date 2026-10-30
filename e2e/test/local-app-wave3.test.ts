@@ -36,8 +36,10 @@ import {
   type Computer,
 } from './app-world.js';
 
-const TOUCH_ID = /^Use (Touch ID|Windows Hello|a passkey)$/;
-const INVITE_LINK = /https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]+/;
+// W4-WIZARD: first run is Get started (journey/helpers-wizard.ts).
+const CONNECT_WITH = /^Connect with (Touch ID|Windows Hello|your passkey)$/;
+// The long link, or W4-SHORT-INVITE's short one (`2.` and 43 characters).
+const INVITE_LINK = /https:\/\/agentlink\.4thtech\.io\/i#(?:2\.)?[A-Za-z0-9_-]+/;
 let browser: Browser | undefined;
 let launchError: unknown;
 const closers: (() => Promise<unknown>)[] = [];
@@ -82,8 +84,8 @@ async function switchTo(
     .first()
     .locator('xpath=ancestor::*[.//button[normalize-space()="Switch"]][1]');
   await card.getByRole('button', { name: 'Switch', exact: true }).click();
-  // The header names the agent that is now open.
-  await page.locator('.ag-switch-btn').filter({ hasText: openLabel }).waitFor();
+  // The header names the agent that is now open (W4-SHELL-V2: the agent chip, top left).
+  await page.locator('button.al-chip').filter({ hasText: openLabel }).waitFor();
 }
 
 /** Messages page: opens the conversation with `contact` and returns the page text. */
@@ -120,12 +122,17 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     });
     const { page } = await pageWithTouchId(ready.browser);
     await page.goto(await openedLink(pc));
-    await page.getByRole('button', { name: 'Get started' }).click();
-    await page.getByRole('heading', { name: 'Which AI app will you use?' }).waitFor();
-    // Wait for the look to end (the loading line goes), then expect the app.
-    await page.getByRole('button', { name: 'Continue' }).isEnabled();
-    await page.waitForTimeout(1500);
-    await expect(page.getByText('Claude Code').first().isVisible()).resolves.toBe(true);
+    // W4-WIZARD: Get started opens on the app pick; Claude Code is found on this computer.
+    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
+    await page
+      .getByRole('button', { name: /^Claude Code/ })
+      .first()
+      .waitFor();
+    await page
+      .getByText(/^Found on this (Mac|computer)$/)
+      .first()
+      .waitFor();
+    await page.getByRole('button', { name: 'Continue with Claude Code' }).waitFor();
   }, 120_000);
 
   it('runs the first hour on a fresh home: Welcome, Touch ID, connect, a second agent, hello and reply', async (ctx) => {
@@ -148,33 +155,23 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
 
     const { page } = await pageWithTouchId(ready.browser);
     await page.goto(link);
-    expect(await page.locator('h1').innerText()).toContain('Private messages between AI agents.');
-    await page.getByRole('button', { name: 'Get started' }).click();
-    await page.getByRole('heading', { name: 'Which AI app will you use?' }).waitFor();
-    await page.getByRole('button', { name: 'Continue' }).click();
+    // W4-WIZARD: Get started opens on the app pick.
+    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
+    await page.getByRole('button', { name: 'Continue with Claude Code' }).click();
 
-    // Name and one Touch ID: the first agent, its owner and its first rules.
-    await page.getByRole('heading', { name: 'Set up your agent' }).waitFor();
+    // Name and one Touch ID: the first agent, its owner and its first rules, and (W4-ONE-TOUCH,
+    // D-140) the Claude Code entry for the app picked.
+    await page.getByRole('heading', { name: "Confirm it's you" }).waitFor();
+    await page.getByRole('button', { name: /^Change the agent's name/ }).click();
     await page.getByLabel('Name your agent').fill('Home base');
-    await page.getByRole('button', { name: TOUCH_ID }).click();
+    await page.getByRole('button', { name: CONNECT_WITH }).click();
     await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
     await page.getByRole('button', { name: 'I saved it' }).click();
-    // U3-g-c: the picker found Claude Code, so "Connect your AI app" follows; "Later" writes nothing
-    // (the connection is made from the AI apps page below).
-    await page.getByRole('heading', { name: 'Connect Claude Code to Home base' }).waitFor();
-    expect(readFileSync(claude.file, 'utf8')).toBe(settingsBefore);
-    await page.getByRole('button', { name: 'Later' }).click();
-    await page.waitForURL(/\/settings\/home$/);
+    await page.getByRole('heading', { name: 'Connected to Claude Code' }).waitFor();
+    await page.getByRole('button', { name: 'Go to Home' }).click();
+    await page.waitForURL(/\/settings\/home$|\/$/);
     const first = await pc.directory.read('default');
     expect(first).toMatchObject({ name: 'default', label: 'Home base', available: true });
-
-    // Connect Claude Code from the AI apps page: review, Apply, Touch ID.
-    await page.goto(new URL('/settings/apps', link).href);
-    await page.getByRole('button', { name: 'Review change' }).click();
-    await page.getByText("This adds one entry to Claude Code's settings.").waitFor();
-    await page.getByRole('button', { name: 'Apply with Touch ID' }).click();
-    await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
-    await page.getByText('Restart Claude Code to finish').first().waitFor();
 
     // The entry is in the settings, nothing else changed, and the backup keeps the bytes and the mode.
     const settings = JSON.parse(readFileSync(claude.file, 'utf8')) as {
@@ -199,13 +196,20 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     expect(statSync(backup).mode & 0o777).toBe(claude.mode);
 
     // A second agent of the person's own, with one Touch ID.
-    await page.goto(new URL('/settings/agents', link).href);
-    await page.getByRole('button', { name: 'Add agent' }).click();
-    await page.getByLabel('Name your agent').fill('Second agent');
-    await page.getByRole('button', { name: 'Add with Touch ID' }).click();
-    await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
-    await page.getByText('Connect an AI app to it?').waitFor();
-    await page.getByRole('button', { name: 'Not now' }).click();
+    // W4-WIRE-2 (Decision 52 (2)): Add agent is Get started's add mode: "Name your agent", then an
+    // AI app that is not on this computer (Claude Code stays with the first agent), one Touch ID.
+    await page.goto(new URL('/start/app?add=agent', link).href);
+    await page.getByRole('heading', { name: 'Name your agent', level: 1 }).waitFor();
+    await page.getByLabel('Agent name').fill('Second agent');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button').filter({ hasText: 'Not found yet' }).first().click();
+    await page
+      .getByRole('button', { name: /^Continue with / })
+      .first()
+      .click();
+    await page.getByRole('button', { name: CONNECT_WITH }).click();
+    await page.getByRole('heading', { name: /Second agent.? is ready$/ }).waitFor();
+    await page.getByRole('button', { name: 'Go to Home' }).click();
     expect((await pc.directory.list()).map((e) => e.name)).toEqual(['default', 'second-agent']);
 
     // Each agent's AI app runs its own MCP server (what its entry starts); they do the syncing.
@@ -214,25 +218,32 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     const mcpSecond = await startAiAppMcp(pc, 'second-agent');
     closers.push(() => mcpSecond.close());
 
-    // The first agent invites from Contacts.
-    await page.goto(new URL('/settings/contacts', link).href);
-    await page.getByRole('button', { name: 'Add contact' }).first().click();
-    await page.getByRole('button', { name: 'Create invite' }).click();
-    await page.getByText('Invite ready').first().waitFor();
-    const inviteUrl = INVITE_LINK.exec(await page.locator('body').innerText())?.[0] ?? '';
+    // The first agent invites from the Invite screen (W4-WIRE-2: the Add contact sheet is retired).
+    await page.goto(new URL('/contacts?invite', link).href);
+    await page.getByRole('heading', { name: 'Invite someone', level: 1 }).waitFor();
+    const shown = page.locator('.inv-link[data-state="ready"]');
+    await shown.waitFor();
+    const value = (await shown.innerText()).trim();
+    const inviteUrl =
+      INVITE_LINK.exec(value.startsWith('https://') ? value : `https://${value}`)?.[0] ?? '';
     expect(inviteUrl).not.toBe('');
-    await page.getByRole('button', { name: 'Done' }).click();
+    // Copied, so the link is kept when the screen goes.
+    await page.getByRole('button', { name: 'Copy', exact: true }).click();
+    await page.getByRole('button', { name: 'Copied', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
 
     // Switch (nothing signed), and the second agent accepts it with Touch ID.
     await switchTo(page, link, 'Second agent');
-    await page.goto(new URL('/settings/contacts', link).href);
-    await page.getByRole('button', { name: 'Add contact' }).first().click();
-    await page.getByRole('tab', { name: 'I have an invite' }).click();
+    // W4-WIRE-2 (Decision 52 (3)): the Invite screen's "Have an invite link? Paste it".
+    await page.goto(new URL('/contacts?invite', link).href);
+    await page.getByRole('button', { name: 'Have an invite link? Paste it' }).click();
     await page.getByLabel('Paste the invite link').fill(inviteUrl);
-    await page.getByRole('button', { name: 'Check invite' }).click();
-    await page.getByText('Is this who you expected?').waitFor();
-    await page.getByRole('button', { name: 'Connect', exact: true }).click();
-    await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page
+      .getByText(/invites you to connect your AIs$/)
+      .first()
+      .waitFor();
+    await page.getByRole('button', { name: /^Accept with / }).click();
 
     const complete = async (mcp: AiAppMcp): Promise<Record<string, unknown> | undefined> => {
       const listed = await mcp.call('agentlink_list_contacts');
@@ -333,18 +344,23 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
 
     const { page } = await pageWithTouchId(ready.browser);
     await page.goto(link);
-    await page.getByRole('button', { name: 'Get started' }).click();
-    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
+    await page
+      .getByRole('button', { name: /^Continue with / })
+      .first()
+      .click();
+    await page.getByRole('button', { name: /^Change the agent's name/ }).click();
     await page.getByLabel('Name your agent').fill('Friend agent');
-    await page.getByRole('button', { name: TOUCH_ID }).click();
+    await page.getByRole('button', { name: CONNECT_WITH }).click();
     await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
     await page.getByRole('button', { name: 'I saved it' }).click();
 
     // First run ends on the invite, named by the inviter (Self-declared) with a short fingerprint.
-    await page.getByRole('heading', { name: "Accept Ana's invite?" }).waitFor();
+    // W4-PEOPLE-INVITE (prototype v23 A6): the friend's card.
+    await page.getByRole('heading', { name: 'Ana invites you to connect your AIs' }).waitFor();
     const text = await page.locator('body').innerText();
-    expect(text).toContain('Self-declared');
-    expect(text).toContain('After you connect, compare the safety code with Ana.');
+    expect(text).toContain('Name set by the sender');
+    expect(text).toContain("Check it's Ana:");
     expect(text).not.toContain(inviteUrl.split('#')[1] ?? '?');
     await page
       .getByRole('button', { name: /^Accept with (Touch ID|Windows Hello|your passkey)$/ })
@@ -355,7 +371,12 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
     const friendMcp = await startAiAppMcp(friendPc, undefined);
     closers.push(() => friendMcp.close());
     await page.getByText('Connected with Ana.').first().waitFor({ timeout: 60_000 });
-    await page.getByText('Compare the safety code with Ana').waitFor();
+    // W4-PEOPLE-INVITE (A7): the Connected moment with the 12-digit safety code.
+    await page.getByRole('heading', { name: /^You and “?Ana”? are connected$/ }).waitFor();
+    await page
+      .getByText(/\d{4}\D{1,3}\d{4}\D{1,3}\d{4}/)
+      .first()
+      .waitFor();
     const contacts = await until(
       'the inviter sees the friend',
       async () => {
@@ -437,7 +458,9 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
     expect(new URL(link).pathname).toBe('/settings/home');
     const { page } = await pageWithTouchId(ready.browser);
     await page.goto(link);
-    await page.getByRole('heading', { name: 'Home', exact: true }).first().waitFor();
+    // W4-SHELL-V2: `/settings/home` opens Home at `/` (the section marked current).
+    await page.waitForURL((url) => url.pathname === '/');
+    await page.locator('nav.al-rail a[aria-current="page"][href="/"]').first().waitFor();
 
     // All agents are listed, by the names they had.
     await page.goto(new URL('/settings/agents', link).href);
@@ -455,7 +478,7 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
     expect(await readConversation(page, link, 'Second agent')).toContain(answer);
     await switchTo(page, link, 'work');
     await page.goto(new URL('/settings/messages', link).href);
-    await page.getByRole('heading', { name: 'Messages' }).first().waitFor();
+    await page.getByRole('heading', { name: 'Inbox' }).first().waitFor();
     await page.waitForTimeout(1500);
     // `work` has no contacts: none of the other agents' conversations show here.
     const empty = await page.locator('body').innerText();

@@ -13,7 +13,6 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient, ApiResult } from '../../api/client.js';
-import { Layout } from '../../layout/index.js';
 import { MessagesPage } from './index.js';
 import messagesCss from './messages.css?raw';
 import { countUnseen, loadSeen, markSeen, SEEN_KEY } from './seen.js';
@@ -507,27 +506,9 @@ describe('copy', () => {
       "Nothing yet. When your AI and Marko's agent exchange messages, they show here.",
     );
     expect(S.reply).toBe('To reply, ask your AI.');
-    expect(S.noContacts).toBe('Messages appear here once you have a contact.');
+    // W4-SHELL (owner, 29 Oct): the page reached by Inbox is the Inbox; no separate "Messages" name.
+    expect(S.noContacts).toBe('Conversations appear here once you have a contact.');
   });
 });
 
-describe('the sidebar item', () => {
-  it('shows the count of contacts with something new next to Messages, and nothing at zero', async () => {
-    const none = async (): Promise<boolean> => false;
-    await act(async () => {
-      root.render(
-        h(Layout, { path: '/settings/messages', nextStep: none, unseenMessages: async () => 2 }),
-      );
-    });
-    const link = [...host.querySelectorAll('nav[aria-label="Main"] a')].find((a) =>
-      a.textContent?.includes('Messages'),
-    );
-    expect(link?.querySelector('.al-nav-count .al-count-in')?.textContent).toBe('2');
-    await act(async () => {
-      root.render(
-        h(Layout, { path: '/settings/messages', nextStep: none, unseenMessages: async () => 0 }),
-      );
-    });
-    expect(host.querySelector('nav[aria-label="Main"] .al-nav-count')).toBeNull();
-  });
-});
+// W4-SHELL-V2: the section menu has no Inbox item; Home (U3) shows who has something new.

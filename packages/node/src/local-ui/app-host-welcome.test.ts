@@ -147,6 +147,7 @@ function send(
 
 interface BeginBody {
   status: string;
+  nonce: string;
   publicKey: { rpId: string; userId: string; challenge: string; prfSalt: string };
 }
 
@@ -235,7 +236,11 @@ function world(agentDesk?: LocalUiAiApps): World {
     },
     create: async (label, options) => {
       log.push(`create ${label} as ${String(options?.name)}`);
-      const agentId = await createKeychainAgent(keychain);
+      // W4-ONE-TOUCH (04 §2.8 step 2): the keys the server held since begin, as the CLI stores them.
+      const agentId =
+        options?.createKeys === undefined
+          ? await createKeychainAgent(keychain)
+          : await options.createKeys();
       // The CLI names the folder `options.name`, else a slug of the label (U3-d).
       const name = options?.name ?? 'slug-of-label';
       ids.set(name, agentId);
@@ -393,6 +398,8 @@ async function harness(
       },
       notifier: () => Promise.resolve(true),
       ownerKdf: KDF,
+      // W4-ONE-TOUCH: the server clock is the agents' (the plan's bodies are dated at begin).
+      now: () => NOW * 1000,
       // Never the real ~/.agentlink: the owner store opens on the test keychain only.
       ...(options.checkInvite === undefined ? {} : { checkInvite: options.checkInvite }),
     },
@@ -452,12 +459,10 @@ async function firstRun(
   const begin = await h.post(BEGIN, s, new Uint8Array(0), extra);
   if (begin.status !== 200) return { begin };
   const begun = JSON.parse(begin.body) as BeginBody;
-  const finish = await h.post(
-    FINISH,
-    s,
-    new Authenticator().create(begun.publicKey, h.origin),
-    extra,
-  );
+  // W4-ONE-TOUCH (04 §2.8): finish carries only the begin nonce.
+  const finish = await h.post(FINISH, s, new Authenticator().create(begun.publicKey, h.origin), {
+    'X-AgentLink-Input': input({ nonce: begun.nonce }),
+  });
   return { begin, finish };
 }
 
@@ -485,6 +490,9 @@ const SETUP_TIME = new Set([
   'GET /api/ui/join',
   'POST /api/ui/join/dismiss',
   'POST /api/ui/join/handoff',
+  // W4-SHELL-V2: the app's UI settings are the app's, not an agent's (ui-settings-server.test.ts).
+  'GET /api/ui/ui-settings',
+  'PUT /api/ui/ui-settings',
 ]);
 
 describe('U3-g-b: ui with no agent at all serves Welcome', () => {
@@ -768,7 +776,9 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
       { ...begun.publicKey, challenge: encodeBase64url(randomBytes(32)) },
       h.origin,
     );
-    const finish = await h.post(FINISH, s, forged);
+    const finish = await h.post(FINISH, s, forged, {
+      'X-AgentLink-Input': input({ nonce: begun.nonce }),
+    });
     expect(finish.status).toBe(403);
     expect(h.w.log).toEqual([]);
   });

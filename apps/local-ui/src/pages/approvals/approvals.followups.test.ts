@@ -25,7 +25,8 @@ import { ApprovePage } from '../approve/index.js';
 import { announceDecided, announceWaiting } from './badge.js';
 import { APPROVED_HOLD_MS, approvalHoodFields } from './card.js';
 import { createApprovalsClient, type ApprovalItem } from './client.js';
-import { ApprovalsPage, type ApprovalsPageProps } from './index.js';
+import { ApprovalsBoard } from './board.js';
+import type { ApprovalsPageProps } from './index.js';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -177,7 +178,7 @@ async function mount(
 ) {
   const { srv, props } = pageProps(answers, over);
   act(() =>
-    root.render(h(HoodProvider, { value: hood }, h<ApprovalsPageProps>(ApprovalsPage, props))),
+    root.render(h(HoodProvider, { value: hood }, h<ApprovalsPageProps>(ApprovalsBoard, props))),
   );
   await flush();
   return srv;
@@ -659,7 +660,8 @@ describe('(d) a denied card leaves like an approved one (UI-REFRESH-o-c)', () =>
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     reduced();
     const navCount = (): string | null | undefined =>
-      [...host.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')]
+      // W4-SHELL-V2: the badge sits on Home in the section menu.
+      [...host.querySelectorAll<HTMLAnchorElement>('nav.al-rail a')]
         .find((a) => a.getAttribute('href') === '/')
         ?.querySelector('.al-count-in')?.textContent;
     const { props } = pageProps({
@@ -682,7 +684,7 @@ describe('(d) a denied card leaves like an approved one (UI-REFRESH-o-c)', () =>
             waitingApprovals: async () => 2,
             readHealth: () => new Promise<never>(() => undefined),
           } as never,
-          h<ApprovalsPageProps>(ApprovalsPage, props) as never,
+          h<ApprovalsPageProps>(ApprovalsBoard, props) as never,
         ),
       ),
     );
@@ -726,7 +728,8 @@ describe('(d) a denied card leaves like an approved one (UI-REFRESH-o-c)', () =>
 
 describe('(c) the sidebar Approvals badge', () => {
   const navLink = (): HTMLAnchorElement | null =>
-    [...host.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')].find(
+    // W4-SHELL-V2: the badge sits on Home in the section menu.
+    [...host.querySelectorAll<HTMLAnchorElement>('nav.al-rail a')].find(
       (a) => a.getAttribute('href') === '/',
     ) ?? null;
 
@@ -801,7 +804,7 @@ describe('(c) the sidebar Approvals badge', () => {
       ],
       [`/api/approvals/${id('E')}/deny`]: [ok({ status: 'applied', decision: 'deny' })],
     });
-    mountLayout('/', async () => 3, h<ApprovalsPageProps>(ApprovalsPage, props));
+    mountLayout('/', async () => 3, h<ApprovalsPageProps>(ApprovalsBoard, props));
     await flush();
     const count = (): string | null | undefined =>
       navLink()?.querySelector('.al-count-in')?.textContent;
@@ -828,7 +831,7 @@ describe('(c) the sidebar Approvals badge', () => {
       ],
       [REVIEW]: [ok({ status: 'applied' })],
     });
-    mountLayout('/', async () => 3, h<ApprovalsPageProps>(ApprovalsPage, props));
+    mountLayout('/', async () => 3, h<ApprovalsPageProps>(ApprovalsBoard, props));
     await flush();
     await click(cardOf('A')?.querySelector('input[value="approve"]'));
     await click(cardOf('B')?.querySelector('input[value="deny"]'));
@@ -842,7 +845,7 @@ describe('(c) the sidebar Approvals badge', () => {
     const { props } = pageProps({
       [LIST]: [ok({ approvals: [item('A'), item('B')] })],
     });
-    mountLayout('/', async () => 2, h<ApprovalsPageProps>(ApprovalsPage, props));
+    mountLayout('/', async () => 2, h<ApprovalsPageProps>(ApprovalsBoard, props));
     await flush();
     const badge = navLink()?.querySelector('.al-count');
     expect(badge?.textContent).not.toContain(CANARY);
@@ -879,12 +882,12 @@ describe('axe (WCAG 2.1 A/AA; colour contrast is a visual check, jsdom has no la
             waitingApprovals: async () => 3,
             readHealth: () => new Promise<never>(() => undefined),
           } as never,
-          h(HoodProvider, { value: true }, h<ApprovalsPageProps>(ApprovalsPage, props)) as never,
+          h(HoodProvider, { value: true }, h<ApprovalsPageProps>(ApprovalsBoard, props)) as never,
         ),
       ),
     );
     await flush();
-    expect(host.querySelector('.al-nav .al-count')).not.toBeNull();
+    expect(host.querySelector('.al-rail-item .al-count')).not.toBeNull();
     expect(host.querySelector('.al-hood')).not.toBeNull();
     expect((await run()).violations.map((v) => v.id)).toEqual([]);
   });

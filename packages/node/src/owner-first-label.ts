@@ -28,7 +28,8 @@ import {
 } from '@4thtech-io/crypto';
 import { NodeKeyStoreError } from './errors.js';
 import { assertAllowedOwnerAction } from './owner-allowlist.js';
-import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
+import { PlanOwnerSession } from './owner-add-agent-plan.js';
+import { FirstCardSession, type FirstAgentCard, type FirstConnect } from './owner-first-card.js';
 import {
   cardNamesOwner,
   signFirstPolicy,
@@ -48,6 +49,11 @@ export interface FirstLabelActions {
 export interface FirstLabel {
   readonly label: string;
   readonly actions: FirstLabelActions;
+  /**
+   * W4-ONE-TOUCH: the unsigned `agent.label` fixed at begin (04 §2.8). With it, exactly this body is
+   * signed (after the same checks), never a newly prepared one.
+   */
+  readonly body?: JsonObject;
 }
 
 /** Whether the first label is in force (fixed values only). */
@@ -97,10 +103,15 @@ export async function signFirstLabel(
 ): Promise<FirstLabelResult> {
   let body: JsonObject;
   try {
-    const prepared = await first.actions.prepareLabel(first.label);
-    if (prepared.status !== 'prepared') return 'not_saved';
-    // A plain copy, read once: what is checked is what is signed and applied.
-    body = parseJson(canonicalize(prepared.body as unknown as JsonObject)) as JsonObject;
+    if (first.body !== undefined) {
+      // W4-ONE-TOUCH: the body fixed at begin (in the challenge), a plain copy read once.
+      body = parseJson(canonicalize(first.body)) as JsonObject;
+    } else {
+      const prepared = await first.actions.prepareLabel(first.label);
+      if (prepared.status !== 'prepared') return 'not_saved';
+      // A plain copy, read once: what is checked is what is signed and applied.
+      body = parseJson(canonicalize(prepared.body as unknown as JsonObject)) as JsonObject;
+    }
   } catch {
     return 'not_saved';
   }
@@ -126,6 +137,71 @@ export interface FirstPartsResult {
   readonly sendFolder?: SendFolderResult;
   /** The first label, when `firstLabel` was given. */
   readonly label?: FirstLabelResult;
+  /**
+   * W4-ONE-TOUCH: the first `app.connect`, when `firstConnect` was given: `stored` when core stored
+   * and nonce-checked exactly that body (the config entry is written later, by the caller).
+   */
+  readonly connect?: FirstConnectResult;
+}
+
+/** W4-ONE-TOUCH: whether the first `app.connect` is stored (fixed values only). */
+export type FirstConnectResult = 'stored' | 'not_stored';
+
+const CONNECT_PARAMS_KEYS = 'agent,app,changeId';
+const CHANGE_ID = /^[0-9a-f]{64}$/;
+
+/** Exactly one `app.connect` for `agent` and `owner`, within L(op) (04 §2.5.1). */
+export function isFirstConnectBody(
+  body: JsonObject,
+  agent: string,
+  owner: OwnerPublicKeys,
+): boolean {
+  if (keysOf(body) !== BODY_KEYS) return false;
+  if (body['v'] !== 1 || body['op'] !== 'app.connect') return false;
+  if (body['agent'] !== agent || body['owner'] !== encodeHex(owner.ownerNostr)) return false;
+  if (typeof body['nonce'] !== 'string' || !NONCE.test(body['nonce'])) return false;
+  const params = body['params'];
+  if (!isObject(params) || keysOf(params) !== CONNECT_PARAMS_KEYS) return false;
+  if (params['agent'] !== agent || typeof params['app'] !== 'string') return false;
+  if (typeof params['changeId'] !== 'string' || !CHANGE_ID.test(params['changeId'])) return false;
+  const issuedAt = body['issuedAt'];
+  const expiresAt = body['expiresAt'];
+  if (!isTime(issuedAt) || !isTime(expiresAt) || expiresAt <= issuedAt) return false;
+  return expiresAt - issuedAt <= PREPARED_OWNER_ACTION_LIFETIME_SECONDS;
+}
+
+/**
+ * W4-ONE-TOUCH (04 §2.8 step 6): after the card, the rules and the label are stored and verified,
+ * signs the `app.connect` fixed at begin with `inner` and stores it through core `apply` (owner
+ * signature, nonce, this agent). `stored` only when core applied exactly that body. The config entry
+ * is never written here.
+ */
+export async function signFirstConnect(
+  inner: OwnerSession,
+  agent: string,
+  owner: OwnerPublicKeys,
+  connect: FirstConnect,
+): Promise<FirstConnectResult> {
+  let body: JsonObject;
+  try {
+    body = parseJson(canonicalize(connect.body)) as JsonObject;
+  } catch {
+    return 'not_stored';
+  }
+  if (!isFirstConnectBody(body, agent, owner)) return 'not_stored';
+  let sig: string;
+  try {
+    assertAllowedOwnerAction(body);
+    sig = await inner.signOwnerAction(body);
+  } catch {
+    return 'not_stored';
+  }
+  try {
+    const outcome = await connect.apply({ body, sig });
+    return outcome.status === 'applied' && outcome.op === 'app.connect' ? 'stored' : 'not_stored';
+  } catch {
+    return 'not_stored';
+  }
 }
 
 /** 06 §6: a label is 1 to 32 code points. */
@@ -154,11 +230,15 @@ export function cardNameOf(first: FirstAgentCard): string {
  * cannot be stored; callers decide from what core stored (cardNamesOwner), never from the error.
  */
 export async function signFirstParts(
-  inner: OwnerSession,
+  given: OwnerSession,
   owner: OwnerPublicKeys,
   first: FirstAgentCard,
   plan?: SendFolderPlan,
 ): Promise<FirstPartsResult> {
+  // W4-ONE-TOUCH (04 §2.8 "The restricted session"): with a plan fixed at begin, the owner session
+  // signs exactly the plan's bodies, in order, each once and byte for byte, and nothing else.
+  const inner: OwnerSession =
+    first.plan === undefined ? given : new PlanOwnerSession(given, first.plan);
   // The wrapper signs one card for this agent and owner, then nothing; `inner` stays open for the
   // rules and the label, which are checked here byte for byte before `inner` signs them.
   const session = new FirstCardSession(inner, first.agent, owner);
@@ -182,8 +262,20 @@ export async function signFirstParts(
       ? await signFirstLabel(inner, first.agent, owner, firstLabel)
       : 'not_saved';
   }
+  // W4-ONE-TOUCH (04 §2.8 step 6): the app.connect last, only when the card is stored and verified,
+  // the label is in force and the rules are in force (or were not part of the plan).
+  let connect: FirstConnectResult | undefined;
+  if (first.firstConnect !== undefined) {
+    const rulesOk =
+      plan?.status !== 'ready' || firstPolicy === undefined || sendFolder?.status === 'allowed';
+    connect =
+      label === 'saved' && rulesOk && (await cardNamesOwner(first, owner))
+        ? await signFirstConnect(inner, first.agent, owner, first.firstConnect)
+        : 'not_stored';
+  }
   return {
     ...(sendFolder === undefined ? {} : { sendFolder }),
     ...(label === undefined ? {} : { label }),
+    ...(connect === undefined ? {} : { connect }),
   };
 }

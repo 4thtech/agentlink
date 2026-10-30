@@ -841,3 +841,67 @@ describe('logs (I-7)', () => {
     }
   });
 });
+
+describe('W4-PAUSE: a queued row waits while the agent is paused (06 §6 "Paused agents"; D-143)', () => {
+  const resumeOf = async (a: Agent) =>
+    signWith(ownerA, {
+      v: 1,
+      agent: a.id,
+      owner: await ownerHex(ownerA),
+      op: 'agent.resume',
+      params: { agent: a.id },
+      nonce: newNonce(),
+      issuedAt: clock.t,
+      expiresAt: clock.t + 600,
+    });
+
+  it('is not published while paused, keeps its row, and is published after a verified agent.resume', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.mode = 'none';
+    expect((await a.client.sendMessage({ to: b.id, text: 'hello' })).status).toBe('ok');
+    const firstIds = [...a.spy.ids].sort();
+    expect(await a.client.pause.pause()).toBe('paused');
+
+    a.spy.mode = 'ack';
+    clock.t += 40; // past the first backoff step and its jitter
+    const paused = await a.client.outbox.processDue();
+    expect(paused.sent).toBe(0);
+    expect(a.spy.published).toHaveLength(4); // only the first (failed) publish
+    let stored = await rows(a.store);
+    expect(stored.outbox.every((r) => r.state === 'pending')).toBe(true);
+    expect(stored.out[0]?.delivery).toBe('queued');
+
+    expect(await a.client.ownerActions.apply(await resumeOf(a))).toEqual({
+      status: 'applied',
+      op: 'agent.resume',
+    });
+    const summary = await a.client.outbox.processDue();
+    expect(summary.sent).toBe(4);
+    expect([...a.spy.ids.slice(4)].sort()).toEqual(firstIds);
+    stored = await rows(a.store);
+    expect(stored.out[0]?.delivery).toBe('sent');
+  });
+
+  it('a send refused while paused keeps no idempotency result: the same clientRequestId sends after resume', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    await a.client.pause.pause();
+    await expect(
+      a.client.sendMessage({ to: b.id, text: 'hello', clientRequestId: 'pause-1' }),
+    ).rejects.toMatchObject({ code: 'agent_paused' });
+    expect(a.spy.published).toEqual([]);
+    expect((await rows(a.store)).idempotency).toEqual([]);
+    expect((await rows(a.store)).out).toEqual([]);
+    expect((await a.client.ownerActions.apply(await resumeOf(a))).status).toBe('applied');
+    const sent = await a.client.sendMessage({
+      to: b.id,
+      text: 'hello',
+      clientRequestId: 'pause-1',
+    });
+    expect(sent.status).toBe('ok');
+    expect(a.spy.published).toHaveLength(4);
+  });
+});

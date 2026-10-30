@@ -212,6 +212,30 @@ describe('the fixed pages (M1-11b-2c; 11 §6.2.1)', () => {
     ).toBe(CSP);
   });
 
+  // W4-SHELL (Decision 40, b11 §34.1): the two destinations of the wave-4 shell, Inbox and
+  // Contacts, are app pages too (a reload or a link lands on them); nothing below or beside them.
+  it('serves the app for /inbox and /contacts, and nothing for look-alike paths', async () => {
+    const withApp = await start();
+    const c = await withApp.cookie();
+    for (const path of ['/inbox', '/contacts']) {
+      const res = await send(withApp.server.port, path, { headers: { Cookie: c } });
+      expect(res.status, path).toBe(200);
+      expect(res.headers['content-security-policy'], path).toBe(CSP);
+    }
+    for (const path of [
+      '/inboxx',
+      '/inbox/x',
+      '/contacts/',
+      '/Contacts',
+      '/inbox.html',
+      '/approvals',
+    ]) {
+      const res = await send(withApp.server.port, path, { headers: { Cookie: c } });
+      expect(res.status, path).toBe(404);
+    }
+    expect((await send(withApp.server.port, '/inbox')).status, 'no session').toBe(401);
+  });
+
   it('the words name the command that works and stay in plain words', () => {
     expect(PAGE_STRINGS.expired).toContain(`${CLI_COMMAND} approve`);
     expect(PAGE_STRINGS.noApp).toContain(`${CLI_COMMAND} approve`);

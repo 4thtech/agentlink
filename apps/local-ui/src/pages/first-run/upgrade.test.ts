@@ -19,6 +19,7 @@ import { encodeRegistration, encodeUpgradeBody } from './passkey.js';
 import {
   PASSKEY_PATH,
   createUpgradeApi,
+  resetPasskeyRegisteredForTests,
   type PasskeyInfoResult,
   type SetupApi,
   type UpgradeApi,
@@ -43,6 +44,8 @@ let host: HTMLElement;
 let root: Root;
 
 beforeEach(() => {
+  // W4-WIRE: a registration in an earlier test is not one on this page.
+  resetPasskeyRegisteredForTests();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -166,9 +169,20 @@ describe('switch to Touch ID on the first-run page (M1-UX-FIRSTRUN-V2-c, B-9)', 
     expect(api.calls).toEqual([]);
   });
 
-  it('shows "already protected" when a passkey is registered', async () => {
-    await mount(fakeUpgrade({ info: { kind: 'ok', registered: true, values: VALUES } }));
-    expect(heading()).toBe('Approvals are already protected on this computer');
+  it('W4-WIZARD: a passkey is registered: no switch; Get started goes on for that owner', async () => {
+    await mount(fakeUpgrade({ info: { kind: 'ok', registered: true, values: VALUES } }), {
+      appsApi: {
+        list: () => Promise.resolve({ kind: 'ok', apps: [], desktopRunning: false }),
+        currentAgent: () => Promise.resolve({ kind: 'ok', folder: 'default' }),
+        preview: () => Promise.resolve({ kind: 'not_available' }),
+        passkey: () => Promise.resolve(undefined),
+        apply: () => Promise.resolve({ kind: 'failed' }),
+      },
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(heading()).toBe('Which AI app do you use?');
     expect(host.querySelector('input[name="backup-code"]')).toBeNull();
   });
 

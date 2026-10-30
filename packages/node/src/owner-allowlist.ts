@@ -48,6 +48,11 @@ export const OWNER_ACTION_OPS: readonly string[] = Object.freeze([
   // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
   'app.connect',
   'app.disconnect',
+  // W4-FILES-SAVE (proposed, owner confirms at merge): the owner saves one received file into the
+  // Inbox folder from the local app.
+  'file.save',
+  // W4-PAUSE (D-143 (5)): the owner resumes a paused agent from the local app (Resume).
+  'agent.resume',
 ]);
 
 export const ownerOperationRefused = (): NodeKeyStoreError =>

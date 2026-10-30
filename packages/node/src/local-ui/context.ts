@@ -7,12 +7,14 @@
 // `LocalUiOwnerOperation` that the central presence gate hands to a `presence: true` route
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
+import type { LiveAgentState, LiveAppRecord } from './live-status.js';
 import {
   CoreError,
   acceptInviteAction,
   decodeInviteLink,
   evaluate,
   type AcceptInviteAction,
+  type OpenInvite,
   type PendingContact,
   type PolicyDecision,
 } from '@4thtech-io/core';
@@ -34,7 +36,11 @@ import type {
   PageQuery,
   PolicyEditOptions,
   LabelReading,
+  RenameAllowance,
+  SendState,
+  PauseReading,
   PreparedOwnerAction,
+  SaveReceivedFileResult,
   PreparedPolicyEdit,
   ProofListItem,
   ReceivedFileItem,
@@ -44,11 +50,12 @@ import type {
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
+import type { AgentEpochKeys } from '../key-epoch.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
-import type { SendFolderPlan } from '../owner-first-policy.js';
 import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
 import type { LocalUiInviteDesk } from './route-types.js';
 import type { JoinDesk } from './join-desk.js';
+import type { LocalUiSettingsDesk } from './api/ui-settings.js';
 
 /**
  * The local UI's built files (apps/local-ui, D-118), in memory, from the caller (the CLI embeds
@@ -86,6 +93,12 @@ export interface LocalUiOptions {
    * `not_available`.
    */
   readonly aiApps?: LocalUiAiApps;
+  /**
+   * W4-RENAME-REACHES-CONTACTS (D-141): the open agent's key items (epochKeysOf its KeyStore), for
+   * the app host's rename gesture only (the gate's `renameAgent`). Held by the server, never by a
+   * handler or LocalUiContext. Absent: a rename that would rotate answers `not_available`.
+   */
+  readonly epochKeys?: AgentEpochKeys;
 }
 
 /**
@@ -269,6 +282,17 @@ export interface LocalUiReadClient {
     received(query: PageQuery): Promise<Page<ReceivedFileItem>>;
     sent(query: PageQuery): Promise<Page<SentFileItem>>;
     savedName(itemId: string): Promise<string | null>;
+    /**
+     * W4-FILES-SAVE: core's prepare helper (optional so page fakes without it stay valid) for the unsigned `file.save` of one received item, by its
+     * ID only (core `ownerActions.prepareFileSave`). Writes nothing (I-4): the body changes nothing
+     * until the gate's one-use `sign` signed it and the save port's core verified and applied it.
+     */
+    prepareSave?(itemId: string): Promise<PreparedOwnerAction>;
+    /**
+     * W4-FILES-SAVE SEC-L1: whether the ID names a received file Save can act on (core
+     * `FilesIoView.isReceived`, store only), checked before presence is asked. Optional for fakes.
+     */
+    isReceived?(itemId: string): Promise<boolean>;
   };
   /**
    * U3-d (D-138; 04 §2.5.1 `agent.label`): the agent's verified label (core `loadLabel`: the stored
@@ -279,6 +303,36 @@ export interface LocalUiReadClient {
   readonly agent?: {
     label(): Promise<LabelReading>;
     prepareLabel(label: string): Promise<PreparedOwnerAction>;
+    /** W4-RENAME-REACHES-CONTACTS (D-141): the name in the agent's current card (core, read). */
+    cardName?(): Promise<string | undefined>;
+    /** D-141: whether a rename may rotate now (3 per rolling 24 h; core, read). */
+    renameAllowance?(): Promise<RenameAllowance>;
+    /** D-141: whether the agent can send (an unfinished rotation is `rotation_pending`; read). */
+    sendState?(): Promise<SendState>;
+    /** W4-PAUSE (D-143 (5)): the agent's pause row (core `pause.read`; `unreadable` is paused). */
+    pauseState?(): Promise<PauseReading>;
+    /**
+     * W4-PAUSE: core's unsigned `agent.resume` for this agent (`not_paused` while not paused).
+     * Writes nothing: it changes nothing until the gate's one-use `sign` signed it and core applied it.
+     */
+    prepareResume?(): Promise<PreparedOwnerAction>;
+  };
+  /**
+   * W4-RENAME-REACHES-CONTACTS (D-141; 07 §3 "Former name", 08 §1): the page showed a contact's
+   * "{new} (was {old})" note, so core stops showing it (core `contacts.markNameChangeSeen`). Display
+   * state only: nothing is decided from it, nothing is signed. Nothing else of the contact book.
+   */
+  readonly contactNames?: {
+    markSeen(contactId: string): Promise<boolean>;
+  };
+  /**
+   * W4-AUTO-SAVE (D-142, 08 §1): the one-time "now saved automatically" notice (core
+   * `autoSave.noticeDue` and `dismissNotice`). Display state only: nothing is decided from it,
+   * nothing is signed, no setting changes. Optional so that page fakes without it stay valid.
+   */
+  readonly autoSaveNotice?: {
+    due(): Promise<boolean>;
+    dismiss(): Promise<void>;
   };
   /**
    * U3-f (04 §2.5.1 `app.connect`, `app.disconnect`): core's prepare helper for an AI app change of
@@ -338,11 +392,31 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       received: (query: PageQuery) => client.filesIo.received(query),
       sent: (query: PageQuery) => client.filesIo.sent(query),
       savedName: (itemId: string) => client.filesIo.savedName(itemId),
+      // W4-FILES-SAVE: the unsigned `file.save` (prepare only).
+      prepareSave: (itemId: string) => client.ownerActions.prepareFileSave(itemId),
+      // W4-FILES-SAVE SEC-L1: the item is a received file (store read).
+      isReceived: (itemId: string) => client.filesIo.isReceived(itemId),
     }),
     // U3-d: the verified label and the unsigned `agent.label` (reads and prepare only).
     agent: Object.freeze({
       label: () => client.ownerActions.loadLabel(),
       prepareLabel: (label: string) => client.ownerActions.prepareLabel(label),
+      // D-141: reads for the rename route (the card's name, the limit, an unfinished rotation).
+      cardName: () => client.identity.cardName(),
+      renameAllowance: () => client.identity.renameAllowance(),
+      sendState: () => client.identity.sendState(),
+      // W4-PAUSE: the pause row and the unsigned `agent.resume` (read and prepare only).
+      pauseState: () => client.pause.read(),
+      prepareResume: () => client.ownerActions.prepareResume(),
+    }),
+    // D-141: the contact's former-name note was shown (display state only).
+    contactNames: Object.freeze({
+      markSeen: (contactId: string) => client.contacts.markNameChangeSeen(contactId),
+    }),
+    // W4-AUTO-SAVE: the one-time notice (display state only).
+    autoSaveNotice: Object.freeze({
+      due: () => client.autoSave.noticeDue(),
+      dismiss: () => client.autoSave.dismissNotice(),
     }),
     // U3-f: the unsigned `app.connect` / `app.disconnect` (prepare only).
     apps: Object.freeze({
@@ -377,6 +451,40 @@ export function creditsPort(client: AgentLinkClient): LocalUiCreditsPort {
   });
 }
 
+/** W4-FILES-SAVE: how a save ended (core `saveReceivedFile`): never a path; the name is untrusted. */
+export type LocalUiFileSaveResult = SaveReceivedFileResult;
+
+/**
+ * W4-FILES-SAVE (04 §2.5.1 `file.save`, §4; 08 §1): saving one received file, for the save owner
+ * route only. It takes an owner-signed object that the route's one-use owner operation produced (the
+ * presence gate ran first); core takes only a `file.save`, verifies the owner signature, agent,
+ * freshness and nonce again, records the nonce, and only then saves with its own fetch (local
+ * decrypt, SSRF-safe download, Inbox folder only). Nothing else of the client is reachable through it.
+ */
+export interface LocalUiFileSavePort {
+  save(signed: { readonly body: JsonObject; readonly sig: string }): Promise<LocalUiFileSaveResult>;
+}
+
+/** The save port over `client` (a fresh frozen object of one bound method). */
+export function fileSavePort(client: AgentLinkClient): LocalUiFileSavePort {
+  return Object.freeze<LocalUiFileSavePort>({
+    save: (signed) => client.saveReceivedFile(signed),
+  });
+}
+
+/**
+ * W4-PAUSE (D-143 (5); 08 §1 `POST /api/ui/agents/pause`): the pause kind's one write over `client`
+ * (a fresh frozen object): core `pause.pause`, which writes only the agent's pause row and signs
+ * nothing. Only the server's pause gate holds it; no page handler reaches it.
+ */
+export interface LocalUiPauseDesk {
+  pause(): Promise<'paused' | 'already'>;
+}
+
+export function pauseDesk(client: AgentLinkClient): LocalUiPauseDesk {
+  return Object.freeze<LocalUiPauseDesk>({ pause: () => client.pause.pause() });
+}
+
 /**
  * UX2-d1: the invite desk of the `presence: 'invite'` routes over `client` (a fresh frozen object):
  * core `createInvite`, and core's accept step 1 with the link's expiry. Nothing here signs, pairs,
@@ -386,11 +494,14 @@ export function inviteDesk(client: AgentLinkClient): LocalUiInviteDesk {
   return Object.freeze<LocalUiInviteDesk>({
     create: (input) => client.pairing.createInvite(input),
     async check(link) {
-      const checked = await client.pairing.acceptInvite({ link });
+      // W4-SHORT-INVITE: a short link is resolved once (core keeps it in memory for the accept).
+      const resolved = await client.pairing.resolveInviteLink(link);
+      const checked = await client.pairing.acceptInvite({ link: resolved });
       // The same codec again for the expiry only (the link was just decoded and checked above).
-      const { expiresAt } = await decodeInviteLink(link);
+      const { expiresAt } = await decodeInviteLink(resolved);
       return Object.freeze({ contact: checked.contact, expiresAt });
     },
+    cancel: (inviteId) => client.pairing.cancelInvite(inviteId),
   });
 }
 
@@ -414,6 +525,14 @@ export type LocalUiAcceptOutcome =
  * `allowed` from anything else, so nothing here can pair without the owner's verified decision.
  */
 export interface LocalUiInviteAcceptPort {
+  /**
+   * W4-SHORT-INVITE (04 §3.6.2): the format 1 link of `link` (a short link fetched once from the
+   * configured drop). The accept route calls it first and uses the result for every step, so the
+   * approval action keeps the resolved invite sealed and nothing re-fetches it.
+   */
+  resolve(link: string): Promise<string>;
+  /** W4-INVITES-LIST: the open invites (ID, label, expiry; never a link). */
+  list(): Promise<readonly OpenInvite[]>;
   check(link: string): Promise<PendingContact>;
   decision(): Promise<PolicyDecision>;
   action(link: string): Promise<AcceptInviteAction>;
@@ -436,6 +555,8 @@ export function inviteAcceptPort(client: AgentLinkClient): LocalUiInviteAcceptPo
   const decision = async (): Promise<PolicyDecision> =>
     evaluate(await client.ownerActions.loadPolicy(), { kind: 'invite.accept' });
   return Object.freeze<LocalUiInviteAcceptPort>({
+    resolve: (link) => client.pairing.resolveInviteLink(link),
+    list: () => client.pairing.openInvites(),
     async check(link) {
       return (await client.pairing.acceptInvite({ link })).contact;
     },
@@ -472,6 +593,11 @@ export function inviteAcceptPort(client: AgentLinkClient): LocalUiInviteAcceptPo
 
 export interface LocalUiContext {
   /**
+   * W4-SHELL-V2 (08 §1, proposed): the app host's UI settings (Under the hood, the section menu),
+   * for api/ui-settings.ts only; absent outside the app host. Allowlisted booleans only.
+   */
+  readonly uiSettings?: LocalUiSettingsDesk;
+  /**
    * U3-g-b: present only while the app host has no agent yet: true when first run cannot set up an
    * owner here (an owner or any agent folder exists). `GET /api/ui/first-run` answers from it.
    */
@@ -480,6 +606,8 @@ export interface LocalUiContext {
   readonly client: LocalUiReadClient | undefined;
   /** M1-11c-a4c: the credits moves for the owner routes; undefined when not set up. */
   readonly credits?: LocalUiCreditsPort;
+  /** W4-FILES-SAVE: saving a received file, for the save owner route; undefined when not set up. */
+  readonly fileSave?: LocalUiFileSavePort;
   /**
    * UX2-d1: accepting an invite, for the accept owner route only; undefined when not set up. Its
    * pairing step runs only after core used an owner-signed, applied approval (I-4).
@@ -506,10 +634,9 @@ export interface LocalUiContext {
    */
   readonly agents?: LocalUiAgentsDesk;
   /**
-   * U3-d (D-138, 08 §1): creating an agent and saving a verified label, for the owner routes of
-   * api/agents-manage.ts only; absent outside the app host. It signs nothing: a new agent's first
-   * parts are signed only through the gate's one-use `addAgent`, and a label is written into
-   * config.json only after core applied the signed `agent.label` (07 §9.1).
+   * U3-d (D-138, 08 §1): the open agent and saving a verified label, for the owner routes of
+   * api/agents-manage.ts and api/apps.ts only; absent outside the app host. It signs nothing: a
+   * label is written into config.json only after core applied the signed `agent.label` (07 §9.1).
    */
   readonly agentsManage?: LocalUiAgentsManage;
   /**
@@ -548,10 +675,16 @@ export interface LocalUiAgentView {
   readonly removing: boolean;
   /** Active contacts; null when the store cannot be read just now. */
   readonly contacts: number | null;
-  /** An AI app is running this agent (the publisher lease row, read only, 06 §6). */
+  /** W4-LIVE-STATUS (D-143): an MCP session row of this agent is live (never the lease, 06 §6). */
   readonly running: boolean;
-  /** The AI app ids whose `agentlink` entry runs this agent (U3-f: from the entry only). */
-  readonly apps: readonly string[];
+  /**
+   * W4-LIVE-STATUS (D-143; 08 §1 "Live AI-app status"): the agent's live state, its newest last seen
+   * while not live, and per AI app (detected, with an entry, or with a live session) its state.
+   * Built through the one allowlist (live-status.ts liveAgentRecord).
+   */
+  readonly state: LiveAgentState;
+  readonly lastSeenAt?: number;
+  readonly apps: readonly LiveAppRecord[];
 }
 
 /** U3-c: the body of `GET /api/ui/agents` in the app host. */
@@ -569,32 +702,12 @@ export interface LocalUiAgentsDesk {
 }
 
 /**
- * U3-d: an agent this request created (keychain identity and folder, no card, no label yet), opened
- * for its first parts. Built by the server only; a handler passes it on to the gate's `addAgent` and
- * then to `settle`, and never reaches its core or its KeyStore through it.
+ * U3-d: what the rename and AI apps routes may call (built by the server over the app host).
+ * W4-ONE-TOUCH: creating an agent is no longer here; the server's create-agent gate does it (04 §2.8).
  */
-export interface LocalUiNewAgent {
-  /** Its folder name (a slug of the label, 06 §6). */
-  readonly name: string;
-  /** The label the page showed, as the request carried it. */
-  readonly label: string;
-  /** The agent's own card parts and core actions (server-held). */
-  readonly first: FirstAgentCard;
-  /** The Send folder for its first policy, checked before the gesture (owner-first-policy.ts). */
-  readonly plan: SendFolderPlan;
-}
-
-/** U3-d: what the create and rename routes may call (built by the server over the app host). */
 export interface LocalUiAgentsManage {
   /** The open agent's folder name; undefined when none is open. */
   current(): string | undefined;
-  /** Creates a keychain agent named from `label` and opens it; undefined when that failed. */
-  create(label: string): Promise<LocalUiNewAgent | undefined>;
-  /**
-   * Closes the new agent; when `ok` is false, removes exactly what `create` made (its keychain items
-   * and its folder), all or nothing. Never throws.
-   */
-  settle(agent: LocalUiNewAgent, ok: boolean): Promise<void>;
   /** After core applied the signed `agent.label`: writes config.json `label` (07 §9.1). */
   labelSaved(name: string, label: string): Promise<void>;
 }

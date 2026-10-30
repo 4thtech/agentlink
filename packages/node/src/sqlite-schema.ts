@@ -66,6 +66,29 @@ const V5_TABLES: readonly TableName[] = ['own_storage'];
 const V6_FILES_COLUMNS: readonly string[] = ['saved_name'];
 /** Tables added by version 7 (U3-d, D-138): the signed local owner actions (07 §3.4). */
 const V7_TABLES: readonly TableName[] = ['local_owner_actions'];
+/** Invites columns added by version 8 (W4-SHORT-INVITE, D-139): a short link's drop object. */
+const V8_INVITES_COLUMNS: readonly string[] = ['drop_lookup_id', 'drop_key_epoch', 'cancelled_at'];
+/** Contacts columns added by version 9 (W4-RENAME-REACHES-CONTACTS, D-141): the former name. */
+const V9_CONTACTS_COLUMNS: readonly string[] = [
+  'former_name',
+  'name_changed_at',
+  'name_change_seen',
+  'declared_name',
+];
+
+/** Tables added by version 10 (W4-LIVE-STATUS, D-143): the MCP session heartbeat (07 §3.2). */
+const V10_TABLES: readonly TableName[] = ['mcp_sessions', 'mcp_last_seen'];
+/** Files columns and tables added by version 11 (W4-AUTO-SAVE, D-142): automatic saving (04 §4.1). */
+const V11_FILES_COLUMNS: readonly string[] = [
+  'auto_save',
+  'auto_reason',
+  'auto_tries',
+  'auto_next_at',
+];
+const V11_TABLES: readonly TableName[] = ['auto_save_log', 'auto_save_state'];
+
+/** Tables added by version 12 (W4-PAUSE, D-143 (5)): the owner's pause of the agent (07 §3.2). */
+const V12_TABLES: readonly TableName[] = ['agent_pause'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -84,7 +107,11 @@ function without(spec: TableSpec, columns: readonly string[]): TableSpec {
 function v1Spec(table: TableName): TableSpec {
   const spec = tableSpec(table);
   if (table === 'envelopes') return without(spec, V2_ENVELOPE_COLUMNS);
-  if (table === 'files') return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS]);
+  if (table === 'files') {
+    return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS, ...V11_FILES_COLUMNS]);
+  }
+  if (table === 'invites') return without(spec, V8_INVITES_COLUMNS);
+  if (table === 'contacts') return without(spec, V9_CONTACTS_COLUMNS);
   return spec;
 }
 
@@ -137,13 +164,60 @@ function v6Statements(): readonly string[] {
 }
 
 /**
+ * Version 8 (W4-SHORT-INVITE, D-139; 07 §3): `invites.drop_lookup_id` and `drop_key_epoch` (sealed)
+ * and `cancelled_at`, appended. Every existing row keeps null (a format 1 invite, not cancelled);
+ * nothing is rewritten. An older build refuses a version 8 file, so the upgrade cannot be rolled back.
+ */
+function v8Statements(): readonly string[] {
+  const invites = tableSpec('invites');
+  return V8_INVITES_COLUMNS.map(
+    (column) =>
+      `ALTER TABLE "invites" ADD COLUMN ${columnDef('invites', column, invites.columns[column] as ColumnSpec)}`,
+  );
+}
+
+/**
+ * Version 9 (W4-RENAME-REACHES-CONTACTS, D-141; 07 §3 "Former name"): `contacts.former_name`,
+ * `name_changed_at`, `name_change_seen` and `declared_name`, appended, all nullable. Every existing row keeps null:
+ * no note is due (null reads as seen); nothing is rewritten.
+ */
+function v9Statements(): readonly string[] {
+  const contacts = tableSpec('contacts');
+  return V9_CONTACTS_COLUMNS.map(
+    (column) =>
+      `ALTER TABLE "contacts" ADD COLUMN ${columnDef('contacts', column, contacts.columns[column] as ColumnSpec)}`,
+  );
+}
+
+/**
+ * Version 11 (W4-AUTO-SAVE, D-142; 04 §4.1; proposed, owner confirms at merge): the `files.auto_*`
+ * columns, appended and null on every existing row (those files arrived before automatic saving and
+ * keep the save-on-request rule), and the `auto_save_log` and `auto_save_state` tables. A store that
+ * already has an identity (an agent that updates) gets the one-time notice row (`show`, 08 §1); a new
+ * store is empty here, so a new agent never shows it.
+ */
+function v11Statements(): readonly string[] {
+  return [
+    ...addFilesColumns(V11_FILES_COLUMNS),
+    ...createSchemaStatements(V11_TABLES),
+    `INSERT INTO "auto_save_state" ("slot", "notice", "paused_reason", "paused_at") ` +
+      `SELECT 'current', 'show', NULL, NULL WHERE EXISTS (SELECT 1 FROM "identity")`,
+  ];
+}
+
+/**
  * The forward migrations, oldest first; the last one's version is STORE_SCHEMA_VERSION. Version 1
  * is the G-9 schema, version 2 adds D-72's columns and table, version 3 adds the `publisher_lease`
  * and `outbox_staged` tables (M1-7k-b; new tables only, so existing rows are untouched), version 4
  * adds `files.delete_after` (M1-1g-i; a nullable column, null on existing rows), version 5 adds
  * `own_storage` (M1-9i-a, D-115; a new table with its one-row trigger, existing rows untouched), version
  * 6 adds `files.saved_name` (MSG-FILES-IO-b; a nullable sealed column, null on existing rows), version
- * 7 adds `local_owner_actions` (U3-d, D-138; a new table, existing rows untouched). A later
+ * 7 adds `local_owner_actions` (U3-d, D-138; a new table, existing rows untouched), version 8 adds the
+ * invites drop columns (W4-SHORT-INVITE, D-139; nullable, null on existing rows), version 9 adds the
+ * contacts former-name columns (W4-RENAME-REACHES-CONTACTS, D-141; nullable, null on existing rows),
+ * version 10 adds `mcp_sessions` and `mcp_last_seen` (W4-LIVE-STATUS, D-143; new tables only), version
+ * 11 adds the auto-save columns and tables (W4-AUTO-SAVE, D-142; nullable, null on existing rows).,
+ * version 12 adds `agent_pause` (W4-PAUSE, D-143 (5); a new table, no row: not paused). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -157,7 +231,10 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V2_TABLES.includes(t) &&
           !V3_TABLES.includes(t) &&
           !V5_TABLES.includes(t) &&
-          !V7_TABLES.includes(t),
+          !V7_TABLES.includes(t) &&
+          !V10_TABLES.includes(t) &&
+          !V11_TABLES.includes(t) &&
+          !V12_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -168,6 +245,11 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 5, statements: createSchemaStatements(V5_TABLES) }),
   Object.freeze({ version: 6, statements: Object.freeze(v6Statements()) }),
   Object.freeze({ version: 7, statements: createSchemaStatements(V7_TABLES) }),
+  Object.freeze({ version: 8, statements: Object.freeze(v8Statements()) }),
+  Object.freeze({ version: 9, statements: Object.freeze(v9Statements()) }),
+  Object.freeze({ version: 10, statements: createSchemaStatements(V10_TABLES) }),
+  Object.freeze({ version: 11, statements: Object.freeze(v11Statements()) }),
+  Object.freeze({ version: 12, statements: createSchemaStatements(V12_TABLES) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

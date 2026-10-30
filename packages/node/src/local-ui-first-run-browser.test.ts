@@ -281,28 +281,26 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
       }
     });
 
-    // Welcome: one sentence and one button; nothing is asked of the setup routes yet.
-    await page.getByRole('button', { name: 'Get started' }).waitFor();
-    expect(await page.locator('h1').innerText()).toContain('Private messages between AI agents.');
-    // The one fade-in has to be over before colours are measured.
+    // W4-WIZARD: Get started, step 1 (pick your AI app). The app list is not available from this
+    // server (U3-f's route is a stub here), so the page says so in plain words and goes on.
+    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
+    await page.getByText("Couldn't look for AI apps. You can still pick one.").waitFor();
+    expect(asked.some((a) => a.url === '/api/ui/apps')).toBe(true);
+    // The moments have to be over before colours are measured.
     await page.evaluate(
       'Promise.all(document.getAnimations().map((a) => a.finished)).then(() => true)',
     );
     expect(await axeViolations(page)).toEqual([]);
-    await page.getByRole('button', { name: 'Get started' }).click();
+    await page.getByRole('button', { name: /^Continue with / }).click();
 
-    // Pick your AI app: the app list is not available from this server (U3-f's route is a stub
-    // here), so the page says so in plain words and goes on.
-    await page.getByRole('heading', { name: 'Which AI app will you use?' }).waitFor();
-    await page.getByText("Couldn't look for AI apps. You can connect one later.").waitFor();
-    expect(asked.some((a) => a.url === '/api/ui/apps')).toBe(true);
-    expect(await axeViolations(page)).toEqual([]);
-    await page.getByRole('button', { name: 'Continue' }).click();
-
-    // Name and protect, one gesture.
-    await page.getByRole('heading', { name: 'Set up your agent' }).waitFor();
-    expect(await page.locator('main').innerText()).toContain('~/AgentLink/Send');
-    expect(await page.getByLabel('Name your agent').inputValue()).toBe('My agent');
+    // Step 2, "Confirm it's you": the agent card (renamed), one gesture; the folders it sets up.
+    await page.getByRole('heading', { name: "Confirm it's you" }).waitFor();
+    expect(await page.locator('main').textContent()).toContain('~/AgentLink/Send');
+    await page.getByRole('button', { name: /^Change the agent's name/ }).click();
+    expect(await page.getByLabel('Name your agent').inputValue()).toBe('Claude Code agent');
+    await page.evaluate(
+      'Promise.all(document.getAnimations().map((a) => a.finished)).then(() => true)',
+    );
     expect(await axeViolations(page)).toEqual([]);
     // The server refuses a label that is not its own restricted form, before any Touch ID.
     const refused = await page.evaluate(async () => {
@@ -322,20 +320,27 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
       body: { status: 'refused', reason: 'label_invalid' },
     });
     await page.getByLabel('Name your agent').fill('Home base');
-    await page.getByRole('button', { name: /^Use (Touch ID|Windows Hello|a passkey)$/ }).click();
+    await page
+      .getByRole('button', { name: /^Connect with (Touch ID|Windows Hello|your passkey)$/ })
+      .click();
     await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
 
-    // The label was checked, then carried by begin and finish exactly as the server parses it
-    // (X-AgentLink-Input = base64url JSON {label}); the first agent.label is stored and verified.
+    // The label was checked, then carried by begin exactly as the server parses it (X-AgentLink-Input
+    // = base64url JSON {label}); W4-ONE-TOUCH (04 §2.8): finish carries only {nonce}. The first
+    // agent.label is stored and verified.
     const labelInput = Buffer.from(JSON.stringify({ label: 'Home base' })).toString('base64url');
     expect(
       asked.find((a) => a.url.startsWith('/api/ui/agents/label-check?label=Home')),
     ).toBeDefined();
-    for (const step of ['begin', 'finish']) {
-      const call = asked.find((a) => a.url === `/api/ui/first-run/owner/${step}`);
-      expect(call?.method).toBe('POST');
-      expect(call?.input).toBe(labelInput);
-    }
+    const begin = asked.find((a) => a.url === '/api/ui/first-run/owner/begin');
+    expect(begin?.method).toBe('POST');
+    expect(begin?.input).toBe(labelInput);
+    const finish = asked.find((a) => a.url === '/api/ui/first-run/owner/finish');
+    expect(finish?.method).toBe('POST');
+    const finishInput = JSON.parse(
+      Buffer.from(finish?.input ?? '', 'base64url').toString('utf8'),
+    ) as Record<string, unknown>;
+    expect(Object.keys(finishInput)).toEqual(['nonce']);
     expect(await client.ownerActions.loadLabel()).toEqual({
       status: 'verified',
       label: 'Home base',
@@ -367,20 +372,26 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     );
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).not.toBeNull();
 
-    // "I saved it": no AI app was chosen, so the end of first run is Home, with the kit put off.
+    // "I saved it": step 3; no AI app was found, so the agent is ready and Home is one click away;
+    // the kit is put off.
     await page.getByRole('button', { name: 'I saved it' }).click();
-    await page.waitForURL(`${server.origin}/settings/home`);
+    await page.waitForURL(`${server.origin}/start/connected`);
+    await page.getByRole('heading', { name: 'Home base is ready' }).waitFor();
     expect(await page.evaluate(() => localStorage.getItem('agentlink.recoveryKit.later'))).toMatch(
       /^[0-9]+$/,
     );
 
-    // A second visit: approvals are already protected; setup is never offered again.
+    // A second visit: Get started goes on for this owner (New agent: no agent is open in this
+    // server); owner setup is never offered again. W4-WIRE-2 (Decision 52 (2)): New agent names
+    // the agent first, then the pick.
     await page.goto(`${server.origin}/first-run`);
-    await page
-      .getByRole('heading', { name: 'Approvals are already protected on this computer' })
-      .waitFor();
-    expect(
-      await page.getByRole('button', { name: /^Use (Touch ID|Windows Hello|a passkey)$/ }).count(),
-    ).toBe(0);
+    await page.getByRole('heading', { name: 'Name your agent' }).waitFor();
+    expect(await page.locator('main').textContent()).not.toContain('Welcome');
+    await page.getByLabel('Agent name').fill('Second');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
+    expect(await page.locator('main').textContent()).not.toContain('Welcome');
+    await page.getByRole('button', { name: /^Continue with / }).click();
+    expect(await page.locator('main').textContent()).not.toContain('~/AgentLink/Send');
   }, 180_000);
 });

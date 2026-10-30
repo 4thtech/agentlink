@@ -84,7 +84,9 @@ const addContact = (): HTMLElement | undefined =>
   );
 
 describe('Empty states point to step 2 of Start here', () => {
-  it('Contacts: "No contacts yet. Invite someone to start." with one Add contact that opens the sheet here', async () => {
+  // W4-WIRE-2: the Add contact sheet is retired (Decision 52 (3)); Add contact opens the Invite screen
+  // here (where "Paste it" takes an invite someone sent).
+  it('Contacts: "No contacts yet. Invite someone to start." with one Add contact that opens the Invite screen here', async () => {
     await mount('contacts', model(false));
     expect(host.textContent).toContain('No contacts yet. Invite someone to start.');
     expect(host.textContent).toContain(CONTACTS_STRINGS.emptyPrompt);
@@ -100,13 +102,14 @@ describe('Empty states point to step 2 of Start here', () => {
       add.click();
     });
     await settle();
-    expect(document.body.querySelector('[role="region"][aria-label="Add contact"]')).not.toBeNull();
+    expect(document.body.querySelector('h1')?.textContent).toBe('Invite someone');
+    expect(document.body.textContent).toContain('Have an invite link? Paste it');
   });
 
-  it('Messages: "No messages yet. Invite someone first, then ask your AI to say hello."', async () => {
+  it('Inbox (W4-SHELL, owner 29 Oct): "Nothing here yet. Invite someone, then ask your AI to say hello."', async () => {
     await mount('messages', model(false));
     expect(host.textContent).toContain(
-      'No messages yet. Invite someone first, then ask your AI to say hello.',
+      'Nothing here yet. Invite someone, then ask your AI to say hello.',
     );
     expect(addContact()?.classList.contains('al-btn-primary')).toBe(true);
     expect(addContact()?.getAttribute('href')).toBe(ADD_CONTACT_HREF);

@@ -12,6 +12,8 @@
 // - Remove is the real route at the sample path (U3-e); its documented statuses are the server's.
 import { encodeUtf8 } from '@4thtech-io/crypto';
 import {
+  AGENTS_CARD_NAME,
+  AGENTS_CARD_NAME_PATH,
   AGENTS_LABEL_CHECK,
   AGENTS_LABEL_CHECK_PATH,
   AGENTS_LABEL_PATH,
@@ -181,7 +183,15 @@ const route = (method: string, path: string) => {
   return found;
 };
 
-function world(): LocalUiContext {
+/** W4-RENAME-REACHES-CONTACTS: the card's name, the limit and the send state core reads. */
+interface WorldOptions {
+  readonly cardName?: string;
+  readonly allowance?: { status: 'ok'; left: number } | { status: 'limited'; retryAt: number };
+  readonly sendState?: string;
+  readonly label?: string;
+}
+
+function world(options: WorldOptions = {}): LocalUiContext {
   const prepared = (label: string) => {
     const body = {
       v: 1,
@@ -199,8 +209,11 @@ function world(): LocalUiContext {
     client: {
       agentId: SELF,
       agent: {
-        label: () => Promise.resolve({ status: 'verified', label: 'Personal' }),
+        label: () => Promise.resolve({ status: 'verified', label: options.label ?? 'Personal' }),
         prepareLabel: (label: string) => Promise.resolve(prepared(label)),
+        cardName: () => Promise.resolve(options.cardName ?? AGENTS_OWNER.cardName),
+        renameAllowance: () => Promise.resolve(options.allowance ?? { status: 'ok', left: 3 }),
+        sendState: () => Promise.resolve(options.sendState ?? 'ready'),
       },
     },
     agentsManage: {
@@ -225,6 +238,13 @@ const operation = {
       ),
     ),
   addAgent: () => Promise.resolve({ status: 'done' }),
+  // W4-RENAME-REACHES-CONTACTS: the gate's one rename gesture (owner-rename.ts signRename).
+  renameAgent: (_review: unknown, request: { labelBody: unknown }) =>
+    Promise.resolve({
+      status: 'signed',
+      label: { body: request.labelBody, sig: 'cd'.repeat(64) },
+      contacts: AGENTS_OWNER.contacts,
+    }),
 } as unknown as LocalUiOwnerOperation;
 
 const plain = (result: LocalUiResult): UiAnswer<unknown> => ({
@@ -232,8 +252,10 @@ const plain = (result: LocalUiResult): UiAnswer<unknown> => ({
   body: JSON.parse(JSON.stringify(result.body)) as unknown,
 });
 
-const read = async (path: string, query: URLSearchParams) =>
-  plain(await (route('GET', path) as LocalUiReadRoute).handler(world(), { params: {}, query }));
+const read = async (path: string, query: URLSearchParams, options: WorldOptions = {}) =>
+  plain(
+    await (route('GET', path) as LocalUiReadRoute).handler(world(options), { params: {}, query }),
+  );
 
 /** What the presence gate hands an owner route: the input JSON exactly as the page sent it. */
 const ownerCall = async (path: string, input: unknown) =>
@@ -258,9 +280,49 @@ describe('contract (server): the real U3-d handlers answer the owner samples', (
     expect(await ownerCall(AGENTS_LABEL_PATH, input)).toEqual(answer);
   });
 
-  it('add takes exactly {label}', async () => {
-    const { input, answer } = AGENTS_OWNER.add;
-    expect(await ownerCall(AGENTS_PATH, input)).toEqual(answer);
+  it('rename to the card name changes only the label (D-141 (3))', async () => {
+    const { input, answer } = AGENTS_OWNER.renameLabelOnly;
+    expect(await ownerCall(AGENTS_LABEL_PATH, input)).toEqual(answer);
+  });
+
+  it('a rename that rotates is refused before the gesture: rename_limited, rotation_pending', async () => {
+    const precheck = (route('POST', AGENTS_LABEL_PATH) as LocalUiOwnerRoute).precheck;
+    if (precheck === undefined) throw new Error('no precheck');
+    const [limited, pending] = AGENTS_OWNER.renameRefusals;
+    if (limited === undefined || pending === undefined) throw new Error('samples');
+    const call = async (input: unknown, options: WorldOptions) => {
+      const result = await precheck(world(options), {
+        params: {},
+        query: new URLSearchParams(),
+        input: JSON.parse(JSON.stringify(input)),
+      });
+      return result === undefined ? undefined : plain(result);
+    };
+    expect(
+      await call(limited.input, {
+        allowance: { status: 'limited', retryAt: limited.answer.body.retryAt },
+      }),
+    ).toEqual(limited.answer);
+    expect(await call(pending.input, { sendState: 'rotation_pending' })).toEqual(pending.answer);
+  });
+
+  it('card-name: differs (renamed before D-141) and same', async () => {
+    expect(
+      await read(AGENTS_CARD_NAME_PATH, new URLSearchParams(), {
+        label: 'Home',
+        cardName: AGENTS_CARD_NAME.differs.answer.body.cardName,
+      }),
+    ).toEqual(AGENTS_CARD_NAME.differs.answer);
+    expect(await read(AGENTS_CARD_NAME_PATH, new URLSearchParams())).toEqual(
+      AGENTS_CARD_NAME.same.answer,
+    );
+  });
+
+  it('W4-ONE-TOUCH: add is the create-agent kind at begin and the collection (the real gate answers the samples: create-connect-server.test.ts)', () => {
+    const begin = route('POST', AGENTS_OWNER.add.beginPath) as { presence: unknown; step: unknown };
+    const finish = route('POST', AGENTS_PATH) as { presence: unknown; step: unknown };
+    expect([begin.presence, begin.step]).toEqual(['create-agent', 'begin']);
+    expect([finish.presence, finish.step]).toEqual(['create-agent', 'finish']);
   });
 
   it('the refusals arrive as {error}: label_invalid, and another agent than the open one is agent_changed', async () => {

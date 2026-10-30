@@ -73,6 +73,16 @@ const ENTRIES: ActivityEntry[] = [
     contact: { id: CONTACT_ID, display: null },
   },
   { kind: 'rules_changed', id: 'rules_changed:7', at: 1_760_000_100, version: 7 },
+  // W4-RENAME-REACHES-CONTACTS (D-141): "{old} is now called {new}", restricted names only.
+  {
+    kind: 'contact_renamed',
+    id: `contact_renamed:${CONTACT_ID}`,
+    at: 1_760_000_050,
+    contactId: CONTACT_ID,
+    contact: { id: CONTACT_ID, display: null },
+    formerName: 'Marko',
+    newName: 'Mark',
+  },
 ];
 
 describe('GET /api/ui/activity (M1-11c-a1)', () => {
@@ -118,6 +128,7 @@ describe('GET /api/ui/activity (M1-11c-a1)', () => {
         { kind: 'sender_blocked', at: 1_760_000_300, senderCode: '2B9E·04D1' },
         { kind: 'contact_blocked', at: 1_760_000_200 },
         { kind: 'rules_changed', at: 1_760_000_100 },
+        { kind: 'contact_renamed', at: 1_760_000_050, formerName: 'Marko', newName: 'Mark' },
       ],
     });
     const text = JSON.stringify(result.body);
@@ -256,6 +267,10 @@ describe('the read-only client view (M1-11c-a1 adds listActivity)', () => {
       'agentId',
       // U3-f: the unsigned app.connect / app.disconnect (prepare only).
       'apps',
+      // W4-AUTO-SAVE: the one-time notice (display state only).
+      'autoSaveNotice',
+      // W4-RENAME-REACHES-CONTACTS: the former-name note's seen mark only (display state).
+      'contactNames',
       'contacts',
       'files',
       'filesIo',

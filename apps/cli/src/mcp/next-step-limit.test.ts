@@ -42,6 +42,7 @@ import * as tool_input from '@4thtech-io/mcp-tools/input.js';
 import * as tool_invite_common from '@4thtech-io/mcp-tools/invite-common.js';
 import * as tool_list_contacts from '@4thtech-io/mcp-tools/list-contacts.js';
 import * as tool_notarize from '@4thtech-io/mcp-tools/notarize.js';
+import * as tool_pause from '@4thtech-io/mcp-tools/pause.js';
 import * as tool_proofs_common from '@4thtech-io/mcp-tools/proofs-common.js';
 import * as tool_propose_terms from '@4thtech-io/mcp-tools/propose-terms.js';
 import * as tool_registry from '@4thtech-io/mcp-tools/registry.js';
@@ -168,6 +169,7 @@ const modules: Record<string, Exports> = {
   '../tools/invite-common.ts': tool_invite_common,
   '../tools/list-contacts.ts': tool_list_contacts,
   '../tools/notarize.ts': tool_notarize,
+  '../tools/pause.ts': tool_pause,
   '../tools/proofs-common.ts': tool_proofs_common,
   '../tools/propose-terms.ts': tool_propose_terms,
   '../tools/registry.ts': tool_registry,

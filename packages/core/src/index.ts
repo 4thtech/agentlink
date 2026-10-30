@@ -11,6 +11,9 @@ export type {
 } from './approval-channel.js';
 export {
   IdentityService,
+  RENAMES_PER_DAY,
+  RENAME_WINDOW_SECONDS,
+  type RenameAllowance,
   type FingerprintForms,
   type OwnFingerprints,
   type IdentityView,
@@ -63,6 +66,9 @@ export {
   type AcceptInviteResult,
   // U3-invite: Accept step 1 alone, for `agentlink join` and the app host's waiting invite.
   checkInviteLink,
+  // W4-SHORT-INVITE / W4-INVITES-LIST (D-139): the drop fetcher of a short link, and an open invite.
+  shortInviteFetcher,
+  type OpenInvite,
   type CheckedInviteLink,
   type CreateInviteInput,
   type CreatedInvite,
@@ -82,8 +88,16 @@ export {
   INVITE_LINK_PREFIX,
   INVITE_MAX_JSON_BYTES,
   INVITE_MAX_PAYLOAD_CHARS,
+  SHORT_INVITE_LINK_CHARS,
+  clearShortInviteCache,
   decodeInviteLink,
   encodeInviteLink,
+  encodeInvitePayload,
+  encodeShortInviteLink,
+  resolveInviteLink,
+  shortInviteSecretOf,
+  type DecodeInviteOptions,
+  type ShortInviteFetch,
 } from './invite-link.js';
 // UX2-d1: the accept-invite approval action and the share text, one for every surface.
 export {
@@ -283,6 +297,26 @@ export {
   type OutboxPeer,
   type OutboxRoute,
 } from './outbox.js';
+// W4-PAUSE (D-143 (5)): the owner's pause of one agent (07 §3.2 `agent_pause`; 06 §6).
+export {
+  AGENT_PAUSED_TEXT,
+  AgentPause,
+  agentPaused,
+  type AgentPauseOptions,
+  type PauseReading,
+} from './agent-pause.js';
+// W4-LIVE-STATUS (D-143): the MCP session heartbeat (07 §3.2 `mcp_sessions`, `mcp_last_seen`; 06 §6).
+export {
+  MCP_SESSION_BEAT_SECONDS,
+  MCP_SESSION_FUTURE_LIMIT_SECONDS,
+  MCP_SESSION_TTL_SECONDS,
+  McpSession,
+  OTHER_APP,
+  mcpAppId,
+  mcpPidValid,
+  mcpSessionLive,
+  type McpSessionOptions,
+} from './mcp-session.js';
 // M1-7k-b: the per-agent publisher lease (07 §3.2 `publisher_lease`; 06 §6).
 export {
   PublisherLease,
@@ -310,6 +344,7 @@ export {
 export {
   CardUpdateSender,
   MAX_CARD_UPDATES_PER_PASS,
+  CATCH_UP_SECONDS,
   type CardUpdateSendResult,
 } from './card-update.js';
 export {
@@ -540,10 +575,14 @@ export {
   type FetchUrlRefusal,
 } from './fetch-url.js';
 export {
+  DOWNLOAD_SUFFIX,
   FALLBACK_FILE_NAME,
   MAX_FILE_NAME_BYTES,
+  needsDownloadSuffix,
   sanitizeFileName,
+  savedFileName,
   withNameSuffix,
+  withRandomNameSuffix,
 } from './file-name.js';
 export {
   decidePath,
@@ -560,8 +599,27 @@ export {
 } from './path-guard.js';
 // M1-7f: files (04 §3.4, §4; 06 §2.3; 07 §5.6; D-84, D-85). The platform half (realpath, the SSRF-safe
 // fetch and download, the inbox file operations) is supplied by @4thtech-io/node (M1-9d).
-export type { DropConfig, FilesPlatform, InboxFolder, OutgoingFile } from './files/platform.js';
+export type {
+  DropConfig,
+  FilesPlatform,
+  InboxFolder,
+  InboxSaveError,
+  OutgoingFile,
+  QuarantineMark,
+} from './files/platform.js';
+export {
+  AUTO_SAVE_CONCURRENCY,
+  AUTO_SAVE_PAUSE_RECHECK_SECONDS,
+  AUTO_SAVE_RESERVE_BYTES,
+  AUTO_SAVE_RETRY_DELAYS,
+  AUTO_SAVE_WINDOW_SECONDS,
+  AutoSaver,
+  autoSaveOf,
+  type AutoSavePause,
+  type AutoSaveRun,
+} from './files/auto-save.js';
 export type { FetchFileInput, FetchFileResult } from './files/incoming.js';
+export type { SaveReceivedFileResult } from './files/save.js';
 export {
   MAX_LINK_ANSWERS_PER_PASS,
   REFRESH_LINK_KIND,

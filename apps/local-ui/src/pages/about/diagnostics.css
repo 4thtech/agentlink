@@ -1,0 +1,66 @@
+/* Advanced › Diagnostics (W4-SETTINGS-ADVANCED): the AI app table and the About block. Tokens only. */
+.dg-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  max-inline-size: 960px;
+  margin-inline: auto;
+}
+.dg-page h1,
+.dg-page h2,
+.dg-page p {
+  margin: 0;
+}
+.dg-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+}
+.dg-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+  flex: 1 1 320px;
+}
+.dg-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--al-color-fg-subtle);
+}
+.dg-note {
+  min-block-size: 20px;
+  color: var(--al-color-status-success-fg);
+}
+.dg-table-wrap {
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  overflow-x: auto;
+}
+.dg-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.dg-table th {
+  text-align: start;
+  padding: var(--al-space-2) var(--al-space-4);
+  border-block-end: var(--al-border-width-thin) solid var(--al-color-border-default);
+  font-weight: 500;
+  color: var(--al-color-fg-subtle);
+}
+.dg-table td {
+  padding: var(--al-space-3) var(--al-space-4);
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.dg-table tbody tr:first-child td {
+  border-block-start: 0;
+}
+.dg-about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+}

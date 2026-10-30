@@ -80,8 +80,12 @@ export async function openUiHostAgent(
   if (opened?.status !== 'ok') return undefined;
   const { agent } = opened;
   try {
-    // The app's files are the server's and never change on a switch.
-    const localUi = withoutAssets(await deps.localUi(agent));
+    // The app's files are the server's and never change on a switch. W4-RENAME-REACHES-CONTACTS
+    // (D-141): the host's agent also gets its key-items token, for the rename gesture only.
+    const localUi = {
+      ...withoutAssets(await deps.localUi(agent)),
+      ...(agent.epochKeys === undefined ? {} : { epochKeys: agent.epochKeys }),
+    };
     const source = createUiApprovalSource(
       // The host owns the agent's lifetime; the source never closes it.
       { ...agent, close: () => Promise.resolve() },
@@ -167,8 +171,9 @@ export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServ
       // HOTFIX-045-REMOVE-FIRSTRUN: Remove in this session (the folder lock, its own open, the
       // revoked list), the same port the agent host gets.
       removal: deps.removal,
-      // The real home and owner files (no override).
-      firstRun: {},
+      // The real home and owner files (no override). W4-ONE-TOUCH (D-140): the desk's plan for
+      // first run's own setup gate only, so one gesture creates the agent and connects its app.
+      firstRun: desk === undefined ? {} : { aiApps: Object.freeze({ plan: desk.plan.bind(desk) }) },
       // U3-invite (08 §4): the invite `join` checked, held in memory by the host only.
       ...(deps.waitingInvite === undefined ? {} : { waitingInvite: deps.waitingInvite }),
       // U3-invite: the 0600 handoff record, so a later `join` hands over here.

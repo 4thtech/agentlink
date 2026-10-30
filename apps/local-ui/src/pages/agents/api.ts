@@ -4,6 +4,9 @@
 // (never the URL), and the server's central gate checks presence before the route runs. A route that
 // is still a stub answers 501 and becomes `not_available`. The generation is also stamped on every
 // mutating request by the page's generation guard (api/generation.ts).
+// W4-AGENTS: Pause is its own kind like the switch (an octet-stream `{generation}`, no presence);
+// Resume is a presence route like Rename (input `{}`, signs `agent.resume`; 08 §1, D-143 (5)). A
+// rename answers how many contacts are told, or `rename_limited` with its time (D-141).
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import type { PresenceProof } from '../contacts/owner.js';
 import { appNameOf, parseAppNames } from './app-names.js';
@@ -32,25 +35,48 @@ export type OwnerKind =
   | 'agent_removing'
   | 'unknown_agent'
   | 'refused'
+  | 'rename_limited'
+  | 'rotation_pending'
+  | 'not_paused'
   | 'not_available'
   | 'session'
   | 'offline'
   | 'failed';
 export interface OwnerOutcome {
   readonly kind: OwnerKind;
+  /** `rename_limited`: when the next rename is allowed (unix seconds). */
+  readonly retryAt?: number;
+  /** A rename that reaches contacts: how many will be told (D-141). */
+  readonly contacts?: number;
 }
+
+/** W4-PAUSE: the answer to Pause (`done` = paused). */
+export type PauseOutcome = {
+  readonly kind: 'done' | 'agent_changed' | 'not_available' | 'session' | 'offline' | 'failed';
+};
+
+/** D-141: the open agent's card name, when it differs from its label. */
+export type CardNameOutcome =
+  | { readonly kind: 'differs'; readonly cardName: string }
+  | { readonly kind: 'same' }
+  | { readonly kind: 'unavailable' };
 
 export interface AgentsApi {
   list(): Promise<ReadOutcome>;
   /** GET label-check: whether the server would sign this label (before Touch ID). */
   labelCheck(label: string): Promise<'ok' | 'refused' | 'unavailable'>;
   switchTo(name: string, generation: number): Promise<SwitchOutcome>;
-  add(input: { label: string }, proof: PresenceProof): Promise<OwnerOutcome>;
   rename(input: { name: string; label: string }, proof: PresenceProof): Promise<OwnerOutcome>;
   remove(
     input: { name: string; typedLabel: string; anyway?: boolean },
     proof: PresenceProof,
   ): Promise<OwnerOutcome>;
+  /** W4-PAUSE: pause the open agent (one click, no presence). */
+  pause(generation: number): Promise<PauseOutcome>;
+  /** W4-PAUSE: resume the open agent (presence; signs `agent.resume`). */
+  resume(proof: PresenceProof): Promise<OwnerOutcome>;
+  /** D-141: "Contacts still see {cardName}" for the open agent. */
+  cardName(): Promise<CardNameOutcome>;
 }
 
 export interface AgentsApiOptions {
@@ -70,7 +96,17 @@ const WORDS: ReadonlySet<string> = new Set([
   'unknown_agent',
   'refused',
   'busy',
+  'rename_limited',
+  'rotation_pending',
+  'not_paused',
 ]);
+
+const CARD_NAME_MAX = 64;
+
+/** A whole-second unix time, or undefined. */
+function unixSeconds(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isSafeInteger(v) && v > 0 ? v : undefined;
+}
 
 function pageToken(): string {
   if (typeof document === 'undefined') return '';
@@ -84,16 +120,25 @@ function base64url(text: string): string {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-async function statusWord(res: Response): Promise<string | undefined> {
+interface Answer {
+  readonly word: string | undefined;
+  readonly body: Record<string, unknown>;
+}
+
+async function readAnswer(res: Response): Promise<Answer> {
   try {
     const body: unknown = await res.json();
-    if (typeof body !== 'object' || body === null) return undefined;
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      return { word: undefined, body: {} };
+    }
     // Presence answers use `status`; a route's refusals arrive as `{error}` (U3-d, U3-e).
-    const { status, error } = body as { status?: unknown; error?: unknown };
-    if (typeof status === 'string') return status;
-    return typeof error === 'string' ? error : undefined;
+    const b = body as Record<string, unknown>;
+    const { status, error } = b;
+    const word =
+      typeof status === 'string' ? status : typeof error === 'string' ? error : undefined;
+    return { word, body: b };
   } catch {
-    return undefined;
+    return { word: undefined, body: {} };
   }
 }
 
@@ -134,8 +179,19 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
     if (res.status === 501) return { kind: 'not_available' };
     if (res.status === 401) return { kind: 'session' };
     if (res.status === 429) return { kind: 'wait' };
-    const word = await statusWord(res);
-    if (res.status === 200 && (word === 'done' || word === 'removed')) return { kind: 'done' };
+    const { word, body: answer } = await readAnswer(res);
+    if (res.status === 200 && (word === 'done' || word === 'removed' || word === 'resumed')) {
+      const contacts = answer['contacts'];
+      return typeof contacts === 'number' && Number.isSafeInteger(contacts) && contacts >= 0
+        ? { kind: 'done', contacts }
+        : { kind: 'done' };
+    }
+    if (word === 'rename_limited') {
+      const retryAt = unixSeconds(answer['retryAt']);
+      return retryAt === undefined
+        ? { kind: 'rename_limited' }
+        : { kind: 'rename_limited', retryAt };
+    }
     if (word === 'undeliverable') return { kind: 'contacts_unreachable' };
     if (word === 'presence_rejected') return { kind: 'rejected' };
     if (word === 'presence_required') return { kind: 'required' };
@@ -163,6 +219,9 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
           agents: list.agents.map((r) => ({
             ...r,
             apps: r.apps.map((id) => appNameOf(id, names)),
+            ...(r.appStates === undefined
+              ? {}
+              : { appStates: r.appStates.map((a) => ({ ...a, name: appNameOf(a.id, names) })) }),
           })),
         },
       };
@@ -196,7 +255,44 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
       if (res.status === 409) return { kind: 'agent_changed' };
       return { kind: 'failed' };
     },
-    add: (input, proof) => owner(AGENTS, { label: input.label }, proof),
+    async pause(generation) {
+      // Its own kind, like the switch: an octet-stream body of exactly `{generation}`, no presence.
+      let res: Response;
+      try {
+        res = await doFetch(`${AGENTS}/pause`, {
+          method: 'POST',
+          headers: { 'X-AgentLink-CSRF': token(), 'Content-Type': 'application/octet-stream' },
+          body: JSON.stringify({ generation }),
+          credentials: 'same-origin',
+          cache: 'no-store',
+        });
+      } catch {
+        return { kind: 'offline' };
+      }
+      if (res.status === 501) return { kind: 'not_available' };
+      if (res.status === 401) return { kind: 'session' };
+      const { word } = await readAnswer(res);
+      if (res.status === 200 && word === 'paused') return { kind: 'done' };
+      if (word === 'agent_changed') return { kind: 'agent_changed' };
+      if (res.status === 403) return { kind: 'session' };
+      return { kind: 'failed' };
+    },
+    resume: (proof) => owner(`${AGENTS}/resume`, {}, proof),
+    async cardName() {
+      const result = await client.get(`${AGENTS}/card-name`);
+      if (result.kind !== 'ok') return { kind: 'unavailable' };
+      const data = result.data as { status?: unknown; cardName?: unknown } | null;
+      if (data?.status === 'same') return { kind: 'same' };
+      if (
+        data?.status === 'differs' &&
+        typeof data.cardName === 'string' &&
+        data.cardName !== '' &&
+        data.cardName.length <= CARD_NAME_MAX
+      ) {
+        return { kind: 'differs', cardName: data.cardName };
+      }
+      return { kind: 'unavailable' };
+    },
     rename: (input, proof) =>
       owner(`${AGENTS}/label`, { name: input.name, label: input.label }, proof),
     remove: (input, proof) =>

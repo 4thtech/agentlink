@@ -41,6 +41,8 @@
 // (AgentDirectory `create`), signs its first parts with the owner's one gesture, and hands it here
 // with `adoptFirst`: the generation increases first, the requests in flight drain, then the agent is
 // opened through the same `open` path as a switch. Nothing is signed here.
+import type { AgentStorePeek } from '../agent-peek.js';
+import type { UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { ApprovalServerSource } from '../approval-server.js';
 import type { LocalUiAiApps, LocalUiOptions } from './context.js';
 import type { AgentRemovalPort } from './api/agents-remove.js';
@@ -63,7 +65,14 @@ export interface AgentDirectoryEntry {
 /** What the Agents list shows of an agent's store (clear columns only, node agent-peek.ts). */
 export interface AgentDirectoryStats {
   readonly contacts: number;
+  /** W4-LIVE-STATUS: a live MCP session row exists (never the lease). */
   readonly running: boolean;
+  /** W4-LIVE-STATUS (D-143): the live MCP sessions (app id and times only; never a pid or ID). */
+  readonly sessions?: AgentStorePeek['sessions'];
+  /** W4-LIVE-STATUS: when each AI app id last ran this agent. */
+  readonly lastSeen?: AgentStorePeek['lastSeen'];
+  /** W4-PAUSE (D-143 (5)): the agent's pause row exists (display only). */
+  readonly paused?: true;
 }
 
 /**
@@ -85,7 +94,22 @@ export interface AgentDirectory {
    * `agent.label` was verified). Returns the folder name. U3-g-b: `options.name` names the folder
    * instead (first run's first agent is `default`, FIRST_AGENT_NAME); refused when it exists.
    */
-  create?(label: string, options?: { readonly name?: string }): Promise<string>;
+  create?(
+    label: string,
+    options?: {
+      readonly name?: string;
+      /**
+       * W4-ONE-TOUCH (04 §2.8 step 2): stores the agent's keys held since begin and returns its
+       * agentId, in place of making new ones. The folder records that agentId.
+       */
+      readonly createKeys?: () => Promise<string>;
+    },
+  ): Promise<string>;
+  /**
+   * W4-ONE-TOUCH (04 §2.8 Begin): the folder name `create` would give `label` now (the slug of 06 §6
+   * made unique), never one of `reserved`. Nothing is created.
+   */
+  nameFor?(label: string, reserved: readonly string[]): Promise<string>;
   /**
    * Card U3-d: removes an agent that `create` made and that was not completed (all or nothing): its
    * keychain items and its folder. Only ever called for an agent this process just created.
@@ -99,6 +123,13 @@ export interface AgentDirectory {
   readCurrent(): Promise<string | undefined>;
   /** Writes `{v:1, current}` to `~/.agentlink/app.json` (0600). Trusted for nothing but order. */
   writeCurrent(name: string): Promise<void>;
+  /**
+   * W4-SHELL-V2: the app's UI settings from `~/.agentlink/ui-settings.json`; undefined when absent
+   * or not valid (a link, a non-private file, an unknown key or a non-boolean value is ignored).
+   */
+  readUiSettings?(): Promise<UiSettings | undefined>;
+  /** W4-SHELL-V2: writes the allowlisted settings to `~/.agentlink/ui-settings.json` (0600, atomic). */
+  writeUiSettings?(settings: UiSettings): Promise<void>;
 }
 
 /** One opened agent as the host serves it (the CLI's openAgent result, wired for the pages). */
@@ -177,6 +208,12 @@ export interface AppHostFirstRun {
   readonly home?: string;
   /** The file-KeyStore owner files whose presence refuses setup (owner-setup.ts defaultOwnerFiles). */
   readonly ownerFiles?: readonly string[];
+  /**
+   * W4-ONE-TOUCH (D-140; 04 §2.8): the CLI's AI apps desk for first run's own setup gate only (never
+   * a route): the change that makes the picked app run the first agent's folder, computed at begin
+   * and written last at finish. Absent: first run connects no app in the same gesture.
+   */
+  readonly aiApps?: Pick<LocalUiAiApps, 'plan'>;
 }
 
 /** U3-g-b: the first agent's label when first run is finished without one (b11 §28, prefilled). */
