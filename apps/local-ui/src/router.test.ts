@@ -65,6 +65,7 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/advanced/proofs', 'Proofs & credits', null],
   ['/advanced/network', 'Relays & network', null],
   ['/advanced/diagnostics', 'Diagnostics', null],
+  ['/advanced/map', 'Connections map', null],
 ];
 const FOCUSED = [
   '/start/app',
@@ -151,7 +152,7 @@ describe('routes', () => {
 });
 
 describe('the sections (nav.ts)', () => {
-  it('Home, Agents, Activity, Settings; Advanced holds five pages', () => {
+  it('Home, Agents, Activity, Settings; Advanced holds six pages', () => {
     expect(SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Home', '/'],
       ['Agents', '/agents'],
@@ -164,6 +165,7 @@ describe('the sections (nav.ts)', () => {
       ['Proofs & credits', '/advanced/proofs'],
       ['Relays & network', '/advanced/network'],
       ['Diagnostics', '/advanced/diagnostics'],
+      ['Connections map', '/advanced/map'],
     ]);
   });
 

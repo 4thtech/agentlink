@@ -77,7 +77,7 @@ export function LiveActivityPage({ source }: LiveActivityPageProps): ReactElemen
                 <time className="ls-time" dateTime={at.toISOString()}>
                   {TIME.format(at)}
                 </time>
-                <span className="ls-kind">{line.kind}</span>
+                <span className="ls-kind">{S[line.kind]}</span>
                 <span className="ls-text">
                   <bdi>{cleanLine(line.text)}</bdi>
                 </span>

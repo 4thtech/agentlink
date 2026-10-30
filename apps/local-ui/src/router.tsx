@@ -67,6 +67,7 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/advanced/proofs', page: lazyPage('/advanced/proofs') },
   { path: '/advanced/network', page: lazyPage('/advanced/network') },
   { path: '/advanced/diagnostics', page: lazyPage('/advanced/diagnostics') },
+  { path: '/advanced/map', page: lazyPage('/advanced/map') },
   // U3-invite (b11 §33.2): the waiting invite, in the focused shell (no chrome).
   { path: '/settings/join', page: lazyPage('/settings/join') },
 ];

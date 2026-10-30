@@ -419,7 +419,14 @@ describe('the section menu (Decision 48)', () => {
     expect(group?.getAttribute('aria-label')).toBe('Advanced');
     expect(
       [...(group?.querySelectorAll('a') ?? [])].map((a) => a.getAttribute('aria-label')),
-    ).toEqual(['Live activity', 'Rules', 'Proofs & credits', 'Relays & network', 'Diagnostics']);
+    ).toEqual([
+      'Live activity',
+      'Rules',
+      'Proofs & credits',
+      'Relays & network',
+      'Diagnostics',
+      'Connections map',
+    ]);
   });
 
   it('on a phone: a bar names the page and its arrow opens the sections as a sheet', async () => {

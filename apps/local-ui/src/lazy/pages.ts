@@ -47,6 +47,7 @@ export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   '/advanced/proofs': proofs,
   '/advanced/network': advanced,
   '/advanced/diagnostics': diagnostics,
+  '/advanced/map': part(async () => (await import('../pages/advanced/map.js')).ConnectionsMapPage),
   // U3-invite: "Accept {name}'s invite?" (b11 §33.2), in the focused shell.
   '/settings/join': part(async () => (await import('../pages/join/index.js')).JoinPage),
 };

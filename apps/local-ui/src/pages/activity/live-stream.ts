@@ -4,6 +4,7 @@
 // api/live.ts, or a source of its own is written, only the source changes; the page does not.
 // A line holds a kind and a short text of owner-chosen names (agent, AI app) and states. Never a
 // message, key, file name or address. Names are cleaned by the page before they are shown (I-5).
+import { LIVE_STREAM_STRINGS as S } from './live-strings.js';
 import { getLive, subscribeLive, type LiveSnapshot } from '../../api/live.js';
 
 /** The most lines kept (the oldest drop first). */
@@ -29,7 +30,6 @@ export interface StreamSource {
   subscribe(onLine: (line: RawLine) => void): () => void;
 }
 
-const NOT_SET_UP = 'not set up';
 
 /** App · agent · state, with the key that says whether it changed. */
 function entries(s: LiveSnapshot): Map<string, { text: string; state: string }> {
@@ -67,7 +67,7 @@ export function diffLines(
     if (now.has(key)) continue;
     const [name, app] = key.split('\u0000') as [string, string];
     const label = prev.agents.find((a) => a.name === name)?.label ?? name;
-    lines.push({ at, kind: 'state', text: `${app} · ${label} · ${NOT_SET_UP}` });
+    lines.push({ at, kind: 'state', text: `${app} · ${label} · ${S.notSetUp}` });
   }
   return lines;
 }

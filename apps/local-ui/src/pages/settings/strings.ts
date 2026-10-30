@@ -10,7 +10,7 @@ export const SETTINGS_STRINGS = {
     light: 'Light',
     dark: 'Dark',
   },
-  rules: { title: 'Rules for approvals', line: 'Ask me before any terms or payment' },
+  rules: { title: 'Rules for approvals', line: 'Choose what your AI may do without asking' },
   proofs: {
     title: 'Proofs & credits',
     fallback: 'Credits and the proofs you made',

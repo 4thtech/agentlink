@@ -12,4 +12,5 @@ export const LIVE_STREAM_STRINGS = {
   /** The words for the kinds of line (shown in mono). */
   heartbeat: 'heartbeat',
   state: 'state',
+  notSetUp: 'not set up',
 } as const;
