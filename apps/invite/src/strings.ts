@@ -9,8 +9,13 @@ export const strings = {
     damaged: 'This invite is damaged or not supported. Ask the person who sent it for a new one.',
     oversized:
       'This invite is too large to be real, so there is nothing to show. Ask the person who sent it for a new one.',
+    unavailable:
+      'This invite is no longer available. It may have expired, been used or been cancelled. Ask the person who sent it for a new one.',
+    unreachable: "Couldn't get the invite right now. Check your connection, then try again.",
     ready: '',
   },
+  /** The button of the `unreachable` state: checks the invite once more. */
+  retry: 'Try again',
   heading: {
     someone: 'Someone invites you to connect your AI agents.',
     time: 'Takes about 2 minutes.',

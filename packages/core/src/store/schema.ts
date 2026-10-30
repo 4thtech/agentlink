@@ -151,6 +151,12 @@ export const TABLES = {
       expires_at: int,
       used_at: opt('int'),
       created_at: int,
+      // W4-SHORT-INVITE (D-139, 04 §3.6.2; schema version 8): a short link's drop object, recorded
+      // before its upload so the inviter can delete it on completion, cancel or expiry; null once
+      // deleted, and for a format 1 invite. Never the link secret or the invite key.
+      drop_lookup_id: opt('enc'),
+      drop_key_epoch: opt('enc'),
+      cancelled_at: opt('int'),
     },
     primaryKey: ['invite_id'],
   },

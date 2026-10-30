@@ -20,6 +20,7 @@ import {
   InlineError,
   ProgressBar,
   Segmented,
+  Switch,
   TextArea,
   TextField,
   formatContactName,
@@ -59,6 +60,7 @@ const REFUSED: Readonly<Record<InviteRefusal, string>> = {
   own: A.ownInvite,
   damaged: A.inviteDamaged,
   cant_use: A.cantUse,
+  unavailable: A.unavailableInvite,
 };
 
 /** True when the browser has a share sheet that takes this text (b11 §21.3: hidden otherwise). */
@@ -94,6 +96,7 @@ function InviteSomeone({
   onAnnounce: (text: string) => void;
 }): ReactElement {
   const [name, setName] = useState('');
+  const [long, setLong] = useState(false);
   const [phase, setPhase] = useState<'form' | 'creating' | 'ready'>('form');
   const [error, setError] = useState<string | undefined>(undefined);
   const [nameError, setNameError] = useState<string | undefined>(undefined);
@@ -116,29 +119,31 @@ function InviteSomeone({
     setError(undefined);
     setNameError(undefined);
     setPhase('creating');
-    void invites.create(wanted === '' ? undefined : wanted).then((outcome) => {
-      if (outcome.kind === 'ok') {
-        const who = wanted === '' ? undefined : wanted;
-        setInvite(outcome.invite);
-        setShownName(who);
-        setPhase('ready');
-        onCreated(who, outcome.invite);
-        onAnnounce(A.inviteReadyPlain);
-        return;
-      }
-      setPhase('form');
-      if (outcome.kind === 'invalid_name') {
-        setNameError(A.nameInvalid);
-        return;
-      }
-      const sentence =
-        outcome.kind === 'not_set_up'
-          ? A.notSetUp
-          : outcome.kind === 'session_expired'
-            ? A.sessionExpired
-            : A.cantCreate;
-      setError(sentence);
-    });
+    void invites
+      .create(wanted === '' ? undefined : wanted, long ? { long: true } : undefined)
+      .then((outcome) => {
+        if (outcome.kind === 'ok') {
+          const who = wanted === '' ? undefined : wanted;
+          setInvite(outcome.invite);
+          setShownName(who);
+          setPhase('ready');
+          onCreated(who, outcome.invite);
+          onAnnounce(A.inviteReadyPlain);
+          return;
+        }
+        setPhase('form');
+        if (outcome.kind === 'invalid_name') {
+          setNameError(A.nameInvalid);
+          return;
+        }
+        const sentence =
+          outcome.kind === 'not_set_up'
+            ? A.notSetUp
+            : outcome.kind === 'session_expired'
+              ? A.sessionExpired
+              : A.cantCreate;
+        setError(sentence);
+      });
   };
 
   if (phase !== 'ready' || invite === undefined) {
@@ -155,6 +160,15 @@ function InviteSomeone({
           onChange={(e) => setName(e.currentTarget.value)}
           {...(nameError === undefined ? {} : { error: nameError })}
         />
+        <details className="ct-advanced">
+          <summary className="al-text-body-sm">{A.advanced}</summary>
+          <Switch
+            label={A.longLink}
+            description={A.longLinkHint}
+            checked={long}
+            onChange={setLong}
+          />
+        </details>
         <Button type="submit" variant="primary" disabled={phase === 'creating'}>
           {phase === 'creating' ? A.creating : A.createInvite}
         </Button>
@@ -293,13 +307,15 @@ function HaveInvite({
       }
       setPhase({ kind: 'paste' });
       setMessage(
-        outcome.kind === 'offline'
-          ? A.offline
-          : outcome.kind === 'not_set_up'
-            ? A.notSetUp
-            : outcome.kind === 'session_expired'
-              ? A.sessionExpired
-              : A.offline,
+        outcome.kind === 'try_again'
+          ? A.busyTryAgain
+          : outcome.kind === 'offline'
+            ? A.offline
+            : outcome.kind === 'not_set_up'
+              ? A.notSetUp
+              : outcome.kind === 'session_expired'
+                ? A.sessionExpired
+                : A.offline,
       );
     });
   };
@@ -324,6 +340,7 @@ function HaveInvite({
       if (outcome.kind === 'presence_required') return setPromptError(S.presenceRequired);
       if (outcome.kind === 'wait') return setPromptError(waitSeconds(outcome.seconds));
       if (outcome.kind === 'busy') return setPromptError(S.busy);
+      if (outcome.kind === 'try_again') return setPromptError(A.busyTryAgain);
       if (outcome.kind === 'refused') {
         setPhase({ kind: 'refused', sentence: REFUSED[outcome.why] });
         return;

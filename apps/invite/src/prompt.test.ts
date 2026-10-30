@@ -15,6 +15,8 @@ import {
 import { BANNED } from './testing/vocabulary.js';
 
 const LINK = 'https://agentlink.4thtech.io/i#abcDEF_-123';
+/** A short link (link format 2, D-139, 04 §3.6.2): `2.` and 43 base64url characters. */
+const SHORT_LINK = `https://agentlink.4thtech.io/i#2.${'aB3_-'.repeat(8)}xyz`;
 
 /** Forms that must never become a command or a sentence (08 §4). */
 const BAD_LINKS = [
@@ -44,6 +46,19 @@ const BAD_LINKS = [
   'https://agentlink.4thtech.io/i#аbc', // Cyrillic а
   `https://agentlink.4thtech.io/i#${'A'.repeat(21847)}`,
   'abcDEF_-123',
+  // Short-link shapes that are not exactly `2.` and 43 base64url characters (D-139).
+  `https://agentlink.4thtech.io/i#2.${'A'.repeat(42)}`,
+  `https://agentlink.4thtech.io/i#2.${'A'.repeat(44)}`,
+  `https://agentlink.4thtech.io/i#2.${'A'.repeat(42)}=`,
+  `https://agentlink.4thtech.io/i#2.${'A'.repeat(42)}+`,
+  `https://agentlink.4thtech.io/i#2.${'A'.repeat(42)}/`,
+  `https://agentlink.4thtech.io/i#3.${'A'.repeat(43)}`,
+  `https://agentlink.4thtech.io/i#2..${'A'.repeat(42)}`,
+  `https://agentlink.4thtech.io/i#A2.${'A'.repeat(43)}`,
+  `https://agentlink.4thtech.io/i#2.${'A'.repeat(43)}.`,
+  'https://agentlink.4thtech.io/i#2.',
+  `2.${'A'.repeat(43)}`,
+  `https://evil.example/i#2.${'A'.repeat(43)}`,
 ];
 
 describe('the install-and-accept prompt (06 §7.1)', () => {
@@ -108,6 +123,13 @@ describe('U3-invite: the command and the sentence (08 §4)', () => {
       expect(() => buildAskAi(link), link).toThrow();
     }
     expect(isCanonicalLink(`https://agentlink.4thtech.io/i#${'A'.repeat(21846)}`)).toBe(true);
+  });
+
+  it('accepts the short link (D-139) and builds the command and the sentence with it', () => {
+    expect(SHORT_LINK).toMatch(/^https:\/\/agentlink\.4thtech\.io\/i#2\.[A-Za-z0-9_-]{43}$/);
+    expect(isCanonicalLink(SHORT_LINK)).toBe(true);
+    expect(buildJoinCommand(SHORT_LINK)).toBe(`npx -y @4thtech-io/agentlink join '${SHORT_LINK}'`);
+    expect(buildAskAi(SHORT_LINK)).toBe(ASK_AI_TEMPLATE.replace('{inviteUrl}', SHORT_LINK));
   });
 
   it('the canonical character set holds no shell metacharacter (sh, PowerShell, cmd.exe)', () => {

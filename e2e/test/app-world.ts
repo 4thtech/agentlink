@@ -523,6 +523,8 @@ export function runJoin(
       terminal: { stdinIsTTY: true, stdoutIsTTY: true, env: {} },
     } as never,
     {
+      // A format 1 link resolves to itself (W4-SHORT-INVITE).
+      resolve: (l) => Promise.resolve(l),
       check: (l, now) => checkInviteLink(l, now),
       now: () => Math.floor(Date.now() / 1000),
       // No app host is running on this computer: `join` starts its own.

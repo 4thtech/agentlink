@@ -204,7 +204,7 @@ areas:
       - name: "Invites and pairing"
         state: done
         prs: [78, 353]
-        summary: "Single-use invite links, the handshake and ack with the commit-then-reveal safety code. Accepting an invite is refused unless the agent it pairs with is the one the invite names (M1-9ze)."
+        summary: "Single-use invite links, the handshake and ack with the commit-then-reveal safety code. Accepting an invite is refused unless the agent it pairs with is the one the invite names (M1-9ze). On the wave-4 branch for 0.4.6 (not released yet): short invite links under 80 characters, with the invite encrypted on the drop and the long link as the automatic fallback and under Advanced, and a list of open invites with Cancel in the local app (W4-SHORT-INVITE, W4-INVITES-LIST)."
       - name: "Safety code checked"
         state: done
         prs: [80, 85]
