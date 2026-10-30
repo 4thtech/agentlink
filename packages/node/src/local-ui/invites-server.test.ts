@@ -150,6 +150,7 @@ async function harness(): Promise<Harness> {
       createInvite: (input: unknown) => {
         core.created.push(input);
         return Promise.resolve({
+          inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
           inviteUrl: LINK,
           format: 'long',
           ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },

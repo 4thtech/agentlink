@@ -28,6 +28,11 @@ export interface InviteCreatedBody {
   readonly expiresAt: string;
   /** `long` when asked for, or the automatic fallback when the drop was unavailable. */
   readonly format: 'short' | 'long';
+  /**
+   * W4-PEOPLE-INVITE: the public ID of the invite just made (as in the open list, never a secret),
+   * so the page can cancel exactly its own invite.
+   */
+  readonly inviteId: string;
 }
 
 /** One open invite: who it is for (the label, or null) and when it expires. Never the link. */
@@ -78,6 +83,7 @@ export const INVITE_CREATE = {
         ownerFingerprint: INVITES_WORLD.ownerFingerprint,
         expiresAt: INVITES_WORLD.expiresAt,
         format: 'short',
+        inviteId: INVITES_WORLD.inviteId,
       },
     } satisfies InvitesAnswer<InviteCreatedBody>,
     outcome: 'ok',

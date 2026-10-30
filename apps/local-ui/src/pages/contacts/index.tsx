@@ -13,6 +13,11 @@
 //
 // Rename and Remove ask for owner presence (the passkey, or the owner code). Every change is one POST
 // to a presence route; the page never signs (owner.ts).
+//
+// W4-PEOPLE-INVITE (prototype v23 A4, A5, A7): "Invite someone" opens the Invite screen in place
+// (`?invite` too); open invites are PendingInviteRow rows that say so once cancelled; Rename, Check
+// safety code and Remove sit in the person ⋯ menu; and when an open invite is answered (or a pasted
+// one connects), the new contact arrives with the Connected moment and its safety code.
 import {
   Banner,
   Button,
@@ -52,7 +57,7 @@ import {
 import { PAGE_TITLES } from '../../strings.js';
 import { AddContactSheet } from './add-contact.js';
 import { ADD_CONTACT_MARKER } from './add-contact-link.js';
-import { ADD_STRINGS as A, connectingTo, expiresIn, waitingToAccept } from './add-strings.js';
+import { ADD_STRINGS as A, connectingTo } from './add-strings.js';
 import {
   LIST_PATH,
   contactPath,
@@ -80,6 +85,12 @@ import {
 } from './owner.js';
 import { PresencePrompt } from './presence-prompt.js';
 import { useInviteFirst } from '../home/start-here-empty.js';
+import { ConnectedMoment, type ConnectedMomentProps } from '../invite/connected.js';
+import { useOwnName } from '../invite/own-name.js';
+import { InviteScreen } from '../invite/invite-screen.js';
+import { PendingInviteRow, type CancelResult } from '../invite/pending-row.js';
+import { PersonMenu } from '../invite/person-menu.js';
+import { INVITE_STRINGS as I } from '../invite/strings.js';
 import { START_STRINGS } from '../home/strings.js';
 import {
   CONTACTS_STRINGS as S,
@@ -549,16 +560,20 @@ function Detail({
           <ContactName {...nameInput(contact)} label={labelKind(contact)} showLabel />
         </h2>
         {pending === undefined && !renaming && !confirmRemove && !confirmOlder ? (
-          <div className="ct-actions">
-            <Button variant="ghost" size="sm" onClick={() => setRenaming(true)}>
-              {S.rename}
-            </Button>
-            {contact.status === 'revoked' ? null : (
-              <Button variant="ghost" size="sm" onClick={() => setConfirmRemove(true)}>
-                {S.remove}
-              </Button>
-            )}
-          </div>
+          <PersonMenu
+            name={name}
+            onRename={() => setRenaming(true)}
+            {...(compare
+              ? {
+                  onCheck: () => {
+                    setMismatch(false);
+                    setSkipped(false);
+                    setCodeTick((n) => n + 1);
+                  },
+                }
+              : {})}
+            {...(contact.status === 'revoked' ? {} : { onRemove: () => setConfirmRemove(true) })}
+          />
         ) : null}
       </div>
       <p className="al-text-body-sm al-muted">
@@ -674,63 +689,60 @@ function hoodFields(c: ContactRow): unknown[] {
   ];
 }
 
-const DAY_MS = 86_400_000;
-
 /** W4-INVITES-LIST: how long Contacts keeps following after Connect (the inviter's answer). */
 const FOLLOW_AFTER_CONNECT_MS = 120_000;
 
 /**
- * W4-INVITES-LIST (b11 §21.3, Closing): the open invites the server holds, as pending rows: the
- * name (or a neutral line), the days left and Cancel. Never a link: a lost link is cancelled and a
- * new one created. The newest gets the 1.2 s highlight as the sheet leaves (a colour fade only).
+ * W4-INVITES-LIST (b11 §21.3, Closing), W4-PEOPLE-INVITE (A4): the open invites the server holds,
+ * and the ones cancelled in this visit, as PendingInviteRow rows. Never a link: a lost link is
+ * cancelled and a new one made. The newest gets the 1.2 s highlight (a colour only).
  */
 function PendingInvites({
   rows,
+  cancelled,
   highlight,
   now,
-  busy,
-  failed,
   onCancel,
 }: {
   rows: readonly OpenInvite[];
+  cancelled: readonly OpenInvite[];
   highlight: string | undefined;
   now: number;
-  busy: string | undefined;
-  failed: boolean;
-  onCancel: (inviteId: string) => void;
+  onCancel: (inviteId: string) => Promise<CancelResult>;
 }): ReactElement | null {
-  if (rows.length === 0) return null;
+  const gone = cancelled.filter((c) => !rows.some((r) => r.inviteId === c.inviteId));
+  if (rows.length === 0 && gone.length === 0) return null;
+  const done = new Set(cancelled.map((c) => c.inviteId));
   return (
-    <>
-      <Surface as="ul" level={1} className="ct-list ct-invites" aria-label={A.pendingLabel}>
-        {rows.map((r) => {
-          const left = Math.max(0, Math.ceil((r.expiresAt - now) / DAY_MS));
-          return (
-            <li
-              key={r.inviteId}
-              className={`ct-invite${r.inviteId === highlight ? ' is-new' : ''}`}
-            >
-              <span className="al-avatar al-text-label" aria-hidden="true">
-                <Icon name="clock" size={14} />
-              </span>
-              <span className="ct-invite-main al-text-body">
-                {waitingToAccept(r.name ?? undefined)}
-                <span className="ct-invite-expiry al-text-caption al-muted">{expiresIn(left)}</span>
-              </span>
-              <Button size="sm" disabled={busy === r.inviteId} onClick={() => onCancel(r.inviteId)}>
-                {A.cancelInvite}
-              </Button>
-            </li>
-          );
-        })}
-      </Surface>
-      {failed ? (
-        <p className="al-text-body-sm" role="alert">
-          {A.cantCancel}
-        </p>
-      ) : null}
-    </>
+    <Surface as="ul" level={1} className="ct-list ct-invites" aria-label={I.pendingLabel}>
+      {[...gone, ...rows].map((r) => (
+        <PendingInviteRow
+          key={r.inviteId}
+          invite={r}
+          now={now}
+          cancelled={done.has(r.inviteId)}
+          highlight={r.inviteId === highlight}
+          onCancel={onCancel}
+        />
+      ))}
+    </Surface>
   );
+}
+
+/** The Connected moment with your own letter (the open agent's name, read only while it shows). */
+function OwnMoment(props: Omit<ConnectedMomentProps, 'me'>): ReactElement {
+  const me = useOwnName(undefined);
+  return <ConnectedMoment {...props} me={me} />;
+}
+
+/** The newest contact that was not there before and is now paired (the Connected moment). */
+function arrival(
+  before: ReadonlySet<string>,
+  contacts: readonly ContactRow[],
+): ContactRow | undefined {
+  return contacts
+    .filter((c) => !before.has(c.ref) && c.status === 'active' && c.pairing === 'complete')
+    .sort((a, b) => b.since - a.since)[0];
 }
 
 export interface ContactsPageProps {
@@ -738,6 +750,16 @@ export interface ContactsPageProps {
   readonly api?: ApiClient;
   readonly owner?: OwnerClient;
   readonly invites?: InviteApi;
+  /** How often the page reads again while something waits (5 s; tests use less). */
+  readonly pollMs?: number;
+}
+
+/** W4-PEOPLE-INVITE: `?invite` opens the Invite screen; the marker leaves the address at once. */
+export const INVITE_MARKER = 'invite';
+function openedForInvite(): boolean {
+  if (typeof location === 'undefined' || location.search !== `?${INVITE_MARKER}`) return false;
+  history.replaceState(history.state, '', location.pathname + location.hash);
+  return true;
 }
 
 /** True once, when the page was opened through the Add contact link (b11 §21.1). */
@@ -752,6 +774,7 @@ export function ContactsPage({
   api: givenApi,
   owner: givenOwner,
   invites: givenInvites,
+  pollMs = 5_000,
 }: ContactsPageProps = {}): ReactElement {
   const api = useMemo(() => givenApi ?? createApiClient(), [givenApi]);
   const owner = useMemo(() => givenOwner ?? createOwnerClient(), [givenOwner]);
@@ -767,8 +790,13 @@ export function ContactsPage({
   const [rows, setRows] = useState<readonly OpenInvite[]>([]);
   const [highlight, setHighlight] = useState<string | undefined>(undefined);
   const [justCreated, setJustCreated] = useState(false);
-  const [cancelling, setCancelling] = useState<string | undefined>(undefined);
-  const [cancelFailed, setCancelFailed] = useState(false);
+  const [cancelledRows, setCancelledRows] = useState<readonly OpenInvite[]>([]);
+  const [inviting, setInviting] = useState(openedForInvite);
+  // The Connected moment: the contacts known before, and whether an arrival is expected (an open
+  // invite, or a pasted one that is connecting).
+  const known = useRef<ReadonlySet<string> | undefined>(undefined);
+  const expecting = useRef(false);
+  const [arrived, setArrived] = useState<ContactRow | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const addButtonId = useId();
   const activity = usePulse(api);
@@ -792,7 +820,10 @@ export function ContactsPage({
       (res) => {
         if (!live || res.kind !== 'ok') return;
         const read = parseOpenInvites(res.data);
-        if (read !== undefined) setRows(read);
+        if (read !== undefined) {
+          setRows(read);
+          if (read.length > 0) expecting.current = true;
+        }
       },
       () => undefined,
     );
@@ -812,6 +843,16 @@ export function ContactsPage({
           return;
         }
         setList({ phase: 'ok', contacts: answer.contacts });
+        // A new paired contact while an invite was open (or a pasted one was connecting).
+        const before = known.current;
+        known.current = new Set(answer.contacts.map((c) => c.ref));
+        if (before !== undefined && expecting.current) {
+          const fresh = arrival(before, answer.contacts);
+          if (fresh !== undefined) {
+            expecting.current = false;
+            setArrived(fresh);
+          }
+        }
         setSelected((current) =>
           current !== undefined && answer.contacts.some((c) => c.ref === current)
             ? current
@@ -846,7 +887,7 @@ export function ContactsPage({
       background.current = true;
       setTick((n) => n + 1);
     };
-    const timer = setInterval(bump, 5_000);
+    const timer = setInterval(bump, pollMs);
     const onVisible = (): void => bump();
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', bump);
@@ -855,7 +896,7 @@ export function ContactsPage({
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', bump);
     };
-  }, [anyPending]);
+  }, [anyPending, pollMs]);
 
   useEffect(() => {
     let live = true;
@@ -892,6 +933,11 @@ export function ContactsPage({
     setNotice(undefined);
     setAdding(true);
   };
+  const openInvite = (): void => {
+    setSheetOpen(false);
+    setNotice(undefined);
+    setInviting(true);
+  };
   const closeAdd = (): void => {
     returnFocus.current = true;
     setAdding(false);
@@ -907,15 +953,22 @@ export function ContactsPage({
   const title = (
     <div className="ct-title-row">
       <h1 className="al-text-title-1">{PAGE_TITLES.contacts}</h1>
-      {ready && !inviteInEmpty ? (
-        <Button
-          id={addButtonId}
-          variant={empty && rows.length === 0 ? 'primary' : 'secondary'}
-          icon="user-plus"
-          onClick={openAdd}
-        >
-          {A.addContact}
-        </Button>
+      {ready ? (
+        <div className="ct-actions">
+          <Button
+            variant={inviteInEmpty ? 'secondary' : 'primary'}
+            icon="user-plus"
+            className="al-press"
+            onClick={openInvite}
+          >
+            {I.title}
+          </Button>
+          {inviteInEmpty ? null : (
+            <Button id={addButtonId} variant="secondary" onClick={openAdd}>
+              {A.addContact}
+            </Button>
+          )}
+        </div>
       ) : null}
     </div>
   );
@@ -932,6 +985,7 @@ export function ContactsPage({
         setAdding(false);
         setNotice(connectingTo(name));
         setConnectingSince(Date.now());
+        expecting.current = true;
         setTick((n) => n + 1);
       }}
       onClose={closeAdd}
@@ -943,29 +997,44 @@ export function ContactsPage({
         {notice}
       </p>
     );
-  const cancelInvite = (inviteId: string): void => {
-    if (cancelling !== undefined) return;
-    setCancelling(inviteId);
-    setCancelFailed(false);
-    void invites.cancel(inviteId).then((outcome) => {
-      setCancelling(undefined);
-      if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') {
-        setTick((n) => n + 1);
-        return;
-      }
-      setCancelFailed(true);
-    });
+  const cancelInvite = async (inviteId: string): Promise<CancelResult> => {
+    const outcome = await invites.cancel(inviteId);
+    if (outcome.kind === 'cancelled') {
+      const row = rows.find((r) => r.inviteId === inviteId);
+      if (row !== undefined) setCancelledRows((list) => [...list, row]);
+      setTick((n) => n + 1);
+      return 'cancelled';
+    }
+    if (outcome.kind === 'not_found') {
+      setTick((n) => n + 1);
+      return 'gone';
+    }
+    return 'failed';
   };
   const invitesList = (
     <PendingInvites
       rows={rows}
+      cancelled={cancelledRows}
       highlight={highlight}
       now={Date.now()}
-      busy={cancelling}
-      failed={cancelFailed}
       onCancel={cancelInvite}
     />
   );
+  const moment =
+    arrived === undefined ? null : (
+      <div className="inv-connected-card">
+        <OwnMoment
+          name={shownName(arrived)}
+          contactRef={arrived.ref}
+          api={api}
+          headingLevel={2}
+          onDone={() => {
+            setArrived(undefined);
+            setSelected(arrived.ref);
+          }}
+        />
+      </div>
+    );
 
   const page = ((): ReactElement => {
     if (list.phase === 'not_set_up') {
@@ -1095,8 +1164,35 @@ export function ContactsPage({
     );
   })();
 
+  if (inviting) {
+    // The Invite screen in place of the list (A5). Done (or Home) brings the list back, with the
+    // new pending row read from the server.
+    return (
+      <>
+        {arrived === undefined ? (
+          <InviteScreen
+            invites={invites}
+            onCreated={() => {
+              expecting.current = true;
+              setJustCreated(true);
+            }}
+            onDone={() => {
+              setInviting(false);
+              setHighlight(justCreated ? rows[0]?.inviteId : undefined);
+              setJustCreated(false);
+              setTick((n) => n + 1);
+            }}
+          />
+        ) : (
+          moment
+        )}
+      </>
+    );
+  }
+
   return (
     <>
+      {moment}
       {page}
       {sheet}
     </>
