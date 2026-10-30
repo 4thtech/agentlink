@@ -39,11 +39,13 @@ const AXE = readFileSync(
 const BASELINE_040 = { jsGzip: 131_357, cssGzip: 12_685 } as const;
 const BUDGET = { cssGzip: 15 * 1024, jsGzip: 10 * 1024 } as const; // plan §7
 
+// W4-SHELL-V2: the sections (today's pages until their builders replace the bodies), Settings,
+// Advanced and Get started.
 const PAGES = [
   { path: '/', title: 'Approvals' },
-  { path: '/settings/home', title: 'Home' },
-  { path: '/settings/activity', title: 'Activity' },
-  // W4-SHELL: the two destinations (today's pages until their builders replace the bodies).
+  { path: '/agents', title: 'Agents' },
+  { path: '/activity', title: 'Activity' },
+  // Interim: today's Messages and Contacts pages (U3, U4 fold them into Home).
   { path: '/inbox', title: 'Inbox' },
   { path: '/contacts', title: 'Contacts' },
   { path: '/settings/files', title: 'Files' },
@@ -52,10 +54,10 @@ const PAGES = [
   { path: '/settings/backup', title: 'Backup' },
   { path: '/settings/notifications', title: 'Notifications' },
   { path: '/settings/appearance', title: 'Appearance' },
-  { path: '/settings/advanced', title: 'Advanced' },
-  { path: '/settings/about', title: 'About' },
+  { path: '/advanced/network', title: 'Advanced' },
+  { path: '/advanced/diagnostics', title: 'About' },
   {
-    path: '/first-run',
+    path: '/start/app',
     title: 'Private messages between AI agents. Only you and your contact can read them.',
   },
 ] as const;
@@ -481,13 +483,13 @@ async function timedNav(page: Page, label: string, title: string): Promise<numbe
 }
 
 /**
- * The nav order a route-change pass walks: W4-SHELL (Decision 40) has two sidebar items, the Inbox
- * and Contacts; the walk goes there and back again.
+ * The order a route-change pass walks in the section menu (W4-SHELL-V2, Decision 48): Agents and
+ * Activity, there and back again.
  */
 const NAV_WALK: readonly (readonly [string, string])[] = [
-  ['Inbox', 'Inbox'],
-  ['Contacts', 'Contacts'],
-  ['Inbox', 'Inbox'],
+  ['Agents', 'Agents'],
+  ['Activity', 'Activity'],
+  ['Agents', 'Agents'],
 ];
 
 beforeAll(async () => {
@@ -577,8 +579,8 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     const tooMany: string[] = [];
     const misplaced: string[] = [];
     try {
-      await page.goto(`${origin}/settings/home`);
-      await settle(page, 'Home');
+      await page.goto(`${origin}/activity`);
+      await settle(page, 'Activity');
       layout.push(...(await layoutKeyframes(page)));
       for (const p of PAGES) {
         await page.goto(origin + p.path);
@@ -633,7 +635,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     for (const mode of MODES.filter((m) => m.reduced || m.contrast || m.forcedColors)) {
       const { ctx, page } = await open(mode);
       try {
-        await page.goto(`${origin}/settings/activity`);
+        await page.goto(`${origin}/activity`);
         await settle(page, 'Activity');
         solid[mode.name] = (await motionAndDepth(page)).backdrop.length;
       } finally {
@@ -654,8 +656,8 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       const plain: Record<string, number> = {};
       const throttled: Record<string, number> = {};
       try {
-        await page.goto(`${origin}/settings/home`);
-        await settle(page, 'Home');
+        await page.goto(`${origin}/activity`);
+        await settle(page, 'Activity');
         // One warm-up pass: the first visit of a page loads its fonts.
         for (const [label, title] of NAV_WALK) await timedNav(page, label, title);
         // Three passes; the median per page (one GC pause on a shared runner is not the app).
@@ -712,8 +714,8 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         out['firstRender'] = first;
 
         // Route changes.
-        await page.goto(`${origin}/settings/home`);
-        await settle(page, 'Home');
+        await page.goto(`${origin}/activity`);
+        await settle(page, 'Activity');
         await startRecorder(page);
         for (const [label, title] of NAV_WALK) {
           await timedNav(page, label, title);
@@ -723,7 +725,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
 
         // Scrolling Activity (200 rows) and Messages (60 conversations, 200 messages).
         for (const [path, title, open200] of [
-          ['/settings/activity', 'Activity', false],
+          ['/activity', 'Activity', false],
           ['/inbox', 'Inbox', true],
         ] as const) {
           await page.goto(origin + path);
@@ -823,32 +825,24 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       const reached = navNames.filter((n) => stops.some((s) => s.includes(n)));
       kb['navReached'] = reached;
 
-      // Under the hood (W4-SHELL: in the avatar menu): reachable by Tab, the menu opens with Enter,
-      // and the item toggles with Space.
-      await page.goto(`${origin}/settings/activity`);
+      // Under the hood (W4-SHELL-V2: the switch top right): reachable by Tab, toggles with Space.
+      await page.goto(`${origin}/activity`);
       await settle(page, 'Activity');
-      const avatar = page.getByRole('button', { name: 'Settings and more' }).first();
-      const hasSwitch = (await avatar.count()) > 0;
+      const sw = page.getByRole('switch', { name: /Under the hood/i }).first();
+      const hasSwitch = (await sw.count()) > 0;
       let toggled = false;
       if (hasSwitch) {
         let found = false;
         for (let i = 0; i < 60 && !found; i++) {
           await page.keyboard.press('Tab');
-          found = await avatar.evaluate((el) => el === document.activeElement);
+          found = await sw.evaluate((el) => el === document.activeElement);
         }
         if (found) {
-          await page.keyboard.press('Enter');
-          const sw = page.getByRole('menuitemcheckbox', { name: /Under the hood/i }).first();
-          await sw.waitFor();
-          for (let i = 0; i < 6; i++) {
-            if (await sw.evaluate((el) => el === document.activeElement)) break;
-            await page.keyboard.press('ArrowDown');
-          }
           const before = await sw.getAttribute('aria-checked');
           await page.keyboard.press('Space');
+          await page.waitForTimeout(100);
           toggled = (await sw.getAttribute('aria-checked')) !== before;
           await page.keyboard.press('Space');
-          await page.keyboard.press('Escape');
         }
         kb['hoodSwitchByTab'] = found;
       }

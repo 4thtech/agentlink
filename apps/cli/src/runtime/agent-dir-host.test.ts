@@ -262,16 +262,14 @@ describe('ui-settings.json (W4-SHELL-V2; 08 §1, proposed)', () => {
     await writeUiSettingsFile(home, { underTheHood: false, menuExpanded: true });
     expect(await readUiSettingsFile(home)).toEqual({ underTheHood: false, menuExpanded: true });
     // No temporary file is left behind.
-    expect((await readdir(join(home, '.agentlink'))).filter((f) => f.endsWith('.tmp'))).toEqual(
-      [],
-    );
+    expect((await readdir(join(home, '.agentlink'))).filter((f) => f.endsWith('.tmp'))).toEqual([]);
   });
 
   it('writes only allowlisted booleans', async () => {
     for (const bad of [{ theme: 'dark' }, { underTheHood: 'yes' }, { path: '/etc/passwd' }]) {
-      expect(
-        codeOf(await writeUiSettingsFile(home, bad as never).catch((e: unknown) => e)),
-      ).toBe('agent_config_invalid');
+      expect(codeOf(await writeUiSettingsFile(home, bad as never).catch((e: unknown) => e))).toBe(
+        'agent_config_invalid',
+      );
     }
     expect(await readUiSettingsFile(home)).toBeUndefined();
   });

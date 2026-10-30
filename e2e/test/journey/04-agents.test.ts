@@ -26,15 +26,15 @@ beforeAll(() => ch.start(), 120_000);
 afterAll(() => ch.stop());
 
 /**
- * W4-SHELL (b11 §34.2): the Agents page is no sidebar item; the agent switcher, top left, opens it
- * ("Manage agents & apps"). An in-app move, never `goto`.
+ * W4-SHELL-V2: the agent chip's dropdown, top left, opens the Agents page ("Manage agents"; Agents
+ * is also a section of the menu). An in-app move, never `goto`.
  */
 async function openAgents(page: Page): Promise<void> {
   await page
     .getByRole('button', { name: /^Agent: / })
     .first()
     .click();
-  await page.getByRole('menuitem', { name: 'Manage agents & apps' }).click();
+  await page.getByRole('menuitem', { name: 'Manage agents' }).click();
   await page.getByRole('heading', { name: 'Agents', level: 1 }).first().waitFor();
 }
 
@@ -90,7 +90,12 @@ describe('chapter 4: agents', () => {
     await firstRunWithTouchId(jp, first.link, 'Ana');
     await first.stop();
     await jp.page.goto(await startUi(pc, ready.files, ch.closers));
-    await jp.page.getByRole('heading', { name: 'Home', exact: true }).first().waitFor();
+    // W4-SHELL-V2: the app opens on Home (the section marked current).
+    await jp.page
+      .getByRole('navigation', { name: 'Sections' })
+      .locator('a[aria-current="page"][href="/"]')
+      .first()
+      .waitFor();
     const probe = await jp.arm();
     const before = jp.gestures.total();
 

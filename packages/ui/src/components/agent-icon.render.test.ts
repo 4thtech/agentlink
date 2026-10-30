@@ -81,7 +81,11 @@ describe('AgentIcon (W4-SHELL, Decision 44 B1)', () => {
       expect(out).toMatch(/^<span[^>]*aria-hidden="true"/);
       expect(out.replace(/<[^>]+>/g, '')).toBe('W');
     }
-    for (const rule of ['.al-agent-icon-dot', '.al-agent-icon-dot.is-ready', '.al-agent-icon-dot.is-none']) {
+    for (const rule of [
+      '.al-agent-icon-dot',
+      '.al-agent-icon-dot.is-ready',
+      '.al-agent-icon-dot.is-none',
+    ]) {
       expect(css).toContain(rule);
     }
   });

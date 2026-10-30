@@ -8,7 +8,7 @@ import { CountBadge } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import { ADVANCED_SECTIONS, SECTIONS, sectionOf, titleOf, type Section } from '../nav.js';
 import { SHELL_STRINGS as S } from '../strings.js';
-import { VT_CLASS } from './motion.js';
+import { VT_CLASS } from '@4thtech-io/ui';
 import { ShellIcon } from './shell-icons.js';
 
 interface MenuProps {
@@ -113,7 +113,7 @@ export function SectionSheet({ path, hood }: MenuProps): ReactElement {
     <a
       key={s.id}
       href={s.path}
-      className={current === s.id ? 'al-sheet-item is-current' : 'al-sheet-item'}
+      className={current === s.id ? 'al-secsheet-item is-current' : 'al-secsheet-item'}
       aria-current={current === s.id ? 'page' : undefined}
       onClick={() => setOpen(false)}
     >
@@ -133,11 +133,11 @@ export function SectionSheet({ path, hood }: MenuProps): ReactElement {
         <ShellIcon name="chev-d" size={18} className={open ? 'al-rot is-on' : 'al-rot'} />
       </button>
       {open ? (
-        <nav id="al-section-sheet" aria-label={S.sections} className="al-sheet al-expand">
+        <nav id="al-section-sheet" aria-label={S.sections} className="al-secsheet al-expand">
           {SECTIONS.map(item)}
           {hood ? (
             <>
-              <span className="al-sheet-head al-text-label">{S.advanced}</span>
+              <span className="al-secsheet-head al-text-label">{S.advanced}</span>
               {ADVANCED_SECTIONS.map(item)}
             </>
           ) : null}

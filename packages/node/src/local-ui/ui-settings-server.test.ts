@@ -181,7 +181,8 @@ async function harness(
   const landed = await send(port, `/?t=${t}`);
   const cookie = (landed.headers['set-cookie']?.[0] ?? '').split(';')[0] ?? '';
   const shell = await send(port, '/', { headers: { Cookie: cookie } });
-  const csrf = /<meta name="agentlink-csrf" content="([A-Za-z0-9_-]+)">/.exec(shell.body)?.[1] ?? '';
+  const csrf =
+    /<meta name="agentlink-csrf" content="([A-Za-z0-9_-]+)">/.exec(shell.body)?.[1] ?? '';
   const write = (extra: Record<string, string> = {}): Record<string, string> => ({
     Cookie: cookie,
     Origin: server.origin,
@@ -304,9 +305,9 @@ describe('GET and PUT /api/ui/ui-settings in the app host', () => {
     expect((await put(h.write({ Host: 'evil.example' }))).status).not.toBe(200);
     expect(h.world.writes).toEqual([]);
     // The read keeps the session and CSRF guards too.
-    expect(
-      (await send(h.port, UI_SETTINGS_PATH, { headers: { Cookie: h.cookie } })).status,
-    ).toBe(403);
+    expect((await send(h.port, UI_SETTINGS_PATH, { headers: { Cookie: h.cookie } })).status).toBe(
+      403,
+    );
   });
 
   it('answers with no agent open (first run shows the shell)', async () => {

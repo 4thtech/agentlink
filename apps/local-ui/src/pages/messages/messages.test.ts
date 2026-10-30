@@ -512,4 +512,3 @@ describe('copy', () => {
 });
 
 // W4-SHELL-V2: the section menu has no Inbox item; Home (U3) shows who has something new.
-

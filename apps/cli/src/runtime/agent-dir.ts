@@ -30,10 +30,7 @@
 //
 // Same-user processes can change all of this (G-1, D-67): these checks keep mistakes and other
 // users out; they are not a boundary against the agent.
-import {
-  readUiSettings,
-  type UiSettings,
-} from '@4thtech-io/types/ui-contract/ui-settings';
+import { readUiSettings, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { constants, type Stats } from 'node:fs';
 import {

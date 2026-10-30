@@ -16,6 +16,10 @@
   min-width: 0;
 }
 .al-app-main {
+  /* Grows into the room beside the rail and never wider than it (no sideways scroll at 360). */
+  flex: 1 1 0%;
+  min-width: 0;
+  box-sizing: border-box;
   align-items: center;
   padding: var(--al-space-7) clamp(16px, 4vw, 40px) var(--al-space-10);
 }
@@ -115,6 +119,13 @@
 .al-chip.is-static {
   cursor: default;
   padding: 4px 14px;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+}
+.al-chip-wrap {
+  min-width: 0;
+  max-width: 100%;
 }
 .al-chip-text {
   display: flex;
@@ -477,13 +488,13 @@
   font-weight: var(--al-font-weight-medium);
   cursor: pointer;
 }
-.al-sheet {
+.al-secsheet {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 4px 0 12px;
 }
-.al-sheet-item {
+.al-secsheet-item {
   display: flex;
   align-items: center;
   min-height: 44px;
@@ -492,12 +503,12 @@
   color: var(--al-color-fg-muted);
   text-decoration: none;
 }
-.al-sheet-item.is-current {
+.al-secsheet-item.is-current {
   color: var(--al-color-accent-fg);
   background: var(--al-color-accent-subtle);
   font-weight: var(--al-font-weight-semibold);
 }
-.al-sheet-head {
+.al-secsheet-head {
   padding: 10px 12px 4px;
 }
 @media (max-width: 600px) {
@@ -510,6 +521,14 @@
   .al-hide-sm {
     display: none !important;
   }
+  .al-goto-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
   .al-chip {
     max-width: 100%;
   }
@@ -519,7 +538,7 @@
 }
 
 /* The shell's dialogs (Keyboard shortcuts, Report a problem). */
-.al-dialog-backdrop {
+.al-sdialog-backdrop {
   position: fixed;
   inset: 0;
   z-index: 40;
@@ -529,7 +548,7 @@
   padding: 96px var(--al-space-4) 0;
   background: var(--al-color-bg-overlay);
 }
-.al-dialog {
+.al-sdialog {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -541,10 +560,10 @@
   background: var(--al-color-bg-raised);
   box-shadow: var(--al-shadow-4);
 }
-.al-dialog-title {
+.al-sdialog-title {
   margin: 0;
 }
-.al-dialog-actions {
+.al-sdialog-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;

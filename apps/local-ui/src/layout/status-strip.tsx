@@ -8,7 +8,7 @@ import { useSyncExternalStore, type ReactElement } from 'react';
 import { getLive, subscribeLive, LIVE_WORDS, type LiveState } from '../api/live.js';
 import { SHELL_STRINGS as S } from '../strings.js';
 import type { ConnectionState } from './index.js';
-import { VT_CLASS } from './motion.js';
+import { VT_CLASS } from '@4thtech-io/ui';
 
 export interface StripItem {
   readonly label: string;
@@ -57,7 +57,11 @@ export function stripItems(
   return items;
 }
 
-export function StatusStrip({ connection }: { readonly connection: ConnectionState }): ReactElement {
+export function StatusStrip({
+  connection,
+}: {
+  readonly connection: ConnectionState;
+}): ReactElement {
   const live = useSyncExternalStore((on) => subscribeLive(on), getLive, getLive);
   const items = stripItems(live.agents, connection);
   return (

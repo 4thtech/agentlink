@@ -2,4 +2,4 @@
 section: Changed
 ---
 
-- The app has a simpler layout: the agent switcher top left shows each agent with a letter icon, its status and the AI apps it works in, plus the AI apps not connected yet; the sidebar has two places, Inbox and Contacts; Settings and Advanced open from the menu at the top right, and Cmd+K finds any page by name. Switching agents keeps you on the same page without reloading it (W4-SHELL, S1, Decision 40, b11 §34.1–§34.2).
+- The app has a new frame. At the top: your agent with a live status ("Ready in Claude Code") and a menu that shows every agent and AI app as it changes, Go to (Cmd+K), a "?" Help menu (Get started, Keyboard shortcuts, User guide, Report a problem) and the "Under the hood" switch. On the left, a small menu (Home, Agents, Activity, Settings) that the arrow expands; on a phone it opens from the top. Under the hood adds a live status line and an Advanced group on the same screens, is remembered by the app for every window, and turns on and off with Cmd+Shift+U. Old addresses still work (W4-SHELL-V2, Decisions 49–51; 08 §1 `ui-settings`, proposed).

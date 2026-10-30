@@ -65,7 +65,13 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/advanced/network', 'Advanced', null],
   ['/advanced/diagnostics', 'About', null],
 ];
-const FOCUSED = ['/start/app', '/start/connect', '/start/connected', '/start/invite', '/settings/join'];
+const FOCUSED = [
+  '/start/app',
+  '/start/connect',
+  '/start/connected',
+  '/start/invite',
+  '/settings/join',
+];
 
 describe('routes', () => {
   it('declares exactly the shell routes', () => {

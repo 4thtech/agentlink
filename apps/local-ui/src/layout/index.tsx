@@ -40,7 +40,8 @@ import type { ApiResult } from '../api/client.js';
 import { TidyNote } from '../pages/agents/tidy-note.js';
 import { subscribeHealth } from './health-feed.js';
 import { readHealth as defaultReadHealth, type HealthState } from './health.js';
-import { startViewTransition, VT_CLASS } from './motion.js';
+import { startViewTransition, VT_CLASS } from '@4thtech-io/ui';
+import { flushSync } from 'react-dom';
 import { SectionRail, SectionSheet } from './section-menu.js';
 import { ShellDialogs, openShellDialog } from './shell-dialogs.js';
 import { StatusStrip } from './status-strip.js';
@@ -149,7 +150,7 @@ function skipToContent(event: MouseEvent<HTMLAnchorElement>): void {
 
 /** Turns Under the hood on or off as one morph of the same screen (U0 View Transition). */
 export function toggleHood(on: boolean): void {
-  startViewTransition(() => setUnderTheHood(on));
+  startViewTransition(() => flushSync(() => setUnderTheHood(on)));
 }
 
 /** Cmd+Shift+U and Cmd+/ (Ctrl elsewhere); Cmd+K belongs to Go to (go-to.tsx). */
@@ -276,7 +277,7 @@ export function Layout({
             <div className="al-route">
               {switchNeeded ? <SwitchToPasskeyBanner platform={platform} /> : null}
               {settings ? (
-                <nav aria-label={SHELL_STRINGS.settingsNav} className="al-subnav al-chrome">
+                <nav aria-label={SHELL_STRINGS.settingsNav} className="al-subnav">
                   {SETTINGS_PAGES.map((p) => (
                     <a
                       key={p.path}

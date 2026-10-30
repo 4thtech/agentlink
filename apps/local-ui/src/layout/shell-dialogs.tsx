@@ -96,10 +96,10 @@ function Shortcuts({
       role="dialog"
       aria-modal="true"
       aria-labelledby={title}
-      className="al-dialog al-pop"
+      className="al-sdialog al-pop"
       onKeyDown={trap.onKeyDown}
     >
-      <h2 id={title} className="al-text-title-3 al-dialog-title">
+      <h2 id={title} className="al-text-title-3 al-sdialog-title">
         {S.shortcutsTitle}
       </h2>
       <dl className="al-shortcuts">
@@ -112,7 +112,7 @@ function Shortcuts({
           </div>
         ))}
       </dl>
-      <div className="al-dialog-actions">
+      <div className="al-sdialog-actions">
         <Button variant="secondary" onClick={onClose}>
           {S.close}
         </Button>
@@ -147,10 +147,10 @@ function Report({
       role="dialog"
       aria-modal="true"
       aria-labelledby={title}
-      className="al-dialog al-pop"
+      className="al-sdialog al-pop"
       onKeyDown={trap.onKeyDown}
     >
-      <h2 id={title} className="al-text-title-3 al-dialog-title">
+      <h2 id={title} className="al-text-title-3 al-sdialog-title">
         {S.reportTitle}
       </h2>
       <label htmlFor={field} className="al-text-body-sm al-muted">
@@ -171,7 +171,7 @@ function Report({
       <p className="al-text-body-sm al-muted" role="status" aria-live="polite">
         {copied ? S.reportCopied : ''}
       </p>
-      <div className="al-dialog-actions">
+      <div className="al-sdialog-actions">
         <Button variant="ghost" onClick={onClose}>
           {S.reportCancel}
         </Button>
@@ -219,7 +219,7 @@ export function ShellDialogs({ keys, facts }: ShellDialogsProps): ReactElement |
   }, [which, close]);
   if (which === null) return null;
   return (
-    <div className="al-dialog-backdrop" onMouseDown={close}>
+    <div className="al-sdialog-backdrop" onMouseDown={close}>
       <div onMouseDown={(e) => e.stopPropagation()}>
         {which === 'shortcuts' ? (
           <Shortcuts onClose={close} keys={keys} />

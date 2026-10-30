@@ -1340,7 +1340,8 @@ export async function startApprovalServerWith(
     uiSettingsDirectory.writeUiSettings === undefined
       ? undefined
       : createUiSettingsDesk({
-          read: () => (uiSettingsDirectory.readUiSettings as () => Promise<UiSettings | undefined>)(),
+          read: () =>
+            (uiSettingsDirectory.readUiSettings as () => Promise<UiSettings | undefined>)(),
           write: (settings) =>
             (uiSettingsDirectory.writeUiSettings as (s: UiSettings) => Promise<void>)(settings),
         });

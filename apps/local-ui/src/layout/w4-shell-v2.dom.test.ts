@@ -15,7 +15,12 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LIVE_POLL_MS, resetLiveForTests } from '../api/live.js';
-import { getPrefs, PREFS_KEY, resetPrefsForTests, resetUiSettingsForTests } from '../prefs/index.js';
+import {
+  getPrefs,
+  PREFS_KEY,
+  resetPrefsForTests,
+  resetUiSettingsForTests,
+} from '../prefs/index.js';
 import { AppRoutes } from '../router.js';
 import { setConnectionState } from './index.js';
 
@@ -91,8 +96,21 @@ const agentsOf = (w: World) => ({
 const APPS = {
   desktopRunning: false,
   apps: [
-    { app: 'claude-code', name: 'Claude Code', path: '~/.claude.json', state: 'connected', agent: 'default', quitFirst: false },
-    { app: 'codex', name: 'Codex', path: '~/.codex/config.toml', state: 'not_connected', quitFirst: false },
+    {
+      app: 'claude-code',
+      name: 'Claude Code',
+      path: '~/.claude.json',
+      state: 'connected',
+      agent: 'default',
+      quitFirst: false,
+    },
+    {
+      app: 'codex',
+      name: 'Codex',
+      path: '~/.codex/config.toml',
+      state: 'not_connected',
+      quitFirst: false,
+    },
   ],
 };
 
@@ -156,8 +174,10 @@ async function mountAt(path: string): Promise<void> {
 }
 
 const q = <T extends Element = HTMLElement>(sel: string): T | null => host.querySelector<T>(sel);
-const qa = <T extends Element = HTMLElement>(sel: string): T[] => [...host.querySelectorAll<T>(sel)];
-const chip = (): HTMLButtonElement | null => q<HTMLButtonElement>('button[aria-label^="Agent: "]');
+const qa = <T extends Element = HTMLElement>(sel: string): T[] => [
+  ...host.querySelectorAll<T>(sel),
+];
+const chip = (): HTMLButtonElement | null => q<HTMLButtonElement>('button.al-chip');
 const hood = (): HTMLButtonElement | null => q<HTMLButtonElement>('button[role="switch"]');
 const rail = (): HTMLElement | null => q('nav.al-rail');
 const railLabels = (): string[] =>
@@ -210,8 +230,8 @@ describe('the top bar (A4)', () => {
     expect(bar).not.toBeNull();
     const order = [
       bar?.querySelector('.al-top-brand'),
-      bar?.querySelector('button[aria-label^="Agent: "]'),
-      bar?.querySelector('button[aria-label="Go to, Command K"]'),
+      bar?.querySelector('button.al-chip'),
+      bar?.querySelector('button.al-goto-btn'),
       bar?.querySelector('button[aria-label="Help"]'),
       bar?.querySelector('button[role="switch"]'),
     ];
@@ -233,9 +253,14 @@ describe('the top bar (A4)', () => {
     expect(chip()?.querySelector('.al-agent-icon-dot.is-ready')).not.toBeNull();
     expect(chip()?.textContent).toContain("Tali's agent");
     expect(chip()?.textContent).toContain('Ready in Claude Code');
-    expect(chip()?.getAttribute('aria-label')).toBe(
-      "Agent: Tali's agent, Ready in Claude Code. Open agents menu",
+    // Its name is its visible text after "Agent:" (WCAG 2.5.3 label in name).
+    expect(chip()?.hasAttribute('aria-label')).toBe(false);
+    // (The letter icon is aria-hidden: the name is the text beside it.)
+    expect(chip()?.querySelector('.al-chip-text')?.textContent).toBe(
+      "Agent: Tali's agent Ready in Claude Code",
     );
+    expect(q('button.al-goto-btn')?.hasAttribute('aria-label')).toBe(false);
+    expect(q('button.al-goto-btn')?.textContent).toContain('Go to…');
   });
 
   it('says one truthful status: a connection that is not up wins (HOTFIX-045)', async () => {
@@ -346,9 +371,9 @@ describe('the section menu (Decision 48)', () => {
     expect(rail()?.getAttribute('aria-label')).toBe('Sections');
     expect(rail()?.dataset['expanded']).toBe('false');
     expect(railLabels()).toEqual(['Home', 'Agents', 'Activity', 'Settings']);
-    expect(qa('nav.al-rail [aria-current="page"]').map((a) => a.getAttribute('aria-label'))).toEqual([
-      'Agents',
-    ]);
+    expect(
+      qa('nav.al-rail [aria-current="page"]').map((a) => a.getAttribute('aria-label')),
+    ).toEqual(['Agents']);
     // Minimized: icons only; the name is on the link.
     expect(q('nav.al-rail .al-rail-label')).toBeNull();
     // Inbox and Contacts are no destinations any more.
@@ -428,12 +453,9 @@ describe('"?" Help', () => {
     await mountAt('/');
     await click(button('Help'));
     expect(q('[role="menu"]')?.getAttribute('aria-label')).toBe('Help');
-    expect(menuItems().map((m) => m.textContent?.replace('⌘/', '').replace('Ctrl+/', '').trim())).toEqual([
-      'Get started',
-      'Keyboard shortcuts',
-      'User guide',
-      'Report a problem',
-    ]);
+    expect(
+      menuItems().map((m) => m.textContent?.replace('⌘/', '').replace('Ctrl+/', '').trim()),
+    ).toEqual(['Get started', 'Keyboard shortcuts', 'User guide', 'Report a problem']);
     const guide = menuItems()[2] as HTMLAnchorElement;
     expect(guide.getAttribute('href')).toBe('https://wiki.4thtech.io/products/agentlink');
     expect(guide.getAttribute('rel')).toContain('noopener');
@@ -579,7 +601,9 @@ describe('Cmd+K (kept from #715), in both modes', () => {
     serve(w);
     await mountAt('/');
     await open();
-    await click(qa('[role="option"]').find((o) => o.textContent?.includes('Turn on Under the hood')));
+    await click(
+      qa('[role="option"]').find((o) => o.textContent?.includes('Turn on Under the hood')),
+    );
     expect(getPrefs().hood).toBe(true);
     expect(w.puts).toEqual([{ underTheHood: true }]);
   });

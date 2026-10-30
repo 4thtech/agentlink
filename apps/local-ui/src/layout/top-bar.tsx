@@ -13,7 +13,7 @@ import { SHELL_STRINGS as S } from '../strings.js';
 import { AgentSwitcher, type SwitcherChip } from './agent-switcher.js';
 import { goToKeys, openGoTo } from './go-to.js';
 import type { ConnectionState } from './index.js';
-import { VT_CLASS } from './motion.js';
+import { VT_CLASS } from '@4thtech-io/ui';
 import { openShellDialog } from './shell-dialogs.js';
 import { ShellIcon } from './shell-icons.js';
 
@@ -58,7 +58,12 @@ export function HelpMenu(): ReactElement {
         <ShellIcon name="help" size={20} />
       </button>
       {open ? (
-        <Menu label={S.help} onClose={close} triggerRef={trigger} className="al-shell-menu al-help-menu al-menu">
+        <Menu
+          label={S.help}
+          onClose={close}
+          triggerRef={trigger}
+          className="al-shell-menu al-help-menu al-menu"
+        >
           <button
             type="button"
             role="menuitem"
@@ -121,7 +126,11 @@ export function shortcutKeys(key: string, shift = false): string {
 }
 
 /** The "Under the hood" switch, top right (role="switch"). */
-export function HoodSwitch({ onToggle }: { readonly onToggle?: (on: boolean) => void }): ReactElement {
+export function HoodSwitch({
+  onToggle,
+}: {
+  readonly onToggle?: (on: boolean) => void;
+}): ReactElement {
   const { hood } = usePrefs();
   return (
     <button
@@ -159,12 +168,12 @@ export function TopBar({ connection, onHood }: TopBarProps): ReactElement {
           ref={goTo}
           type="button"
           className="al-goto-btn al-press"
-          aria-label={S.goToButtonName}
           onClick={() => openGoTo(goTo.current)}
         >
           <ShellIcon name="search" size={16} />
-          <span className="al-hide-sm">{S.goToButton}</span>
-          <span className="al-hide-sm">
+          {/* Visible text is the name (WCAG 2.5.3); on a phone it is read but not shown. */}
+          <span className="al-goto-word">{S.goToButton}</span>
+          <span className="al-hide-sm" aria-hidden="true">
             <Kbd>{goToKeys()}</Kbd>
           </span>
         </button>

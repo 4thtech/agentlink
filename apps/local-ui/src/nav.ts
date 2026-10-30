@@ -28,15 +28,7 @@ export const ADVANCED_HOME = '/advanced/network';
 
 /** The icons of the section menu (layout/shell-icons.tsx; Lucide, as the prototype). */
 export type SectionIcon =
-  | 'home'
-  | 'agents'
-  | 'activity'
-  | 'settings'
-  | 'stream'
-  | 'rules'
-  | 'proofs'
-  | 'relays'
-  | 'diag';
+  'home' | 'agents' | 'activity' | 'settings' | 'stream' | 'rules' | 'proofs' | 'relays' | 'diag';
 
 export interface Section {
   readonly id: string;
@@ -59,7 +51,12 @@ export const ADVANCED_SECTIONS: readonly Section[] = [
   { id: 'rules', label: PAGE_TITLES.rules, icon: 'rules', path: '/advanced/rules' },
   { id: 'proofs', label: PAGE_TITLES.proofs, icon: 'proofs', path: '/advanced/proofs' },
   { id: 'network', label: PAGE_TITLES.network, icon: 'relays', path: ADVANCED_HOME },
-  { id: 'diagnostics', label: PAGE_TITLES.diagnostics, icon: 'diag', path: '/advanced/diagnostics' },
+  {
+    id: 'diagnostics',
+    label: PAGE_TITLES.diagnostics,
+    icon: 'diag',
+    path: '/advanced/diagnostics',
+  },
 ];
 
 export interface SettingsPage {

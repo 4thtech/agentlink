@@ -25,7 +25,7 @@ import { AGENTS_STRINGS as A } from '../pages/agents/strings.js';
 import { createAppsApi, type AppsApi } from '../pages/apps/api.js';
 import { APPS_PAGE_PATH } from '../pages/apps/data.js';
 import { ShellIcon } from './shell-icons.js';
-import { VT_CLASS } from './motion.js';
+import { VT_CLASS } from '@4thtech-io/ui';
 
 /** The top bar's one status for the connection (HOTFIX-045), when it is not up. */
 export interface SwitcherChip {
@@ -41,8 +41,7 @@ export const CHIP_STRINGS = {
   connectApp: (app: string): string => `Connect ${app}`,
   addAgent: 'Add agent',
   manageAgents: 'Manage agents',
-  chipName: (label: string, status: string): string =>
-    `Agent: ${label}, ${status}. Open agents menu`,
+  chipPrefix: 'Agent: ',
   openApp: 'Open the AgentLink app to see your agents.',
 } as const;
 
@@ -167,7 +166,6 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
         className={`al-chip al-press ${VT_CLASS.chip}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={CHIP_STRINGS.chipName(label, status)}
         onClick={() => {
           if (!open) free.reread();
           setOpen((v) => !v);
@@ -175,10 +173,16 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
       >
         <AgentIcon label={label} seed={seed} size="lg" {...(dot === undefined ? {} : { dot })} />
         <span className="al-chip-text">
-          <span className="al-chip-name">{label}</span>
+          {/* The name is the visible text (WCAG 2.5.3), after a word for screen readers. */}
+          <span className="al-sr-only">{CHIP_STRINGS.chipPrefix}</span>
+          <span className="al-chip-name">{label}</span>{' '}
           <span className="al-chip-status">{status}</span>
         </span>
-        <ShellIcon name="chev-d" size={16} className={open ? 'al-chip-chev is-open' : 'al-chip-chev'} />
+        <ShellIcon
+          name="chev-d"
+          size={16}
+          className={open ? 'al-chip-chev is-open' : 'al-chip-chev'}
+        />
       </button>
       {open ? (
         <Menu
@@ -205,7 +209,9 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
                   <span className="al-am-name">{agent.label}</span>
                   <span className="al-am-status">{agent.statusText}</span>
                 </span>
-                {agent.current ? <ShellIcon name="check" size={16} className="al-am-check" /> : null}
+                {agent.current ? (
+                  <ShellIcon name="check" size={16} className="al-am-check" />
+                ) : null}
               </button>
               {agent.apps.length > 0 ? (
                 <span className="al-am-apps">
@@ -251,7 +257,12 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
             <ShellIcon name="plus" size={16} />
             {CHIP_STRINGS.addAgent}
           </button>
-          <button type="button" role="menuitem" className="al-mitem" onClick={() => go(AGENTS_PATH)}>
+          <button
+            type="button"
+            role="menuitem"
+            className="al-mitem"
+            onClick={() => go(AGENTS_PATH)}
+          >
             <ShellIcon name="settings" size={16} />
             {CHIP_STRINGS.manageAgents}
           </button>

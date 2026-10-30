@@ -22,7 +22,6 @@ export const SHELL_STRINGS = {
   offlineChip: 'Not connected',
   goTo: 'Go to',
   goToButton: 'Go to…',
-  goToButtonName: 'Go to, Command K',
   goToFind: 'Go to a page or run a command',
   goToNone: 'Nothing found.',
   goToHint: 'Type a name, then Enter.',
@@ -54,7 +53,8 @@ export const SHELL_STRINGS = {
   reportTitle: 'Report a problem',
   reportWhat: 'What went wrong?',
   reportPlaceholder: 'e.g. Claude Code shows Not running but it is open',
-  reportDiagnostics: 'Add diagnostics (versions and statuses only, no messages, keys or file names)',
+  reportDiagnostics:
+    'Add diagnostics (versions and statuses only, no messages, keys or file names)',
   reportCancel: 'Cancel',
   reportCopy: 'Copy report',
   reportCopied: 'Copied. Paste it into an email or an issue.',
