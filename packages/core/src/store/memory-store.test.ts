@@ -94,7 +94,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   });
 
   it('invites drop columns (W4-SHORT-INVITE, schema 8): sealed lookup ID and epoch, cancelled_at', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(8);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(8);
     expect(TABLES.invites.columns['drop_lookup_id']).toEqual({ kind: 'enc', nullable: true });
     expect(TABLES.invites.columns['drop_key_epoch']).toEqual({ kind: 'enc', nullable: true });
     expect(TABLES.invites.columns['cancelled_at']).toEqual({ kind: 'int', nullable: true });
@@ -115,6 +115,20 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
       },
       primaryKey: ['record'],
     });
+  });
+
+  it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 9): four nullable columns, appended last', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(9);
+    expect(Object.keys(TABLES.contacts.columns).slice(-4)).toEqual([
+      'former_name',
+      'name_changed_at',
+      'name_change_seen',
+      'declared_name',
+    ]);
+    expect(TABLES.contacts.columns.declared_name).toEqual({ kind: 'enc', nullable: true });
+    expect(TABLES.contacts.columns.former_name).toEqual({ kind: 'enc', nullable: true });
+    expect(TABLES.contacts.columns.name_changed_at).toEqual({ kind: 'int', nullable: true });
+    expect(TABLES.contacts.columns.name_change_seen).toEqual({ kind: 'flag', nullable: true });
   });
 
   it('files.saved_name (MSG-FILES-IO-b, schema 6): a nullable sealed column, appended last', () => {

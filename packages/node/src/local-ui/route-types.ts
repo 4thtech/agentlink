@@ -19,6 +19,7 @@
 import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
 import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiContext } from './context.js';
+import type { RenameSignOutcome } from '../owner-rename.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
 /**
@@ -70,7 +71,24 @@ export interface LocalUiOwnerOperation {
    * decrypts. Undefined on every other route, before `sign`, and once the gesture has ended.
    */
   carrierKeys?(): EnvelopeKeys | undefined;
+  /**
+   * W4-RENAME-REACHES-CONTACTS (D-141; 04 §2.5.1 `agent.label`, §2.6): the one owner operation of a
+   * rename that rotates, instead of `sign` (one or the other, once). With the presence this request
+   * carried it signs exactly the open agent's next card (keyEpoch + 1, the new label as its name) and
+   * then exactly `request.labelBody` (owner-rename.ts signRename); the handler never sees the owner
+   * session or the epoch control. Absent outside the app host or without the agent's key items.
+   */
+  renameAgent?(review: OwnerReview, request: LocalUiRenameRequest): Promise<LocalUiRenameOutcome>;
 }
+
+/** D-141: what the rename route hands the gate: the new label and the `agent.label` core prepared. */
+export interface LocalUiRenameRequest {
+  readonly label: string;
+  readonly labelBody: JsonObject;
+}
+
+/** D-141: how the rename gesture ended (owner-rename.ts). */
+export type LocalUiRenameOutcome = RenameSignOutcome;
 
 export interface LocalUiReadRoute {
   readonly method: LocalUiReadMethod;
