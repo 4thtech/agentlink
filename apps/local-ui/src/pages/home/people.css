@@ -1,263 +1,200 @@
-/* W4-HOME: Home simple and pro (prototype v23 A4, A10; D-116: styled from the approved design with
-   the design tokens). Motion only through U0's classes (al-expand, al-reveal, al-pop, al-press,
-   al-optimistic, the shared element); the one transition here is the chevron's turn (transform),
-   off under reduced motion. Classes only, no inline styles (08 §4 CSP). */
+/* W4-HOME: Home simple and pro (prototype v23 A4, A10; D-116: the approved design with the tokens).
+   Shared classes carry type, buttons, avatars and menus (al-text-label, al-text-code, al-btn,
+   al-avatar, al-shell-menu, al-mitem) so Home stays inside the CSS budget; motion only through
+   U0's classes. Classes only, no inline styles (08 §4 CSP). */
 
-.hm-page {
+.hm-c,
+.hm-f {
   display: flex;
   flex-direction: column;
-  gap: var(--al-space-5);
   min-width: 0;
 }
-.hm-stack {
-  display: flex;
-  flex-direction: column;
+.hm-f {
+  flex-flow: row wrap;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+.hm-page,
+.hm-stack,
+.hm-skeleton {
   gap: var(--al-space-5);
-  min-width: 0;
+}
+.hm-people,
+.hm-thread,
+.hm-msgs,
+.hm-menu-panel,
+.hm-ap-bulk,
+.hm-approvals {
+  gap: var(--al-space-3);
+}
+.hm-open {
+  gap: var(--al-space-4);
+  padding: var(--al-space-1) var(--al-space-4) var(--al-space-5);
+  border-top: 1px solid var(--al-color-border-subtle);
+}
+.hm-files,
+.hm-ap-body {
+  gap: var(--al-space-2);
+}
+.hm-msg,
+.hm-row-main,
+.hm-file-main {
+  gap: 2px;
 }
 .hm-kicker {
   margin: 0;
-  font-family: var(--al-font-family-mono);
-  font-size: var(--al-text-label-size);
-  line-height: var(--al-text-label-line);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--al-color-fg-subtle);
-  font-weight: var(--al-font-weight-medium);
 }
-.hm-mono {
-  font-family: var(--al-font-family-mono);
-  font-size: var(--al-text-code-size);
-}
-.hm-ellipsis {
-  min-width: 0;
+.hm-ellipsis,
+.hm-name {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.hm-notice {
+.hm-name {
+  font-size: var(--al-text-body-lg-size);
+  font-weight: var(--al-font-weight-semibold);
+}
+.hm-notice,
+.hm-inline-note,
+.hm-ap-done,
+.hm-sub,
+.hm-msg-who,
+.hm-file-meta,
+.hm-note,
+.hm-cell-time,
+.hm-cell-muted,
+.hm-dl-hint {
   margin: 0;
-  padding: var(--al-space-3) var(--al-space-4);
-  border-radius: var(--al-radius-md);
-  border: var(--al-border-width-thin) solid var(--al-color-status-success-border);
-  background: var(--al-color-status-success-bg);
-  color: var(--al-color-status-success-fg);
+  color: var(--al-color-fg-subtle);
+}
+.hm-skel-invite,
+.hm-invite {
+  min-height: 64px;
+  box-sizing: border-box;
+}
+.hm-invite,
+.hm-invite-sm {
+  text-decoration: none;
 }
 
-/* Skeleton in the shape of Home. */
-.hm-skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-5);
+/* Rows of controls. */
+
+.hm-people-head,
+.hm-open-head,
+.hm-files-head {
+  justify-content: space-between;
 }
-.hm-skel-card {
-  height: 56px;
+.hm-open-head > .hm-kicker {
+  flex: 1 1 0;
 }
-.hm-skel-invite {
-  height: 64px;
+.hm-tools {
+  flex: 1 1 420px;
+  justify-content: flex-end;
+}
+.hm-search {
+  flex: 1 1 160px;
+}
+.hm-search,
+.hm-agent,
+.hm-rename {
+  height: 36px;
+}
+.hm-rename {
+  flex: 1 1 180px;
 }
 
-/* The approval card on top (warning tone, as the approved design). */
+/* The approval card on top, in the warning tone of the approved design. */
 .hm-approvals {
   display: flex;
   flex-direction: column;
-  gap: var(--al-space-3);
   padding: var(--al-space-4);
   border-radius: var(--al-radius-md);
-  border: var(--al-border-width-thin) solid var(--al-color-status-warning-border);
+  border: 1px solid var(--al-color-status-warning-border);
   background: var(--al-color-status-warning-bg);
 }
 .hm-approvals .al-approval {
-  background: transparent;
+  background: none;
   border: 0;
   box-shadow: none;
   padding: 0;
 }
 .hm-approvals .al-approval h2 {
-  font-size: var(--al-text-body-size);
-  line-height: var(--al-text-body-line);
-  font-weight: var(--al-font-weight-semibold);
   margin: 0;
+  font-size: var(--al-text-body-size);
 }
 .hm-approvals .al-approval-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-2);
 }
 .hm-approvals .al-approval-actions .al-btn {
-  flex: 0 0 auto;
-  width: auto;
-  min-height: 36px;
   height: 36px;
-  padding: 0 var(--al-space-4);
+  min-height: 36px;
+}
+.hm-approvals
+  .al-approval-details[open]
+  :is(.al-hood, .al-approval-rows, .al-note, .al-approval-foot) {
+  background: var(--al-color-bg-surface);
+  padding: var(--al-space-2) var(--al-space-3);
+}
+.hm-ap-meta,
+.hm-msg-meta {
+  overflow-wrap: anywhere;
+}
+.hm-ap-meta,
+.hm-ap-more,
+.hm-ap-note,
+.hm-problem,
+.hm-dl.is-failed,
+.hm-cell[data-delivery='not_delivered'] {
+  color: var(--al-color-status-warning-fg);
 }
 .hm-ap-meta {
   margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-1) var(--al-space-4);
-  font-family: var(--al-font-family-mono);
-  font-size: var(--al-text-caption-size);
-  line-height: var(--al-text-caption-line);
-  color: var(--al-color-status-warning-fg);
-  overflow-wrap: anywhere;
+  gap: 0 var(--al-space-4);
 }
 .hm-ap-more {
-  align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: var(--al-space-1);
+  align-self: flex-start;
   min-height: 32px;
   padding: 0;
   border: 0;
-  background: transparent;
-  color: var(--al-color-status-warning-fg);
+  background: none;
   font: inherit;
-  font-size: var(--al-text-body-sm-size);
-  font-weight: var(--al-font-weight-medium);
   cursor: pointer;
-}
-.hm-ap-list {
-  display: flex;
-  flex-direction: column;
-  border-top: var(--al-border-width-thin) solid var(--al-color-status-warning-border);
 }
 .hm-ap-item {
   display: flex;
-  align-items: flex-start;
   gap: var(--al-space-3);
-  padding: var(--al-space-3) 0;
-  border-bottom: var(--al-border-width-thin) solid var(--al-color-status-warning-border);
-}
-.hm-ap-pick {
-  width: 18px;
-  height: 18px;
-  margin: var(--al-space-2) 0 0;
-  accent-color: var(--al-color-accent-default);
+  padding-top: var(--al-space-3);
 }
 .hm-ap-body {
   flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-2);
-}
-.hm-ap-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-3);
-  padding-top: var(--al-space-3);
-}
-.hm-ap-note {
-  color: var(--al-color-status-warning-fg);
-}
-.hm-ap-bulk {
-  padding-top: var(--al-space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-}
-.hm-ap-done {
-  margin: 0;
-}
-
-/* The chevrons turn; colour and transform only. */
-.hm-chev {
-  display: inline-flex;
-  flex: none;
-  color: var(--al-color-fg-subtle);
-  transition: transform var(--al-duration-base) var(--al-easing-spring);
-}
-.hm-chev[data-open='right-open'] {
-  transform: rotate(90deg);
-}
-.hm-ap-more .hm-chev {
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 6px solid currentColor;
-  color: inherit;
-}
-.hm-ap-more .hm-chev[data-open='down'] {
-  transform: rotate(180deg);
-}
-
-/* Invite someone: the one big action of simple Home. */
-.hm-invite {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--al-space-3);
-  min-height: 64px;
-  border-radius: var(--al-radius-md);
-  background: var(--al-color-accent-default);
-  color: var(--al-color-fg-on-accent);
-  font-size: var(--al-text-body-lg-size);
-  font-weight: var(--al-font-weight-semibold);
-  text-decoration: none;
-}
-.hm-invite:hover {
-  background: var(--al-color-accent-hover);
-  color: var(--al-color-fg-on-accent);
 }
 
 /* People. */
-.hm-people {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-  min-width: 0;
-}
-.hm-people-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--al-space-3);
-}
-.hm-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--al-space-2);
-  flex: 1 1 420px;
-}
-.hm-search {
-  flex: 1 1 160px;
-  max-width: 240px;
-  height: 36px;
-}
-.hm-agent {
-  height: 36px;
-}
-.hm-agent select {
-  background: transparent;
-  color: inherit;
-}
-.hm-invite-sm {
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-2);
-}
-.hm-list {
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+.hm-list,
+.hm-file-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--al-color-border-default);
   border-radius: var(--al-radius-md);
   background: var(--al-color-bg-surface);
   overflow: hidden;
-  min-width: 0;
 }
-.hm-person + .hm-person,
-.hm-person + .hm-nomatch,
-.hm-person + .hm-invite-row,
-.hm-invite-row + .hm-invite-row {
-  border-top: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+:is(.hm-person, .hm-invite-row, .hm-nomatch, .hm-file)
+  + :is(.hm-person, .hm-invite-row, .hm-nomatch, .hm-file) {
+  border-top: 1px solid var(--al-color-border-subtle);
 }
-.hm-person[data-open='true'] {
-  background: var(--al-color-bg-sunken);
+.hm-row,
+.hm-row-toggle {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .hm-row {
   box-sizing: border-box;
@@ -266,104 +203,26 @@
   align-items: center;
   gap: var(--al-space-4);
   padding: var(--al-space-4);
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.hm-row:hover {
-  background: var(--al-color-bg-raised);
 }
 .hm-row-main {
   flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
-.hm-name {
-  font-size: var(--al-text-body-lg-size);
-  line-height: var(--al-text-body-lg-line);
-  font-weight: var(--al-font-weight-semibold);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.hm-sub {
-  color: var(--al-color-fg-subtle);
-}
-.hm-problem {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-1);
-  font-size: var(--al-text-caption-size);
-  color: var(--al-color-status-warning-fg);
+.hm-invite-row,
+.hm-nomatch {
+  padding: var(--al-space-4);
 }
 .hm-avatar {
   width: 40px;
   height: 40px;
-  flex: none;
-  border-radius: var(--al-radius-full);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   font-weight: var(--al-font-weight-semibold);
-  font-size: var(--al-text-body-lg-size);
-  background: var(--al-color-status-info-bg);
-  color: var(--al-color-status-info-fg);
-}
-.hm-avatar[data-tint='1'] {
-  background: var(--al-color-identity-registered-bg);
-  color: var(--al-color-identity-registered-fg);
-}
-.hm-avatar[data-tint='2'] {
-  background: var(--al-color-status-success-bg);
-  color: var(--al-color-status-success-fg);
-}
-.hm-avatar[data-tint='3'] {
-  background: var(--al-color-proof-bg);
-  color: var(--al-color-proof-fg);
-}
-.hm-avatar[data-tint='4'] {
-  background: var(--al-color-accent-subtle);
-  color: var(--al-color-accent-default);
-}
-.hm-avatar[data-tint='5'] {
-  background: var(--al-color-identity-verified-bg);
-  color: var(--al-color-identity-verified-fg);
-}
-.hm-avatar.is-small {
-  width: 28px;
-  height: 28px;
-  font-size: var(--al-text-caption-size);
 }
 .hm-avatar.is-pending {
-  background: transparent;
-  border: var(--al-border-width-thin) dashed var(--al-color-border-strong);
-  color: var(--al-color-fg-muted);
-}
-.hm-invite-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-3) var(--al-space-4);
-  padding: var(--al-space-4);
-}
-.hm-nomatch {
-  padding: var(--al-space-4);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-3);
-}
-.hm-nomatch p {
-  margin: 0;
+  border-style: dashed;
 }
 
-/* The People table (pro). */
+/* The People table (pro): a grid; the toggle is stretched over its row. */
 .hm-prow {
+  position: relative;
   box-sizing: border-box;
   display: grid;
   grid-template-columns:
@@ -375,33 +234,12 @@
   font-size: var(--al-text-body-sm-size);
 }
 .hm-prow-head {
-  padding: var(--al-space-2) var(--al-space-4);
-  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-default);
-  font-family: var(--al-font-family-mono);
-  font-size: var(--al-text-label-size);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  border-bottom: 1px solid var(--al-color-border-default);
   color: var(--al-color-fg-subtle);
-  font-weight: var(--al-font-weight-medium);
-}
-/* The toggle covers the whole row (a stretched button), so a click anywhere opens it; the cells
-   stay plain text and the keyboard has one target. */
-.hm-prow.hm-row {
-  position: relative;
-  cursor: default;
 }
 .hm-row-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-3);
-  min-width: 0;
   padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+  flex-wrap: nowrap;
 }
 .hm-row-toggle::after {
   content: '';
@@ -409,51 +247,26 @@
   inset: 0;
 }
 .hm-row-toggle .hm-name {
-  font-size: var(--al-text-body-sm-size);
+  font-size: inherit;
 }
-.hm-cell {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-2);
-  min-width: 0;
+.hm-cell,
+.hm-cell-last {
   color: var(--al-color-fg-muted);
 }
-.hm-cell[data-delivery='sent'] {
+.hm-cell[data-delivery='sent'],
+.hm-dl.is-sent,
+.hm-copied,
+.hm-v.is-proof,
+.hm-facts dd.is-checked {
   color: var(--al-color-status-success-fg);
 }
-.hm-cell[data-delivery='not_delivered'] {
-  color: var(--al-color-status-warning-fg);
-}
-.hm-cell-last {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  color: var(--al-color-fg-muted);
-}
-.hm-cell-time {
-  font-size: var(--al-text-caption-size);
-  color: var(--al-color-fg-subtle);
-}
-.hm-cell-muted {
-  color: var(--al-color-fg-subtle);
-}
-/* Their words in the table: still the untrusted container, on one line (the label is read out). */
 .hm-untrusted-line {
-  border-width: var(--al-border-width-thin);
   display: flex;
   align-items: center;
-  min-width: 0;
-}
-.hm-untrusted-line .al-untrusted-label {
-  padding: 0 var(--al-space-1);
+  border-width: 1px;
 }
 .hm-untrusted-line .al-untrusted-label span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+  display: none;
 }
 .hm-untrusted-line .al-untrusted-body {
   min-width: 0;
@@ -461,337 +274,106 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: var(--al-text-body-sm-size);
-}
-.hm-dot {
-  width: 8px;
-  height: 8px;
-  flex: none;
-  border-radius: var(--al-radius-full);
-  background: var(--al-color-fg-subtle);
-}
-.hm-dot[data-state='ready'],
-.hm-dot[data-state='working'] {
-  background: var(--al-color-status-success-icon);
-}
-.hm-dot[data-state='paused'],
-.hm-dot[data-state='idle'] {
-  background: var(--al-color-status-warning-icon);
 }
 
-/* A person opened in place. */
-.hm-open {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-4);
-  padding: var(--al-space-1) var(--al-space-4) var(--al-space-5);
-  border-top: var(--al-border-width-thin) solid var(--al-color-border-subtle);
-  min-width: 0;
-}
-.hm-open-head {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--al-space-2);
-  padding-top: var(--al-space-3);
-}
-.hm-open-head > .hm-kicker {
-  flex: 1 1 0;
-  min-width: 0;
-}
+/* The ⋯ menu. */
 .hm-menu-wrap {
   position: relative;
-  display: inline-flex;
 }
 .hm-menu-btn {
   width: 36px;
-  height: 36px;
-  border-radius: var(--al-radius-sm);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  background: transparent;
-  color: var(--al-color-fg-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+  padding: 0;
 }
-.hm-menu {
-  position: absolute;
-  z-index: 31;
-  top: 42px;
-  right: 0;
-  width: 220px;
-  display: flex;
-  flex-direction: column;
-  padding: var(--al-space-2);
-  border-radius: var(--al-radius-md);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  background: var(--al-color-bg-overlay);
-  box-shadow: var(--al-shadow-3);
-  box-sizing: border-box;
-}
-.hm-menu-item {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-3);
-  min-height: 40px;
-  padding: 0 var(--al-space-3);
-  border: 0;
-  border-radius: var(--al-radius-sm);
-  background: transparent;
-  color: var(--al-color-fg-default);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.hm-menu-item:hover,
-.hm-menu-item:focus-visible {
-  background: var(--al-color-bg-raised);
-}
-.hm-menu-item.is-danger {
+.hm-danger,
+.hm-inline-error,
+.hm-remove > span {
   color: var(--al-color-status-danger-fg);
 }
 .hm-menu-panel {
   flex-basis: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
 }
-.hm-menu-panel:empty {
+.hm-menu-panel:empty,
+.hm-file-problem:empty {
   display: none;
-}
-.hm-inline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-2);
-}
-.hm-rename {
-  flex: 1 1 180px;
-  height: 36px;
 }
 .hm-inline p {
   margin: 0;
   flex-basis: 100%;
 }
-.hm-inline-error {
-  color: var(--al-color-status-danger-fg);
-}
-.hm-inline-note {
-  margin: 0;
-  color: var(--al-color-status-success-fg);
-}
-.hm-remove {
-  padding: var(--al-space-3);
-  border-radius: var(--al-radius-md);
-  border: var(--al-border-width-thin) solid var(--al-color-status-danger-border);
-  background: var(--al-color-status-danger-bg);
-}
 .hm-remove > span {
   flex: 1 1 240px;
-  color: var(--al-color-status-danger-fg);
 }
-.hm-code-digits {
-  font-size: var(--al-text-code-lg-size);
-  letter-spacing: 0.08em;
+
+/* Contact facts and message details (pro). */
+.hm-facts,
+.hm-msg-meta {
+  margin: 0;
+  color: var(--al-color-fg-subtle);
 }
 .hm-facts {
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--al-space-2) var(--al-space-4);
-  padding: var(--al-space-3);
-  border-radius: var(--al-radius-sm);
-  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
-  background: var(--al-color-bg-sunken);
-  font-size: var(--al-text-caption-size);
-}
-.hm-facts div {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  gap: var(--al-space-2) var(--al-space-6);
 }
 .hm-facts dd {
   margin: 0;
   color: var(--al-color-fg-muted);
   overflow-wrap: anywhere;
 }
-.hm-facts dd.is-checked {
-  color: var(--al-color-status-success-fg);
-}
-
-/* The conversation. */
-.hm-thread {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-  min-width: 0;
-}
-.hm-earlier {
-  align-self: center;
-}
-.hm-msgs {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-}
-.hm-msg {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-1);
-  max-width: 560px;
-  width: 100%;
-  min-width: 0;
-}
-.hm-msg.is-in {
-  align-self: flex-end;
-}
-.hm-msg-who {
-  font-size: var(--al-text-caption-size);
-  color: var(--al-color-fg-subtle);
-}
-.hm-bubble {
-  padding: var(--al-space-3);
-  border-radius: var(--al-radius-md);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  background: var(--al-color-bg-raised);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.hm-msg-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-1) var(--al-space-3);
-  min-height: 28px;
-  font-size: var(--al-text-caption-size);
-}
-.hm-dl {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-1);
-}
-.hm-dl.is-sent,
-.hm-copied {
-  color: var(--al-color-status-success-fg);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-1);
-}
-.hm-dl.is-waiting {
-  color: var(--al-color-fg-muted);
-}
-.hm-dl.is-failed {
-  color: var(--al-color-status-warning-fg);
-}
-.hm-dl-hint {
-  color: var(--al-color-fg-subtle);
-}
-.hm-copy {
-  min-height: 28px;
-  padding: 0 var(--al-space-2);
-  border: 0;
-  border-radius: var(--al-radius-xs);
-  background: transparent;
-  color: var(--al-color-fg-subtle);
-  font: inherit;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-1);
-}
 .hm-msg-meta {
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
   gap: 2px var(--al-space-4);
-  padding: var(--al-space-2);
-  border-radius: var(--al-radius-sm);
-  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
-  background: var(--al-color-bg-sunken);
-  font-family: var(--al-font-family-mono);
-  font-size: var(--al-text-caption-size);
-  color: var(--al-color-fg-subtle);
-  overflow-wrap: anywhere;
 }
 .hm-v {
   color: var(--al-color-fg-muted);
 }
-.hm-v.is-proof {
-  color: var(--al-color-status-success-fg);
-}
-.hm-note {
+
+/* The conversation. */
+.hm-msgs {
   margin: 0;
-  color: var(--al-color-fg-subtle);
+  padding: 0;
+  list-style: none;
+}
+.hm-msg {
+  max-width: 560px;
+  width: 100%;
+}
+.hm-msg.is-in {
+  align-self: flex-end;
+}
+.hm-bubble {
+  padding: var(--al-space-3);
+  border-radius: var(--al-radius-md);
+  border: 1px solid var(--al-color-border-default);
+  background: var(--al-color-bg-raised);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hm-msg-actions,
+.hm-sub,
+.hm-msg-who,
+.hm-problem {
+  font-size: var(--al-text-caption-size);
+}
+.hm-msg-actions {
+  min-height: 28px;
+}
+.hm-dl.is-waiting,
+.hm-file {
+  color: var(--al-color-fg-muted);
+}
+.hm-copy {
+  min-height: 28px;
 }
 
 /* Files. */
-.hm-files {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-2);
-}
-.hm-files-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--al-space-2);
-}
-.hm-file-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
-  border-radius: var(--al-radius-md);
-  overflow: hidden;
-}
 .hm-file {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-2) var(--al-space-3);
   padding: var(--al-space-3);
-  background: var(--al-color-bg-canvas);
-  color: var(--al-color-fg-muted);
-}
-.hm-file + .hm-file {
-  border-top: var(--al-border-width-thin) solid var(--al-color-border-subtle);
 }
 .hm-file-main {
   flex: 1 1 180px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 .hm-file-own {
   overflow-wrap: anywhere;
-  color: var(--al-color-fg-default);
-}
-.hm-file-meta {
-  color: var(--al-color-fg-subtle);
-}
-.hm-file-state {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-2);
-  margin: 0;
-}
-.hm-file-actions {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--al-space-2);
-}
-.hm-file-problem:empty {
-  display: none;
 }
 
 @media (max-width: 760px) {
@@ -801,49 +383,4 @@
   .hm-opt {
     display: none !important;
   }
-}
-@media (max-width: 600px) {
-  .hm-hide-sm {
-    display: none;
-  }
-  .hm-msg {
-    max-width: 100%;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .hm-chev {
-    transition: none;
-  }
-}
-:root[data-motion='reduced'] .hm-chev {
-  transition: none;
-}
-
-/* The facts behind Details sit on the surface colour, so their small text keeps its contrast on
-   the warning-toned card. */
-.hm-approvals .al-approval-details[open] .al-hood,
-.hm-approvals .al-approval-details[open] .al-approval-rows,
-.hm-approvals .al-approval-details[open] .al-note,
-.hm-approvals .al-approval-details[open] .al-approval-foot {
-  background: var(--al-color-bg-surface);
-  border-radius: var(--al-radius-sm);
-  padding: var(--al-space-2) var(--al-space-3);
-}
-.hm-approvals .al-hood-row dt {
-  color: var(--al-color-fg-muted);
-}
-
-/* Table cells that hold a block (IR-W4-HOME-1 d): they shrink like the grid cells around them. */
-.hm-cellbox {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-.hm-ap-top {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-3);
-}
-.hm-ap-top .hm-ap-pick {
-  margin: 0;
 }

@@ -148,8 +148,8 @@ function useLiveAgents(): readonly LiveAgent[] {
 /** The skeleton in the shape of Home (U0): the card, Invite, the People label and three rows. */
 function HomeSkeleton({ pro }: { readonly pro: boolean }): ReactElement {
   return (
-    <div className="hm-skeleton">
-      <SkeletonLine width={100} size="control" className="hm-skel-card" />
+    <div className="hm-skeleton hm-c">
+      <SkeletonLine width={100} size="control" />
       {pro ? null : <SkeletonLine width={100} size="control" className="hm-skel-invite" />}
       <SkeletonLine width="label" size="caption" />
       {pro ? <SkeletonTable rows={3} columns={6} /> : <SkeletonList rows={3} />}
@@ -165,15 +165,8 @@ function Avatar({
   readonly small?: boolean;
 }): ReactElement {
   const letter = [...name.trim()][0]?.toUpperCase() ?? '?';
-  // A tint picked from the name, so a person keeps their colour (no image, no key).
-  let h = 0;
-  for (const ch of name) h = (h * 31 + (ch.codePointAt(0) ?? 0)) % 6;
   return (
-    <span
-      className={small ? 'hm-avatar is-small' : 'hm-avatar'}
-      data-tint={String(h)}
-      aria-hidden="true"
-    >
+    <span className={small ? 'al-avatar' : 'al-avatar hm-avatar'} aria-hidden="true">
       {letter}
     </span>
   );
@@ -231,9 +224,9 @@ function PersonOpen({
   const { thread, loadEarlier } = useThread(messages, person.contactId, tick);
   const files = thread.state === 'ready' ? filesOf(thread.inbox.items, thread.sent.items) : [];
   return (
-    <div className="hm-open al-expand" data-person-open={person.contactId}>
-      <div className="hm-open-head">
-        <span className="hm-kicker">{S.conversationTitle}</span>
+    <div className="hm-open hm-c al-expand" data-person-open={person.contactId}>
+      <div className="hm-open-head hm-f">
+        <span className="hm-kicker al-text-label">{S.conversationTitle}</span>
         <PersonMenu
           name={person.name}
           contact={contact}
@@ -247,18 +240,18 @@ function PersonOpen({
         <dl className="hm-facts al-reveal">
           {contact.fingerprint === undefined ? null : (
             <div>
-              <dt className="hm-kicker">{S.fingerprint}</dt>
-              <dd className="hm-mono">{contact.fingerprint}</dd>
+              <dt className="hm-kicker al-text-label">{S.fingerprint}</dt>
+              <dd className="al-text-code">{contact.fingerprint}</dd>
             </div>
           )}
           <div>
-            <dt className="hm-kicker">{S.identity}</dt>
+            <dt className="hm-kicker al-text-label">{S.identity}</dt>
             <dd className={contact.label === 'safety-code-checked' ? 'is-checked' : undefined}>
               {contact.label === 'safety-code-checked' ? S.identityChecked : S.identityNotChecked}
             </dd>
           </div>
           <div>
-            <dt className="hm-kicker">{S.paired}</dt>
+            <dt className="hm-kicker al-text-label">{S.paired}</dt>
             <dd>
               {new Date(contact.since * 1000).toLocaleDateString(undefined, {
                 day: 'numeric',
@@ -268,7 +261,7 @@ function PersonOpen({
             </dd>
           </div>
           <div>
-            <dt className="hm-kicker">{S.handledBy}</dt>
+            <dt className="hm-kicker al-text-label">{S.handledBy}</dt>
             <dd>{agent}</dd>
           </div>
         </dl>
@@ -316,15 +309,15 @@ function PendingInviteRow({
   const left = Math.max(0, Math.ceil((invite.expiresAt - Date.now()) / DAY_MS));
   const name = invite.name ?? undefined;
   return (
-    <div className="hm-invite-row">
-      <span className="hm-avatar is-pending" aria-hidden="true">
+    <div className="hm-invite-row hm-f">
+      <span className="al-avatar hm-avatar is-pending" aria-hidden="true">
         {name === undefined ? (
           <Icon name="clock" size={16} />
         ) : (
           ([...name][0]?.toUpperCase() ?? '?')
         )}
       </span>
-      <span className="hm-row-main">
+      <span className="hm-row-main hm-c">
         {name === undefined ? null : <PersonName name={name} />}
         <span className="hm-sub al-text-body-sm">
           {name === undefined ? S.waitingToAcceptNoName : fmt(S.waitingToAccept, { name })}
@@ -332,7 +325,7 @@ function PendingInviteRow({
           {left === 1 ? S.linkWorksOneDay : fmt(S.linkWorksDays, { count: left })}
         </span>
         {pro ? (
-          <span className="hm-mono hm-cell-time">
+          <span className="al-text-code hm-cell-time">
             {invite.inviteId} · {S.approvalExpires} {exactTime(Math.floor(invite.expiresAt / 1000))}
             {agent === '' ? '' : ` · ${agent}`}
           </span>
@@ -392,7 +385,7 @@ function LastText({
   if (last === undefined) return <span className="hm-cell-muted">{S.noMessagesYet}</span>;
   const text = last.item.text === '' ? filesText(last.item.files.length) : last.item.text;
   return (
-    <span className="hm-cell-last">
+    <span className="hm-cell-last hm-c">
       {last.out || last.item.text === '' ? (
         <span className="hm-ellipsis">{text}</span>
       ) : (
@@ -400,7 +393,7 @@ function LastText({
           {text}
         </UntrustedContent>
       )}
-      <span className="hm-mono hm-cell-time">{exactTime(last.item.at)}</span>
+      <span className="al-text-code hm-cell-time">{exactTime(last.item.at)}</span>
     </span>
   );
 }
@@ -535,12 +528,12 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   const now = Date.now();
 
   const peopleHead = (
-    <div className="hm-people-head">
-      <h2 id="hm-people-h" className="hm-kicker">
+    <div className="hm-people-head hm-f">
+      <h2 id="hm-people-h" className="hm-kicker al-text-label">
         {S.people}
       </h2>
       {pro ? (
-        <div className="hm-tools al-reveal">
+        <div className="hm-tools hm-f al-reveal">
           <label className="al-visually-hidden" htmlFor="hm-search">
             {S.searchPeople}
           </label>
@@ -590,7 +583,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   );
 
   return (
-    <div className="hm-page" data-layer={pro ? 'pro' : 'simple'}>
+    <div className="hm-page hm-c" data-layer={pro ? 'pro' : 'simple'}>
       <h1 className="al-visually-hidden">{S.title}</h1>
       {view.state === 'failed' ? (
         <Banner tone="warning">
@@ -609,7 +602,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
         skeleton={<HomeSkeleton pro={pro} />}
         label={S.loading}
       >
-        <div className="hm-stack">
+        <div className="hm-stack hm-c">
           {props.getStarted ?? null}
           {props.ownerNotice ?? null}
           <HomeApprovals
@@ -626,12 +619,15 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
             </p>
           )}
           {pro ? null : (
-            <a className="hm-invite al-press" href={INVITE_HREF}>
+            <a
+              className="al-btn al-btn-primary al-btn-lg al-btn-block hm-invite al-press"
+              href={INVITE_HREF}
+            >
               <Icon name="user-plus" size={22} />
               <span>{S.inviteSomeone}</span>
             </a>
           )}
-          <section aria-labelledby="hm-people-h" className="hm-people">
+          <section aria-labelledby="hm-people-h" className="hm-people hm-c">
             {peopleHead}
             {data !== undefined &&
             data.people.length === 0 &&
@@ -651,7 +647,11 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                   className="hm-table"
                 >
                   {pro ? (
-                    <div className="hm-prow hm-prow-head" data-people-head="" role="row">
+                    <div
+                      className="hm-prow hm-prow-head al-text-label"
+                      data-people-head=""
+                      role="row"
+                    >
                       <span role="columnheader">{S.colPerson}</span>
                       <span role="columnheader" className="hm-opt">
                         {S.colHandledBy}
@@ -689,10 +689,10 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                       >
                         {pro ? (
                           <div className="hm-prow hm-row" role="row">
-                            <span role="cell" className="hm-cellbox">
+                            <span role="cell" className="hm-cellbox hm-f">
                               <button
                                 type="button"
-                                className="hm-row-toggle"
+                                className="hm-row-toggle hm-f"
                                 aria-expanded={isOpen}
                                 onClick={(e) =>
                                   toggle(person.contactId, e.currentTarget.closest('.hm-person'))
@@ -702,38 +702,27 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                                 <PersonName name={person.name} />
                               </button>
                             </span>
-                            <span role="cell" className="hm-opt hm-cell">
-                              <span
-                                className="hm-dot"
-                                data-state={current?.state ?? 'off'}
-                                aria-hidden="true"
-                              />
+                            <span role="cell" className="hm-opt hm-cell hm-f">
                               <span className="hm-ellipsis">{agentLabel}</span>
                             </span>
-                            <span role="cell" className="hm-cellbox">
+                            <span role="cell" className="hm-cellbox hm-f">
                               <LastText person={person} summary={summary} />
                             </span>
                             <span
                               role="cell"
-                              className="hm-opt hm-cell"
+                              className="hm-opt hm-cell hm-f"
                               data-delivery={summary?.delivery ?? 'none'}
                             >
                               {delivery}
                             </span>
-                            <span role="cell" className="hm-opt hm-mono">
+                            <span role="cell" className="hm-opt al-text-code">
                               {summary === undefined ? '' : String(summary.proofs)}
                             </span>
-                            <span role="cell" className="hm-opt hm-mono">
+                            <span role="cell" className="hm-opt al-text-code">
                               {summary === undefined ? '' : String(summary.files)}
                             </span>
-                            <span role="cell" className="hm-cellbox">
-                              <span
-                                className="hm-chev"
-                                data-open={isOpen ? 'right-open' : 'right'}
-                                aria-hidden="true"
-                              >
-                                <Icon name="chevron-right" size={16} />
-                              </span>
+                            <span role="cell" className="hm-cellbox hm-f">
+                              <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} size={16} />
                             </span>
                           </div>
                         ) : (
@@ -746,7 +735,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                             }
                           >
                             <Avatar name={person.name} />
-                            <span className="hm-row-main">
+                            <span className="hm-row-main hm-c">
                               <PersonName name={person.name} />
                               <span className="hm-sub al-text-body-sm">
                                 {person.lastAt > 0
@@ -757,18 +746,12 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                               </span>
                             </span>
                             {problem ? (
-                              <span className="hm-problem">
+                              <span className="hm-problem hm-f">
                                 <Icon name="triangle-alert" size={14} />
-                                <span className="hm-hide-sm">{S.notDelivered}</span>
+                                <span>{S.notDelivered}</span>
                               </span>
                             ) : null}
-                            <span
-                              className="hm-chev"
-                              data-open={isOpen ? 'right-open' : 'right'}
-                              aria-hidden="true"
-                            >
-                              <Icon name="chevron-right" size={18} />
-                            </span>
+                            <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} size={18} />
                           </button>
                         )}
                         {isOpen && data !== undefined ? (
@@ -801,7 +784,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                   })}
                 </div>
                 {data !== undefined && people.length === 0 && data.people.length > 0 ? (
-                  <div className="hm-nomatch">
+                  <div className="hm-nomatch hm-f">
                     <p className="al-text-body-sm al-muted">{S.noMatch}</p>
                     {otherAgent === undefined ? null : (
                       <Button size="sm" onClick={() => void switchAgent(otherAgent.name)}>

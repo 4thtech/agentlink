@@ -233,7 +233,7 @@ export function PersonMenu({
         <button
           ref={button}
           type="button"
-          className="hm-menu-btn"
+          className="al-btn al-btn-ghost al-btn-sm hm-menu-btn"
           aria-haspopup="menu"
           aria-expanded={open}
           aria-controls={open ? menuId : undefined}
@@ -243,11 +243,11 @@ export function PersonMenu({
           <Icon name="ellipsis" size={18} />
         </button>
         {open ? (
-          <div ref={menu} id={menuId} role="menu" className="hm-menu al-menu">
+          <div ref={menu} id={menuId} role="menu" className="al-shell-menu al-help-menu al-menu">
             <button
               type="button"
               role="menuitem"
-              className="hm-menu-item"
+              className="al-mitem"
               onClick={() => start('rename')}
             >
               <Icon name="tag" size={16} />
@@ -256,7 +256,7 @@ export function PersonMenu({
             <button
               type="button"
               role="menuitem"
-              className="hm-menu-item"
+              className="al-mitem"
               onClick={() => start('check')}
             >
               <Icon name="safety-code" size={16} />
@@ -265,7 +265,7 @@ export function PersonMenu({
             <button
               type="button"
               role="menuitem"
-              className="hm-menu-item is-danger"
+              className="al-mitem hm-danger"
               onClick={() => start('remove')}
             >
               <Icon name="minus" size={16} />
@@ -274,9 +274,9 @@ export function PersonMenu({
           </div>
         ) : null}
       </span>
-      <div className="hm-menu-panel">
+      <div className="hm-menu-panel hm-c">
         {mode === 'rename' && pending === undefined ? (
-          <form className="hm-inline al-reveal" onSubmit={saveName}>
+          <form className="hm-inline hm-f al-reveal" onSubmit={saveName}>
             <label htmlFor={fieldId} className="al-text-body-sm">
               {S.nameInList}
             </label>
@@ -306,7 +306,7 @@ export function PersonMenu({
           </form>
         ) : null}
         {mode === 'check' && pending === undefined ? (
-          <div className="hm-inline hm-code al-reveal">
+          <div className="hm-inline hm-f hm-code al-reveal">
             {contact.label === 'safety-code-checked' ? (
               <p className="al-text-body-sm">{fmt(S.alreadyChecked, { name })}</p>
             ) : contact.pairing !== 'complete' ? (
@@ -320,7 +320,7 @@ export function PersonMenu({
             ) : (
               <>
                 <p className="al-text-body-sm">{fmt(S.codeLead, { name })}</p>
-                <p className="hm-code-digits al-text-code">{code.code}</p>
+                <p className="al-text-code-lg">{code.code}</p>
                 <Button
                   size="sm"
                   onClick={() =>
@@ -343,7 +343,7 @@ export function PersonMenu({
           <div
             role="alertdialog"
             aria-label={S.removeLabel}
-            className="hm-inline hm-remove al-reveal"
+            className="hm-inline hm-f hm-remove al-reveal"
           >
             <span className="al-text-body-sm">{fmt(S.removeText, { name })}</span>
             <Button

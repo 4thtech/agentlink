@@ -10,7 +10,7 @@
 //
 // Nothing here signs (D-118); every server value is React text (I-5); the badge hears how many
 // still wait (a number only).
-import { Button, VT_CLASS } from '@4thtech-io/ui';
+import { Button, Icon, VT_CLASS } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement } from 'react';
 import { announceDecided, announceWaiting } from '../approvals/badge.js';
 import {
@@ -51,7 +51,7 @@ function kindOf(item: ApprovalItem): string {
 /** Under the hood: ID, kind, exact expiry, and whether it costs money. */
 function Meta({ item }: { readonly item: ApprovalItem }): ReactElement {
   return (
-    <p className="hm-ap-meta al-reveal">
+    <p className="hm-ap-meta hm-f al-text-code al-reveal">
       <span>
         {S.approvalId} {item.approvalId}
       </span>
@@ -103,7 +103,7 @@ function BulkReview({
     else setLines((l) => [...l, A.presenceRejected]);
   };
   return (
-    <div className="hm-ap-bulk al-reveal">
+    <div className="hm-ap-bulk hm-c al-reveal">
       <OwnerStep
         passkey={owner.passkey !== undefined}
         passkeyLabel={A.confirmPasskey}
@@ -250,7 +250,7 @@ export function HomeApprovals({
   return (
     <section aria-label={S.approvalsLabel} className={`hm-approvals ${VT_CLASS.approval}`}>
       {pro ? (
-        <div className="hm-ap-top">
+        <div className="hm-ap-top hm-f">
           {canPick(first) ? (
             <Pick
               item={first}
@@ -281,11 +281,11 @@ export function HomeApprovals({
           onClick={() => setOpen((o) => !o)}
         >
           {fmt(open ? S.hideMore : S.moreWaiting, { count: more.length })}
-          <span className="hm-chev" data-open={open ? 'down' : 'up'} aria-hidden="true" />
+          <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} />
         </button>
       )}
       {open && more.length > 0 ? (
-        <div className="hm-ap-list al-expand">
+        <div className="hm-ap-list hm-c al-expand">
           {more.map((item) => (
             <div key={item.approvalId} className="hm-ap-item">
               {canPick(item) ? (
@@ -296,7 +296,7 @@ export function HomeApprovals({
                   onToggle={() => toggle(item)}
                 />
               ) : null}
-              <div className="hm-ap-body">
+              <div className="hm-ap-body hm-c">
                 {pro ? <Meta item={item} /> : null}
                 <SingleApproval
                   item={item}
@@ -314,7 +314,7 @@ export function HomeApprovals({
         </div>
       ) : null}
       {pro && (open || bulk.length > 0) ? (
-        <div className="hm-ap-bar">
+        <div className="hm-ap-bar hm-f">
           {bulk.length > 0 && !reviewing ? (
             <Button variant="primary" size="sm" onClick={() => void startReview()}>
               {fmt(S.approveSelected, { count: bulk.length })}

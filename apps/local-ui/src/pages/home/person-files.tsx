@@ -67,7 +67,7 @@ function ShowIn({ id, reveal }: { readonly id: string; readonly reveal: Reveal }
     setProblem(outcome === 'shown' ? undefined : REVEAL_PROBLEM[outcome]);
   };
   return (
-    <span className="hm-file-actions">
+    <span className="hm-file-actions hm-f">
       <Button size="sm" icon="folder" disabled={busy} onClick={() => void click()}>
         {showInLabel()}
       </Button>
@@ -117,7 +117,7 @@ function ReceivedState({
   if (file === undefined) return null;
   if (file.state === 'saved') {
     return (
-      <div className="hm-file-state">
+      <div className="hm-file-state hm-f">
         <span className="al-text-body-sm">{S.savedAs}</span>
         {file.savedName === null ? null : (
           <UntrustedContent from={file.from} fileName={file.savedName} className="hm-file-name" />
@@ -127,11 +127,11 @@ function ReceivedState({
     );
   }
   if (file.state === 'expired') {
-    return <p className="hm-file-state al-text-body-sm al-muted">{S.expired}</p>;
+    return <p className="hm-file-state hm-f al-text-body-sm al-muted">{S.expired}</p>;
   }
   if (file.state !== 'not_saved') return null;
   return (
-    <div className="hm-file-state">
+    <div className="hm-file-state hm-f">
       <span className="al-text-body-sm al-muted">{S.arrivedNotSaved}</span>
       <SaveFile id={file.id} api={save} passkey={passkey} onSaved={onSaved} />
     </div>
@@ -167,9 +167,9 @@ export function PersonFiles({
   readonly folderNote?: ReactNode;
 }): ReactElement {
   return (
-    <div className="hm-files">
-      <div className="hm-files-head">
-        <span className="hm-kicker">{S.filesTitle}</span>
+    <div className="hm-files hm-c">
+      <div className="hm-files-head hm-f">
+        <span className="hm-kicker al-text-label">{S.filesTitle}</span>
         {folderNote ?? null}
       </div>
       {rows.length === 0 ? (
@@ -180,9 +180,9 @@ export function PersonFiles({
             const meta = `${fmt(row.out ? S.toName : S.fromName, { name })} · ${shortTime(row.at)} · ${sizeText(row.size)}`;
             const sentItem = row.out ? sent.get(row.id) : undefined;
             return (
-              <li key={`${row.out ? 'o' : 'i'}-${row.id}`} className="hm-file">
+              <li key={`${row.out ? 'o' : 'i'}-${row.id}`} className="hm-file hm-f">
                 <Icon name="file" size={18} />
-                <div className="hm-file-main">
+                <div className="hm-file-main hm-c">
                   {row.out ? (
                     <code className="hm-file-own al-text-code">{row.name}</code>
                   ) : (
@@ -192,7 +192,7 @@ export function PersonFiles({
                 </div>
                 {row.out ? (
                   sentItem === undefined ? null : (
-                    <span className="hm-file-state al-text-body-sm">
+                    <span className="hm-file-state hm-f al-text-body-sm">
                       {SENT_WORD[sentItem.status]}
                     </span>
                   )

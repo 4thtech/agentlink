@@ -136,7 +136,7 @@ export function useThread(
 function Delivery({ status }: { readonly status: MessageItem['status'] }): ReactElement | null {
   if (status === 'sent') {
     return (
-      <span className="hm-dl is-sent al-pop">
+      <span className="hm-dl hm-f is-sent al-pop">
         <Icon name="check" size={13} />
         <span>{S.sent}</span>
       </span>
@@ -144,7 +144,7 @@ function Delivery({ status }: { readonly status: MessageItem['status'] }): React
   }
   if (status === 'queued') {
     return (
-      <span className="hm-dl is-waiting">
+      <span className="hm-dl hm-f is-waiting">
         <Icon name="clock" size={13} />
         <span>{S.waitingToSend}</span>
       </span>
@@ -153,7 +153,7 @@ function Delivery({ status }: { readonly status: MessageItem['status'] }): React
   if (status === 'not_delivered') {
     return (
       <>
-        <span className="hm-dl is-failed">
+        <span className="hm-dl hm-f is-failed">
           <Icon name="triangle-alert" size={13} />
           <span>{S.notDelivered}</span>
         </span>
@@ -188,9 +188,14 @@ function CopyText({ text }: { readonly text: string }): ReactElement {
   };
   return (
     <>
-      <button type="button" className="hm-copy" aria-label={S.copyLabel} onClick={copy}>
+      <button
+        type="button"
+        className="al-btn al-btn-ghost al-btn-sm hm-copy"
+        aria-label={S.copyLabel}
+        onClick={copy}
+      >
         {state === 'copied' ? (
-          <span className="hm-copied al-pop">
+          <span className="hm-copied hm-f al-pop">
             <Icon name="check" size={13} />
             <span>{S.copied}</span>
           </span>
@@ -232,7 +237,7 @@ function Details({
         ? S.receiptYes
         : S.receiptNo;
   return (
-    <p className="hm-msg-meta al-reveal">
+    <p className="hm-msg-meta hm-f al-text-code al-reveal">
       <span>
         {S.msgId} <span className="hm-v">{item.id}</span>
       </span>
@@ -282,7 +287,7 @@ export function Conversation({
   const [loading, setLoading] = useState(false);
   if (thread.state === 'loading') {
     return (
-      <div className="hm-thread" role="status" aria-busy="true">
+      <div className="hm-thread hm-c" role="status" aria-busy="true">
         <span className="al-visually-hidden">{S.loadingConversation}</span>
         <SkeletonLine width={40} size="caption" />
         <SkeletonLine width={70} size="pill" />
@@ -303,7 +308,7 @@ export function Conversation({
   const more = thread.inbox.next !== undefined || thread.sent.next !== undefined;
   const ours = agent === '' ? S.yourAgent : fmt(S.yourAi, { name: agent });
   return (
-    <div className="hm-thread">
+    <div className="hm-thread hm-c">
       {more ? (
         <Button
           variant="ghost"
@@ -322,12 +327,12 @@ export function Conversation({
       {items.length === 0 ? (
         <p className="al-text-body-sm al-muted">{fmt(S.noMessages, { name })}</p>
       ) : (
-        <ol className="hm-msgs">
+        <ol className="hm-msgs hm-c">
           {items.map(({ item, out }) => (
             <li
               key={`${out ? 'o' : 'i'}-${item.id}`}
               // UI-REFRESH-k: what another party wrote never moves in; your AI's words may.
-              className={out ? 'hm-msg is-out al-reveal' : 'hm-msg is-in'}
+              className={out ? 'hm-msg hm-c is-out al-reveal' : 'hm-msg hm-c is-in'}
             >
               {out ? (
                 <>
@@ -351,7 +356,7 @@ export function Conversation({
                   </UntrustedContent>
                 </>
               )}
-              <div className="hm-msg-actions">
+              <div className="hm-msg-actions hm-f">
                 {out ? <Delivery status={item.status} /> : null}
                 <CopyText text={item.text} />
               </div>
