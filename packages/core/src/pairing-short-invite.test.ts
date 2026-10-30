@@ -32,6 +32,9 @@ import { giftWrapId } from './testing/envelopes.js';
 const ORIGIN = 'https://drop.test';
 const SHORT = /^https:\/\/agentlink\.4thtech\.io\/i#2\.([A-Za-z0-9_-]{43})$/;
 const clock = new FakeClock();
+/** A real macrotask turn, also while fake timers are installed (captured before any are). */
+const realSetTimeout = globalThis.setTimeout;
+const realTick = (): Promise<void> => new Promise((resolve) => realSetTimeout(resolve, 0));
 
 interface Seen {
   readonly method: string;
@@ -201,7 +204,7 @@ describe('create: short by default (04 §3.6.2 Create)', () => {
       });
       // The upload is sent (after real crypto work), then the drop goes silent.
       while (!drop.seen.some((s) => s.path === '/v1/invite')) {
-        await new Promise((resolve) => setImmediate(resolve));
+        await realTick();
       }
       await vi.advanceTimersByTimeAsync(9_000);
       expect(settled).toBe(false);
@@ -213,7 +216,7 @@ describe('create: short by default (04 §3.6.2 Create)', () => {
       expect(created.inviteUrl.startsWith(INVITE_LINK_PREFIX)).toBe(true);
       // The sweep was still started for the recorded object (the outcome is ambiguous).
       while (!drop.seen.some((s) => s.method === 'DELETE')) {
-        await new Promise((resolve) => setImmediate(resolve));
+        await realTick();
       }
     } finally {
       vi.useRealTimers();
