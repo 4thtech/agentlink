@@ -20,7 +20,6 @@ import {
   PrefsHood,
   getPrefs,
   setMenuExpanded,
-  setUnderTheHood,
   startUiSettings,
   useMenuExpanded,
   usePrefs,
@@ -40,8 +39,8 @@ import type { ApiResult } from '../api/client.js';
 import { TidyNote } from '../pages/agents/tidy-note.js';
 import { subscribeHealth } from './health-feed.js';
 import { readHealth as defaultReadHealth, type HealthState } from './health.js';
-import { startViewTransition, VT_CLASS } from '@4thtech-io/ui';
-import { flushSync } from 'react-dom';
+import { VT_CLASS } from '@4thtech-io/ui';
+import { morph, toggleHood } from './hood.js';
 import { SectionRail, SectionSheet } from './section-menu.js';
 import { ShellDialogs, openShellDialog } from './shell-dialogs.js';
 import { StatusStrip } from './status-strip.js';
@@ -148,10 +147,7 @@ function skipToContent(event: MouseEvent<HTMLAnchorElement>): void {
   main.focus();
 }
 
-/** Turns Under the hood on or off as one morph of the same screen (U0 View Transition). */
-export function toggleHood(on: boolean): void {
-  startViewTransition(() => flushSync(() => setUnderTheHood(on)));
-}
+export { toggleHood };
 
 /** Cmd+Shift+U and Cmd+/ (Ctrl elsewhere); Cmd+K belongs to Go to (go-to.tsx). */
 function useShellKeys(): void {
@@ -270,7 +266,7 @@ export function Layout({
             path={path}
             hood={hood}
             expanded={expanded}
-            onToggle={() => setMenuExpanded(!expanded)}
+            onToggle={() => morph(() => setMenuExpanded(!expanded))}
             waiting={waiting}
           />
           <main className={`al-shell-content al-app-main ${VT_CLASS.main}`} id="al-main">

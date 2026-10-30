@@ -221,7 +221,7 @@ export class AgentLinkClient {
     this.#ctx = ctx;
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
-    this.pairing = new PairingService(ctx, this.identity, this.contacts);
+    this.pairing = new PairingService(ctx, this.identity, this.contacts, files?.drop);
     this.ownerActions = new OwnerActions(
       ctx,
       this.identity,

@@ -16,9 +16,11 @@
 //    fixed line telling the person to run the command from the invite page in their own terminal
 //    (M1-UX-OPEN-APP, the AI-opened app, is a later card).
 //
-// `join` never reads the clipboard or standard input, never fetches anything (its only request is
-// the loopback handoff), never accepts, signs, prints or stores the invite, and never writes an AI
-// app config.
+// `join` never reads the clipboard or standard input, never fetches anything except, for a short
+// link (W4-SHORT-INVITE, D-139; 04 §3.6.2), one GET of the invite object from the drop host in the
+// shipped config (no redirects, size cap, 10 s), then hands the RESOLVED invite on (the loopback
+// handoff or the host's memory), so nothing fetches it again. It never accepts, signs, prints or
+// stores the invite, and never writes an AI app config.
 //
 // Threat note (G-1, D-67; 04 §2.5): the TTY and marker checks are UX guards. A same-user process
 // that reads the record can only set a waiting invite, which still needs the owner's presence to
@@ -29,7 +31,11 @@ import {
   INVITE_MAX_PAYLOAD_CHARS,
   CoreError,
   checkInviteLink,
+  resolveInviteLink,
+  shortInviteFetcher,
 } from '@4thtech-io/core';
+import { DROP_DEFAULT_ENDPOINT } from '@4thtech-io/storage';
+import { guardedDropFetch } from '../runtime/files.js';
 import { homedir } from 'node:os';
 import {
   EXIT_FAILED,
@@ -53,6 +59,10 @@ import { nodeUiDeps, serveUi, type UiDeps } from './ui.js';
 export const JOIN_TEXT = Object.freeze({
   refused: "This isn't a complete AgentLink invite. Open the link again and copy the command.",
   expired: 'This invite has expired. Ask the person who sent it for a new one.',
+  unavailable:
+    'This invite is no longer available. It may have expired, been used or been cancelled. Ask the person who sent it for a new one.',
+  unreachable:
+    "AgentLink couldn't fetch this invite. Check your connection, then run the command again.",
   waiting: 'Finish or close the invite already open in AgentLink, then run the command again.',
   handedOff: 'AgentLink opened the invite in your browser. Check who it is, then accept it there.',
   opened:
@@ -67,6 +77,11 @@ export const JOIN_TEXT = Object.freeze({
  * and INVITE_MAX_PAYLOAD_CHARS, and a test checks that.
  */
 const CANONICAL = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,21846}$/;
+/**
+ * W4-SHORT-INVITE (08 §4, 04 §3.6.2): the short link form, 43 characters of strict base64url whose
+ * last one has zero trailing bits (core's codec checks the same again).
+ */
+const SHORT = /^https:\/\/agentlink\.4thtech\.io\/i#2\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
 
 /** True when the literal pattern is exactly the shipped prefix and payload cap (tests). */
 export function joinPatternMatchesShippedHost(): boolean {
@@ -88,10 +103,12 @@ export function joinLinkOf(args: readonly string[]): string | undefined {
   if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {
     value = value.slice(1, -1);
   }
-  return CANONICAL.test(value) ? value : undefined;
+  return CANONICAL.test(value) || SHORT.test(value) ? value : undefined;
 }
 
 export interface JoinDeps {
+  /** W4-SHORT-INVITE: the format 1 link of `link` (a short link fetched once from the drop). */
+  resolve(link: string): Promise<string>;
   /** Accept step 1 (core checkInviteLink). */
   check(link: string, nowSeconds: number): Promise<unknown>;
   /** Unix seconds. */
@@ -111,9 +128,21 @@ export async function joinStep(
   prefix: string = cliPrefix(),
 ): Promise<number> {
   const { output } = context;
-  const link = joinLinkOf(context.parsed.positionals);
-  if (link === undefined) {
+  const given = joinLinkOf(context.parsed.positionals);
+  if (given === undefined) {
     output.printError(JOIN_TEXT.refused);
+    return EXIT_USAGE;
+  }
+  let link: string;
+  try {
+    link = await deps.resolve(given);
+  } catch (error) {
+    const code = error instanceof CoreError ? error.code : undefined;
+    if (code === 'invite_fetch_failed') {
+      output.printError(JOIN_TEXT.unreachable);
+      return EXIT_FAILED;
+    }
+    output.printError(code === 'invite_unavailable' ? JOIN_TEXT.unavailable : JOIN_TEXT.refused);
     return EXIT_USAGE;
   }
   try {
@@ -150,7 +179,12 @@ export async function joinStep(
 /** The production deps: core's check, the record under the OS user's home, the `ui` deps. */
 export function nodeJoinDeps(): JoinDeps {
   const home = homedir();
+  const fetchShort = shortInviteFetcher({
+    endpoint: DROP_DEFAULT_ENDPOINT,
+    fetch: guardedDropFetch(DROP_DEFAULT_ENDPOINT, (request) => globalThis.fetch(request)),
+  });
   return Object.freeze<JoinDeps>({
+    resolve: (link) => resolveInviteLink(link, fetchShort),
     check: (link, nowSeconds) => checkInviteLink(link, nowSeconds),
     now: () => Math.floor(Date.now() / 1000),
     readRecord: () => readAppHostRecord(home),

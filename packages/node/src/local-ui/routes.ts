@@ -62,6 +62,7 @@ import { REVEAL_PATH } from './reveal-path.js';
 // UX2-d1: the invite paths live in invite-paths.ts for the same reason.
 import {
   INVITE_ACCEPT_PATH,
+  INVITE_CANCEL_PATH,
   INVITE_CHECK_PATH,
   INVITE_CREATE_PATH,
   JOIN_ACCEPT_PATH,
@@ -89,6 +90,7 @@ const INVITE_STEP_PATHS: Readonly<Record<string, string>> = Object.freeze({
   create: INVITE_CREATE_PATH,
   check: INVITE_CHECK_PATH,
   dismiss: JOIN_DISMISS_PATH,
+  cancel: INVITE_CANCEL_PATH,
 });
 export const LOCAL_UI_API_PREFIX = '/api/ui/';
 /** M1-11s-c: setup routes live only under the first-run page's API. */
@@ -244,7 +246,7 @@ export class LocalUiRouteRegistry {
     } else if (presence === 'invite') {
       // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.
       if (method !== 'POST') throw invalid('an invite route is a POST');
-      if (step !== 'create' && step !== 'check' && step !== 'dismiss') {
+      if (step !== 'create' && step !== 'check' && step !== 'dismiss' && step !== 'cancel') {
         throw invalid('unknown invite step');
       }
       if (route.path !== INVITE_STEP_PATHS[step]) {

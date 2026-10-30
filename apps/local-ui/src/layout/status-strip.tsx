@@ -1,7 +1,7 @@
 // W4-SHELL-V2 (W4 UX v2 Layer 3 "Live status strip"; prototype v23 A10/A11): under the top bar while
-// Under the hood is on. Per AI app a dot and the agent in it, then the relay connection. It reads the
-// same shared live store as the agent chip (api/live.ts) and the shell's connection state; it never
-// polls on its own. Latency, the outgoing queue, credits and the last proof join when their reads
+// Under the hood is on. Per AI app a dot and the agent in it, then AgentLink itself. It reads the
+// same shared live store as the agent chip (api/live.ts) and the shell's connection state ("AgentLink
+// running"); it never polls on its own. The relay link, latency, the outgoing queue, credits and the last proof join when their reads
 // exist (K1 live status, U6 Advanced); until then they are not shown (never a made-up value).
 // App and agent names are text only (I-5).
 import { useSyncExternalStore, type ReactElement } from 'react';
@@ -26,7 +26,7 @@ const RANK: Readonly<Record<LiveState, number>> = {
   removing: 6,
 };
 
-/** One item per AI app (the busiest agent in it), then the relay. */
+/** One item per AI app (the busiest agent in it), then AgentLink itself. */
 export function stripItems(
   agents: ReturnType<typeof getLive>['agents'],
   connection: ConnectionState,
@@ -42,20 +42,27 @@ export function stripItems(
   }
   const items: StripItem[] = [...best].map(([app, { state, agent }]) => ({
     label: app,
+    // An agent is named where it is at work in the app; otherwise the state's own word.
     value:
-      state === 'working' || state === 'ready' || state === 'paused'
+      state === 'working' || state === 'ready' || state === 'idle' || state === 'paused'
         ? `${agent} ${LIVE_WORDS[state].toLowerCase()}`
-        : LIVE_WORDS.off.toLowerCase(),
+        : LIVE_WORDS[state].toLowerCase(),
     state,
   }));
-  const relayUp = connection === 'connected';
-  items.push({
-    label: 'Relay',
-    value: relayUp ? 'connected' : connection === 'unknown' ? 'checking' : 'not connected',
-    state: relayUp ? 'ready' : 'off',
-  });
+  // The app's own state from the health read (IR-W4-SHELL-V2-1): the relay link itself is not known
+  // here until K1 reports it, so it is never claimed.
+  items.push({ label: 'AgentLink', ...APP_STATE[connection] });
   return items;
 }
+
+const APP_STATE: Readonly<Record<ConnectionState, { value: string; state: LiveState }>> = {
+  connected: { value: 'running', state: 'ready' },
+  unknown: { value: 'checking', state: 'off' },
+  paused: { value: 'paused', state: 'paused' },
+  not_running: { value: 'not running', state: 'off' },
+  needs_setup: { value: 'needs setup', state: 'none' },
+  offline: { value: 'not connected', state: 'off' },
+};
 
 export function StatusStrip({
   connection,

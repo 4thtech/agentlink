@@ -23,6 +23,7 @@ import {
 } from '../prefs/index.js';
 import { AppRoutes } from '../router.js';
 import { setConnectionState } from './index.js';
+import { stripItems } from './status-strip.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -30,6 +31,8 @@ let host: HTMLElement;
 let root: Root;
 
 interface World {
+  /** False: the page is bound to one agent (outside the app host). */
+  switchable?: boolean;
   current: string;
   generation: number;
   switches: string[];
@@ -136,7 +139,7 @@ function serve(w: World): void {
       });
     if (url.pathname === '/api/ui/agents' && method === 'GET') {
       w.agentReads += 1;
-      return json(agentsOf(w));
+      return json(w.switchable === false ? { switchable: false, agents: [] } : agentsOf(w));
     }
     if (url.pathname === '/api/ui/apps' && method === 'GET') return json(APPS);
     if (url.pathname === UI_SETTINGS_PATH && method === 'GET') return json(w.settings);
@@ -290,7 +293,7 @@ describe('the live agent dropdown', () => {
       'Work agent',
       'Notes',
     ]);
-    expect(rows[0]?.querySelector('[aria-current="true"]')).not.toBeNull();
+    expect(rows[0]?.querySelector('[role="menuitemradio"][aria-checked="true"]')).not.toBeNull();
     expect(rows[0]?.textContent).toContain('Ready in Claude Code');
     expect(rows[0]?.querySelector('.al-am-app')?.textContent).toBe('Claude CodeReady');
     expect(rows[1]?.querySelector('.al-am-app')?.textContent).toBe('CursorNot running');
@@ -525,7 +528,7 @@ describe('Under the hood (kept by the app)', () => {
     const strip = q('[aria-label="Live status"]');
     expect(strip?.textContent).toContain('Claude Code');
     expect(strip?.textContent).toContain("Tali's agent ready");
-    expect(strip?.textContent).toContain('Relay');
+    expect(strip?.textContent).toContain('AgentLink');
     expect(q('.al-app')?.getAttribute('data-hood')).toBe('on');
   });
 
@@ -647,5 +650,176 @@ describe('kept from today', () => {
       expect(part?.querySelector('[style]') ?? null).toBeNull();
       expect(part?.hasAttribute('style')).toBe(false);
     }
+  });
+});
+
+// ------------------------------------------------------------------------------ IR-W4-SHELL-V2-1
+
+/** Stubs document.startViewTransition and records each call (the U0 kit uses it when present). */
+function stubViewTransition(): { calls: number } {
+  const seen = { calls: 0 };
+  (document as unknown as { startViewTransition?: unknown }).startViewTransition = (
+    update: () => void,
+  ) => {
+    seen.calls += 1;
+    update();
+    const done = Promise.resolve();
+    return {
+      finished: done,
+      ready: done,
+      updateCallbackDone: done,
+      skipTransition: () => undefined,
+    };
+  };
+  return seen;
+}
+afterEach(() => {
+  delete (document as unknown as { startViewTransition?: unknown }).startViewTransition;
+});
+
+describe('the live status strip says only what it knows (IR-1, 2)', () => {
+  it('names the app\'s own state "AgentLink", never a relay it cannot see', async () => {
+    serve(world());
+    await mountAt('/');
+    act(() => setConnectionState('connected'));
+    await click(hood());
+    const strip = q('[aria-label="Live status"]');
+    expect(strip?.textContent).toContain('AgentLinkrunning');
+    expect(strip?.textContent).not.toContain('Relay');
+    act(() => setConnectionState('not_running'));
+    await settle();
+    expect(q('[aria-label="Live status"]')?.textContent).toContain('AgentLinknot running');
+  });
+
+  it('uses each state\'s own word (Idle, Not set up), never "not running" for them', () => {
+    const agent = (state: 'idle' | 'none' | 'working') => ({
+      name: 'a',
+      label: 'Ana',
+      current: true,
+      state,
+      statusText: '',
+      removing: false,
+      apps: [{ app: 'Codex', state, word: '' }],
+    });
+    expect(stripItems([agent('idle')], 'connected')[0]?.value).toBe('Ana idle');
+    expect(stripItems([agent('none')], 'connected')[0]?.value).toBe('not set up');
+    expect(stripItems([agent('working')], 'connected')[0]?.value).toBe('Ana working');
+  });
+});
+
+describe('the agent dropdown as a menu of choices (IR-4, 9)', () => {
+  it('each agent is a menuitemradio; the open one is checked; its AI apps describe it', async () => {
+    serve(world());
+    await mountAt('/');
+    await click(chip());
+    const radios = qa('[role="menuitemradio"]');
+    expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
+    const described = radios[0]?.getAttribute('aria-describedby') ?? '';
+    expect(described).not.toBe('');
+    expect(document.getElementById(described)?.textContent).toContain('Claude CodeReady');
+    expect(radios[2]?.hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('arrow keys move between the choices; Escape closes and gives focus back to the chip', async () => {
+    serve(world());
+    await mountAt('/');
+    chip()?.focus();
+    await click(chip());
+    const radios = qa('[role="menuitemradio"]');
+    expect(document.activeElement).toBe(radios[0]);
+    await act(async () => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+      );
+    });
+    expect(document.activeElement).toBe(radios[1]);
+    await act(async () => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      );
+    });
+    await settle();
+    expect(q('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(chip());
+  });
+
+  it('outside the app host the chip is plain words, not a menu', async () => {
+    serve(world({ switchable: false }));
+    await mountAt('/');
+    expect(chip()).toBeNull();
+    const plain = q('.al-chip.is-static');
+    expect(plain?.tagName).toBe('SPAN');
+    expect(plain?.textContent).toBe('Open the AgentLink app to see your agents.');
+    expect(q('[aria-haspopup="menu"][aria-label^="Agent"]')).toBeNull();
+  });
+});
+
+describe('the phone sheet (IR-5)', () => {
+  it('focus moves in; Escape closes and gives focus back to the bar', async () => {
+    narrow = true;
+    serve(world());
+    await mountAt('/activity');
+    const bar = q<HTMLButtonElement>('.al-topnav-btn');
+    bar?.focus();
+    await click(bar);
+    const sheet = q('#al-section-sheet');
+    expect(sheet?.contains(document.activeElement)).toBe(true);
+    await act(async () => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      );
+    });
+    await settle();
+    expect(q('#al-section-sheet')).toBeNull();
+    expect(document.activeElement).toBe(bar);
+  });
+
+  it('a click outside closes it', async () => {
+    narrow = true;
+    serve(world());
+    await mountAt('/activity');
+    await click(q('.al-topnav-btn'));
+    expect(q('#al-section-sheet')).not.toBeNull();
+    await act(async () => {
+      q('main')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    await settle();
+    expect(q('#al-section-sheet')).toBeNull();
+  });
+});
+
+describe('motion through the U0 kit (IR-6, 7, 8)', () => {
+  it("expanding the rail is one View Transition; the labels enter with the kit's class", async () => {
+    serve(world());
+    await mountAt('/');
+    const vt = stubViewTransition();
+    await click(button('Expand menu'));
+    expect(vt.calls).toBe(1);
+    expect(rail()?.dataset['expanded']).toBe('true');
+    const labels = qa('nav.al-rail .al-rail-label');
+    expect(labels.length).toBeGreaterThan(0);
+    for (const l of labels) expect(l.classList.contains('al-slide-in')).toBe(true);
+  });
+
+  it('turning Under the hood on or off morphs the same screen (one View Transition each)', async () => {
+    serve(world());
+    await mountAt('/agents');
+    const vt = stubViewTransition();
+    await click(hood());
+    expect(vt.calls).toBe(1);
+    await key({ key: 'u', metaKey: true, shiftKey: true });
+    expect(vt.calls).toBe(2);
+    expect(location.pathname).toBe('/agents');
+  });
+
+  it('Settings › Appearance turns it on with the same morph', async () => {
+    const w = world();
+    serve(w);
+    await mountAt('/settings/appearance');
+    const vt = stubViewTransition();
+    await click(q('main [role="switch"]'));
+    expect(vt.calls).toBe(1);
+    expect(getPrefs().hood).toBe(true);
+    expect(w.puts).toEqual([{ underTheHood: true }]);
   });
 });

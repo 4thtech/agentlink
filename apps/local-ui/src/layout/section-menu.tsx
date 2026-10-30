@@ -5,7 +5,7 @@
 // group only while Under the hood is on. Links are real links (the router takes plain clicks; a
 // modified click opens a tab), the current one marked with aria-current="page".
 import { CountBadge } from '@4thtech-io/ui';
-import { useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { ADVANCED_SECTIONS, SECTIONS, sectionOf, titleOf, type Section } from '../nav.js';
 import { SHELL_STRINGS as S } from '../strings.js';
 import { VT_CLASS } from '@4thtech-io/ui';
@@ -38,7 +38,7 @@ function RailLink({
       title={expanded ? undefined : section.label}
     >
       <ShellIcon name={section.icon} size={20} />
-      {expanded ? <span className="al-rail-label al-label">{section.label}</span> : null}
+      {expanded ? <span className="al-rail-label al-slide-in">{section.label}</span> : null}
       {/* The shared tick badge (UI-REFRESH-o-b): approvals waiting, on Home. */}
       {count > 0 ? (
         <CountBadge
@@ -81,7 +81,7 @@ export function SectionRail({
         onClick={onToggle}
       >
         <ShellIcon name="chev-r" size={20} className={expanded ? 'al-rot is-on' : 'al-rot'} />
-        {expanded ? <span className="al-rail-label al-label">{S.collapse}</span> : null}
+        {expanded ? <span className="al-rail-label al-slide-in">{S.collapse}</span> : null}
       </button>
       {SECTIONS.map((s) => (
         <RailLink
@@ -106,16 +106,50 @@ export function SectionRail({
 }
 
 /** The phone bar and its sheet (600 px and under). */
+/**
+ * The phone bar and its sheet (600 px and under). Opening moves focus to the current section (else
+ * the first); Escape or a click outside closes it and gives focus back to the bar; choosing a section
+ * closes it.
+ */
 export function SectionSheet({ path, hood }: MenuProps): ReactElement {
   const [open, setOpen] = useState(false);
+  const bar = useRef<HTMLButtonElement>(null);
+  const sheet = useRef<HTMLElement>(null);
   const current = sectionOf(path);
+  const close = useCallback((restore: boolean): void => {
+    setOpen(false);
+    if (restore) bar.current?.focus();
+  }, []);
+  useEffect(() => {
+    if (!open) return undefined;
+    const nav = sheet.current;
+    (nav?.querySelector<HTMLElement>('[aria-current="page"]') ?? nav?.querySelector('a'))?.focus();
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      close(true);
+    };
+    const outside = (event: MouseEvent): void => {
+      const target = event.target as Node | null;
+      if (target === null) return;
+      if (sheet.current?.contains(target) === true || bar.current?.contains(target) === true)
+        return;
+      close(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', outside);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', outside);
+    };
+  }, [open, close]);
   const item = (s: Section): ReactElement => (
     <a
       key={s.id}
       href={s.path}
       className={current === s.id ? 'al-secsheet-item is-current' : 'al-secsheet-item'}
       aria-current={current === s.id ? 'page' : undefined}
-      onClick={() => setOpen(false)}
+      onClick={() => close(false)}
     >
       {s.label}
     </a>
@@ -123,6 +157,7 @@ export function SectionSheet({ path, hood }: MenuProps): ReactElement {
   return (
     <div className="al-topnav al-chrome">
       <button
+        ref={bar}
         type="button"
         className="al-topnav-btn"
         aria-expanded={open}
@@ -133,7 +168,12 @@ export function SectionSheet({ path, hood }: MenuProps): ReactElement {
         <ShellIcon name="chev-d" size={18} className={open ? 'al-rot is-on' : 'al-rot'} />
       </button>
       {open ? (
-        <nav id="al-section-sheet" aria-label={S.sections} className="al-secsheet al-expand">
+        <nav
+          ref={sheet}
+          id="al-section-sheet"
+          aria-label={S.sections}
+          className="al-secsheet al-expand"
+        >
           {SECTIONS.map(item)}
           {hood ? (
             <>

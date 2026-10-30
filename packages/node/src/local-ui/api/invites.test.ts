@@ -112,6 +112,7 @@ function desk(over: Partial<LocalUiInviteDesk> = {}): {
         created.push(input);
         return Promise.resolve<CreatedInvite>({
           inviteUrl: LINK,
+          format: 'long',
           ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },
           expiresAt: 1_793_786_400,
         });
@@ -123,6 +124,7 @@ function desk(over: Partial<LocalUiInviteDesk> = {}): {
           expiresAt: 1_793_786_400,
         });
       },
+      cancel: () => Promise.resolve('not_found'),
       ...over,
     },
   };
@@ -150,6 +152,7 @@ describe('create an invite (UX2-d1, decision 1.1)', () => {
         shareText: `Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once, until 4 Nov 2026: ${LINK}`,
         ownerFingerprint: 'EF56·7890',
         expiresAt: '2026-11-04T10:00:00Z',
+        format: 'long',
       },
     });
     expect(d.created).toEqual([{}]);
@@ -347,6 +350,8 @@ function acceptWorld(
 } {
   const seen: AcceptSeen = { checked: [], requested: [], accepted: [], signed: [], applied: [] };
   const port: LocalUiInviteAcceptPort = {
+    resolve: (link) => Promise.resolve(link),
+    list: () => Promise.resolve([]),
     check: (link) => {
       seen.checked.push(link);
       return Promise.resolve(CONTACT);

@@ -69,6 +69,10 @@ export type CoreErrorCode =
   | 'invite_invalid'
   | 'invite_too_large'
   | 'invite_expired'
+  // W4-SHORT-INVITE (04 §3.6.2): a short link's object is gone (expired, used, cancelled, deleted
+  // or never existed; the drop does not say which), or the drop could not be reached (retryable).
+  | 'invite_unavailable'
+  | 'invite_fetch_failed'
   | 'invite_options_invalid'
   | 'safety_code_unavailable'
   // Files (04 §4, 06 §2.3, 07 §5; M1-7f)

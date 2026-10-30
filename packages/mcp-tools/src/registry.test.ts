@@ -8,7 +8,8 @@ import { PENDING_M1A_TOOLS, TOOLS } from './registry.js';
 /** 06 §2.0, the M1a rows: [readOnly, destructive, idempotent, openWorld]. */
 const M1A_TABLE: Readonly<Record<string, readonly [boolean, boolean, boolean, boolean]>> = {
   agentlink_status: [true, false, true, true],
-  agentlink_create_invite: [false, false, false, false],
+  // W4-SHORT-INVITE (D-139): creating an invite uploads the encrypted invite to the drop.
+  agentlink_create_invite: [false, false, false, true],
   agentlink_accept_invite: [false, false, false, true],
   agentlink_list_contacts: [true, false, true, false],
   agentlink_send: [false, false, false, true],

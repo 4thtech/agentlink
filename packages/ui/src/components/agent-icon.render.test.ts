@@ -78,8 +78,13 @@ describe('AgentIcon (W4-SHELL, Decision 44 B1)', () => {
       const out = html(h(AgentIcon, { label: 'Work', seed: 'work', size: 'lg', dot }));
       expect(out).toContain(`al-agent-icon-dot is-${dot}`);
       // Still decoration only: the whole icon stays hidden, and the letter is still the text.
-      expect(out).toMatch(/^<span[^>]*aria-hidden="true"/);
-      expect(out.replace(/<[^>]+>/g, '')).toBe('W');
+      // The exact markup: the hidden icon, the letter as its only text, then the empty dot.
+      expect(out).toMatch(
+        new RegExp(
+          `^<span class="al-agent-icon is-[a-z]+ is-lg" aria-hidden="true">W` +
+            `<span class="al-agent-icon-dot is-${dot}"></span></span>$`,
+        ),
+      );
     }
     for (const rule of [
       '.al-agent-icon-dot',

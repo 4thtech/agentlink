@@ -27,6 +27,12 @@ import { gzipSync } from 'node:zlib';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ROUTES } from './fixtures/local-ui-refresh.js';
+import {
+  emulateReducedMotion,
+  expectFadesOnly,
+  expectStableLayout,
+  observeLayoutShift,
+} from './helpers/motion.js';
 
 const DIST = fileURLToPath(new URL('../../apps/local-ui/dist/', import.meta.url));
 // axe-core (devDependency of this package) as a script for the page.
@@ -783,6 +789,38 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     },
     240_000,
   );
+
+  // W4-SHELL-V2 (W4 UI re-brief, acceptance of every UI unit): the shell keeps its layout still
+  // (CLS ≤ 0.01) while it loads and settles, and under reduced motion every shell move is a fade
+  // (the agent menu, Help, the rail expanding, the Under the hood morph): no pulse, nothing moves.
+  it('shell motion: CLS ≤ 0.01 on load; reduced motion fades only (menu, Help, rail, morph)', async () => {
+    const { ctx, page } = await open(MODES[0] as Mode);
+    try {
+      await observeLayoutShift(page);
+      await page.goto(`${origin}/agents`);
+      await settle(page, 'Agents');
+      await page.waitForTimeout(600);
+      report['shellCls'] = await expectStableLayout(page);
+
+      await emulateReducedMotion(page);
+      await page.locator('button.al-chip').first().click();
+      await expectFadesOnly(page);
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Help' }).first().click();
+      await expectFadesOnly(page);
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Expand menu' }).first().click();
+      await expectFadesOnly(page);
+      await page
+        .getByRole('switch', { name: /Under the hood/ })
+        .first()
+        .click();
+      await expectFadesOnly(page);
+      await page.locator('[aria-label="Live status"]').first().waitFor();
+    } finally {
+      await ctx.close();
+    }
+  }, 60_000);
 
   it('keyboard: nav, Under the hood switch, Sheets (inert background), Approvals', async () => {
     const { ctx, page } = await open(MODES[0] as Mode);
