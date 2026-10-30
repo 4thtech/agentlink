@@ -285,6 +285,7 @@
   overflow-wrap: anywhere;
 }
 .st-go {
+  gap: var(--al-space-3);
   min-block-size: 48px;
 }
 
