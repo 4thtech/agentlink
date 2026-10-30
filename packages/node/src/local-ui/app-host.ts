@@ -86,7 +86,22 @@ export interface AgentDirectory {
    * `agent.label` was verified). Returns the folder name. U3-g-b: `options.name` names the folder
    * instead (first run's first agent is `default`, FIRST_AGENT_NAME); refused when it exists.
    */
-  create?(label: string, options?: { readonly name?: string }): Promise<string>;
+  create?(
+    label: string,
+    options?: {
+      readonly name?: string;
+      /**
+       * W4-ONE-TOUCH (04 §2.8 step 2): stores the agent's keys held since begin and returns its
+       * agentId, in place of making new ones. The folder records that agentId.
+       */
+      readonly createKeys?: () => Promise<string>;
+    },
+  ): Promise<string>;
+  /**
+   * W4-ONE-TOUCH (04 §2.8 Begin): the folder name `create` would give `label` now (the slug of 06 §6
+   * made unique), never one of `reserved`. Nothing is created.
+   */
+  nameFor?(label: string, reserved: readonly string[]): Promise<string>;
   /**
    * Card U3-d: removes an agent that `create` made and that was not completed (all or nothing): its
    * keychain items and its folder. Only ever called for an agent this process just created.
@@ -185,6 +200,12 @@ export interface AppHostFirstRun {
   readonly home?: string;
   /** The file-KeyStore owner files whose presence refuses setup (owner-setup.ts defaultOwnerFiles). */
   readonly ownerFiles?: readonly string[];
+  /**
+   * W4-ONE-TOUCH (D-140; 04 §2.8): the CLI's AI apps desk for first run's own setup gate only (never
+   * a route): the change that makes the picked app run the first agent's folder, computed at begin
+   * and written last at finish. Absent: first run connects no app in the same gesture.
+   */
+  readonly aiApps?: Pick<LocalUiAiApps, 'plan'>;
 }
 
 /** U3-g-b: the first agent's label when first run is finished without one (b11 §28, prefilled). */

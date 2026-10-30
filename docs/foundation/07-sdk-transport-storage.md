@@ -271,6 +271,22 @@ Every mutating call runs: **policy check → (approval) → action → store →
 - **On failure.** A lease that cannot be read or written counts as not held: the process keeps no subscriptions, and its tools still work (06 §6).
 - **Not authority.** The lease decides only who keeps relay connections. Every effect is still idempotent and claimed per row (outbox claim, M1-7k; idempotency lease, §3.3), so two holders at once cost connections, never a second effect.
 
+**`mcp_sessions`**, **`mcp_last_seen`** and **`agent_pause`**: which `agentlink mcp` processes run this agent, when each AI app last ran it, and whether the owner paused it (06 §6 "MCP session heartbeat" and "Paused agents"; D-143; proposed, owner confirms at merge; W4-LIVE-STATUS, W4-PAUSE). Added by the next store schema version (additive; the number is set at build, after the other wave-4 changes).
+
+| Table and column | Type and meaning |
+|---|---|
+| `mcp_sessions`.session_id | `id`: 16 random bytes, base64url, chosen per process; primary key |
+| `mcp_sessions`.app | text: an id of the 06 §7 table, or `other` |
+| `mcp_sessions`.agent_id | the agent's `agentId`; a reader ignores a row whose value is not the store's agent |
+| `mcp_sessions`.pid | `int`: the writer's process ID, read only by a reader on this machine and never put in an answer, event, log or error |
+| `mcp_sessions`.started_at, beat_until, last_tool_at | `int`: unix seconds; `last_tool_at` is null until the first tool call |
+| `mcp_last_seen`.app | text: an id as above; primary key, so at most one row per id |
+| `mcp_last_seen`.last_seen_at | `int`: unix seconds |
+| `agent_pause`.paused_at | `int`: unix seconds; one row at most, present only while the agent is paused |
+
+- **At rest.** In clear: none of these columns is secret, and none holds a path, a name sent by a client or message content.
+- **Not authority.** As for the lease: these rows decide what the app shows. `agent_pause` stops the agent's own tools and loop (06 §6); it is ended only by a verified `agent.resume` (04 §2.5.1) on the owner's side, and a same-user process that edits the store directly is the G-1 residual.
+
 ### 3.3 Idempotency results (06 §1 rule 6)
 
 **`idempotency`**: the original result of each mutating tool call made with a `clientRequestId`.

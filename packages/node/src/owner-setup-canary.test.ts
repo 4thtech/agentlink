@@ -323,7 +323,7 @@ async function canarySetup(agent: Agent): Promise<CanaryRun> {
   const cookie = (landing.headers['set-cookie']?.[0] ?? '').split(';')[0] ?? '';
   const page = record(await send(server.port, '/', { headers: { Cookie: cookie } }));
   const csrf = /<meta name="agentlink-csrf" content="([A-Za-z0-9_-]+)">/.exec(page.body)?.[1] ?? '';
-  const post = async (path: string, body: Uint8Array): Promise<Response> =>
+  const post = async (path: string, body: Uint8Array, input?: unknown): Promise<Response> =>
     record(
       await send(server.port, path, {
         method: 'POST',
@@ -333,14 +333,18 @@ async function canarySetup(agent: Agent): Promise<CanaryRun> {
           'X-AgentLink-CSRF': csrf,
           'Content-Type': 'application/octet-stream',
           'Sec-Fetch-Site': 'same-origin',
+          ...(input === undefined
+            ? {}
+            : { 'X-AgentLink-Input': encodeBase64url(encodeUtf8(JSON.stringify(input))) }),
         },
         body,
       }),
     );
   const begun = await post(BEGIN, new Uint8Array(0));
   expect(begun.status).toBe(200);
-  const { publicKey } = JSON.parse(begun.body) as {
+  const { publicKey, nonce } = JSON.parse(begun.body) as {
     publicKey: { rpId: string; challenge: string };
+    nonce: string;
   };
   const credentialId = encodeUtf8('canary-credential');
   const authenticatorData = concatBytes(
@@ -369,6 +373,8 @@ async function canarySetup(agent: Agent): Promise<CanaryRun> {
       clientDataJSON,
       prfOutput: canaryPrf(),
     }),
+    // W4-ONE-TOUCH (04 §2.8): finish carries only the begin nonce.
+    { nonce },
   );
   return { events, responses, held, finish };
 }

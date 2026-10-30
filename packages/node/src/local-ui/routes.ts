@@ -50,6 +50,7 @@ import { storageRoutes } from './api/storage.js';
 import {
   AGENTS_REMOVE_PATH,
   AGENTS_SWITCH_PATH,
+  CREATE_AGENT_PATHS,
   UI_SETTINGS_WRITE_PATH,
   type LocalUiRoute,
 } from './route-types.js';
@@ -219,6 +220,17 @@ export class LocalUiRouteRegistry {
       if (step !== 'begin' && step !== 'finish') throw invalid('unknown pay-confirm step');
       if (this.#entries.some((e) => e.route.presence === 'pay-confirm' && e.route.step === step)) {
         throw invalid('this pay-confirm step is already registered');
+      }
+    } else if (presence === 'create-agent') {
+      // W4-ONE-TOUCH (D-140): New agent with one gesture; the server's create-agent gate runs it.
+      if (method !== 'POST') throw invalid('a create-agent route is a POST');
+      if (handler !== undefined) throw invalid('a create-agent route has no handler');
+      if (step !== 'begin' && step !== 'finish') throw invalid('unknown create-agent step');
+      if (route.path !== CREATE_AGENT_PATHS[step]) {
+        throw invalid('a create-agent route is only at its fixed path');
+      }
+      if (this.#entries.some((e) => e.route.presence === 'create-agent' && e.route.step === step)) {
+        throw invalid('this create-agent step is already registered');
       }
     } else if (presence === 'reveal') {
       // MSG-FILES-IO-h: Show in Finder only; the server's reveal gate runs it (D-134).

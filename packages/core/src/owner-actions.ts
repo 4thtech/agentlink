@@ -591,6 +591,49 @@ export class OwnerActions {
   }
 
   /**
+   * W4-ONE-TOUCH (D-140; 04 §2.8 "Failure in the middle"; proposed, owner confirms at merge): records
+   * that the stored `app.connect` with `nonce` for `app` was never applied, because the AI app's
+   * config entry could not be written after it was stored. Its `app:<id>` record is removed, so
+   * nothing can infer a connection from it; its nonce row stays, so the signed object can never be
+   * applied later. Only that exact object (op, app, nonce) is removed; anything else is left alone
+   * and the answer is false. Connection state is read only from the config file's entry (08 §1).
+   */
+  async markAppNotApplied(app: string, nonce: string): Promise<boolean> {
+    const record = `app:${app}`;
+    try {
+      const row = await this.#ctx.store.transaction((tx) =>
+        tx.get('local_owner_actions', { record }),
+      );
+      if (row === undefined || row.op !== 'app.connect') return false;
+      const text = await open(
+        this.#ctx,
+        'local_owner_actions',
+        'signed_json',
+        [record],
+        row.signed_json,
+      );
+      const parsed = signedOwnerActionSchema.safeParse(JSON.parse(text));
+      if (
+        !parsed.success ||
+        parsed.data.body.op !== 'app.connect' ||
+        parsed.data.body.params.app !== app ||
+        parsed.data.body.nonce !== nonce
+      ) {
+        return false;
+      }
+      return await this.#ctx.store.transaction((tx) => {
+        if (tx.get('owner_action_nonces', { nonce }) === undefined) return false;
+        const now = tx.get('local_owner_actions', { record });
+        if (now === undefined || now.applied_at !== row.applied_at) return false;
+        tx.delete('local_owner_actions', { record });
+        return true;
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * `storage.set` and `storage.remove` (M1-9i-a, D-115; 04 §2.5.1; 07 §3.4). The object checks and
    * the nonce first (L(op) = 600 s). `storage.set` then needs the KeyStore item `s3:<id>` with the
    * signed credentialDigest (compared in constant time); `storage.remove` needs `id` to be the stored

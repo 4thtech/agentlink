@@ -5633,7 +5633,7 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
   - To be written when planned; full threat note, Fable 5.1 audit.
 
 #### W4-ONE-TOUCH · onboarding: one Touch ID creates an agent and connects its AI app (wave 4, owner decision W5, D-140)
-- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Status:** in review, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/api/{first-run,agents,apps}.ts`, `owner-setup*.ts`, `owner-add-agent*.ts`, `owner-first-*.ts`; `apps/local-ui/src/pages/{welcome,first-run,agents,apps}/**`; `e2e/test/journey/01-*`
 - **Depends on:** the W4-ONE-TOUCH spec PR (#706)
 - **Spec:** D-140; 04 §2.3.1, §2.5, §2.5.1, §2.8 ("Create an agent and connect its AI app with one gesture"); 06 §7; 08 §1; 11 §5.8
@@ -5677,6 +5677,31 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
   - Add "Save to Inbox" with Touch ID: the file is decrypted locally and written to a folder chosen on the user's computer. The app still never opens a received file, and no path comes from inbound content.
 - **Acceptance:**
   - To be written when planned; full threat note, Fable 5.1 audit.
+
+#### W4-LIVE-STATUS · local app: live AI-app status, with a heartbeat per MCP process and a live event stream (wave 4, owner Decision 49, D-143)
+- **Status:** planned, wave 4 (0.4.6) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (the new local route) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/store/schema.ts` and migration (`mcp_sessions`, `mcp_last_seen`), `packages/core/src/constants.ts`; `apps/cli/src/mcp/**` (initialize, beat timer, tool-call stamp, exit); `packages/node/src/agent-peek.ts`, `packages/node/src/approval-server.ts` and `packages/node/src/local-ui/api/agents*.ts` (states, `GET /api/ui/events`); `packages/types/src/ui-contract/*`; `apps/local-ui/src/{layout/agent-switcher.tsx,pages/agents/**,pages/apps/**}` and one shared live hook
+- **Depends on:** the W4-LIVE-STATUS spec PR; absorbs the status part of W4-SWITCHER-STATUS
+- **Spec:** D-143; 04 §2.5 ("Live status and Pause"), §4; 06 §6 ("MCP session heartbeat"); 07 §3.2; 08 §1 (`GET /api/ui/agents`, `GET /api/ui/events`, "Live AI-app status"); 11 §5
+- **Invariants:** I-5, I-7
+- **Scope:**
+  - Every `agentlink mcp` process writes its session row at `initialize` (AI app id from `clientInfo.name` through a fixed table, else `other`), beats every 15 s (TTL 45 s), stamps tool calls, writes `mcp_last_seen` and deletes its row on clean exit; readers drop rows past their TTL or whose pid is gone (signal 0 only).
+  - `GET /api/ui/agents` gains `state`, `lastSeenAt` and per-app states; Running comes from live rows, not the lease.
+  - `GET /api/ui/events`: changes only, allowlisted fields, event IDs with a 64-event replay buffer, `: ping` every 15 s, 4 streams per session and 8 in all, 30 min lifetime, backlog cap; one shared `fetch`-based subscription in the page with 5 s visible-tab polling as fallback.
+- **Acceptance:**
+  - RED tests first: a second MCP process on the same agent shows as running while the first holds the lease; a clean exit and a killed process each disappear within 3 s; a stale row disappears after its TTL; a `clientInfo.name` that is not in the table maps to `other` and never appears in any answer, event or log, including MCP transport and SDK debug output of `initialize`; a row whose pid is 0, negative, 1 or not an integer is not live; the stream carries no field outside the allowlist (snapshot test of every event); a cookie without the CSRF header, a wrong `Host`, `Sec-Fetch-Site: cross-site` and a 5th stream are refused; `Last-Event-ID` replays from the buffer and an unknown one gets `snapshot`; the publisher lease and the host's pairing passes behave as before; a real-browser test opens and quits an AI app (a stub MCP client) and the switcher updates with no reload (journey no-reload probe); axe passes; changelog.d fragment; full threat note, Fable 5.1 audit.
+
+#### W4-PAUSE · local app: pause and resume an agent (wave 4, owner Decision 49 Q7, D-143 (5))
+- **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (owner presence on Resume) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/store/**` (`agent_pause`), the core send, fetch, loop and owner-action paths (`agent.resume`); `packages/mcp-tools/src/**` (the `AGENT_PAUSED` refusal and the status line); `packages/node/src/local-ui/api/agents*.ts` (pause and resume routes); `apps/local-ui/src/pages/agents/**`
+- **Depends on:** W4-LIVE-STATUS (the `paused` state and its event); Q-143-1 to Q-143-4 decided (owner, Decision 50, 30 Oct 2026)
+- **Spec:** D-143 (5); 04 §2.5 ("Live status and Pause"), §2.5.1 (`agent.resume`); 06 §6 ("Paused agents"); 07 §3.2; 08 §1 ("Pause an agent"); 11 §5
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - Pause (no presence, its own route kind, writes only `agent_pause`) and Resume (presence, signs `agent.resume`, refused with `not_paused` before the gesture when not paused).
+  - While paused: send and fetch tools refuse with `rejected`/`AGENT_PAUSED` before any effect and keep no idempotency result; no outbox publish, subscriptions, catch-up, processing or pairing pass; read tools answer from the store and `agentlink_status` adds the paused line. Resume runs the usual look-back.
+- **Acceptance:**
+  - RED tests first: every send and fetch tool refuses while paused and works with the same `clientRequestId` after resume; a queued outbox row is not published while paused and is after resume; the lease holder closes its subscriptions within 5 s of a pause; an `agent_pause` row that cannot be read makes the agent behave as paused (fail closed); auto-save (D-142) fetches nothing while paused; no MCP tool or CLI command reaches pause or resume; Resume without presence is refused and a replayed `agent.resume` is refused by its nonce; the tool-surface snapshot is unchanged; real-browser test of Pause, the banner and Resume with Touch ID (virtual authenticator); axe passes; changelog.d fragment; full threat note, Fable 5.1 audit.
 
 ### Usability wave 3 (U3, 0.4.4)
 

@@ -1368,6 +1368,46 @@
     "name": "al-duration-ambient-sweep",
     "value": "1400ms",
     "usage": "Progress loops: skeleton shimmer, the indeterminate bar and arc (D-132)."
+   },
+   {
+    "name": "al-duration-press",
+    "value": "150ms",
+    "usage": "W4: press feedback, a 3 % scale on buttons and chips (prototype v23)."
+   },
+   {
+    "name": "al-duration-fade",
+    "value": "160ms",
+    "usage": "W4: fades under reduced motion, and the live strip leaving."
+   },
+   {
+    "name": "al-duration-exit",
+    "value": "180ms",
+    "usage": "W4: the old page leaving in a page change."
+   },
+   {
+    "name": "al-duration-crossfade",
+    "value": "220ms",
+    "usage": "W4: the whole-page crossfade, the agent switch and the chip morph."
+   },
+   {
+    "name": "al-duration-reveal",
+    "value": "300ms",
+    "usage": "W4: something revealed in place (invite link, Connected, file Saved), and a page entering where View Transitions are missing."
+   },
+   {
+    "name": "al-duration-page",
+    "value": "340ms",
+    "usage": "W4: the page change, the shared element (person row to conversation) and the simple-to-pro morph."
+   },
+   {
+    "name": "al-duration-shimmer",
+    "value": "1200ms",
+    "usage": "W4: the skeleton shimmer loop (opacity only)."
+   },
+   {
+    "name": "al-duration-pulse",
+    "value": "1600ms",
+    "usage": "W4: the live-dot pulse loop while an agent is working."
    }
   ]
  },
@@ -1392,6 +1432,26 @@
     "name": "al-easing-emphasized",
     "value": "cubic-bezier(0.05, 0.7, 0.1, 1)",
     "usage": "Signature moments and the ring meter filling: a slower settle than enter (D-132)."
+   },
+   {
+    "name": "al-easing-spring",
+    "value": "linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1)",
+    "usage": "W4: the spring of page changes and reveals (CSS linear(); a small overshoot, then settles at exactly 1)."
+   },
+   {
+    "name": "al-easing-overshoot",
+    "value": "cubic-bezier(0.2, 0.9, 0.3, 1.1)",
+    "usage": "W4: menus, drops and press: a short overshoot."
+   },
+   {
+    "name": "al-easing-pop",
+    "value": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+    "usage": "W4: the check pop (Copy, Connected, Saved)."
+   },
+   {
+    "name": "al-easing-ping",
+    "value": "cubic-bezier(0, 0, 0.2, 1)",
+    "usage": "W4: the live-dot pulse ring growing out."
    }
   ]
  },

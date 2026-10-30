@@ -200,6 +200,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       (r) =>
         r.presence !== 'setup' &&
         r.presence !== 'pay-confirm' &&
+        // W4-ONE-TOUCH: New agent's two routes are covered in create-connect-server.test.ts.
+        r.presence !== 'create-agent' &&
         r.path !== '/api/ui/first-run' &&
         !built.has(r.path),
     );

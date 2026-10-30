@@ -65,6 +65,7 @@ import {
 import './first-run.css';
 import { createJoinApi, type JoinRead } from '../join/api.js';
 import {
+  CREATED as C,
   FIRST_RUN as T,
   NAME as N,
   NAME_MAX,
@@ -134,6 +135,8 @@ interface Done {
   /** Present only while the "Your backup code" step is on screen. */
   readonly ownerCode?: string;
   readonly computerName?: string;
+  /** W4-ONE-TOUCH: the app the one gesture connected (or tried to). */
+  readonly app?: { readonly id: string; readonly name: string; readonly connected: boolean };
 }
 
 type View =
@@ -161,6 +164,15 @@ type View =
       readonly appName: string;
       readonly folder: string;
       readonly label: string;
+    }
+  | {
+      /**
+       * W4-ONE-TOUCH (11 §5.8): after the backup code: "{label} is ready in {app}. Restart {app}
+       * to finish.", or, when the entry could not be written, "… isn't connected yet." with Connect.
+       */
+      readonly k: 'created';
+      readonly label: string;
+      readonly app: { readonly id: string; readonly name: string; readonly connected: boolean };
     }
   | { readonly k: 'unsupported' }
   | {
@@ -289,6 +301,8 @@ function NameStep({
   onChange,
   onBack,
   onGo,
+  connect,
+  onConnect,
 }: {
   view: Extract<View, { k: 'protect' }>;
   name: string;
@@ -300,6 +314,9 @@ function NameStep({
   onChange: () => void;
   onBack: () => void;
   onGo: (withoutPasskey: boolean) => void;
+  /** W4-ONE-TOUCH: whether the one gesture also connects the chosen app. */
+  connect: boolean;
+  onConnect: (value: boolean) => void;
 }): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
   const press = (event: KeyboardEvent<HTMLInputElement>): void => {
@@ -314,10 +331,18 @@ function NameStep({
       </h1>
       {app === undefined ? null : (
         <div className="fr-chosen">
-          <div className="fr-chosen-name">
+          {/* W4-ONE-TOUCH (D-140; 11 §5.8): "Connect to {app}" is prefilled; unticking it is
+              "Not now" and leaves the app out of the one gesture. */}
+          <label className="fr-chosen-name fr-connect">
+            <input
+              type="checkbox"
+              checked={connect}
+              disabled={view.working}
+              onChange={(event) => onConnect(event.currentTarget.checked)}
+            />
             <AppMark name={app.name} />
-            <span className="al-text-body">{app.name}</span>
-          </div>
+            <span className="al-text-body">{N.connectTo(app.name)}</span>
+          </label>
           <Button variant="ghost" size="sm" aria-label={N.changeLabel(app.name)} onClick={onChange}>
             {N.change}
           </Button>
@@ -415,6 +440,8 @@ export function FirstRunPage({
   const [choice, setChoice] = useState('');
   const [name, setName] = useState('');
   const [edited, setEdited] = useState(false);
+  // W4-ONE-TOUCH (D-140): "Connect to {app}" is prefilled; unticked means "Not now".
+  const [connectApp, setConnectApp] = useState(true);
   const [noPrfHere, setNoPrfHere] = useState(false);
   const asked = useRef(false);
   const backupTitle = useTitleFocus<HTMLHeadingElement>(view.k);
@@ -529,7 +556,10 @@ export function FirstRunPage({
         if (checked.problem === 'offline') return setView({ k: 'down' });
         return problem(checked);
       }
-      const begun = await api.begin(label);
+      // W4-ONE-TOUCH (D-140): with the app picked and "Connect to {app}" ticked, the same one
+      // gesture also connects it; begin fixes the plan, finish carries only its nonce.
+      const app = chosenApp !== undefined && connectApp ? chosenApp : undefined;
+      const begun = await api.begin(label, app?.id);
       if (begun.kind === 'owner_exists') return existingOwner();
       if (begun.kind === 'error') return problem(begun);
       // Without PRF here, any passkey: the gesture proves presence, the backup code approves.
@@ -538,7 +568,7 @@ export function FirstRunPage({
       if (made.kind === 'cancelled') return again(SETUP_MESSAGES.cancelled);
       let finished;
       try {
-        finished = await api.finish(made.body, label);
+        finished = await api.finish(made.body, begun.nonce);
       } finally {
         made.body.fill(0);
       }
@@ -580,10 +610,13 @@ export function FirstRunPage({
           sendFolder: finished.sendFolder,
           ownerCode: finished.ownerCode,
           computerName: finished.computerName,
+          ...(finished.app === undefined || app === undefined || finished.app !== app.id
+            ? {}
+            : { app: { id: app.id, name: app.name, connected: finished.connected === true } }),
         },
       });
     },
-    [api, createPasskey, existingOwner, name],
+    [api, createPasskey, existingOwner, name, chosenApp, connectApp],
   );
 
   /**
@@ -648,11 +681,20 @@ export function FirstRunPage({
   // The owner code is dropped from state when the owner leaves the step that shows it. The recovery
   // kit is put off ("Later", remembered for the banner); with an AI app chosen and an agent folder
   // to connect it to, "Connect your AI app" follows, otherwise Home.
-  const leave = async (): Promise<void> => {
+  // W4-ONE-TOUCH (D-140): the app was part of the one gesture; "Not now" (or no app) goes Home.
+  const leave = (done: Done): void => {
     rememberRecoveryKitLater();
+    // The backup code leaves the page now, whichever screen comes next (L-3).
+    if (done.app === undefined) {
+      setView({ k: 'leaving' });
+      return goHome();
+    }
+    setView({ k: 'created', label: name.trim(), app: done.app });
+  };
+
+  /** W4-ONE-TOUCH (04 §2.8 "created_not_connected"): Connect, the ordinary signed AI apps step. */
+  const connectNow = async (app: { readonly id: string; readonly name: string }): Promise<void> => {
     setView({ k: 'leaving' });
-    const app = chosenApp;
-    if (app === undefined) return goHome();
     const agent = await appsApi.currentAgent();
     if (!mounted.current) return;
     if (agent.kind !== 'ok') return goHome();
@@ -809,6 +851,8 @@ export function FirstRunPage({
           onChange={toPick}
           onBack={toPick}
           onGo={(withoutPasskey) => void protect(withoutPasskey)}
+          connect={connectApp}
+          onConnect={setConnectApp}
         />
       );
     }
@@ -839,8 +883,38 @@ export function FirstRunPage({
             code={done.ownerCode ?? ''}
             computer={done.computerName ?? ''}
             sensor={done.passkey ? sensor : SENSOR.other}
-            onSaved={() => void leave()}
+            onSaved={() => leave(done)}
           />
+        </section>
+      );
+    }
+    case 'created': {
+      const { app } = view;
+      return (
+        <section className="fr-card" aria-labelledby="fr-h">
+          <div className="fr-chosen-name">
+            <AppMark name={app.name} />
+            <span className="al-text-body">{app.name}</span>
+          </div>
+          <h1 id="fr-h" ref={backupTitle} tabIndex={-1} className="al-text-title-1" role="status">
+            {app.connected ? C.ready(view.label, app.name) : C.notConnected(view.label, app.name)}
+          </h1>
+          <div className="fr-actions">
+            {app.connected ? (
+              <Button variant="primary" size="lg" onClick={goHome}>
+                {C.next}
+              </Button>
+            ) : (
+              <>
+                <Button variant="primary" size="lg" onClick={() => void connectNow(app)}>
+                  {C.connect}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={goHome}>
+                  {C.later}
+                </Button>
+              </>
+            )}
+          </div>
         </section>
       );
     }

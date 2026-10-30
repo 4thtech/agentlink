@@ -67,15 +67,11 @@ describe('owner operations', () => {
     expect(s.body).toBe('123456');
     expect(s.headers.get('X-AgentLink-Input')).not.toContain('123456');
   });
-  it('remove sends the typed label; add posts to the collection', async () => {
+  it('remove sends the typed label', async () => {
     const r = api(200, { status: 'done' });
     await r.agents.remove({ name: 'w', typedLabel: 'Work' }, proof);
     expect(r.seen[0]?.url).toBe('/api/ui/agents/remove');
     expect(input(r.seen[0]!)).toEqual({ name: 'w', typedLabel: 'Work' });
-    const a = api(200, { status: 'done' });
-    await a.agents.add({ label: 'New' }, proof);
-    expect(a.seen[0]?.url).toBe('/api/ui/agents');
-    expect(input(a.seen[0]!)).toEqual({ label: 'New' });
   });
   it('maps each answer to a word', async () => {
     const p = { name: 'w', label: 'L' };

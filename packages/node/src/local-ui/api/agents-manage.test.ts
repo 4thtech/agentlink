@@ -9,20 +9,15 @@
 //   agent only. The body core prepared binds the open agent's `agentId` (never a name or the label
 //   in config.json); the owner statement names the agent by its verified label ("Rename Personal to
 //   Home"), never by config.json's text. Only after core applied it is config.json's label written.
-// - `POST /api/ui/agents` `{label}` (presence): the server creates a keychain agent (folder name a
-//   slug of the label), the one gesture signs exactly its first card, its first policy and its first
-//   label, and on any failure exactly what the request created is removed again (all or nothing).
+// - W4-ONE-TOUCH (D-140): `POST /api/ui/agents/begin` and `POST /api/ui/agents` are the create-agent
+//   kind, run by the server's own gate with no page handler (create-connect-server.test.ts).
 // - A handler that signs nothing performed no owner operation (the gate answers 409 `refused`).
 import type { LabelReading, PreparedOwnerAction } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import { describe, expect, it } from 'vitest';
+import type { LocalUiAgentsManage, LocalUiContext, LocalUiReadClient } from '../context.js';
 import type {
-  LocalUiAgentsManage,
-  LocalUiContext,
-  LocalUiNewAgent,
-  LocalUiReadClient,
-} from '../context.js';
-import type {
+  LocalUiCreateAgentRoute,
   LocalUiOwnerOperation,
   LocalUiOwnerRoute,
   LocalUiReadRoute,
@@ -42,7 +37,8 @@ const route = (method: string, path: string) => {
 };
 const labelCheck = route('GET', '/api/ui/agents/label-check') as LocalUiReadRoute;
 const rename = route('POST', '/api/ui/agents/label') as LocalUiOwnerRoute;
-const add = route('POST', '/api/ui/agents') as LocalUiOwnerRoute;
+const add = route('POST', '/api/ui/agents') as LocalUiCreateAgentRoute;
+const begin = route('POST', '/api/ui/agents/begin') as LocalUiCreateAgentRoute;
 
 function prepared(label: string, agent = SELF): PreparedOwnerAction {
   const body = {
@@ -67,8 +63,6 @@ interface World {
   readonly context: LocalUiContext;
   readonly applied: { readonly body: JsonObject; readonly sig: string }[];
   readonly saved: [string, string][];
-  readonly settled: [string, boolean][];
-  readonly created: string[];
 }
 
 function world(
@@ -77,13 +71,10 @@ function world(
     /** What core loads as this agent's label. */
     reading?: LabelReading;
     applyStatus?: 'applied' | 'refused';
-    create?: 'ok' | 'fail';
   } = {},
 ): World {
   const applied: World['applied'] = [];
   const saved: World['saved'] = [];
-  const settled: World['settled'] = [];
-  const created: string[] = [];
   const client = {
     agentId: SELF,
     agent: {
@@ -102,15 +93,6 @@ function world(
   } as unknown as LocalUiReadClient;
   const manage: LocalUiAgentsManage = {
     current: () => (options.current === undefined ? 'personal' : options.current),
-    create: (label) => {
-      created.push(label);
-      if (options.create === 'fail') return Promise.resolve(undefined);
-      return Promise.resolve({ name: 'work-agent' } as unknown as LocalUiNewAgent);
-    },
-    settle: (agent, ok) => {
-      settled.push([agent.name, ok]);
-      return Promise.resolve();
-    },
     labelSaved: (name, label) => {
       saved.push([name, label]);
       return Promise.resolve();
@@ -130,20 +112,18 @@ function world(
     },
     now: () => 0,
   } as unknown as LocalUiContext;
-  return { context, applied, saved, settled, created };
+  return { context, applied, saved };
 }
 
 interface Owner {
   readonly operation: LocalUiOwnerOperation;
   readonly reviews: OwnerReview[];
   readonly requests: OwnerSignRequest[][];
-  readonly added: LocalUiNewAgent[];
 }
 
-function owner(addOutcome: 'done' | 'failed' = 'done'): Owner {
+function owner(): Owner {
   const reviews: OwnerReview[] = [];
   const requests: OwnerSignRequest[][] = [];
-  const added: LocalUiNewAgent[] = [];
   const operation: LocalUiOwnerOperation = {
     sign: (review, reqs) => {
       reviews.push(review);
@@ -156,15 +136,8 @@ function owner(addOutcome: 'done' | 'failed' = 'done'): Owner {
         ),
       );
     },
-    addAgent: (review, agent) => {
-      reviews.push(review);
-      added.push(agent);
-      return Promise.resolve(
-        addOutcome === 'done' ? { status: 'done' as const } : { status: 'failed' as const },
-      );
-    },
   };
-  return { operation, reviews, requests, added };
+  return { operation, reviews, requests };
 }
 
 const run = (r: LocalUiOwnerRoute, w: World, o: Owner, input: unknown): Promise<LocalUiResult> =>
@@ -175,10 +148,11 @@ const run = (r: LocalUiOwnerRoute, w: World, o: Owner, input: unknown): Promise<
   );
 
 describe('the U3-d routes are registered once and replace the U3-c stubs', () => {
-  it('registers label-check, create and rename; none is a stub', () => {
+  it('registers label-check, create (begin and finish) and rename; none is a stub', () => {
     const all = createLocalUiRoutes().routes();
     for (const [method, path] of [
       ['GET', '/api/ui/agents/label-check'],
+      ['POST', '/api/ui/agents/begin'],
       ['POST', '/api/ui/agents'],
       ['POST', '/api/ui/agents/label'],
     ] as const) {
@@ -187,8 +161,14 @@ describe('the U3-d routes are registered once and replace the U3-c stubs', () =>
       expect((found[0] as { stub?: unknown }).stub, path).toBeUndefined();
     }
     expect(rename.presence).toBe(true);
-    expect(add.presence).toBe(true);
     expect(labelCheck.presence).toBe(false);
+  });
+
+  it('W4-ONE-TOUCH: creating an agent is the create-agent kind, with no page handler', () => {
+    expect(begin).toMatchObject({ presence: 'create-agent', step: 'begin' });
+    expect(add).toMatchObject({ presence: 'create-agent', step: 'finish' });
+    expect((begin as { handler?: unknown }).handler).toBeUndefined();
+    expect((add as { handler?: unknown }).handler).toBeUndefined();
   });
 });
 
@@ -300,70 +280,5 @@ describe('POST /api/ui/agents/label (rename; signs agent.label)', () => {
     const result = await run(rename, w, o, { name: 'personal', label: 'Home' });
     expect(result).toEqual({ status: 409, body: { error: 'not_applied' } });
     expect(w.saved).toEqual([]);
-  });
-});
-
-describe('POST /api/ui/agents (add an agent; card, first policy and first label)', () => {
-  it('creates the agent, signs it through the one owner operation, keeps it on success', async () => {
-    const w = world();
-    const o = owner('done');
-    const result = await run(add, w, o, { label: 'Work agent' });
-    expect(result).toEqual({
-      status: 200,
-      body: { status: 'done', name: 'work-agent', label: 'Work agent' },
-    });
-    expect(w.created).toEqual(['Work agent']);
-    expect(o.added).toHaveLength(1);
-    // The statement names the new agent's label (04 §2.5 "The label in every presence statement").
-    expect(o.reviews[0]?.lines.join(' ')).toContain('Work agent');
-    expect(w.settled).toEqual([['work-agent', true]]);
-    expect(o.requests).toEqual([]);
-  });
-
-  it('all or nothing: a failed signing removes exactly the agent this request created', async () => {
-    const w = world();
-    const o = owner('failed');
-    const result = await run(add, w, o, { label: 'Work agent' });
-    expect(result).toEqual({ status: 409, body: { error: 'not_applied' } });
-    expect(w.settled).toEqual([['work-agent', false]]);
-  });
-
-  it('refuses a bad label or input before anything is created or signed', async () => {
-    for (const input of [
-      { label: '' },
-      { label: 'Work  agent' },
-      { label: '<b>x</b>' },
-      { label: 'Work', app: 'codex' },
-      { name: 'x' },
-      undefined,
-    ]) {
-      const w = world();
-      const o = owner();
-      const result = await run(add, w, o, input);
-      expect(result.status, JSON.stringify(input)).toBeGreaterThanOrEqual(400);
-      expect(w.created, JSON.stringify(input)).toEqual([]);
-      expect(o.added).toEqual([]);
-    }
-  });
-
-  it('a creation that fails signs nothing', async () => {
-    const w = world({ create: 'fail' });
-    const o = owner();
-    const result = await run(add, w, o, { label: 'Work agent' });
-    expect(result.status).toBeGreaterThanOrEqual(400);
-    expect(o.added).toEqual([]);
-  });
-
-  it('outside the app host (no agents port) it signs nothing', async () => {
-    const w = world();
-    const context = { ...w.context, agentsManage: undefined } as unknown as LocalUiContext;
-    const o = owner();
-    const result = await add.handler(
-      context,
-      { params: {}, query: new URLSearchParams(), input: { label: 'Work' } },
-      o.operation,
-    );
-    expect(result.status).toBe(501);
-    expect(o.added).toEqual([]);
   });
 });

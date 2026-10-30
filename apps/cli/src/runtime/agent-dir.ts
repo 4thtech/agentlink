@@ -60,7 +60,7 @@ import {
   type AgentDirectoryEntry,
   type KeyStoreBackendKind,
 } from '@4thtech-io/node';
-import { createAgentFolder, discardNewAgentFolder } from './agent-create.js';
+import { agentSlug, createAgentFolder, discardNewAgentFolder } from './agent-create.js';
 import { isAgentLabel, isAgentName } from './agent-name.js';
 import { RuntimeError } from './errors.js';
 
@@ -895,11 +895,17 @@ export function agentDirectory(
       const name = await createAgentFolder(
         home,
         label,
-        { ...check, createAgent, discardKeys },
+        // W4-ONE-TOUCH (04 §2.8 step 2): the keys the app held since begin, when it passes them.
+        { ...check, createAgent: options?.createKeys ?? createAgent, discardKeys },
         options?.name,
       );
       created.add(name);
       return name;
+    },
+    // W4-ONE-TOUCH (04 §2.8 Begin): the folder name `create` would give the label now.
+    nameFor: async (label, reserved) => {
+      const taken = await listAgentNames(home, check).catch(() => [] as string[]);
+      return agentSlug(label, [...taken, ...reserved]);
     },
     discardNew: async (name) => {
       // Only an agent this directory created in this process: never an existing agent's keys.
