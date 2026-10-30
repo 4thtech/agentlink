@@ -67,6 +67,13 @@ function Meta({ item }: { readonly item: ApprovalItem }): ReactElement {
 }
 
 const RETRY = new Set(['presence_rejected', 'presence_required', 'busy', 'wait']);
+/** A review that applied nothing: what changed, in the list's own words (IR-W4-HOME-1 b). */
+const NOT_APPLIED: Readonly<Record<string, string>> = {
+  changed: A.listChanged,
+  not_pending: A.listNotPending,
+  commitment: A.listTerms,
+  paid_item_in_batch: A.listPaid,
+};
 
 /** The bulk review's presence step: exactly the picked requests, then one gesture. */
 function BulkReview({
@@ -79,7 +86,8 @@ function BulkReview({
   readonly picks: readonly ApprovalItem[];
   readonly owner: OwnerState;
   readonly client: ApprovalsClient;
-  readonly onDone: (applied: number) => void;
+  /** `applied` requests were decided; otherwise `why` says why nothing was. */
+  readonly onDone: (applied: number, why?: string) => void;
   readonly onBack: () => void;
 }): ReactElement {
   const [lines, setLines] = useState<readonly string[]>([]);
@@ -91,7 +99,7 @@ function BulkReview({
     }
     if (a.kind === 'offline') setLines((l) => [...l, A.notRunning]);
     else if (a.kind === 'dismissed') setLines((l) => [...l, A.notUsed]);
-    else if (!RETRY.has(a.status)) onDone(0);
+    else if (!RETRY.has(a.status)) onDone(0, NOT_APPLIED[a.status] ?? A.listRefused);
     else setLines((l) => [...l, A.presenceRejected]);
   };
   return (
@@ -121,6 +129,29 @@ function BulkReview({
         {A.back}
       </Button>
     </div>
+  );
+}
+
+function Pick({
+  item,
+  picked,
+  disabled,
+  onToggle,
+}: {
+  readonly item: ApprovalItem;
+  readonly picked: boolean;
+  readonly disabled: boolean;
+  readonly onToggle: () => void;
+}): ReactElement {
+  return (
+    <input
+      type="checkbox"
+      className="hm-ap-pick"
+      checked={picked}
+      disabled={disabled}
+      aria-label={fmt(S.selectApproval, { summary: item.summary })}
+      onChange={onToggle}
+    />
   );
 }
 
@@ -171,7 +202,16 @@ export function HomeApprovals({
     );
   }
   const more = sorted.slice(1);
-  const bulk = pro ? more.filter((i) => picked.has(i.approvalId) && pickable(i)) : [];
+  // The card on top can be picked too (IR-W4-HOME-1 a); terms and paid requests never.
+  const bulk = pro ? sorted.filter((i) => picked.has(i.approvalId) && pickable(i)) : [];
+  const canPick = (i: ApprovalItem): boolean => pro && pickable(i) && owner.ready;
+  const toggle = (i: ApprovalItem): void =>
+    setPicked((p) => {
+      const next = new Set(p);
+      if (next.has(i.approvalId)) next.delete(i.approvalId);
+      else next.add(i.approvalId);
+      return next;
+    });
   // Before presence, read the list again: what is no longer waiting, or changed, is left out and
   // said (04 §2.5.2, as the review-together list did); only the rest goes to the gesture.
   const startReview = async (): Promise<void> => {
@@ -209,7 +249,19 @@ export function HomeApprovals({
 
   return (
     <section aria-label={S.approvalsLabel} className={`hm-approvals ${VT_CLASS.approval}`}>
-      {pro ? <Meta item={first} /> : null}
+      {pro ? (
+        <div className="hm-ap-top">
+          {canPick(first) ? (
+            <Pick
+              item={first}
+              picked={picked.has(first.approvalId)}
+              disabled={reviewing}
+              onToggle={() => toggle(first)}
+            />
+          ) : null}
+          <Meta item={first} />
+        </div>
+      ) : null}
       <SingleApproval
         key={first.approvalId}
         item={first}
@@ -236,21 +288,12 @@ export function HomeApprovals({
         <div className="hm-ap-list al-expand">
           {more.map((item) => (
             <div key={item.approvalId} className="hm-ap-item">
-              {pro && pickable(item) && owner.ready ? (
-                <input
-                  type="checkbox"
-                  className="hm-ap-pick"
-                  checked={picked.has(item.approvalId)}
+              {canPick(item) ? (
+                <Pick
+                  item={item}
+                  picked={picked.has(item.approvalId)}
                   disabled={reviewing}
-                  aria-label={fmt(S.selectApproval, { summary: item.summary })}
-                  onChange={() =>
-                    setPicked((p) => {
-                      const next = new Set(p);
-                      if (next.has(item.approvalId)) next.delete(item.approvalId);
-                      else next.add(item.approvalId);
-                      return next;
-                    })
-                  }
+                  onToggle={() => toggle(item)}
                 />
               ) : null}
               <div className="hm-ap-body">
@@ -268,34 +311,36 @@ export function HomeApprovals({
               </div>
             </div>
           ))}
-          {pro ? (
-            <div className="hm-ap-bar">
-              {bulk.length > 0 && !reviewing ? (
-                <Button variant="primary" size="sm" onClick={() => void startReview()}>
-                  {fmt(S.approveSelected, { count: bulk.length })}
-                </Button>
-              ) : null}
-              <span className="hm-ap-note al-text-body-sm">{S.paidAlone}</span>
-            </div>
-          ) : null}
-          {reviewing && kept.length > 0 ? (
-            <BulkReview
-              picks={kept}
-              owner={owner}
-              client={client}
-              onBack={() => setReviewing(false)}
-              onDone={(applied) => {
-                setReviewing(false);
-                setPicked(new Set());
-                if (applied > 0) {
-                  announceDecided(applied);
-                  setNotice(fmt(S.approvedSelected, { count: applied }));
-                }
-                onChanged();
-              }}
-            />
-          ) : null}
         </div>
+      ) : null}
+      {pro && (open || bulk.length > 0) ? (
+        <div className="hm-ap-bar">
+          {bulk.length > 0 && !reviewing ? (
+            <Button variant="primary" size="sm" onClick={() => void startReview()}>
+              {fmt(S.approveSelected, { count: bulk.length })}
+            </Button>
+          ) : null}
+          {open ? <span className="hm-ap-note al-text-body-sm">{S.paidAlone}</span> : null}
+        </div>
+      ) : null}
+      {reviewing && kept.length > 0 ? (
+        <BulkReview
+          picks={kept}
+          owner={owner}
+          client={client}
+          onBack={() => setReviewing(false)}
+          onDone={(applied, why) => {
+            setReviewing(false);
+            setPicked(new Set());
+            if (applied > 0) {
+              announceDecided(applied);
+              setNotice(fmt(S.approvedSelected, { count: applied }));
+            } else if (why !== undefined) {
+              setNotice(why);
+            }
+            onChanged();
+          }}
+        />
       ) : null}
       {notice === undefined ? null : (
         <p role="status" className="hm-ap-done al-text-body-sm">

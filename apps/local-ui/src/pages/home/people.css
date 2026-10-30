@@ -832,3 +832,18 @@
 .hm-approvals .al-hood-row dt {
   color: var(--al-color-fg-muted);
 }
+
+/* Table cells that hold a block (IR-W4-HOME-1 d): they shrink like the grid cells around them. */
+.hm-cellbox {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.hm-ap-top {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+.hm-ap-top .hm-ap-pick {
+  margin: 0;
+}

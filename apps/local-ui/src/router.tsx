@@ -53,8 +53,9 @@ function lazyPage(path: string): ComponentType {
 }
 
 export const ROUTES: readonly RouteDef[] = [
-  // W4-SHELL-V2: the sections (Decision 48). Home keeps the waiting approvals at `/`, where every
-  // approval link of the terminal, the MCP and notifications points, until U3 builds Home.
+  // W4-SHELL-V2: the sections (Decision 48). W4-HOME: Home is `/` (pages/approvals ApprovalsPage
+  // renders it), where every approval link of the terminal, the MCP and notifications points; the
+  // waiting approvals are its card on top.
   { path: HOME_PATH, page: ApprovalsPage },
   { path: '/agents', page: lazyPage('/agents') },
   { path: '/activity', page: lazyPage('/activity') },

@@ -38,6 +38,7 @@ export const HOME_STRINGS = {
   colDelivery: 'Delivery',
   colProofs: 'Proofs',
   colFiles: 'Files',
+  colOpen: 'Open',
   searchPeople: 'Search people',
   allAgents: 'All agents',
 

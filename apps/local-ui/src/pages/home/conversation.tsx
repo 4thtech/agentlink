@@ -201,6 +201,9 @@ function CopyText({ text }: { readonly text: string }): ReactElement {
           </>
         )}
       </button>
+      <span className="al-visually-hidden" aria-live="polite">
+        {state === 'copied' ? S.copied : ''}
+      </span>
       {state === 'failed' ? (
         <span role="status" className="hm-dl-hint">
           {S.copyFailed}
@@ -251,6 +254,16 @@ function Details({
   );
 }
 
+/** The time from which every box with more pages is loaded (newest first, so its last item). */
+export function coveredFrom(boxes: readonly Box[]): number {
+  let from = -Infinity;
+  for (const b of boxes) {
+    const oldest = b.items[b.items.length - 1];
+    if (b.next !== undefined && oldest !== undefined) from = Math.max(from, oldest.at);
+  }
+  return from;
+}
+
 export function Conversation({
   name,
   agent,
@@ -280,8 +293,12 @@ export function Conversation({
   if (thread.state === 'failed') {
     return <Banner tone="warning">{S.conversationUnavailable}</Banner>;
   }
+  // IR-W4-HOME-1: each box pages on its own, so show only the stretch both cover: nothing older
+  // than the oldest loaded message of a box that still has older ones (else that box's side of the
+  // stretch would be missing). Load earlier moves the line back.
+  const cutoff = coveredFrom([thread.inbox, thread.sent]);
   const items = mergeThread(thread.inbox.items, thread.sent.items).filter(
-    ({ item }) => item.text !== '',
+    ({ item }) => item.text !== '' && item.at >= cutoff,
   );
   const more = thread.inbox.next !== undefined || thread.sent.next !== undefined;
   const ours = agent === '' ? S.yourAgent : fmt(S.yourAi, { name: agent });
@@ -309,7 +326,8 @@ export function Conversation({
           {items.map(({ item, out }) => (
             <li
               key={`${out ? 'o' : 'i'}-${item.id}`}
-              className={out ? 'hm-msg is-out al-reveal' : 'hm-msg is-in al-reveal'}
+              // UI-REFRESH-k: what another party wrote never moves in; your AI's words may.
+              className={out ? 'hm-msg is-out al-reveal' : 'hm-msg is-in'}
             >
               {out ? (
                 <>

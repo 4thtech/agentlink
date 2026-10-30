@@ -334,7 +334,9 @@ describe('the confirmation sheet in the app (M1-PAY-CONFIRM-b, M1-11b-2; Chromiu
       .click();
     await page.getByRole('button', { name: '+2 more waiting' }).click();
     await page.getByRole('checkbox').first().waitFor();
-    expect(await page.getByRole('checkbox').count()).toBe(1);
+    // Both free requests (the card on top too) can be picked; the paid one never.
+    expect(await page.getByRole('checkbox').count()).toBe(2);
+    expect(await page.getByRole('checkbox', { name: /Record a proof/ }).count()).toBe(0);
     const paidCard = page.locator(`[data-approval="${id(2)}"]`);
     await page.getByText('Costs money · approve one at a time').first().waitFor();
     await paidCard.locator('details > summary').click();

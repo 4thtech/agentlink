@@ -65,6 +65,7 @@ import {
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
 import { filesOf, PersonFiles, type Reveal } from './person-files.js';
 import { PersonMenu } from './person-menu.js';
+import { PersonName } from './person-name.js';
 import './people.css';
 
 /** How often Home looks again while the tab is visible. */
@@ -324,7 +325,7 @@ function PendingInviteRow({
         )}
       </span>
       <span className="hm-row-main">
-        {name === undefined ? null : <bdi className="hm-name">{name}</bdi>}
+        {name === undefined ? null : <PersonName name={name} />}
         <span className="hm-sub al-text-body-sm">
           {name === undefined ? S.waitingToAcceptNoName : fmt(S.waitingToAccept, { name })}
           {' · '}
@@ -357,6 +358,24 @@ function PendingInviteRow({
       >
         {S.cancelInvite}
       </Button>
+    </div>
+  );
+}
+
+/** Under the hood the opened part is one row of the table, its one cell spanning the columns. */
+function OpenRow({
+  pro,
+  children,
+}: {
+  readonly pro: boolean;
+  readonly children: ReactNode;
+}): ReactElement {
+  if (!pro) return <>{children}</>;
+  return (
+    <div role="row" className="hm-open-row">
+      <div role="cell" aria-colspan={7}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -625,132 +644,162 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               />
             ) : (
               <div className="hm-list">
-                {pro ? (
-                  <div className="hm-prow hm-prow-head" data-people-head="">
-                    <span>{S.colPerson}</span>
-                    <span className="hm-opt">{S.colHandledBy}</span>
-                    <span>{S.colLastMessage}</span>
-                    <span className="hm-opt">{S.colDelivery}</span>
-                    <span className="hm-opt">{S.colProofs}</span>
-                    <span className="hm-opt">{S.colFiles}</span>
-                    <span />
-                  </div>
-                ) : null}
-                {people.map((person) => {
-                  const summary = summaries.get(person.contactId);
-                  const isOpen = open === person.contactId;
-                  const problem = summary?.delivery === 'not_delivered';
-                  const delivery =
-                    summary?.delivery === undefined ? '' : (DELIVERY_WORD[summary.delivery] ?? '');
-                  return (
-                    <div
-                      key={person.contactId}
-                      className="hm-person"
-                      data-person={person.contactId}
-                      data-open={isOpen ? 'true' : undefined}
-                    >
-                      {pro ? (
-                        <div className="hm-prow hm-row">
+                {/* Under the hood, People is a table to assistive technology (rows and cells). */}
+                <div
+                  role={pro ? 'table' : undefined}
+                  aria-label={pro ? S.people : undefined}
+                  className="hm-table"
+                >
+                  {pro ? (
+                    <div className="hm-prow hm-prow-head" data-people-head="" role="row">
+                      <span role="columnheader">{S.colPerson}</span>
+                      <span role="columnheader" className="hm-opt">
+                        {S.colHandledBy}
+                      </span>
+                      <span role="columnheader">{S.colLastMessage}</span>
+                      <span role="columnheader" className="hm-opt">
+                        {S.colDelivery}
+                      </span>
+                      <span role="columnheader" className="hm-opt">
+                        {S.colProofs}
+                      </span>
+                      <span role="columnheader" className="hm-opt">
+                        {S.colFiles}
+                      </span>
+                      <span role="columnheader">
+                        <span className="al-visually-hidden">{S.colOpen}</span>
+                      </span>
+                    </div>
+                  ) : null}
+                  {people.map((person) => {
+                    const summary = summaries.get(person.contactId);
+                    const isOpen = open === person.contactId;
+                    const problem = summary?.delivery === 'not_delivered';
+                    const delivery =
+                      summary?.delivery === undefined
+                        ? ''
+                        : (DELIVERY_WORD[summary.delivery] ?? '');
+                    return (
+                      <div
+                        key={person.contactId}
+                        className="hm-person"
+                        role={pro ? 'rowgroup' : undefined}
+                        data-person={person.contactId}
+                        data-open={isOpen ? 'true' : undefined}
+                      >
+                        {pro ? (
+                          <div className="hm-prow hm-row" role="row">
+                            <span role="cell" className="hm-cellbox">
+                              <button
+                                type="button"
+                                className="hm-row-toggle"
+                                aria-expanded={isOpen}
+                                onClick={(e) =>
+                                  toggle(person.contactId, e.currentTarget.closest('.hm-person'))
+                                }
+                              >
+                                <Avatar name={person.name} small />
+                                <PersonName name={person.name} />
+                              </button>
+                            </span>
+                            <span role="cell" className="hm-opt hm-cell">
+                              <span
+                                className="hm-dot"
+                                data-state={current?.state ?? 'off'}
+                                aria-hidden="true"
+                              />
+                              <span className="hm-ellipsis">{agentLabel}</span>
+                            </span>
+                            <span role="cell" className="hm-cellbox">
+                              <LastText person={person} summary={summary} />
+                            </span>
+                            <span
+                              role="cell"
+                              className="hm-opt hm-cell"
+                              data-delivery={summary?.delivery ?? 'none'}
+                            >
+                              {delivery}
+                            </span>
+                            <span role="cell" className="hm-opt hm-mono">
+                              {summary === undefined ? '' : String(summary.proofs)}
+                            </span>
+                            <span role="cell" className="hm-opt hm-mono">
+                              {summary === undefined ? '' : String(summary.files)}
+                            </span>
+                            <span role="cell" className="hm-cellbox">
+                              <span
+                                className="hm-chev"
+                                data-open={isOpen ? 'right-open' : 'right'}
+                                aria-hidden="true"
+                              >
+                                <Icon name="chevron-right" size={16} />
+                              </span>
+                            </span>
+                          </div>
+                        ) : (
                           <button
                             type="button"
-                            className="hm-row-toggle"
+                            className="hm-row"
                             aria-expanded={isOpen}
                             onClick={(e) =>
                               toggle(person.contactId, e.currentTarget.closest('.hm-person'))
                             }
                           >
-                            <Avatar name={person.name} small />
-                            <bdi className="hm-name">{person.name}</bdi>
-                          </button>
-                          <span className="hm-opt hm-cell">
+                            <Avatar name={person.name} />
+                            <span className="hm-row-main">
+                              <PersonName name={person.name} />
+                              <span className="hm-sub al-text-body-sm">
+                                {person.lastAt > 0
+                                  ? fmt(S.lastMessage, { when: ago(person.lastAt, now) })
+                                  : S.noMessagesYet}
+                                {summary === undefined ? '' : ` · ${filesText(summary.files)}`}
+                                {many && agentLabel !== '' ? ` · ${agentLabel}` : ''}
+                              </span>
+                            </span>
+                            {problem ? (
+                              <span className="hm-problem">
+                                <Icon name="triangle-alert" size={14} />
+                                <span className="hm-hide-sm">{S.notDelivered}</span>
+                              </span>
+                            ) : null}
                             <span
-                              className="hm-dot"
-                              data-state={current?.state ?? 'off'}
+                              className="hm-chev"
+                              data-open={isOpen ? 'right-open' : 'right'}
                               aria-hidden="true"
+                            >
+                              <Icon name="chevron-right" size={18} />
+                            </span>
+                          </button>
+                        )}
+                        {isOpen && data !== undefined ? (
+                          <OpenRow pro={pro}>
+                            <PersonOpen
+                              person={person}
+                              contact={data.contacts.get(person.contactId)}
+                              data={data}
+                              clients={clients}
+                              agent={agentLabel}
+                              pro={pro}
+                              tick={tick}
+                              passkey={passkey}
+                              refresh={refresh}
+                              props={props}
+                              {...(props.folderNote === undefined
+                                ? {}
+                                : { folderNote: props.folderNote })}
+                              onChanged={(what) => {
+                                if (what === 'remove') setOpen(undefined);
+                                if (what === 'remove')
+                                  setNotice(fmt(S.removed, { name: person.name }));
+                                refresh();
+                              }}
                             />
-                            <span className="hm-ellipsis">{agentLabel}</span>
-                          </span>
-                          <LastText person={person} summary={summary} />
-                          <span
-                            className="hm-opt hm-cell"
-                            data-delivery={summary?.delivery ?? 'none'}
-                          >
-                            {delivery}
-                          </span>
-                          <span className="hm-opt hm-mono">
-                            {summary === undefined ? '' : String(summary.proofs)}
-                          </span>
-                          <span className="hm-opt hm-mono">
-                            {summary === undefined ? '' : String(summary.files)}
-                          </span>
-                          <span
-                            className="hm-chev"
-                            data-open={isOpen ? 'right-open' : 'right'}
-                            aria-hidden="true"
-                          >
-                            <Icon name="chevron-right" size={16} />
-                          </span>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="hm-row"
-                          aria-expanded={isOpen}
-                          onClick={(e) =>
-                            toggle(person.contactId, e.currentTarget.closest('.hm-person'))
-                          }
-                        >
-                          <Avatar name={person.name} />
-                          <span className="hm-row-main">
-                            <bdi className="hm-name">{person.name}</bdi>
-                            <span className="hm-sub al-text-body-sm">
-                              {person.lastAt > 0
-                                ? fmt(S.lastMessage, { when: ago(person.lastAt, now) })
-                                : S.noMessagesYet}
-                              {summary === undefined ? '' : ` · ${filesText(summary.files)}`}
-                              {many && agentLabel !== '' ? ` · ${agentLabel}` : ''}
-                            </span>
-                          </span>
-                          {problem ? (
-                            <span className="hm-problem">
-                              <Icon name="triangle-alert" size={14} />
-                              <span className="hm-hide-sm">{S.notDelivered}</span>
-                            </span>
-                          ) : null}
-                          <span
-                            className="hm-chev"
-                            data-open={isOpen ? 'right-open' : 'right'}
-                            aria-hidden="true"
-                          >
-                            <Icon name="chevron-right" size={18} />
-                          </span>
-                        </button>
-                      )}
-                      {isOpen && data !== undefined ? (
-                        <PersonOpen
-                          person={person}
-                          contact={data.contacts.get(person.contactId)}
-                          data={data}
-                          clients={clients}
-                          agent={agentLabel}
-                          pro={pro}
-                          tick={tick}
-                          passkey={passkey}
-                          refresh={refresh}
-                          props={props}
-                          {...(props.folderNote === undefined
-                            ? {}
-                            : { folderNote: props.folderNote })}
-                          onChanged={(what) => {
-                            if (what === 'remove') setOpen(undefined);
-                            if (what === 'remove') setNotice(fmt(S.removed, { name: person.name }));
-                            refresh();
-                          }}
-                        />
-                      ) : null}
-                    </div>
-                  );
-                })}
+                          </OpenRow>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
                 {data !== undefined && people.length === 0 && data.people.length > 0 ? (
                   <div className="hm-nomatch">
                     <p className="al-text-body-sm al-muted">{S.noMatch}</p>

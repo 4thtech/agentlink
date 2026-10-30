@@ -12,6 +12,7 @@
 //
 // Reading here never writes and never marks anything read for the AI.
 import type { ApiClient } from '../../api/client.js';
+import { cleanName } from './person-name.js';
 import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
 import { INVITES_LIST_PATH, parseOpenInvites, type OpenInvite } from '../contacts/invite-api.js';
 import { parseReceived, parseSent, type ReceivedItem, type SentItem } from '../files/io-api.js';
@@ -117,15 +118,17 @@ export function createPeopleApi(api: ApiClient): PeopleApi {
       return {
         ok: true,
         data: {
-          people: [...people.value].sort((a, b) => b.lastAt - a.lastAt),
+          people: people.value
+            .map((p) => ({ ...p, name: cleanName(p.name) }))
+            .sort((a, b) => b.lastAt - a.lastAt),
           contacts: new Map(
             list?.kind === 'ok' ? list.contacts.map((c) => [c.ref, c] as const) : [],
           ),
           received: new Map((rec?.items ?? []).map((f) => [f.id, f] as const)),
           sent: new Map((out?.items ?? []).map((f) => [f.id, f] as const)),
-          invites: [
-            ...((invites.kind === 'ok' ? parseOpenInvites(invites.data) : undefined) ?? []),
-          ].sort((a, b) => a.expiresAt - b.expiresAt),
+          invites: ((invites.kind === 'ok' ? parseOpenInvites(invites.data) : undefined) ?? [])
+            .map((i) => (i.name === null ? i : { ...i, name: cleanName(i.name) }))
+            .sort((a, b) => a.expiresAt - b.expiresAt),
         },
       };
     },
