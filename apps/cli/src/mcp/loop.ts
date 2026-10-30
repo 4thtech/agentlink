@@ -103,6 +103,11 @@ export interface LoopClient {
     readonly reports: readonly unknown[];
   }>;
   readonly outbox: { processDue(): Promise<unknown> };
+  /**
+   * W4-AUTO-SAVE (D-142, 04 §4.1): received files saved automatically, run by the lease holder after
+   * each pass and after live delivery stored something. Optional for older fakes.
+   */
+  readonly autoSave?: { run(): Promise<unknown> };
   /** Live delivery (M1-9s). Optional: without it the loop polls with `syncInbox`. */
   subscribeInbox?(options?: {
     readonly onProcessed?: (result: {
@@ -381,7 +386,20 @@ export class BackgroundLoop {
     } catch (error) {
       this.#log.warn('background delivery failed', errorCode(error));
     }
+    if (!this.holding) return partial;
+    await this.#runAutoSave();
     return partial;
+  }
+
+  /** W4-AUTO-SAVE: one automatic-save run (core runs one at a time). Never rejects; codes only. */
+  async #runAutoSave(): Promise<void> {
+    const autoSave = this.#client.autoSave;
+    if (autoSave === undefined) return;
+    try {
+      await autoSave.run();
+    } catch (error) {
+      this.#log.warn('auto-save failed', errorCode(error));
+    }
   }
 
   /** Opens the live subscription, if the client has one (M1-9s). Never rejects. */
@@ -415,6 +433,8 @@ export class BackgroundLoop {
     if (result.stored > 0 || result.reports.length > 0) this.#notify();
     // Processing may stage outbound rows (a handshake-ack, a delivery ack): deliver them now.
     if (result.reports.length > 0) this.#deliverSoon();
+    // W4-AUTO-SAVE: a stored message may carry files to save automatically.
+    if (result.stored > 0) void this.#runAutoSave();
   }
 
   /** One outbox run at a time; a request during a run makes one more run after it. */

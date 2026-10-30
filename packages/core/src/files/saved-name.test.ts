@@ -145,7 +145,7 @@ describe('files.saved_name: the name fetchFile chose, sealed (MSG-FILES-IO-b)', 
     });
     b.inbox.plantSymlink('authorized_keys');
     const fetched = await b.client.fetchFile({ envelopeId });
-    expect(fetched).toMatchObject({ status: 'ok', name: 'authorized_keys (1)' });
+    expect(fetched).toMatchObject({ status: 'ok', name: 'authorized_keys (2)' });
     if (fetched.status !== 'ok') return;
     const saved = await savedNameOf(ctxOf(b), (await rowOf(b, envelopeId))!);
     expect(saved).toBe(fetched.name);
@@ -155,13 +155,20 @@ describe('files.saved_name: the name fetchFile chose, sealed (MSG-FILES-IO-b)', 
     expect([...b.inbox.files().keys()]).toContain(saved);
   });
 
-  it('a second fetch records the newest saved name', async () => {
+  it('a second fetch is answered from the record; once the file is gone, the newest name is recorded', async () => {
     await agents();
     const envelopeId = await send(500);
     await b.client.fetchFile({ envelopeId });
+    // D-142 (06 §2.3): still a regular file in the Inbox folder, so no second copy.
     const second = await b.client.fetchFile({ envelopeId });
-    expect(second).toMatchObject({ status: 'ok', name: 'report (1).pdf' });
-    expect(await savedNameOf(ctxOf(b), (await rowOf(b, envelopeId))!)).toBe('report (1).pdf');
+    expect(second).toMatchObject({ status: 'ok', name: 'report.pdf' });
+    expect(b.inbox.files().size).toBe(1);
+    // The owner moved it away and something else took its name: saved again, the new name recorded.
+    await b.inbox.remove('report.pdf');
+    b.inbox.plantFolder('report.pdf');
+    const third = await b.client.fetchFile({ envelopeId });
+    expect(third).toMatchObject({ status: 'ok', name: 'report (2).pdf' });
+    expect(await savedNameOf(ctxOf(b), (await rowOf(b, envelopeId))!)).toBe('report (2).pdf');
   });
 
   it('a failed download records nothing', async () => {

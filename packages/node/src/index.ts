@@ -204,6 +204,17 @@ export {
   type AllowedPathErrorCode,
   type AllowedPathOptions,
 } from './allowed-path.js';
+// W4-AUTO-SAVE (D-142, 04 §4.1): the Inbox folder rules, the held directory, the quarantine mark and
+// the free-space read, for the files platform's every save.
+export {
+  freeBytes,
+  inboxFolderProblem,
+  openInboxDir,
+  quarantineMark,
+  type InboxDir,
+  type InboxFolderProblem,
+  type InboxFolderRulesInput,
+} from './inbox-folder.js';
 // M1-36b-2-c: the Send folder for an agent that already has its card (`policy allow-send-folder`
 // †). The owner signs through the given owner operation (performOwnerOperation); the folder checks
 // and the byte-exact policy check stay inside.

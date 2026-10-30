@@ -27,19 +27,23 @@ export const RECEIVED_LOCATOR = JSON.stringify({ kind: 'received' });
 /**
  * Builds the receiver rows for an inbound payload and the payload text to store without the keys.
  * Call before the store transaction (no await inside it). A payload without files is returned as
- * it is, with no rows.
+ * it is, with no rows. `fromContact` (W4-AUTO-SAVE, D-142): the envelope is stored as a contact's
+ * message, so its files start `pending` for the automatic save (04 §4.1), stamped with the arrival
+ * time; anything else (an unknown sender's request) waits for Save with no reason.
  */
 export async function receivedFileRows(
   ctx: CoreContext,
   envelopeId: string,
   payload: Payload,
   payloadText: string,
+  fromContact = false,
 ): Promise<{ readonly payloadText: string; readonly rows: Row<'files'>[] }> {
   if (payload.files.length === 0) return { payloadText, rows: [] };
   const stored = JSON.parse(payloadText) as { files: { fileKey: string }[] };
   // The sender states `expiresAt`; the receiver keeps its row at most the 7-day maximum from now
   // (04 §4 Delivery), so a hostile far-future value cannot keep the key for good.
-  const latest = nowOf(ctx) + FILE_LINK_MAX_EXPIRY_DAYS * 86_400;
+  const now = nowOf(ctx);
+  const latest = now + FILE_LINK_MAX_EXPIRY_DAYS * 86_400;
   const rows: Row<'files'>[] = [];
   for (const [idx, entry] of payload.files.entries()) {
     const key = [envelopeId, idx];
@@ -58,6 +62,10 @@ export async function receivedFileRows(
       delete_after: null,
       // MSG-FILES-IO-b: set by fetchFile once the file is saved; null means "not saved yet".
       saved_name: null,
+      auto_save: fromContact ? 'pending' : 'waiting',
+      auto_reason: null,
+      auto_tries: 0,
+      auto_next_at: now,
     });
     const target = stored.files[idx];
     if (target !== undefined) target.fileKey = SHREDDED_FILE_KEY;

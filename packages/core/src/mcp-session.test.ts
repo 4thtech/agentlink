@@ -36,7 +36,7 @@ describe('MCP session heartbeat: values (06 §6, 07 §3.2)', () => {
   it('beats every 15 s with a TTL of 45 s, in the next store schema version', () => {
     expect(MCP_SESSION_BEAT_SECONDS).toBe(15);
     expect(MCP_SESSION_TTL_SECONDS).toBe(45);
-    // Added by version 10; W4-PAUSE's version 11 keeps them.
+    // W4-AUTO-SAVE (D-142) takes version 11 after it, W4-PAUSE (D-143 (5)) version 12.
     expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(10);
   });
 });

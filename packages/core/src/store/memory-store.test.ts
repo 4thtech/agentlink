@@ -62,7 +62,10 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         // W4-LIVE-STATUS (D-143; 07 §3.2, schema 10): the MCP session heartbeat.
         'mcp_sessions',
         'mcp_last_seen',
-        // W4-PAUSE (D-143 (5); 07 §3.2, schema 11): the owner's pause of the agent.
+        // W4-AUTO-SAVE (D-142; 04 §4.1, schema 11): the limits log and the one-row state.
+        'auto_save_log',
+        'auto_save_state',
+        // W4-PAUSE (D-143 (5); 07 §3.2, schema 12): the owner's pause of the agent.
         'agent_pause',
         'idempotency',
         'owner_action_nonces',
@@ -139,7 +142,14 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   it('files.saved_name (MSG-FILES-IO-b, schema 6): a nullable sealed column, appended last', () => {
     expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(6);
     expect(TABLES.files.columns.saved_name).toEqual({ kind: 'enc', nullable: true });
-    expect(Object.keys(TABLES.files.columns).at(-1)).toBe('saved_name');
+    // W4-AUTO-SAVE (schema 11) appends the auto-save columns after it.
+    expect(Object.keys(TABLES.files.columns).slice(-5)).toEqual([
+      'saved_name',
+      'auto_save',
+      'auto_reason',
+      'auto_tries',
+      'auto_next_at',
+    ]);
   });
 });
 

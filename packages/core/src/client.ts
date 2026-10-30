@@ -28,6 +28,7 @@ import type { TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
 import { AgentRemovalService } from './agent-removal.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
+import { AutoSaver, type AutoSavePause } from './files/auto-save.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import { savedNameOf } from './files/received.js';
 import { saveReceivedFile, type SaveReceivedFileResult } from './files/save.js';
@@ -136,6 +137,11 @@ export interface AgentLinkClientOptions {
    */
   readonly files?: FilesPlatform;
   /**
+   * W4-AUTO-SAVE (D-142): the agent's pause state for the automatic save (W4-PAUSE wires it, D-143).
+   * Absent: never paused.
+   */
+  readonly autoSavePause?: AutoSavePause;
+  /**
    * The chains for proofs (M1-7g; 07 §6.2, §6.3): read clients, chain-state ports and submitters,
    * built by the runtime from the shipped chain list. Without it, the proof calls return
    * `PROOFS_UNAVAILABLE` and `proof` envelopes are stored but not acted on.
@@ -200,6 +206,11 @@ export class AgentLinkClient {
   readonly messages: MessagesView;
   /** The local app's Files Received and Sent (MSG-FILES-IO-a): read-only, store only. */
   readonly filesIo: FilesIoView;
+  /**
+   * W4-AUTO-SAVE (D-142, 04 §4.1): received files saved automatically. The background loop of the
+   * lease holder calls `run`; the local app reads and dismisses the one-time notice. No MCP tool.
+   */
+  readonly autoSave: AutoSaver;
   /** The activity feed (M1-11r-a, M1-11r-d; the local UI): messages, files, approvals, proofs, blocks, rules. */
   readonly activity: ActivityService;
   readonly #send: SendService;
@@ -223,6 +234,7 @@ export class AgentLinkClient {
     files: FilesPlatform | undefined,
     proofs: ProofsPlatform | undefined,
     ownStorageKeys: OwnStorageKeys | undefined,
+    autoSavePause?: AutoSavePause,
   ) {
     this.agentId = agentId;
     this.#ctx = ctx;
@@ -279,6 +291,9 @@ export class AgentLinkClient {
       ...(files === undefined ? {} : { files }),
     });
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
+    this.autoSave = new AutoSaver(ctx, this.#files, () => ownerActions.loadPolicy(), {
+      ...(autoSavePause === undefined ? {} : { pause: autoSavePause }),
+    });
     this.#filesPlatform = files;
     this.files = new FilesView(ctx, files, () => ownerActions.loadPolicy());
     this.fileLinks = new FileLinks(
@@ -686,6 +701,7 @@ export class AgentLinkClient {
       options.files,
       options.proofs,
       options.ownStorageKeys,
+      options.autoSavePause,
     );
   }
 }

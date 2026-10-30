@@ -45,6 +45,10 @@ export async function sealFileRows(
       delete_after: r.deleteAfter,
       // MSG-FILES-IO-b: only a received file is saved by fetchFile.
       saved_name: null,
+      auto_save: null,
+      auto_reason: null,
+      auto_tries: null,
+      auto_next_at: null,
     });
   }
   return rows;

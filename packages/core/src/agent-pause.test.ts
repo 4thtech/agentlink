@@ -85,8 +85,8 @@ async function rejectsPaused(run: () => Promise<unknown>): Promise<void> {
 }
 
 describe('agent_pause (07 §3.2; 06 §6 "Paused agents")', () => {
-  it('is a one-row table of schema version 11, in clear (a slot and a time)', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(11);
+  it('is a one-row table of schema version 12, in clear (a slot and a time)', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(12);
     expect(TABLES.agent_pause).toMatchObject({ primaryKey: ['slot'], maxRows: 1 });
     expect(Object.keys(TABLES.agent_pause.columns).sort()).toEqual(['paused_at', 'slot']);
     expect(TABLES.agent_pause.columns.paused_at.kind).toBe('int');

@@ -39,6 +39,7 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
 } from '@4thtech-io/crypto';
+import { AUTO_SAVE_DEFAULTS } from '@4thtech-io/types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { createKeychainAgent, openRecordedKeyStore } from './keychain-keystore.js';
@@ -190,7 +191,11 @@ function defaultsWith(folders: readonly string[]): string {
   const base = JSON.parse(JSON.stringify(effective.policy)) as {
     files: Record<string, unknown>;
   };
-  return canonicalize({ ...base, files: { ...base.files, allowedFolders: [...folders] } });
+  // D-142: every policy.set this core signs carries files.autoSave (the defaults here).
+  return canonicalize({
+    ...base,
+    files: { ...base.files, allowedFolders: [...folders], autoSave: { ...AUTO_SAVE_DEFAULTS } },
+  });
 }
 
 async function exists(path: string): Promise<boolean> {
