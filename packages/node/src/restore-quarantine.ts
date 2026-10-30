@@ -21,7 +21,7 @@ import { unlinkSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import {
   CryptoInputError,
-  decodeHex,
+  decodeHex0x,
   encodeHex,
   equalBytes,
   parseJson,
@@ -172,8 +172,9 @@ export async function checkQuarantinedSnapshot(
     );
     const stored = parseJson(text) as { card?: { ownerNostr?: unknown } } | null;
     const named = stored?.card?.ownerNostr;
-    if (typeof named !== 'string' || !/^[0-9a-f]{64}$/.test(named)) return false;
-    if (!equalBytes(decodeHex(named, { length: 32 }), ownerNostr)) return false;
+    // The card spelling of ownerNostr: `0x` + 64 lowercase hex (04 §2.4.1); anything else throws.
+    if (typeof named !== 'string') return false;
+    if (!equalBytes(decodeHex0x(named, { length: 32 }), ownerNostr)) return false;
     file.state = 'checked';
     return true;
   } catch {
