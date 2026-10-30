@@ -62,6 +62,36 @@ describe('readConfig', () => {
     }
   });
 
+  it('uses the spec invite limits and the invite host as the invite origin (W4-SHORT-INVITE)', () => {
+    const config = readConfig({ DROP_URL_KEY: KEY });
+    expect(DEFAULTS.inviteMaxSize).toBe(17_441);
+    expect(DEFAULTS.inviteDownloadLimit).toBe(8);
+    expect(DEFAULTS.inviteKeyUploadsPerHour).toBe(20);
+    expect(DEFAULTS.inviteKeyUploadsPerDay).toBe(100);
+    expect(DEFAULTS.inviteKeyLive).toBe(50);
+    expect(DEFAULTS.inviteIpFetchesPerHour).toBe(30);
+    expect(DEFAULTS.inviteFetchesPerHour).toBe(20_000);
+    expect(config?.inviteOrigins).toEqual(['https://agentlink.4thtech.io']);
+    // The size cap and the download limit are not configurable.
+    const fixed = readConfig({
+      DROP_URL_KEY: KEY,
+      DROP_INVITE_MAX_SIZE: '99999',
+      DROP_INVITE_DOWNLOAD_LIMIT: '99',
+    });
+    expect(fixed?.limits.inviteMaxSize).toBe(17_441);
+    expect(fixed?.limits.inviteDownloadLimit).toBe(8);
+    const overridden = readConfig({
+      DROP_URL_KEY: KEY,
+      DROP_INVITE_FETCHES_PER_HOUR: '40',
+      DROP_INVITE_ORIGINS: 'https://invite.example',
+    });
+    expect(overridden?.limits.inviteFetchesPerHour).toBe(40);
+    expect(overridden?.inviteOrigins).toEqual(['https://invite.example']);
+    expect(readConfig({ DROP_URL_KEY: KEY, DROP_INVITE_ORIGINS: '' })?.inviteOrigins).toEqual([]);
+    expect(readConfig({ DROP_URL_KEY: KEY, DROP_INVITE_ORIGINS: '*' })).toBeNull();
+    expect(readConfig({ DROP_URL_KEY: KEY, DROP_INVITE_KEY_LIVE: '0' })).toBeNull();
+  });
+
   it('refuses a wildcard or non-https CORS origin, or one with a path', () => {
     for (const origins of [
       '*',

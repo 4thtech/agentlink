@@ -81,6 +81,8 @@ function harness(
   terminal: TerminalContext = TTY,
   script: {
     readonly check?: 'ok' | 'expired' | 'invalid';
+    /** W4-SHORT-INVITE: how a short link resolves (default: to LINK). */
+    readonly resolve?: 'ok' | 'gone' | 'down';
     readonly record?: AppHostRecord;
     readonly alive?: boolean;
     readonly handoff?: HandoffOutcome;
@@ -90,6 +92,7 @@ function harness(
   const err: string[] = [];
   const calls = {
     checked: [] as string[],
+    resolved: [] as string[],
     records: 0,
     handoffs: [] as { record: AppHostRecord; link: string }[],
     starts: [] as { name: string | undefined; invite: string | undefined }[],
@@ -116,6 +119,16 @@ function harness(
     },
   };
   const deps: JoinDeps = {
+    resolve: (link) => {
+      calls.resolved.push(link);
+      if (script.resolve === 'gone') {
+        return Promise.reject(new CoreError('invite_unavailable', 'x'));
+      }
+      if (script.resolve === 'down') {
+        return Promise.reject(new CoreError('invite_fetch_failed', 'x'));
+      }
+      return Promise.resolve(link.includes('#2.') ? LINK : link);
+    },
     check: (link) => {
       calls.checked.push(link);
       if (script.check === 'expired') return Promise.reject(new CoreError('invite_expired', 'x'));
@@ -346,5 +359,43 @@ describe('the dispatcher hands `join` its raw arguments (no option parsing)', ()
     });
     expect(code).toBe(EXIT_USAGE);
     expect(err).toEqual([JOIN_TEXT.refused]);
+  });
+});
+
+describe('agentlink join: a short link (W4-SHORT-INVITE, D-139; 08 §4)', () => {
+  const SHORT = 'https://agentlink.4thtech.io/i#2.AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8';
+
+  it('takes the short link form, bare or quoted, and refuses broken short forms', () => {
+    expect(joinLinkOf([SHORT])).toBe(SHORT);
+    expect(joinLinkOf([`'${SHORT}'`])).toBe(SHORT);
+    for (const bad of [
+      `${SHORT}A`,
+      SHORT.slice(0, -1),
+      `${SHORT.slice(0, -1)}B`,
+      SHORT.replace('#2.', '#3.'),
+      SHORT.replace('https://agentlink', 'https://evil'),
+      '2.AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+    ]) {
+      expect(joinLinkOf([bad]), bad).toBeUndefined();
+    }
+  });
+
+  it('resolves once, checks the resolved invite and hands the RESOLVED invite to the app', async () => {
+    const h = harness(TTY, { record: RECORD });
+    expect(await h.run([SHORT])).toBe(EXIT_OK);
+    expect(h.calls.resolved).toEqual([SHORT]);
+    expect(h.calls.checked).toEqual([LINK]);
+    expect(h.calls.handoffs).toEqual([{ record: RECORD, link: LINK }]);
+  });
+
+  it('a gone invite and an unreachable drop print fixed lines, nothing of the link', async () => {
+    const gone = harness(TTY, { resolve: 'gone' });
+    expect(await gone.run([SHORT])).toBe(EXIT_USAGE);
+    expect(gone.err).toEqual([JOIN_TEXT.unavailable]);
+    expect(gone.calls.checked).toEqual([]);
+    const down = harness(TTY, { resolve: 'down' });
+    expect(await down.run([SHORT])).toBe(EXIT_FAILED);
+    expect(down.err).toEqual([JOIN_TEXT.unreachable]);
+    for (const line of [...gone.err, ...down.err]) expect(line).not.toContain('2.AAEC');
   });
 });

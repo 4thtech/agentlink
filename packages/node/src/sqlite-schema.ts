@@ -66,6 +66,8 @@ const V5_TABLES: readonly TableName[] = ['own_storage'];
 const V6_FILES_COLUMNS: readonly string[] = ['saved_name'];
 /** Tables added by version 7 (U3-d, D-138): the signed local owner actions (07 §3.4). */
 const V7_TABLES: readonly TableName[] = ['local_owner_actions'];
+/** Invites columns added by version 8 (W4-SHORT-INVITE, D-139): a short link's drop object. */
+const V8_INVITES_COLUMNS: readonly string[] = ['drop_lookup_id', 'drop_key_epoch', 'cancelled_at'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -85,6 +87,7 @@ function v1Spec(table: TableName): TableSpec {
   const spec = tableSpec(table);
   if (table === 'envelopes') return without(spec, V2_ENVELOPE_COLUMNS);
   if (table === 'files') return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS]);
+  if (table === 'invites') return without(spec, V8_INVITES_COLUMNS);
   return spec;
 }
 
@@ -137,6 +140,19 @@ function v6Statements(): readonly string[] {
 }
 
 /**
+ * Version 8 (W4-SHORT-INVITE, D-139; 07 §3): `invites.drop_lookup_id` and `drop_key_epoch` (sealed)
+ * and `cancelled_at`, appended. Every existing row keeps null (a format 1 invite, not cancelled);
+ * nothing is rewritten. An older build refuses a version 8 file, so the upgrade cannot be rolled back.
+ */
+function v8Statements(): readonly string[] {
+  const invites = tableSpec('invites');
+  return V8_INVITES_COLUMNS.map(
+    (column) =>
+      `ALTER TABLE "invites" ADD COLUMN ${columnDef('invites', column, invites.columns[column] as ColumnSpec)}`,
+  );
+}
+
+/**
  * The forward migrations, oldest first; the last one's version is STORE_SCHEMA_VERSION. Version 1
  * is the G-9 schema, version 2 adds D-72's columns and table, version 3 adds the `publisher_lease`
  * and `outbox_staged` tables (M1-7k-b; new tables only, so existing rows are untouched), version 4
@@ -168,6 +184,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 5, statements: createSchemaStatements(V5_TABLES) }),
   Object.freeze({ version: 6, statements: Object.freeze(v6Statements()) }),
   Object.freeze({ version: 7, statements: createSchemaStatements(V7_TABLES) }),
+  Object.freeze({ version: 8, statements: Object.freeze(v8Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

@@ -21,6 +21,17 @@
 //   then stages the pairing (04 §3.6 Accept steps 2 and 3; I-4). The pairing stays pending until the
 //   inviter's agent answers; the safety code follows as on Contacts.
 //
+// W4-SHORT-INVITE and W4-INVITES-LIST (D-139; 04 §3.6.2; 08 §1):
+// - create takes `{"long": true}` from Advanced only (D-139 (7)) and answers the link `format`;
+// - `GET /api/ui/invites` (a read) answers the open invites: ID, name (the invite label) and expiry,
+//   never a link, a secret or a lookup ID;
+// - `POST /api/ui/invites/cancel`, the invite kind, step `cancel`, body exactly `{"inviteId"}`: core
+//   `cancelInvite`, which refuses a later answer and deletes a short link's drop object;
+// - check and accept also take the short link `…/i#2.<43>` (or the bare `2.<43>`): core resolves it
+//   with one GET from the configured drop host; accept resolves it FIRST and uses the resolved invite
+//   for every step, so the approval action keeps it sealed and nothing re-fetches it. A gone object
+//   is `unavailable_invite`, an unreachable drop `try_again`.
+//
 // Only the canonical link `https://agentlink.4thtech.io/i#<payload>` or the bare payload ever reaches
 // core: any other host, scheme, path, percent-escape, whitespace or size is refused here first, and
 // nothing in these routes fetches anything (04 §4). The link holds the invite secret: it is answered
@@ -30,6 +41,7 @@ import {
   INVITE_LINK_PREFIX,
   INVITE_MAX_PAYLOAD_CHARS,
   acceptInviteSummary,
+  shortInviteSecretOf,
   inviteShareText,
   type CreatedInvite,
   type PendingContact,
@@ -43,7 +55,13 @@ import {
 } from '@4thtech-io/crypto';
 import { buildApprovalOperation } from '../../owner-approval.js';
 import type { LocalUiContext } from '../context.js';
-import { INVITE_ACCEPT_PATH, INVITE_CHECK_PATH, INVITE_CREATE_PATH } from '../invite-paths.js';
+import {
+  INVITE_ACCEPT_PATH,
+  INVITE_CANCEL_PATH,
+  INVITE_CHECK_PATH,
+  INVITE_CREATE_PATH,
+  INVITES_LIST_PATH,
+} from '../invite-paths.js';
 import {
   LOCAL_UI_MAX_INPUT_CHARS,
   UI_NOT_SET_UP,
@@ -52,6 +70,7 @@ import {
   type LocalUiInviteRoute,
   type LocalUiOwnerOperation,
   type LocalUiOwnerRoute,
+  type LocalUiReadRoute,
   type LocalUiRequest,
   type LocalUiResult,
   type LocalUiRoute,
@@ -95,6 +114,13 @@ const NOT_APPLIED = fixed(409, 'not_applied');
 /** Applied, but core would not use it (void, expired, or the rule changed in between). */
 const NOT_USED = fixed(409, 'refused');
 const UNAVAILABLE = fixed(503, 'unavailable');
+/** W4-SHORT-INVITE: the short link's object is gone (expired, used, cancelled or deleted). */
+const UNAVAILABLE_INVITE = fixed(400, 'unavailable_invite');
+/** W4-SHORT-INVITE: the drop could not be reached; retryable. */
+const TRY_AGAIN = fixed(503, 'try_again');
+const NOT_FOUND = fixed(404, 'not_found');
+/** An invite ID (16 bytes, base64url), as Cancel names it. */
+const INVITE_ID = /^[A-Za-z0-9_-]{22}$/;
 
 const INVALID_INVITE_CODES: ReadonlySet<string> = new Set([
   'invite_invalid',
@@ -123,6 +149,8 @@ function inviteRefusal(error: unknown): LocalUiResult | undefined {
   if (!(error instanceof CoreError)) return undefined;
   const code: string = error.code;
   if (code === 'invite_expired') return EXPIRED;
+  if (code === 'invite_unavailable') return UNAVAILABLE_INVITE;
+  if (code === 'invite_fetch_failed') return TRY_AGAIN;
   if (code === 'contact_is_self') return OWN_INVITE;
   if (INVALID_INVITE_CODES.has(code)) return INVALID_INVITE;
   if (CANNOT_PAIR_CODES.has(code)) return CANNOT_PAIR;
@@ -145,6 +173,12 @@ function inviteOf(value: unknown): string | 'invalid' | 'not_a_link' {
   const link = value['invite'];
   if (typeof link !== 'string') return 'invalid';
   if (link.length === 0 || link.length > INVITE_LINK_MAX_CHARS) return 'not_a_link';
+  // W4-SHORT-INVITE: link format 2, parsed strictly by core's one codec (04 §3.6.2 step 1).
+  try {
+    if (shortInviteSecretOf(link) !== undefined) return link;
+  } catch {
+    return 'not_a_link';
+  }
   const payload = link.startsWith(INVITE_LINK_PREFIX)
     ? link.slice(INVITE_LINK_PREFIX.length)
     : link;
@@ -183,18 +217,24 @@ async function createInvite(
 ): Promise<LocalUiResult> {
   if (invites === undefined) return UI_NOT_SET_UP;
   const keys = Object.keys(body);
-  if (keys.some((k) => k !== 'label')) return INVALID;
+  if (keys.some((k) => k !== 'label' && k !== 'long')) return INVALID;
   let label: string | undefined;
-  if (keys.length === 1) {
+  if (keys.includes('label')) {
     const value: JsonValue | undefined = body['label'];
     if (typeof value !== 'string' || value.length === 0 || value.length > MAX_LABEL_CHARS) {
       return INVALID;
     }
     label = value;
   }
+  // W4-SHORT-INVITE (D-139 (7)): only `true` asks for the long link.
+  if (keys.includes('long') && body['long'] !== true) return INVALID;
+  const long = body['long'] === true;
   let created: CreatedInvite;
   try {
-    created = await invites.create(label === undefined ? {} : { label });
+    created = await invites.create({
+      ...(label === undefined ? {} : { label }),
+      ...(long ? { long: true as const } : {}),
+    });
   } catch (error) {
     if (error instanceof CoreError) {
       if (error.code === 'name_invalid') return INVALID_LABEL;
@@ -203,7 +243,7 @@ async function createInvite(
     }
     return UNAVAILABLE;
   }
-  const { inviteUrl, expiresAt } = created;
+  const { inviteUrl, expiresAt, format } = created;
   const short: unknown = created.ownerFingerprint.short;
   const when = rfc3339(expiresAt);
   if (
@@ -211,7 +251,8 @@ async function createInvite(
     !inviteUrl.startsWith(INVITE_LINK_PREFIX) ||
     typeof short !== 'string' ||
     !FINGERPRINT.test(short) ||
-    when === undefined
+    when === undefined ||
+    (format !== 'short' && format !== 'long')
   ) {
     return UNAVAILABLE;
   }
@@ -223,8 +264,63 @@ async function createInvite(
       shareText: inviteShareText(inviteUrl, expiresAt),
       ownerFingerprint: short,
       expiresAt: when,
+      format,
     }),
   });
+}
+
+// --- open invites and cancel (W4-INVITES-LIST) -------------------------------------------------
+
+async function listInvites(
+  context: LocalUiContext,
+  request: LocalUiRequest,
+): Promise<LocalUiResult> {
+  if ([...request.query.keys()].length > 0) return INVALID;
+  const port = context.invites;
+  if (port === undefined) return UI_NOT_SET_UP;
+  let open: Awaited<ReturnType<typeof port.list>>;
+  try {
+    open = await port.list();
+  } catch (error) {
+    if (error instanceof CoreError && error.code === 'identity_missing') return UI_NOT_SET_UP;
+    return UNAVAILABLE;
+  }
+  const invites: JsonObject[] = [];
+  for (const item of open) {
+    const when = rfc3339(item.expiresAt);
+    if (!INVITE_ID.test(item.inviteId) || when === undefined) continue;
+    // The label is the name the invite was made for (a suggested alias, 06 §2.1): text only.
+    const name =
+      typeof item.label === 'string' &&
+      item.label.length > 0 &&
+      item.label.length <= MAX_LABEL_CHARS
+        ? item.label
+        : null;
+    invites.push({ inviteId: item.inviteId, name, expiresAt: when });
+  }
+  return Object.freeze({ status: 200, body: Object.freeze({ invites }) });
+}
+
+async function cancelInvite(
+  _context: LocalUiContext,
+  body: JsonObject,
+  invites: LocalUiInviteDesk | undefined,
+): Promise<LocalUiResult> {
+  if (invites === undefined) return UI_NOT_SET_UP;
+  const keys = Object.keys(body);
+  const inviteId = body['inviteId'];
+  if (keys.length !== 1 || typeof inviteId !== 'string' || !INVITE_ID.test(inviteId)) {
+    return INVALID;
+  }
+  let outcome: 'cancelled' | 'not_found';
+  try {
+    outcome = await invites.cancel(inviteId);
+  } catch (error) {
+    if (error instanceof CoreError && error.code === 'identity_missing') return UI_NOT_SET_UP;
+    return UNAVAILABLE;
+  }
+  if (outcome === 'not_found') return NOT_FOUND;
+  return Object.freeze({ status: 200, body: Object.freeze({ status: 'cancelled' }) });
 }
 
 // --- check ------------------------------------------------------------------------------------
@@ -275,11 +371,19 @@ async function acceptInvite(
  */
 export async function acceptInviteLink(
   context: LocalUiContext,
-  link: string,
+  given: string,
   owner: LocalUiOwnerOperation,
 ): Promise<LocalUiResult> {
   const port = context.invites;
   if (port === undefined) return UI_NOT_SET_UP;
+  // W4-SHORT-INVITE: resolve a short link once, before anything else; every step below uses the
+  // resolved invite, so the approval action holds it and nothing fetches it again (08 §1).
+  let link: string;
+  try {
+    link = await port.resolve(given);
+  } catch (error) {
+    return inviteRefusal(error) ?? UNAVAILABLE;
+  }
   const ownerContext = await context.ownerContext();
   if (ownerContext === undefined) return UI_NOT_SET_UP;
 
@@ -364,8 +468,25 @@ export const inviteAcceptRoute: LocalUiOwnerRoute = Object.freeze<LocalUiOwnerRo
   handler: acceptInvite,
 });
 
+export const invitesListRoute: LocalUiReadRoute = Object.freeze<LocalUiReadRoute>({
+  method: 'GET',
+  path: INVITES_LIST_PATH,
+  presence: false,
+  handler: listInvites,
+});
+
+export const inviteCancelRoute: LocalUiInviteRoute = Object.freeze<LocalUiInviteRoute>({
+  method: 'POST',
+  path: INVITE_CANCEL_PATH,
+  presence: 'invite',
+  step: 'cancel',
+  handler: cancelInvite,
+});
+
 export const invitesRoutes: readonly LocalUiRoute[] = Object.freeze([
   inviteCreateRoute,
   inviteCheckRoute,
   inviteAcceptRoute,
+  invitesListRoute,
+  inviteCancelRoute,
 ]);
