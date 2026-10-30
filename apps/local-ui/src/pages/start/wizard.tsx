@@ -358,7 +358,8 @@ export function ConnectedStep({
           <Icon name="agent" size={30} />
         )}
       </div>
-      <div className="st-intro st-center al-reveal st-delay-1" role="status">
+      {/* The title takes focus and is read once; no live region around it (IR-W4-WIZARD-1 L). */}
+      <div className="st-intro st-center al-reveal st-delay-1">
         <h1 id="st-h" ref={title} tabIndex={-1} className="st-title">
           {connected && appName !== undefined ? D.title(appName) : D.notConnectedTitle(label)}
         </h1>

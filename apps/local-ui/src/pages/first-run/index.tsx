@@ -55,6 +55,7 @@ import { CreateAgentGate } from '../apps/create-agent-gate.js';
 import type { CreateAgentApi } from '../apps/create-agent-api.js';
 import { readAgentSignal } from '../home/start-here-api.js';
 import type { AgentSignal } from '../home/start-here.js';
+import { markLeavingStart } from '../start/guard.js';
 import { markAutoShown, rememberWizard, wizardMemory, type WizardOutcome } from '../start/store.js';
 import { CONNECT_STEP as S, PICK_STEP as P, type StepId } from '../start/strings.js';
 import {
@@ -130,6 +131,8 @@ export function endFirstRun(read: () => Promise<JoinRead>): Promise<void> {
     .catch((): JoinRead => ({ kind: 'failed' }))
     .then((answer) => {
       const waiting = answer.kind === 'ok' && answer.state !== 'none';
+      // IR-W4-WIZARD-1: this full load ends Get started; its open-on-launch check keeps Home.
+      markLeavingStart();
       window.location.assign(waiting ? JOIN : HOME);
     });
 }
@@ -477,6 +480,8 @@ function useStartPath(): string {
 }
 
 /** "Add agent" reuses the steps: `/start/app?add=agent`. */
+// IR-W4-WIZARD-SEC-1 L2: `add` (value `agent`) is the only query key Get started reads; any other
+// key or value is ignored and never reaches a request.
 function wantsNewAgent(): boolean {
   return new URLSearchParams(location.search).get('add') === 'agent';
 }
@@ -850,6 +855,17 @@ export function FirstRunPage({
   // earlier choices goes back to step 1; Connected without an outcome reads the real state).
   useEffect(() => {
     // Back to step 1 (the browser's Back, or "Back"): the pick shows again.
+    // IR-W4-WIZARD-SEC-1 L1: leaving step 2 while the backup code shows (Back/Forward, a typed
+    // address) is "I saved it" without the click: the code leaves the state and the page, never
+    // hidden to come back; the kit is put off as with the click.
+    if (view.k === 'done' && step !== 'connect') {
+      rememberRecoveryKitLater();
+      rememberWizard({
+        outcome: { label, ...(view.done.app === undefined ? {} : { app: view.done.app }) },
+      });
+      setView({ k: 'step' });
+      return;
+    }
     if (step === 'app' && view.k === 'protect' && !view.working) {
       setView({ k: 'step' });
       return;
