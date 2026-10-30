@@ -119,6 +119,8 @@ const UNAVAILABLE_INVITE = fixed(400, 'unavailable_invite');
 /** W4-SHORT-INVITE: the drop could not be reached; retryable. */
 const TRY_AGAIN = fixed(503, 'try_again');
 const NOT_FOUND = fixed(404, 'not_found');
+/** W4-PAUSE (06 §6, 08 §1): the owner paused the agent; invites wait until Resume. */
+const AGENT_PAUSED = fixed(409, 'agent_paused');
 /** An invite ID (16 bytes, base64url), as Cancel names it. */
 const INVITE_ID = /^[A-Za-z0-9_-]{22}$/;
 
@@ -148,6 +150,7 @@ const CANNOT_PAIR_CODES: ReadonlySet<string> = new Set([
 function inviteRefusal(error: unknown): LocalUiResult | undefined {
   if (!(error instanceof CoreError)) return undefined;
   const code: string = error.code;
+  if (code === 'agent_paused') return AGENT_PAUSED;
   if (code === 'invite_expired') return EXPIRED;
   if (code === 'invite_unavailable') return UNAVAILABLE_INVITE;
   if (code === 'invite_fetch_failed') return TRY_AGAIN;
@@ -237,6 +240,7 @@ async function createInvite(
     });
   } catch (error) {
     if (error instanceof CoreError) {
+      if (error.code === 'agent_paused') return AGENT_PAUSED;
       if (error.code === 'name_invalid') return INVALID_LABEL;
       if (error.code === 'identity_missing') return UI_NOT_SET_UP;
       if (CANNOT_SEND_CODES.has(error.code)) return CANNOT_SEND;

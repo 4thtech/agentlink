@@ -228,7 +228,9 @@ export class AgentLinkClient {
     this.#ctx = ctx;
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
-    this.pairing = new PairingService(ctx, this.identity, this.contacts, files?.drop);
+    this.pause = new AgentPause({ store: ctx.store, now: () => nowOf(ctx) });
+    // W4-PAUSE (IR-W4-PAUSE-1): invites refuse while paused (CLI and app routes alike).
+    this.pairing = new PairingService(ctx, this.identity, this.contacts, files?.drop, this.pause);
     this.ownerActions = new OwnerActions(
       ctx,
       this.identity,
@@ -260,7 +262,6 @@ export class AgentLinkClient {
       this.idempotency,
     );
     this.requests = new RequestsQueue(ctx);
-    this.pause = new AgentPause({ store: ctx.store, now: () => nowOf(ctx) });
     // W4-PAUSE: nothing is published while the agent is paused (queued rows wait).
     this.outbox = new OutboxService(ctx, this.identity, this.contacts, transport, this.pause);
     this.removal = new AgentRemovalService(ctx, {

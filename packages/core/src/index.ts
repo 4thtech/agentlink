@@ -299,6 +299,7 @@ export {
 } from './outbox.js';
 // W4-PAUSE (D-143 (5)): the owner's pause of one agent (07 §3.2 `agent_pause`; 06 §6).
 export {
+  AGENT_PAUSED_TEXT,
   AgentPause,
   agentPaused,
   type AgentPauseOptions,
