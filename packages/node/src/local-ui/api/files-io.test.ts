@@ -139,7 +139,13 @@ describe('GET /api/ui/files/received and /sent: registration (MSG-FILES-IO-d)', 
       sendMessage: () => Promise.reject(new Error('never')),
     };
     const view = readOnlyClient(full as never);
-    expect(Object.keys(view.filesIo).sort()).toEqual(['received', 'savedName', 'sent']);
+    // W4-FILES-SAVE adds prepareSave: core's unsigned `file.save` (prepare only, writes nothing).
+    expect(Object.keys(view.filesIo).sort()).toEqual([
+      'prepareSave',
+      'received',
+      'savedName',
+      'sent',
+    ]);
     expect(await view.filesIo.savedName(`${ENV_A}.00`)).toBeNull();
     calls.length = 0;
     expect(view.filesIo).not.toBe(full.filesIo);
