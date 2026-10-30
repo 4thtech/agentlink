@@ -95,6 +95,11 @@ export const TABLES = {
   // sender lookup), key_epoch, nostr_keys (every agentNostr of a stored card, oldest first: superseded
   // keys, 04 §3.1.1 step 7, and the revoked set, §3.4), updated_at. Status `removed` is a tombstone
   // (02 F-14): the keys stay so later envelopes from them are dropped.
+  // W4-RENAME-REACHES-CONTACTS (D-141; 07 §3 "Former name", store version 9, appended): former_name
+  // (`enc`, the name the owner last saw before a card-update changed it), name_changed_at and
+  // name_change_seen (null or 1: no note due; 0: the note is due), and declared_name (`enc`, the
+  // contact's own self-declared name, kept also while the owner's alias is shown, so the note can read
+  // "Now calls itself {new} (was {old})"; null on rows from before version 9). Display state only.
   contacts: {
     columns: {
       contact_id: id,
@@ -117,6 +122,10 @@ export const TABLES = {
       safety_code_checked: flag,
       created_at: int,
       updated_at: int,
+      former_name: opt('enc'),
+      name_changed_at: opt('int'),
+      name_change_seen: opt('flag'),
+      declared_name: opt('enc'),
     },
     primaryKey: ['contact_id'],
     unique: [{ columns: ['agent_nostr'] }],

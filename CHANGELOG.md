@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-10-29
+
+### Added
+
+- Preview builds of the next wave (W4-NEXT-PREVIEW, process, owner Decision 44 A1): every green state of the `wave-4` integration branch is published to npm `next` as `x.y.z-next.wave4.<date and time>`, so you can try it with `npx -y @4thtech-io/agentlink@next`. It never touches `latest`, makes no GitHub Release and commits nothing, so nothing has to be undone when the wave merges into `main`.
+
+### Changed
+
+- Docs and status now say AgentLink 0.4.4 was released on 29 Oct 2026 (Welcome and a short first run, all your agents in one window, the AI apps page, the live connections map, Start here in seven steps, joining from an invite link, and contacts seeing the name you typed). The README opens the app with `npx -y @4thtech-io/agentlink` and keeps `init` for an AI that sets itself up, the user guide applies to 0.4.4, the Claude Desktop page links the 0.4.4 extension files, and the CLI reference, harness configuration, knowledge base and `llms.txt` no longer call these features merged for the next release (DOCS-044-RELEASED).
+- Spec: one Touch ID creates an agent and connects its AI app (W4-ONE-TOUCH, S2, D-140, 04 §2.8, 08 §1): the agent's keys are made before the gesture so the AI app change can name the new agent, one challenge binds the whole set of signatures, and the AI app entry is written last; if only the entry fails, the agent is kept and the app offers Connect.
+- Spec: renames reach contacts (W4-RENAME-REACHES-CONTACTS, S2, D-141, 04 §2.6, 06 §6): renaming an agent in the app now signs a new card with the new name under the same Touch ID, and the existing card update tells every contact, who see "{new} (was {old})" once. Renames stay owner-only, are limited to 3 a day, and no AI app tool can rename an agent.
+- Spec for much shorter invite links (W4-SHORT-INVITE, S2, D-139, 04 §3.6.2): the invite is encrypted on your computer and kept on the encrypted drop, and the link carries only a short secret, so it is under 80 characters instead of over a thousand. 4thTech still only ever holds ciphertext; older long links keep working. Proposed, owner confirms at merge; not built yet.
+
+### Fixed
+
+- The release health check waits up to 15 minutes for npm to serve each new package file before it checks provenance and signatures, and a re-run of a release that failed after publishing now finishes it (moves `latest` after the check passes, then creates the GitHub Release and the desktop bundles) instead of stopping; it finishes only on a re-run of the same run and only the exact package files that run built (CHORE-RELEASE-HEALTH-TARBALL-WAIT, process).
+- A new contact now appears on both Contacts pages without a reload once an invite is accepted: the page keeps checking while one of your invites is open or you are connecting (HOTFIX-045-CONTACTS-NEW).
+- Contacts no longer stays on "Waiting for their agent" after pairing has finished: while anyone is still waiting, the page checks again every few seconds and when you come back to the tab (HOTFIX-045-CONTACTS-REFRESH).
+- In Add contact, the box where you paste an invite no longer draws its text over the label and the hint above and below it. The box is now a proper multi-line field that grows with its text (HOTFIX-045-PASTE-FIELD).
+- Removing an agent works right after first run (HOTFIX-045-REMOVE-FIRSTRUN, S2; 04 §2.5, 06 §6): on a new computer, Remove no longer says "Couldn't finish removing" until you quit and reopen the app. Touch ID or your backup code is still asked before anything is deleted.
+- Removing an agent finishes (HOTFIX-045-REMOVE, S2; 04 §2.5, 06 §6): Remove no longer stops at "Removal not finished — Try again" every time, and Try again now also works on a computer with only one agent. Touch ID or your backup code is still asked before anything is deleted.
+- The top bar shows one status instead of two and no "+N" chip, and a file that arrived but is not saved shows a fixed line instead of an endless bar (HOTFIX-045-TOPBAR, S1, 08 §1).
+- Touch ID instead of the backup code when no agent is open (HOTFIX-045-TOUCHID, S2; 04 §2.3.1, §2.5; 11 §5): the app now finds your Touch ID even when no agent is open. When Touch ID can't be used, the sheet says why instead of silently asking for the backup code, and if this computer doesn't have Touch ID set up for AgentLink yet (for example an owner set up before 0.3.0) you can switch once right there: your backup code, then one touch.
+
 ## [0.4.4] - 2026-10-29
 
 ### Added
@@ -779,7 +803,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/4thtech/agentlink/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/4thtech/agentlink/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/4thtech/agentlink/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/4thtech/agentlink/compare/v0.4.1...v0.4.2
