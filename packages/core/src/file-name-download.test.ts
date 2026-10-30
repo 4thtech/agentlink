@@ -62,6 +62,13 @@ describe('savedFileName (04 §4.1)', () => {
     expect(savedFileName('notes.txt.download')).toBe('notes.txt.download');
   });
 
+  it('folds the extension through upper and lower case (IR SEC L4: long s, Kelvin sign)', () => {
+    expect(needsDownloadSuffix('evil.\u017Fcr')).toBe(true); // ſcr → SCR → scr
+    expect(needsDownloadSuffix('evil.ln\u212A')).toBe(true); // Kelvin sign K → k
+    expect(needsDownloadSuffix('desktop.\u0131ni')).toBe(true); // dotless ı → I → i
+    expect(savedFileName('evil.\u017Fcr')).toBe('evil.\u017Fcr.download');
+  });
+
   it('a 300-byte name is cut to 255 bytes on a code-point boundary, the extension kept', () => {
     const long = `${'é'.repeat(150)}.pdf`; // 304 bytes
     const name = savedFileName(long);

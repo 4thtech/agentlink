@@ -229,6 +229,11 @@ export interface FileAgent {
   readonly inbox: MemoryInbox;
   readonly lines: string[];
   readonly platform: FilesPlatform;
+  /**
+   * W4-AUTO-SAVE: a second client on the same store, keys and Inbox folder, as another AgentLink
+   * process of this agent (`agentlink ui`, another MCP process) opens it: its own in-memory locks.
+   */
+  secondProcess(): Promise<AgentLinkClient>;
 }
 
 export interface FileAgentOptions {
@@ -287,6 +292,7 @@ export async function openFileAgent(
       };
     },
   };
+  const policyMark = new MemoryPolicyMark();
   const client = await AgentLinkClient.create({
     keyStore,
     store,
@@ -294,7 +300,7 @@ export async function openFileAgent(
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
     transport: spy.factory,
-    policyMark: new MemoryPolicyMark(),
+    policyMark,
     files: platform,
     ...(options.proofs === undefined ? {} : { proofs: options.proofs }),
     ...(options.autoSavePause === undefined ? {} : { autoSavePause: options.autoSavePause }),
@@ -321,6 +327,22 @@ export async function openFileAgent(
     inbox,
     lines,
     platform,
+    secondProcess: () =>
+      AgentLinkClient.create({
+        keyStore,
+        store,
+        cipher,
+        approvals: new RecordingApprovalChannel(),
+        clock: clock.now,
+        transport: spy.factory,
+        policyMark,
+        files: platform,
+        logger: createLogger({
+          name: 'core',
+          level: 'debug',
+          sink: (_l, line) => lines.push(line),
+        }),
+      }),
   };
 }
 

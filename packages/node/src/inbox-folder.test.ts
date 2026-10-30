@@ -107,6 +107,41 @@ describe('inboxFolderProblem: the folder rules (04 §4.1)', () => {
     );
   });
 
+  it('refuses OS and app folders (IR SEC L1): Library, System, Applications, AppData, Program Files', async () => {
+    const home = scratch();
+    const lib = join(home, 'Library', 'Inbox');
+    mkdirSync(lib, { recursive: true, mode: 0o700 });
+    chmodSync(join(home, 'Library'), 0o700);
+    chmodSync(lib, 0o700);
+    const stat = lstatSync(lib);
+    const darwin = (realpath: string) =>
+      inboxFolderProblem({ realpath, home, sendFolders: [], stat, platform: 'darwin' });
+    expect(await darwin(join(home, 'Library'))).toBe('os_folder');
+    expect(await darwin(lib)).toBe('os_folder');
+    for (const p of ['/Library/In', '/System/In', '/Applications/In', '/Applications']) {
+      expect(await darwin(p), p).toBe('os_folder');
+    }
+    const win = (realpath: string) =>
+      inboxFolderProblem({
+        realpath,
+        home: 'C:\\Users\\ana',
+        sendFolders: [],
+        stat,
+        platform: 'win32',
+      });
+    for (const p of [
+      'C:\\Users\\ana\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup',
+      'C:\\Users\\ana\\AppData\\Local\\In',
+      'C:\\Program Files\\In',
+      'C:\\Program Files (x86)\\In',
+      'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\StartUp',
+      'C:\\Windows\\Temp',
+    ]) {
+      expect(await win(p), p).toBe('os_folder');
+    }
+    expect(await win('C:\\Users\\ana\\Documents\\Inbox')).toBeUndefined();
+  });
+
   it('refuses a file and a missing path', async () => {
     const home = scratch();
     const file = join(home, 'f');
