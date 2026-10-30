@@ -322,7 +322,6 @@ const LEGACY_APP_KEYFRAMES = [
   'apps/local-ui/src/pages/agents/map/map.css | mp-travel',
   'apps/local-ui/src/pages/contacts/contacts.css | ct-breathe',
   'apps/local-ui/src/pages/contacts/contacts.css | ct-dup-in',
-  'apps/local-ui/src/pages/contacts/contacts.css | ct-highlight',
   'apps/local-ui/src/pages/home/home.css | hm-start-fade',
   'apps/local-ui/src/pages/home/home.css | hm-start-pop',
   'apps/local-ui/src/pages/moving/moving.css | mv-travel',
