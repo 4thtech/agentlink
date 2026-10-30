@@ -207,7 +207,7 @@ describe('chapter 3: inbox', () => {
   // conversation (both ways, the other side's words in the untrusted box) and the files (Save with
   // one Touch ID, then Show in Finder / Explorer / folder); the approval card sits on top of Home.
   // Motion (U0 helper): reduced motion runs fades only, and Home's first load does not shift.
-  it('Home: hello → reply in the person row; a file arrives and Save takes one Touch ID; the approval card on top takes one Touch ID', async (ctx) => {
+  it('Home: hello → reply in the person row; a file arrives and is saved by itself; the approval card on top takes one Touch ID', async (ctx) => {
     const ready = ch.need(ctx);
     if (ready === undefined) return;
     const world = journeyWorld();
@@ -223,7 +223,16 @@ describe('chapter 3: inbox', () => {
     const bProbe = await b.arm();
     await navTo(a.page, 'Home');
     await navTo(b.page, 'Home');
-    // Home's own first load moves nothing (the score counts from here: the shell before it is U1's).
+    // Home's own first load moves nothing. The score counts from here: before it, the shell's
+    // "Switch to Touch ID" next step (registered while accepting the invite) leaves on the first
+    // page change after it, when its re-read answers, and moves the page up once; that is the
+    // shell's banner (layout/index.tsx), not Home, so the baseline waits for it to be gone.
+    await eventually(
+      'the shell next step has settled',
+      async () => (await b.page.locator('main a[href="/first-run"]').count()) === 0,
+    );
+    await b.page.getByRole('heading', { name: 'People' }).waitFor();
+    await b.page.waitForTimeout(500);
     const clsBefore = await layoutShiftScore(b.page);
     await navTo(b.page, 'Agents');
     await navTo(b.page, 'Home');
@@ -258,20 +267,16 @@ describe('chapter 3: inbox', () => {
     await a.page.getByText(REPLY).first().waitFor({ timeout: 30_000 });
     await a.page.getByText('Sent', { exact: true }).first().waitFor({ timeout: 30_000 });
 
-    // A file: in Ana's Files, "Arrived · not saved", then Save with one Touch ID.
+    // A file: W4-AUTO-SAVE (D-142) saves a paired contact's file by itself; Ana's Files on Home
+    // shows "Saved as" and Show in Finder / Explorer / folder, with no Touch ID. (Save with one
+    // Touch ID, when the automatic save cannot run, is the test above.)
     const file = await sendable(pcA);
+    const before = b.gestures.total();
     await mcpA.call('agentlink_send', { to: 'Bo', text: 'The brief', path: file.path });
     await b.page.getByText(FILE_NAME).first().waitFor({ timeout: 30_000 });
-    await b.page
-      .getByText(/Arrived · not saved/)
-      .first()
-      .waitFor({ timeout: 30_000 });
-    expect(await b.page.locator('[role="progressbar"]').count()).toBe(0);
-    const before = b.gestures.total();
-    await b.page.getByRole('button', { name: 'Save to Inbox' }).first().click();
-    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
     await eventually('the file is saved', async () => (await text(b.page)).includes('Saved as'));
-    expect(b.gestures.total() - before).toBe(1);
+    expect(await b.page.locator('[role="progressbar"]').count()).toBe(0);
+    expect(b.gestures.total() - before).toBe(0);
     await b.page
       .getByRole('button', { name: /^Show in (Finder|Explorer|folder)$/ })
       .first()
