@@ -196,6 +196,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // W4-INVITES-LIST: the open invites (a read) and Cancel (api/invites-short.test.ts).
       '/api/ui/invites',
       '/api/ui/invites/cancel',
+      // W4-LIVE-STATUS: the live event stream (local-ui/events-server.test.ts).
+      '/api/ui/events',
       // W4-SHELL-V2: the app's UI settings (local-ui/ui-settings-server.test.ts).
       '/api/ui/ui-settings',
     ]);

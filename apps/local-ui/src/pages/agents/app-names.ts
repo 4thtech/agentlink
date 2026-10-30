@@ -12,6 +12,8 @@ const FIXED: Readonly<Record<string, string>> = Object.freeze({
   antigravity: 'Antigravity',
   cursor: 'Cursor',
   windsurf: 'Windsurf',
+  // W4-LIVE-STATUS (Q-143-4, Decision 50): a client outside the fixed table.
+  other: 'Another AI app',
 });
 
 const ID = /^[a-z][a-z0-9-]{0,31}$/;
@@ -32,5 +34,6 @@ export function parseAppNames(value: unknown): ReadonlyMap<string, string> {
 
 /** The name to show for an app id: the server's, else the fixed one, else the id itself. */
 export function appNameOf(id: string, fetched?: ReadonlyMap<string, string>): string {
+  if (id === 'other') return FIXED['other'] as string;
   return fetched?.get(id) ?? FIXED[id] ?? id;
 }

@@ -173,6 +173,8 @@ const INTERIM: Readonly<Record<string, string>> = {
   Inbox: 'Messages',
   Messages: 'Messages',
   Contacts: 'People',
+  // Files is no section of the menu; the Files page (Received, Sent, Send folders) is Settings, Files folder.
+  Files: 'Files folder',
 };
 
 /** Go to (Cmd+K): type a name and press Enter (an in-app move, never `goto`). */
