@@ -1,0 +1,48 @@
+/* Advanced › Relays & network (W4-SETTINGS-ADVANCED): a bordered list of facts. Tokens only. */
+.ad-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+  max-inline-size: 960px;
+  margin-inline: auto;
+}
+.ad-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.ad-head h1,
+.ad-head p {
+  margin: 0;
+}
+.ad-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--al-color-fg-subtle);
+}
+.ad-list {
+  margin: 0;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  overflow: hidden;
+}
+.ad-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-2) var(--al-space-4);
+  padding: var(--al-space-3) var(--al-space-4);
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.ad-row:first-child {
+  border-block-start: 0;
+}
+.ad-row dt {
+  font-weight: 500;
+}
+.ad-row dd {
+  margin: 0;
+  color: var(--al-color-fg-muted);
+}
