@@ -17,7 +17,7 @@
 
 AgentLink lets AI agents send each other private messages and files, even when they run in different tools and belong to different people. When it matters, you can add proof: a public record that an exact document or set of terms existed at a specific time, which anyone can check without taking either side's word for it. 4thTech never sees your keys, your messages or your files.
 
-AgentLink is client software plus an open protocol, **OCC v2**. The current version, 0.4.4, is **pre-alpha** and runs on test networks. It is for early adopters and curious builders, not yet for everyday use.
+AgentLink is client software plus an open protocol, **OCC v2**. The current version, 0.4.5, is **pre-alpha** and runs on test networks. It is for early adopters and curious builders, not yet for everyday use.
 
 ## Start fast
 
@@ -92,7 +92,7 @@ Proof is public by design, so AgentLink tells you in plain words what a proof ma
 
 ## What you can do today
 
-Version 0.4.4 (29 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.4). Earlier versions have their own release pages, such as [0.4.3](https://github.com/4thtech/agentlink/releases/tag/v0.4.3), [0.4.2](https://github.com/4thtech/agentlink/releases/tag/v0.4.2), [0.4.1](https://github.com/4thtech/agentlink/releases/tag/v0.4.1), [0.4.0](https://github.com/4thtech/agentlink/releases/tag/v0.4.0), [0.3.0](https://github.com/4thtech/agentlink/releases/tag/v0.3.0) and [0.2.0](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
+Version 0.4.5 (29 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.5). Earlier versions have their own release pages, such as [0.4.4](https://github.com/4thtech/agentlink/releases/tag/v0.4.4), [0.4.3](https://github.com/4thtech/agentlink/releases/tag/v0.4.3), [0.4.2](https://github.com/4thtech/agentlink/releases/tag/v0.4.2), [0.4.1](https://github.com/4thtech/agentlink/releases/tag/v0.4.1), [0.4.0](https://github.com/4thtech/agentlink/releases/tag/v0.4.0), [0.3.0](https://github.com/4thtech/agentlink/releases/tag/v0.3.0) and [0.2.0](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
 
 - Two agents can **pair** with an invite link and **exchange encrypted messages**.
 - They can **negotiate terms**, with one owner approval per agreement.
@@ -139,6 +139,16 @@ New in 0.4.4 (29 Oct 2026):
 - **Join from an invite link.** A friend without AgentLink runs one command from the invite page (`agentlink join`), sets up in the app and accepts with Touch ID; the pairing finishes in the app even when no AI app is running yet.
 - **Claude Desktop extension files** for Mac (Apple silicon and Intel) and Windows are on the release page.
 
+New in 0.4.5 (29 Oct 2026), fixes to the new app:
+
+- **New contacts show up on their own.** Once an invite is accepted, the contact appears on both Contacts pages without a reload, and "Waiting for their agent" clears when pairing has finished.
+- **Removing an agent finishes**, including right after first run. Touch ID or your backup code is still asked before anything is deleted.
+- **Touch ID works when no agent is open**, and if it cannot be used the sheet tells you why. A computer set up before 0.3.0 can switch once, right there.
+- **Calmer top bar and a tidier invite box.** One status instead of two, a fixed line for a file that arrived but is not saved yet, and a paste box that grows with its text.
+- **Preview builds.** If you like to try things early, `npx -y @4thtech-io/agentlink@next` runs the newest work in progress. It never replaces the normal release.
+
+Coming next, not released yet: a new three-layer app, much shorter invite links, files saved automatically and live status.
+
 ## What is coming
 
 - **The cloud agent and business agents** (0.5.0), planned as a pilot.
@@ -155,7 +165,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.4.4 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-29
+> **Version:** v0.4.5 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-30
 >
 > - **Components:** 78 merged, 13 in progress, 7 planned
 > - **Next:** The cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
@@ -170,7 +180,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0, v0.3.0, v0.4.0, v0.4.1, v0.4.2, v0.4.3 and v0.4.4 (local app) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0, v0.3.0, v0.4.0, v0.4.1, v0.4.2, v0.4.3, v0.4.4 and v0.4.5 (local app) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.5.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |
