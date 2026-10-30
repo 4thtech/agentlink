@@ -15,11 +15,7 @@
 import { Button, InlineError, ProgressBar, TextArea, formatContactName } from '@4thtech-io/ui';
 import { useId, useState, type FormEvent, type ReactElement } from 'react';
 import type { CheckedInvite, InviteApi, InviteRefusal } from '../contacts/invite-api.js';
-import {
-  passkeyProof,
-  type PasskeyInfo,
-  type PresenceProof,
-} from '../contacts/owner.js';
+import { passkeyProof, type PasskeyInfo, type PresenceProof } from '../contacts/owner.js';
 import { PresencePrompt } from '../contacts/presence-prompt.js';
 import { CONTACTS_STRINGS as C, waitSeconds } from '../contacts/strings.js';
 import { detectPlatform } from '../first-run/passkey.js';

@@ -395,7 +395,10 @@ export async function acceptInviteInApp(
 ): Promise<void> {
   const { page } = jp;
   await checkInviteInApp(jp, link);
-  await page.getByText(/invites you to connect your AIs$/).first().waitFor();
+  await page
+    .getByText(/invites you to connect your AIs$/)
+    .first()
+    .waitFor();
   expect(await text(page)).toContain(inviter);
   await page.getByRole('button', { name: ACCEPT_WITH }).click();
 }

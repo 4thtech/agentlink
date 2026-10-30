@@ -905,7 +905,6 @@ export function ContactsPage({
     };
   }, [owner]);
 
-
   // The highlight lasts 1.2 s (b11 §21.3); only its colour fades, so it is the same when reduced.
   useEffect(() => {
     if (highlight === undefined) return undefined;
@@ -1042,7 +1041,12 @@ export function ContactsPage({
                 title={START_STRINGS.emptyContacts}
                 prompt={S.emptyPrompt}
                 action={
-                  <Button variant="primary" icon="user-plus" className="al-press" onClick={openInvite}>
+                  <Button
+                    variant="primary"
+                    icon="user-plus"
+                    className="al-press"
+                    onClick={openInvite}
+                  >
                     {START_STRINGS.addContact}
                   </Button>
                 }

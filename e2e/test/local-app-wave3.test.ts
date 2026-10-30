@@ -239,7 +239,10 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     await page.getByRole('button', { name: 'Have an invite link? Paste it' }).click();
     await page.getByLabel('Paste the invite link').fill(inviteUrl);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await page.getByText(/invites you to connect your AIs$/).first().waitFor();
+    await page
+      .getByText(/invites you to connect your AIs$/)
+      .first()
+      .waitFor();
     await page.getByRole('button', { name: /^Accept with / }).click();
 
     const complete = async (mcp: AiAppMcp): Promise<Record<string, unknown> | undefined> => {
