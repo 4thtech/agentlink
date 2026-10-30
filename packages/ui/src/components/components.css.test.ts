@@ -5,7 +5,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import pkgText from '../../package.json?raw';
 import tokens from '../tokens/tokens.css?raw';
-import components from './components.css?raw';
+import componentsCss from './components.css?raw';
+import legacyShell from './legacy-shell.css?raw';
+
+// W4-HOME: the legacy app shell's rules moved to legacy-shell.css (AppShell's own stylesheet, not
+// imported by the app); the component stylesheet is both files.
+const components = `${componentsCss}\n${legacyShell}`;
 import { fixtures } from './components.fixture.js';
 import * as ui from './index.js';
 
