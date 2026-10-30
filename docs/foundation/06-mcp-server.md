@@ -125,7 +125,7 @@ type FileInfo = {
   plaintextSha256: string;               // 64 lowercase hex (04 §2.4.1)
   delivery: "inline" | "drop" | "own";   // inline content, the encrypted drop (host is the configured drop origin), or other storage
   expiresAt: string | null;              // RFC 3339 UTC, formatted by us; null for inline
-  savedTo?: string;                      // local path, once agentlink_fetch_file saved it (M1b)
+  savedTo?: string;                      // local path, once the file is saved: automatically (D-142), by Save in the app, or by agentlink_fetch_file (M1b)
 };
 
 type MessageBase = {
@@ -211,7 +211,12 @@ Files are sent with `agentlink_send` and `path` (§2.2) and fetched with `agentl
 | Tool | Input | Output | Notes |
 |---|---|---|---|
 | `agentlink_send` with `path` | as in §2.2 | as in §2.2, with `file` | `path` (resolved with realpath) must be inside an owner-allowed folder (policy `files.allowedFolders`); ≤ 12 255 bytes of file content inline (12 288 bytes of `ALF1` ciphertext, 04 §3.4), otherwise stored per `files.storage` (§3, 07 §5.6; inline packing under the 17 136-byte payload cap, 04 §3.4, G-27, D-85): own storage if configured, else the encrypted drop. No storage setup is needed within the drop limits. `needs_setup` (own storage) only when the drop cannot take the file (above its size cap or weekly quota, or policy `own`) and no own storage is configured or selected (§3) |
-| `agentlink_fetch_file` | `{envelopeId, fileIndex? = 0}` | `{savedTo, name, size, integrity: "verified", receipt?: "DELIVERED recorded"}` | Applies SSRF rules (04 §4); checks both hashes; saves into `files.inboxFolder`; never executes. Records `DELIVERED` if notarized and the policy allows it for that contact (`receipts.autoDelivered`, default `false`, or a contact rule; §3, D-109) |
+| `agentlink_fetch_file` | `{envelopeId, fileIndex? = 0}` | `{savedTo, name, size, integrity: "verified", receipt?: "DELIVERED recorded"}` | Applies SSRF rules (04 §4); checks both hashes; saves into `files.inboxFolder` under the writing rules of 04 §4.1; never executes. Records `DELIVERED` if notarized and the policy allows it for that contact (`receipts.autoDelivered`, default `false`, or a contact rule; §3, D-109). Idempotent with auto-save (D-142): a file already saved is answered from the record, below |
+
+**Files are saved automatically (D-142; decided by Tali in chat, 2026-10-29, Decision 47; details proposed, owner confirms at merge; W4-AUTO-SAVE).** A file that arrives from a contact the owner keeps is saved into `files.inboxFolder` by the agent's core, without a tool call, within the limits of `files.autoSave` (§3) and the rules of 04 §4.1. The tool surface does not change (D-53): no tool is added, and no tool turns auto-save on or off, changes the folder or its limits, or sets "Ask before saving" (I-4).
+- **`agentlink_inbox`** shows `savedTo` on a file once it is saved, however it was saved. A file that is not saved (auto-save off, "Ask before saving" for that contact, a limit reached, disk full, folder unavailable, a failed download) has no `savedTo`, as today.
+- **`agentlink_fetch_file` still works,** with the same input, output and status values (§1 rule 1). It shares one lock per file with auto-save and with Save in the app, so two at once write one copy. When the store records a saved name for the file and that name is still a regular file directly inside the Inbox folder (realpath, 04 §4), it re-hashes that file and, when its SHA-256 and size still equal the file's plaintext hash and size from the payload, answers `{savedTo, name, size, integrity: "verified"}` from the record without downloading again, writing a second copy or recording a second receipt. So `integrity: "verified"` always means verified now, at the time of the answer, never only at save time (IR-W4-AUTO-SAVE-spec-1). When the saved file was moved, deleted or changed since (a different hash or size), it downloads again under a new name, as today, while the link has not expired. While the agent is paused (§6 "Paused agents", D-143, specified in PR #721 on wave-4) it refuses with `AGENT_PAUSED`. It is the user's request through the AI, so it is not held back (unchanged; decided, Decision 51, 2026-10-30) by the auto-save limits, the off switch or "Ask before saving": that is today's save-on-request path. It still applies `files.maxReceiveSizeMB`, the SSRF rules and every writing rule of 04 §4.1 (quarantine mark, disk-free check, sanitised names, no overwrite).
+- **On the cloud agent** nothing is saved automatically: it has no disk, and `agentlink_fetch_file` keeps the behaviour below.
 
 **Files on the cloud agent (0.5.0; resolves G-14; D-131 (g), (k), decided by the owner, 2026-10-26).** The Worker has no file system, so the two file tools keep their names, schemas and status values (§1 rule 1) and differ only in where the file lives:
 - `agentlink_fetch_file` decrypts the file inside the Worker, checks both hashes and stores the plaintext in the user's own R2 bucket under a random key. `savedTo` is a link on the Worker's own host that works for 15 minutes (the tool result carries it as the decrypted content this tool returns; it is never logged, I-7). The object is deleted after 7 days.
@@ -310,7 +315,13 @@ contacts:
   rateLimitPerContactPerHour: 120
 files:
   allowedFolders: []           # empty = agentlink_send with a path returns needs_setup (NO_ALLOWED_FOLDER) whose nextStep names `policy allow-send-folder` and `policy allow-folder <path>` for the owner's own terminal (M1-36b-2-c; proposed, owner confirms at merge); owner init and add-agent sign ~/AgentLink/Send as the first rule (D-121 D6)
-  inboxFolder: ~/AgentLink/Inbox
+  inboxFolder: ~/AgentLink/Inbox  # where received files are saved; chosen once, changeable in Settings (D-142, folder rules in 04 §4.1)
+  autoSave:                    # D-142 (proposed, owner confirms at merge): files from contacts the owner keeps are saved automatically
+    on: true                   # the global switch in Settings; false = files wait for Save or the AI's fetch, as before D-142
+    perContactFilesPerDay: 50  # rolling 24 h, per contact
+    perContactMBPerDay: 500
+    totalFilesPerDay: 200      # rolling 24 h, all contacts of this agent
+    totalMBPerDay: 2048
   maxSendSizeMB: 100
   maxReceiveSizeMB: 200
   storage: auto                # auto (default: own storage if configured, else the encrypted drop) | drop | own
@@ -349,14 +360,15 @@ contactRules: []            # per-contact proof rules (G-32), at most 256; creat
 | Enum | `contacts.acceptInvites` (`approval`, `auto`); `contacts.unknownSenders` (`queue`, `drop`); `files.storage` (`auto`, `drop`, `own`); `files.deleteAfter` (`expiry`, `receipt`); `proofs.notarize` and `commitments.accept` (each `allow`, `approval`, `deny`); `proofs.allowKeyDisclosure` (`approval`, `deny`: never `allow`, because disclosing a content key is owner-only, 04 §2.5); `commitments.autoAcceptDirection` (`buy`, `sell`) | String, exactly one of the listed values |
 | Contact list | `contacts.allowed` | The string `"paired"`, or a JSON array of 1–256 agent IDs |
 | Contact list | `commitments.autoAcceptContacts` | A JSON array of 0–256 agent IDs |
-| Boolean | `files.ownerArchive`, `receipts.autoDelivered`, `receipts.autoOpened`, `contactRules[].receipts.autoDelivered` (D-109) | `true` or `false` |
-| Integer | `contacts.rateLimitPerContactPerHour` [1, 3600]; `files.maxSendSizeMB` and `files.maxReceiveSizeMB` [1, 10 240]; `files.defaultExpiryDays` [1, 7]; `envelopes.maxEnvelopeKB` [1, 24] | JSON integer (04 §2.4.1 integer rule) in the range shown |
+| Boolean | `files.ownerArchive`, `files.autoSave.on` (D-142), `receipts.autoDelivered`, `receipts.autoOpened`, `contactRules[].receipts.autoDelivered` (D-109) | `true` or `false`; `contactRules[].files.askBeforeSaving` (D-142) is exactly `true` |
+| Integer | `contacts.rateLimitPerContactPerHour` [1, 3600]; `files.maxSendSizeMB` and `files.maxReceiveSizeMB` [1, 10 240]; `files.defaultExpiryDays` [1, 7]; `envelopes.maxEnvelopeKB` [1, 24]; `files.autoSave.perContactFilesPerDay` and `totalFilesPerDay` [1, 1000]; `files.autoSave.perContactMBPerDay` and `totalMBPerDay` [1, 10 240] (D-142) | JSON integer (04 §2.4.1 integer rule) in the range shown |
 | USD amount | `proofs.dailyBudgetUSD`, `proofs.perActionMaxUSD`, `commitments.autoAcceptMaxUSD`; `commitments.autoAcceptMinUSD` (or `null`); `contactRules[].proofs.perActionMaxUSD` | A USD amount (04 §2.4.1): the single spelling `^(0\|[1-9][0-9]{0,8})(\.[0-9]{0,5}[1-9])?$` (`"5"`, `"0.5"`; never `"5.00"` or `"0.50"`), compared as an exact decimal and never as a binary float. A JSON number is rejected |
 | Path | `files.allowedFolders` (array of 0–32, unique), `files.inboxFolder`, `proofs.exportFolder` | String of 1–4096 UTF-8 bytes with no C0 or C1 control character. A leading `~/` means the user's home folder. The core resolves each path with realpath when it is used (04 §4) |
 | Chain | `proofs.defaultChain` | A chain key from 07 §6.3, matching `^[a-z0-9-]{1,32}$` |
 | Rules | `contactRules` | A JSON array of 0–256 `ContactRule` objects (below) |
 
 - **Agent IDs** in policy lists are `0x` + 40 lowercase hex (04 §2.4.1, §2.9). Each list is sorted in strictly ascending byte order, which also makes the entries unique, so one set of contacts has one spelling. An unsorted list or a duplicate is rejected.
+- **`files.autoSave` in policies signed before D-142 (proposed, owner confirms at merge).** It is the one key that may be absent: a stored policy without it, signed before D-142, stays valid and is read with the `autoSave` defaults above (auto-save on; decided, Decision 51, 2026-10-30), so updating never turns a valid policy into "policy not valid, confirm it again". When present it is a strict object with all five keys. Every `policy.set` signed by a core that knows D-142 includes it; an older core refuses such a policy (fail closed, as for any added key). No other key may be absent.
 - **The defaults** in this JSON form are the listing above, with `contacts.allowed: "paired"`, empty arrays, the USD values `"5"`, `"1"` and `"0"`, and `autoAcceptMinUSD: null`. M1-2b's snapshot test compares them with this section.
 
 **Per-contact rules (G-32; accepted, D-90).** "Remember for this contact" on a proof approval (11 §8) is an owner-signed `policy.set` that adds or changes one entry in `contactRules`. No other mechanism exists: there is no separate rule object and no partial patch, so one signed document and one `version` stay the only source of policy (04 §2.5.1, G-6). *Later (D-130 (6), M2, card M2-UX-REMEMBER-MORE):* offering "Remember for this contact" for more kinds of approval (incoming files over the size limit, receipts for this contact) is planned for M2 and needs its own rule fields and decision entry; until then it stays proof-only as specified here.
@@ -369,14 +381,19 @@ contactRules: []            # per-contact proof rules (G-32), at most 256; creat
     "notarize": "allow | approval | deny",  // replaces proofs.notarize for this contact, except that a global deny always wins
     "perActionMaxUSD": "<USD amount>"       // replaces proofs.perActionMaxUSD for this contact
   },
-  "receipts": {                             // optional (D-109, M1-33a); at least one of `proofs` and `receipts`
+  "receipts": {                             // optional (D-109, M1-33a); at least one of `proofs`, `receipts` and `files`
     "autoDelivered": true                   // replaces receipts.autoDelivered for this contact
+  },
+  "files": {                                // optional (D-142; proposed, owner confirms at merge)
+    "askBeforeSaving": true                 // exactly true: files from this contact are not saved automatically
   }
 }
 ```
 
+- **Files part (D-142; proposed, owner confirms at merge).** `files.askBeforeSaving: true` is "Ask before saving" for this contact (08 §1, 11 §5.7): its files arrive and wait for Save in the app or the AI's fetch, as before D-142. It can only make saving stricter: there is no per-contact way to save automatically while `files.autoSave.on` is `false`, and no per-contact limits. It is set from the contact's page with the owner's presence (a `policy.set`), never by an MCP tool.
+
 - **Receipts part (D-109).** A rule's `receipts.autoDelivered` applies only to DELIVERED receipts for records whose signer is `contact`, under the same paired, not blocked or revoked condition as below; it never applies to OPENED, ACCEPTED or REJECTED. A rule may carry `receipts` without `proofs`; `proofs`, when present, still needs at least one of its two keys.
-- **Where it applies.** A rule applies to proof actions (`agentlink_notarize`, and `notarize` on `agentlink_send`, `agentlink_propose_terms` and `agentlink_respond_to_terms`) whose counterparty is `contact`, meaning the other agent of the envelope being recorded. It applies only while `contact` is a paired contact that is not blocked or revoked. A re-pair under the same agent ID keeps the owner keys unchanged (04 §2.9), so the rule cannot pass to another owner. A rule never applies to unknown senders, to `dailyBudgetUSD`, to `allowKeyDisclosure`, or to any `commitments`, `contacts` or `files` rule. Rules are read only from the verified policy. Where no verified policy exists, or the G-6 fail-closed result applies, no rule applies.
+- **Where it applies.** A rule applies to proof actions (`agentlink_notarize`, and `notarize` on `agentlink_send`, `agentlink_propose_terms` and `agentlink_respond_to_terms`) whose counterparty is `contact`, meaning the other agent of the envelope being recorded. It applies only while `contact` is a paired contact that is not blocked or revoked. A re-pair under the same agent ID keeps the owner keys unchanged (04 §2.9), so the rule cannot pass to another owner. A rule never applies to unknown senders, to `dailyBudgetUSD`, to `allowKeyDisclosure`, or to any `commitments`, `contacts` or `files` rule, except its own `files.askBeforeSaving` (D-142). Rules are read only from the verified policy. Where no verified policy exists, or the G-6 fail-closed result applies, no rule applies.
 - **Evaluation for a proof action** (pure, M1-7i), with `r` the rule for its counterparty, if any. The result is the strictest outcome of the steps: `deny` beats `approval`, which beats `allow`.
   1. If `proofs.notarize` is `deny`, the result is `deny`.
   2. Effective `notarize` = `r.proofs.notarize` if present, else `proofs.notarize`. `deny` gives `deny`; `approval` gives `approval`.
@@ -413,7 +430,7 @@ Policies are owner-signed documents (04 §2.5; G-6 resolved for this point, prop
 - every paid action (`proofs`, including the proof part of a commitment) and every commitment (`commitments.accept`, `agentlink_respond_to_terms`, `accept` and `reject` acknowledgements, firm offers) needs the owner's approval, and so does every owner-gated action (new contacts, file access, key disclosure); nothing is auto-accepted, no `contactRules` entry applies, and no budget or auto-accept grant is read from the stored policy;
 - unknown senders are queued, not dropped, and no folder is allowed (`files.allowedFolders` is treated as empty);
 - a paired contact (not blocked, removed or revoked) counts as allowed for Talk (D-70): its envelopes are received, and envelopes to it are sent, without approval, within the hard caps below. Residual: a narrower `contacts.allowed` list is not honoured while the policy is invalid. Commitments, paid actions and owner-gated actions still need approval, as above. A `card-update` (04 §3.4.1) is subject to `contacts.allowed` like any message and, unlike Talk, is not sent at all while the policy fails closed (D-106);
-- limits that grant nothing use the built-in defaults as hard caps (`rateLimitPerContactPerHour`, `maxSendSizeMB`, `maxReceiveSizeMB`, `defaultExpiryDays`, `maxEnvelopeKB`, `deleteAfter: "expiry"`); no receipt is signed automatically (`autoDelivered` and `autoOpened` are treated as `false`); and nothing is uploaded, because sending a file needs an allowed folder;
+- limits that grant nothing use the built-in defaults as hard caps (`rateLimitPerContactPerHour`, `maxSendSizeMB`, `maxReceiveSizeMB`, `defaultExpiryDays`, `maxEnvelopeKB`, `deleteAfter: "expiry"`); no receipt is signed automatically (`autoDelivered` and `autoOpened` are treated as `false`); and nothing is uploaded, because sending a file needs an allowed folder; nothing is saved automatically (`files.autoSave.on` is treated as `false`, D-142), and received files wait for Save or the AI's fetch;
 - an invalid stored policy is never partly applied: no decision value is taken from it, and a `deny` in it cannot be trusted, so it becomes `approval`, never `allow`; the approval card says the policy is not valid;
 - the local UI and the console say "policy not valid, confirm it again" until the owner signs a new `policy.set` with presence. The deliberate path back is `agentlink policy recover` (§8, D-100): the owner reviews either the stored policy (when it parses and its signature verifies, as after a rollback or a mark mismatch) or the defaults, in full, and signs a complete policy at version max(mark, stored) + 1, above both the KeyStore mark and the stored policy's version (D-103); nothing is rebuilt without that review.
 
