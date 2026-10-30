@@ -5729,6 +5729,18 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
 - **Acceptance:**
   - RED tests first; DOM tests for both layers (inbound text only in the untrusted container, GETs only on read, item ID only on reveal and save); journey chapter 3 un-gated on Home with a reduced-motion and CLS run; the real-browser approval tests on Home's card and bulk flow; skeleton after ~300 ms; 360 px; changeset and changelog.d fragment.
 
+#### W4-WIRE-2 · local app: name step for new agents, paste an invite link (wave 4, owner Decision 52 (2), (3))
+- **Status:** in review, wave 4 (0.4.6) · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (pasted invite, owner presence) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/{start,first-run,invite,contacts,agents}/**`, `layout/agent-switcher.tsx`; `e2e/test/journey/{world,helpers-agents}.ts`, `e2e/test/local-app-wave3.test.ts`
+- **Depends on:** W4-WIRE (#740)
+- **Spec:** owner Decision 52 (2), (3); W4 UX v2 layer 1; 04 §2.8 (D-140), §3.6, §3.6.2; 11 §5; b11 §21, §29.3
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Add agent (agent menu, Agents' New agent, Go to) is Get started's add mode: "Name your agent" (agent-name rules, the taken-name hint, the server's check), the AI app pick, one Touch ID (create + connect); `?add=agent` kept on every step; an abandoned run starts fresh; Connected offers "Open {name}"; ends on Home without a reload. The quick Add sheet is retired.
+  - "Have an invite link? Paste it" (People, and the Invite screen): only the AgentLink short or long link goes on, to the existing check and accept (friend's card, Accept with Touch ID, Connected moment); the paste screen makes no invite of yours. The Add contact sheet is retired, with its code and CSS.
+- **Acceptance:**
+  - RED tests first; DOM tests for the name rules, the fresh start, the paste refusals (no request, no navigation) and the accept contract; journeys 01–07 green; CSS budget unchanged; changeset and changelog.d fragment.
+
 ### Wave 4 follow-ups from the reviews (W4-CARDS-1030)
 
 Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720, #731, #737 and the K3 fix). Each is small and independent; none blocks 0.4.6. Items already fixed on `wave-4` are not carded. The class follows the path rules of `audit-rules.md` §2.2. Findings carry the review's ID; no finding detail is repeated here.

@@ -38,7 +38,8 @@ import {
 
 // W4-WIZARD: first run is Get started (journey/helpers-wizard.ts).
 const CONNECT_WITH = /^Connect with (Touch ID|Windows Hello|your passkey)$/;
-const INVITE_LINK = /https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]+/;
+// The long link, or W4-SHORT-INVITE's short one (`2.` and 43 characters).
+const INVITE_LINK = /https:\/\/agentlink\.4thtech\.io\/i#(?:2\.)?[A-Za-z0-9_-]+/;
 let browser: Browser | undefined;
 let launchError: unknown;
 const closers: (() => Promise<unknown>)[] = [];
@@ -195,13 +196,20 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     expect(statSync(backup).mode & 0o777).toBe(claude.mode);
 
     // A second agent of the person's own, with one Touch ID.
-    // W4-AGENTS: Add opens from `?add=1` (the agent chip's Add agent); New agent is Get started.
-    await page.goto(new URL('/agents?add=1', link).href);
-    await page.getByLabel('Name your agent').fill('Second agent');
-    await page.getByRole('button', { name: 'Add with Touch ID' }).click();
-    await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
-    await page.getByText('Connect an AI app to it?').waitFor();
-    await page.getByRole('button', { name: 'Not now' }).click();
+    // W4-WIRE-2 (Decision 52 (2)): Add agent is Get started's add mode: "Name your agent", then an
+    // AI app that is not on this computer (Claude Code stays with the first agent), one Touch ID.
+    await page.goto(new URL('/start/app?add=agent', link).href);
+    await page.getByRole('heading', { name: 'Name your agent', level: 1 }).waitFor();
+    await page.getByLabel('Agent name').fill('Second agent');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button').filter({ hasText: 'Not found yet' }).first().click();
+    await page
+      .getByRole('button', { name: /^Continue with / })
+      .first()
+      .click();
+    await page.getByRole('button', { name: CONNECT_WITH }).click();
+    await page.getByRole('heading', { name: /Second agent.? is ready$/ }).waitFor();
+    await page.getByRole('button', { name: 'Go to Home' }).click();
     expect((await pc.directory.list()).map((e) => e.name)).toEqual(['default', 'second-agent']);
 
     // Each agent's AI app runs its own MCP server (what its entry starts); they do the syncing.
@@ -210,25 +218,32 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     const mcpSecond = await startAiAppMcp(pc, 'second-agent');
     closers.push(() => mcpSecond.close());
 
-    // The first agent invites from Contacts.
-    await page.goto(new URL('/settings/contacts', link).href);
-    await page.getByRole('button', { name: 'Add contact' }).first().click();
-    await page.getByRole('button', { name: 'Create invite' }).click();
-    await page.getByText('Invite ready').first().waitFor();
-    const inviteUrl = INVITE_LINK.exec(await page.locator('body').innerText())?.[0] ?? '';
+    // The first agent invites from the Invite screen (W4-WIRE-2: the Add contact sheet is retired).
+    await page.goto(new URL('/contacts?invite', link).href);
+    await page.getByRole('heading', { name: 'Invite someone', level: 1 }).waitFor();
+    const shown = page.locator('.inv-link[data-state="ready"]');
+    await shown.waitFor();
+    const value = (await shown.innerText()).trim();
+    const inviteUrl =
+      INVITE_LINK.exec(value.startsWith('https://') ? value : `https://${value}`)?.[0] ?? '';
     expect(inviteUrl).not.toBe('');
-    await page.getByRole('button', { name: 'Done' }).click();
+    // Copied, so the link is kept when the screen goes.
+    await page.getByRole('button', { name: 'Copy', exact: true }).click();
+    await page.getByRole('button', { name: 'Copied', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
 
     // Switch (nothing signed), and the second agent accepts it with Touch ID.
     await switchTo(page, link, 'Second agent');
-    await page.goto(new URL('/settings/contacts', link).href);
-    await page.getByRole('button', { name: 'Add contact' }).first().click();
-    await page.getByRole('tab', { name: 'I have an invite' }).click();
+    // W4-WIRE-2 (Decision 52 (3)): the Invite screen's "Have an invite link? Paste it".
+    await page.goto(new URL('/contacts?invite', link).href);
+    await page.getByRole('button', { name: 'Have an invite link? Paste it' }).click();
     await page.getByLabel('Paste the invite link').fill(inviteUrl);
-    await page.getByRole('button', { name: 'Check invite' }).click();
-    await page.getByText('Is this who you expected?').waitFor();
-    await page.getByRole('button', { name: 'Connect', exact: true }).click();
-    await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page
+      .getByText(/invites you to connect your AIs$/)
+      .first()
+      .waitFor();
+    await page.getByRole('button', { name: /^Accept with / }).click();
 
     const complete = async (mcp: AiAppMcp): Promise<Record<string, unknown> | undefined> => {
       const listed = await mcp.call('agentlink_list_contacts');

@@ -19,6 +19,24 @@ export const WIZARD = {
   progressLabel: 'Get started progress',
 } as const;
 
+/**
+ * W4-WIRE-2 (owner Decision 52 (2)): Add agent's first screen, before the pick. The name rules are
+ * the agent-name rules of first run (1 to 32 characters; the server checks the name before any
+ * Touch ID).
+ */
+export const NAME_STEP = {
+  stepName: 'Name your agent',
+  eyebrow: 'New agent',
+  title: 'Name your agent',
+  body: 'You and the people you connect with see this name. You can rename it later in Agents.',
+  field: 'Agent name',
+  next: 'Continue',
+  checking: 'Checking the name…',
+  then: 'Next, pick the AI app it works in.',
+  /** IR-W4-WIRE-2X-1: the old Add sheet's hint, kept (a hint only; the name may still be used). */
+  taken: 'You already have an agent with this name.',
+} as const;
+
 /** A1, step 1: pick your AI app. */
 export const PICK_STEP = {
   eyebrow: 'Welcome',
@@ -68,6 +86,8 @@ export const CONNECTED_STEP = {
     `If ${app} is open, quit it and open it again so it picks up AgentLink.`,
   invite: 'Invite someone',
   home: 'Go to Home',
+  /** W4-WIRE-2: Add agent's Connected: open the new agent (only when asked). */
+  open: (agent: string): string => `Open ${agent}`,
   then: 'Then',
   example: (app: string): string => `just ask ${app}, like "send Denis the brief".`,
 } as const;

@@ -443,6 +443,8 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§4, §9.1) and the owner's decis
 
 ## 21. Add contact: create an invite, or use one
 
+> **W4-WIRE-2 (owner Decision 52 (3)):** the Add contact sheet below is retired. Creating an invite is the Invite screen (§34.5; every Invite someone and Add contact opens it). Using an invite someone sent is **"Have an invite link? Paste it"**: a small link-style option in People's title row and on the Invite screen. It opens a paste screen ("Accept an invite") with no invite panel, so no link of yours is made; only the AgentLink short or long link (alone, without `https://`, or inside the shared message) goes on, to the check and then the friend's card ("{name} invites you to connect your AIs", the short owner fingerprint, **Accept with Touch ID** or the backup code, **Not now**); the Connected moment follows. Anything else is refused in place with no request: "That isn't an AgentLink invite link. Copy the whole link and paste it again." §21.4's refusal sentences are kept. The rest of this section is history.
+
 **Idea.** Today a newcomer has to know to ask their AI for an invite, and Home's Next step leads to a page without a button (UX-WAVE-2 item 1). One **Add contact** button now does it in the app: create a ready-to-send invite and hand it on through Copy, the system share sheet or a QR code, or paste an invite someone sent you. Pattern: Slack and Linear "Invite people", Signal and WhatsApp contact QR codes, Apple's share sheet. Built from `Button`, `Segmented` (§22), `TextField`, the `QrCode` of Add credits (`pages/proofs/qr.tsx`), the copied moment (§6 row 6) and the level-3 side sheet (§13.1). Owner decisions 1.1 and 2.1 apply. **This section replaces §8 screens 8 and 9** where they differ: creating an invite needs no Touch ID (decision 1.1), the QR code shows on request, and the safety line is the one in §21.3.
 
 ### 21.1 Where it opens
@@ -895,7 +897,7 @@ Home, 1440 (content column ~1180)
 
 A solo user can still see a reply end to end. The quiet link under step 4 opens a short panel in the §21 sheet shell (level 3, 480 px; a full page at 600 px and under): **"Try it with a second agent of your own"**.
 
-1. **Add an agent** (the §29.3 Add sheet, AI app chosen, name prefilled from it, Touch ID). A second agent needs a **different AI app** from the first (an AI app serves one agent at a time, §30.2): for example Claude Desktop beside Claude Code.
+1. **Add an agent** (§29.3, Get started's add mode: name, AI app, Touch ID). A second agent needs a **different AI app** from the first (an AI app serves one agent at a time, §30.2): for example Claude Desktop beside Claude Code.
 2. **Connect that AI app to it** (the §30.3 change panel). The panel shows the two agents side by side with their AppMark, app name and state word.
 3. **The app accepts the invite for that agent**: it creates an invite from one agent and accepts it for the other. The owner sees one confirmation line, "Pair Claude Code agent and Claude Desktop agent?", and the safety code is shown once as a pair.
 
@@ -1063,15 +1065,14 @@ Agents, 1440
 - **Loading:** three skeleton rows in the final size. **Error:** "Couldn't load your agents." with **Try again**; rows keep the last known values.
 - **Motion:** a new row slides in and settles (§6 row 1); a removed row collapses (§6 row 4); live dots as §5. Reduced motion: changes at once.
 
-### 29.3 Add an agent (sheet)
+### 29.3 Add an agent (Get started's add mode)
 
-The §21.1 sheet shell (level 3, right, 480 px; a full page at 600 px and under; not a modal). Title "Add an agent".
+W4-WIRE-2 (owner Decision 52 (2)): the Add sheet is retired. **Add agent** (the agent menu), **New agent** (Agents) and Go to open Get started's add mode at `/start/app?add=agent`; the query stays on every step, so an open agent never turns it into "Connect another AI app". The wizard frame (§34.3) and its words apply; a run left before its end (Skip to Home, a link, Back) starts fresh the next time.
 
-1. **Which AI app will use it?** The same radio list as first run (§28.2), but apps already serving another agent show "Used by Personal" and are not selectable here (an AI app serves one agent at a time; to move one, use §30.3). "I'll choose later" is allowed.
-2. **Name:** `TextField` "Name your agent", prefilled "{App} agent" (or "Second agent" with no app), up to 40 characters, not overwritten once edited.
-3. **Touch ID:** **Add with Touch ID**. The owner signs the new agent's card; the statement names the label. The owner is the same, so no new passkey is created.
-4. **After it:** the success moment (§6 row 7), then, when an app was chosen, **"Connect {App} to it?"** with **Connect {App}** (primary; opens the §30.3 change panel) and **Not now** (text); with none chosen, **"Connect an AI app to it?"**. The new agent does not become the open one unless **Switch to it** (a checkbox, off by default) was ticked.
-- **In progress:** indeterminate bar, "Adding…". **Errors:** Touch ID cancelled ("Not added yet. Try again."); failed ("Couldn't add it. Nothing was saved. Try again.").
+1. **Name your agent** (step 1, before the pick; progress "Step 1 of 4 · Name your agent"): one `TextField` "Agent name", 1 to 32 characters, no control, bidi or invisible format characters; "You already have an agent with this name." as a hint (the name may still be used); the server checks the name before any Touch ID. **Continue**.
+2. **Which AI app do you use?** The same tiles as first run, with **Back** to the name. An app not on this computer creates the agent alone.
+3. **Confirm it's you:** the agent card and one **Connect with Touch ID** (D-140: create and connect in one gesture), or the backup code.
+4. **Connected** (or "{name} is ready" when no app was connected), with **Invite someone**, **Open {name}** (opens the new agent only when pressed) and **Go to Home** (in the app, no reload).
 
 ### 29.4 Remove an agent (sheet)
 

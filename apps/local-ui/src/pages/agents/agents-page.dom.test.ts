@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { resetLiveForTests } from '../../api/live.js';
 import { createOwnerClient } from '../contacts/owner.js';
 import { createAgentsApi } from './api.js';
+import { CreateAgentGate } from '../apps/create-agent-gate.js';
 import { AgentsPage, type AgentsPageProps } from './index.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -386,20 +387,39 @@ describe('Add', () => {
       },
     },
   };
-  it('asks for a name (40 characters, prefilled); begin, then the backup code finishes with only the nonce', async () => {
+  // W4-WIRE-2 (Decision 52 (2)): New agent is Get started's add mode (`/start/app?add=agent`, its
+  // own "Name your agent" step); the quick Add sheet is retired. The one-gesture gate keeps its
+  // contract: begin, then the backup code finishes with only the nonce.
+  async function mountGate(onDone = vi.fn()): Promise<Mock> {
+    await act(async () => {
+      root.render(
+        createElement(CreateAgentGate, {
+          label: 'Second agent',
+          summary: '',
+          onDone,
+          onCancel: () => undefined,
+        }),
+      );
+    });
+    await settle();
+    return onDone;
+  }
+  it('`?add=1` (an older Add agent link) opens no sheet on Agents', async () => {
+    history.replaceState(null, '', '/agents?add=1');
+    await mountPage();
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(plain(host)).not.toContain('Add an agent');
+    expect([...host.querySelectorAll('button')].map((b) => b.textContent)).not.toContain(
+      'Add with Touch ID',
+    );
+  });
+  it('the gate: begin, then the backup code finishes with only the nonce', async () => {
     answers['POST /api/ui/agents/begin'] = READY;
     answers['POST /api/ui/agents'] = {
       status: 200,
       body: { status: 'done', name: 'second-agent', label: 'Second agent' },
     };
-    history.replaceState(null, '', '/agents?add=1');
-    await mountPage();
-    const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
-    expect(plain(sheet)).toContain('Add an agent');
-    const field = sheet.querySelector<HTMLInputElement>('input[type="text"]')!;
-    expect(field.maxLength).toBe(32);
-    expect(field.value).toBe('Second agent');
-    await click(button(sheet, 'Add with Touch ID'));
+    const onDone = await mountGate();
     await click(button(host, 'Use a backup code instead'));
     await type(backupCode(), '123456');
     await click(button(host, 'Confirm with my backup code'));
@@ -409,20 +429,18 @@ describe('Add', () => {
     expect(begin?.body).toBe('');
     expect(finish?.body).toBe('123456');
     expect(finish?.headers.get('X-AgentLink-Input')).not.toContain('123456');
-    expect(plain(host)).toContain('Connect an AI app to it?');
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ label: 'Second agent' }));
   });
   it('a refused begin says why and creates nothing', async () => {
     answers['POST /api/ui/agents/begin'] = { status: 409, body: { status: 'busy' } };
-    history.replaceState(null, '', '/agents?add=1');
-    await mountPage();
-    const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
-    await click(button(sheet, 'Add with Touch ID'));
+    const onDone = await mountGate();
     await click(button(host, 'Use a backup code instead'));
     await type(backupCode(), '123456');
     await click(button(host, 'Confirm with my backup code'));
     await settle();
     expect(calls.some((c) => c.url === '/api/ui/agents' && c.method === 'POST')).toBe(false);
     expect(plain(host)).toContain('Another setup or approval is running.');
+    expect(onDone).not.toHaveBeenCalled();
   });
 });
 

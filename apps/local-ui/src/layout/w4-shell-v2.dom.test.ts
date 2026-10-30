@@ -320,6 +320,15 @@ describe('the live agent dropdown', () => {
     expect(location.pathname).toBe('/agents');
   });
 
+  it('W4-WIRE-2: Add agent opens Get started in add mode (its Name your agent step), not a sheet', async () => {
+    serve(world());
+    await mountAt('/');
+    await click(chip());
+    await click(menuItems().find((m) => m.textContent?.trim() === 'Add agent'));
+    expect(location.pathname).toBe('/start/app');
+    expect(location.search).toBe('?add=agent');
+  });
+
   it('without the events stream (404) it updates by itself: one shared read every 5 s while visible, none while hidden', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const w = world();

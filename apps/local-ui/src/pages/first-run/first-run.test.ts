@@ -256,8 +256,9 @@ describe('first run: protect approvals (D-120 (1))', () => {
   it('owner already set up: Get started goes on for that owner (New agent) and never offers setup', async () => {
     const api = fakeApi({ status: { kind: 'ok', owner: 'set_up' } });
     await mount(api);
-    // Step 2 for an owner: New agent (no agent is open here), never owner setup.
-    expect(text()).toContain(CONNECT_STEP.title);
+    // For an owner: New agent (no agent is open here), never owner setup. W4-WIRE-2: New agent
+    // starts with "Name your agent" (Decision 52 (2)).
+    expect(host.querySelector('h1')?.textContent).toBe('Name your agent');
     expect(text()).not.toContain(FIRST_RUN.foldersNote);
     expect(api.finished).toHaveLength(0);
   });

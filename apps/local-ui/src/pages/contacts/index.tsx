@@ -55,9 +55,8 @@ import {
   type Pulse,
 } from '../pulse/index.js';
 import { PAGE_TITLES } from '../../strings.js';
-import { AddContactSheet } from './add-contact.js';
 import { ADD_CONTACT_MARKER } from './add-contact-link.js';
-import { ADD_STRINGS as A, connectingTo } from './add-strings.js';
+import { connectingTo } from './add-strings.js';
 import {
   LIST_PATH,
   contactPath,
@@ -87,10 +86,10 @@ import { PresencePrompt } from './presence-prompt.js';
 import { useInviteFirst } from '../home/start-here-empty.js';
 import { ConnectedMoment, type ConnectedMomentProps } from '../invite/connected.js';
 import { useOwnName } from '../invite/own-name.js';
-import { InviteScreen } from '../invite/invite-screen.js';
+import { InviteScreen, PasteScreen } from '../invite/invite-screen.js';
 import { PendingInviteRow, type CancelResult } from '../invite/pending-row.js';
 import { PersonMenu } from '../invite/person-menu.js';
-import { INVITE_STRINGS as I } from '../invite/strings.js';
+import { INVITE_STRINGS as I, PASTE_STRINGS as PS } from '../invite/strings.js';
 import { START_STRINGS } from '../home/strings.js';
 import {
   CONTACTS_STRINGS as S,
@@ -786,7 +785,6 @@ export function ContactsPage({
   const [removed, setRemoved] = useState(false);
   const [kept, setKept] = useState(loadKept);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [adding, setAdding] = useState(false);
   const [rows, setRows] = useState<readonly OpenInvite[]>([]);
   const [highlight, setHighlight] = useState<string | undefined>(undefined);
   const [justCreated, setJustCreated] = useState(false);
@@ -799,11 +797,9 @@ export function ContactsPage({
   const expecting = useRef(false);
   const [arrived, setArrived] = useState<ContactRow | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
-  const addButtonId = useId();
   const activity = usePulse(api);
   const { activitySort } = usePrefs();
   const inviteFirst = useInviteFirst();
-  const returnFocus = useRef(false);
 
   // HOTFIX-045: one read at a time; a background read (the poll) never replaces a good list with an error.
   const inFlight = useRef(false);
@@ -909,13 +905,6 @@ export function ContactsPage({
     };
   }, [owner]);
 
-  // Focus goes back to Add contact when the sheet closes (b11 §21.6).
-  useEffect(() => {
-    if (adding || !returnFocus.current) return;
-    returnFocus.current = false;
-    document.getElementById(addButtonId)?.focus();
-  }, [adding]);
-
   // The highlight lasts 1.2 s (b11 §21.3); only its colour fades, so it is the same when reduced.
   useEffect(() => {
     if (highlight === undefined) return undefined;
@@ -929,23 +918,19 @@ export function ContactsPage({
     setTick((n) => n + 1);
   }, []);
 
-  const openAdd = (): void => {
+  // IR-W4-WIRE-2X-1: "Have an invite link? Paste it" opens a paste screen that makes no invite.
+  const [pasting, setPasting] = useState(false);
+  const openPaste = (): void => {
     setSheetOpen(false);
     setNotice(undefined);
-    setAdding(true);
+    setInviting(false);
+    setPasting(true);
   };
   const openInvite = (): void => {
     setSheetOpen(false);
     setNotice(undefined);
     setInviting(true);
   };
-  const closeAdd = (): void => {
-    returnFocus.current = true;
-    setAdding(false);
-    setHighlight(justCreated ? rows[0]?.inviteId : undefined);
-    setJustCreated(false);
-  };
-
   const ready = list.phase === 'ok';
   const empty = ready && list.contacts.length === 0;
   // Start here step 2 not done yet: the empty state carries the one Add contact (b11 §27.4), and it
@@ -964,34 +949,23 @@ export function ContactsPage({
           >
             {I.title}
           </Button>
-          {inviteInEmpty ? null : (
-            <Button id={addButtonId} variant="secondary" onClick={openAdd}>
-              {A.addContact}
-            </Button>
-          )}
+          <button type="button" className="inv-link-button" onClick={openPaste}>
+            {PS.open}
+          </button>
         </div>
       ) : null}
     </div>
   );
-  const sheet = adding ? (
-    <AddContactSheet
-      invites={invites}
-      passkey={passkey}
-      onCreated={() => {
-        setJustCreated(true);
-        setTick((n) => n + 1);
-      }}
-      onConnected={(name) => {
-        returnFocus.current = true;
-        setAdding(false);
-        setNotice(connectingTo(name));
-        setConnectingSince(Date.now());
-        expecting.current = true;
-        setTick((n) => n + 1);
-      }}
-      onClose={closeAdd}
-    />
-  ) : null;
+  // W4-WIRE-2 (Decision 52 (3)): the Add contact sheet is retired. Invite someone opens the Invite
+  // screen, and its "Have an invite link? Paste it" accepts an invite someone sent.
+  const accepted = (name: string): void => {
+    setInviting(false);
+    setPasting(false);
+    setNotice(connectingTo(name));
+    setConnectingSince(Date.now());
+    expecting.current = true;
+    setTick((n) => n + 1);
+  };
   const status =
     notice === undefined ? null : (
       <p className="al-text-body" role="status">
@@ -1079,8 +1053,13 @@ export function ContactsPage({
                 title={START_STRINGS.emptyContacts}
                 prompt={S.emptyPrompt}
                 action={
-                  <Button id={addButtonId} variant="primary" icon="user-plus" onClick={openAdd}>
-                    {A.addContact}
+                  <Button
+                    variant="primary"
+                    icon="user-plus"
+                    className="al-press"
+                    onClick={openInvite}
+                  >
+                    {START_STRINGS.addContact}
                   </Button>
                 }
               />
@@ -1134,7 +1113,6 @@ export function ContactsPage({
             onSelect={(ref) => {
               setRemoved(false);
               setSelected(ref);
-              setAdding(false);
               setSheetOpen(true);
             }}
           />
@@ -1165,6 +1143,23 @@ export function ContactsPage({
     );
   })();
 
+  if (pasting) {
+    return (
+      <>
+        {arrived === undefined ? (
+          <PasteScreen
+            invites={invites}
+            passkey={passkey}
+            onConnected={accepted}
+            onDone={() => setPasting(false)}
+          />
+        ) : (
+          moment
+        )}
+      </>
+    );
+  }
+
   if (inviting) {
     // The Invite screen in place of the list (A5). Done (or Home) brings the list back, with the
     // new pending row read from the server.
@@ -1173,6 +1168,7 @@ export function ContactsPage({
         {arrived === undefined ? (
           <InviteScreen
             invites={invites}
+            paste={{ passkey, onConnected: accepted, onOpen: openPaste }}
             onCreated={() => {
               expecting.current = true;
               setJustCreated(true);
@@ -1195,7 +1191,6 @@ export function ContactsPage({
     <>
       {moment}
       {page}
-      {sheet}
     </>
   );
 }

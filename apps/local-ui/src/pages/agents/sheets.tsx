@@ -1,4 +1,5 @@
-// U3-h: Rename (inline on the row), Add an agent and Remove an agent (b11 §29.3 to §29.5). Each is an
+// U3-h: Rename (inline on the row) and Remove an agent (b11 §29.4, §29.5). W4-WIRE-2: Add an agent
+// (§29.3) is Get started's add mode now (`/start/app?add=agent`, Decision 52 (2)). Each is an
 // owner operation behind the presence gate: the page sends one request with the proof and the
 // server signs. The routes of U3-d and U3-e may still be stubs (501): that reads as a plain
 // "not done" sentence and nothing is claimed. Labels are rendered as text only (I-5).
@@ -8,11 +9,9 @@ import { navigate } from '../../router.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import { AppMark } from './app-mark.js';
 import type { AgentsApi } from './api.js';
-import { AGENTS_APPS_PATH, type AgentRow } from './data.js';
+import type { AgentRow } from './data.js';
 import { gateMessage, OwnerGate, RETRY_IN_PLACE, usePasskey } from './owner-gate.js';
 import { AGENTS_STRINGS as S } from './strings.js';
-import { CreateAgentGate, type CreatedAgent } from '../apps/create-agent-gate.js';
-import { CREATED } from '../first-run/strings.js';
 
 /** The label rule the person sees: 1 to 32 characters, no control characters (06 §6). */
 export const LABEL_MAX = 32;
@@ -171,138 +170,6 @@ export function RenameEditor({
         </p>
       )}
     </form>
-  );
-}
-
-// -------------------------------------------------------------------------------------------- Add
-
-export function AddSheet({
-  api,
-  owner,
-  existing,
-  onClose,
-  onChanged,
-  onAdded,
-}: Shared & {
-  existing: readonly AgentRow[];
-  onClose: () => void;
-  onChanged: () => void;
-  /** After a successful add: the label, and whether to switch to it. */
-  onAdded: (label: string, switchToIt: boolean) => void;
-}): ReactElement {
-  void owner;
-  const [text, setText] = useState<string>(S.addDefaultName);
-  const [switchToIt, setSwitchToIt] = useState(false);
-  const [step, setStep] = useState<'name' | 'presence' | 'added'>('name');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
-  // W4-ONE-TOUCH (D-140): what the one gesture created (and the app it connected, if any).
-  const [created, setCreated] = useState<CreatedAgent | undefined>(undefined);
-  const switchId = useId();
-  const label = text.trim();
-  const taken = existing.some((r) => r.label === label);
-  const toApps = (): void => {
-    onClose();
-    navigate(AGENTS_APPS_PATH);
-  };
-
-  return (
-    <Sheet open title={S.addTitle} onClose={onClose} closeLabel={S.close} className="ag-sheet">
-      {step === 'added' ? (
-        <div className="ag-sheet-body">
-          <p className="al-text-body" role="status">
-            {created?.app === undefined
-              ? label
-              : created.app.connected
-                ? CREATED.ready(created.label, created.app.name)
-                : CREATED.notConnected(created.label, created.app.name)}
-          </p>
-          {created?.app?.connected === true ? (
-            <div className="ag-actions">
-              <Button variant="primary" onClick={onClose}>
-                {CREATED.next}
-              </Button>
-            </div>
-          ) : (
-            <>
-              {created?.app === undefined ? (
-                <p className="al-text-title-3">{S.addedPrompt}</p>
-              ) : null}
-              <div className="ag-actions">
-                <Button variant="primary" onClick={toApps}>
-                  {created?.app === undefined ? S.connectApp : CREATED.connect}
-                </Button>
-                <Button variant="ghost" onClick={onClose}>
-                  {S.notNow}
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
-      ) : step === 'presence' ? (
-        // W4-ONE-TOUCH (D-140): one screen, one gesture: the agent and, with "Connect to {app}"
-        // ticked, its AI app (create-agent-gate.tsx).
-        <CreateAgentGate
-          label={label}
-          summary={S.addStatement(label)}
-          onDone={(made) => {
-            setCreated(made);
-            onChanged();
-            onAdded(made.label, switchToIt);
-            setStep('added');
-          }}
-          onCancel={() => setStep('name')}
-        />
-      ) : (
-        <form
-          className="ag-sheet-body"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (labelProblem(text) || busy) return;
-            setError(undefined);
-            setBusy(true);
-            void api.labelCheck(label).then((checked) => {
-              setBusy(false);
-              if (checked === 'refused') return setError(S.labelInvalid);
-              setStep('presence');
-            });
-          }}
-        >
-          <TextField
-            label={S.addField}
-            name="new-agent-label"
-            type="text"
-            maxLength={LABEL_MAX}
-            autoComplete="off"
-            value={text}
-            onChange={(e) => setText(e.currentTarget.value)}
-            {...(taken ? { hint: 'You already have an agent with this name.' } : {})}
-          />
-          <label className="ag-check" htmlFor={switchId}>
-            <input
-              id={switchId}
-              type="checkbox"
-              checked={switchToIt}
-              onChange={(e) => setSwitchToIt(e.currentTarget.checked)}
-            />
-            <span>{S.switchToIt}</span>
-          </label>
-          <div className="ag-actions">
-            <Button type="submit" variant="primary" icon="approval" disabled={labelProblem(text)}>
-              {S.addTouchId}
-            </Button>
-            <Button variant="ghost" onClick={onClose}>
-              {S.cancel}
-            </Button>
-          </div>
-          {error === undefined ? null : (
-            <p className="al-text-body-sm ag-error" role="alert">
-              {error}
-            </p>
-          )}
-        </form>
-      )}
-    </Sheet>
   );
 }
 
