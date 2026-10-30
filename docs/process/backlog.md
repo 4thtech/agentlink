@@ -5729,6 +5729,129 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
 - **Acceptance:**
   - RED tests first; DOM tests for both layers (inbound text only in the untrusted container, GETs only on read, item ID only on reveal and save); journey chapter 3 un-gated on Home with a reduced-motion and CLS run; the real-browser approval tests on Home's card and bulk flow; skeleton after ~300 ms; 360 px; changeset and changelog.d fragment.
 
+### Wave 4 follow-ups from the reviews (W4-CARDS-1030)
+
+Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720, #731, #737 and the K3 fix). Each is small and independent; none blocks 0.4.6. Items already fixed on `wave-4` are not carded. The class follows the path rules of `audit-rules.md` §2.2. Findings carry the review's ID; no finding detail is repeated here.
+
+#### W4-DEAD-UI-CLEANUP · local app: delete the approvals board and the legacy shell (new, wave 4 follow-up)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/{board.tsx,board.css}` and their tests; `packages/ui` AppShell and TrayMenu (`shell.tsx`) and `legacy-shell.css`, with their exports
+- **Depends on:** W4-WIRE (the new shell and Home are wired)
+- **Spec:** 08 §1; D-116
+- **Invariants:** —
+- **Source:** orchestrator follow-ups (W4-HOME and W4-SHELL-V2 reviews)
+- **Acceptance:** nothing imports the removed files and no app renders them; build, tests and the CSS budget pass; the approval card, bulk flow and their browser tests are unchanged
+
+#### W4-KIT-RESTORE-EPOCH · backup: validate the key epoch when restoring (new, #720, #716)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node` (restore)
+- **Depends on:** none
+- **Spec:** 04 §2.3.3, §2.6; D-141
+- **Invariants:** I-1, I-2
+- **Source:** #720; #716
+- **Scope:** validate the kit's key epoch at import and require agreement with the snapshot; refusal text names only steps that exist.
+- **Acceptance:** RED tests first: a kit whose epoch is invalid or disagrees with the snapshot is refused before anything is written; valid kits (with or without an epoch) still restore
+
+#### W4-SAVE-LOWS · files: save precheck, failure codes and a sharper K3 test (new, #714 lows, K3 low)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Opus review · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/files/save.ts`, `packages/core/src/files/auto-save-fix1.test.ts`
+- **Depends on:** none
+- **Spec:** 04 §2.5.1, §4.1; 06 §2.3
+- **Invariants:** I-4, I-7
+- **Source:** #714 L1 (failed-code cast), L2 (approval used before the download), SEC L1 (precheck); K3 L1 (test). Already fixed on `wave-4`, not carded: #714 L3 (a save racing a fetch made a second copy; K3 added the already-saved check and the per-item queue) and SEC L2 (`safeParse`).
+- **Scope:** (1) the failed-code type includes `files_unavailable` instead of a narrowing cast; (2) `file.save` confirms the item was received before it asks for presence, so an unknown item makes no owner prompt; (3) when the download fails for a transient reason after the owner approved, the owner is not asked twice, or the copy says plainly why they are; verify on `wave-4` first and close this part if it no longer applies; (4) the K3 test asserts exactly one file was saved, so it fails if the second save is not suppressed.
+- **Acceptance:** RED tests first for (1), (2) and (4); (3) has a test or a note that it no longer applies; the `file.save` and `agentlink_fetch_file` schemas are unchanged
+
+#### W4-AUTO-SAVE-RESIDUAL-DOC · 04 §4.1: name the cross-process race in saving (new, K3 low)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (spec path) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/foundation/04-security-and-crypto.md`
+- **Depends on:** none
+- **Spec:** 04 §4.1; D-142
+- **Invariants:** I-7
+- **Source:** K3 review low (the in-process queue does not cover two processes)
+- **Scope:** state as a residual that two processes saving the same item at once can leave one extra copy with a suffix such as "name (2)"; nothing is lost, replaced or followed. Marked "proposed, owner confirms at merge".
+- **Acceptance:** the residual is in 04 §4.1 next to the other auto-save residuals; `node tools/docs-status/index.mjs --check` passes; changelog.d fragment
+
+#### W4-CANCEL-INVITE-SWEEP · pairing: cancelling an invite does not wait for the clean-up (new, #718 low)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/pairing.ts` (`cancelInvite`)
+- **Depends on:** none
+- **Spec:** 07 §3; 08 §1
+- **Invariants:** I-7
+- **Source:** #718 review low
+- **Scope:** `cancelInvite` starts `sweepInviteObjects` without awaiting it and ignores its failure, as `createInvite` does.
+- **Acceptance:** RED test first: Cancel returns while a slow sweep is still running and a failing sweep does not fail Cancel; the invite is marked cancelled before the sweep starts
+
+#### W4-RENAME-LOWS · contacts: rename display edge cases and doc text (new, #716)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core`; the local-ui rename notice
+- **Depends on:** W4-WIRE
+- **Spec:** 06 §2.1; 08 §1; 11 §5.8; D-141
+- **Invariants:** I-5
+- **Source:** #716
+- **Scope:** rename display edge cases (a name changed and changed back shows a correct notice) and safe rendering of the names shown; doc text kept in step with the decision log.
+- **Acceptance:** RED tests first for the display cases; DOM test for safe rendering; no new string breaks 11 §5
+
+#### W4-HOME-RETRY · messages: a real Retry for "Not delivered" (new, W4-HOME #731)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (a resend must not weaken idempotency) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (resend of one outbox row), `packages/node/src/local-ui/api/**`, `apps/local-ui/src/pages/home/**`
+- **Depends on:** W4-WIRE
+- **Spec:** 07 §3; 08 §1; 11 §5
+- **Invariants:** I-4, I-7
+- **Source:** W4-HOME U3 notes
+- **Scope:** a Retry action on a "Not delivered" message that asks the core to send the same stored message again, under the same message ID. No new send path for the agent; no change to MCP tools.
+- **Acceptance:** RED tests first: Retry publishes the same envelope at most once; a delivered message offers no Retry; a paused agent refuses it; the tool-surface snapshot is unchanged; real-browser test; axe passes
+
+#### W4-HOME-ALL-AGENTS · local app: Home people list across all agents (new, W4-HOME #731)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Opus review · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/**` (one read-only aggregate route), `apps/local-ui/src/pages/home/**`
+- **Depends on:** W4-WIRE
+- **Spec:** 08 §1; USABILITY-WAVE-3 (one agent open at a time)
+- **Invariants:** I-4, I-7
+- **Source:** W4-HOME U3 notes (0.4.6 shows the open agent and "Open <agent>")
+- **Scope:** a GET route that reads each agent's contacts and last activity without opening more than one agent for writing, and an "All agents" filter on Home; opening a row in another agent still goes through the existing switch.
+- **Acceptance:** RED tests first: the route is GET-only and writes nothing; one agent's store failing does not hide the others; contact names and messages stay in the untrusted container; 360 px; axe passes
+
+#### W4-TEST-NITS · tests: small wave 4 test fixes (new, #737 L-1, U6 low)
+- **Status:** backlog · **Size:** S · **Tier:** Haiku · **Security:** S2 (test-only, `packages/core` path) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/terms-flow.test.ts`; `e2e/test/local-ui-refresh*` (PAGES list)
+- **Depends on:** none
+- **Spec:** —
+- **Invariants:** —
+- **Source:** #737 L-1; U6 review low
+- **Scope:** a comment at the terms-flow memo key that `JSON.stringify` can collide for inputs that are not plain JSON (the test inputs are); add `{path: '/advanced/map', title: 'Connections map'}` to the e2e page list so axe runs on it. No test is weakened.
+- **Acceptance:** the comment is there; the e2e page list includes the map and passes; empty changeset
+
+#### W4-OPEN-FILE-SPEC · spec: opening a saved file from the app (new, owner Decision 49 Q8)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/foundation/04-security-and-crypto.md`, `08-*`, `11-*`
+- **Depends on:** W4-AUTO-SAVE, W4-FILES-SAVE
+- **Spec:** 04 §4, §4.1; 08 §1; 11 §5.7
+- **Invariants:** I-4, I-5, I-7
+- **Source:** orchestrator Decision 49 (Q8)
+- **Scope:** spec first, before any build: what "Open" on a saved file may do (by item ID only, never a path from the browser; the file as already saved, with its quarantine mark; which kinds open directly and which only show in the folder; what the OS and the app each say); residuals. Owner decisions are listed as questions, not guessed. Marked "proposed, owner confirms at merge".
+- **Acceptance:** the rules are stated and testable; open questions are listed for the owner; Fable 5.1 review; Tali's "merge"; changelog.d fragment
+
+#### W4-CONNECTIONS-MAP-V2 · local app: Connections map saved views (new, 0.4.7)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/advanced/map*`
+- **Depends on:** W4-WIRE, U6 (the Connections map)
+- **Spec:** 08 §1; 11 §5; D-116
+- **Invariants:** I-5
+- **Source:** orchestrator plan for 0.4.7
+- **Scope:** the person can name and keep a view of the map (filters and layout) and return to it. Stored locally in the app, per agent; holds no message text and nothing the map does not already show.
+- **Acceptance:** DOM tests: save, rename, delete and reopen a view; a view survives reload; inbound names render as text; 360 px; axe passes; changelog.d fragment
+
+#### W4-SAFETY-CODE-WORDS · pairing: show the safety code as words (new, proposal)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/foundation/04-security-and-crypto.md` (§3.6.1), `packages/core` (display encoding), `apps/local-ui`
+- **Depends on:** owner decision
+- **Spec:** 04 §3.6.1; 11 §5
+- **Invariants:** I-1, I-2
+- **Source:** orchestrator plan
+- **Scope:** spec first: a fixed, versioned word list and a one-to-one mapping from the same value the 12-digit code is shown from, so strength and the commit-then-reveal rule are unchanged; digits stay available. Two people reading words aloud must be able to compare them. Marked "proposed, owner confirms at merge".
+- **Acceptance:** vectors for the mapping (both directions; a wrong word fails); the word list has no look-alike or offensive words and is reviewed; digits and words always agree; Fable 5.1 review; Tali's "merge"; changelog.d fragment
+
 ### Usability wave 3 (U3, 0.4.4)
 
 Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The owner (Tali) decided on 2026-10-29 to take all recommended options of §11: (1) 0.4.4 with every card, and if Remove (U3-e) has not passed its Fable security audit when the rest is ready, 0.4.4 ships without it and Remove follows in 0.4.5; (2) one app, one agent open at a time, switching without Touch ID; (3) name and Touch ID on one screen; (4) Remove with Touch ID, typed label, export offer, always retired, contacts told; (5) AI app connect with the exact entry shown, Touch ID and a backup; (6) existing agents kept, last used opens, one-time "Tidy up" note, the terminal never asks which agent; (7) new screens from the new b11 sections, styled from the D2 screens, with the owner's screenshot review in each PR; (8) live view: Agents page map and the moving-row mark in Messages and Files in 0.4.4, Home, Contacts and compact view in 0.4.5, no preview on hover. Spec edits are marked "proposed, owner confirms at merge". S2 cards: tests first, Opus independent review, Fable where marked, Tali's "merge". UI cards: screenshots at 1440 and 360, light and dark. All new local routes sit behind the session, CSRF, `Host`, `Origin`, fetch-metadata and octet-stream gate; every presence route signs an owner action (D-68); errors are fixed codes; no route takes a path from the page.
