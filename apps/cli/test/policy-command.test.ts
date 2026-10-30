@@ -59,7 +59,7 @@ import type {
   RelaySocketHandlers,
   RelayTarget,
 } from '@4thtech-io/transport-nostr';
-import { defaultPolicy } from '@4thtech-io/types';
+import { AUTO_SAVE_DEFAULTS, defaultPolicy } from '@4thtech-io/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -511,9 +511,12 @@ describe('policy allow-folder <path> †', () => {
     expect(await version()).toBe(2);
     const after = await loaded();
     if (before.mode === 'fail_closed' || after.mode === 'fail_closed') throw new Error('closed');
-    expect({ ...after.policy, files: { ...after.policy.files, allowedFolders: [] } }).toEqual(
-      before.policy,
-    );
+    // Only the folder changed; a base signed before D-142 also gets the files.autoSave defaults,
+    // as every new policy.set does.
+    expect({ ...after.policy, files: { ...after.policy.files, allowedFolders: [] } }).toEqual({
+      ...before.policy,
+      files: { ...before.policy.files, autoSave: { ...AUTO_SAVE_DEFAULTS } },
+    });
     expect(after.policy.contacts.acceptInvites).toBe('auto');
   });
 
@@ -833,9 +836,12 @@ describe('policy allow-send-folder † (M1-36b-2-c; D-121 D6)', () => {
     expect(await version()).toBe(2);
     const after = await loaded();
     if (before.mode === 'fail_closed' || after.mode === 'fail_closed') throw new Error('closed');
-    expect({ ...after.policy, files: { ...after.policy.files, allowedFolders: [] } }).toEqual(
-      before.policy,
-    );
+    // Only the folder changed; a base signed before D-142 also gets the files.autoSave defaults,
+    // as every new policy.set does.
+    expect({ ...after.policy, files: { ...after.policy.files, allowedFolders: [] } }).toEqual({
+      ...before.policy,
+      files: { ...before.policy.files, autoSave: { ...AUTO_SAVE_DEFAULTS } },
+    });
     expect(result.out.join('\n')).toContain(send());
     expect(readdirSync(send())).toEqual([]);
     if (process.platform !== 'win32') expect(statSync(send()).mode & 0o777).toBe(0o700);

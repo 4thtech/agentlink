@@ -369,7 +369,8 @@ describe('saving: names and the inbox folder (04 §4 "Downloads", I-5)', () => {
     ['../../.ssh/authorized_keys', 'authorized_keys'],
     ['..\\..\\Windows\\system32\\evil.dll', 'evil.dll'],
     ['.bashrc', 'bashrc'],
-    ['invoice‮fdp.exe', 'invoicefdp.exe'],
+    // W4-AUTO-SAVE (Decision 51): an .exe name gets .download (04 §4.1).
+    ['invoice‮fdp.exe', 'invoicefdp.exe.download'],
     ['a\u0000b\u0007c.txt', 'abc.txt'],
     ['CON.txt', '_CON.txt'],
   ])('a hostile name %j is saved as %j inside the inbox', async (hostile, saved) => {
@@ -386,22 +387,29 @@ describe('saving: names and the inbox folder (04 §4 "Downloads", I-5)', () => {
     b.inbox.plantSymlink('report.pdf');
     const envelopeId = await sendOne(fileBytes(500));
     const result = await b.client.fetchFile({ envelopeId });
-    expect(result).toMatchObject({ status: 'ok', name: 'report (1).pdf' });
+    // 04 §4.1 (D-142): the next free name is "{stem} (2){ext}".
+    expect(result).toMatchObject({ status: 'ok', name: 'report (2).pdf' });
     expect(b.inbox.entries.get('report.pdf')?.kind).toBe('symlink');
     expect(b.inbox.entries.get('report.pdf')?.data.length).toBe(0);
     expect(b.inbox.writes.every((name) => name.startsWith('.agentlink-partial-'))).toBe(true);
   });
 
-  it('never overwrites: a second fetch gets a suffix within the 255-byte name limit', async () => {
+  it('never overwrites: a file at the name gives a suffix within the 255-byte name limit', async () => {
     const long = `${'é'.repeat(125)}.pdf`; // 254 bytes
     const envelopeId = await sendOne(fileBytes(500), long);
     const first = await b.client.fetchFile({ envelopeId });
-    const second = await b.client.fetchFile({ envelopeId });
     expect(first).toMatchObject({ status: 'ok', name: long });
+    // D-142: a second fetch of the same file is answered from the record, no second copy.
+    const again = await b.client.fetchFile({ envelopeId });
+    expect(again).toMatchObject({ status: 'ok', name: long });
+    expect(b.inbox.files().size).toBe(1);
+    // Another file with the same name gets the next free name.
+    const other = await sendOne(fileBytes(400), long);
+    const second = await b.client.fetchFile({ envelopeId: other });
     expect(second.status).toBe('ok');
     if (second.status !== 'ok') return;
     expect(second.name).not.toBe(long);
-    expect(second.name.endsWith(' (1).pdf')).toBe(true);
+    expect(second.name.endsWith(' (2).pdf')).toBe(true);
     expect(new TextEncoder().encode(second.name).length).toBeLessThanOrEqual(255);
     expect(b.inbox.files().size).toBe(2);
   });

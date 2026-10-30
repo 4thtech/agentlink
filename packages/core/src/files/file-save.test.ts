@@ -234,7 +234,7 @@ describe('file.save: saveReceivedFile (W4-FILES-SAVE)', () => {
     const out = await b.client.saveReceivedFile(
       await signBody(await prepared(b, `${envelopeId}.00`)),
     );
-    expect(out).toEqual({ status: 'saved', name: 'brief (1).txt' });
+    expect(out).toEqual({ status: 'saved', name: 'brief (2).txt' });
     expect(b.inbox.entries.get('brief.txt')?.kind).toBe('symlink');
     expect(b.inbox.writes).not.toContain('brief.txt');
   });
