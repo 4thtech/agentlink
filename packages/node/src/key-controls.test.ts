@@ -825,7 +825,7 @@ describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
   });
 
   /** A kit sealed directly, with a snapshot whose identity or card does not match. */
-  async function mismatchKit(kind: 'agent_id' | 'owner') {
+  async function mismatchKit(kind: 'agent_id' | 'owner' | 'bare_hex') {
     const owner = await makeOwner();
     const keychain = new MemoryKeychain();
     const agentId = await createKeychainAgent(keychain);
@@ -836,7 +836,10 @@ describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
     const snapshot =
       kind === 'agent_id'
         ? await makeSnapshot(agentId, storeKey, encodeHex0x(owner.nostr), otherId)
-        : await makeSnapshot(agentId, storeKey, otherOwner);
+        : kind === 'owner'
+          ? await makeSnapshot(agentId, storeKey, otherOwner)
+          : // The right owner in a spelling no card has (bare hex): refused too (04 §2.4.1).
+            await makeSnapshot(agentId, storeKey, encodeHex(owner.nostr));
     const parts: Uint8Array[] = [];
     const code = await sealRecoveryKit(
       {
@@ -902,7 +905,7 @@ describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
     }
   });
 
-  for (const kind of ['agent_id', 'owner'] as const) {
+  for (const kind of ['agent_id', 'owner', 'bare_hex'] as const) {
     it(`snapshot mismatch (${kind}): one generic error, quarantine emptied, nothing written`, async () => {
       const { kit, code } = await mismatchKit(kind);
       for (const backend of [keychainImportBackend(), fileImportBackend()]) {
