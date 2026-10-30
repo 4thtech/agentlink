@@ -133,11 +133,11 @@ describe('chapter 4: agents', () => {
       ['Ana', 'A'],
       ['Side project', 'S'],
     ] as const) {
-      const row = page.getByRole('menuitem').filter({ hasText: label }).first();
+      const row = page.getByRole('menuitemradio').filter({ hasText: label }).first();
       await row.waitFor();
       expect((await row.innerText()).trim().startsWith(letter)).toBe(true);
     }
-    await page.getByRole('menuitem').filter({ hasText: 'Side project' }).first().click();
+    await page.getByRole('menuitemradio').filter({ hasText: 'Side project' }).first().click();
     await page
       .getByRole('button', { name: /^Agent: Side project/ })
       .first()
@@ -206,7 +206,7 @@ describe('chapter 4: agents', () => {
         .getByRole('button', { name: /^Agent: / })
         .first()
         .click();
-      expect(await a.page.getByRole('menuitem').filter({ hasText: 'Ana' }).count()).toBe(0);
+      expect(await a.page.getByRole('menuitemradio').filter({ hasText: 'Ana' }).count()).toBe(0);
       await eventually(
         'Bo sees Ana retired',
         async () => (await text(b.page)).includes('No longer active'),

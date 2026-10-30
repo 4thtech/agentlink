@@ -147,7 +147,7 @@ describe('chapter 5: upgrade', () => {
       .click();
     await jp.page.getByText('Your agents · live').first().waitFor();
     for (const label of ['Ana', 'work']) {
-      await jp.page.getByRole('menuitem').filter({ hasText: label }).first().waitFor();
+      await jp.page.getByRole('menuitemradio').filter({ hasText: label }).first().waitFor();
     }
     await jp.page.keyboard.press('Escape');
     await navTo(jp.page, 'Inbox');
