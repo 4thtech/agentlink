@@ -611,12 +611,12 @@ describe('W4-INVITES-LIST: open invites from the server', () => {
     expect(el?.querySelectorAll('li').length).toBe(2);
     expect(el?.textContent).toContain(waitingToAccept('Bo'));
     expect(el?.textContent).toContain(waitingToAccept(undefined));
-    expect(el?.textContent).toMatch(/Expires in [\d,]+ days/);
+    // W4-PEOPLE-INVITE: the rows are PendingInviteRow (prototype v23 A4).
+    expect(el?.textContent).toMatch(/link works [\d,]+ more days/);
     const cancels = [...(el?.querySelectorAll('button') ?? [])].filter(
-      (b) => (b.textContent ?? '').trim() === 'Cancel',
+      (b) => (b.textContent ?? '').trim() === 'Cancel invite',
     );
     expect(cancels.length).toBe(2);
-    expect(A.cancelInvite).toBe('Cancel');
   });
 
   it('shows nothing when there are none, and when the list cannot be read', async () => {
@@ -665,8 +665,12 @@ describe('W4-INVITES-LIST: open invites from the server', () => {
     expect(calls.filter((c) => c.method === 'GET' && c.url === CREATE).length).toBeGreaterThan(
       reads,
     );
-    expect(rowsEl()?.querySelectorAll('li').length).toBe(1);
-    expect(rowsEl()?.textContent).not.toContain('Bo');
+    // The cancelled row stays for this visit and says the link no longer works (A4).
+    expect(rowsEl()?.querySelectorAll('li').length).toBe(2);
+    expect(rowsEl()?.querySelector('li')?.textContent).toContain(
+      'Invite cancelled. The link no longer works.',
+    );
+    expect(rowsEl()?.querySelector('li button')?.textContent).not.toBe('Cancel invite');
   });
 
   it('drops a row the server no longer has (not found) without an error', async () => {

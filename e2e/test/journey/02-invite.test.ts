@@ -18,6 +18,18 @@ import {
   WAVE4,
   type JourneyPage,
 } from './world.js';
+import {
+  emulateReducedMotion,
+  expectFadesOnly,
+  expectStableLayout,
+  observeLayoutShift,
+} from '../helpers/motion.js';
+import {
+  inviteFromScreen,
+  inviteLinkOnScreen,
+  openInviteScreen,
+  seesConnected,
+} from './helpers-u4.js';
 
 const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
@@ -130,4 +142,51 @@ describe('chapter 2: contacts and invites', () => {
     );
     await aProbe.check();
   }, 180_000);
+
+  // W4-PEOPLE-INVITE (prototype v23 A5): the Invite screen. A short link at once, Copy with the ✓
+  // moment, the pending row with Cancel invite, Under the hood's long link and QR code; reduced
+  // motion fades only and the screen does not shift (CLS ≤ 0.01).
+  it('the Invite screen: a short link, Copy ✓, a pending row, then their accept pairs both', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const { a, b, mcpA, mcpB } = await twoOwners(ready.browser, ready.files, world, ch.closers);
+    const aProbe = await a.arm();
+
+    await emulateReducedMotion(a.page);
+    await openInviteScreen(a.page);
+    await observeLayoutShift(a.page);
+    const shown = await inviteLinkOnScreen(a.page);
+    expect(shown).toMatch(SHORT_INVITE);
+    await expectFadesOnly(a.page);
+    await expectStableLayout(a.page);
+    await a.page.getByRole('button', { name: 'Done', exact: true }).click();
+
+    const link = await inviteFromScreen(a, 'Bo');
+    expect(link).toMatch(SHORT_INVITE);
+    await a.page.getByText('Waiting for Bo to accept').first().waitFor();
+    await a.page.getByRole('button', { name: 'Cancel invite' }).first().waitFor();
+
+    await acceptInviteInApp(b, link, 'Ana');
+    await until('Bo is paired with Ana', () => pairedWith(mcpB, 'Ana'), 30_000);
+    await until('Ana is paired with Bo', () => pairedWith(mcpA, 'Bo'), 30_000);
+    await aProbe.check();
+  }, 180_000);
+
+  // Gate: the same pairing follow as the test above it ("both Contacts pages reach the safety code
+  // by themselves"): neither page completes the pairing in 30 s while nothing calls the MCP server.
+  it.runIf(WAVE4)(
+    'both sides see "You and … are connected" with the safety code (A7)',
+    async (ctx) => {
+      const ready = ch.need(ctx);
+      if (ready === undefined) return;
+      const world = journeyWorld();
+      const { a, b } = await twoOwners(ready.browser, ready.files, world, ch.closers);
+      const link = await inviteFromScreen(a, 'Bo');
+      await acceptInviteInApp(b, link, 'Ana');
+      await seesConnected(b.page, 'Ana');
+      await seesConnected(a.page, 'Bo');
+    },
+    180_000,
+  );
 });
