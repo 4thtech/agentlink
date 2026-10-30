@@ -39,6 +39,21 @@ const json = (value: unknown): Uint8Array => encodeUtf8(JSON.stringify(value));
 const UPLOAD_BODY = json({ v: 1, size: 20000, expiresAt: TS + 86_400, nonce: NONCE, ts: TS });
 const DELETE_BODY = json({ v: 1, objectId: 'ZWOMpLAsUhfSBVsghbLRDw', nonce: NONCE, ts: TS });
 const UPLOAD: DropAuthRequest = { method: 'POST', url: URL_UPLOAD, body: UPLOAD_BODY };
+// W4-SHORT-INVITE (07 §5.4 `POST /v1/invite`): the body carries the ALI1 object (at most 17 441
+// bytes, base64url), so this one path signs bodies up to the Worker's 24 KiB invite cap.
+const URL_INVITE = 'https://drop.agentlink.4thtech.io/v1/invite';
+const INVITE: DropAuthRequest = {
+  method: 'POST',
+  url: URL_INVITE,
+  body: json({
+    v: 1,
+    lookupId: 'AAECAwQFBgcICQoLDA0ODw',
+    expiresAt: TS + 86_400,
+    object: 'A'.repeat(23_255),
+    nonce: NONCE,
+    ts: TS,
+  }),
+};
 const DELETE: DropAuthRequest = { method: 'DELETE', url: URL_DELETE, body: DELETE_BODY };
 
 const dropHex = (seed: Uint8Array, epoch = 0): string => {
@@ -186,6 +201,19 @@ describe('KeyStore.signDropRequest: the signature (07 §5.4)', () => {
   });
 });
 
+describe('KeyStore.signDropRequest: invite uploads (W4-SHORT-INVITE, 07 §5.4)', () => {
+  it('signs a POST /v1/invite whose body carries the largest invite object', async () => {
+    store = new MemoryKeyStore(SEED);
+    expect(INVITE.body.length).toBeGreaterThan(1024);
+    const authorization = await store.signDropRequest(INVITE, TS);
+    expect(verifyDropAuthorization(authorization, INVITE, TS)).toEqual({
+      ok: true,
+      pubkey: dropHex(SEED),
+      createdAt: TS,
+    });
+  });
+});
+
 describe('KeyStore.signDropRequest: the drop key (04 §2.1, D-48)', () => {
   it('signs with the drop key, never the Nostr or EVM identity key', async () => {
     store = new MemoryKeyStore(SEED);
@@ -317,6 +345,30 @@ describe('KeyStore.signDropRequest: refusals (IR-M1-6c-1)', () => {
       () => store.signDropRequest({ ...UPLOAD, domain: 'other' } as unknown as DropAuthRequest, TS),
     ],
     ['no request', () => store.signDropRequest(null as unknown as DropAuthRequest, TS)],
+    [
+      'an invite body over the 24 KiB invite cap (W4-SHORT-INVITE)',
+      () =>
+        store.signDropRequest(
+          { ...INVITE, body: json({ v: 1, nonce: NONCE, ts: TS, pad: 'x'.repeat(24 * 1024) }) },
+          TS,
+        ),
+    ],
+    [
+      'a body over 1024 bytes on any other path, or a DELETE to /v1/invite',
+      () =>
+        store.signDropRequest(
+          {
+            method: 'DELETE',
+            url: URL_INVITE,
+            body: json({ v: 1, nonce: NONCE, ts: TS, pad: 'x'.repeat(2000) }),
+          },
+          TS,
+        ),
+    ],
+    [
+      'a large body on /v1/invite with a query',
+      () => store.signDropRequest({ ...INVITE, url: `${URL_INVITE}?x=1` }, TS),
+    ],
   ];
 
   for (const [name, call] of variants) {

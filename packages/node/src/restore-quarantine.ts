@@ -21,7 +21,7 @@ import { unlinkSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import {
   CryptoInputError,
-  decodeHex,
+  decodeHex0x,
   encodeHex,
   equalBytes,
   parseJson,
@@ -177,11 +177,9 @@ export async function checkQuarantinedSnapshot(
       card?: { ownerNostr?: unknown; keyEpoch?: unknown };
     } | null;
     const named = stored?.card?.ownerNostr;
-    // A real card spells its owner keys `0x` + lowercase hex (04 §2.4.1); before W4-RENAME-REACHES-
-    // CONTACTS only the bare form was accepted, so a kit of a real agent was refused here.
-    if (typeof named !== 'string' || !/^(?:0x)?[0-9a-f]{64}$/.test(named)) return false;
-    const hex = named.startsWith('0x') ? named.slice(2) : named;
-    if (!equalBytes(decodeHex(hex, { length: 32 }), ownerNostr)) return false;
+    // The card spelling of ownerNostr: `0x` + 64 lowercase hex (04 §2.4.1); anything else throws.
+    if (typeof named !== 'string') return false;
+    if (!equalBytes(decodeHex0x(named, { length: 32 }), ownerNostr)) return false;
     // W4-RENAME-REACHES-CONTACTS (D-141): the epoch the store's card is at, for a kit without the
     // `key-epoch` item (kits made before it): the row and its card must agree.
     const epoch = row.key_epoch;

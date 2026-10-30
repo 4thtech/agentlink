@@ -31,7 +31,11 @@ export interface PairingFollowClient {
   publisherLease(): { take(): Promise<boolean>; release(): Promise<boolean> };
   syncInbox(options?: { readonly budgetMs?: number }): Promise<unknown>;
   readonly outbox: { processDue(): Promise<unknown> };
-  readonly pairing: { waiting(): Promise<boolean> };
+  readonly pairing: {
+    waiting(): Promise<boolean>;
+    /** W4-SHORT-INVITE (04 §3.6.2): deletes drop objects of completed, cancelled or expired invites. */
+    sweepInviteObjects?(): Promise<void>;
+  };
 }
 
 /** `ran`: one pass under the lease; `held`: another process holds it; `busy` / `soon`: skipped. */
@@ -91,6 +95,14 @@ export function pairingFollower(
     try {
       await client.syncInbox({ budgetMs });
       await client.outbox.processDue();
+      // W4-SHORT-INVITE (O-L3): the drop-object sweep runs in the background, never holding the
+      // pass or the lease (core dedupes a sweep in flight). A failed DELETE is retried with backoff
+      // on a later pass; nothing is logged (I-7).
+      try {
+        client.pairing.sweepInviteObjects?.().catch(() => undefined);
+      } catch {
+        // A sweep that throws synchronously is the same as one that failed.
+      }
     } catch {
       // The next pass tries again.
     } finally {

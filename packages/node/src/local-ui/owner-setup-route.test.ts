@@ -290,7 +290,8 @@ async function harness(
   const opened: string[] = [];
   const events: ApprovalServerEvent[] = [];
   const seeds: Uint8Array[] = [];
-  const state = { clock: 1_000_000 };
+  // W4-ONE-TOUCH: the server clock is the agent's (the plan's bodies are dated at begin, 04 §2.8).
+  const state = { clock: NOW * 1000 };
   const server = await startApprovalServerWith(
     {
       source: sourceOf(agent),
@@ -371,14 +372,30 @@ function post(
     'Sec-Fetch-Site': 'same-origin',
     ...headers,
   };
+  // W4-ONE-TOUCH (04 §2.8): finish carries only the begin nonce; the page sends the one its begin
+  // answered. A test that sets its own input (or none, with the header set to undefined) keeps it.
+  if (path === FINISH && !('X-AgentLink-Input' in headers)) {
+    const nonce = beginNonces.get(session.cookie);
+    if (nonce !== undefined) all['X-AgentLink-Input'] = inputOf({ nonce });
+  }
   const clean: Record<string, string> = {};
   for (const [k, v] of Object.entries(all)) if (v !== undefined) clean[k] = v;
   return send(h.port, path, {
     method: 'POST',
     headers: clean,
     ...(body === undefined ? {} : { body }),
+  }).then((res) => {
+    if (path === BEGIN && res.status === 200) {
+      const nonce = (JSON.parse(res.body) as { nonce?: unknown }).nonce;
+      if (typeof nonce === 'string') beginNonces.set(session.cookie, nonce);
+    }
+    return res;
   });
 }
+
+/** W4-ONE-TOUCH: the nonce of each session's last begin. */
+const beginNonces = new Map<string, string>();
+const inputOf = (value: unknown): string => encodeBase64url(encodeUtf8(JSON.stringify(value)));
 
 interface BeginBody {
   status: string;
@@ -800,19 +817,33 @@ describe('the pending seed: short-lived, single-use, bound to the session (M1-11
     expect(allZero(other.seeds[0] as Uint8Array)).toBe(true);
   });
 
-  it('refuses a second begin while one setup is in progress, from any session (fail closed)', async () => {
+  it('refuses a second begin from another session while one setup is held (fail closed)', async () => {
     const agent = await initAgent();
     const h = await harness(agent);
     const a = await h.session();
     const b = await h.session();
     await begin(h, a);
-    for (const s of [b, a]) {
-      const res = await post(h, BEGIN, s, new Uint8Array(0));
-      expect(res.status).toBe(409);
-      expect(JSON.parse(res.body)).toEqual({ status: 'busy' });
-    }
+    const res = await post(h, BEGIN, b, new Uint8Array(0));
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ status: 'busy' });
     expect(h.seeds).toHaveLength(1);
   });
+
+  it('W4-ONE-TOUCH (Decision 45): a new begin from the same session replaces and wipes the held one', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const a = await h.session();
+    const first = await begin(h, a);
+    const second = await begin(h, a);
+    expect(second.publicKey.challenge).not.toBe(first.publicKey.challenge);
+    expect(h.seeds).toHaveLength(2);
+    expect(allZero(h.seeds[0] as Uint8Array)).toBe(true);
+    // The replaced begin's response no longer finishes; the new one does.
+    const stale = new Authenticator().create(first.publicKey, { origin: h.origin });
+    expect((await post(h, FINISH, a, stale)).status).toBe(403);
+    const fresh = new Authenticator().create(second.publicKey, { origin: h.origin });
+    expect((await post(h, FINISH, a, fresh)).status).toBe(200);
+  }, 60_000);
 
   it('is bound to the session that began it: another session cannot finish it', async () => {
     const agent = await initAgent();
@@ -821,7 +852,10 @@ describe('the pending seed: short-lived, single-use, bound to the session (M1-11
     const b = await h.session();
     const begun = await begin(h, a);
     const body = new Authenticator().create(begun.publicKey, { origin: h.origin });
-    const res = await post(h, FINISH, b, body);
+    // Even with the right nonce: the plan is bound to the session that began it.
+    const res = await post(h, FINISH, b, body, {
+      'X-AgentLink-Input': inputOf({ nonce: beginNonces.get(a.cookie) }),
+    });
     expect(res.status).toBe(409);
     expect(JSON.parse(res.body)).toEqual({ status: 'not_pending' });
     expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
@@ -848,10 +882,27 @@ describe('the pending seed: short-lived, single-use, bound to the session (M1-11
         },
         { origin: h.origin },
       ),
+      { 'X-AgentLink-Input': inputOf({ nonce: encodeBase64url(randomBytes(32)) }) },
     );
     expect(res.status).toBe(409);
     expect(JSON.parse(res.body)).toEqual({ status: 'not_pending' });
   });
+
+  it('W4-ONE-TOUCH: finish takes only {nonce}: none, a label or any other key is refused', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const body = new Authenticator().create(begun.publicKey, { origin: h.origin });
+    const nonce = beginNonces.get(s.cookie);
+    for (const value of [undefined, { label: 'A' }, { nonce, label: 'A' }, { nonce: 'short' }]) {
+      const res = await post(h, FINISH, s, body.slice(), {
+        'X-AgentLink-Input': value === undefined ? undefined : inputOf(value),
+      });
+      expect(res.status).toBe(400);
+    }
+    expect((await post(h, FINISH, s, body)).status).toBe(200);
+  }, 60_000);
 });
 
 describe('finish checks the passkey creation before anything is stored (04 §2.3.1)', () => {
@@ -892,17 +943,24 @@ describe('finish checks the passkey creation before anything is stored (04 §2.3
     ['a malformed body', () => encodeUtf8('not a registration')],
   ];
   for (const [what, make] of bad) {
-    it(`refuses ${what}: 403, nothing stored, the hold wiped and gone`, async () => {
+    // W4-ONE-TOUCH (04 §2.8, Decision 45): a rejected proof signs nothing and does not consume the
+    // plan; the third ends it (wiped and gone).
+    it(`refuses ${what}: 403, nothing stored, the hold kept; the third refusal wipes it`, async () => {
       const agent = await initAgent();
       const h = await harness(agent);
       const s = await h.session();
       const begun = await begin(h, s);
-      const res = await post(h, FINISH, s, make(begun, h.origin));
-      expect(res.status).toBe(403);
-      expect([...agent.keychain.items.keys()].filter((k) => k.startsWith('owner'))).toEqual([]);
+      const statuses: number[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const res = await post(h, FINISH, s, make(begun, h.origin));
+        statuses.push(res.status);
+        expect([...agent.keychain.items.keys()].filter((k) => k.startsWith('owner'))).toEqual([]);
+        expect(await agent.client.identity.get()).toBeUndefined();
+        if (i === 0) expect(allZero(h.seeds[0] as Uint8Array)).toBe(false);
+        h.clock += 30_000;
+      }
+      expect(statuses).toEqual([403, 403, 403]);
       expect(allZero(h.seeds[0] as Uint8Array)).toBe(true);
-      expect(await agent.client.identity.get()).toBeUndefined();
-      // Single-use: even the right response is refused now.
       const retry = await post(
         h,
         FINISH,
@@ -912,6 +970,20 @@ describe('finish checks the passkey creation before anything is stored (04 §2.3
       expect(retry.status).toBe(409);
     });
   }
+
+  it('W4-ONE-TOUCH: after a rejected proof the right response still finishes (the plan was kept)', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const wrong = new Authenticator().create(begun.publicKey, {
+      origin: h.origin,
+      challenge: encodeBase64url(randomBytes(32)),
+    });
+    expect((await post(h, FINISH, s, wrong)).status).toBe(403);
+    const right = new Authenticator().create(begun.publicKey, { origin: h.origin });
+    expect((await post(h, FINISH, s, right)).status).toBe(200);
+  }, 60_000);
 });
 
 describe('finish is all or nothing: a failure at any step leaves no owner (rollback)', () => {
@@ -1614,7 +1686,6 @@ describe('U3-d: first run with a name (one gesture, the first agent.label)', () 
     const agent = await initAgent();
     const { res } = await namedSetup(agent, {
       begin: { label: 'Claude Code agent' },
-      finish: { label: 'Claude Code agent' },
     });
     expect(res?.status).toBe(200);
     const done = JSON.parse(res?.body ?? '{}') as { status: string; label?: string };
@@ -1641,20 +1712,20 @@ describe('U3-d: first run with a name (one gesture, the first agent.label)', () 
   it('refuses a begin input with other keys', async () => {
     await mkdir(home(), { recursive: true });
     const agent = await initAgent();
-    const { h, beginRes } = await namedSetup(agent, { begin: { label: 'Work', app: 'codex' } });
+    const { h, beginRes } = await namedSetup(agent, { begin: { label: 'Work', other: 'codex' } });
     expect(beginRes.status).toBe(400);
     expect(h.seeds).toEqual([]);
   });
 
-  it('refuses a finish whose label is not the one begin was given; nothing is set up', async () => {
+  it('W4-ONE-TOUCH: a finish that carries a label is refused (it takes only the nonce); nothing is set up', async () => {
     await mkdir(home(), { recursive: true });
     const agent = await initAgent();
     const { res } = await namedSetup(agent, {
       begin: { label: 'Personal' },
-      finish: { label: 'Someone else' },
+      finish: { nonce: 'x'.repeat(43), label: 'Someone else' },
     });
     expect(res?.status).toBe(400);
-    expect(JSON.parse(res?.body ?? '{}')).toEqual({ status: 'label_invalid' });
+    expect(JSON.parse(res?.body ?? '{}')).toEqual({ status: 'invalid' });
     expect(await agent.client.identity.get()).toBeUndefined();
     expect(await agent.client.ownerActions.loadLabel()).toEqual({ status: 'unverified' });
   });
@@ -1672,7 +1743,6 @@ describe('U3-d: first run with a name (one gesture, the first agent.label)', () 
     const agent = await initAgent();
     const { res } = await namedSetup(agent, {
       begin: { label: 'Claude Code agent' },
-      finish: { label: 'Claude Code agent' },
     });
     expect(res?.status).toBe(200);
     const added = (await tree(home())).filter((p) => !before.includes(p));

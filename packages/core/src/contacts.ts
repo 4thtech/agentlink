@@ -1097,7 +1097,7 @@ export class ContactBook {
     const name = await seal(ctx, 'contacts', 'name', key, checked.name);
     const relays = await seal(ctx, 'contacts', 'relays', key, canonicalize([...checked.relays]));
     // D-141 (07 §3 "Former name"): the contact's own name before, read now and checked unchanged at
-    // apply time: `declared_name`, else (a row from before version 8) its shown name when that is its
+    // apply time: `declared_name`, else (a row from before version 9) its shown name when that is its
     // own. Under an owner alias the alias stays and the note reads "Now calls itself …".
     const declared = await seal(ctx, 'contacts', 'declared_name', key, checked.name);
     const before = await ctx.store.transaction((tx) => tx.get('contacts', { contact_id: id }));

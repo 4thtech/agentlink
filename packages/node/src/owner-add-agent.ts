@@ -50,7 +50,11 @@ import {
   type KeychainBackend,
 } from './keychain.js';
 import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
-import { signFirstParts, type FirstPartsResult } from './owner-first-label.js';
+import {
+  signFirstParts,
+  type FirstConnectResult,
+  type FirstPartsResult,
+} from './owner-first-label.js';
 import {
   cardNamesOwner,
   keepsFolder,
@@ -446,7 +450,12 @@ export function addAgentToOwner(options: AddAgentOptions): Promise<AddAgentResul
 
 /** How an Add from the local app ended (fixed values only). */
 export type NewAgentOutcome =
-  | { readonly status: 'done'; readonly sendFolder?: SendFolderResult }
+  | {
+      readonly status: 'done';
+      readonly sendFolder?: SendFolderResult;
+      /** W4-ONE-TOUCH: the first app.connect, when the agent carried `firstConnect`. */
+      readonly connect?: FirstConnectResult;
+    }
   | { readonly status: 'failed' };
 
 /** The longest label: 32 code points (06 §6, 04 §2.5.1 `agent.label`). */
@@ -488,9 +497,13 @@ export async function signNewAgent(
   if (parts.label !== 'saved') return failed;
   const attempted = plan.status === 'ready' && first.firstPolicy !== undefined;
   if (attempted && parts.sendFolder?.status !== 'allowed') return failed;
-  return parts.sendFolder === undefined
-    ? { status: 'done' }
-    : { status: 'done', sendFolder: parts.sendFolder };
+  // W4-ONE-TOUCH (04 §2.8 "Failure in the middle"): the agent is complete here; an app.connect that
+  // was not stored keeps it (the caller answers `created_not_connected`).
+  return {
+    status: 'done',
+    ...(parts.sendFolder === undefined ? {} : { sendFolder: parts.sendFolder }),
+    ...(first.firstConnect === undefined ? {} : { connect: parts.connect ?? 'not_stored' }),
+  };
 }
 
 /** Every fixed KeyStore item an agent can have (04 §2.2); a new agent has no `s3:<id>` item. */

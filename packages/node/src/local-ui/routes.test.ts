@@ -191,6 +191,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // W4-RENAME-REACHES-CONTACTS: "Contacts still see" and the former-name seen mark.
       '/api/ui/agents/card-name',
       '/api/ui/contacts/:ref/name-seen',
+      // W4-INVITES-LIST: the open invites (a read) and Cancel (api/invites-short.test.ts).
+      '/api/ui/invites',
+      '/api/ui/invites/cancel',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
@@ -201,6 +204,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       (r) =>
         r.presence !== 'setup' &&
         r.presence !== 'pay-confirm' &&
+        // W4-ONE-TOUCH: New agent's two routes are covered in create-connect-server.test.ts.
+        r.presence !== 'create-agent' &&
         r.path !== '/api/ui/first-run' &&
         !built.has(r.path),
     );
@@ -342,6 +347,8 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
     ).toEqual([
       `POST ${INVITE_CREATE_PATH}`,
       `POST ${INVITE_CHECK_PATH}`,
+      // W4-INVITES-LIST: Cancel an open invite (no presence, signs nothing).
+      'POST /api/ui/invites/cancel',
       'POST /api/ui/join/dismiss',
     ]);
     expect(routes.find((r) => r.path === INVITE_ACCEPT_PATH)).toMatchObject({

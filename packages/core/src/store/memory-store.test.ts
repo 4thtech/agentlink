@@ -93,6 +93,13 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
     });
   });
 
+  it('invites drop columns (W4-SHORT-INVITE, schema 8): sealed lookup ID and epoch, cancelled_at', () => {
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(8);
+    expect(TABLES.invites.columns['drop_lookup_id']).toEqual({ kind: 'enc', nullable: true });
+    expect(TABLES.invites.columns['drop_key_epoch']).toEqual({ kind: 'enc', nullable: true });
+    expect(TABLES.invites.columns['cancelled_at']).toEqual({ kind: 'int', nullable: true });
+  });
+
   it('local_owner_actions (U3-d, schema 7): the signed local owner actions, sealed', () => {
     expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(7);
     expect(TABLES.local_owner_actions).toEqual({
@@ -110,8 +117,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
     });
   });
 
-  it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 8): four nullable columns, appended last', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(8);
+  it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 9): four nullable columns, appended last', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(9);
     expect(Object.keys(TABLES.contacts.columns).slice(-4)).toEqual([
       'former_name',
       'name_changed_at',

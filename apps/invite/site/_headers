@@ -1,8 +1,9 @@
 # Headers of the invite host (08 §4, D-53, M1-19). Read by Cloudflare static hosting; the tests read
 # the same file. The CSP allows one first-party script file and nothing else: no inline script or
-# style, no connection of any kind, no framing, and no HTML sink under Trusted Types.
+# style, no connection except to the drop host (a short-link invite object, D-139, 04 §3.6.2), no
+# framing, and no HTML sink under Trusted Types.
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; connect-src https://drop.agentlink.4thtech.io; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types 'none'
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY

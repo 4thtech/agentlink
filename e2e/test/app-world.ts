@@ -159,7 +159,11 @@ export function startServerOf(
         ? options
         : {
             ...options,
-            host: { ...host, firstRun: { home: pc.home, ownerFiles: defaultOwnerFiles(pc.home) } },
+            // W4-ONE-TOUCH: the CLI's first-run desk (`aiApps`) is kept.
+            host: {
+              ...host,
+              firstRun: { ...host.firstRun, home: pc.home, ownerFiles: defaultOwnerFiles(pc.home) },
+            },
           };
     return startApprovalServerWith(
       {
@@ -529,6 +533,8 @@ export function runJoin(
       terminal: { stdinIsTTY: true, stdoutIsTTY: true, env: {} },
     } as never,
     {
+      // A format 1 link resolves to itself (W4-SHORT-INVITE).
+      resolve: (l) => Promise.resolve(l),
       check: (l, now) => checkInviteLink(l, now),
       now: () => Math.floor(Date.now() / 1000),
       // No app host is running on this computer: `join` starts its own.

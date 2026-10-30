@@ -96,6 +96,15 @@
   min-inline-size: 0;
   overflow-wrap: anywhere;
 }
+/* W4-ONE-TOUCH: "Connect to {app}" (prefilled), the same checkbox pattern as the Agents sheet. */
+.fr-connect {
+  cursor: pointer;
+  gap: var(--al-space-3);
+}
+.fr-connect input {
+  flex: none;
+  margin: 0;
+}
 .fr-actions {
   display: grid;
   gap: var(--al-space-4);

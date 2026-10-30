@@ -66,8 +66,10 @@ const V5_TABLES: readonly TableName[] = ['own_storage'];
 const V6_FILES_COLUMNS: readonly string[] = ['saved_name'];
 /** Tables added by version 7 (U3-d, D-138): the signed local owner actions (07 §3.4). */
 const V7_TABLES: readonly TableName[] = ['local_owner_actions'];
-/** Contacts columns added by version 8 (W4-RENAME-REACHES-CONTACTS, D-141): the former name. */
-const V8_CONTACTS_COLUMNS: readonly string[] = [
+/** Invites columns added by version 8 (W4-SHORT-INVITE, D-139): a short link's drop object. */
+const V8_INVITES_COLUMNS: readonly string[] = ['drop_lookup_id', 'drop_key_epoch', 'cancelled_at'];
+/** Contacts columns added by version 9 (W4-RENAME-REACHES-CONTACTS, D-141): the former name. */
+const V9_CONTACTS_COLUMNS: readonly string[] = [
   'former_name',
   'name_changed_at',
   'name_change_seen',
@@ -92,7 +94,8 @@ function v1Spec(table: TableName): TableSpec {
   const spec = tableSpec(table);
   if (table === 'envelopes') return without(spec, V2_ENVELOPE_COLUMNS);
   if (table === 'files') return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS]);
-  if (table === 'contacts') return without(spec, V8_CONTACTS_COLUMNS);
+  if (table === 'invites') return without(spec, V8_INVITES_COLUMNS);
+  if (table === 'contacts') return without(spec, V9_CONTACTS_COLUMNS);
   return spec;
 }
 
@@ -145,13 +148,26 @@ function v6Statements(): readonly string[] {
 }
 
 /**
- * Version 8 (W4-RENAME-REACHES-CONTACTS, D-141; 07 §3 "Former name"): `contacts.former_name`,
- * `name_changed_at` and `name_change_seen`, appended, all nullable. Every existing row keeps null:
- * no note is due (null reads as seen); nothing is rewritten.
+ * Version 8 (W4-SHORT-INVITE, D-139; 07 §3): `invites.drop_lookup_id` and `drop_key_epoch` (sealed)
+ * and `cancelled_at`, appended. Every existing row keeps null (a format 1 invite, not cancelled);
+ * nothing is rewritten. An older build refuses a version 8 file, so the upgrade cannot be rolled back.
  */
 function v8Statements(): readonly string[] {
+  const invites = tableSpec('invites');
+  return V8_INVITES_COLUMNS.map(
+    (column) =>
+      `ALTER TABLE "invites" ADD COLUMN ${columnDef('invites', column, invites.columns[column] as ColumnSpec)}`,
+  );
+}
+
+/**
+ * Version 9 (W4-RENAME-REACHES-CONTACTS, D-141; 07 §3 "Former name"): `contacts.former_name`,
+ * `name_changed_at`, `name_change_seen` and `declared_name`, appended, all nullable. Every existing row keeps null:
+ * no note is due (null reads as seen); nothing is rewritten.
+ */
+function v9Statements(): readonly string[] {
   const contacts = tableSpec('contacts');
-  return V8_CONTACTS_COLUMNS.map(
+  return V9_CONTACTS_COLUMNS.map(
     (column) =>
       `ALTER TABLE "contacts" ADD COLUMN ${columnDef('contacts', column, contacts.columns[column] as ColumnSpec)}`,
   );
@@ -165,6 +181,7 @@ function v8Statements(): readonly string[] {
  * `own_storage` (M1-9i-a, D-115; a new table with its one-row trigger, existing rows untouched), version
  * 6 adds `files.saved_name` (MSG-FILES-IO-b; a nullable sealed column, null on existing rows), version
  * 7 adds `local_owner_actions` (U3-d, D-138; a new table, existing rows untouched), version 8 adds the
+ * invites drop columns (W4-SHORT-INVITE, D-139; nullable, null on existing rows), version 9 adds the
  * contacts former-name columns (W4-RENAME-REACHES-CONTACTS, D-141; nullable, null on existing rows). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
@@ -191,6 +208,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 6, statements: Object.freeze(v6Statements()) }),
   Object.freeze({ version: 7, statements: createSchemaStatements(V7_TABLES) }),
   Object.freeze({ version: 8, statements: Object.freeze(v8Statements()) }),
+  Object.freeze({ version: 9, statements: Object.freeze(v9Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

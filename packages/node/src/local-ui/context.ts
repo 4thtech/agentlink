@@ -13,6 +13,7 @@ import {
   decodeInviteLink,
   evaluate,
   type AcceptInviteAction,
+  type OpenInvite,
   type PendingContact,
   type PolicyDecision,
 } from '@4thtech-io/core';
@@ -48,7 +49,6 @@ import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
 import type { AgentEpochKeys } from '../key-epoch.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
-import type { SendFolderPlan } from '../owner-first-policy.js';
 import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
 import type { LocalUiInviteDesk } from './route-types.js';
 import type { JoinDesk } from './join-desk.js';
@@ -417,11 +417,14 @@ export function inviteDesk(client: AgentLinkClient): LocalUiInviteDesk {
   return Object.freeze<LocalUiInviteDesk>({
     create: (input) => client.pairing.createInvite(input),
     async check(link) {
-      const checked = await client.pairing.acceptInvite({ link });
+      // W4-SHORT-INVITE: a short link is resolved once (core keeps it in memory for the accept).
+      const resolved = await client.pairing.resolveInviteLink(link);
+      const checked = await client.pairing.acceptInvite({ link: resolved });
       // The same codec again for the expiry only (the link was just decoded and checked above).
-      const { expiresAt } = await decodeInviteLink(link);
+      const { expiresAt } = await decodeInviteLink(resolved);
       return Object.freeze({ contact: checked.contact, expiresAt });
     },
+    cancel: (inviteId) => client.pairing.cancelInvite(inviteId),
   });
 }
 
@@ -445,6 +448,14 @@ export type LocalUiAcceptOutcome =
  * `allowed` from anything else, so nothing here can pair without the owner's verified decision.
  */
 export interface LocalUiInviteAcceptPort {
+  /**
+   * W4-SHORT-INVITE (04 §3.6.2): the format 1 link of `link` (a short link fetched once from the
+   * configured drop). The accept route calls it first and uses the result for every step, so the
+   * approval action keeps the resolved invite sealed and nothing re-fetches it.
+   */
+  resolve(link: string): Promise<string>;
+  /** W4-INVITES-LIST: the open invites (ID, label, expiry; never a link). */
+  list(): Promise<readonly OpenInvite[]>;
   check(link: string): Promise<PendingContact>;
   decision(): Promise<PolicyDecision>;
   action(link: string): Promise<AcceptInviteAction>;
@@ -467,6 +478,8 @@ export function inviteAcceptPort(client: AgentLinkClient): LocalUiInviteAcceptPo
   const decision = async (): Promise<PolicyDecision> =>
     evaluate(await client.ownerActions.loadPolicy(), { kind: 'invite.accept' });
   return Object.freeze<LocalUiInviteAcceptPort>({
+    resolve: (link) => client.pairing.resolveInviteLink(link),
+    list: () => client.pairing.openInvites(),
     async check(link) {
       return (await client.pairing.acceptInvite({ link })).contact;
     },
@@ -537,10 +550,9 @@ export interface LocalUiContext {
    */
   readonly agents?: LocalUiAgentsDesk;
   /**
-   * U3-d (D-138, 08 §1): creating an agent and saving a verified label, for the owner routes of
-   * api/agents-manage.ts only; absent outside the app host. It signs nothing: a new agent's first
-   * parts are signed only through the gate's one-use `addAgent`, and a label is written into
-   * config.json only after core applied the signed `agent.label` (07 §9.1).
+   * U3-d (D-138, 08 §1): the open agent and saving a verified label, for the owner routes of
+   * api/agents-manage.ts and api/apps.ts only; absent outside the app host. It signs nothing: a
+   * label is written into config.json only after core applied the signed `agent.label` (07 §9.1).
    */
   readonly agentsManage?: LocalUiAgentsManage;
   /**
@@ -600,32 +612,12 @@ export interface LocalUiAgentsDesk {
 }
 
 /**
- * U3-d: an agent this request created (keychain identity and folder, no card, no label yet), opened
- * for its first parts. Built by the server only; a handler passes it on to the gate's `addAgent` and
- * then to `settle`, and never reaches its core or its KeyStore through it.
+ * U3-d: what the rename and AI apps routes may call (built by the server over the app host).
+ * W4-ONE-TOUCH: creating an agent is no longer here; the server's create-agent gate does it (04 §2.8).
  */
-export interface LocalUiNewAgent {
-  /** Its folder name (a slug of the label, 06 §6). */
-  readonly name: string;
-  /** The label the page showed, as the request carried it. */
-  readonly label: string;
-  /** The agent's own card parts and core actions (server-held). */
-  readonly first: FirstAgentCard;
-  /** The Send folder for its first policy, checked before the gesture (owner-first-policy.ts). */
-  readonly plan: SendFolderPlan;
-}
-
-/** U3-d: what the create and rename routes may call (built by the server over the app host). */
 export interface LocalUiAgentsManage {
   /** The open agent's folder name; undefined when none is open. */
   current(): string | undefined;
-  /** Creates a keychain agent named from `label` and opens it; undefined when that failed. */
-  create(label: string): Promise<LocalUiNewAgent | undefined>;
-  /**
-   * Closes the new agent; when `ok` is false, removes exactly what `create` made (its keychain items
-   * and its folder), all or nothing. Never throws.
-   */
-  settle(agent: LocalUiNewAgent, ok: boolean): Promise<void>;
   /** After core applied the signed `agent.label`: writes config.json `label` (07 §9.1). */
   labelSaved(name: string, label: string): Promise<void>;
 }

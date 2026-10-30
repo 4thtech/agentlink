@@ -98,6 +98,18 @@ export default defineConfig({
         ...testBindings,
         DROP_GLOBAL_BYTES_PER_DAY: String(MiB),
       }),
+      // W4-SHORT-INVITE (D-139): invite objects, with the spec's invite limits. The per-IP signed
+      // request ceiling is raised so the per-key invite limits are what the tests meet; the invite
+      // host origin is a test origin. The 24-hour and live-cap tests take their own longer timeouts.
+      workerProject('drop-invite', ['test/invite.test.ts'], {
+        ...testBindings,
+        DROP_IP_REQUESTS_PER_HOUR: '100000',
+        DROP_INVITE_ORIGINS: 'https://invite.example',
+      }),
+      workerProject('drop-invite-global', ['test/invite-global.test.ts'], {
+        ...testBindings,
+        DROP_INVITE_FETCHES_PER_HOUR: '40',
+      }),
       // The one 5 MiB multipart round trip runs alone. Evidence for its 60 s timeout: on the Linux CI
       // runner a 6 MiB version took 32.6 s in Miniflare's R2 (CI run 39018466636; 1.9 s on macOS),
       // so 20 s is too tight there (IR-M1-27a-1 H-1). The data is already the smallest two-part object.
