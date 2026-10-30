@@ -119,6 +119,8 @@ describe('SkeletonGate', () => {
     act(() => root.render(h(SkeletonGate, { loading: true, skeleton: h(SkeletonRow) }, 'Ana')));
     act(() => vi.advanceTimersByTime(1000));
     act(() => root.render(h(SkeletonGate, { loading: false, skeleton: h(SkeletonRow) }, 'Ana')));
+    // The skeleton has been up past its 500 ms minimum: it leaves on the next tick.
+    act(() => vi.advanceTimersByTime(1));
     expect(host.querySelector('.al-skel-reveal')?.textContent).toBe('Ana');
   });
 });

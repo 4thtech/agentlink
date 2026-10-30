@@ -6,9 +6,8 @@
 // wave 4 calls the same helper from its journey chapter.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { Browser, Page } from 'playwright';
+import { chromium, type Browser, type Page } from 'playwright';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { launchBrowser } from '../app-world.js';
 import {
   CLS_BUDGET,
   emulateReducedMotion,
@@ -34,9 +33,13 @@ let launchError: unknown;
 let page: Page;
 
 beforeAll(async () => {
-  const launched = await launchBrowser();
-  browser = launched.browser;
-  launchError = launched.error;
+  // The same launch as app-world.ts, without its built-package imports (this test needs none).
+  const executablePath = process.env['AGENTLINK_TEST_CHROMIUM'];
+  try {
+    browser = await chromium.launch(executablePath === undefined ? {} : { executablePath });
+  } catch (error) {
+    launchError = error;
+  }
 }, 120_000);
 afterAll(async () => {
   await browser?.close();
@@ -48,7 +51,8 @@ beforeEach(async (ctx) => {
     return;
   }
   page = await browser.newPage();
-  await page.setContent(PAGE);
+  // A real navigation: setContent marks the next layout shifts as after input (hadRecentInput).
+  await page.goto(`data:text/html,${encodeURIComponent(PAGE)}`);
   await page.addStyleTag({ content: KIT_CSS });
 });
 afterEach(async () => {
@@ -78,7 +82,9 @@ describe('layout shift', () => {
 
   it('measures content pushed down by a late banner, and expectStableLayout fails', async () => {
     await observeLayoutShift(page);
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
+      // Let the first layout paint, so the content has a place to shift from.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       // A tall block arriving above the content, the way an unreserved notice would.
       const banner = document.createElement('div');
       banner.textContent = 'Late banner';

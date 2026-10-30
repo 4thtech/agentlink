@@ -28,8 +28,9 @@ interface FakeTransition {
   reject: (e: unknown) => void;
 }
 
-type Doc = Document & { startViewTransition?: (cb: () => void) => FakeTransition };
-const doc = (): Doc => document as Doc;
+// The DOM types already declare startViewTransition; the tests swap it for a fake or remove it.
+const doc = (): { startViewTransition?: unknown } =>
+  document as unknown as { startViewTransition?: unknown };
 
 let started: FakeTransition[];
 /** A fake API that runs the update at once (like Chromium does after the snapshot). */

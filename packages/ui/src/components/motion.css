@@ -129,3 +129,432 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* W4-MOTION-KIT: the wave-4 motion kit (W4 UX v2, "Motion and perceived speed"; prototype v23).
+   Every UI unit takes its motion and loading from here: no local keyframes, no motion library.
+   Durations and curves are tokens (tokens.css, W4 block); only opacity and transform move. */
+
+/* Moments: press, reveal (invite link, Connected, file Saved), menus, the check pop and draw,
+   the agent-switch crossfade. */
+.al-press {
+  transition: transform var(--al-duration-press) var(--al-easing-overshoot);
+}
+.al-press:active {
+  transform: scale(0.97);
+}
+.al-reveal {
+  animation: al-enter var(--al-duration-reveal) var(--al-easing-spring) both;
+}
+.al-expand {
+  transform-origin: top center;
+  animation: al-drop var(--al-duration-reveal) var(--al-easing-overshoot) both;
+}
+.al-menu {
+  transform-origin: top right;
+  animation: al-drop var(--al-duration-base) var(--al-easing-overshoot) both;
+}
+.al-menu[data-align='start'] {
+  transform-origin: top left;
+}
+.al-slide-in {
+  animation: al-slide var(--al-duration-base) var(--al-easing-overshoot) both;
+}
+.al-pop {
+  animation: al-pop var(--al-duration-slow) var(--al-easing-pop) both;
+}
+.al-draw path {
+  stroke-dasharray: 24;
+  animation: al-draw var(--al-duration-reveal) var(--al-easing-overshoot) var(--al-duration-fast)
+    both;
+}
+.al-crossfade {
+  animation: al-fade-in var(--al-duration-crossfade) var(--al-easing-standard) both;
+}
+
+/* Optimistic items: shown at once, dimmed until confirmed. */
+.al-optimistic {
+  transition: opacity var(--al-duration-fade) var(--al-easing-standard);
+}
+.al-optimistic[data-state='pending'] {
+  opacity: 0.6;
+}
+
+/* The live-dot pulse: a ring grows out of the dot and fades. */
+.al-pulse {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  inline-size: 8px;
+  block-size: 8px;
+  color: var(--al-color-status-success-icon);
+}
+.al-pulse[data-tone='warning'] {
+  color: var(--al-color-status-warning-icon);
+}
+.al-pulse[data-tone='danger'] {
+  color: var(--al-color-status-danger-icon);
+}
+.al-pulse[data-tone='accent'] {
+  color: var(--al-color-accent-default);
+}
+.al-pulse[data-tone='neutral'] {
+  color: var(--al-color-status-neutral-icon);
+}
+.al-pulse-dot {
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: var(--al-radius-full);
+  background: currentColor;
+}
+.al-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--al-radius-full);
+  background: currentColor;
+  pointer-events: none;
+  animation: al-pulse-ping var(--al-duration-pulse) var(--al-easing-ping) infinite;
+}
+.al-pulse-ring[data-paused='true'] {
+  animation-play-state: paused;
+}
+
+/* Skeletons in the shape of the real layouts: an opacity shimmer on the neutral background. */
+.al-skel {
+  display: block;
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-status-neutral-bg);
+  animation: al-skel-shimmer var(--al-duration-shimmer) var(--al-easing-standard) infinite;
+}
+.al-skel-line {
+  inline-size: 100%;
+  block-size: 14px;
+}
+.al-skel-line[data-size='caption'] {
+  block-size: 12px;
+}
+.al-skel-line[data-size='pill'] {
+  block-size: 24px;
+  margin-block-start: var(--al-space-2);
+}
+.al-skel-line[data-size='title'] {
+  block-size: 30px;
+}
+.al-skel-line[data-size='control'] {
+  block-size: var(--al-size-control-lg);
+}
+.al-skel-line[data-w='30'] {
+  inline-size: 30%;
+}
+.al-skel-line[data-w='40'] {
+  inline-size: 40%;
+}
+.al-skel-line[data-w='55'] {
+  inline-size: 55%;
+}
+.al-skel-line[data-w='65'] {
+  inline-size: 65%;
+}
+.al-skel-line[data-w='70'] {
+  inline-size: 70%;
+}
+.al-skel-line[data-w='label'] {
+  inline-size: 80px;
+}
+.al-skel-line[data-w='button'] {
+  inline-size: 120px;
+}
+.al-skel-line[data-w='heading'] {
+  inline-size: 140px;
+}
+.al-skel-avatar {
+  flex: none;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--al-radius-full);
+}
+.al-skel-avatar[data-size='44'] {
+  inline-size: 44px;
+  block-size: 44px;
+}
+.al-skel-col {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  min-inline-size: 0;
+}
+.al-skel-row {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  padding: var(--al-space-4) var(--al-space-5);
+}
+.al-skel-row + .al-skel-row,
+.al-skel-trow + .al-skel-trow {
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.al-skel-list,
+.al-skel-table,
+.al-skel-card {
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+}
+.al-skel-list,
+.al-skel-table {
+  overflow: hidden;
+}
+.al-skel-card {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  padding: var(--al-space-5);
+}
+.al-skel-trow {
+  display: grid;
+  align-items: center;
+  gap: var(--al-space-4);
+  padding: var(--al-space-4) var(--al-space-5);
+}
+.al-skel-table[data-cols='2'] .al-skel-trow {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.al-skel-table[data-cols='3'] .al-skel-trow {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.al-skel-table[data-cols='4'] .al-skel-trow {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.al-skel-table[data-cols='5'] .al-skel-trow {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.al-skel-table[data-cols='6'] .al-skel-trow {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.al-skel-table[data-cols='7'] .al-skel-trow {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.al-skel-gate {
+  display: grid;
+  gap: var(--al-space-5);
+}
+.al-skel-reveal {
+  animation: al-fade-in var(--al-duration-fade) var(--al-easing-enter) both;
+}
+
+/* Same-document View Transitions (motion-vt.ts): names by class and attribute, never inline. */
+.al-vt-main {
+  view-transition-name: al-main;
+}
+.al-vt-rail {
+  view-transition-name: al-rail;
+}
+.al-vt-top {
+  view-transition-name: al-top;
+}
+.al-vt-strip {
+  view-transition-name: al-strip;
+}
+.al-vt-chip {
+  view-transition-name: al-chip;
+}
+.al-vt-approval {
+  view-transition-name: al-approval;
+}
+[data-vt-shared] {
+  view-transition-name: al-shared;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--al-duration-crossfade);
+}
+::view-transition-group(al-main) {
+  animation-duration: var(--al-duration-page);
+  animation-timing-function: var(--al-easing-spring);
+}
+::view-transition-old(al-main),
+::view-transition-new(al-main) {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: none;
+  object-position: 50% 0;
+  overflow: clip;
+}
+::view-transition-old(al-main) {
+  animation: al-out var(--al-duration-exit) var(--al-easing-exit) both;
+}
+::view-transition-new(al-main) {
+  animation: al-in var(--al-duration-slow) var(--al-easing-overshoot) var(--al-duration-press)
+    both;
+}
+::view-transition-new(al-strip) {
+  animation: al-strip-in var(--al-duration-reveal) var(--al-easing-overshoot) both;
+}
+::view-transition-old(al-strip) {
+  animation: al-fade-out var(--al-duration-fade) var(--al-easing-standard) both;
+}
+::view-transition-group(al-chip) {
+  animation-duration: var(--al-duration-crossfade);
+}
+::view-transition-group(al-shared) {
+  animation-duration: var(--al-duration-page);
+  animation-timing-function: var(--al-easing-spring);
+}
+/* No View Transitions in this browser: a page still enters with a short fade-up. */
+@supports not (view-transition-name: none) {
+  .al-route {
+    animation: al-enter var(--al-duration-reveal) var(--al-easing-spring) both;
+  }
+}
+
+@keyframes al-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes al-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes al-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes al-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes al-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes al-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes al-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes al-out {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+@keyframes al-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+}
+@keyframes al-strip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+}
+@keyframes al-pulse-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+@keyframes al-skel-shimmer {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* Reduced motion (system setting or the app's data-motion): every move becomes a fade, the pulse
+   is gone, the skeleton holds still. The global switch at the top already stops element motion;
+   these rules reach the View Transition pseudo-elements, which it does not. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*) {
+    animation: none !important;
+  }
+  ::view-transition-old(*) {
+    animation: al-fade-out var(--al-duration-fade) var(--al-easing-standard) both !important;
+  }
+  ::view-transition-new(*) {
+    animation: al-fade-in var(--al-duration-fade) var(--al-easing-standard) both !important;
+  }
+  .al-skel {
+    animation: none;
+    opacity: 0.7;
+  }
+  .al-pulse-ring {
+    animation: none;
+    display: none;
+  }
+  .al-press:active {
+    transform: none;
+  }
+}
+:root[data-motion='reduced']::view-transition-group(*) {
+  animation: none !important;
+}
+:root[data-motion='reduced']::view-transition-old(*) {
+  animation: al-fade-out var(--al-duration-fade) var(--al-easing-standard) both !important;
+}
+:root[data-motion='reduced']::view-transition-new(*) {
+  animation: al-fade-in var(--al-duration-fade) var(--al-easing-standard) both !important;
+}
+:root[data-motion='reduced'] .al-skel {
+  animation: none;
+  opacity: 0.7;
+}
+:root[data-motion='reduced'] .al-pulse-ring {
+  animation: none;
+  display: none;
+}
+:root[data-motion='reduced'] .al-press:active {
+  transform: none;
+}
