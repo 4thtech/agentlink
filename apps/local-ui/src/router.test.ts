@@ -50,10 +50,11 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/', 'Approvals', 'Home'],
   ['/agents', 'Agents', 'Agents'],
   ['/activity', 'Activity', 'Activity'],
-  ['/activity/live', 'Live activity', null],
+  ['/activity/live', 'Live activity stream', null],
   ['/inbox', 'Inbox', 'Home'],
   ['/contacts', 'Contacts', 'Home'],
-  ['/settings/backup', 'Backup', 'Settings'],
+  ['/settings', 'Settings', 'Settings'],
+  ['/settings/backup', 'Backup & Touch ID', 'Settings'],
   ['/settings/apps', 'AI apps', 'Settings'],
   ['/settings/files', 'Files', 'Settings'],
   ['/settings/appearance', 'Appearance', 'Settings'],
@@ -62,8 +63,9 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/settings/proofs', 'Proofs & credits', 'Settings'],
   ['/advanced/rules', 'Rules', null],
   ['/advanced/proofs', 'Proofs & credits', null],
-  ['/advanced/network', 'Advanced', null],
-  ['/advanced/diagnostics', 'About', null],
+  ['/advanced/network', 'Relays & network', null],
+  ['/advanced/diagnostics', 'Diagnostics', null],
+  ['/advanced/map', 'Connections map', null],
 ];
 const FOCUSED = [
   '/start/app',
@@ -132,7 +134,6 @@ describe('routes', () => {
   it.each([
     ['/first-run', '/start/app'],
     ['/start', '/start/app'],
-    ['/settings', '/settings/backup'],
     ['/settings/home', '/'],
     ['/settings/agents', '/agents'],
     ['/settings/activity', '/activity'],
@@ -151,12 +152,12 @@ describe('routes', () => {
 });
 
 describe('the sections (nav.ts)', () => {
-  it('Home, Agents, Activity, Settings; Advanced holds five pages', () => {
+  it('Home, Agents, Activity, Settings; Advanced holds six pages', () => {
     expect(SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Home', '/'],
       ['Agents', '/agents'],
       ['Activity', '/activity'],
-      ['Settings', '/settings/backup'],
+      ['Settings', '/settings'],
     ]);
     expect(ADVANCED_SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Live activity', '/activity/live'],
@@ -164,6 +165,7 @@ describe('the sections (nav.ts)', () => {
       ['Proofs & credits', '/advanced/proofs'],
       ['Relays & network', '/advanced/network'],
       ['Diagnostics', '/advanced/diagnostics'],
+      ['Connections map', '/advanced/map'],
     ]);
   });
 
@@ -230,7 +232,7 @@ describe('the sections (nav.ts)', () => {
       history.pushState(null, '', '/settings/backup');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    expect(host.querySelector('main h1')?.textContent).toBe('Backup');
+    expect(host.querySelector('main h1')?.textContent).toBe('Backup & Touch ID');
   });
 });
 

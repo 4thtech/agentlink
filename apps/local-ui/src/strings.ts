@@ -93,6 +93,7 @@ export const PAGE_TITLES = {
   filesStorage: 'Files & storage',
   network: 'Relays & network',
   diagnostics: 'Diagnostics',
+  connectionsMap: 'Connections map',
 } as const;
 
 /** Shown under every code field: 0.2.0 owners only know the code from the terminal (B-9 not built yet). */
