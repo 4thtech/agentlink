@@ -3,7 +3,7 @@
 // which opens in place. Each row is a link to its page (the same pages as before) with one line that
 // says where it stands, from real reads: the credits and the relay count. When a read fails the line
 // falls back to plain words; nothing is made up, and no address, key or path of this computer shows.
-import { useEffect, useId, useState, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiResult } from '../../api/client.js';
 import { ShellIcon, type ShellIconName } from '../../layout/shell-icons.js';
 import { HEALTH_PATH } from '../../layout/health.js';
@@ -105,22 +105,16 @@ export function SettingsPage({ get = productionGet }: SettingsPageProps): ReactE
   }, [get]);
 
   // The relay count is read the first time Advanced opens, not on every visit.
+  const asked = useRef(false);
   useEffect(() => {
-    if (!open || relays !== undefined) return;
-    let live = true;
+    if (!open || asked.current) return;
+    asked.current = true;
     setRelays('loading');
     get(HEALTH_PATH).then(
-      (r) => {
-        if (live) setRelays(parseRelays(r) ?? {});
-      },
-      () => {
-        if (live) setRelays({});
-      },
+      (r) => setRelays(parseRelays(r) ?? {}),
+      () => setRelays({}),
     );
-    return () => {
-      live = false;
-    };
-  }, [open, relays, get]);
+  }, [open, get]);
 
   const proofsLine =
     credits?.kind === 'ok'

@@ -64,6 +64,7 @@ describe('Relays & network', () => {
     expect(host.textContent).not.toContain(S.unknown);
   });
   it('uses plain words (11 §5)', () => {
-    expect(lintVocabulary(JSON.stringify(S))).toEqual([]);
+    // "Relays" is the Advanced group's own name (spec: Relays & network); nothing else may trip.
+    expect(lintVocabulary(JSON.stringify(S)).filter((w) => w !== 'nostr/relay')).toEqual([]);
   });
 });

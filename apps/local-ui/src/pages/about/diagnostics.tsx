@@ -50,6 +50,7 @@ export interface DiagnosticsPageProps {
   readonly copy?: ((text: string) => Promise<void>) | undefined;
 }
 
+const subscribe = (on: () => void): (() => void) => subscribeLive(on);
 const clipboard = (text: string): Promise<void> => navigator.clipboard.writeText(text);
 
 export function DiagnosticsPage({
@@ -57,7 +58,7 @@ export function DiagnosticsPage({
   live: injected,
   copy = clipboard,
 }: DiagnosticsPageProps): ReactElement {
-  const shared = useSyncExternalStore((on) => subscribeLive(on), getLive, getLive);
+  const shared = useSyncExternalStore(subscribe, getLive, getLive);
   const live = injected ?? shared;
   const [version, setVersion] = useState<string | undefined>(undefined);
   const [relays, setRelays] = useState<Relays | undefined>(undefined);

@@ -8,5 +8,5 @@ export const BACKUP_STRINGS = {
   kitPending: 'You put this off during setup. Keep your backup code safe until then.',
   touchTitle: 'Touch ID',
   touchBody:
-    'Touch ID, or your computer password, confirms anything that changes who can act for you. Your AI never sees it.',
+    'Touch ID, or the login of your computer, confirms anything that changes who can act for you. Your AI never sees it.',
 } as const;

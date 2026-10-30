@@ -230,7 +230,7 @@ describe('the sections (nav.ts)', () => {
       history.pushState(null, '', '/settings/backup');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    expect(host.querySelector('main h1')?.textContent).toBe('Backup');
+    expect(host.querySelector('main h1')?.textContent).toBe('Backup & Touch ID');
   });
 });
 

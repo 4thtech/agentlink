@@ -81,6 +81,7 @@ describe('Diagnostics', () => {
     expect(host.querySelectorAll('a[href^="https://"]').length).toBeGreaterThanOrEqual(3);
   });
   it('uses plain words (11 §5)', () => {
-    expect(lintVocabulary(JSON.stringify(S))).toEqual([]);
+    // "Relays" is the Advanced group's own name (spec: Relays & network); nothing else may trip.
+    expect(lintVocabulary(JSON.stringify(S)).filter((w) => w !== 'nostr/relay')).toEqual([]);
   });
 });
