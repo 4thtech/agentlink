@@ -5046,7 +5046,9 @@ export async function startApprovalServerWith(
         return res.writableLength;
       },
       onClose: (fn) => {
-        res.once('close', fn);
+        // The hub registers after its awaited read: a reader already gone frees its slot at once.
+        if (res.destroyed || res.writableEnded || req.destroyed) fn();
+        else res.once('close', fn);
       },
     };
     const opened = await liveEvents.open(sink, cookie, header(req, 'last-event-id'));
