@@ -326,6 +326,7 @@ import { createHealthReader } from './local-ui/api/health.js';
 import {
   checkGesture,
   signGesture,
+  type OwnerReview,
   type OwnerSignRequest,
   type PromptingOwnerKeyStore,
 } from './owner-operation.js';
