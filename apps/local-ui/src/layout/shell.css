@@ -339,7 +339,7 @@
 .al-hood-label {
   white-space: nowrap;
 }
-.al-switch-track {
+.al-hood-track {
   position: relative;
   display: inline-block;
   flex: none;
@@ -348,7 +348,7 @@
   border-radius: var(--al-radius-full);
   background: var(--al-color-border-default);
 }
-.al-switch-knob {
+.al-hood-knob {
   position: absolute;
   top: 2px;
   left: 2px;
@@ -357,10 +357,10 @@
   border-radius: 50%;
   background: var(--al-color-fg-default);
 }
-.al-hood-switch[aria-checked='true'] .al-switch-track {
+.al-hood-switch[aria-checked='true'] .al-hood-track {
   background: var(--al-color-accent-default);
 }
-.al-hood-switch[aria-checked='true'] .al-switch-knob {
+.al-hood-switch[aria-checked='true'] .al-hood-knob {
   transform: translateX(16px);
 }
 
