@@ -95,8 +95,14 @@ export function pairingFollower(
     try {
       await client.syncInbox({ budgetMs });
       await client.outbox.processDue();
-      // Never throws; a failed DELETE is retried with backoff on a later pass.
-      await client.pairing.sweepInviteObjects?.();
+      // W4-SHORT-INVITE (O-L3): the drop-object sweep runs in the background, never holding the
+      // pass or the lease (core dedupes a sweep in flight). A failed DELETE is retried with backoff
+      // on a later pass; nothing is logged (I-7).
+      try {
+        client.pairing.sweepInviteObjects?.().catch(() => undefined);
+      } catch {
+        // A sweep that throws synchronously is the same as one that failed.
+      }
     } catch {
       // The next pass tries again.
     } finally {
