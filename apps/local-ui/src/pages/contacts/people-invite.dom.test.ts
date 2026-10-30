@@ -10,7 +10,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../api/client.js';
 import { INVITE_STRINGS as I } from '../invite/strings.js';
-import { ContactsPage } from './index.js';
+import { ContactsPage, type ContactsPageProps } from './index.js';
 import { createInviteApi } from './invite-api.js';
 import { createOwnerClient } from './owner.js';
 import { CONTACTS_STRINGS as S } from './strings.js';
@@ -107,7 +107,7 @@ async function mount(state: State): Promise<void> {
   const fetch = server(state);
   await act(async () => {
     root.render(
-      createElement(ContactsPage, {
+      createElement<ContactsPageProps>(ContactsPage, {
         api: createApiClient({ fetch, token: 't' }),
         owner: createOwnerClient({ fetch, token: 't' }),
         invites: createInviteApi({ fetch, token: 't' }),
@@ -174,10 +174,11 @@ describe("People: the inviter's Connected moment (A7)", () => {
       await new Promise((r) => setTimeout(r, 60));
     });
     await settle();
-    expect(text()).toContain('You and Marko are connected');
+    // The name rule quotes a name the contact gave itself (I-5).
+    expect(text()).toContain('You and “Marko” are connected');
     expect(text()).toContain('4821');
     await click(I.done);
-    expect(text()).not.toContain('You and Marko are connected');
+    expect(text()).not.toContain('are connected');
   });
 
   it('a contact that was already there never triggers it', async () => {
@@ -193,7 +194,7 @@ describe('People: the person ⋯ menu', () => {
       document.querySelector<HTMLButtonElement>('.ct-row')?.click();
     });
     await settle();
-    await click('More for Marko');
+    await click('More for “Marko”');
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
     expect(items).toEqual([I.rename, I.checkCode, I.remove]);
     await click(I.rename);

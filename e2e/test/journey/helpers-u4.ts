@@ -37,11 +37,12 @@ export async function inviteFromScreen(jp: JourneyPage, name?: string): Promise<
 
 /** The Connected moment on either side: "You and {name} are connected" and a 12-digit code. */
 export async function seesConnected(page: Page, name: string, ms = 30_000): Promise<void> {
+  // The name rule quotes a name the contact gave itself: “Ana”.
   await page
-    .getByRole('heading', { name: `You and ${name} are connected` })
+    .getByRole('heading', { name: new RegExp(`^You and “?${name}”? are connected$`) })
     .waitFor({ timeout: ms });
   await page
-    .getByText(/\d{4} \d{4} \d{4}/)
+    .getByText(/\d{4}\D{1,3}\d{4}\D{1,3}\d{4}/)
     .first()
     .waitFor({ timeout: ms });
 }

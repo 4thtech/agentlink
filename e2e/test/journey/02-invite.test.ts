@@ -19,9 +19,11 @@ import {
   type JourneyPage,
 } from './world.js';
 import {
+  CLS_BUDGET,
   emulateReducedMotion,
   expectFadesOnly,
   expectStableLayout,
+  layoutShiftScore,
   observeLayoutShift,
 } from '../helpers/motion.js';
 import {
@@ -125,8 +127,7 @@ describe('chapter 2: contacts and invites', () => {
     expect(dropDump).not.toContain(secret.slice(2));
 
     // The open invite is a pending row, read from the server (it survives leaving the page).
-    // (Messages: the wave-4 shell no longer lists Home in the navigation.)
-    await navTo(a.page, 'Messages');
+    await navTo(a.page, 'Inbox');
     await navTo(a.page, 'Contacts');
     await a.page.getByText('Waiting for them to accept').first().waitFor();
     await a.page.getByRole('button', { name: 'Cancel' }).first().click();
@@ -154,12 +155,17 @@ describe('chapter 2: contacts and invites', () => {
     const aProbe = await a.arm();
 
     await emulateReducedMotion(a.page);
-    await openInviteScreen(a.page);
+    // The page's earlier shifts (the shell loading) are the baseline: this screen adds none.
+    await navTo(a.page, 'Contacts');
     await observeLayoutShift(a.page);
+    const before = await layoutShiftScore(a.page);
+    await openInviteScreen(a.page);
     const shown = await inviteLinkOnScreen(a.page);
     expect(shown).toMatch(SHORT_INVITE);
+    await a.page.getByRole('button', { name: 'Copy', exact: true }).click();
+    await a.page.getByRole('button', { name: 'Copied', exact: true }).waitFor();
     await expectFadesOnly(a.page);
-    await expectStableLayout(a.page);
+    await expectStableLayout(a.page, before + CLS_BUDGET);
     await a.page.getByRole('button', { name: 'Done', exact: true }).click();
 
     const link = await inviteFromScreen(a, 'Bo');
@@ -170,6 +176,9 @@ describe('chapter 2: contacts and invites', () => {
     await acceptInviteInApp(b, link, 'Ana');
     await until('Bo is paired with Ana', () => pairedWith(mcpB, 'Ana'), 30_000);
     await until('Ana is paired with Bo', () => pairedWith(mcpA, 'Bo'), 30_000);
+    // Both pages show the Connected moment with the safety code, with no navigation (A7).
+    await seesConnected(b.page, 'Ana');
+    await seesConnected(a.page, 'Bo');
     await aProbe.check();
   }, 180_000);
 

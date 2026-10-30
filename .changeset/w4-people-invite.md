@@ -1,0 +1,6 @@
+---
+'@4thtech-io/node': patch
+'@4thtech-io/agentlink': patch
+---
+
+W4-PEOPLE-INVITE: the local app's Invite screen, made at once from People (`/contacts?invite` too): an optional name that is only for your list, the short link with Copy (a ✓ Copied moment), Email (your mail app) and Share (where the browser has a share sheet), "Works for 7 days" and "See what they'll see". A link that never left the screen is cancelled when you leave it. Under the hood adds the invite's details, a long link instead and the QR code. Open invites show as rows with "link works N more days" and Cancel invite, and say so once cancelled. Rename, Check safety code and Remove move into a person ⋯ menu. A friend who joins with `agentlink join` sees "{name} invites you to connect your AIs" with one Accept with Touch ID, and "Not now" says nothing was shared. When a connection completes, both sides show "You and {name} are connected" with the 12-digit safety code and "Numbers don't match?".

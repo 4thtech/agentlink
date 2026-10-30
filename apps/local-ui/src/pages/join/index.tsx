@@ -13,8 +13,17 @@
 // - After accepting: "Waiting for {name}'s agent to answer." (the 10-minute line after 10 minutes),
 //   then "Connected with {name}." and the safety-code step on Contacts. The safety code does not
 //   exist before the handshake-ack (04 §3.6.1), so it is never shown here before that.
+// W4-PEOPLE-INVITE (prototype v23 A6, A7): the card is the friend's screen, "{name} invites you to
+// connect your AIs" with one Accept with Touch ID; "Not now" says nothing was shared and the link
+// still works; once connected, the Connected moment shows the safety code for the new contact
+// (found in this app's contacts by the inviter's fingerprint), and Done goes Home.
 import { Button, ProgressBar } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
+import { createApiClient, type ApiClient } from '../../api/client.js';
+import { LIST_PATH, parseList } from '../contacts/data.js';
+import { ConnectedMoment } from '../invite/connected.js';
+import { FingerprintIcon } from '../invite/icons.js';
+import { INVITE_STRINGS as I, invitesYou, letterOf } from '../invite/strings.js';
 import {
   createOwnerClient,
   passkeyProof,
@@ -28,8 +37,8 @@ import { createJoinApi, type JoinApi, type JoinInvite, type JoinState } from './
 import { JOIN_STRINGS as S } from './strings.js';
 import './join.css';
 
-const HOME = '/settings/home';
-const CONTACTS = '/settings/contacts';
+const HOME = '/';
+const CONTACTS = '/contacts';
 /** How often the screen reads again while it follows the pairing. */
 const POLL_MS = 3_000;
 /** b11 §33.2: the extra line after 10 minutes with no answer. */
@@ -48,6 +57,30 @@ export interface JoinPageProps {
   readonly go?: (path: string) => void;
   readonly now?: () => number;
   readonly pollMs?: number;
+  /** This app's contacts, for the safety code once connected. Default: the page's own client. */
+  readonly contacts?: ApiClient;
+}
+
+const compact = (fp: string): string => fp.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+
+/** The new contact whose owner fingerprint starts with the inviter's short one (newest first). */
+async function findContact(api: ApiClient, fingerprint: string): Promise<string | undefined> {
+  const res = await api.get(LIST_PATH);
+  if (res.kind !== 'ok') return undefined;
+  const list = parseList(res.data);
+  if (list.kind !== 'ok') return undefined;
+  const want = compact(fingerprint);
+  if (want.length < 8) return undefined;
+  const found = list.contacts
+    .filter(
+      (c) =>
+        c.pairing === 'complete' &&
+        c.status === 'active' &&
+        c.fingerprint !== undefined &&
+        compact(c.fingerprint).startsWith(want),
+    )
+    .sort((a, b) => b.since - a.since)[0];
+  return found?.ref;
 }
 
 function goTo(path: string): void {
@@ -72,7 +105,11 @@ export function JoinPage({
   go = goTo,
   now = () => Date.now(),
   pollMs = POLL_MS,
+  contacts: givenContacts,
 }: JoinPageProps): ReactElement {
+  const [contacts] = useState<ApiClient>(() => givenContacts ?? createApiClient());
+  const [declined, setDeclined] = useState(false);
+  const [contactRef, setContactRef] = useState<string | undefined>(undefined);
   const [api] = useState<JoinApi>(() => given ?? createJoinApi());
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [view, setView] = useState<View>({ kind: 'loading' });
@@ -168,9 +205,27 @@ export function JoinPage({
     });
   };
 
+  // "Not now" forgets the invite on this computer; the link itself keeps working until it expires.
   const notNow = (): void => {
-    void api.dismiss().then(() => go(HOME));
+    void api.dismiss().then(() => setDeclined(true));
   };
+
+  // Connected: find the new contact for the safety code (it exists only now, 04 §3.6.1).
+  const connectedFingerprint =
+    view.kind === 'read' && view.state === 'connected' ? view.invite?.fingerprint : undefined;
+  useEffect(() => {
+    if (connectedFingerprint === undefined) return undefined;
+    let live = true;
+    void findContact(contacts, connectedFingerprint).then(
+      (ref) => {
+        if (live) setContactRef(ref);
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [contacts, connectedFingerprint]);
 
   if (view.kind === 'loading') {
     return (
@@ -225,21 +280,17 @@ export function JoinPage({
   }
   if (view.state === 'connected') {
     return (
-      <section className="jn-card">
-        <h1 className="al-text-title-2" tabIndex={-1} ref={title}>
-          {S.connected(name)}
-        </h1>
+      <section className="jn-moment">
         <p className="jn-live" role="status" aria-live="polite">
           {S.connected(name)}
         </p>
-        <div className="jn-actions">
-          <Button variant="primary" onClick={() => go(CONTACTS)}>
-            {S.compare(name)}
-          </Button>
-          <Button variant="secondary" onClick={() => void api.dismiss().then(() => go(HOME))}>
-            {S.goHome}
-          </Button>
-        </div>
+        <ConnectedMoment
+          name={name}
+          me={agent}
+          api={contacts}
+          {...(contactRef === undefined ? {} : { contactRef })}
+          onDone={() => void api.dismiss().then(() => go(HOME))}
+        />
       </section>
     );
   }
@@ -264,29 +315,31 @@ export function JoinPage({
     );
   }
 
-  // Waiting for the owner (the drawn card).
+  // Waiting for the owner: the friend's card (A6).
+  const until = DAY.format(new Date(invite.expiresAt));
   return (
-    <section className="jn-card">
-      <h1 className="al-text-title-2" tabIndex={-1} ref={title}>
-        {S.title(name)}
-      </h1>
-      <p className="al-text-body">{S.check(name, fingerprint)}</p>
-      <section className="jn-who" aria-label={S.regionLabel}>
-        <p className="jn-name">
-          <span className="al-text-title-3">“{name}”</span>{' '}
-          <span className="jn-badge al-text-body-sm">{S.selfDeclared}</span>
-        </p>
-        <p className="al-text-body-sm">
-          <span className="jn-caps">{S.fingerprintLabel}</span>{' '}
-          <span className="jn-mono">{fingerprint}</span> ·{' '}
-          {S.until(DAY.format(new Date(invite.expiresAt)))}
-        </p>
-        <p className="al-text-body-sm">
-          <strong>{S.isThisWho}</strong>
-        </p>
-        {agent === '' ? null : <p className="al-text-body-sm al-muted">{S.forAgent(agent)}</p>}
-      </section>
-      <p className="al-text-body-sm al-muted">{S.afterConnect(name)}</p>
+    <section className="jn-card jn-friend al-reveal">
+      <div className="jn-who-row">
+        <span className="jn-letter" aria-hidden="true">
+          {letterOf(name)}
+        </span>
+        <span className="jn-badge al-text-caption">{I.nameBySender}</span>
+      </div>
+      <div className="jn-head">
+        <h1 className="jn-title" tabIndex={-1} ref={title}>
+          {invitesYou(name)}
+        </h1>
+        <p className="jn-lead al-muted">{I.acceptBody(name)}</p>
+      </div>
+      <p className="al-text-body-sm al-muted jn-check" aria-label={S.regionLabel}>
+        {S.check(name, fingerprint)} · {S.until(until)}
+        {agent === '' ? null : (
+          <>
+            {' · '}
+            {S.forAgent(agent)}
+          </>
+        )}
+      </p>
       {askCode ? (
         <PresencePrompt
           summary={S.statement(name, fingerprint, agent === '' ? 'this agent' : agent)}
@@ -297,25 +350,41 @@ export function JoinPage({
           onCancel={() => setAskCode(false)}
         />
       ) : (
-        <>
-          <p className="al-text-body-sm jn-statement">
-            {S.statement(name, fingerprint, agent === '' ? 'this agent' : agent)}
-          </p>
-          <div className="jn-actions">
-            <Button variant="primary" icon="approval" onClick={accept} disabled={busy}>
+        <div className="jn-accept">
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            className="jn-primary al-press"
+            onClick={accept}
+            disabled={busy || declined}
+          >
+            <span className="inv-btn-in">
+              {passkey === undefined ? null : <FingerprintIcon />}
               {passkey === undefined ? S.acceptWithCode : S.acceptWith(platform)}
-            </Button>
-            <Button variant="ghost" onClick={notNow} disabled={busy}>
-              {S.notNow}
-            </Button>
-          </div>
+            </span>
+          </Button>
           {busy ? <ProgressBar label={S.connecting(name)} indeterminate /> : null}
           {error === undefined ? null : (
             <p className="al-text-body-sm jn-error" role="alert">
               {error}
             </p>
           )}
-        </>
+          {declined ? (
+            <>
+              <p className="jn-declined al-reveal" role="status">
+                {I.declined(until)}
+              </p>
+              <Button variant="ghost" onClick={() => go(HOME)}>
+                {S.goHome}
+              </Button>
+            </>
+          ) : (
+            <button type="button" className="jn-not-now" onClick={notNow} disabled={busy}>
+              {S.notNow}
+            </button>
+          )}
+        </div>
       )}
     </section>
   );

@@ -290,15 +290,18 @@ async function createFor(name: string | undefined, routes: Routes = {}): Promise
 }
 
 describe('UX2-d2: where the sheet opens', () => {
-  it('puts Add contact in the title row: secondary with contacts, primary when the list is empty', async () => {
+  // W4-PEOPLE-INVITE: Invite someone (the Invite screen) is the one primary action; Add contact
+  // (the sheet, for a pasted invite too) stays beside it as secondary.
+  it('puts Add contact in the title row, secondary beside the primary Invite someone', async () => {
     await mount();
     const add = button(A.addContact);
     expect(add.closest('.ct-title-row')).not.toBeNull();
     expect(add.className).toContain('al-btn-secondary');
+    expect(button('Invite someone').className).toContain('al-btn-primary');
     act(() => root.unmount());
     root = createRoot(host);
     await mount({ [`GET ${LIST}`]: { status: 'ok', contacts: [] } });
-    expect(button(A.addContact).className).toContain('al-btn-primary');
+    expect(button(A.addContact).className).toContain('al-btn-secondary');
   });
 
   it('opens a labelled region, not a modal, and focuses its first field', async () => {
@@ -670,7 +673,7 @@ describe('W4-INVITES-LIST: open invites from the server', () => {
     expect(rowsEl()?.querySelector('li')?.textContent).toContain(
       'Invite cancelled. The link no longer works.',
     );
-    expect(rowsEl()?.querySelector('li button')?.textContent).not.toBe('Cancel invite');
+    expect(rowsEl()?.querySelector('li')?.querySelector('button')).toBeNull();
   });
 
   it('drops a row the server no longer has (not found) without an error', async () => {

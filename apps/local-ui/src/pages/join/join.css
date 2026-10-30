@@ -75,3 +75,85 @@
     align-items: stretch;
   }
 }
+
+/* W4-PEOPLE-INVITE (prototype v23 A6, A7): the friend's card and the Connected moment. Motion comes
+   from the U0 kit classes (al-reveal, al-press); nothing here animates by itself. */
+.jn-friend {
+  gap: var(--al-space-6);
+}
+.jn-who-row {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+.jn-letter {
+  inline-size: 48px;
+  block-size: 48px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-accent-subtle);
+  color: var(--al-color-accent-default);
+  font-weight: var(--al-font-weight-semibold);
+  font-size: 20px;
+}
+.jn-head {
+  display: grid;
+  gap: var(--al-space-3);
+}
+.jn-title {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: var(--al-font-weight-semibold);
+  letter-spacing: -0.02em;
+}
+.jn-lead {
+  font-size: 16px;
+  line-height: 24px;
+}
+.jn-accept {
+  display: grid;
+  gap: var(--al-space-3);
+}
+.jn-primary {
+  min-block-size: 52px;
+  justify-content: center;
+  gap: var(--al-space-3);
+  font-size: 16px;
+}
+.jn-not-now {
+  justify-self: center;
+  min-block-size: 44px;
+  padding-inline: var(--al-space-4);
+  border: 0;
+  background: transparent;
+  color: var(--al-color-fg-muted);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.jn-not-now:focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}
+.jn-declined {
+  padding: var(--al-space-3);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-muted);
+  font-size: 13px;
+  text-align: center;
+}
+.jn-moment {
+  inline-size: 100%;
+}
+@media (max-width: 480px) {
+  .jn-title {
+    font-size: 24px;
+    line-height: 30px;
+  }
+}

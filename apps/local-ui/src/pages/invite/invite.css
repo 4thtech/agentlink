@@ -1,0 +1,488 @@
+/* W4-PEOPLE-INVITE: the Invite screen, its panel, the pending row, the person menu and the
+   Connected moment (prototype v23 A3, A5–A7). Tokens only. Motion comes from the U0 kit classes
+   (al-reveal, al-pop, al-press, al-menu, al-expand); nothing here animates by itself. Every box
+   keeps its size while its content loads (the link box is 48 px tall before and after), so the
+   screen does not shift. */
+.inv-screen {
+  inline-size: 100%;
+  max-inline-size: 600px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-7);
+  box-sizing: border-box;
+}
+.inv-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  min-block-size: var(--al-size-touch-min);
+  padding-inline-end: var(--al-space-2);
+  color: var(--al-color-fg-muted);
+  text-decoration: none;
+}
+.inv-back:hover {
+  color: var(--al-color-fg-default);
+}
+.inv-head,
+.inv-connected-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.inv-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: var(--al-font-weight-semibold);
+  letter-spacing: -0.02em;
+}
+.inv-intro {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+.inv-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-7);
+}
+.inv-name {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.inv-name-label {
+  font-weight: var(--al-font-weight-medium);
+}
+.inv-name-label .al-muted {
+  font-weight: var(--al-font-weight-regular);
+}
+.inv-input-wrap {
+  block-size: var(--al-size-touch-min);
+}
+.inv-input {
+  inline-size: 100%;
+  padding-inline: var(--al-space-3);
+  font-size: 15px;
+  box-sizing: border-box;
+}
+.inv-btn-in {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+.inv-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  padding: var(--al-space-6);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-raised);
+}
+.inv-eyebrow {
+  margin: 0;
+  font-family: var(--al-font-family-mono);
+  font-size: 11px;
+  font-weight: var(--al-font-weight-regular);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--al-color-fg-muted);
+}
+.inv-row,
+.inv-ways {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--al-space-3);
+}
+.inv-link {
+  flex: 1 1 280px;
+  min-inline-size: 0;
+  display: flex;
+  align-items: center;
+  min-block-size: 48px;
+  padding-inline: var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+  font-family: var(--al-font-family-mono);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow-x: auto;
+  user-select: all;
+  box-sizing: border-box;
+}
+.inv-link[data-state='making'] {
+  user-select: none;
+}
+.inv-copy {
+  min-block-size: 48px;
+  min-inline-size: 112px;
+  justify-content: center;
+  gap: var(--al-space-2);
+}
+.inv-ways .al-btn {
+  min-block-size: var(--al-size-touch-min);
+  gap: var(--al-space-2);
+}
+.inv-mark {
+  display: inline-flex;
+}
+.inv-note {
+  margin: 0;
+}
+.inv-error {
+  color: var(--al-color-status-danger-fg);
+}
+.inv-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding-block-start: var(--al-space-4);
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.inv-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--al-space-1) var(--al-space-4);
+  margin: 0;
+}
+.inv-facts dt {
+  color: var(--al-color-fg-muted);
+}
+.inv-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.inv-mono {
+  font-family: var(--al-font-family-mono);
+}
+.inv-qr {
+  display: grid;
+  justify-items: start;
+  gap: var(--al-space-2);
+  margin: 0;
+}
+.inv-qr-code {
+  inline-size: 200px;
+  block-size: 200px;
+}
+.inv-foot,
+.inv-connected-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-4);
+}
+.inv-link-button {
+  min-block-size: var(--al-size-touch-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--al-color-fg-link);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.inv-link-button:focus-visible,
+.inv-back:focus-visible,
+.inv-more:focus-visible,
+.inv-menu-item:focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* "See what they'll see": a still picture of the friend's card (A6). */
+.inv-theirs {
+  margin: 0;
+}
+.inv-friend-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  max-inline-size: 520px;
+  padding: var(--al-space-6);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  box-sizing: border-box;
+}
+.inv-friend-who {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+.inv-friend-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: var(--al-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+.inv-badge {
+  padding: 2px var(--al-space-2);
+  border: var(--al-border-width-thin) dashed var(--al-color-border-strong);
+  border-radius: var(--al-radius-sm);
+  color: var(--al-color-fg-muted);
+}
+.inv-fake-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--al-space-2);
+  min-block-size: 48px;
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-accent-default);
+  color: var(--al-color-fg-on-accent);
+  font-weight: var(--al-font-weight-semibold);
+}
+.inv-center {
+  margin: 0;
+  text-align: center;
+}
+
+/* Letters (letter icons until an icon set exists). */
+.inv-avatar {
+  inline-size: 48px;
+  block-size: 48px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--al-radius-full);
+  font-weight: var(--al-font-weight-semibold);
+  font-size: 20px;
+}
+.inv-avatar--me {
+  background: var(--al-color-accent-subtle);
+  color: var(--al-color-accent-default);
+}
+.inv-avatar--them {
+  background: var(--al-color-status-info-bg);
+  color: var(--al-color-status-info-fg);
+}
+
+/* The pending row (A4). */
+.inv-pending {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-3) var(--al-space-4);
+  padding: var(--al-space-4);
+  list-style: none;
+}
+.inv-pending + .inv-pending {
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.inv-pending.is-new {
+  background: var(--al-color-accent-subtle);
+}
+.inv-pending-letter {
+  inline-size: 40px;
+  block-size: 40px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--al-border-width-thin) dashed var(--al-color-border-strong);
+  border-radius: var(--al-radius-full);
+  color: var(--al-color-fg-muted);
+  font-weight: var(--al-font-weight-semibold);
+  font-size: 16px;
+}
+.inv-pending-main {
+  flex: 1 1 200px;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.inv-pending-name {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: var(--al-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+/* The person ⋯ menu (A4). */
+.inv-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.inv-more {
+  inline-size: var(--al-size-touch-min);
+  block-size: var(--al-size-touch-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--al-radius-sm);
+  background: transparent;
+  color: var(--al-color-fg-muted);
+  cursor: pointer;
+}
+.inv-more:hover,
+.inv-more[aria-expanded='true'] {
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-default);
+}
+.inv-menu {
+  position: absolute;
+  inset-block-start: calc(100% + var(--al-space-1));
+  inset-inline-end: 0;
+  z-index: 20;
+  inline-size: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--al-space-1);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-raised);
+  box-shadow: var(--al-shadow-2);
+  box-sizing: border-box;
+}
+.inv-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  min-block-size: 40px;
+  padding-inline: var(--al-space-3);
+  border: 0;
+  border-radius: var(--al-radius-sm);
+  background: transparent;
+  color: var(--al-color-fg-default);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.inv-menu-item svg {
+  color: var(--al-color-fg-muted);
+}
+.inv-menu-item:hover,
+.inv-menu-item:focus-visible {
+  background: var(--al-color-bg-sunken);
+}
+.inv-menu-item.is-danger,
+.inv-menu-item.is-danger svg {
+  color: var(--al-color-status-danger-fg);
+}
+
+/* The Connected moment (A7). */
+.inv-connected {
+  inline-size: 100%;
+  max-inline-size: 560px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--al-space-7);
+  text-align: center;
+  box-sizing: border-box;
+}
+.inv-pair {
+  display: flex;
+  align-items: center;
+}
+.inv-pair .inv-avatar {
+  inline-size: 56px;
+  block-size: 56px;
+  font-size: 22px;
+  border: 3px solid var(--al-color-bg-canvas);
+}
+.inv-pair .inv-avatar--them {
+  margin-inline-start: -14px;
+}
+.inv-pair-check {
+  inline-size: 32px;
+  block-size: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline-start: -10px;
+  margin-block-start: 30px;
+  border: var(--al-border-width-thin) solid var(--al-color-status-success-border);
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-status-success-bg);
+  color: var(--al-color-status-success-icon);
+}
+.inv-connected-head {
+  align-items: center;
+}
+.inv-connected-title {
+  margin: 0;
+  font-size: 40px;
+  line-height: 44px;
+  font-weight: var(--al-font-weight-semibold);
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+h2.inv-connected-title {
+  font-size: 28px;
+  line-height: 34px;
+}
+.inv-code {
+  inline-size: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-6);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-sunken);
+  box-sizing: border-box;
+}
+.inv-code-digits {
+  margin: 0;
+  font-family: var(--al-font-family-mono);
+  font-size: 26px;
+  line-height: 36px;
+  font-weight: var(--al-font-weight-medium);
+  letter-spacing: 0.04em;
+}
+.inv-code-sep {
+  color: var(--al-color-fg-subtle);
+}
+.inv-mismatch {
+  inline-size: 100%;
+  padding: var(--al-space-3) var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-status-warning-border);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-status-warning-bg);
+  color: var(--al-color-status-warning-fg);
+  text-align: start;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.inv-connected-actions {
+  justify-content: center;
+}
+/* Inside a page (People), the moment is a card above the list. */
+.inv-connected-card {
+  padding: var(--al-space-7) var(--al-space-5);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-raised);
+}
+
+@media (max-width: 480px) {
+  .inv-title {
+    font-size: 24px;
+    line-height: 30px;
+  }
+  .inv-connected-title {
+    font-size: 30px;
+    line-height: 36px;
+  }
+  .inv-code-digits {
+    font-size: 22px;
+  }
+  .inv-copy {
+    flex: 1 1 100%;
+  }
+}

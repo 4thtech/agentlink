@@ -334,10 +334,11 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
     await page.getByRole('button', { name: 'I saved it' }).click();
 
     // First run ends on the invite, named by the inviter (Self-declared) with a short fingerprint.
-    await page.getByRole('heading', { name: "Accept Ana's invite?" }).waitFor();
+    // W4-PEOPLE-INVITE (prototype v23 A6): the friend's card.
+    await page.getByRole('heading', { name: 'Ana invites you to connect your AIs' }).waitFor();
     const text = await page.locator('body').innerText();
-    expect(text).toContain('Self-declared');
-    expect(text).toContain('After you connect, compare the safety code with Ana.');
+    expect(text).toContain('Name set by the sender');
+    expect(text).toContain("Check it's Ana:");
     expect(text).not.toContain(inviteUrl.split('#')[1] ?? '?');
     await page
       .getByRole('button', { name: /^Accept with (Touch ID|Windows Hello|your passkey)$/ })
@@ -348,7 +349,12 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
     const friendMcp = await startAiAppMcp(friendPc, undefined);
     closers.push(() => friendMcp.close());
     await page.getByText('Connected with Ana.').first().waitFor({ timeout: 60_000 });
-    await page.getByText('Compare the safety code with Ana').waitFor();
+    // W4-PEOPLE-INVITE (A7): the Connected moment with the 12-digit safety code.
+    await page.getByRole('heading', { name: /^You and “?Ana”? are connected$/ }).waitFor();
+    await page
+      .getByText(/\d{4}\D{1,3}\d{4}\D{1,3}\d{4}/)
+      .first()
+      .waitFor();
     const contacts = await until(
       'the inviter sees the friend',
       async () => {
