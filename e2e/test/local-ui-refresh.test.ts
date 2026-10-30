@@ -822,6 +822,79 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     }
   }, 60_000);
 
+  // W4-SHELL-LIVE (U1-b; follow-up of W4-SHELL-V2: the top bar shifted ~0.023 when Under the hood
+  // turned on): the app's own Under the hood value turns it on after load (this browser had it off),
+  // and the live status of the AI apps changes while nobody touches the page (Claude Code quits).
+  // Neither moves the page: the strip, the chip and the menu keep their places (CLS ≤ 0.01).
+  for (const width of [1280, 360]) {
+    it(`shell live: Under the hood from the app and an AI app quitting keep CLS ≤ 0.01 (${width})`, async () => {
+      const { ctx, page } = await open({ ...(MODES[0] as Mode), width });
+      try {
+        let reads = 0;
+        const agents = (): unknown => {
+          reads += 1;
+          const running = reads <= 1;
+          return {
+            switchable: true,
+            generation: 1,
+            current: 'default',
+            label: "Tali's agent",
+            agents: [
+              {
+                name: 'default',
+                label: "Tali's agent",
+                labelled: true,
+                current: true,
+                available: true,
+                removing: false,
+                contacts: 2,
+                running,
+                state: running ? 'ready' : 'offline',
+                ...(running ? {} : { lastSeenAt: Math.floor(Date.now() / 1000) - 180 }),
+                apps: [
+                  running
+                    ? { app: 'claude-code', state: 'ready', since: 1_800_000_000 }
+                    : {
+                        app: 'claude-code',
+                        state: 'not_running',
+                        lastSeenAt: Math.floor(Date.now() / 1000) - 180,
+                      },
+                ],
+              },
+            ],
+          };
+        };
+        const json = (body: unknown, status = 200) => ({
+          status,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        });
+        await page.route('**/api/ui/agents', (route) => route.fulfill(json(agents())));
+        await page.route('**/api/ui/ui-settings', (route) =>
+          route.fulfill(json({ underTheHood: true })),
+        );
+        // No stream here: the live store falls back to its 5 s read, a change with no input.
+        await page.route('**/api/ui/events', (route) => route.fulfill(json({ error: 'x' }, 404)));
+        await observeLayoutShift(page);
+        await page.goto(`${origin}/agents`);
+        await settle(page, 'Agents');
+        await page.locator('[aria-label="Live status"] li').first().waitFor();
+        await page.waitForFunction(
+          () => {
+            const status = document.querySelector('button.al-chip .al-chip-status')?.textContent;
+            return status !== undefined && status !== '' && !status.includes('Ready');
+          },
+          undefined,
+          { timeout: 15_000 },
+        );
+        await page.waitForTimeout(300);
+        report[`shellLiveCls${width}`] = await expectStableLayout(page);
+      } finally {
+        await ctx.close();
+      }
+    }, 60_000);
+  }
+
   it('keyboard: nav, Under the hood switch, Sheets (inert background), Approvals', async () => {
     const { ctx, page } = await open(MODES[0] as Mode);
     const kb: Record<string, unknown> = {};
