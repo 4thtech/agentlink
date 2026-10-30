@@ -12,7 +12,7 @@
 import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
-import { AgentPause } from './agent-pause.js';
+import { AgentPause, agentPaused } from './agent-pause.js';
 import { STORE_SCHEMA_VERSION } from './constants.js';
 import { CoreError } from './errors.js';
 import { TABLES } from './store/schema.js';
@@ -141,6 +141,11 @@ describe('while paused the core refuses relay and sending paths before any effec
     await rejectsPaused(() => a.client.notarize({} as never));
     await rejectsPaused(() => a.client.acknowledge({} as never));
     await rejectsPaused(() => a.client.sendCardUpdates());
+    // IR-W4-PAUSE-1: invites (CLI `invite` and `accept`, the app's invite routes) refuse too.
+    await rejectsPaused(() => a.client.pairing.createInvite({}));
+    await rejectsPaused(() => a.client.pairing.createInvite({ long: true }));
+    await rejectsPaused(() => a.client.pairing.resolveInviteLink('https://example.invalid/x'));
+    await rejectsPaused(() => a.client.pairing.acceptInvite({ link: 'x' }));
     // W4-FILES-SAVE: the app's Save is a file fetch too; refused before any nonce is recorded.
     await rejectsPaused(() => a.client.saveReceivedFile({}));
     expect(await nonceRows(a)).toEqual([]);
@@ -239,5 +244,13 @@ describe('agent.resume (04 §2.5.1)', () => {
     expect(prepared.body.agent).toBe(a.id);
     expect(prepared.body.params).toEqual({ agent: a.id });
     expect(prepared.body.expiresAt - prepared.body.issuedAt).toBeLessThanOrEqual(600);
+  });
+});
+
+describe('the paused refusal text (06 §6)', () => {
+  it('is the fixed sentence the tools and the CLI show', () => {
+    expect(agentPaused().message).toBe(
+      'This agent is paused. The owner can resume it in the AgentLink app.',
+    );
   });
 });

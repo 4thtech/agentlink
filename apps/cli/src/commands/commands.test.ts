@@ -815,6 +815,27 @@ describe('accept and invite argument checks', () => {
     expect(inputs).toEqual([{ long: true }, {}]);
   });
 
+  it('W4-PAUSE (IR-W4-PAUSE-1): invite and accept refuse while paused with the fixed paused text', async () => {
+    const PAUSED = 'This agent is paused. The owner can resume it in the AgentLink app.';
+    // Core's own refusal (any message): the CLI prints the one fixed sentence (06 §6).
+    const paused = (): Promise<never> =>
+      Promise.reject(new CoreError('agent_paused', 'paused'));
+    const f = fakeAgent({
+      pairing: {
+        createInvite: paused,
+        resolveInviteLink: paused,
+        acceptInvite: paused,
+      },
+    });
+    const h = harness(f);
+    const invite = await h.run(['invite'], PIPED);
+    expect(invite.code).toBe(EXIT_FAILED);
+    expect(invite.err).toEqual([PAUSED]);
+    const accept = await h.run(['accept', 'https://agentlink.4thtech.io/i#AAAA']);
+    expect(accept.code).toBe(EXIT_FAILED);
+    expect(accept.err).toEqual([PAUSED]);
+  });
+
   it('prints core fixed text for an expected core refusal and a generic line for anything else', async () => {
     const refusing = fakeAgent({
       pairing: {

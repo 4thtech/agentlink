@@ -415,3 +415,41 @@ describe('resume (presence; signs agent.resume, 04 §2.5.1)', () => {
     expect(h.state.paused).toBe(true);
   });
 });
+
+// IR-W4-PAUSE-SEC-1 L-1: an unreadable pause row is answered `unavailable` before the gesture (no
+// Touch ID asked for nothing), and a failing apply after the gesture is a fixed answer, never a throw.
+describe('resume: unreadable pause row and a failing apply (W4-PAUSE fix round)', () => {
+  const UNAVAILABLE = { status: 503, body: { error: 'unavailable' } };
+
+  function unreadable(): LocalUiContext {
+    const base = world({ paused: true });
+    const client = (base as unknown as { client: { agent: Record<string, unknown> } }).client;
+    return {
+      ...base,
+      client: {
+        ...client,
+        agent: { ...client.agent, pauseState: () => Promise.resolve({ status: 'unreadable' }) },
+      },
+    } as unknown as LocalUiContext;
+  }
+
+  it('an unreadable row: precheck answers unavailable and the handler signs nothing', async () => {
+    const route = resumeRoute();
+    expect(plain(await route.precheck?.(unreadable(), request()))).toEqual(UNAVAILABLE);
+    const s = signer();
+    expect(plain(await route.handler(unreadable(), request(), s.operation))).toEqual(UNAVAILABLE);
+    expect(s.signed).toEqual([]);
+  });
+
+  it('an apply that throws after the gesture is a fixed answer', async () => {
+    const ctx = {
+      ...world({ paused: true }),
+      applyOwnerAction: () => Promise.reject(new Error('SQLITE_BUSY /Users/x/store.sqlite')),
+    } as unknown as LocalUiContext;
+    const s = signer();
+    const result = await resumeRoute().handler(ctx, request(), s.operation);
+    expect(plain(result)).toEqual(UNAVAILABLE);
+    expect(JSON.stringify(result)).not.toContain('SQLITE');
+  });
+});
+
