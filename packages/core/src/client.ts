@@ -137,8 +137,8 @@ export interface AgentLinkClientOptions {
    */
   readonly files?: FilesPlatform;
   /**
-   * W4-AUTO-SAVE (D-142): the agent's pause state for the automatic save (W4-PAUSE wires it, D-143).
-   * Absent: never paused.
+   * W4-AUTO-SAVE (D-142): the agent's pause state for the automatic save. Absent (W4-PAUSE, D-143):
+   * the agent's own pause row, fail closed. A runtime passes one only to replace it (tests).
    */
   readonly autoSavePause?: AutoSavePause;
   /**
@@ -291,8 +291,10 @@ export class AgentLinkClient {
       ...(files === undefined ? {} : { files }),
     });
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
+    // W4-PAUSE x W4-AUTO-SAVE (D-143 (5), D-142): by default auto-save reads this agent's own pause
+    // row (fail closed: an unreadable row counts as paused), so no runtime can forget to wire it.
     this.autoSave = new AutoSaver(ctx, this.#files, () => ownerActions.loadPolicy(), {
-      ...(autoSavePause === undefined ? {} : { pause: autoSavePause }),
+      pause: autoSavePause ?? { paused: () => this.pause.paused() },
     });
     this.#filesPlatform = files;
     this.files = new FilesView(ctx, files, () => ownerActions.loadPolicy());
