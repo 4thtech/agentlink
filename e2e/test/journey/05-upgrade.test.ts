@@ -19,6 +19,7 @@ import {
   type JourneyComputer,
   type JourneyWorld,
 } from './world.js';
+import { skipGetStartedIfShown } from './helpers-wizard.js';
 
 const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
@@ -88,6 +89,8 @@ describe('chapter 5: upgrade', () => {
     });
     const jp = await journeyPage(ready.browser);
     await jp.page.goto(await openedLink(pc));
+    // W4-WIZARD: no AI app is connected in this home, so Get started opens; skip it.
+    await skipGetStartedIfShown(jp.page);
     const probe = await jp.arm();
 
     // W4-SHELL-V2: the Agents page opens from the agent chip's dropdown, top left; the history is on
@@ -133,6 +136,8 @@ describe('chapter 5: upgrade', () => {
     });
     const jp = await journeyPage(ready.browser);
     await jp.page.goto(await openedLink(pc));
+    // W4-WIZARD: no AI app is connected in this home, so Get started opens; skip it.
+    await skipGetStartedIfShown(jp.page);
     const probe = await jp.arm();
     await jp.page
       .getByRole('navigation', { name: 'Sections' })

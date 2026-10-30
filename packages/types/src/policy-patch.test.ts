@@ -20,9 +20,19 @@ describe('policyPatchSchema (M1-11r-b)', () => {
       const patchSection = policyPatchSchema.shape[section] as unknown as {
         unwrap(): { shape: Record<string, unknown> };
       };
+      // Every field of the policy section, the optional `files.autoSave` (D-142) included.
+      const policySection = policySchema.shape[section] as unknown as {
+        shape: Record<string, unknown>;
+      };
       expect(Object.keys(patchSection.unwrap().shape).sort()).toEqual(
-        Object.keys(value as object).sort(),
+        Object.keys(policySection.shape).sort(),
       );
+      // The defaults name every one of them except `files.autoSave` (read as AUTO_SAVE_DEFAULTS).
+      expect(
+        Object.keys(policySection.shape)
+          .filter((k) => !(section === 'files' && k === 'autoSave'))
+          .sort(),
+      ).toEqual(Object.keys(value as object).sort());
     }
   });
 

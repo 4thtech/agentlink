@@ -6,8 +6,8 @@
 //   code plus the restart line;
 // - every fixed reason code in plain words; nothing from the server or the browser is shown;
 // - the recovery kit stays "Later" (remembered for the persistent banner) when the backup code is saved;
-// - U3-g (b11 §28): the setup page starts at Welcome and the app pick; these tests go through them
-//   (first-run-v3.test.ts covers those screens) and end on Home;
+// - W4-WIZARD (W4 UX v2 layer 1): the setup page is Get started: these tests pick the app on step 1
+//   (start/wizard.dom.test.ts covers the steps), run step 2 and end on step 3, Connected;
 // - the default views use no web3 or key words (11 §5.1; UX north star).
 import { act, createElement as h, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -30,6 +30,17 @@ import {
 } from './setup-api.js';
 import { lintVocabulary } from '@4thtech-io/ui';
 import { FIRST_RUN, SETUP_MESSAGES } from './strings.js';
+import { resetAutoShown, resetWizard } from '../start/store.js';
+import { CONNECTED_STEP, CONNECT_STEP } from '../start/strings.js';
+
+/** W4-WIZARD: the one button of step 2, by platform. */
+const GO = {
+  mac: CONNECT_STEP.connect('Touch ID'),
+  windows: CONNECT_STEP.connect('Windows Hello'),
+  other: CONNECT_STEP.connect('your passkey'),
+} as const;
+/** Step 3 after a first run with no AI app found (the pick was "Claude Code", not found yet). */
+const READY = CONNECTED_STEP.notConnectedTitle('Claude Code agent');
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -124,6 +135,9 @@ async function mount(
   extra: Partial<FirstRunPageProps> = {},
 ): Promise<void> {
   goHome = vi.fn();
+  resetWizard();
+  resetAutoShown();
+  history.replaceState(null, '', '/start/app');
   await act(async () => {
     const props: FirstRunPageProps = {
       api,
@@ -133,17 +147,30 @@ async function mount(
       passkeysAvailable: () => available,
       platform: 'other',
       prfSupport: () => Promise.resolve('yes'),
+      readJoin: () => Promise.resolve({ kind: 'failed' }),
       ...extra,
     };
     root.render(h(FirstRunPage as ComponentType<FirstRunPageProps>, props));
   });
-  // U3-g: setup starts at Welcome, then the app pick; go through both to the name screen.
-  if ([...host.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Get started')) {
-    await click('Get started');
+  // W4-WIZARD: setup starts on step 1 (pick the AI app); go on to step 2.
+  await settleAll();
+  const next = [...host.querySelectorAll('button')].find((b) =>
+    b.textContent?.trim().startsWith('Continue with'),
+  );
+  if (next !== undefined) {
+    await act(async () => {
+      next.click();
+      await Promise.resolve();
+    });
+    await settleAll();
+  }
+}
+
+async function settleAll(): Promise<void> {
+  for (let i = 0; i < 4; i++) {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
-    await click('Continue');
   }
 }
 
@@ -158,6 +185,7 @@ async function click(name: string): Promise<void> {
     button(name).click();
     await Promise.resolve();
   });
+  await settleAll();
 }
 
 const text = (): string => host.textContent ?? '';
@@ -167,12 +195,12 @@ const BANNED =
   /\b(wallet|gas|seed|transaction|chain|blockchain|hash|private key|owner key|address|0x[0-9a-f]+|localhost|prf|webauthn)\b/i;
 
 describe('first run: protect approvals (D-120 (1))', () => {
-  it('starts on "Set up your agent" with one primary action and says what one confirmation does', async () => {
+  it('starts on "Confirm it\'s you" with one primary action and says what one confirmation does', async () => {
     await mount(fakeApi());
-    expect(host.querySelector('h1')?.textContent).toBe('Set up your agent');
+    expect(host.querySelector('h1')?.textContent).toBe(CONNECT_STEP.title);
     expect(text()).toContain(FIRST_RUN.foldersNote);
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
-    expect(button(FIRST_RUN.usePasskey).className).toContain('al-btn-primary');
+    expect(button(GO.other).className).toContain('al-btn-primary');
     expect(text()).not.toMatch(BANNED);
   });
 
@@ -183,7 +211,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
       seen.push(v);
       return Promise.resolve({ kind: 'ok', body: BODY.slice() });
     });
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(seen).toEqual([VALUES]);
     expect(api.finished).toHaveLength(1);
     expect(api.finished[0]).toEqual(BODY);
@@ -191,7 +219,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
 
   it('M1-UX-FIRSTRUN-V2: shows "Your backup code" once, in a save form, with the fingerprint', async () => {
     await mount(fakeApi());
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
     expect(text()).toContain(FIRST_RUN.fingerprintLabel);
     expect(host.querySelector('.al-fp')?.textContent).toContain(FP);
@@ -209,7 +237,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
         finish: done({ confirmed: false }),
       }),
     );
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(text()).toContain(
       "Setup finished, but we couldn't confirm one step. Your agent may need a restart.",
     );
@@ -219,19 +247,19 @@ describe('first run: protect approvals (D-120 (1))', () => {
 
   it('without a passkey that protects approvals, the backup code is the way to approve here', async () => {
     await mount(fakeApi({ finish: done({ passkey: false }) }));
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(text()).toContain(FIRST_RUN.doneNoPasskeyBody);
     expect(host.querySelector('.al-secret-val')?.textContent).toContain('ABCD');
     expect(button(FIRST_RUN.savedIt)).toBeDefined();
   });
 
-  it('owner already set up: says so and never offers setup', async () => {
-    await mount(fakeApi({ status: { kind: 'ok', owner: 'set_up' } }));
-    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.alreadyTitle);
-    expect(text()).toContain('agentlink doctor');
-    expect([...host.querySelectorAll('button')].map((b) => b.textContent)).not.toContain(
-      FIRST_RUN.usePasskey,
-    );
+  it('owner already set up: Get started goes on for that owner (New agent) and never offers setup', async () => {
+    const api = fakeApi({ status: { kind: 'ok', owner: 'set_up' } });
+    await mount(api);
+    // Step 2 for an owner: New agent (no agent is open here), never owner setup.
+    expect(text()).toContain(CONNECT_STEP.title);
+    expect(text()).not.toContain(FIRST_RUN.foldersNote);
+    expect(api.finished).toHaveLength(0);
   });
 
   it('IR-M1-11b-1-1 L-1: an unknown status sends the owner to agentlink doctor, not to setup', async () => {
@@ -247,7 +275,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
       statusAfter: { kind: 'ok', owner: 'set_up' },
     });
     await mount(api);
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(text()).toContain(SETUP_MESSAGES.finishedNoCode);
     expect(host.querySelectorAll('button')).toHaveLength(0);
     expect(api.finished).toHaveLength(1);
@@ -259,7 +287,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
       statusAfter: { kind: 'ok', owner: 'missing' },
     });
     await mount(api);
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(text()).toContain(SETUP_MESSAGES.notFinished);
     expect(button(FIRST_RUN.tryAgain)).toBeDefined();
   });
@@ -271,7 +299,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
         statusAfter: { kind: 'error', problem: 'offline' },
       }),
     );
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(text()).toContain("AgentLink isn't running");
     expect([...host.querySelectorAll('button')].map((b) => b.textContent?.trim())).not.toContain(
       FIRST_RUN.tryAgain,
@@ -280,14 +308,14 @@ describe('first run: protect approvals (D-120 (1))', () => {
 
   it('a race lost at begin or finish shows the same "already protected" state', async () => {
     await mount(fakeApi({ finish: { kind: 'owner_exists' } }));
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.alreadyTitle);
   });
 
   it('a cancelled passkey dialog changes nothing and offers to try again', async () => {
     const api = fakeApi();
     await mount(api, () => Promise.resolve({ kind: 'cancelled' }));
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(text()).toContain(SETUP_MESSAGES.cancelled);
     expect(api.finished).toHaveLength(0);
     expect(button(FIRST_RUN.tryAgain)).toBeDefined();
@@ -310,14 +338,14 @@ describe('first run: protect approvals (D-120 (1))', () => {
 
   it('after a failure that may have kept something, it never offers to start again', async () => {
     await mount(fakeApi({ finish: { kind: 'error', problem: 'keychain' } }));
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(text()).toContain(SETUP_MESSAGES.keychain);
     expect(host.querySelectorAll('button')).toHaveLength(0);
   });
 
   it('rolled_back offers to start again', async () => {
     await mount(fakeApi({ finish: { kind: 'error', problem: 'rolled_back' } }));
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(text()).toContain(SETUP_MESSAGES.rolled_back);
     expect(button(FIRST_RUN.tryAgain)).toBeDefined();
   });
@@ -330,9 +358,9 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
 
   it('shows the folders setup creates before the gesture, and one button named for the platform', async () => {
     for (const [platform, label] of [
-      ['mac', FIRST_RUN.useTouchId],
-      ['windows', FIRST_RUN.useWindowsHello],
-      ['other', FIRST_RUN.usePasskey],
+      ['mac', GO.mac],
+      ['windows', GO.windows],
+      ['other', GO.other],
     ] as const) {
       await mount(fakeApi(), undefined, true, { platform });
       expect(text()).toContain('~/AgentLink/Send');
@@ -353,13 +381,13 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
       asked.push(options);
       return Promise.resolve({ kind: 'ok', body: BODY.slice() });
     });
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(asked).toEqual([{ platform: true }]);
   });
 
   it('the backup code sits in a real save form; Copy is secondary with the clipboard warning', async () => {
     await mount(fakeApi(), undefined, true, { platform: 'mac' });
-    await click(FIRST_RUN.useTouchId);
+    await click(GO.mac);
     const form = host.querySelector('form');
     expect(form).not.toBeNull();
     const user = form?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
@@ -382,7 +410,7 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     await mount(fakeApi());
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(buttons()).toEqual([FIRST_RUN.saveToManager, FIRST_RUN.copy, FIRST_RUN.savedIt]);
     await act(async () => {
       host.querySelector('form')?.requestSubmit();
@@ -393,7 +421,8 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
     await click(FIRST_RUN.savedIt);
     // U3-g: with no AI app chosen the end of first run is Home; the kit stays "Later".
-    expect(goHome).toHaveBeenCalledTimes(1);
+    // W4-WIZARD: first run goes on to step 3 (Connected); Home is one click away there.
+    expect(host.querySelector('h1')?.textContent).toBe(READY);
     expect(host.querySelector('h1')?.textContent).not.toBe(FIRST_RUN.backupTitle);
     // The code is gone from the page once the owner moves on.
     expect(text()).not.toContain('ABCD');
@@ -404,7 +433,7 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
   // node, attribute or field value of the whole document (not only the page's visible text).
   it('L-3: the backup code leaves the DOM after "I saved it"', async () => {
     await mount(fakeApi());
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     const fields = (): string[] =>
       [...document.querySelectorAll('input, textarea')].map(
         (f) => (f as HTMLInputElement | HTMLTextAreaElement).value,
@@ -413,7 +442,8 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     // Shown while the backup-code step is open (the save form holds it).
     expect(fields().some((v) => v.replaceAll(' ', '') === compact)).toBe(true);
     await click(FIRST_RUN.savedIt);
-    expect(goHome).toHaveBeenCalledTimes(1);
+    // W4-WIZARD: first run goes on to step 3 (Connected); Home is one click away there.
+    expect(host.querySelector('h1')?.textContent).toBe(READY);
     const html = document.documentElement.outerHTML;
     for (const part of [CODE, compact, ...CODE.split(' ')]) {
       expect(html).not.toContain(part);
@@ -424,12 +454,12 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
 
   it('says the Send folder is allowed, or why not, in plain words', async () => {
     await mount(fakeApi());
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(text()).toContain(FIRST_RUN.sendAllowed);
     act(() => root.unmount());
     root = createRoot(host);
     await mount(fakeApi({ finish: done({ sendFolder: 'not_allowed' }) }));
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(text()).toContain(FIRST_RUN.sendNotAllowed);
     expect(text()).not.toMatch(BANNED);
   });
@@ -461,7 +491,7 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
         asked += 1;
         return Promise.resolve({ kind: 'ok', body: BODY.slice() });
       });
-      await click(FIRST_RUN.usePasskey);
+      await click(GO.other);
       expect(asked).toBe(0);
       expect(text()).toContain(SETUP_MESSAGES[problem]);
       expect(button(FIRST_RUN.tryAgain)).toBeDefined();
@@ -577,12 +607,13 @@ describe('every fixed reason code has plain words', () => {
 describe('recovery kit "Later" and the end on Home (D-120 (2); U3-a, D-138; U3-g)', () => {
   it('"I saved it" remembers the kit as later for the banner and lands on Home', async () => {
     await mount(fakeApi());
-    await click(FIRST_RUN.usePasskey);
+    await click(GO.other);
     expect(recoveryKitPending()).toBe(false);
     await click(FIRST_RUN.savedIt);
     expect(recoveryKitPending()).toBe(true);
     expect(localStorage.getItem(RECOVERY_KIT_LATER_KEY)).toMatch(/^[0-9]+$/);
-    expect(goHome).toHaveBeenCalledTimes(1);
+    // W4-WIZARD: first run goes on to step 3 (Connected); Home is one click away there.
+    expect(host.querySelector('h1')?.textContent).toBe(READY);
     expect(host.querySelector('details')).toBeNull();
     expect(text()).not.toContain('ABCD');
     expect(text()).not.toMatch(BANNED);

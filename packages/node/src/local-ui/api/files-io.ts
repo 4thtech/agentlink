@@ -18,8 +18,17 @@
 // the checked item ID; the handler reads the sealed saved name from the store and the Inbox folder
 // from the rules in force, and passes just those to the checked reveal (local-ui/reveal-file.ts). No
 // name or path from the request is ever used. Not an MCP tool (I-4).
+//
+// W4-AUTO-SAVE (D-142; 08 §1, 11 §5.7; proposed, owner confirms at merge): a received item also
+// carries `savedBy: 'auto'` (saved automatically) or `reason` (one fixed code, never error text) when
+// it was not saved; the received page carries `autoSave: {on, folder, notice}`, where `folder` is the
+// owner's own Inbox folder setting with the home folder shown as `~` (never inbound text, never a
+// resolved path). `GET /api/ui/files/auto-save-notice/dismiss` dismisses the one-time notice: display
+// state only, like the former-name seen mark (D-141); no presence, nothing signed, no setting changes.
+import { homedir } from 'node:os';
 import {
   CoreError,
+  autoSaveOf,
   type PageQuery,
   type ReceivedFileItem,
   type SentFileItem,
@@ -36,6 +45,10 @@ import {
   type LocalUiRevealRoute,
 } from '../route-types.js';
 import { REVEAL_PATH } from '../reveal-path.js';
+import {
+  AUTO_SAVE_NOTICE_PATH,
+  AUTO_SAVE_REASONS as AUTO_SAVE_REASON_CODES,
+} from '@4thtech-io/types/ui-contract/auto-save';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -49,6 +62,8 @@ const MAX_FILE_NAME_CHARS = 255;
 /** A contact name as the Contacts page sends it (contacts.ts). */
 const MAX_CONTACT_NAME_CHARS = 128;
 const RECEIVED_STATES: ReadonlySet<string> = new Set(['saved', 'not_saved', 'expired', 'deleted']);
+/** W4-AUTO-SAVE: the reason codes a received item may carry (types ui-contract/auto-save.ts). */
+const AUTO_SAVE_REASONS: ReadonlySet<string> = new Set(AUTO_SAVE_REASON_CODES);
 const SENT_STATES: ReadonlySet<string> = new Set(['available', 'expired', 'deleted']);
 const SENT_STATUSES: ReadonlySet<string> = new Set(['queued', 'sent', 'not_delivered']);
 
@@ -109,7 +124,7 @@ function receivedView(item: ReceivedFileItem): JsonObject | undefined {
   const base = common(item);
   if (base === undefined) return undefined;
   const from = contactName(item.from);
-  const { state, proof, savedName } = item as unknown as Record<string, unknown>;
+  const { state, proof, savedName, savedBy, reason } = item as unknown as Record<string, unknown>;
   if (from === undefined || typeof state !== 'string' || !RECEIVED_STATES.has(state)) {
     return undefined;
   }
@@ -122,6 +137,10 @@ function receivedView(item: ReceivedFileItem): JsonObject | undefined {
     size: base.size,
     state,
     ...(state === 'saved' && isSingleName(savedName) ? { savedName } : {}),
+    ...(state === 'saved' && savedBy === 'auto' ? { savedBy: 'auto' } : {}),
+    ...(state === 'not_saved' && typeof reason === 'string' && AUTO_SAVE_REASONS.has(reason)
+      ? { reason }
+      : {}),
     proof,
   };
 }
@@ -162,6 +181,7 @@ function pageRoute<T>(
     readonly nextCursor?: string;
   }>,
   view: (item: T) => JsonObject | undefined,
+  extra?: (client: LocalUiReadClient) => Promise<JsonObject>,
 ): LocalUiReadRoute {
   const handler = async (context: LocalUiContext, request: LocalUiRequest) => {
     const client = context.client;
@@ -176,12 +196,13 @@ function pageRoute<T>(
         if (shown !== undefined) items.push(shown);
       }
       const next = page.nextCursor;
+      const more = extra === undefined ? {} : await extra(client);
       return {
         status: 200,
         body:
           typeof next === 'string' && next.length > 0 && next.length <= MAX_CURSOR
-            ? { items, nextCursor: next }
-            : { items },
+            ? { items, nextCursor: next, ...more }
+            : { items, ...more },
       };
     } catch (error) {
       // Never the error's text: it could name a file, a path or a store detail.
@@ -192,12 +213,74 @@ function pageRoute<T>(
   return Object.freeze<LocalUiReadRoute>({ method: 'GET', path, presence: false, handler });
 }
 
+/** The Inbox folder setting with the home folder shown as `~` (08 §1); never resolved. */
+export function displayFolder(folder: string, home: string = homedir()): string {
+  const h = home.endsWith('/') || home.endsWith('\\') ? home.slice(0, -1) : home;
+  if (h.length > 0 && folder === h) return '~';
+  for (const sep of ['/', '\\']) {
+    if (h.length > 0 && folder.startsWith(`${h}${sep}`))
+      return `~${sep}${folder.slice(h.length + 1)}`;
+  }
+  return folder;
+}
+
+/** W4-AUTO-SAVE: the received page's `autoSave` block. Fails closed to off, no notice. */
+async function autoSaveBlock(client: LocalUiReadClient): Promise<JsonObject> {
+  // A page fake without the rules view gets no block; the server's client always has it.
+  if ((client as Partial<LocalUiReadClient>).policy === undefined) return {};
+  // Rules that cannot be read: off, no folder (fail closed). Never the error's text.
+  const policy = await client.policy.load().catch(() => undefined);
+  const on = policy !== undefined && autoSaveOf(policy)?.on === true;
+  const folder =
+    policy === undefined || policy.mode === 'fail_closed'
+      ? ''
+      : (policy.policy.files as { inboxFolder?: unknown }).inboxFolder;
+  const notice = await (client.autoSaveNotice?.due() ?? Promise.resolve(false)).catch(() => false);
+  return {
+    autoSave: {
+      on,
+      folder: typeof folder === 'string' ? displayFolder(folder) : '',
+      notice: notice === true,
+    },
+  };
+}
+
+const DISMISSED: LocalUiResult = Object.freeze({
+  status: 200,
+  body: Object.freeze({ status: 'dismissed' }),
+});
+
+async function dismissNotice(
+  context: LocalUiContext,
+  request: LocalUiRequest,
+): Promise<LocalUiResult> {
+  const client = context.client;
+  if (client === undefined) return UI_NOT_SET_UP;
+  if ([...request.query.keys()].length > 0) return BAD_REQUEST;
+  const notice = client.autoSaveNotice;
+  if (notice === undefined) return UI_UNAVAILABLE;
+  try {
+    await notice.dismiss();
+  } catch {
+    // Never the error's text.
+    return UI_UNAVAILABLE;
+  }
+  return DISMISSED;
+}
+
 export const filesIoRoutes: readonly LocalUiReadRoute[] = Object.freeze([
   pageRoute<ReceivedFileItem>(
     '/api/ui/files/received',
     (client, query) => client.filesIo.received(query),
     receivedView,
+    autoSaveBlock,
   ),
+  Object.freeze<LocalUiReadRoute>({
+    method: 'GET',
+    path: AUTO_SAVE_NOTICE_PATH,
+    presence: false,
+    handler: dismissNotice,
+  }),
   pageRoute<SentFileItem>(
     '/api/ui/files/sent',
     (client, query) => client.filesIo.sent(query),

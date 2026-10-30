@@ -20,8 +20,10 @@ import {
   PrefsHood,
   getPrefs,
   setMenuExpanded,
+  settleUiSettings,
   startUiSettings,
   useMenuExpanded,
+  useUiSettingsSettled,
   usePrefs,
 } from '../prefs/index.js';
 import { SHELL_STRINGS } from '../strings.js';
@@ -149,6 +151,9 @@ function skipToContent(event: MouseEvent<HTMLAnchorElement>): void {
 
 export { toggleHood };
 
+/** How long the shell waits at most for the app's settings before it shows the page (CLS). */
+export const SETTINGS_WAIT_MS = 300;
+
 /** Cmd+Shift+U and Cmd+/ (Ctrl elsewhere); Cmd+K belongs to Go to (go-to.tsx). */
 function useShellKeys(): void {
   useEffect(() => {
@@ -201,9 +206,15 @@ export function Layout({
   const waiting = useApprovalsWaiting(path, waitingApprovals);
   const { hood } = usePrefs();
   const expanded = useMenuExpanded();
+  const settled = useUiSettingsSettled();
   useShellKeys();
   useEffect(() => {
     void startUiSettings();
+    // W4-SHELL-LIVE (CLS ≤ 0.01): the strip and the body wait for the app's Under the hood and menu
+    // values, at most SETTINGS_WAIT_MS (nothing shows under ~300 ms anyway), so neither the strip
+    // nor the menu pushes the page along when the read lands.
+    const wait = setTimeout(settleUiSettings, SETTINGS_WAIT_MS);
+    return () => clearTimeout(wait);
   }, []);
   // UX2-g: one Start here model for the shell: the card and the empty states.
   const start = useStartHere(startHere, !focused, path);
@@ -259,9 +270,9 @@ export function Layout({
       </a>
       <div className="al-app" data-hood={hood ? 'on' : 'off'}>
         <TopBar connection={connection} onHood={toggleHood} />
-        {hood ? <StatusStrip connection={connection} /> : null}
-        <SectionSheet path={path} hood={hood} />
-        <div className="al-app-body">
+        {settled && hood ? <StatusStrip connection={connection} /> : null}
+        {settled ? <SectionSheet path={path} hood={hood} /> : null}
+        <div className="al-app-body" hidden={!settled}>
           <SectionRail
             path={path}
             hood={hood}
@@ -294,7 +305,7 @@ export function Layout({
             </div>
           </main>
         </div>
-        <footer className="al-statusbar al-chrome al-text-code">
+        <footer className="al-statusbar al-chrome al-text-code" hidden={!settled}>
           {/* One polite live region: announced when the state changes, never per poll (B-11 §15). */}
           <span className="al-sb-item" role="status" aria-live="polite" aria-atomic="true">
             <span key={connection} className="al-sb-state">

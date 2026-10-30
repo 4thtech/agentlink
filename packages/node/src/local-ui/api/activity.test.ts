@@ -267,6 +267,8 @@ describe('the read-only client view (M1-11c-a1 adds listActivity)', () => {
       'agentId',
       // U3-f: the unsigned app.connect / app.disconnect (prepare only).
       'apps',
+      // W4-AUTO-SAVE: the one-time notice (display state only).
+      'autoSaveNotice',
       // W4-RENAME-REACHES-CONTACTS: the former-name note's seen mark only (display state).
       'contactNames',
       'contacts',

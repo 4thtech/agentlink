@@ -1477,7 +1477,13 @@ export class EnvelopeService {
     const received =
       d.state === 'sent_copy'
         ? { payloadText: o.payloadText, rows: [] }
-        : await receivedFileRows(ctx, item.envelopeId, payload, o.payloadText);
+        : await receivedFileRows(
+            ctx,
+            item.envelopeId,
+            payload,
+            o.payloadText,
+            d.state === 'ok' && d.contactId !== undefined,
+          );
     const sealed = await seal(
       ctx,
       'envelopes',

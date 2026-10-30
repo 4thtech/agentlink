@@ -51,12 +51,16 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // W4-RENAME-REACHES-CONTACTS (D-141): an opaque token of a KeyStore this package opened; only
       // this package turns it into an epoch control (key-epoch.ts), for the app host's rename.
       'epochKeysOf',
+      // W4-AUTO-SAVE (D-142, 04 §4.1): the Inbox folder rules, the held directory, the quarantine
+      // mark and the free-space read (paths in, fixed codes out; no key, no store).
+      'freeBytes',
       // M1-9x: a store-only boolean (owner item present); no bytes, no secret, nothing unlocked.
       'hasOwnerOnMachine',
       // M1-9z: a store-only boolean (a leftover owner-code change); nothing unlocked.
       'hasUnfinishedOwnerCodeChange',
       // U3-c (06 §6): the shared folder lock while an agent is open (no key, no store).
       'holdAgentFolderShared',
+      'inboxFolderProblem',
       'initOwner',
       'nodeHostResolver',
       'nodeNip11Fetcher',
@@ -66,6 +70,7 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'openAgentKeyStore',
       'openAgentStore',
       'openAllowedFile',
+      'openInboxDir',
       // M1-11b-6: a store-only boolean (no owner anywhere: card, owner items, owner files).
       'ownerSetupAvailable',
       'packageName',
@@ -75,6 +80,7 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // W4-LIVE-STATUS (04 §2.5): signal 0 to a valid pid, a boolean back; no key, no seam.
       'pidAlive',
       'probeOsKeychain',
+      'quarantineMark',
       'resolveAllowedFile',
       'selectKeyStoreBackend',
       // M1-36b-2-c: the Send folder for an existing agent; the owner signs through the given

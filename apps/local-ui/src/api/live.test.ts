@@ -1,5 +1,6 @@
-// W4-SHELL-V2 (W4 UX v2 "Live status"): the plain status words from today's agents read. Never
-// "Working" without evidence (K1 adds per-app heartbeats; U1-b swaps the poll for its SSE).
+// W4-SHELL-V2 (W4 UX v2 "Live status"): the plain status words from an agents row of the earlier
+// read form (app names and Running only). Never "Working" without evidence. W4-SHELL-LIVE: the words
+// of 08 §1 (an agent that runs nowhere is "Offline"; its AI apps "Not running").
 import { UI_SETTINGS_SAMPLES, readUiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import { describe, expect, it } from 'vitest';
 import type { AgentRow } from '../pages/agents/data.js';
@@ -21,15 +22,17 @@ describe('liveAgent', () => {
   it('a running agent is Ready in its first AI app; each app says Ready', () => {
     const a = liveAgent(row({ apps: ['Claude Code', 'Codex'] }));
     expect(a.state).toBe('ready');
-    expect(a.statusText).toBe('Ready in Claude Code');
+    // 08 §1: with several apps, "Ready in {app} and {n} more".
+    expect(a.statusText).toBe('Ready in Claude Code and 1 more');
     expect(a.apps.map((x) => `${x.app}:${x.word}`)).toEqual(['Claude Code:Ready', 'Codex:Ready']);
   });
 
-  it('a stopped agent is Not running, and so is each app', () => {
+  it('a stopped agent is Offline, and each of its apps Not running', () => {
     const a = liveAgent(row({ running: false }));
     expect(a.state).toBe('off');
-    expect(a.statusText).toBe(LIVE_WORDS.off);
+    expect(a.statusText).toBe('Offline');
     expect(a.apps[0]?.state).toBe('off');
+    expect(a.apps[0]?.word).toBe(LIVE_WORDS.off);
   });
 
   it('an agent with no AI app is Not set up', () => {

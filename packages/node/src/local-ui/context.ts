@@ -287,6 +287,11 @@ export interface LocalUiReadClient {
      * until the gate's one-use `sign` signed it and the save port's core verified and applied it.
      */
     prepareSave?(itemId: string): Promise<PreparedOwnerAction>;
+    /**
+     * W4-FILES-SAVE SEC-L1: whether the ID names a received file Save can act on (core
+     * `FilesIoView.isReceived`, store only), checked before presence is asked. Optional for fakes.
+     */
+    isReceived?(itemId: string): Promise<boolean>;
   };
   /**
    * U3-d (D-138; 04 §2.5.1 `agent.label`): the agent's verified label (core `loadLabel`: the stored
@@ -311,6 +316,15 @@ export interface LocalUiReadClient {
    */
   readonly contactNames?: {
     markSeen(contactId: string): Promise<boolean>;
+  };
+  /**
+   * W4-AUTO-SAVE (D-142, 08 §1): the one-time "now saved automatically" notice (core
+   * `autoSave.noticeDue` and `dismissNotice`). Display state only: nothing is decided from it,
+   * nothing is signed, no setting changes. Optional so that page fakes without it stay valid.
+   */
+  readonly autoSaveNotice?: {
+    due(): Promise<boolean>;
+    dismiss(): Promise<void>;
   };
   /**
    * U3-f (04 §2.5.1 `app.connect`, `app.disconnect`): core's prepare helper for an AI app change of
@@ -372,6 +386,8 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       savedName: (itemId: string) => client.filesIo.savedName(itemId),
       // W4-FILES-SAVE: the unsigned `file.save` (prepare only).
       prepareSave: (itemId: string) => client.ownerActions.prepareFileSave(itemId),
+      // W4-FILES-SAVE SEC-L1: the item is a received file (store read).
+      isReceived: (itemId: string) => client.filesIo.isReceived(itemId),
     }),
     // U3-d: the verified label and the unsigned `agent.label` (reads and prepare only).
     agent: Object.freeze({
@@ -385,6 +401,11 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
     // D-141: the contact's former-name note was shown (display state only).
     contactNames: Object.freeze({
       markSeen: (contactId: string) => client.contacts.markNameChangeSeen(contactId),
+    }),
+    // W4-AUTO-SAVE: the one-time notice (display state only).
+    autoSaveNotice: Object.freeze({
+      due: () => client.autoSave.noticeDue(),
+      dismiss: () => client.autoSave.dismissNotice(),
     }),
     // U3-f: the unsigned `app.connect` / `app.disconnect` (prepare only).
     apps: Object.freeze({
