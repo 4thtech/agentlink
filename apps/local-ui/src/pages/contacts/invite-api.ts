@@ -41,6 +41,8 @@ export interface CreatedInvite {
   readonly expiresAt: number;
   /** `long` when asked for, or when the service fell back to it: the sheet works the same. */
   readonly format: 'short' | 'long';
+  /** W4-PEOPLE-INVITE: this invite's public ID (as the open list shows it): cancel only this one. */
+  readonly inviteId: string;
 }
 
 /** One open invite from the server: never a link. */
@@ -129,7 +131,9 @@ function created(json: Record<string, unknown>): CreatedInvite | undefined {
   const { inviteUrl, shareText } = json;
   const expiresAt = timeOf(json['expiresAt']);
   const format = json['format'];
+  const inviteId = json['inviteId'];
   if (format !== 'short' && format !== 'long') return undefined;
+  if (typeof inviteId !== 'string' || !INVITE_ID.test(inviteId)) return undefined;
   if (typeof inviteUrl !== 'string' || !inviteUrl.startsWith(LINK_PREFIX)) return undefined;
   if (
     format === 'short'
@@ -142,7 +146,7 @@ function created(json: Record<string, unknown>): CreatedInvite | undefined {
   // The share text is our template around this very link (11 §6.1 J7): nothing else is sent.
   if (!shareText.endsWith(inviteUrl)) return undefined;
   if (expiresAt === undefined) return undefined;
-  return { inviteUrl, shareText, expiresAt, format };
+  return { inviteUrl, shareText, expiresAt, format, inviteId };
 }
 
 /** The open invites, read through an allowlist; a row of another shape is left out. */

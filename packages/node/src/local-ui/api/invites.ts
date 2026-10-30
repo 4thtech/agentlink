@@ -22,7 +22,8 @@
 //   inviter's agent answers; the safety code follows as on Contacts.
 //
 // W4-SHORT-INVITE and W4-INVITES-LIST (D-139; 04 §3.6.2; 08 §1):
-// - create takes `{"long": true}` from Advanced only (D-139 (7)) and answers the link `format`;
+// - create takes `{"long": true}` from Advanced only (D-139 (7)) and answers the link `format` and
+//   (W4-PEOPLE-INVITE) the invite's public `inviteId`;
 // - `GET /api/ui/invites` (a read) answers the open invites: ID, name (the invite label) and expiry,
 //   never a link, a secret or a lookup ID;
 // - `POST /api/ui/invites/cancel`, the invite kind, step `cancel`, body exactly `{"inviteId"}`: core
@@ -243,7 +244,7 @@ async function createInvite(
     }
     return UNAVAILABLE;
   }
-  const { inviteUrl, expiresAt, format } = created;
+  const { inviteId, inviteUrl, expiresAt, format } = created;
   const short: unknown = created.ownerFingerprint.short;
   const when = rfc3339(expiresAt);
   if (
@@ -252,7 +253,9 @@ async function createInvite(
     typeof short !== 'string' ||
     !FINGERPRINT.test(short) ||
     when === undefined ||
-    (format !== 'short' && format !== 'long')
+    (format !== 'short' && format !== 'long') ||
+    typeof inviteId !== 'string' ||
+    !INVITE_ID.test(inviteId)
   ) {
     return UNAVAILABLE;
   }
@@ -265,6 +268,9 @@ async function createInvite(
       ownerFingerprint: short,
       expiresAt: when,
       format,
+      // W4-PEOPLE-INVITE: the public ID of this invite (as the open list shows it), so the page
+      // cancels exactly the invite it made. Never a secret or a lookup ID.
+      inviteId,
     }),
   });
 }

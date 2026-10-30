@@ -93,6 +93,23 @@ describe('contract (page): the join screen client and the shared samples', () =>
     });
   });
 
+  // W4-PEOPLE-INVITE (IR SEC-1 L3): connected carries the new contact's ref; a malformed one is
+  // dropped (the screen then shows no code rather than another contact's).
+  it('GET: connected reads the new contact ref; a malformed ref is left out', async () => {
+    const read = await answering(JOIN_READ.connected.answer).api.read();
+    expect(read).toMatchObject({
+      kind: 'ok',
+      state: 'connected',
+      contactRef: JOIN_WORLD.contactId,
+    });
+    const bad = await answering({
+      status: 200,
+      body: { ...JOIN_READ.connected.answer.body, contactRef: '0xNOT/../a-ref' },
+    }).api.read();
+    expect(bad).toMatchObject({ kind: 'ok', state: 'connected' });
+    expect((bad as { contactRef?: string }).contactRef).toBeUndefined();
+  });
+
   it('accept: exactly {inviteId} in X-AgentLink-Input, the proof as the octet-stream body', async () => {
     const { sent, api } = answering(JOIN_ACCEPT.started.answer);
     const outcome = await api.accept(JOIN_ACCEPT.started.input.inviteId, {

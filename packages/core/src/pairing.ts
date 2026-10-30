@@ -108,6 +108,11 @@ export interface CreateInviteInput {
 }
 
 export interface CreatedInvite {
+  /**
+   * W4-PEOPLE-INVITE: the invite's public 16-byte ID (base64url), as `openInvites` lists it and
+   * `cancelInvite` takes it. Never the secret.
+   */
+  readonly inviteId: string;
   /** The link to share. It carries the invite secret: never log it (I-7). */
   readonly inviteUrl: string;
   /**
@@ -509,7 +514,13 @@ export class PairingService implements PairingHandler {
         }
       }
       ctx.log.info('invite created', { expiresAt, format });
-      return { inviteUrl, format, ownerFingerprint: fingerprintOf(own.card), expiresAt };
+      return {
+        inviteId: id,
+        inviteUrl,
+        format,
+        ownerFingerprint: fingerprintOf(own.card),
+        expiresAt,
+      };
     } finally {
       wipe(secret);
       wipe(nonceA);

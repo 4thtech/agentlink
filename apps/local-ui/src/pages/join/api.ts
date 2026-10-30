@@ -19,6 +19,8 @@ export const JOIN_DISMISS_PATH = '/api/ui/join/dismiss';
 const CSRF_HEADER = 'X-AgentLink-CSRF';
 const INVITE_ID = /^[A-Za-z0-9_-]{22}$/;
 const FINGERPRINT = /^[0-9A-F]{4}·[0-9A-F]{4}$/;
+/** A contact's ref as the contacts routes take it. */
+const CONTACT_REF = /^0x[0-9a-f]{40}$/;
 const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const MAX_NAME_CHARS = 128;
 const MAX_LABEL_CHARS = 64;
@@ -59,6 +61,8 @@ export type JoinRead =
       readonly state: JoinState;
       readonly invite?: JoinInvite;
       readonly agent?: string;
+      /** W4-PEOPLE-INVITE: when connected, the new contact's ref (for its safety code). */
+      readonly contactRef?: string;
     }
   | { readonly kind: 'session_expired' | 'offline' | 'not_available' | 'failed' };
 
@@ -196,11 +200,16 @@ export function createJoinApi(options: JoinApiOptions = {}): JoinApi {
       if (state === 'none') return { kind: 'ok', state, ...(agent === undefined ? {} : { agent }) };
       const invite = inviteOf(json);
       if (invite === undefined) return { kind: 'failed' };
+      // W4-PEOPLE-INVITE: only when connected, the new contact's ref; any other shape is left out.
+      const ref = json['contactRef'];
+      const contactRef =
+        state === 'connected' && typeof ref === 'string' && CONTACT_REF.test(ref) ? ref : undefined;
       return {
         kind: 'ok',
         state: state as JoinState,
         invite,
         ...(agent === undefined ? {} : { agent }),
+        ...(contactRef === undefined ? {} : { contactRef }),
       };
     },
 
