@@ -6,7 +6,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from '../../api/client.js';
 import { ContactsPage, type ContactsPageProps } from './index.js';
-import { addPendingInvite, forgetPendingInvites } from './pending-invites.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -27,9 +26,11 @@ let host: HTMLElement;
 let root: Root;
 let contacts: ReturnType<typeof row>[];
 let reads: number;
+let openInvites: unknown[];
 
 const api = {
   get: async (path: string) => {
+    if (path === '/api/ui/invites') return { kind: 'ok', data: { invites: openInvites } };
     if (path !== '/api/ui/contacts') return { kind: 'error', status: 404 };
     reads += 1;
     return { kind: 'ok', data: { status: 'ok', contacts } };
@@ -55,20 +56,21 @@ async function mount(): Promise<void> {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  forgetPendingInvites();
+  openInvites = [];
   contacts = [row(ANA, 'Ana')];
   reads = 0;
 });
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
-  forgetPendingInvites();
   vi.useRealTimers();
 });
 
 describe('HOTFIX-045-CONTACTS-NEW', () => {
   it('shows a new contact while an invite is open and no row was pending', async () => {
-    addPendingInvite('Marko', Date.now() + 86_400_000);
+    openInvites = [
+      { inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ', name: 'Marko', expiresAt: '2027-01-15T08:00:00Z' },
+    ];
     await mount();
     expect(host.textContent).not.toContain('Marko Novak');
     contacts = [row(ANA, 'Ana'), row(MARKO, 'Marko Novak')];
