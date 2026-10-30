@@ -344,11 +344,11 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     flowRoutes,
     // U3-invite: the waiting invite (read, accept, "Not now") and the handoff kind.
     joinRoutes,
-    uiSettingsRoutes,
     // W4-FILES-SAVE: "Save to Inbox" (owner presence, one signed `file.save`).
     [filesSaveRoute],
     // W4-RENAME-REACHES-CONTACTS: the seen mark of a contact's former-name note.
     contactNamesRoutes,
+    uiSettingsRoutes,
   ]) {
     for (const route of routes) registry.register(route);
   }
