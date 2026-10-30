@@ -25,6 +25,8 @@ import {
   emulateReducedMotion,
   expectFadesOnly,
   layoutShiftScore,
+  shiftCount,
+  shiftsSince,
   observeLayoutShift,
 } from '../helpers/motion.js';
 
@@ -229,10 +231,14 @@ describe('chapter 3: inbox', () => {
     expect(await b.page.locator('main a[href="/first-run"]').count()).toBe(0);
     await b.page.waitForTimeout(500);
     const clsBeforeHome = await layoutShiftScore(b.page);
+    const seenBefore = await shiftCount(b.page);
     await navTo(b.page, 'Home');
     await b.page.getByRole('heading', { name: 'People' }).waitFor();
     await b.page.waitForTimeout(500);
-    expect((await layoutShiftScore(b.page)) - clsBeforeHome).toBeLessThanOrEqual(CLS_BUDGET);
+    expect(
+      (await layoutShiftScore(b.page)) - clsBeforeHome,
+      `Home's first load shifted: ${await shiftsSince(b.page, seenBefore)}`,
+    ).toBeLessThanOrEqual(CLS_BUDGET);
     const clsBefore = await layoutShiftScore(b.page);
     await navTo(b.page, 'Agents');
     await navTo(b.page, 'Home');

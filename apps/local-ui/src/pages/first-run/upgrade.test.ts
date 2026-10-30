@@ -19,6 +19,7 @@ import { encodeRegistration, encodeUpgradeBody } from './passkey.js';
 import {
   PASSKEY_PATH,
   createUpgradeApi,
+  resetPasskeyRegisteredForTests,
   type PasskeyInfoResult,
   type SetupApi,
   type UpgradeApi,
@@ -43,6 +44,8 @@ let host: HTMLElement;
 let root: Root;
 
 beforeEach(() => {
+  // W4-WIRE: a registration in an earlier test is not one on this page.
+  resetPasskeyRegisteredForTests();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);

@@ -489,7 +489,19 @@ const UPGRADE_PROBLEMS: ReadonlySet<string> = new Set<UpgradeProblem>([
  */
 export const PASSKEY_REGISTERED_EVENT = 'agentlink:passkey-registered';
 
+let registeredHere = false;
+
+/** Whether a passkey was registered in this page's life (a later stale read cannot bring it back). */
+export function passkeyRegisteredHere(): boolean {
+  return registeredHere;
+}
+
+export function resetPasskeyRegisteredForTests(): void {
+  registeredHere = false;
+}
+
 export function announcePasskeyRegistered(): void {
+  registeredHere = true;
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(PASSKEY_REGISTERED_EVENT));
 }
 
