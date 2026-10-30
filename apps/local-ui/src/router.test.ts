@@ -47,7 +47,7 @@ const currentSection = (): string | null | undefined =>
 
 /** Path, the page's own heading (today's page), and the section marked current. */
 const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
-  ['/', 'Approvals', 'Home'],
+  ['/', 'Home', 'Home'],
   ['/agents', 'Agents', 'Agents'],
   ['/activity', 'Activity', 'Activity'],
   ['/activity/live', 'Live activity', null],
@@ -111,10 +111,10 @@ describe('routes', () => {
     expect(host.querySelector('main .al-empty')).not.toBeNull();
   });
 
-  it('keeps / on the waiting approvals (every approval link points there), with Home current', () => {
+  it('shows Home at / (every approval link points there; the approval card sits on top), with Home current', () => {
     mountAt('/');
     expect(location.pathname).toBe('/');
-    expect(host.querySelector('main h1')?.textContent).toBe('Approvals');
+    expect(host.querySelector('main h1')?.textContent).toBe('Home');
     expect(currentSection()).toBe('Home');
   });
 
