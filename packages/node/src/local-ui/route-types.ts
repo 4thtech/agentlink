@@ -95,6 +95,11 @@ export interface LocalUiReadRoute {
   readonly method: LocalUiReadMethod;
   readonly path: string;
   readonly presence: false;
+  /**
+   * W4-LIVE-STATUS (D-143): a `text/event-stream` read. The server runs it after the read gate
+   * (session, CSRF, Host, Origin, fetch metadata) through its own events gate; `handler` is not used.
+   */
+  readonly stream?: true;
   readonly handler: (context: LocalUiContext, request: LocalUiRequest) => Promise<LocalUiResult>;
 }
 

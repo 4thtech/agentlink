@@ -9,7 +9,9 @@ function main() {
   const root = process.argv[2]
     ? resolve(process.argv[2])
     : join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const { problems, packages, files } = runChecks(root);
+  const { problems, packages, files } = runChecks(root, {
+    cache: process.env.CI ? 'write-only' : true,
+  });
   if (problems.length > 0) {
     for (const problem of problems) console.error(problem);
     console.error(

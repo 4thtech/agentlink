@@ -71,6 +71,9 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'pwd',
   'session',
   'xpriv',
+  // W4-LIVE-STATUS (06 §6, I-5): the MCP client's own name is untrusted text and never logged,
+  // including MCP transport and SDK debug output of `initialize`.
+  'clientInfo',
 ];
 
 // Each sensitive name as lowercase letters only ("privateKey" -> "privatekey").

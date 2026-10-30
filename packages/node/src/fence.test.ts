@@ -72,6 +72,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // U3-c: counts from clear store columns, read-only (no key, no cipher).
       'peekAgentStore',
       'performOwnerOperation',
+      // W4-LIVE-STATUS (04 §2.5): signal 0 to a valid pid, a boolean back; no key, no seam.
+      'pidAlive',
       'probeOsKeychain',
       'resolveAllowedFile',
       'selectKeyStoreBackend',
