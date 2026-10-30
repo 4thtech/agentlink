@@ -381,8 +381,14 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
       /^[0-9]+$/,
     );
 
-    // A second visit: Get started goes on for this owner; owner setup is never offered again.
+    // A second visit: Get started goes on for this owner (New agent: no agent is open in this
+    // server); owner setup is never offered again. W4-WIRE-2 (Decision 52 (2)): New agent names
+    // the agent first, then the pick.
     await page.goto(`${server.origin}/first-run`);
+    await page.getByRole('heading', { name: 'Name your agent' }).waitFor();
+    expect(await page.locator('main').textContent()).not.toContain('Welcome');
+    await page.getByLabel('Agent name').fill('Second');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
     expect(await page.locator('main').textContent()).not.toContain('Welcome');
     await page.getByRole('button', { name: /^Continue with / }).click();

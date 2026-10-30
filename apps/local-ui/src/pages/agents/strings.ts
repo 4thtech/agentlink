@@ -24,7 +24,6 @@ export const AGENTS_STRINGS = {
   switch: 'Switch',
   rename: 'Rename',
   connect: 'Connect',
-  connectApp: 'Connect an AI app',
   remove: 'Remove',
   more: 'More',
   tryAgain: 'Try again',
@@ -51,15 +50,6 @@ export const AGENTS_STRINGS = {
   labelInvalid: "That name can't be used. Change it and try again.",
   notRenamed: 'Not renamed yet. Try again.',
   renameFailed: "Couldn't rename it. Try again.",
-  addTitle: 'Add an agent',
-  addField: 'Name your agent',
-  addTouchId: 'Add with Touch ID',
-  addDefaultName: 'Second agent',
-  notAdded: 'Not added yet. Try again.',
-  addFailed: "Couldn't add it. Nothing was saved. Try again.",
-  adding: 'Adding…',
-  addedPrompt: 'Connect an AI app to it?',
-  switchToIt: 'Switch to it',
   removeTitle: (label: string): string => `Remove ${iso(label)}?`,
   removingTitle: (label: string): string => `Removing ${iso(label)}…`,
   removeIntro: 'This will delete, from this computer:',
@@ -98,7 +88,6 @@ export const AGENTS_STRINGS = {
   switcherName: (label: string, apps: string, state: string): string =>
     `Agent: ${label}, ${apps}, ${state}. Switch agent.`,
   renameStatement: (from: string, to: string): string => `Rename ${iso(from)} to ${iso(to)}`,
-  addStatement: (label: string): string => `Add ${iso(label)}`,
   removeStatement: (label: string): string => `Remove ${iso(label)}`,
 
   // W4-AGENTS (W4 UX v2 "Agents"; 08 §1 "Live AI-app status" words; "AI app", never "harness").

@@ -190,6 +190,22 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* W4-WIRE-2: "Have an invite link? Paste it" (the link button above), its field and the friend's card. */
+.inv-paste,
+.inv-paste-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--al-space-4);
+}
+.inv-paste > div,
+.inv-paste-form,
+.inv-paste-form .al-field {
+  align-self: stretch;
+}
+.inv-paste-note {
+  margin: 0;
+}
 .inv-link-button:focus-visible,
 .inv-back:focus-visible,
 .inv-more:focus-visible,

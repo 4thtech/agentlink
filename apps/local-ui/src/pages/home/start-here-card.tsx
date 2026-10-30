@@ -130,7 +130,7 @@ function Detail({
         </>
       );
     case 'invite':
-      // The one action opens the Add contact sheet (UX2-d2, b11 §21.1, §27.1). Below it, a quiet
+      // The one action opens the Invite screen (W4-WIRE; b11 §27.1). Below it, a quiet
       // link to the second-agent path (U3-j, §27.5).
       return next ? (
         <>

@@ -376,17 +376,24 @@ export async function createInviteInApp(jp: JourneyPage): Promise<string> {
   return link;
 }
 
-/** Contacts → Add contact → I have an invite → paste → Check invite (stops on "Is this…?"). */
+/** The friend's one button on the pasted invite's card, by platform (as CONNECT_WITH). */
+export const ACCEPT_WITH = /^Accept with (Touch ID|Windows Hello|your passkey)$/;
+
+/**
+ * W4-WIRE-2 (Decision 52 (3)): Invite someone → "Have an invite link? Paste it" → paste → Continue
+ * (stops on the friend's card, "{name} invites you to connect your AIs"). The Add contact sheet is
+ * retired.
+ */
 export async function checkInviteInApp(jp: JourneyPage, link: string): Promise<void> {
   const { page } = jp;
-  await navTo(page, 'Contacts');
-  await page.getByRole('button', { name: 'Add contact' }).first().click();
-  await page.getByRole('tab', { name: 'I have an invite' }).click();
+  await goTo(page, 'Invite someone');
+  await page.getByRole('heading', { name: 'Invite someone', level: 1 }).waitFor();
+  await page.getByRole('button', { name: 'Have an invite link? Paste it' }).click();
   await page.getByLabel('Paste the invite link').fill(link);
-  await page.getByRole('button', { name: 'Check invite' }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
 }
 
-/** Check invite, then Connect with one Touch ID. */
+/** Paste it, then Accept with one Touch ID. */
 export async function acceptInviteInApp(
   jp: JourneyPage,
   link: string,
@@ -394,10 +401,12 @@ export async function acceptInviteInApp(
 ): Promise<void> {
   const { page } = jp;
   await checkInviteInApp(jp, link);
-  await page.getByText('Is this who you expected?').waitFor();
+  await page
+    .getByText(/invites you to connect your AIs$/)
+    .first()
+    .waitFor();
   expect(await text(page)).toContain(inviter);
-  await page.getByRole('button', { name: 'Connect', exact: true }).click();
-  await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+  await page.getByRole('button', { name: ACCEPT_WITH }).click();
 }
 
 /** True once the agent behind `mcp` lists `name` as a completed pairing. */

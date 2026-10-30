@@ -8,6 +8,8 @@ import type { DetectedApp } from '../first-run/apps-api.js';
 export interface WizardOutcome {
   readonly label: string;
   readonly app?: { readonly id: string; readonly name: string; readonly connected: boolean };
+  /** W4-WIRE-2: Add agent's new agent (its folder name), for "Open {name}" on Connected. */
+  readonly agent?: string;
 }
 
 export interface WizardMemory {
@@ -18,6 +20,10 @@ export interface WizardMemory {
   /** The agent's name, once the person edited it. */
   readonly name?: string;
   readonly outcome?: WizardOutcome;
+  /** W4-WIRE-2: this run is Add agent (`?add=agent`); a new Add agent starts with nothing kept. */
+  readonly adding?: boolean;
+  /** W4-WIRE-2: Add agent's "Name your agent" step was passed with the name above. */
+  readonly named?: boolean;
 }
 
 let memory: WizardMemory = {};
@@ -30,6 +36,16 @@ export function wizardMemory(): WizardMemory {
 
 export function rememberWizard(patch: Partial<WizardMemory>): void {
   memory = { ...memory, ...patch };
+}
+
+/**
+ * W4-WIRE-2 (IR-W4-WIRE-2X-1): Add agent left before its end (Skip to Home, a link, Back): what it
+ * kept goes, so the next Add agent starts at "Name your agent". The look for AI apps is kept.
+ */
+export function forgetAbandonedAdd(): void {
+  if (memory.adding !== true) return;
+  const apps = memory.apps;
+  memory = apps === undefined ? {} : { apps };
 }
 
 /** Forgets the choices (a new run of Get started, and tests). */

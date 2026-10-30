@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-// HOTFIX-045-PASTE-FIELD in a real browser: in Add contact (Paste tab) the label, the paste box and the
-// hint sit one under the other and never overlap, even with a long pasted invite. Renders the real
-// sheet to markup, loads the app's real stylesheets and measures bounding boxes in Chromium at
+// HOTFIX-045-PASTE-FIELD in a real browser: in the paste field the label, the paste box and the hint
+// sit one under the other and never overlap, even with a long pasted invite. W4-WIRE-2: the field is
+// the Invite screen's "Have an invite link? Paste it" now (the Add contact sheet is retired). Renders
+// the real part to markup, loads the app's real stylesheets and measures bounding boxes in Chromium at
 // 1440 and 360 px, light and dark. Needs the Playwright Chromium; without it the test is skipped
 // locally (in CI a missing browser fails it). AGENTLINK_TEST_CHROMIUM names another executable.
 import { act, createElement } from 'react';
@@ -14,9 +15,9 @@ import depth from '@4thtech-io/ui/depth.css?raw';
 import motion from '@4thtech-io/ui/motion.css?raw';
 import progress from '@4thtech-io/ui/progress.css?raw';
 import tokens from '@4thtech-io/ui/tokens.css?raw';
-import contacts from './contacts.css?raw';
-import { AddContactSheet } from './add-contact.js';
-import type { InviteApi } from './invite-api.js';
+import invite from './invite.css?raw';
+import type { InviteApi } from '../contacts/invite-api.js';
+import { PasteInvite } from './paste-invite.js';
 
 const LONG = `Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once: https://agentlink.4thtech.io/i#${'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-'.repeat(6)}`;
 
@@ -37,33 +38,24 @@ afterAll(async () => {
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// The sheet portals into document.body, so it is rendered in jsdom and its markup handed to Chromium.
+// Rendered in jsdom (opened, as after a click) and its markup handed to Chromium.
 async function pageHtml(): Promise<string> {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
   await act(async () => {
     root.render(
-      createElement(AddContactSheet, {
-        invites: {} as unknown as InviteApi,
-        passkey: undefined,
-        onCreated: () => undefined,
-        onConnected: () => undefined,
-        onClose: () => undefined,
-      }),
+      createElement(PasteInvite, { invites: {} as unknown as InviteApi, platform: 'mac' }),
     );
   });
-  // The real state of the sheet with "I have an invite" selected (the invite panel is hidden).
+  // The real state after "Have an invite link? Paste it".
   await act(async () => {
-    const tab = [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find(
-      (el) => el.textContent?.trim() === 'I have an invite',
-    );
-    tab?.click();
+    document.querySelector<HTMLElement>('.inv-link-button')?.click();
   });
   const markup = document.body.innerHTML;
   act(() => root.unmount());
   host.remove();
-  const css = [tokens, components, depth, progress, motion, chrome, contacts].join('\n');
+  const css = [tokens, components, depth, progress, motion, chrome, invite].join('\n');
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body>${markup}</body></html>`;
 }
 
@@ -74,7 +66,7 @@ const cases = [
   { width: 360, scheme: 'dark' },
 ] as const;
 
-describe('Add contact paste field layout (HOTFIX-045-PASTE-FIELD)', () => {
+describe('Paste it: the paste field layout (HOTFIX-045-PASTE-FIELD)', () => {
   for (const c of cases) {
     it(`label, box and hint do not overlap at ${c.width}px, ${c.scheme}`, async (ctx) => {
       if (browser === undefined) {
@@ -88,11 +80,7 @@ describe('Add contact paste field layout (HOTFIX-045-PASTE-FIELD)', () => {
       });
       try {
         await page.setContent(await pageHtml());
-        // Only the paste panel shows, as in the real sheet.
         await expect(page.locator('textarea[name="invite-link"]').isVisible()).resolves.toBe(true);
-        await expect(page.getByRole('button', { name: 'Create invite' }).isVisible()).resolves.toBe(
-          false,
-        );
         const field = page.locator('textarea[name="invite-link"]');
         await field.fill(LONG);
         const box = async (sel: string) => {
