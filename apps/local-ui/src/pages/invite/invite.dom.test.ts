@@ -147,7 +147,7 @@ async function show(element: ReactElement, hood = false): Promise<void> {
 }
 
 const panel = (w: World, extra: Partial<InvitePanelProps> = {}): ReactElement =>
-  createElement(InvitePanel, { invites: w.invites, api: w.api, now: () => NOW, ...extra });
+  createElement(InvitePanel, { invites: w.invites, now: () => NOW, ...extra });
 
 const text = (): string => host.textContent ?? '';
 const button = (label: string): HTMLButtonElement => {
@@ -382,7 +382,6 @@ describe('the Invite screen (A5)', () => {
     await show(
       createElement(InviteScreen, {
         invites: w.invites,
-        api: w.api,
         now: () => NOW,
         sender: 'Tali',
         onDone: done,

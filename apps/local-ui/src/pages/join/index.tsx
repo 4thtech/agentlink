@@ -20,7 +20,6 @@
 import { Button, ProgressBar } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
-import { LIST_PATH, parseList } from '../contacts/data.js';
 import { ConnectedMoment } from '../invite/connected.js';
 import { FingerprintIcon } from '../invite/icons.js';
 import { INVITE_STRINGS as I, invitesYou, letterOf } from '../invite/strings.js';
@@ -57,30 +56,8 @@ export interface JoinPageProps {
   readonly go?: (path: string) => void;
   readonly now?: () => number;
   readonly pollMs?: number;
-  /** This app's contacts, for the safety code once connected. Default: the page's own client. */
+  /** This app's contacts route, for the new contact's safety code. Default: the page's own client. */
   readonly contacts?: ApiClient;
-}
-
-const compact = (fp: string): string => fp.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-
-/** The new contact whose owner fingerprint starts with the inviter's short one (newest first). */
-async function findContact(api: ApiClient, fingerprint: string): Promise<string | undefined> {
-  const res = await api.get(LIST_PATH);
-  if (res.kind !== 'ok') return undefined;
-  const list = parseList(res.data);
-  if (list.kind !== 'ok') return undefined;
-  const want = compact(fingerprint);
-  if (want.length < 8) return undefined;
-  const found = list.contacts
-    .filter(
-      (c) =>
-        c.pairing === 'complete' &&
-        c.status === 'active' &&
-        c.fingerprint !== undefined &&
-        compact(c.fingerprint).startsWith(want),
-    )
-    .sort((a, b) => b.since - a.since)[0];
-  return found?.ref;
 }
 
 function goTo(path: string): void {
@@ -94,6 +71,7 @@ type View =
       readonly state: JoinState;
       readonly invite?: JoinInvite;
       readonly agent?: string;
+      readonly contactRef?: string;
     }
   | { readonly kind: 'offline' };
 
@@ -109,7 +87,6 @@ export function JoinPage({
 }: JoinPageProps): ReactElement {
   const [contacts] = useState<ApiClient>(() => givenContacts ?? createApiClient());
   const [declined, setDeclined] = useState(false);
-  const [contactRef, setContactRef] = useState<string | undefined>(undefined);
   const [api] = useState<JoinApi>(() => given ?? createJoinApi());
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [view, setView] = useState<View>({ kind: 'loading' });
@@ -129,6 +106,7 @@ export function JoinPage({
         state: answer.state,
         ...(answer.invite === undefined ? {} : { invite: answer.invite }),
         ...(answer.agent === undefined ? {} : { agent: answer.agent }),
+        ...(answer.contactRef === undefined ? {} : { contactRef: answer.contactRef }),
       });
     } else {
       setView({ kind: 'offline' });
@@ -210,22 +188,8 @@ export function JoinPage({
     void api.dismiss().then(() => setDeclined(true));
   };
 
-  // Connected: find the new contact for the safety code (it exists only now, 04 §3.6.1).
-  const connectedFingerprint =
-    view.kind === 'read' && view.state === 'connected' ? view.invite?.fingerprint : undefined;
-  useEffect(() => {
-    if (connectedFingerprint === undefined) return undefined;
-    let live = true;
-    void findContact(contacts, connectedFingerprint).then(
-      (ref) => {
-        if (live) setContactRef(ref);
-      },
-      () => undefined,
-    );
-    return () => {
-      live = false;
-    };
-  }, [contacts, connectedFingerprint]);
+  // Connected: the server names the new contact (IR SEC-1 L3), so the code is that contact's.
+  const contactRef = view.kind === 'read' ? view.contactRef : undefined;
 
   if (view.kind === 'loading') {
     return (
@@ -351,6 +315,10 @@ export function JoinPage({
         />
       ) : (
         <div className="jn-accept">
+          {/* IR-1 low (c): what Touch ID signs, shown before the gesture (04 §3.6 Accept step 2). */}
+          <p className="al-text-body-sm jn-statement">
+            {S.statement(name, fingerprint, agent === '' ? 'this agent' : agent)}
+          </p>
           <Button
             variant="primary"
             size="lg"

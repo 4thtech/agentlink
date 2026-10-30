@@ -1172,7 +1172,6 @@ export function ContactsPage({
         {arrived === undefined ? (
           <InviteScreen
             invites={invites}
-            api={api}
             onCreated={() => {
               expecting.current = true;
               setJustCreated(true);

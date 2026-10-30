@@ -16,14 +16,7 @@
 //   service) and the QR code.
 import { Button, InlineError, SkeletonLine, useHood } from '@4thtech-io/ui';
 import { useCallback, useEffect, useId, useRef, useState, type ReactElement } from 'react';
-import { createApiClient, type ApiClient } from '../../api/client.js';
-import {
-  INVITES_LIST_PATH,
-  createInviteApi,
-  parseOpenInvites,
-  type CreatedInvite,
-  type InviteApi,
-} from '../contacts/invite-api.js';
+import { createInviteApi, type CreatedInvite, type InviteApi } from '../contacts/invite-api.js';
 import { QrCode } from '../proofs/qr.js';
 import { CheckMark, CopyMark, MailIcon, ShareIcon } from './icons.js';
 import { INVITE_STRINGS as S, linkLabel, mailtoOf, worksFor } from './strings.js';
@@ -36,7 +29,6 @@ const MAX_NAME = 32;
 export interface InvitePanelProps {
   /** For tests; the page's own same-origin clients by default. */
   readonly invites?: InviteApi;
-  readonly api?: ApiClient;
   /** Opens the mail app with a `mailto:` address. Default: the browser's location. */
   readonly openMail?: (url: string) => void;
   /** A link was made (the pending list can read again). */
@@ -46,8 +38,8 @@ export interface InvitePanelProps {
 
 interface Made {
   readonly invite: CreatedInvite;
-  /** The open invite's ID, found in the server's list; undefined when it could not be read. */
-  readonly id: string | undefined;
+  /** This invite's public ID, from its own create answer (never looked up in a list). */
+  readonly id: string;
   /** The name the link was made for ('' for none). */
   readonly label: string;
   /** A long link was asked for (Under the hood), not a fallback. */
@@ -75,22 +67,17 @@ function defaultMail(url: string): void {
   window.location.assign(url);
 }
 
-/** The link as the box shows it: without the scheme (the copy keeps it). */
-const shownLink = (url: string): string => url.replace(/^https:\/\//, '');
-
 /** RFC 3339 to the minute, UTC: the exact expiry Under the hood. */
 const exact = (ms: number): string =>
   `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
 export function InvitePanel({
   invites: givenInvites,
-  api: givenApi,
   openMail = defaultMail,
   onCreated,
   now = () => Date.now(),
 }: InvitePanelProps): ReactElement {
   const [invites] = useState<InviteApi>(() => givenInvites ?? createInviteApi());
-  const [api] = useState<ApiClient>(() => givenApi ?? createApiClient());
   const hood = useHood();
   const nameId = useId();
   const hintId = `${nameId}-hint`;
@@ -113,16 +100,6 @@ export function InvitePanel({
   madeRef.current = made;
   sharedRef.current = shared;
 
-  const openIds = useCallback(async (): Promise<ReadonlySet<string>> => {
-    try {
-      const res = await api.get(INVITES_LIST_PATH);
-      const rows = res.kind === 'ok' ? parseOpenInvites(res.data) : undefined;
-      return new Set((rows ?? []).map((r) => r.inviteId));
-    } catch {
-      return new Set();
-    }
-  }, [api]);
-
   const make = useCallback(
     async (label: string, long: boolean): Promise<void> => {
       const mine = (run.current += 1);
@@ -130,7 +107,6 @@ export function InvitePanel({
       setPhase('making');
       setError(undefined);
       setNameError(undefined);
-      const before = await openIds();
       const outcome = await invites.create(
         label === '' ? undefined : label,
         long ? { long } : undefined,
@@ -153,12 +129,13 @@ export function InvitePanel({
         );
         return;
       }
-      const after = await openIds();
-      const id = [...after].find((x) => !before.has(x));
+      // IR-W4-PEOPLE-INVITE-1 (M): the ID comes only from this create's own answer, so the panel can
+      // never cancel another invite (one sent earlier, or one the AI app made meanwhile).
+      const id = outcome.invite.inviteId;
       const next: Made = { invite: outcome.invite, id, label, askedLong: long };
       if (mine !== run.current || !live.current) {
         // A newer link (or leaving) won: this one never reached the screen.
-        if (id !== undefined) void invites.cancel(id);
+        void invites.cancel(id);
         return;
       }
       madeRef.current = next;
@@ -166,9 +143,9 @@ export function InvitePanel({
       setPhase('ready');
       onCreated?.();
       // The one it replaces never left the screen: it goes.
-      if (previous?.id !== undefined && !sharedRef.current) void invites.cancel(previous.id);
+      if (previous !== undefined && !sharedRef.current) void invites.cancel(previous.id);
     },
-    [invites, openIds, onCreated],
+    [invites, onCreated],
   );
 
   useEffect(() => {
@@ -178,7 +155,7 @@ export function InvitePanel({
       live.current = false;
       const last = madeRef.current;
       // A link that never left the screen leaves no pending row behind.
-      if (last?.id !== undefined && !sharedRef.current) void invites.cancel(last.id);
+      if (last !== undefined && !sharedRef.current) void invites.cancel(last.id);
     };
     // Made once per panel.
   }, []);
@@ -203,6 +180,29 @@ export function InvitePanel({
     sharedRef.current = true;
     setShared(true);
   };
+
+  // IR-1 low (a): any copy whose selection holds the link counts as sent (the box, a triple-click,
+  // a selection that spans the page), so leaving never cancels a link that went out.
+  const boxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onCopy = (): void => {
+      const url = madeRef.current?.invite.inviteUrl;
+      const selection = document.getSelection();
+      if (url === undefined || selection === null || selection.rangeCount === 0) return;
+      const box = boxRef.current;
+      let inBox = false;
+      for (let i = 0; i < selection.rangeCount && box !== null; i += 1) {
+        const range = selection.getRangeAt(i);
+        if (box.contains(range.commonAncestorContainer) || range.intersectsNode(box)) inBox = true;
+      }
+      if (inBox || selection.toString().includes(url.slice(-12))) {
+        sharedRef.current = true;
+        setShared(true);
+      }
+    };
+    document.addEventListener('copy', onCopy);
+    return () => document.removeEventListener('copy', onCopy);
+  }, []);
 
   /** The name is committed (the field lost focus, or Enter): a fresh link while nothing went out. */
   const commitName = (): void => {
@@ -289,13 +289,13 @@ export function InvitePanel({
         <span className="inv-eyebrow">{linkLabel(wanted)}</span>
         <div className="inv-row">
           <div
+            ref={boxRef}
             className="inv-link"
             data-state={ready ? 'ready' : 'making'}
             aria-busy={ready ? undefined : 'true'}
-            onCopy={markShared}
           >
             {invite !== undefined && phase !== 'making' ? (
-              shownLink(invite.inviteUrl)
+              invite.inviteUrl
             ) : phase === 'error' ? null : (
               <>
                 <SkeletonLine width={70} />

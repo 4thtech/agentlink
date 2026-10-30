@@ -395,8 +395,16 @@
   font-size: 22px;
   border: 3px solid var(--al-color-bg-canvas);
 }
-.inv-pair .inv-avatar--them {
+.inv-meet {
+  display: inline-flex;
+}
+/* The right letter comes from the right: the kit's slide, mirrored, with the letter turned back. */
+.inv-from-right {
   margin-inline-start: -14px;
+  transform: scaleX(-1);
+}
+.inv-unflip {
+  transform: scaleX(-1);
 }
 .inv-pair-check {
   inline-size: 32px;

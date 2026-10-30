@@ -78,8 +78,16 @@ export function ConnectedMoment({
   return (
     <section className="inv-connected al-reveal" aria-label={connectedWith(name)}>
       <div className="inv-pair" aria-hidden="true">
-        <span className="inv-avatar inv-avatar--me">{letterOf(me)}</span>
-        <span className="inv-avatar inv-avatar--them">{letterOf(name)}</span>
+        {/* The two letters meet (U0 al-slide-in; the right one mirrored so it comes from the right),
+            then the check pops (al-pop). Reduced motion: the kit's switch, no movement. */}
+        <span className="inv-meet al-slide-in">
+          <span className="inv-avatar inv-avatar--me">{letterOf(me)}</span>
+        </span>
+        <span className="inv-meet inv-from-right">
+          <span className="inv-meet al-slide-in">
+            <span className="inv-avatar inv-avatar--them inv-unflip">{letterOf(name)}</span>
+          </span>
+        </span>
         <span className="inv-pair-check">
           <CheckMark />
         </span>
