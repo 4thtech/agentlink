@@ -27,7 +27,11 @@ function Row(props: {
   readonly title: string;
   readonly line: string;
 }): ReactElement {
-  const own = props.icon === 'backup' || props.icon === 'folder' || props.icon === 'appearance' || props.icon === 'bell';
+  const own =
+    props.icon === 'backup' ||
+    props.icon === 'folder' ||
+    props.icon === 'appearance' ||
+    props.icon === 'bell';
   return (
     <a className="st-row" href={props.href}>
       {own ? (
@@ -52,7 +56,11 @@ function themeLine(theme: 'system' | 'light' | 'dark'): string {
       : S.appearance.system;
 }
 
-function AdvancedRows({ relays }: { readonly relays: Relays | 'loading' | undefined }): ReactElement {
+function AdvancedRows({
+  relays,
+}: {
+  readonly relays: Relays | 'loading' | undefined;
+}): ReactElement {
   const A = S.advanced;
   const relayText =
     relays === 'loading'
@@ -134,12 +142,7 @@ export function SettingsPage({ get = productionGet }: SettingsPageProps): ReactE
           line={themeLine(prefs.theme)}
         />
         <Row href="/settings/rules" icon="rules" title={S.rules.title} line={S.rules.line} />
-        <Row
-          href="/settings/proofs"
-          icon="proofs"
-          title={S.proofs.title}
-          line={proofsLine}
-        />
+        <Row href="/settings/proofs" icon="proofs" title={S.proofs.title} line={proofsLine} />
         <Row
           href="/settings/notifications"
           icon="bell"

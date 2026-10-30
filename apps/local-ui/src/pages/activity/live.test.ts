@@ -93,8 +93,12 @@ describe('Live activity stream', () => {
   it('lists lines newest first, with the time, the kind and the text', async () => {
     const m = manualSource();
     await mount(m.source);
-    await act(async () => m.emit({ at: Date.UTC(2026, 9, 30, 14, 12, 0), kind: 'heartbeat', text: 'A' }));
-    await act(async () => m.emit({ at: Date.UTC(2026, 9, 30, 14, 12, 5), kind: 'state', text: 'B' }));
+    await act(async () =>
+      m.emit({ at: Date.UTC(2026, 9, 30, 14, 12, 0), kind: 'heartbeat', text: 'A' }),
+    );
+    await act(async () =>
+      m.emit({ at: Date.UTC(2026, 9, 30, 14, 12, 5), kind: 'state', text: 'B' }),
+    );
     const rows = [...host.querySelectorAll('[role="log"] .ls-line')];
     expect(rows.map((r) => r.querySelector('.ls-text')?.textContent)).toEqual(['B', 'A']);
     expect(rows[0]?.querySelector('.ls-kind')?.textContent).toBe('state');
@@ -132,7 +136,8 @@ describe('Live activity stream', () => {
     const m = manualSource();
     await mount(m.source);
     await act(async () => {
-      for (let i = 0; i < MAX_STREAM_LINES + 5; i++) m.emit({ at: i, kind: 'heartbeat', text: `l${String(i)}` });
+      for (let i = 0; i < MAX_STREAM_LINES + 5; i++)
+        m.emit({ at: i, kind: 'heartbeat', text: `l${String(i)}` });
     });
     expect(host.querySelectorAll('.ls-line')).toHaveLength(MAX_STREAM_LINES);
     expect(m.open()).toBe(true);

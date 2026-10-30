@@ -30,7 +30,6 @@ export interface StreamSource {
   subscribe(onLine: (line: RawLine) => void): () => void;
 }
 
-
 /** App · agent · state, with the key that says whether it changed. */
 function entries(s: LiveSnapshot): Map<string, { text: string; state: string }> {
   const out = new Map<string, { text: string; state: string }>();

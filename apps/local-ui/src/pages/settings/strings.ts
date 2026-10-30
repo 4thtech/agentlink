@@ -3,7 +3,10 @@
 export const SETTINGS_STRINGS = {
   title: 'Settings',
   backup: { title: 'Backup & Touch ID', line: 'Your recovery kit and how you approve things' },
-  files: { title: 'Files folder', line: 'Folders your AI may send from, and where received files go' },
+  files: {
+    title: 'Files folder',
+    line: 'Folders your AI may send from, and where received files go',
+  },
   appearance: {
     title: 'Appearance',
     system: 'Match my computer',
