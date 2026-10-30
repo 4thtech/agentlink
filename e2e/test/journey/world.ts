@@ -28,6 +28,7 @@ import {
   type AiAppMcp,
   type Computer,
 } from '../app-world.js';
+import { getStartedWithTouchId } from './helpers-wizard.js';
 
 export type FakeDrop = ReturnType<typeof createFakeDrop>;
 export type Relays = ReturnType<typeof memoryRelays>;
@@ -287,10 +288,10 @@ export async function startUiRun(
 }
 
 /**
- * Today's first run (0.4.5), the seed of the chapters that need an owner with a real passkey on this
- * computer: Welcome, Continue, name, Touch ID (one `create`), the backup code, and no AI app. Ends on
- * the app's Home. W4-ONE-TOUCH changes first run; chapter 1 asserts the new path, and this seed keeps
- * working as long as "Not now"/"Later" still skips the AI app.
+ * First run, the seed of the chapters that need an owner with a real passkey on this computer.
+ * W4-WIZARD: Get started (helpers-wizard.ts): the first app tile, the name, Touch ID (one `create`),
+ * the backup code; no AI app is on these computers, so step 3 says "{label} is ready" and "Go to
+ * Home" ends on the app's Home.
  */
 export async function firstRunWithTouchId(
   jp: JourneyPage,
@@ -299,17 +300,9 @@ export async function firstRunWithTouchId(
 ): Promise<void> {
   const { page } = jp;
   await page.goto(link);
-  await page.getByRole('button', { name: 'Get started' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel('Name your agent').fill(label);
-  await page.getByRole('button', { name: TOUCH_ID }).click();
-  await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
-  await page.getByRole('button', { name: 'I saved it' }).click();
-  // With an AI app detected first run offers it; "Later" writes nothing.
-  const later = page.getByRole('button', { name: 'Later' });
+  await getStartedWithTouchId(page, label);
+  await page.getByRole('button', { name: 'Go to Home' }).click();
   // W4-SHELL-V2: first run ends on Home (`/`; the old `/settings/home` redirects there).
-  const home = (url: URL): boolean => url.pathname === '/' || url.pathname === '/settings/home';
-  await Promise.race([page.waitForURL(home), later.waitFor().then(() => later.click())]);
   await page.waitForURL((url) => url.pathname === '/');
 }
 
