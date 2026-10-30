@@ -88,6 +88,7 @@ describe('the pages', () => {
       it('has the elements the script fills, and the step section apart from the inviter', () => {
         for (const id of [
           'state',
+          'retry',
           'inviter',
           'invite-heading',
           'inviter-name',

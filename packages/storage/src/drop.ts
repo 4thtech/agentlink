@@ -44,6 +44,7 @@ import {
 } from './adapter.js';
 import { validateS3Endpoint } from './endpoint.js';
 import { StorageError, type StorageErrorCode, type StorageLimit } from './errors.js';
+import { INVITE_OBJECT_MAX_BYTES, isInviteLookupId } from './drop-invite.js';
 import { discard, readCappedText, type FetchLike } from './http.js';
 
 const MiB = 1024 * 1024;
@@ -113,6 +114,28 @@ export interface DropAdapter extends StorageAdapter {
   readonly maxGetUrlLength: number;
   /** Like `presignGet`, and also returns the object's expiry. */
   presign(obj: StoredObject, expiresAt: Date): Promise<DropPresignedGet>;
+  /** W4-SHORT-INVITE: the drop key's current epoch, recorded with an invite before its upload. */
+  inviteEpoch(): Promise<number>;
+  /**
+   * W4-SHORT-INVITE (07 §5.4 `POST /v1/invite`): uploads one `ALI1` object under `lookupId`, signed at
+   * `epoch` (refused with `upload_failed`, nothing more sent, if the key moved on). 429 and 503 are
+   * `rate_limited` and `unavailable`; any other refusal is `upload_failed`.
+   */
+  putInvite(input: DropInviteUpload): Promise<{ readonly expiresAt: Date }>;
+  /** W4-SHORT-INVITE (`DELETE /v1/i/{lookupId}`), signed at the upload `epoch`; 404 is done. */
+  deleteInvite(lookupId: string, epoch: number): Promise<void>;
+}
+
+/** One invite object upload (W4-SHORT-INVITE, 04 §3.6.2). */
+export interface DropInviteUpload {
+  /** Strict 22-character base64url of the 16-byte lookup ID. */
+  readonly lookupId: string;
+  /** The `ALI1` bytes (at most 17 441). */
+  readonly object: Uint8Array;
+  /** Equal to the invite's own expiry; at most 7 days ahead. */
+  readonly expiresAt: Date;
+  /** The drop key epoch the caller recorded before the upload. */
+  readonly epoch: number;
 }
 
 interface Target {
@@ -601,6 +624,55 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
 
     async presignGet(obj: StoredObject, expiresAt: Date): Promise<string> {
       return (await presign(obj, expiresAt)).url;
+    },
+
+    inviteEpoch: currentEpoch,
+
+    async putInvite(input: DropInviteUpload): Promise<{ readonly expiresAt: Date }> {
+      if (
+        input === null ||
+        typeof input !== 'object' ||
+        !isInviteLookupId(input.lookupId) ||
+        !(input.object instanceof Uint8Array) ||
+        input.object.length < 1 ||
+        input.object.length > INVITE_OBJECT_MAX_BYTES ||
+        !isKeyEpoch(input.epoch)
+      ) {
+        throw new StorageError('invalid_argument', 'invalid invite upload');
+      }
+      const at = now();
+      checkFuture(input.expiresAt, at, 'expiresAt');
+      const expiresAt = Math.floor(input.expiresAt.getTime() / 1000);
+      const response = await signed(
+        'POST',
+        '/v1/invite',
+        { lookupId: input.lookupId, expiresAt, object: encodeBase64url(input.object) },
+        at,
+        input.epoch,
+      );
+      if (response.status !== 201) {
+        const error = await refusal(response, 'upload_failed');
+        log?.warn('drop invite upload failed', { code: error.code, status: response.status });
+        throw error;
+      }
+      const body = await readJson(response);
+      if (body?.expiresAt !== expiresAt) throw invalidResponse();
+      return { expiresAt: new Date(expiresAt * 1000) };
+    },
+
+    async deleteInvite(lookupId: string, epoch: number): Promise<void> {
+      if (!isInviteLookupId(lookupId) || !isKeyEpoch(epoch)) {
+        throw new StorageError('invalid_argument', 'invalid invite delete');
+      }
+      const response = await signed('DELETE', `/v1/i/${lookupId}`, { lookupId }, now(), epoch);
+      if (response.status !== 204 && response.status !== 404) {
+        const error = await refusal(response, 'delete_failed');
+        log?.warn('drop invite delete failed', { code: error.code, status: response.status });
+        throw error.code === 'rate_limited' || error.code === 'unavailable'
+          ? error
+          : new StorageError('delete_failed', 'drop delete failed', response.status);
+      }
+      await discard(response);
     },
 
     presign,

@@ -49,8 +49,8 @@ async function publishHandshake(agent: OpenedAgent): Promise<boolean> {
 
 export function createAcceptHandler(deps: CommandDeps = createDeps()): CommandHandler {
   return (context: CommandContext) => {
-    const [link, ...extra] = context.parsed.positionals;
-    if (link === undefined || extra.length > 0) {
+    const [given, ...extra] = context.parsed.positionals;
+    if (given === undefined || extra.length > 0) {
       context.output.printError(DISPATCH_TEXT.badArguments);
       return Promise.resolve(EXIT_USAGE);
     }
@@ -63,6 +63,9 @@ export function createAcceptHandler(deps: CommandDeps = createDeps()): CommandHa
 
     return withAgent(context, deps, async (agent) => {
       const { client } = agent;
+      // W4-SHORT-INVITE (04 §3.6.2): a short link is resolved once, first (one GET from the shipped
+      // drop host); every step below uses the resolved invite, so the approval action holds it.
+      const link = await client.pairing.resolveInviteLink(given);
       // Step 1 always runs and stores nothing: decode, strict schema, expiry, both card signatures,
       // name and relays (04 §3.6 Accept). A bad link ends here with core's fixed sentence.
       const checked = await client.pairing.acceptInvite({ link });

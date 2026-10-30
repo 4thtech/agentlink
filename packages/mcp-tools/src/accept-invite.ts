@@ -58,9 +58,12 @@ export async function acceptInviteHandler(
 ): Promise<HandlerOutput> {
   const invites = context.client.invites;
   if (invites === undefined) return notAvailable();
-  const { inviteUrl, approvalId } = input as AcceptInput;
+  const { inviteUrl: given, approvalId } = input as AcceptInput;
 
   try {
+    // W4-SHORT-INVITE (04 §3.6.2): a short link is resolved once, first; every step below uses the
+    // resolved invite, so the approval action holds it and a retry builds the same action.
+    const inviteUrl = invites.resolve === undefined ? given : await invites.resolve(given);
     // Step 1 always runs and stores nothing: decode, strict schema, expiry, both card signatures,
     // name and relays (04 §3.6 Accept). A bad link ends here with fixed text.
     const checked = await invites.check(inviteUrl);

@@ -534,7 +534,7 @@ describe('apps/invite/wrangler.toml', () => {
   it('serves the headers of 08 §4 from site/_headers, which the build copies', () => {
     const headers = read('apps/invite/site/_headers');
     expect(headers).toContain('Referrer-Policy: no-referrer');
-    expect(headers).toContain("connect-src 'none'");
+    expect(headers).toContain('connect-src https://drop.agentlink.4thtech.io;');
     expect(read('apps/invite/vite.config.ts')).toContain("publicDir: 'site'");
   });
 });

@@ -181,6 +181,11 @@ export type InboxPage =
  * used owner approval (I-4).
  */
 export interface InviteTools {
+  /**
+   * W4-SHORT-INVITE (04 §3.6.2): the format 1 link of a link (a short link fetched once from the
+   * configured drop). Absent in a double: the link is used as given.
+   */
+  resolve?(link: string): Promise<string>;
   /** A single-use invite (04 §3.6); the link carries the secret and is never logged. */
   create(input: { label?: string; expiresInDays?: number }): Promise<CreatedInvite>;
   /** Step 1 of accept: decodes and checks the link, stores nothing (06 §2.1 name rule applies). */
@@ -670,6 +675,7 @@ const OFFLINE_CODES: ReadonlySet<string> = new Set(['transport_unavailable']);
 
 function coreInviteTools(client: AgentLinkClient): InviteTools {
   return Object.freeze<InviteTools>({
+    resolve: (link) => client.pairing.resolveInviteLink(link),
     create: (input) => client.pairing.createInvite(input),
     async check(link) {
       return (await client.pairing.acceptInvite({ link })).contact;

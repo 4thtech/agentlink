@@ -83,9 +83,19 @@ export {
   createDropAdapter,
   type DropAdapter,
   type DropAdapterConfig,
+  type DropInviteUpload,
   type DropPresignedGet,
   type DropSigner,
 } from './drop.js';
+// W4-SHORT-INVITE (D-139): the unauthenticated fetch of a short invite's `ALI1` object (07 §5.4).
+export {
+  INVITE_FETCH_TIMEOUT_MS,
+  INVITE_LOOKUP_ID_RE,
+  INVITE_OBJECT_MAX_BYTES,
+  fetchInviteObject,
+  isInviteLookupId,
+  type InviteFetchConfig,
+} from './drop-invite.js';
 export {
   PAYLOAD_MAX_BYTES,
   PAYLOAD_MAX_FILES,

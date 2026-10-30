@@ -191,7 +191,7 @@ export interface LocalUiRevealRoute {
 }
 
 /** UX2-d1: the steps of the invite kind (U3-invite adds `dismiss`, "Not now" on the join screen). */
-export type LocalUiInviteStep = 'create' | 'check' | 'dismiss';
+export type LocalUiInviteStep = 'create' | 'check' | 'dismiss' | 'cancel';
 
 /** UX2-d1: a pasted invite after core's accept step 1 (04 §3.6): who it is and its expiry. */
 export interface LocalUiCheckedInvite {
@@ -207,8 +207,11 @@ export interface LocalUiCheckedInvite {
  * Neither signs, pairs or reaches the owner store. The link holds the invite secret: never log it.
  */
 export interface LocalUiInviteDesk {
-  create(input: { readonly label?: string }): Promise<CreatedInvite>;
+  /** W4-SHORT-INVITE: `long` (Advanced, D-139 (7)) asks for the format 1 link. */
+  create(input: { readonly label?: string; readonly long?: true }): Promise<CreatedInvite>;
   check(link: string): Promise<LocalUiCheckedInvite>;
+  /** W4-INVITES-LIST: core `cancelInvite` (04 §3.6.2: an owner action on the local page). */
+  cancel(inviteId: string): Promise<'cancelled' | 'not_found'>;
 }
 
 /**
