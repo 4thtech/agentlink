@@ -7,7 +7,6 @@ import { Kbd, Lockup } from '@4thtech-io/ui';
 import { useCallback, useRef, useState, type ReactElement } from 'react';
 import { START_PATH } from '../nav.js';
 import { navigate } from '../router.js';
-import { Menu } from '../pages/agents/menu.js';
 import { setUnderTheHood, usePrefs } from '../prefs/index.js';
 import { SHELL_STRINGS as S } from '../strings.js';
 import { AgentSwitcher, type SwitcherChip } from './agent-switcher.js';
@@ -16,6 +15,7 @@ import type { ConnectionState } from './index.js';
 import { VT_CLASS } from '@4thtech-io/ui';
 import { openShellDialog } from './shell-dialogs.js';
 import { ShellIcon } from './shell-icons.js';
+import { ShellMenu } from './shell-menu.js';
 
 /** The user guide (the same address as About › Read the guides). */
 export const GUIDE_URL = 'https://wiki.4thtech.io/products/agentlink';
@@ -58,7 +58,7 @@ export function HelpMenu(): ReactElement {
         <ShellIcon name="help" size={20} />
       </button>
       {open ? (
-        <Menu
+        <ShellMenu
           label={S.help}
           onClose={close}
           triggerRef={trigger}
@@ -112,7 +112,7 @@ export function HelpMenu(): ReactElement {
             <ShellIcon name="flag" size={16} />
             {S.helpReport}
           </button>
-        </Menu>
+        </ShellMenu>
       ) : null}
     </div>
   );
@@ -142,8 +142,8 @@ export function HoodSwitch({
       onClick={() => (onToggle ?? setUnderTheHood)(!hood)}
     >
       <span className="al-hood-label">{S.hood}</span>
-      <span className="al-switch-track" aria-hidden="true">
-        <span className="al-switch-knob" />
+      <span className="al-hood-track" aria-hidden="true">
+        <span className="al-hood-knob" />
       </span>
     </button>
   );

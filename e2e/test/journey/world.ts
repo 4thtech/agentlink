@@ -169,7 +169,11 @@ export async function journeyPage(browser: Browser): Promise<JourneyPage> {
  * W4-SHELL-V2: until Home (U3) and People (U4) hold them, today's Messages and Contacts pages are
  * reached from Go to (Cmd+K) by these names; they are no sections of the menu.
  */
-const INTERIM: Readonly<Record<string, string>> = { Inbox: 'Messages', Contacts: 'People' };
+const INTERIM: Readonly<Record<string, string>> = {
+  Inbox: 'Messages',
+  Messages: 'Messages',
+  Contacts: 'People',
+};
 
 /** Go to (Cmd+K): type a name and press Enter (an in-app move, never `goto`). */
 export async function goTo(page: Page, name: string): Promise<void> {

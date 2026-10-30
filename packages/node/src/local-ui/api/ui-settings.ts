@@ -10,7 +10,8 @@
 //   refuses a query, an operation input or a presence header, and parses the body itself (strict
 //   JSON, allowlisted keys, boolean values, at most UI_SETTINGS_MAX_BODY_BYTES). The handler gets only
 //   that checked change. The file write is the app host's (`~/.agentlink/ui-settings.json`, 0600, a
-//   fresh exclusive temp file renamed into place, never following a link; apps/cli agent-dir.ts).
+//   fresh exclusive temp file renamed into place, never following a link;
+//   apps/cli/src/runtime/agent-dir.ts).
 // - Fixed answers only; nothing here logs a value or a path.
 import type { JsonObject } from '@4thtech-io/crypto';
 import { UI_SETTINGS_PATH, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';

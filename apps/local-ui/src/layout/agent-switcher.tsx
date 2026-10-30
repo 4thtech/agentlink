@@ -8,7 +8,7 @@
 // itself. Switching needs no Touch ID (it only changes what you look at) and never reloads the page.
 // Labels and app names are text only (I-5).
 import { AgentIcon, type AgentDotState, type LiveDotState } from '@4thtech-io/ui';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactElement } from 'react';
 import {
   getLive,
@@ -20,11 +20,11 @@ import {
 import { AGENTS_PATH } from '../nav.js';
 import { navigate } from '../router.js';
 import type { AgentsApi } from '../pages/agents/api.js';
-import { Menu } from '../pages/agents/menu.js';
 import { AGENTS_STRINGS as A } from '../pages/agents/strings.js';
 import { createAppsApi, type AppsApi } from '../pages/apps/api.js';
 import { APPS_PAGE_PATH } from '../pages/apps/data.js';
 import { ShellIcon } from './shell-icons.js';
+import { ShellMenu } from './shell-menu.js';
 import { VT_CLASS } from '@4thtech-io/ui';
 
 /** The top bar's one status for the connection (HOTFIX-045), when it is not up. */
@@ -125,6 +125,7 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
   const free = useFreeApps(appsApi);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
   const close = useCallback((restore: boolean): void => {
     setOpen(false);
     if (restore) trigger.current?.focus();
@@ -185,7 +186,7 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
         />
       </button>
       {open ? (
-        <Menu
+        <ShellMenu
           label={CHIP_STRINGS.menuName}
           onClose={close}
           triggerRef={trigger}
@@ -198,9 +199,12 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
             <div key={agent.name} className="al-am-row">
               <button
                 type="button"
-                role="menuitem"
+                role="menuitemradio"
+                aria-checked={agent.current}
+                {...(agent.apps.length > 0
+                  ? { 'aria-describedby': `${menuId}-${agent.name}` }
+                  : {})}
                 className="al-mitem al-am-item"
-                aria-current={agent.current ? 'true' : undefined}
                 aria-disabled={agent.removing ? 'true' : undefined}
                 onClick={() => choose(agent)}
               >
@@ -214,7 +218,7 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
                 ) : null}
               </button>
               {agent.apps.length > 0 ? (
-                <span className="al-am-apps">
+                <span id={`${menuId}-${agent.name}`} className="al-am-apps">
                   {agent.apps.map((app) => (
                     <AppLine key={app.app} app={app} />
                   ))}
@@ -266,7 +270,7 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
             <ShellIcon name="settings" size={16} />
             {CHIP_STRINGS.manageAgents}
           </button>
-        </Menu>
+        </ShellMenu>
       ) : null}
     </div>
   );
