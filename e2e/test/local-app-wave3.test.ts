@@ -153,28 +153,21 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     await page.getByRole('heading', { name: 'Which AI app will you use?' }).waitFor();
     await page.getByRole('button', { name: 'Continue' }).click();
 
-    // Name and one Touch ID: the first agent, its owner and its first rules.
+    // Name and one Touch ID: the first agent, its owner and its first rules, and (W4-ONE-TOUCH,
+    // D-140) the Claude Code entry: "Connect to Claude Code" is ticked for the app picked.
     await page.getByRole('heading', { name: 'Set up your agent' }).waitFor();
     await page.getByLabel('Name your agent').fill('Home base');
+    await page.getByText('Connect to Claude Code').waitFor();
     await page.getByRole('button', { name: TOUCH_ID }).click();
     await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
     await page.getByRole('button', { name: 'I saved it' }).click();
-    // U3-g-c: the picker found Claude Code, so "Connect your AI app" follows; "Later" writes nothing
-    // (the connection is made from the AI apps page below).
-    await page.getByRole('heading', { name: 'Connect Claude Code to Home base' }).waitFor();
-    expect(readFileSync(claude.file, 'utf8')).toBe(settingsBefore);
-    await page.getByRole('button', { name: 'Later' }).click();
+    await page
+      .getByText('Home base is ready in Claude Code. Restart Claude Code to finish.')
+      .waitFor();
+    await page.getByRole('button', { name: 'Continue' }).click();
     await page.waitForURL(/\/settings\/home$/);
     const first = await pc.directory.read('default');
     expect(first).toMatchObject({ name: 'default', label: 'Home base', available: true });
-
-    // Connect Claude Code from the AI apps page: review, Apply, Touch ID.
-    await page.goto(new URL('/settings/apps', link).href);
-    await page.getByRole('button', { name: 'Review change' }).click();
-    await page.getByText("This adds one entry to Claude Code's settings.").waitFor();
-    await page.getByRole('button', { name: 'Apply with Touch ID' }).click();
-    await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
-    await page.getByText('Restart Claude Code to finish').first().waitFor();
 
     // The entry is in the settings, nothing else changed, and the backup keeps the bytes and the mode.
     const settings = JSON.parse(readFileSync(claude.file, 'utf8')) as {

@@ -134,6 +134,12 @@ export const SETUP_MESSAGES = {
   session_expired: 'This link has expired. Ask your AI to open AgentLink again.',
   forbidden: "This page couldn't be checked. Ask your AI to open AgentLink again.",
   unknown: "Setup didn't finish. Run `agentlink doctor` in your own terminal.",
+  // W4-ONE-TOUCH (D-140; 11 §5.8): the AI app picked on the same screen.
+  quit_first: 'Quit Claude Desktop first. Nothing changed. Then try again.',
+  app_unavailable:
+    "This AI app can't be connected from here right now. Nothing changed. Leave it out with Not now, or try again.",
+  changed: 'Its settings changed since you looked. Nothing was saved. Try again.',
+  tries_exhausted: 'That was the third try. Nothing was saved. Start again.',
   // IR-M1-11b-1-1 L-2: the connection dropped after finish was sent, and the re-check says the owner
   // exists: the setup probably finished, but its answer (with the backup code) never arrived.
   finishedNoCode:
@@ -234,6 +240,22 @@ export const NAME = {
   setting: 'Setting up…',
   backupInstead: 'Use a backup code instead',
   back: 'Back',
+  /** W4-ONE-TOUCH (D-140; 11 §5.8 "Create and connect"): prefilled; unticked = "Not now". */
+  connectTo: (app: string): string => `Connect to ${app}`,
+  notNow: 'Not now',
+  /** W4-ONE-TOUCH: New agent with the backup code. */
+  confirmCode: 'Confirm with my backup code',
+} as const;
+
+/** W4-ONE-TOUCH (D-140; 11 §5.8 "Create and connect"): after the one gesture. */
+export const CREATED = {
+  ready: (label: string, app: string): string =>
+    `${label} is ready in ${app}. Restart ${app} to finish.`,
+  notConnected: (label: string, app: string): string =>
+    `${label} is ready. ${app} isn't connected yet.`,
+  connect: 'Connect',
+  later: 'Later',
+  next: 'Continue',
 } as const;
 
 /** The most code points a name may have (06 §6; the server checks it again). */

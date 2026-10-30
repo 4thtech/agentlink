@@ -154,6 +154,7 @@ import {
 } from '@4thtech-io/core';
 import {
   KeyStoreError,
+  canonicalize,
   canonicalizeToBytes,
   decodeBase64url,
   decodeHex,
@@ -231,9 +232,26 @@ import {
   removeCreated,
   type SendFolderPlan,
 } from './owner-first-policy.js';
-import { labelActionsOf, type FirstAgentCard } from './owner-first-card.js';
+import {
+  labelActionsOf,
+  type FirstAgentCard,
+  type FirstPolicyActions,
+} from './owner-first-card.js';
 import { signNewAgent } from './owner-add-agent.js';
+import {
+  CREATE_CONNECT_HOLD_MS,
+  CREATE_CONNECT_NONCE_BYTES,
+  CREATE_CONNECT_TRIES,
+  agentFingerprintOf,
+  buildCreateConnectPlan,
+  createConnectChallenge,
+  type CreateConnectPlan,
+  type PlanStatement,
+  type PlanStatementApp,
+} from './owner-add-agent-plan.js';
+import { HeldAgentSeed } from './keychain-keystore.js';
 import { isAgentLabelText } from './local-ui/api/agents-manage.js';
+import { AI_APP_IDS, appChangeId } from './local-ui/api/apps.js';
 import {
   PASSKEY_RP_ID,
   assertPasskeyAssertion,
@@ -253,8 +271,8 @@ import {
   type LocalUiAgentView,
   type LocalUiAgentsList,
   type LocalUiAgentsManage,
+  type LocalUiAiAppPlan,
   type LocalUiAiApps,
-  type LocalUiNewAgent,
   type LocalUiAssets,
   type LocalUiContext,
   type LocalUiOptions,
@@ -268,6 +286,7 @@ import type {
   LocalUiReadRoute,
   LocalUiRoute,
   LocalUiSwitchRoute,
+  LocalUiCreateAgentStep,
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
   LocalUiResult,
@@ -279,6 +298,7 @@ import {
   AppHostSlot,
   FIRST_AGENT_LABEL,
   FIRST_AGENT_NAME,
+  HOST_AGENT_NAME,
   type AppHostAgent,
   type AppHostFirstRun,
   type AppHostHold,
@@ -303,10 +323,8 @@ import {
 } from './local-ui/routes.js';
 import { createHealthReader } from './local-ui/api/health.js';
 import {
-  assertPrintable,
   checkGesture,
   signGesture,
-  type OwnerReview,
   type OwnerSignRequest,
   type PromptingOwnerKeyStore,
 } from './owner-operation.js';
@@ -650,6 +668,16 @@ export type ApprovalServerEvent =
         | 'folder_refused'
         /** U3-d: the label is not its own restricted form, or not the one `begin` was given. */
         | 'label_invalid'
+        /** W4-ONE-TOUCH (04 §2.8): owner and agent made, the AI app entry not written. */
+        | 'created_not_connected'
+        /** W4-ONE-TOUCH: the third rejected presence proof ended the plan. */
+        | 'tries_exhausted'
+        /** W4-ONE-TOUCH: the AI app's file changed since begin; nothing was signed. */
+        | 'changed'
+        /** W4-ONE-TOUCH: Claude Desktop runs ("Quit Claude Desktop first"). */
+        | 'quit_first'
+        /** W4-ONE-TOUCH: the picked AI app can't be connected from here. */
+        | 'app_unavailable'
         | 'failed';
       /** IR-M1-11s-c-1 L-4: with `failed`, which kind of failure (a fixed code). */
       readonly reason?: OwnerSetupFailure;
@@ -922,10 +950,78 @@ interface PendingSetup {
   readonly timer: ReturnType<typeof setTimeout>;
   /** M1-UX-FIRSTRUN-V2: the folders begin prepared (removed unless the first policy applies). */
   readonly folders?: SetupFolders;
-  /** U3-d: the label `begin` was given (06 §6 label rule); `finish` must carry the same. */
+  /** U3-d: the label `begin` was given (06 §6 label rule). */
   readonly label?: string;
   /** U3-g-b: begun with no agent yet (first run creates the agent); `finish` must be the same. */
   readonly noAgent?: true;
+  /** W4-ONE-TOUCH (04 §2.8): the begin nonce; `finish` carries only this (and the response). */
+  readonly nonce: Uint8Array;
+  /** W4-ONE-TOUCH: the first agent's seed, held with the owner seed (no agent yet). */
+  readonly agentSeed?: HeldAgentSeed;
+  /** W4-ONE-TOUCH: the plan the challenge binds (absent: a random challenge, no plan). */
+  readonly plan?: CreateConnectPlan;
+  /** W4-ONE-TOUCH: the picked AI app's change as planned at begin. */
+  readonly app?: PlannedApp;
+  /** W4-ONE-TOUCH: rejected presence proofs so far (the third ends the hold). */
+  tries: number;
+}
+
+/** W4-ONE-TOUCH (04 §2.8): the picked AI app as begin planned it, for the checks before writing. */
+interface PlannedApp {
+  readonly app: string;
+  readonly name: string;
+  readonly folder: string;
+  readonly kind: 'connect' | 'move';
+  readonly identity: string;
+  readonly changeId: string;
+  /** The desk that planned it (first run's or the open agent's), to plan again before writing. */
+  readonly desk: { readonly plan: LocalUiAiApps['plan'] };
+}
+
+/** W4-ONE-TOUCH (04 §2.8): New agent's held plan, in memory only. */
+interface PendingCreate {
+  readonly session: Uint8Array;
+  readonly nonce: Uint8Array;
+  readonly challenge: Uint8Array;
+  readonly expiresAt: number;
+  readonly timer: ReturnType<typeof setTimeout>;
+  readonly seed: HeldAgentSeed;
+  readonly plan: CreateConnectPlan;
+  readonly statement: PlanStatement;
+  readonly app?: PlannedApp;
+  /** The Send folder for the first policy, prepared at begin (removed again unless used). */
+  readonly send: SendFolderPlan;
+  tries: number;
+}
+
+/** W4-ONE-TOUCH: the begin nonce as it travels: 32 bytes, base64url. */
+const PLAN_NONCE = /^[A-Za-z0-9_-]{43}$/;
+
+/** W4-ONE-TOUCH: a fresh change for `app` and `folder`, recomputed for `agentId` (04 §2.5.1). */
+function changeOf(
+  plan: LocalUiAiAppPlan,
+  app: string,
+  folder: string,
+  agentId: string,
+): { kind: 'connect' | 'move'; changeId: string; identity: string } | undefined {
+  if (plan.status !== 'change' || plan.app !== app) return undefined;
+  if (plan.kind !== 'connect' && plan.kind !== 'move') return undefined;
+  if (plan.newAgent !== folder || plan.newEntry === null) return undefined;
+  if (plan.kind === 'connect' && (plan.oldAgent !== null || plan.oldEntry !== null))
+    return undefined;
+  const copy = (e: JsonObject | null): JsonObject | null =>
+    e === null ? null : (parseJson(canonicalize(e)) as JsonObject);
+  return {
+    kind: plan.kind,
+    identity: plan.identity,
+    changeId: appChangeId({
+      app,
+      path: plan.file,
+      oldEntry: copy(plan.oldEntry),
+      newEntry: copy(plan.newEntry),
+      agent: agentId,
+    }),
+  };
 }
 
 /** U3-g-b: what a setup runs against: the open agent's setup, or first run with no agent yet. */
@@ -1136,9 +1232,8 @@ export async function startApprovalServerWith(
   const requestHolds = new WeakMap<IncomingMessage, AppHostHold>();
   /** U3-d: the open agent's verified label is read once per bind; answers wait for it. */
   let labelReady: Promise<void> = Promise.resolve();
-  /** U3-d: the agents this server created and has not settled, with their opened handles. */
-  const newAgents = new WeakSet<LocalUiNewAgent>();
-  const newAgentHandles = new WeakMap<LocalUiNewAgent, AppHostAgent>();
+  /** W4-ONE-TOUCH: the Send folder home of the open agent's first policy (tests: a temp home). */
+  let boundHome: string | undefined = options.host?.initial?.firstCard?.firstPolicy?.home;
   // M1-11s-b: the bundle is checked before anything listens (fail closed).
   const localUi = loadLocalUi(options.localUi?.assets);
   const routes = internals.routes ?? createLocalUiRoutes();
@@ -1200,58 +1295,9 @@ export async function startApprovalServerWith(
   let lastHandoffAt = Number.NEGATIVE_INFINITY;
   let lastJoinOpenAt = Number.NEGATIVE_INFINITY;
   // U3-d (D-138; 08 §1; 04 §2.8 "From the local app"): create an agent and save a verified label.
-  // Nothing here signs: the first parts are signed only by the owner gate's `addAgent`.
+  // Nothing here signs. W4-ONE-TOUCH: creating an agent is the create-agent gate's (createAgentGate).
   const agentsManage: LocalUiAgentsManage = Object.freeze<LocalUiAgentsManage>({
     current: () => host?.current,
-    create: async (label: string) => {
-      const slot = host;
-      const directory = slot?.directory;
-      if (slot === undefined || directory?.create === undefined) return undefined;
-      let name: string;
-      try {
-        name = await directory.create(label);
-      } catch {
-        return undefined;
-      }
-      const opened = await slot.openNew(name);
-      const first = opened?.firstCard;
-      const firstPolicy = first?.firstPolicy;
-      const actions = labelActionsOf(firstPolicy?.actions);
-      if (opened === undefined || first === undefined || actions === undefined) {
-        await opened?.close().catch(() => undefined);
-        await directory.discardNew?.(name).catch(() => undefined);
-        return undefined;
-      }
-      // The Send folder for its first policy, checked (or created) now; removed again on failure.
-      const plan = await prepareSendFolder(firstPolicy?.home).catch(
-        () => ({ status: 'refused', reason: 'not_real' }) as const,
-      );
-      const agent: LocalUiNewAgent = Object.freeze<LocalUiNewAgent>({
-        name,
-        label,
-        first: Object.freeze<FirstAgentCard>({ ...first, firstLabel: { label, actions } }),
-        plan: plan as SendFolderPlan,
-      });
-      newAgents.add(agent);
-      newAgentHandles.set(agent, opened);
-      return agent;
-    },
-    settle: async (agent: LocalUiNewAgent, ok: boolean) => {
-      const opened = newAgentHandles.get(agent);
-      newAgentHandles.delete(agent);
-      newAgents.delete(agent);
-      await opened?.close().catch(() => undefined);
-      const directory = host?.directory;
-      if (opened === undefined || directory === undefined) return;
-      if (ok) {
-        // Display only (07 §9.1): the verified label is in the new agent's store.
-        await directory.writeLabel(agent.name, agent.label).catch(() => undefined);
-        return;
-      }
-      // All or nothing (04 §2.8): exactly what this request made goes again.
-      await removeCreated(agent.plan).catch(() => undefined);
-      await directory.discardNew?.(agent.name).catch(() => undefined);
-    },
     labelSaved: async (name: string, label: string) => {
       const slot = host;
       if (slot === undefined) return;
@@ -1997,7 +2043,6 @@ export async function startApprovalServerWith(
         }
         let store: { lock(): Promise<void>; close(): Promise<void> };
         let session: OwnerSession;
-        let ownerKeys: OwnerPublicKeys;
         if (context === undefined) {
           // HOTFIX-045-REMOVE (GAP B): no card; the stored owner must be the one `byNostr` names.
           try {
@@ -2008,7 +2053,7 @@ export async function startApprovalServerWith(
               presence,
               { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
             );
-            ({ store, session, owner: ownerKeys } = unlocked);
+            ({ store, session } = unlocked);
           } catch (error) {
             if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
               presenceFailed();
@@ -2043,7 +2088,6 @@ export async function startApprovalServerWith(
             return;
           }
           store = opened;
-          ownerKeys = context.owner;
         }
         try {
           presenceSucceeded();
@@ -2086,35 +2130,8 @@ export async function startApprovalServerWith(
                 }
                 return signatures;
               },
-              // U3-d (04 §2.8 "From the local app"): Add an agent, in the app host only. The same
-              // one owner operation: exactly the new agent's first card, first policy and first
-              // label, for that agent only (signNewAgent); never `sign` as well. Never on the
-              // HOTFIX-045-REMOVE path (no card): only the removal's own revoke is signed there.
-              ...(host === undefined || byNostr !== undefined
-                ? {}
-                : {
-                    addAgent: async (review: OwnerReview, agent: LocalUiNewAgent) => {
-                      if (used) {
-                        throw new NodeKeyStoreError(
-                          'owner_operation_invalid',
-                          'One owner operation signs once.',
-                        );
-                      }
-                      used = true;
-                      if (!newAgents.has(agent)) {
-                        throw new NodeKeyStoreError(
-                          'owner_operation_invalid',
-                          'Only an agent this app just created gets its first card here.',
-                        );
-                      }
-                      if (!Array.isArray(review.lines) || review.lines.length === 0) {
-                        throw new NodeKeyStoreError('owner_operation_invalid', 'Nothing to show.');
-                      }
-                      for (const line of review.lines) assertPrintable(line, 'A review line');
-                      if (!stillCurrent(req)) throw new AgentChanged();
-                      return signNewAgent(session, ownerKeys, agent.first, agent.plan);
-                    },
-                  }),
+              // W4-ONE-TOUCH: Add an agent is no longer an ordinary owner route; its first parts
+              // are signed only by the create-agent gate (createAgentGate, 04 §2.8).
             });
             if (!stillCurrent(req)) throw new AgentChanged();
             result = await run(owner);
@@ -2804,7 +2821,9 @@ export async function startApprovalServerWith(
     if (which === undefined || which !== pendingSetup) return;
     pendingSetup = undefined;
     clearTimeout(which.timer);
-    wipe(which.seed, which.challenge, which.session);
+    wipe(which.seed, which.challenge, which.session, which.nonce);
+    // W4-ONE-TOUCH: the first agent's held seed dies with the hold (its folder name is released).
+    which.agentSeed?.wipe();
     // M1-UX-FIRSTRUN-V2: no policy was signed, so the folders this begin created go again
     // (M1-UX-FIRSTRUN-V2-b: queued, and awaited by the next begin and by close).
     const folders = which.folders;
@@ -2852,13 +2871,20 @@ export async function startApprovalServerWith(
    * `default`, FIRST_AGENT_NAME) and opens it for its first parts only. Undefined, with nothing left behind,
    * when it cannot be created or opened or has no first card.
    */
-  const createFirstAgent = async (label: string): Promise<AppHostAgent | undefined> => {
+  const createFirstAgent = async (
+    label: string,
+    seed: HeldAgentSeed | undefined,
+  ): Promise<AppHostAgent | undefined> => {
     const slot = host;
     const directory = slot?.directory;
     if (slot === undefined || directory?.create === undefined) return undefined;
     let name: string;
     try {
-      name = await directory.create(label, { name: FIRST_AGENT_NAME });
+      // W4-ONE-TOUCH (04 §2.8 step 2): the keys held since begin, never new ones.
+      name = await directory.create(label, {
+        name: FIRST_AGENT_NAME,
+        ...(seed === undefined ? {} : { createKeys: () => seed.store(keychainOf()) }),
+      });
     } catch {
       return undefined;
     }
@@ -2901,6 +2927,193 @@ export async function startApprovalServerWith(
   };
 
   /**
+   * W4-ONE-TOUCH (04 §2.8 Begin): plans the picked AI app's change for `folder` and `agentId` with
+   * `desk` (entry-only, the §2.5 "Writing AI app configs" rules are the desk's). A fixed refusal when
+   * Claude Desktop runs or the app cannot be connected, including an entry that already names `folder`
+   * (IR-W4-ONE-TOUCH L-2).
+   */
+  const planApp = async (
+    desk: { readonly plan: LocalUiAiApps['plan'] },
+    app: string,
+    folder: string,
+    agentId: string,
+  ): Promise<
+    | { readonly planned: PlannedApp; readonly shown: PlanStatementApp }
+    | 'quit_first'
+    | 'app_unavailable'
+  > => {
+    let planned: LocalUiAiAppPlan;
+    try {
+      planned = await desk.plan(app, folder);
+    } catch {
+      return 'app_unavailable';
+    }
+    if (planned.status === 'quit_first') return 'quit_first';
+    if (planned.status !== 'change' || planned.app !== app) return 'app_unavailable';
+    const copy = (e: JsonObject | null): JsonObject | null =>
+      e === null ? null : (parseJson(canonicalize(e)) as JsonObject);
+    const name = String(planned.name);
+    // IR-W4-ONE-TOUCH L-2: an entry that already names the reserved folder (left over, while no such
+    // agent exists) is never claimed as a connection without a signed app.connect: refused.
+    if (planned.kind === 'disconnect') return 'app_unavailable';
+    const change = changeOf(planned, app, folder, agentId);
+    if (change === undefined) return 'app_unavailable';
+    return {
+      planned: { app, name, folder, ...change, desk },
+      shown: {
+        app,
+        name,
+        kind: change.kind,
+        path: String(planned.path),
+        oldEntry: copy(planned.oldEntry),
+        newEntry: copy(planned.newEntry),
+        oldAgent: planned.oldAgent,
+      },
+    };
+  };
+
+  /**
+   * W4-ONE-TOUCH (04 §2.8 Finish, step 8): the change recomputed from the file as it is now must be
+   * the one begin planned (same file identity, kind and `changeId` for this agentId).
+   */
+  const recheckApp = async (
+    planned: PlannedApp,
+    agentId: string,
+  ): Promise<
+    { readonly status: 'ok'; readonly fresh: LocalUiAiAppPlan } | 'changed' | 'quit_first'
+  > => {
+    let fresh: LocalUiAiAppPlan;
+    try {
+      fresh = await planned.desk.plan(planned.app, planned.folder);
+    } catch {
+      return 'changed';
+    }
+    if (fresh.status === 'quit_first') return 'quit_first';
+    const change = changeOf(fresh, planned.app, planned.folder, agentId);
+    if (
+      change === undefined ||
+      change.identity !== planned.identity ||
+      change.kind !== planned.kind ||
+      change.changeId !== planned.changeId
+    ) {
+      return 'changed';
+    }
+    return { status: 'ok', fresh };
+  };
+
+  /**
+   * W4-ONE-TOUCH (04 §2.8 steps 7 and 8): writes the AI app entry last, after the owner session is
+   * closed and its secrets wiped. `connected` only when the file was written; otherwise the stored
+   * `app.connect` is recorded as not applied (its nonce stays used)
+   * and the agent stays as it is. Undefined when no app was picked.
+   */
+  const writeEntry = async (
+    planned: PlannedApp | undefined,
+    plan: CreateConnectPlan | undefined,
+    stored: 'stored' | 'not_stored' | undefined,
+    actions: FirstPolicyActions | undefined,
+  ): Promise<'connected' | 'not_connected' | undefined> => {
+    if (planned === undefined || plan === undefined) return undefined;
+    const nonce = plan.connect?.['nonce'];
+    if (stored !== 'stored' || typeof nonce !== 'string') return 'not_connected';
+    let written = false;
+    try {
+      const again = await recheckApp(planned, plan.agentId);
+      if (typeof again === 'object' && again.fresh.status === 'change') {
+        written = (await again.fresh.commit(plan.agentId)) === 'written';
+      }
+    } catch {
+      written = false;
+    }
+    if (written) return 'connected';
+    // 04 §2.8 "Failure in the middle": never inferred as a connection later.
+    await actions?.markAppNotApplied?.(planned.app, nonce).catch(() => false);
+    return 'not_connected';
+  };
+
+  /**
+   * W4-ONE-TOUCH: the agent's first parts as the plan fixed them: the label, the policy and the
+   * app.connect bodies of the plan and the plan itself (the restricted session). Undefined when the
+   * agent's core cannot sign a first label here.
+   */
+  const plannedFirst = (
+    first: FirstAgentCard,
+    plan: CreateConnectPlan,
+  ): FirstAgentCard | undefined => {
+    const firstPolicy = first.firstPolicy;
+    const actions = labelActionsOf(firstPolicy?.actions);
+    if (firstPolicy === undefined || actions === undefined || first.agent !== plan.agentId) {
+      return undefined;
+    }
+    const policyActions = firstPolicy.actions;
+    return Object.freeze<FirstAgentCard>({
+      ...first,
+      firstLabel: { label: plan.label, actions, body: plan.labelBody },
+      firstPolicy: {
+        ...firstPolicy,
+        ...(plan.policy === undefined ? {} : { body: plan.policy }),
+      },
+      ...(plan.connect === undefined
+        ? {}
+        : {
+            firstConnect: {
+              body: plan.connect,
+              apply: (input: object) => policyActions.apply(input),
+            },
+          }),
+      plan: plan.entries,
+    });
+  };
+
+  /** W4-ONE-TOUCH: setup's input: begin `{label, app?}` (or none), finish exactly `{nonce}`. */
+  function setupInput(
+    req: IncomingMessage,
+    step: LocalUiSetupStep,
+  ):
+    | { readonly label?: string; readonly app?: string; readonly nonce?: string }
+    | 'invalid'
+    | 'label_invalid' {
+    const input = operationInput(req);
+    if (input === undefined) return step === 'begin' ? {} : 'invalid';
+    if (
+      input === 'invalid' ||
+      typeof input !== 'object' ||
+      input === null ||
+      Array.isArray(input)
+    ) {
+      return 'invalid';
+    }
+    const keys = Object.keys(input);
+    const value = input as Record<string, unknown>;
+    if (step === 'finish') {
+      // 04 §2.8: finish takes only the begin nonce (and the creation response as the body).
+      if (keys.length !== 1 || keys[0] !== 'nonce') return 'invalid';
+      const nonce = value['nonce'];
+      return typeof nonce === 'string' && PLAN_NONCE.test(nonce) ? { nonce } : 'invalid';
+    }
+    if (!keys.includes('label') || !keys.every((k) => k === 'label' || k === 'app')) {
+      return 'invalid';
+    }
+    const app = value['app'];
+    if (app !== undefined && (typeof app !== 'string' || !AI_APP_IDS.includes(app))) {
+      return 'invalid';
+    }
+    const label = value['label'];
+    if (!isAgentLabelText(label)) return 'label_invalid';
+    return { label, ...(typeof app === 'string' ? { app } : {}) };
+  }
+
+  /** W4-ONE-TOUCH: true when `text` is exactly the held nonce (constant time on the bytes). */
+  const sameNonce = (text: string | undefined, nonce: Uint8Array): boolean => {
+    if (text === undefined || !PLAN_NONCE.test(text)) return false;
+    try {
+      return equalBytes(decodeBase64url(text), nonce);
+    } catch {
+      return false;
+    }
+  };
+
+  /**
    * M1-11s-c: the setup gate for the two `presence: 'setup'` routes (never ownerGate). The caller
    * checked the session, CSRF, Origin, fetch metadata and the octet-stream type.
    */
@@ -2928,15 +3141,13 @@ export async function startApprovalServerWith(
       finishSetup(res, 503, 'unavailable');
       return;
     }
-    // U3-d (08 §1 first run v3): `begin` and `finish` may carry `{label}` as the operation input.
-    const given = setupLabel(req);
+    // U3-d, W4-ONE-TOUCH (08 §1): begin may carry `{label, app?}`; finish carries only `{nonce}`.
+    const given = setupInput(req, step);
     if (given === 'invalid' || given === 'label_invalid') {
       req.resume();
       finishSetup(res, 400, given);
       return;
     }
-    // U3-g-b: the first agent always gets a label (b11 §28 prefills it; a page without one gets it).
-    const label = given ?? (target.kind === 'first' ? FIRST_AGENT_LABEL : undefined);
     const body = await boundedBody(req, res, MAX_SETUP_REGISTRATION_BYTES);
     if (body === undefined) return;
     try {
@@ -2944,33 +3155,14 @@ export async function startApprovalServerWith(
         agentChanged(res);
         return;
       }
-      if (step === 'begin') await setupBegin(res, body, cookie, target, label);
-      else await setupFinish(req, res, body, cookie, target, label);
+      if (step === 'begin') {
+        // U3-g-b: the first agent always gets a label (b11 §28 prefills it; a page without one gets it).
+        const label = given.label ?? (target.kind === 'first' ? FIRST_AGENT_LABEL : undefined);
+        await setupBegin(res, body, cookie, target, label, given.app);
+      } else await setupFinish(req, res, body, cookie, target, given.nonce);
     } finally {
       wipe(body);
     }
-  }
-
-  /**
-   * U3-d: the setup steps' label: absent (no input), exactly `{"label": <text>}` under the 06 §6
-   * label rule, or a fixed refusal (`invalid` for any other input, `label_invalid` for a label core
-   * would not sign). The label is never logged or echoed.
-   */
-  function setupLabel(req: IncomingMessage): string | undefined | 'invalid' | 'label_invalid' {
-    const input = operationInput(req);
-    if (input === undefined) return undefined;
-    if (
-      input === 'invalid' ||
-      typeof input !== 'object' ||
-      input === null ||
-      Array.isArray(input)
-    ) {
-      return 'invalid';
-    }
-    const keys = Object.keys(input);
-    if (keys.length !== 1 || keys[0] !== 'label') return 'invalid';
-    const label = (input as { label?: unknown }).label;
-    return isAgentLabelText(label) ? label : 'label_invalid';
   }
 
   async function setupBegin(
@@ -2979,18 +3171,26 @@ export async function startApprovalServerWith(
     cookie: string,
     target: SetupTarget,
     label: string | undefined,
+    app: string | undefined,
   ): Promise<void> {
     if (body.length !== 0) {
       finishSetup(res, 400, 'invalid');
       return;
     }
     sweepSetup();
-    // Fail closed: one setup at a time, from any session, and never during an owner operation.
-    if (pendingSetup !== undefined || busy) {
+    // W4-ONE-TOUCH (04 §2.8, Decision 45): a new begin from the same page session (a dismissed
+    // platform prompt) replaces the held plan; any other session is refused while one is held.
+    // Never during an owner operation.
+    const before = pendingSetup;
+    if (busy || (before !== undefined && !matches(cookie, before.session))) {
       finishSetup(res, 409, 'busy');
       return;
     }
+    if (before !== undefined) dropSetup(before);
     busy = true;
+    let made: { readonly seed: Uint8Array; readonly keys: OwnerPublicKeys } | undefined;
+    let agentSeed: HeldAgentSeed | undefined;
+    let kept = false;
     try {
       // M1-UX-FIRSTRUN-V2-b (L-1): a dropped setup's folders are gone before new ones are prepared.
       await folderRemoval;
@@ -3025,10 +3225,76 @@ export async function startApprovalServerWith(
           return;
         }
       }
-      const { seed, keys } = (internals.newOwnerSeed ?? newOwnerSeed)();
-      const challenge = randomBytes(32);
+      made = (internals.newOwnerSeed ?? newOwnerSeed)();
+      const { keys } = made;
+      // W4-ONE-TOUCH (04 §2.3.1, §2.8): with no agent yet, the first agent's seed is made now, held
+      // beside the owner seed, so its agentId is known before the gesture. For an agent that exists
+      // (setup of the open agent), its own agentId, when a first label can be signed for it.
+      let agentId: string | undefined;
+      let folder: string | undefined;
+      if (target.kind === 'first') {
+        agentSeed = HeldAgentSeed.create();
+        agentId = agentSeed.agentId;
+        folder = FIRST_AGENT_NAME;
+      } else if (
+        label !== undefined &&
+        labelActionsOf(target.setup.firstCard.firstPolicy?.actions) !== undefined
+      ) {
+        agentId = target.setup.firstCard.agent;
+        folder = host?.current ?? target.setup.firstCard.name;
+      }
+      let planned: PlannedApp | undefined;
+      let shown: PlanStatementApp | undefined;
+      if (app !== undefined) {
+        const desk = target.kind === 'first' ? target.firstRun.aiApps : agentUi?.aiApps;
+        const found =
+          desk === undefined || agentId === undefined || folder === undefined
+            ? ('app_unavailable' as const)
+            : await planApp(desk, app, folder, agentId);
+        if (typeof found === 'string') {
+          await removeFolders(folders);
+          finishSetup(res, 409, found);
+          return;
+        }
+        ({ planned, shown } = found);
+      }
+      const fingerprint = ownerFingerprintText(keys);
+      const nonce = randomBytes(CREATE_CONNECT_NONCE_BYTES);
+      let plan: CreateConnectPlan | undefined;
+      let statement: PlanStatement | undefined;
+      let challenge: Uint8Array;
+      if (agentId !== undefined && folder !== undefined && label !== undefined) {
+        const send =
+          folders?.send.status === 'ready' && firstPolicy !== undefined
+            ? folders.send.folder
+            : undefined;
+        plan = buildCreateConnectPlan({
+          agentId,
+          owner: keys,
+          label,
+          folder,
+          // IR-W4-ONE-TOUCH L-1: the card keys held since begin (first run with no agent yet).
+          ...(agentSeed === undefined
+            ? {}
+            : { agentKeys: { agentNostr: agentSeed.agentNostr, agentEnc: agentSeed.agentEnc } }),
+          ...(send === undefined ? {} : { sendFolder: send }),
+          ...(planned === undefined
+            ? {}
+            : { app: { app: planned.app, changeId: planned.changeId } }),
+          nowSeconds: Math.floor(now() / 1000),
+        });
+        statement = {
+          label,
+          agentFingerprint: agentFingerprintOf(agentId),
+          ownerFingerprint: fingerprint,
+          folder,
+          ...(shown === undefined ? {} : { app: shown }),
+        };
+        // 04 §2.8: the WebAuthn create() carries the plan-bound challenge.
+        challenge = createConnectChallenge(nonce, statement, plan);
+      } else challenge = randomBytes(32);
       const held: PendingSetup = {
-        seed,
+        seed: made.seed,
         keys,
         challenge,
         session: (sessions[sessionAt] as Uint8Array).slice(),
@@ -3037,12 +3303,20 @@ export async function startApprovalServerWith(
         ...(folders === undefined ? {} : { folders }),
         ...(label === undefined ? {} : { label }),
         ...(target.kind === 'first' ? { noAgent: true as const } : {}),
+        nonce,
+        ...(agentSeed === undefined ? {} : { agentSeed }),
+        ...(plan === undefined ? {} : { plan }),
+        ...(planned === undefined ? {} : { app: planned }),
+        tries: 0,
       };
       held.timer.unref();
       pendingSetup = held;
+      kept = true;
       finishSetup(res, 200, 'ready', {
         expiresInMs: SETUP_HOLD_MS,
-        fingerprint: ownerFingerprintText(keys),
+        fingerprint,
+        nonce: encodeBase64url(nonce),
+        ...(statement === undefined ? {} : { statement: statement as unknown as JsonValue }),
         publicKey: {
           rpId: PASSKEY_RP_ID,
           rpName: 'AgentLink',
@@ -3054,6 +3328,10 @@ export async function startApprovalServerWith(
       });
     } finally {
       busy = false;
+      if (!kept) {
+        if (made !== undefined) wipe(made.seed);
+        agentSeed?.wipe();
+      }
     }
   }
 
@@ -3063,15 +3341,16 @@ export async function startApprovalServerWith(
     body: Uint8Array,
     cookie: string,
     target: SetupTarget,
-    label: string | undefined,
+    nonceText: string | undefined,
   ): Promise<void> {
     const held = pendingSetup;
     // Bound to its session: another session neither finishes nor consumes it. U3-g-b: and to its
-    // kind (begun with no agent yet, or for the open agent).
+    // kind (begun with no agent yet, or for the open agent). W4-ONE-TOUCH: and to its nonce.
     if (
       held === undefined ||
       !matches(cookie, held.session) ||
-      (held.noAgent === true) !== (target.kind === 'first')
+      (held.noAgent === true) !== (target.kind === 'first') ||
+      !sameNonce(nonceText, held.nonce)
     ) {
       finishSetup(res, 409, 'not_pending');
       return;
@@ -3086,11 +3365,41 @@ export async function startApprovalServerWith(
       finishSetup(res, 409, 'busy');
       return;
     }
-    // Single-use: taken before any await; wiped whatever happens below.
+    // W4-ONE-TOUCH (04 §2.8 Finish, Decision 45): a rejected presence proof signs nothing and does
+    // not consume the plan; it counts towards the backoff, and the third ends the plan.
+    let registration: SetupRegistration | undefined;
+    try {
+      registration = parseSetupRegistration(body);
+    } catch {
+      registration = undefined;
+    }
+    let accepted = false;
+    if (registration !== undefined) {
+      try {
+        checkSetupRegistration(registration, { challenge: held.challenge, origin });
+        accepted = true;
+      } catch {
+        accepted = false;
+      }
+    }
+    if (!accepted) {
+      wipe(registration?.prfOutput);
+      presenceFailed();
+      held.tries += 1;
+      if (held.tries >= CREATE_CONNECT_TRIES) {
+        dropSetup(held);
+        await folderRemoval;
+        finishSetup(res, 403, 'tries_exhausted');
+        return;
+      }
+      finishSetup(res, 403, registration === undefined ? 'presence_required' : 'presence_rejected');
+      return;
+    }
+    const proof = registration as SetupRegistration;
+    // Single-use from here: taken before any await; wiped whatever happens below.
     pendingSetup = undefined;
     clearTimeout(held.timer);
     busy = true;
-    let registration: SetupRegistration | undefined;
     // M1-UX-FIRSTRUN-V2: the folders stay only when the first policy is (or may be) in force.
     let keepFolders = false;
     let released = false;
@@ -3121,22 +3430,15 @@ export async function startApprovalServerWith(
       finishSetup(...args);
     };
     try {
-      // U3-d: the label signed is the one `begin` was given and the page still shows.
-      if (label !== held.label) {
-        await answer(res, 400, 'label_invalid');
-        return;
-      }
-      try {
-        registration = parseSetupRegistration(body);
-      } catch {
-        await answer(res, 403, 'presence_required');
-        return;
-      }
-      try {
-        checkSetupRegistration(registration, { challenge: held.challenge, origin });
-      } catch {
-        await answer(res, 403, 'presence_rejected');
-        return;
+      // W4-ONE-TOUCH (04 §2.8 Finish): the AI app change is still the one begin planned (same file,
+      // same old entry, same changeId for this agentId), and Claude Desktop is not running, before
+      // anything is created or signed.
+      if (held.app !== undefined && held.plan !== undefined) {
+        const again = await recheckApp(held.app, held.plan.agentId);
+        if (typeof again === 'string') {
+          await answer(res, 409, again);
+          return;
+        }
       }
       let setup: LocalUiOwnerSetupOption;
       if (target.kind === 'agent') setup = target.setup;
@@ -3154,9 +3456,14 @@ export async function startApprovalServerWith(
           await answer(res, 409, 'owner_exists');
           return;
         }
-        created = await createFirstAgent(held.label ?? FIRST_AGENT_LABEL);
+        // W4-ONE-TOUCH (04 §2.8 step 2): the agent's keys are the ones held since begin.
+        created = await createFirstAgent(held.label ?? FIRST_AGENT_LABEL, held.agentSeed);
         const firstCard = created?.firstCard;
-        if (created === undefined || firstCard === undefined) {
+        if (
+          created === undefined ||
+          firstCard === undefined ||
+          (held.plan !== undefined && firstCard.agent !== held.plan.agentId)
+        ) {
           await answer(res, 500, 'failed', {}, { reason: 'internal' });
           return;
         }
@@ -3178,6 +3485,22 @@ export async function startApprovalServerWith(
         await answer(res, 409, 'owner_exists');
         return;
       }
+      // U3-d-b: the first agent always gets its first label (the typed one, else the prefilled
+      // FIRST_AGENT_LABEL its folder was created with), so its card is never named after the folder
+      // `default`. W4-ONE-TOUCH: with a plan, exactly the plan's bodies (the restricted session).
+      const labelled = withFirstLabel(
+        setup.firstCard,
+        held.label ?? (created === undefined ? undefined : FIRST_AGENT_LABEL),
+      );
+      // IR-W4-ONE-TOUCH (Opus a): with a plan, only the restricted plan session signs; when the agent
+      // cannot take the plan's parts, nothing is signed (fail closed, never a silent fallback).
+      const planned =
+        held.plan === undefined ? undefined : plannedFirst(setup.firstCard, held.plan);
+      if (held.plan !== undefined && planned === undefined) {
+        await answer(res, 500, 'failed', {}, { reason: 'internal' });
+        return;
+      }
+      const firstCard = planned ?? labelled;
       let result: Awaited<ReturnType<typeof completeOwnerSetup>>;
       try {
         result = await completeOwnerSetup(
@@ -3185,16 +3508,10 @@ export async function startApprovalServerWith(
           {
             seed: held.seed,
             keys: held.keys,
-            credentialId: registration.credentialId,
-            prfOutput: registration.prfOutput,
-            authenticatorData: registration.authenticatorData,
-            // U3-d-b: the first agent always gets its first label (the typed one, else the
-            // prefilled FIRST_AGENT_LABEL its folder was created with), so its card is never
-            // named after the folder `default`.
-            firstCard: withFirstLabel(
-              setup.firstCard,
-              held.label ?? (created === undefined ? undefined : FIRST_AGENT_LABEL),
-            ),
+            credentialId: proof.credentialId,
+            prfOutput: proof.prfOutput,
+            authenticatorData: proof.authenticatorData,
+            firstCard,
             ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),
           },
           {
@@ -3216,7 +3533,22 @@ export async function startApprovalServerWith(
       }
       ownerIsOurs = true;
       keepFolders = keepsFolder(result.sendFolder);
+      // W4-ONE-TOUCH (04 §2.8 step 7): the owner session is closed (completeOwnerSetup); the owner
+      // seed and the PRF output are wiped before the AI app's file is written. The generated owner
+      // code stays only for the one answer below (the backup-code step), then it is wiped.
+      wipe(held.seed, proof.prfOutput);
       try {
+        // W4-ONE-TOUCH (step 8): the entry last; on any failure the agent is kept (Decision 45).
+        const connected = result.confirmed
+          ? await writeEntry(
+              held.app,
+              held.plan,
+              result.connect,
+              (created?.firstCard ?? setup.firstCard).firstPolicy?.actions,
+            )
+          : held.app === undefined
+            ? undefined
+            : ('not_connected' as const);
         const fingerprint = ownerFingerprintText(held.keys);
         const sendFolder: SetupSendFolder | undefined = result.sendFolder?.status;
         // U3-d: config.json's label (display only, 07 §9.1) after core applied the signed one.
@@ -3240,10 +3572,17 @@ export async function startApprovalServerWith(
         }
         // The owner code goes to the page once, for the backup-code step; never an event.
         // IR-M1-11s-c-1 M-1: also when the card is unconfirmed, since the owner was kept.
+        // W4-ONE-TOUCH: `created_not_connected` (still with the owner code) when the app picked
+        // was not connected; the page offers Connect.
+        const outcome = !result.confirmed
+          ? 'done_unconfirmed'
+          : connected === 'not_connected'
+            ? 'created_not_connected'
+            : 'done';
         await answer(
           res,
           200,
-          result.confirmed ? 'done' : 'done_unconfirmed',
+          outcome,
           {
             passkey: result.passkey,
             ownerCode: grouped(result.ownerCode),
@@ -3251,6 +3590,7 @@ export async function startApprovalServerWith(
             computerName: computerNameOf(safeHostname()),
             ...(sendFolder === undefined ? {} : { sendFolder }),
             ...(result.label === undefined ? {} : { label: result.label }),
+            ...(held.app === undefined ? {} : { app: held.app.app }),
           },
           { fingerprint, ...(sendFolder === undefined ? {} : { sendFolder }) },
         );
@@ -3259,10 +3599,505 @@ export async function startApprovalServerWith(
       }
     } finally {
       busy = false;
-      wipe(held.seed, held.challenge, held.session, registration?.prfOutput);
+      wipe(held.seed, held.challenge, held.session, held.nonce, proof.prfOutput);
+      held.agentSeed?.wipe();
       await release();
     }
   }
+
+  // --- W4-ONE-TOUCH: New agent with one gesture (D-140; 04 §2.8; 08 §1) ---------------------------
+
+  /** The one held New agent plan, if any (one at a time, from one page session). */
+  let pendingCreate: PendingCreate | undefined;
+
+  const finishCreate = (
+    res: ServerResponse,
+    status: number,
+    outcome: string,
+    extra: Record<string, unknown> = {},
+  ): void => {
+    // Fixed values only: never the seed, the nonce, the challenge, the assertion or the code (I-7).
+    stamp(res);
+    sendJson(res, status, { status: outcome, ...extra });
+  };
+
+  /** Wipes and forgets the held plan (if it is still `which`); its Send folder goes unless used. */
+  const dropCreate = (which: PendingCreate | undefined = pendingCreate): void => {
+    if (which === undefined || which !== pendingCreate) return;
+    pendingCreate = undefined;
+    clearTimeout(which.timer);
+    wipe(which.nonce, which.challenge, which.session);
+    which.seed.wipe();
+    void removeCreated(which.send).catch(() => undefined);
+  };
+
+  /**
+   * Drops a held plan whose session is gone, and (`expired`) one past its 120 s. A finish sweeps by
+   * session only, so its own expired plan still answers `expired`.
+   */
+  const sweepCreate = (expired: boolean): void => {
+    const held = pendingCreate;
+    if (held === undefined) return;
+    if (
+      (expired && now() >= held.expiresAt) ||
+      !sessions.some((s) => equalBytes(s, held.session))
+    ) {
+      dropCreate(held);
+    }
+  };
+
+  /**
+   * W4-ONE-TOUCH: the gate of `POST /api/ui/agents/begin` and `POST /api/ui/agents` (the
+   * create-agent kind, never ownerGate). The caller checked the session, CSRF, Origin, fetch
+   * metadata, the octet-stream type and the generation.
+   */
+  async function createAgentGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    step: LocalUiCreateAgentStep,
+    cookie: string,
+  ): Promise<void> {
+    const wait = waitSeconds();
+    if (wait > 0) {
+      req.resume();
+      res.setHeader('Retry-After', String(wait));
+      finishCreate(res, 429, 'wait', { retryAfter: wait });
+      return;
+    }
+    const input = operationInput(req);
+    const mode = header(req, 'x-agentlink-presence');
+    const passkey = mode === 'passkey';
+    if (input === 'invalid' || (mode !== undefined && !passkey)) {
+      req.resume();
+      finishCreate(res, 400, 'invalid');
+      return;
+    }
+    const body = await boundedBody(
+      req,
+      res,
+      passkey ? MAX_PAY_CONFIRM_ASSERTION_BYTES : MAX_SECRET_BYTES,
+    );
+    if (body === undefined) return;
+    try {
+      sweepCreate(false);
+      const sessionAt = matchIndex(cookie, sessions);
+      if (sessionAt < 0) {
+        finishCreate(res, 409, 'not_pending');
+        return;
+      }
+      const session = sessions[sessionAt] as Uint8Array;
+      if (!stillCurrent(req)) {
+        agentChanged(res);
+        return;
+      }
+      if (host === undefined || host.directory.create === undefined) {
+        sendResult(res, NOT_AVAILABLE);
+        return;
+      }
+      if (step === 'begin') await createBegin(res, input, body, session, passkey);
+      else await createFinish(req, res, input, body, session, passkey);
+    } finally {
+      wipe(body);
+    }
+  }
+
+  async function createBegin(
+    res: ServerResponse,
+    input: JsonValue | undefined,
+    body: Uint8Array,
+    session: Uint8Array,
+    passkey: boolean,
+  ): Promise<void> {
+    if (body.length !== 0 || passkey) {
+      finishCreate(res, 400, 'invalid');
+      return;
+    }
+    const value = typeof input === 'object' && input !== null && !Array.isArray(input) ? input : {};
+    const keys = Object.keys(value);
+    if (
+      input === undefined ||
+      !keys.includes('label') ||
+      !keys.every((k) => k === 'label' || k === 'app')
+    ) {
+      finishCreate(res, 400, 'invalid');
+      return;
+    }
+    const label = (value as Record<string, unknown>)['label'];
+    const app = (value as Record<string, unknown>)['app'];
+    if (app !== undefined && (typeof app !== 'string' || !AI_APP_IDS.includes(app))) {
+      finishCreate(res, 400, 'invalid');
+      return;
+    }
+    if (!isAgentLabelText(label)) {
+      finishCreate(res, 400, 'label_invalid');
+      return;
+    }
+    sweepCreate(true);
+    // Decision 45: a new begin from the same page session replaces the held plan; others wait.
+    const before = pendingCreate;
+    if (busy || (before !== undefined && !equalBytes(before.session, session))) {
+      finishCreate(res, 409, 'busy');
+      return;
+    }
+    if (before !== undefined) dropCreate(before);
+    const slot = host;
+    const directory = slot?.directory;
+    if (slot === undefined || directory?.nameFor === undefined) {
+      sendResult(res, NOT_AVAILABLE);
+      return;
+    }
+    busy = true;
+    let seed: HeldAgentSeed | undefined;
+    let send: SendFolderPlan | undefined;
+    let kept = false;
+    try {
+      const context = await source.context();
+      if (context === undefined) {
+        finishCreate(res, 503, 'needs_setup');
+        return;
+      }
+      // The folder name is reserved for as long as the plan is held (one plan at a time).
+      const folder = await directory.nameFor(label, []);
+      if (!HOST_AGENT_NAME.test(folder) || (await directory.read(folder)) !== undefined) {
+        finishCreate(res, 500, 'failed');
+        return;
+      }
+      seed = HeldAgentSeed.create();
+      let planned: PlannedApp | undefined;
+      let shown: PlanStatementApp | undefined;
+      if (typeof app === 'string') {
+        const desk = agentUi?.aiApps;
+        const found =
+          desk === undefined
+            ? ('app_unavailable' as const)
+            : await planApp(desk, app, folder, seed.agentId);
+        if (typeof found === 'string') {
+          finishCreate(res, 409, found);
+          return;
+        }
+        ({ planned, shown } = found);
+      }
+      // The Send folder for its first policy, checked (or created) now; removed again unless used.
+      send = await prepareSendFolder(boundHome).catch((): SendFolderPlan => ({
+        status: 'unavailable',
+        reason: 'folder_unavailable',
+      }));
+      const plan = buildCreateConnectPlan({
+        agentId: seed.agentId,
+        // IR-W4-ONE-TOUCH L-1: the card keys held since begin.
+        agentKeys: { agentNostr: seed.agentNostr, agentEnc: seed.agentEnc },
+        owner: context.owner,
+        label,
+        folder,
+        ...(send.status === 'ready' ? { sendFolder: send.folder } : {}),
+        ...(planned === undefined ? {} : { app: { app: planned.app, changeId: planned.changeId } }),
+        nowSeconds: Math.floor(now() / 1000),
+      });
+      const statement: PlanStatement = {
+        label,
+        agentFingerprint: agentFingerprintOf(seed.agentId),
+        ownerFingerprint: ownerFingerprintText(context.owner),
+        folder,
+        ...(shown === undefined ? {} : { app: shown }),
+      };
+      const nonce = randomBytes(CREATE_CONNECT_NONCE_BYTES);
+      const challenge = createConnectChallenge(nonce, statement, plan);
+      const held: PendingCreate = {
+        session: session.slice(),
+        nonce,
+        challenge,
+        expiresAt: now() + CREATE_CONNECT_HOLD_MS,
+        timer: setTimeout(() => dropCreate(held), CREATE_CONNECT_HOLD_MS),
+        seed,
+        plan,
+        statement,
+        ...(planned === undefined ? {} : { app: planned }),
+        send,
+        tries: 0,
+      };
+      held.timer.unref();
+      pendingCreate = held;
+      kept = true;
+      // Rule 5 of 04 §2.5.3: the passkey is offered only when its credential key is kept.
+      let credentialId: string | undefined;
+      try {
+        const stored = await readOwnerPasskeyHeader(keychainOf());
+        if (
+          stored !== null &&
+          (await readOwnerPasskeyKey(keychainOf(), stored.credentialId)) !== null
+        ) {
+          credentialId = encodeBase64url(stored.credentialId);
+        }
+      } catch {
+        credentialId = undefined;
+      }
+      finishCreate(res, 200, 'ready', {
+        nonce: encodeBase64url(nonce),
+        statement: statement as unknown as JsonValue,
+        expiresInMs: CREATE_CONNECT_HOLD_MS,
+        publicKey: {
+          rpId: PASSKEY_RP_ID,
+          challenge: encodeBase64url(challenge),
+          allowCredentials: credentialId === undefined ? [] : [credentialId],
+          userVerification: 'required',
+          timeoutMs: CREATE_CONNECT_HOLD_MS,
+          prfSalt: encodeBase64url(ownerPrfSalt()),
+        },
+      });
+    } catch {
+      finishCreate(res, 500, 'failed');
+    } finally {
+      busy = false;
+      if (!kept) {
+        seed?.wipe();
+        if (send !== undefined) await removeCreated(send).catch(() => undefined);
+      }
+    }
+  }
+
+  async function createFinish(
+    req: IncomingMessage,
+    res: ServerResponse,
+    input: JsonValue | undefined,
+    body: Uint8Array,
+    session: Uint8Array,
+    passkey: boolean,
+  ): Promise<void> {
+    // 04 §2.8: finish takes only the begin nonce and the presence proof.
+    if (!onlyKeys(input, ['nonce']) || typeof input['nonce'] !== 'string') {
+      finishCreate(res, 400, 'invalid');
+      return;
+    }
+    const nonceText = input['nonce'];
+    if (body.length === 0) {
+      finishCreate(res, 403, 'presence_required');
+      return;
+    }
+    if (busy) {
+      finishCreate(res, 409, 'busy');
+      return;
+    }
+    const held = pendingCreate;
+    if (
+      held === undefined ||
+      !equalBytes(held.session, session) ||
+      !sameNonce(nonceText, held.nonce)
+    ) {
+      finishCreate(res, 409, 'not_pending');
+      return;
+    }
+    if (now() >= held.expiresAt) {
+      dropCreate(held);
+      finishCreate(res, 409, 'expired');
+      return;
+    }
+    busy = true;
+    let assertion: PayConfirmAssertion | undefined;
+    let taken = false;
+    let sendUsed = false;
+    /** A rejected proof: counted (backoff and the plan's tries); the third ends the plan. */
+    const rejected = (status: 'presence_rejected' | 'presence_required'): void => {
+      presenceFailed();
+      held.tries += 1;
+      if (held.tries >= CREATE_CONNECT_TRIES) {
+        dropCreate(held);
+        finishCreate(res, 403, 'tries_exhausted');
+      } else finishCreate(res, 403, status);
+    };
+    try {
+      const context = await source.context();
+      if (context === undefined) {
+        finishCreate(res, 503, 'needs_setup');
+        return;
+      }
+      let presence: OwnerPresence;
+      if (passkey) {
+        assertion = parsePayConfirmAssertion(body);
+        if (assertion === undefined) {
+          rejected('presence_required');
+          return;
+        }
+        let check: ReturnType<typeof checkPayConfirmAssertion> = 'presence_rejected';
+        try {
+          const stored = await readOwnerPasskeyHeader(keychainOf());
+          if (stored !== null) {
+            check = checkPayConfirmAssertion(assertion, {
+              challenge: held.challenge,
+              origin,
+              passkey: stored,
+              publicKey: await readOwnerPasskeyKey(keychainOf(), stored.credentialId),
+              owner: context.owner,
+            });
+          }
+        } catch {
+          check = 'presence_rejected';
+        }
+        if (check === 'verification_required') {
+          finishCreate(res, 403, 'verification_required');
+          return;
+        }
+        if (check === 'key_missing') {
+          finishCreate(res, 409, 'passkey_update_needed');
+          return;
+        }
+        if (check !== 'ok') {
+          rejected('presence_rejected');
+          return;
+        }
+        presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
+      } else {
+        presence = { kind: 'passphrase', secret: body };
+      }
+      let store: PromptingOwnerKeyStore;
+      try {
+        store = await openOwnerStore(context.owner);
+      } catch {
+        finishCreate(res, 503, 'needs_setup');
+        return;
+      }
+      let created: AppHostAgent | undefined;
+      let outcome: Awaited<ReturnType<typeof signNewAgent>> = { status: 'failed' };
+      let refusal: { readonly status: number; readonly outcome: string } | undefined;
+      try {
+        let ownerSession: OwnerSession;
+        try {
+          // unlock wipes the presented bytes, whether or not they unlock.
+          ownerSession = await store.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
+        } catch (error) {
+          if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+            rejected('presence_rejected');
+          } else finishCreate(res, 500, 'failed');
+          return;
+        }
+        presenceSucceeded();
+        // Single use from here: the plan is taken before the owner key signs anything.
+        pendingCreate = undefined;
+        clearTimeout(held.timer);
+        taken = true;
+        try {
+          const plan = held.plan;
+          const now2 = await source.context();
+          if (!stillCurrent(req)) refusal = { status: 409, outcome: 'agent_changed' };
+          else if (
+            now2 === undefined ||
+            !equalBytes(now2.owner.ownerNostr, plan.owner.ownerNostr) ||
+            !equalBytes(now2.owner.ownerEvm, plan.owner.ownerEvm) ||
+            !equalBytes(now2.owner.ownerEnc, plan.owner.ownerEnc)
+          ) {
+            refusal = { status: 409, outcome: 'refused' };
+          } else if ((await host?.directory.read(plan.folder)) !== undefined) {
+            refusal = { status: 409, outcome: 'name_taken' };
+          } else if (held.app !== undefined) {
+            const again = await recheckApp(held.app, plan.agentId);
+            if (typeof again === 'string') refusal = { status: 409, outcome: again };
+          }
+          if (refusal === undefined) {
+            // (2) The keys held since begin and the reserved folder, then the first parts.
+            created = await createHeldAgent(held);
+            const first =
+              created?.firstCard === undefined ? undefined : plannedFirst(created.firstCard, plan);
+            if (created === undefined || first === undefined) {
+              refusal = { status: 500, outcome: 'failed' };
+            } else {
+              if (!stillCurrent(req)) throw new AgentChanged();
+              outcome = await signNewAgent(ownerSession, plan.owner, first, held.send);
+            }
+          }
+        } finally {
+          // (7) No owner key in memory during the file write.
+          await ownerSession.close().catch(() => undefined);
+        }
+      } finally {
+        await store.lock().catch(() => undefined);
+        await store.close().catch(() => undefined);
+      }
+      if (refusal !== undefined || outcome.status !== 'done' || created === undefined) {
+        // All or nothing (04 §2.8 "From the local app"): exactly what this request made goes.
+        if (created !== undefined) {
+          await created.close().catch(() => undefined);
+          await host?.directory.discardNew?.(created.name).catch(() => undefined);
+        }
+        finishCreate(res, refusal?.status ?? 409, refusal?.outcome ?? 'not_applied');
+        return;
+      }
+      sendUsed = keepsFolder(outcome.sendFolder);
+      const plan = held.plan;
+      let connected: 'connected' | 'not_connected' | undefined;
+      try {
+        // Display only (07 §9.1): the verified label is in the new agent's store.
+        await host?.directory.writeLabel(created.name, plan.label).catch(() => undefined);
+        // (8) The entry last; on failure the agent is kept and Connect is offered (Decision 45).
+        connected = await writeEntry(
+          held.app,
+          plan,
+          outcome.connect,
+          created.firstCard?.firstPolicy?.actions,
+        );
+      } finally {
+        await created.close().catch(() => undefined);
+      }
+      emit({ kind: 'owner_operation', outcome: 'done' });
+      finishCreate(res, 200, connected === 'not_connected' ? 'created_not_connected' : 'done', {
+        name: created.name,
+        label: plan.label,
+        ...(held.app === undefined ? {} : { app: held.app.app }),
+      });
+    } catch (error) {
+      if (error instanceof AgentChanged) finishCreate(res, 409, 'agent_changed');
+      else finishCreate(res, 500, 'failed');
+    } finally {
+      busy = false;
+      if (taken) {
+        wipe(held.nonce, held.challenge, held.session);
+        held.seed.wipe();
+        if (!sendUsed) await removeCreated(held.send).catch(() => undefined);
+      }
+      if (assertion !== undefined) {
+        wipe(
+          assertion.prfOutput,
+          assertion.clientDataJSON,
+          assertion.signature,
+          assertion.authenticatorData,
+        );
+      }
+    }
+  }
+
+  /**
+   * W4-ONE-TOUCH (04 §2.8 step 2): stores the held keys as a keychain agent in the reserved folder
+   * (exclusively, the directory's rules) and opens it for its first parts. Undefined, with nothing
+   * left behind, when it cannot be created or opened, or is not the planned agent.
+   */
+  const createHeldAgent = async (held: PendingCreate): Promise<AppHostAgent | undefined> => {
+    const slot = host;
+    const directory = slot?.directory;
+    if (slot === undefined || directory?.create === undefined) return undefined;
+    let name: string;
+    try {
+      name = await directory.create(held.plan.label, {
+        name: held.plan.folder,
+        createKeys: () => held.seed.store(keychainOf()),
+      });
+    } catch {
+      return undefined;
+    }
+    if (name !== held.plan.folder) {
+      await directory.discardNew?.(name).catch(() => undefined);
+      return undefined;
+    }
+    const opened = await slot.openNew(name);
+    if (
+      opened === undefined ||
+      opened.name !== name ||
+      opened.firstCard === undefined ||
+      opened.firstCard.agent !== held.plan.agentId
+    ) {
+      await opened?.close().catch(() => undefined);
+      await directory.discardNew?.(name).catch(() => undefined);
+      return undefined;
+    }
+    return opened;
+  };
 
   /**
    * MSG-FILES-IO-h (D-134): the gate of the one reveal route (Show in Finder). The caller checked the
@@ -3624,6 +4459,11 @@ export async function startApprovalServerWith(
       await payConfirmGate(req, res, route.step, cookie);
       return;
     }
+    if (route.presence === 'create-agent') {
+      // W4-ONE-TOUCH (D-140, 04 §2.8): New agent with one gesture has its own gate.
+      await createAgentGate(req, res, route.step, cookie);
+      return;
+    }
     const input = operationInput(req);
     if (input === 'invalid') {
       req.resume();
@@ -3882,6 +4722,9 @@ export async function startApprovalServerWith(
     decided.clear();
     dropSetup();
     payHolds.clear();
+    // W4-ONE-TOUCH: a held New agent plan names the old agent's owner and Send folder home.
+    dropCreate();
+    boundHome = agent?.firstCard?.firstPolicy?.home;
   }
 
   /** Every answer of the app host carries the generation and the open agent's label (08 §1). */
@@ -4328,6 +5171,7 @@ export async function startApprovalServerWith(
     close: async () => {
       dropSetup();
       payHolds.clear();
+      dropCreate();
       await folderRemoval;
       // U3-invite: the handoff record goes first, so no `join` hands over to a closing host.
       if (handoffWritten) await options.host?.handoff?.remove().catch(() => undefined);

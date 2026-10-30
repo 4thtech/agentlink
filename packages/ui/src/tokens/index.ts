@@ -26,3 +26,14 @@ export function contrastRatio(foreground: string, background: string): number {
   const b = luminance(background);
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
+
+import { scalarTokens } from './data.js';
+
+/** The motion tokens alone (durations and easings), for logic that needs the values (W4-MOTION-KIT). */
+export const motionTokens = Object.fromEntries(
+  Object.entries(scalarTokens).filter(([name]) => /^al-(duration|easing)-/.test(name)),
+) as {
+  readonly [
+    K in Extract<ScalarTokenName, `al-duration-${string}` | `al-easing-${string}`>
+  ]: (typeof scalarTokens)[K];
+};

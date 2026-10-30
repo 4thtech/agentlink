@@ -63,6 +63,9 @@ export {
   type AcceptInviteResult,
   // U3-invite: Accept step 1 alone, for `agentlink join` and the app host's waiting invite.
   checkInviteLink,
+  // W4-SHORT-INVITE / W4-INVITES-LIST (D-139): the drop fetcher of a short link, and an open invite.
+  shortInviteFetcher,
+  type OpenInvite,
   type CheckedInviteLink,
   type CreateInviteInput,
   type CreatedInvite,
@@ -82,8 +85,16 @@ export {
   INVITE_LINK_PREFIX,
   INVITE_MAX_JSON_BYTES,
   INVITE_MAX_PAYLOAD_CHARS,
+  SHORT_INVITE_LINK_CHARS,
+  clearShortInviteCache,
   decodeInviteLink,
   encodeInviteLink,
+  encodeInvitePayload,
+  encodeShortInviteLink,
+  resolveInviteLink,
+  shortInviteSecretOf,
+  type DecodeInviteOptions,
+  type ShortInviteFetch,
 } from './invite-link.js';
 // UX2-d1: the accept-invite approval action and the share text, one for every surface.
 export {

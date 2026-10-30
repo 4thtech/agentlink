@@ -18,8 +18,7 @@
 // any presence check and never runs its handler.
 import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
 import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
-import type { LocalUiContext, LocalUiNewAgent } from './context.js';
-import type { NewAgentOutcome } from '../owner-add-agent.js';
+import type { LocalUiContext } from './context.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
 /**
@@ -71,15 +70,6 @@ export interface LocalUiOwnerOperation {
    * decrypts. Undefined on every other route, before `sign`, and once the gesture has ended.
    */
   carrierKeys?(): EnvelopeKeys | undefined;
-  /**
-   * U3-d (04 §2.8 "From the local app", D-138): the one owner operation of "Add an agent", instead of
-   * `sign` (one or the other, once). With the presence this request carried it signs exactly the new
-   * agent's first card (the restricted one-card session), its first policy (when its Send folder is
-   * ready) and its first `agent.label`, each for that agent only (owner-add-agent.ts signNewAgent);
-   * the handler never sees the owner session. `failed` means the caller must settle the agent as not
-   * kept. Absent outside the app host.
-   */
-  addAgent?(review: OwnerReview, agent: LocalUiNewAgent): Promise<NewAgentOutcome>;
 }
 
 export interface LocalUiReadRoute {
@@ -147,6 +137,29 @@ export interface LocalUiPayConfirmRoute {
   readonly step: LocalUiPayConfirmStep;
 }
 
+/** W4-ONE-TOUCH: the two steps of "New agent" with one gesture (04 §2.8, D-140). */
+export type LocalUiCreateAgentStep = 'begin' | 'finish';
+
+/** W4-ONE-TOUCH (08 §1): the two fixed paths of New agent with one gesture. */
+export const CREATE_AGENT_PATHS: Readonly<Record<LocalUiCreateAgentStep, string>> = Object.freeze({
+  begin: '/api/ui/agents/begin',
+  finish: '/api/ui/agents',
+});
+
+/**
+ * W4-ONE-TOUCH (D-140; 08 §1 `POST /api/ui/agents/begin` and `POST /api/ui/agents`): creating an
+ * agent (and connecting its AI app) with one gesture. Like a pay-confirm route it has no page
+ * handler: the approval server's own createAgentGate runs the step, so no page file ever touches the
+ * held seed, the challenge, the assertion, the backup code or the owner key. Only POST, only these
+ * two paths, one route per step (routes.ts).
+ */
+export interface LocalUiCreateAgentRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'create-agent';
+  readonly step: LocalUiCreateAgentStep;
+}
+
 /**
  * MSG-FILES-IO-h: the checked reveal a reveal handler may call (local-ui/reveal-file.ts, built by the
  * server): the Inbox folder from the rules in force and the saved name from the store. It resolves,
@@ -178,7 +191,7 @@ export interface LocalUiRevealRoute {
 }
 
 /** UX2-d1: the steps of the invite kind (U3-invite adds `dismiss`, "Not now" on the join screen). */
-export type LocalUiInviteStep = 'create' | 'check' | 'dismiss';
+export type LocalUiInviteStep = 'create' | 'check' | 'dismiss' | 'cancel';
 
 /** UX2-d1: a pasted invite after core's accept step 1 (04 §3.6): who it is and its expiry. */
 export interface LocalUiCheckedInvite {
@@ -194,8 +207,11 @@ export interface LocalUiCheckedInvite {
  * Neither signs, pairs or reaches the owner store. The link holds the invite secret: never log it.
  */
 export interface LocalUiInviteDesk {
-  create(input: { readonly label?: string }): Promise<CreatedInvite>;
+  /** W4-SHORT-INVITE: `long` (Advanced, D-139 (7)) asks for the format 1 link. */
+  create(input: { readonly label?: string; readonly long?: true }): Promise<CreatedInvite>;
   check(link: string): Promise<LocalUiCheckedInvite>;
+  /** W4-INVITES-LIST: core `cancelInvite` (04 §3.6.2: an owner action on the local page). */
+  cancel(inviteId: string): Promise<'cancelled' | 'not_found'>;
 }
 
 /**
@@ -280,6 +296,7 @@ export type LocalUiRoute =
   | LocalUiOwnerRoute
   | LocalUiSetupRoute
   | LocalUiPayConfirmRoute
+  | LocalUiCreateAgentRoute
   | LocalUiRevealRoute
   | LocalUiInviteRoute;
 

@@ -20,6 +20,14 @@ export type SetupProblem =
   | 'folder_unavailable'
   /** U3-d: the agent's name is not one core would sign (06 §2.1); nothing began. */
   | 'label_invalid'
+  /** W4-ONE-TOUCH: Claude Desktop runs; quit it first (11 §5.8). Nothing began. */
+  | 'quit_first'
+  /** W4-ONE-TOUCH: the picked app can't be connected from here; nothing began. */
+  | 'app_unavailable'
+  /** W4-ONE-TOUCH: the app's settings file changed since begin; nothing was saved. */
+  | 'changed'
+  /** W4-ONE-TOUCH: the third wrong answer ended this attempt; nothing was saved. */
+  | 'tries_exhausted'
   /** 409 `no_agent`: the app has no agent yet; setup comes first. */
   | 'no_agent'
   | 'expired'
@@ -70,7 +78,18 @@ export const UNNAMED_COMPUTER = 'this computer';
 export type StatusResult = { readonly kind: 'ok'; readonly owner: SetupState } | SetupError;
 
 export type BeginResult =
-  | { readonly kind: 'ready'; readonly publicKey: CreationValues }
+  | {
+      readonly kind: 'ready';
+      readonly publicKey: CreationValues;
+      /** W4-ONE-TOUCH (04 §2.8): the begin nonce; finish carries only this. */
+      readonly nonce: string;
+      /** W4-ONE-TOUCH: the app the statement names (shown from begin's answer only). */
+      readonly app?: {
+        readonly id: string;
+        readonly name: string;
+        readonly kind: 'connect' | 'move';
+      };
+    }
   | { readonly kind: 'owner_exists' }
   | SetupError;
 
@@ -79,6 +98,10 @@ export type FinishResult =
       readonly kind: 'done';
       /** False for `done_unconfirmed`: the owner was kept, one step couldn't be confirmed. */
       readonly confirmed: boolean;
+      /** W4-ONE-TOUCH: the AI app picked on the same screen (its id), when one was. */
+      readonly app?: string;
+      /** W4-ONE-TOUCH: with `app`, whether its entry was written (`created_not_connected`: no). */
+      readonly connected?: boolean;
       /** False when the authenticator gave no PRF output: the owner code is the way to approve. */
       readonly passkey: boolean;
       /** The backup owner code, grouped; shown on this page only, never stored or logged. */
@@ -115,6 +138,31 @@ const REASONS: ReadonlySet<string> = new Set<SetupProblem>([
   'internal',
 ]);
 const BASE64URL = /^[A-Za-z0-9_-]{1,2048}$/;
+/** W4-ONE-TOUCH: the begin nonce (32 bytes, base64url). */
+const NONCE = /^[A-Za-z0-9_-]{43}$/;
+/** An AI app id of the fixed harness table (06 §7). */
+const APP_ID = /^[a-z][a-z-]{1,31}$/;
+const APP_NAME = /^[A-Za-z][A-Za-z0-9 ]{0,31}$/;
+
+/** W4-ONE-TOUCH: the app the begin statement names, as fixed fields only. */
+function appOf(statement: unknown): {
+  readonly app?: { readonly id: string; readonly name: string; readonly kind: 'connect' | 'move' };
+} {
+  if (typeof statement !== 'object' || statement === null) return {};
+  const app = (statement as { app?: unknown }).app;
+  if (typeof app !== 'object' || app === null) return {};
+  const { app: id, name, kind } = app as { app?: unknown; name?: unknown; kind?: unknown };
+  if (
+    typeof id !== 'string' ||
+    !APP_ID.test(id) ||
+    typeof name !== 'string' ||
+    !APP_NAME.test(name) ||
+    (kind !== 'connect' && kind !== 'move')
+  ) {
+    return {};
+  }
+  return { app: { id, name, kind } };
+}
 /** The grouped owner code: 24 characters in groups of four (04 §2.8 kind 1). */
 const OWNER_CODE = /^[A-Z0-9]{4}( [A-Z0-9]{4}){1,15}$/;
 /** The short owner fingerprint (11 §5.2), for example `7F3A·19C2`. */
@@ -137,9 +185,13 @@ export type LabelCheckResult = { readonly kind: 'ok' } | { readonly kind: 'refus
 
 export interface SetupApi {
   status(): Promise<StatusResult>;
-  /** U3-g: the agent's name travels as the operation input `{label}` (U3-d; absent: no name). */
-  begin(label?: string): Promise<BeginResult>;
-  finish(body: Uint8Array, label?: string): Promise<FinishResult>;
+  /**
+   * U3-g: the agent's name travels as the operation input `{label}` (U3-d; absent: no name).
+   * W4-ONE-TOUCH (D-140): with the app picked on the same screen, `{label, app}`.
+   */
+  begin(label?: string, app?: string): Promise<BeginResult>;
+  /** W4-ONE-TOUCH (04 §2.8): only the begin nonce and the creation response. */
+  finish(body: Uint8Array, nonce: string): Promise<FinishResult>;
   /** U3-g: asked before Touch ID, so the gesture is only asked for a name that can be signed. */
   labelCheck(label: string): Promise<LabelCheckResult>;
 }
@@ -302,36 +354,40 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
       return { kind: 'error', problem: 'unknown' };
     },
 
-    async begin(label) {
-      const answer = await call(
-        'POST',
-        BEGIN_PATH,
-        undefined,
-        label === undefined ? undefined : { label },
-      );
+    async begin(label, app) {
+      const input =
+        label === undefined ? undefined : app === undefined ? { label } : { label, app };
+      const answer = await call('POST', BEGIN_PATH, undefined, input);
       if (answer === 'offline') return { kind: 'error', problem: 'offline' };
       const status = str(answer.json?.['status']);
       if (status === 'owner_exists') return { kind: 'owner_exists' };
       if (answer.status === 200 && status === 'ready') {
         const publicKey = creationValues(answer.json?.['publicKey']);
-        return publicKey === undefined
+        const nonce = str(answer.json?.['nonce']);
+        return publicKey === undefined || nonce === undefined || !NONCE.test(nonce)
           ? { kind: 'error', problem: 'unknown' }
-          : { kind: 'ready', publicKey };
+          : { kind: 'ready', publicKey, nonce, ...appOf(answer.json?.['statement']) };
+      }
+      // W4-ONE-TOUCH: the picked app can't be written now (11 §5.8 "Quit Claude Desktop first").
+      if (status === 'quit_first' || status === 'app_unavailable') {
+        return { kind: 'error', problem: status };
       }
       return problemOf(answer);
     },
 
-    async finish(body, label) {
-      const answer = await call(
-        'POST',
-        FINISH_PATH,
-        body,
-        label === undefined ? undefined : { label },
-      );
+    async finish(body, nonce) {
+      // W4-ONE-TOUCH (04 §2.8): finish carries only the begin nonce and the creation response.
+      const answer = await call('POST', FINISH_PATH, body, { nonce });
       if (answer === 'offline') return { kind: 'error', problem: 'offline' };
       const status = str(answer.json?.['status']);
       if (status === 'owner_exists') return { kind: 'owner_exists' };
-      if (answer.status === 200 && (status === 'done' || status === 'done_unconfirmed')) {
+      if (status === 'tries_exhausted' || status === 'changed' || status === 'quit_first') {
+        return { kind: 'error', problem: status };
+      }
+      if (
+        answer.status === 200 &&
+        (status === 'done' || status === 'done_unconfirmed' || status === 'created_not_connected')
+      ) {
         const ownerCode = str(answer.json?.['ownerCode']);
         const fingerprint = str(answer.json?.['fingerprint']);
         const passkey = answer.json?.['passkey'];
@@ -347,9 +403,12 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
         }
         const send = str(answer.json?.['sendFolder']);
         const name = str(answer.json?.['computerName']);
+        const app = str(answer.json?.['app']);
         return {
           kind: 'done',
-          confirmed: status === 'done',
+          confirmed: status !== 'done_unconfirmed',
+          // W4-ONE-TOUCH: the app picked on the same screen, and whether its entry was written.
+          ...(app === undefined || !APP_ID.test(app) ? {} : { app, connected: status === 'done' }),
           passkey,
           ownerCode,
           fingerprint,

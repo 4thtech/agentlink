@@ -36,8 +36,15 @@ export const CANONICAL_PREFIX = 'https://agentlink.4thtech.io/i#';
  */
 const CANONICAL_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,21846}$/;
 
-/** True for the canonical invite link. */
-export const isCanonicalLink = (link: string): boolean => CANONICAL_LINK.test(link);
+/**
+ * 08 §4 (D-139, 04 §3.6.2): the short link, `https://agentlink.4thtech.io/i#2.` and exactly 43
+ * base64url characters. `.` is not special to any of the shells above.
+ */
+const SHORT_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#2\.[A-Za-z0-9_-]{43}$/;
+
+/** True for the canonical invite link, long (format 1) or short (format 2). */
+export const isCanonicalLink = (link: string): boolean =>
+  CANONICAL_LINK.test(link) || SHORT_LINK.test(link);
 
 function fill(template: string, inviteUrl: string): string {
   if (!isCanonicalLink(inviteUrl)) throw new Error('not a canonical invite link');

@@ -161,7 +161,14 @@ beforeEach(async () => {
 describe('two clients pair (04 §3.6)', () => {
   it('completes on both sides, and both owner surfaces recompute the same code', async () => {
     const invite = await a.client.pairing.createInvite({ label: 'Bob' });
-    expect(Object.keys(invite).sort()).toEqual(['expiresAt', 'inviteUrl', 'ownerFingerprint']);
+    expect(Object.keys(invite).sort()).toEqual([
+      'expiresAt',
+      'format',
+      'inviteUrl',
+      'ownerFingerprint',
+    ]);
+    // W4-SHORT-INVITE: no drop configured here, so the format 1 link.
+    expect(invite.format).toBe('long');
     expect(invite.inviteUrl.startsWith(INVITE_LINK_PREFIX)).toBe(true);
     expect(invite.expiresAt).toBe(clock.t + 7 * 86_400);
     expect(invite.ownerFingerprint.short).toMatch(/^[0-9A-F]{4}·[0-9A-F]{4}$/);

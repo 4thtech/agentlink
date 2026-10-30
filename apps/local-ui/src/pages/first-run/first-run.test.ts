@@ -92,7 +92,8 @@ function fakeApi(
       return Promise.resolve(statusCalls > 1 ? (options.statusAfter ?? first) : first);
     },
     labelCheck: () => Promise.resolve({ kind: 'ok' }),
-    begin: () => Promise.resolve(options.begin ?? { kind: 'ready', publicKey: VALUES }),
+    begin: () =>
+      Promise.resolve(options.begin ?? { kind: 'ready', publicKey: VALUES, nonce: 'N'.repeat(43) }),
     finish: (body) => {
       finished.push(body.slice());
       return Promise.resolve(options.finish ?? done());
@@ -492,7 +493,7 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
       },
     });
     expect(await api.begin()).toEqual({ kind: 'error', problem: 'folder_not_empty' });
-    expect(await api.finish(new Uint8Array(1))).toEqual(done());
+    expect(await api.finish(new Uint8Array(1), 'N'.repeat(43))).toEqual(done());
     answers[BEGIN_PATH] = {
       status: 409,
       body: { status: 'folder_refused', reason: 'folder_unavailable' },
@@ -509,7 +510,7 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
         computerName: '<b>',
       },
     };
-    expect(await api.finish(new Uint8Array(1))).toEqual(
+    expect(await api.finish(new Uint8Array(1), 'N'.repeat(43))).toEqual(
       done({ sendFolder: 'none', computerName: 'this computer' }),
     );
   });
@@ -607,7 +608,13 @@ describe('the setup calls (setup-api.ts)', () => {
     const r = recorder({
       [BEGIN_PATH]: {
         status: 200,
-        body: { status: 'ready', expiresInMs: 120000, fingerprint: FP, publicKey: VALUES },
+        body: {
+          status: 'ready',
+          expiresInMs: 120000,
+          fingerprint: FP,
+          publicKey: VALUES,
+          nonce: 'N'.repeat(43),
+        },
       },
       [FINISH_PATH]: {
         status: 200,
@@ -615,8 +622,8 @@ describe('the setup calls (setup-api.ts)', () => {
       },
     });
     const api = createSetupApi({ fetch: r.fetch, token: 'tok' });
-    expect(await api.begin()).toEqual({ kind: 'ready', publicKey: VALUES });
-    expect(await api.finish(BODY)).toEqual(
+    expect(await api.begin()).toEqual({ kind: 'ready', publicKey: VALUES, nonce: 'N'.repeat(43) });
+    expect(await api.finish(BODY, 'N'.repeat(43))).toEqual(
       done({ sendFolder: 'none', computerName: 'this computer' }),
     );
     for (const call of r.calls) {
@@ -636,7 +643,7 @@ describe('the setup calls (setup-api.ts)', () => {
       sent.push(init?.body as Uint8Array);
       return Promise.resolve(new Response(JSON.stringify({ status: 'busy' }), { status: 409 }));
     }) as typeof globalThis.fetch;
-    await createSetupApi({ fetch, token: 't' }).finish(BODY);
+    await createSetupApi({ fetch, token: 't' }).finish(BODY, 'N'.repeat(43));
     expect(sent[0]).not.toBe(BODY);
     expect(sent[0]?.length).toBe(BODY.length);
     expect(sent[0]?.every((b) => b === 0)).toBe(true);
@@ -651,29 +658,33 @@ describe('the setup calls (setup-api.ts)', () => {
         passkey: false,
         ownerCode: CODE,
         fingerprint: FP,
-      }).finish(BODY),
+      }).finish(BODY, 'N'.repeat(43)),
     ).toEqual(
       done({ confirmed: false, passkey: false, sendFolder: 'none', computerName: 'this computer' }),
     );
-    expect(await answer(409, { status: 'owner_exists' }).finish(BODY)).toEqual({
+    expect(await answer(409, { status: 'owner_exists' }).finish(BODY, 'N'.repeat(43))).toEqual({
       kind: 'owner_exists',
     });
     for (const reason of ['rolled_back', 'keychain', 'check_failed', 'internal']) {
-      expect(await answer(500, { status: 'failed', reason }).finish(BODY)).toEqual({
+      expect(await answer(500, { status: 'failed', reason }).finish(BODY, 'N'.repeat(43))).toEqual({
         kind: 'error',
         problem: reason,
       });
     }
-    expect(await answer(500, { status: 'failed', reason: '<b>x</b>' }).finish(BODY)).toEqual({
+    expect(
+      await answer(500, { status: 'failed', reason: '<b>x</b>' }).finish(BODY, 'N'.repeat(43)),
+    ).toEqual({
       kind: 'error',
       problem: 'internal',
     });
-    expect(await answer(429, { status: 'wait', retryAfter: 4 }).finish(BODY)).toEqual({
+    expect(
+      await answer(429, { status: 'wait', retryAfter: 4 }).finish(BODY, 'N'.repeat(43)),
+    ).toEqual({
       kind: 'error',
       problem: 'wait',
       retryAfter: 4,
     });
-    expect(await answer(401, { status: 'rejected' }).finish(BODY)).toEqual({
+    expect(await answer(401, { status: 'rejected' }).finish(BODY, 'N'.repeat(43))).toEqual({
       kind: 'error',
       problem: 'session_expired',
     });
@@ -684,7 +695,7 @@ describe('the setup calls (setup-api.ts)', () => {
         passkey: true,
         ownerCode: '<img>',
         fingerprint: FP,
-      }).finish(BODY),
+      }).finish(BODY, 'N'.repeat(43)),
     ).toEqual({ kind: 'error', problem: 'unknown' });
   });
 

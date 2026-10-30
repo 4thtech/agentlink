@@ -94,6 +94,17 @@ Source previews are in `d2/source/screens/<Name>.dc.html`; PNGs as listed. "Card
 
 When a drop lands, the orchestrator records it here: the date, the links or files, and the delivered or partial status. It then schedules the intake tasks from the backlog.
 
+### Motion kit (wave 4, W4-MOTION-KIT)
+
+The motion values of the owner-approved wave-4 prototype (v23) are tokens, added to the D1 source (`d1/tokens/tokens.source.json`, `d1/tokens/tokens.css`) and to `packages/ui` (`tokens.css`, `motionTokens`): `--al-duration-press` 150 ms, `-fade` 160, `-exit` 180, `-crossfade` 220, `-reveal` 300, `-page` 340, `-shimmer` 1200, `-pulse` 1600; `--al-easing-spring` (a CSS `linear()` spring that settles at exactly 1), `-overshoot`, `-pop`, `-ping`. Transitions stay within 150–350 ms and move only opacity and transform (`motion-lint.test.ts`).
+
+Every wave-4 screen takes motion and loading from the kit in `@4thtech-io/ui` (`motion.css`), never local keyframes or a motion library:
+
+- `useViewTransition()` / `startViewTransition()`: same-document View Transitions for page changes and the simple-to-pro morph; regions named by `VT_CLASS`, one shared element via `from` / `to` (`data-vt-shared`). No API: the update runs at once and `.al-route` fades up.
+- Skeletons in the real layouts after 300 ms: `SkeletonGate`, `SkeletonRow`, `SkeletonCard`, `SkeletonList`, `SkeletonTable`, `SkeletonLine`.
+- `Pulse` (live dot while working), `useOptimisticItems` (sent items appear at once), the existing `ProgressBar` for transfers, and the moment classes `.al-reveal`, `.al-pop`, `.al-draw`, `.al-menu`, `.al-press`, `.al-crossfade`.
+- Reduced motion (system or the app's setting): fades only, no pulse, still skeletons. In e2e, `e2e/test/helpers/motion.ts` checks it (`emulateReducedMotion`, `expectFadesOnly`) and the layout shift (`observeLayoutShift`, `expectStableLayout`, CLS ≤ 0.01).
+
 ## Rules for agents
 
 1. **Check the Status and the screen index first.** This file is the only design status (D-116, LL-16). A surface with a screen in the index is built **styled** from it, after DESIGN-ADJ-1, using `packages/ui`. Only a surface with no screen is built functional and unstyled: semantic HTML, accessible markup (WCAG 2.2 AA, keyboard navigation, visible focus) and placeholder CSS variables. **Never invent a visual design**, colour scheme, icon or brand for it.
