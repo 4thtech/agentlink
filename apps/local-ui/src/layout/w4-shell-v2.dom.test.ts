@@ -293,7 +293,7 @@ describe('the live agent dropdown', () => {
       'Work agent',
       'Notes',
     ]);
-    expect(rows[0]?.querySelector('[aria-current="true"]')).not.toBeNull();
+    expect(rows[0]?.querySelector('[role="menuitemradio"][aria-checked="true"]')).not.toBeNull();
     expect(rows[0]?.textContent).toContain('Ready in Claude Code');
     expect(rows[0]?.querySelector('.al-am-app')?.textContent).toBe('Claude CodeReady');
     expect(rows[1]?.querySelector('.al-am-app')?.textContent).toBe('CursorNot running');
@@ -528,7 +528,7 @@ describe('Under the hood (kept by the app)', () => {
     const strip = q('[aria-label="Live status"]');
     expect(strip?.textContent).toContain('Claude Code');
     expect(strip?.textContent).toContain("Tali's agent ready");
-    expect(strip?.textContent).toContain('Relay');
+    expect(strip?.textContent).toContain('AgentLink');
     expect(q('.al-app')?.getAttribute('data-hood')).toBe('on');
   });
 
@@ -664,7 +664,12 @@ function stubViewTransition(): { calls: number } {
     seen.calls += 1;
     update();
     const done = Promise.resolve();
-    return { finished: done, ready: done, updateCallbackDone: done, skipTransition: () => undefined };
+    return {
+      finished: done,
+      ready: done,
+      updateCallbackDone: done,
+      skipTransition: () => undefined,
+    };
   };
   return seen;
 }
@@ -784,7 +789,7 @@ describe('the phone sheet (IR-5)', () => {
 });
 
 describe('motion through the U0 kit (IR-6, 7, 8)', () => {
-  it('expanding the rail is one View Transition; the labels enter with the kit\'s class', async () => {
+  it("expanding the rail is one View Transition; the labels enter with the kit's class", async () => {
     serve(world());
     await mountAt('/');
     const vt = stubViewTransition();

@@ -811,7 +811,10 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       await page.keyboard.press('Escape');
       await page.getByRole('button', { name: 'Expand menu' }).first().click();
       await expectFadesOnly(page);
-      await page.getByRole('switch', { name: /Under the hood/ }).first().click();
+      await page
+        .getByRole('switch', { name: /Under the hood/ })
+        .first()
+        .click();
       await expectFadesOnly(page);
       await page.locator('[aria-label="Live status"]').first().waitFor();
     } finally {
