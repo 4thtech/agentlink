@@ -231,9 +231,29 @@ const CACHE_MS = 15 * 60 * 1000;
 /** lookupId → the resolved format 1 link: memory only, for this process (04 §3.6.2 step 3). */
 const resolved = new Map<string, { readonly link: string; readonly at: number }>();
 
-/** Forgets every resolved short link (tests, and a host that wants none kept). */
-export function clearShortInviteCache(): void {
-  resolved.clear();
+/**
+ * Forgets resolved short links: every one (tests, and a host that wants none kept), or only those
+ * that `link` names (a short link, or the format 1 link one resolved to). The accept path calls it with the link once the
+ * pairing has started (F-L1): the resolved link carries the pairing secret, so it is not kept for
+ * the rest of the 15 minutes (04 §3.6.2).
+ */
+export function clearShortInviteCache(link?: string): void {
+  if (link === undefined) {
+    resolved.clear();
+    return;
+  }
+  const secret = shortInviteSecretOf(link);
+  if (secret !== undefined) {
+    try {
+      resolved.delete(encodeBase64url(shortInviteLookupId(secret)));
+    } finally {
+      wipe(secret);
+    }
+    return;
+  }
+  for (const [lookupId, entry] of resolved) {
+    if (entry.link === link) resolved.delete(lookupId);
+  }
 }
 
 /**

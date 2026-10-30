@@ -72,6 +72,7 @@ import { CoreError, type CoreErrorCode } from './errors.js';
 import type { IdentityService } from './identity.js';
 import type { DropConfig } from './files/platform.js';
 import {
+  clearShortInviteCache,
   decodeInviteLink,
   encodeInviteLink,
   encodeInvitePayload,
@@ -720,6 +721,8 @@ export class PairingService implements PairingHandler {
         tx.insert('envelopes', row);
       });
       ctx.log.info('pairing started', { role: 'invitee' });
+      // F-L1: the resolved link (it carries the pairing secret) is not kept after a used accept.
+      clearShortInviteCache(input.link);
       return {
         status: 'pending',
         contact,
