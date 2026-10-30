@@ -31,8 +31,18 @@
 //                eslint-disable or inline eslint config that switches the boundary rules off.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import {
   LIBRARIES,
@@ -599,8 +609,76 @@ function workspaceZones(root) {
   return zones.sort((a, b) => a.zone.localeCompare(b.zone));
 }
 
-/** Runs every check against the repository at `root`. Returns { problems, packages, files }. */
-export function runChecks(root) {
+const sha256 = (data) => createHash('sha256').update(data).digest('hex');
+
+/**
+ * Per-file scanning with an optional result cache. checkSource is a pure function of (zone, file
+ * path, file text, root) plus the rules in check.mjs/policy.mjs and the TypeScript version, so a
+ * result is reusable exactly when all of those hash the same. The cache therefore lives in a file
+ * named by the hash of the rules and the TypeScript version (any rule change starts a fresh file),
+ * and each entry is keyed by zone, path and the hash of the file text. It only skips re-parsing
+ * unchanged files; it never changes what is reported. Off by default (tests that build throwaway
+ * repositories must not write anywhere); the repository scans turn it on, and the first scan in a
+ * checkout (a cold cache, e.g. every fresh CI runner) does the full work.
+ */
+function fileScanner(root, cache) {
+  if (!cache) {
+    return {
+      scan: (zone, file) => checkSource(zone, file, readFileSync(file, 'utf8'), root),
+      flush: () => {},
+    };
+  }
+  const here = dirname(fileURLToPath(import.meta.url));
+  const rulesHash = sha256(
+    [
+      readFileSync(join(here, 'check.mjs')),
+      readFileSync(join(here, 'policy.mjs')),
+      ts.version,
+      root,
+    ].join('\0'),
+  );
+  const cacheFile = join(root, 'node_modules', '.cache', 'deps-check', `${rulesHash}.json`);
+  let entries = {};
+  try {
+    entries = JSON.parse(readFileSync(cacheFile, 'utf8'));
+  } catch {
+    // no cache yet, or unreadable: start empty
+  }
+  let dirty = false;
+  const used = {};
+  return {
+    scan(zone, file) {
+      const text = readFileSync(file, 'utf8');
+      const key = sha256(`${zone}\0${relative(root, file)}\0${text}`);
+      let found = entries[key];
+      if (!Array.isArray(found) || !found.every((item) => typeof item === 'string')) {
+        found = checkSource(zone, file, text, root);
+        dirty = true;
+      }
+      used[key] = found;
+      return found;
+    },
+    flush() {
+      // Keep only what this scan used, so the file does not grow with every edit.
+      if (!dirty && Object.keys(used).length === Object.keys(entries).length) return;
+      try {
+        mkdirSync(dirname(cacheFile), { recursive: true });
+        const temp = `${cacheFile}.${process.pid}.tmp`;
+        writeFileSync(temp, JSON.stringify(used));
+        renameSync(temp, cacheFile);
+      } catch {
+        // a read-only checkout just runs without a cache
+      }
+    },
+  };
+}
+
+/**
+ * Runs every check against the repository at `root`. Returns { problems, packages, files }.
+ * `cache: true` reuses per-file results from node_modules/.cache (see fileScanner).
+ */
+export function runChecks(root, { cache = false } = {}) {
+  const { scan, flush } = fileScanner(root, cache);
   const problems = [];
   const graph = {};
   let files = 0;
@@ -662,7 +740,7 @@ export function runChecks(root) {
       const misnamed = misnamedTestFile(relative(root, file).split('\\').join('/'));
       if (misnamed !== null) problems.push(`${relative(root, file)}: ${misnamed}`);
       files += 1;
-      problems.push(...checkSource(zone, file, readFileSync(file, 'utf8'), root));
+      problems.push(...scan(zone, file));
     }
   }
 
@@ -674,11 +752,12 @@ export function runChecks(root) {
       problems.push(`${link}: symbolic links are not allowed here`);
     for (const file of listed.files) {
       files += 1;
-      problems.push(...checkSource(zone, file, readFileSync(file, 'utf8'), root));
+      problems.push(...scan(zone, file));
     }
   }
 
   const cycle = findCycle(graph);
   if (cycle) problems.push(`workspace dependency cycle: ${cycle.join(' -> ')}`);
+  flush();
   return { problems, packages: zones.length, files };
 }

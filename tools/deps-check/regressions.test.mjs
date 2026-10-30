@@ -2,7 +2,15 @@
 // is a red case here, in deps-check and, where the form is visible to ESLint, in ESLint too.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -818,5 +826,56 @@ describe('M1-5b-b: relay sockets only in packages/node', () => {
   it('allows ws as a runtime dependency of packages/node only', () => {
     expect(manifest('packages/node', { dependencies: { ws: '8.22.0' } })).toEqual([]);
     expect(manifest('packages/core', { dependencies: { ws: '8.22.0' } })).not.toEqual([]);
+  });
+});
+
+describe('W4-DEPS-CHECK-FLAKE: the per-file result cache never changes the report', () => {
+  const dirs = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+  const repo = (files) => {
+    const root = mkdtempSync(join(tmpdir(), 'deps-check-cache-'));
+    dirs.push(root);
+    const all = {
+      'packages/core/package.json': JSON.stringify({ name: '@4thtech-io/core' }),
+      ...files,
+    };
+    for (const [path, content] of Object.entries(all)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), content);
+    }
+    return root;
+  };
+
+  it('reports the same problems cold, warm and without the cache', () => {
+    const root = repo({
+      'packages/core/src/a.ts': `export * from 'viem';\n`,
+      'packages/core/src/b.ts': `export const b = 1;\n`,
+    });
+    const plain = runChecks(root);
+    expect(plain.problems.some((problem) => problem.includes('viem'))).toBe(true);
+    expect(runChecks(root, { cache: true })).toEqual(plain);
+    expect(runChecks(root, { cache: true })).toEqual(plain);
+  });
+
+  it('re-checks a file whose text changed after a clean cached run', () => {
+    const root = repo({ 'packages/core/src/a.ts': `export const a = 1;\n` });
+    expect(runChecks(root, { cache: true }).problems).toEqual([]);
+    writeFileSync(join(root, 'packages/core/src/a.ts'), `export * from 'viem';\n`);
+    const { problems } = runChecks(root, { cache: true });
+    expect(problems.some((problem) => problem.includes('viem'))).toBe(true);
+  });
+
+  it('ignores a damaged or hand-edited cache entry', () => {
+    const root = repo({ 'packages/core/src/a.ts': `export * from 'viem';\n` });
+    runChecks(root, { cache: true });
+    const cacheDir = join(root, 'node_modules', '.cache', 'deps-check');
+    const [name] = readdirSync(cacheDir);
+    const entries = JSON.parse(readFileSync(join(cacheDir, name), 'utf8'));
+    for (const key of Object.keys(entries)) entries[key] = 'not a list';
+    writeFileSync(join(cacheDir, name), JSON.stringify(entries));
+    const { problems } = runChecks(root, { cache: true });
+    expect(problems.some((problem) => problem.includes('viem'))).toBe(true);
   });
 });
