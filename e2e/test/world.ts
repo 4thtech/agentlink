@@ -111,7 +111,11 @@ export function createFakeWorld(): World {
     notary,
     drop,
     waitMs: { relay: 60_000, chain: 20_000 },
-    storedBytes: () => [...drop.objects.values()].flatMap((o) => (o.bytes ? [o.bytes] : [])),
+    // W4-SHORT-INVITE: invite objects are drop bytes too (the zero-access audit covers them).
+    storedBytes: () => [
+      ...[...drop.objects.values()].flatMap((o) => (o.bytes ? [o.bytes] : [])),
+      ...[...drop.invites.values()].map((o) => o.bytes),
+    ],
     verifier: () => verifier,
     topUp: (agentId) => {
       // The faucet's gift: 50 cents of testnet credits, five $0.10 fees (apps/submitter faucet,

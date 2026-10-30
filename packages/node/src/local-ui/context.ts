@@ -13,6 +13,7 @@ import {
   decodeInviteLink,
   evaluate,
   type AcceptInviteAction,
+  type OpenInvite,
   type PendingContact,
   type PolicyDecision,
 } from '@4thtech-io/core';
@@ -386,11 +387,14 @@ export function inviteDesk(client: AgentLinkClient): LocalUiInviteDesk {
   return Object.freeze<LocalUiInviteDesk>({
     create: (input) => client.pairing.createInvite(input),
     async check(link) {
-      const checked = await client.pairing.acceptInvite({ link });
+      // W4-SHORT-INVITE: a short link is resolved once (core keeps it in memory for the accept).
+      const resolved = await client.pairing.resolveInviteLink(link);
+      const checked = await client.pairing.acceptInvite({ link: resolved });
       // The same codec again for the expiry only (the link was just decoded and checked above).
-      const { expiresAt } = await decodeInviteLink(link);
+      const { expiresAt } = await decodeInviteLink(resolved);
       return Object.freeze({ contact: checked.contact, expiresAt });
     },
+    cancel: (inviteId) => client.pairing.cancelInvite(inviteId),
   });
 }
 
@@ -414,6 +418,14 @@ export type LocalUiAcceptOutcome =
  * `allowed` from anything else, so nothing here can pair without the owner's verified decision.
  */
 export interface LocalUiInviteAcceptPort {
+  /**
+   * W4-SHORT-INVITE (04 §3.6.2): the format 1 link of `link` (a short link fetched once from the
+   * configured drop). The accept route calls it first and uses the result for every step, so the
+   * approval action keeps the resolved invite sealed and nothing re-fetches it.
+   */
+  resolve(link: string): Promise<string>;
+  /** W4-INVITES-LIST: the open invites (ID, label, expiry; never a link). */
+  list(): Promise<readonly OpenInvite[]>;
   check(link: string): Promise<PendingContact>;
   decision(): Promise<PolicyDecision>;
   action(link: string): Promise<AcceptInviteAction>;
@@ -436,6 +448,8 @@ export function inviteAcceptPort(client: AgentLinkClient): LocalUiInviteAcceptPo
   const decision = async (): Promise<PolicyDecision> =>
     evaluate(await client.ownerActions.loadPolicy(), { kind: 'invite.accept' });
   return Object.freeze<LocalUiInviteAcceptPort>({
+    resolve: (link) => client.pairing.resolveInviteLink(link),
+    list: () => client.pairing.openInvites(),
     async check(link) {
       return (await client.pairing.acceptInvite({ link })).contact;
     },

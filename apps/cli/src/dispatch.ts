@@ -115,7 +115,13 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     guard: 'none',
     options: { ...AGENT, brief: { type: 'boolean' } },
   },
-  { name: 'invite', usage: ['agentlink invite'], guard: 'none', options: AGENT },
+  {
+    name: 'invite',
+    usage: ['agentlink invite [--long]'],
+    guard: 'none',
+    // W4-SHORT-INVITE (D-139 (7)): the long link, with nothing uploaded to the drop.
+    options: { ...AGENT, long: { type: 'boolean' } },
+  },
   {
     name: 'accept',
     usage: ['agentlink accept <url> [--approval <approvalId>]'],

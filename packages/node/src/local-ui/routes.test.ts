@@ -190,6 +190,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/join/handoff',
       // W4-SHELL-V2: the app's UI settings (local-ui/ui-settings-server.test.ts).
       '/api/ui/ui-settings',
+      // W4-INVITES-LIST: the open invites (a read) and Cancel (api/invites-short.test.ts).
+      '/api/ui/invites',
+      '/api/ui/invites/cancel',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
@@ -343,6 +346,8 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
     ).toEqual([
       `POST ${INVITE_CREATE_PATH}`,
       `POST ${INVITE_CHECK_PATH}`,
+      // W4-INVITES-LIST: Cancel an open invite (no presence, signs nothing).
+      'POST /api/ui/invites/cancel',
       'POST /api/ui/join/dismiss',
     ]);
     expect(routes.find((r) => r.path === INVITE_ACCEPT_PATH)).toMatchObject({

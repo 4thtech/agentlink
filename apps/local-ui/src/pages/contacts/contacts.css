@@ -246,6 +246,18 @@
   flex: 1;
   min-inline-size: 0;
 }
+.ct-invite-expiry {
+  display: block;
+}
+.ct-advanced {
+  display: grid;
+  gap: var(--al-space-3);
+}
+.ct-advanced > summary {
+  cursor: pointer;
+  color: var(--al-color-fg-muted);
+  padding-block: var(--al-space-2);
+}
 .ct-invite.is-new::before {
   content: '';
   position: absolute;

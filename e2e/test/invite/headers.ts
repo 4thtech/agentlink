@@ -1,8 +1,8 @@
 // The headers of the invite host (08 §4), read from the `_headers` file in site/.
 
-/** 08 §4, verbatim. */
+/** 08 §4, verbatim (D-139: connect-src is the drop host, for a short-link invite object). */
 export const CSP =
-  "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types 'none'";
+  "default-src 'none'; script-src 'self'; style-src 'self'; connect-src https://drop.agentlink.4thtech.io; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types 'none'";
 
 /** The headers a path gets from `_headers`: every `/*`-style block that matches, merged. */
 export function headersFor(file: string, path: string): Record<string, string> {

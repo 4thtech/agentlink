@@ -47,6 +47,15 @@ export const ADD_STRINGS = {
   askForNew: 'Ask the person who sent it for a new invite.',
   offline: "Can't reach AgentLink on this computer. Try again in a minute.",
   connectRefused: "Couldn't connect with this invite. Nothing was changed. Check it again.",
+  advanced: 'Advanced',
+  longLink: 'Use a long link',
+  longLinkHint:
+    'A longer link that holds everything itself. Nothing is stored on the AgentLink service.',
+  cancelInvite: 'Cancel',
+  cantCancel: "Couldn't cancel the invite. Try again in a minute.",
+  unavailableInvite:
+    "This invite can't be used anymore. It may have expired, been used or been cancelled. Ask for a new one.",
+  busyTryAgain: "AgentLink couldn't check the invite just now. Try again in a minute.",
   pendingLabel: 'Invites waiting for an answer',
   daysLeftLabel: 'Time left',
 } as const;
@@ -83,6 +92,11 @@ export function qrLabel(name: string | undefined): string {
 /** The pending row (b11 §21.3, Closing). */
 export function waitingToAccept(name: string | undefined): string {
   return `Waiting for ${name ?? 'them'} to accept`;
+}
+
+/** The expiry under a pending row. */
+export function expiresIn(days: number): string {
+  return days === 1 ? 'Expires in 1 day' : `Expires in ${String(days)} days`;
 }
 
 export function daysLeft(days: number): string {

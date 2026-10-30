@@ -30,7 +30,9 @@ export type StorageErrorCode =
   /** M1-6c: the object's link has expired; the drop cannot extend it (07 §5.4). */
   | 'expired'
   /** M1-6c: a storage service answered with something this client refuses (off-origin URL, bad JSON). */
-  | 'invalid_response';
+  | 'invalid_response'
+  /** W4-SHORT-INVITE: no invite object under that ID (the drop's uniform 404; 07 §5.4). */
+  | 'not_found';
 
 /** M1-6c: the drop limits that mean "set up own storage" (07 §5.4 Limits). */
 export type StorageLimit = 'size' | 'quota';
