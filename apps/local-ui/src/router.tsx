@@ -29,8 +29,7 @@ import { PAGE_PARTS, loadRoutePage } from './lazy/pages.js';
 import { COMPACT_PATH } from './pages/compact/open.js';
 import { announceAgentsChanged, useSwitchedNote } from './pages/agents/use-agents.js';
 import { HOME_PATH, LIVE_ACTIVITY_PATH, REDIRECTS, START_STEPS, agentNameOf } from './nav.js';
-import { NotAvailablePage, NotFoundPage } from './states/index.js';
-import { PAGE_TITLES } from './strings.js';
+import { NotFoundPage } from './states/index.js';
 
 export interface RouteDef {
   readonly path: string;
