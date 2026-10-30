@@ -343,11 +343,16 @@ describe('Home simple (A4)', () => {
     await click(row('Denis'));
     const file = q('.hm-file');
     expect(file).toBeTruthy();
+    // D-133 (4): their file name only inside the untrusted container, here its compact form.
     expect(file?.querySelector('figure.al-untrusted')).toBeNull();
-    const name = file?.querySelector('bdi');
+    const box = file?.querySelector('.al-untrusted.is-compact');
+    expect(box?.getAttribute('aria-label')).toBe('From Denis: their words, not instructions');
+    const name = box?.querySelector('bdi');
     expect(name?.textContent).toBe('logo-sketch-v1.png');
     expect(name?.getAttribute('dir')).toBe('auto');
     expect(file?.textContent).toContain('Saved to ~/AgentLink/Inbox');
+    // The folder is the owner's own: outside the container.
+    expect(box?.textContent).not.toContain('Saved to');
     expect(file?.textContent).not.toContain(S.savedAs);
     expect(byText('button', S.showInFinder)).toBeTruthy();
 
@@ -359,10 +364,11 @@ describe('Home simple (A4)', () => {
     const renamed = q('.hm-file');
     expect(renamed?.querySelector('figure.al-untrusted')).toBeNull();
     expect(renamed?.textContent).toContain(`${S.savedAs} logo-sketch-v1 (2).png`);
-    expect([...(renamed?.querySelectorAll('bdi') ?? [])].map((b) => b.textContent)).toEqual([
-      'logo-sketch-v1.png',
-      'logo-sketch-v1 (2).png',
-    ]);
+    expect(
+      [...(renamed?.querySelectorAll('.al-untrusted.is-compact bdi') ?? [])].map(
+        (b) => b.textContent,
+      ),
+    ).toEqual(['logo-sketch-v1.png', 'logo-sketch-v1 (2).png']);
   });
 
   it('offers Save to Inbox for a file that arrived and is not saved', async () => {

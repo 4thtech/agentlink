@@ -275,7 +275,7 @@ describe('chapter 3: inbox', () => {
 
     // A file: W4-AUTO-SAVE (D-142) saves a paired contact's file by itself; Ana's Files on Home
     // shows one light row (W4-WIRE-3): the name, "Saved to ~/AgentLink/Inbox" and Show in Finder /
-    // Explorer / folder, with no Touch ID and no message box around the name. (Save with one Touch
+    // Explorer / folder, with no Touch ID; the name in the compact untrusted container. (Save with one Touch
     // ID, when the automatic save cannot run, is the test above.)
     const file = await sendable(pcA);
     const before = b.gestures.total();
@@ -284,8 +284,14 @@ describe('chapter 3: inbox', () => {
     await eventually('the file is saved', async () =>
       (await text(b.page)).includes('Saved to ~/AgentLink/Inbox'),
     );
+    // D-133 (4): the name only inside the compact untrusted container; the folder outside it.
+    await b.page
+      .locator('.hm-file .al-untrusted.is-compact')
+      .filter({ hasText: FILE_NAME })
+      .first()
+      .waitFor();
     expect(
-      await b.page.locator('.hm-file figure.al-untrusted').filter({ hasText: FILE_NAME }).count(),
+      await b.page.locator('.hm-file .al-untrusted').filter({ hasText: 'Saved to' }).count(),
     ).toBe(0);
     expect(await b.page.locator('[role="progressbar"]').count()).toBe(0);
     expect(b.gestures.total() - before).toBe(0);
