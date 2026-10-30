@@ -52,7 +52,8 @@ export async function removeAgent(page: Page, label: string): Promise<void> {
   await page.getByLabel(labelled('Type ', label, ' to confirm')).fill(label);
   await page.getByRole('button', { name: 'Remove with Touch ID' }).click();
   const confirm = page.getByRole('button', { name: CONFIRM_PASSKEY });
-  const done = page.getByText(`${label} was removed.`).first();
+  // W4-WIRE: the label is its own bidi-isolated run in the sentence (I-5).
+  const done = page.getByText(labelled('', label, ' was removed.')).first();
   await Promise.race([confirm.waitFor().then(() => confirm.click()), done.waitFor()]).catch(
     () => undefined,
   );

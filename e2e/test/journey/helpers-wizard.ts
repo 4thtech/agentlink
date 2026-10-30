@@ -43,11 +43,10 @@ export async function getStartedWithTouchId(
 export async function skipGetStartedIfShown(page: Page): Promise<void> {
   const start = page.getByRole('link', { name: 'Skip to Home' });
   const home = page.getByRole('navigation', { name: 'Sections' }).first();
-  const which = await Promise.race([
-    start.waitFor().then(() => 'start' as const),
-    home.waitFor().then(() => 'home' as const),
-  ]);
-  if (which === 'start') {
+  // W4-WIRE (U2 low): one wait for whichever shows (no second wait left running to time out or
+  // reject after the page is gone), then a look at which one it was.
+  await start.or(home).first().waitFor();
+  if (await start.isVisible()) {
     await start.click();
     await home.waitFor();
   }

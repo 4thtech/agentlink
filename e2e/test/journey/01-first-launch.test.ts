@@ -86,6 +86,9 @@ describe('chapter 1: onboarding', () => {
     await page.waitForURL((url) => url.pathname === '/start/invite');
     await page.getByRole('heading', { name: 'Invite someone' }).waitFor();
     await page.getByRole('button', { name: 'Skip for now' }).waitFor();
+    // W4-WIRE: step 4 is U4's invite panel itself: the link is made at once, with Copy, in place.
+    await page.locator('.inv-link[data-state="ready"]').waitFor();
+    await page.getByRole('button', { name: 'Copy', exact: true }).waitFor();
 
     // No reload since step 1 (the finish answer's new generation is adopted in place); no layout
     // shift across the four steps.
@@ -98,7 +101,14 @@ describe('chapter 1: onboarding', () => {
     await page.waitForURL((url) => url.pathname === '/');
     expect(await text(page)).not.toContain('Which AI app do you use?');
     await page.getByRole('heading', { name: 'People' }).first().waitFor();
-    expect(await text(page)).toContain('No one here yet.');
+    // W4-WIRE: Home shows once its Get started read has answered too (its skeleton until then).
+    await page.getByText('No one here yet.').first().waitFor();
+    // W4-WIRE: Home carries the Get started card (one of the three ways back), counted from real
+    // state: the AI app is connected; inviting someone is next, on the Invite screen.
+    await page.getByRole('heading', { name: 'Get started · 1 of 3 done' }).waitFor();
+    expect(
+      await page.getByRole('link', { name: 'Invite someone' }).first().getAttribute('href'),
+    ).toBe('/contacts?invite');
   }, 180_000);
 
   // IR-W4-WIZARD-1 H: the app opens Get started by itself only while setup is incomplete, on the

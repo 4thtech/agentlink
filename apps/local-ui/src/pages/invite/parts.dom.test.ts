@@ -232,6 +232,8 @@ describe('ConnectedMoment (A7)', () => {
     expect(them?.closest('.al-slide-in')).not.toBeNull();
     expect(them?.closest('.inv-from-right')).not.toBeNull();
     expect(host.querySelector('.inv-pair-check .al-pop')).not.toBeNull();
+    // W4-WIRE (U4 low): the whole check (its green circle) pops, not only the tick inside it.
+    expect(host.querySelector('.inv-pair-check.al-pop')).not.toBeNull();
     expect(me?.textContent).toBe('T');
     expect(them?.textContent).toBe('D');
   });

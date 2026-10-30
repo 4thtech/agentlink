@@ -23,6 +23,13 @@ export const START_STEPS = ['/start/app', '/start/connect', '/start/connected', 
  */
 export const INTERIM_MESSAGES_PATH = '/inbox';
 export const INTERIM_PEOPLE_PATH = '/contacts';
+/**
+ * W4-WIRE: the Invite screen (U4), where every "Invite someone" and "Add contact" leads: Home, the
+ * Get started card, Go to, the empty states and the compact window. A fixed marker with no data.
+ */
+export const INVITE_PATH = `${INTERIM_PEOPLE_PATH}?invite`;
+/** W4-WIRE: "Add agent" and "New agent" reuse the Get started steps (one flow, not two). */
+export const NEW_AGENT_PATH = '/start/app?add=agent';
 /** Advanced, from Settings (the first Advanced page). */
 export const ADVANCED_HOME = '/advanced/network';
 
@@ -168,7 +175,7 @@ export function goToEntries(hood: boolean): readonly GoToEntry[] {
     {
       label: 'Invite someone',
       hint: 'Action',
-      path: INTERIM_PEOPLE_PATH,
+      path: INVITE_PATH,
       keywords: 'contact add person',
     },
     { label: PAGE_TITLES.people, hint: go, path: INTERIM_PEOPLE_PATH, keywords: 'contacts' },
@@ -176,7 +183,7 @@ export function goToEntries(hood: boolean): readonly GoToEntry[] {
     {
       label: 'New agent',
       hint: 'Action',
-      path: `${AGENTS_PATH}?add=1`,
+      path: NEW_AGENT_PATH,
       keywords: 'add agent create',
     },
     { label: PAGE_TITLES.getStarted, hint: 'Help', path: START_PATH, keywords: 'setup start' },

@@ -88,7 +88,7 @@ export function ConnectedMoment({
             <span className="inv-avatar inv-avatar--them inv-unflip">{letterOf(name)}</span>
           </span>
         </span>
-        <span className="inv-pair-check">
+        <span className="inv-pair-check al-pop">
           <CheckMark />
         </span>
       </div>

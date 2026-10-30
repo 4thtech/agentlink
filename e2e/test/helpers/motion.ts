@@ -92,6 +92,19 @@ export async function layoutShiftScore(page: Page): Promise<number> {
   return (await clsState(page)).score;
 }
 
+/** How many shifts were counted so far (a mark for `shiftsSince`). */
+export async function shiftCount(page: Page): Promise<number> {
+  return (await clsState(page)).shifts.length;
+}
+
+/** The shifts counted after a `shiftCount` mark, as "value [nodes]" (for a failure message). */
+export async function shiftsSince(page: Page, mark: number): Promise<string> {
+  return (await clsState(page)).shifts
+    .slice(mark)
+    .map((s) => `${s.value.toFixed(4)} [${s.nodes.join(', ')}]`)
+    .join('; ');
+}
+
 /** Throws when the layout shifted more than `max` (default CLS_BUDGET); returns the score. */
 export async function expectStableLayout(page: Page, max = CLS_BUDGET): Promise<number> {
   const state = await clsState(page);

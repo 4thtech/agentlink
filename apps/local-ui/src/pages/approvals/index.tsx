@@ -26,6 +26,13 @@
 //   full list above stays as `ApprovalsBoard` in board.tsx (its tests keep the review-together
 //   rules); nothing imports it at runtime, so neither it nor board.css is in the app bundle.
 import { HomeScreen } from '../home/home-screen.js';
+import { GetStartedCard } from '../start/get-started-card.js';
+import {
+  readSetupState,
+  startProgress,
+  type Progress,
+  type SetupState,
+} from '../start/setup-state.js';
 import { Surface, type PayPlatform } from '@4thtech-io/ui';
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
@@ -43,6 +50,8 @@ export interface ApprovalsPageProps {
   readonly canPasskey?: boolean;
   readonly platform?: PayPlatform;
   readonly reducedMotion?: boolean;
+  /** W4-WIRE: the real setup state for the Get started card on Home. Default: the app's reads. */
+  readonly readSetup?: () => Promise<SetupState>;
 }
 
 export function browserPasskeys(): boolean {
@@ -162,6 +171,34 @@ export function ApprovalsHead({ end }: { end?: ReactNode } = {}): ReactElement {
   );
 }
 
+/** W4-WIRE: how long Home waits for the Get started read before it shows without the card. */
+export const START_READ_WAIT_MS = 1500;
+
+/**
+ * W4-WIRE: the Get started card's progress, read before Home shows (Home holds its skeleton until
+ * then), so the card is there from the first frame and never arrives late to move the page.
+ * undefined while reading; null when there is no card (an unanswered or late read: nothing shows).
+ */
+export function useStartProgress(read: () => Promise<SetupState>): Progress | null | undefined {
+  const [progress, setProgress] = useState<Progress | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    const settle = (p: Progress | null): void => {
+      if (live) setProgress((now) => (now === undefined ? p : now));
+    };
+    const timer = setTimeout(() => settle(null), START_READ_WAIT_MS);
+    read().then(
+      (state) => settle(startProgress(state)),
+      () => settle(null),
+    );
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [read]);
+  return progress;
+}
+
 /** `/`: Home (W4-HOME), with the approvals as the card on top. */
 export function ApprovalsPage({
   client,
@@ -169,15 +206,21 @@ export function ApprovalsPage({
   canPasskey,
   platform,
   reducedMotion,
+  readSetup = readSetupState,
 }: ApprovalsPageProps): ReactElement {
   // The owner's state, as the list showed it: not set up yet (nothing can be approved, with the
   // reason) or no passkeys in this browser (the backup code is the way).
   const approvals = useMemo(() => client ?? createApprovalsClient(), [client]);
   const passkeys = canPasskey ?? browserPasskeys();
   const owner = useOwner(approvals, passkeys);
+  const started = useStartProgress(readSetup);
   return (
     <HomeScreen
       approvalsClient={approvals}
+      holding={started === undefined}
+      {...(started === null || started === undefined
+        ? {}
+        : { getStarted: <GetStartedCard progress={started} /> })}
       {...(owner === undefined
         ? {}
         : { ownerNotice: <OwnerPanel owner={owner} canPasskey={passkeys} /> })}

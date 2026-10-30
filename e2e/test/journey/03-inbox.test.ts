@@ -25,6 +25,8 @@ import {
   emulateReducedMotion,
   expectFadesOnly,
   layoutShiftScore,
+  shiftCount,
+  shiftsSince,
   observeLayoutShift,
 } from '../helpers/motion.js';
 
@@ -222,17 +224,21 @@ describe('chapter 3: inbox', () => {
     const aProbe = await a.arm();
     const bProbe = await b.arm();
     await navTo(a.page, 'Home');
+    // Home's own first load moves nothing, and neither does the shell around it. W4-WIRE: the
+    // "Switch to Touch ID" next step (registered while accepting the invite) left at registration,
+    // on the page where it happened, so it is not there when Home opens and never leaves under it
+    // (that move once cost Home 0.024–0.037). The score counts from before Home's first load.
+    expect(await b.page.locator('main a[href="/first-run"]').count()).toBe(0);
+    await b.page.waitForTimeout(500);
+    const clsBeforeHome = await layoutShiftScore(b.page);
+    const seenBefore = await shiftCount(b.page);
     await navTo(b.page, 'Home');
-    // Home's own first load moves nothing. The score counts from here: before it, the shell's
-    // "Switch to Touch ID" next step (registered while accepting the invite) leaves on the first
-    // page change after it, when its re-read answers, and moves the page up once; that is the
-    // shell's banner (layout/index.tsx), not Home, so the baseline waits for it to be gone.
-    await eventually(
-      'the shell next step has settled',
-      async () => (await b.page.locator('main a[href="/first-run"]').count()) === 0,
-    );
     await b.page.getByRole('heading', { name: 'People' }).waitFor();
     await b.page.waitForTimeout(500);
+    expect(
+      (await layoutShiftScore(b.page)) - clsBeforeHome,
+      `Home's first load shifted: ${await shiftsSince(b.page, seenBefore)}`,
+    ).toBeLessThanOrEqual(CLS_BUDGET);
     const clsBefore = await layoutShiftScore(b.page);
     await navTo(b.page, 'Agents');
     await navTo(b.page, 'Home');

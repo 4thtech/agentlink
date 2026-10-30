@@ -57,8 +57,11 @@ export function takeIntent(
     forgetIntent();
     return undefined;
   }
-  const at = typeof v.at === 'number' && Number.isFinite(v.at) ? v.at : now;
+  // W4-WIRE (U5 low): an entry with no time (an older format) is dropped, never taken as now (it
+  // would then never expire).
+  const at = typeof v.at === 'number' && Number.isFinite(v.at) ? v.at : undefined;
   if (
+    at === undefined ||
     typeof v.name !== 'string' ||
     !NAME.test(v.name) ||
     typeof v.action !== 'string' ||

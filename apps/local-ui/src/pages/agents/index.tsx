@@ -27,7 +27,7 @@ import {
 } from 'react';
 import { getLive, subscribeLive } from '../../api/live.js';
 import { lazyPart } from '../../lazy/index.js';
-import { agentNameOf } from '../../nav.js';
+import { agentNameOf, NEW_AGENT_PATH } from '../../nav.js';
 import type { AppsApi } from '../apps/api.js';
 import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import { createAgentsApi, type AgentsApi } from './api.js';
@@ -60,8 +60,8 @@ export function setAgentsMapView(view: AgentsMapView | undefined): void {
   mapView = view;
 }
 
-/** "New agent" reuses the Get started steps (U2): `/start/app?add=agent`. */
-export const NEW_AGENT_PATH = '/start/app?add=agent';
+/** "New agent" reuses the Get started steps (U2): `/start/app?add=agent` (nav.ts, W4-WIRE). */
+export { NEW_AGENT_PATH };
 
 export interface AgentsPageProps {
   readonly api?: AgentsApi;

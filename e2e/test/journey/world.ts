@@ -351,16 +351,22 @@ export async function twoOwners(
   return { pcA, pcB, a, b, mcpA, mcpB, quitA: uiA.stop };
 }
 
-/** Contacts → Add contact → Create invite → Copy invite → Done: the link the sheet showed. */
+/**
+ * W4-WIRE: Go to → Invite someone → the Invite screen (U4): the link is made at once; Copy (✓
+ * Copied) → Done. Answers the link the screen showed (it shows it without https://).
+ */
 export async function createInviteInApp(jp: JourneyPage): Promise<string> {
   const { page } = jp;
-  await navTo(page, 'Contacts');
-  await page.getByRole('button', { name: 'Add contact' }).first().click();
-  await page.getByRole('button', { name: 'Create invite' }).click();
-  await page.getByText('Invite ready').first().waitFor();
-  const link = ANY_INVITE.exec(await text(page))?.[0] ?? '';
-  await page.getByRole('button', { name: 'Copy invite' }).click();
-  await page.getByRole('button', { name: 'Done' }).click();
+  await goTo(page, 'Invite someone');
+  await page.getByRole('heading', { name: 'Invite someone', level: 1 }).waitFor();
+  const shown = page.locator('.inv-link[data-state="ready"]');
+  await shown.waitFor();
+  const value = (await shown.innerText()).trim();
+  const link =
+    ANY_INVITE.exec(value.startsWith('https://') ? value : `https://${value}`)?.[0] ?? '';
+  await page.getByRole('button', { name: 'Copy', exact: true }).click();
+  await page.getByRole('button', { name: 'Copied', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
   return link;
 }
 

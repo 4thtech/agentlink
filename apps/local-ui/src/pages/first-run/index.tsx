@@ -40,7 +40,9 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { INTERIM_PEOPLE_PATH } from '../../nav.js';
+import { lazyPart } from '../../lazy/index.js';
+import { INVITE_PATH } from '../../nav.js';
+import { createInviteApi, type InviteApi } from '../contacts/invite-api.js';
 import { navigate } from '../../router.js';
 import {
   LinkExpiredState,
@@ -111,6 +113,32 @@ import {
   type Platform,
 } from './strings.js';
 
+/**
+ * W4-WIRE: Get started step 4 is U4's invite panel (the same one as the Invite screen), loaded on
+ * first use so the first load of the app does not carry it.
+ */
+const INVITE_PANEL = lazyPart(async () => (await import('../invite/invite-panel.js')).InvitePanel);
+
+/** W4-WIRE: the invite calls of step 4, with the cancels still on their way. */
+function trackCancels(base: InviteApi): { api: InviteApi; settled: () => Promise<void> } {
+  const inFlight = new Set<Promise<unknown>>();
+  const api: InviteApi = {
+    ...base,
+    cancel: (id) => {
+      const sent = base.cancel(id);
+      inFlight.add(sent);
+      void sent.finally(() => inFlight.delete(sent)).catch(() => undefined);
+      return sent;
+    },
+  };
+  const settled = (): Promise<void> =>
+    Promise.race([
+      Promise.allSettled([...inFlight]).then(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  return { api, settled };
+}
+
 /** U3-a (D-138; 08 §1): first run, and the passkey switch on this page, finish on Home. */
 const HOME = '/settings/home';
 
@@ -132,7 +160,8 @@ export function endFirstRun(read: () => Promise<JoinRead>): Promise<void> {
     .then((answer) => {
       const waiting = answer.kind === 'ok' && answer.state !== 'none';
       // IR-W4-WIZARD-1: this full load ends Get started; its open-on-launch check keeps Home.
-      markLeavingStart();
+      // W4-WIRE (U2 low): only an ending on Home needs the mark (the join screen is never guarded).
+      if (!waiting) markLeavingStart();
       window.location.assign(waiting ? JOIN : HOME);
     });
 }
@@ -519,6 +548,20 @@ export function FirstRunPage({
   const sensor = SENSOR[platform];
   // What the person chose on earlier steps (kept in memory while the steps change; no secret).
   const memory = wizardMemory();
+  // W4-WIRE: step 4's invite panel (U4) loads with the first step, so it is there, in place, when
+  // step 4 opens (no move when it arrives).
+  useEffect(() => {
+    if (invitePanel === undefined) void INVITE_PANEL.load().catch(() => undefined);
+  }, [invitePanel]);
+  // A link that never left step 4 is cancelled when the panel goes (U4's rule). "Go to Home" is a
+  // full load, which would cut that cancel off: the panel goes first, its cancel is answered (at
+  // most 1.5 s), then Home opens.
+  const stepInvites = useMemo(() => trackCancels(createInviteApi()), []);
+  const [inviteGone, setInviteGone] = useState(false);
+  const leaveInvite = (): void => {
+    setInviteGone(true);
+    window.setTimeout(() => void stepInvites.settled().then(goHome), 0);
+  };
   const [list, setList] = useState<PickList>(() =>
     memory.apps === undefined
       ? { k: 'loading' }
@@ -928,9 +971,11 @@ export function FirstRunPage({
   if (step === 'invite') {
     return frame(
       <InviteStep
-        inviteHref={INTERIM_PEOPLE_PATH}
-        onHome={goHome}
-        {...(invitePanel === undefined ? {} : { panel: invitePanel })}
+        inviteHref={INVITE_PATH}
+        onHome={invitePanel === undefined ? leaveInvite : goHome}
+        panel={
+          invitePanel ?? (inviteGone ? <></> : <INVITE_PANEL.Part invites={stepInvites.api} />)
+        }
       />,
     );
   }

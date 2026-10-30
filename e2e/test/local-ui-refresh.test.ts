@@ -64,6 +64,8 @@ const PAGES = [
   { path: '/settings/appearance', title: 'Appearance' },
   { path: '/advanced/network', title: 'Relays & network' },
   { path: '/advanced/diagnostics', title: 'Diagnostics' },
+  // W4-WIRE (U6 low): the Connections map is checked like every Advanced page.
+  { path: '/advanced/map', title: 'Connections map' },
   // W4-WIZARD: Get started opens on step 1, the AI app pick.
   { path: '/start/app', title: 'Which AI app do you use?' },
 ] as const;

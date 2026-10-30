@@ -37,7 +37,7 @@ import {
 } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { getLive, subscribeLive, switchAgent, type LiveAgent } from '../../api/live.js';
-import { INTERIM_PEOPLE_PATH } from '../../nav.js';
+import { INVITE_PATH } from '../../nav.js';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import { usePrefs } from '../../prefs/index.js';
 import type { OwnerState, SheetOptions } from '../approvals/card.js';
@@ -47,7 +47,6 @@ import {
   type ApprovalsClient,
   type DecisionPasskey,
 } from '../approvals/client.js';
-import { ADD_CONTACT_MARKER } from '../contacts/add-contact-link.js';
 import type { ContactRow } from '../contacts/data.js';
 import { createInviteApi, type InviteApi, type OpenInvite } from '../contacts/invite-api.js';
 import { createFilesApi } from '../files/files-api.js';
@@ -70,8 +69,8 @@ import './people.css';
 
 /** How often Home looks again while the tab is visible. */
 export const HOME_POLL_MS = 5_000;
-/** Invite someone: today's invite sheet (U4 replaces it with the Invite panel). */
-export const INVITE_HREF = `${INTERIM_PEOPLE_PATH}?${ADD_CONTACT_MARKER}`;
+/** Invite someone: U4's Invite screen (W4-WIRE). */
+export const INVITE_HREF = INVITE_PATH;
 
 export interface HomeScreenProps {
   /** Test seams: the fetch, session token and passkey container; the page's own when absent. */
@@ -87,6 +86,8 @@ export interface HomeScreenProps {
   readonly pollMs?: number;
   /** U2's "Get started · n of 3 done" card, on top while setup is not done. */
   readonly getStarted?: ReactNode;
+  /** W4-WIRE: keep the skeleton while the page still reads what goes on top (the Get started card). */
+  readonly holding?: boolean;
   /** Why nothing can be approved here yet (owner not set up, no passkeys in this browser). */
   readonly ownerNotice?: ReactNode;
   /** U4's pending invite rows; otherwise the server's open invites, each with Cancel. */
@@ -605,7 +606,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
         </Banner>
       ) : null}
       <SkeletonGate
-        loading={view.state === 'loading'}
+        loading={view.state === 'loading' || props.holding === true}
         skeleton={<HomeSkeleton pro={pro} />}
         label={S.loading}
       >
@@ -729,7 +730,11 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                               {summary === undefined ? '' : String(summary.files)}
                             </span>
                             <span role="cell" className="hm-cellbox hm-f">
-                              <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} size={16} />
+                              <Icon
+                                name="chevron-right"
+                                size={16}
+                                className={isOpen ? 'hm-chev is-open' : 'hm-chev'}
+                              />
                             </span>
                           </div>
                         ) : (
@@ -758,7 +763,11 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                                 <span>{S.notDelivered}</span>
                               </span>
                             ) : null}
-                            <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} size={18} />
+                            <Icon
+                              name="chevron-right"
+                              size={18}
+                              className={isOpen ? 'hm-chev is-open' : 'hm-chev'}
+                            />
                           </button>
                         )}
                         {isOpen && data !== undefined ? (

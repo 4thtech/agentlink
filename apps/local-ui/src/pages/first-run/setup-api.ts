@@ -482,6 +482,29 @@ const UPGRADE_PROBLEMS: ReadonlySet<string> = new Set<UpgradeProblem>([
   'failed',
 ]);
 
+/**
+ * W4-WIRE: a passkey was just registered on this page (an event with no data). The shell's "Switch
+ * to Touch ID" next step leaves at once, on the page where it happened, instead of on the next page
+ * change (where it moved the page that opened, CLS).
+ */
+export const PASSKEY_REGISTERED_EVENT = 'agentlink:passkey-registered';
+
+let registeredHere = false;
+
+/** Whether a passkey was registered in this page's life (a later stale read cannot bring it back). */
+export function passkeyRegisteredHere(): boolean {
+  return registeredHere;
+}
+
+export function resetPasskeyRegisteredForTests(): void {
+  registeredHere = false;
+}
+
+export function announcePasskeyRegistered(): void {
+  registeredHere = true;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(PASSKEY_REGISTERED_EVENT));
+}
+
 export function createUpgradeApi(options: SetupApiOptions = {}): UpgradeApi {
   const doFetch: Fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   return {
@@ -513,7 +536,10 @@ export function createUpgradeApi(options: SetupApiOptions = {}): UpgradeApi {
       const answer = await request(doFetch, options.token, 'POST', PASSKEY_PATH, body);
       if (answer === 'offline') return { kind: 'error', problem: 'offline' };
       const status = str(answer.json?.['status']);
-      if (answer.status === 200 && status === 'registered') return { kind: 'registered' };
+      if (answer.status === 200 && status === 'registered') {
+        announcePasskeyRegistered();
+        return { kind: 'registered' };
+      }
       if (status === 'wait') {
         const raw = answer.json?.['retryAfter'];
         const retryAfter =

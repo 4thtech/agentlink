@@ -554,6 +554,13 @@
      status words (a longer status would wrap it to a row of its own and move the page). */
   .al-chip-wrap {
     flex: 1 1 200px;
+    /* W4-WIRE: the agent dropdown hangs from the bar, inside the 16 px gutters (never past the edge). */
+    position: static;
+  }
+  .al-agent-menu {
+    left: 16px;
+    right: 16px;
+    width: auto;
   }
   .al-chip {
     width: 100%;
