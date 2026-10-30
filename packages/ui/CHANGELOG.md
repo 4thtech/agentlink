@@ -1,5 +1,11 @@
 # @4thtech-io/ui
 
+## 0.4.6
+
+### Patch Changes
+
+- b72f9ad: W4-WIRE-3: the app's live status now follows your AI apps: the events stream no longer drops itself when the first read of your agents takes a moment, so Claude Code shows Ready, Working and Not running without a reload. Received files on Home are one light row: the file name in a compact "from them" container, "Saved to ~/AgentLink/Inbox" and Show in Finder ("Saved as" only when the name changed).
+
 ## 0.4.5
 
 No changes in this release.

@@ -1,5 +1,0 @@
----
-section: Added
----
-
-- Files you receive are saved automatically (W4-AUTO-SAVE, S2, D-142, 04 §4.1): when a contact you keep sends a file, your agent downloads it, decrypts it on your computer, checks it and saves it into your Inbox folder (default `~/AgentLink/Inbox`), with no request from you or your AI. It stays within the daily limits (50 files and 500 MB per contact, 200 files and 2 GB in total), keeps 1 GiB free on the disk, and never saves while the agent is paused or for a contact you set to "Ask before saving". Every saved file gets the system's "downloaded from the internet" mark on macOS and Windows, is never made runnable, and never replaces anything in the folder; names that the system could act on get `.download` added. A file that is not saved automatically waits for Save, with a short reason. Your AI's file fetch and Save never write a second copy of a file already saved. The app reads which files were saved automatically, why others were not, your Inbox folder, and the one-time "now saved automatically" notice; the screens show them in a follow-up.

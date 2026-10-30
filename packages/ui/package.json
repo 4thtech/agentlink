@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/ui",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "private": true,
   "description": "Shared design system: design tokens (CSS and typed), Geist fonts and the core React components.",
   "license": "MIT",
