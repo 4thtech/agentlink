@@ -12,6 +12,7 @@ import {
   layoutShiftScore,
   observeLayoutShift,
 } from '../helpers/motion.js';
+import { skipGetStartedIfShown } from './helpers-wizard.js';
 import {
   chapter,
   firstRunWithTouchId,
@@ -40,7 +41,8 @@ describe('chapter 7: advanced', () => {
     await first.stop();
     await jp.page.goto(await startUi(pc, ready.files, ch.closers));
     const { page } = jp;
-    await page.getByRole('navigation', { name: 'Sections' }).waitFor();
+    // W4-WIZARD: no AI app is connected here, so the launch opens Get started; skip it.
+    await skipGetStartedIfShown(page);
     const probe = await jp.arm();
 
     // Simple layer: Settings is one list; Advanced opens in place.
