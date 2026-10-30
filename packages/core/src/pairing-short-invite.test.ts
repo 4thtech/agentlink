@@ -14,7 +14,7 @@ import {
 } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { createLogger } from '@4thtech-io/log';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import type { FilesPlatform } from './files/platform.js';
 import { INVITE_LINK_PREFIX, clearShortInviteCache } from './invite-link.js';
@@ -45,7 +45,7 @@ function fakeDrop() {
   const objects = new Map<string, Uint8Array>();
   const seen: Seen[] = [];
   const state = {
-    mode: 'ok' as 'ok' | 'down' | 'busy' | 'refuse',
+    mode: 'ok' as 'ok' | 'down' | 'busy' | 'refuse' | 'hang',
     onUpload: async (): Promise<void> => {},
   };
   const fetch = async (request: Request): Promise<Response> => {
@@ -53,6 +53,8 @@ function fakeDrop() {
     const body = request.method === 'GET' ? '' : await request.text();
     seen.push({ method: request.method, path: url.pathname, body, at: 'before' });
     if (state.mode === 'down') throw new Error('connect ECONNREFUSED');
+    // A drop that accepts the connection and never answers (no abort honoured either).
+    if (state.mode === 'hang') return new Promise<Response>(() => {});
     if (state.mode === 'busy') return new Response('{}', { status: 503 });
     const id = /^\/v1\/i\/([A-Za-z0-9_-]{22})$/.exec(url.pathname)?.[1];
     if (request.method === 'POST' && url.pathname === '/v1/invite') {
@@ -117,6 +119,7 @@ async function agent(n: number, name: string, drop: ReturnType<typeof fakeDrop> 
 const inviteRows = (a: { store: MemoryStore }) => a.store.transaction((tx) => tx.select('invites'));
 
 beforeEach(() => clearShortInviteCache());
+afterEach(() => vi.useRealTimers());
 
 describe('create: short by default (04 §3.6.2 Create)', () => {
   it('uploads the ALI1 object under the derived lookup ID and returns `…/i#2.<43>`', async () => {
@@ -184,6 +187,30 @@ describe('create: short by default (04 §3.6.2 Create)', () => {
     }
   });
 
+  it('a drop that never answers: the format 1 link within the 10 s upload deadline (O-L1)', async () => {
+    const drop = fakeDrop();
+    const a = await agent(37, 'Ana', drop);
+    drop.state.mode = 'hang';
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let settled = false;
+      const pending = a.client.pairing.createInvite().finally(() => {
+        settled = true;
+      });
+      // Long before safe-fetch's 60 s, and without waiting for the (also hung) object DELETE.
+      await vi.advanceTimersByTimeAsync(10_500);
+      expect(settled).toBe(true);
+      const created = await pending;
+      expect(created.format).toBe('long');
+      expect(created.inviteUrl.startsWith(INVITE_LINK_PREFIX)).toBe(true);
+      // The sweep was still started for the recorded object (the outcome is ambiguous).
+      await vi.advanceTimersByTimeAsync(0);
+      expect(drop.seen.some((s) => s.method === 'DELETE')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('`long: true` uploads nothing and records no drop object', async () => {
     const drop = fakeDrop();
     const a = await agent(34, 'Ana', drop);
@@ -228,6 +255,9 @@ describe('accept a short link (B)', () => {
     // One fetch for the two accept calls (the resolved invite is reused in this process).
     expect(drop.seen.filter((s) => s.method === 'GET')).toHaveLength(1);
     if (started.status !== 'pending') return;
+    // F-L1: a successful accept forgets the resolved link (it carries the pairing secret).
+    await b.client.pairing.resolveInviteLink(created.inviteUrl);
+    expect(drop.seen.filter((s) => s.method === 'GET')).toHaveLength(2);
     const received = await a.client.envelopes.receive({
       envelope: started.handshake.envelope,
       giftWrapId: giftWrapId(),
@@ -272,6 +302,36 @@ describe('accept a short link (B)', () => {
     expect(await a.store.transaction((tx) => tx.count('contacts'))).toBe(0);
     void parseJson;
     void ({} as Envelope);
+  });
+});
+
+describe('a Cancel racing the answer (O-L2)', () => {
+  it('a Cancel after the answer is checked, before it commits, still refuses the pairing', async () => {
+    const drop = fakeDrop();
+    const a = await agent(47, 'Ana', drop);
+    const b = await agent(48, 'Bo', drop);
+    const created = await a.client.pairing.createInvite();
+    const started = await b.client.pairing.acceptInvite({ link: created.inviteUrl, allowed: true });
+    if (started.status !== 'pending') throw new Error('test: not started');
+    const [open] = await a.client.pairing.openInvites();
+    await a.client.envelopes.receive({
+      envelope: started.handshake.envelope,
+      giftWrapId: giftWrapId(),
+    });
+    // The owner presses Cancel while A is between the answer's checks and its commit: the first
+    // read of A's own card comes right after the cancelled/expired checks (pairing.ts).
+    const identity = a.client.identity;
+    const signedCard = identity.signedCard.bind(identity);
+    let cancelled: string | undefined;
+    identity.signedCard = async () => {
+      if (cancelled === undefined) cancelled = await a.client.pairing.cancelInvite(open!.inviteId);
+      return signedCard();
+    };
+    const reports = await a.client.envelopes.processReceived();
+    expect(cancelled).toBe('cancelled');
+    expect(JSON.stringify(reports)).toContain('invite_expired');
+    expect(await a.store.transaction((tx) => tx.count('contacts'))).toBe(0);
+    expect((await inviteRows(a))[0]?.used_at).toBeNull();
   });
 });
 

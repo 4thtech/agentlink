@@ -13,7 +13,8 @@ import {
 } from './drop-fetch.js';
 import { dropResponse } from './testing/fixtures.js';
 
-const LOOKUP = 'AbCdEfGhIjKlMnOpQr_-12';
+// 16 bytes as strict base64url: the last character carries zero trailing bits ([AQgw]).
+const LOOKUP = 'AbCdEfGhIjKlMnOpQr_-1w';
 
 type FetchArgs = [RequestInfo | URL, RequestInit | undefined];
 
@@ -93,6 +94,9 @@ describe('inviteFetcher: the request', () => {
       'AbCdEfGhIjKlMnOpQr+/12',
       '../../v1/upload/xxxxxx',
       'AbCdEfGhIjKlMnOpQr%2F1',
+      // F-L2: 22 characters but not the canonical encoding of 16 bytes (non-zero trailing bits).
+      'AbCdEfGhIjKlMnOpQr_-12',
+      'AbCdEfGhIjKlMnOpQr_-1B',
     ]) {
       expect(await codeOf(get(bad)), bad).toBe('invite_invalid');
     }
