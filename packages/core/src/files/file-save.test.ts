@@ -266,6 +266,21 @@ describe('file.save: saveReceivedFile (W4-FILES-SAVE)', () => {
     expect(again).toEqual({ status: 'saved', name: 'brief.txt' });
   });
 
+  // IR (Fable): a replayed owner signature never saves twice. The same signed object sent twice at
+  // once: one copy, one nonce row; the loser is answered already_saved (serialised) and never applied.
+  it('the same signed save sent twice at once writes one copy and burns one nonce', async () => {
+    const { a, b } = await agents();
+    const envelopeId = await send(a, b, 'brief.txt', 50_000);
+    const signedSave = await signBody(await prepared(b, `${envelopeId}.00`));
+    const outs = await Promise.all([
+      b.client.saveReceivedFile(signedSave),
+      b.client.saveReceivedFile(signedSave),
+    ]);
+    expect(outs).toEqual([{ status: 'saved', name: 'brief.txt' }, { status: 'already_saved' }]);
+    expect([...b.inbox.files().keys()]).toEqual(['brief.txt']);
+    expect((await nonceRows(b)).length).toBe(1);
+  });
+
   // IR (Fable) L2: saves of one item are serialised: two at once yield one copy; the second waits
   // and is answered already_saved.
   it('two concurrent saves of the same file write one copy; the second is already_saved', async () => {
