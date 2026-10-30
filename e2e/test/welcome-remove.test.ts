@@ -134,6 +134,7 @@ describe('Remove in the session first run started (HOTFIX-045-REMOVE-FIRSTRUN)',
     expect(begin.status).toBe(200);
     const { publicKey, nonce } = JSON.parse(begin.body) as {
       publicKey: { rpId: string; userId: string; challenge: string; prfSalt: string };
+      nonce: string;
     };
     const salt = decodeBase64url(publicKey.prfSalt);
     const created = auth.create(decodeBase64url(publicKey.userId), salt);
