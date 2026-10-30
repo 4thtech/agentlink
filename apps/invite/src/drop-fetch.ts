@@ -5,6 +5,7 @@
 // `application/octet-stream` and at most 17 441 bytes (a running count), within 10 s. Errors are
 // core's three invite codes and carry nothing from the answer (I-5).
 import { CoreError, type ShortInviteFetch } from '@4thtech-io/core';
+import { SHORT_INVITE_LOOKUP_ID_RE } from '@4thtech-io/crypto';
 
 /** The drop host (07 §5.4, `DROP_DEFAULT_ENDPOINT`): the only origin the CSP lets the page reach. */
 export const DROP_HOST = 'https://drop.agentlink.4thtech.io';
@@ -15,7 +16,8 @@ export const INVITE_OBJECT_MAX_BYTES = 17_441;
 /** The whole fetch, body included, is given up after this (04 §3.6.2 step 3). */
 export const INVITE_FETCH_TIMEOUT_MS = 10_000;
 
-const LOOKUP_ID = /^[A-Za-z0-9_-]{22}$/;
+/** Strict base64url of 16 bytes, shared with storage and the drop Worker (F-L2). */
+const LOOKUP_ID = SHORT_INVITE_LOOKUP_ID_RE;
 
 const unavailable = (): CoreError =>
   new CoreError('invite_unavailable', 'This invite is no longer available.');

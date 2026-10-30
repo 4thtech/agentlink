@@ -18,6 +18,7 @@
 // Errors are typed codes; no response echoes request input.
 import {
   DROP_OBJECT_ID_LENGTH,
+  SHORT_INVITE_LOOKUP_ID_RE,
   createSha256,
   decodeBase64url,
   decodeUtf8,
@@ -62,7 +63,7 @@ const MIN_INVITE_OBJECT = 17 + 16;
  * A strict lookupId: 22 base64url characters with zero trailing bits (the last is A, Q, g or w),
  * so exactly one string names each 16-byte ID (07 §5.4).
  */
-const LOOKUP_ID = /^[A-Za-z0-9_-]{21}[AQgw]$/;
+const LOOKUP_ID = SHORT_INVITE_LOOKUP_ID_RE;
 const REPORT_REASONS = ['malware', 'illegal', 'spam', 'other'] as const;
 const OBJECT_ID = '[A-Za-z0-9_-]{22}';
 const HEX_64 = /^[0-9a-f]{64}$/;

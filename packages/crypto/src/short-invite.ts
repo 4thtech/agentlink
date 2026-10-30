@@ -21,6 +21,11 @@ import { wipe } from './wipe.js';
 export const SHORT_INVITE_SECRET_LENGTH = 32;
 /** The drop lookup ID: 16 bytes (22 base64url characters). */
 export const SHORT_INVITE_LOOKUP_ID_LENGTH = 16;
+/**
+ * The lookup ID as text: strict base64url of 16 bytes, 22 characters, the last with zero trailing
+ * bits (07 §5.4). The one form every surface accepts (storage, the drop Worker, the invite page).
+ */
+export const SHORT_INVITE_LOOKUP_ID_RE = /^[A-Za-z0-9_-]{21}[AQgw]$/;
 /** The largest D-69 payload P an object carries (the inflate input, 04 §3.6). */
 export const SHORT_INVITE_MAX_PAYLOAD = 16_384;
 /** The largest `ALI1` object: header 17 + padded plaintext 17 408 + tag 16. */

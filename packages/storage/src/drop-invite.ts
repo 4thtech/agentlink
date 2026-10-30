@@ -5,6 +5,7 @@
 // referrer are sent, the answer must be 200 with `application/octet-stream`, and the body is capped
 // at 17 441 bytes (Content-Length first, then a running count). The fetch it is given is the drop's
 // guarded fetch (exact origin, https). No error carries the URL or the lookup ID (I-7).
+import { SHORT_INVITE_LOOKUP_ID_RE } from '@4thtech-io/crypto';
 import { validateS3Endpoint } from './endpoint.js';
 import { StorageError } from './errors.js';
 import { discard, type FetchLike } from './http.js';
@@ -14,7 +15,7 @@ export const INVITE_OBJECT_MAX_BYTES = 17_441;
 /** The whole fetch is bounded (04 §3.6.2 step 3: at most 10 s). */
 export const INVITE_FETCH_TIMEOUT_MS = 10_000;
 /** Strict base64url of 16 bytes: 22 characters, the last with zero trailing bits (07 §5.4). */
-export const INVITE_LOOKUP_ID_RE = /^[A-Za-z0-9_-]{21}[AQgw]$/;
+export const INVITE_LOOKUP_ID_RE = SHORT_INVITE_LOOKUP_ID_RE;
 const MAX_RETRY_AFTER_SECONDS = 3_600;
 
 export interface InviteFetchConfig {

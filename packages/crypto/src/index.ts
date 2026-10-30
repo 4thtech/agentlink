@@ -86,6 +86,7 @@ export { HKDF_SHA256_MAX_LENGTH, hkdfSha256 } from './hkdf.js';
 // W4-SHORT-INVITE (04 §3.6.2, D-139): the short invite link secret, its lookup ID and `ALI1` v1.
 export {
   SHORT_INVITE_LOOKUP_ID_LENGTH,
+  SHORT_INVITE_LOOKUP_ID_RE,
   SHORT_INVITE_MAX_OBJECT,
   SHORT_INVITE_MAX_PAYLOAD,
   SHORT_INVITE_MIN_OBJECT,
