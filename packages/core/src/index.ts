@@ -567,10 +567,14 @@ export {
   type FetchUrlRefusal,
 } from './fetch-url.js';
 export {
+  DOWNLOAD_SUFFIX,
   FALLBACK_FILE_NAME,
   MAX_FILE_NAME_BYTES,
+  needsDownloadSuffix,
   sanitizeFileName,
+  savedFileName,
   withNameSuffix,
+  withRandomNameSuffix,
 } from './file-name.js';
 export {
   decidePath,
@@ -587,7 +591,25 @@ export {
 } from './path-guard.js';
 // M1-7f: files (04 §3.4, §4; 06 §2.3; 07 §5.6; D-84, D-85). The platform half (realpath, the SSRF-safe
 // fetch and download, the inbox file operations) is supplied by @4thtech-io/node (M1-9d).
-export type { DropConfig, FilesPlatform, InboxFolder, OutgoingFile } from './files/platform.js';
+export type {
+  DropConfig,
+  FilesPlatform,
+  InboxFolder,
+  InboxSaveError,
+  OutgoingFile,
+  QuarantineMark,
+} from './files/platform.js';
+export {
+  AUTO_SAVE_CONCURRENCY,
+  AUTO_SAVE_PAUSE_RECHECK_SECONDS,
+  AUTO_SAVE_RESERVE_BYTES,
+  AUTO_SAVE_RETRY_DELAYS,
+  AUTO_SAVE_WINDOW_SECONDS,
+  AutoSaver,
+  autoSaveOf,
+  type AutoSavePause,
+  type AutoSaveRun,
+} from './files/auto-save.js';
 export type { FetchFileInput, FetchFileResult } from './files/incoming.js';
 export type { SaveReceivedFileResult } from './files/save.js';
 export {
