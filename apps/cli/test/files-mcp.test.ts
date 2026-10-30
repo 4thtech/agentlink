@@ -145,9 +145,16 @@ describe('agentlink_send with path and agentlink_fetch_file on disk', () => {
     expect(new Uint8Array(await readFile(savedTo))).toEqual(SMALL);
     expect((await lstat(savedTo)).mode & 0o777).toBe(0o600);
 
-    // A second fetch never overwrites: it gets a new name.
+    // A second fetch never writes a second copy (D-142, 04 §4.1): the file is still saved, so it is
+    // answered from the record.
     const again = await call(bobMcp, 'agentlink_fetch_file', { envelopeId: message!.envelopeId });
-    expect(again.structured).toMatchObject({ status: 'ok', name: 'hello (1).txt' });
+    expect(again.structured).toMatchObject({ status: 'ok', savedTo, name: 'hello.txt' });
+    // Once the saved file is gone, a fetch saves it again, never over another entry.
+    await rm(savedTo);
+    await mkdir(savedTo);
+    const third = await call(bobMcp, 'agentlink_fetch_file', { envelopeId: message!.envelopeId });
+    expect(third.structured).toMatchObject({ status: 'ok', name: 'hello (2).txt' });
+    expect((await lstat(savedTo)).isDirectory()).toBe(true);
   });
 
   it('refuses traversal, hidden, protected and relative paths with fixed errors, never opening them', async () => {

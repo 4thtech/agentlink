@@ -46,6 +46,8 @@ export interface ConnectAppProps {
   readonly passkeyProof: (info: PasskeyInfo) => Promise<PresenceProof | undefined>;
   /** Leaves for Home (Later, done, or nothing to connect). */
   readonly onDone: () => void;
+  /** W4-WIZARD: the entry is written; Get started shows its Connected step instead of "done". */
+  readonly onConnected?: () => void;
 }
 
 /** `"agentlink": { … }` as the person would see it in the file; AgentLink's own entry only. */
@@ -74,6 +76,7 @@ export function ConnectApp({
   sensor,
   passkeyProof,
   onDone,
+  onConnected,
 }: ConnectAppProps): ReactElement {
   const [view, setView] = useState<View>({ k: 'loading' });
   const [info, setInfo] = useState<PasskeyInfo | undefined | 'unknown'>('unknown');
@@ -159,8 +162,10 @@ export function ConnectApp({
     setView({ k: 'working', change });
     const result = await appsApi.apply(change.changeId, proof);
     if (!live.current) return;
-    if (result.kind === 'done') setView({ k: 'done' });
-    else fail(change, result);
+    if (result.kind === 'done') {
+      if (onConnected !== undefined) onConnected();
+      else setView({ k: 'done' });
+    } else fail(change, result);
   };
 
   if (view.k === 'loading') return <LoadingState text={T.loading} />;

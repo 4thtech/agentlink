@@ -61,6 +61,7 @@ import {
 } from '@4thtech-io/core';
 import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
 import {
+  AUTO_SAVE_DEFAULTS,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   POLICY_BOUNDS,
   defaultPolicy,
@@ -560,9 +561,15 @@ async function setFolders(
   summary: string,
   done: string,
 ): Promise<number> {
+  // D-142 (06 §3): every policy.set this CLI signs carries files.autoSave; a policy signed before
+  // D-142 has none and is read with the defaults, so the new document gets them.
   let policy: Policy = {
     ...rules.policy,
-    files: { ...rules.policy.files, allowedFolders: [...folders] },
+    files: {
+      ...rules.policy.files,
+      allowedFolders: [...folders],
+      autoSave: rules.policy.files.autoSave ?? { ...AUTO_SAVE_DEFAULTS },
+    },
   };
   if (folders.length > POLICY_BOUNDS.allowedFolders.max) {
     output.printError(POLICY_TEXT.tooMany);

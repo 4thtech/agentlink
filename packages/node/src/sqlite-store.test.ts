@@ -443,8 +443,8 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     // add a migration with the next version instead (07 §3.7: forward migrations only).
     const digestOf = (i: number) =>
       encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-    expect(STORE_SCHEMA_VERSION).toBe(10);
-    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(STORE_SCHEMA_VERSION).toBe(11);
+    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     // Version 1 (G-9) is unchanged by D-72.
     expect(digestOf(0)).toMatchInlineSnapshot(
       `"6a2a36755c97cca746bdfe0b166c409cf1a067b1fd526011470446c0bb7dfd1b"`,
@@ -558,6 +558,51 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     ]);
     expect(v10.some((s) => s.startsWith('ALTER TABLE'))).toBe(false);
     expect(digestOf(9)).toBe('40536c0d6cf98abd567807603de2ee761e454fbff14896e232e2f1dba63a5257');
+    // Version 11 (W4-AUTO-SAVE, D-142; 04 §4.1): the files auto-save columns (appended, nullable),
+    // the limits log and the one-row state table, and the notice row for an agent that updates.
+    const v11 = MIGRATIONS[10]?.statements ?? [];
+    expect(
+      v11
+        .filter((st) => st.startsWith('ALTER TABLE "files" ADD COLUMN'))
+        .map((st) => /ADD COLUMN "([a-z_]+)"/.exec(st)?.[1]),
+    ).toEqual(['auto_save', 'auto_reason', 'auto_tries', 'auto_next_at']);
+    expect(v11.filter((s) => s.startsWith('CREATE TABLE')).map((s) => s.split('"')[1])).toEqual([
+      'auto_save_log',
+      'auto_save_state',
+    ]);
+    expect(digestOf(10)).toBe('98f8a3b23daa0032810d98e3adec12d61f87eb0ecf71010cad7b55b7e094da93');
+  });
+
+  it('migrates a version 10 file to version 11 (D-142): the notice only for an agent that updates', async () => {
+    for (const withIdentity of [true, false]) {
+      const file = `${path()}-${withIdentity ? 'updated' : 'new'}`;
+      const raw = new Database(file);
+      for (const m of MIGRATIONS.slice(0, 10)) {
+        for (const statement of m.statements) raw.prepare(statement).run();
+      }
+      raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+      raw.pragma('user_version = 10');
+      if (withIdentity) {
+        raw
+          .prepare(
+            'INSERT INTO "identity" ("agent_id", "agent_card_json", "pending_card_json", "name", ' +
+              '"relays", "key_epoch", "storage_prefix", "revoked_at", "created_at", "updated_at") ' +
+              'VALUES (?, ?, NULL, ?, ?, 0, ?, NULL, 1, 1)',
+          )
+          .run('0x' + 'a'.repeat(40), 'x', 'x', 'x', 'AAAAAAAAAAAAAAAAAAAAAA');
+      }
+      raw.close();
+      const v11 = await SqliteStore.open(file);
+      expect(v11.schemaVersion).toBe(11);
+      const state = await v11.transaction((tx) => tx.select('auto_save_state'));
+      expect(state).toEqual(
+        withIdentity
+          ? [{ slot: 'current', notice: 'show', paused_reason: null, paused_at: null }]
+          : [],
+      );
+      expect(await v11.transaction((tx) => tx.select('auto_save_log'))).toEqual([]);
+      await v11.close();
+    }
   });
 
   it('migrates a version 9 file to version 10 (D-143): rows kept, the heartbeat tables empty', async () => {
@@ -575,7 +620,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       .run('AAAAAAAAAAAAAAAAAAAAAA', 'x');
     raw.close();
     const v10 = await SqliteStore.open(path());
-    expect(v10.schemaVersion).toBe(10);
+    expect(v10.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     expect(await v10.transaction((tx) => tx.select('invites'))).toHaveLength(1);
     expect(await v10.transaction((tx) => tx.select('mcp_sessions'))).toEqual([]);
     await v10.transaction((tx) => {

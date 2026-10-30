@@ -50,6 +50,10 @@ export const POLICY_BOUNDS = freeze({
   sizeMB: freeze({ min: 1, max: 10_240 } as const),
   defaultExpiryDays: freeze({ min: 1, max: 7 } as const),
   maxEnvelopeKB: freeze({ min: 1, max: 24 } as const),
+  /** `files.autoSave.perContactFilesPerDay` and `totalFilesPerDay` (D-142). */
+  autoSaveFilesPerDay: freeze({ min: 1, max: 1000 } as const),
+  /** `files.autoSave.perContactMBPerDay` and `totalMBPerDay` (D-142). */
+  autoSaveMBPerDay: freeze({ min: 1, max: 10_240 } as const),
 } as const);
 
 // --- field schemas -------------------------------------------------------------------------------
@@ -110,11 +114,38 @@ export const chainKeySchema = z
 // --- ContactRule (06 §3 "Per-contact rules", G-32) -----------------------------------------------
 
 /**
- * One contact's rule: at least one of `proofs` and `receipts` (D-109).
+ * `files.autoSave` (D-142; 06 §3; proposed, owner confirms at merge): incoming files from contacts
+ * the owner keeps are saved automatically within these rolling 24-hour limits (04 §4.1). A strict
+ * object with all five keys when present. It is the one policy key that may be absent: a policy
+ * signed before D-142 has none and is read with AUTO_SAVE_DEFAULTS (auto-save on; Decision 51).
+ */
+export const autoSaveSchema = z.strictObject({
+  on: z.boolean(),
+  perContactFilesPerDay: intIn(POLICY_BOUNDS.autoSaveFilesPerDay),
+  perContactMBPerDay: intIn(POLICY_BOUNDS.autoSaveMBPerDay),
+  totalFilesPerDay: intIn(POLICY_BOUNDS.autoSaveFilesPerDay),
+  totalMBPerDay: intIn(POLICY_BOUNDS.autoSaveMBPerDay),
+});
+
+export type AutoSavePolicy = z.infer<typeof autoSaveSchema>;
+
+/** The 06 §3 `files.autoSave` defaults (D-142, Decision 51): on, 50/500 per contact, 200/2048. */
+export const AUTO_SAVE_DEFAULTS: Readonly<AutoSavePolicy> = freeze({
+  on: true,
+  perContactFilesPerDay: 50,
+  perContactMBPerDay: 500,
+  totalFilesPerDay: 200,
+  totalMBPerDay: 2048,
+});
+
+/**
+ * One contact's rule: at least one of `proofs`, `receipts` and `files` (D-109, D-142).
  * - `proofs` holds at least one of `notarize` (replaces `proofs.notarize` for this contact; a
  *   global `deny` still wins) and `perActionMaxUSD` (replaces `proofs.perActionMaxUSD`).
  * - `receipts` holds exactly `autoDelivered`, which replaces `receipts.autoDelivered` for DELIVERED
  *   receipts on this contact's records only; never OPENED, ACCEPTED or REJECTED (06 §3, M1-33a).
+ * - `files` holds exactly `askBeforeSaving: true` (D-142): this contact's files are not saved
+ *   automatically and wait for Save or the AI's fetch.
  * An absent key is absent: an explicit `undefined` is rejected.
  */
 export const contactRuleSchema = z
@@ -131,10 +162,12 @@ export const contactRuleSchema = z
       )
       .exactOptional(),
     receipts: z.strictObject({ autoDelivered: z.boolean() }).exactOptional(),
+    // D-142: "Ask before saving" for this contact; only `true` (it can only make saving stricter).
+    files: z.strictObject({ askBeforeSaving: z.literal(true) }).exactOptional(),
   })
   .refine(
-    (r) => r.proofs !== undefined || r.receipts !== undefined,
-    'a contact rule sets proofs, receipts or both',
+    (r) => r.proofs !== undefined || r.receipts !== undefined || r.files !== undefined,
+    'a contact rule sets proofs, receipts, files or a combination',
   );
 
 const contactRulesSchema = z
@@ -174,6 +207,8 @@ export const policySchema = z.strictObject({
     defaultExpiryDays: intIn(POLICY_BOUNDS.defaultExpiryDays),
     deleteAfter: z.enum(FILE_DELETE_AFTER),
     ownerArchive: z.boolean(),
+    // D-142: may be absent only in a policy signed before D-142 (read as AUTO_SAVE_DEFAULTS).
+    autoSave: autoSaveSchema.exactOptional(),
   }),
   envelopes: z.strictObject({
     maxEnvelopeKB: intIn(POLICY_BOUNDS.maxEnvelopeKB),

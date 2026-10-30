@@ -99,7 +99,8 @@ describe('GET /api/ui/files/received and /sent: registration (MSG-FILES-IO-d)', 
       expect(createLocalUiRoutes().match('POST', path)).toBe('method');
     }
     expect(filesIoRoutes.every((r) => r.method === 'GET' && r.presence === false)).toBe(true);
-    expect(filesIoRoutes).toHaveLength(2);
+    // W4-AUTO-SAVE adds the notice's dismiss (a read-kind display-state route).
+    expect(filesIoRoutes).toHaveLength(3);
   });
 
   it('keeps the existing /api/ui/files routes', () => {
@@ -139,8 +140,10 @@ describe('GET /api/ui/files/received and /sent: registration (MSG-FILES-IO-d)', 
       sendMessage: () => Promise.reject(new Error('never')),
     };
     const view = readOnlyClient(full as never);
-    // W4-FILES-SAVE adds prepareSave: core's unsigned `file.save` (prepare only, writes nothing).
+    // W4-FILES-SAVE adds prepareSave: core's unsigned `file.save` (prepare only, writes nothing),
+    // and (SEC-L1) isReceived, a store read before presence.
     expect(Object.keys(view.filesIo).sort()).toEqual([
+      'isReceived',
       'prepareSave',
       'received',
       'savedName',

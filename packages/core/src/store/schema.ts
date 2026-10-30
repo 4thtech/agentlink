@@ -198,6 +198,12 @@ export const TABLES = {
   // saved_name (MSG-FILES-IO-b, schema version 6): the single file name fetchFile placed in the
   // Inbox folder, sealed like `name`; never a path. Null until a fetch saved the file, and on every
   // row stored before version 6. It goes with the row when retention deletes it.
+  // auto_save, auto_reason, auto_tries, auto_next_at (W4-AUTO-SAVE, D-142, schema version 11;
+  // proposed, owner confirms at merge): a received file's automatic save (04 §4.1). `pending` from
+  // ingest until the core saved it (`saved`) or it waits for Save (`waiting`, with a fixed reason, or
+  // none when the agent was paused). auto_tries counts failed downloads (at most 3 retries);
+  // auto_next_at is the arrival time at ingest, then the time of the next retry. Null on outbound rows
+  // and on every row stored before version 11: those arrived before automatic saving.
   files: {
     columns: {
       envelope_id: id,
@@ -212,6 +218,19 @@ export const TABLES = {
       deleted_at: opt('int'),
       delete_after: optOneOf('expiry', 'receipt'),
       saved_name: opt('enc'),
+      auto_save: optOneOf('pending', 'saved', 'waiting'),
+      auto_reason: optOneOf(
+        'limit_contact',
+        'limit_today',
+        'ask_before_saving',
+        'auto_save_off',
+        'disk_full',
+        'folder_unavailable',
+        'folder_cannot_mark',
+        'download_failed',
+      ),
+      auto_tries: opt('int'),
+      auto_next_at: opt('int'),
     },
     primaryKey: ['envelope_id', 'idx'],
   },
@@ -380,6 +399,29 @@ export const TABLES = {
   mcp_last_seen: {
     columns: { app: text, last_seen_at: int },
     primaryKey: ['app'],
+  },
+  // 04 §4.1 (W4-AUTO-SAVE, D-142; schema version 11; proposed, owner confirms at merge): the rolling
+  // 24-hour auto-save limits, one reservation per file the core started to save automatically: the
+  // contact, the time and the declared size. Counts and bytes only: never a name, folder or link.
+  // Rows older than 24 hours are pruned.
+  auto_save_log: {
+    columns: { envelope_id: id, idx: int, contact_id: id, at: int, bytes: int },
+    primaryKey: ['envelope_id', 'idx'],
+  },
+  // 04 §4.1, 08 §1 (D-142; schema version 11): at most one row. notice: the one-time "now saved
+  // automatically" notice of an agent that updated (`show` until the owner dismisses it, Decision
+  // 51); the version 11 migration writes `show` only into a store that already has an identity, so a
+  // new agent never shows it. paused_reason and paused_at: auto-save paused for the folder (disk
+  // full, cannot mark, unavailable), checked again at most once per 10 minutes.
+  auto_save_state: {
+    columns: {
+      slot: oneOf(SINGLETON_SLOT),
+      notice: optOneOf('show', 'dismissed'),
+      paused_reason: optOneOf('disk_full', 'folder_cannot_mark', 'folder_unavailable'),
+      paused_at: opt('int'),
+    },
+    primaryKey: ['slot'],
+    maxRows: 1,
   },
   // 07 §3.3. approval_id is the empty string for a call without one, so it is `text`.
   idempotency: {

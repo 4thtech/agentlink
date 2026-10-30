@@ -113,8 +113,8 @@ describe('chapter 2: contacts and invites', () => {
     expect(dropDump).not.toContain(secret.slice(2));
 
     // The open invite is a pending row, read from the server (it survives leaving the page).
-    // (Messages: the wave-4 shell no longer lists Home in the navigation.)
-    await navTo(a.page, 'Messages');
+    // (Inbox goes through Go to in the wave-4 shell: world.ts INTERIM.)
+    await navTo(a.page, 'Inbox');
     await navTo(a.page, 'Contacts');
     await a.page.getByText('Waiting for them to accept').first().waitFor();
     await a.page.getByRole('button', { name: 'Cancel' }).first().click();

@@ -214,6 +214,10 @@ async function putFileRow(
     delete_after: 'expiry',
     // Store schema 6 (MSG-FILES-IO-b): not saved yet.
     saved_name: null,
+    auto_save: null,
+    auto_reason: null,
+    auto_tries: null,
+    auto_next_at: null,
     ...over,
   };
   await agent.store.transaction((tx) => tx.insert('files', row));
@@ -775,7 +779,14 @@ describe('FilesIoView.received (plan §4 GET /api/ui/files/received)', () => {
       [`${live}.00`, 'a.pdf', 'not_saved'],
     ]);
     for (const item of items) {
-      expect(keys(item)).toEqual(RECEIVED_KEYS);
+      // W4-AUTO-SAVE (D-142): these rows carry no auto-save state (stored before automatic saving),
+      // so a file not saved reads `before_auto_save`; an expired one has no reason.
+      if (item.state === 'not_saved') {
+        expect(keys(item)).toEqual([...RECEIVED_KEYS, 'reason'].sort());
+        expect(item.reason).toBe('before_auto_save');
+      } else {
+        expect(keys(item)).toEqual(RECEIVED_KEYS);
+      }
       expect(keys(item.from)).toEqual(['label', 'name', 'nameSource']);
     }
     expect(items[1]).toMatchObject({ at: T0, size: 20, proof: false });

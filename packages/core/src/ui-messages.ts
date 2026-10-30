@@ -165,6 +165,13 @@ export interface ReceivedFileItem {
   readonly state: ReceivedFileState;
   /** Only when `saved`: the single file name the AI's fetch placed in the Inbox folder. */
   readonly savedName?: string;
+  /** W4-AUTO-SAVE (D-142): only when `saved` by the core's automatic save. */
+  readonly savedBy?: 'auto';
+  /**
+   * W4-AUTO-SAVE (D-142, 08 §1): only when `not_saved`, why it was not saved automatically: a fixed
+   * code, never error text. Absent while the automatic save is still to run, or with no reason line.
+   */
+  readonly reason?: NonNullable<Row<'files'>['auto_reason']> | 'before_auto_save';
   readonly proof: boolean;
 }
 
@@ -605,14 +612,23 @@ export class FilesIoView {
       if (from === undefined) return undefined;
       let state: ReceivedFileState;
       let savedName: string | null = null;
+      let reason: ReceivedFileItem['reason'];
+      let savedBy: 'auto' | undefined;
       if (fileRow === undefined) {
         // Retention deleted the row, and with it the key; or a payload stored before the rows
         // existed, which still carries its key until its expiry.
         state =
           entry.fileKey === SHREDDED_FILE_KEY || now >= entry.expiresAt ? 'expired' : 'not_saved';
+        if (state === 'not_saved') reason = 'before_auto_save';
       } else {
         savedName = await this.#saved(fileRow);
         state = savedName !== null ? 'saved' : now >= fileRow.expires_at ? 'expired' : 'not_saved';
+        if (state === 'saved' && fileRow.auto_save === 'saved') savedBy = 'auto';
+        if (state === 'not_saved') {
+          // D-142: a row stored before automatic saving has no auto_save value.
+          reason =
+            fileRow.auto_save === null ? 'before_auto_save' : (fileRow.auto_reason ?? undefined);
+        }
       }
       return {
         id: fileId(row.envelope_id, idx),
@@ -622,9 +638,36 @@ export class FilesIoView {
         size: entry.size,
         state,
         ...(savedName === null ? {} : { savedName }),
+        ...(savedBy === undefined ? {} : { savedBy }),
+        ...(reason === undefined ? {} : { reason }),
         proof,
       };
     });
+  }
+
+  /**
+   * W4-FILES-SAVE (SEC-L1): true when `id` names a received file of this agent that Save can act on
+   * (an inbound `ok` message from a contact the list shows, with its receiver row kept). The local
+   * app checks this before it asks for the owner's presence. Never logs.
+   */
+  async isReceived(id: string): Promise<boolean> {
+    if (typeof id !== 'string') return false;
+    const m = SAVED_ITEM_ID.exec(id);
+    if (m === null) return false;
+    const envelopeId = m[1] as string;
+    const idx = Number(m[2]);
+    const row = await this.#ctx.store.transaction((tx) => {
+      const scope = visibleTx(tx);
+      if (scope.length === 0) return undefined;
+      const message = tx.select(
+        'envelopes',
+        { ...whereOf('in', scope), envelope_id: envelopeId },
+        { limit: 1 },
+      )[0];
+      if (message === undefined) return undefined;
+      return tx.select('files', { envelope_id: envelopeId, idx }, { limit: 1 })[0];
+    });
+    return row !== undefined && row.deleted_at === null;
   }
 
   /**

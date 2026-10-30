@@ -57,6 +57,7 @@ const world = (over: Partial<World> = {}): World => ({
   ...over,
 });
 
+// W4-SHELL-LIVE: the read as K1 answers it (08 §1): app ids with a live state per agent.
 const agentsOf = (w: World) => ({
   switchable: true,
   generation: w.generation,
@@ -71,7 +72,8 @@ const agentsOf = (w: World) => ({
       removing: false,
       contacts: 2,
       running: w.running,
-      apps: ['Claude Code'],
+      state: w.running ? 'ready' : 'offline',
+      apps: [{ app: 'claude-code', state: w.running ? 'ready' : 'not_running' }],
     },
     {
       name: 'work',
@@ -81,7 +83,8 @@ const agentsOf = (w: World) => ({
       removing: false,
       contacts: 0,
       running: false,
-      apps: ['Cursor'],
+      state: 'offline',
+      apps: [{ app: 'cursor', state: 'not_running' }],
     },
     {
       name: 'notes',
@@ -91,6 +94,7 @@ const agentsOf = (w: World) => ({
       removing: false,
       contacts: 0,
       running: false,
+      state: 'offline',
       apps: [],
     },
   ],
@@ -316,7 +320,7 @@ describe('the live agent dropdown', () => {
     expect(location.pathname).toBe('/agents');
   });
 
-  it('updates by itself: one shared read every 5 s while the tab is visible, none while hidden', async () => {
+  it('without the events stream (404) it updates by itself: one shared read every 5 s while visible, none while hidden', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const w = world();
     serve(w);
@@ -330,7 +334,10 @@ describe('the live agent dropdown', () => {
     });
     await settle();
     expect(w.agentReads).toBe(first + 1);
-    expect(chip()?.textContent).toContain('Not running');
+    // W4-SHELL-LIVE: 08 §1 words; an agent that runs nowhere is Offline (its apps Not running).
+    act(() => setConnectionState('connected'));
+    await settle();
+    expect(chip()?.textContent).toContain('Offline');
     // Hidden tab: no timer reads; visible again: a read at once.
     Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
     Object.defineProperty(document, 'hidden', { value: true, configurable: true });
