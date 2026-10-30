@@ -270,17 +270,18 @@ export function AgentsPage({
   const [view, setView] = useState<'list' | 'map'>('list');
 
   let body: ReactElement;
-  if (failed) {
-    body = (
-      <Surface as="section" level={1} className="ag-error-box">
-        <p className="al-text-body" role="alert">
-          {S.loadError}
-        </p>
-        <Button variant="secondary" onClick={reread}>
-          {S.tryAgain}
-        </Button>
-      </Surface>
-    );
+  const errorBox = (
+    <Surface as="section" level={1} className="ag-error-box">
+      <p className="al-text-body" role="alert">
+        {S.loadError}
+      </p>
+      <Button variant="secondary" onClick={reread}>
+        {S.tryAgain}
+      </Button>
+    </Surface>
+  );
+  if (failed && detailName !== undefined) {
+    body = errorBox;
   } else if (detailName !== undefined) {
     body =
       detail === undefined ? (
@@ -352,60 +353,61 @@ export function AgentsPage({
         </div>
       </div>
     );
-    const content =
-      list !== undefined && rows.length === 0 ? (
-        <EmptyState
-          title={S.empty}
-          action={
-            <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
-              {S.newAgent}
-            </a>
-          }
-        />
-      ) : hood && view === 'map' && MapView !== undefined ? (
-        <MapView agents={rows} onShowList={() => setView('list')} onSwitch={doSwitch} />
-      ) : hood ? (
-        <Fleet
-          rows={rows}
-          now={now}
-          onPause={onPause}
-          onResume={onResume}
-          onRemove={(picked) => setRemoveQueue(picked)}
-        />
-      ) : (
-        <div className="ag-cards">
-          {rows.map((row) => (
-            <AgentCard
-              key={row.name}
-              row={row}
-              tidy={tidy.has(row.name)}
-              actions={{
-                api,
-                owner,
-                ...(apps === undefined ? {} : { apps }),
-                now,
-                labelOf,
-                cardName,
-                panel,
-                setPanel,
-                onPause,
-                onResume,
-                onSwitch: doSwitch,
-                onRemove: (r) => setRemoveQueue([r]),
-                onAppsElsewhere,
-                onRenamed,
-                onCardUpdated: (told) => {
-                  setCardName(undefined);
-                  setNotice(told && open !== undefined ? S.renamedTold(open.label) : undefined);
-                  changed();
-                },
-                onChanged: changed,
-                onAgentChanged: agentChanged,
-              }}
-            />
-          ))}
-        </div>
-      );
+    const content = failed ? (
+      errorBox
+    ) : list !== undefined && rows.length === 0 ? (
+      <EmptyState
+        title={S.empty}
+        action={
+          <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
+            {S.newAgent}
+          </a>
+        }
+      />
+    ) : hood && view === 'map' && MapView !== undefined ? (
+      <MapView agents={rows} onShowList={() => setView('list')} onSwitch={doSwitch} />
+    ) : hood ? (
+      <Fleet
+        rows={rows}
+        now={now}
+        onPause={onPause}
+        onResume={onResume}
+        onRemove={(picked) => setRemoveQueue(picked)}
+      />
+    ) : (
+      <div className="ag-cards">
+        {rows.map((row) => (
+          <AgentCard
+            key={row.name}
+            row={row}
+            tidy={tidy.has(row.name)}
+            actions={{
+              api,
+              owner,
+              ...(apps === undefined ? {} : { apps }),
+              now,
+              labelOf,
+              cardName,
+              panel,
+              setPanel,
+              onPause,
+              onResume,
+              onSwitch: doSwitch,
+              onRemove: (r) => setRemoveQueue([r]),
+              onAppsElsewhere,
+              onRenamed,
+              onCardUpdated: (told) => {
+                setCardName(undefined);
+                setNotice(told && open !== undefined ? S.renamedTold(open.label) : undefined);
+                changed();
+              },
+              onChanged: changed,
+              onAgentChanged: agentChanged,
+            }}
+          />
+        ))}
+      </div>
+    );
     body = (
       <>
         {head}
@@ -424,7 +426,7 @@ export function AgentsPage({
           skeleton={hood ? <SkeletonTable rows={4} columns={5} /> : <SkeletonList rows={3} />}
           label={S.loading}
         >
-          {list === undefined ? null : content}
+          {list === undefined && !failed ? null : content}
         </SkeletonGate>
       </>
     );
