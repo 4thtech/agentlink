@@ -139,8 +139,13 @@ describe('the repository itself', () => {
   // every package's tests at once (turbo, browser projects included), and the scan took 16.2 s there
   // (run 38769544356) and exceeded 30 s on a slower runner (run 38770433435). Same assertions, a
   // 120 s timeout for this one test, with headroom over the contended worst case.
+  // W4-DEPS-CHECK-FLAKE: the repository has since grown to ~1,400 files (14 MB) and three full
+  // scans ran per CI job (the lint step plus this file plus e2e-zone.test.mjs), reaching 133 s on a
+  // contended runner (#718, #714). The scans now reuse per-file results from node_modules/.cache
+  // (key: rules + TypeScript version + zone + path + file text hash), so only the first scan in a
+  // checkout parses; a cold run is unchanged (~1.5 s here), a warm one ~0.1 s.
   it('passes every boundary check', { timeout: 120_000 }, () => {
-    const { problems, packages } = runChecks(REPO);
+    const { problems, packages } = runChecks(REPO, { cache: true });
     expect(problems).toEqual([]);
     expect(packages).toBeGreaterThan(10);
   });
