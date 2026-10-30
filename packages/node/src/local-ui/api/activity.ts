@@ -43,6 +43,9 @@ const PROOF_STATE: Readonly<Record<string, string>> = Object.freeze({
   received: 'received',
 });
 
+/** D-141: the longest name a rename entry carries (restricted names are at most 32 code points). */
+const MAX_RENAMED_CHARS = 128;
+
 const result = (status: number, body: JsonObject): LocalUiResult => Object.freeze({ status, body });
 const invalidQuery = (): LocalUiResult => result(400, { error: 'invalid_query' });
 
@@ -88,6 +91,14 @@ function view(entry: ActivityEntry): JsonObject | undefined {
     case 'contact_blocked':
     case 'rules_changed':
       return { kind: entry.kind, at };
+    case 'contact_renamed': {
+      // W4-RENAME-REACHES-CONTACTS (D-141): "{formerName} is now called {newName}", both as core
+      // restricted them (06 §2.1), short plain text only; never a raw name.
+      const plain = (name: unknown): name is string =>
+        typeof name === 'string' && name.length > 0 && name.length <= MAX_RENAMED_CHARS;
+      if (!plain(entry.formerName) || !plain(entry.newName)) return undefined;
+      return { kind: entry.kind, at, formerName: entry.formerName, newName: entry.newName };
+    }
     default:
       return undefined;
   }

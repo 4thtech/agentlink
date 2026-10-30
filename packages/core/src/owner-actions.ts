@@ -37,6 +37,7 @@ import {
   approvalIdSchema,
   contactRenameParamsSchema,
   evmAddress,
+  fileSaveParamsSchema,
   policyPatchSchema,
   policySchema,
   signedOwnerActionSchema,
@@ -91,6 +92,9 @@ import type { StoreTx } from './store/store.js';
  * the highest applied version (0 when none was ever applied) or throws; `raise` sets the mark to
  * max(mark, version) under the inter-process lock (06 §6), never lowers it, and returns the new mark.
  */
+
+/** A received item ID (core ui-messages.ts): `<envelope ID>.<index>`, the index 00 to 15. */
+const FILE_ITEM_ID = /^([A-Za-z0-9_-]{22})\.(0[0-9]|1[0-5])$/;
 export interface PolicyVersionMark {
   read(): Promise<number>;
   raise(version: number): Promise<number>;
@@ -345,6 +349,8 @@ export class OwnerActions {
       case 'app.connect':
       case 'app.disconnect':
         return this.#applyAppChange(value, base);
+      case 'file.save':
+        return this.#applyFileSave(value, base);
       case 'credits.deposit':
       case 'credits.withdraw':
       case 'agent.revoke': {
@@ -402,6 +408,7 @@ export class OwnerActions {
     const contactId = body.params.contact;
     let sealedAlias: Sealed | undefined;
     let othersSnapshot = '';
+    let keepDeclared: { readonly name: Sealed; readonly sealed: Sealed } | undefined;
     if (body.op === 'contact.rename') {
       if (!isRestrictedAlias(body.params.alias)) return this.#report(refused(op, 'alias_invalid'));
       const wanted = foldName(body.params.alias);
@@ -413,6 +420,18 @@ export class OwnerActions {
       }
       othersSnapshot = await this.#ctx.store.transaction((tx) => activeOthers(tx, contactId));
       sealedAlias = await seal(this.#ctx, 'contacts', 'name', [contactId], body.params.alias);
+      // D-141: a row from before store version 9 shown by its own name keeps that name as its
+      // self-declared name before the alias replaces it, so a later rename can say "was {old}".
+      const current = await this.#ctx.store.transaction((tx) =>
+        tx.get('contacts', { contact_id: contactId }),
+      );
+      if (current?.name_source === 'counterparty' && current.declared_name === null) {
+        const own = await open(this.#ctx, 'contacts', 'name', [contactId], current.name);
+        keepDeclared = {
+          name: current.name,
+          sealed: await seal(this.#ctx, 'contacts', 'declared_name', [contactId], own),
+        };
+      }
     }
     const now = base.now;
     const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
@@ -424,11 +443,19 @@ export class OwnerActions {
       if (sealedAlias !== undefined) {
         // The uniqueness check above read these rows; any change since refuses the object.
         if (activeOthers(tx, contactId) !== othersSnapshot) return refused(op, 'store_changed');
+        if (keepDeclared !== undefined && row.name !== keepDeclared.name) {
+          return refused(op, 'store_changed');
+        }
         tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
         tx.update(
           'contacts',
           { contact_id: contactId, status: row.status },
-          { name: sealedAlias, name_source: 'owner', updated_at: now },
+          {
+            name: sealedAlias,
+            name_source: 'owner',
+            updated_at: now,
+            ...(keepDeclared === undefined ? {} : { declared_name: keepDeclared.sealed }),
+          },
         );
         return { status: 'applied', op };
       }
@@ -739,6 +766,30 @@ export class OwnerActions {
       }
       tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
       return { status: 'applied', op: 'backup.export' };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * `file.save` (W4-FILES-SAVE; 04 §2.5.1; proposed, owner confirms at merge): the object checks and
+   * the nonce, then the nonce row alone, in one store transaction, as `backup.export`. The row is the
+   * audit record of the save; the caller (the client's saveReceivedFile) saves the file with core's
+   * own fetch only after this applied, with the envelope and index of the signed body.
+   */
+  async #applyFileSave(value: unknown, base: OwnerActionCheckContext): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    if (signed.body.op !== 'file.save') return this.#report(refused(signed.body.op, 'malformed'));
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) {
+        return refused('file.save', 'nonce_used');
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      return { status: 'applied', op: 'file.save' };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
   }
@@ -1343,6 +1394,29 @@ export class OwnerActions {
     const params = appChangeParamsSchema.safeParse({ app, agent: signer.agent, changeId });
     if (!params.success) return refuse('change_invalid');
     return this.#build(signer, op, { app: params.data.app, agent: signer.agent, changeId });
+  }
+
+  /**
+   * The unsigned `file.save` for one received file (W4-FILES-SAVE; 04 §2.5.1): from the item ID
+   * `<envelope ID>.<index>` (index two digits, 00 to 15) alone; `params.agent` is this agent's
+   * agentId, never a value from the page. A malformed ID is `item_invalid`. Whether the message was
+   * received and the file can be fetched is core fetchFile's check after the owner signed. Writes
+   * nothing.
+   */
+  async prepareFileSave(itemId: string): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'file.save', reason }) as const;
+    const m = typeof itemId === 'string' ? FILE_ITEM_ID.exec(itemId) : null;
+    if (m === null) return refuse('item_invalid');
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    const params = fileSaveParamsSchema.safeParse({
+      agent: signer.agent,
+      envelopeId: m[1],
+      fileIndex: Number(m[2]),
+    });
+    if (!params.success) return refuse('item_invalid');
+    return this.#build(signer, 'file.save', params.data);
   }
 
   /**

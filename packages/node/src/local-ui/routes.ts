@@ -25,6 +25,7 @@ import { activityRoutes } from './api/activity.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
 import { agentsRoutes } from './api/agents.js';
 import { agentsManageRoutes } from './api/agents-manage.js';
+import { contactNamesRoutes } from './api/contacts-renamed.js';
 import { agentsRemoveRoutes } from './api/agents-remove.js';
 import { appsRoutes } from './api/apps.js';
 import { flowRoutes } from './api/flow.js';
@@ -35,6 +36,7 @@ import { contactsRoutes } from './api/contacts.js';
 import { filesRoutes } from './api/files.js';
 // MSG-FILES-IO-d: Files, Received and Sent (read-only); MSG-FILES-IO-h: Show in Finder.
 import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
+import { filesSaveRoute } from './api/files-save.js';
 import { firstRunRoutes } from './api/first-run.js';
 // M1-11s-a-d: the status bar's health read (read-only).
 import { healthRoutes } from './api/health.js';
@@ -342,6 +344,10 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     flowRoutes,
     // U3-invite: the waiting invite (read, accept, "Not now") and the handoff kind.
     joinRoutes,
+    // W4-FILES-SAVE: "Save to Inbox" (owner presence, one signed `file.save`).
+    [filesSaveRoute],
+    // W4-RENAME-REACHES-CONTACTS: the seen mark of a contact's former-name note.
+    contactNamesRoutes,
     uiSettingsRoutes,
   ]) {
     for (const route of routes) registry.register(route);

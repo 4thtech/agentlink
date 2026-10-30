@@ -11,6 +11,9 @@ export type {
 } from './approval-channel.js';
 export {
   IdentityService,
+  RENAMES_PER_DAY,
+  RENAME_WINDOW_SECONDS,
+  type RenameAllowance,
   type FingerprintForms,
   type OwnFingerprints,
   type IdentityView,
@@ -321,6 +324,7 @@ export {
 export {
   CardUpdateSender,
   MAX_CARD_UPDATES_PER_PASS,
+  CATCH_UP_SECONDS,
   type CardUpdateSendResult,
 } from './card-update.js';
 export {
@@ -573,6 +577,7 @@ export {
 // fetch and download, the inbox file operations) is supplied by @4thtech-io/node (M1-9d).
 export type { DropConfig, FilesPlatform, InboxFolder, OutgoingFile } from './files/platform.js';
 export type { FetchFileInput, FetchFileResult } from './files/incoming.js';
+export type { SaveReceivedFileResult } from './files/save.js';
 export {
   MAX_LINK_ANSWERS_PER_PASS,
   REFRESH_LINK_KIND,

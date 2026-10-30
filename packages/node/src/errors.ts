@@ -3,6 +3,9 @@
 // error is attached as `cause` (I-7). Callers branch on `code`.
 
 export type NodeKeyStoreErrorCode =
+  | 'policy_mark_invalid'
+  /** W4-RENAME-REACHES-CONTACTS: the stored key-epoch item is not a canonical epoch. Never read as 0. */
+  | 'key_epoch_invalid'
   /** The agent ID is not `0x` + 40 lowercase hex (04 §2.9). */
   | 'agent_id_invalid'
   /** The agent's keychain item is missing. Never answered by creating a new identity. */

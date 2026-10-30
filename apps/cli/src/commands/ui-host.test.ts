@@ -4,6 +4,7 @@
 import type {
   AgentDirectory,
   AgentDirectoryEntry,
+  AgentRemovalPort,
   ApprovalServerOptions,
   LocalUiAssets,
 } from '@4thtech-io/node';
@@ -94,6 +95,8 @@ describe('openUiHostAgent (U3-c)', () => {
 // starts with no open agent and lets first run create the first one (host.firstRun).
 describe('startUiWelcome (U3-g-b)', () => {
   const APP: LocalUiAssets = { files: new Map([['index.html', new Uint8Array([60])]]) };
+  // HOTFIX-045-REMOVE-FIRSTRUN: the CLI's removal seam (never called by these tests).
+  const REMOVAL = Object.freeze({ tag: 'removal-port' }) as unknown as AgentRemovalPort;
 
   function welcome(
     over: {
@@ -115,6 +118,7 @@ describe('startUiWelcome (U3-g-b)', () => {
         keychainUsable: () => Promise.resolve(over.keychain ?? true),
         assets: () => over.assets ?? APP,
         open: () => Promise.resolve(undefined),
+        removal: REMOVAL,
         startServer: (options) => {
           started.push(options);
           return Promise.resolve({
@@ -168,6 +172,14 @@ describe('startUiWelcome (U3-g-b)', () => {
     expect(Object.keys(host?.aiAppsList ?? {})).toEqual(['list']);
     await host?.firstRun?.aiApps?.plan('claude-code', 'default');
     expect(planned).toEqual([['claude-code', 'default']]);
+  });
+
+  // HOTFIX-045-REMOVE-FIRSTRUN: before this, the host first run started had no removal port, so
+  // Remove answered 501 in that session until `agentlink ui` restarted.
+  it('HOTFIX-045-REMOVE-FIRSTRUN: hands the host the removal port, so Remove works in this session', async () => {
+    const w = welcome();
+    await startUiWelcome(w.deps);
+    expect(w.started[0]?.host?.removal).toBe(REMOVAL);
   });
 
   it('U3-invite: with an invite, the host holds it and the handoff record, and open goes to openJoin', async () => {

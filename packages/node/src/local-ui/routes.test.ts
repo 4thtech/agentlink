@@ -167,6 +167,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/health',
       // MSG-FILES-IO-h: Show in Finder (api/files-io-reveal.test.ts).
       '/api/ui/files/received/reveal',
+      // W4-FILES-SAVE: Save to Inbox (api/files-save.test.ts).
+      '/api/ui/files/save',
       // UX2-d1: create, check and accept an invite (api/invites.test.ts).
       '/api/ui/invites',
       '/api/ui/invites/check',
@@ -188,6 +190,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/join/accept',
       '/api/ui/join/dismiss',
       '/api/ui/join/handoff',
+      // W4-RENAME-REACHES-CONTACTS: "Contacts still see" and the former-name seen mark.
+      '/api/ui/agents/card-name',
+      '/api/ui/contacts/:ref/name-seen',
       // W4-INVITES-LIST: the open invites (a read) and Cancel (api/invites-short.test.ts).
       '/api/ui/invites',
       '/api/ui/invites/cancel',

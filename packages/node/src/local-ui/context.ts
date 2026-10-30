@@ -35,7 +35,10 @@ import type {
   PageQuery,
   PolicyEditOptions,
   LabelReading,
+  RenameAllowance,
+  SendState,
   PreparedOwnerAction,
+  SaveReceivedFileResult,
   PreparedPolicyEdit,
   ProofListItem,
   ReceivedFileItem,
@@ -45,6 +48,7 @@ import type {
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
+import type { AgentEpochKeys } from '../key-epoch.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
 import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
 import type { LocalUiInviteDesk } from './route-types.js';
@@ -87,6 +91,12 @@ export interface LocalUiOptions {
    * `not_available`.
    */
   readonly aiApps?: LocalUiAiApps;
+  /**
+   * W4-RENAME-REACHES-CONTACTS (D-141): the open agent's key items (epochKeysOf its KeyStore), for
+   * the app host's rename gesture only (the gate's `renameAgent`). Held by the server, never by a
+   * handler or LocalUiContext. Absent: a rename that would rotate answers `not_available`.
+   */
+  readonly epochKeys?: AgentEpochKeys;
 }
 
 /**
@@ -270,6 +280,12 @@ export interface LocalUiReadClient {
     received(query: PageQuery): Promise<Page<ReceivedFileItem>>;
     sent(query: PageQuery): Promise<Page<SentFileItem>>;
     savedName(itemId: string): Promise<string | null>;
+    /**
+     * W4-FILES-SAVE: core's prepare helper (optional so page fakes without it stay valid) for the unsigned `file.save` of one received item, by its
+     * ID only (core `ownerActions.prepareFileSave`). Writes nothing (I-4): the body changes nothing
+     * until the gate's one-use `sign` signed it and the save port's core verified and applied it.
+     */
+    prepareSave?(itemId: string): Promise<PreparedOwnerAction>;
   };
   /**
    * U3-d (D-138; 04 §2.5.1 `agent.label`): the agent's verified label (core `loadLabel`: the stored
@@ -280,6 +296,20 @@ export interface LocalUiReadClient {
   readonly agent?: {
     label(): Promise<LabelReading>;
     prepareLabel(label: string): Promise<PreparedOwnerAction>;
+    /** W4-RENAME-REACHES-CONTACTS (D-141): the name in the agent's current card (core, read). */
+    cardName?(): Promise<string | undefined>;
+    /** D-141: whether a rename may rotate now (3 per rolling 24 h; core, read). */
+    renameAllowance?(): Promise<RenameAllowance>;
+    /** D-141: whether the agent can send (an unfinished rotation is `rotation_pending`; read). */
+    sendState?(): Promise<SendState>;
+  };
+  /**
+   * W4-RENAME-REACHES-CONTACTS (D-141; 07 §3 "Former name", 08 §1): the page showed a contact's
+   * "{new} (was {old})" note, so core stops showing it (core `contacts.markNameChangeSeen`). Display
+   * state only: nothing is decided from it, nothing is signed. Nothing else of the contact book.
+   */
+  readonly contactNames?: {
+    markSeen(contactId: string): Promise<boolean>;
   };
   /**
    * U3-f (04 §2.5.1 `app.connect`, `app.disconnect`): core's prepare helper for an AI app change of
@@ -339,11 +369,21 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       received: (query: PageQuery) => client.filesIo.received(query),
       sent: (query: PageQuery) => client.filesIo.sent(query),
       savedName: (itemId: string) => client.filesIo.savedName(itemId),
+      // W4-FILES-SAVE: the unsigned `file.save` (prepare only).
+      prepareSave: (itemId: string) => client.ownerActions.prepareFileSave(itemId),
     }),
     // U3-d: the verified label and the unsigned `agent.label` (reads and prepare only).
     agent: Object.freeze({
       label: () => client.ownerActions.loadLabel(),
       prepareLabel: (label: string) => client.ownerActions.prepareLabel(label),
+      // D-141: reads for the rename route (the card's name, the limit, an unfinished rotation).
+      cardName: () => client.identity.cardName(),
+      renameAllowance: () => client.identity.renameAllowance(),
+      sendState: () => client.identity.sendState(),
+    }),
+    // D-141: the contact's former-name note was shown (display state only).
+    contactNames: Object.freeze({
+      markSeen: (contactId: string) => client.contacts.markNameChangeSeen(contactId),
     }),
     // U3-f: the unsigned `app.connect` / `app.disconnect` (prepare only).
     apps: Object.freeze({
@@ -375,6 +415,27 @@ export function creditsPort(client: AgentLinkClient): LocalUiCreditsPort {
   return Object.freeze<LocalUiCreditsPort>({
     addReceivedFunds: (signed) => client.proofs.addReceivedFunds(signed),
     withdrawCredits: (signed) => client.proofs.withdrawCredits(signed),
+  });
+}
+
+/** W4-FILES-SAVE: how a save ended (core `saveReceivedFile`): never a path; the name is untrusted. */
+export type LocalUiFileSaveResult = SaveReceivedFileResult;
+
+/**
+ * W4-FILES-SAVE (04 §2.5.1 `file.save`, §4; 08 §1): saving one received file, for the save owner
+ * route only. It takes an owner-signed object that the route's one-use owner operation produced (the
+ * presence gate ran first); core takes only a `file.save`, verifies the owner signature, agent,
+ * freshness and nonce again, records the nonce, and only then saves with its own fetch (local
+ * decrypt, SSRF-safe download, Inbox folder only). Nothing else of the client is reachable through it.
+ */
+export interface LocalUiFileSavePort {
+  save(signed: { readonly body: JsonObject; readonly sig: string }): Promise<LocalUiFileSaveResult>;
+}
+
+/** The save port over `client` (a fresh frozen object of one bound method). */
+export function fileSavePort(client: AgentLinkClient): LocalUiFileSavePort {
+  return Object.freeze<LocalUiFileSavePort>({
+    save: (signed) => client.saveReceivedFile(signed),
   });
 }
 
@@ -499,6 +560,8 @@ export interface LocalUiContext {
   readonly client: LocalUiReadClient | undefined;
   /** M1-11c-a4c: the credits moves for the owner routes; undefined when not set up. */
   readonly credits?: LocalUiCreditsPort;
+  /** W4-FILES-SAVE: saving a received file, for the save owner route; undefined when not set up. */
+  readonly fileSave?: LocalUiFileSavePort;
   /**
    * UX2-d1: accepting an invite, for the accept owner route only; undefined when not set up. Its
    * pairing step runs only after core used an owner-signed, applied approval (I-4).

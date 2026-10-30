@@ -16,6 +16,8 @@ export type CoreErrorCode =
   | 'owner_key_mismatch'
   | 'key_epoch_mismatch'
   | 'rotation_pending'
+  /** W4-RENAME-REACHES-CONTACTS (D-141): more than RENAMES_PER_DAY renames in 24 h. */
+  | 'rename_limited'
   | 'owner_keys_changed'
   | 'card_invalid'
   | 'card_owner_signature_invalid'
