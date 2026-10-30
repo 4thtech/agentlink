@@ -87,7 +87,7 @@ describe('production build', () => {
 // UI-REFRESH-u: the Settings pages and the Under the hood panel load on first use.
 describe('first load (UI-REFRESH-u)', () => {
   const LAZY_MODULES =
-    /\/pages\/(home|activity|messages|contacts|files|proofs|rules|about|appearance|backup|advanced)\/index\.tsx$|\/components\/hood\.js$/;
+    /\/pages\/(agents|apps|join|activity|messages|contacts|files|proofs|rules|about|appearance|backup|advanced)\/index\.tsx$|\/components\/hood\.js$/;
 
   /** Every chunk the page loads at start: the scripts in index.html and what they import. */
   function initialChunks(): Out[] {
@@ -119,7 +119,7 @@ describe('first load (UI-REFRESH-u)', () => {
     const lazy = outputs.filter(
       (o) => o.type === 'chunk' && o.modules.some((m) => LAZY_MODULES.test(m)),
     );
-    // 11 pages plus the panel.
+    // W4-SHELL-V2: 13 pages plus the panel.
     expect(lazy.length).toBeGreaterThanOrEqual(12);
     for (const chunk of lazy) expect(initial.has(chunk.fileName)).toBe(false);
   });

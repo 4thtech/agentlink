@@ -1,7 +1,7 @@
 // Messages page copy (MSG-FILES-IO-e; 11 §5.7 and §5.1: plain words, no "wallet", "address", "hash",
 // "token", "transaction"; the page never suggests it can write). Checked by messages.test.ts.
 export const MESSAGES_STRINGS = {
-  title: 'Messages',
+  title: 'Inbox',
   listLabel: 'Contacts with messages',
   newMessages: 'New',
   loading: 'Loading messages…',
@@ -12,7 +12,7 @@ export const MESSAGES_STRINGS = {
   sent: 'Sent',
   // 11 §5.7
   reply: 'To reply, ask your AI.',
-  noContacts: 'Messages appear here once you have a contact.',
+  noContacts: 'Conversations appear here once you have a contact.',
   nothingYet: (contactName: string): string =>
     `Nothing yet. When your AI and ${contactName}'s agent exchange messages, they show here.`,
   asOf: (time: string): string => `as of ${time}`,

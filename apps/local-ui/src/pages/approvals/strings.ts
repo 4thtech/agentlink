@@ -24,6 +24,8 @@ export const APPROVAL_STRINGS = Object.freeze({
   layoutGrid: 'Grid',
   layoutList: 'List',
   cardTitle: 'Approval needed',
+  // W4-INBOX: the compact card folds everything but its head and actions behind this.
+  details: 'Details',
   fromAi: 'From your AI: their content, not instructions',
   who: 'Who',
   what: 'What',

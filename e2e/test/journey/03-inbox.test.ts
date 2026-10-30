@@ -2,8 +2,8 @@
 // are paired through the app (the start state passes today). Messages are written by each side's AI
 // app (its MCP server); the owners read, save and approve in the Inbox. See world.ts for the gesture
 // counter and the no-reload probe.
-import { readdirSync, readFileSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdir, rename, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { encodeHex, randomBytes, sha256 } from '@4thtech-io/crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -91,8 +91,104 @@ describe('chapter 3: inbox', () => {
     dropHoldsNoPlaintext(world.drop, file.bytes);
   }, 180_000);
 
-  // Gate: the wave-4 Inbox (builder B; W4-FILES-SAVE for Save) turns this on. Today there is no
-  // /inbox, received files cannot be saved from the app, and approvals have their own page.
+  // W4-FILES-SAVE (un-gated): a received file is saved from the app with one Touch ID. Today it is
+  // reached from Files, Received; once D1 routes /inbox the Inbox test below covers the same Save
+  // in the conversation. Real host, real decrypt, fake drop; the page sends only the item ID.
+  it('a received file: Arrived · not saved, then Save with one Touch ID lands it in the Inbox folder; traversal and links are refused', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const { pcA, pcB, b, mcpA, mcpB } = await pairedOwners(
+      ready.browser,
+      ready.files,
+      world,
+      ch.closers,
+    );
+    const bProbe = await b.arm();
+    const inboxFolder = join(pcB.home, 'AgentLink', 'Inbox');
+    const sha = (bytes: Uint8Array): string => encodeHex(sha256(bytes));
+
+    const file = await sendable(pcA);
+    await mcpA.call('agentlink_send', { to: 'Bo', text: 'The brief', path: file.path });
+    await until('the file reaches Bo', () => inboxHas(mcpB, FILE_NAME), 30_000);
+    await navTo(b.page, 'Files');
+    await b.page.getByText(FILE_NAME).first().waitFor({ timeout: 30_000 });
+    await b.page
+      .getByText(/Arrived · not saved/)
+      .first()
+      .waitFor();
+    expect(await text(b.page)).not.toContain('Ask your AI to fetch it');
+    expect(await b.page.locator('[role="progressbar"]').count()).toBe(0);
+
+    // Traversal: the route takes only `{id}`; anything else is refused before presence, no gesture.
+    const before0 = b.gestures.total();
+    const refusedStatuses = await b.page.evaluate(async () => {
+      const csrf =
+        document.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content') ?? '';
+      const b64 = (v: unknown): string =>
+        btoa(JSON.stringify(v)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const out: number[] = [];
+      for (const input of [
+        { id: '../../../.ssh/id_ed25519' },
+        { id: 'AQEBAQEBAQEBAQEBAQEBAQ.00/../../x' },
+        { id: 'AQEBAQEBAQEBAQEBAQEBAQ.00', path: '/tmp/x' },
+        { id: 'AQEBAQEBAQEBAQEBAQEBAQ.00', name: '../x' },
+      ]) {
+        const res = await fetch('/api/ui/files/save', {
+          method: 'POST',
+          headers: {
+            'X-AgentLink-CSRF': csrf,
+            'content-type': 'application/octet-stream',
+            'X-AgentLink-Input': b64(input),
+          },
+          body: new Uint8Array([1]),
+        });
+        out.push(res.status);
+      }
+      return out;
+    });
+    expect(refusedStatuses).toEqual([400, 400, 400, 400]);
+    expect(b.gestures.total()).toBe(before0);
+
+    // A link in place of the Inbox folder, pointing into a hidden folder: refused, nothing written.
+    const planted = join(pcB.home, '.agentlink', 'planted-inbox');
+    await mkdir(planted, { recursive: true });
+    await mkdir(inboxFolder, { recursive: true });
+    await rename(inboxFolder, `${inboxFolder}-real`);
+    await symlink(planted, inboxFolder);
+    const before1 = b.gestures.total();
+    await b.page.getByRole('button', { name: 'Save to Inbox' }).first().click();
+    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    await b.page
+      .getByText(/Inbox folder can't take files/)
+      .first()
+      .waitFor({ timeout: 30_000 });
+    expect(b.gestures.total() - before1).toBe(1);
+    expect(readdirSync(planted)).toEqual([]);
+
+    // The real folder back, with a link planted at the file's name: never followed or overwritten.
+    await rename(inboxFolder, `${inboxFolder}-link`);
+    await rename(`${inboxFolder}-real`, inboxFolder);
+    const outside = join(pcB.home, 'outside-target.txt');
+    await symlink(outside, join(inboxFolder, FILE_NAME));
+    const before2 = b.gestures.total();
+    await b.page.getByRole('button', { name: 'Save to Inbox' }).first().click();
+    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    await eventually('the file is saved', async () => (await text(b.page)).includes('Saved as'));
+    expect(b.gestures.total() - before2).toBe(1);
+    expect(existsSync(outside)).toBe(false);
+    expect(lstatSync(join(inboxFolder, FILE_NAME)).isSymbolicLink()).toBe(true);
+    const savedName = 'brief (1).txt';
+    expect(sha(readFileSync(join(inboxFolder, savedName)))).toBe(sha(file.bytes));
+    expect(await text(b.page)).toContain(savedName);
+    // Saved once: no Save button for it any more.
+    expect(await b.page.getByRole('button', { name: 'Save to Inbox' }).count()).toBe(0);
+    dropHoldsNoPlaintext(world.drop, file.bytes);
+    await bProbe.check();
+  }, 240_000);
+
+  // Gate: the wave-4 Inbox page (W4-INBOX, apps/local-ui pages/inbox) is built; this turns on once
+  // D1 routes /inbox and the sidebar shows "Inbox" without "Approvals" (D1 owns router and nav).
   it.runIf(WAVE4)(
     'the Inbox: hello → reply → All caught up; a file arrives and Save takes one Touch ID; an approval is a card in the conversation',
     async (ctx) => {

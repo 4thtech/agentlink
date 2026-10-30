@@ -101,7 +101,7 @@ export const START_STRINGS = {
   addContact: 'Add contact',
   // Empty states elsewhere point to the invite step.
   emptyContacts: 'No contacts yet. Invite someone to start.',
-  emptyMessages: 'No messages yet. Invite someone first, then ask your AI to say hello.',
+  emptyMessages: 'Nothing here yet. Invite someone, then ask your AI to say hello.',
   emptyFiles: 'No files yet. Invite someone first.',
   // Status words for done / next / later, read out with the step.
   stateDone: 'Done',

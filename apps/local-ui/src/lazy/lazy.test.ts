@@ -125,7 +125,8 @@ describe('prefetchPages', () => {
       await Promise.resolve();
       rounds += 1;
     }
-    expect(rounds).toBe(Object.keys(PAGE_PARTS).length + 1);
+    // W4-SHELL-V2: one fetch per page part (several paths share one).
+    expect(rounds).toBe(new Set(Object.values(PAGE_PARTS)).size + 1);
   });
 });
 

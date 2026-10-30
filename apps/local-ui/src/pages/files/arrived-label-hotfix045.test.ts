@@ -63,7 +63,9 @@ describe('HOTFIX-045-TOPBAR: the Arrived label', () => {
     expect(row).not.toBeNull();
     expect(row?.querySelector('[role="progressbar"]')).toBeNull();
     expect(row?.querySelector('.al-pb, .is-unknown')).toBeNull();
-    // 11 §5: the fixed line, once.
-    expect(row?.textContent).toContain('Not saved yet. Ask your AI to fetch it.');
+    // 11 §5 (W4-FILES-SAVE): the fixed line, once, and the Save action instead of "ask your AI".
+    expect(row?.textContent).toContain('Arrived · not saved');
+    expect(row?.textContent).not.toContain('Ask your AI to fetch it');
+    expect(row?.textContent).toContain('Save to Inbox');
   });
 });

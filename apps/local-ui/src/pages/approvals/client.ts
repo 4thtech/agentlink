@@ -165,6 +165,45 @@ function itemOf(v: unknown): ApprovalItem | undefined {
   };
 }
 
+/**
+ * One gesture with this page's own challenge: the four-field decision assertion (M1-8e). Shared with
+ * the Inbox's Save (W4-FILES-SAVE), whose owner route takes the same body. Undefined when there is
+ * no credentials container or the prompt was dismissed.
+ */
+export async function passkeyAssertion(
+  container: CredentialsContainer | undefined,
+  passkey: DecisionPasskey,
+): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  if (container === undefined) return undefined;
+  const challenge = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(challenge);
+  let credential: Credential | null;
+  try {
+    credential = await container.get({
+      publicKey: {
+        challenge,
+        rpId: 'localhost',
+        allowCredentials: [{ type: 'public-key', id: fromB64(passkey.credentialId) }],
+        userVerification: 'required',
+        timeout: 120000,
+        extensions: {
+          prf: { eval: { first: fromB64(passkey.prfSalt) } },
+        } as AuthenticationExtensionsClientInputs,
+      },
+    });
+  } catch {
+    return undefined;
+  }
+  if (credential === null) return undefined;
+  const c = credential as PublicKeyCredential;
+  const r = c.response as AuthenticatorAssertionResponse;
+  const ext = c.getClientExtensionResults() as { prf?: { results?: { first?: ArrayBuffer } } };
+  const prf = bytesOf(ext.prf?.results?.first);
+  const body = fields([bytesOf(c.rawId), bytesOf(r.authenticatorData), bytesOf(r.userHandle), prf]);
+  prf.fill(0);
+  return body;
+}
+
 export function createApprovalsClient(options: ApprovalsClientOptions = {}): ApprovalsClient {
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const token = (): string => options.token ?? pageToken();
@@ -223,43 +262,8 @@ export function createApprovalsClient(options: ApprovalsClientOptions = {}): App
     }
   }
 
-  /** One gesture with this page's own challenge: the four-field decision assertion (M1-8e). */
-  async function assertion(passkey: DecisionPasskey): Promise<Uint8Array<ArrayBuffer> | undefined> {
-    const container = credentials();
-    if (container === undefined) return undefined;
-    const challenge = new Uint8Array(32);
-    globalThis.crypto.getRandomValues(challenge);
-    let credential: Credential | null;
-    try {
-      credential = await container.get({
-        publicKey: {
-          challenge,
-          rpId: 'localhost',
-          allowCredentials: [{ type: 'public-key', id: fromB64(passkey.credentialId) }],
-          userVerification: 'required',
-          timeout: 120000,
-          extensions: {
-            prf: { eval: { first: fromB64(passkey.prfSalt) } },
-          } as AuthenticationExtensionsClientInputs,
-        },
-      });
-    } catch {
-      return undefined;
-    }
-    if (credential === null) return undefined;
-    const c = credential as PublicKeyCredential;
-    const r = c.response as AuthenticatorAssertionResponse;
-    const ext = c.getClientExtensionResults() as { prf?: { results?: { first?: ArrayBuffer } } };
-    const prf = bytesOf(ext.prf?.results?.first);
-    const body = fields([
-      bytesOf(c.rawId),
-      bytesOf(r.authenticatorData),
-      bytesOf(r.userHandle),
-      prf,
-    ]);
-    prf.fill(0);
-    return body;
-  }
+  const assertion = (passkey: DecisionPasskey): Promise<Uint8Array<ArrayBuffer> | undefined> =>
+    passkeyAssertion(credentials(), passkey);
 
   /** The body and headers for the owner's presence; undefined when the prompt was dismissed. */
   async function presenceBody(

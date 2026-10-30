@@ -45,6 +45,10 @@ export interface AppShellProps {
   pageTitle?: string;
   /** The controls at the right end of the top bar: the Under the hood switch, status chip, theme. */
   topBarEnd?: ReactNode;
+  /** W4-SHELL: before the page title in the top bar (the agent switcher at 360). */
+  topBarStart?: ReactNode;
+  /** W4-SHELL: the top of the sidebar, under the mark (the agent switcher, b11 §34.1). */
+  sideTop?: ReactNode;
   agent?: string;
   nav?: readonly NavItem[];
   connection?: Connection;
@@ -92,6 +96,8 @@ export function AppShell({
   title = 'AgentLink',
   pageTitle,
   topBarEnd,
+  topBarStart,
+  sideTop,
   agent,
   nav = [],
   connection = 'connected',
@@ -109,6 +115,7 @@ export function AppShell({
           <div className="al-side-brand">
             <Lockup size={18} />
           </div>
+          {sideTop === undefined ? null : <div className="al-side-top">{sideTop}</div>}
           {agent === undefined ? null : (
             <button type="button" className="al-agent-switch">
               <Icon name="agent" size={14} />
@@ -153,6 +160,9 @@ export function AppShell({
         <div className="al-shell-body">
           {pageTitle === undefined ? null : (
             <header className="al-topbar al-chrome">
+              {topBarStart === undefined ? null : (
+                <div className="al-topbar-start">{topBarStart}</div>
+              )}
               <span className="al-topbar-title al-text-title-3">{pageTitle}</span>
               <div className="al-topbar-end">{topBarEnd}</div>
             </header>

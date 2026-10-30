@@ -426,7 +426,14 @@ describe('the generation check on every mutating request (U3-c, 08 §1)', () => 
       .routes()
       // U3-invite: the handoff is not a page request (no session, no generation); it refuses any
       // generation header outright (local-ui/join-server.test.ts).
-      .filter((r) => r.method !== 'GET' && r.presence !== 'switch' && r.presence !== 'handoff');
+      // W4-SHELL-V2: the app's UI settings are not an agent's: no generation (ui-settings-server.test.ts).
+      .filter(
+        (r) =>
+          r.method !== 'GET' &&
+          r.presence !== 'switch' &&
+          r.presence !== 'handoff' &&
+          r.presence !== 'ui-settings',
+      );
     expect(mutating.length).toBeGreaterThan(10);
     for (const route of mutating) {
       for (const generation of [undefined, '0', '2', 'x', '01', '1.0']) {

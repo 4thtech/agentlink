@@ -165,11 +165,47 @@ export async function journeyPage(browser: Browser): Promise<JourneyPage> {
   return { page, context, gestures, arm };
 }
 
-/** In-app navigation: a click on the sidebar item (never `goto`, which would load a new document). */
+/**
+ * W4-SHELL-V2: until Home (U3) and People (U4) hold them, today's Messages and Contacts pages are
+ * reached from Go to (Cmd+K) by these names; they are no sections of the menu.
+ */
+const INTERIM: Readonly<Record<string, string>> = {
+  Inbox: 'Messages',
+  Messages: 'Messages',
+  Contacts: 'People',
+};
+
+/** Go to (Cmd+K): type a name and press Enter (an in-app move, never `goto`). */
+export async function goTo(page: Page, name: string): Promise<void> {
+  await page
+    .getByRole('button', { name: /^Go to/ })
+    .first()
+    .click();
+  const field = page.getByRole('combobox');
+  await field.fill(name);
+  await page
+    .getByRole('option', { name: new RegExp(`^${name}`) })
+    .first()
+    .click();
+}
+
+/**
+ * In-app navigation: a click on the section menu item (never `goto`, which would load a new
+ * document). W4-SHELL-V2: "Inbox" and "Contacts" go through Go to (INTERIM).
+ */
 export async function navTo(page: Page, label: string): Promise<void> {
-  // The item's name may carry a count after the label ("Messages 2").
-  const name = new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`);
-  await page.getByRole('navigation').getByRole('link', { name }).first().click();
+  const interim = INTERIM[label];
+  if (interim !== undefined) {
+    await goTo(page, interim);
+    return;
+  }
+  // The item's name may carry a count after the label ("Home, 2 waiting for you").
+  const name = new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(,|\\s|$)`);
+  await page
+    .getByRole('navigation', { name: 'Sections' })
+    .getByRole('link', { name })
+    .first()
+    .click();
 }
 
 /** Polls `check` until it is true. */
@@ -275,11 +311,10 @@ export async function firstRunWithTouchId(
   await page.getByRole('button', { name: 'I saved it' }).click();
   // With an AI app detected first run offers it; "Later" writes nothing.
   const later = page.getByRole('button', { name: 'Later' });
-  await Promise.race([
-    page.waitForURL(/\/settings\/home$/),
-    later.waitFor().then(() => later.click()),
-  ]);
-  await page.waitForURL(/\/settings\/home$/);
+  // W4-SHELL-V2: first run ends on Home (`/`; the old `/settings/home` redirects there).
+  const home = (url: URL): boolean => url.pathname === '/' || url.pathname === '/settings/home';
+  await Promise.race([page.waitForURL(home), later.waitFor().then(() => later.click())]);
+  await page.waitForURL((url) => url.pathname === '/');
 }
 
 export const ANY_INVITE = new RegExp(`${SHORT_INVITE.source}|${LONG_INVITE.source}`);
