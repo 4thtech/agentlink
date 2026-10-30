@@ -490,6 +490,9 @@ const SETUP_TIME = new Set([
   'GET /api/ui/join',
   'POST /api/ui/join/dismiss',
   'POST /api/ui/join/handoff',
+  // W4-SHELL-V2: the app's UI settings are the app's, not an agent's (ui-settings-server.test.ts).
+  'GET /api/ui/ui-settings',
+  'PUT /api/ui/ui-settings',
 ]);
 
 describe('U3-g-b: ui with no agent at all serves Welcome', () => {

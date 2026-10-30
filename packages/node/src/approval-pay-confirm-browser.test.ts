@@ -321,7 +321,8 @@ describe('the confirmation sheet in the app (M1-PAY-CONFIRM-b, M1-11b-2; Chromiu
     source.addPaid(2);
     await page.goto(server.origin + '/');
     await page
-      .locator('nav[aria-label="Main"] a[aria-current="page"]', { hasText: 'Approvals' })
+      // W4-SHELL-V2: the waiting list and one request sit inside Home (the section menu).
+      .locator('nav.al-rail a[aria-current="page"][href="/"]')
       .waitFor();
     // Rule 7: the paid request has no list choice; the free one does.
     await page
@@ -392,7 +393,8 @@ describe('the confirmation sheet in the app (M1-PAY-CONFIRM-b, M1-11b-2; Chromiu
     source.addPaid(3);
     await page.goto(server.approvalUrl(id(3)));
     await page
-      .locator('nav[aria-label="Main"] a[aria-current="page"]', { hasText: 'Approvals' })
+      // W4-SHELL-V2: the waiting list and one request sit inside Home (the section menu).
+      .locator('nav.al-rail a[aria-current="page"][href="/"]')
       .waitFor();
     await page.getByRole('button', { name: 'Approve', exact: true }).click();
     const dialog = page.getByRole('dialog');
