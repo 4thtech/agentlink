@@ -13,6 +13,7 @@
 import type { JsonObject } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import {
+  AUTO_SAVE_DEFAULTS,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   POLICY_DEFAULTS,
   defaultPolicy,
@@ -199,13 +200,15 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
     expect(Object.keys(body.params).sort()).toEqual(['policy', 'version']);
     const expected = defaultPolicy();
     expected.files.allowedFolders = [FOLDER];
+    // D-142: every policy.set this core signs carries files.autoSave (the defaults here).
+    expected.files.autoSave = { ...AUTO_SAVE_DEFAULTS };
     expect(body.params.policy).toEqual(expected);
     // Every section and field is present: the whole document, never a partial patch.
     for (const section of Object.keys(POLICY_DEFAULTS) as (keyof Policy)[]) {
       const value = POLICY_DEFAULTS[section];
       if (Array.isArray(value)) continue;
       expect(Object.keys(body.params.policy[section]).sort()).toEqual(
-        Object.keys(value as object).sort(),
+        Object.keys(section === 'files' ? { ...value, autoSave: 0 } : (value as object)).sort(),
       );
     }
     expect(prepared.jcs).toBe(JSON.stringify(JSON.parse(prepared.jcs)));
@@ -783,7 +786,10 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
               : Object.keys(value as object).map((f) => `${section}.${f}`),
           )
           .sort();
-      expect(leaves(POLICY_FIELD_LOOSENING)).toEqual(leaves(POLICY_DEFAULTS));
+      // The defaults plus `files.autoSave` (D-142), the one field they may leave out.
+      expect(leaves(POLICY_FIELD_LOOSENING)).toEqual(
+        [...leaves(POLICY_DEFAULTS), 'files.autoSave'].sort(),
+      );
       expect(Object.keys(POLICY_FIELD_LOOSENING).sort()).toEqual(
         Object.keys(policySchema.shape).sort(),
       );
@@ -804,6 +810,7 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
         .sort();
       expect(tableLeaves).toEqual(schemaLeaves);
       expect(tableLeaves).toEqual([
+        'files.askBeforeSaving',
         'proofs.notarize',
         'proofs.perActionMaxUSD',
         'receipts.autoDelivered',

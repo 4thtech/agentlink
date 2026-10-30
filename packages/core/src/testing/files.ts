@@ -28,6 +28,7 @@ import {
 import { defaultPolicy, type Policy } from '@4thtech-io/types';
 import { unwrapGiftWrap, wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
 import { AgentLinkClient } from '../client.js';
+import type { AutoSavePause } from '../files/auto-save.js';
 import type { FilesPlatform, InboxFolder, OutgoingFile } from '../files/platform.js';
 import type { ProofsPlatform } from '../proofs/platform.js';
 import { MemoryStore } from '../store/memory-store.js';
@@ -57,7 +58,7 @@ export class PublishSpy {
 }
 
 interface Entry {
-  kind: 'file' | 'symlink';
+  kind: 'file' | 'symlink' | 'folder';
   data: Uint8Array;
   mode: number;
 }
@@ -74,6 +75,19 @@ export class MemoryInbox implements TempFileOps {
     this.entries.set(name, { kind: 'symlink', data: new Uint8Array(0), mode: 0o777 });
   }
 
+  /** W4-AUTO-SAVE: a folder at a name. */
+  plantFolder(name: string): void {
+    this.entries.set(name, { kind: 'folder', data: new Uint8Array(0), mode: 0o700 });
+  }
+
+  /** W4-AUTO-SAVE: a regular file directly inside (InboxFolder.isSavedFile). */
+  isFile(name: string): Promise<boolean> {
+    return Promise.resolve(this.entries.get(name)?.kind === 'file');
+  }
+
+  /** W4-AUTO-SAVE: the next write fails for lack of space (ENOSPC). */
+  failNextWriteWithNoSpace = false;
+
   create(name: string): Promise<TempFileHandle> {
     if (this.entries.has(name)) return Promise.reject(new Error('EEXIST'));
     const entry: Entry = { kind: 'file', data: new Uint8Array(0), mode: 0o600 };
@@ -83,6 +97,10 @@ export class MemoryInbox implements TempFileOps {
     return Promise.resolve({
       write: (chunk: Uint8Array) => {
         if (closed) return Promise.reject(new Error('closed'));
+        if (this.failNextWriteWithNoSpace) {
+          this.failNextWriteWithNoSpace = false;
+          return Promise.reject(Object.assign(new Error('no space'), { saveError: 'disk_full' }));
+        }
         const next = new Uint8Array(entry.data.length + chunk.length);
         next.set(entry.data);
         next.set(chunk, entry.data.length);
@@ -211,6 +229,11 @@ export interface FileAgent {
   readonly inbox: MemoryInbox;
   readonly lines: string[];
   readonly platform: FilesPlatform;
+  /**
+   * W4-AUTO-SAVE: a second client on the same store, keys and Inbox folder, as another AgentLink
+   * process of this agent (`agentlink ui`, another MCP process) opens it: its own in-memory locks.
+   */
+  secondProcess(): Promise<AgentLinkClient>;
 }
 
 export interface FileAgentOptions {
@@ -222,6 +245,12 @@ export interface FileAgentOptions {
   readonly relays: readonly string[];
   /** The proofs platform (M1-7g), for the delete-on-receipt tests (M1-1g-h). */
   readonly proofs?: ProofsPlatform;
+  /** W4-AUTO-SAVE: the Inbox folder's mark, free space and so on (default: a regular-file check). */
+  readonly inboxExtras?: Partial<Omit<InboxFolder, 'realpath' | 'ops'>>;
+  /** W4-AUTO-SAVE: the agent's pause state. */
+  readonly autoSavePause?: AutoSavePause;
+  /** W4-AUTO-SAVE: runs each time a save resolves the Inbox folder (inside the file's lock). */
+  readonly beforeInbox?: () => Promise<void>;
 }
 
 /** An agent with a files platform whose allowed folder is WORK and whose inbox is INBOX. */
@@ -253,8 +282,17 @@ export async function openFileAgent(
         if (own === undefined) throw new Error('no download');
         return own.download(url);
       }),
-    inbox: (): Promise<InboxFolder> => Promise.resolve({ realpath: INBOX, ops: inbox }),
+    inbox: async (): Promise<InboxFolder> => {
+      await options.beforeInbox?.();
+      return {
+        realpath: INBOX,
+        ops: inbox,
+        isSavedFile: (name: string) => inbox.isFile(name),
+        ...options.inboxExtras,
+      };
+    },
   };
+  const policyMark = new MemoryPolicyMark();
   const client = await AgentLinkClient.create({
     keyStore,
     store,
@@ -262,9 +300,10 @@ export async function openFileAgent(
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
     transport: spy.factory,
-    policyMark: new MemoryPolicyMark(),
+    policyMark,
     files: platform,
     ...(options.proofs === undefined ? {} : { proofs: options.proofs }),
+    ...(options.autoSavePause === undefined ? {} : { autoSavePause: options.autoSavePause }),
     logger: createLogger({
       name: 'core',
       level: 'debug',
@@ -288,6 +327,22 @@ export async function openFileAgent(
     inbox,
     lines,
     platform,
+    secondProcess: () =>
+      AgentLinkClient.create({
+        keyStore,
+        store,
+        cipher,
+        approvals: new RecordingApprovalChannel(),
+        clock: clock.now,
+        transport: spy.factory,
+        policyMark,
+        files: platform,
+        logger: createLogger({
+          name: 'core',
+          level: 'debug',
+          sink: (_l, line) => lines.push(line),
+        }),
+      }),
   };
 }
 

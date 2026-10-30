@@ -97,17 +97,110 @@ export function sanitizeFileName(raw: unknown): string {
   return name === '' ? FALLBACK_FILE_NAME : name;
 }
 
+/** D-142 (04 §4.1): appended to names the OS shell acts on when it shows or opens the folder. */
+export const DOWNLOAD_SUFFIX = '.download';
+
+/** Whole names (compared case-insensitively) the Windows shell reads when it shows a folder. */
+const RISKY_NAMES: ReadonlySet<string> = new Set(['desktop.ini', 'autorun.inf']);
 /**
- * `name` with ` (n)` before its extension, within MAX_FILE_NAME_BYTES (the stem is cut on a
- * code-point boundary), for a save that must not overwrite (M1-7f). `n` 0 returns `name`.
+ * Extensions (compared case-insensitively, after sanitisation) that get `.download` (04 §4.1): those
+ * the shell acts on when it only shows the folder (Windows `.lnk`, `.url`, `.scf`, `.library-ms`,
+ * `.searchconnector-ms`; Linux `.desktop`) and, decided in Decision 51 (2026-10-30), those that run
+ * when double-clicked from the folder (macOS `.webloc`, `.inetloc`, `.fileloc`, `.command`, `.tool`,
+ * `.terminal`; Windows `.exe`, `.scr`, `.pif`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.hta`, `.msi`,
+ * `.website`, `.settingcontent-ms`).
+ */
+const RISKY_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.lnk',
+  '.url',
+  '.scf',
+  '.library-ms',
+  '.searchconnector-ms',
+  '.desktop',
+  '.webloc',
+  '.inetloc',
+  '.fileloc',
+  '.command',
+  '.tool',
+  '.terminal',
+  '.exe',
+  '.scr',
+  '.pif',
+  '.bat',
+  '.cmd',
+  '.ps1',
+  '.vbs',
+  '.js',
+  '.hta',
+  '.msi',
+  '.website',
+  '.settingcontent-ms',
+]);
+
+/** True when `name` (already sanitised) gets `.download` before it is saved (04 §4.1). */
+export function needsDownloadSuffix(name: string): boolean {
+  // Folded through upper case first, so a long s (U+017F), a Kelvin sign (U+212A) or a dotless i
+  // (U+0131), which some file systems and shells treat as their ASCII letter, compare as it.
+  const lower = name.toUpperCase().toLowerCase();
+  if (RISKY_NAMES.has(lower)) return true;
+  const dot = lower.lastIndexOf('.');
+  return dot > 0 && RISKY_EXTENSIONS.has(lower.slice(dot));
+}
+
+/**
+ * The extension kept when a name is cut or numbered: the last extension when it is at most 16 bytes,
+ * with `.download` after it when the name ends in `.download` (04 §4.1). Empty when there is none.
+ */
+function keptExtension(name: string): string {
+  let rest = name;
+  let tail = '';
+  if (name.toLowerCase().endsWith(DOWNLOAD_SUFFIX) && name.length > DOWNLOAD_SUFFIX.length) {
+    rest = name.slice(0, -DOWNLOAD_SUFFIX.length);
+    tail = name.slice(-DOWNLOAD_SUFFIX.length);
+  }
+  const dot = rest.lastIndexOf('.');
+  const ext = dot > 0 && utf8Length(rest.slice(dot)) <= 16 ? rest.slice(dot) : '';
+  return ext + tail;
+}
+
+/** `stem` cut on a code-point boundary so that `stem + tail` is at most 255 UTF-8 bytes. */
+function fitName(stem: string, tail: string): string {
+  return `${truncateUtf8(stem, MAX_FILE_NAME_BYTES - utf8Length(tail)).trimEnd()}${tail}`;
+}
+
+/**
+ * The name a received file is saved under (D-142, 04 §4.1): sanitizeFileName, then `.download` when
+ * the name rule applies, then at most 255 UTF-8 bytes measured on that final name (the stem is cut on
+ * a code-point boundary; the last extension, with `.download` after it, is kept). Pure.
+ */
+export function savedFileName(raw: unknown): string {
+  let name = sanitizeFileName(raw);
+  if (needsDownloadSuffix(name)) name = `${name}${DOWNLOAD_SUFFIX}`;
+  if (utf8Length(name) <= MAX_FILE_NAME_BYTES) return name;
+  const ext = keptExtension(name);
+  const stem = name.slice(0, name.length - ext.length);
+  const out = fitName(stem, ext);
+  return out === ext ? `${FALLBACK_FILE_NAME}${ext}` : out;
+}
+
+/**
+ * `name` with ` (n)` before its extension (and before `.download`, 04 §4.1), within
+ * MAX_FILE_NAME_BYTES (the stem is cut on a code-point boundary), for a save that must not overwrite
+ * (M1-7f). `n` 0 returns `name`.
  */
 export function withNameSuffix(name: string, n: number): string {
   if (n === 0) return name;
-  const dot = name.lastIndexOf('.');
-  const hasExt = dot > 0 && name.length - dot <= 16;
-  const stem = hasExt ? name.slice(0, dot) : name;
-  const tail = ` (${String(n)})${hasExt ? name.slice(dot) : ''}`;
-  const room = MAX_FILE_NAME_BYTES - utf8Length(tail);
-  // trimEnd, not a regex: linear on any input (CodeQL js/polynomial-redos).
-  return `${truncateUtf8(stem, room).trimEnd()}${tail}`;
+  const ext = keptExtension(name);
+  const stem = name.slice(0, name.length - ext.length);
+  return fitName(stem, ` (${String(n)})${ext}`);
+}
+
+/**
+ * `name` with ` (<suffix>)` before its extension: the last resort after " (999)" (04 §4.1), where
+ * `suffix` is 8 random characters the caller draws. Same length rule as withNameSuffix.
+ */
+export function withRandomNameSuffix(name: string, suffix: string): string {
+  const ext = keptExtension(name);
+  const stem = name.slice(0, name.length - ext.length);
+  return fitName(stem, ` (${suffix})${ext}`);
 }

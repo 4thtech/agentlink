@@ -172,6 +172,10 @@ describe('files.deleteAfter: receipt, the DELIVERED receipt deletes the stored o
       // As a sender row under `receipt` would be: only the direction keeps it out (M1-1g-i).
       delete_after: 'receipt' as const,
       saved_name: null,
+      auto_save: null,
+      auto_reason: null,
+      auto_tries: null,
+      auto_next_at: null,
     };
     // M1-7f-2 stores A's own inbound row at ingest; the planted one replaces it.
     await a.store.transaction((tx) => {

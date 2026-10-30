@@ -36,6 +36,7 @@ import {
   type KeyStore,
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
+import { AUTO_SAVE_DEFAULTS } from '@4thtech-io/types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { createKeychainAgent, openRecordedKeyStore } from './keychain-keystore.js';
@@ -263,7 +264,15 @@ async function rulesOf(agent: Agent): Promise<{ jcs: string; version: number; do
 /** `doc` with only `files.allowedFolders` replaced. */
 function withFolders(doc: MutableJson, folders: readonly string[]): string {
   const files = doc['files'] as MutableJson;
-  return canonicalize({ ...doc, files: { ...files, allowedFolders: [...folders] } } as JsonObject);
+  // D-142: a base signed before it gets the files.autoSave defaults, as every new policy.set does.
+  return canonicalize({
+    ...doc,
+    files: {
+      ...files,
+      allowedFolders: [...folders],
+      autoSave: (files['autoSave'] ?? { ...AUTO_SAVE_DEFAULTS }) as MutableJson,
+    },
+  } as JsonObject);
 }
 
 /** Signs one policy edit on the rules in force (to give the agent non-default rules first). */
