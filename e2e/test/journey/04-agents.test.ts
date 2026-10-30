@@ -192,7 +192,8 @@ describe('chapter 4: agents', () => {
     await openAgents(page);
     await agentCard(page, 'Work').getByRole('button', { name: 'Pause', exact: true }).click();
     const sheet = page.getByRole('dialog', { name: labelled('Pause ', 'Work', '?') });
-    await sheet.waitFor({ timeout: 15_000 });
+    // The switch mounts the views again; the page's own read then opens the sheet.
+    await sheet.waitFor();
     await page
       .getByRole('button', { name: /^Agent: Work/ })
       .first()
@@ -206,9 +207,14 @@ describe('chapter 4: agents', () => {
       .getByRole('button', { name: /^Agent: Ana/ })
       .first()
       .waitFor();
+    // The switch mounts the views again: wait until the Agents page itself shows Ana open (its own
+    // read), so Resume is pressed on the page for the agent open now, not on the one being replaced.
+    await agentCard(page, 'Ana').getByText('Open', { exact: true }).waitFor();
+    await agentCard(page, 'Work').getByText('Paused', { exact: true }).first().waitFor();
     const before = jp.gestures.total();
     await agentCard(page, 'Work').getByRole('button', { name: 'Resume', exact: true }).click();
-    await page.getByRole('button', { name: CONFIRM_PASSKEY }).click({ timeout: 15_000 });
+    // Switch to Work, its own read, then the Resume gate (Touch ID).
+    await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
     await eventually(
       'Work resumed',
       async () => !(await text(page)).includes('Work is paused'),
