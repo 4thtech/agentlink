@@ -17,7 +17,7 @@ import {
 } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { createLogger } from '@4thtech-io/log';
-import { POLICY_DEFAULTS } from '@4thtech-io/types';
+import { defaultPolicy } from '@4thtech-io/types';
 import {
   wrapEnvelope,
   type RelayConnector,
@@ -52,7 +52,7 @@ import {
   textPayload,
 } from './testing/envelopes.js';
 import type { TestAgent, TestOwner } from './testing/envelopes.js';
-import { newNonce, ownerHex, signWith } from './testing/owner.js';
+import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './testing/owner.js';
 import { nostrTransport } from './transport.js';
 
 const RELAYS_A = Object.freeze(['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net']);
@@ -163,7 +163,18 @@ interface OpenOptions {
   readonly keyStore?: KeyStore;
   readonly deliveryAcks?: boolean;
   readonly init?: false;
+  /**
+   * An owner-signed `policy.set` with this `contacts.rateLimitPerContactPerHour` (a stricter limit than
+   * the default). The rate-limit tests need twice the limit in signed, wrapped and verified envelopes;
+   * with the default of 120 that is 240 envelopes and several seconds of pure crypto, which a loaded CI
+   * runner stretches past the 60 s test timeout (W4-SYNC-FLAKE). A small limit exercises the same code
+   * with the same assertions, relative to the limit, in a fraction of the work.
+   */
+  readonly rateLimit?: number;
 }
+
+/** The limit the rate-limit tests set (see `OpenOptions.rateLimit`): small, and well below the default. */
+const TEST_RATE_LIMIT = 12;
 
 async function openAgent(
   n: number,
@@ -183,6 +194,7 @@ async function openAgent(
     cipher,
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
+    ...(options.rateLimit === undefined ? {} : { policyMark: new MemoryPolicyMark() }),
     transport: nostrTransport({ connector: net, addressCheck: 'platform' }),
     logger: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
     ...(options.deliveryAcks === undefined ? {} : { deliveryAcks: options.deliveryAcks }),
@@ -194,6 +206,23 @@ async function openAgent(
       name,
       relays,
     });
+  }
+  if (options.rateLimit !== undefined) {
+    const policy = defaultPolicy();
+    policy.contacts.rateLimitPerContactPerHour = options.rateLimit;
+    const signed = await signWith(owner, {
+      v: 1,
+      agent: client.agentId,
+      owner: await ownerHex(owner),
+      op: 'policy.set',
+      params: { version: 1, policy: policy as unknown as JsonObject },
+      nonce: newNonce(),
+      issuedAt: clock.t,
+      expiresAt: clock.t + 600,
+    });
+    const outcome = await client.ownerActions.apply(JSON.stringify(signed));
+    if (outcome.status !== 'applied')
+      throw new Error(`test: not applied ${JSON.stringify(outcome)}`);
   }
   const receives = { count: 0 };
   const receive = client.envelopes.receive.bind(client.envelopes);
@@ -494,11 +523,11 @@ describe('per-contact rate limit (07 §3.2 rate_counters; 06 §3)', () => {
   it('twice the limit of envelopes from one contact are limited without delaying another contact', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', RELAYS_A, net);
-    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { rateLimit: TEST_RATE_LIMIT });
     const c = await openAgent(3, 'carol', RELAYS_C, net);
     await pair(a, b);
     await pair(c, b);
-    const limit = POLICY_DEFAULTS.contacts.rateLimitPerContactPerHour;
+    const limit = TEST_RATE_LIMIT;
     const total = 2 * limit;
     const crafter = await textCrafter(a, b);
     for (let i = 0; i < total; i += 1) {
@@ -931,10 +960,10 @@ describe('IR-M1-7h-1 F02: rate limit at processing time', () => {
   it('a card-update with twice the limit of texts from the new key in one pass delivers no more than the limit', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', RELAYS_A, net);
-    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { rateLimit: TEST_RATE_LIMIT });
     await pair(a, b);
     await rotate(a);
-    const limit = POLICY_DEFAULTS.contacts.rateLimitPerContactPerHour;
+    const limit = TEST_RATE_LIMIT;
     const total = 2 * limit;
     const update = await a.client.envelopes.build({
       to: { contact: b.id },
