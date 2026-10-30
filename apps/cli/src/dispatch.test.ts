@@ -43,6 +43,11 @@ function recorder() {
 }
 
 describe('--help (06 §8)', () => {
+  it('W4-PAUSE (I-4; 06 §6 "Paused agents"): no CLI command pauses or resumes an agent', () => {
+    for (const name of COMMAND_NAMES) expect(name).not.toMatch(/pause|resume/);
+    expect(helpText()).not.toMatch(/\bpause\b|\bresume\b/i);
+  });
+
   it('lists exactly the M1a commands', () => {
     expect([...COMMAND_NAMES]).toEqual([
       'init',

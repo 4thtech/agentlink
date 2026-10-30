@@ -22,7 +22,15 @@ import { isAgentName } from '../runtime/agent-name.js';
 import { cliPrefix, commandPrefix } from '../runtime/cli-prefix.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
 import { copy, renderCopy } from '@4thtech-io/mcp-tools/strings/index.js';
-import { TEXT, createDeps, fill, fixedErrorText, printAll, type CommandDeps } from './shared.js';
+import {
+  TEXT,
+  agentPausedNow,
+  createDeps,
+  fill,
+  fixedErrorText,
+  printAll,
+  type CommandDeps,
+} from './shared.js';
 
 /**
  * D-100: the rules line (11 §5: "rules", never "policy", except in the command itself). M1-36e: the
@@ -201,11 +209,16 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
         emit(TEXT.doctorNoRelays, true);
       }
 
-      try {
-        const caught = await client.catchUp({ budgetMs: 3_000 });
-        emit(caught.partial ? TEXT.doctorPartial : copy('cli.doctor.networkOk'));
-      } catch {
-        emit(copy('cli.doctor.networkDown', { prefix: cliPrefix() }), true);
+      if (await agentPausedNow(client)) {
+        // W4-PAUSE (06 §6): a paused agent fetches nothing, so the network is not checked.
+        emit(TEXT.statusPaused);
+      } else {
+        try {
+          const caught = await client.catchUp({ budgetMs: 3_000 });
+          emit(caught.partial ? TEXT.doctorPartial : copy('cli.doctor.networkOk'));
+        } catch {
+          emit(copy('cli.doctor.networkDown', { prefix: cliPrefix() }), true);
+        }
       }
 
       try {

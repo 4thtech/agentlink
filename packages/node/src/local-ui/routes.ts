@@ -17,6 +17,9 @@
 //   route (`presence: true`, with a handler that never runs): the server answers it 501
 //   `not_available` before the presence gate. This file registers every U3 route of 08 §1 now, so the
 //   later cards only replace the stubs in their own api/ files.
+// - W4-PAUSE (D-143 (5), 08 §1): a `presence: 'pause'` route is only a POST at AGENTS_PAUSE_PATH with
+//   no handler, registered once; the server's pause gate runs it. Resume (AGENTS_RESUME_PATH) is a
+//   `presence: true` route like every other change.
 // - A path is fixed segments `[a-z0-9-]` and `:name` parameters; a parameter matches only
 //   `[A-Za-z0-9_-]{1,128}` (no dot, no percent-escape, no slash), so no handler sees `..` or an
 //   encoded separator. Duplicates throw.
@@ -28,6 +31,8 @@ import { eventsRoutes } from './api/events.js';
 import { agentsManageRoutes } from './api/agents-manage.js';
 import { contactNamesRoutes } from './api/contacts-renamed.js';
 import { agentsRemoveRoutes } from './api/agents-remove.js';
+// W4-PAUSE: Pause (its own kind) and Resume (presence; signs `agent.resume`).
+import { agentsPauseRoutes } from './api/agents-pause.js';
 import { appsRoutes } from './api/apps.js';
 import { flowRoutes } from './api/flow.js';
 import { advancedRoutes } from './api/advanced.js';
@@ -51,7 +56,9 @@ import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
 import { storageRoutes } from './api/storage.js';
 import {
+  AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
+  AGENTS_RESUME_PATH,
   AGENTS_SWITCH_PATH,
   CREATE_AGENT_PATHS,
   UI_SETTINGS_WRITE_PATH,
@@ -76,7 +83,9 @@ import {
 import { joinRoutes } from './api/join.js';
 
 export {
+  AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
+  AGENTS_RESUME_PATH,
   AGENTS_SWITCH_PATH,
   INVITE_ACCEPT_PATH,
   INVITE_CHECK_PATH,
@@ -194,6 +203,15 @@ export class LocalUiRouteRegistry {
       if (handler !== undefined) throw invalid('a remove route has no handler');
       if (this.#entries.some((e) => e.route.presence === 'remove')) {
         throw invalid('the remove route is already registered');
+      }
+    } else if (presence === 'pause') {
+      // W4-PAUSE: pausing the open agent; the server's pause gate runs it (D-143 (5)).
+      if (method !== 'POST') throw invalid('a pause route is a POST');
+      if (route.path !== AGENTS_PAUSE_PATH)
+        throw invalid('a pause route is only at its fixed path');
+      if (handler !== undefined) throw invalid('a pause route has no handler');
+      if (this.#entries.some((e) => e.route.presence === 'pause')) {
+        throw invalid('the pause route is already registered');
       }
     } else if (presence === 'switch') {
       // U3-c: switching the open agent; the server's switch gate runs it (D-138).
@@ -351,6 +369,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     contactNamesRoutes,
     // W4-LIVE-STATUS (D-143): the live AI app status stream (its own events gate in the server).
     eventsRoutes,
+    // W4-PAUSE (D-143 (5)): Pause and Resume.
+    agentsPauseRoutes,
     uiSettingsRoutes,
   ]) {
     for (const route of routes) registry.register(route);

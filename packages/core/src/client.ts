@@ -10,7 +10,7 @@ import type { ApprovalChannel } from './approval-channel.js';
 import { STORE_SCHEMA_VERSION } from './constants.js';
 import { ContactBook, type ProofPackSigner } from './contacts.js';
 import { EnvelopeService } from './envelopes.js';
-import type { CoreContext } from './context.js';
+import { nowOf, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
 import { OwnStorage, type OwnStorageKeys } from './own-storage.js';
@@ -20,6 +20,7 @@ import { IdempotencyService } from './idempotency.js';
 import { PairingService } from './pairing.js';
 import { RequestsQueue } from './requests.js';
 import { OutboxService } from './outbox.js';
+import { AgentPause } from './agent-pause.js';
 import { McpSession } from './mcp-session.js';
 import { PublisherLease } from './publisher-lease.js';
 import { SendService, type SendMessageInput, type SendMessageResult } from './send.js';
@@ -136,8 +137,8 @@ export interface AgentLinkClientOptions {
    */
   readonly files?: FilesPlatform;
   /**
-   * W4-AUTO-SAVE (D-142): the agent's pause state for the automatic save (W4-PAUSE wires it, D-143).
-   * Absent: never paused.
+   * W4-AUTO-SAVE (D-142): the agent's pause state for the automatic save. Absent (W4-PAUSE, D-143):
+   * the agent's own pause row, fail closed. A runtime passes one only to replace it (tests).
    */
   readonly autoSavePause?: AutoSavePause;
   /**
@@ -172,6 +173,11 @@ export class AgentLinkClient {
   readonly idempotency: IdempotencyService;
   /** The outbox: staged envelopes, delivery passes and retries (M1-7k; 07 §3.2, §4.2). */
   readonly outbox: OutboxService;
+  /**
+   * W4-PAUSE (D-143 (5); 06 §6 "Paused agents"; 07 §3.2 `agent_pause`): the owner's pause of this
+   * agent. Only the app host's pause kind calls `pause()`; only a verified `agent.resume` ends it.
+   */
+  readonly pause: AgentPause;
   /** Inbox items with their untrusted-content metadata, and store-only counts (M1-7h; 06 §2.1, §4). */
   readonly inbox: InboxService;
   /** Delivery acknowledgements (02 F-23; M1-7h): behind the `deliveryAcks` flag. */
@@ -234,7 +240,9 @@ export class AgentLinkClient {
     this.#ctx = ctx;
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
-    this.pairing = new PairingService(ctx, this.identity, this.contacts, files?.drop);
+    this.pause = new AgentPause({ store: ctx.store, now: () => nowOf(ctx) });
+    // W4-PAUSE (IR-W4-PAUSE-1): invites refuse while paused (CLI and app routes alike).
+    this.pairing = new PairingService(ctx, this.identity, this.contacts, files?.drop, this.pause);
     this.ownerActions = new OwnerActions(
       ctx,
       this.identity,
@@ -266,7 +274,8 @@ export class AgentLinkClient {
       this.idempotency,
     );
     this.requests = new RequestsQueue(ctx);
-    this.outbox = new OutboxService(ctx, this.identity, this.contacts, transport);
+    // W4-PAUSE: nothing is published while the agent is paused (queued rows wait).
+    this.outbox = new OutboxService(ctx, this.identity, this.contacts, transport, this.pause);
     this.removal = new AgentRemovalService(ctx, {
       identity: this.identity,
       contacts: this.contacts,
@@ -282,8 +291,10 @@ export class AgentLinkClient {
       ...(files === undefined ? {} : { files }),
     });
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
+    // W4-PAUSE x W4-AUTO-SAVE (D-143 (5), D-142): by default auto-save reads this agent's own pause
+    // row (fail closed: an unreadable row counts as paused), so no runtime can forget to wire it.
     this.autoSave = new AutoSaver(ctx, this.#files, () => ownerActions.loadPolicy(), {
-      ...(autoSavePause === undefined ? {} : { pause: autoSavePause }),
+      pause: autoSavePause ?? { paused: () => this.pause.paused() },
     });
     this.#filesPlatform = files;
     this.files = new FilesView(ctx, files, () => ownerActions.loadPolicy());
@@ -364,6 +375,7 @@ export class AgentLinkClient {
    * 04 §3.1.1 steps 5 to 9 (`card-update` first) and, behind the flag, delivery acks.
    */
   async syncInbox(options?: SyncInboxOptions): Promise<SyncInboxResult> {
+    await this.pause.assertRunning();
     const result = await this.#sync.syncInbox(options);
     // M1-4d-f: announce the current card to contacts that lack it (after a rotation, also one made
     // without a transport). Best effort: it never fails the sync, and the next pass tries again.
@@ -414,7 +426,8 @@ export class AgentLinkClient {
    * active contact that does not hold it yet (M1-4d-f; 04 §2.6, §2.9, §3.4.1). The owner flow calls
    * it after a rotation; `syncInbox` also runs it. Idempotent.
    */
-  sendCardUpdates(): Promise<CardUpdateSendResult> {
+  async sendCardUpdates(): Promise<CardUpdateSendResult> {
+    await this.pause.assertRunning();
     return this.cardUpdates.sendPending();
   }
 
@@ -424,7 +437,8 @@ export class AgentLinkClient {
    * `syncInbox` (dedup by gift-wrap id and envelopeHash, one store transaction, rate limit). Only
    * the publisher-lease holder opens one; close it on lease loss and before the store closes.
    */
-  subscribeInbox(options?: SubscribeInboxOptions): Promise<InboxSubscription> {
+  async subscribeInbox(options?: SubscribeInboxOptions): Promise<InboxSubscription> {
+    await this.pause.assertRunning();
     return this.#sync.subscribeInbox(options);
   }
 
@@ -433,7 +447,8 @@ export class AgentLinkClient {
    * stores envelopes and counts them by sender. Processes nothing: no handshake, ack, card update,
    * receipt or read mark.
    */
-  catchUp(options?: SyncInboxOptions): Promise<CatchUpResult> {
+  async catchUp(options?: SyncInboxOptions): Promise<CatchUpResult> {
+    await this.pause.assertRunning();
     return this.#sync.catchUp(options);
   }
 
@@ -443,7 +458,9 @@ export class AgentLinkClient {
    * outbox rows in one store transaction, then the first publish. Idempotent under
    * `clientRequestId` (06 §1 rule 6).
    */
-  sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
+  async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
+    // W4-PAUSE: before the idempotency claim, so no result is kept and the same call works later.
+    await this.pause.assertRunning();
     return this.#send.send(input);
   }
 
@@ -453,7 +470,8 @@ export class AgentLinkClient {
    * hashes verified before the file gets its (sanitised, never overwriting) name (D-84). Never
    * executes anything.
    */
-  fetchFile(input: FetchFileInput): Promise<FetchFileResult> {
+  async fetchFile(input: FetchFileInput): Promise<FetchFileResult> {
+    await this.pause.assertRunning();
     return this.#files.fetch(input);
   }
 
@@ -466,7 +484,9 @@ export class AgentLinkClient {
    * `ownerActions.apply`, then the same fetch as `fetchFile` with the signed envelope and index. A file
    * already saved is answered before anything is applied. Never a path in the result.
    */
-  saveReceivedFile(signed: unknown): Promise<SaveReceivedFileResult> {
+  async saveReceivedFile(signed: unknown): Promise<SaveReceivedFileResult> {
+    // W4-PAUSE (08 §1 "What stops"): no file fetch while paused, refused before the nonce is used.
+    await this.pause.assertRunning();
     return saveReceivedFile(
       {
         ownerActions: this.ownerActions,
@@ -485,8 +505,18 @@ export class AgentLinkClient {
    * replaces this file's link, so `fetchFile` works again. Refused locally once retention has passed
    * (`LINK_EXPIRED`) and for an inline file (`NOT_REFRESHABLE`).
    */
-  requestFileLink(input: RequestFileLinkInput): Promise<RequestFileLinkResult> {
+  async requestFileLink(input: RequestFileLinkInput): Promise<RequestFileLinkResult> {
+    await this.pause.assertRunning();
     return this.fileLinks.request(input);
+  }
+
+  /**
+   * W4-PAUSE (06 §6 "Paused agents"): true while the owner has paused this agent, and when its pause
+   * row cannot be read (fail closed). Every process checks it before a tool call, a command and a
+   * loop step.
+   */
+  paused(): Promise<boolean> {
+    return this.pause.paused();
   }
 
   /**
@@ -530,7 +560,8 @@ export class AgentLinkClient {
    * Sends an `offer` (07 §2 `proposeTerms`; 06 §2.2a `agentlink_propose_terms`; M1-32): the core
    * fills `termsId`, `version`, `parties`, `previousTermsHash` and `termsHash` from its store.
    */
-  proposeTerms(input: ProposeTermsInput): Promise<ProposeTermsResult> {
+  async proposeTerms(input: ProposeTermsInput): Promise<ProposeTermsResult> {
+    await this.pause.assertRunning();
     return this.terms.propose(input);
   }
 
@@ -539,6 +570,7 @@ export class AgentLinkClient {
    * `accept` is a commitment under one approval per agreement (04 §3.4.2).
    */
   async respondToTerms(input: RespondToTermsInput): Promise<RespondToTermsResult> {
+    await this.pause.assertRunning();
     const result = await this.terms.respond(input);
     // An accept whose offer is already recorded: its ACCEPTED receipt is signed now, under the
     // same approval (07 §2.1 step 3; D-55). Never fails the call.
@@ -571,7 +603,8 @@ export class AgentLinkClient {
    * kind from the payload, automatic chain selection, policy `proofs.*` and budget, then the
    * Record and, once on-chain, the `proof` envelope with the salt to the recipient.
    */
-  notarize(input: NotarizeInput): Promise<NotarizeResult> {
+  async notarize(input: NotarizeInput): Promise<NotarizeResult> {
+    await this.pause.assertRunning();
     return this.proofs.notarize(input);
   }
 
@@ -579,7 +612,8 @@ export class AgentLinkClient {
    * An explicit receipt on a record received (07 §2 `acknowledge`; 06 §2.4): `opened` only when
    * the user asked; `accepted` / `rejected` are commitments (`commitments.accept`, D-31).
    */
-  acknowledge(input: AcknowledgeInput): Promise<AcknowledgeResult> {
+  async acknowledge(input: AcknowledgeInput): Promise<AcknowledgeResult> {
+    await this.pause.assertRunning();
     return this.proofs.acknowledge(input);
   }
 

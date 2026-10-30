@@ -175,6 +175,8 @@ describe('constants (04, 05, 06)', () => {
         'agent.label',
         'app.connect',
         'app.disconnect',
+        // W4-PAUSE (D-143 (5)): Resume is a local owner action.
+        'agent.resume',
         // W4-FILES-SAVE (proposed, owner confirms at merge): save a received file from the app.
         'file.save',
       ].sort(),
@@ -255,6 +257,7 @@ describe('constants (04, 05, 06)', () => {
       'agent.label': 600,
       'app.connect': 600,
       'app.disconnect': 600,
+      'agent.resume': 600,
       'agent.revoke': null,
       'file.save': 600,
     });

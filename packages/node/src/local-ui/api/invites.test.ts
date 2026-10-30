@@ -578,3 +578,31 @@ describe('one invite size bound for check and accept (IR UX2-d1 L)', () => {
     expect(w.seen.checked).toHaveLength(0);
   });
 });
+
+// W4-PAUSE fix round (IR-W4-PAUSE-1; 06 §6 "Paused agents", 08 §1): core refuses invites while the
+// agent is paused, and the app answers one clean fixed code (never a 500); nothing is signed.
+describe('a paused agent: create, check and accept answer agent_paused (W4-PAUSE)', () => {
+  const PAUSED = { status: 409, body: { error: 'agent_paused' } };
+
+  it('create', async () => {
+    const d = desk({ create: () => Promise.reject(coreError('agent_paused')) });
+    expect(await inviteCreateRoute.handler(context(), {}, d.desk)).toEqual(PAUSED);
+  });
+
+  it('check', async () => {
+    const d = desk({ check: () => Promise.reject(coreError('agent_paused')) });
+    expect(await inviteCheckRoute.handler(context(), { invite: LINK }, d.desk)).toEqual(PAUSED);
+  });
+
+  it('accept: refused at resolve or at check, before anything is signed', async () => {
+    for (const port of [
+      { resolve: () => Promise.reject(coreError('agent_paused')) },
+      { check: () => Promise.reject(coreError('agent_paused')) },
+    ]) {
+      const w = acceptWorld({ port });
+      expect(await run(w, { invite: LINK })).toEqual(PAUSED);
+      expect(w.seen.signed).toEqual([]);
+      expect(w.seen.applied).toEqual([]);
+    }
+  });
+});

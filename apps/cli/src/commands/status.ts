@@ -15,7 +15,15 @@ import { renderContactName, type CatchUpResult, type InboxCounts } from '@4thtec
 import { DISPATCH_TEXT, EXIT_OK, EXIT_USAGE, type CommandHandler } from '../dispatch.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
 import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
-import { TEXT, createDeps, fill, printAll, withAgent, type CommandDeps } from './shared.js';
+import {
+  TEXT,
+  agentPausedNow,
+  createDeps,
+  fill,
+  printAll,
+  withAgent,
+  type CommandDeps,
+} from './shared.js';
 
 /** The 3 s budget of `agentlink_status` (06 §2.0). */
 export const STATUS_CATCH_UP_MS = 3_000;
@@ -30,15 +38,21 @@ export function createStatusHandler(deps: CommandDeps = createDeps()): CommandHa
     return withAgent(context, deps, async ({ client, name, agentId }) => {
       const warnings: string[] = [];
       let counts: InboxCounts;
-      try {
-        const caught: CatchUpResult = await client.catchUp({ budgetMs: STATUS_CATCH_UP_MS });
-        counts = caught;
-        if (caught.partial) warnings.push(TEXT.statusPartial);
-        if (caught.incomplete > 0) warnings.push(TEXT.statusIncomplete);
-      } catch {
-        // Offline or no transport: the stored counts still answer (store reads only).
+      if (await agentPausedNow(client)) {
+        // W4-PAUSE (06 §6): a paused agent answers from the store, with no relay fetch.
         counts = await client.inbox.counts();
-        warnings.push(TEXT.statusOffline);
+        warnings.push(TEXT.statusPaused);
+      } else {
+        try {
+          const caught: CatchUpResult = await client.catchUp({ budgetMs: STATUS_CATCH_UP_MS });
+          counts = caught;
+          if (caught.partial) warnings.push(TEXT.statusPartial);
+          if (caught.incomplete > 0) warnings.push(TEXT.statusIncomplete);
+        } catch {
+          // Offline or no transport: the stored counts still answer (store reads only).
+          counts = await client.inbox.counts();
+          warnings.push(TEXT.statusOffline);
+        }
       }
 
       const lines: string[] = [];

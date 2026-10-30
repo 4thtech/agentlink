@@ -79,6 +79,9 @@ export const AGENTS_LABEL_CHECK_PATH = '/api/ui/agents/label-check';
 export const AGENTS_REMOVE_PATH = '/api/ui/agents/remove';
 /** W4-RENAME-REACHES-CONTACTS (D-141): "Contacts still see {cardName}" (a read, no presence). */
 export const AGENTS_CARD_NAME_PATH = '/api/ui/agents/card-name';
+/** W4-PAUSE (D-143 (5); 08 §1): Pause (its own kind, no presence) and Resume (presence). */
+export const AGENTS_PAUSE_PATH = '/api/ui/agents/pause';
+export const AGENTS_RESUME_PATH = '/api/ui/agents/resume';
 /** Every owner operation and the switch send this type (the presence body; the switch's JSON). */
 export const OCTET_STREAM = 'application/octet-stream';
 
@@ -150,6 +153,41 @@ export const AGENTS_SWITCH = {
     answer: { status: 409, body: { status: 'agent_changed' } } satisfies UiAnswer,
     outcome: 'agent_changed',
   },
+} as const;
+
+/** W4-PAUSE: `POST /api/ui/agents/pause`: an octet-stream body of exactly this JSON. */
+export interface AgentsPauseBody {
+  readonly generation: number;
+}
+
+/**
+ * W4-PAUSE (D-143 (5); 08 §1 "Pause an agent"): Pause is one click with no Touch ID: an octet-stream
+ * body `{generation}` (a number), no `X-AgentLink-Input`, no presence header. A second Pause answers
+ * the same. The agents list and the events stream then carry `state: 'paused'` for the agent.
+ */
+export const AGENTS_PAUSE = {
+  accepted: {
+    body: { generation: 1 } satisfies AgentsPauseBody,
+    answer: { status: 200, body: { status: 'paused' } } satisfies UiAnswer,
+  },
+  stale: {
+    body: { generation: 99 } satisfies AgentsPauseBody,
+    answer: { status: 409, body: { status: 'agent_changed' } } satisfies UiAnswer,
+  },
+  invalid: {
+    answer: { status: 400, body: { status: 'invalid' } } satisfies UiAnswer,
+  },
+} as const;
+
+/**
+ * W4-PAUSE (04 §2.5.1 `agent.resume`; 08 §1): Resume with Touch ID is a presence route like Rename:
+ * `X-AgentLink-Generation`, `X-AgentLink-Input` of `{}`, the presence proof as the body. It is
+ * refused with `not_paused` before the gesture when the agent is not paused.
+ */
+export const AGENTS_RESUME = {
+  input: {},
+  resumed: { answer: { status: 200, body: { status: 'resumed' } } satisfies UiAnswer },
+  notPaused: { answer: { status: 409, body: { error: 'not_paused' } } satisfies UiAnswer },
 } as const;
 
 /** `GET label-check?label=`: what core would sign, before Touch ID. */

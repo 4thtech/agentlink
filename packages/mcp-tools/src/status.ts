@@ -27,6 +27,7 @@ import { copy } from './strings/index.js';
 import { activeContacts, refsById, renderRef, type ContactRef } from './contacts.js';
 import type { Counts, ToolContext } from './context.js';
 import { topUpUrl } from './proofs-common.js';
+import { agentPaused } from './pause.js';
 import { ok, type HandlerOutput } from './result.js';
 import { TOOL_TEXT, noOwnerResult } from './text.js';
 
@@ -43,12 +44,19 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
   // Credits are read in parallel with the catch-up, within the platform's own budget.
   const accountRead = accountFields(context, self.agentId);
   let counts: Counts;
-  try {
-    counts = await client.catchUp(STATUS_CATCH_UP_BUDGET_MS);
-  } catch {
-    // Offline or no relay: the stored counts still answer the session-start check.
-    logger.info('status catch-up unavailable; stored counts used');
+  // W4-PAUSE (06 §6 "Paused agents"): a paused agent answers from the store, with no relay fetch,
+  // and the result adds the fixed paused line.
+  const paused = await agentPaused(client);
+  if (paused) {
     counts = await client.storedCounts();
+  } else {
+    try {
+      counts = await client.catchUp(STATUS_CATCH_UP_BUDGET_MS);
+    } catch {
+      // Offline or no relay: the stored counts still answer the session-start check.
+      logger.info('status catch-up unavailable; stored counts used');
+      counts = await client.storedCounts();
+    }
   }
 
   const incomplete = counts.incomplete ?? 0;
@@ -92,8 +100,13 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
     incomplete,
   });
   return ok(statusSummary(inbox, counts.requests, offers), {
-    // M1-5g: a relay returned a second at its cap. Fixed text only (I-5, I-7).
-    ...(incomplete > 0 ? { nextStep: copy('chat.inbox.incompleteNextStep') } : {}),
+    // M1-5g: a relay returned a second at its cap. Fixed text only (I-5, I-7). W4-PAUSE: the
+    // paused line instead (no catch-up ran, so nothing can be incomplete).
+    ...(paused
+      ? { nextStep: TOOL_TEXT.pausedNextStep }
+      : incomplete > 0
+        ? { nextStep: copy('chat.inbox.incompleteNextStep') }
+        : {}),
     agent: { name: context.agentName, id: self.agentId, fingerprint: self.agentFingerprint },
     owner: { fingerprint: self.ownerFingerprint },
     contacts: contacts.length,

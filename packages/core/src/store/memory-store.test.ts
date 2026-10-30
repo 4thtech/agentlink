@@ -65,6 +65,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         // W4-AUTO-SAVE (D-142; 04 §4.1, schema 11): the limits log and the one-row state.
         'auto_save_log',
         'auto_save_state',
+        // W4-PAUSE (D-143 (5); 07 §3.2, schema 12): the owner's pause of the agent.
+        'agent_pause',
         'idempotency',
         'owner_action_nonces',
         'revoked_agents',

@@ -108,6 +108,8 @@ function fakeClient(states: readonly string[]): Fake {
           ownerFingerprint: '3333·4444',
         }),
       contacts: () => Promise.resolve([]),
+      // W4-PAUSE: the agent is not paused (a refused pause read would fail closed).
+      paused: () => Promise.resolve(false),
       terms,
     } as Record<string | symbol, unknown>,
     {
