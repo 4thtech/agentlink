@@ -11,6 +11,9 @@ import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
 import { AGENTS_READ, APPS_READ, parseAgentSignal } from '../home/start-here-api.js';
 import { STATUS_PATH } from '../first-run/setup-api.js';
 
+/** The approvals waiting (Home lists them); a waiting approval is never hidden behind Get started. */
+export const APPROVALS_READ = '/api/approvals';
+
 /** What the reads said. `undefined` means "no answer", never "no". */
 export interface SetupState {
   readonly owner: 'missing' | 'set_up' | undefined;
@@ -20,6 +23,8 @@ export interface SetupState {
   readonly appConnected: boolean | undefined;
   /** The contacts (any state), or undefined when the read gave no answer. */
   readonly contacts: readonly ContactRow[] | undefined;
+  /** Approvals waiting on Home (`GET /api/approvals`); undefined when the read gave no answer. */
+  readonly waiting?: number | undefined;
 }
 
 export const UNKNOWN_STATE: SetupState = {
@@ -107,11 +112,12 @@ export interface SetupReads {
 export async function readSetupState(reads: SetupReads = {}): Promise<SetupState> {
   const client = reads.client ?? createApiClient();
   const safe = <T>(p: Promise<T>): Promise<T | undefined> => p.catch(() => undefined);
-  const [status, agents, apps, contacts] = await Promise.all([
+  const [status, agents, apps, contacts, approvals] = await Promise.all([
     safe(client.get<unknown>(STATUS_PATH)),
     safe(client.get<unknown>(AGENTS_READ)),
     safe(client.get<unknown>(APPS_READ)),
     safe(client.get<unknown>(LIST_PATH)),
+    safe(client.get<unknown>(APPROVALS_READ)),
   ]);
   let owner: SetupState['owner'];
   if (status?.kind === 'ok' && isRecord(status.data)) {
@@ -125,10 +131,12 @@ export async function readSetupState(reads: SetupReads = {}): Promise<SetupState
   let appConnected: boolean | undefined;
   if (agent === false) appConnected = false;
   else if (agentsData !== undefined) {
+    // "No AI app" is only ever read from a real AI apps list of the app host. Without one (a page
+    // bound to the agent an AI app already runs, or a list that failed) it is unknown, never "no".
     const appsOk = apps?.kind === 'ok';
-    const appsAnswered = appsOk || apps?.kind === 'not_available';
+    const bound = isRecord(agentsData) && agentsData['switchable'] === false;
     const signal = parseAgentSignal(agentsData, appsOk ? apps.data : undefined);
-    if (signal !== undefined && (signal.connected || appsAnswered)) {
+    if (signal !== undefined && (signal.connected || (appsOk && !bound))) {
       appConnected = signal.connected;
     }
   }
@@ -137,5 +145,10 @@ export async function readSetupState(reads: SetupReads = {}): Promise<SetupState
     const parsed = parseList(contacts.data);
     if (parsed.kind === 'ok') rows = parsed.contacts;
   } else if (owner === 'missing' || agent === false) rows = [];
-  return { owner, agent, appConnected, contacts: rows };
+  let waiting: number | undefined;
+  if (approvals?.kind === 'ok' && isRecord(approvals.data)) {
+    const list = approvals.data['approvals'];
+    if (Array.isArray(list)) waiting = list.length;
+  }
+  return { owner, agent, appConnected, contacts: rows, waiting };
 }

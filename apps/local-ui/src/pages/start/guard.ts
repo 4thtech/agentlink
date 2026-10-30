@@ -12,9 +12,16 @@ export const START_FIRST_STEP = '/start/app';
 /** Where the app may open Get started by itself: Home only. */
 export const GUARDED_PATHS: readonly string[] = ['/'];
 
-/** Whether a page opened at `path` should open Get started instead, for this state. */
+/**
+ * Whether a page opened at `path` should open Get started instead, for this state. A waiting
+ * approval keeps Home: it is time-bound and is never hidden behind Get started.
+ */
 export function shouldOpenStart(path: string, state: SetupState): boolean {
-  return GUARDED_PATHS.includes(path) && setupIncomplete(state);
+  return (
+    GUARDED_PATHS.includes(path) &&
+    setupIncomplete(state) &&
+    !(state.waiting !== undefined && state.waiting > 0)
+  );
 }
 
 export interface StartGuardOptions {

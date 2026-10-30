@@ -122,7 +122,13 @@ describe('readSetupState: the four reads', () => {
     const state = await readSetupState({
       client: client({ '/api/ui/first-run': ok({ owner: 'missing' }) }),
     });
-    expect(state).toEqual({ owner: 'missing', agent: false, appConnected: false, contacts: [] });
+    expect(state).toEqual({
+      owner: 'missing',
+      agent: false,
+      appConnected: false,
+      contacts: [],
+      waiting: undefined,
+    });
   });
 
   it('an open agent with no AI app is incomplete', async () => {
@@ -141,9 +147,33 @@ describe('readSetupState: the four reads', () => {
     expect(setupIncomplete(state)).toBe(true);
   });
 
+  it('without a real AI apps list (not available, or a page bound to its agent) no app is unknown', async () => {
+    const bound = await readSetupState({
+      client: client({
+        '/api/ui/first-run': ok({ owner: 'set_up' }),
+        '/api/ui/agents': ok({ switchable: false }),
+        '/api/ui/apps': { kind: 'not_available' },
+      }),
+    });
+    expect(bound.appConnected).toBeUndefined();
+    expect(setupIncomplete(bound)).toBe(false);
+    const noDesk = await readSetupState({
+      client: client({
+        '/api/ui/first-run': ok({ owner: 'set_up' }),
+        '/api/ui/agents': ok({
+          switchable: true,
+          current: 'work',
+          agents: [{ name: 'work', labelled: true, running: false, apps: [] }],
+        }),
+        '/api/ui/apps': { kind: 'not_available' },
+      }),
+    });
+    expect(noDesk.appConnected).toBeUndefined();
+  });
+
   it('failed reads are unknown, never incomplete', async () => {
     const state = await readSetupState({ client: client({}) });
-    expect(state).toEqual(UNKNOWN_STATE);
+    expect(state).toEqual({ ...UNKNOWN_STATE, waiting: undefined });
     expect(setupIncomplete(state)).toBe(false);
   });
 });
@@ -176,6 +206,9 @@ describe('openStartIfIncomplete: the open-on-launch check', () => {
     );
     expect(go).not.toHaveBeenCalled();
     expect(shouldOpenStart('/approve/abc', { ...SET_UP, owner: 'missing' })).toBe(false);
+    // A waiting approval keeps Home.
+    expect(shouldOpenStart('/', { ...SET_UP, owner: 'missing', waiting: 1 })).toBe(false);
+    expect(shouldOpenStart('/', { ...SET_UP, owner: 'missing', waiting: 0 })).toBe(true);
   });
 
   it('after Skip to Home (or Get started opened), it never opens by itself again', async () => {
