@@ -98,10 +98,11 @@ describe('routes', () => {
     expect(host.querySelector('main.al-first-run')).not.toBeNull();
   });
 
-  it('shows one agent at /agents/<name> on the Agents page (U5 builds the detail)', () => {
+  it('shows one agent at /agents/<name> on the Agents page (W4-AGENTS: its own page)', () => {
     mountAt('/agents/work');
     expect(location.pathname).toBe('/agents/work');
-    expect(host.querySelector('main h1')?.textContent).toBe('Agents');
+    // The Agents page draws the agent's page (its heading is the agent's label once read).
+    expect(host.querySelector('main.ag-page')).not.toBeNull();
     expect(currentSection()).toBe('Agents');
   });
 
