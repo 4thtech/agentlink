@@ -22,11 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { NodeKeyStoreError } from './errors.js';
 import { performOwnerOperation } from './index.js';
 import type { KeychainBackend } from './keychain.js';
-import {
-  OWNER_ACTION_OPS,
-  OWNER_OPERATION_REFUSED,
-  allowedTypedData,
-} from './owner-allowlist.js';
+import { OWNER_ACTION_OPS, OWNER_OPERATION_REFUSED, allowedTypedData } from './owner-allowlist.js';
 import { initOwnerWith } from './owner-init.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
 import { runOwnerGesture, runOwnerOperation, type OwnerSignRequest } from './owner-operation.js';
@@ -417,4 +413,3 @@ describe('the owner-action op allowlist is exactly the ops owner flows sign', ()
     expect(OWNER_ACTION_OPS.filter((op) => /pause/.test(op))).toEqual([]);
   });
 });
-
