@@ -736,7 +736,7 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
   it('IR-W4-WIRE-2X-SEC-1: bidi and invisible format characters never reach the server', async () => {
     const labelCheck = vi.fn(() => Promise.resolve({ kind: 'ok' } as const));
     await mount(asAdd({ api: Object.assign(fakeSetup({ status: OWNER }), { labelCheck }) }));
-    for (const bad of ['Evil\u202Ename', 'Zero\u200Bwidth', 'Iso\u2066late', 'Bom\uFEFF']) {
+    for (const bad of ['Evil\u202Ename', 'Zero\u200Bwidth', 'Iso\u2066late', 'B\uFEFFom']) {
       await typeName(bad);
       await click('Continue');
       expect(h1()).toBe('Name your agent');

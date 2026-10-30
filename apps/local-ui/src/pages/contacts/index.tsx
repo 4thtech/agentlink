@@ -86,10 +86,10 @@ import { PresencePrompt } from './presence-prompt.js';
 import { useInviteFirst } from '../home/start-here-empty.js';
 import { ConnectedMoment, type ConnectedMomentProps } from '../invite/connected.js';
 import { useOwnName } from '../invite/own-name.js';
-import { InviteScreen } from '../invite/invite-screen.js';
+import { InviteScreen, PasteScreen } from '../invite/invite-screen.js';
 import { PendingInviteRow, type CancelResult } from '../invite/pending-row.js';
 import { PersonMenu } from '../invite/person-menu.js';
-import { INVITE_STRINGS as I } from '../invite/strings.js';
+import { INVITE_STRINGS as I, PASTE_STRINGS as PS } from '../invite/strings.js';
 import { START_STRINGS } from '../home/strings.js';
 import {
   CONTACTS_STRINGS as S,
@@ -918,6 +918,14 @@ export function ContactsPage({
     setTick((n) => n + 1);
   }, []);
 
+  // IR-W4-WIRE-2X-1: "Have an invite link? Paste it" opens a paste screen that makes no invite.
+  const [pasting, setPasting] = useState(false);
+  const openPaste = (): void => {
+    setSheetOpen(false);
+    setNotice(undefined);
+    setInviting(false);
+    setPasting(true);
+  };
   const openInvite = (): void => {
     setSheetOpen(false);
     setNotice(undefined);
@@ -941,6 +949,9 @@ export function ContactsPage({
           >
             {I.title}
           </Button>
+          <button type="button" className="inv-link-button" onClick={openPaste}>
+            {PS.open}
+          </button>
         </div>
       ) : null}
     </div>
@@ -949,6 +960,7 @@ export function ContactsPage({
   // screen, and its "Have an invite link? Paste it" accepts an invite someone sent.
   const accepted = (name: string): void => {
     setInviting(false);
+    setPasting(false);
     setNotice(connectingTo(name));
     setConnectingSince(Date.now());
     expecting.current = true;
@@ -1131,6 +1143,23 @@ export function ContactsPage({
     );
   })();
 
+  if (pasting) {
+    return (
+      <>
+        {arrived === undefined ? (
+          <PasteScreen
+            invites={invites}
+            passkey={passkey}
+            onConnected={accepted}
+            onDone={() => setPasting(false)}
+          />
+        ) : (
+          moment
+        )}
+      </>
+    );
+  }
+
   if (inviting) {
     // The Invite screen in place of the list (A5). Done (or Home) brings the list back, with the
     // new pending row read from the server.
@@ -1139,7 +1168,7 @@ export function ContactsPage({
         {arrived === undefined ? (
           <InviteScreen
             invites={invites}
-            paste={{ passkey, onConnected: accepted }}
+            paste={{ passkey, onConnected: accepted, onOpen: openPaste }}
             onCreated={() => {
               expecting.current = true;
               setJustCreated(true);

@@ -29,8 +29,8 @@ const PREFIX = 'https://agentlink.4thtech.io/i#';
 const BARE = 'agentlink.4thtech.io/i#';
 /** Short link (04 §3.6.2): `2.` and the 43-character secret. */
 const SHORT = /^2\.[A-Za-z0-9_-]{43}$/;
-/** Long link (04 §3.6): strict base64url, at most the codec's payload bound. */
-const PAYLOAD = /^[A-Za-z0-9_-]{1,21846}$/;
+/** Long link (04 §3.6): strict base64url, at most the invite client's bound (invite-api.ts). */
+const PAYLOAD = /^[A-Za-z0-9_-]{1,8192}$/;
 /** More pasted text than any message with one link in it: refused unread. */
 const MAX_TEXT = 32_768;
 /** Punctuation a sentence or a quote may put around a link. */
@@ -79,6 +79,13 @@ export interface PasteInviteProps {
   readonly platform?: Platform;
   /** The invite was accepted; `name` is the name-rule output. The page follows the pairing. */
   readonly onConnected?: (name: string) => void;
+  /**
+   * IR-W4-WIRE-2X-1: "Paste it" hands over to the page's own paste screen (one that makes no invite
+   * of yours) instead of opening the field here.
+   */
+  readonly onOpen?: () => void;
+  /** The field shows at once (the paste screen). */
+  readonly startOpen?: boolean;
 }
 
 type Phase =
@@ -94,10 +101,12 @@ export function PasteInvite({
   gesture = passkeyProof,
   platform: givenPlatform,
   onConnected,
+  onOpen,
+  startOpen = false,
 }: PasteInviteProps): ReactElement {
   const regionId = useId();
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
-  const [phase, setPhase] = useState<Phase>({ k: 'closed' });
+  const [phase, setPhase] = useState<Phase>({ k: startOpen ? 'form' : 'closed' });
   const [text, setText] = useState('');
   // The link the check answered for: the one Accept sends (never another text typed since).
   const [link, setLink] = useState('');
@@ -299,7 +308,9 @@ export function PasteInvite({
         className="inv-link-button"
         aria-expanded={open}
         aria-controls={regionId}
-        onClick={() => (open ? setPhase({ k: 'closed' }) : restart())}
+        onClick={() =>
+          onOpen !== undefined ? onOpen() : open ? setPhase({ k: 'closed' }) : restart()
+        }
       >
         {P.open}
       </button>

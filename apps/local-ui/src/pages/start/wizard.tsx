@@ -254,6 +254,8 @@ export interface NameStepProps {
   readonly error?: string;
   /** The server is checking the name. */
   readonly working?: boolean;
+  /** IR-W4-WIRE-2X-1: another agent already has this name (a hint). */
+  readonly taken?: boolean;
 }
 
 /**
@@ -266,6 +268,7 @@ export function NameStep({
   onContinue,
   error,
   working = false,
+  taken = false,
 }: NameStepProps): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
   const submit = (event: FormEvent<HTMLFormElement>): void => {
@@ -290,6 +293,7 @@ export function NameStep({
           spellCheck={false}
           value={value}
           readOnly={working}
+          {...(taken ? { hint: N.taken } : {})}
           {...(error === undefined ? {} : { error })}
           onChange={(event) => onChange(event.currentTarget.value)}
         />
@@ -387,6 +391,8 @@ export interface ConnectedStepProps {
   readonly onHome: () => void;
   /** E1: connect the app now (the ordinary signed AI apps step). */
   readonly onConnect?: () => void;
+  /** W4-WIRE-2: Add agent: open the new agent (named by `label`), only when asked. */
+  readonly onOpen?: () => void;
 }
 
 /** A2, step 3: the Connected ✓ moment, or E1's "{agent} is ready" with Connect. */
@@ -396,6 +402,7 @@ export function ConnectedStep({
   onInvite,
   onHome,
   onConnect,
+  onOpen,
 }: ConnectedStepProps): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
   const connected = app?.connected === true;
@@ -448,6 +455,11 @@ export function ConnectedStep({
             onClick={onInvite}
           >
             {D.invite}
+          </Button>
+        )}
+        {onOpen === undefined ? null : (
+          <Button variant="secondary" size="lg" onClick={onOpen}>
+            {D.open(label)}
           </Button>
         )}
         <Button variant="secondary" size="lg" onClick={onHome}>

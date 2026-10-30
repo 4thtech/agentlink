@@ -77,6 +77,9 @@ export const INVITE_STRINGS = {
  */
 export const PASTE_STRINGS = {
   open: 'Have an invite link? Paste it',
+  /** The paste screen (IR-W4-WIRE-2X-1): the option on its own, no link of yours is made. */
+  title: 'Accept an invite',
+  intro: 'Paste the link someone sent you. You accept it with Touch ID.',
   label: 'Paste the invite link',
   hint: 'It starts with https://agentlink.4thtech.io/i#',
   go: 'Continue',

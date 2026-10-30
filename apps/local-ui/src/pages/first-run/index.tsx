@@ -52,6 +52,7 @@ import { INVITE_PATH } from '../../nav.js';
 import { createInviteApi, type InviteApi } from '../contacts/invite-api.js';
 import { navigate } from '../../router.js';
 import { announceAgentsChanged } from '../agents/use-agents.js';
+import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import {
   LinkExpiredState,
   LoadingState,
@@ -67,6 +68,7 @@ import { readAgentSignal } from '../home/start-here-api.js';
 import type { AgentSignal } from '../home/start-here.js';
 import { markLeavingStart, skipToHome } from '../start/guard.js';
 import {
+  forgetAbandonedAdd,
   markAutoShown,
   rememberWizard,
   resetWizard,
@@ -221,6 +223,8 @@ export interface FirstRunPageProps {
   /** U3-invite: whether `agentlink join` left an invite waiting, and how its screen opens. */
   readonly readJoin?: () => Promise<JoinRead>;
   readonly openJoin?: () => void;
+  /** W4-WIRE-2: the agents (names already used, and opening the new one). Default: the server's. */
+  readonly agentsApi?: Pick<AgentsApi, 'list' | 'switchTo'>;
 }
 
 interface Done {
@@ -538,8 +542,11 @@ function wantsNewAgent(): boolean {
 /** The query Add agent keeps on every step. */
 const ADD_QUERY = '?add=agent';
 
-// eslint-disable-next-line no-control-regex
-const CONTROL = /[\u0000-\u001f\u007f]/;
+// The agent-name rule here: no control characters, and (IR-W4-WIRE-2X-SEC-1) no bidi controls or
+// invisible format characters, which could make a name read as another; the server checks again.
+const CONTROL =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/;
 
 /**
  * W4-WIRE-2: Add agent starts from nothing (a name or a pick of an earlier run is not kept), and a
@@ -580,6 +587,7 @@ export function FirstRunPage({
   readSignal = readAgentSignal,
   readJoin = () => createJoinApi().read(),
   openJoin = () => window.location.assign(JOIN),
+  agentsApi: givenAgents,
 }: FirstRunPageProps = {}): ReactElement {
   // W4-WIRE-2: decided once per mount, before the remembered choices are read.
   useState(startRun);
@@ -624,6 +632,9 @@ export function FirstRunPage({
   const [named, setNamedState] = useState(memory.named === true);
   const [nameError, setNameError] = useState<string | undefined>(undefined);
   const [naming, setNaming] = useState(false);
+  const [agents] = useState(() => givenAgents ?? createAgentsApi());
+  // IR-W4-WIRE-2X-1: the names the owner's agents have, for the "already have" hint (Add agent).
+  const [takenNames, setTakenNames] = useState<ReadonlySet<string>>(() => new Set());
   const setNamed = (value: boolean): void => {
     setNamedState(value);
     rememberWizard({ named: value });
@@ -661,6 +672,8 @@ export function FirstRunPage({
     markAutoShown();
     return () => {
       mounted.current = false;
+      // IR-W4-WIRE-2X-1: leaving Get started (not moving between its steps) ends an Add agent.
+      if (!location.pathname.startsWith('/start/')) forgetAbandonedAdd();
     };
   }, []);
 
@@ -779,6 +792,32 @@ export function FirstRunPage({
     }
     setName(typed);
     setNamed(true);
+  };
+
+  // IR-W4-WIRE-2X-1: Add agent reads the agents' names once, for the hint (never a rule).
+  const adding = mode?.k === 'add';
+  useEffect(() => {
+    if (!adding) return undefined;
+    let live = true;
+    void agents.list().then(
+      (result) => {
+        if (live && result.kind === 'ok') {
+          setTakenNames(new Set(result.list.agents.map((a) => a.label)));
+        }
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [adding, agents]);
+
+  /** W4-WIRE-2: "Open {name}" on Add agent's Connected: open the new agent, then Home. */
+  const openNewAgent = async (folder: string): Promise<void> => {
+    const read = await agents.list().catch(() => undefined);
+    const generation = read?.kind === 'ok' ? read.list.generation : undefined;
+    if (generation !== undefined) await agents.switchTo(folder, generation).catch(() => undefined);
+    goHome();
   };
 
   /** Step 1 → 2: the name follows the app until the person edits it. */
@@ -1046,6 +1085,9 @@ export function FirstRunPage({
       <ConnectedStep
         label={outcome.label}
         {...(app === undefined ? {} : { app })}
+        {...(wantsNewAgent() && outcome.agent !== undefined
+          ? { onOpen: () => void openNewAgent(outcome.agent ?? '') }
+          : {})}
         onInvite={() => toStep('invite')}
         onHome={goHome}
         {...(app === undefined || app.connected || app.id === ''
@@ -1252,6 +1294,7 @@ export function FirstRunPage({
           value={name}
           onChange={setName}
           onContinue={() => void submitName()}
+          taken={takenNames.has(name.trim())}
           working={naming}
           {...(nameError === undefined ? {} : { error: nameError })}
         />
@@ -1297,6 +1340,7 @@ export function FirstRunPage({
           onDone={(created) =>
             finishStep({
               label: created.label,
+              agent: created.name,
               ...(created.app === undefined ? {} : { app: created.app }),
             })
           }
