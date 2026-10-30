@@ -24,10 +24,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPayConfirmClient } from '../../pay-confirm/index.js';
 import { getPrefs, PREFS_KEY, resetPrefsForTests } from '../../prefs/index.js';
 import { ApprovePage } from '../approve/index.js';
-import approvalsCss from './approvals.css?raw';
+import pageCss from './approvals.css?raw';
+import boardCss from './board.css?raw';
+
+// W4-HOME: the list's own rules moved to board.css; the page's stylesheet is both files.
+const approvalsCss = `${pageCss}\n${boardCss}`;
 import { APPROVED_HOLD_MS } from './card.js';
 import { createApprovalsClient } from './client.js';
-import { ApprovalsPage, type ApprovalsPageProps } from './index.js';
+import { ApprovalsBoard } from './board.js';
+import type { ApprovalsPageProps } from './index.js';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -198,7 +203,7 @@ function pageProps(answers: Record<string, Answer[]>, over: Partial<ApprovalsPag
 async function mount(answers: Record<string, Answer[]>, hood = false) {
   const { srv, props } = pageProps(answers);
   act(() =>
-    root.render(h(HoodProvider, { value: hood }, h<ApprovalsPageProps>(ApprovalsPage, props))),
+    root.render(h(HoodProvider, { value: hood }, h<ApprovalsPageProps>(ApprovalsBoard, props))),
   );
   await flush();
   return srv;
@@ -461,7 +466,7 @@ describe('what does not change (B-11 §26.3)', () => {
           window.localStorage.setItem(PREFS_KEY, JSON.stringify({ approvalsLayout: 'list' }));
           resetPrefsForTests();
         }
-        act(() => root.render(h<ApprovalsPageProps>(ApprovalsPage, props)));
+        act(() => root.render(h<ApprovalsPageProps>(ApprovalsBoard, props)));
         await flush();
         expect(page()?.getAttribute('data-layout')).toBe(layout);
         await click(buttonNamed(S.approve, cardOf('D') as ParentNode));
@@ -492,7 +497,7 @@ describe('what does not change (B-11 §26.3)', () => {
           window.localStorage.setItem(PREFS_KEY, JSON.stringify({ approvalsLayout: 'list' }));
           resetPrefsForTests();
         }
-        act(() => root.render(h<ApprovalsPageProps>(ApprovalsPage, props)));
+        act(() => root.render(h<ApprovalsPageProps>(ApprovalsBoard, props)));
         await flush();
         expect(page()?.getAttribute('data-layout')).toBe(layout);
         expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(0);

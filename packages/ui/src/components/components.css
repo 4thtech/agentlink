@@ -1318,97 +1318,9 @@ body {
   color: var(--al-color-fg-default);
 }
 
-/* shell */
-.al-shell {
-  display: flex;
-  flex-direction: column;
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  border-radius: var(--al-radius-lg);
-  overflow: hidden;
-  background: var(--al-color-bg-canvas);
-  box-shadow: var(--al-shadow-3);
-  height: 100%;
-}
-.al-win-bar {
-  display: flex;
-  align-items: center;
-  height: 32px;
-  padding: 0 var(--al-space-3);
-  background: var(--al-color-bg-surface);
-  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-default);
-  color: var(--al-color-fg-muted);
-  flex: none;
-}
-.al-win-dots {
-  display: inline-flex;
-  gap: var(--al-space-2);
-}
-.al-win-dots i {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--al-radius-full);
-  background: var(--al-color-border-strong);
-}
-.al-win-title {
-  flex: 1;
-  text-align: center;
-}
-.al-win-bar.is-windows .al-win-title,
-.al-win-bar.is-linux .al-win-title {
-  text-align: left;
-}
-.al-win-ctrls {
-  display: inline-flex;
-  gap: var(--al-space-4);
-  align-items: center;
-}
-.al-win-max {
-  width: 10px;
-  height: 10px;
-  border: var(--al-border-width-thin) solid currentColor;
-}
-.al-shell-main {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-.al-side {
-  width: var(--al-layout-sidebar-width);
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-  padding: var(--al-space-4) var(--al-space-3);
-  background: var(--al-color-bg-surface);
-  border-right: var(--al-border-width-thin) solid var(--al-color-border-default);
-  box-sizing: border-box;
-}
-.al-side-brand {
-  padding: 0 var(--al-space-2) var(--al-space-2);
-}
-.al-side ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.al-agent-switch {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-2);
-  padding: var(--al-space-2);
-  border-radius: var(--al-radius-md);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  background: var(--al-color-bg-sunken);
-  color: var(--al-color-fg-default);
-  cursor: pointer;
-  text-align: left;
-}
-.al-agent-switch span {
-  flex: 1;
-}
+/* The legacy app shell's rules (sidebar, top bar, window bar, tray) are in legacy-shell.css, which
+   the app does not import (W4-HOME). */
+
 /* W4-SHELL (Decision 44 B1): an agent's letter icon, until an icon set exists. Token pairs only. */
 .al-agent-icon {
   display: inline-flex;
@@ -1489,125 +1401,7 @@ body {
 .al-agent-icon-dot.is-none {
   border-style: dashed;
 }
-/* W4-SHELL: the agent switcher's place at the top of the sidebar, under the mark. */
-.al-side-top {
-  display: flex;
-  min-width: 0;
-}
-.al-topbar-start {
-  display: flex;
-  align-items: center;
-  flex: none;
-  min-width: 0;
-}
-.al-nav {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-3);
-  height: var(--al-size-control-md);
-  padding: 0 var(--al-space-2);
-  border-radius: var(--al-radius-md);
-  color: var(--al-color-fg-muted);
-  text-decoration: none;
-  position: relative;
-  z-index: 1;
-}
-.al-nav:hover {
-  background: var(--al-color-bg-raised);
-  color: var(--al-color-fg-default);
-}
-/* The current-page highlight is one element that slides between items (UI-REFRESH-f, B-11 §6 row 11).
-   Only transform and opacity change. Its place is the active index on .al-nav-wrap (a data
-   attribute, so no inline style); rows are one control height tall with a 1 px gap. */
-.al-nav-wrap {
-  position: relative;
-}
-.al-nav-slider {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: var(--al-size-control-md);
-  border-radius: var(--al-radius-md);
-  background: var(--al-color-accent-subtle);
-  opacity: 0;
-  transform: translateY(0);
-  transition:
-    transform var(--al-duration-fast) var(--al-easing-standard),
-    opacity var(--al-duration-fast) var(--al-easing-standard);
-  pointer-events: none;
-}
-.al-nav-slider::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 2px;
-  background: var(--al-color-accent-default);
-}
-.al-nav-wrap[data-active='0'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(0 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='1'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(1 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='2'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(2 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='3'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(3 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='4'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(4 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='5'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(5 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='6'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(6 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='7'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(7 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='8'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(8 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='9'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(9 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='10'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(10 * (var(--al-size-control-md) + 1px)));
-}
-.al-nav-wrap[data-active='11'] .al-nav-slider {
-  opacity: 1;
-  transform: translateY(calc(11 * (var(--al-size-control-md) + 1px)));
-}
-@media (prefers-reduced-motion: reduce) {
-  .al-nav-slider {
-    transition: none;
-  }
-}
-:root[data-motion='reduced'] .al-nav-slider {
-  transition: none;
-}
-.al-nav.is-active {
-  color: var(--al-color-accent-fg);
-}
-.al-nav span:first-of-type {
-  flex: 1;
-}
+
 .al-nav-count {
   min-width: 18px;
   padding: 0 var(--al-space-1);
@@ -1618,55 +1412,12 @@ body {
   font-size: 11px;
   line-height: 18px;
 }
-.al-nav-dot {
-  inline-size: 8px;
-  block-size: 8px;
-  border-radius: 50%;
-  background: var(--al-color-accent-default);
-  flex: none;
-}
+
 .al-chrome {
   /* The material itself (colours, blur, borders) is chrome.css; the frame parts only share the box. */
   box-sizing: border-box;
 }
-.al-shell-body {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: auto;
-}
-.al-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-4);
-  height: var(--al-size-control-lg);
-  padding: 0 var(--al-space-6);
-  box-sizing: border-box;
-}
-.al-topbar-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.al-topbar-end {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-4);
-  flex: none;
-}
-.al-topbar .al-switch-row {
-  padding: 0;
-  border-bottom: 0;
-  gap: var(--al-space-3);
-}
+
 .al-shell-content {
   flex: 1 0 auto;
   min-width: 0;
@@ -1780,42 +1531,7 @@ body {
 @media (max-width: 600px) {
   /* The sidebar is the bottom bar (B-11 §13.2): one row of icon-over-label items under the page,
      scrolling sideways rather than squeezing nine labels. The highlight is the item's own tint. */
-  .al-shell-main {
-    flex-direction: column;
-  }
-  .al-side {
-    order: 2;
-    width: 100%;
-    flex-direction: row;
-    gap: 0;
-    padding: var(--al-space-2) var(--al-space-3);
-    border-right: 0;
-    border-top: var(--al-border-width-thin) solid var(--al-color-border-default);
-    overflow-x: auto;
-  }
-  .al-side-brand,
-  .al-agent-switch {
-    display: none;
-  }
-  .al-nav-wrap {
-    flex: none;
-  }
-  .al-side ul {
-    flex-direction: row;
-    gap: var(--al-space-1);
-  }
-  .al-nav {
-    flex-direction: column;
-    justify-content: center;
-    gap: var(--al-space-1);
-    min-width: 64px;
-    height: 48px;
-    padding: 0 var(--al-space-3);
-    font-size: 11px;
-  }
-  .al-nav span:first-of-type {
-    flex: none;
-  }
+
   .al-nav-count {
     position: absolute;
     top: 2px;
@@ -1825,73 +1541,12 @@ body {
   .al-nav-count.al-count {
     position: absolute;
   }
-  .al-nav-dot {
-    position: absolute;
-    top: 6px;
-    right: 10px;
-  }
-  .al-nav-slider {
-    display: none;
-  }
-  .al-nav.is-active {
-    background: var(--al-color-accent-subtle);
-  }
-  .al-topbar {
-    padding: 0 var(--al-space-4);
-  }
-  .al-topbar-end {
-    gap: var(--al-space-3);
-  }
+
   .al-shell-content {
     padding: var(--al-space-4);
   }
 }
-.al-tray {
-  width: 260px;
-  padding: var(--al-space-1);
-  border-radius: var(--al-radius-md);
-  background: var(--al-color-bg-raised);
-  border: var(--al-border-width-thin) solid var(--al-color-border-strong);
-  box-shadow: var(--al-shadow-2);
-}
-.al-tray ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.al-tray-status {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-2);
-  padding: var(--al-space-2) var(--al-space-3);
-  color: var(--al-color-fg-muted);
-  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-subtle);
-  margin-bottom: var(--al-space-1);
-}
-.al-tray-item {
-  display: flex;
-  align-items: center;
-  gap: var(--al-space-3);
-  height: 28px;
-  padding: 0 var(--al-space-3);
-  border-radius: var(--al-radius-sm);
-  color: var(--al-color-fg-default);
-  cursor: default;
-}
-.al-tray-item span:first-of-type {
-  flex: 1;
-}
-.al-tray-item:hover,
-.al-tray-item:focus {
-  background: var(--al-color-accent-default);
-  color: var(--al-color-fg-on-accent);
-  outline: none;
-}
-.al-tray-item:hover .al-kbd,
-.al-tray-item:hover .al-muted {
-  color: inherit;
-  background: transparent;
-}
+
 .al-tray-sep {
   height: 1px;
   margin: var(--al-space-1) 0;

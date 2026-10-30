@@ -50,13 +50,8 @@
 /* The shell (UI-REFRESH-f, B-11 §3, §13.2, §6 row 11). */
 
 /* The material resets the border shorthand, so each part names its hairline here, on the content
-   side: sidebar right, top bar bottom, status bar top, sub-navigation bottom. */
-.al-side.al-chrome {
-  border-right-width: var(--al-border-width-thin);
-}
-.al-topbar.al-chrome {
-  border-bottom-width: var(--al-border-width-thin);
-}
+   side (the legacy sidebar and top bar rules are in legacy-shell.css). */
+
 .al-statusbar.al-chrome {
   border-top-width: var(--al-border-width-thin);
 }
@@ -99,10 +94,7 @@
 
 @media (max-width: 600px) {
   /* The sidebar is the bottom bar: its hairline moves from the right edge to the top. */
-  .al-side.al-chrome {
-    border-right-width: 0;
-    border-top-width: var(--al-border-width-thin);
-  }
+
   .al-subnav {
     margin: calc(-1 * var(--al-space-4)) calc(-1 * var(--al-space-4)) 0;
     padding: var(--al-space-3) var(--al-space-4);
@@ -123,9 +115,7 @@
 :root {
   view-transition-name: none;
 }
-.al-shell-body {
-  view-transition-name: al-page;
-}
+
 @keyframes al-page-in {
   from {
     opacity: 0;

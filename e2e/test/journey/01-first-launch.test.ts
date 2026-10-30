@@ -9,15 +9,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fakeClaudeCode } from '../app-world.js';
 import { emulateReducedMotion, expectStableLayout, observeLayoutShift } from '../helpers/motion.js';
 import { CONNECT_WITH, getStartedWithTouchId } from './helpers-wizard.js';
-import { chapter, journeyPage, journeyWorld, startUi, startUiRun, text, WAVE4 } from './world.js';
+import { chapter, journeyPage, journeyWorld, startUi, startUiRun, text } from './world.js';
 
 const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
 afterAll(() => ch.stop());
 
 // W4-ONE-TOUCH (builder A) turned this on: one gesture creates the owner and the agent and connects
-// the AI app. W4-WIZARD moved it onto Get started (steps 1 to 4, ungated). Only the very end (the
-// empty Home) waits for Home (U3), so it alone stays behind the JOURNEY_WAVE4 gate.
+// the AI app. W4-WIZARD moved it onto Get started (steps 1 to 4). W4-HOME un-gated the very end:
+// once set up, the app opens on Home.
 describe('chapter 1: onboarding', () => {
   it('fresh home → Get started → one Touch ID creates the agent and connects Claude Code', async (ctx) => {
     const ready = ch.need(ctx);
@@ -92,12 +92,13 @@ describe('chapter 1: onboarding', () => {
     await probe.check();
     await expectStableLayout(page);
 
-    // Home (gated until U3's Home lands): once set up, Home, and Get started does not come back.
-    if (WAVE4) {
-      await page.getByRole('button', { name: 'Done, go to Home' }).click();
-      await page.waitForURL((url) => url.pathname === '/');
-      expect(await text(page)).not.toContain('Which AI app do you use?');
-    }
+    // W4-HOME (un-gated): once set up, the app opens on Home with no one in People yet, and Get
+    // started does not come back.
+    await page.getByRole('button', { name: 'Done, go to Home' }).click();
+    await page.waitForURL((url) => url.pathname === '/');
+    expect(await text(page)).not.toContain('Which AI app do you use?');
+    await page.getByRole('heading', { name: 'People' }).first().waitFor();
+    expect(await text(page)).toContain('No one here yet.');
   }, 180_000);
 
   // IR-W4-WIZARD-1 H: the app opens Get started by itself only while setup is incomplete, on the

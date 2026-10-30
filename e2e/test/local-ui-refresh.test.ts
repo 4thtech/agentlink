@@ -48,7 +48,7 @@ const BUDGET = { cssGzip: 15 * 1024, jsGzip: 10 * 1024 } as const; // plan §7
 // W4-SHELL-V2: the sections (today's pages until their builders replace the bodies), Settings,
 // Advanced and Get started.
 const PAGES = [
-  { path: '/', title: 'Approvals' },
+  { path: '/', title: 'Home' },
   { path: '/agents', title: 'Agents' },
   { path: '/activity', title: 'Activity' },
   // Interim: today's Messages and Contacts pages (U3, U4 fold them into Home).
@@ -905,7 +905,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     try {
       // Approvals: nothing autofocused on an Approve; the controls are reachable by Tab.
       await page.goto(`${origin}/`);
-      await settle(page, 'Approvals');
+      await settle(page, 'Home');
       kb['approvalsFocusOnLoad'] = await page.evaluate(() => {
         const a = document.activeElement;
         if (!a || a === document.body || a === document.documentElement) return '(body)';

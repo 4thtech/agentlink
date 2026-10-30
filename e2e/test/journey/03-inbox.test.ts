@@ -1,4 +1,4 @@
-// W4-JOURNEY-E2E chapter 3, Inbox (WAVE-4 build plan §1 steps 4–6; 08 §1 IA; b11 §34.4). Ana and Bo
+// W4-JOURNEY-E2E chapter 3, Home (W4-HOME; WAVE-4 build plan §1 steps 4–6; 08 §1 IA; b11 §34.4). Ana and Bo
 // are paired through the app (the start state passes today). Messages are written by each side's AI
 // app (its MCP server); the owners read, save and approve in the Inbox. See world.ts for the gesture
 // counter and the no-reload probe.
@@ -17,10 +17,16 @@ import {
   navTo,
   pairedOwners,
   text,
-  WAVE4,
   type FakeDrop,
   type JourneyComputer,
 } from './world.js';
+import {
+  CLS_BUDGET,
+  emulateReducedMotion,
+  expectFadesOnly,
+  layoutShiftScore,
+  observeLayoutShift,
+} from '../helpers/motion.js';
 
 const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
@@ -63,7 +69,7 @@ function dropHoldsNoPlaintext(drop: FakeDrop, bytes: Buffer): void {
 
 describe('chapter 3: inbox', () => {
   // Passes today: the harness's shared relay and drop carry a hello, a reply and a file between the
-  // two computers (agent level; the Inbox pages are the WAVE4 test below).
+  // two computers (agent level; Home is the last test below).
   it('hello, reply and a file travel between the two computers; the drop holds ciphertext only', async (ctx) => {
     const ready = ch.need(ctx);
     if (ready === undefined) return;
@@ -91,9 +97,9 @@ describe('chapter 3: inbox', () => {
     dropHoldsNoPlaintext(world.drop, file.bytes);
   }, 180_000);
 
-  // W4-FILES-SAVE (un-gated): a received file is saved from the app with one Touch ID. Today it is
-  // reached from Files, Received; once D1 routes /inbox the Inbox test below covers the same Save
-  // in the conversation. Real host, real decrypt, fake drop; the page sends only the item ID.
+  // W4-FILES-SAVE (un-gated): a received file is saved from the app with one Touch ID, from the
+  // sender's Files on Home (W4-HOME). Real host, real decrypt, fake drop; the page sends only the
+  // item ID.
   it('a received file: Arrived · not saved, then Save with one Touch ID lands it in the Inbox folder; traversal and links are refused', async (ctx) => {
     const ready = ch.need(ctx);
     if (ready === undefined) return;
@@ -119,7 +125,12 @@ describe('chapter 3: inbox', () => {
     const file = await sendable(pcA);
     await mcpA.call('agentlink_send', { to: 'Bo', text: 'The brief', path: file.path });
     await until('the file reaches Bo', () => inboxHas(mcpB, FILE_NAME), 30_000);
-    await navTo(b.page, 'Files');
+    await navTo(b.page, 'Home');
+    await b.page
+      .getByRole('button', { name: /^A(na)?\b/ })
+      .filter({ hasText: 'Ana' })
+      .first()
+      .click();
     await b.page.getByText(FILE_NAME).first().waitFor({ timeout: 30_000 });
     await b.page
       .getByText(/Arrived · not saved/)
@@ -192,106 +203,146 @@ describe('chapter 3: inbox', () => {
     await bProbe.check();
   }, 240_000);
 
-  // Gate: the wave-4 Inbox page (W4-INBOX, apps/local-ui pages/inbox) is built; this turns on once
-  // D1 routes /inbox and the sidebar shows "Inbox" without "Approvals" (D1 owns router and nav).
-  it.runIf(WAVE4)(
-    'the Inbox: hello → reply → All caught up; a file arrives and Save takes one Touch ID; an approval is a card in the conversation',
-    async (ctx) => {
-      const ready = ch.need(ctx);
-      if (ready === undefined) return;
-      const world = journeyWorld();
-      const { pcA, pcB, a, b, mcpA, mcpB } = await pairedOwners(
-        ready.browser,
-        ready.files,
-        world,
-        ch.closers,
-      );
-      const aProbe = await a.arm();
-      const bProbe = await b.arm();
-      await navTo(a.page, 'Inbox');
-      await navTo(b.page, 'Inbox');
+  // W4-HOME (un-gated): Home at `/` holds what the Inbox held. A person row opens in place to the
+  // conversation (both ways, the other side's words in the untrusted box) and the files (Save with
+  // one Touch ID, then Show in Finder / Explorer / folder); the approval card sits on top of Home.
+  // Motion (U0 helper): reduced motion runs fades only, and Home's first load does not shift.
+  it('Home: hello → reply in the person row; a file arrives and is saved by itself; the approval card on top takes one Touch ID', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const { pcA, pcB, a, b, mcpA, mcpB } = await pairedOwners(
+      ready.browser,
+      ready.files,
+      world,
+      ch.closers,
+    );
+    await emulateReducedMotion(b.page);
+    await observeLayoutShift(b.page);
+    const aProbe = await a.arm();
+    const bProbe = await b.arm();
+    await navTo(a.page, 'Home');
+    await navTo(b.page, 'Home');
+    // Home's own first load moves nothing. The score counts from here: before it, the shell's
+    // "Switch to Touch ID" next step (registered while accepting the invite) leaves on the first
+    // page change after it, when its re-read answers, and moves the page up once; that is the
+    // shell's banner (layout/index.tsx), not Home, so the baseline waits for it to be gone.
+    await eventually(
+      'the shell next step has settled',
+      async () => (await b.page.locator('main a[href="/first-run"]').count()) === 0,
+    );
+    await b.page.getByRole('heading', { name: 'People' }).waitFor();
+    await b.page.waitForTimeout(500);
+    const clsBefore = await layoutShiftScore(b.page);
+    await navTo(b.page, 'Agents');
+    await navTo(b.page, 'Home');
+    await b.page.getByRole('heading', { name: 'People' }).waitFor();
+    await b.page.waitForTimeout(500);
+    expect((await layoutShiftScore(b.page)) - clsBefore).toBeLessThanOrEqual(CLS_BUDGET);
 
-      // Hello (A's AI app) shows in B's Inbox by itself; the reply shows in A's.
-      await mcpA.call('agentlink_send', { to: 'Bo', text: HELLO });
-      await b.page.getByText(HELLO).first().waitFor({ timeout: 30_000 });
-      await mcpB.call('agentlink_send', { to: 'Ana', text: REPLY });
-      await a.page.getByText(REPLY).first().waitFor({ timeout: 30_000 });
-      await a.page.getByText(REPLY).first().click();
-      await navTo(a.page, 'Inbox');
-      await a.page.getByText('All caught up').first().waitFor();
+    // Hello (A's AI app): Bo's Home shows Ana with the last activity; the row opens in place.
+    await mcpA.call('agentlink_send', { to: 'Bo', text: HELLO });
+    const anaRow = b.page
+      .getByRole('button', { name: /^A(na)?\b/ })
+      .filter({ hasText: 'Ana' })
+      .first();
+    await anaRow.waitFor({ timeout: 30_000 });
+    await eventually('Ana shows a last message', async () =>
+      ((await anaRow.textContent()) ?? '').includes('Last message'),
+    );
+    await anaRow.click();
+    await eventually(
+      'the row opens in place',
+      async () => (await anaRow.getAttribute('aria-expanded')) === 'true',
+    );
+    await b.page.locator('figure.al-untrusted').filter({ hasText: HELLO }).first().waitFor();
+    await expectFadesOnly(b.page);
+    await mcpB.call('agentlink_send', { to: 'Ana', text: REPLY });
+    const boRow = a.page
+      .getByRole('button', { name: /^B(o)?\b/ })
+      .filter({ hasText: 'Bo' })
+      .first();
+    await boRow.waitFor({ timeout: 30_000 });
+    await boRow.click();
+    await a.page.getByText(REPLY).first().waitFor({ timeout: 30_000 });
+    await a.page.getByText('Sent', { exact: true }).first().waitFor({ timeout: 30_000 });
 
-      // A file: "Arrived · not saved" (static, no moving bar), then Save with one Touch ID.
-      const file = await sendable(pcA);
-      await mcpA.call('agentlink_send', { to: 'Bo', text: 'The brief', path: file.path });
-      await b.page.getByText(FILE_NAME).first().waitFor({ timeout: 30_000 });
-      await b.page
-        .getByText(/Arrived · not saved/)
-        .first()
-        .waitFor();
-      expect(await b.page.locator('[role="progressbar"]').count()).toBe(0);
-      const before = b.gestures.total();
-      await b.page.getByRole('button', { name: 'Save' }).first().click();
-      await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
-      await eventually('the file is saved', async () => (await text(b.page)).includes('Saved'));
-      expect(b.gestures.total() - before).toBe(1);
-      const inboxFolder = join(pcB.home, 'AgentLink', 'Inbox');
-      const saved = readdirSync(inboxFolder, { recursive: true }).map(String);
-      const savedPath = saved.find((n) => n.endsWith(FILE_NAME));
-      expect(savedPath).toBeDefined();
-      const sha = (bytes: Uint8Array): string => encodeHex(sha256(bytes));
-      expect(sha(readFileSync(join(inboxFolder, savedPath ?? '')))).toBe(sha(file.bytes));
-      dropHoldsNoPlaintext(world.drop, file.bytes);
+    // A file: W4-AUTO-SAVE (D-142) saves a paired contact's file by itself; Ana's Files on Home
+    // shows "Saved as" and Show in Finder / Explorer / folder, with no Touch ID. (Save with one
+    // Touch ID, when the automatic save cannot run, is the test above.)
+    const file = await sendable(pcA);
+    const before = b.gestures.total();
+    await mcpA.call('agentlink_send', { to: 'Bo', text: 'The brief', path: file.path });
+    await b.page.getByText(FILE_NAME).first().waitFor({ timeout: 30_000 });
+    await eventually('the file is saved', async () => (await text(b.page)).includes('Saved as'));
+    expect(await b.page.locator('[role="progressbar"]').count()).toBe(0);
+    expect(b.gestures.total() - before).toBe(0);
+    await b.page
+      .getByRole('button', { name: /^Show in (Finder|Explorer|folder)$/ })
+      .first()
+      .waitFor({ timeout: 30_000 });
+    const inboxFolder = join(pcB.home, 'AgentLink', 'Inbox');
+    const saved = readdirSync(inboxFolder, { recursive: true }).map(String);
+    const savedPath = saved.find((n) => n.endsWith(FILE_NAME));
+    expect(savedPath).toBeDefined();
+    const sha = (bytes: Uint8Array): string => encodeHex(sha256(bytes));
+    expect(sha(readFileSync(join(inboxFolder, savedPath ?? '')))).toBe(sha(file.bytes));
+    dropHoldsNoPlaintext(world.drop, file.bytes);
 
-      // An approval is a card in the conversation, confirmed with one Touch ID: Ana offers terms,
-      // Bo's AI accepts, the default policy asks Bo, and Bo approves in the Inbox.
-      const offer = await mcpA.call('agentlink_propose_terms', {
-        to: 'Bo',
-        terms: {
-          subject: 'Logo design',
-          deliverables: [{ description: 'Three logo drafts', by: 'me' }],
-          price: { amount: '500.00', currency: 'USD', payer: 'them' },
-          deadlines: [{ ref: 'd1', due: '2027-01-30T17:00:00Z' }],
-        },
-      });
-      expect(offer.structured['status']).toBe('ok');
-      const envelopeId = await until(
-        'the offer reaches Bo',
-        async () => {
-          const inbox = (await mcpB.call('agentlink_inbox')).structured;
-          const messages = (inbox['messages'] ?? []) as Record<string, unknown>[];
-          return messages.find((m) => m['type'] === 'offer')?.['envelopeId'];
-        },
-        30_000,
-      );
-      const asked = await mcpB.call('agentlink_respond_to_terms', {
-        envelopeId,
-        decision: 'accept',
-      });
-      expect(asked.structured['status']).toBe('pending_approval');
-      const card = b.page.getByRole('article').filter({ hasText: 'Logo design' }).first();
-      await card.waitFor({ timeout: 30_000 });
-      const beforeApprove = b.gestures.total();
-      await card.getByRole('button', { name: /Approve/ }).click();
-      await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
-      await eventually(
-        'the approval is recorded',
-        async () =>
-          (
-            await mcpB.call('agentlink_respond_to_terms', {
-              envelopeId,
-              decision: 'accept',
-              approvalId: asked.structured['approvalId'],
-            })
-          ).structured['status'] === 'ok',
-      );
-      expect(b.gestures.total() - beforeApprove).toBe(1);
-      // There is no Approvals page in the sidebar any more.
-      expect(
-        await b.page.getByRole('navigation').getByRole('link', { name: 'Approvals' }).count(),
-      ).toBe(0);
-      await aProbe.check();
-      await bProbe.check();
-    },
-    240_000,
-  );
+    // The approval card on top of Home, confirmed with one Touch ID: Ana offers terms, Bo's AI
+    // accepts, the default policy asks Bo, and Bo approves on Home.
+    const offer = await mcpA.call('agentlink_propose_terms', {
+      to: 'Bo',
+      terms: {
+        subject: 'Logo design',
+        deliverables: [{ description: 'Three logo drafts', by: 'me' }],
+        price: { amount: '500.00', currency: 'USD', payer: 'them' },
+        deadlines: [{ ref: 'd1', due: '2027-01-30T17:00:00Z' }],
+      },
+    });
+    expect(offer.structured['status']).toBe('ok');
+    const envelopeId = await until(
+      'the offer reaches Bo',
+      async () => {
+        const inbox = (await mcpB.call('agentlink_inbox')).structured;
+        const messages = (inbox['messages'] ?? []) as Record<string, unknown>[];
+        return messages.find((m) => m['type'] === 'offer')?.['envelopeId'];
+      },
+      30_000,
+    );
+    const asked = await mcpB.call('agentlink_respond_to_terms', {
+      envelopeId,
+      decision: 'accept',
+    });
+    expect(asked.structured['status']).toBe('pending_approval');
+    const card = b.page
+      .getByRole('region', { name: 'Waiting for your approval' })
+      .filter({ hasText: 'Logo design' })
+      .first();
+    await card.waitFor({ timeout: 30_000 });
+    const beforeApprove = b.gestures.total();
+    await card
+      .getByRole('button', { name: /^Approve/ })
+      .first()
+      .click();
+    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    await eventually(
+      'the approval is recorded',
+      async () =>
+        (
+          await mcpB.call('agentlink_respond_to_terms', {
+            envelopeId,
+            decision: 'accept',
+            approvalId: asked.structured['approvalId'],
+          })
+        ).structured['status'] === 'ok',
+    );
+    expect(b.gestures.total() - beforeApprove).toBe(1);
+    // There is no Approvals page in the menu: approvals live on Home.
+    expect(
+      await b.page.getByRole('navigation').getByRole('link', { name: 'Approvals' }).count(),
+    ).toBe(0);
+    await aProbe.check();
+    await bProbe.check();
+  }, 240_000);
 });

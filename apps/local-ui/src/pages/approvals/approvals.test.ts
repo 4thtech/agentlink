@@ -13,7 +13,8 @@ import { PAY_CONFIRM_STRINGS as P } from '@4thtech-io/ui';
 import { createPayConfirmClient } from '../../pay-confirm/index.js';
 import { AppRoutes } from '../../router.js';
 import { ApprovePage } from '../approve/index.js';
-import { ApprovalsPage, type ApprovalsPageProps } from './index.js';
+import { ApprovalsBoard } from './board.js';
+import type { ApprovalsPageProps } from './index.js';
 import { createApprovalsClient } from './client.js';
 import { APPROVAL_STRINGS as S } from './strings.js';
 
@@ -156,7 +157,7 @@ async function mount(answers: Record<string, Answer[]>, over: Partial<ApprovalsP
   const payConfirm = createPayConfirmClient({ fetch: srv.fetch, token: 't0ken' });
   act(() =>
     root.render(
-      createElement<ApprovalsPageProps>(ApprovalsPage, {
+      createElement<ApprovalsPageProps>(ApprovalsBoard, {
         client,
         payConfirm,
         canPasskey: false,
@@ -464,7 +465,7 @@ describe('one request: its own Approve or Deny, then presence', () => {
     });
     act(() =>
       root.render(
-        createElement<ApprovalsPageProps>(ApprovalsPage, {
+        createElement<ApprovalsPageProps>(ApprovalsBoard, {
           client: createApprovalsClient({ fetch: srv.fetch, token: 't', credentials }),
           canPasskey: true,
         }),

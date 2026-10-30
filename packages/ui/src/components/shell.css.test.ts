@@ -4,8 +4,14 @@
 // the View Transitions pseudo-elements with token durations; and the chrome text meets WCAG 2.1 AA
 // over the worst content that can scroll under it (the material opacity is chosen from this).
 import { describe, expect, it } from 'vitest';
-import components from './components.css?raw';
-import chrome from './chrome.css?raw';
+import componentsCss from './components.css?raw';
+import chromeCss from './chrome.css?raw';
+import legacyShell from './legacy-shell.css?raw';
+
+// W4-HOME: the legacy app shell's rules moved to legacy-shell.css (AppShell's own stylesheet, not
+// imported by the app); each sheet is read together with it.
+const components = `${componentsCss}\n${legacyShell}`;
+const chrome = `${chromeCss}\n${legacyShell}`;
 import { colorTokens, contrastRatio, depthTokens } from '../tokens/index.js';
 
 const strip = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, '');
