@@ -82,8 +82,8 @@ async function switchTo(
     .first()
     .locator('xpath=ancestor::*[.//button[normalize-space()="Switch"]][1]');
   await card.getByRole('button', { name: 'Switch', exact: true }).click();
-  // The header names the agent that is now open.
-  await page.locator('.ag-switch-btn').filter({ hasText: openLabel }).waitFor();
+  // The header names the agent that is now open (W4-SHELL-V2: the agent chip, top left).
+  await page.locator('button.al-chip').filter({ hasText: openLabel }).waitFor();
 }
 
 /** Messages page: opens the conversation with `contact` and returns the page text. */
@@ -430,7 +430,9 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
     expect(new URL(link).pathname).toBe('/settings/home');
     const { page } = await pageWithTouchId(ready.browser);
     await page.goto(link);
-    await page.getByRole('heading', { name: 'Home', exact: true }).first().waitFor();
+    // W4-SHELL-V2: `/settings/home` opens Home at `/` (the section marked current).
+    await page.waitForURL((url) => url.pathname === '/');
+    await page.locator('nav.al-rail a[aria-current="page"][href="/"]').first().waitFor();
 
     // All agents are listed, by the names they had.
     await page.goto(new URL('/settings/agents', link).href);
@@ -448,7 +450,7 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
     expect(await readConversation(page, link, 'Second agent')).toContain(answer);
     await switchTo(page, link, 'work');
     await page.goto(new URL('/settings/messages', link).href);
-    await page.getByRole('heading', { name: 'Messages' }).first().waitFor();
+    await page.getByRole('heading', { name: 'Inbox' }).first().waitFor();
     await page.waitForTimeout(1500);
     // `work` has no contacts: none of the other agents' conversations show here.
     const empty = await page.locator('body').innerText();

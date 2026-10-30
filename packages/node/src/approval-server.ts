@@ -75,7 +75,9 @@
 //   server listens. `/assets/<name>` is an exact map lookup (no decoding, no path join), served with
 //   its fixed content type, nosniff, the strict CSP (plus `font-src 'self'`) and immutable caching;
 //   anything else is 404. The app's index.html, with this server's CSRF token filled in, is served
-//   for `/first-run` and `/settings[/...]`, and (M1-11b-2) for `/` and `/approve/<id>`.
+//   for `/first-run` and `/settings[/...]`, (M1-11b-2) for `/` and `/approve/<id>`, (W4-SHELL)
+//   for `/inbox` and `/contacts`, and (W4-SHELL-V2) for `/agents[/<name>]`, `/activity[/live]`,
+//   `/advanced/<page>` and `/start/<step>`.
 // - M1-11b-2c: the server-rendered approval page, its `/app.js` and `/app.css`, are gone (404).
 //   Without a bundle, `/` and `/approve/<id>` answer the fixed NO_APP_HTML (approval-pages.ts):
 //   no script, no form, no CSRF token, so nothing can be decided in the browser; it points to
@@ -96,6 +98,13 @@
 //   octet-stream checks, the body must be exactly `{"id":"<item ID>"}` (no query, input or presence
 //   header); the handler gets only that ID and the checked reveal (local-ui/reveal-file.ts). No
 //   owner presence, no owner store, nothing signed or written.
+// - W4-SHELL-V2 (Decisions 49–51; proposed in 08 §1, owner confirms at merge), the app's own UI
+//   settings: the one `presence: 'ui-settings'` route (`PUT /api/ui/ui-settings`) is run by
+//   `uiSettingsGate`, never by `ownerGate`. After the same session, CSRF, Origin, fetch-metadata and
+//   octet-stream checks, no query, operation input or presence header; the body is one strict JSON
+//   object of allowlisted booleans (`underTheHood`, `menuExpanded`), at most 128 bytes. No owner
+//   presence, no owner store, nothing signed, no generation (it is the app's, not an agent's); the
+//   app host writes only `~/.agentlink/ui-settings.json`. Its read answers with no agent open too.
 // - UX2-d1 (owner decision 1.1; proposed in 08 §1, owner confirms at merge), creating an invite and
 //   checking a pasted one: the two `presence: 'invite'` routes are run by `inviteGate`, never by
 //   `ownerGate`. After the same session, CSRF, Origin, fetch-metadata and octet-stream checks, no
@@ -293,9 +302,16 @@ import type {
   LocalUiRenameRequest,
   LocalUiResult,
   LocalUiRevealRoute,
+  LocalUiUiSettingsRoute,
   LocalUiSetupStep,
 } from './local-ui/route-types.js';
 import { LOCAL_UI_MAX_INPUT_CHARS, NOT_AVAILABLE } from './local-ui/route-types.js';
+import {
+  UI_SETTINGS_MAX_BODY_BYTES,
+  readUiSettings,
+  type UiSettings,
+} from '@4thtech-io/types/ui-contract/ui-settings';
+import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
 import {
   AppHostSlot,
   FIRST_AGENT_LABEL,
@@ -388,8 +404,15 @@ const API_ONE = /^\/api\/approvals\/(apr_[A-Za-z0-9_-]{22})$/;
 const API_DECIDE = /^\/api\/approvals\/(apr_[A-Za-z0-9_-]{22})\/(approve|deny)$/;
 const REVIEW_ITEM = /^(apr_[A-Za-z0-9_-]{22}):([0-9a-f]{64}):([ad])$/;
 
-/** M1-11s-b: the local UI app's pages (D-118); everything else keeps its own route or is 404. */
-const APP_PAGE = /^\/(?:first-run|settings(?:\/[a-z0-9]+(?:-[a-z0-9]+)*){0,4})$/;
+/**
+ * M1-11s-b: the local UI app's pages (D-118); everything else keeps its own route or is 404.
+ * W4-SHELL (Decision 40): the wave-4 destinations `/inbox` and `/contacts`, exactly; nothing below
+ * or beside them. W4-SHELL-V2 (Decisions 49–51): the sections `/agents` (and one agent,
+ * `/agents/<name>`), `/activity` (and `/activity/live`), `/advanced/<page>`, and the Get started
+ * steps `/start/<step>`; one lower-case segment each, nothing deeper.
+ */
+const APP_PAGE =
+  /^\/(?:first-run|inbox|contacts|start(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|agents(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|activity(?:\/live)?|advanced(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|settings(?:\/[a-z0-9]+(?:-[a-z0-9]+)*){0,4})$/;
 const ASSETS_PREFIX = '/assets/';
 /** One file name: no separator, no leading dot, no escape. */
 const ASSET_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -919,6 +942,9 @@ const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
   // answer during first run on a computer with no agent yet. Accepting needs the agent.
   'GET /api/ui/join',
   'POST /api/ui/join/dismiss',
+  // W4-SHELL-V2: the app's UI settings are the app's, not an agent's (the shell during first run).
+  'GET /api/ui/ui-settings',
+  'PUT /api/ui/ui-settings',
 ]);
 
 /**
@@ -1311,6 +1337,18 @@ export async function startApprovalServerWith(
 
   // U3-c (IR-U3-c-SEC-1 L-1): the source is captured when the context is built, so a handler that
   // outlives a switch's drain wait keeps the agent it started with and never reaches the next one.
+  // W4-SHELL-V2: the app host's UI settings store (one queue of changes for the whole process).
+  const uiSettingsDirectory = options.host?.directory;
+  const uiSettingsDesk =
+    uiSettingsDirectory?.readUiSettings === undefined ||
+    uiSettingsDirectory.writeUiSettings === undefined
+      ? undefined
+      : createUiSettingsDesk({
+          read: () =>
+            (uiSettingsDirectory.readUiSettings as () => Promise<UiSettings | undefined>)(),
+          write: (settings) =>
+            (uiSettingsDirectory.writeUiSettings as (s: UiSettings) => Promise<void>)(settings),
+        });
   const buildUiContext = (bound: ApprovalServerSource = source): LocalUiContext =>
     Object.freeze<LocalUiContext>({
       // IR-M1-11s-b-1 H-1: handlers read through a read-only view, never the client itself.
@@ -1335,6 +1373,8 @@ export async function startApprovalServerWith(
       }),
       // U3-c: the Agents list, in the app host only.
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
+      // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
+      ...(uiSettingsDesk === undefined ? {} : { uiSettings: uiSettingsDesk }),
       // U3-d: create an agent and save a verified label, in the app host only.
       ...(options.host === undefined ? {} : { agentsManage }),
       // U3-invite: the waiting invite, in the app host only.
@@ -4442,6 +4482,11 @@ export async function startApprovalServerWith(
       await switchGate(req, res, url);
       return;
     }
+    if (route.presence === 'ui-settings') {
+      // W4-SHELL-V2: the app's UI settings (no agent, no generation, no presence); its own gate.
+      await uiSettingsGate(req, res, url, route);
+      return;
+    }
     // U3-c: the generation, before any presence check; held until the request is answered.
     const hold = mutatingHold(req, res);
     if (hold === false) return;
@@ -4463,7 +4508,7 @@ export async function startApprovalServerWith(
     req: IncomingMessage,
     res: ServerResponse,
     url: URL,
-    route: Exclude<LocalUiRoute, LocalUiReadRoute | LocalUiSwitchRoute>,
+    route: Exclude<LocalUiRoute, LocalUiReadRoute | LocalUiSwitchRoute | LocalUiUiSettingsRoute>,
     params: Readonly<Record<string, string>>,
     cookie: string,
   ): Promise<void> {
@@ -4978,6 +5023,55 @@ export async function startApprovalServerWith(
             ? 503
             : 409;
     finishSwitch(status, outcome);
+  }
+
+  /**
+   * W4-SHELL-V2: `PUT /api/ui/ui-settings`, the ui-settings kind. The caller checked the session,
+   * CSRF, Origin, fetch metadata and the octet-stream type. No query, operation input or presence
+   * header; the body is one strict JSON object of allowlisted booleans (readUiSettings, at least one
+   * key). No owner presence, nothing signed. The handler gets only the checked change; nothing here
+   * logs a value. Fixed answers.
+   */
+  async function uiSettingsGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiUiSettingsRoute,
+  ): Promise<void> {
+    const invalid = (): void => {
+      stamp(res);
+      sendJson(res, 400, { error: 'invalid' });
+    };
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      invalid();
+      return;
+    }
+    const body = await boundedBody(req, res, UI_SETTINGS_MAX_BODY_BYTES);
+    if (body === undefined) return;
+    let change: UiSettings | undefined;
+    try {
+      change = readUiSettings(parseJson(decodeUtf8(body)), 1);
+    } catch {
+      change = undefined;
+    }
+    if (change === undefined) {
+      invalid();
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext, change);
+    } catch {
+      sendJson(res, 500, { status: 'failed' });
+      return;
+    }
+    stamp(res);
+    sendResult(res, result);
   }
 
   /** U3-e: one removal at a time. */

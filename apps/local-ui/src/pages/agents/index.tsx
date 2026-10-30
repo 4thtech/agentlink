@@ -44,11 +44,13 @@ export function setAgentsMapView(view: AgentsMapView | undefined): void {
 export interface AgentsPageProps {
   readonly api?: AgentsApi;
   readonly owner?: OwnerClient;
-  /** Reloads every page after a switch (default: the browser reload). */
+  /**
+   * Runs after a switch the server took. Default: nothing; W4-SHELL: the generation guard swaps
+   * every view for the agent that is open now, with no reload (router.tsx).
+   */
   readonly reload?: () => void;
 }
 
-const defaultReload = (): void => window.location.reload();
 const connectHref = (name: string): string =>
   `${AGENTS_APPS_PATH}?agent=${encodeURIComponent(name)}`;
 
@@ -195,7 +197,7 @@ function Row({
 export function AgentsPage({
   api: givenApi,
   owner: givenOwner,
-  reload = defaultReload,
+  reload,
 }: AgentsPageProps = {}): ReactElement {
   const api = useMemo(() => givenApi ?? createAgentsApi(), [givenApi]);
   const owner = useMemo(() => givenOwner ?? createOwnerClient(), [givenOwner]);

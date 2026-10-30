@@ -53,6 +53,7 @@ import type { FirstAgentCard } from '../owner-first-card.js';
 import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
 import type { LocalUiInviteDesk } from './route-types.js';
 import type { JoinDesk } from './join-desk.js';
+import type { LocalUiSettingsDesk } from './api/ui-settings.js';
 
 /**
  * The local UI's built files (apps/local-ui, D-118), in memory, from the caller (the CLI embeds
@@ -545,6 +546,11 @@ export function inviteAcceptPort(client: AgentLinkClient): LocalUiInviteAcceptPo
 }
 
 export interface LocalUiContext {
+  /**
+   * W4-SHELL-V2 (08 §1, proposed): the app host's UI settings (Under the hood, the section menu),
+   * for api/ui-settings.ts only; absent outside the app host. Allowlisted booleans only.
+   */
+  readonly uiSettings?: LocalUiSettingsDesk;
   /**
    * U3-g-b: present only while the app host has no agent yet: true when first run cannot set up an
    * owner here (an owner or any agent folder exists). `GET /api/ui/first-run` answers from it.

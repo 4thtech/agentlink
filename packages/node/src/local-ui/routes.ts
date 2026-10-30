@@ -53,8 +53,11 @@ import {
   AGENTS_REMOVE_PATH,
   AGENTS_SWITCH_PATH,
   CREATE_AGENT_PATHS,
+  UI_SETTINGS_WRITE_PATH,
   type LocalUiRoute,
 } from './route-types.js';
+// W4-SHELL-V2: the app's own UI settings (read, and the ui-settings kind).
+import { uiSettingsRoutes } from './api/ui-settings.js';
 // The fixed path lives in reveal-path.ts so api/files-io.ts uses it without importing this file.
 import { REVEAL_PATH } from './reveal-path.js';
 // UX2-d1: the invite paths live in invite-paths.ts for the same reason.
@@ -170,6 +173,16 @@ export class LocalUiRouteRegistry {
       if (handler !== undefined) throw invalid('a handoff route has no handler');
       if (this.#entries.some((e) => e.route.presence === 'handoff')) {
         throw invalid('the handoff route is already registered');
+      }
+    } else if (presence === 'ui-settings') {
+      // W4-SHELL-V2: the app's own UI settings; the server's ui-settings gate runs it (no presence).
+      if (method !== 'PUT') throw invalid('a ui-settings route is a PUT');
+      if (route.path !== UI_SETTINGS_WRITE_PATH) {
+        throw invalid('a ui-settings route is only at its fixed path');
+      }
+      if (typeof handler !== 'function') throw invalid('a ui-settings route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'ui-settings')) {
+        throw invalid('the ui-settings route is already registered');
       }
     } else if (presence === 'remove') {
       // U3-e: removing an agent; the server's remove gate runs it (D-138).
@@ -335,6 +348,7 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     [filesSaveRoute],
     // W4-RENAME-REACHES-CONTACTS: the seen mark of a contact's former-name note.
     contactNamesRoutes,
+    uiSettingsRoutes,
   ]) {
     for (const route of routes) registry.register(route);
   }
