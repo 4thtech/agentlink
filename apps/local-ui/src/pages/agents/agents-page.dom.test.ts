@@ -132,6 +132,8 @@ async function type(el: HTMLInputElement, value: string): Promise<void> {
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+/** Text without the bidi isolates the page puts around labels (U+2068, U+2069). */
+const plain = (el: Element): string => (el.textContent ?? '').replace(/[\u2068\u2069]/g, '');
 const code = (): HTMLInputElement =>
   host.querySelector<HTMLInputElement>('input[name="owner-code"]')!;
 
@@ -173,7 +175,7 @@ describe('the Agents page', () => {
     };
     await mountPage();
     expect(host.querySelector('img')).toBeNull();
-    expect(host.textContent).toContain('<img src=x onerror=alert(1)>');
+    expect(plain(host)).toContain('<img src=x onerror=alert(1)>');
   });
   it('says what to do with no agents, and offers New agent (Get started)', async () => {
     answers['GET /api/ui/agents'] = {
@@ -181,14 +183,14 @@ describe('the Agents page', () => {
       body: list([], { current: null, label: null }),
     };
     await mountPage();
-    expect(host.textContent).toContain('No agents left. Add one to keep using AgentLink.');
+    expect(plain(host)).toContain('No agents left. Add one to keep using AgentLink.');
     const links = [...host.querySelectorAll('a')].filter((a) => a.textContent === 'New agent');
     expect(links.map((a) => a.getAttribute('href'))).toContain('/start/app?add=agent');
   });
   it('says "Couldn\'t load your agents." with Try again when the read fails', async () => {
     answers['GET /api/ui/agents'] = { status: 500, body: {} };
     await mountPage();
-    expect(host.textContent).toContain("Couldn't load your agents.");
+    expect(plain(host)).toContain("Couldn't load your agents.");
     expect(button(host, 'Try again')).toBeDefined();
   });
   it('marks the Tidy up agents "No AI app, no contacts"', async () => {
@@ -214,7 +216,7 @@ describe('the Agents page', () => {
       calls.filter((c) => c.url === '/api/ui/agents' && c.method === 'GET').length;
     const before = reads();
     await click(button(rowOf('work'), 'Switch'));
-    expect(host.textContent).toContain('You switched agents. Nothing was changed.');
+    expect(plain(host)).toContain('You switched agents. Nothing was changed.');
     // The page's read and the shared live store's read.
     expect(reads()).toBeGreaterThan(before);
   });
@@ -229,7 +231,7 @@ describe('Rename', () => {
     expect(field.maxLength).toBe(32);
     await type(field, 'Home');
     await click(button(rowOf('work'), 'Rename with Touch ID'));
-    expect(host.textContent).toContain('Rename Work to Home');
+    expect(plain(host)).toContain('Rename Work to Home');
     await type(code(), '123456');
     await click(button(host, 'Confirm'));
     const post = calls.find((c) => c.url === '/api/ui/agents/label')!;
@@ -244,7 +246,7 @@ describe('Rename', () => {
     await click(button(rowOf('work'), 'Rename with Touch ID'));
     await type(code(), '123456');
     await click(button(host, 'Confirm'));
-    expect(host.textContent).toContain('Not renamed yet. Try again.');
+    expect(plain(host)).toContain('Not renamed yet. Try again.');
     expect(rowOf('work')).toBeTruthy();
   });
 });
@@ -259,7 +261,7 @@ describe('label check and removal states', () => {
     await click(button(rowOf('work'), 'Rename'));
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
     await click(button(rowOf('work'), 'Rename with Touch ID'));
-    expect(host.textContent).toContain("That name can't be used.");
+    expect(plain(host)).toContain("That name can't be used.");
     expect(host.querySelector('input[name="owner-code"]')).toBeNull();
   });
   it('closes the Remove sheet on agent_removing: the agent shows as Removal not finished', async () => {
@@ -289,12 +291,12 @@ describe('Remove', () => {
   };
   it('names what goes and keeps the button off until the exact label is typed', async () => {
     const sheet = await open('work');
-    expect(sheet.textContent).toContain('Remove Work?');
-    expect(sheet.textContent).toContain("Work's keys and settings");
-    expect(sheet.textContent).toContain('Its entry in Codex');
-    expect(sheet.textContent).toContain('Your 1 contact will be told Work is retired.');
-    expect(sheet.textContent).toContain("This can't be undone.");
-    expect(sheet.textContent).toContain('Agent folder: work');
+    expect(plain(sheet)).toContain('Remove Work?');
+    expect(plain(sheet)).toContain("Work's keys and settings");
+    expect(plain(sheet)).toContain('Its entry in Codex');
+    expect(plain(sheet)).toContain('Your 1 contact will be told Work is retired.');
+    expect(plain(sheet)).toContain("This can't be undone.");
+    expect(plain(sheet)).toContain('Agent folder: work');
     expect(button(sheet, 'Export history first')).toBeDefined();
     expect(button(sheet, 'Remove with Touch ID')!.disabled).toBe(true);
     const field = sheet.querySelector<HTMLInputElement>('input[type="text"]')!;
@@ -312,14 +314,14 @@ describe('Remove', () => {
       atob(post.headers.get('X-AgentLink-Input')!.replace(/-/g, '+').replace(/_/g, '/')),
     );
     expect(sent).toEqual({ name: 'work', typedLabel: 'Work' });
-    expect(host.textContent).toContain('Quit any AI app that uses Work first.');
+    expect(plain(host)).toContain('Quit any AI app that uses Work first.');
     expect(button(host, 'Check again')).toBeDefined();
   });
   it('reads "not available" gracefully and never says it was removed', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 501, body: {} };
     const sheet = await open('work');
     await confirmTyped(sheet);
-    expect(host.textContent).toContain("Couldn't finish removing Work. Nothing else was changed.");
+    expect(plain(host)).toContain("Couldn't finish removing Work. Nothing else was changed.");
     expect(host.textContent).not.toContain('Work was removed.');
   });
   it('offers Remove anyway when contacts cannot be told, with Not now', async () => {
@@ -329,7 +331,7 @@ describe('Remove', () => {
     };
     const sheet = await open('work');
     await confirmTyped(sheet);
-    expect(host.textContent).toContain("Remove anyway? Contacts can't be told now.");
+    expect(plain(host)).toContain("Remove anyway? Contacts can't be told now.");
     expect(button(host, 'Remove anyway')).toBeDefined();
     expect(button(host, 'Not now')).toBeDefined();
   });
@@ -338,14 +340,14 @@ describe('Remove', () => {
     const sheet = await open('work');
     await confirmTyped(sheet);
     expect(host.querySelector('[role="dialog"]')).toBeNull();
-    expect(host.textContent).toContain('You switched agents. Nothing was changed.');
+    expect(plain(host)).toContain('You switched agents. Nothing was changed.');
   });
   it('after a removal the sheet closes and a note names it', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 200, body: { status: 'done' } };
     const sheet = await open('work');
     await confirmTyped(sheet);
     expect(host.querySelector('[role="dialog"]')).toBeNull();
-    expect(host.textContent).toContain('Work was removed.');
+    expect(plain(host)).toContain('Work was removed.');
   });
 });
 
@@ -393,7 +395,7 @@ describe('Add', () => {
     history.replaceState(null, '', '/agents?add=1');
     await mountPage();
     const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
-    expect(sheet.textContent).toContain('Add an agent');
+    expect(plain(sheet)).toContain('Add an agent');
     const field = sheet.querySelector<HTMLInputElement>('input[type="text"]')!;
     expect(field.maxLength).toBe(32);
     expect(field.value).toBe('Second agent');
@@ -407,7 +409,7 @@ describe('Add', () => {
     expect(begin?.body).toBe('');
     expect(finish?.body).toBe('123456');
     expect(finish?.headers.get('X-AgentLink-Input')).not.toContain('123456');
-    expect(host.textContent).toContain('Connect an AI app to it?');
+    expect(plain(host)).toContain('Connect an AI app to it?');
   });
   it('a refused begin says why and creates nothing', async () => {
     answers['POST /api/ui/agents/begin'] = { status: 409, body: { status: 'busy' } };
@@ -420,7 +422,7 @@ describe('Add', () => {
     await click(button(host, 'Confirm with my backup code'));
     await settle();
     expect(calls.some((c) => c.url === '/api/ui/agents' && c.method === 'POST')).toBe(false);
-    expect(host.textContent).toContain('Another setup or approval is running.');
+    expect(plain(host)).toContain('Another setup or approval is running.');
   });
 });
 

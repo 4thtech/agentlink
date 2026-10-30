@@ -1,5 +1,12 @@
 // U3-h: Agents copy (b11 §29; 11 §5). "keys" appears only in the Remove sheet, because it is what is
 // deleted. No "wallet", "gas", "seed phrase" or "transaction".
+/**
+ * W4-AGENTS (I-5; IR-W4-AGENTS-SEC-1 L1): an agent label inside a title, a statement or an aria
+ * name is its own bidi-isolated run (U+2068 … U+2069), so no character in it can reorder the words
+ * around it. Rendered text elsewhere uses `<bdi>`.
+ */
+export const iso = (label: string): string => `\u2068${label}\u2069`;
+
 export const AGENTS_STRINGS = {
   title: 'Agents',
   open: 'Open',
@@ -53,8 +60,8 @@ export const AGENTS_STRINGS = {
   adding: 'Adding…',
   addedPrompt: 'Connect an AI app to it?',
   switchToIt: 'Switch to it',
-  removeTitle: (label: string): string => `Remove ${label}?`,
-  removingTitle: (label: string): string => `Removing ${label}…`,
+  removeTitle: (label: string): string => `Remove ${iso(label)}?`,
+  removingTitle: (label: string): string => `Removing ${iso(label)}…`,
   removeIntro: 'This will delete, from this computer:',
   keysAndSettings: (label: string): string => `${label}'s keys and settings`,
   history: (contacts: number | null): string =>
@@ -67,7 +74,7 @@ export const AGENTS_STRINGS = {
   cantUndo: "This can't be undone.",
   exportFirst: 'Export history first',
   typeName: "Type the agent's name to confirm",
-  typeNameLabel: (label: string): string => `Type ${label} to confirm`,
+  typeNameLabel: (label: string): string => `Type ${iso(label)} to confirm`,
   typeNameDisabled: 'Type the name to enable this',
   removeTouchId: 'Remove with Touch ID',
   quitAny: (label: string): string => `Quit any AI app that uses ${label} first.`,
@@ -90,9 +97,9 @@ export const AGENTS_STRINGS = {
     n === null ? 'Contacts not readable just now' : `${n} ${n === 1 ? 'contact' : 'contacts'}`,
   switcherName: (label: string, apps: string, state: string): string =>
     `Agent: ${label}, ${apps}, ${state}. Switch agent.`,
-  renameStatement: (from: string, to: string): string => `Rename ${from} to ${to}`,
-  addStatement: (label: string): string => `Add ${label}`,
-  removeStatement: (label: string): string => `Remove ${label}`,
+  renameStatement: (from: string, to: string): string => `Rename ${iso(from)} to ${iso(to)}`,
+  addStatement: (label: string): string => `Add ${iso(label)}`,
+  removeStatement: (label: string): string => `Remove ${iso(label)}`,
 
   // W4-AGENTS (W4 UX v2 "Agents"; 08 §1 "Live AI-app status" words; "AI app", never "harness").
   intro: 'Each agent is one identity your AI apps use. Status updates by itself.',
@@ -113,13 +120,13 @@ export const AGENTS_STRINGS = {
   // Pause (08 §1 "Pause an agent", D-143 (5)): one click, no Touch ID; Resume with Touch ID.
   pause: 'Pause',
   resume: 'Resume',
-  pauseTitle: (label: string): string => `Pause ${label}?`,
+  pauseTitle: (label: string): string => `Pause ${iso(label)}?`,
   pauseBody: (label: string): string =>
-    `Your AI apps can't send or receive messages as ${label} until you resume it. Nothing is deleted.`,
+    `Your AI apps can't send or receive messages as ${iso(label)} until you resume it. Nothing is deleted.`,
   /** After the label (in its own bdi run): "{label} is paused". */
   isPaused: ' is paused',
   resumeTouchId: 'Resume with Touch ID',
-  resumeStatement: (label: string): string => `Resume ${label}`,
+  resumeStatement: (label: string): string => `Resume ${iso(label)}`,
   pauseFailed: "Couldn't pause it. Try again.",
   resumeFailed: "Couldn't resume it. Try again.",
   notPaused: 'It is not paused any more.',

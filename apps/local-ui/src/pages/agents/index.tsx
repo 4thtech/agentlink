@@ -119,22 +119,25 @@ export function AgentsPage({
   const { state, reload: reread, switchTo } = useAgents(api, reload);
   // The shared live store keeps the stream (or the poll) running and announces changes, so the
   // page's own read follows; in polling mode the store's own read is the newest. Whichever answer
-  // arrived last is shown, and each one is recorded for the agent page's history first.
+  // arrived last is shown; the agent page's history records each shown answer once.
   const subscribe = useCallback((on: () => void) => subscribeLive(on, { api }), [api]);
   const live = useSyncExternalStore(subscribe, getLive);
   const own = listOf(state);
   const [latest, setLatest] = useState<AgentsList | undefined>(undefined);
   useEffect(() => {
-    if (live.list === undefined) return;
-    recordLive(live.list);
-    setLatest(live.list);
+    if (live.list !== undefined) setLatest(live.list);
   }, [live.list]);
   useEffect(() => {
-    if (own === undefined) return;
-    recordLive(own);
-    setLatest(own);
+    if (own !== undefined) setLatest(own);
   }, [own]);
   const list: AgentsList | undefined = latest ?? own ?? live.list;
+  // One sample per shown answer; the page draws again so the agent page sees it.
+  const [, setRecorded] = useState(0);
+  useEffect(() => {
+    if (latest === undefined) return;
+    recordLive(latest);
+    setRecorded((n) => n + 1);
+  }, [latest]);
 
   const [panel, setPanel] = useState<{ name: string; panel: Panel } | undefined>(undefined);
   // `?add=1` (the agent chip's "Add agent") opens Add here, also when the page is already open;
@@ -171,21 +174,24 @@ export function AgentsPage({
     announceAgentsChanged();
   }, []);
 
-  // What to do once another agent is open (a switch-first press); taken once per page mount, on
-  // the first list read here (the page that pressed never takes its own).
-  const intentChecked = useRef(false);
+  // What to do once another agent is open (a switch-first press). Taken from the page's own fresh
+  // read only (the shared store may still hold the agent before the switch), and kept until a read
+  // shows that agent open (intent.ts). The page that pressed never takes its own: it is mounted
+  // again for the agent now open.
+  const pressedHere = useRef(false);
   const act = useCallback((action: IntentAction, row: AgentRow): void => {
     if (action === 'pause') setPausing(row);
     else if (action === 'resume') setResuming(true);
     else setPanel({ name: row.name, panel: 'apps' });
   }, []);
+  const fresh = state.kind === 'ready' ? state.list : undefined;
   useEffect(() => {
-    if (intentChecked.current || list === undefined) return;
-    intentChecked.current = true;
-    const action = takeIntent(list.current);
-    const row = list.agents.find((r) => r.current);
-    if (action !== undefined && row !== undefined) act(action, row);
-  }, [list, act]);
+    if (pressedHere.current || fresh === undefined) return;
+    const row = fresh.agents.find((r) => r.current);
+    if (row === undefined) return;
+    const action = takeIntent(fresh.current);
+    if (action !== undefined) act(action, row);
+  }, [fresh, act]);
 
   // D-141: "Contacts still see {cardName}" for the open agent, read once.
   useEffect(() => {
@@ -203,7 +209,10 @@ export function AgentsPage({
       setNotice(undefined);
       void switchTo(row.name).then((outcome) => {
         if (outcome.kind === 'agent_changed') setNotice(S.agentChanged);
-        if (outcome.kind !== 'done') forgetIntent();
+        if (outcome.kind !== 'done') {
+          pressedHere.current = false;
+          forgetIntent();
+        }
       });
     },
     [switchTo],
@@ -212,6 +221,7 @@ export function AgentsPage({
   const firstOpen = useCallback(
     (row: AgentRow, action: IntentAction): void => {
       if (row.current) return act(action, row);
+      pressedHere.current = true;
       rememberIntent({ name: row.name, action });
       setNotice(S.switching(row.label));
       doSwitch(row);

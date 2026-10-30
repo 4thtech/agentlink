@@ -49,8 +49,8 @@ function Sparkline({
       aria-label={S.sparkLabel(name, samples.length, word)}
       data-sparkline={app}
     >
-      {samples.map((s) => (
-        <span key={s.at} className={`ag-bar is-${s.state}`} />
+      {samples.map((s, i) => (
+        <span key={i} className={`ag-bar is-${s.state}`} />
       ))}
     </span>
   );
@@ -227,8 +227,8 @@ export function AgentDetail({
             <p className="al-text-body-sm al-muted">{S.noActivity}</p>
           ) : (
             <ul className="ag-plain al-text-body-sm">
-              {changes.map((c) => (
-                <li key={c.at} className="ag-event">
+              {changes.map((c, i) => (
+                <li key={i} className="ag-event">
                   <span className="al-muted">{clock(c.at)}</span>
                   <span>
                     {c.state === 'paused'
