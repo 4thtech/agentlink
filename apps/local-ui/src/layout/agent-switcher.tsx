@@ -5,9 +5,12 @@
 // status and, per AI app, a dot and a word (Working / Ready / Not running / Not set up / Paused); then
 // "Another AI app", the detected AI apps that serve no agent, each with Connect (kept from #715); then
 // Add agent and Manage agents. It follows the shared live store (api/live.ts), so it updates by
-// itself. Switching needs no Touch ID (it only changes what you look at) and never reloads the page.
+// itself (W4-SHELL-LIVE: over the events stream, so quitting or starting an AI app shows within
+// seconds; per AI app Working with the U0 pulse / Ready / Idle / Not running · last seen / Not set up
+// in the words of 08 §1). Switching needs no Touch ID (it only changes what you look at) and never
+// reloads the page.
 // Labels and app names are text only (I-5).
-import { AgentIcon, type AgentDotState, type LiveDotState } from '@4thtech-io/ui';
+import { AgentIcon, Pulse, type AgentDotState, type LiveDotState } from '@4thtech-io/ui';
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactElement } from 'react';
 import {
@@ -102,10 +105,16 @@ function useFreeApps(appsApi: AppsApi | undefined): {
   return { names, reread };
 }
 
+/** A live dot; Working pulses (the U0 Pulse: a still dot with reduced motion). */
+export function LiveDot({ state }: { readonly state: LiveState }): ReactElement {
+  if (state === 'working') return <Pulse tone="success" className="al-ldot-pulse" />;
+  return <span className={`al-ldot is-${state}`} aria-hidden="true" />;
+}
+
 function AppLine({ app }: { app: LiveAgent['apps'][number] }): ReactElement {
   return (
     <span className="al-am-app">
-      <span className={`al-ldot is-${app.state}`} aria-hidden="true" />
+      <LiveDot state={app.state} />
       <span className="al-am-app-name">{app.app}</span>
       <span className={`al-am-app-word is-${app.state}`}>{app.word}</span>
     </span>
