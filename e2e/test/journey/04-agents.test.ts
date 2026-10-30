@@ -14,7 +14,7 @@ import {
   layoutShiftScore,
   observeLayoutShift,
 } from '../helpers/motion.js';
-import { addAgent, agentCard, openAgents, removeAgent } from './helpers-agents.js';
+import { addAgent, agentCard, labelled, openAgents, removeAgent } from './helpers-agents.js';
 import {
   CONFIRM_PASSKEY,
   chapter,
@@ -43,7 +43,7 @@ async function pauseAna(page: Page): Promise<void> {
     .first()
     .waitFor();
   await agentCard(page, 'Ana').getByRole('button', { name: 'Pause', exact: true }).click();
-  const sheet = page.getByRole('dialog', { name: 'Pause Ana?' });
+  const sheet = page.getByRole('dialog', { name: labelled('Pause ', 'Ana', '?') });
   await sheet.getByText('Nothing is deleted.', { exact: false }).waitFor();
   await sheet.getByRole('button', { name: 'Pause', exact: true }).click();
   await page.getByText('Ana is paused').first().waitFor();
@@ -175,6 +175,48 @@ describe('chapter 4: agents', () => {
     expect(jp.gestures.total() - before).toBe(1);
     await probe.check();
   }, 180_000);
+
+  // 08 §1: Pause and Resume act on the open agent; on another agent's card the app switches to it
+  // first (no reload: the views mount again) and then asks: "Pause Work?", or Resume's Touch ID.
+  it('Pause and Resume on another agent switch to it first, then ask', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
+    await addAgent(jp.page, 'Work');
+    const { page } = jp;
+    const probe = await jp.arm();
+
+    await openAgents(page);
+    await agentCard(page, 'Work').getByRole('button', { name: 'Pause', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: labelled('Pause ', 'Work', '?') });
+    await sheet.waitFor({ timeout: 15_000 });
+    await page
+      .getByRole('button', { name: /^Agent: Work/ })
+      .first()
+      .waitFor();
+    await sheet.getByRole('button', { name: 'Pause', exact: true }).click();
+    await page.getByText('Work is paused').first().waitFor();
+
+    // Back to Ana; Resume on Work's card opens Work and asks for Touch ID once.
+    await agentCard(page, 'Ana').getByRole('button', { name: 'Switch', exact: true }).click();
+    await page
+      .getByRole('button', { name: /^Agent: Ana/ })
+      .first()
+      .waitFor();
+    const before = jp.gestures.total();
+    await agentCard(page, 'Work').getByRole('button', { name: 'Resume', exact: true }).click();
+    await page.getByRole('button', { name: CONFIRM_PASSKEY }).click({ timeout: 15_000 });
+    await eventually(
+      'Work resumed',
+      async () => !(await text(page)).includes('Work is paused'),
+      30_000,
+    );
+    expect(jp.gestures.total() - before).toBe(1);
+    await probe.check();
+  }, 240_000);
 
   // Gate: W4-RENAME-REACHES-CONTACTS (builder D, D2; the contact row is C2) turns this on. Today a
   // rename changes only the local label; the contact keeps the old name.

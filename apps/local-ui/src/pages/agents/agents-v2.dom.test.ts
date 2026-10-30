@@ -166,6 +166,8 @@ async function choose(el: HTMLSelectElement, value: string): Promise<void> {
 }
 const code = (): HTMLInputElement =>
   host.querySelector<HTMLInputElement>('input[name="owner-code"]')!;
+/** Text without the bidi isolates the page puts around labels (U+2068, U+2069). */
+const plain = (el: Element): string => (el.textContent ?? '').replace(/[\u2068\u2069]/g, '');
 const posts = (url: string): Call[] => calls.filter((c) => c.method === 'POST' && c.url === url);
 
 describe('Agents, simple (A8)', () => {
@@ -238,6 +240,69 @@ describe('Agents, simple (A8)', () => {
     await mount();
     expect(host.textContent).toContain('Pause Work?');
     expect(sessionStorage.getItem(INTENT_KEY)).toBeNull();
+  });
+
+  it('keeps the remembered Pause through a stale first read, until its own read shows the agent open', async () => {
+    sessionStorage.setItem(INTENT_KEY, JSON.stringify({ name: 'work', action: 'pause' }));
+    // The router mounts the page again while the shared store still holds the old agent.
+    await mount();
+    expect(plain(host)).not.toContain('Pause Work?');
+    expect(sessionStorage.getItem(INTENT_KEY)).not.toBeNull();
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list(
+        FLEET().map((a) => ({ ...a, current: a.name === 'work' })),
+        { current: 'work', label: 'Work' },
+      ),
+    };
+    await act(async () => {
+      window.dispatchEvent(new Event('agentlink:agents-changed'));
+    });
+    await settle();
+    expect(plain(host)).toContain('Pause Work?');
+    expect(sessionStorage.getItem(INTENT_KEY)).toBeNull();
+  });
+
+  it('the same for Resume: the gate opens once the paused agent is the open one', async () => {
+    sessionStorage.setItem(INTENT_KEY, JSON.stringify({ name: 'invoices', action: 'resume' }));
+    await mount();
+    expect(plain(host)).not.toContain('Resume Invoices');
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list(
+        FLEET().map((a) => ({ ...a, current: a.name === 'invoices' })),
+        { current: 'invoices', label: 'Invoices' },
+      ),
+    };
+    await act(async () => {
+      window.dispatchEvent(new Event('agentlink:agents-changed'));
+    });
+    await settle();
+    expect(plain(host)).toContain('Resume Invoices');
+    expect(host.querySelector('input[name="owner-code"]')).not.toBeNull();
+  });
+
+  it('isolates the label in the Pause title and body and the Resume statement (U+2068 … U+2069)', async () => {
+    const rtl = '\u05e2\u05d1\u05d5\u05d3\u05d4 \u202e1';
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list([agent('default', rtl, { current: true, state: 'paused' })], { label: rtl }),
+    };
+    await mount();
+    await click(button(card('default'), 'Resume'));
+    expect(host.textContent).toContain(`Resume \u2068${rtl}\u2069`);
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list([agent('default', rtl, { current: true, state: 'ready' })], { label: rtl }),
+    };
+    await act(async () => {
+      window.dispatchEvent(new Event('agentlink:agents-changed'));
+    });
+    await settle();
+    await click(button(card('default'), 'Pause'));
+    const sheet = host.querySelector('[role="dialog"]')!;
+    expect(sheet.textContent).toContain(`Pause \u2068${rtl}\u2069?`);
+    expect(sheet.textContent).toContain(`messages as \u2068${rtl}\u2069 until`);
   });
 
   it('a paused open agent: the banner, and Resume with Touch ID signs agent.resume', async () => {

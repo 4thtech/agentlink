@@ -33,6 +33,12 @@ export async function addAgent(page: Page, label: string): Promise<void> {
   await page.getByRole('button', { name: 'Not now' }).click();
 }
 
+/** A label as the app words it in titles and statements: inside U+2068 … U+2069 (bidi isolates). */
+export function labelled(before: string, label: string, after = ''): RegExp {
+  const esc = (t: string): string => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${esc(before)}\u2068?${esc(label)}\u2069?${esc(after)}$`);
+}
+
 /** The agent's card on the simple Agents page: a region named by its label. */
 export function agentCard(page: Page, label: string) {
   return page.getByRole('main').getByRole('region', { name: label, exact: true }).first();
@@ -42,8 +48,8 @@ export function agentCard(page: Page, label: string) {
 export async function removeAgent(page: Page, label: string): Promise<void> {
   await openAgents(page);
   await agentCard(page, label).getByRole('button', { name: 'Remove', exact: true }).click();
-  await page.getByRole('heading', { name: `Remove ${label}?` }).waitFor();
-  await page.getByLabel(`Type ${label} to confirm`).fill(label);
+  await page.getByRole('heading', { name: labelled('Remove ', label, '?') }).waitFor();
+  await page.getByLabel(labelled('Type ', label, ' to confirm')).fill(label);
   await page.getByRole('button', { name: 'Remove with Touch ID' }).click();
   const confirm = page.getByRole('button', { name: CONFIRM_PASSKEY });
   const done = page.getByText(`${label} was removed.`).first();
