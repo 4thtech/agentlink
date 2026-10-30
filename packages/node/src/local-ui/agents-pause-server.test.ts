@@ -452,4 +452,3 @@ describe('resume: unreadable pause row and a failing apply (W4-PAUSE fix round)'
     expect(JSON.stringify(result)).not.toContain('SQLITE');
   });
 });
-

@@ -818,8 +818,7 @@ describe('accept and invite argument checks', () => {
   it('W4-PAUSE (IR-W4-PAUSE-1): invite and accept refuse while paused with the fixed paused text', async () => {
     const PAUSED = 'This agent is paused. The owner can resume it in the AgentLink app.';
     // Core's own refusal (any message): the CLI prints the one fixed sentence (06 §6).
-    const paused = (): Promise<never> =>
-      Promise.reject(new CoreError('agent_paused', 'paused'));
+    const paused = (): Promise<never> => Promise.reject(new CoreError('agent_paused', 'paused'));
     const f = fakeAgent({
       pairing: {
         createInvite: paused,
