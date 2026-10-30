@@ -70,6 +70,7 @@ function server(state: State): typeof fetch {
         shareText: `Add my AI agent on AgentLink: ${SHORT}`,
         expiresAt: '2999-01-01T00:00:00Z',
         format: 'short',
+        inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
       });
     }
     if (method === 'POST' && url === '/api/ui/invites/cancel') {

@@ -21,6 +21,8 @@ const INVITE = {
   expiresAt: Date.UTC(2027, 0, 15),
 };
 
+const MARKO_REF = '0x7f3a19c200000000000000000000000000000001';
+
 function fakeApi(states: JoinState[], accept: JoinAcceptOutcome = { kind: 'pending' }) {
   const calls = { accepted: [] as { id: string; proof: PresenceProof }[], dismissed: 0, reads: 0 };
   let at = 0;
@@ -31,7 +33,14 @@ function fakeApi(states: JoinState[], accept: JoinAcceptOutcome = { kind: 'pendi
       const answer: JoinRead =
         state === 'none'
           ? { kind: 'ok', state }
-          : { kind: 'ok', state, invite: INVITE, agent: 'Claude Code agent' };
+          : {
+              kind: 'ok',
+              state,
+              invite: INVITE,
+              agent: 'Claude Code agent',
+              // W4-PEOPLE-INVITE (IR SEC-1 L3): connected names the new contact's ref.
+              ...(state === 'connected' ? { contactRef: MARKO_REF } : {}),
+            };
       return Promise.resolve(answer);
     },
     accept: (id, proof) => {
@@ -87,7 +96,6 @@ const click = async (label: string): Promise<void> => {
 };
 const PASSKEY = () => Promise.resolve({ credentialId: 'c', prfSalt: 's' });
 
-const MARKO_REF = '0x7f3a19c200000000000000000000000000000001';
 /** This app's contacts and the safety code, for the Connected moment. */
 function contactsApi(): ApiClient & { paths: string[] } {
   const paths: string[] = [];
@@ -132,6 +140,10 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
     );
     expect(text()).toContain('For: Claude Code agent');
     expect(text()).not.toMatch(/\d{4} \d{4} \d{4}/);
+    // IR-1 low (c): the owner sees what Touch ID signs before the gesture.
+    expect(text()).toContain(
+      'Accept an invite from Marko (Self-declared, owner 7F3A·19C2) for Claude Code agent',
+    );
     expect(button('Accept with Touch ID')).toBeDefined();
     expect(button('Not now')).toBeDefined();
     // Never a link, and the name never becomes markup.
@@ -240,7 +252,8 @@ describe('the other states (b11 §33.2)', () => {
       await new Promise((r) => setTimeout(r, 0));
     });
     expect(host.querySelector('h1')?.textContent).toBe('You and Marko are connected');
-    expect(contacts.paths).toContain(`/api/ui/contacts/${MARKO_REF}/safety-code`);
+    // The code of exactly the contact the server named: no lookup by fingerprint in the list.
+    expect(contacts.paths).toEqual([`/api/ui/contacts/${MARKO_REF}/safety-code`]);
     expect(text()).toContain('4821');
     await click('Done');
     expect(go).toHaveBeenCalledWith('/');

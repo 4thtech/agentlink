@@ -35,8 +35,26 @@ interface World {
   readonly cancelled: string[];
 }
 
-/** A fake server: each create adds an open invite with a new ID; list answers the open ones. */
-function world(fallback = false): World {
+interface WorldOptions {
+  /** The drop is down: every link falls back to the long one. */
+  readonly fallback?: boolean;
+  /** Every list read fails (the page must never need it to cancel). */
+  readonly listFails?: boolean;
+  /** Before each create, another invite is made elsewhere (the AI app's MCP, another tab). */
+  readonly concurrent?: boolean;
+}
+
+/**
+ * A fake server: each create adds an open invite with a new ID and answers that ID (IR-1 M);
+ * list answers the open ones (or fails).
+ */
+function world(options: boolean | WorldOptions = false): World {
+  const {
+    fallback = false,
+    listFails = false,
+    concurrent = false,
+  } = typeof options === 'boolean' ? { fallback: options } : options;
+  let elsewhere = 0;
   const open: { inviteId: string; name: string | null; expiresAt: string }[] = [];
   const created: World['created'] = [];
   const cancelled: string[] = [];
@@ -45,8 +63,17 @@ function world(fallback = false): World {
       const long = options?.long === true || fallback;
       created.push({ label, long: options?.long === true });
       const url = long ? LONG : created.length % 2 === 1 ? SHORT_A : SHORT_B;
+      if (concurrent) {
+        elsewhere += 1;
+        open.push({
+          inviteId: `other--${String(elsewhere).padStart(16, '0')}`,
+          name: 'Sent from the AI app',
+          expiresAt: new Date(EXPIRES).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        });
+      }
+      const inviteId = `invite-${String(created.length).padStart(16, '0')}`;
       open.push({
-        inviteId: `invite-${String(created.length).padStart(16, '0')}`,
+        inviteId,
         name: label ?? null,
         expiresAt: new Date(EXPIRES).toISOString().replace(/\.\d{3}Z$/, 'Z'),
       });
@@ -57,6 +84,7 @@ function world(fallback = false): World {
           shareText: `Connect with me on AgentLink: ${url}`,
           expiresAt: EXPIRES,
           format: long ? 'long' : 'short',
+          inviteId,
         },
       };
       return Promise.resolve(outcome);
@@ -72,11 +100,15 @@ function world(fallback = false): World {
   };
   const api: ApiClient = {
     get: <T>() =>
-      Promise.resolve({
-        kind: 'ok',
-        status: 200,
-        data: { status: 'ok', invites: open.map((o) => ({ ...o })) },
-      } as ApiResult<T>),
+      Promise.resolve(
+        (listFails
+          ? { kind: 'offline' }
+          : {
+              kind: 'ok',
+              status: 200,
+              data: { status: 'ok', invites: open.map((o) => ({ ...o })) },
+            }) as ApiResult<T>,
+      ),
     post: () => Promise.resolve({ kind: 'error', status: 500 }),
     owner: () => Promise.resolve({ kind: 'error', status: 500 }),
   };
@@ -173,7 +205,8 @@ describe('the invite panel (A3/A5)', () => {
     const w = world();
     await show(panel(w));
     expect(w.created).toEqual([{ label: undefined, long: false }]);
-    expect(text()).toContain('agentlink.4thtech.io/i#2.AAAA');
+    // IR SEC-1 L2: the full https:// link, so a copied or selected link never loads over http.
+    expect(host.querySelector('.inv-link')?.textContent).toBe(SHORT_A);
     expect(text()).toContain(S.linkLabel);
     expect(text()).toContain('Works for 7 days. Only the person with the link can accept.');
     expect(text()).toContain("Only for your list. It isn't sent anywhere.");
@@ -249,6 +282,70 @@ describe('the invite panel (A3/A5)', () => {
     root = undefined;
     await settle();
     expect(kept.cancelled).toEqual([]);
+  });
+
+  // IR-W4-PEOPLE-INVITE-1 (M): the panel cancels only an invite whose ID its own create answered.
+  it('a failed list read never makes it cancel another invite', async () => {
+    const w = world({ listFails: true, concurrent: true });
+    await show(panel(w));
+    await typeName('Denis');
+    await blurName();
+    act(() => root?.unmount());
+    root = undefined;
+    await settle();
+    expect(w.cancelled).toEqual(['invite-0000000000000001', 'invite-0000000000000002']);
+    expect(w.cancelled.some((id) => id.startsWith('other'))).toBe(false);
+  });
+
+  it('an invite made elsewhere at the same time is never cancelled (rename, leave)', async () => {
+    const w = world({ concurrent: true });
+    await show(panel(w));
+    await typeName('Denis');
+    await blurName();
+    act(() => root?.unmount());
+    root = undefined;
+    await settle();
+    expect(w.cancelled).toEqual(['invite-0000000000000001', 'invite-0000000000000002']);
+  });
+
+  it('copying the link by selecting it anywhere counts as sent: it stays when you leave', async () => {
+    const w = world();
+    await show(panel(w));
+    const box = host.querySelector('.inv-link') as HTMLElement;
+    const range = document.createRange();
+    range.selectNodeContents(box);
+    const selection = document.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    await act(async () => {
+      document.dispatchEvent(new Event('copy', { bubbles: true }));
+    });
+    selection?.removeAllRanges();
+    act(() => root?.unmount());
+    root = undefined;
+    await settle();
+    expect(w.cancelled).toEqual([]);
+  });
+
+  it('a copy of something else does not count as sent', async () => {
+    const w = world();
+    await show(panel(w));
+    const other = document.createElement('p');
+    other.textContent = 'unrelated text';
+    document.body.append(other);
+    const range = document.createRange();
+    range.selectNodeContents(other);
+    document.getSelection()?.removeAllRanges();
+    document.getSelection()?.addRange(range);
+    await act(async () => {
+      document.dispatchEvent(new Event('copy', { bubbles: true }));
+    });
+    document.getSelection()?.removeAllRanges();
+    other.remove();
+    act(() => root?.unmount());
+    root = undefined;
+    await settle();
+    expect(w.cancelled).toEqual(['invite-0000000000000001']);
   });
 
   it('the long-link fallback says so in plain words', async () => {

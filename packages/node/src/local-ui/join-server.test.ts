@@ -699,13 +699,19 @@ describe('POST /api/ui/join/accept (08 §4)', () => {
       { link: LINK, allowed: true },
     ]);
     expect(parse((await h.read()).body)).toMatchObject({ state: 'waiting_for_them' });
+    expect(parse((await h.read()).body)['contactRef']).toBeUndefined();
     // A second accept finds no invite to take: nothing more is signed.
     const again = await h.accept(INVITE_ID, world.code);
     expect(again.status).toBe(409);
     expect(h.core.applied).toHaveLength(1);
     // Connected once the inviter's agent answered (the contact exists).
     h.core.contacts.push({ id: CONTACT_ID, status: 'active' });
-    expect(parse((await h.read()).body)).toMatchObject({ state: 'connected' });
+    // W4-PEOPLE-INVITE (IR SEC-1 L3): connected names the new contact's ref (its ID, as the
+    // contacts routes use it), so the screen reads that contact's safety code and no other.
+    expect(parse((await h.read()).body)).toMatchObject({
+      state: 'connected',
+      contactRef: CONTACT_ID.toLowerCase(),
+    });
     // After accept, a new handoff is taken (the shown invite was answered).
     expect((await h.handoff({ invite: OTHER_LINK })).status).toBe(200);
     expectNoLink(h, res.body);

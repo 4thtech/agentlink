@@ -71,6 +71,7 @@ function desk(over: Partial<LocalUiInviteDesk> = {}) {
     create: (input) => {
       created.push(input);
       return Promise.resolve<CreatedInvite>({
+        inviteId: INVITES_WORLD.inviteId,
         inviteUrl: input.long === true ? LONG : SHORT,
         format: input.long === true ? 'long' : 'short',
         ownerFingerprint: { short: '7F3A·19C2', long: '7F3A19C2'.repeat(8) },

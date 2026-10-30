@@ -42,6 +42,7 @@ const CREATED = {
   ownerFingerprint: '7F3A·19C2',
   expiresAt: '2026-11-04T12:00:00Z',
   format: 'long',
+  inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
 };
 const CHECKED = {
   status: 'ok',
@@ -572,6 +573,7 @@ describe('W4-SHORT-INVITE: the long link under Advanced', () => {
         inviteUrl: SHORT,
         shareText: `Add my AI agent on AgentLink: ${SHORT}`,
         format: 'short',
+        inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
       },
     });
     expect(sheet()?.textContent).toContain(SHORT);

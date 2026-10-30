@@ -223,6 +223,19 @@ describe('ConnectedMoment (A7)', () => {
     expect(done).toHaveBeenCalledTimes(1);
   });
 
+  // IR-1 low (b): the two letters meet and the check pops (U0 classes; reduced motion is the kit's).
+  it('the letters meet and the check pops, from the U0 motion kit', async () => {
+    await show(createElement(ConnectedMoment, { name: 'Denis', me: 'Tali' }));
+    const me = host.querySelector('.inv-avatar--me');
+    const them = host.querySelector('.inv-avatar--them');
+    expect(me?.closest('.al-slide-in')).not.toBeNull();
+    expect(them?.closest('.al-slide-in')).not.toBeNull();
+    expect(them?.closest('.inv-from-right')).not.toBeNull();
+    expect(host.querySelector('.inv-pair-check .al-pop')).not.toBeNull();
+    expect(me?.textContent).toBe('T');
+    expect(them?.textContent).toBe('D');
+  });
+
   it('without the code yet it says where it will appear; never a wrong code', async () => {
     await show(
       createElement(ConnectedMoment, { name: 'Ana', api: api({ status: 'ok', code: 'x' }) }),
