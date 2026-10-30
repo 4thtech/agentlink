@@ -7,7 +7,7 @@
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import process from 'node:process';
-import { CoreError } from '@4thtech-io/core';
+import { AGENT_PAUSED_TEXT, CoreError } from '@4thtech-io/core';
 import { NodeKeyStoreError, NodeStoreError } from '@4thtech-io/node';
 import type { CommandContext } from '../dispatch.js';
 import { EXIT_FAILED } from '../dispatch.js';
@@ -116,6 +116,8 @@ export const TEXT = Object.freeze({
   statusOffline:
     "Warning  Can't reach the message network, so this shows only what is already stored.",
   statusPartial: 'Warning  Part of the message network did not answer, so this may be incomplete.',
+  // W4-PAUSE (06 §6 "Paused agents"): fixed text, the same sentence the tools give.
+  statusPaused: 'Warning  This agent is paused. The owner can resume it in the AgentLink app.',
   // M1-5g: a relay returned a second at its cap. Fixed text: no count, relay or time (I-5, I-7).
   statusIncomplete:
     'Warning  Some messages may be missing from this check. AgentLink will look for them again on the next check.',
@@ -185,6 +187,8 @@ export function printAll(context: CommandContext, lines: readonly string[]): voi
  * value; undefined for any other error (its text could carry a value, I-5).
  */
 export function fixedErrorText(error: unknown): string | undefined {
+  // W4-PAUSE (06 §6): the CLI's sending commands refuse with the tools' fixed sentence.
+  if (error instanceof CoreError && error.code === 'agent_paused') return AGENT_PAUSED_TEXT;
   if (
     error instanceof CoreError ||
     error instanceof RuntimeError ||
@@ -221,5 +225,20 @@ export async function withAgent(
     return EXIT_FAILED;
   } finally {
     await agent.close();
+  }
+}
+
+/**
+ * W4-PAUSE (D-143 (5); 06 §6 "Paused agents"): whether the owner paused this agent. Fail closed: a
+ * pause state that cannot be read counts as paused. A client without the read is not paused.
+ */
+export async function agentPausedNow(client: {
+  readonly paused?: () => Promise<boolean>;
+}): Promise<boolean> {
+  if (typeof client.paused !== 'function') return false;
+  try {
+    return await client.paused();
+  } catch {
+    return true;
   }
 }

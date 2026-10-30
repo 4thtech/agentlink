@@ -1,0 +1,100 @@
+/* Settings (W4-SETTINGS-ADVANCED; prototype v23 "Settings"): one bordered list, a row per setting
+   (icon, title, a line, a chevron), Advanced opening in place. Tokens only; the only motion is the
+   U0 reveal class and a chevron turn (transform), off under reduced motion. */
+.st-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+  max-inline-size: 680px;
+  margin-inline: auto;
+}
+.st-page h1 {
+  margin: 0;
+}
+.st-list {
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  overflow: hidden;
+}
+.st-row {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-block-size: 64px;
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  padding: var(--al-space-3) var(--al-space-4);
+  border: 0;
+  border-block-end: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+.st-row:last-child {
+  border-block-end: 0;
+}
+.st-row:hover {
+  background: var(--al-color-bg-raised);
+}
+.st-row .al-sicon {
+  flex: none;
+  color: var(--al-color-fg-muted);
+}
+.st-row-text {
+  flex: 1;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+}
+.st-row-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+.st-row-line {
+  font-size: 13px;
+  color: var(--al-color-fg-subtle);
+}
+.st-chev {
+  flex: none;
+  color: var(--al-color-fg-subtle);
+  transition: transform var(--al-duration-base) var(--al-easing-enter);
+}
+.st-row[aria-expanded='true'] .st-chev {
+  transform: rotate(90deg);
+}
+.st-advanced {
+  background: var(--al-color-bg-sunken);
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  padding-block: var(--al-space-1);
+}
+.st-adv-row {
+  box-sizing: border-box;
+  min-block-size: 48px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-2);
+  padding: var(--al-space-2) var(--al-space-4) var(--al-space-2) 50px;
+  color: inherit;
+  text-decoration: none;
+}
+a.st-adv-row:hover {
+  background: var(--al-color-bg-surface);
+}
+.st-adv-value {
+  font-size: 12px;
+  color: var(--al-color-fg-subtle);
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-chev {
+    transition: none;
+  }
+}
+[data-motion='reduced'] .st-chev {
+  transition: none;
+}

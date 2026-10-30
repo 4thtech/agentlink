@@ -11,8 +11,8 @@ export const AGENTS_PATH = '/agents';
 export const ACTIVITY_PATH = '/activity';
 export const LIVE_ACTIVITY_PATH = '/activity/live';
 export const SETTINGS_PATH = '/settings';
-/** Where Settings opens (A9: the first entry). */
-export const SETTINGS_HOME = '/settings/backup';
+/** Where Settings opens (A9: the list of settings, W4-SETTINGS-ADVANCED). */
+export const SETTINGS_HOME = '/settings';
 /** Get started, step 1 (U2 builds the steps). */
 export const START_PATH = '/start/app';
 export const START_STEPS = ['/start/app', '/start/connect', '/start/connected', '/start/invite'];
@@ -28,7 +28,16 @@ export const ADVANCED_HOME = '/advanced/network';
 
 /** The icons of the section menu (layout/shell-icons.tsx; Lucide, as the prototype). */
 export type SectionIcon =
-  'home' | 'agents' | 'activity' | 'settings' | 'stream' | 'rules' | 'proofs' | 'relays' | 'diag';
+  | 'home'
+  | 'agents'
+  | 'activity'
+  | 'settings'
+  | 'stream'
+  | 'rules'
+  | 'proofs'
+  | 'relays'
+  | 'diag'
+  | 'map';
 
 export interface Section {
   readonly id: string;
@@ -57,6 +66,7 @@ export const ADVANCED_SECTIONS: readonly Section[] = [
     icon: 'diag',
     path: '/advanced/diagnostics',
   },
+  { id: 'map', label: PAGE_TITLES.connectionsMap, icon: 'map', path: '/advanced/map' },
 ];
 
 export interface SettingsPage {
@@ -125,7 +135,6 @@ export function titleOf(path: string): string {
 export const REDIRECTS: Readonly<Record<string, string>> = {
   '/first-run': START_PATH,
   '/start': START_PATH,
-  '/settings': SETTINGS_HOME,
   '/settings/home': HOME_PATH,
   '/settings/messages': INTERIM_MESSAGES_PATH,
   '/settings/contacts': INTERIM_PEOPLE_PATH,

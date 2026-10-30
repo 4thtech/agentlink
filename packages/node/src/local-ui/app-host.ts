@@ -71,6 +71,8 @@ export interface AgentDirectoryStats {
   readonly sessions?: AgentStorePeek['sessions'];
   /** W4-LIVE-STATUS: when each AI app id last ran this agent. */
   readonly lastSeen?: AgentStorePeek['lastSeen'];
+  /** W4-PAUSE (D-143 (5)): the agent's pause row exists (display only). */
+  readonly paused?: true;
 }
 
 /**

@@ -21,6 +21,7 @@ import {
   ownerActionSchema,
   type PolicyRule,
   type AgentLabelParams,
+  type AgentResumeParams,
   type AppChangeParams,
   type FileSaveParams,
   type ContactCheckParams,
@@ -49,6 +50,7 @@ export type PreparableOp =
   | 'agent.label'
   | 'app.connect'
   | 'app.disconnect'
+  | 'agent.resume'
   | 'file.save';
 
 const PREPARABLE: readonly string[] = [
@@ -61,6 +63,8 @@ const PREPARABLE: readonly string[] = [
   // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
   'app.connect',
   'app.disconnect',
+  // W4-PAUSE (D-143 (5)): the owner resumes a paused agent from the local app.
+  'agent.resume',
   // W4-FILES-SAVE: the owner saves one received file into the Inbox folder from the local app.
   'file.save',
 ];
@@ -73,6 +77,7 @@ interface ParamsOf {
   readonly 'agent.label': AgentLabelParams;
   readonly 'app.connect': AppChangeParams;
   readonly 'app.disconnect': AppChangeParams;
+  readonly 'agent.resume': AgentResumeParams;
   readonly 'file.save': FileSaveParams;
 }
 
@@ -152,6 +157,8 @@ export type PrepareRefusal =
   | 'label_invalid'
   /** U3-f: the app is not in the fixed table, or `changeId` is not 64 lowercase hex. */
   | 'change_invalid'
+  /** W4-PAUSE: Resume for an agent that is not paused (refused before the gesture). */
+  | 'not_paused'
   /** W4-FILES-SAVE: not a received item ID `<envelope ID>.<index>` (index 00 to 15). */
   | 'item_invalid';
 

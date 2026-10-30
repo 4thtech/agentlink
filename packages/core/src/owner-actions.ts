@@ -349,6 +349,8 @@ export class OwnerActions {
       case 'app.connect':
       case 'app.disconnect':
         return this.#applyAppChange(value, base);
+      case 'agent.resume':
+        return this.#applyResume(value, base);
       case 'file.save':
         return this.#applyFileSave(value, base);
       case 'credits.deposit':
@@ -572,6 +574,40 @@ export class OwnerActions {
       }
       tx.insert('local_owner_actions', { record, op, signed_json: sealed, applied_at: now });
       return { status: 'applied', op };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * `agent.resume` (W4-PAUSE, D-143 (5); 04 §2.5.1; 06 §6 "Paused agents"; proposed, owner confirms
+   * at merge): ends a pause of this agent. The object checks and the nonce first (another owner,
+   * another agent in the body or in `params.agent`, a replay, an expired object or one outliving
+   * 600 s is refused and writes nothing). Then, in one store transaction, the nonce is checked again
+   * and the pause row must exist (`not_paused` otherwise, with the nonce left unused); the nonce row
+   * is recorded and the pause row deleted. The nonce row (`op`, `action_hash`, `applied_at`) is the
+   * record, as for `contact.remove`: there is nothing else to keep. No envelope carries it.
+   */
+  async #applyResume(value: unknown, base: OwnerActionCheckContext): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    const { body } = signed;
+    if (body.op !== 'agent.resume' || body.params.agent !== base.agent) {
+      return this.#report(refused(body.op, 'agent_mismatch'));
+    }
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) {
+        return refused('agent.resume', 'nonce_used');
+      }
+      if (tx.get('agent_pause', { slot: SINGLETON_SLOT }) === undefined) {
+        return refused('agent.resume', 'not_paused');
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      tx.delete('agent_pause', { slot: SINGLETON_SLOT });
+      return { status: 'applied', op: 'agent.resume' };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
   }
@@ -1394,6 +1430,30 @@ export class OwnerActions {
     const params = appChangeParamsSchema.safeParse({ app, agent: signer.agent, changeId });
     if (!params.success) return refuse('change_invalid');
     return this.#build(signer, op, { app: params.data.app, agent: signer.agent, changeId });
+  }
+
+  /**
+   * The unsigned `agent.resume` for this agent (W4-PAUSE, D-143 (5); 04 §2.5.1): `params.agent` is
+   * this agent's `agentId`, never a value from the page. Refused with `not_paused` when the pause row
+   * is absent, so the page asks for Touch ID only when there is a pause to end (08 §1). A row that
+   * cannot be read is prepared (the agent counts as paused; apply checks the row again). Writes
+   * nothing.
+   */
+  async prepareResume(): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'agent.resume', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    let paused: boolean;
+    try {
+      paused = await this.#ctx.store.transaction(
+        (tx) => tx.get('agent_pause', { slot: SINGLETON_SLOT }) !== undefined,
+      );
+    } catch {
+      paused = true;
+    }
+    if (!paused) return refuse('not_paused');
+    return this.#build(signer, 'agent.resume', { agent: signer.agent });
   }
 
   /**

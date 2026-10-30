@@ -88,7 +88,10 @@ export type CoreErrorCode =
   // W4-AUTO-SAVE (D-142, 04 §4.1): the Inbox folder's volume is (almost) full, or it cannot hold the
   // OS quarantine mark an automatic save needs.
   | 'disk_full'
-  | 'folder_cannot_mark';
+  | 'folder_cannot_mark'
+  // W4-PAUSE (D-143 (5); 06 §6 "Paused agents"): the owner paused this agent (or its pause row
+  // cannot be read: fail closed); nothing was sent, fetched or kept.
+  | 'agent_paused';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

@@ -426,11 +426,14 @@ describe('the generation check on every mutating request (U3-c, 08 §1)', () => 
       .routes()
       // U3-invite: the handoff is not a page request (no session, no generation); it refuses any
       // generation header outright (local-ui/join-server.test.ts).
+      // W4-PAUSE: the pause kind carries its generation in its body, like the switch
+      // (local-ui/agents-pause-server.test.ts).
       // W4-SHELL-V2: the app's UI settings are not an agent's: no generation (ui-settings-server.test.ts).
       .filter(
         (r) =>
           r.method !== 'GET' &&
           r.presence !== 'switch' &&
+          r.presence !== 'pause' &&
           r.presence !== 'handoff' &&
           r.presence !== 'ui-settings',
       );

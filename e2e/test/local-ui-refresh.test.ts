@@ -57,11 +57,13 @@ const PAGES = [
   { path: '/settings/files', title: 'Files' },
   { path: '/settings/proofs', title: 'Proofs & credits' },
   { path: '/settings/rules', title: 'Rules' },
-  { path: '/settings/backup', title: 'Backup' },
+  { path: '/settings', title: 'Settings' },
+  { path: '/activity/live', title: 'Live activity stream' },
+  { path: '/settings/backup', title: 'Backup & Touch ID' },
   { path: '/settings/notifications', title: 'Notifications' },
   { path: '/settings/appearance', title: 'Appearance' },
-  { path: '/advanced/network', title: 'Advanced' },
-  { path: '/advanced/diagnostics', title: 'About' },
+  { path: '/advanced/network', title: 'Relays & network' },
+  { path: '/advanced/diagnostics', title: 'Diagnostics' },
   // W4-WIZARD: Get started opens on step 1, the AI app pick.
   { path: '/start/app', title: 'Which AI app do you use?' },
 ] as const;

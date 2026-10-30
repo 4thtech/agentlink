@@ -29,22 +29,11 @@ import { PAGE_PARTS, loadRoutePage } from './lazy/pages.js';
 import { COMPACT_PATH } from './pages/compact/open.js';
 import { announceAgentsChanged, useSwitchedNote } from './pages/agents/use-agents.js';
 import { HOME_PATH, LIVE_ACTIVITY_PATH, REDIRECTS, START_STEPS, agentNameOf } from './nav.js';
-import { NotAvailablePage, NotFoundPage } from './states/index.js';
-import { PAGE_TITLES } from './strings.js';
+import { NotFoundPage } from './states/index.js';
 
 export interface RouteDef {
   readonly path: string;
   readonly page: ComponentType;
-}
-
-/** Notifications has no page yet: a plain stub, replaced when its card lands. */
-function NotificationsPage(): ReactElement {
-  return <NotAvailablePage title={PAGE_TITLES.notifications} />;
-}
-
-/** Live activity (Under the hood) has no page yet: U6 builds the live stream. */
-function LiveActivityPage(): ReactElement {
-  return <NotAvailablePage title={PAGE_TITLES.liveActivity} />;
 }
 
 /** A page fetched on first visit (UI-REFRESH-u); the first load of the app carries none. */
@@ -59,18 +48,19 @@ export const ROUTES: readonly RouteDef[] = [
   { path: HOME_PATH, page: ApprovalsPage },
   { path: '/agents', page: lazyPage('/agents') },
   { path: '/activity', page: lazyPage('/activity') },
-  { path: LIVE_ACTIVITY_PATH, page: LiveActivityPage },
+  { path: LIVE_ACTIVITY_PATH, page: lazyPage(LIVE_ACTIVITY_PATH) },
   // Get started (U2 builds the steps; today's first run until then), in the focused shell.
   ...START_STEPS.map((path) => ({ path, page: FirstRunPage })),
   // Interim: today's Messages and Contacts (U3, U4 fold them into Home).
   { path: '/inbox', page: lazyPage('/inbox') },
   { path: '/contacts', page: lazyPage('/contacts') },
   // Settings (A9).
+  { path: '/settings', page: lazyPage('/settings') },
   { path: '/settings/backup', page: lazyPage('/settings/backup') },
   { path: '/settings/apps', page: lazyPage('/settings/apps') },
   { path: '/settings/files', page: lazyPage('/settings/files') },
   { path: '/settings/appearance', page: lazyPage('/settings/appearance') },
-  { path: '/settings/notifications', page: NotificationsPage },
+  { path: '/settings/notifications', page: lazyPage('/settings/notifications') },
   { path: '/settings/rules', page: lazyPage('/settings/rules') },
   { path: '/settings/proofs', page: lazyPage('/settings/proofs') },
   // Advanced (Under the hood).
@@ -78,6 +68,7 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/advanced/proofs', page: lazyPage('/advanced/proofs') },
   { path: '/advanced/network', page: lazyPage('/advanced/network') },
   { path: '/advanced/diagnostics', page: lazyPage('/advanced/diagnostics') },
+  { path: '/advanced/map', page: lazyPage('/advanced/map') },
   // U3-invite (b11 §33.2): the waiting invite, in the focused shell (no chrome).
   { path: '/settings/join', page: lazyPage('/settings/join') },
 ];

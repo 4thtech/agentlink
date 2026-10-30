@@ -297,6 +297,14 @@ export {
   type OutboxPeer,
   type OutboxRoute,
 } from './outbox.js';
+// W4-PAUSE (D-143 (5)): the owner's pause of one agent (07 §3.2 `agent_pause`; 06 §6).
+export {
+  AGENT_PAUSED_TEXT,
+  AgentPause,
+  agentPaused,
+  type AgentPauseOptions,
+  type PauseReading,
+} from './agent-pause.js';
 // W4-LIVE-STATUS (D-143): the MCP session heartbeat (07 §3.2 `mcp_sessions`, `mcp_last_seen`; 06 §6).
 export {
   MCP_SESSION_BEAT_SECONDS,

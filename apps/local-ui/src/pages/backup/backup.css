@@ -1,0 +1,18 @@
+/* Settings › Backup & Touch ID (W4-SETTINGS-ADVANCED): stacked sections on Surface 1, as About. */
+.bk-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+  max-inline-size: var(--al-layout-max-content);
+}
+.bk-page h1,
+.bk-page h2,
+.bk-page p {
+  margin: 0;
+}
+.bk-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+}

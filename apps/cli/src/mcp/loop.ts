@@ -34,6 +34,12 @@
 // - Notifications (optional, 06 §6). `attachInboxResource` serves `agentlink://inbox` (counts only)
 //   and sends `notifications/resources/updated` after a pass that stored or processed something,
 //   only to a client that subscribed. Nothing depends on it: the tools work without it.
+// - Paused agents (W4-PAUSE, D-143 (5); 06 §6 "Paused agents"). When the client can read the
+//   agent's pause row (`paused`), every pass checks it first and, while the agent is paused, does
+//   nothing: no fetch, no processing, no publish, no subscription; the holder keeps the lease and
+//   idles. A pause check every `PAUSE_CHECK_MS` (5 s) closes a live subscription that was open when
+//   the owner paused, and on resume runs a pass at once: the usual look-back from the relay cursor,
+//   then the subscription again. Fail closed: a pause state that cannot be read counts as paused.
 // - Shutdown. `stop()` clears the timers, waits for a lease step or pass in flight, closes the live
 //   subscription (waiting for its processing in flight), then releases the lease, so another server
 //   takes over at its next try. Call it before the agent's store closes.
@@ -71,6 +77,8 @@ export const PARTIAL_RETRY_MS = 1_000;
  * so a wrap missed while a relay was down is fetched within one reconnect period anyway.
  */
 export const CATCH_UP_INTERVAL_MS = 300_000;
+/** W4-PAUSE: a pause takes effect within one check (at most 5 s) for work already running. */
+export const PAUSE_CHECK_MS = 5_000;
 
 /** The publisher lease as the loop uses it (core `PublisherLease`). */
 export interface LoopLease {
@@ -107,6 +115,11 @@ export interface LoopClient {
       readonly reports: readonly unknown[];
     }) => void;
   }): Promise<LoopSubscription>;
+  /**
+   * W4-PAUSE: whether the owner paused this agent (core `paused`; true when the row cannot be read).
+   * Optional: without it the loop never pauses (test doubles of the M1-9 passes).
+   */
+  paused?(): Promise<boolean>;
 }
 
 /** One-shot timers. Tests pass a manual scheduler; production uses unref'd `setTimeout`. */
@@ -178,6 +191,10 @@ export class BackgroundLoop {
   /** An outbox run started after the subscription processed something; runs never overlap. */
   #deliverRun: Promise<void> | undefined;
   #deliverAgain = false;
+  /** W4-PAUSE: the last pause state read (a check or a pass); true idles every step. */
+  #paused = false;
+  #pauseTimer: unknown;
+  #pauseStep: Promise<void> | undefined;
 
   constructor(options: BackgroundLoopOptions) {
     this.#client = options.client;
@@ -212,6 +229,71 @@ export class BackgroundLoop {
     if (this.#state !== 'new') return;
     this.#state = 'running';
     this.#scheduleLease(0);
+    this.#schedulePauseCheck();
+  }
+
+  /** W4-PAUSE: true while the last pause read said paused (or could not read). */
+  get paused(): boolean {
+    return this.#paused;
+  }
+
+  /** W4-PAUSE: reads the pause state; fail closed. False when the client cannot pause. */
+  async #readPaused(): Promise<boolean> {
+    const client = this.#client;
+    if (client.paused === undefined) return false;
+    try {
+      return await client.paused();
+    } catch {
+      return true; // a pause row that cannot be read counts as paused (06 §6)
+    }
+  }
+
+  /**
+   * W4-PAUSE: one pause check. A new pause closes the live subscription at once; a resume runs a
+   * pass now (look-back, then the subscription again). Runs on its own timer; tests may call it
+   * directly. Never rejects.
+   */
+  async pauseStep(): Promise<void> {
+    if (this.#state !== 'running') return;
+    if (this.#pauseStep !== undefined) return this.#pauseStep;
+    const step = (async () => {
+      const paused = await this.#readPaused();
+      if (this.#state !== 'running') return;
+      this.#setPaused(paused);
+    })();
+    this.#pauseStep = step;
+    try {
+      await step;
+    } finally {
+      this.#pauseStep = undefined;
+    }
+  }
+
+  #setPaused(paused: boolean): void {
+    if (paused && !this.#paused) {
+      this.#paused = true;
+      this.#closeSubscription();
+      this.#log.info('background loop paused');
+    } else if (!paused && this.#paused) {
+      this.#paused = false;
+      // The next pass catches up from the relay cursor (the usual look-back), then subscribes.
+      this.#sinceCatchUp = this.#catchUpMs;
+      this.#log.info('background loop resumed');
+      if (this.holding && this.#passRun === undefined) {
+        this.#clearPassTimer();
+        this.#schedulePass(0);
+      }
+    }
+  }
+
+  #schedulePauseCheck(): void {
+    if (this.#state !== 'running' || this.#client.paused === undefined) return;
+    this.#pauseTimer = this.#timers.set(() => {
+      this.#pauseTimer = undefined;
+      void this.pauseStep().finally(() => {
+        this.#schedulePauseCheck();
+      });
+    }, PAUSE_CHECK_MS);
   }
 
   /**
@@ -276,6 +358,9 @@ export class BackgroundLoop {
 
   async #pass(): Promise<boolean> {
     let partial = false;
+    // W4-PAUSE: every loop step checks the pause row first; while paused it does nothing at all.
+    this.#setPaused(await this.#readPaused());
+    if (this.#paused || !this.holding) return false;
     if (this.live && this.#sinceCatchUp + this.#syncMs < this.#catchUpMs) {
       // Live (M1-9s): the subscription receives; this pass only delivers due outbox rows.
       this.#sinceCatchUp += this.#syncMs;
@@ -292,10 +377,10 @@ export class BackgroundLoop {
       // A catch-up that did not finish stays due for the next pass.
       this.#sinceCatchUp = fetched && !partial ? 0 : this.#catchUpMs;
     }
-    if (!this.holding) return false; // lost during the fetch: deliver nothing more
+    if (!this.holding || this.#paused) return false; // lost or paused during the fetch
     // After the catch-up (on the start-up pass, the 48 h look-back), open or reopen the subscription.
     if (!this.live) await this.#openSubscription();
-    if (!this.holding) return false;
+    if (!this.holding || this.#paused) return false;
     try {
       await this.#client.outbox.processDue();
     } catch (error) {
@@ -333,8 +418,8 @@ export class BackgroundLoop {
       this.#log.warn('live subscription unavailable', errorCode(error));
       return;
     }
-    if (!this.holding) {
-      // The lease was lost (or the loop stopped) while it opened: close it at once.
+    if (!this.holding || this.#paused) {
+      // The lease was lost (or the loop stopped, or the agent was paused) while it opened.
       await this.#closeQuietly(subscription);
       return;
     }
@@ -344,7 +429,7 @@ export class BackgroundLoop {
 
   /** The subscription processed stored envelopes: notify, and deliver what that queued. */
   #onProcessed(result: { readonly stored: number; readonly reports: readonly unknown[] }): void {
-    if (!this.holding) return;
+    if (!this.holding || this.#paused) return;
     if (result.stored > 0 || result.reports.length > 0) this.#notify();
     // Processing may stage outbound rows (a handshake-ack, a delivery ack): deliver them now.
     if (result.reports.length > 0) this.#deliverSoon();
@@ -354,7 +439,7 @@ export class BackgroundLoop {
 
   /** One outbox run at a time; a request during a run makes one more run after it. */
   #deliverSoon(): void {
-    if (!this.holding) return;
+    if (!this.holding || this.#paused) return;
     if (this.#deliverRun !== undefined) {
       this.#deliverAgain = true;
       return;
@@ -367,7 +452,7 @@ export class BackgroundLoop {
         } catch (error) {
           this.#log.warn('background delivery failed', errorCode(error));
         }
-      } while (this.#deliverAgain && this.holding);
+      } while (this.#deliverAgain && this.holding && !this.#paused);
     })();
     this.#deliverRun = run;
     void run.finally(() => {
@@ -416,8 +501,10 @@ export class BackgroundLoop {
     this.#holding = false;
     if (this.#leaseTimer !== undefined) this.#timers.clear(this.#leaseTimer);
     this.#leaseTimer = undefined;
+    if (this.#pauseTimer !== undefined) this.#timers.clear(this.#pauseTimer);
+    this.#pauseTimer = undefined;
     this.#clearPassTimer();
-    await Promise.allSettled([this.#leaseStep, this.#passRun]);
+    await Promise.allSettled([this.#leaseStep, this.#passRun, this.#pauseStep]);
     // Close the live subscription and wait for its processing before the lease (and the store) go.
     this.#closeSubscription();
     await Promise.allSettled([...this.#closings, this.#deliverRun]);

@@ -266,3 +266,39 @@ describe('pidAlive (04 §2.5 "The pid is used for one check only")', () => {
     expect(pidAlive(deadPid())).toBe(false);
   });
 });
+
+// W4-PAUSE (D-143 (5); 07 §3.2 `agent_pause`; 08 §1 "Per agent state"): the Agents list and the live
+// stream show `paused` from the pause row, read-only like the rest of the peek.
+describe('peekAgentStore: the pause row (W4-PAUSE)', () => {
+  function withPause(rows: number | 'no-table'): void {
+    seed(['active'], undefined, { sessions: [] });
+    const db = new Database(path);
+    if (rows !== 'no-table') {
+      db.exec('CREATE TABLE agent_pause (slot TEXT PRIMARY KEY, paused_at INTEGER)');
+      for (let i = 0; i < rows; i += 1) {
+        db.prepare('INSERT INTO agent_pause VALUES (?, ?)').run(`s${String(i)}`, NOW - 60);
+      }
+    }
+    db.close();
+  }
+
+  it('a pause row reads as paused', () => {
+    withPause(1);
+    expect(peekAgentStore(path, NOW)?.paused).toBe(true);
+  });
+
+  it('no row, or a store from before the pause table, is not paused', () => {
+    withPause(0);
+    expect(peekAgentStore(path, NOW)?.paused).toBeUndefined();
+    rmSync(path);
+    withPause('no-table');
+    expect(peekAgentStore(path, NOW)?.paused).toBeUndefined();
+  });
+
+  it('reading the pause row writes nothing', () => {
+    withPause(1);
+    const before = readFileSync(path);
+    peekAgentStore(path, NOW);
+    expect(readFileSync(path).equals(before)).toBe(true);
+  });
+});
