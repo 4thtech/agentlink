@@ -15,7 +15,7 @@ import type { AppsApi, AppsListResult, ApplyResult, DetectedApp } from '../first
 import { FirstRunPage, type FirstRunPageProps } from '../first-run/index.js';
 import { encodeRegistration } from '../first-run/passkey.js';
 import type { FinishResult, SetupApi, StatusResult } from '../first-run/setup-api.js';
-import { resetAutoShown, resetWizard, wasAutoShown } from './store.js';
+import { rememberWizard, resetAutoShown, resetWizard, wasAutoShown } from './store.js';
 import { RECOVERY_KIT_LATER_KEY } from '../../states/index.js';
 import {
   CONNECTED_STEP,
@@ -147,12 +147,17 @@ function fakeApps(
   };
 }
 
-function fakeCreate(finish: CreateFinish): CreateAgentApi & { begun: (string | undefined)[] } {
+function fakeCreate(
+  finish: CreateFinish,
+): CreateAgentApi & { begun: (string | undefined)[]; labels: string[] } {
   const begun: (string | undefined)[] = [];
+  const labels: string[] = [];
   return {
     begun,
-    begin: (_label: string, appId?: string) => {
+    labels,
+    begin: (label: string, appId?: string) => {
       begun.push(appId);
+      labels.push(label);
       return Promise.resolve({
         kind: 'ready',
         nonce: 'M'.repeat(43),
@@ -555,6 +560,10 @@ describe('W4-WIZARD: the same steps for an owner who has one already', () => {
       createAgentApi: create,
       passkeysAvailable: () => true,
     });
+    // W4-WIRE-2 (Decision 52 (2)): New agent names the agent first, then the pick.
+    expect(h1()).toBe('Name your agent');
+    await typeName('Cursor agent');
+    await click('Continue');
     expect(text()).toContain(PICK_STEP.eyebrowAdd);
     await click(/^CursorFound/);
     await click(PICK_STEP.next('Cursor'));
@@ -562,6 +571,123 @@ describe('W4-WIZARD: the same steps for an owner who has one already', () => {
     expect(create.begun).toEqual(['cursor']);
     expect(went.at(-1)).toBe('/start/connected');
     expect(h1()).toBe(CONNECTED_STEP.title('Cursor'));
+  });
+});
+
+/** Types into the agent's name field as a person does (React sees an input event). */
+async function typeName(value: string): Promise<void> {
+  const input = host.querySelector<HTMLInputElement>('input[name="agent-name"]');
+  if (input === null) throw new Error(`no name field: ${text()}`);
+  await act(async () => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    set?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
+  const OWNER: StatusResult = { kind: 'ok', owner: 'set_up' };
+  const registered = {
+    info: () => Promise.resolve({ kind: 'ok', registered: true } as const),
+    register: () => Promise.resolve({ kind: 'registered' } as const),
+  } as unknown as NonNullable<FirstRunPageProps['upgradeApi']>;
+  const made = (): ReturnType<typeof fakeCreate> =>
+    fakeCreate({ kind: 'done', name: 'side-project', label: 'Side project', app: 'cursor' });
+  /** An owner with an open agent ("work") who chose Add agent. */
+  const asAdd = (extra: Partial<FirstRunPageProps> = {}): Partial<FirstRunPageProps> => ({
+    api: fakeSetup({ status: OWNER }),
+    upgradeApi: registered,
+    appsApi: fakeApps({ agent: 'work' }),
+    ...extra,
+  });
+
+  beforeEach(() => {
+    history.replaceState(null, '', '/start/app?add=agent');
+  });
+
+  it('/start/app?add=agent: "Name your agent" first, then the pick, then one Touch ID with that name and app', async () => {
+    const create = made();
+    const labelCheck = vi.fn(() => Promise.resolve({ kind: 'ok' } as const));
+    const { went } = await mount(
+      asAdd({
+        api: Object.assign(fakeSetup({ status: OWNER }), { labelCheck }),
+        createAgentApi: create,
+      }),
+    );
+    expect(h1()).toBe('Name your agent');
+    const bar = host.querySelector('[role="progressbar"]');
+    expect(bar?.getAttribute('aria-valuetext')).toBe('Step 1 of 4 · Name your agent');
+    const input = host.querySelector<HTMLInputElement>('input[name="agent-name"]');
+    expect(input).not.toBeNull();
+    expect(host.querySelector(`label[for="${input?.id ?? ''}"]`)?.textContent).toContain(
+      'Agent name',
+    );
+    await typeName('Side project');
+    await click('Continue');
+    expect(labelCheck).toHaveBeenCalledWith('Side project');
+    expect(h1()).toBe(PICK_STEP.title);
+    expect(text()).toContain(PICK_STEP.eyebrowAdd);
+    await click(/^CursorFound/);
+    await click(PICK_STEP.next('Cursor'));
+    // Add agent stays Add agent on every step (an open agent never turns it into Connect another).
+    expect(went.at(-1)).toBe('/start/connect?add=agent');
+    expect(text()).toContain('Side project');
+    await click(CONNECT_STEP.connect('Touch ID'));
+    expect(create.labels).toEqual(['Side project']);
+    expect(create.begun).toEqual(['cursor']);
+    expect(went.at(-1)).toBe('/start/connected?add=agent');
+    expect(h1()).toBe(CONNECTED_STEP.title('Cursor'));
+  });
+
+  it('the agent-name rules: empty, more than 32 characters and a refused name never move on', async () => {
+    const labelCheck = vi.fn(() => Promise.resolve({ kind: 'refused' } as const));
+    await mount(asAdd({ api: Object.assign(fakeSetup({ status: OWNER }), { labelCheck }) }));
+    await typeName('   ');
+    await click('Continue');
+    expect(text()).toContain('Give your agent a name.');
+    await typeName('x'.repeat(33));
+    await click('Continue');
+    expect(text()).toContain('Use up to 32 characters.');
+    await typeName('Line\u0007break');
+    await click('Continue');
+    expect(labelCheck).not.toHaveBeenCalled();
+    await typeName('Refused name');
+    await click('Continue');
+    expect(labelCheck).toHaveBeenCalledTimes(1);
+    expect(h1()).toBe('Name your agent');
+    expect(host.querySelector('[aria-invalid="true"]')).not.toBeNull();
+  });
+
+  it('Back on the pick returns to the name, kept', async () => {
+    await mount(asAdd());
+    await typeName('Side project');
+    await click('Continue');
+    await click(CONNECT_STEP.back);
+    expect(h1()).toBe('Name your agent');
+    expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe(
+      'Side project',
+    );
+  });
+
+  it('a new Add agent starts with no name from an earlier run', async () => {
+    rememberWizard({ name: 'Old name', choice: 'cursor', outcome: { label: 'Old name' } });
+    await mount(asAdd());
+    expect(h1()).toBe('Name your agent');
+    expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe('');
+  });
+
+  it('a direct visit to /start/connect?add=agent before a name goes back to the name', async () => {
+    history.replaceState(null, '', '/start/connect?add=agent');
+    const { went } = await mount(asAdd());
+    expect(went[0]).toBe('/start/app?add=agent (replace)');
+  });
+
+  it('axe finds nothing on the name step; its words pass lintVocabulary', async () => {
+    await mount(asAdd());
+    const result = await axe.run(host, { rules: { region: { enabled: false } } });
+    expect(result.violations.map((v) => v.id)).toEqual([]);
+    expect(lintVocabulary(text())).toEqual([]);
+    expect(host.querySelector('[style*="animation"]')).toBeNull();
   });
 });
 
