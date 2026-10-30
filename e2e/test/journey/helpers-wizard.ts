@@ -35,3 +35,20 @@ export async function getStartedWithTouchId(
   await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
   await page.getByRole('button', { name: 'I saved it' }).click();
 }
+
+/**
+ * A launch of a home with agents but no AI app connected: setup is incomplete, so the app opens Get
+ * started by itself (IR-W4-WIZARD-1); these chapters skip it, as a person may, and go on from Home.
+ */
+export async function skipGetStartedIfShown(page: Page): Promise<void> {
+  const start = page.getByRole('link', { name: 'Skip to Home' });
+  const home = page.getByRole('navigation', { name: 'Sections' }).first();
+  const which = await Promise.race([
+    start.waitFor().then(() => 'start' as const),
+    home.waitFor().then(() => 'home' as const),
+  ]);
+  if (which === 'start') {
+    await start.click();
+    await home.waitFor();
+  }
+}
