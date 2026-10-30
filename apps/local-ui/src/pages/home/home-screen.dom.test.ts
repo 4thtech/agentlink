@@ -58,7 +58,9 @@ function server(answers: Answers) {
       url,
       method: init?.method ?? 'GET',
       headers: new Headers(init?.headers),
-      body: raw instanceof Uint8Array ? new Uint8Array(raw) : new Uint8Array(0),
+      body: ArrayBuffer.isView(raw)
+        ? new Uint8Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength))
+        : new Uint8Array(0),
     });
     const entry = answers[url];
     const a = Array.isArray(entry)
@@ -233,8 +235,7 @@ async function click(el: Element | null | undefined): Promise<void> {
 }
 const row = (name: string): HTMLButtonElement | undefined =>
   all('button[aria-expanded]').find((b) => b.textContent?.includes(name)) as
-    | HTMLButtonElement
-    | undefined;
+    HTMLButtonElement | undefined;
 
 describe('Home simple (A4)', () => {
   it('shows Invite someone and People with the last activity; reading sends GETs only', async () => {
@@ -341,7 +342,11 @@ describe('Home simple (A4)', () => {
 
   it('shows the approval card on top with +N more, Approve and Deny', async () => {
     await render(
-      base({ [APPROVALS]: ok({ approvals: [approval(APR_TERMS, { commitment: true }), approval(APR_FREE)] }) }),
+      base({
+        [APPROVALS]: ok({
+          approvals: [approval(APR_TERMS, { commitment: true }), approval(APR_FREE)],
+        }),
+      }),
     );
     const card = q('section[aria-label="' + S.approvalsLabel + '"]');
     expect(card).toBeTruthy();
@@ -398,8 +403,10 @@ describe('Home pro (A10, Under the hood on)', () => {
     expect(head?.textContent).toContain(S.colDelivery);
     expect(head?.textContent).toContain(S.colProofs);
     expect(head?.textContent).toContain(S.colFiles);
-    const denis = row('Denis');
+    // The toggle is the person cell (stretched over the row); the cells are the row's.
+    const denis = row('Denis')?.closest('[data-person]');
     expect(denis?.textContent).toContain(S.notDelivered);
+    expect(denis?.textContent).toContain('Tali will look at the terms tonight.');
     // No big Invite card in pro: the small Invite button sits in the People header.
     expect(all('a').filter((a) => a.textContent?.trim() === S.inviteSomeone)).toHaveLength(1);
     const search = q<HTMLInputElement>('input[type="search"]');

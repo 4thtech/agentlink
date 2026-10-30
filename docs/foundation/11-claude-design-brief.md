@@ -364,7 +364,7 @@ Local app pages that show what the AI sent and received (08 §1). They are read-
 | Received file, not saved | "Arrived · not saved", with **Save to Inbox** (W4-FILES-SAVE; proposed, owner confirms at merge). Saving: "Confirm with your passkey" or the backup code ("Confirm save"); "Saved to your Inbox folder."; "Your Inbox folder can't take files right now, so nothing was saved."; "This file is already in your Inbox folder." |
 | Inbox (W4-INBOX) | "Inbox", "Needs you", "All caught up" ("Nothing needs you right now. New messages, files and approvals appear here."), "Conversations", "New message", "Conversation with {name}", "To reply, ask your AI." (proposed, owner confirms at merge) |
 | Received file, gone | "Expired" · "Deleted" |
-| Show in Finder | "Show in Finder" (Windows and Linux: "Show in folder"); no Touch ID |
+| Show in Finder | "Show in Finder" (Windows: "Show in Explorer"; Linux and others: "Show in folder"; W4-HOME, W4 UX v2; proposed, owner confirms at merge); no Touch ID |
 
 **Rules.**
 - Inbound message text and other people's file names appear only inside the untrusted-content container, as plain text: never in the page title, toasts, notifications, Activity rows, Home tiles or the OS passkey prompt. Those say "New message from {contactName}" only, with the name per §5.2.

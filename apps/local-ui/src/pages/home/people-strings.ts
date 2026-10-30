@@ -22,6 +22,10 @@ export const HOME_STRINGS = {
   // A person row (simple).
   lastMessage: 'Last message {when}',
   noMessagesYet: 'No messages yet',
+  agoNow: 'just now',
+  agoMinutes: '{n} min ago',
+  agoHours: '{n} h ago',
+  agoYesterday: 'yesterday',
   files: '{count} files',
   oneFile: '1 file',
   notDelivered: 'Not delivered',

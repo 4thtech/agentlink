@@ -17,7 +17,7 @@ import { createPayConfirmClient } from '../../pay-confirm/index.js';
 import { ApprovePage } from '../approve/index.js';
 import approvalsCss from './approvals.css?raw';
 import { createApprovalsClient } from './client.js';
-import { APPROVAL_TTL, ApprovalsPage, type ApprovalsPageProps } from './index.js';
+import { APPROVAL_TTL, ApprovalsBoard, type ApprovalsPageProps } from './index.js';
 import { APPROVAL_STRINGS as S } from './strings.js';
 
 // Read through Vite (a relative import would leave the app): the server's approval lifetime, and
@@ -161,7 +161,7 @@ async function mount(
       h(
         HoodProvider,
         { value: hood },
-        h<ApprovalsPageProps>(ApprovalsPage, {
+        h<ApprovalsPageProps>(ApprovalsBoard, {
           client,
           payConfirm,
           canPasskey: false,
@@ -524,7 +524,7 @@ describe('first load', () => {
       String(u) === PASSKEY ? passkey() : never()) as typeof fetch;
     await act(async () => {
       root.render(
-        h<ApprovalsPageProps>(ApprovalsPage, {
+        h<ApprovalsPageProps>(ApprovalsBoard, {
           client: createApprovalsClient({ fetch: fetchFn, token: 't' }),
           canPasskey: false,
         }),

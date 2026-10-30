@@ -21,6 +21,10 @@
 // - UX2-a (B-11 §26): the cards sit in a grid (default) or today's single column, chosen with the
 //   "Layout" control in the title row and remembered in the prefs store. Layout only: the cards'
 //   content and order, presence, the decide calls and the leave after a decision are unchanged.
+// - W4-HOME (Decisions 47–50): `/` is Home now. `ApprovalsPage` (the page the router puts at `/`,
+//   where every approval link points) renders Home, whose card on top carries the approvals; the
+//   full list above stays as `ApprovalsBoard` (its tests keep the review-together rules).
+import { HomeScreen } from '../home/home-screen.js';
 import { Button, Segmented, Skeleton, Surface, type PayPlatform } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
 import {
@@ -561,7 +565,27 @@ function ApprovalsList({
   );
 }
 
+/** `/`: Home (W4-HOME), with the approvals as the card on top. */
 export function ApprovalsPage({
+  client,
+  payConfirm,
+  canPasskey,
+  platform,
+  reducedMotion,
+}: ApprovalsPageProps): ReactElement {
+  return (
+    <HomeScreen
+      {...(client === undefined ? {} : { approvalsClient: client })}
+      {...(payConfirm === undefined ? {} : { payConfirm })}
+      {...(canPasskey === undefined ? {} : { canPasskey })}
+      {...(platform === undefined ? {} : { platform })}
+      {...(reducedMotion === undefined ? {} : { reducedMotion })}
+    />
+  );
+}
+
+/** The full approvals list (review together), as it was at `/` before Home. */
+export function ApprovalsBoard({
   client: given,
   payConfirm,
   canPasskey: givenCanPasskey,

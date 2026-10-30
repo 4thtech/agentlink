@@ -21,9 +21,10 @@ import {
   type JourneyComputer,
 } from './world.js';
 import {
+  CLS_BUDGET,
   emulateReducedMotion,
   expectFadesOnly,
-  expectStableLayout,
+  layoutShiftScore,
   observeLayoutShift,
 } from '../helpers/motion.js';
 
@@ -96,9 +97,9 @@ describe('chapter 3: inbox', () => {
     dropHoldsNoPlaintext(world.drop, file.bytes);
   }, 180_000);
 
-  // W4-FILES-SAVE (un-gated): a received file is saved from the app with one Touch ID. Today it is
-  // reached from Files, Received; once D1 routes /inbox the Inbox test below covers the same Save
-  // in the conversation. Real host, real decrypt, fake drop; the page sends only the item ID.
+  // W4-FILES-SAVE (un-gated): a received file is saved from the app with one Touch ID, from the
+  // sender's Files on Home (W4-HOME). Real host, real decrypt, fake drop; the page sends only the
+  // item ID.
   it('a received file: Arrived · not saved, then Save with one Touch ID lands it in the Inbox folder; traversal and links are refused', async (ctx) => {
     const ready = ch.need(ctx);
     if (ready === undefined) return;
@@ -116,7 +117,12 @@ describe('chapter 3: inbox', () => {
     const file = await sendable(pcA);
     await mcpA.call('agentlink_send', { to: 'Bo', text: 'The brief', path: file.path });
     await until('the file reaches Bo', () => inboxHas(mcpB, FILE_NAME), 30_000);
-    await navTo(b.page, 'Files');
+    await navTo(b.page, 'Home');
+    await b.page
+      .getByRole('button', { name: /^A(na)?\b/ })
+      .filter({ hasText: 'Ana' })
+      .first()
+      .click();
     await b.page.getByText(FILE_NAME).first().waitFor({ timeout: 30_000 });
     await b.page
       .getByText(/Arrived · not saved/)
@@ -212,22 +218,36 @@ describe('chapter 3: inbox', () => {
     const bProbe = await b.arm();
     await navTo(a.page, 'Home');
     await navTo(b.page, 'Home');
+    // Home's own first load moves nothing (the score counts from here: the shell before it is U1's).
+    const clsBefore = await layoutShiftScore(b.page);
+    await navTo(b.page, 'Agents');
+    await navTo(b.page, 'Home');
     await b.page.getByRole('heading', { name: 'People' }).waitFor();
-    await expectStableLayout(b.page);
+    await b.page.waitForTimeout(500);
+    expect((await layoutShiftScore(b.page)) - clsBefore).toBeLessThanOrEqual(CLS_BUDGET);
 
     // Hello (A's AI app): Bo's Home shows Ana with the last activity; the row opens in place.
     await mcpA.call('agentlink_send', { to: 'Bo', text: HELLO });
-    const anaRow = b.page.getByRole('button', { name: /^A(na)?\b/ }).filter({ hasText: 'Ana' }).first();
+    const anaRow = b.page
+      .getByRole('button', { name: /^A(na)?\b/ })
+      .filter({ hasText: 'Ana' })
+      .first();
     await anaRow.waitFor({ timeout: 30_000 });
     await eventually('Ana shows a last message', async () =>
       ((await anaRow.textContent()) ?? '').includes('Last message'),
     );
     await anaRow.click();
-    expect(await anaRow.getAttribute('aria-expanded')).toBe('true');
+    await eventually(
+      'the row opens in place',
+      async () => (await anaRow.getAttribute('aria-expanded')) === 'true',
+    );
     await b.page.locator('figure.al-untrusted').filter({ hasText: HELLO }).first().waitFor();
     await expectFadesOnly(b.page);
     await mcpB.call('agentlink_send', { to: 'Ana', text: REPLY });
-    const boRow = a.page.getByRole('button', { name: /^B(o)?\b/ }).filter({ hasText: 'Bo' }).first();
+    const boRow = a.page
+      .getByRole('button', { name: /^B(o)?\b/ })
+      .filter({ hasText: 'Bo' })
+      .first();
     await boRow.waitFor({ timeout: 30_000 });
     await boRow.click();
     await a.page.getByText(REPLY).first().waitFor({ timeout: 30_000 });
@@ -291,7 +311,10 @@ describe('chapter 3: inbox', () => {
       .first();
     await card.waitFor({ timeout: 30_000 });
     const beforeApprove = b.gestures.total();
-    await card.getByRole('button', { name: /^Approve/ }).first().click();
+    await card
+      .getByRole('button', { name: /^Approve/ })
+      .first()
+      .click();
     await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
     await eventually(
       'the approval is recorded',
