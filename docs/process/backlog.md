@@ -5694,7 +5694,7 @@ Not started. These record what the 0.4.4 test left over, so nothing is lost. Eac
 #### W4-PAUSE · local app: pause and resume an agent (wave 4, owner Decision 49 Q7, D-143 (5))
 - **Status:** planned, wave 4 (0.4.6) · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (owner presence on Resume) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core/src/store/**` (`agent_pause`), the core send, fetch, loop and owner-action paths (`agent.resume`); `packages/mcp-tools/src/**` (the `AGENT_PAUSED` refusal and the status line); `packages/node/src/local-ui/api/agents*.ts` (pause and resume routes); `apps/local-ui/src/pages/agents/**`
-- **Depends on:** W4-LIVE-STATUS (the `paused` state and its event); owner answers to Q-143-1 to Q-143-3 at the spec merge
+- **Depends on:** W4-LIVE-STATUS (the `paused` state and its event); Q-143-1 to Q-143-4 decided (owner, Decision 50, 30 Oct 2026)
 - **Spec:** D-143 (5); 04 §2.5 ("Live status and Pause"), §2.5.1 (`agent.resume`); 06 §6 ("Paused agents"); 07 §3.2; 08 §1 ("Pause an agent"); 11 §5
 - **Invariants:** I-4, I-5, I-7
 - **Scope:**
