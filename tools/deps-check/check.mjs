@@ -639,10 +639,15 @@ function fileScanner(root, cache) {
   );
   const cacheFile = join(root, 'node_modules', '.cache', 'deps-check', `${rulesHash}.json`);
   let entries = {};
-  try {
-    entries = JSON.parse(readFileSync(cacheFile, 'utf8'));
-  } catch {
-    // no cache yet, or unreadable: start empty
+  // 'write-only' (the gating run in CI): never read what is on disk, so code running in the same job
+  // cannot plant entries that pass a violating file; the scan still writes the cache for the tests.
+  if (cache !== 'write-only') {
+    try {
+      const parsed = JSON.parse(readFileSync(cacheFile, 'utf8'));
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) entries = parsed;
+    } catch {
+      // no cache yet, or unreadable: start empty
+    }
   }
   let dirty = false;
   const used = {};
