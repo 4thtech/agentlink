@@ -38,7 +38,7 @@ import { Fleet, fleetSummary } from './fleet.js';
 import { recordLive } from './history.js';
 import { forgetIntent, rememberIntent, takeIntent, type IntentAction } from './intent.js';
 import { PausedBanner, PauseSheet, ResumeGate } from './parts.js';
-import { AddSheet, RemoveSheet } from './sheets.js';
+import { RemoveSheet } from './sheets.js';
 import { AgentCard, type Panel } from './simple.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 import { announceAgentsChanged, listOf, useAgents } from './use-agents.js';
@@ -140,15 +140,6 @@ export function AgentsPage({
   }, [latest]);
 
   const [panel, setPanel] = useState<{ name: string; panel: Panel } | undefined>(undefined);
-  // `?add=1` (the agent chip's "Add agent") opens Add here, also when the page is already open;
-  // it is then taken off the address, so the next "Add agent" is a change again.
-  const search = useSyncExternalStore(subscribePath, () => location.search);
-  const [adding, setAdding] = useState(false);
-  useEffect(() => {
-    if (new URLSearchParams(search).get('add') !== '1') return;
-    setAdding(true);
-    history.replaceState(history.state, '', location.pathname);
-  }, [search]);
   const [removeQueue, setRemoveQueue] = useState<readonly AgentRow[]>([]);
   const [pausing, setPausing] = useState<AgentRow | undefined>(undefined);
   const [resuming, setResuming] = useState(false);
@@ -467,26 +458,6 @@ export function AgentsPage({
           onAgentChanged={() => {
             setPausing(undefined);
             agentChanged();
-          }}
-        />
-      ) : null}
-      {adding && generation !== undefined ? (
-        <AddSheet
-          api={api}
-          owner={owner}
-          existing={rows}
-          onClose={() => setAdding(false)}
-          onChanged={changed}
-          onAdded={(label, switchToIt) => {
-            if (!switchToIt) return;
-            const before = new Set(rows.map((r) => r.name));
-            void api.list().then((result) => {
-              if (result.kind !== 'ok') return;
-              const fresh = result.list.agents.find(
-                (r) => !before.has(r.name) && r.label === label,
-              );
-              if (fresh !== undefined) void switchTo(fresh.name);
-            });
           }}
         />
       ) : null}

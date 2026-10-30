@@ -18,6 +18,10 @@ export interface WizardMemory {
   /** The agent's name, once the person edited it. */
   readonly name?: string;
   readonly outcome?: WizardOutcome;
+  /** W4-WIRE-2: this run is Add agent (`?add=agent`); a new Add agent starts with nothing kept. */
+  readonly adding?: boolean;
+  /** W4-WIRE-2: Add agent's "Name your agent" step was passed with the name above. */
+  readonly named?: boolean;
 }
 
 let memory: WizardMemory = {};

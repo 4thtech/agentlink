@@ -6,14 +6,16 @@
 //
 // Motion comes from the U0 kit only (al-reveal, al-pop, al-draw, al-press); under reduced motion the
 // kit turns every one into a fade. Names from the server (an app, the agent) are rendered as text.
-import { Button, Icon, Lockup, Skeleton } from '@4thtech-io/ui';
-import type { MouseEvent, ReactElement, ReactNode } from 'react';
+import { Button, Icon, Lockup, Skeleton, TextField } from '@4thtech-io/ui';
+import type { FormEvent, MouseEvent, ReactElement, ReactNode } from 'react';
 import { useTitleFocus } from '../welcome/index.js';
 import type { DetectedApp } from '../first-run/apps-api.js';
 import { skipToHome } from './guard.js';
 import {
   CONNECTED_STEP as D,
+  CONNECT_STEP as C,
   INVITE_STEP as I,
+  NAME_STEP as N,
   PICK_STEP as P,
   STEP_IDS,
   WIZARD as W,
@@ -51,12 +53,14 @@ export interface WizardFrameProps {
   readonly children?: ReactNode;
   /** Test seam: where "Skip to Home" goes. Default: Home, in the app. */
   readonly onSkip?: () => void;
+  /** W4-WIRE-2: the step's name when it is not the route's own (Add agent's "Name your agent"). */
+  readonly stepName?: string;
 }
 
 /** The focused column's header and the step under it. */
-export function WizardFrame({ step, children, onSkip }: WizardFrameProps): ReactElement {
+export function WizardFrame({ step, children, onSkip, stepName }: WizardFrameProps): ReactElement {
   const n = STEP_IDS.indexOf(step) + 1;
-  const label = W.stepLabel(n, W.stepNames[step]);
+  const label = W.stepLabel(n, stepName ?? W.stepNames[step]);
   const skip = (event: MouseEvent<HTMLAnchorElement>): void => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
@@ -145,6 +149,8 @@ export interface PickStepProps {
   readonly lookFailed?: boolean;
   /** Mac: "Found on this Mac"; elsewhere "Found on this computer". */
   readonly mac?: boolean;
+  /** W4-WIRE-2: Add agent's way back to "Name your agent". */
+  readonly onBack?: () => void;
 }
 
 /** A1, step 1: "Which AI app do you use?" with one tile per app and "Continue with {app}". */
@@ -156,11 +162,13 @@ export function PickStep({
   eyebrow = P.eyebrow,
   lookFailed = false,
   mac = true,
+  onBack,
 }: PickStepProps): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
   const picked = tiles === 'loading' ? undefined : tiles.find((t) => t.id === choice);
   return (
     <section className="st-screen st-w-640" aria-labelledby="st-h">
+      {onBack === undefined ? null : <BackButton onBack={onBack} label={C.back} />}
       <div className="st-intro">
         <span className="st-eyebrow">{eyebrow}</span>
         <h1 id="st-h" ref={title} tabIndex={-1} className="st-title">
@@ -234,6 +242,65 @@ export function PickStep({
           {lookFailed ? P.lookFailed : P.later}
         </p>
       </div>
+    </section>
+  );
+}
+
+export interface NameStepProps {
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly onContinue: () => void;
+  /** Why the name can't be used (an agent-name rule, or the server refused it). */
+  readonly error?: string;
+  /** The server is checking the name. */
+  readonly working?: boolean;
+}
+
+/**
+ * W4-WIRE-2 (owner Decision 52 (2)): Add agent's "Name your agent", before the pick. The A1 column
+ * (eyebrow, title, one line), one field and one primary button; Enter continues.
+ */
+export function NameStep({
+  value,
+  onChange,
+  onContinue,
+  error,
+  working = false,
+}: NameStepProps): ReactElement {
+  const title = useTitleFocus<HTMLHeadingElement>();
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    if (!working) onContinue();
+  };
+  return (
+    <section className="st-screen st-w-560" aria-labelledby="st-h">
+      <div className="st-intro">
+        <span className="st-eyebrow">{N.eyebrow}</span>
+        <h1 id="st-h" ref={title} tabIndex={-1} className="st-title">
+          {N.title}
+        </h1>
+        <p className="st-lead">{N.body}</p>
+      </div>
+      <form className="st-actions" onSubmit={submit}>
+        <TextField
+          label={N.field}
+          name="agent-name"
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          value={value}
+          readOnly={working}
+          {...(error === undefined ? {} : { error })}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+        <Button type="submit" variant="primary" size="lg" className="al-press" disabled={working}>
+          {N.next}
+        </Button>
+        {/* One line either way, so the check moves nothing. */}
+        <p className="st-note" role="status" aria-live="polite">
+          {working ? N.checking : N.then}
+        </p>
+      </form>
     </section>
   );
 }

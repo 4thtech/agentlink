@@ -71,6 +71,32 @@ export const INVITE_STRINGS = {
     `Don't send anything yet. Remove ${name} from People and invite them again, in person or on a call.`,
 } as const;
 
+/**
+ * W4-WIRE-2 (Decision 52 (3)): "Have an invite link? Paste it" on the Invite screen. The refusal
+ * sentences are the old Add contact sheet's (11 §5), kept word for word.
+ */
+export const PASTE_STRINGS = {
+  open: 'Have an invite link? Paste it',
+  label: 'Paste the invite link',
+  hint: 'It starts with https://agentlink.4thtech.io/i#',
+  go: 'Continue',
+  checking: 'Checking the invite…',
+  notLink: "That isn't an AgentLink invite link. Copy the whole link and paste it again.",
+  expired: 'This invite has expired.',
+  own: 'This is your own invite.',
+  damaged: "This link isn't a complete AgentLink invite. Ask for it again.",
+  cantUse: "This invite can't be used here.",
+  unavailable:
+    "This invite can't be used anymore. It may have expired, been used or been cancelled. Ask for a new one.",
+  askForNew: 'Ask the person who sent it for a new invite.',
+  another: 'Paste another link',
+  busy: "AgentLink couldn't check the invite just now. Try again in a minute.",
+  offline: "Can't reach AgentLink on this computer. Try again in a minute.",
+  notConnected: "Couldn't connect with this invite. Nothing was changed. Check it again.",
+  thisAgent: 'this agent',
+  connecting: (name: string): string => `Connecting to ${name}…`,
+} as const;
+
 /** "Invite link for Denis", or "Invite link". */
 export function linkLabel(name: string): string {
   return name === '' ? INVITE_STRINGS.linkLabel : `Invite link for ${name}`;

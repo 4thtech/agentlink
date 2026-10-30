@@ -27,6 +27,13 @@
 // `?add=agent`), else Connect another AI app (the signed AI apps step with the exact entry). The page
 // mounts again on every step, so the non-secret choices live in pages/start/store.ts; the backup
 // code never leaves this component's state.
+//
+// W4-WIRE-2 (owner Decision 52 (2)): Add agent (the agent dropdown's "Add agent", Agents' "New agent",
+// `/start/app?add=agent`) names the agent first ("Name your agent", the agent-name rules, then the
+// server's check), then the pick, then the one Touch ID that creates and connects (W4-ONE-TOUCH
+// begin/finish). `?add=agent` stays on every step, so an open agent never turns it into Connect
+// another AI app, and a new Add agent starts with nothing kept from an earlier run. It ends on Home
+// in the app (no reload), and the agents are read again.
 import { Banner, Button, CopyPrompt, Fingerprint, ProgressBar, TextField } from '@4thtech-io/ui';
 import {
   useCallback,
@@ -44,6 +51,7 @@ import { lazyPart } from '../../lazy/index.js';
 import { INVITE_PATH } from '../../nav.js';
 import { createInviteApi, type InviteApi } from '../contacts/invite-api.js';
 import { navigate } from '../../router.js';
+import { announceAgentsChanged } from '../agents/use-agents.js';
 import {
   LinkExpiredState,
   LoadingState,
@@ -57,15 +65,27 @@ import { CreateAgentGate } from '../apps/create-agent-gate.js';
 import type { CreateAgentApi } from '../apps/create-agent-api.js';
 import { readAgentSignal } from '../home/start-here-api.js';
 import type { AgentSignal } from '../home/start-here.js';
-import { markLeavingStart } from '../start/guard.js';
-import { markAutoShown, rememberWizard, wizardMemory, type WizardOutcome } from '../start/store.js';
-import { CONNECT_STEP as S, PICK_STEP as P, type StepId } from '../start/strings.js';
+import { markLeavingStart, skipToHome } from '../start/guard.js';
+import {
+  markAutoShown,
+  rememberWizard,
+  resetWizard,
+  wizardMemory,
+  type WizardOutcome,
+} from '../start/store.js';
+import {
+  CONNECT_STEP as S,
+  NAME_STEP as NS,
+  PICK_STEP as P,
+  type StepId,
+} from '../start/strings.js';
 import {
   AgentCard,
   BackButton,
   ConnectedStep,
   FingerprintGlyph,
   InviteStep,
+  NameStep,
   PickStep,
   WizardFrame,
   appTiles,
@@ -515,6 +535,32 @@ function wantsNewAgent(): boolean {
   return new URLSearchParams(location.search).get('add') === 'agent';
 }
 
+/** The query Add agent keeps on every step. */
+const ADD_QUERY = '?add=agent';
+
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u001f\u007f]/;
+
+/**
+ * W4-WIRE-2: Add agent starts from nothing (a name or a pick of an earlier run is not kept), and a
+ * run that is not Add agent drops what Add agent kept. The look for AI apps is kept either way.
+ */
+function startRun(): void {
+  const memory = wizardMemory();
+  const adding = wantsNewAgent();
+  if (adding === (memory.adding === true)) return;
+  const apps = memory.apps;
+  resetWizard();
+  rememberWizard({ ...(apps === undefined ? {} : { apps }), ...(adding ? { adding } : {}) });
+}
+
+/** W4-WIRE-2: Add agent ends on Home in the app (no reload); the agents are read again. */
+function leaveAddAgent(): void {
+  resetWizard();
+  announceAgentsChanged();
+  skipToHome();
+}
+
 export function FirstRunPage({
   api: given,
   createPasskey = createSetupPasskey,
@@ -525,7 +571,7 @@ export function FirstRunPage({
   createUpgradePasskey = browserUpgradePasskey,
   appsApi: givenApps,
   passkeyProof = browserPasskeyProof,
-  goHome = openHome,
+  goHome: givenHome,
   step: givenStep,
   go = (path: string, replace?: boolean) => navigate(path, replace === true),
   onSkip,
@@ -535,6 +581,9 @@ export function FirstRunPage({
   readJoin = () => createJoinApi().read(),
   openJoin = () => window.location.assign(JOIN),
 }: FirstRunPageProps = {}): ReactElement {
+  // W4-WIRE-2: decided once per mount, before the remembered choices are read.
+  useState(startRun);
+  const goHome = givenHome ?? (wantsNewAgent() ? leaveAddAgent : openHome);
   const [api] = useState<SetupApi>(() => given ?? createSetupApi());
   const [upgradeApi] = useState<UpgradeApi>(() => givenUpgrade ?? createUpgradeApi());
   const [appsApi] = useState<AppsApi>(() => givenApps ?? createAppsApi());
@@ -571,6 +620,14 @@ export function FirstRunPage({
   );
   const [choice, setChoiceState] = useState(memory.choice ?? '');
   const [name, setNameState] = useState(memory.name ?? '');
+  // W4-WIRE-2: Add agent's "Name your agent" step: passed, why a name can't be used, checking.
+  const [named, setNamedState] = useState(memory.named === true);
+  const [nameError, setNameError] = useState<string | undefined>(undefined);
+  const [naming, setNaming] = useState(false);
+  const setNamed = (value: boolean): void => {
+    setNamedState(value);
+    rememberWizard({ named: value });
+  };
   const [noPrfHere, setNoPrfHere] = useState(false);
   const backupTitle = useTitleFocus<HTMLHeadingElement>(view.k);
   const mounted = useRef(true);
@@ -595,6 +652,7 @@ export function FirstRunPage({
   };
   const setName = (value: string): void => {
     setNameState(value);
+    setNameError(undefined);
     rememberWizard({ name: value });
   };
   useEffect(() => {
@@ -695,7 +753,33 @@ export function FirstRunPage({
     return undefined;
   }, [list, view]);
 
-  const toStep = (next: StepId, replace = false): void => go(stepPath(next), replace);
+  // W4-WIRE-2: Add agent keeps `?add=agent` on every step.
+  const toStep = (next: StepId, replace = false): void =>
+    go(stepPath(next) + (wantsNewAgent() ? ADD_QUERY : ''), replace);
+
+  /**
+   * W4-WIRE-2: "Name your agent" → the pick. The agent-name rules first (1 to 32 characters, no
+   * control characters), then the server says whether it would sign this name; nothing is created.
+   */
+  const submitName = async (): Promise<void> => {
+    const typed = name.trim();
+    const size = [...typed].length;
+    if (size === 0) return setNameError(N.empty);
+    if (size > NAME_MAX) return setNameError(N.tooLong);
+    if (CONTROL.test(typed)) return setNameError(SETUP_MESSAGES.label_invalid);
+    setNaming(true);
+    const checked = await api.labelCheck(typed);
+    if (!mounted.current) return;
+    setNaming(false);
+    if (checked.kind === 'refused') return setNameError(SETUP_MESSAGES.label_invalid);
+    if (checked.kind === 'error') {
+      if (checked.problem === 'offline') return setView({ k: 'down' });
+      if (checked.problem === 'session_expired') return setView({ k: 'expired' });
+      return setNameError(setupMessage(checked));
+    }
+    setName(typed);
+    setNamed(true);
+  };
 
   /** Step 1 → 2: the name follows the app until the person edits it. */
   const toConnect = (): void => {
@@ -916,6 +1000,8 @@ export function FirstRunPage({
     if (view.k !== 'step' || mode === undefined) return;
     if (step === 'connect') {
       if (wizardMemory().choice === undefined) return toStep('app', true);
+      // W4-WIRE-2: Add agent's connect step needs its name first.
+      if (mode.k === 'add' && wizardMemory().named !== true) return toStep('app', true);
       if (mode.k === 'first') setView({ k: 'protect', working: false, noPrf: noPrfHere });
     }
   }, [view, mode, step, noPrfHere]);
@@ -1158,6 +1244,20 @@ export function FirstRunPage({
   if (mode === undefined) return frame(<LoadingState text={T.loading} />);
   const eyebrow =
     mode.k === 'first' ? P.eyebrow : mode.k === 'add' ? P.eyebrowAdd : P.eyebrowConnect;
+  if (step === 'app' && mode.k === 'add' && !named) {
+    // W4-WIRE-2: Add agent names the agent first.
+    return (
+      <WizardFrame step="app" stepName={NS.stepName} {...(onSkip === undefined ? {} : { onSkip })}>
+        <NameStep
+          value={name}
+          onChange={setName}
+          onContinue={() => void submitName()}
+          working={naming}
+          {...(nameError === undefined ? {} : { error: nameError })}
+        />
+      </WizardFrame>
+    );
+  }
   if (step === 'app') {
     return frame(
       <PickStep
@@ -1168,6 +1268,7 @@ export function FirstRunPage({
         eyebrow={eyebrow}
         lookFailed={list.k === 'unavailable'}
         mac={platform === 'mac'}
+        {...(mode.k === 'add' ? { onBack: () => setNamed(false) } : {})}
       />,
     );
   }
