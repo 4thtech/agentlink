@@ -63,30 +63,30 @@ export const AGENTS_STRINGS = {
   removeTitle: (label: string): string => `Remove ${iso(label)}?`,
   removingTitle: (label: string): string => `Removing ${iso(label)}…`,
   removeIntro: 'This will delete, from this computer:',
-  keysAndSettings: (label: string): string => `${label}'s keys and settings`,
+  keysAndSettings: (label: string): string => `${iso(label)}'s keys and settings`,
   history: (contacts: number | null): string =>
     contacts === null
       ? 'Its message and file history'
       : `Its message and file history (${contacts} ${contacts === 1 ? 'contact' : 'contacts'})`,
   itsEntry: (app: string): string => `Its entry in ${app}`,
   contactsTold: (label: string, n: number): string =>
-    `Your ${n} ${n === 1 ? 'contact' : 'contacts'} will be told ${label} is retired.`,
+    `Your ${n} ${n === 1 ? 'contact' : 'contacts'} will be told ${iso(label)} is retired.`,
   cantUndo: "This can't be undone.",
   exportFirst: 'Export history first',
   typeName: "Type the agent's name to confirm",
   typeNameLabel: (label: string): string => `Type ${iso(label)} to confirm`,
   typeNameDisabled: 'Type the name to enable this',
   removeTouchId: 'Remove with Touch ID',
-  quitAny: (label: string): string => `Quit any AI app that uses ${label} first.`,
+  quitAny: (label: string): string => `Quit any AI app that uses ${iso(label)} first.`,
   agentFolder: (folder: string): string => `Agent folder: ${folder}`,
   checkAgain: 'Check again',
   removeAnywayQ: "Remove anyway? Contacts can't be told now.",
   removeAnyway: 'Remove anyway',
   notRemoved: 'Not removed. Try again.',
   removeFailed: (label: string): string =>
-    `Couldn't finish removing ${label}. Nothing else was changed.`,
-  removed: (label: string): string => `${label} was removed.`,
-  nowShowing: (label: string): string => `Now showing ${label}`,
+    `Couldn't finish removing ${iso(label)}. Nothing else was changed.`,
+  removed: (label: string): string => `${iso(label)} was removed.`,
+  nowShowing: (label: string): string => `Now showing ${iso(label)}`,
   tidyNote: (n: number): string =>
     n === 1
       ? "1 of your agents isn't connected to an AI app and has no contacts."
@@ -115,7 +115,7 @@ export const AGENTS_STRINGS = {
   backupTitle: 'Recovery kit',
   backupHint: 'Save a recovery kit. Keep it somewhere safe, away from this computer.',
   backupLink: 'Back up recovery kit',
-  switching: (label: string): string => `Opening ${label}…`,
+  switching: (label: string): string => `Opening ${iso(label)}…`,
 
   // Pause (08 §1 "Pause an agent", D-143 (5)): one click, no Touch ID; Resume with Touch ID.
   pause: 'Pause',
@@ -181,8 +181,8 @@ export const AGENTS_STRINGS = {
   backup: 'Backup',
   noPeople: 'No people yet.',
   reading: 'Loading…',
-  peopleOther: (label: string): string => `Open ${label} to see its people.`,
-  rulesOther: (label: string): string => `Open ${label} to see its rules.`,
+  peopleOther: (label: string): string => `Open ${iso(label)} to see its people.`,
+  rulesOther: (label: string): string => `Open ${iso(label)} to see its rules.`,
   openAgent: 'Open this agent',
   seeAllActivity: 'See all activity',
   seeRules: 'Change rules',

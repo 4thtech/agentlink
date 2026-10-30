@@ -362,7 +362,8 @@ export async function createInviteInApp(jp: JourneyPage): Promise<string> {
   const shown = page.locator('.inv-link[data-state="ready"]');
   await shown.waitFor();
   const value = (await shown.innerText()).trim();
-  const link = ANY_INVITE.exec(value.startsWith('https://') ? value : `https://${value}`)?.[0] ?? '';
+  const link =
+    ANY_INVITE.exec(value.startsWith('https://') ? value : `https://${value}`)?.[0] ?? '';
   await page.getByRole('button', { name: 'Copy', exact: true }).click();
   await page.getByRole('button', { name: 'Copied', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Done', exact: true }).click();

@@ -229,7 +229,10 @@ describe('Agents, simple (A8)', () => {
   });
 
   it('after the switch, the remembered Pause opens for the agent that is open now, once', async () => {
-    sessionStorage.setItem(INTENT_KEY, JSON.stringify({ name: 'work', action: 'pause' }));
+    sessionStorage.setItem(
+      INTENT_KEY,
+      JSON.stringify({ name: 'work', action: 'pause', at: Date.now() }),
+    );
     answers['GET /api/ui/agents'] = {
       status: 200,
       body: list(
@@ -243,7 +246,10 @@ describe('Agents, simple (A8)', () => {
   });
 
   it('keeps the remembered Pause through a stale first read, until its own read shows the agent open', async () => {
-    sessionStorage.setItem(INTENT_KEY, JSON.stringify({ name: 'work', action: 'pause' }));
+    sessionStorage.setItem(
+      INTENT_KEY,
+      JSON.stringify({ name: 'work', action: 'pause', at: Date.now() }),
+    );
     // The router mounts the page again while the shared store still holds the old agent.
     await mount();
     expect(plain(host)).not.toContain('Pause Work?');
@@ -264,7 +270,10 @@ describe('Agents, simple (A8)', () => {
   });
 
   it('the same for Resume: the gate opens once the paused agent is the open one', async () => {
-    sessionStorage.setItem(INTENT_KEY, JSON.stringify({ name: 'invoices', action: 'resume' }));
+    sessionStorage.setItem(
+      INTENT_KEY,
+      JSON.stringify({ name: 'invoices', action: 'resume', at: Date.now() }),
+    );
     await mount();
     expect(plain(host)).not.toContain('Resume Invoices');
     answers['GET /api/ui/agents'] = {

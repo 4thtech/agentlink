@@ -40,7 +40,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { INTERIM_PEOPLE_PATH } from '../../nav.js';
+import { lazyPart } from '../../lazy/index.js';
+import { INVITE_PATH } from '../../nav.js';
 import { navigate } from '../../router.js';
 import {
   LinkExpiredState,
@@ -111,6 +112,12 @@ import {
   type Platform,
 } from './strings.js';
 
+/**
+ * W4-WIRE: Get started step 4 is U4's invite panel (the same one as the Invite screen), loaded on
+ * first use so the first load of the app does not carry it.
+ */
+const INVITE_PANEL = lazyPart(async () => (await import('../invite/invite-panel.js')).InvitePanel);
+
 /** U3-a (D-138; 08 §1): first run, and the passkey switch on this page, finish on Home. */
 const HOME = '/settings/home';
 
@@ -132,7 +139,8 @@ export function endFirstRun(read: () => Promise<JoinRead>): Promise<void> {
     .then((answer) => {
       const waiting = answer.kind === 'ok' && answer.state !== 'none';
       // IR-W4-WIZARD-1: this full load ends Get started; its open-on-launch check keeps Home.
-      markLeavingStart();
+      // W4-WIRE (U2 low): only an ending on Home needs the mark (the join screen is never guarded).
+      if (!waiting) markLeavingStart();
       window.location.assign(waiting ? JOIN : HOME);
     });
 }
@@ -519,6 +527,11 @@ export function FirstRunPage({
   const sensor = SENSOR[platform];
   // What the person chose on earlier steps (kept in memory while the steps change; no secret).
   const memory = wizardMemory();
+  // W4-WIRE: step 4's invite panel (U4) loads with the first step, so it is there, in place, when
+  // step 4 opens (no move when it arrives).
+  useEffect(() => {
+    if (invitePanel === undefined) void INVITE_PANEL.load().catch(() => undefined);
+  }, [invitePanel]);
   const [list, setList] = useState<PickList>(() =>
     memory.apps === undefined
       ? { k: 'loading' }
@@ -928,9 +941,9 @@ export function FirstRunPage({
   if (step === 'invite') {
     return frame(
       <InviteStep
-        inviteHref={INTERIM_PEOPLE_PATH}
+        inviteHref={INVITE_PATH}
         onHome={goHome}
-        {...(invitePanel === undefined ? {} : { panel: invitePanel })}
+        panel={invitePanel ?? <INVITE_PANEL.Part />}
       />,
     );
   }

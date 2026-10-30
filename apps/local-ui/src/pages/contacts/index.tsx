@@ -762,7 +762,7 @@ function openedForInvite(): boolean {
   return true;
 }
 
-/** True once, when the page was opened through the Add contact link (b11 §21.1). */
+/** True once, when the page was opened through an older Add contact link (b11 §21.1). */
 function openedForAdd(): boolean {
   if (typeof location === 'undefined' || location.search !== `?${ADD_CONTACT_MARKER}`) return false;
   // Drop the marker at once: the address holds nothing about the sheet afterwards.
@@ -786,12 +786,13 @@ export function ContactsPage({
   const [removed, setRemoved] = useState(false);
   const [kept, setKept] = useState(loadKept);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [adding, setAdding] = useState(openedForAdd);
+  const [adding, setAdding] = useState(false);
   const [rows, setRows] = useState<readonly OpenInvite[]>([]);
   const [highlight, setHighlight] = useState<string | undefined>(undefined);
   const [justCreated, setJustCreated] = useState(false);
   const [cancelledRows, setCancelledRows] = useState<readonly OpenInvite[]>([]);
-  const [inviting, setInviting] = useState(openedForInvite);
+  // W4-WIRE: the old Add contact marker opens the Invite screen too (the sheet is no way in now).
+  const [inviting, setInviting] = useState(() => openedForInvite() || openedForAdd());
   // The Connected moment: the contacts known before, and whether an arrival is expected (an open
   // invite, or a pasted one that is connecting).
   const known = useRef<ReadonlySet<string> | undefined>(undefined);

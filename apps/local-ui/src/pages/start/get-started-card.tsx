@@ -5,7 +5,7 @@
 // browser: hiding is a preference, not setup state). An unanswered read shows nothing.
 import { Icon } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement } from 'react';
-import { INTERIM_PEOPLE_PATH } from '../../nav.js';
+import { INTERIM_PEOPLE_PATH, INVITE_PATH } from '../../nav.js';
 import {
   readSetupState,
   startProgress,
@@ -34,9 +34,10 @@ function hideHere(): void {
   }
 }
 
-/** Where each step's link goes: Get started for the first, People for the other two (U4). */
+/** Where each step's link goes: Get started, the Invite screen (W4-WIRE), People (U4). */
 export function stepHref(step: CardStep): string {
-  return step.id === 'connect' ? '/start/app' : INTERIM_PEOPLE_PATH;
+  if (step.id === 'connect') return '/start/app';
+  return step.id === 'invite' ? INVITE_PATH : INTERIM_PEOPLE_PATH;
 }
 
 function stepWords(step: CardStep): string {
@@ -48,15 +49,22 @@ function stepWords(step: CardStep): string {
 export interface GetStartedCardProps {
   /** Test seam: the real state. Default: the app's own reads. */
   readonly read?: () => Promise<SetupState>;
+  /**
+   * W4-WIRE: the progress, already read by the page that places the card (Home reads it before it
+   * shows, so the card never arrives late and moves the page). Given, the card reads nothing.
+   */
+  readonly progress?: Progress;
 }
 
 export function GetStartedCard({
   read = readSetupState,
+  progress: given,
 }: GetStartedCardProps): ReactElement | null {
   const [hidden, setHidden] = useState(hiddenHere);
-  const [progress, setProgress] = useState<Progress | undefined>(undefined);
+  const [fromRead, setProgress] = useState<Progress | undefined>(undefined);
+  const progress = given ?? fromRead;
   useEffect(() => {
-    if (hidden) return undefined;
+    if (hidden || given !== undefined) return undefined;
     let live = true;
     void read().then(
       (state) => {
@@ -67,7 +75,7 @@ export function GetStartedCard({
     return () => {
       live = false;
     };
-  }, [read, hidden]);
+  }, [read, hidden, given]);
   if (hidden || progress === undefined || progress.complete || progress.unknown) return null;
   const next = progress.steps.find((s) => !s.done);
   return (

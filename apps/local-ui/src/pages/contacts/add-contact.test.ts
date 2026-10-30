@@ -17,7 +17,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../api/client.js';
-import { ADD_CONTACT_HREF } from './add-contact-link.js';
+import { ADD_CONTACT_HREF, ADD_CONTACT_MARKER } from './add-contact-link.js';
 import {
   ADD_STRINGS as A,
   expiresIn,
@@ -336,11 +336,13 @@ describe('UX2-d2: where the sheet opens', () => {
     expect(sheet()).toBeNull();
   });
 
-  it('opens from the fixed address marker and drops the marker at once', async () => {
-    expect(ADD_CONTACT_HREF).toBe('/settings/contacts?add-contact');
-    history.replaceState(null, '', ADD_CONTACT_HREF);
+  // W4-WIRE: the shared link and the old marker open U4's Invite screen, not this sheet.
+  it('the old address marker opens the Invite screen instead, and drops the marker at once', async () => {
+    expect(ADD_CONTACT_HREF).toBe('/contacts?invite');
+    history.replaceState(null, '', `/settings/contacts?${ADD_CONTACT_MARKER}`);
     await mount();
-    expect(sheet()).not.toBeNull();
+    expect(sheet()).toBeNull();
+    expect(document.body.querySelector('h1')?.textContent).toBe('Invite someone');
     expect(location.search).toBe('');
     expect(location.pathname).toBe('/settings/contacts');
   });

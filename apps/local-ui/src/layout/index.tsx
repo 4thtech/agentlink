@@ -31,7 +31,7 @@ import { GoTo } from './go-to.js';
 import { TopBar, shortcutKeys } from './top-bar.js';
 import { useApprovalsWaiting } from '../pages/approvals/badge.js';
 import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js';
-import { createUpgradeApi } from '../pages/first-run/setup-api.js';
+import { createUpgradeApi, PASSKEY_REGISTERED_EVENT } from '../pages/first-run/setup-api.js';
 import type { Platform } from '../pages/first-run/strings.js';
 import { StartHereContext } from '../pages/home/start-here-context.js';
 import type { StartHereReads } from '../pages/home/start-here.js';
@@ -239,6 +239,13 @@ export function Layout({
       live = false;
     };
   }, [path, nextStep, focused]);
+  // W4-WIRE: a passkey registered on this page ends the next step at once (not on the next page
+  // change, where its leaving moved the page that opened).
+  useEffect(() => {
+    const done = (): void => setSwitchNeeded(false);
+    window.addEventListener(PASSKEY_REGISTERED_EVENT, done);
+    return () => window.removeEventListener(PASSKEY_REGISTERED_EVENT, done);
+  }, []);
   const facts = useCallback(
     () => ({
       ...(version === undefined ? {} : { version }),

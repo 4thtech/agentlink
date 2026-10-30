@@ -207,6 +207,14 @@
 .hm-row-main {
   flex: 1;
 }
+/* W4-WIRE: the chevron turns as the row opens (transform only; reduced motion: at once, kit). */
+.hm-chev {
+  flex: none;
+  transition: transform var(--al-duration-fast) var(--al-easing-standard);
+}
+.hm-chev.is-open {
+  transform: rotate(90deg);
+}
 .hm-invite-row,
 .hm-nomatch {
   padding: var(--al-space-4);
