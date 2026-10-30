@@ -2,8 +2,11 @@
 // origin clicks on a link to a routed path change the page without a reload; everything else is left
 // to the browser. M1-11b-2: Approvals (`/`) and one request (`/approve/<id>`, the deep link from
 // the terminal, notifications and the MCP) are pages of this app.
-// W4-SHELL (Decision 40): two destinations, the Inbox and Contacts. Approvals (`/`, where every
-// approval link points) and one request mark the Inbox until the Inbox holds them (b11 §34.4). Another agent opened (here or in another tab) never reloads the page: the generation guard
+// W4-SHELL-V2 (Decisions 49–51): the sections Home (`/`, where every approval link points, and one
+// request `/approve/<id>`), Agents (and `/agents/<name>`), Activity (and `/activity/live`), Settings
+// and, while Under the hood is on, Advanced (`/advanced/<page>`); Get started is `/start/<step>`.
+// Old paths redirect (nav.ts REDIRECTS). Another agent opened (here or in another tab) never reloads
+// the page: the generation guard
 // hands the change to the router, which swaps the whole shell and page for the agent that is open
 // now (same route, same document) and only then lets changes carry the new generation.
 import {
@@ -25,7 +28,7 @@ import { lazyPart } from './lazy/index.js';
 import { PAGE_PARTS, loadRoutePage } from './lazy/pages.js';
 import { COMPACT_PATH } from './pages/compact/open.js';
 import { announceAgentsChanged, useSwitchedNote } from './pages/agents/use-agents.js';
-import { APPROVALS_PATH, INBOX_PATH, REDIRECTS } from './nav.js';
+import { HOME_PATH, LIVE_ACTIVITY_PATH, REDIRECTS, START_STEPS, agentNameOf } from './nav.js';
 import { NotAvailablePage, NotFoundPage } from './states/index.js';
 import { PAGE_TITLES } from './strings.js';
 
@@ -39,33 +42,42 @@ function NotificationsPage(): ReactElement {
   return <NotAvailablePage title={PAGE_TITLES.notifications} />;
 }
 
-/** A Settings page fetched on first visit (UI-REFRESH-u); the first load of the app carries none. */
+/** Live activity (Under the hood) has no page yet: U6 builds the live stream. */
+function LiveActivityPage(): ReactElement {
+  return <NotAvailablePage title={PAGE_TITLES.liveActivity} />;
+}
+
+/** A page fetched on first visit (UI-REFRESH-u); the first load of the app carries none. */
 function lazyPage(path: string): ComponentType {
   return (PAGE_PARTS[path] as (typeof PAGE_PARTS)[string]).Part;
 }
 
 export const ROUTES: readonly RouteDef[] = [
-  // W4-SHELL: the two destinations (b11 §34.1). Today's pages; their builders replace the bodies.
-  { path: INBOX_PATH, page: lazyPage(INBOX_PATH) },
+  // W4-SHELL-V2: the sections (Decision 48). Home keeps the waiting approvals at `/`, where every
+  // approval link of the terminal, the MCP and notifications points, until U3 builds Home.
+  { path: HOME_PATH, page: ApprovalsPage },
+  { path: '/agents', page: lazyPage('/agents') },
+  { path: '/activity', page: lazyPage('/activity') },
+  { path: LIVE_ACTIVITY_PATH, page: LiveActivityPage },
+  // Get started (U2 builds the steps; today's first run until then), in the focused shell.
+  ...START_STEPS.map((path) => ({ path, page: FirstRunPage })),
+  // Interim: today's Messages and Contacts (U3, U4 fold them into Home).
+  { path: '/inbox', page: lazyPage('/inbox') },
   { path: '/contacts', page: lazyPage('/contacts') },
-  // Approvals fold into the Inbox (b11 §34.4); until then the waiting list is a page of its own.
-  { path: APPROVALS_PATH, page: ApprovalsPage },
-  { path: '/first-run', page: FirstRunPage },
-  { path: '/settings/home', page: lazyPage('/settings/home') },
-  { path: '/settings/agents', page: lazyPage('/settings/agents') },
-  { path: '/settings/files', page: lazyPage('/settings/files') },
-  // Settings (b11 §34.6).
-  { path: '/settings/apps', page: lazyPage('/settings/apps') },
+  // Settings (A9).
   { path: '/settings/backup', page: lazyPage('/settings/backup') },
+  { path: '/settings/apps', page: lazyPage('/settings/apps') },
+  { path: '/settings/files', page: lazyPage('/settings/files') },
   { path: '/settings/appearance', page: lazyPage('/settings/appearance') },
-  { path: '/settings/proofs', page: lazyPage('/settings/proofs') },
-  { path: '/settings/rules', page: lazyPage('/settings/rules') },
   { path: '/settings/notifications', page: NotificationsPage },
-  // Advanced.
-  { path: '/settings/activity', page: lazyPage('/settings/activity') },
-  { path: '/settings/advanced', page: lazyPage('/settings/advanced') },
-  { path: '/settings/about', page: lazyPage('/settings/about') },
-  // U3-invite (b11 §33.2): the waiting invite, in the first-run shell (no sidebar).
+  { path: '/settings/rules', page: lazyPage('/settings/rules') },
+  { path: '/settings/proofs', page: lazyPage('/settings/proofs') },
+  // Advanced (Under the hood).
+  { path: '/advanced/rules', page: lazyPage('/advanced/rules') },
+  { path: '/advanced/proofs', page: lazyPage('/advanced/proofs') },
+  { path: '/advanced/network', page: lazyPage('/advanced/network') },
+  { path: '/advanced/diagnostics', page: lazyPage('/advanced/diagnostics') },
+  // U3-invite (b11 §33.2): the waiting invite, in the focused shell (no chrome).
   { path: '/settings/join', page: lazyPage('/settings/join') },
 ];
 
@@ -129,8 +141,19 @@ function usePath(): string {
 
 function isRouted(path: string): boolean {
   return (
-    path in REDIRECTS || ROUTES.some((r) => r.path === path) || approvalIdOf(path) !== undefined
+    path in REDIRECTS ||
+    ROUTES.some((r) => r.path === path) ||
+    approvalIdOf(path) !== undefined ||
+    agentNameOf(path) !== undefined
   );
+}
+
+/** The route a path shows: its own, or one agent's page (`/agents/<name>`, U5 builds the detail). */
+function routeOf(path: string): RouteDef | undefined {
+  const own = ROUTES.find((r) => r.path === path);
+  if (own !== undefined) return own;
+  if (agentNameOf(path) !== undefined) return ROUTES.find((r) => r.path === '/agents');
+  return undefined;
 }
 
 /** Turn a plain left-click on a link to a routed path of this app into a navigation. */
@@ -186,13 +209,13 @@ export function AppRoutes(): ReactElement {
   }, [path]);
   if (path === COMPACT_PATH) return <CompactPart.Part key={`${path}#${epoch}`} />;
   const shown = REDIRECTS[path] ?? path;
-  // One request belongs to the Inbox (approvals fold into it): the same nav item is current.
+  // One request belongs to Home (approvals fold into it): Home is current there.
   const oneRequest = approvalIdOf(shown) !== undefined;
-  const route = ROUTES.find((r) => r.path === shown);
+  const route = routeOf(shown);
   const Page = oneRequest ? ApprovePage : (route?.page ?? NotFoundPage);
   return (
     <>
-      <Layout key={epoch} path={oneRequest ? APPROVALS_PATH : shown}>
+      <Layout key={epoch} path={shown}>
         <Page key={shown} />
       </Layout>
       {/* "Now showing {label}" after a switch (b11 §29.9), outside the views that remount. */}

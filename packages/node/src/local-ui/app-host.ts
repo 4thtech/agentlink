@@ -41,6 +41,7 @@
 // (AgentDirectory `create`), signs its first parts with the owner's one gesture, and hands it here
 // with `adoptFirst`: the generation increases first, the requests in flight drain, then the agent is
 // opened through the same `open` path as a switch. Nothing is signed here.
+import type { UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { ApprovalServerSource } from '../approval-server.js';
 import type { LocalUiAiApps, LocalUiOptions } from './context.js';
 import type { AgentRemovalPort } from './api/agents-remove.js';
@@ -99,6 +100,13 @@ export interface AgentDirectory {
   readCurrent(): Promise<string | undefined>;
   /** Writes `{v:1, current}` to `~/.agentlink/app.json` (0600). Trusted for nothing but order. */
   writeCurrent(name: string): Promise<void>;
+  /**
+   * W4-SHELL-V2: the app's UI settings from `~/.agentlink/ui-settings.json`; undefined when absent
+   * or not valid (a link, a non-private file, an unknown key or a non-boolean value is ignored).
+   */
+  readUiSettings?(): Promise<UiSettings | undefined>;
+  /** W4-SHELL-V2: writes the allowlisted settings to `~/.agentlink/ui-settings.json` (0600, atomic). */
+  writeUiSettings?(settings: UiSettings): Promise<void>;
 }
 
 /** One opened agent as the host serves it (the CLI's openAgent result, wired for the pages). */

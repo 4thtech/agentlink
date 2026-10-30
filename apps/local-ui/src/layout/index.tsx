@@ -1,26 +1,33 @@
-// The shared frame: sidebar, content and status bar from the design system's AppShell. Content
-// switches by route; the layout itself never changes (d1/screens/local).
-// W4-SHELL (Decision 40; b11 §34.1, d2 console/home 1280 and 360): the agent switcher top left (first
-// in the sidebar under the mark; at 360 at the start of the top bar), two destinations (Inbox and
-// Contacts), the page title, and the avatar menu at the right (Settings, Advanced, Under the hood,
-// Cmd+K). A Settings page shows the grouped Settings sub-navigation above it. The preferences reach
-// every page through PrefsHood (the Under the hood switch).
-import { AppShell, type NavItem } from '@4thtech-io/ui';
+// W4-SHELL-V2 (Decisions 49–51; W4 UX v2 "three layers"; prototype v23 A4/A8/A9/A10/A11): the shared
+// frame. One top bar across the window (the mark, the agent chip with its live dropdown, Go to, the
+// "?" Help menu and the Under the hood switch); under it, while Under the hood is on, the live status
+// strip; then the section menu (a minimized rail, or a sheet on a phone) beside the page; the status
+// bar at the bottom (the connection in words, the version). Same routes in both layers: turning
+// Under the hood on or off morphs the same screen in place (a View Transition, U0), never another
+// route tree. Get started (`/start/<step>`) and the join screen are a focused column with no chrome.
+// Shortcuts: Cmd+K (Go to), Cmd+Shift+U (Under the hood), Cmd+/ (shortcuts); Ctrl elsewhere.
 import {
+  useCallback,
   useEffect,
   useState,
-  useSyncExternalStore,
   type MouseEvent,
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { INBOX_PATH, NAV_ITEMS, OTHER_PAGES, SETTINGS_GROUPS, SETTINGS_PAGES } from '../nav.js';
-import { PrefsHood } from '../prefs/index.js';
+import { getLive } from '../api/live.js';
+import { SETTINGS_PAGES, sectionOf } from '../nav.js';
+import {
+  PrefsHood,
+  getPrefs,
+  setMenuExpanded,
+  setUnderTheHood,
+  startUiSettings,
+  useMenuExpanded,
+  usePrefs,
+} from '../prefs/index.js';
 import { SHELL_STRINGS } from '../strings.js';
-import { AgentSwitcher } from './agent-switcher.js';
 import { GoTo } from './go-to.js';
-import { AccountMenu, connectionChip } from './top-bar.js';
-import { useUnseenMessages } from '../pages/messages/badge.js';
+import { TopBar, shortcutKeys } from './top-bar.js';
 import { useApprovalsWaiting } from '../pages/approvals/badge.js';
 import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js';
 import { createUpgradeApi } from '../pages/first-run/setup-api.js';
@@ -33,6 +40,11 @@ import type { ApiResult } from '../api/client.js';
 import { TidyNote } from '../pages/agents/tidy-note.js';
 import { subscribeHealth } from './health-feed.js';
 import { readHealth as defaultReadHealth, type HealthState } from './health.js';
+import { startViewTransition, VT_CLASS } from './motion.js';
+import { SectionRail, SectionSheet } from './section-menu.js';
+import { ShellDialogs, openShellDialog } from './shell-dialogs.js';
+import { StatusStrip } from './status-strip.js';
+import './shell.css';
 
 /**
  * What the status bar shows. "Connected" appears only when the local server's health read says the
@@ -100,49 +112,15 @@ export function useHealth(
   return version;
 }
 
-// "Paused" means the user paused AgentLink, so it is never used for an unknown state.
-const SHELL_STATE = {
-  unknown: 'checking',
-  connected: 'connected',
-  offline: 'disconnected',
-  paused: 'paused',
-  not_running: 'not-running',
-  needs_setup: 'needs-setup',
-} as const;
-
-function inSettings(path: string): boolean {
-  return SETTINGS_PAGES.some((p) => p.path === path);
-}
-
-/** The title in the top bar: the nav, Settings or other page entry of the path, else the app's name. */
-function pageTitleOf(path: string): string {
-  const item = NAV_ITEMS.find((i) => i.path === path);
-  if (item !== undefined) return item.label;
-  const page = SETTINGS_PAGES.find((p) => p.path === path);
-  if (page !== undefined) return page.label;
-  return OTHER_PAGES[path]?.title ?? SHELL_STRINGS.appName;
-}
-
-/** The nav item marked current on a path: its own, or the one a page belongs to (Approvals: Inbox). */
-function navOf(path: string): string | undefined {
-  if (NAV_ITEMS.some((i) => i.path === path)) return path;
-  return OTHER_PAGES[path]?.nav;
-}
-
-const NARROW = '(max-width: 600px)';
-
-/** True at 600 px and under, where the sidebar is the bottom bar (B-11 §13.2). */
-function useNarrow(): boolean {
-  return useSyncExternalStore(
-    (on) => {
-      if (typeof window.matchMedia !== 'function') return () => undefined;
-      const query = window.matchMedia(NARROW);
-      query.addEventListener?.('change', on);
-      return () => query.removeEventListener?.('change', on);
-    },
-    () => typeof window.matchMedia === 'function' && window.matchMedia(NARROW).matches,
-  );
-}
+/** The status bar's words; "Paused" means the user paused AgentLink, never an unknown state. */
+const STATUS: Readonly<Record<ConnectionState, readonly [cls: string, word: string]>> = {
+  unknown: ['checking', 'Checking…'],
+  connected: ['connected', 'Connected'],
+  offline: ['disconnected', 'Not connected'],
+  paused: ['paused', 'Paused'],
+  not_running: ['not-running', 'Not running'],
+  needs_setup: ['needs-setup', 'Needs setup'],
+};
 
 /**
  * M1-UX-FIRSTRUN-V2-c: true when the owner exists but approves only with the backup code (no
@@ -155,9 +133,10 @@ export async function needsPasskeySwitch(): Promise<boolean> {
   return info.kind === 'ok' && !info.registered;
 }
 
-const FIRST_RUN_PATH = '/first-run';
-/** U3-invite: the join screen, in the same focused shell. */
-const JOIN_PATH = '/settings/join';
+/** Get started and the join screen: a focused column with no chrome (b11 §28, §33.2). */
+export function isFocusedPath(path: string): boolean {
+  return path.startsWith('/start/') || path === '/first-run' || path === '/settings/join';
+}
 
 /** UI-REFRESH-t: the first Tab stop. Focus goes to the page content (it is made focusable here). */
 function skipToContent(event: MouseEvent<HTMLAnchorElement>): void {
@@ -168,6 +147,31 @@ function skipToContent(event: MouseEvent<HTMLAnchorElement>): void {
   main.focus();
 }
 
+/** Turns Under the hood on or off as one morph of the same screen (U0 View Transition). */
+export function toggleHood(on: boolean): void {
+  startViewTransition(() => setUnderTheHood(on));
+}
+
+/** Cmd+Shift+U and Cmd+/ (Ctrl elsewhere); Cmd+K belongs to Go to (go-to.tsx). */
+function useShellKeys(): void {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const mod = event.metaKey || event.ctrlKey;
+      if (!mod || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (event.shiftKey && key === 'u') {
+        event.preventDefault();
+        toggleHood(!getPrefs().hood);
+      } else if (!event.shiftKey && key === '/') {
+        event.preventDefault();
+        openShellDialog('shortcuts');
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+}
+
 export interface LayoutProps {
   readonly path: string;
   readonly children?: ReactNode;
@@ -175,9 +179,9 @@ export interface LayoutProps {
   readonly nextStep?: () => Promise<boolean>;
   /** The platform the next step names. Default: detected from the browser. */
   readonly platform?: Platform;
-  /** Test seam: the Messages badge count. Default: read from the local app. */
+  /** Test seam: the Messages badge count (kept for the page tests; Home shows approvals). */
   readonly unseenMessages?: () => Promise<number>;
-  /** Test seam: the Approvals badge count. Default: read from the local app. */
+  /** Test seam: the approvals waiting count. Default: read from the local app. */
   readonly waitingApprovals?: () => Promise<number>;
   /** Test seam: the health read (M1-11s-a-d). Default: GET /api/ui/health. */
   readonly readHealth?: () => Promise<ApiResult<unknown>>;
@@ -190,24 +194,26 @@ export function Layout({
   children,
   nextStep = needsPasskeySwitch,
   platform: givenPlatform,
-  unseenMessages,
   waitingApprovals,
   readHealth,
   startHere,
 }: LayoutProps): ReactElement {
+  const focused = isFocusedPath(path);
   const connection = useConnectionState();
   const version = useHealth(readHealth);
-  const unseen = useUnseenMessages(path, unseenMessages);
   const waiting = useApprovalsWaiting(path, waitingApprovals);
-  const settings = inSettings(path);
-  const narrow = useNarrow();
-  const current = navOf(path);
-  // UX2-g: one Start here model for the shell: the Home dot, the card and the empty states.
-  const start = useStartHere(startHere, path !== FIRST_RUN_PATH, path);
+  const { hood } = usePrefs();
+  const expanded = useMenuExpanded();
+  useShellKeys();
+  useEffect(() => {
+    void startUiSettings();
+  }, []);
+  // UX2-g: one Start here model for the shell: the card and the empty states.
+  const start = useStartHere(startHere, !focused, path);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [switchNeeded, setSwitchNeeded] = useState(false);
   useEffect(() => {
-    if (path === FIRST_RUN_PATH) {
+    if (focused) {
       setSwitchNeeded(false);
       return undefined;
     }
@@ -224,23 +230,18 @@ export function Layout({
     return () => {
       live = false;
     };
-  }, [path, nextStep]);
-  const nav: NavItem[] = NAV_ITEMS.map((item) => ({
-    icon: item.icon,
-    label: item.label,
-    href: item.path,
-    active: item.routed && item.path === current,
-    // The Inbox carries what needs you first (approvals waiting), else the new messages: the same
-    // shared tick badge (UI-REFRESH-o-b, -o-d), read as "3 waiting for you" or "3 new".
-    ...(item.id === 'inbox' && waiting > 0
-      ? { count: waiting, countLabel: SHELL_STRINGS.approvalsWaiting }
-      : item.id === 'inbox' && unseen > 0
-        ? { count: unseen, countLabel: SHELL_STRINGS.messagesNew }
-        : {}),
-  }));
-  // U3-g (b11 §28): first run is a focused column, with no sidebar, top bar or status bar.
-  // U3-invite (b11 §33.2): so is the join screen that ends it.
-  if (path === FIRST_RUN_PATH || path === JOIN_PATH) {
+  }, [path, nextStep, focused]);
+  const facts = useCallback(
+    () => ({
+      ...(version === undefined ? {} : { version }),
+      connection: (STATUS[connection] ?? STATUS.unknown)[1],
+      hood: getPrefs().hood,
+      agents: getLive().agents.length,
+    }),
+    [version, connection],
+  );
+
+  if (focused) {
     return (
       <PrefsHood>
         <a href="#al-main" className="al-skip al-text-body-sm" onClick={skipToContent}>
@@ -252,50 +253,64 @@ export function Layout({
       </PrefsHood>
     );
   }
+  const [statusClass, statusWord] = STATUS[connection];
+  const settings = sectionOf(path) === 'settings';
   return (
     <PrefsHood>
       <a href="#al-main" className="al-skip al-text-body-sm" onClick={skipToContent}>
         {SHELL_STRINGS.skipToContent}
       </a>
-      <AppShell
-        nav={nav}
-        pageTitle={pageTitleOf(path)}
-        {...(narrow
-          ? { topBarStart: <AgentSwitcher chip={connectionChip(connection)} place="bar" /> }
-          : { sideTop: <AgentSwitcher chip={connectionChip(connection)} place="side" /> })}
-        topBarEnd={<AccountMenu />}
-        connection={SHELL_STATE[connection]}
-        {...(version === undefined ? {} : { version })}
-      >
-        {switchNeeded && path !== FIRST_RUN_PATH ? (
-          <SwitchToPasskeyBanner platform={platform} />
-        ) : null}
-        {settings ? (
-          <nav aria-label="Settings" className="al-subnav al-chrome">
-            {SETTINGS_GROUPS.map((group) => (
-              <div key={group.label} className="al-subnav-group">
-                <span className="al-subnav-label al-text-label al-muted">{group.label}</span>
-                {group.pages.map((p) => (
-                  <a
-                    key={p.path}
-                    href={p.path}
-                    className={p.path === path ? 'is-active' : undefined}
-                    aria-current={p.path === path ? 'page' : undefined}
-                  >
-                    {p.label}
-                  </a>
-                ))}
-              </div>
-            ))}
-          </nav>
-        ) : null}
-        <StartHereContext.Provider value={start}>
-          {/* The one-time Tidy up note (b11 §29.7), on the home: the Inbox (and Home while it stays). */}
-          {path === INBOX_PATH || path === '/settings/home' ? <TidyNote /> : null}
-          {children}
-        </StartHereContext.Provider>
-      </AppShell>
-      <GoTo />
+      <div className="al-app" data-hood={hood ? 'on' : 'off'}>
+        <TopBar connection={connection} onHood={toggleHood} />
+        {hood ? <StatusStrip connection={connection} /> : null}
+        <SectionSheet path={path} hood={hood} />
+        <div className="al-app-body">
+          <SectionRail
+            path={path}
+            hood={hood}
+            expanded={expanded}
+            onToggle={() => setMenuExpanded(!expanded)}
+            waiting={waiting}
+          />
+          <main className={`al-shell-content al-app-main ${VT_CLASS.main}`} id="al-main">
+            <div className="al-route">
+              {switchNeeded ? <SwitchToPasskeyBanner platform={platform} /> : null}
+              {settings ? (
+                <nav aria-label={SHELL_STRINGS.settingsNav} className="al-subnav al-chrome">
+                  {SETTINGS_PAGES.map((p) => (
+                    <a
+                      key={p.path}
+                      href={p.path}
+                      className={p.path === path ? 'is-active' : undefined}
+                      aria-current={p.path === path ? 'page' : undefined}
+                    >
+                      {p.label}
+                    </a>
+                  ))}
+                </nav>
+              ) : null}
+              <StartHereContext.Provider value={start}>
+                {/* The one-time Tidy up note (b11 §29.7), on Home. */}
+                {path === '/' ? <TidyNote /> : null}
+                {children}
+              </StartHereContext.Provider>
+            </div>
+          </main>
+        </div>
+        <footer className="al-statusbar al-chrome al-text-code">
+          {/* One polite live region: announced when the state changes, never per poll (B-11 §15). */}
+          <span className="al-sb-item" role="status" aria-live="polite" aria-atomic="true">
+            <span key={connection} className="al-sb-state">
+              <span className={`al-dot is-${statusClass}`} aria-hidden="true" />
+              {statusWord}
+            </span>
+          </span>
+          <span className="al-sb-spacer" />
+          {version === undefined ? null : <span className="al-sb-item">{version}</span>}
+        </footer>
+      </div>
+      <GoTo onHood={toggleHood} />
+      <ShellDialogs keys={shortcutKeys} facts={facts} />
     </PrefsHood>
   );
 }

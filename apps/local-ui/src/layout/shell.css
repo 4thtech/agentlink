@@ -1,0 +1,639 @@
+/* W4-SHELL-V2 (Decisions 49–51; prototype v23 A4/A8/A9/A10/A11): the shell. One top bar across the
+   window, the live strip under it (Under the hood), the section rail beside the page (a sheet on a
+   phone) and the status bar at the bottom. Tokens only; no inline style (08 §4 CSP). Motion lives in
+   the U0 kit (the classes al-press, al-menu, al-expand, al-reveal, al-label, al-pop and the view
+   transition names): nothing here animates. */
+.al-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--al-color-bg-canvas);
+  color: var(--al-color-fg-default);
+}
+.al-app-body {
+  flex: 1 0 auto;
+  display: flex;
+  min-width: 0;
+}
+.al-app-main {
+  align-items: center;
+  padding: var(--al-space-7) clamp(16px, 4vw, 40px) var(--al-space-10);
+}
+.al-route {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-6);
+}
+/* Under the hood: Home and Agents grow into tables (A10/A11). */
+.al-app[data-hood='on'] .al-route {
+  max-width: 1040px;
+}
+.al-app-main .al-subnav {
+  position: static;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+  border: 0;
+  background: none;
+}
+
+/* The top bar. */
+.al-top {
+  position: relative;
+  z-index: 25;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 10px clamp(16px, 4vw, 40px);
+  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.al-top-brand {
+  display: inline-flex;
+  align-items: center;
+  margin-right: var(--al-space-1);
+}
+.al-top-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.al-goto-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  min-height: 44px;
+  padding: 0 10px;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-canvas);
+  color: var(--al-color-fg-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.al-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--al-radius-sm);
+  background: transparent;
+  color: var(--al-color-fg-muted);
+  cursor: pointer;
+}
+.al-iconbtn:hover,
+.al-goto-btn:hover {
+  color: var(--al-color-fg-default);
+}
+.al-help,
+.al-chip-wrap {
+  position: relative;
+}
+
+/* The agent chip. */
+.al-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  max-width: 280px;
+  padding: 4px 10px 4px 4px;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-bg-raised);
+  color: var(--al-color-fg-default);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.al-chip.is-static {
+  cursor: default;
+  padding: 4px 14px;
+}
+.al-chip-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 16px;
+}
+.al-chip-name {
+  font-size: 13px;
+  font-weight: var(--al-font-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.al-chip-status {
+  font-size: 12px;
+  color: var(--al-color-fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.al-chip-chev {
+  flex: none;
+  color: var(--al-color-fg-subtle);
+}
+.al-chip-chev.is-open,
+.al-rot.is-on {
+  transform: rotate(180deg);
+}
+
+/* Menus (the agent dropdown, Help): the level-3 surface. */
+.al-shell-menu {
+  position: absolute;
+  z-index: 31;
+  top: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  box-sizing: border-box;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-raised);
+  box-shadow: var(--al-shadow-3);
+}
+.al-agent-menu {
+  left: 0;
+  width: min(380px, calc(100vw - 32px));
+  max-height: 480px;
+  overflow-y: auto;
+}
+.al-help-menu {
+  right: 0;
+  width: min(260px, calc(100vw - 32px));
+}
+.al-menu-head {
+  padding: 6px 10px 4px;
+  font-family: var(--al-font-family-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--al-color-fg-subtle);
+  font-weight: var(--al-font-weight-medium);
+}
+.al-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--al-color-border-default);
+}
+.al-mitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: var(--al-radius-sm);
+  background: transparent;
+  color: var(--al-color-fg-default);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.al-mitem:hover,
+.al-mitem:focus-visible {
+  background: var(--al-color-bg-sunken);
+}
+.al-mitem .al-sicon {
+  flex: none;
+  color: var(--al-color-fg-muted);
+}
+.al-mitem-grow {
+  flex: 1;
+}
+.al-am-row + .al-am-row {
+  border-top: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  padding-top: 4px;
+}
+.al-am-item {
+  min-height: 44px;
+}
+.al-am-item[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: default;
+}
+.al-am-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 17px;
+}
+.al-am-name {
+  font-weight: var(--al-font-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.al-am-status {
+  font-size: 12px;
+  color: var(--al-color-fg-muted);
+}
+.al-am-item .al-am-check {
+  color: var(--al-color-accent-fg);
+}
+.al-am-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px 8px 52px;
+}
+.al-am-app {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
+}
+.al-am-app-name {
+  white-space: nowrap;
+  color: var(--al-color-fg-default);
+}
+.al-am-app-word {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--al-color-fg-subtle);
+}
+.al-am-app-word.is-working,
+.al-am-app-word.is-ready {
+  color: var(--al-color-status-success-fg);
+}
+.al-am-app-word.is-paused {
+  color: var(--al-color-fg-muted);
+}
+.al-am-free {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-2);
+  padding-left: 10px;
+}
+.al-am-free .al-am-connect {
+  width: auto;
+  color: var(--al-color-fg-link);
+}
+
+/* A live dot: filled for Working and Ready, a ring otherwise, dashed for Not set up. Words always
+   stand next to it (never colour alone). */
+.al-ldot {
+  display: inline-block;
+  flex: none;
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--al-color-border-strong);
+}
+.al-ldot.is-working,
+.al-ldot.is-ready {
+  border-color: var(--al-color-status-success-icon);
+  background: var(--al-color-status-success-icon);
+}
+.al-ldot.is-paused {
+  border-color: var(--al-color-fg-muted);
+}
+.al-ldot.is-none {
+  border-style: dashed;
+}
+
+/* The Under the hood switch, top right. */
+.al-hood-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  min-height: 44px;
+  padding: 0 4px 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--al-color-fg-default);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.al-hood-label {
+  white-space: nowrap;
+}
+.al-switch-track {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-border-default);
+}
+.al-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--al-color-fg-default);
+}
+.al-hood-switch[aria-checked='true'] .al-switch-track {
+  background: var(--al-color-accent-default);
+}
+.al-hood-switch[aria-checked='true'] .al-switch-knob {
+  transform: translateX(16px);
+}
+
+/* The live status strip (Under the hood). */
+.al-strip {
+  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  background: var(--al-color-bg-sunken);
+  overflow-x: auto;
+}
+.al-strip-list {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  width: max-content;
+  margin: 0;
+  padding: 8px clamp(16px, 4vw, 40px);
+  list-style: none;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 18px;
+}
+.al-strip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.al-strip-label {
+  color: var(--al-color-fg-subtle);
+}
+
+/* The section rail: minimized (64 px) or expanded (240 px). */
+.al-rail {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  gap: 4px;
+  width: 64px;
+  padding: 12px 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-right: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.al-rail[data-expanded='true'] {
+  width: 240px;
+}
+.al-rail-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  width: 100%;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: var(--al-radius-sm);
+  background: transparent;
+  color: var(--al-color-fg-muted);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  overflow: hidden;
+  cursor: pointer;
+}
+.al-rail-item .al-sicon {
+  flex: none;
+}
+.al-rail-item:hover {
+  color: var(--al-color-fg-default);
+}
+.al-rail-item.is-current {
+  color: var(--al-color-accent-fg);
+  background: var(--al-color-accent-subtle);
+  font-weight: var(--al-font-weight-semibold);
+}
+.al-rail-toggle {
+  color: var(--al-color-fg-subtle);
+  font-size: 13px;
+}
+.al-rail-label {
+  white-space: nowrap;
+}
+.al-rail-item .al-rail-count {
+  position: absolute;
+  top: 4px;
+  left: 28px;
+}
+.al-rail[data-expanded='true'] .al-rail-count {
+  position: static;
+  margin-left: auto;
+}
+.al-rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.al-rail-sep {
+  height: 1px;
+  margin: 8px 4px;
+  background: var(--al-color-border-subtle);
+}
+.al-rail-head {
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
+/* The phone bar and its sheet (600 px and under). */
+.al-topnav {
+  display: none;
+  flex-direction: column;
+  padding: 4px 16px;
+  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.al-topnav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-2);
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--al-color-fg-default);
+  font: inherit;
+  font-weight: var(--al-font-weight-medium);
+  cursor: pointer;
+}
+.al-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 12px;
+}
+.al-sheet-item {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--al-radius-sm);
+  color: var(--al-color-fg-muted);
+  text-decoration: none;
+}
+.al-sheet-item.is-current {
+  color: var(--al-color-accent-fg);
+  background: var(--al-color-accent-subtle);
+  font-weight: var(--al-font-weight-semibold);
+}
+.al-sheet-head {
+  padding: 10px 12px 4px;
+}
+@media (max-width: 600px) {
+  .al-rail {
+    display: none;
+  }
+  .al-topnav {
+    display: flex;
+  }
+  .al-hide-sm {
+    display: none !important;
+  }
+  .al-chip {
+    max-width: 100%;
+  }
+  .al-app-main {
+    padding-top: var(--al-space-5);
+  }
+}
+
+/* The shell's dialogs (Keyboard shortcuts, Report a problem). */
+.al-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 96px var(--al-space-4) 0;
+  background: var(--al-color-bg-overlay);
+}
+.al-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(460px, calc(100vw - 32px));
+  padding: 20px;
+  box-sizing: border-box;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-raised);
+  box-shadow: var(--al-shadow-4);
+}
+.al-dialog-title {
+  margin: 0;
+}
+.al-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--al-space-2);
+}
+.al-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+.al-shortcut {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--al-space-4);
+}
+.al-shortcut dd {
+  margin: 0;
+}
+.al-report-text {
+  min-height: 96px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  border: var(--al-border-width-thin) solid var(--al-color-border-strong);
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-default);
+  font: inherit;
+  resize: vertical;
+}
+.al-report-diag {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+
+/* Cmd+K (kept from #715), with the prototype's hint column. */
+.al-goto-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 72px var(--al-space-4) 0;
+  background: var(--al-color-bg-overlay);
+}
+.al-goto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+  width: 560px;
+  max-width: 100%;
+  max-height: 70vh;
+  padding: var(--al-space-2);
+  box-sizing: border-box;
+  overflow: hidden;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-raised);
+  box-shadow: var(--al-shadow-4);
+}
+.al-goto-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+.al-goto-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: var(--al-radius-sm);
+  color: var(--al-color-fg-default);
+  cursor: pointer;
+}
+.al-goto-option:hover,
+.al-goto-option.is-active {
+  background: var(--al-color-accent-subtle);
+}
+.al-goto-label {
+  flex: 1;
+}
+.al-goto-hint {
+  font-size: 11px;
+  color: var(--al-color-fg-subtle);
+}
+.al-goto-none {
+  padding: var(--al-space-3);
+}

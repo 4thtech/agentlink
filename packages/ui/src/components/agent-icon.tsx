@@ -31,17 +31,33 @@ export function agentIconTone(key: string): AgentIconTone {
   return AGENT_ICON_TONES[hash % AGENT_ICON_TONES.length] as AgentIconTone;
 }
 
+/**
+ * W4-SHELL-V2: the live dot in the icon's corner (prototype v23): filled for Working and Ready, a
+ * ring for Not running and Paused, a dashed ring for Not set up. Decoration only: the status is
+ * always said in words next to the icon (never colour alone).
+ */
+export const AGENT_DOT_STATES = ['working', 'ready', 'idle', 'off', 'paused', 'none'] as const;
+export type AgentDotState = (typeof AGENT_DOT_STATES)[number];
+
 export interface AgentIconProps {
   /** The agent's label: its first letter is drawn. */
   label: string;
   /** The agent's stable key (its folder name): it picks the colour. Defaults to the label. */
   seed?: string;
-  /** `md` 24 px (menus, rows), `lg` 32 px (the trigger at 360). */
+  /** `md` 24 px (rows), `lg` 32 px (the agent chip and its menu). */
   size?: 'md' | 'lg';
+  /** W4-SHELL-V2: the live dot in the corner; none when undefined. */
+  dot?: AgentDotState;
   className?: string;
 }
 
-export function AgentIcon({ label, seed, size = 'md', className }: AgentIconProps): ReactElement {
+export function AgentIcon({
+  label,
+  seed,
+  size = 'md',
+  dot,
+  className,
+}: AgentIconProps): ReactElement {
   return (
     <span
       className={cx(
@@ -53,6 +69,7 @@ export function AgentIcon({ label, seed, size = 'md', className }: AgentIconProp
       aria-hidden="true"
     >
       {agentInitial(label)}
+      {dot === undefined ? null : <span className={cx('al-agent-icon-dot', `is-${dot}`)} />}
     </span>
   );
 }

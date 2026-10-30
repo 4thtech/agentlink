@@ -1461,6 +1461,34 @@ body {
   color: var(--al-color-status-neutral-fg);
   border-color: var(--al-color-status-neutral-border);
 }
+/* W4-SHELL-V2 (prototype v23): the live dot in the icon's corner. Filled for Working and Ready, a
+   ring for Not running, Idle and Paused, a dashed ring for Not set up. The icon positions it. */
+.al-agent-icon {
+  position: relative;
+}
+.al-agent-icon-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--al-color-border-strong);
+  background: var(--al-color-bg-surface);
+  box-shadow: 0 0 0 2px var(--al-color-bg-surface);
+}
+.al-agent-icon-dot.is-working,
+.al-agent-icon-dot.is-ready {
+  border-color: var(--al-color-status-success-icon);
+  background: var(--al-color-status-success-icon);
+}
+.al-agent-icon-dot.is-paused {
+  border-color: var(--al-color-fg-muted);
+}
+.al-agent-icon-dot.is-none {
+  border-style: dashed;
+}
 /* W4-SHELL: the agent switcher's place at the top of the sidebar, under the mark. */
 .al-side-top {
   display: flex;

@@ -30,6 +30,10 @@
 //
 // Same-user processes can change all of this (G-1, D-67): these checks keep mistakes and other
 // users out; they are not a boundary against the agent.
+import {
+  readUiSettings,
+  type UiSettings,
+} from '@4thtech-io/types/ui-contract/ui-settings';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { constants, type Stats } from 'node:fs';
 import {
@@ -680,40 +684,10 @@ export async function readAppCurrent(
   home: string,
   options: OwnerCheck = {},
 ): Promise<string | undefined> {
-  const uid = expectedUid(options);
-  try {
-    const root = join(home, '.agentlink');
-    if ((await checkDir(root, uid)) === undefined) return undefined;
-    const path = join(root, APP_FILE);
-    const before = await lstatOrMissing(path);
-    if (before === undefined) return undefined;
-    checkFileInfo(before, uid);
-    const handle = await open(
-      path,
-      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0),
-    );
-    try {
-      const info = await handle.stat();
-      if (!info.isFile() || info.ino !== before.ino || info.dev !== before.dev) return undefined;
-      if (info.size > MAX_APP_FILE_BYTES) return undefined;
-      const buffer = Buffer.alloc(MAX_APP_FILE_BYTES + 1);
-      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-      if (bytesRead > MAX_APP_FILE_BYTES) return undefined;
-      const parsed: unknown = JSON.parse(
-        new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, bytesRead)),
-      );
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined;
-      const record = parsed as Record<string, unknown>;
-      if (Object.keys(record).sort().join(',') !== 'current,v' || record['v'] !== 1) {
-        return undefined;
-      }
-      return isAgentName(record['current']) ? record['current'] : undefined;
-    } finally {
-      await handle.close();
-    }
-  } catch {
-    return undefined;
-  }
+  const record = await readRootJson(home, APP_FILE, MAX_APP_FILE_BYTES, options);
+  if (record === undefined) return undefined;
+  if (Object.keys(record).sort().join(',') !== 'current,v' || record['v'] !== 1) return undefined;
+  return isAgentName(record['current']) ? record['current'] : undefined;
 }
 
 /**
@@ -726,13 +700,27 @@ export async function writeAppCurrent(
   options: OwnerCheck = {},
 ): Promise<void> {
   if (!isAgentName(name)) throw new RuntimeError('agent_name_invalid');
+  await writeRootFile(home, APP_FILE, `${JSON.stringify({ v: 1, current: name })}\n`, options);
+}
+
+/**
+ * Writes one small file directly under `~/.agentlink` with mode 0600: a fresh temporary file
+ * (created exclusively, never following a link) renamed into place. An existing entry that is a
+ * link, not a regular private file, or has a second name is refused (04 §4).
+ */
+async function writeRootFile(
+  home: string,
+  file: string,
+  text: string,
+  options: OwnerCheck,
+): Promise<void> {
   const uid = expectedUid(options);
   const root = join(home, '.agentlink');
   await ensurePrivateDir(root, uid);
-  const target = join(root, APP_FILE);
+  const target = join(root, file);
   const existing = await lstatOrMissing(target);
   if (existing !== undefined) checkFileInfo(existing, uid);
-  const temp = join(root, `.${APP_FILE}.${encodeHex(randomBytes(8))}.tmp`);
+  const temp = join(root, `.${file}.${encodeHex(randomBytes(8))}.tmp`);
   const handle = await open(
     temp,
     constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0),
@@ -740,7 +728,7 @@ export async function writeAppCurrent(
   );
   try {
     if (POSIX) await handle.chmod(FILE_MODE);
-    await handle.writeFile(`${JSON.stringify({ v: 1, current: name })}\n`, 'utf8');
+    await handle.writeFile(text, 'utf8');
     await handle.sync();
   } finally {
     await handle.close();
@@ -751,6 +739,83 @@ export async function writeAppCurrent(
     await unlink(temp).catch(() => undefined);
     throw new RuntimeError('agent_path_invalid');
   }
+}
+
+/**
+ * Reads one small JSON object directly under `~/.agentlink`, or undefined: a missing, linked,
+ * non-private, oversized or malformed file is ignored, never an error. The handle is checked to be
+ * the file lstat saw (no swap between the check and the open).
+ */
+async function readRootJson(
+  home: string,
+  file: string,
+  maxBytes: number,
+  options: OwnerCheck,
+): Promise<Record<string, unknown> | undefined> {
+  const uid = expectedUid(options);
+  try {
+    const root = join(home, '.agentlink');
+    if ((await checkDir(root, uid)) === undefined) return undefined;
+    const path = join(root, file);
+    const before = await lstatOrMissing(path);
+    if (before === undefined) return undefined;
+    checkFileInfo(before, uid);
+    const handle = await open(
+      path,
+      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0),
+    );
+    try {
+      const info = await handle.stat();
+      if (!info.isFile() || info.ino !== before.ino || info.dev !== before.dev) return undefined;
+      if (info.size > maxBytes) return undefined;
+      const buffer = Buffer.alloc(maxBytes + 1);
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+      if (bytesRead > maxBytes) return undefined;
+      const parsed: unknown = JSON.parse(
+        new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, bytesRead)),
+      );
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined;
+      return parsed as Record<string, unknown>;
+    } finally {
+      await handle.close();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
+/** W4-SHELL-V2: the app's UI settings file (Under the hood, the section menu). */
+export const UI_SETTINGS_FILE = 'ui-settings.json';
+const MAX_UI_SETTINGS_BYTES = 256;
+
+/**
+ * W4-SHELL-V2: the app's UI settings from `~/.agentlink/ui-settings.json` (`{"v":1,"settings":{…}}`),
+ * or undefined. Only allowlisted booleans are read (readUiSettings); anything else is ignored.
+ */
+export async function readUiSettingsFile(
+  home: string,
+  options: OwnerCheck = {},
+): Promise<UiSettings | undefined> {
+  const record = await readRootJson(home, UI_SETTINGS_FILE, MAX_UI_SETTINGS_BYTES, options);
+  if (record === undefined) return undefined;
+  if (Object.keys(record).sort().join(',') !== 'settings,v' || record['v'] !== 1) return undefined;
+  return readUiSettings(record['settings']);
+}
+
+/** W4-SHELL-V2: writes the allowlisted settings (checked again here) to the 0600 file, atomically. */
+export async function writeUiSettingsFile(
+  home: string,
+  settings: UiSettings,
+  options: OwnerCheck = {},
+): Promise<void> {
+  const checked = readUiSettings({ ...settings });
+  if (checked === undefined) throw new RuntimeError('agent_config_invalid');
+  await writeRootFile(
+    home,
+    UI_SETTINGS_FILE,
+    `${JSON.stringify({ v: 1, settings: checked })}\n`,
+    options,
+  );
 }
 
 /** One agent folder as the app host lists it: never a path or an agent ID. */
@@ -845,5 +910,7 @@ export function agentDirectory(
     removeFolder: (name) => removeAgentFolder(home, name, check),
     readCurrent: () => readAppCurrent(home, check),
     writeCurrent: (name) => writeAppCurrent(home, name, check),
+    readUiSettings: () => readUiSettingsFile(home, check),
+    writeUiSettings: (settings) => writeUiSettingsFile(home, settings, check),
   });
 }

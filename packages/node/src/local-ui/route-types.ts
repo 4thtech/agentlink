@@ -18,6 +18,7 @@
 // any presence check and never runs its handler.
 import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
 import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
+import { UI_SETTINGS_PATH, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { LocalUiContext, LocalUiNewAgent } from './context.js';
 import type { NewAgentOutcome } from '../owner-add-agent.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
@@ -272,7 +273,27 @@ export interface LocalUiHandoffRoute {
   readonly presence: 'handoff';
 }
 
+/** W4-SHELL-V2: the fixed path of the ui-settings kind (08 §1, proposed). */
+export const UI_SETTINGS_WRITE_PATH = UI_SETTINGS_PATH;
+
+/**
+ * W4-SHELL-V2 (Decisions 49–51; 08 §1, proposed): saving the app's own UI settings (Under the hood,
+ * the section menu), the ninth named route kind. Only `PUT /api/ui/ui-settings`, registered once
+ * (routes.ts). The server's ui-settings gate runs after the same session, CSRF, Origin,
+ * fetch-metadata and octet-stream checks as every write, refuses a query, an operation input or a
+ * presence header, and parses the body itself (one strict JSON object of allowlisted booleans,
+ * @4thtech-io/types ui-contract/ui-settings). No owner presence and nothing signed: it changes how
+ * the app looks, never a policy, key or approval (I-4). The handler gets only the checked change.
+ */
+export interface LocalUiUiSettingsRoute {
+  readonly method: 'PUT';
+  readonly path: string;
+  readonly presence: 'ui-settings';
+  readonly handler: (context: LocalUiContext, change: UiSettings) => Promise<LocalUiResult>;
+}
+
 export type LocalUiRoute =
+  | LocalUiUiSettingsRoute
   | LocalUiHandoffRoute
   | LocalUiRemoveRoute
   | LocalUiSwitchRoute
