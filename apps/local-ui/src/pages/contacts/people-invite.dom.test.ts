@@ -34,6 +34,7 @@ interface State {
   contacts: unknown[];
   open: { inviteId: string; name: string | null; expiresAt: string }[];
   accepted?: number;
+  created?: number;
 }
 
 function server(state: State): typeof fetch {
@@ -60,6 +61,7 @@ function server(state: State): typeof fetch {
       });
     }
     if (method === 'POST' && url === '/api/ui/invites') {
+      state.created = (state.created ?? 0) + 1;
       state.open.push({
         inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
         name: null,
@@ -183,7 +185,6 @@ describe('W4-WIRE-2: a pasted invite link on the Invite screen (Decision 52 (3))
   it('Paste it → Continue → Accept with the backup code → the Connected moment', async () => {
     const state: State = { contacts: [], open: [] };
     await mount(state);
-    await click(I.title);
     await click('Have an invite link? Paste it');
     const field = document.querySelector<HTMLTextAreaElement>('textarea[name="invite-link"]')!;
     await act(async () => {
@@ -212,6 +213,19 @@ describe('W4-WIRE-2: a pasted invite link on the Invite screen (Decision 52 (3))
     });
     await settle();
     expect(text()).toContain('You and “Marko” are connected');
+    // IR-W4-WIRE-2X-1: pasting someone's invite makes no invite of your own.
+    expect(state.created ?? 0).toBe(0);
+  });
+
+  it('Paste it on the Invite screen opens the paste screen; the link it made goes (U4 rule)', async () => {
+    const state: State = { contacts: [], open: [] };
+    await mount(state);
+    await click(I.title);
+    expect(state.created).toBe(1);
+    await click('Have an invite link? Paste it');
+    expect(document.querySelector('.inv-panel')).toBeNull();
+    expect(document.querySelector('textarea[name="invite-link"]')).not.toBeNull();
+    expect(state.open).toEqual([]);
   });
 });
 

@@ -574,6 +574,33 @@ describe('W4-WIZARD: the same steps for an owner who has one already', () => {
   });
 });
 
+/** The agents the name step and "Open {name}" read: "Work" is taken; switches are recorded. */
+function fakeAgents(): NonNullable<FirstRunPageProps['agentsApi']> & {
+  switched: { name: string; generation: number }[];
+} {
+  const switched: { name: string; generation: number }[] = [];
+  return {
+    switched,
+    list: () =>
+      Promise.resolve({
+        kind: 'ok',
+        list: {
+          switchable: true,
+          generation: 3,
+          current: 'work',
+          label: 'Work',
+          agents: [{ name: 'work', label: 'Work', current: true, apps: [] }],
+        },
+      } as unknown as Awaited<ReturnType<NonNullable<FirstRunPageProps['agentsApi']>['list']>>),
+    switchTo: (name: string, generation: number) => {
+      switched.push({ name, generation });
+      return Promise.resolve({ kind: 'done' } as unknown as Awaited<
+        ReturnType<NonNullable<FirstRunPageProps['agentsApi']>['switchTo']>
+      >);
+    },
+  };
+}
+
 /** Types into the agent's name field as a person does (React sees an input event). */
 async function typeName(value: string): Promise<void> {
   const input = host.querySelector<HTMLInputElement>('input[name="agent-name"]');
@@ -680,6 +707,57 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     history.replaceState(null, '', '/start/connect?add=agent');
     const { went } = await mount(asAdd());
     expect(went[0]).toBe('/start/app?add=agent (replace)');
+  });
+
+  it('IR-W4-WIRE-2X-1: an abandoned Add agent (Skip to Home, or away) starts fresh next time', async () => {
+    await mount(asAdd());
+    await typeName('Side project');
+    await click('Continue');
+    expect(h1()).toBe(PICK_STEP.title);
+    // The person leaves Get started (Skip to Home, a link, Back): the page goes.
+    history.pushState(null, '', '/');
+    act(() => root.unmount());
+    root = createRoot(host);
+    history.replaceState(null, '', '/start/app?add=agent');
+    await mount(asAdd());
+    expect(h1()).toBe('Name your agent');
+    expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe('');
+  });
+
+  it('IR-W4-WIRE-2X-1: a name another agent has says so (a hint; it may still be used)', async () => {
+    const agentsApi = fakeAgents();
+    await mount(asAdd({ agentsApi }));
+    await typeName('Work');
+    expect(text()).toContain('You already have an agent with this name.');
+    await typeName('Side project');
+    expect(text()).not.toContain('You already have an agent with this name.');
+  });
+
+  it('IR-W4-WIRE-2X-SEC-1: bidi and invisible format characters never reach the server', async () => {
+    const labelCheck = vi.fn(() => Promise.resolve({ kind: 'ok' } as const));
+    await mount(asAdd({ api: Object.assign(fakeSetup({ status: OWNER }), { labelCheck }) }));
+    for (const bad of ['Evil\u202Ename', 'Zero\u200Bwidth', 'Iso\u2066late', 'Bom\uFEFF']) {
+      await typeName(bad);
+      await click('Continue');
+      expect(h1()).toBe('Name your agent');
+    }
+    expect(labelCheck).not.toHaveBeenCalled();
+  });
+
+  it('IR-W4-WIRE-2X-1: Connected offers "Open {name}" (never switches by itself)', async () => {
+    const agentsApi = fakeAgents();
+    const home = vi.fn();
+    await mount(asAdd({ createAgentApi: made(), agentsApi, goHome: home }));
+    await typeName('Side project');
+    await click('Continue');
+    await click(/^CursorFound/);
+    await click(PICK_STEP.next('Cursor'));
+    await click(CONNECT_STEP.connect('Touch ID'));
+    expect(h1()).toBe(CONNECTED_STEP.title('Cursor'));
+    expect(agentsApi.switched).toEqual([]);
+    await click('Open Side project');
+    expect(agentsApi.switched).toEqual([{ name: 'side-project', generation: 3 }]);
+    expect(home).toHaveBeenCalledTimes(1);
   });
 
   it('axe finds nothing on the name step; its words pass lintVocabulary', async () => {

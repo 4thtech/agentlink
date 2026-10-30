@@ -159,6 +159,8 @@ describe('W4-WIRE-2: "Have an invite link? Paste it" on the Invite screen', () =
     ['a short link of the wrong size', `https://agentlink.4thtech.io/i#2.${SECRET}A`],
     ['two different links', `${SHORT} ${LONG}`],
     ['plain words', 'hello there'],
+    // IR-W4-WIRE-2X-SEC-1: the same bound as the invite client (8 192 payload characters).
+    ['a long link past the bound', `https://agentlink.4thtech.io/i#${'A'.repeat(8193)}`],
   ])('refuses %s here: no request and no navigation', async (_what, value) => {
     const { invites } = await mount();
     const before = location.href;
