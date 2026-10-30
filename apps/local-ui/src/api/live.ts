@@ -587,8 +587,9 @@ const onVisibility = (): void => {
   else schedulePoll();
 };
 const onChanged = (): void => {
-  // Our own announcement, or the stream already carries every change: nothing to read.
-  if (announcing || mode === 'stream') return;
+  // Our own announcement: nothing to read. Another view's (an agent added, renamed or removed here)
+  // is read at once, stream or not: the list and its generation follow without waiting for a tick.
+  if (announcing) return;
   void readNow();
 };
 

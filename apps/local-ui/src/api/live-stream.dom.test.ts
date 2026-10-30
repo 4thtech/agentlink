@@ -289,6 +289,18 @@ describe('the shared live subscription over the events stream', () => {
     expect(getLive().list?.generation).toBe(2);
   });
 
+  it('another view announcing a change (an agent added here) reads the list at once, stream or not', async () => {
+    const s = serve();
+    subscribeLive(() => undefined);
+    await flush();
+    const reads = s.agentReads;
+    s.records = [record(), record({ name: 'side', label: 'Side project', current: false })];
+    window.dispatchEvent(new Event('agentlink:agents-changed'));
+    await flush();
+    expect(s.agentReads).toBe(reads + 1);
+    expect(getLive().agents.map((a) => a.label)).toEqual(['Personal', 'Side project']);
+  });
+
   it('reconnects with Last-Event-ID after the stream ends and applies the replay', async () => {
     const s = serve();
     subscribeLive(() => undefined);
