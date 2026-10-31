@@ -1,5 +1,24 @@
 # @4thtech-io/core
 
+## 0.4.6
+
+### Patch Changes
+
+- b72f9ad: W4-AUTO-SAVE (D-142): received files from contacts you keep are saved automatically into the Inbox folder, within daily limits and a free-space reserve, with the quarantine mark, `.download` for risky names, never overwriting, and one save per file shared by auto-save, Save and `agentlink_fetch_file`.
+- b72f9ad: W4-INBOX, W4-FILES-SAVE: the local app's Inbox page (Needs you, conversations with messages and files inline, approvals as cards with inline Touch ID, All caught up) and "Save to Inbox" for a received file: one Touch ID signs a local `file.save` owner action, and core saves the file into the Inbox folder with its own fetch (local decrypt, no path from the page).
+- b72f9ad: W4-LIVE-STATUS (D-143): every `agentlink mcp` process, lease holder or not, keeps one MCP session row (store schema version 10: `mcp_sessions` and `mcp_last_seen`), written when it answers `initialize`, renewed every 15 s (TTL 45 s), stamped on tool calls and deleted on clean exit. The AI app id comes from `clientInfo.name` through one fixed table (else `other`); the name itself is never stored or logged (the redacting logger now drops `clientInfo`). The app host reads live rows only (TTL, this agent, a pid in 2..2^31-1 that answers signal 0), so `GET /api/ui/agents` gains `state`, `lastSeenAt` and per AI app `{app, state, since?, lastSeenAt?}`, and Running no longer comes from the publisher lease. New read `GET /api/ui/events`: a `text/event-stream` of changes only (allowlisted fields, `Last-Event-ID` replay from 64 events, `: ping` every 15 s, 4 streams per page session and 8 in all, 30 min each), behind the same gate as every `/api/ui/` read. The page's switch to the stream is U1-b.
+- b72f9ad: W4-PAUSE (D-143 (5)): the owner can pause an agent. Store schema version 11 adds `agent_pause` (one row while paused). `POST /api/ui/agents/pause` `{generation}` is a route kind of its own (no presence, nothing signed, only the pause row written); `POST /api/ui/agents/resume` is a presence route that signs the new local owner action `agent.resume` `{agent}` (600 s, nonce single use; refused with `not_paused` before the gesture when not paused), and core deletes the row in the same store write that records the nonce. While paused (and when the pause row cannot be read: fail closed) the sending and fetching tools answer `rejected` / `AGENT_PAUSED` before any effect and keep no idempotency result; core refuses sync, catch-up, subscriptions, sends, file fetches, terms, proofs and card updates with `agent_paused`; the outbox publishes nothing (queued rows wait); the background loop keeps the lease and idles, closing its subscription within one 5 s check; the app host's pairing passes skip the agent. `agentlink_status` and `agentlink_inbox` answer from the store, and status adds the paused line. `GET /api/ui/agents` and the events stream show `paused`. No MCP tool or CLI command pauses or resumes; the tool surface is unchanged.
+- Updated dependencies [b72f9ad]
+- Updated dependencies [b72f9ad]
+- Updated dependencies [b72f9ad]
+- Updated dependencies [b72f9ad]
+  - @4thtech-io/types@0.4.6
+  - @4thtech-io/log@0.4.6
+  - @4thtech-io/chain@0.4.6
+  - @4thtech-io/transport-nostr@0.4.6
+  - @4thtech-io/storage@0.4.6
+  - @4thtech-io/crypto@0.4.6
+
 ## 0.4.5
 
 ### Patch Changes

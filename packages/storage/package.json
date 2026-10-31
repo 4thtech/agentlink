@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/storage",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "private": true,
   "description": "Storage adapters: inline and S3-compatible (ciphertext only).",
   "license": "MIT",
