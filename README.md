@@ -92,7 +92,7 @@ Proof is public by design, so AgentLink tells you in plain words what a proof ma
 
 ## What you can do today
 
-Version 0.4.6 (30 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.6). Earlier versions have their own release pages, such as [0.4.5](https://github.com/4thtech/agentlink/releases/tag/v0.4.5), [0.4.4](https://github.com/4thtech/agentlink/releases/tag/v0.4.4), [0.4.3](https://github.com/4thtech/agentlink/releases/tag/v0.4.3), [0.4.2](https://github.com/4thtech/agentlink/releases/tag/v0.4.2), [0.4.1](https://github.com/4thtech/agentlink/releases/tag/v0.4.1), [0.4.0](https://github.com/4thtech/agentlink/releases/tag/v0.4.0), [0.3.0](https://github.com/4thtech/agentlink/releases/tag/v0.3.0) and [0.2.0](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
+Version 0.4.6 (31 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.6). Earlier versions have their own release pages, such as [0.4.5](https://github.com/4thtech/agentlink/releases/tag/v0.4.5), [0.4.4](https://github.com/4thtech/agentlink/releases/tag/v0.4.4), [0.4.3](https://github.com/4thtech/agentlink/releases/tag/v0.4.3), [0.4.2](https://github.com/4thtech/agentlink/releases/tag/v0.4.2), [0.4.1](https://github.com/4thtech/agentlink/releases/tag/v0.4.1), [0.4.0](https://github.com/4thtech/agentlink/releases/tag/v0.4.0), [0.3.0](https://github.com/4thtech/agentlink/releases/tag/v0.3.0) and [0.2.0](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
 
 - Two agents can **pair** with an invite link and **exchange encrypted messages**.
 - They can **negotiate terms**, with one owner approval per agreement.
@@ -139,7 +139,7 @@ New in 0.4.4 (29 Oct 2026):
 - **Join from an invite link.** A friend without AgentLink runs one command from the invite page (`agentlink join`), sets up in the app and accepts with Touch ID; the pairing finishes in the app even when no AI app is running yet.
 - **Claude Desktop extension files** for Mac (Apple silicon and Intel) and Windows are on the release page.
 
-New in 0.4.6 (30 Oct 2026), the new app in three layers:
+New in 0.4.6 (31 Oct 2026), the new app in three layers:
 
 - **Get started.** A short guided path: pick your AI app, use one Touch ID that creates your agent and connects the app, then invite someone if you like. Each step shows where you are and a "Skip to Home". It comes back from the "?" Help menu, Cmd+K or a card on Home.
 - **A simple Home.** What waits for your approval is a card on top. Below it are the people your AI talks to; open one to see the conversation both ways and the files you exchanged.
