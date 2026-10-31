@@ -1,52 +1,45 @@
-# Agents page and the agent switcher
+# Agents
 
-*Applies to AgentLink 0.4.4. In 0.4.3 the app shows one agent and you choose it in the terminal.*
+*Applies to AgentLink 0.4.6. In 0.4.4 and 0.4.5 this page was a list with a map view, Switch and Add agent.*
 
 An agent is one identity of yours: its own contacts, messages and files. Most people have one. You may want a second to try AgentLink on your own, or one per project. All your agents live in the same window.
 
-## Switch between agents
+## Live status
 
-The top bar shows the open agent: its name, the AI app it works from and whether it is **Running**. Press it to see your agents and pick another. You can also press **Switch** on the Agents page.
+Each agent shows what it is doing right now, and updates by itself, with no reload:
 
-Switching asks for no Touch ID, because it approves nothing. The page then shows the other agent's own contacts, messages and files. If a page was still showing the first agent, it is refreshed before it can change anything, so a change can never land on the wrong agent.
+- **Working in Claude Code**, **Ready in Claude Code** or **Offline · last seen 5 min ago** for the agent.
+- For each AI app: **Working**, **Ready**, **Idle**, **Not running** (with when it was last seen) or **Not set up**.
 
-Every agent that was already on your computer is listed, under the name it had. Nothing is renamed or lost when you update.
+Each AI app reports in every 15 seconds, so an app that quits or crashes drops off within seconds. A second AI app on the same agent shows too. If the live updates cannot reach the page, it checks every 5 seconds instead. The same status shows in the top bar and its agent menu, where you also pick another agent. Switching asks for no Touch ID, because it approves nothing.
 
-## The list
+## What you can do
 
-**Agents** in the menu opens the list. Each row shows the agent's name, whether it is **Running** or **Not running**, which AI app it **Works from** (or **Not connected to an AI app**) and how many contacts it has. A row has **Switch**, **Rename**, **Connect an AI app** or **Connect**, **More** and, for the open agent, **Open**.
+- **Pause** and **Resume.** See below.
+- **Rename.** Your contacts see the new name. The change is signed with your Touch ID and reaches each contact with the card update. An agent can be renamed for its contacts 3 times a day. No AI app tool or terminal command can rename an agent.
+- **Connect** or **Disconnect** an AI app. You see the exact change first, are told to quit the app first, and restart it afterwards. See [AI apps](ai-apps.md).
+- **Back up.** Leads to your recovery kit, which brings your agent and its contacts back if this computer is lost. A recovery kit restores again in 0.4.6.
+- **Remove.** Retires an agent for good. The sheet names what goes from this computer (keys and settings, message and file history, its AI app entry) and how many contacts will be told. If an AI app still uses the agent, quit it first and **Check again**. You can **Export history first**. Type the agent's name to confirm. If your contacts can't be told right now, it asks **Remove anyway?** It can't be undone, and a removed agent can only come back as a new agent. Your owner identity and your other agents stay.
 
-If some of your agents are not connected to an AI app and have no contacts, a calm note offers **Tidy up**. If they were only for testing, you can remove them.
+## Pause and resume
+
+**Pause** is one click and asks for no Touch ID. It stops the agent in every AI app that runs it.
+
+- The AI can still read what the agent already holds.
+- Sending messages, answering offers, adding proof, invites and fetching files are refused with "This agent is paused. The owner can resume it in the AgentLink app."
+- Messages already waiting to go stay queued and go out after you resume.
+- Nothing new is received while it is paused, and files are not saved automatically.
+
+**Resume** asks for Touch ID. Your AI cannot pause or resume an agent.
 
 ## Add an agent
 
-1. Press **Add agent**.
-2. Name it, for example **Second agent**.
-3. Press **Add with Touch ID**.
+Use **New agent** (from Agents or the agent menu). It uses the same steps as [Get started](get-started-wizard.md#adding-another-agent): name, AI app, one Touch ID. Two agents of one owner can pair with each other: this is the easy way to try AgentLink without a second person. See [Pair with someone](../get-started/pair-with-someone.md#no-one-to-invite-yet).
 
-AgentLink makes the agent, signs it as yours and names it in that one step. Your contacts see the name you typed, not the name of its folder on your computer. If anything fails, nothing is left behind. Adding an agent never changes your AI apps' settings. The sheet then asks **Connect an AI app to it?**, which you can answer with **Not now**.
+## Under the hood
 
-An agent made here belongs to you, like your first. Two agents of one owner can pair with each other: this is the easy way to try AgentLink without a second person. See [Pair with someone](../get-started/pair-with-someone.md#no-one-to-invite-yet).
+With [Under the hood](under-the-hood.md) on, Agents becomes a table with search, filters by status or AI app, sorting by activity and a bulk Remove. Each agent also has its own page with its AI apps, people, rules, recent activity and backup.
 
-## Rename
-
-**Rename** changes only the name you see on your own computer: contacts keep seeing the name the agent was created with. It never changes the agent's folder, its AI app entries or its identity. It asks for Touch ID.
-
-## Remove an agent
-
-**More**, then **Remove**, retires an agent for good. The sheet names what goes from this computer: its keys and settings, its message and file history, and its entry in an AI app. It also says how many contacts will be told the agent is retired.
-
-1. If an AI app still uses the agent, the sheet says **Quit any AI app that uses** the agent **first.** Close the app, then **Check again**.
-2. You can **Export history first** to keep a copy.
-3. Type the agent's name to confirm, then press **Remove with Touch ID**.
-4. If your contacts can't be told right now, the sheet asks **Remove anyway?** before it goes on.
-
-It can't be undone, and a removed agent can't be restored from a backup: it can only come back as a new agent. Your owner identity and your other agents stay.
-
-## Live connections
-
-The **Map** view next to **List** shows who your agents are talking to, right now. Each agent is a box with its AI app. Its contacts sit on the right (the top 12, then **+N more**), and a line appears for people who exchanged something in the last 24 hours. A short dash travels along the line while a message or file is moving. Quiet contacts are behind **Show quiet**. Press a box or a line to open that conversation in [Messages](messages.md).
-
-The map shows names and words only, never message content. With reduced motion nothing travels and the word **now** shows instead. The list is the text version of the same facts.
+The live connections map from 0.4.4 is not in this screen. A new Connections map is planned next.
 
 Back to [The local app](README.md).

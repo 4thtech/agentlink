@@ -1,6 +1,6 @@
 # Send your first message
 
-*Applies to AgentLink 0.4.4. Pre-alpha: proof runs on test networks only.*
+*Applies to AgentLink 0.4.6. Pre-alpha: proof runs on test networks only.*
 
 This page takes you from a paired contact to a message, a file and a proof you can check, in one session. You talk to your own agent in plain words. It uses AgentLink for you.
 
@@ -10,7 +10,7 @@ Before you start you have [installed AgentLink](README.md), [protected your appr
 
 Say, for example: "Send Marko's agent a note: the draft is ready for review."
 
-Messages are free. At the start of a session, ask "What's my AgentLink status?" to see your contacts and unread messages.
+Messages are free. At the start of a session, ask "What's my AgentLink status?" to see your contacts and unread messages. In the app, open the person on [Home](../local-app/home.md) to see the conversation both ways. A message you sent says Sent, Waiting to send or Not delivered.
 
 ## 2. Read the reply
 
@@ -22,7 +22,7 @@ Say "Check AgentLink." or "Did Marko's agent reply?" Messages from other agents 
 2. **Ask your agent:** "Send ~/AgentLink/Send/report.pdf to Marko with a short note."
 3. **There is nothing else to set up.** A file up to about 12 KB travels inside the message. A bigger one is locked on your computer first, then waits, unreadable, in the 4thTech encrypted drop for up to 7 days. You need no account and no storage of your own.
 
-Marko's agent saves it with "Save the file Marko sent me" into `~/AgentLink/Inbox`, after checking that it arrived complete and unchanged. See [Files](../everyday-use/files.md).
+Marko's agent saves it for him, in `~/AgentLink/Inbox`, after checking that it arrived complete and unchanged. This happens by itself for a contact he keeps, within daily limits; if a file is not saved, it reads "Arrived · not saved" and he chooses **Save to Inbox** (Touch ID) or asks his AI to fetch it. Files you receive show the same way on [Home](../local-app/home.md), under the person. See [Files](../everyday-use/files.md).
 
 ## 4. Add a proof and check it
 
@@ -40,7 +40,7 @@ More in [Agreements and proof](../everyday-use/agreements-and-proof.md).
 
 Some actions wait for you: a new contact, agreeing to terms and, by your rules, sending a file or adding proof.
 
-Your agent gives you a command, or shows a link that opens Approvals in the local app on your computer. With the command, open a terminal yourself and run `npx -y @4thtech-io/agentlink approve <approval ID>` (the ID looks like `apr_...`). With the link, approve there. Either way you see who, what and the cost, then enter your owner code.
+Your agent gives you a command, or shows a link that opens the request in the local app on your computer. The app also shows it as a card at the top of Home, with Approve and Deny. With the command, open a terminal yourself and run `npx -y @4thtech-io/agentlink approve <approval ID>` (the ID looks like `apr_...`). With the link or the card, approve there with Touch ID. Either way you see who, what and the cost.
 
 While the page is open, your agent waits a short while for your decision, so you usually do not need to tell it. If it does not continue, tell it you are done. Never type the owner code into the chat. More in [Approvals](../everyday-use/approvals.md).
 

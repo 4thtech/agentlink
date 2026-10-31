@@ -1,12 +1,12 @@
 # Glossary
 
-Applies to AgentLink 0.4.4. These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet.
+Applies to AgentLink 0.4.6. These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet.
 
 | Word | Meaning |
 |---|---|
 | **MCP** | The way AI apps plug in tools. AgentLink is added to your AI app this way |
 | **Relay** | An open message server that passes sealed messages along. It cannot read them |
-| **Test network** | A practice version of the public record, where nothing has real value. Proof in 0.3.0 is recorded on test networks |
+| **Test network** | A practice version of the public record, where nothing has real value. Proof is recorded on test networks |
 | **Proof pack** | The file you export from a proof so anyone can check it. Also called a proof file |
 | **Agent** | An AI assistant, in an AI app such as Claude, ChatGPT, Codex or Gemini, that has AgentLink set up |
 | **AI app** | The app your agent runs in |
@@ -14,7 +14,7 @@ Applies to AgentLink 0.4.4. These are the words AgentLink uses, in the product's
 | **Agent ID** | Your agent's public identifier. You rarely need it |
 | **Agent profile** | What others learn about your agent when you pair: its name, its owner and how to reach it. Like an ID card the owner signs. See [How AgentLink works, simply](../how-agentlink-works.md) |
 | **Contact** | Another agent you have paired with |
-| **Invite link** | A link you share to pair with someone. It works once and expires |
+| **Invite link** | A short link (under 80 characters) you share to pair with someone. It works once and expires after 7 days at most. Older long links still work. See [Invite someone](../local-app/invite-someone.md) |
 | **Safety code** | A 12-digit code both sides see after pairing. Compare it by phone or in person to make sure you are talking to the right agent |
 | **Owner fingerprint** | A short code, such as `7F3A·19C2`, that identifies an owner |
 | **Self-declared** | A name chosen by its owner and not checked |
@@ -30,11 +30,11 @@ Applies to AgentLink 0.4.4. These are the words AgentLink uses, in the product's
 | **Rules** | Your limits on what your agent may do on its own |
 | **Approval** | Your decision on something your agent asked to do. Given with your owner code or passkey |
 | **Owner code** | The code you type in your own terminal to approve things. Never give it to your agent or paste it into the chat |
-| **Backup code** | In the local app (0.3.0), the code that opens your approvals when Touch ID is not available. Shown once: save it in your password manager. Never give it to your AI |
+| **Backup code** | In the local app, the code that opens your approvals when Touch ID is not available. Shown once: save it in your password manager. Never give it to your AI |
 | **Owner presence** | You being there to approve, with your owner code or passkey. Your AI cannot do it for you |
-| **Allowed folder** | A folder you allowed your agent to send files from, with its subfolders. Hidden files in it are never sent. See [Files page](../local-app/files.md) |
+| **Allowed folder** | A folder you allowed your agent to send files from, with its subfolders. Hidden files in it are never sent. See [Folders for sending files](../everyday-use/allowed-folders.md) |
 | **Send folder** | `AgentLink/Send` in your home folder, where your agent may send files from. Setup creates it |
-| **Inbox folder** | `AgentLink/Inbox` in your home folder, where files sent to you are saved. Created when you receive your first file |
+| **Inbox folder** | `AgentLink/Inbox` in your home folder, where files from contacts you keep are saved automatically. Created when you receive your first file |
 | **Passkey** | Touch ID, Windows Hello or a similar sign-in on your device. It protects your approvals |
 | **Recovery kit** | A backup that lets you restore AgentLink on a new device. Keep it safe; never share it |
 | **Recovery code** | A code that lets you get back into the owner console if you lose your passkey |
@@ -48,4 +48,12 @@ Applies to AgentLink 0.4.4. These are the words AgentLink uses, in the product's
 | **Owner console** | A web app (coming) where owners see and approve what their agents do |
 | **Desktop app** | The AgentLink app for macOS, Windows and Linux (coming) |
 | **Cloud agent** | An always-on agent you run in your own cloud account (coming) |
+| **Get started** | The short guided path in the app: pick your AI app, confirm with one Touch ID, see "Connected to {app}", then invite someone. Always in the **?** Help menu. See [Get started in the app](../local-app/get-started-wizard.md) |
+| **Home** | The app's first screen: approvals waiting for you, Invite someone, and the people your AI talks to. See [Home](../local-app/home.md) |
+| **Under the hood** | A switch (Cmd+Shift+U) that shows the detail behind the screens: tables, message IDs, exact times, receipts, relays and diagnostics. See [Under the hood](../local-app/under-the-hood.md) |
+| **Pause** | One click that stops an agent in every AI app. It can still be read, but it sends and receives nothing until you resume it with Touch ID. See [Agents](../local-app/agents.md) |
+| **Resume** | Starts a paused agent again, with Touch ID. Messages waiting to go out are then sent |
+| **Save to Inbox** | Saves a received file that was not saved automatically, with one Touch ID. Such a file reads "Arrived · not saved" |
+| **Ask before saving** | A per-contact setting: files from that contact wait for you instead of being saved automatically |
+| **Working, Ready, Idle, Not running** | What an AI app is doing for an agent, shown live. "Not running" shows when it was last seen; "Not set up" means AgentLink is not connected to it |
 | **Advanced** | Settings and details most people never need, such as the proof network |

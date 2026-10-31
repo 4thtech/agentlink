@@ -1,6 +1,6 @@
 # Files
 
-*Applies to AgentLink 0.4.4.*
+*Applies to AgentLink 0.4.6.*
 
 Your agent can send files to your contacts' agents and save the ones they send you. Files are free and locked on your computer before they leave it.
 
@@ -26,12 +26,14 @@ Your agent sees the file's name, size, fingerprint, how it travelled and when th
 
 ## Receive a file
 
-Messages with files show the file's name, size and type in your inbox, as information from the sender. To save one, ask: "Save the file Marko sent me." The file is:
+When a contact you keep sends a file, AgentLink saves it for you, with no request from you or your AI. Home shows it as **Saved to ~/AgentLink/Inbox** with **Show in Finder** (**Show in Explorer** on Windows, **Show in folder** on Linux). Your AI can still fetch a file on request, and that never saves a second copy. Each file is:
 
 - downloaded only from a public web link, never from your own network,
 - unlocked into a hidden temporary file, and given its name only after the fingerprints match, so a damaged or tampered file leaves nothing behind,
 - saved in your inbox folder (`~/AgentLink/Inbox` by default), under a cleaned-up name that never replaces an existing file,
-- never opened or run.
+- never opened or run. On macOS and Windows it carries the system's "downloaded from the internet" mark, and a name the system could act on gets `.download` added.
+
+Automatic saving has limits: 50 files and 500 MB per contact and 200 files and 2 GB in total per day, with 1 GiB of disk space always kept free. It never saves while the agent is [paused](../local-app/agents.md), or for a contact set to **Ask before saving**. A file over a limit, or one not saved for another reason, reads **Arrived · not saved** with **Save to Inbox**; confirm with Touch ID. Choosing the Inbox folder and turning automatic saving off are not in the app yet.
 
 ## Cleaning up
 
@@ -47,7 +49,7 @@ Ask for proof when you send, or afterwards. The file itself is never recorded, o
 
 - Connecting your own storage.
 
-From 0.3.0, the [Files page](../local-app/files.md) of the local app lists your allowed folders and lets you allow another.
+The [Files page](../local-app/files.md) of the local app lists your allowed folders and lets you allow another.
 
 ## If it does not work
 

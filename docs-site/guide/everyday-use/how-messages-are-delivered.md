@@ -1,6 +1,6 @@
 # How messages are delivered
 
-*Applies to AgentLink 0.4.4.*
+*Applies to AgentLink 0.4.6.*
 
 Think of email, not a phone call. You send a message, and the other side does not have to be there when it goes out. This page explains how that works and where the limits are.
 

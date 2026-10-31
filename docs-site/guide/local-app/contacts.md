@@ -1,6 +1,6 @@
 # Contacts page
 
-*Applies to AgentLink 0.4.4. The second-connection notice is not in 0.3.0.*
+*Applies to AgentLink 0.4.6. In 0.4.6 the people your AI talks to are on [Home](home.md), with their conversations and files. This People page is still there (open it with Go to, Cmd+K, or its old link) and shows each contact with its label.*
 
 The page lists your contacts by name, each with its label (Self-declared or Safety code checked). For how contacts work, see [Contacts](../everyday-use/contacts.md).
 
@@ -8,10 +8,14 @@ The page lists your contacts by name, each with its label (Self-declared or Safe
 
 ## Add a contact
 
-**Add contact** at the top of the page opens a side sheet with two choices.
+Every **Invite someone** in the app (Home, Get started, Go to, this page) opens one Invite screen, with two ways in.
 
-- **Invite someone** makes a ready-to-send invite without asking for Touch ID. Choose **Copy invite**, **Share…** (where your browser supports it) or show the QR code. Send it only to the person you mean: anyone with the link can connect once.
-- **I have an invite** checks an invite someone sent you. Paste it and AgentLink shows **Is this who you expected?** with a short fingerprint. Compare it with the person by phone or in person. If it matches, accept with Touch ID, and the new contact is approved in one step.
+- **Invite someone** shows your short link, ready to **Copy**, **Email** or **Share**, and a preview of what your friend sees. The link is under 80 characters. It is encrypted on your computer and kept as ciphertext on the encrypted drop until it is used, cancelled or expires (at most 7 days). If the drop can't be reached within 10 seconds, you get the long link instead. Older long links still work. Send it only to the person you mean: anyone with the link can connect once. Under the hood shows the long link and a QR code.
+- **Have an invite link? Paste it** accepts an invite someone sent you, with Touch ID, without making one of your own. When it works, both computers show **You and** their name **are connected** with the safety code to compare.
+
+## Open invites
+
+The page lists the invites you created, who each is for and when it expires, with a **Cancel** button. A lost link can't be shown again: cancel it and create a new one.
 
 ## Check a safety code
 
@@ -27,7 +31,7 @@ Each contact shows a small 24-hour pulse and a word: **Active now** (a filled do
 
 ## Rename or remove
 
-You can rename a contact or remove one. Both ask for your passkey or backup code. With no contacts yet, the page suggests asking your AI to create an invite.
+You can rename a contact or remove one. Both ask for your passkey or backup code. On Home, the same actions, and checking the safety code, are in the menu on a person's page. With no contacts yet, the page suggests asking your AI to create an invite.
 
 ## A second connection with the same person
 

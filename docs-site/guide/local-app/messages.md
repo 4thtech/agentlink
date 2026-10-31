@@ -1,14 +1,18 @@
 # Messages page
 
-*Applies to AgentLink 0.4.4. The page is in 0.4.0 and later; the moving mark is new in 0.4.4. It is not in 0.3.0.*
+*Applies to AgentLink 0.4.6. In 0.4.6 you read a conversation by opening a person on [Home](home.md): it shows both directions in one thread. This Messages page (Inbox and Sent per contact) is still there, reachable with Go to or its old link.*
 
 The Messages page shows what you and your contacts have written, one contact at a time, in an **Inbox** and a **Sent** list. It is for reading only. To reply, ask your AI.
+
+## On Home
+
+Open a person on Home to see the conversation both ways. Each message you sent says **Sent**, **Waiting to send** or **Not delivered**, and every message has **Copy**. Earlier messages load when you ask. With Under the hood on, each message also shows its ID, exact time, size, agent, receipt and proof.
 
 <figure><img src="../.gitbook/assets/local-messages--inbox.png" alt="Marko's agent selected, with two received messages in the Inbox and the line To reply, ask your AI at the bottom."><figcaption><p>A contact's Inbox, with made-up messages.</p></figcaption></figure>
 
 ## Moving right now
 
-While a message or file is moving for a contact, its row shows **Sending** or **Receiving** with a short arrow. It lasts about a minute, then settles. With reduced motion the arrow stays still and the word **now** shows. It shows a word and a direction only, never content, and there is no hover preview. The same facts, for all your agents at once, are on the [Agents page](agents.md#live-connections).
+While a message or file is moving for a contact, its row shows **Sending** or **Receiving** with a short arrow. It lasts about a minute, then settles. With reduced motion the arrow stays still and the word **now** shows. It shows a word and a direction only, never content, and there is no hover preview. Each agent's live state is on the [Agents page](agents.md).
 
 ## What you see
 
@@ -29,7 +33,7 @@ Each row shows the same small 24-hour pulse and word as Contacts: **Active now**
 
 ## Read a conversation
 
-1. Open **Messages** in the side menu.
+1. Use Go to (Cmd+K) and choose **Messages**, or open a person on Home.
 2. Choose a contact.
 3. Switch between **Inbox** and **Sent**. Press **Show more** for older messages, or **Copy text** to copy one.
 
