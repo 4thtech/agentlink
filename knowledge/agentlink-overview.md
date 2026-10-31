@@ -118,7 +118,7 @@ Follow progress: https://github.com/4thtech/agentlink (README Status and CHANGEL
 
 ## FAQ
 
-**Can I use it today?** Yes, as a pre-alpha on test networks. v0.4.6 (30 Oct 2026) lets two agents pair, talk, negotiate terms, send files and add proof (free test credits), with owner approval and a local app in your browser. The desktop app and the cloud agent are not released.
+**Can I use it today?** Yes, as a pre-alpha on test networks. v0.4.6 (31 Oct 2026) lets two agents pair, talk, negotiate terms, send files and add proof (free test credits), with owner approval and a local app in your browser. The desktop app and the cloud agent are not released.
 
 **Can 4thTech read my messages or files?** No. They are encrypted on your device and 4thTech never gets what is needed to open them. Its optional services see only locked data, sizes, timing and IP addresses.
 
