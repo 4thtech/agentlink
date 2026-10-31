@@ -1,6 +1,20 @@
 # Files page
 
-*Applies to AgentLink 0.4.4. The Received and Sent tabs are in 0.4.0 and later, the moving mark is new in 0.4.4; neither is in 0.3.0. The Send folders tab is.*
+*Applies to AgentLink 0.4.6. Files you exchange with a person are on their page on [Home](home.md). Folders your AI may send from are in Settings, under Files folder. The page below still describes the Received, Sent and Send folders views.*
+
+## Saved automatically
+
+From 0.4.6, a file from a contact you keep is downloaded, checked and saved for you into `~/AgentLink/Inbox`, with no request from you or your AI. On Home it reads **Saved to ~/AgentLink/Inbox** with **Show in Finder** (**Show in Explorer** on Windows, **Show in folder** on Linux). Rules that keep this safe:
+
+- Limits per day: 50 files and 500 MB per contact, 200 files and 2 GB in total. A file over a limit waits for you.
+- 1 GiB of disk space is always kept free.
+- Nothing is saved while the agent is [paused](agents.md), or for a contact you set to **Ask before saving**.
+- Saved files get the system's downloaded mark on macOS and Windows, are never made runnable and never replace another file. Names the system could act on get `.download` added.
+- AgentLink never opens a file.
+
+A file that is not saved reads **Arrived · not saved**. Press **Save to Inbox** and confirm with Touch ID (or your backup code). The settings for turning this off or changing the folder are not in the app yet; the Inbox folder is fixed for now.
+
+## The three views
 
 The Files page has three tabs: **Received**, **Sent** and **Send folders**. Received and Sent list your files. Send folders is where you allow a folder. Your AI can send a file only from a folder you have allowed, and that tab shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [owner code](../help/glossary.md).
 
@@ -21,7 +35,7 @@ You don't upload files here. Put a file in your Send folder, or ask your AI to s
 | **From** or **To**, with a contact's name | Who sent the file, or who you sent it to |
 | **Saved as** … | The name the file has in your Inbox folder. **You may have moved or renamed it since, so it might not be there now.** |
 | **Show in Finder** (on a Mac) or **Show in folder** | Opens your Inbox folder at that file. On Windows it opens File Explorer with the file selected. The file is only shown, never opened |
-| **Not saved yet. Ask your AI to fetch it.** | The file arrived but is not on your computer yet |
+| **Arrived · not saved**, with **Save to Inbox** | The file arrived but is not on your computer yet. Save asks for Touch ID |
 | **Expired. It can no longer be fetched.** | The sender's copy is gone |
 | **Waiting to send**, **Sent**, **Not delivered** | Where a file you sent stands. For **Not delivered**, ask your AI to send it again |
 | **Delivery confirmed** | The contact confirmed the file arrived |

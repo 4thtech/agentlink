@@ -1,6 +1,6 @@
 # What leaves your computer
 
-Applies to AgentLink 0.4.4, a pre-alpha release. Proof runs on test networks only.
+Applies to AgentLink 0.4.6, a pre-alpha release. Proof runs on test networks only.
 
 This page explains in plain words what AgentLink sends where, who can see what, and what it cannot protect you from.
 
@@ -37,6 +37,7 @@ The open message servers that carry your messages are run by many people, not on
 |---|---|---|
 | Your messages | Open message servers, as sealed packages | The two agents and the people responsible for each of them |
 | Your files | The 4thTech encrypted drop, or your own storage if you connected it, as locked data with a random name. The drop deletes it within 7 days | The same people as for messages. The drop never gets what is needed to open it, or the file name |
+| Your invite link | A short link. The invite behind it is locked on your computer and waits in the 4thTech encrypted drop until it is used, cancelled or expires (at most 7 days) | Only someone who has the link. The drop holds locked data and cannot open it |
 | Proof | A public record, only if you ask for proof | Everyone can see the fingerprint and some details (see below). Never the content |
 | Your agent's secrets and your passkey | Stay on your computer, in built-in secure storage | You and your agent. See "What AgentLink cannot protect" below |
 | Your rules and approvals | Stored with your agent | You and your agent |
@@ -64,9 +65,12 @@ To keep more private: leave delivery confirmations off, add credits from a separ
 ## How files and checks work
 
 - **Locked in pieces.** A file is locked on your computer in small pieces, so a cut-off or altered file is noticed and refused.
-- **Checked before it appears.** A downloaded file is first written to a hidden temporary file. It is moved to your inbox folder only after every check passes, and deleted if one fails.
+- **Checked before it appears.** A downloaded file is first written to a hidden temporary file. It is moved to your Inbox folder only after every check passes, and deleted if one fails.
+- **Saved for you, with limits.** Files from contacts you keep are saved to `~/AgentLink/Inbox` by themselves, unlocked only on your computer. At most 50 files and 500 MB per contact and 200 files and 2 GB in total are saved a day, and 1 GiB of your disk is always kept free; a file over a limit waits for you to choose **Save to Inbox**. You can set a contact to "Ask before saving", and nothing is saved while an agent is paused. Saved files carry the system's "downloaded from the internet" mark on macOS and Windows, are never made runnable and never replace a file already there; a name the system could act on gets `.download` added. AgentLink never opens a file.
+- **Pause.** One click stops an agent in every AI app. Only you can resume it, with Touch ID.
+- **Live status stays on your computer.** The app learns which AI app is working with which agent from your own computer. It carries only agent names, app names, states and times, and none of it is sent to 4thTech.
 - **Small files travel inside the message.** Bigger ones go to the encrypted drop (or your own storage) as locked data. The key travels only inside the sealed message.
-- **Reading a proof file.** Your agent checks a proof file only if it is in your proof or inbox folder. It cannot be pointed at other files on your computer.
+- **Reading a proof file.** Your agent checks a proof file only if it is in your proof or Inbox folder. It cannot be pointed at other files on your computer.
 
 ## What AgentLink cannot protect
 

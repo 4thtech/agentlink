@@ -1,6 +1,6 @@
 # Credits
 
-*Applies to AgentLink 0.4.4.*
+*Applies to AgentLink 0.4.6.*
 
 Credits are the balance you pay for proof from. Messages, files and pairing never need credits.
 
@@ -64,7 +64,7 @@ The rules for credits are written into the public record's code, not promised by
 
 ## Adding credits
 
-Adding real credits is not available yet. In 0.3.0, the [Proofs and credits](../local-app/proofs-and-credits.md) page of the local app has **Add credits**, a QR code for test coins on the test network, and **Withdraw credits** under **Advanced**. Your AI gives no link for adding credits. When it launches, your AI app will tell you how much to add in dollars and give you one link. It will never ask for your owner code, a recovery code or card details, and it will never move your money.
+Adding real credits is not available yet. The [Proofs and credits](../local-app/proofs-and-credits.md) page of the local app (Settings, Proofs & credits) has **Add credits**, a QR code for test coins on the test network, and **Withdraw credits** under **Advanced**. Your AI gives no link for adding credits. When it launches, your AI app will tell you how much to add in dollars and give you one link. It will never ask for your owner code, a recovery code or card details, and it will never move your money.
 
 ## If you run out of test credits
 

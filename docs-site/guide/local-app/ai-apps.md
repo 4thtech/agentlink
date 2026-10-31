@@ -1,14 +1,14 @@
 # AI apps page
 
-*Applies to AgentLink 0.4.4. In 0.4.3 an AI app is connected from the terminal with `init`.*
+*Applies to AgentLink 0.4.6. In 0.4.3 an AI app is connected from the terminal with `init`.*
 
 The AI apps page shows the AI apps AgentLink found on your computer, such as Claude Code, and which agent each one works with. From here you connect an app, move it to another agent, or disconnect it. Nothing else in the app's settings file is touched.
 
-Open it from **AI apps** in the menu, or from the **Connect an AI app** buttons on the [Agents page](agents.md) and in [Start here](home.md#start-here).
+Open it from **Connect** on an agent in [Agents](agents.md), or from [Get started](get-started-wizard.md). Getting started connects the AI app you pick for you, with the same one Touch ID that creates your agent.
 
 ## Connect an AI app
 
-1. Find the app and press **Review change**.
+1. Choose **Connect** and pick the app.
 2. AgentLink shows the exact entry it will add, and the file it goes in. It says: **This adds one entry to** the app's **settings.** Nothing else in that file changes.
 3. Press **Apply with Touch ID**.
 4. If the app is open, the page says **Restart** the app **to finish**. AgentLink never restarts it for you.
@@ -17,7 +17,7 @@ A backup of the file is saved next to it first, with the same permissions. The a
 
 ## Move it to another agent
 
-Each AI app works with one agent at a time. If you have several agents, the card of an app that is connected to another one offers **Use** an agent **instead**. You see which entry goes and which comes, then confirm with Touch ID. The page says: the app **will use** the new agent **instead of** the old one.
+Each AI app works with one agent at a time. If an app is connected to another agent, you are offered **Use** an agent **instead**. You see which entry goes and which comes, then confirm with Touch ID. The page says: the app **will use** the new agent **instead of** the old one.
 
 ## Disconnect
 
@@ -28,6 +28,8 @@ Each AI app works with one agent at a time. If you have several agents, the card
 - **Quit** the app **first.** Claude Desktop rewrites its settings when it closes, so AgentLink never changes them while it is open. Close it, then **Check again**.
 - **This app already has an AgentLink entry we didn't write.** AgentLink does not change it. Connect by hand with **Show manual steps** if you want to.
 - **Not listed? Connect it by hand** shows what to add yourself. Nothing there is run by AgentLink.
+
+Whether an app is **Working**, **Ready**, **Idle**, **Not running** or **Not set up** shows live; see [Agents](agents.md#live-status).
 
 An AI app can only change what the page shows. Your AI cannot rewire itself: this needs your Touch ID.
 

@@ -1,6 +1,6 @@
 # FAQ
 
-Applies to AgentLink 0.4.4, a pre-alpha release. Proof runs on test networks only. For the full picture, see [What works today](../README.md#what-works-today).
+Applies to AgentLink 0.4.6, a pre-alpha release. Proof runs on test networks only. For the full picture, see [What works today](../README.md#what-works-today).
 
 ## The basics
 
@@ -14,7 +14,7 @@ MCP is the way AI apps plug in extra tools. AgentLink is added to your AI app th
 
 ### Which AI apps work?
 
-Claude Code, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, and Claude Desktop. Claude Desktop also has a one-click extension on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.4). Any other AI app that supports MCP tools may work, but we have not tested them. See [Other AI apps](../get-started/other-ai-apps.md).
+Claude Code, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, and Claude Desktop. Claude Desktop also has a one-click extension on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.6). Any other AI app that supports MCP tools may work, but we have not tested them. See [Other AI apps](../get-started/other-ai-apps.md).
 
 ### Do I need a crypto app, an account or a balance to start?
 
@@ -38,6 +38,18 @@ No. They are locked on your computer before they leave it, and 4thTech never get
 
 Your agent, the other agent, and the owners of both agents. The owner is the person or company responsible for an agent.
 
+### How do I stop my agent right away?
+
+Open **Agents** and choose **Pause**. It takes one click and no Touch ID, and it stops the agent in every AI app. Your AI can still read, but sends, offers, proof, invites and file fetches are refused with "This agent is paused. The owner can resume it in the AgentLink app." Resume needs Touch ID, and your AI cannot pause or resume. See [Agents](../local-app/agents.md).
+
+### Where do files people send me go?
+
+Files from contacts you keep are saved automatically to `~/AgentLink/Inbox`, within daily limits and never while the agent is paused. A file that was not saved reads "Arrived · not saved" with **Save to Inbox**. You can set a contact to "Ask before saving". AgentLink never opens or runs a saved file. See [Privacy and security](../privacy-and-security.md).
+
+### What is Under the hood?
+
+A switch at the top of the app (Cmd+Shift+U) that shows the detail behind the screens: message IDs, exact times, receipts, connection details and a copyable diagnostics report. See [Under the hood](../local-app/under-the-hood.md).
+
 ### Can my AI do things without asking me?
 
 Only within the rules you set. New contacts, accepting terms and spending above your limit ask you first by default. Your AI can't approve for you or change your rules through AgentLink.
@@ -48,7 +60,7 @@ Anyone can see that your agent recorded something, when, and what kind it was (a
 
 ### What does "test network" mean?
 
-It is a practice version of the public record, where nothing has real value. Proof in 0.3.0 is recorded there, with free test credits. Paid proof on the real record comes later, after an outside audit.
+It is a practice version of the public record, where nothing has real value. Proof is recorded there, with free test credits. Paid proof on the real record comes later, after an outside audit.
 
 ## Using it
 
@@ -66,11 +78,11 @@ Not directly yet. They need an always-on agent in your own cloud account, which 
 
 ### How do I open the AgentLink app?
 
-From 0.3.0, run `npx -y @4thtech-io/agentlink ui`. In 0.2.0, the only page that opens in your browser is the approval page, when your agent needs your OK.
+Run `npx -y @4thtech-io/agentlink` in a terminal you opened yourself (`ui` does the same). On a new computer it opens on Get started; afterwards on Home, and Get started stays in the **?** Help menu. In 0.2.0, the only page that opens in your browser is the approval page, when your agent needs your OK.
 
 ### What if I lose my computer?
 
-Your keys live on your computer. A recovery kit, a backup you keep safe, is being built so you can restore AgentLink on a new device. It is not ready to use yet.
+Your keys live on your computer. Back up an agent from **Agents** to get a recovery kit that you keep safe; restoring from a kit works again in 0.4.6. Keep your backup code safe as well.
 
 ## The project
 

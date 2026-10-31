@@ -1,6 +1,6 @@
 # Confirming paid actions
 
-*Applies to AgentLink 0.4.4. It is not in 0.3.0.*
+*Applies to AgentLink 0.4.6.*
 
 Some things cost credits or change how much your AI may spend. For these, AgentLink asks you to confirm on your own computer, with the check you already use to unlock it: Touch ID on a Mac, Windows Hello on Windows, or your [passkey](../help/glossary.md). Your AI can't confirm this for you.
 
@@ -34,7 +34,7 @@ No passkey, or it won't work? Choose **Use backup code instead** (a small link u
 | **Couldn't confirm it was you. Try again.** | Try again with your fingerprint, face or PIN |
 | **Something changed since you opened this. Check it again.** | Read the new amounts, then confirm again |
 | **This request expired.** | Ask your AI to start again. Nothing was paid |
-| **Your passkey needs to be set up again for paid actions. Use your backup code this time.** | Use the backup code now, then switch to Touch ID again in [First run](first-run.md) |
+| **Your passkey needs to be set up again for paid actions. Use your backup code this time.** | Use the backup code now. Setting Touch ID up again from the app is not available yet |
 | **That backup code didn't match.** | Check the code. After three wrong tries, start again |
 
 <details>

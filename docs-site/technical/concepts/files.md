@@ -1,6 +1,6 @@
 # Files
 
-> **Status: In the next release** for sending and saving files through the MCP tools (M1-9d-1; not in v0.1.1); the encrypted drop is built but not deployed. Planned for v0.2.0 (M1); consumer storage connectors for v0.3.0 (M2). Sources: [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [07 §5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
+> **Status: Available since v0.2.0** (sending and fetching files through the MCP tools, M1-9d-1); **automatic saving, Save to Inbox in the app and the Inbox folder rules since v0.4.6** (31 Oct 2026). The encrypted drop serves ciphertext for testers on the test networks; consumer storage connectors are planned for the desktop apps (M2). Sources: [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [07 §5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
 
 ## Encryption
 
@@ -45,6 +45,20 @@ A send retried after a crash between the upload and the stored message uploads t
 
 Not yet built (M1-7f-2): the refresh-link request and answer, and retention (deleting the object and both sides' file keys at expiry or on receipt). On the receiving side the core will move each file key out of the stored message into its own sealed `files` row at ingest, so retention can delete it (D-98).
 
+## Automatic saving (since 0.4.6)
+
+Source: [04 §4.1](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) (D-142, W4-AUTO-SAVE). Before 0.4.6 a received file was downloaded only when you or your AI asked. Now a contact you keep can cause a file to land on your disk without a click, so the rules are strict.
+
+- **Who saves.** Only the process that holds the agent's publisher lease, in its background loop, after the message is verified and stored. With no AgentLink process running, files are saved when one runs next, until they expire.
+- **Which files.** Only from a contact that is paired, allowed and not blocked or removed (checked when the message is stored and again right before the download); never from an unknown sender, never for a file named in a request, never while the agent is paused, and only for files whose message the agent stored after it ran with this feature. A file that arrives while the agent is paused is not saved on resume; it waits for Save, so resuming never starts a burst of downloads.
+- **Limits** (a cost bound, not a security boundary), counted over rolling 24 hours in the agent's store as counts and bytes only: 50 files and 500 MB per contact, 200 files and 2 GB for all contacts, plus the usual per-file cap (`files.maxReceiveSizeMB`, 200 by default). At most 2 downloads run at a time and a failed one is retried after 1 minute, 10 minutes and 1 hour. At least 1 GiB must stay free on the disk. A file over a limit is never refused: it reads "Arrived · not saved" and waits for Save to Inbox.
+- **Your controls.** Policy `files.autoSave.on` (on by default; a policy signed before 0.4.6 is read as on) and, per contact, `askBeforeSaving`. In 0.4.6 the app shows the Inbox folder on Home and each file's state; screens for the on and off switch, "Ask before saving" and choosing another folder are not built yet.
+- **The folder.** `files.inboxFolder`, `~/AgentLink/Inbox` by default, created with mode 0700 when missing. A chosen folder must be an existing directory owned by you, not hidden, not an operating-system or app folder, and not inside or containing an allowed send folder, so a received file never becomes sendable by your AI without you moving it.
+- **Writing the file.** The folder is resolved with realpath at every save and used through a directory handle, never through the path again. The file is decrypted into a hidden temporary file (created exclusively, mode 0600, never executable), given the operating system's "downloaded from the internet" mark (`com.apple.quarantine` on macOS, Mark-of-the-Web on Windows), verified against both hashes, and moved into place with a no-replace rename, so nothing is ever replaced. If the mark cannot be set, nothing is saved automatically and the file waits for Save. Linux has no such mark, an accepted residual for 0.4.6.
+- **Names.** The sender's name is untrusted text: path parts, control, direction-changing and zero-width characters are removed, hidden and reserved names are fixed, and a numbered suffix is added when the name exists. Names that the system shell would act on when only showing the folder, or that run when double-clicked (for example `.exe`, `.bat`, `.command`, `.webloc`, `.lnk`, `.desktop`), get `.download` appended. AgentLink never opens, previews, unpacks or runs a received file.
+- **Save to Inbox in the app** (`file.save`, W4-FILES-SAVE). For a file that was not saved automatically, the app asks for Touch ID (or the backup code) and the owner signs `file.save` with only the agent, the message ID and the file's index in it. The app never sends a name, folder or path; the core saves with its own fetch into the Inbox folder, then Home shows "Saved to ~/AgentLink/Inbox" and a Show in Finder (Show in Explorer on Windows, Show in folder on Linux) action. No AI app tool can sign `file.save`.
+- **One copy.** Automatic saving, Save to Inbox and `agentlink_fetch_file` share one lock per file and the store records the name the file got, so a file already saved is not saved again. The lock is per process; across processes a rare race can leave a second copy named "name (2)", and nothing is overwritten.
+
 ## The encrypted drop
 
 - **No accounts.** Requests are signed with the dedicated drop key, unlinkable to the agent card, EVM address or any billing profile. Replays are rejected.
@@ -61,4 +75,4 @@ Download URLs are valid for at most 7 days. Retention follows policy `files.dele
 
 ## Safety rules for fetching
 
-`https` only; loopback, private, link-local and unique-local addresses are refused; at most 2 redirects, each re-checked; size capped at the declared size. Downloads land only in the configured inbox folder, with sanitized names, and are never executed. Files are sent only from owner-allowed folders, checked after `realpath` resolution.
+`https` only; loopback, private, link-local and unique-local addresses are refused; at most 2 redirects, each re-checked; size capped at the declared size. Downloads (automatic or on request) land only in the configured inbox folder, with sanitized names, and are never executed. Files are sent only from owner-allowed folders, checked after `realpath` resolution.
