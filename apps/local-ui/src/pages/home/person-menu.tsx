@@ -253,15 +253,18 @@ export function PersonMenu({
               <Icon name="tag" size={16} />
               {S.rename}
             </button>
-            <button
-              type="button"
-              role="menuitem"
-              className="al-mitem"
-              onClick={() => start('check')}
-            >
-              <Icon name="safety-code" size={16} />
-              {S.checkSafetyCode}
-            </button>
+            {/* W6-FLOW-FIXES: a removed connection (status `revoked`) has no code left to check. */}
+            {contact?.status === 'revoked' ? null : (
+              <button
+                type="button"
+                role="menuitem"
+                className="al-mitem"
+                onClick={() => start('check')}
+              >
+                <Icon name="safety-code" size={16} />
+                {S.checkSafetyCode}
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"

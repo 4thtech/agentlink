@@ -94,6 +94,11 @@ export const LIVE_WORDS = {
   readyInMore: (app: string, n: number): string => `Ready in ${app} and ${n} more`,
   workingIn: (app: string): string => `Working in ${app}`,
   lastSeen: (word: string, ago: string): string => `${word} · last seen ${ago}`,
+  /**
+   * W6-FLOW-FIXES: an AI app is set up for the agent but has never run it (no heartbeat yet, e.g.
+   * right after "Connected to Claude Code"): the honest state, never "Offline".
+   */
+  connectedRestart: (app: string): string => `Connected · restart ${app} to start`,
 } as const;
 
 /** "just now", "5 min ago", "3 h ago", "1 day ago" (08 §1: the page computes relative times). */
@@ -114,6 +119,8 @@ interface AppRecord {
   readonly app: string;
   readonly state: AppWire;
   readonly lastSeenAt?: number;
+  /** The earlier read form (a plain id): it never carries a last seen time. */
+  readonly legacy?: true;
 }
 interface AgentRecord {
   readonly name: string;
@@ -149,7 +156,9 @@ const timeOf = (v: unknown): number | undefined =>
 function parseApp(v: unknown, running: boolean): AppRecord | undefined {
   // The earlier read form: a plain app id; Ready while the agent runs, else Not running.
   if (typeof v === 'string') {
-    return APP_ID.test(v) ? { app: v, state: running ? 'ready' : 'not_running' } : undefined;
+    return APP_ID.test(v)
+      ? { app: v, state: running ? 'ready' : 'not_running', legacy: true }
+      : undefined;
   }
   if (!isObject(v) || typeof v['app'] !== 'string' || !APP_ID.test(v['app'])) return undefined;
   const state = v['state'];
@@ -258,10 +267,15 @@ function toLive(r: AgentRecord, name: (id: string) => string, now: number): Live
     statusText = LIVE_WORDS.none;
   } else {
     state = 'off';
+    const never = shown.find(
+      (a) => a.state === 'not_running' && a.lastSeenAt === undefined && a.legacy !== true,
+    );
     statusText =
-      r.lastSeenAt === undefined
-        ? LIVE_WORDS.offline
-        : LIVE_WORDS.lastSeen(LIVE_WORDS.offline, agoText(r.lastSeenAt, now));
+      r.lastSeenAt !== undefined
+        ? LIVE_WORDS.lastSeen(LIVE_WORDS.offline, agoText(r.lastSeenAt, now))
+        : never !== undefined && shown.every((a) => a.lastSeenAt === undefined)
+          ? LIVE_WORDS.connectedRestart(name(never.app))
+          : LIVE_WORDS.offline;
   }
   return {
     name: r.name,
@@ -279,6 +293,7 @@ export function liveAgent(row: AgentRow): LiveAgent {
   const apps: AppRecord[] = row.apps.map((app) => ({
     app,
     state: row.running ? 'ready' : 'not_running',
+    legacy: true,
   }));
   const record: AgentRecord = {
     name: row.name,

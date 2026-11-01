@@ -31,6 +31,8 @@ export interface AppLive {
   readonly since?: number;
   /** Unix seconds: when a session of this app last ran the agent (while not live). */
   readonly lastSeenAt?: number;
+  /** The earlier read form (a plain id), which never carries a last seen time. */
+  readonly legacy?: true;
 }
 
 export interface AgentRow {
@@ -99,7 +101,7 @@ function seconds(v: unknown): number | undefined {
 /** W4-LIVE-STATUS: one `{app, state, since?, lastSeenAt?}`; a plain id (older hosts) as `fallback`. */
 function appLiveOf(a: unknown, fallback: AppState): AppLive[] {
   if (typeof a === 'string') {
-    return APP_ID.test(a) ? [{ id: a, name: appNameOf(a), state: fallback }] : [];
+    return APP_ID.test(a) ? [{ id: a, name: appNameOf(a), state: fallback, legacy: true }] : [];
   }
   if (!isObject(a) || typeof a['app'] !== 'string' || !APP_ID.test(a['app'])) return [];
   const state = typeof a['state'] === 'string' && APP_STATES.has(a['state']) ? a['state'] : null;
@@ -228,6 +230,7 @@ export function appsOf(row: AgentRow): readonly AppLive[] {
     id: name,
     name,
     state: row.running ? 'ready' : 'not_running',
+    legacy: true as const,
   }));
 }
 
@@ -248,7 +251,8 @@ function liveApps(row: AgentRow): AppLive[] {
 
 /**
  * The agent's one line (08 §1): "Working in {app}", "Ready in {app}" ("and {n} more"), "Idle",
- * "Offline · last seen {time}" ("Offline" when never seen), "Paused"; "Removal not finished".
+ * "Offline · last seen {time}" ("Connected · restart {app} to start" when an app is set up but has
+ * never run it, else "Offline"), "Paused"; "Removal not finished".
  */
 export function agentLine(row: AgentRow, now: number): string {
   if (row.removing) return S.removalNotFinished;
@@ -262,9 +266,13 @@ export function agentLine(row: AgentRow, now: number): string {
   }
   if (state === 'idle') return W.idle;
   if (state === 'ready' || state === 'working') return W.ready;
-  return row.lastSeenAt === undefined
-    ? W.offline
-    : W.lastSeen(W.offline, relativeTime(row.lastSeenAt, now));
+  if (row.lastSeenAt !== undefined) return W.lastSeen(W.offline, relativeTime(row.lastSeenAt, now));
+  // W6-FLOW-FIXES: set up in an AI app that has never run it yet (no heartbeat): not "Offline".
+  const setUp = appsOf(row).filter((a) => a.state !== 'not_set_up');
+  const never = setUp.find((a) => a.state === 'not_running' && a.legacy !== true);
+  return never !== undefined && setUp.every((a) => a.lastSeenAt === undefined)
+    ? W.connectedRestart(never.name)
+    : W.offline;
 }
 
 /** One AI app's word: "Working", "Ready", "Idle", "Not running · last seen {time}", "Not set up". */

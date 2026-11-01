@@ -5830,6 +5830,17 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 - **Not in this card:** the inbox-folder guard test (own card).
 - **Acceptance:** unit tests for both forms and the migration; `wait-for-ci` tests for the wave gate name; CI green incl. `windows-smoke`; changeset and changelog.d fragment
 
+#### OPS-FAST-LANE-3 · every merge testable as `@next`; `latest` needs the heavy lane green (owner Decision 54 items 1 and 5)
+- **Status:** in progress · **Size:** M · **Tier:** Sonnet build · **Security:** S1 (sensitive path `.github/**`; supply-chain publish flow, no new secret) · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/release.yml`, `tools/release/` (`next-preview.mjs`, `wait-for-ci.mjs`, tests), `.changeset/config.json`, `docs/process/`, `docs/runbooks/merge-and-release.md`, `README.md`
+- **Depends on:** the `ci.yml` card that makes `ci-gate (push)` on `main` the heavy lane (merge that one first)
+- **Spec:** `docs/process/release-and-deployment.md` §4.1; D-25, D-52
+- **Invariants:** I-7
+- **Source:** Decision 54: a one-line fix took 10–20 h; every merge must be testable within minutes; a release cannot ship with heavy red
+- **Scope:** (1) the preview lane (`preview-gate`, `pack-preview`, `publish-preview`, `smoke-preview`) now also runs on `main`: snapshot `x.y.z-next.snap.<UTC datetime>` to `next` after each push, waiting only for "still the head of `main`", no owner click (`npm-next` has no reviewer, deployment branch `main`), smoke `npx -y @4thtech-io/agentlink@next --version`; skipped without a pending changeset or in pre mode. (2) `ci-green` is main only and requires `ci-gate (push)` + `security-gate`; `pack` (so `publish-next`, `publish-latest`, desktop extension) needs it; the Version packages PR and the snapshot do not. (3) `wait-for-ci` keeps the W5-WINDOWS wave-branch rule (`ci-gate` or `ci-gate (push)`), main stays exact; job names may contain parentheses. (4) docs.
+- **Acceptance:** `tools` tests green (next-preview, wait-for-ci structure and behaviour); YAML valid; changelog.d fragment
+- **Owner settings:** none (checked: `npm-next` has no required reviewers and allows `main`)
+
 #### W4-CANCEL-INVITE-SWEEP · pairing: cancelling an invite does not wait for the clean-up (new, #718 low)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core/src/pairing.ts` (`cancelInvite`)
@@ -5949,6 +5960,21 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
   - Go to "Files" opens Home (each person's files); the old Inbox page is removed and `/inbox` redirects to Home.
   - "People" everywhere (page title, Go to, counts, toasts, AI-facing status lines); no curly quotes around names; "Self-declared" reads "Not checked yet".
 - **Acceptance:** unit and DOM tests updated; CSS budget unchanged; motion-lint clean.
+
+### Classroom wave 6 (W6, golden-path QA of 1 Nov)
+
+#### W6-FLOW-FIXES · local app: Remove says "Quit {app} first" before Touch ID; a removed connection shows; no "Offline" right after Connected (golden-path QA P1-2, P1-3, P1-4)
+- **Status:** in review (wave 6) · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/agents/{sheets.tsx,data.ts,strings.ts}`, `apps/local-ui/src/api/live.ts`, `apps/local-ui/src/pages/home/{home-screen.tsx,conversation.tsx,person-menu.tsx,people-strings.ts}`
+- **Depends on:** U3-e (removal), W4-LIVE-STATUS, W4-HOME
+- **Spec:** 08 §1 (Agents, Live AI-app status, Home); 04 §2.5 (removing an agent); 11 §5
+- **Invariants:** I-4, I-5
+- **Source:** golden-path QA (1 Nov), P1-2, P1-3, P1-4; the classroom uses the app in 5 days
+- **Scope:**
+  - Remove agent: "Remove with Touch ID" and "Check again" first read the agents list; while an AI app runs the agent (a live session), the sheet says "Quit {app} first." with Check again, before any gesture. The read is a hint only: a failed read goes on to the Touch ID step, and the server's folder lock (`in_use`) and presence requirement are unchanged.
+  - Removed connection: when the other side removed its agent (contact status `revoked`, already in `GET /api/ui/contacts`), Home's row says "{name} removed this connection", the conversation says the AI can't send to them any more, "Ask your AI to send it again" and Check safety code are hidden. No protocol or server change.
+  - Live status: an agent set up in an AI app that has never run it (no last seen, before the first heartbeat) reads "Connected · restart {app} to start" in the chip, the dropdown and the Agents card, not "Offline".
+- **Acceptance:** DOM and unit tests for each item; no server or wire change; vocabulary lint; changeset and changelog.d fragment.
 
 ### Usability wave 3 (U3, 0.4.4)
 
@@ -6543,7 +6569,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - **Deploy (D-25)** block as in M1-19.
 
 #### M1-19-d · Invite page: production deploy (new, split from M1-19-b, owner decision 2026-10-24)
-- **Status:** blocked (trademark check; production domain decision) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
+- **Status:** in review (owner Decision 55: production on `agentlink.4thtech.io`; unblocked) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · `.github/workflows/deploy-invite.yml`, apps/invite/wrangler.toml
 - **Depends on:** M1-19-b; the trademark check and the production hostname (owner)
 - **Spec:** 04 §3.6; 08 §4; release-and-deployment.md §1.1, §4.6; D-25, D-52
@@ -10664,6 +10690,13 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M3-15 | **DECISION NEEDED (optional):** welcome credits, eligibility and budget |
 | M3-11 | Provide the GitBook MCP; merge the GitBook change request |
 | Releases | Approve every npm `latest` publish with one click on the waiting deployment (D-25, D-52); remove the `production` Environment's required reviewer when the first deployable app exists (M1b) |
+
+#### OPS-MERGE-FRICTION · fewer manual steps at merge time (wave 5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `tools/orchestrator/{record-ir.py,retrigger-version-pr.py,merge-friction.test.mjs}`; `docs/process/orchestrator-playbook.md` §6
+- **Depends on:** none
+- **Spec:** `audit-rules.md` §3; `release-and-deployment.md`
+- **Done when:** `record-ir.py` re-runs only a failed latest `review-gate` run for the PR head after recording; `retrigger-version-pr.py` closes and reopens a bot "Version packages" PR whose runs wait for approval; both tested offline with a fake `gh`; no gate weakened. **Owner proposal (not built):** give the version step a GitHub App token or fine-grained PAT as `github-token:` so the PR's checks start by themselves.
 
 #### W5-SHEET-CLOSE + W5-SAFETY-STEP · local app: side panels always close; Home's safety-code step opens the code (wave 5)
 - **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b

@@ -239,8 +239,12 @@ function PersonOpen({
   const messages: MessagesApi = clients.people.messages;
   const { thread, loadEarlier } = useThread(messages, person.contactId, tick);
   const files = thread.state === 'ready' ? filesOf(thread.inbox.items, thread.sent.items) : [];
+  const removed = contact?.status === 'revoked';
   return (
     <div className="hm-open hm-c al-expand" data-person-open={person.contactId}>
+      {removed ? (
+        <Banner tone="warning">{fmt(S.connectionRemovedBody, { name: person.name })}</Banner>
+      ) : null}
       <div className="hm-open-head hm-f">
         <span className="hm-kicker al-text-label">{S.conversationTitle}</span>
         <PersonMenu
@@ -288,6 +292,7 @@ function PersonOpen({
         pro={pro}
         thread={thread}
         loadEarlier={loadEarlier}
+        removed={removed}
       />
       <PersonFiles
         name={person.name}
@@ -722,7 +727,10 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                   {people.map((person) => {
                     const summary = summaries.get(person.contactId);
                     const isOpen = open === person.contactId;
-                    const problem = summary?.delivery === 'not_delivered';
+                    // W6-FLOW-FIXES: the other side removed this connection (its agent was
+                    // retired: contact status `revoked`). Say so on the row; nothing can be sent.
+                    const gone = data?.contacts.get(person.contactId)?.status === 'revoked';
+                    const problem = !gone && summary?.delivery === 'not_delivered';
                     const delivery =
                       summary?.delivery === undefined
                         ? ''
@@ -734,6 +742,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                         role={pro ? 'rowgroup' : undefined}
                         data-person={person.contactId}
                         data-open={isOpen ? 'true' : undefined}
+                        data-removed={gone ? 'true' : undefined}
                       >
                         {pro ? (
                           <div className="hm-prow hm-row" role="row">
@@ -754,7 +763,13 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                               <span className="hm-ellipsis">{agentLabel}</span>
                             </span>
                             <span role="cell" className="hm-cellbox hm-f">
-                              <LastText person={person} summary={summary} />
+                              {gone ? (
+                                <span className="hm-sub al-text-body-sm">
+                                  {fmt(S.connectionRemoved, { name: person.name })}
+                                </span>
+                              ) : (
+                                <LastText person={person} summary={summary} />
+                              )}
                             </span>
                             <span
                               role="cell"
@@ -790,9 +805,11 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                             <span className="hm-row-main hm-c">
                               <PersonName name={person.name} />
                               <span className="hm-sub al-text-body-sm">
-                                {person.lastAt > 0
-                                  ? fmt(S.lastMessage, { when: ago(person.lastAt, now) })
-                                  : S.noMessagesYet}
+                                {gone
+                                  ? fmt(S.connectionRemoved, { name: person.name })
+                                  : person.lastAt > 0
+                                    ? fmt(S.lastMessage, { when: ago(person.lastAt, now) })
+                                    : S.noMessagesYet}
                                 {summary === undefined ? '' : ` · ${filesText(summary.files)}`}
                                 {many && agentLabel !== '' ? ` · ${agentLabel}` : ''}
                               </span>
