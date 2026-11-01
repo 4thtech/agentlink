@@ -98,10 +98,15 @@ describe('the pages', () => {
           'inviter-host',
           'step',
           'step-heading',
-          'tab-command',
-          'tab-ai',
+          'way-ai',
+          'way-command',
+          'way-link',
+          'ai-text',
           'step-text',
+          'link-text',
+          'copy-ai',
           'copy',
+          'copy-link',
           'next',
         ]) {
           expect(html, id).toMatch(new RegExp(`id="${id}"`));

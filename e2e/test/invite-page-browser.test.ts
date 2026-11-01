@@ -195,8 +195,15 @@ describe('a good invite (U3-invite)', () => {
     );
     // The step: our own heading, the command by default, the fixed Node.js link.
     await expect(page.locator('#step-heading').textContent()).resolves.toBe('Set up in 2 minutes');
-    await expect(page.locator('#tab-command').getAttribute('aria-selected')).resolves.toBe('true');
+    // The three ways, in order: Ask your AI, the command, the link.
+    await expect(page.locator('#step h3').allTextContents()).resolves.toEqual([
+      'Ask your AI',
+      'Install and accept with one command',
+      'Already have AgentLink? Open it and paste the link',
+    ]);
+    await expect(page.locator('#ai-text').textContent()).resolves.toBe(buildAskAi(link));
     await expect(page.locator('#step-text').textContent()).resolves.toBe(buildJoinCommand(link));
+    await expect(page.locator('#link-text').textContent()).resolves.toBe(link);
     await expect(page.locator('#step-help').textContent()).resolves.toBe(
       'Paste it into Terminal and press Return. Needs Node.js 22 or later.',
     );
@@ -217,19 +224,19 @@ describe('a good invite (U3-invite)', () => {
     await context.close();
   });
 
-  it('copies exactly the command, with no line break, then exactly the sentence', async () => {
+  it('copies exactly the command, the sentence and the link, with no line break', async () => {
     const link = await futureLink();
     const { page, context } = await open(payloadOf(link));
     await page.locator('#copy').click();
     await expect.poll(() => clipboard(page)).toBe(buildJoinCommand(link));
     expect((await clipboard(page)).endsWith('\n')).toBe(false);
     await expect(page.locator('#copy-status').textContent()).resolves.toBe('Copied');
-    await page.locator('#tab-ai').click();
-    await expect(page.locator('#tab-ai').getAttribute('aria-selected')).resolves.toBe('true');
-    await expect(page.locator('#step-text').textContent()).resolves.toBe(buildAskAi(link));
-    await expect(page.locator('#node-help').isVisible()).resolves.toBe(false);
-    await page.locator('#copy').click();
+    await page.locator('#copy-ai').click();
     await expect.poll(() => clipboard(page)).toBe(buildAskAi(link));
+    expect(/[\r\n]/.test(await clipboard(page))).toBe(false);
+    await expect(page.locator('#copy-link').textContent()).resolves.toBe('Copy link');
+    await page.locator('#copy-link').click();
+    await expect.poll(() => clipboard(page)).toBe(link);
     expect(/[\r\n]/.test(await clipboard(page))).toBe(false);
     await context.close();
   });
@@ -251,8 +258,8 @@ describe('a good invite (U3-invite)', () => {
     const payload = payloadOf(link);
     const { page, context, probe } = await open(payload);
     await page.locator('#copy').click();
-    await page.locator('#tab-ai').click();
-    await page.locator('#copy').click();
+    await page.locator('#copy-ai').click();
+    await page.locator('#copy-link').click();
     await page.waitForTimeout(300);
     // Only the page, its script and its style file are ever requested, with no fragment, no body,
     // no referrer.
@@ -294,9 +301,8 @@ describe('a hostile invite (I-5)', () => {
       const { page, context, probe } = await open(payloadOf(link));
       // Same elements as for a plain name: nothing was built from the name.
       expect(await tagSequence(page), name).toEqual(baseline);
-      expect(
-        await page.locator('img, div:not(.card):not(.panel):not(#switch), svg, iframe').count(),
-      ).toBe(0);
+      // The only svg is the fixed AgentLink mark in the header.
+      expect(await page.locator('img, div, svg:not(.mark), iframe').count()).toBe(0);
       expect(await page.locator('object, embed, form, input, style').count()).toBe(0);
       // The one link is the fixed Node.js link.
       expect(await page.locator('a').count()).toBe(1);
@@ -319,9 +325,10 @@ describe('a hostile invite (I-5)', () => {
       await expect
         .poll(() => clipboard(page))
         .toBe(buildJoinCommand(`${PREFIX}${payloadOf(link)}`));
-      await page.locator('#tab-ai').click();
-      await page.locator('#copy').click();
+      await page.locator('#copy-ai').click();
       await expect.poll(() => clipboard(page)).toBe(buildAskAi(`${PREFIX}${payloadOf(link)}`));
+      await page.locator('#copy-link').click();
+      await expect.poll(() => clipboard(page)).toBe(`${PREFIX}${payloadOf(link)}`);
       expect(probe.violations, name).toEqual([]);
       expect(probe.consoleErrors, name).toEqual([]);
       await context.close();
@@ -438,7 +445,7 @@ describe('accessibility and motion (U3-invite, b11 §33.1)', () => {
       });
       expect(violations, mode.name).toEqual([]);
       const sizes = await page.evaluate(() =>
-        ['tab-command', 'tab-ai', 'copy'].map(
+        ['copy-ai', 'copy', 'copy-link'].map(
           (id) => document.getElementById(id)?.getBoundingClientRect().height ?? 0,
         ),
       );
