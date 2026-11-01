@@ -14,7 +14,8 @@ CI deploys; nobody deploys from a workstation. The orchestrator (Opus) verifies.
 - The deploy pipeline for the artifact exists. Today:
   - `deploy-drop.yml` (encrypted drop Worker, `drop.agentlink.4thtech.io`) and `deploy-submitter.yml` (submitter and faucet, `submit.agentlink.4thtech.io`) deploy on every merge to `main` that touches their paths: staging first, a smoke test, then production through the `production` environment (an approval click while a required reviewer is set, D-52), with a health check, a read-back of the logging settings, an automatic rollback and the freeze on failure. Each writes a **deploy record draft** to the run summary.
   - `release.yml` publishes npm `next` and `latest` ([RB-09](merge-and-release.md)).
-  - Static sites have no pipeline here yet; the static-site commands below are the procedure for when they do.
+  - `deploy-invite.yml` (the invite page, `agentlink.4thtech.io`, M1-19-d) deploys the same way: staging on `workers.dev`, the smoke test, then production through the `production` environment on the Custom Domain `agentlink.4thtech.io` (the host of every invite link, `/i#…`). Its build stages exactly five files (`_headers`, `index.html`, `i/index.html`, `invite.css`, `invite.js`) and hashes them into a manifest; the smoke test and the production health check compare every served page, the script and the style file with that manifest byte for byte, check the `_headers` headers on each and expect a 404 for an unknown path. The first production deploy creates the DNS record and the certificate; its health check waits up to 15 minutes for them. No automatic rollback is possible for that first deploy (no earlier version).
+  - The other static sites have no pipeline here yet; the static-site commands below are the procedure for when they do.
   - A deploy workflow does not run for a merge that touches none of its paths. Production can therefore lag `main` without anything being wrong; the question is whether it lags *on the deploy paths* (step 1).
 
 ## Steps
@@ -37,6 +38,7 @@ CI deploys; nobody deploys from a workstation. The orchestrator (Opus) verifies.
      curl -fsS https://<host>/<asset-path> | shasum -a 256
      curl -fsSI https://<host>/ | grep -iE 'content-security-policy|strict-transport-security'
      ```
+     For the invite page: `https://agentlink.4thtech.io/i`, `/`, `/invite.js` and `/invite.css` against the `invite-site` artifact of the run. Never request an invite link with its `#…` part; the fragment is not sent anyway, and a test needs none.
    - Worker: the run summary's **Deploy record draft** table is CI's own read of Cloudflare: commit, bundle SHA-256 (the same bytes staging ran), version deployed, rollback target, health check, logging read-back, lifecycle check (drop only) and rollback result. Check that the commit is the merge you are verifying, the bundle SHA-256 is the one `build` published, and every result row says `success` (rollback: `not needed`). An agent holds no Cloudflare credential and cannot read the live version itself; the public proof is the live observation in step 4 (for the submitter, `https://submit.agentlink.4thtech.io/v1/health` answers `"ok":true`; for the drop, `https://drop.agentlink.4thtech.io/v1/health` answers `{"ok":true}` and an unsigned upload answers 401). The owner can read the live version with `wrangler deployments status`.
    - npm package:
      ```bash

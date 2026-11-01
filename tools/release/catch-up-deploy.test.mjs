@@ -265,8 +265,9 @@ describe('parseArgs', () => {
   });
 });
 
-// The `catch-up` job of both deploy workflows.
-describe.each(['deploy-submitter.yml', 'deploy-drop.yml', 'deploy-invite.yml'])('%s catch-up job', (file) => {
+// The `catch-up` job of every deploy workflow.
+const CATCH_UP_WORKFLOWS = ['deploy-submitter.yml', 'deploy-drop.yml', 'deploy-invite.yml'];
+describe.each(CATCH_UP_WORKFLOWS)('%s catch-up job', (file) => {
   const source = readFileSync(
     resolve(import.meta.dirname, `../../.github/workflows/${file}`),
     'utf8',

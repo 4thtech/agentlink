@@ -1,6 +1,6 @@
 # Deploy reconcile (CHORE-DEPLOY-RECONCILE): production cannot stay behind main for long. The
-# catch-up job of deploy-submitter.yml and deploy-drop.yml hands a run that did not deploy to main's
-# head, but when the head's own CI flakes while it is still the head, and the later merges do not
+# catch-up job of deploy-submitter.yml, deploy-drop.yml and deploy-invite.yml hands a run that did
+# not deploy to main's head, but when the head's own CI flakes while it is still the head, and the later merges do not
 # touch the deploy paths, no deploy run starts again. Once an hour this compares, per service, the
 # commit production runs (the newest run whose deploy-production job deployed) with main's head; when
 # a commit in between touched the workflow's `on.push.paths`, the head's CI is green and no run for
@@ -49,4 +49,5 @@ jobs:
           set -euo pipefail
           node tools/release/reconcile-deploy.mjs \
             --workflow deploy-submitter.yml \
-            --workflow deploy-drop.yml
+            --workflow deploy-drop.yml \
+            --workflow deploy-invite.yml

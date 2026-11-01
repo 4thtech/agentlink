@@ -35,10 +35,10 @@ Hosting is Cloudflare Workers, with static sites as Workers static assets. The z
 
 | Hostname | Serves | Source |
 |---|---|---|
-| `agentlink.4thtech.io` | Landing page and the M1 invite / how-to-install page | Static site (path set by its task) |
+| `agentlink.4thtech.io` | The invite page at `/i` (the host of every invite link, `https://agentlink.4thtech.io/i#…`, 04 §3.6) and a minimal landing page at `/` (what AgentLink is, a link to the repository); owner Decision 55, M1-19-d. Worker `agentlink-invite`, Custom Domain set in `apps/invite/wrangler.toml`; staging: Worker `agentlink-invite-staging` on `workers.dev` | `apps/invite` (`deploy-invite.yml`) |
 | `console.agentlink.4thtech.io` | Owner console PWA | `apps/console` |
 | `verify.agentlink.4thtech.io` | Verify page | `apps/verify` |
-| `invite.agentlink.4thtech.io` | Invite landing | `apps/invite` |
+| `invite.agentlink.4thtech.io` | Reserved for the invite landing; not deployed (invite links name `agentlink.4thtech.io/i`) | `apps/invite` |
 | `pay.agentlink.4thtech.io` | Deposit page, isolated origin (M3-4) | Static site (path set by its task) |
 | `submit.agentlink.4thtech.io` | Submitter API and testnet faucet | `apps/submitter` |
 | `drop.agentlink.4thtech.io` | Encrypted drop (D-48, M1-27); Worker `agentlink-drop`, Custom Domain set in `apps/drop/wrangler.toml` (M1-27b; the owner confirms the name when he attaches the domain). Staging: Worker `agentlink-drop-staging` on `workers.dev` | `apps/drop` |
@@ -297,7 +297,7 @@ This section and §4.6 are the **contract** for the Cloudflare deploy workflows.
 | Integrity | SRI on all scripts; CSP and security headers per 08 §2.3 and `audit-rules.md` WEB-1…WEB-6; self-hosted fonts. |
 | Origins | Separate origins (§1.1). |
 | Hashes | Published in the GitHub release; the console shows its build hash in Settings. |
-| Deploy | Workers static assets through the Cloudflare deploy workflow: staging automatically on merge (`workers.dev`); production automatically once staging smoke is green (Workers Custom Domains, D-52). The invite page deploys through `deploy-invite.yml` (M1-19-b) to **staging only** for now: the built site is hashed once, staging serves exactly those files, and the smoke test compares the served pages and script with the build byte for byte and checks the headers of 08 §4. Its production deploy waits for the trademark check and the production domain decision (card M1-19-d); until then `deploy-reconcile.yml` does not cover it either. |
+| Deploy | Workers static assets through the Cloudflare deploy workflow: staging automatically on merge (`workers.dev`); production automatically once staging smoke is green (Workers Custom Domains, D-52). The invite page deploys through `deploy-invite.yml` (M1-19-b, M1-19-d): the built site (exactly `_headers`, `index.html`, `i/index.html`, `invite.css`, `invite.js`) is hashed once; staging serves exactly those files, and the smoke test compares the served pages, script and style file with the build byte for byte and checks the headers of 08 §4. Production follows on the Custom Domain `agentlink.4thtech.io` (owner Decision 55) through the `production` environment, as the drop (§4.5): head-of-main check, the live version recorded, the same site check over HTTP (up to 15 minutes without DNS or TLS while a new Custom Domain's record and certificate are created), the logging read-back, automatic rollback, the freeze job, catch-up and `deploy-reconcile.yml`. The production token needs Workers Scripts edit and, on zone `4thtech.io`, Workers Routes edit and DNS edit (the same scope as the drop's Custom Domain). |
 | Verify | Served asset hashes equal the release manifest; headers checked; the fragment-never-sent test runs against staging, and the header and hash checks also against production. |
 | Rollback | Automatic in `deploy-production`: back to the previous version, hash-identical. Clients may cache; a service-worker update may be needed. |
 

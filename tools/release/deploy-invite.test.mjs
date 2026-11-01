@@ -133,7 +133,9 @@ describe('deploy-invite.yml structure', () => {
   it('builds the site once, with no credentials, and deploys that directory to staging', () => {
     const build = job('build');
     expect(build).not.toMatch(/environment:|secrets\.|CLOUDFLARE/);
-    expect(build).toMatch(/exactly _headers, i\/index\.html, index\.html, invite\.css and invite\.js/);
+    expect(build).toMatch(
+      /exactly _headers, i\/index\.html, index\.html, invite\.css and invite\.js/,
+    );
     expect(build).toContain(
       'if [ "$found" != "./_headers ./i/index.html ./index.html ./invite.css ./invite.js " ]; then',
     );
@@ -332,7 +334,9 @@ describe('credential check', () => {
   it('is the same block in the staging and the production deploy', () => {
     expect(copies.length).toBe(2);
     expect(copies[1]).toBe(copies[0]);
-    expect(job('deploy-production')).toMatch(/DEPLOY_ENV: production\n\s+WORKER: agentlink-invite\n/);
+    expect(job('deploy-production')).toMatch(
+      /DEPLOY_ENV: production\n\s+WORKER: agentlink-invite\n/,
+    );
   });
 
   it('skips cleanly without credentials', () => {
