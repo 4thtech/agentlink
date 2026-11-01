@@ -39,7 +39,7 @@ afterAll(() => ch.stop());
 async function pauseAna(page: Page): Promise<void> {
   await openAgents(page);
   await agentCard(page, 'Ana')
-    .getByText(/^(Offline|Ready|Working|Idle)/)
+    .getByText(/^(Offline|Connected · restart|Ready|Working|Idle)/)
     .first()
     .waitFor();
   await agentCard(page, 'Ana').getByRole('button', { name: 'Pause', exact: true }).click();
@@ -147,7 +147,12 @@ describe('chapter 4: agents', () => {
       await page.keyboard.press('Escape');
       return word;
     };
-    await eventually('Offline before', async () => (await chip.innerText()).startsWith('Offline'));
+    // W6-FLOW-FIXES: set up but never run (no heartbeat yet) is the honest state, not "Offline".
+    await eventually(
+      'Connected before the first heartbeat',
+      async () => (await chip.innerText()).trim() === 'Connected · restart Claude Code to start',
+    );
+    expect(await appWord()).toBe('Not running');
 
     const mcp = await startAiAppMcp(pc, undefined);
     ch.closers.push(() => mcp.close());
