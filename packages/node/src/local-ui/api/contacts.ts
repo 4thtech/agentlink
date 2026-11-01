@@ -120,6 +120,10 @@ function row(view: ContactView): JsonObject | undefined {
     view.pairedAt >= 0
       ? { pairedAt: view.pairedAt }
       : {}),
+    // W5-INVITE-FEEDBACK: this agent's role in that pairing (which toast the page shows).
+    ...(view.pairedAs === 'inviter' || view.pairedAs === 'invitee'
+      ? { pairedAs: view.pairedAs }
+      : {}),
     // W4-RENAME-REACHES-CONTACTS (D-141; 08 §1): the unseen former name, as core restricted it.
     ...formerNameOf(view),
   };

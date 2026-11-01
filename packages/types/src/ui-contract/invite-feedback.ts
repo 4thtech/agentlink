@@ -12,7 +12,7 @@
 // - `POST /api/ui/invites/accept` also answers `again` (a re-pair: the safety code check starts
 //   over) next to the existing `sent`.
 // - `GET /api/ui/contacts` rows also carry `pairedAt` (unix seconds of the kept pairing), so a
-//   re-pair is visible; the `contacts` event of `GET /api/ui/events` carries only `at`.
+//   re-pair is visible, and `pairedAs` (`inviter` or `invitee`), which decides the toast; the `contacts` event of `GET /api/ui/events` carries only `at`.
 // The world's values are filler.
 
 export interface ConnectingBody {

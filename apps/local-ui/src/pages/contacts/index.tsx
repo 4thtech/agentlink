@@ -78,7 +78,7 @@ import {
 } from './invite-api.js';
 import { CONTACTS_CHANGED, diffContacts } from '../../api/contact-changes.js';
 import { ConnectingInviteRow } from '../invite/pending-row.js';
-import { PASTE_MARKER, takeHandedOver } from '../invite/paste-entry.js';
+import { PASTE_MARKER } from '../invite/paste-entry.js';
 import { FEEDBACK_STRINGS as F } from '../invite/strings.js';
 import { isKept, keep, loadKept } from './kept.js';
 import {
@@ -995,8 +995,6 @@ export function ContactsPage({
 
   // IR-W4-WIRE-2X-1: "Have an invite link? Paste it" opens a paste screen that makes no invite.
   const [pasting, setPasting] = useState(openedForPaste);
-  // W5-PASTE-ENTRY: a link the clipboard offer handed over, for the paste field (memory only).
-  const [handed] = useState(takeHandedOver);
   const openPaste = (): void => {
     setSheetOpen(false);
     setNotice(undefined);
@@ -1232,7 +1230,6 @@ export function ContactsPage({
         {arrived === undefined ? (
           <PasteScreen
             invites={invites}
-            {...(handed === undefined ? {} : { initialText: handed })}
             passkey={passkey}
             onConnected={accepted}
             onDone={() => setPasting(false)}

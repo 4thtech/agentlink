@@ -5890,7 +5890,7 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 - **Scope:**
   - "Someone invited you? Paste link" on Home next to Invite someone, in Get started step 2 and as a top-level button on People; `/contacts?paste` opens the paste screen (the marker leaves the address).
   - Opt-in clipboard check: "Paste from clipboard" reads only on a click; "Check the clipboard for an invite link when I come back to AgentLink" (off by default, this browser only) reads on window focus and only offers "Use the invite link you copied?". Only one AgentLink invite link counts; the clipboard text never leaves the page.
-- **Acceptance:** DOM tests (no read without a click or the opt-in, no request from the clipboard alone, the link handed over in memory only); vocabulary lint; CSS budget unchanged.
+- **Acceptance:** DOM tests (no read without a click or the opt-in, no request from the clipboard alone); vocabulary lint; CSS budget unchanged.
 
 ### Usability wave 3 (U3, 0.4.4)
 

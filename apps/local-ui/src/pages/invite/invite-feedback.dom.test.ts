@@ -38,13 +38,7 @@ import {
   type InviteApi,
 } from '../contacts/invite-api.js';
 import type { PasskeyInfo, PresenceProof } from '../contacts/owner.js';
-import {
-  CLIPBOARD_OPT_IN_KEY,
-  ClipboardOffer,
-  PASTE_HREF,
-  PasteEntryLink,
-  takeHandedOver,
-} from './paste-entry.js';
+import { CLIPBOARD_OPT_IN_KEY, ClipboardOffer, PASTE_HREF, PasteEntryLink } from './paste-entry.js';
 import { PasteInvite } from './paste-invite.js';
 import { FEEDBACK_STRINGS as F, changeText } from './strings.js';
 
@@ -199,6 +193,24 @@ describe('diffContacts: what changed between two reads', () => {
       ),
     ).toEqual([]);
     expect(diffContacts(picture({ contacts: [row(REF_A)] }), picture())).toEqual([]);
+  });
+
+  it('the pairing role decides, not which rows this page saw (B completes before its row was read)', () => {
+    // An open invite of B's own was listed, and B's accept completed before its connecting row
+    // was ever seen: B is the invitee of this pairing, so it is "connected".
+    expect(
+      diffContacts(
+        picture({ openInvites: 1 }),
+        picture({ contacts: [row(REF_A, { pairedAs: 'invitee' } as never)] }),
+      ),
+    ).toEqual<ContactChange[]>([{ kind: 'connected', ref: REF_A, name: 'Marko' }]);
+    // The inviter's side says "accepted" even with no open invite seen before.
+    expect(
+      diffContacts(
+        picture(),
+        picture({ contacts: [row(REF_A, { pairedAs: 'inviter' } as never)] }),
+      ),
+    ).toEqual<ContactChange[]>([{ kind: 'accepted', ref: REF_A, name: 'Marko' }]);
   });
 
   it('a contact that is still pending is not a change yet', () => {
@@ -423,12 +435,5 @@ describe('W5-PASTE-ENTRY: "Someone invited you? Paste link"', () => {
     expect(text()).toContain(F.clipboardOffer);
     await click(F.useIt);
     expect(found).toHaveBeenCalledWith(SHORT);
-  });
-
-  it('a link handed over to the paste screen is taken once', async () => {
-    const { handOver } = await import('./paste-entry.js');
-    handOver(SHORT);
-    expect(takeHandedOver()).toBe(SHORT);
-    expect(takeHandedOver()).toBeUndefined();
   });
 });

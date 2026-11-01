@@ -49,6 +49,7 @@ const view = (over: Partial<ContactView> = {}): ContactView =>
     createdAt: 1_790_000_000,
     updatedAt: 1_790_000_000,
     pairedAt: 1_790_000_100,
+    pairedAs: 'invitee',
     ...over,
   }) as unknown as ContactView;
 
@@ -210,6 +211,7 @@ describe('contact rows carry pairedAt', () => {
     );
     const rows = (result.body as { contacts: Record<string, unknown>[] }).contacts;
     expect(rows[0]?.['pairedAt']).toBe(1_790_000_100);
+    expect(rows[0]?.['pairedAs']).toBe('invitee');
     expect(rows[1]).not.toHaveProperty('pairedAt');
   });
 });

@@ -60,8 +60,6 @@ export interface PasteInviteProps {
     name: string,
     info: { readonly sent: boolean; readonly again: boolean },
   ) => void;
-  /** W5-PASTE-ENTRY: a link handed over (the clipboard offer), already in the field. */
-  readonly initialText?: string;
   /**
    * IR-W4-WIRE-2X-1: "Paste it" hands over to the page's own paste screen (one that makes no invite
    * of yours) instead of opening the field here.
@@ -86,12 +84,11 @@ export function PasteInvite({
   onConnected,
   onOpen,
   startOpen = false,
-  initialText = '',
 }: PasteInviteProps): ReactElement {
   const regionId = useId();
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [phase, setPhase] = useState<Phase>({ k: startOpen ? 'form' : 'closed' });
-  const [text, setText] = useState(initialText);
+  const [text, setText] = useState('');
   // The link the check answered for: the one Accept sends (never another text typed since).
   const [link, setLink] = useState('');
   const [message, setMessage] = useState<string | undefined>(undefined);

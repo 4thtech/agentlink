@@ -28,6 +28,8 @@ export interface ContactRow {
   readonly olderSameOwner?: string;
   /** W5-INVITE-FEEDBACK: unix seconds of the kept pairing; a later one is a re-pair. Never shown. */
   readonly pairedAt?: number;
+  /** W5-INVITE-FEEDBACK: this agent's role in that pairing. Never shown. */
+  readonly pairedAs?: 'inviter' | 'invitee';
 }
 
 export type ListAnswer =
@@ -64,6 +66,7 @@ function row(v: unknown): ContactRow | undefined {
   if (!isObject(v)) return undefined;
   const { ref, name, nameSource, fingerprint, label, status, pairing, since, olderSameOwner } = v;
   const pairedAt = v['pairedAt'];
+  const pairedAs = v['pairedAs'];
   if (typeof ref !== 'string' || !REF.test(ref)) return undefined;
   if (typeof name !== 'string' || name.length > MAX_NAME) return undefined;
   if (!oneOf(nameSource, ['owner', 'counterparty'] as const)) return undefined;
@@ -89,6 +92,7 @@ function row(v: unknown): ContactRow | undefined {
     ...(typeof pairedAt === 'number' && Number.isSafeInteger(pairedAt) && pairedAt >= 0
       ? { pairedAt }
       : {}),
+    ...(pairedAs === 'inviter' || pairedAs === 'invitee' ? { pairedAs } : {}),
   };
 }
 

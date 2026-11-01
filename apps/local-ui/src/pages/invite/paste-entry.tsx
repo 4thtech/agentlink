@@ -9,8 +9,6 @@
 //   inviteLinkOf, fail closed); on focus it is only offered ("Use the invite link you copied?"),
 //   never checked or sent on its own. The clipboard text never leaves this page: it goes into the
 //   paste field, and the owner's Continue sends the link to this computer's own server as before.
-// - handOver/takeHandedOver pass a link to the paste screen in memory only (never the address or
-//   storage: the link holds the invite secret).
 import { Button } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type ReactElement } from 'react';
 import { INTERIM_PEOPLE_PATH } from '../../nav.js';
@@ -22,20 +20,6 @@ export const PASTE_MARKER = 'paste';
 export const PASTE_HREF = `${INTERIM_PEOPLE_PATH}?${PASTE_MARKER}`;
 /** This browser's opt-in to the focus check (a per-viewer convenience; nothing else is stored). */
 export const CLIPBOARD_OPT_IN_KEY = 'agentlink.clipboardInviteCheck';
-
-let handed: string | undefined;
-
-/** Keeps one invite link (in memory) for the paste screen to take. */
-export function handOver(link: string): void {
-  handed = link;
-}
-
-/** The link handed over, once. */
-export function takeHandedOver(): string | undefined {
-  const link = handed;
-  handed = undefined;
-  return link;
-}
 
 /** "Someone invited you? Paste link": opens People's paste screen. */
 export function PasteEntryLink({ className }: { readonly className?: string }): ReactElement {

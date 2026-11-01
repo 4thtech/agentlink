@@ -7,7 +7,7 @@
 //   announcement, when the tab comes back, and, while something waits (an open invite or an accept)
 //   and the stream is not running, every 5 s. It compares the read with the last one (diffContacts)
 //   and tells its listeners what changed: a new contact while an invite was open ("accepted"), an
-//   accept of ours that completed ("connected"), and a re-pair, a later `pairedAt` on a contact
+//   accept of ours that completed ("connected"), by the pairing's role (`pairedAs`), and a re-pair, a later `pairedAt` on a contact
 //   already there ("again").
 // - Another agent's list (after a switch) is never a change: the first read of each agent is only
 //   remembered. Names are text from the server's name rule (I-5); refs are never shown.
@@ -68,7 +68,14 @@ export function diffContacts(
     const was = old.get(c.ref);
     const name = shown(c);
     if (was === undefined || !paired(was)) {
-      const kind = mine.has(c.ref) || before.openInvites === 0 ? 'connected' : 'accepted';
+      // The pairing's role decides (the server's `pairedAs`), never which rows this page happened
+      // to see; an older app without it falls back to what this page saw.
+      const kind =
+        c.pairedAs === 'inviter'
+          ? 'accepted'
+          : c.pairedAs === 'invitee' || mine.has(c.ref) || before.openInvites === 0
+            ? 'connected'
+            : 'accepted';
       out.push({ kind, ref: c.ref, name });
       continue;
     }

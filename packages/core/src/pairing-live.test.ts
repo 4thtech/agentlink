@@ -151,6 +151,9 @@ describe('ContactView.pairedAt (W5-INVITE-FEEDBACK)', () => {
     const again = (await a.client.contacts.list())[0]?.pairedAt;
     expect(again).toBeGreaterThan(first ?? Number.POSITIVE_INFINITY);
     expect((await b.client.contacts.list())[0]?.pairedAt).toBe(again);
+    // The role of the kept pairing: A invited, B accepted.
+    expect((await a.client.contacts.list())[0]?.pairedAs).toBe('inviter');
+    expect((await b.client.contacts.list())[0]?.pairedAs).toBe('invitee');
     // Still one contact on each side: the re-pair updated it in place.
     expect(await a.client.contacts.list()).toHaveLength(1);
   });
