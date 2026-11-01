@@ -114,6 +114,12 @@ function row(view: ContactView): JsonObject | undefined {
     status: view.status,
     pairing: view.pairing,
     since: view.createdAt,
+    // W5-INVITE-FEEDBACK (08 §1): when the kept pairing was made, so a re-pair is visible.
+    ...(typeof view.pairedAt === 'number' &&
+    Number.isSafeInteger(view.pairedAt) &&
+    view.pairedAt >= 0
+      ? { pairedAt: view.pairedAt }
+      : {}),
     // W4-RENAME-REACHES-CONTACTS (D-141; 08 §1): the unseen former name, as core restricted it.
     ...formerNameOf(view),
   };

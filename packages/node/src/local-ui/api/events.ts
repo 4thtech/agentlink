@@ -11,6 +11,8 @@
 //   whose allowlisted fields changed, each whole, plus the names no longer listed) and `generation`
 //   `{generation, current, at}` after a switch. `data` is one line of JSON. Every agent passes the
 //   one allowlist (live-status.ts liveAgentRecord) again here.
+// - W5-INVITE-FEEDBACK: `contacts` `{at}` when the open agent's contacts or invites changed (core
+//   `pairing.changeMark`, an opaque digest compared here and never sent), not for a switch.
 // - Changes only: while a stream is open the hub reads every 2 s (and at once on `poke`, after a
 //   switch), compares the allowlisted state with the last one sent, and emits only on a change.
 // - IDs and replay: `id: <boot>.<seq>`; `boot` is 8 random base64url characters chosen when the host
@@ -46,6 +48,11 @@ export interface LiveSnapshot {
   readonly generation: number;
   readonly current: string | null;
   readonly agents: readonly LiveAgentRecord[];
+  /**
+   * W5-INVITE-FEEDBACK: the open agent's opaque contacts mark (core `pairing.changeMark`), or
+   * undefined when it cannot be read now. Compared here only; never written to a stream.
+   */
+  readonly contactsMark?: string | undefined;
 }
 
 /** One open stream's writer (the server adapts its response). */
@@ -119,6 +126,8 @@ export class LiveEvents {
   #seq = 0;
   #last: LiveSnapshot | undefined;
   #lastText = new Map<string, string>();
+  /** W5-INVITE-FEEDBACK: the last contacts mark read (never sent). */
+  #mark: string | undefined;
   #timer: unknown;
   #reading: Promise<void> | undefined;
   #closed = false;
@@ -257,15 +266,25 @@ export class LiveEvents {
     const prevTexts = this.#lastText;
     this.#lastText = texts;
     for (const stream of [...this.#streams]) this.#snapshot(stream);
+    // W5-INVITE-FEEDBACK: a mark that cannot be read now keeps the last one; another agent's first
+    // mark is only remembered (the switch is the `generation` event).
+    const mark = raw.contactsMark;
+    const prevMark = this.#mark;
+    if (typeof mark === 'string') this.#mark = mark;
     if (prev === undefined) return;
     const at = this.#seconds();
-    if (prev.generation !== next.generation || prev.current !== next.current) {
+    const switched = prev.generation !== next.generation || prev.current !== next.current;
+    if (switched) {
       this.#emit('generation', { generation: next.generation, current: next.current, at });
     }
     const changed = agents.filter((a) => prevTexts.get(a.name) !== texts.get(a.name));
     const gone = [...prevTexts.keys()].filter((name) => !texts.has(name));
     if (changed.length > 0 || gone.length > 0) {
       this.#emit('agents', { agents: changed, ...(gone.length > 0 ? { gone } : {}), at });
+    }
+    if (!switched && typeof mark === 'string' && prevMark !== undefined && mark !== prevMark) {
+      // Only `at`: the page reads the contacts and invites again through the usual reads.
+      this.#emit('contacts', { at });
     }
   }
 

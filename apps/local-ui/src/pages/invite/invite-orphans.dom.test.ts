@@ -92,13 +92,16 @@ describe('the double-create', () => {
   });
 
   it('a copied link is never cancelled and is forgotten', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.resolve() },
+    });
     const { api, cancelled } = fake([ID_1]);
     await act(async () => {
       root.render(createElement(InvitePanel, { invites: api }));
     });
     await settle();
     await act(async () => {
-      document.dispatchEvent(new Event('copy'));
       const copy = [...host.querySelectorAll('button')].find((b) =>
         (b.textContent ?? '').includes('Copy'),
       );

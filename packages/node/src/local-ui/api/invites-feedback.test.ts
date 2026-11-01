@@ -68,7 +68,7 @@ const desk: LocalUiInviteDesk = {
   cancel: () => Promise.resolve('not_found'),
 };
 
-const request = (over: Partial<LocalUiRequest> = {}): LocalUiRequest =>
+const request = (over: Record<string, unknown> = {}): LocalUiRequest =>
   ({
     method: 'GET',
     path: '/api/ui/invites',
@@ -189,13 +189,14 @@ describe('accept says when it was a re-pair (again)', () => {
     expect(result).toEqual(INVITE_ACCEPT_AGAIN_OFFLINE.answer);
   });
 
-  it('answers again: false for a first pairing', async () => {
+  it('answers no again for a first pairing', async () => {
     const result = await inviteAcceptRoute.handler(
       context({ invites: port(true) }, []),
       request({ method: 'POST', input: { invite: LINK } }),
       owner,
     );
-    expect(result.body).toMatchObject({ status: 'pending', sent: true, again: false });
+    expect(result.body).toMatchObject({ status: 'pending', sent: true });
+    expect(result.body).not.toHaveProperty('again');
   });
 });
 

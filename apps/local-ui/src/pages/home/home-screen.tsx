@@ -38,6 +38,8 @@ import {
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { getLive, subscribeLive, switchAgent, type LiveAgent } from '../../api/live.js';
 import { INVITE_PATH } from '../../nav.js';
+import { CONTACTS_CHANGED } from '../../api/contact-changes.js';
+import { PasteEntryLink } from '../invite/paste-entry.js';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import { usePrefs } from '../../prefs/index.js';
 import type { OwnerState, SheetOptions } from '../approvals/card.js';
@@ -48,7 +50,13 @@ import {
   type DecisionPasskey,
 } from '../approvals/client.js';
 import type { ContactRow } from '../contacts/data.js';
-import { createInviteApi, type InviteApi, type OpenInvite } from '../contacts/invite-api.js';
+import {
+  createInviteApi,
+  type ConnectingRow,
+  type InviteApi,
+  type OpenInvite,
+} from '../contacts/invite-api.js';
+import { FEEDBACK_STRINGS as F } from '../invite/strings.js';
 import { createFilesApi } from '../files/files-api.js';
 import type { Conversation as Person, MessagesApi, Problem } from '../messages/api.js';
 import { createSaveApi, type SaveApi } from '../inbox/save-api.js';
@@ -364,6 +372,26 @@ function PendingInviteRow({
   );
 }
 
+/**
+ * W5-INVITE-FEEDBACK: an accept of this agent that waits for the inviter's answer: "Connecting to
+ * {name}…", or "Waiting for {name} to come online. This finishes on its own." Text only (I-5).
+ */
+function ConnectingRowView({ row }: { readonly row: ConnectingRow }): ReactElement {
+  return (
+    <div className="hm-invite-row hm-f">
+      <span className="al-avatar hm-avatar is-pending" aria-hidden="true">
+        {[...row.name][0]?.toUpperCase() ?? '?'}
+      </span>
+      <span className="hm-row-main hm-c">
+        <PersonName name={row.name} />
+        <span className="hm-sub al-text-body-sm">
+          {row.sent ? F.connecting(row.name) : F.waitingOnline(row.name)}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /** Under the hood the opened part is one row of the table, its one cell spanning the columns. */
 function OpenRow({
   pro,
@@ -503,6 +531,12 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
     };
   }, [pollMs, refresh]);
 
+  // W5-INVITE-FEEDBACK: a contact or invite changed (the stream): read again at once.
+  useEffect(() => {
+    window.addEventListener(CONTACTS_CHANGED, refresh);
+    return () => window.removeEventListener(CONTACTS_CHANGED, refresh);
+  }, [refresh]);
+
   const passkey = useCallback(async (): Promise<DecisionPasskey | undefined> => {
     const answer = await clients.approvals.passkey();
     return answer.kind === 'ready' ? answer.passkey : undefined;
@@ -534,6 +568,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
     (p) => !pro || (otherAgent === undefined && (q === '' || p.name.toLowerCase().includes(q))),
   );
   const pending = props.pendingRows === undefined ? (data?.invites ?? []) : [];
+  const connectingRows = props.pendingRows === undefined ? (data?.connecting ?? []) : [];
   const now = Date.now();
 
   const peopleHead = (
@@ -586,6 +621,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
             <Icon name="user-plus" size={16} />
             <span>{S.inviteSomeone}</span>
           </a>
+          <PasteEntryLink className="inv-link-button" />
         </div>
       ) : null}
     </div>
@@ -636,11 +672,14 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               <span>{S.inviteSomeone}</span>
             </a>
           )}
+          {/* W5-PASTE-ENTRY: the other way in, right next to Invite someone. */}
+          {pro ? null : <PasteEntryLink className="inv-link-button" />}
           <section aria-labelledby="hm-people-h" className="hm-people hm-c">
             {peopleHead}
             {data !== undefined &&
             data.people.length === 0 &&
             pending.length === 0 &&
+            connectingRows.length === 0 &&
             props.pendingRows === undefined ? (
               <EmptyState
                 title={S.noPeople}
@@ -810,6 +849,9 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                     )}
                   </div>
                 ) : null}
+                {connectingRows.map((row) => (
+                  <ConnectingRowView key={`c-${row.ref}`} row={row} />
+                ))}
                 {props.pendingRows ??
                   pending.map((invite) => (
                     <PendingInviteRow

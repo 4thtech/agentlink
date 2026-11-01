@@ -5,8 +5,8 @@
 // cancelled and a new one made. The name is the owner's own label, rendered as text.
 import { Button, useHood } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
-import type { OpenInvite } from '../contacts/invite-api.js';
-import { INVITE_STRINGS as S, letterOf, waitingLine } from './strings.js';
+import type { ConnectingRow, OpenInvite } from '../contacts/invite-api.js';
+import { FEEDBACK_STRINGS as F, INVITE_STRINGS as S, letterOf, waitingLine } from './strings.js';
 import './invite.css';
 
 const DAY_MS = 86_400_000;
@@ -78,6 +78,28 @@ export function PendingInviteRow({
           {state === 'busy' ? S.cancelling : S.cancelInvite}
         </Button>
       )}
+    </li>
+  );
+}
+
+/**
+ * W5-INVITE-FEEDBACK: one accept of this agent that waits for the inviter's answer (from the server,
+ * so it survives a reload): "Connecting to {name}…", or, while it could not leave this computer
+ * yet, "Waiting for {name} to come online. This finishes on its own." No Cancel: it finishes or
+ * expires on its own. The name is text only (I-5).
+ */
+export function ConnectingInviteRow({ row }: { readonly row: ConnectingRow }): ReactElement {
+  return (
+    <li className="inv-pending inv-connecting">
+      <span className="inv-pending-letter" aria-hidden="true">
+        {letterOf(row.name)}
+      </span>
+      <span className="inv-pending-main">
+        <span className="inv-pending-name">{row.name}</span>
+        <span className="al-text-body-sm al-muted">
+          {row.sent ? F.connecting(row.name) : F.waitingOnline(row.name)}
+        </span>
+      </span>
     </li>
   );
 }

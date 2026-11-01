@@ -460,7 +460,14 @@ describe('the contacts event (W5-INVITE-FEEDBACK)', () => {
     try {
       subscribeLive(() => undefined);
       await flush();
-      s.streams[0]?.push(block('BOOTboot.1', 'snapshot', { generation: 1, current: 'default', agents: [record()], at: NOW }));
+      s.streams[0]?.push(
+        block('BOOTboot.1', 'snapshot', {
+          generation: 1,
+          current: 'default',
+          agents: [record()],
+          at: NOW,
+        }),
+      );
       await flush();
       const agentsBefore = changed;
       s.streams[0]?.push(block('BOOTboot.2', 'contacts', { at: NOW }));

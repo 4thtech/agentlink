@@ -155,3 +155,40 @@ export function letterOf(text: string): string {
   const found = /[\p{L}\p{N}]/u.exec(text);
   return found === null ? '•' : found[0].toUpperCase();
 }
+
+/**
+ * W5-INVITE-FEEDBACK + W5-PASTE-ENTRY (11 §5): both sides of an invite, live. `{name}` is the name
+ * the list shows (the owner's alias or the name rule's output), rendered as React text.
+ */
+export const FEEDBACK_STRINGS = {
+  accepted: (name: string): string => `${name} accepted your invite`,
+  connected: (name: string): string => `You're connected with ${name}`,
+  again: (name: string): string => `Connected again with ${name}. Check the safety code again.`,
+  connecting: (name: string): string => `Connecting to ${name}…`,
+  waitingOnline: (name: string): string =>
+    `Waiting for ${name} to come online. This finishes on its own.`,
+  already: (name: string): string => `You're already connected to ${name}. Connect again?`,
+  againResets: 'Connecting again starts the safety code check over.',
+  checkAction: 'Check the code',
+  connectingLabel: 'Connections in progress',
+  // W5-PASTE-ENTRY.
+  pasteEntry: 'Someone invited you? Paste link',
+  pasteFromClipboard: 'Paste from clipboard',
+  clipboardEmpty: "There's no AgentLink invite link on the clipboard.",
+  clipboardBlocked: "Couldn't read the clipboard. Paste the link with your keyboard instead.",
+  clipboardOptIn: 'Check the clipboard for an invite link when I come back to AgentLink',
+  clipboardOffer: 'Use the invite link you copied?',
+  useIt: 'Use it',
+  notNow: 'Not now',
+} as const;
+
+/** The toast for one change (contact-changes.ts ContactChange). */
+export function changeText(change: {
+  readonly kind: 'accepted' | 'connected' | 'again';
+  readonly name: string;
+  readonly ref?: string;
+}): string {
+  if (change.kind === 'accepted') return FEEDBACK_STRINGS.accepted(change.name);
+  if (change.kind === 'again') return FEEDBACK_STRINGS.again(change.name);
+  return FEEDBACK_STRINGS.connected(change.name);
+}

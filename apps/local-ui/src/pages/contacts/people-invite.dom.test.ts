@@ -185,7 +185,8 @@ describe('W4-WIRE-2: a pasted invite link on the Invite screen (Decision 52 (3))
   it('Paste it → Continue → Accept with the backup code → the Connected moment', async () => {
     const state: State = { contacts: [], open: [] };
     await mount(state);
-    await click('Have an invite link? Paste it');
+    // W5-PASTE-ENTRY: People's own way in is now the top-level "Someone invited you? Paste link".
+    await click('Someone invited you? Paste link');
     const field = document.querySelector<HTMLTextAreaElement>('textarea[name="invite-link"]')!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(

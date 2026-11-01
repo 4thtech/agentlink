@@ -171,9 +171,9 @@ describe('diffContacts: what changed between two reads', () => {
     const connecting = [
       { ref: REF_A, name: 'Marko', expiresAt: 0, sent: true, again: false },
     ] as const;
-    expect(
-      diffContacts(picture({ connecting }), picture({ contacts: [row(REF_A)] })),
-    ).toEqual<ContactChange[]>([{ kind: 'connected', ref: REF_A, name: 'Marko' }]);
+    expect(diffContacts(picture({ connecting }), picture({ contacts: [row(REF_A)] }))).toEqual<
+      ContactChange[]
+    >([{ kind: 'connected', ref: REF_A, name: 'Marko' }]);
   });
 
   it('a re-pair (a later pairedAt on a contact already there): again, on both sides', () => {
@@ -203,7 +203,10 @@ describe('diffContacts: what changed between two reads', () => {
 
   it('a contact that is still pending is not a change yet', () => {
     expect(
-      diffContacts(picture({ openInvites: 1 }), picture({ contacts: [row(REF_A, { pairing: 'pending' })] })),
+      diffContacts(
+        picture({ openInvites: 1 }),
+        picture({ contacts: [row(REF_A, { pairing: 'pending' })] }),
+      ),
     ).toEqual([]);
   });
 });
@@ -224,7 +227,9 @@ describe('the words (11 §5)', () => {
     );
     expect(F.already('Marko')).toBe("You're already connected to Marko. Connect again?");
     for (const s of [
-      ...Object.values(F).filter((v): v is string => typeof v === 'string'),
+      ...Object.values(F as Record<string, unknown>).filter(
+        (v): v is string => typeof v === 'string',
+      ),
       F.waitingOnline('x'),
       F.already('x'),
     ]) {
@@ -278,7 +283,10 @@ describe('the toast host', () => {
   });
 });
 
-function fakeInvites(check: CheckOutcome, accept: AcceptOutcome): InviteApi & { checked: string[] } {
+function fakeInvites(
+  check: CheckOutcome,
+  accept: AcceptOutcome,
+): InviteApi & { checked: string[] } {
   const checked: string[] = [];
   return {
     checked,
@@ -333,7 +341,8 @@ describe('re-pair on the paste screen', () => {
     expect(text()).toContain("You're already connected to Marko (work). Connect again?");
     expect(text()).toContain(F.againResets);
     await click(/Touch ID/);
-    expect(connected).toHaveBeenCalledWith('Marko', { sent: false, again: true });
+    // The name rule quotes a self-declared name.
+    expect(connected).toHaveBeenCalledWith('“Marko”', { sent: false, again: true });
   });
 
   it('a first pairing says nothing about connecting again', async () => {

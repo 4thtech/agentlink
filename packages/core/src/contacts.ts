@@ -122,6 +122,29 @@ export interface ContactView {
   };
   readonly createdAt: number;
   readonly updatedAt: number;
+  /**
+   * W5-INVITE-FEEDBACK (08 §1): when the kept pairing's `handshake` was made (unix seconds, its
+   * signed `createdAt`), for a completed pairing whose handshake is stored. A re-pair moves it
+   * forward on both sides (04 §2.9 keeps the later handshake), so the app can say "Connected again".
+   */
+  readonly pairedAt?: number;
+}
+
+/**
+ * W5-INVITE-FEEDBACK (08 §1): one accept of this agent that waits for the inviter's answer (a staged
+ * `pairings` row of role `invitee`, not expired). Display fields only: never a card, key, link or
+ * pairing ID.
+ */
+export interface ConnectingContact {
+  /** The inviter's agentId (its contact ID once paired). */
+  readonly id: string;
+  /** The existing contact's shown name for a re-pair; else the inviter's name under the name rule. */
+  readonly display: ContactDisplayName;
+  readonly expiresAt: number;
+  /** False while the `handshake` still waits in the outbox (not published yet). */
+  readonly sent: boolean;
+  /** True when the agent is already an active, paired contact: a re-pair (04 §2.9). */
+  readonly again: boolean;
 }
 
 /**
@@ -461,7 +484,66 @@ export class ContactBook {
       ...(await this.#nameChange(row, short)),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      ...(await this.#pairedAt(row)),
     };
+  }
+
+  /** W5-INVITE-FEEDBACK: the kept handshake's `created_at` (plain column), if any. */
+  async #pairedAt(row: Row<'contacts'>): Promise<{ readonly pairedAt?: number }> {
+    const id = row.handshake_envelope_id;
+    if (row.pairing !== 'complete' || id === null) return {};
+    const at = await this.#ctx.store.transaction(
+      (tx) => tx.get('envelopes', { envelope_id: id })?.created_at,
+    );
+    return typeof at === 'number' && Number.isSafeInteger(at) ? { pairedAt: at } : {};
+  }
+
+  /**
+   * W5-INVITE-FEEDBACK (08 §1): this agent's accepts that wait for the inviter's answer, oldest
+   * first. Opens only the staged name (and, for a re-pair, the contact's shown name); nothing is
+   * written.
+   */
+  async connecting(): Promise<readonly ConnectingContact[]> {
+    const ctx = this.#ctx;
+    const now = nowOf(ctx);
+    const rows = await ctx.store.transaction((tx) =>
+      tx
+        .select('pairings', { role: 'invitee' }, { orderBy: [['created_at', 'asc']] })
+        .filter((r) => r.expires_at > now)
+        .map((r) => ({
+          row: r,
+          contact: tx.get('contacts', { contact_id: r.contact_id }),
+          delivery: tx.get('envelopes', { envelope_id: r.pairing_id })?.delivery ?? null,
+        })),
+    );
+    const out: ConnectingContact[] = [];
+    for (const { row, contact, delivery } of rows) {
+      const again = contact?.status === 'active' && contact.pairing === 'complete';
+      let display: ContactDisplayName;
+      try {
+        display =
+          again && contact !== undefined
+            ? (await this.#view(contact)).display
+            : {
+                name: restrictName(
+                  await open(ctx, 'pairings', 'name', [row.pairing_id], row.name),
+                  formatFingerprint(decodeHex(row.owner_fingerprint, { length: 32 }), 'short'),
+                ),
+                label: 'self-declared',
+                nameSource: 'counterparty',
+              };
+      } catch {
+        continue;
+      }
+      out.push({
+        id: row.contact_id,
+        display,
+        expiresAt: row.expires_at,
+        sent: delivery === 'sent',
+        again,
+      });
+    }
+    return out;
   }
 
   /** D-141: the unseen former-name note of a contact shown by its own name, if any. */

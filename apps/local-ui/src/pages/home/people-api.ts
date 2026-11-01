@@ -14,7 +14,13 @@
 import type { ApiClient } from '../../api/client.js';
 import { cleanName } from './person-name.js';
 import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
-import { INVITES_LIST_PATH, parseOpenInvites, type OpenInvite } from '../contacts/invite-api.js';
+import {
+  INVITES_LIST_PATH,
+  parseConnecting,
+  parseOpenInvites,
+  type ConnectingRow,
+  type OpenInvite,
+} from '../contacts/invite-api.js';
 import {
   parseInboxFolder,
   parseReceived,
@@ -62,6 +68,8 @@ export interface HomeData {
   readonly sent: ReadonlyMap<string, SentItem>;
   /** Invites that wait to be accepted, soonest to expire first. */
   readonly invites: readonly OpenInvite[];
+  /** W5-INVITE-FEEDBACK: this agent's accepts that wait for the inviter's answer. */
+  readonly connecting?: readonly ConnectingRow[];
   /** W4-WIRE-3: the Inbox folder received files are saved to (`~/AgentLink/Inbox`), when known. */
   readonly inboxFolder?: string;
 }
@@ -138,6 +146,12 @@ export function createPeopleApi(api: ApiClient): PeopleApi {
           invites: ((invites.kind === 'ok' ? parseOpenInvites(invites.data) : undefined) ?? [])
             .map((i) => (i.name === null ? i : { ...i, name: cleanName(i.name) }))
             .sort((a, b) => a.expiresAt - b.expiresAt),
+          connecting: parseConnecting(invites.kind === 'ok' ? invites.data : undefined).map(
+            (c) => ({
+              ...c,
+              name: cleanName(c.name),
+            }),
+          ),
           ...(inboxFolder === undefined ? {} : { inboxFolder }),
         },
       };

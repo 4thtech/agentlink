@@ -29,6 +29,8 @@ export {
   type ContactCheckOutcome,
   type ContactStatus,
   type ContactView,
+  // W5-INVITE-FEEDBACK: an accept that waits for the inviter's answer.
+  type ConnectingContact,
   type InboundCard,
   type InboundScreen,
   type InboundSender,

@@ -1327,10 +1327,17 @@ export async function startApprovalServerWith(
     read: async () => {
       if (host === undefined) return undefined;
       const list = await listAgents(APPS_LIST_REUSE_MS);
+      // W5-INVITE-FEEDBACK: the open agent's contacts mark (plain columns of its open store, read
+      // only; it also sees a pairing the AI app's MCP server completed). Compared by the hub, never
+      // sent; undefined when it cannot be read.
+      const client = agentUi?.client;
+      const contactsMark =
+        client === undefined ? undefined : await client.pairing.changeMark().catch(() => undefined);
       return {
         generation: list.generation,
         current: list.current,
         agents: list.agents.map(liveAgentRecord),
+        contactsMark,
       };
     },
     now,

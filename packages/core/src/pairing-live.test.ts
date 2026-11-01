@@ -117,11 +117,7 @@ describe('contacts.connecting (W5-INVITE-FEEDBACK)', () => {
   it('says sent once the handshake left the outbox', async () => {
     const { accepted } = await accept(a, b);
     await b.store.transaction((tx) =>
-      tx.update(
-        'envelopes',
-        { envelope_id: accepted.pairingId },
-        { delivery: 'sent' },
-      ),
+      tx.update('envelopes', { envelope_id: accepted.pairingId }, { delivery: 'sent' }),
     );
     expect((await b.client.contacts.connecting())[0]?.sent).toBe(true);
   });
@@ -178,9 +174,9 @@ describe('pairing.changeMark (W5-INVITE-FEEDBACK)', () => {
     marks.add(created);
     const cancelled = await a.client.pairing.cancelInvite(invite.inviteId);
     expect(cancelled).toBe('cancelled');
+    // Back to no open invite: the mark moves off the open one (the views show what they showed).
     const afterCancel = await mark(a);
-    expect(marks.has(afterCancel)).toBe(false);
-    marks.add(afterCancel);
+    expect(afterCancel).not.toBe(created);
 
     const bStart = await mark(b);
     const { accepted } = await accept(a, b);

@@ -5864,6 +5864,34 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 - **Scope:** spec first: a fixed, versioned word list and a one-to-one mapping from the same value the 12-digit code is shown from, so strength and the commit-then-reveal rule are unchanged; digits stay available. Two people reading words aloud must be able to compare them. Marked "proposed, owner confirms at merge".
 - **Acceptance:** vectors for the mapping (both directions; a wrong word fails); the word list has no look-alike or offensive words and is reviewed; digits and words always agree; Fable 5.1 review; Tali's "merge"; changelog.d fragment
 
+### Usability wave 5 (W5 "Make it usable", 0.4.7)
+
+#### W5-INVITE-FEEDBACK · invites: both sides see an invite happen, live (owner test of 0.4.6, 1 Nov)
+- **Status:** in review (wave 5, 0.4.7) · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 (pairing, contacts) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/{contacts,pairing}.ts`; `packages/node/src/local-ui/api/{events,invites,contacts}.ts`, `packages/node/src/local-ui/context.ts`, `packages/node/src/approval-server.ts` (event hub read); `packages/types/src/ui-contract/invite-feedback.ts`; `apps/local-ui/src/{api/contact-changes.ts,api/live.ts,layout/contact-toasts.tsx}`, `apps/local-ui/src/pages/{contacts,invite,home}/**`
+- **Depends on:** W4-LIVE-STATUS (`GET /api/ui/events`), W4-INVITES-LIST
+- **Spec:** 08 §1 (`GET /api/ui/events` event `contacts`; `GET /api/ui/invites` `connecting`; check `alreadyContact`; accept `again`; contact rows `pairedAt`); 04 §2.9 (re-pair); 11 §5
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Source:** owner test of 0.4.6 (1 Nov): the paste re-paired an existing contact silently and nothing told either side
+- **Scope:**
+  - Waiting rows on both sides, from the server: the inviter's open invites (Cancel) and the accepter's "Connecting to {name}…" (core `contacts.connecting()`), so they survive a reload.
+  - Contact and invite changes over the existing events stream: a `contacts` event `{at}` when core's opaque `pairing.changeMark()` of the open agent changes (also after the AI app's MCP server completed a pairing); never for a switch. The page reads again and shows "{name} accepted your invite" or "You're connected with {name}", and the contact gets a short pulse (a fade with reduced motion).
+  - Re-pair: check answers `alreadyContact`; the paste screen asks "You're already connected to {name}. Connect again?" and says the safety code check starts over. Afterwards both sides show "Connected again with {name}. Check the safety code again." (`pairedAt` moved forward).
+  - Honest offline: accept `sent:false` (and a `connecting` row not sent yet) shows "Waiting for {name} to come online. This finishes on its own."
+  - Stop the double-create: a link that never left the screen is remembered in the tab (public invite IDs only), cancelled with a keepalive request when the page hides and on the next load.
+- **Acceptance:** RED commit first; core, node and local-ui tests for each item; no protocol wire change; events carry only `at`; names render as text; CSS budget unchanged; independent review; Tali's "merge"; changeset and changelog.d fragment.
+
+#### W5-PASTE-ENTRY · local app: "Someone invited you? Paste link" where people look (owner test of 0.4.6, 1 Nov)
+- **Status:** in review (wave 5, 0.4.7, same PR as W5-INVITE-FEEDBACK) · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/invite/paste-entry.tsx`, `apps/local-ui/src/pages/{home,contacts}/**`
+- **Depends on:** W4-WIRE-2
+- **Spec:** 08 §1 (People `?paste`); 11 §5
+- **Invariants:** I-5, I-7
+- **Scope:**
+  - "Someone invited you? Paste link" on Home next to Invite someone, in Get started step 2 and as a top-level button on People; `/contacts?paste` opens the paste screen (the marker leaves the address).
+  - Opt-in clipboard check: "Paste from clipboard" reads only on a click; "Check the clipboard for an invite link when I come back to AgentLink" (off by default, this browser only) reads on window focus and only offers "Use the invite link you copied?". Only one AgentLink invite link counts; the clipboard text never leaves the page.
+- **Acceptance:** DOM tests (no read without a click or the opt-in, no request from the clipboard alone, the link handed over in memory only); vocabulary lint; CSS budget unchanged.
+
 ### Usability wave 3 (U3, 0.4.4)
 
 Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The owner (Tali) decided on 2026-10-29 to take all recommended options of §11: (1) 0.4.4 with every card, and if Remove (U3-e) has not passed its Fable security audit when the rest is ready, 0.4.4 ships without it and Remove follows in 0.4.5; (2) one app, one agent open at a time, switching without Touch ID; (3) name and Touch ID on one screen; (4) Remove with Touch ID, typed label, export offer, always retired, contacts told; (5) AI app connect with the exact entry shown, Touch ID and a backup; (6) existing agents kept, last used opens, one-time "Tidy up" note, the terminal never asks which agent; (7) new screens from the new b11 sections, styled from the D2 screens, with the owner's screenshot review in each PR; (8) live view: Agents page map and the moving-row mark in Messages and Files in 0.4.4, Home, Contacts and compact view in 0.4.5, no preview on hover. Spec edits are marked "proposed, owner confirms at merge". S2 cards: tests first, Opus independent review, Fable where marked, Tali's "merge". UI cards: screenshots at 1440 and 360, light and dark. All new local routes sit behind the session, CSRF, `Host`, `Origin`, fetch-metadata and octet-stream gate; every presence route signs an owner action (D-68); errors are fixed codes; no route takes a path from the page.

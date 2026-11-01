@@ -690,3 +690,19 @@
 .al-goto-none {
   padding: var(--al-space-3);
 }
+
+/* W5-INVITE-FEEDBACK: the contact toasts, bottom centre above the status bar. */
+.al-toasts {
+  position: fixed;
+  inset-inline: var(--al-space-4);
+  inset-block-end: calc(var(--al-space-6) + 24px);
+  z-index: var(--al-z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--al-space-2);
+  pointer-events: none;
+}
+.al-toasts > .al-toast {
+  pointer-events: auto;
+}
