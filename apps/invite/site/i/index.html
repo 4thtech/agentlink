@@ -11,73 +11,79 @@
   </head>
   <body>
     <header class="top">
-      <span class="brand"><span class="mark" aria-hidden="true"></span>AgentLink</span>
-      <span id="inviter-host" class="host"></span>
+      <span class="brand"
+        ><svg
+          class="mark"
+          viewBox="0 0 48 48"
+          width="24"
+          height="24"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path
+            class="brackets"
+            d="M5 6H15.5V11H10V37H15.5V42H5Z M43 6H32.5V11H38V37H32.5V42H43Z"
+          />
+          <path class="seal" d="M24 15L33 24L24 33L15 24Z" /></svg
+        >AgentLink</span
+      >
     </header>
     <main>
       <p class="eyebrow">INVITE</p>
       <p id="state" role="status">Checking the invite in your browser…</p>
-      <button id="retry" type="button" class="copy" hidden>Try again</button>
+      <button id="retry" type="button" class="btn" hidden>Try again</button>
 
       <section id="inviter" hidden aria-labelledby="invite-heading">
         <h1 id="invite-heading"></h1>
         <p class="muted">Takes about 2 minutes.</p>
-        <div class="card">
+        <article class="card">
           <p class="who">
             <span id="inviter-name" class="name"></span>
             <span id="inviter-label" class="badge"></span>
           </p>
           <p class="row">
             <span class="caps">FINGERPRINT</span>
-            <span id="inviter-fingerprint" class="mono"></span>
+            <span id="inviter-fingerprint" class="mono code-chip"></span>
           </p>
           <p id="inviter-expiry" class="muted"></p>
           <p class="muted small">
             Name chosen by its owner. You'll compare a safety code after accepting.
           </p>
-        </div>
+        </article>
       </section>
 
       <section id="step" hidden aria-labelledby="step-heading">
         <h2 id="step-heading">Set up in 2 minutes</h2>
-        <div id="switch" class="switch" role="tablist" aria-label="How to set up">
-          <button
-            id="tab-command"
-            type="button"
-            role="tab"
-            aria-controls="panel"
-            aria-selected="true"
-          >
-            Copy a command
-          </button>
-          <button
-            id="tab-ai"
-            type="button"
-            role="tab"
-            aria-controls="panel"
-            aria-selected="false"
-            tabindex="-1"
-          >
-            Ask your AI
-          </button>
-        </div>
-        <p id="node-help" class="small">
-          <a
-            id="node-link"
-            href="https://nodejs.org/en/download"
-            target="_blank"
-            rel="noopener noreferrer"
-            >Need Node.js? Get it here</a
-          >
-        </p>
-        <div id="panel" class="panel" role="tabpanel" aria-labelledby="tab-command">
-          <p class="panel-head">
-            <span id="panel-label" class="caps">TERMINAL</span>
-            <button id="copy" type="button" class="copy">Copy</button>
+        <article id="way-ai" class="card way" aria-labelledby="way-ai-title">
+          <h3 id="way-ai-title"></h3>
+          <p id="ai-help" class="muted small"></p>
+          <p class="actions"><button id="copy-ai" type="button" class="btn secondary"></button></p>
+        </article>
+        <article id="way-command" class="card way primary" aria-labelledby="way-command-title">
+          <h3 id="way-command-title"></h3>
+          <p id="step-help" class="muted small"></p>
+          <p id="step-text" class="preview mono"></p>
+          <p class="actions">
+            <button id="copy" type="button" class="btn"></button>
+            <span id="node-help" class="small"
+              ><a
+                id="node-link"
+                href="https://nodejs.org/en/download"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Need Node.js? Get it here</a
+              ></span
+            >
           </p>
-          <pre id="step-text"></pre>
-        </div>
-        <p id="step-help" class="muted small"></p>
+        </article>
+        <article id="way-link" class="card way" aria-labelledby="way-link-title">
+          <h3 id="way-link-title"></h3>
+          <p id="link-help" class="muted small"></p>
+          <p id="link-text" class="preview mono"></p>
+          <p class="actions">
+            <button id="copy-link" type="button" class="btn secondary"></button>
+          </p>
+        </article>
         <p id="copy-status" class="small" role="status" aria-live="polite"></p>
       </section>
       <p id="next" class="muted small" hidden></p>

@@ -30,25 +30,23 @@ name: CI
 # GitHub refuses to merge a draft.
 #
 # OPS-FAST-LANE-1 (owner decision 54, 2026-11-01): two lanes.
-# - Fast lane: a pull request (and a push to a feature branch, a merge group while the queue still
-#   exists). `checks` lints, typechecks, builds and tests the affected packages and their dependents;
-#   the short Linux jobs run when the change reaches their packages; the heavy-lane jobs (macOS and
+# - Fast lane: a pull request (a push to a feature branch no longer runs CI).
+#   `checks` lints, typechecks, builds and tests the affected packages and their dependents; the short Linux jobs run when the change reaches their packages; the heavy-lane jobs (macOS and
 #   Windows legs, windows-smoke, the full e2e scenario) run only when the change is in their own area
 #   (HEAVY_LANE in tools/ci/select-affected.mjs). A change under `.github/` or `tools/`, or an
 #   unreadable diff, runs everything. `ci-gate` requires what ran.
 # - Heavy lane: a push to `main` or `wave-4` (the release branches) runs everything, and `ci-gate`
 #   there requires every heavy job to have run and passed; release.yml requires that gate.
-# The `merge_group` trigger stays only so a queue that is still switched on is not left waiting; it
-# runs the fast lane. Breakage on `main` is fixed forward (decision 54 item 2).
+# There is no merge queue (the `merge_group` trigger is removed). Breakage on `main` is fixed
+# forward (decision 54 item 2).
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
+  # OPS-FASTLANE-4: a push runs only on the release branches (the heavy lane); a feature-branch push
+  # is covered by its pull request run, so it no longer doubles CI.
   push:
-    # The merge queue's own branches (`gh-readonly-queue/**`) are already run as `merge_group`
-    # (CHORE-CI-QUEUE-DEDUPE); a second `push` run of the same commit only saturates the runner pool.
-    branches-ignore: [sync, "gh-readonly-queue/**"]
-  merge_group:
+    branches: [main, wave-4]
 
 permissions: {}
 
