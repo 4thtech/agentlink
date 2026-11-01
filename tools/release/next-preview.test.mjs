@@ -324,7 +324,10 @@ describe('release.yml: triggers', () => {
     const gate = jobOf(release, 'preview-gate');
     expect(gate).toMatch(/commits\/\$BRANCH/);
     expect(gate).toMatch(/result=superseded/);
-    expect(gate).not.toMatch(/ci-gate \(push\)/);
+    // The CI wait is the wave-4 step only; a wave-4 push run publishes `ci-gate (push)`.
+    const wait = gate.slice(gate.indexOf('id: wait'), gate.indexOf('id: head'));
+    expect(wait).toMatch(/if: github\.ref != 'refs\/heads\/main'/);
+    expect(wait).toMatch(/--require "ci\.yml:ci-gate \(push\)"/);
   });
 
   it('security.yml runs on push to wave-4 so ci-green can find its gate', () => {
@@ -345,7 +348,8 @@ describe('release.yml: the main lane never runs for a wave-4 push', () => {
 
   it('every job outside the preview lane is ci-green, guard or downstream of select-mode', () => {
     for (const name of jobsOf(release)) {
-      if (['ci-green', 'preview-gate', 'guard', 'select-mode', ...PREVIEW_JOBS].includes(name)) continue;
+      if (['ci-green', 'preview-gate', 'guard', 'select-mode', ...PREVIEW_JOBS].includes(name))
+        continue;
       const job = jobOf(release, name);
       // Jobs with always() still only act on main-lane outputs, which are empty when skipped.
       const onMainLane = needsOf(job).some((n) => reaches(n, 'select-mode'));

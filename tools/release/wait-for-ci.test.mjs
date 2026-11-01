@@ -625,11 +625,7 @@ describe('workflows that wait for CI', () => {
     }
   });
 
-  for (const name of [
-    'deploy-submitter.yml',
-    'deploy-drop.yml',
-    'deploy-invite.yml',
-  ]) {
+  for (const name of ['deploy-submitter.yml', 'deploy-drop.yml', 'deploy-invite.yml']) {
     it(`${name}: ci-green publishes its result and guard requires it to be green`, () => {
       const source = read(name);
       const ciGreen = jobOf(source, 'ci-green');

@@ -34,8 +34,7 @@ export const PREVIEW_TAG = 'next';
 // were `{tag}.wave4.{datetime}` for the wave-4 branch, which stay recognised as leaked below). A main
 // pre-mode prerelease is `x.y.z-next.<n>` (numeric second identifier), so the two schemes can never
 // produce the same version.
-const PREVIEW_VERSION =
-  /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-next\.snap\.[0-9]{14}$/;
+const PREVIEW_VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-next\.snap\.[0-9]{14}$/;
 const LEAKED_VERSION = /-next\.(snap|wave4)\./;
 const SCOPED_NAME = /^@4thtech-io\/[a-z0-9][a-z0-9._-]*$/;
 const LANES = new Set(['main', PREVIEW_BRANCH]);
