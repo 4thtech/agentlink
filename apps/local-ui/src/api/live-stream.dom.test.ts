@@ -445,3 +445,30 @@ describe('the shared live subscription over the events stream', () => {
     expect(s.requests.filter((p) => p === EVENTS_PATH)).toHaveLength(1);
   });
 });
+
+// W5-INVITE-FEEDBACK (08 §1, event `contacts`): the stream says when the open agent's contacts or
+// invites changed; the page announces `agentlink:contacts-changed` so the views that show them
+// read again (the event carries only `at`), and it is not an agents change.
+describe('the contacts event (W5-INVITE-FEEDBACK)', () => {
+  it('announces agentlink:contacts-changed, not agentlink:agents-changed', async () => {
+    const s = serve();
+    let contacts = 0;
+    const onContacts = (): void => {
+      contacts += 1;
+    };
+    window.addEventListener('agentlink:contacts-changed', onContacts);
+    try {
+      subscribeLive(() => undefined);
+      await flush();
+      s.streams[0]?.push(block('BOOTboot.1', 'snapshot', { generation: 1, current: 'default', agents: [record()], at: NOW }));
+      await flush();
+      const agentsBefore = changed;
+      s.streams[0]?.push(block('BOOTboot.2', 'contacts', { at: NOW }));
+      await flush();
+      expect(contacts).toBe(1);
+      expect(changed).toBe(agentsBefore);
+    } finally {
+      window.removeEventListener('agentlink:contacts-changed', onContacts);
+    }
+  });
+});
