@@ -18,11 +18,11 @@ function pushBlock(file) {
 }
 
 describe('push triggers skip merge-queue branches', () => {
-  it('ci.yml ignores gh-readonly-queue/** pushes but keeps sync ignored and merge_group', () => {
+  it('ci.yml pushes only on main and wave-4 and has no merge_group (OPS-FASTLANE-4)', () => {
     const block = pushBlock('ci.yml');
-    expect(block).toMatch(/branches-ignore:.*sync/);
-    expect(block).toMatch(/branches-ignore:.*gh-readonly-queue\/\*\*/);
-    expect(read('ci.yml')).toMatch(/^ {2}merge_group:/m);
+    expect(block).toMatch(/branches:\s*\[main, wave-4\]/);
+    expect(block).not.toMatch(/branches-ignore/);
+    expect(read('ci.yml')).not.toMatch(/^ {2}merge_group:/m);
   });
   it('secret-scan-branches.yml ignores gh-readonly-queue/** (security.yml covers merge_group)', () => {
     expect(pushBlock('secret-scan-branches.yml')).toMatch(

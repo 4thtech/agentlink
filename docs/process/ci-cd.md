@@ -46,8 +46,7 @@ Owner decision 54 (1 Nov 2026), items 1 and 2: a pull request runs only the quic
 | Pull request touching root config, the lockfile, `test-vectors/` or `packages/types`, `crypto`, `core` | Fast | Full suite (global triggers) | every package job; heavy-lane jobs by area (an install file such as `pnpm-lock.yaml` or root `package.json` triggers all of them) | `ci-gate` |
 | Pull request, selector fails or the diff cannot be read | Fast, but everything runs | Full suite, with a warning | every job | `ci-gate` |
 | `push` to `main` or `wave-4` (the release branches) | **Heavy** | Full suite; the selector is never run | every job, including the macOS and Windows legs, `windows-smoke` and `e2e-deterministic`; `ci-gate (push)` fails if `checks` or any heavy job did not succeed (a skip fails, `HEAVY_REQUIRED`) | `ci-gate (push)`: `release.yml` and the `deploy-*.yml` workflows require it |
-| `push` to another branch | Fast | Affected packages, diffed against the merge base with `main` (`git merge-base HEAD origin/main`); a base that cannot be found runs everything | package jobs by package; heavy-lane jobs never (the pull request run covers them) | `ci-gate (push)`, not required |
-| `merge_group` (only while the queue is still switched on) | Fast, like the pull request | Affected packages (diff `merge_group.base_sha..HEAD`) | as for a pull request | `ci-gate` |
+| `push` to another branch | none | CI does not run on a push to a feature branch (OPS-FASTLANE-4); its pull request run covers it | none | none |
 | Draft pull request | Skipped (CHORE-CI-SPEED-1) | skipped with `detect`; the secret scan, zizmor, `pr-hygiene` and `review-gate` still run | the gates report (skipped upstream counts as a pass) |
 
 A wrong or too-narrow selection can only delay a failure to the heavy run on `main`, which `release.yml` requires before anything ships (fix forward). Selection rules are in the header of `tools/ci/select-affected.mjs`; its tests are `tools/ci/select-affected.test.mjs`, which pin every map below.
@@ -80,7 +79,7 @@ Examples on today's graph: a UI-only PR (`apps/local-ui`, `packages/ui`, an `e2e
 
 **Concurrency:** the group `ci-<event>-<PR number or ref>` cancels a superseded pull request run (and a feature-branch push run); runs on `main` are never cancelled.
 
-**Merge queue.** The `merge_group` trigger is left in place, harmless: while the queue is still switched on, a group runs the fast lane (no `QUEUE_REQUIRED`), so nothing waits on it. The owner switches the queue off in the ruleset (owner setup, §2); the trigger can then be removed in a later cleanup.
+**Merge queue.** The queue is off, and `ci.yml` has no `merge_group` trigger (OPS-FASTLANE-4). `ci.yml` pushes run only on `main` and `wave-4` (the heavy lane); a push to any other branch runs nothing there, because its pull request run covers it. `security.yml`, `pr-hygiene.yml` and `review-gate.yml` keep an inert `merge_group` trigger.
 
 ### Draft pull requests and the stale-PR precheck (CHORE-CI-SPEED-1)
 
