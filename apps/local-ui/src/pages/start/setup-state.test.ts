@@ -48,19 +48,21 @@ describe('setupIncomplete: real state only', () => {
 });
 
 describe('startProgress: the Home card (A4)', () => {
-  it('counts connect, invite and the safety code check', () => {
+  it('counts connect and invite; the safety code is a suggestion that never holds the card', () => {
     expect(startProgress({ ...SET_UP, contacts: [] }).done).toBe(1);
     const two = startProgress({ ...SET_UP, contacts: [contact()] });
     expect(two.done).toBe(2);
-    expect(two.total).toBe(3);
-    expect(two.steps[2]).toMatchObject({ id: 'check', done: false, name: 'Denis' });
+    expect(two.total).toBe(2);
+    expect(two.complete).toBe(true);
+    expect(two.suggestion).toMatchObject({ id: 'check', done: false, name: 'Denis' });
     expect(
-      startProgress({ ...SET_UP, contacts: [contact({ label: 'safety-code-checked' })] }).complete,
+      startProgress({ ...SET_UP, contacts: [contact({ label: 'safety-code-checked' })] }).suggestion
+        .done,
     ).toBe(true);
   });
   it('never shows a name the other side chose (I-5)', () => {
     const p = startProgress({ ...SET_UP, contacts: [contact({ nameSource: 'counterparty' })] });
-    expect(p.steps[2]?.name).toBeNull();
+    expect(p.suggestion.name).toBeNull();
   });
   it('is unknown while a read for an undone step has no answer', () => {
     expect(startProgress(UNKNOWN_STATE).unknown).toBe(true);

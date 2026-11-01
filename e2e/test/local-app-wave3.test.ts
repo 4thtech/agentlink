@@ -88,11 +88,25 @@ async function switchTo(
   await page.locator('button.al-chip').filter({ hasText: openLabel }).waitFor();
 }
 
-/** Messages page: opens the conversation with `contact` and returns the page text. */
+/** Opens Home by address; Get started opens first while no AI app is connected, so skip it. */
+async function toHome(page: Page): Promise<void> {
+  const skip = page
+    .getByRole('button', { name: 'Skip to Home' })
+    .or(page.getByRole('link', { name: 'Skip to Home' }));
+  const shown = await skip
+    .first()
+    .waitFor({ state: 'visible', timeout: 8000 })
+    .then(() => true)
+    .catch(() => false);
+  if (shown) await skip.first().click();
+}
+
+/** Home: opens the conversation with `contact` and returns the page text. */
 async function readConversation(page: Page, origin: string, contact: string): Promise<string> {
-  await page.goto(new URL('/settings/messages', origin).href);
+  await page.goto(new URL('/', origin).href);
+  await toHome(page);
   await page.getByText(contact, { exact: true }).first().click();
-  await page.getByText('Copy text').first().waitFor();
+  await page.getByRole('button', { name: 'Copy message text' }).first().waitFor();
   return page.locator('body').innerText();
 }
 
@@ -477,8 +491,9 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
     await switchTo(page, link, 'default', 'Home base');
     expect(await readConversation(page, link, 'Second agent')).toContain(answer);
     await switchTo(page, link, 'work');
-    await page.goto(new URL('/settings/messages', link).href);
-    await page.getByRole('heading', { name: 'Inbox' }).first().waitFor();
+    await page.goto(new URL('/', link).href);
+    await toHome(page);
+    await page.getByRole('heading', { name: 'People' }).first().waitFor();
     await page.waitForTimeout(1500);
     // `work` has no contacts: none of the other agents' conversations show here.
     const empty = await page.locator('body').innerText();

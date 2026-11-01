@@ -5949,6 +5949,18 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
   - Opt-in clipboard check: "Paste from clipboard" reads only on a click; "Check the clipboard for an invite link when I come back to AgentLink" (off by default, this browser only) reads on window focus and only offers "Use the invite link you copied?". Only one AgentLink invite link counts; the clipboard text never leaves the page.
 - **Acceptance:** DOM tests (no read without a click or the opt-in, no request from the clipboard alone); vocabulary lint; CSS budget unchanged.
 
+#### W6-UI-POLISH · classroom QA polish: Get started completes, Files has a home, one name for people (wave 6, QA 1 Nov)
+- **Status:** in review (wave 6) · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/{nav.ts,router.tsx,lazy/pages.ts,pages/start/**,pages/contacts/**,pages/join/**}`, `packages/{ui,core,mcp-tools}` name strings, `apps/invite`
+- **Depends on:** W5-PASTE-ENTRY
+- **Spec:** 11 §5.2 (name rule, edit proposed, owner confirms at merge); 08 §1
+- **Invariants:** I-4 (the safety code is checked only by the signed "They match"), I-5
+- **Scope:**
+  - Get started completes when you are connected with someone (2 of 2); "Check a safety code" is a gentle suggestion, never counted, never faked.
+  - Go to "Files" opens Home (each person's files); the old Inbox page is removed and `/inbox` redirects to Home.
+  - "People" everywhere (page title, Go to, counts, toasts); no curly quotes around names; "Self-declared" reads "Not checked yet". AI-facing text keeps the 06 form (quoted, self-declared).
+- **Acceptance:** unit and DOM tests updated; CSS budget unchanged; motion-lint clean.
+
 ### Classroom wave 6 (W6, golden-path QA of 1 Nov)
 
 #### W6-FLOW-FIXES · local app: Remove says "Quit {app} first" before Touch ID; a removed connection shows; no "Offline" right after Connected (golden-path QA P1-2, P1-3, P1-4)

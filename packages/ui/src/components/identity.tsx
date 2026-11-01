@@ -57,7 +57,7 @@ export function StatusChip({ status, detail, children, className }: StatusChipPr
 const IDENTITY: Readonly<
   Record<IdentityKind, readonly [tone: string, icon: string, word: string]>
 > = {
-  selfdeclared: ['selfdeclared', 'identity-selfdeclared', 'Self-declared'],
+  selfdeclared: ['selfdeclared', 'identity-selfdeclared', 'Not checked yet'],
   checked: ['checked', 'identity-checked', 'Safety code checked'],
   registered: ['registered', 'identity-registered', 'Registered'],
   verified: ['verified', 'identity-verified', 'Verified domain'],
@@ -165,7 +165,7 @@ export function formatContactName(input: ContactNameInput): FormattedName {
   if (name === '' || RESERVED.some((w) => lower.includes(w)) || !NAME_OK.test(name)) {
     return { kind: 'fingerprint', text: `Contact ${cleanText(input.fingerprint ?? '—', 64)}` };
   }
-  return { kind: 'restricted', text: `“${name.slice(0, 32)}”` };
+  return { kind: 'restricted', text: name.slice(0, 32) };
 }
 
 export interface ContactNameProps extends ContactNameInput {

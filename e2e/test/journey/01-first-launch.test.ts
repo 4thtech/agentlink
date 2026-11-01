@@ -105,7 +105,7 @@ describe('chapter 1: onboarding', () => {
     await page.getByText('No one here yet.').first().waitFor();
     // W4-WIRE: Home carries the Get started card (one of the three ways back), counted from real
     // state: the AI app is connected; inviting someone is next, on the Invite screen.
-    await page.getByRole('heading', { name: 'Get started · 1 of 3 done' }).waitFor();
+    await page.getByRole('heading', { name: 'Get started · 1 of 2 done' }).waitFor();
     expect(
       await page.getByRole('link', { name: 'Invite someone' }).first().getAttribute('href'),
     ).toBe('/contacts?invite');

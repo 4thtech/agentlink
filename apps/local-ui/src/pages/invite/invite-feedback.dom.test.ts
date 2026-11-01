@@ -354,7 +354,7 @@ describe('re-pair on the paste screen', () => {
     expect(text()).toContain(F.againResets);
     await click(/Touch ID/);
     // The name rule quotes a self-declared name.
-    expect(connected).toHaveBeenCalledWith('“Marko”', { sent: false, again: true });
+    expect(connected).toHaveBeenCalledWith('Marko', { sent: false, again: true });
   });
 
   it('a first pairing says nothing about connecting again', async () => {

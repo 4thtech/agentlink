@@ -51,8 +51,7 @@ export const ROUTES: readonly RouteDef[] = [
   { path: LIVE_ACTIVITY_PATH, page: lazyPage(LIVE_ACTIVITY_PATH) },
   // Get started (U2 builds the steps; today's first run until then), in the focused shell.
   ...START_STEPS.map((path) => ({ path, page: FirstRunPage })),
-  // Interim: today's Messages and Contacts (U3, U4 fold them into Home).
-  { path: '/inbox', page: lazyPage('/inbox') },
+  // Interim: today's People page (U4 folds it into Home).
   { path: '/contacts', page: lazyPage('/contacts') },
   // Settings (A9).
   { path: '/settings', page: lazyPage('/settings') },

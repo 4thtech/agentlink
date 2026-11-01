@@ -352,7 +352,7 @@ describe('W4-WIRE-2: Paste it on the Invite screen', () => {
     expect(call?.headers.get('x-agentlink-presence')).toBeNull();
     expect(JSON.parse(call?.body ?? '')).toEqual({ invite: LINK });
     expect(posts(calls, ACCEPT)).toEqual([]);
-    expect(text()).toContain('“Marko Novak” invites you to connect your AIs');
+    expect(text()).toContain('Marko Novak invites you to connect your AIs');
     expect(text()).toContain('Name set by the sender');
     expect(text()).toContain('7F3A·19C2');
     expect(buttons('Accept with your backup code').length).toBe(1);

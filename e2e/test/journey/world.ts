@@ -171,8 +171,6 @@ export async function journeyPage(browser: Browser): Promise<JourneyPage> {
  * reached from Go to (Cmd+K) by these names; they are no sections of the menu.
  */
 const INTERIM: Readonly<Record<string, string>> = {
-  Inbox: 'Messages',
-  Messages: 'Messages',
   Contacts: 'People',
   // Files is no section of the menu; the Files page (Received, Sent, Send folders) is Settings, Files folder.
   Files: 'Files folder',
@@ -197,7 +195,9 @@ export async function goTo(page: Page, name: string): Promise<void> {
  * In-app navigation: a click on the section menu item (never `goto`, which would load a new
  * document). W4-SHELL-V2: "Inbox" and "Contacts" go through Go to (INTERIM).
  */
-export async function navTo(page: Page, label: string): Promise<void> {
+export async function navTo(page: Page, requested: string): Promise<void> {
+  // W6-UI-POLISH: the old Inbox page is gone; the conversations and files are on Home.
+  const label = requested === 'Inbox' || requested === 'Messages' ? 'Home' : requested;
   const interim = INTERIM[label];
   if (interim !== undefined) {
     await goTo(page, interim);

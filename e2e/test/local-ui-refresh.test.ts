@@ -51,9 +51,8 @@ const PAGES = [
   { path: '/', title: 'Home' },
   { path: '/agents', title: 'Agents' },
   { path: '/activity', title: 'Activity' },
-  // Interim: today's Messages and Contacts pages (U3, U4 fold them into Home).
-  { path: '/inbox', title: 'Inbox' },
-  { path: '/contacts', title: 'Contacts' },
+  // Interim: today's People page (U4 folds it into Home). W6-UI-POLISH: /inbox goes to Home.
+  { path: '/contacts', title: 'People' },
   { path: '/settings/files', title: 'Files' },
   { path: '/settings/proofs', title: 'Proofs & credits' },
   { path: '/settings/rules', title: 'Rules' },
@@ -625,7 +624,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       }
       // With a Sheet open: the chrome plus the overlay, never more than five.
       await page.goto(`${origin}/contacts`);
-      await settle(page, 'Contacts');
+      await settle(page, 'People');
       await page.getByRole('button', { name: /Ana/ }).first().click();
       await page.getByRole('dialog').first().waitFor();
       await page.waitForTimeout(400);
@@ -738,7 +737,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         // Scrolling Activity (200 rows) and Messages (60 conversations, 200 messages).
         for (const [path, title, open200] of [
           ['/activity', 'Activity', false],
-          ['/inbox', 'Inbox', true],
+          ['/', 'Home', true],
         ] as const) {
           await page.goto(origin + path);
           await settle(page, title);
@@ -762,7 +761,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
 
         // Sheet open and close (Contacts detail).
         await page.goto(`${origin}/contacts`);
-        await settle(page, 'Contacts');
+        await settle(page, 'People');
         await startRecorder(page);
         for (let i = 0; i < 3; i++) {
           await page.getByRole('button', { name: /Ana/ }).first().click();
@@ -967,7 +966,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
 
       // Sheet: focus moves in, background inert, Escape closes and focus returns.
       await page.goto(`${origin}/contacts`);
-      await settle(page, 'Contacts');
+      await settle(page, 'People');
       const row = page.getByRole('button', { name: /Ana/ }).first();
       await row.focus();
       await page.keyboard.press('Enter');

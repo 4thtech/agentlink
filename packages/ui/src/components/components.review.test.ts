@@ -25,14 +25,14 @@ describe('IR-M1-35b-1', () => {
     const named = html(
       h(ui.ApprovalCard, { ...approval, receiptRequest: { contact: { name: 'Marko' } } }),
     );
-    expect(named).toContain('Ask “Marko” (Self-declared) to confirm delivery?');
+    expect(named).toContain('Ask Marko (Not checked yet) to confirm delivery?');
   });
 
-  it('2: labels a declared name Self-declared by default, but not an alias', () => {
+  it('2: labels a declared name Not checked yet by default, but not an alias', () => {
     expect(html(h(ui.ContactName, { name: 'Marko', fingerprint: 'AB' }))).toContain(
-      'Self-declared',
+      'Not checked yet',
     );
-    expect(html(h(ui.ContactName, { alias: 'Marko' }))).not.toContain('Self-declared');
+    expect(html(h(ui.ContactName, { alias: 'Marko' }))).not.toContain('Not checked yet');
     expect(
       html(h(ui.ContactName, { name: 'Marko', fingerprint: 'AB', label: 'checked' })),
     ).toContain('Safety code checked');
@@ -97,7 +97,7 @@ describe('IR-M1-35b-1', () => {
     }
   });
 
-  it('IR-2 2: a declared name shows (Self-declared) in the receipt line and the remember row', () => {
+  it('IR-2 2: a declared name shows (Not checked yet) in the receipt line and the remember row', () => {
     const out = html(
       h(ui.ApprovalCard, {
         ...approval,
@@ -105,12 +105,12 @@ describe('IR-M1-35b-1', () => {
         remember: { reason: 'ask-me', contact: { name: 'Marko' }, rule: 'r' },
       }),
     );
-    expect(out).toContain('Ask “Marko” (Self-declared) to confirm delivery?');
-    expect(out).toContain('“Marko” (Self-declared)</span>');
+    expect(out).toContain('Ask Marko (Not checked yet) to confirm delivery?');
+    expect(out).toContain('Marko (Not checked yet)</span>');
     const alias = html(
       h(ui.ApprovalCard, { ...approval, receiptRequest: { contact: { alias: 'Marko' } } }),
     );
     expect(alias).toContain('Ask Marko to confirm delivery?');
-    expect(alias).not.toContain('Self-declared');
+    expect(alias).not.toContain('Not checked yet');
   });
 });

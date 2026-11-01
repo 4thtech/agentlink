@@ -39,7 +39,7 @@ const PROOF: PayStatement = {
   kind: 'proof',
   amountUsd: '0.1',
   purpose: 'proof',
-  counterparty: '“Ana” (self-declared)',
+  counterparty: 'Ana (not checked yet)',
   changes: [],
 };
 const REMEMBER: PayStatement = {
@@ -109,7 +109,7 @@ describe('the statement the server returned, and nothing else', () => {
     expect(v.amount).toBe('$0.10');
     expect(v.amountSpoken).toBe('10 cents');
     expect(v.rows).toEqual([
-      { label: 'For', value: 'A proof with “Ana” (self-declared)' },
+      { label: 'For', value: 'A proof with Ana (not checked yet)' },
       { label: 'Paid from', value: 'Your credits' },
     ]);
     expect(v.changes).toEqual([]);
@@ -119,7 +119,7 @@ describe('the statement the server returned, and nothing else', () => {
     const v = payConfirmView(REMEMBER);
     expect(v.amount).toBe('$0.123');
     expect(v.changes).toEqual([
-      { label: 'Per-proof limit for “Ana” (self-declared)', old: 'Not set', new: '$0.13' },
+      { label: 'Per-proof limit for Ana (not checked yet)', old: 'Not set', new: '$0.13' },
     ]);
     expect(JSON.stringify(v)).not.toContain('0x1212');
   });
@@ -194,7 +194,7 @@ describe('the sheet: a modal dialog (b11 §19.5)', () => {
       .map((id) => document.getElementById(id)?.textContent ?? '')
       .join(' ');
     expect(described).toContain('$0.10');
-    expect(described).toContain('A proof with “Ana” (self-declared)');
+    expect(described).toContain('A proof with Ana (not checked yet)');
     expect(document.activeElement).toBe(title);
     expect(document.activeElement?.textContent).not.toBe('Confirm with Touch ID');
     expect(buttonNamed('Confirm with Touch ID')?.autofocus).toBe(false);

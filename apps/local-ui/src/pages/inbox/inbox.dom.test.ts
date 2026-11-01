@@ -84,7 +84,7 @@ const MARKO = {
 const ANA = { contactId: '0x' + '22'.repeat(20), name: 'Ana', lastAt: AT + 10, lastInAt: 0 };
 const APPROVAL_ID = `apr_${'A'.repeat(22)}`;
 
-const approval = (who = '\u201cMarko\u201d (self-declared)') => ({
+const approval = (who = 'Marko (not checked yet)') => ({
   approvalId: APPROVAL_ID,
   summary: 'Accept terms from Marko: Logo design',
   actionDigest: 'a'.repeat(64),
@@ -274,7 +274,7 @@ describe('Needs you: an approval is a card with inline Touch ID (the existing ap
     );
     expect(card).toBeDefined();
     const line = card?.querySelector('.al-approval-line');
-    expect(line?.textContent).toBe('\u201cMarko\u201d (self-declared) · Accept terms · Free');
+    expect(line?.textContent).toBe('Marko (not checked yet) · Accept terms · Free');
     const details = card?.querySelector('details');
     expect(details).not.toBeNull();
     expect(details?.open).toBe(false);
