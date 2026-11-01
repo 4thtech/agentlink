@@ -414,6 +414,13 @@ describe('heavy lane: which heavy jobs a pull request runs (by area)', () => {
     expect(running(['apps/cli/test/two-process.keychain.test.ts'])).toEqual(['keychain-os']);
   });
 
+  it('a crypto or KeyStore file change runs the macOS and Windows keychain legs and node-os', () => {
+    expect(running(['packages/crypto/src/index.ts'])).toEqual(['keychain-os', 'node-os']);
+    expect(running(['packages/node/src/file-keystore.ts'])).toEqual(['keychain-os', 'node-os']);
+    expect(running(['packages/node/src/file-keystore-fs.ts'])).toEqual(['keychain-os', 'node-os']);
+    expect(running(['packages/node/src/inter-process-lock.ts'])).toEqual(['node-os']);
+  });
+
   it('an e2e scenario change runs the full e2e; an affected-area e2e test does not', () => {
     expect(running(['e2e/src/relays.mjs'])).toEqual(['e2e-deterministic']);
     expect(running(['e2e/test/pair-and-message.test.ts'])).toEqual(['e2e-deterministic']);

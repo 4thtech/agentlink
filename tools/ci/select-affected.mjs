@@ -131,7 +131,8 @@ export const HEAVY_LANE = Object.freeze({
     'packages/node/src/allowed-path',
     'packages/node/src/owner-send-folder',
     'packages/node/src/agent-folder-lock',
-    'packages/node/src/file-keystore-fs',
+    'packages/node/src/file-keystore',
+    'packages/node/src/inter-process-lock',
     'packages/node/src/approval-os',
     'packages/node/src/keychain',
     'packages/node/src/os-keychain',
@@ -140,9 +141,13 @@ export const HEAVY_LANE = Object.freeze({
     'packages/node/vitest.config',
     'packages/core/src/path-guard',
     'packages/core/src/files/',
+    // The keys the node suite stores and reads back on each OS come from crypto (KeyStore).
+    'packages/crypto/',
   ],
   'path-guard': ['packages/node/src/allowed-path', 'packages/core/src/path-guard'],
   'keychain-os': [
+    'packages/crypto/',
+    'packages/node/src/file-keystore',
     'packages/node/src/keychain',
     'packages/node/src/os-keychain',
     'packages/node/package.json',
