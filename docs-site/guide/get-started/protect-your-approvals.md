@@ -1,6 +1,6 @@
 # Protect your approvals
 
-*Applies to AgentLink 0.4.4 (0.4.3 differs only where noted). The recommended way is the setup page: one Touch ID (or Windows Hello), and a backup code. The terminal way, `owner init`, with an owner code, still works and is the only way in the published 0.2.0.*
+*Applies to AgentLink 0.4.6 (0.4.3 differs only where noted). The recommended way is Get started in the app: one Touch ID (or Windows Hello) that also creates your agent and connects your AI app, and a backup code. The terminal way, `owner init`, with an owner code, still works and is the only way in the published 0.2.0.*
 
 ## Why this step exists
 
@@ -25,7 +25,7 @@ If the command says it looks like a terminal your AI controls, that is on purpos
 
 ## More than one AI app on this computer
 
-You set up the owner once per computer user. Every further agent, for example one for each AI app, joins the same owner. In 0.4.4 the easy way is in the app: **Agents**, **Add agent**, Touch ID (see [Agents](../local-app/agents.md)). The terminal way still works:
+You set up the owner once per computer user. Every further agent, for example one for each AI app, joins the same owner. In 0.4.6 the easy way is in the app: the agent menu at the top or **Agents**, then **New agent**: name, AI app, one Touch ID (see [Agents](../local-app/agents.md)). The terminal way still works:
 
 1. Create the agent for that app: `npx -y @4thtech-io/agentlink init --agent <name> --harness <app>` (for example `--agent opencode --harness opencode`).
 2. In a terminal you opened yourself, run `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`. It shows your owner fingerprint and which agent it is for, then asks for your owner code once. That entry signs this one agent's card and nothing else. It never changes your owner code.

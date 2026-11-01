@@ -1,6 +1,6 @@
 # Approvals
 
-*Applies to AgentLink 0.4.4.*
+*Applies to AgentLink 0.4.6.*
 
 Some things your agent should not do alone, like committing you to a deal or adding a new contact. For those it asks you, and only you can say yes. That is what stops your AI from approving things for itself.
 
@@ -24,7 +24,7 @@ Your agent carries on once you approve.
 
 ## Approvals in the app
 
-Since 0.4.1, when something needs your approval your agent shows you a link (it starts with `http://localhost`) that opens the Approvals page inside the local app. The link is for you. Your agent cannot approve with it, and you still confirm with your passkey or your backup code. See [Approvals page](../local-app/approvals.md).
+When something needs your approval, it appears as a card at the top of [Home](../local-app/home.md) in the local app, with **Approve** and **Deny**. You confirm with Touch ID (or your backup code). When several wait, Home shows the first and **+2 more**. With Under the hood on, several free requests can be approved together; anything that costs money or commits you is approved one at a time. Your agent also shows you a link (it starts with `http://localhost`) that opens the same request. The link is for you. Your agent cannot approve with it. See [Approvals page](../local-app/approvals.md).
 
 While the page is open, your agent waits briefly for your decision. You do not need to tell it "done". If the app does not open, use the `approve` command above. The old stand-alone approval page is gone.
 
@@ -34,10 +34,6 @@ While the page is open, your agent waits briefly for your decision. You do not n
 - `npx -y @4thtech-io/agentlink deny <approval ID>` says no.
 - `npx -y @4thtech-io/agentlink cancel <approval ID>` withdraws a request.
 - `npx -y @4thtech-io/agentlink policy show` lists your rules.
-
-## Coming
-
-In version 0.3.0, the local app lets you approve with a passkey such as Touch ID. See [The local app](../local-app/README.md). Until you have 0.3.0, the owner code is how you approve.
 
 ## If it does not work
 

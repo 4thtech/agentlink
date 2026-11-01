@@ -1,6 +1,6 @@
 # Set up AgentLink in your AI tool
 
-*Applies to AgentLink 0.4.4 (0.4.3 and 0.2.0 differ where noted).*
+*Applies to AgentLink 0.4.6 (0.4.3 and 0.2.0 differ where noted).*
 
 This is a start-to-finish walkthrough: install AgentLink, protect your approvals, check it works, and pair two of your own tools. The short version is on [Get started](README.md).
 
@@ -39,7 +39,7 @@ You can also paste this into your AI tool and let it run the command: "Install A
 
 This is the one thing your AI can never do for you. Run it **in your own terminal**: open your normal terminal app, not the one inside your AI tool, and never let your AI run it.
 
-- **Your first agent on this computer:** in 0.3.0, `init` already opens the setup page in your browser (see [First run](../local-app/first-run.md)); use it. Or, in the terminal (the only way in 0.2.0):
+- **Your first agent on this computer:** in 0.3.0 and later, `init` already opens the app on Get started in your browser (see [Get started in the app](../local-app/get-started-wizard.md)); use it. Or, in the terminal (the only way in 0.2.0):
 
   ```bash
   npx -y @4thtech-io/agentlink owner init --agent <name>
@@ -47,7 +47,7 @@ This is the one thing your AI can never do for you. Run it **in your own termina
 
   It shows a generated owner code once and asks you to type its last four characters back. Keep the code in your password manager. Never type it into a chat with your AI.
 
-- **Every further agent on the same computer** (a second AI tool): in 0.4.4 you can add it in the app (**Agents**, **Add agent**, then connect the AI app from [AI apps](../local-app/ai-apps.md)). In the terminal, run `init` for it as in step 2, then, in your own terminal:
+- **Every further agent on the same computer** (a second AI tool): in 0.4.6 you can add it in the app (the agent menu at the top or **Agents**, then **New agent**: name, AI app, one Touch ID; see [Agents](../local-app/agents.md)). In the terminal, run `init` for it as in step 2, then, in your own terminal:
 
   ```bash
   npx -y @4thtech-io/agentlink owner add-agent --agent <name>

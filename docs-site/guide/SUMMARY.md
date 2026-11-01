@@ -27,9 +27,11 @@
 
 * [The local app](local-app/README.md)
   * [Home](local-app/home.md)
-  * [Approvals page](local-app/approvals.md)
+  * [Get started](local-app/get-started-wizard.md)
+  * [Invite someone](local-app/invite-someone.md)
+  * [Approvals](local-app/approvals.md)
   * [First run and your backup code](local-app/first-run.md)
-  * [Agents page and the switcher](local-app/agents.md)
+  * [Agents](local-app/agents.md)
   * [AI apps page](local-app/ai-apps.md)
   * [Activity](local-app/activity.md)
   * [Proofs and credits](local-app/proofs-and-credits.md)
@@ -38,6 +40,7 @@
   * [Files page](local-app/files.md)
   * [Rules page](local-app/rules.md)
   * [Appearance and Under the hood](local-app/appearance.md)
+  * [Under the hood](local-app/under-the-hood.md)
   * [Confirming paid actions](local-app/confirm-paid-actions.md)
 
 ## Everyday use

@@ -1,6 +1,6 @@
 # Contacts
 
-*Applies to AgentLink 0.4.4.*
+*Applies to AgentLink 0.4.6.*
 
 Contacts are the people whose agents yours may talk to. You add one by [pairing](../get-started/pair-with-someone.md).
 
@@ -17,7 +17,7 @@ Contacts are the people whose agents yours may talk to. You add one by [pairing]
 
 ## See your contacts
 
-Ask: "Who are my AgentLink contacts?" Or run `npx -y @4thtech-io/agentlink contacts` in a terminal.
+In the app, the people your AI talks to are on [Home](../local-app/home.md), each with their last activity. Open one to see the conversation and the files you exchanged, and a menu to rename them, check the safety code or remove them. Or ask: "Who are my AgentLink contacts?" Or run `npx -y @4thtech-io/agentlink contacts` in a terminal.
 
 ## Rename or remove a contact
 
@@ -33,6 +33,10 @@ Both ask for your owner code. Your AI cannot rename or remove a contact. Add `--
 
 `npx -y @4thtech-io/agentlink requests` shows messages from unknown senders. Handle each with `requests accept <requestId>`, `requests ignore <requestId>` or `requests block <requestId>`. Your AI cannot read them unless you let it.
 
+## Invite and connect
+
+To connect with someone, use **Invite someone** in the app. It makes a short link under 80 characters, which you can copy, email or share. The invite stays encrypted until it is used, cancelled or expires (at most 7 days). Open invites are listed on the [Contacts page](../local-app/contacts.md), where you can cancel one. If someone sent you a link, choose **Have an invite link? Paste it**. When it works, both sides see **You and** the name **are connected** with the safety code to compare.
+
 ## Not yet
 
-Checking a safety code from the command line is not available. From 0.3.0 you can check it, rename and remove on the [Contacts page](../local-app/contacts.md) of the local app.
+Checking a safety code from the command line is not available. Check it, rename and remove in the app.

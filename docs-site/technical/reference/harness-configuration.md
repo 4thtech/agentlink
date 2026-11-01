@@ -1,6 +1,6 @@
 # Harness configuration
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha); current version v0.4.4, 29 Oct 2026.** The configuration below is what `agentlink init` writes. Other harnesses and remote harnesses are planned for later releases and are not covered here.
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha); current version v0.4.6, 31 Oct 2026.** The configuration below is what `agentlink init` writes. Other harnesses and remote harnesses are planned for later releases and are not covered here.
 
 **Purpose:** the exact MCP configuration for Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode and Antigravity, for people who configure it by hand instead of using `agentlink init`, and the harness permission settings that keep an agent away from AgentLink's private files.
 
@@ -14,7 +14,7 @@ An existing `agentlink` entry that differs is left alone. Existing config is bac
 
 ### Several agents on one computer
 
-From 0.4.4 the local app can do the same job: its **AI apps** page connects an AI app to an agent, moves it to another agent or disconnects it, with one Touch ID. It shows the exact `agentlink` entry it adds, changes or removes, saves a backup of the file first, touches nothing else in it, and does not change Claude Desktop's settings while that app is open. The result is the same single entry; `init` stays the way for an AI to set itself up.
+From 0.4.4 the local app can do the same job: since 0.4.6, **Connect** and **Disconnect** on the Agents screen (and the AI app step of Get started and New agent) connect an AI app to an agent, move it to another agent or disconnect it, with one Touch ID; the first Touch ID of Get started also creates the agent and connects the app ("{label} is ready in {app}. Restart {app} to finish."). Quit the AI app first (Claude Desktop is never written while it runs) and restart it afterwards. It shows the exact `agentlink` entry it adds, changes or removes, saves a backup of the file first, touches nothing else in it, and does not change Claude Desktop's settings while that app is open. The result is the same single entry; `init` stays the way for an AI to set itself up.
 
 Each app's config holds one `agentlink` entry, so each app runs one agent. Give each app its own agent with `init --agent <name> --harness <id>`; its entry then ends in `--agent <name>`. The owner key is set up once per computer user (`owner init`); every further agent gets its card from it with `agentlink owner add-agent --agent <name>`, run in your own terminal, one owner code entry for exactly that agent ([04 §2.8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), D-78). An approval for one agent is refused by every other. The agents still run as the same user, so this is logical isolation, not a security boundary.
 

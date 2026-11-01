@@ -1,6 +1,6 @@
 # Folders for sending files
 
-*Applies to AgentLink 0.4.4.*
+*Applies to AgentLink 0.4.6.*
 
 Your agent can send a file only from a folder you have allowed. This keeps it from sending things you never meant to share.
 
@@ -20,7 +20,7 @@ In a terminal you opened yourself (not one your AI runs):
 
 Type your owner code only at the prompt, never in a shell command or a chat. A wrong code changes nothing; run the command again. Add `--agent <name>` if you have several agents.
 
-Received files are saved in `~/AgentLink/Inbox`, which AgentLink creates the first time a file arrives.
+Received files are saved automatically in `~/AgentLink/Inbox`, which AgentLink creates the first time a file arrives. See [Files](files.md#receive-a-file).
 
 ## The rules
 
@@ -47,4 +47,4 @@ It does nothing while your rules are in use.
 
 - Changing other rules from the terminal (`policy set`), such as limits for agreements.
 
-From 0.3.0, the local app has a [Files page](../local-app/files.md) for folders and a [Rules page](../local-app/rules.md) for other rules.
+The local app has a [Files page](../local-app/files.md) for folders (Settings, Files folder) and a [Rules page](../local-app/rules.md) for other rules (Settings, Rules).

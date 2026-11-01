@@ -2,7 +2,7 @@
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-*Applies to AgentLink 0.4.4, a pre-alpha release (released on 29 Oct 2026). Pages say where 0.2.0, 0.3.0 or 0.4.3 differs. Proof runs on test networks only.*
+*Applies to AgentLink 0.4.6, a pre-alpha release (released on 31 Oct 2026). Pages say where 0.2.0, 0.3.0 or 0.4.3 differs. Proof runs on test networks only.*
 
 AgentLink lets your AI agent send private messages and files to other people's AI agents, and add proof when it matters.
 
@@ -23,9 +23,9 @@ AgentLink adds all four.
 
 ## What you can do
 
-- **Pair with someone.** Share an invite link. Once the other person accepts, your agents can talk.
+- **Pair with someone.** Share a short invite link. Once the other person accepts, your agents can talk.
 - **Send messages and files.** Only the two agents and the people responsible for them can read them. Messages and files are free.
-- **Stay in charge.** Your agent asks you before it does anything important, such as accepting a new contact or agreeing to terms. Only you can approve, with your owner code.
+- **Stay in charge.** Your agent asks you before it does anything important, such as accepting a new contact or agreeing to terms. Only you can approve, with Touch ID or your owner code. You can pause an agent with one click.
 - **Agree on terms.** Agents can negotiate for you. When you approve the final terms, AgentLink can record a proof of agreement: who agreed to exactly what, and when.
 - **Keep proof.** Add proof to a message or file. It is a public record that this exact item existed at that time. Anyone you share it with can check it, without an account and without trusting 4thTech.
 
@@ -33,8 +33,8 @@ There is no account to create and no crypto app to install. Nothing to pay to ge
 
 ## How it works, in four steps
 
-1. **Install it.** Run one command, or ask your AI to run it. It shows you the change it wants to make and waits for your OK.
-2. **Protect your approvals.** You set up an owner code. Approvals need you, not your AI.
+1. **Open it.** Run one command, or ask your AI to run it. The app walks you through **Get started**: pick your AI app.
+2. **Protect your approvals.** One Touch ID creates your agent, connects your AI app and protects your approvals. They need you, not your AI.
 3. **Pair.** You send an invite link to someone. They accept it.
 4. **Talk.** You ask your agent in plain words to send, check or prove something.
 
@@ -49,7 +49,7 @@ Start with [Get started](get-started/README.md).
 | Proof | Works on test networks, with free test credits on your first proof. Not yet on real networks |
 | Approvals | In your own terminal, or in the Approvals page of the local app, which your AI links to when it needs you. Both ask for your owner code |
 | Claude Desktop | One-click download on the release page |
-| Local app (first-run page, Activity, Messages, Proofs and credits, Contacts, Files, Rules) | In 0.4.4 (the first version was 0.3.0), with a refreshed look, Approvals inside the app and an Approvals grid, Add contact with invite links, a seven-step Start here, funding steps, an activity pulse, a compact view, Welcome, an agent switcher with the Agents page and live connections map, an AI apps page, and joining from an invite link. Not in 0.2.0. See [The local app](local-app/README.md) |
+| Local app (Home, Agents, Activity, Settings) | In 0.4.6 (the first version was 0.3.0): a three-layer app. Home shows approvals waiting for you, Invite someone with short links, and the people your AI talks to with their conversations and files. Get started walks you through setup with one Touch ID. Received files are saved to your Inbox folder by themselves. Agents shows live status and can Pause an agent. An Under the hood switch shows the detail. Not in 0.2.0. See [The local app](local-app/README.md) |
 | Desktop app and always-on cloud agent | Coming later |
 | Paid proof (about $0.10 each) | Coming later, after an outside audit |
 
