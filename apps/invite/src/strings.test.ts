@@ -30,8 +30,8 @@ describe('page copy', () => {
     for (const text of texts(strings)) expect(text).not.toMatch(/[{}]/);
   });
 
-  it('labels the inviter Self-declared (11 §5.2)', () => {
-    expect(strings.inviter.label).toBe('Self-declared');
+  it('labels the inviter Not checked yet (11 §5.2)', () => {
+    expect(strings.inviter.label).toBe('Not checked yet');
   });
 
   it('has the b11 §33.3 strings exactly', () => {

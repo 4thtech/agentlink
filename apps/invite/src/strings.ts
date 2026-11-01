@@ -21,7 +21,7 @@ export const strings = {
     time: 'Takes about 2 minutes.',
   },
   inviter: {
-    label: 'Self-declared',
+    label: 'Not checked yet',
     fingerprint: 'FINGERPRINT',
     note: "Name chosen by its owner. You'll compare a safety code after accepting.",
     expiryPrefix: 'Works once, until ',

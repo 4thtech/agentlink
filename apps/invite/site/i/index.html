@@ -27,7 +27,6 @@
           <path class="seal" d="M24 15L33 24L24 33L15 24Z" /></svg
         >AgentLink</span
       >
-      <span id="inviter-host" class="host"></span>
     </header>
     <main>
       <p class="eyebrow">INVITE</p>
@@ -58,13 +57,12 @@
         <article id="way-ai" class="card way" aria-labelledby="way-ai-title">
           <h3 id="way-ai-title"></h3>
           <p id="ai-help" class="muted small"></p>
-          <pre id="ai-text"></pre>
-          <p class="actions"><button id="copy-ai" type="button" class="btn"></button></p>
+          <p class="actions"><button id="copy-ai" type="button" class="btn secondary"></button></p>
         </article>
-        <article id="way-command" class="card way" aria-labelledby="way-command-title">
+        <article id="way-command" class="card way primary" aria-labelledby="way-command-title">
           <h3 id="way-command-title"></h3>
           <p id="step-help" class="muted small"></p>
-          <pre id="step-text"></pre>
+          <p id="step-text" class="preview mono"></p>
           <p class="actions">
             <button id="copy" type="button" class="btn"></button>
             <span id="node-help" class="small"
@@ -81,8 +79,10 @@
         <article id="way-link" class="card way" aria-labelledby="way-link-title">
           <h3 id="way-link-title"></h3>
           <p id="link-help" class="muted small"></p>
-          <pre id="link-text"></pre>
-          <p class="actions"><button id="copy-link" type="button" class="btn"></button></p>
+          <p id="link-text" class="preview mono"></p>
+          <p class="actions">
+            <button id="copy-link" type="button" class="btn secondary"></button>
+          </p>
         </article>
         <p id="copy-status" class="small" role="status" aria-live="polite"></p>
       </section>

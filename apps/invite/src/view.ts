@@ -27,6 +27,14 @@ export function formatExpiry(seconds: number): string {
   return `${strings.inviter.expiryPrefix}${day}${strings.inviter.expirySuffix}`;
 }
 
+/** "agentlink.4thtech.io/i#jVPL…mfnHw": the host, the path and the ends of the fragment. */
+export function shorten(link: string): string {
+  const at = link.indexOf('#');
+  const head = link.slice(0, at + 1).replace(/^https:\/\//, '');
+  const rest = link.slice(at + 1);
+  return rest.length <= 14 ? head + rest : `${head}${rest.slice(0, 4)}…${rest.slice(-5)}`;
+}
+
 /** How long "Copied" stays (b11 §6 row 6). */
 const COPIED_MS = 1600;
 
@@ -37,7 +45,6 @@ const COPIED_MS = 1600;
 export function render(
   doc: Document,
   view: InviteView,
-  host: string,
   copy: (text: string) => Promise<void>,
   retry?: () => void,
 ): void {
@@ -56,7 +63,7 @@ export function render(
       title: strings.step.askAi,
       help: 'ai-help',
       helpText: strings.step.askAiHelp,
-      text: 'ai-text',
+      text: undefined,
       button: 'copy-ai',
       label: strings.step.copy,
       title_id: 'way-ai-title',
@@ -90,13 +97,12 @@ export function render(
   next.textContent = '';
   copyStatus.textContent = '';
   for (const c of cards) {
-    element(doc, c.text).textContent = '';
+    if (c.text !== undefined) element(doc, c.text).textContent = '';
     (element(doc, c.button) as HTMLButtonElement).onclick = null;
   }
   retryButton.onclick = null;
   retryButton.hidden = true;
   retryButton.disabled = false;
-  element(doc, 'inviter-host').textContent = host;
 
   state.dataset['state'] = view.kind;
   state.textContent =
@@ -122,8 +128,8 @@ export function render(
     element(doc, 'invite-heading').textContent = who.fallback
       ? strings.heading.someone
       : invitesHeading(who.name);
-    // The quotes are ours; the name between them is text.
-    element(doc, 'inviter-name').textContent = `“${who.name}”`;
+    // The name is text.
+    element(doc, 'inviter-name').textContent = who.name;
     element(doc, 'inviter-label').textContent = strings.inviter.label;
     element(doc, 'inviter-fingerprint').textContent = who.fingerprint;
     element(doc, 'inviter-expiry').textContent = formatExpiry(who.expiresAt);
@@ -141,7 +147,12 @@ export function render(
       const button = element(doc, c.button) as HTMLButtonElement;
       element(doc, c.title_id).textContent = c.title;
       element(doc, c.help).textContent = c.helpText;
-      element(doc, c.text).textContent = text ?? '';
+      // One short line (the link is shortened), never the whole link; the button copies all of it.
+      if (c.text !== undefined) {
+        element(doc, c.text).textContent = (text ?? '')
+          .split(view.inviteUrl)
+          .join(shorten(view.inviteUrl));
+      }
       button.textContent = c.label;
       // Too long for a command (08 §4): that card is left out, the others stay.
       element(doc, c.card).hidden = text === undefined;

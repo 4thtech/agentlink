@@ -182,11 +182,9 @@ describe('a good invite (U3-invite)', () => {
     await expect(page.locator('#inviter').textContent()).resolves.toContain(
       'Takes about 2 minutes.',
     );
-    await expect(page.locator('#inviter-name').textContent()).resolves.toBe('“Marko”');
-    await expect(page.locator('#inviter-label').textContent()).resolves.toBe('Self-declared');
-    await expect(page.locator('#inviter-host').textContent()).resolves.toBe(
-      new URL(originOf(site)).host,
-    );
+    await expect(page.locator('#inviter-name').textContent()).resolves.toBe('Marko');
+    await expect(page.locator('#inviter-label').textContent()).resolves.toBe('Not checked yet');
+    expect(((await page.locator('header').textContent()) ?? '').trim()).toBe('AgentLink');
     await expect(page.locator('#inviter-fingerprint').textContent()).resolves.toMatch(
       /^[0-9A-F]{4}·[0-9A-F]{4}$/,
     );
@@ -201,9 +199,14 @@ describe('a good invite (U3-invite)', () => {
       'Install and accept with one command',
       'Already have AgentLink? Open it and paste the link',
     ]);
-    await expect(page.locator('#ai-text').textContent()).resolves.toBe(buildAskAi(link));
-    await expect(page.locator('#step-text').textContent()).resolves.toBe(buildJoinCommand(link));
-    await expect(page.locator('#link-text').textContent()).resolves.toBe(link);
+    // One short line each; the full link is never on screen, only in the copy.
+    await expect(page.locator('#step-text').textContent()).resolves.toMatch(
+      /^npx -y @4thtech-io\/agentlink join 'agentlink\.4thtech\.io\/i#.{4}….{5}'$/,
+    );
+    await expect(page.locator('#link-text').textContent()).resolves.toMatch(
+      /^agentlink\.4thtech\.io\/i#.{4}….{5}$/,
+    );
+    expect((await page.locator('main').innerText()).includes(payloadOf(link))).toBe(false);
     await expect(page.locator('#step-help').textContent()).resolves.toBe(
       'Paste it into Terminal and press Return. Needs Node.js 22 or later.',
     );
@@ -314,10 +317,10 @@ describe('a hostile invite (I-5)', () => {
       // The shown name is the restricted one, in its own element, quoted; the heading uses it too
       // (or "Someone" on the name rule's fallback).
       const shown = (await page.locator('#inviter-name').textContent()) ?? '';
-      expect(shown).toMatch(/^“[\p{L}\p{N} .'·-]{1,45}”$/u);
+      expect(shown).toMatch(/^[\p{L}\p{N} .'·-]{1,45}$/u);
       const heading = (await page.locator('#invite-heading').textContent()) ?? '';
       expect(heading).toMatch(/^[\p{L}\p{N} .'·-]{1,45} invites you to connect your AI agents\.$/u);
-      expect(await page.locator('#inviter-label').textContent()).toBe('Self-declared');
+      expect(await page.locator('#inviter-label').textContent()).toBe('Not checked yet');
       // The step section never contains anything the inviter chose.
       const stepSection = (await page.locator('#step').textContent()) ?? '';
       expect(stepSection).not.toMatch(/evil|ignore all|approve everything|__pwned|onerror/i);
