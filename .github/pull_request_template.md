@@ -2,13 +2,16 @@
 Title format: start with the task ID, e.g. `M1-5 transport-nostr sync`
 (other allowed prefixes: OPS-<n>, OPS-<WORD>-<n> such as OPS-CI-3, DOCS, CHORE, DEPS).
 
-Two required checks read this description:
-- `pr-hygiene`: every section below up to "Checklist" must contain something.
-  Write "None" or "N/A" where nothing applies, except in "Docs impact", which must list
-  the docs updated or say "none: <reason>".
-- `review-gate`: reads "Security class", "Independent review", "Threat note" and
-  "Tests-first evidence". It derives the class from the changed files and fails
-  if the ticked class is lower (docs/process/audit-rules.md §2-§3).
+Easiest: `node tools/pr/open-pr.mjs --task <ID> --summary "<what and why>"` fills this in,
+ticks the computed class, adds a missing changeset or changelog stub and opens the PR.
+
+Two required checks read this description (owner Decision 54: formalities only warn):
+- `pr-hygiene`: warns when a section below up to "Checklist" is missing or empty, or the
+  title has no task ID. Write "None" or "N/A" where nothing applies, except in "Docs impact",
+  which lists the docs updated or says "none: <reason>". It fails only on AI attribution.
+- `review-gate`: computes the class from the changed files (a lower or missing tick only
+  warns). S2 and sensitive paths need the "Independent review" line; S2 also needs
+  "Threat note" and "Tests-first evidence" (docs/process/audit-rules.md §2-§3).
 Keep the section headings exactly as they are. HTML comments are ignored.
 One task per pull request (docs/process/backlog.md).
 -->
@@ -30,7 +33,7 @@ Write "None" if no invariant is touched.
 
 
 ## Security class
-<!-- Tick exactly one. Path defaults and content rules: audit-rules.md §2. The highest applicable class wins; only the owner may lower one. -->
+<!-- Tick exactly one. review-gate computes the class from the paths (audit-rules.md §2.2); a lower tick only warns, a higher one (content rules, §2.4) raises the class. Only the owner may lower one. -->
 - [ ] **S0**: none (docs outside docs/foundation and docs/process, tooling without secrets, styling without data-flow change)
 - [ ] **S1**: sensitive (inbound content; files, paths or URLs; storage credentials; policy or approval UI; CI, release or supply-chain configuration; the chain client; specs and agent instructions)
 - [ ] **S2**: critical (crypto; keys and owner presence; envelope or pairing protocol; policy engine; contracts; anything that signs; the submitter; deploy scripts with roles; test vectors)
@@ -53,18 +56,19 @@ Write "None" if no invariant is touched.
 
 
 ## Review requirements
-<!-- audit-rules.md §3, D-51. S0/S1: agents may enable auto-merge (`gh pr merge N --auto --match-head-commit <sha>`; the merge queue decides the method); GitHub merges when every check is green. S2 and sensitive paths (.github, AGENTS.md, CLAUDE.md, .claude, supply-chain files): merge only after CI, the independent AI review and Tali's "merge" in chat; record the go-ahead here. Agents never approve and never use admin bypass. -->
-- [ ] S1/S2: independent review report referenced under "Independent review"
+<!-- audit-rules.md §3, D-51, owner Decision 54. S0/S1 outside the sensitive paths: no independent review; agents may enable auto-merge (`gh pr merge N --auto --match-head-commit <sha>`); GitHub merges when every check is green. S2 and sensitive paths (.github, AGENTS.md, CLAUDE.md, .claude, supply-chain files): merge only after CI, the independent AI review and Tali's "merge" in chat; record the go-ahead here. Agents never approve and never use admin bypass. -->
+- [ ] S2 and sensitive paths: independent review report referenced under "Independent review"
 - [ ] S2 and sensitive paths (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files): Tali's explicit "merge" in chat, recorded here (D-51); Denis's approval is not required
 - [ ] S2: threat note and tests-first evidence filled in below
 
 
 ## Independent review
 <!--
-S1/S2 (review-gate checks it): the one-line summary of the independent review report (audit-rules.md §4.5):
+Required for S2 and for sensitive paths (.github/**, AGENTS.md, CLAUDE.md, .claude/**, supply-chain
+files) only; review-gate checks it. The one-line summary of the independent review report (audit-rules.md §4.5):
 report ID (IR-<TASK-ID>-<n>), verdict, finding counts by severity, tracker IDs, and the link to the
 private report in 4thtech/agentlink-ops. No unfixed vulnerability details here: this repository is public.
-S0: N/A.
+S0, and S1 outside the sensitive paths: no review needed (owner Decision 54); write "Not required".
 -->
 
 

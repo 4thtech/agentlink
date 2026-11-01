@@ -10,7 +10,7 @@
 //      `deploy-production` job succeeded with its deploy step run (not skipped);
 //   3. compares that commit with the head; when no file between them matches the workflow's own
 //      `on.push.paths`, production is current for this service;
-//   4. otherwise requires the head's own CI gates green (ci.yml ci-gate, security.yml security-gate);
+//   4. otherwise requires the head's own CI gates green (ci.yml ci-gate (push), the heavy lane; security.yml security-gate);
 //   5. skips while a run of the workflow for ANY head waits for the production approval (at most
 //      one pending approval per service; the summary asks the owner to approve or cancel it), and
 //      skips while a push or dispatch run of the workflow for the head is in flight (queued,
@@ -48,7 +48,7 @@ export const DEPLOY_STEP = 'Deploy to production (Custom Domain)';
 export const MAX_ATTEMPTS = 2;
 /** The CI gates every deploy run waits for (its ci-green job). */
 export const REQUIRED_GATES = [
-  { workflow: 'ci.yml', job: 'ci-gate' },
+  { workflow: 'ci.yml', job: 'ci-gate (push)' },
   { workflow: 'security.yml', job: 'security-gate' },
 ];
 

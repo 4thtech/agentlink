@@ -164,11 +164,17 @@ jobs:
 
       # CodeQL errors out when it finds no source for a language, so skip the
       # JavaScript/TypeScript leg until the first source file is committed.
+      # OPS-FAST-LANE-1 (owner decision 54): on a pull request a leg analyzes only when the change
+      # holds sources of its language (JS/TS files for javascript-typescript, anything under
+      # `.github/` for actions); an unreadable diff analyzes. Pushes to `main` and `wave-4` and the
+      # weekly schedule always analyze.
       - name: Check for sources in this language
         id: scope
         shell: bash
         env:
           LANGUAGE: ${{ matrix.language }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           analyze=true
@@ -177,6 +183,19 @@ jobs:
             if [ "$count" -eq 0 ]; then
               analyze=false
               echo "::notice::No JavaScript/TypeScript sources yet; CodeQL for $LANGUAGE is skipped."
+            fi
+          fi
+          if [ "$analyze" = true ] && [ "$EVENT_NAME" = pull_request ] && [[ "$PR_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] \
+            && git fetch --quiet --no-tags --depth=1 origin "$PR_BASE_SHA" 2> /dev/null \
+            && changed="$(git diff --no-renames --name-only "$PR_BASE_SHA" HEAD 2> /dev/null)"; then
+            case "$LANGUAGE" in
+              javascript-typescript) pattern='\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$' ;;
+              actions) pattern='^\.github/' ;;
+              *) pattern='' ;;
+            esac
+            if [ -n "$pattern" ] && [ -n "$changed" ] && ! grep -Eq "$pattern" <<< "$changed"; then
+              analyze=false
+              echo "::notice::This pull request changes no $LANGUAGE source; CodeQL for it runs on main and weekly."
             fi
           fi
           echo "analyze=$analyze" >> "$GITHUB_OUTPUT"
