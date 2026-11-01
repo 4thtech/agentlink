@@ -50,6 +50,7 @@ import { morph, toggleHood } from './hood.js';
 import { SectionRail, SectionSheet } from './section-menu.js';
 import { ShellDialogs, openShellDialog } from './shell-dialogs.js';
 import { StatusStrip } from './status-strip.js';
+import { ContactToasts } from './contact-toasts.js';
 import './shell.css';
 
 /**
@@ -331,6 +332,8 @@ export function Layout({
       </div>
       <GoTo onHood={toggleHood} />
       <ShellDialogs keys={shortcutKeys} facts={facts} />
+      {/* W5-INVITE-FEEDBACK: "{name} accepted your invite" and friends, on every page. */}
+      {settled ? <ContactToasts /> : null}
     </PrefsHood>
   );
 }

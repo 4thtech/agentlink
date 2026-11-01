@@ -33,6 +33,10 @@
 //   for every step, so the approval action keeps it sealed and nothing re-fetches it. A gone object
 //   is `unavailable_invite`, an unreachable drop `try_again`.
 //
+// W5-INVITE-FEEDBACK (08 §1): the list also answers `connecting` (the accepts that wait: ref, name,
+// expiry, `sent`, `again`), check answers `alreadyContact` `{ref, name}` for an invite from a paired
+// contact, and accept answers `again` next to `sent`.
+//
 // Only the canonical link `https://agentlink.4thtech.io/i#<payload>` or the bare payload ever reaches
 // core: any other host, scheme, path, percent-escape, whitespace or size is refused here first, and
 // nothing in these routes fetches anything (04 §4). The link holds the invite secret: it is answered
@@ -212,6 +216,33 @@ function contactOut(contact: PendingContact): JsonObject | undefined {
   return { name, label: 'self-declared', ownerFingerprint: short };
 }
 
+/** A contact's ID: its agent's EVM address, lowercase (04 §2.9). */
+const REF = /^0x[0-9a-f]{40}$/;
+
+/**
+ * W5-INVITE-FEEDBACK (04 §2.9 re-pair): the active, paired contact with this agent ID, as `{ref,
+ * name}` under the name the owner sees for it (core's display name), or undefined. A failed read is
+ * undefined: it never changes the answer otherwise.
+ */
+async function existingContact(
+  context: LocalUiContext,
+  id: string,
+): Promise<{ readonly ref: string; readonly name: string } | undefined> {
+  if (!REF.test(id)) return undefined;
+  try {
+    const views = (await context.client?.contacts.list()) ?? [];
+    const found = views.find(
+      (v) => v.id === id && v.status === 'active' && v.pairing === 'complete',
+    );
+    const name: unknown = found?.display.name;
+    if (found === undefined || typeof name !== 'string' || name.length === 0) return undefined;
+    if (name.length > MAX_NAME_CHARS) return undefined;
+    return { ref: found.id, name };
+  } catch {
+    return undefined;
+  }
+}
+
 // --- create -----------------------------------------------------------------------------------
 
 async function createInvite(
@@ -308,7 +339,30 @@ async function listInvites(
         : null;
     invites.push({ inviteId: item.inviteId, name, expiresAt: when });
   }
-  return Object.freeze({ status: 200, body: Object.freeze({ invites }) });
+  if (port.connecting === undefined) {
+    return Object.freeze({ status: 200, body: Object.freeze({ invites }) });
+  }
+  // W5-INVITE-FEEDBACK: the accepts that wait for the inviter's answer (the invitee side). A read
+  // that fails answers none: the open invites still show.
+  const connecting: JsonObject[] = [];
+  try {
+    for (const item of await port.connecting()) {
+      const when = rfc3339(item.expiresAt);
+      const name: unknown = item.display.name;
+      if (typeof item.id !== 'string' || !REF.test(item.id) || when === undefined) continue;
+      if (typeof name !== 'string' || name.length === 0 || name.length > MAX_NAME_CHARS) continue;
+      connecting.push({
+        ref: item.id,
+        name,
+        expiresAt: when,
+        sent: item.sent === true,
+        again: item.again === true,
+      });
+    }
+  } catch {
+    connecting.length = 0;
+  }
+  return Object.freeze({ status: 200, body: Object.freeze({ invites, connecting }) });
 }
 
 async function cancelInvite(
@@ -336,7 +390,7 @@ async function cancelInvite(
 // --- check ------------------------------------------------------------------------------------
 
 async function checkInvite(
-  _context: LocalUiContext,
+  context: LocalUiContext,
   body: JsonObject,
   invites: LocalUiInviteDesk | undefined,
 ): Promise<LocalUiResult> {
@@ -353,9 +407,16 @@ async function checkInvite(
   const contact = contactOut(checked.contact);
   const when = rfc3339(checked.expiresAt);
   if (contact === undefined || when === undefined) return UNAVAILABLE;
+  // W5-INVITE-FEEDBACK: "You're already connected to {name}. Connect again?" before Touch ID.
+  const already = await existingContact(context, checked.contact.id);
   return Object.freeze({
     status: 200,
-    body: Object.freeze({ status: 'ok', contact, expiresAt: when }),
+    body: Object.freeze({
+      status: 'ok',
+      contact,
+      expiresAt: when,
+      ...(already === undefined ? {} : { alreadyContact: already }),
+    }),
   });
 }
 
@@ -436,6 +497,8 @@ export async function acceptInviteLink(
   const outcome = await context.applyOwnerAction(signature.signed);
   if (outcome.status !== 'applied') return NOT_APPLIED;
 
+  // W5-INVITE-FEEDBACK: a re-pair (the safety code check starts over once it completes, 04 §2.9).
+  const again = (await existingContact(context, contact.id)) !== undefined;
   // Step 3: core uses the applied approval once, then stages and sends the handshake.
   let done: Awaited<ReturnType<typeof port.acceptApproved>>;
   try {
@@ -449,7 +512,12 @@ export async function acceptInviteLink(
   const out = contactOut(done.contact) ?? shown;
   return Object.freeze({
     status: 200,
-    body: Object.freeze({ status: 'pending', contact: out, sent: done.sent }),
+    body: Object.freeze({
+      status: 'pending',
+      contact: out,
+      sent: done.sent,
+      ...(again ? { again: true } : {}),
+    }),
   });
 }
 

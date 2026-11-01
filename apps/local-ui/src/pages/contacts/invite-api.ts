@@ -63,6 +63,25 @@ export interface CheckedInvite {
   readonly fingerprint: string;
   /** Unix milliseconds. */
   readonly expiresAt: number;
+  /**
+   * W5-INVITE-FEEDBACK: the invite comes from an agent that is already a contact (a re-pair), with
+   * the name the owner sees for it. Text only.
+   */
+  readonly already?: { readonly ref: string; readonly name: string };
+}
+
+/** W5-INVITE-FEEDBACK: one accept of this agent that waits for the inviter's answer. */
+export interface ConnectingRow {
+  /** The contact's ID, used only to match rows; never shown. */
+  readonly ref: string;
+  /** The name rule's output (or the owner's alias for a re-pair): text only (I-5). */
+  readonly name: string;
+  /** Unix milliseconds. */
+  readonly expiresAt: number;
+  /** False while the accept has not left this computer yet. */
+  readonly sent: boolean;
+  /** The agent is already a contact: a re-pair. */
+  readonly again: boolean;
 }
 
 export type CreateOutcome =
@@ -77,7 +96,13 @@ export type CheckOutcome =
   | { readonly kind: 'not_set_up' | 'session_expired' | 'offline' | 'failed' | 'try_again' };
 
 export type AcceptOutcome =
-  | { readonly kind: 'pending' }
+  | {
+      readonly kind: 'pending';
+      /** W5-INVITE-FEEDBACK: false when the accept could not leave this computer yet. */
+      readonly sent?: boolean;
+      /** W5-INVITE-FEEDBACK: a re-pair with an existing contact. */
+      readonly again?: boolean;
+    }
   | { readonly kind: 'wait'; readonly seconds: number }
   | { readonly kind: 'refused'; readonly why: InviteRefusal }
   | {
@@ -96,7 +121,8 @@ export type AcceptOutcome =
 
 export interface InviteApi {
   create(label: string | undefined, options?: { readonly long?: boolean }): Promise<CreateOutcome>;
-  cancel(inviteId: string): Promise<CancelOutcome>;
+  /** `keepalive`: the request outlives the page (W5-INVITE-FEEDBACK, a page that hides). */
+  cancel(inviteId: string, options?: { readonly keepalive?: boolean }): Promise<CancelOutcome>;
   check(invite: string): Promise<CheckOutcome>;
   accept(invite: string, proof: PresenceProof): Promise<AcceptOutcome>;
 }
@@ -165,6 +191,33 @@ export function parseOpenInvites(data: unknown): readonly OpenInvite[] | undefin
   return out;
 }
 
+const REF = /^0x[0-9a-f]{40}$/;
+
+/** W5-INVITE-FEEDBACK: the accepts that wait (`connecting`), read through an allowlist. */
+export function parseConnecting(data: unknown): readonly ConnectingRow[] {
+  if (!isObject(data) || !Array.isArray(data['connecting'])) return [];
+  const out: ConnectingRow[] = [];
+  for (const item of data['connecting'] as unknown[]) {
+    if (!isObject(item)) continue;
+    const { ref, name, sent, again } = item;
+    const expiresAt = timeOf(item['expiresAt']);
+    if (typeof ref !== 'string' || !REF.test(ref) || expiresAt === undefined) continue;
+    if (typeof name !== 'string' || name.length === 0 || name.length > MAX_NAME_CHARS) continue;
+    if (typeof sent !== 'boolean' || typeof again !== 'boolean') continue;
+    out.push({ ref, name, expiresAt, sent, again });
+  }
+  return out;
+}
+
+function alreadyOf(value: unknown): CheckedInvite['already'] {
+  if (!isObject(value)) return undefined;
+  const { ref, name } = value;
+  if (typeof ref !== 'string' || !REF.test(ref)) return undefined;
+  if (typeof name !== 'string' || name.length === 0 || name.length > MAX_NAME_CHARS)
+    return undefined;
+  return { ref, name };
+}
+
 function checked(json: Record<string, unknown>): CheckedInvite | undefined {
   const contact = json['contact'];
   const expiresAt = timeOf(json['expiresAt']);
@@ -175,7 +228,13 @@ function checked(json: Record<string, unknown>): CheckedInvite | undefined {
   }
   if (label !== 'self-declared') return undefined;
   if (typeof ownerFingerprint !== 'string' || !FINGERPRINT.test(ownerFingerprint)) return undefined;
-  return { name, fingerprint: ownerFingerprint, expiresAt };
+  const already = alreadyOf(json['alreadyContact']);
+  return {
+    name,
+    fingerprint: ownerFingerprint,
+    expiresAt,
+    ...(already === undefined ? {} : { already }),
+  };
 }
 
 /** A pasted invite the server refused, as one of the sheet's sentences. */
@@ -194,7 +253,7 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
 
   async function call(
     path: string,
-    init: { headers: Headers; body: Uint8Array },
+    init: { headers: Headers; body: Uint8Array; keepalive?: boolean },
   ): Promise<
     { kind: 'answer'; status: number; json: Record<string, unknown> } | { kind: 'offline' }
   > {
@@ -206,6 +265,7 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
         body: init.body as BodyInit,
         credentials: 'same-origin',
         cache: 'no-store',
+        ...(init.keepalive === true ? { keepalive: true } : {}),
       });
     } catch {
       return { kind: 'offline' };
@@ -246,10 +306,14 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
       return { kind: 'failed' };
     },
 
-    async cancel(inviteId) {
+    async cancel(inviteId, options) {
       if (!INVITE_ID.test(inviteId)) return { kind: 'failed' };
       const body = encode({ inviteId });
-      const answer = await call(INVITE_CANCEL_PATH, { headers: inviteHeaders(), body });
+      const answer = await call(INVITE_CANCEL_PATH, {
+        headers: inviteHeaders(),
+        body,
+        ...(options?.keepalive === true ? { keepalive: true } : {}),
+      });
       if (answer.kind === 'offline') return { kind: 'offline' };
       const { status, json } = answer;
       if (status === 200 && json['status'] === 'cancelled') return { kind: 'cancelled' };
@@ -285,7 +349,10 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
       const answer = await call(INVITE_ACCEPT_PATH, { headers, body });
       if (answer.kind === 'offline') return { kind: 'offline' };
       const { status, json } = answer;
-      if (status === 200 && json['status'] === 'pending') return { kind: 'pending' };
+      if (status === 200 && json['status'] === 'pending') {
+        // W5-INVITE-FEEDBACK: an older app answers neither; it reads as sent, not a re-pair.
+        return { kind: 'pending', sent: json['sent'] !== false, again: json['again'] === true };
+      }
       if (status === 401) return { kind: 'session_expired' };
       const gate = json['status'];
       if (gate === 'presence_rejected' || gate === 'presence_required' || gate === 'busy') {

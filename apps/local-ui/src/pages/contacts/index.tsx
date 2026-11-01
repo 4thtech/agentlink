@@ -70,10 +70,16 @@ import {
 import {
   INVITES_LIST_PATH,
   createInviteApi,
+  parseConnecting,
   parseOpenInvites,
+  type ConnectingRow,
   type InviteApi,
   type OpenInvite,
 } from './invite-api.js';
+import { CONTACTS_CHANGED, diffContacts } from '../../api/contact-changes.js';
+import { ConnectingInviteRow } from '../invite/pending-row.js';
+import { PASTE_MARKER } from '../invite/paste-entry.js';
+import { FEEDBACK_STRINGS as F } from '../invite/strings.js';
 import { isKept, keep, loadKept } from './kept.js';
 import {
   createOwnerClient,
@@ -90,7 +96,7 @@ import { useOwnName } from '../invite/own-name.js';
 import { InviteScreen, PasteScreen } from '../invite/invite-screen.js';
 import { PendingInviteRow, type CancelResult } from '../invite/pending-row.js';
 import { PersonMenu } from '../invite/person-menu.js';
-import { INVITE_STRINGS as I, PASTE_STRINGS as PS } from '../invite/strings.js';
+import { INVITE_STRINGS as I } from '../invite/strings.js';
 import { START_STRINGS } from '../home/strings.js';
 import {
   CONTACTS_STRINGS as S,
@@ -210,6 +216,7 @@ function ContactList({
   arrivals,
   seq,
   onSelect,
+  fresh,
 }: {
   contacts: readonly ContactRow[];
   selected: string | undefined;
@@ -217,6 +224,8 @@ function ContactList({
   arrivals: ReadonlySet<string>;
   seq: number;
   onSelect: (ref: string) => void;
+  /** W5-INVITE-FEEDBACK: the contact that just connected (a short pulse). */
+  fresh?: string | undefined;
 }): ReactElement {
   const dupes = duplicateNames(contacts);
   return (
@@ -225,7 +234,7 @@ function ContactList({
         <li key={c.ref}>
           <button
             type="button"
-            className={`al-contact ct-row${c.status === 'active' ? '' : ` is-${c.status}`}`}
+            className={`al-contact ct-row${c.status === 'active' ? '' : ` is-${c.status}`}${c.ref === fresh ? ' is-fresh' : ''}`}
             aria-current={c.ref === selected ? 'true' : undefined}
             onClick={() => onSelect(c.ref)}
           >
@@ -700,18 +709,24 @@ function PendingInvites({
   highlight,
   now,
   onCancel,
+  connecting = [],
 }: {
   rows: readonly OpenInvite[];
   cancelled: readonly OpenInvite[];
   highlight: string | undefined;
   now: number;
   onCancel: (inviteId: string) => Promise<CancelResult>;
+  /** W5-INVITE-FEEDBACK: this agent's accepts that wait for the inviter's answer. */
+  connecting?: readonly ConnectingRow[];
 }): ReactElement | null {
   const gone = cancelled.filter((c) => !rows.some((r) => r.inviteId === c.inviteId));
-  if (rows.length === 0 && gone.length === 0) return null;
+  if (rows.length === 0 && gone.length === 0 && connecting.length === 0) return null;
   const done = new Set(cancelled.map((c) => c.inviteId));
   return (
     <Surface as="ul" level={1} className="ct-list ct-invites" aria-label={I.pendingLabel}>
+      {connecting.map((c) => (
+        <ConnectingInviteRow key={`c-${c.ref}`} row={c} />
+      ))}
       {[...gone, ...rows].map((r) => (
         <PendingInviteRow
           key={r.inviteId}
@@ -759,6 +774,13 @@ function openedForInvite(): boolean {
   return true;
 }
 
+/** W5-PASTE-ENTRY: `?paste` opens the paste screen; the marker leaves the address at once. */
+function openedForPaste(): boolean {
+  if (typeof location === 'undefined' || location.search !== `?${PASTE_MARKER}`) return false;
+  history.replaceState(history.state, '', location.pathname + location.hash);
+  return true;
+}
+
 /** True once, when the page was opened through an older Add contact link (b11 §21.1). */
 function openedForAdd(): boolean {
   if (typeof location === 'undefined' || location.search !== `?${ADD_CONTACT_MARKER}`) return false;
@@ -789,6 +811,16 @@ export function ContactsPage({
   const [highlight, setHighlight] = useState<string | undefined>(undefined);
   const [justCreated, setJustCreated] = useState(false);
   const [cancelledRows, setCancelledRows] = useState<readonly OpenInvite[]>([]);
+  // W5-INVITE-FEEDBACK: the accepts that wait (server rows), the contact that just connected, and
+  // the last list for telling what changed.
+  const [connectingRows, setConnectingRows] = useState<readonly ConnectingRow[]>([]);
+  const [fresh, setFresh] = useState<string | undefined>(undefined);
+  const lastRead = useRef<
+    | { contacts: readonly ContactRow[]; connecting: readonly ConnectingRow[]; open: number }
+    | undefined
+  >(undefined);
+  const lastConnecting = useRef<readonly ConnectingRow[]>([]);
+  const lastOpen = useRef(0);
   // W4-WIRE: the old Add contact marker opens the Invite screen too (the sheet is no way in now).
   const [inviting, setInviting] = useState(() => openedForInvite() || openedForAdd());
   // The Connected moment: the contacts known before, and whether an arrival is expected (an open
@@ -819,8 +851,12 @@ export function ContactsPage({
         const read = parseOpenInvites(res.data);
         if (read !== undefined) {
           setRows(read);
+          lastOpen.current = read.length;
           if (read.length > 0) expecting.current = true;
         }
+        const waiting = parseConnecting(res.data);
+        lastConnecting.current = waiting;
+        setConnectingRows(waiting);
       },
       () => undefined,
     );
@@ -840,6 +876,28 @@ export function ContactsPage({
           return;
         }
         setList({ phase: 'ok', contacts: answer.contacts });
+        // W5-INVITE-FEEDBACK: the contact that connected (or connected again) gets a short pulse;
+        // after a re-pair the safety code check starts over, so the page says so.
+        const prior = lastRead.current;
+        lastRead.current = {
+          contacts: answer.contacts,
+          connecting: lastConnecting.current,
+          open: lastOpen.current,
+        };
+        if (prior !== undefined) {
+          const pic = (r: typeof prior) => ({
+            agent: null,
+            contacts: r.contacts,
+            connecting: r.connecting,
+            openInvites: r.open,
+          });
+          const [change] = diffContacts(pic(prior), pic(lastRead.current)).slice(-1);
+          if (change !== undefined) {
+            setFresh(change.ref);
+            if (change.kind === 'again') setNotice(F.again(change.name));
+            else setNotice(undefined);
+          }
+        }
         // A new paired contact while an invite was open (or a pasted one was connecting).
         const before = known.current;
         known.current = new Set(answer.contacts.map((c) => c.ref));
@@ -883,7 +941,24 @@ export function ContactsPage({
   const anyPending =
     (list.phase === 'ok' && list.contacts.some((c) => c.pairing === 'pending')) ||
     rows.length > 0 ||
+    connectingRows.length > 0 ||
     connecting;
+  // W5-INVITE-FEEDBACK: the stream says the contacts or invites changed: read again at once.
+  useEffect(() => {
+    const onContacts = (): void => {
+      if (inFlight.current) return;
+      inFlight.current = true;
+      background.current = true;
+      setTick((n) => n + 1);
+    };
+    window.addEventListener(CONTACTS_CHANGED, onContacts);
+    return () => window.removeEventListener(CONTACTS_CHANGED, onContacts);
+  }, []);
+  useEffect(() => {
+    if (fresh === undefined) return undefined;
+    const t = setTimeout(() => setFresh(undefined), 2400);
+    return () => clearTimeout(t);
+  }, [fresh]);
   useEffect(() => {
     if (!anyPending) return undefined;
     // Skips while a read is running (slow servers never pile up) and while the tab is hidden; coming
@@ -929,7 +1004,7 @@ export function ContactsPage({
   }, []);
 
   // IR-W4-WIRE-2X-1: "Have an invite link? Paste it" opens a paste screen that makes no invite.
-  const [pasting, setPasting] = useState(false);
+  const [pasting, setPasting] = useState(openedForPaste);
   const openPaste = (): void => {
     setSheetOpen(false);
     setNotice(undefined);
@@ -959,19 +1034,23 @@ export function ContactsPage({
           >
             {I.title}
           </Button>
-          <button type="button" className="inv-link-button" onClick={openPaste}>
-            {PS.open}
-          </button>
+          <Button variant="secondary" className="al-press" onClick={openPaste}>
+            {F.pasteEntry}
+          </Button>
         </div>
       ) : null}
     </div>
   );
   // W4-WIRE-2 (Decision 52 (3)): the Add contact sheet is retired. Invite someone opens the Invite
   // screen, and its "Have an invite link? Paste it" accepts an invite someone sent.
-  const accepted = (name: string): void => {
+  const accepted = (
+    name: string,
+    info?: { readonly sent: boolean; readonly again: boolean },
+  ): void => {
     setInviting(false);
     setPasting(false);
-    setNotice(connectingTo(name));
+    // W5-INVITE-FEEDBACK: honest about an accept that could not leave this computer yet.
+    setNotice(info?.sent === false ? F.waitingOnline(name) : connectingTo(name));
     setConnectingSince(Date.now());
     expecting.current = true;
     setTick((n) => n + 1);
@@ -1003,6 +1082,7 @@ export function ContactsPage({
       highlight={highlight}
       now={Date.now()}
       onCancel={cancelInvite}
+      connecting={connectingRows}
     />
   );
   const moment =
@@ -1056,7 +1136,7 @@ export function ContactsPage({
             </p>
           ) : null}
           {status}
-          {rows.length === 0 ? (
+          {rows.length === 0 && connectingRows.length === 0 ? (
             inviteFirst ? (
               <EmptyState
                 icon="users"
@@ -1120,6 +1200,7 @@ export function ContactsPage({
             pulse={activity.pulse}
             arrivals={activity.arrivals}
             seq={activity.seq}
+            fresh={fresh}
             onSelect={(ref) => {
               setRemoved(false);
               setSelected(ref);

@@ -30,6 +30,7 @@ import {
   derivePairingProofKey,
   encodeBase64url,
   encodeHex,
+  encodeUtf8,
   formatFingerprint,
   decodeHex,
   generateShortInviteSecret,
@@ -37,6 +38,7 @@ import {
   randomBytes,
   sealShortInvite,
   safetyCodeCommit,
+  sha256,
   verifyCardPop,
   verifyPairingProof,
   wipe,
@@ -416,6 +418,37 @@ export class PairingService implements PairingHandler {
           .some((row) => row.used_at == null && row.cancelled_at == null && row.expires_at > now) ||
         tx.select('pairings').some((row) => row.expires_at > now),
     );
+  }
+
+  /**
+   * W5-INVITE-FEEDBACK (08 §1 `GET /api/ui/events`, event `contacts`): an opaque mark of what the
+   * owner's contact and invite views show, so the app host can tell when they changed (also when
+   * another process, the AI app's MCP server, completed a pairing). Reads plain columns only: no
+   * sealed column is opened, nothing is written. A SHA-256 hex digest; never sent anywhere.
+   */
+  async changeMark(): Promise<string> {
+    const now = nowOf(this.#ctx);
+    const parts = await this.#ctx.store.transaction((tx) => [
+      tx
+        .select('contacts')
+        .map((r) =>
+          [r.contact_id, r.status, r.pairing, r.handshake_envelope_id ?? '', r.updated_at].join(
+            ':',
+          ),
+        )
+        .sort(),
+      tx
+        .select('pairings')
+        .filter((r) => r.expires_at > now)
+        .map((r) => r.pairing_id)
+        .sort(),
+      tx
+        .select('invites')
+        .filter((r) => r.used_at == null && r.cancelled_at == null && r.expires_at > now)
+        .map((r) => r.invite_id)
+        .sort(),
+    ]);
+    return encodeHex(sha256(encodeUtf8(JSON.stringify(parts))));
   }
 
   // --- A: create an invite -----------------------------------------------------------------------

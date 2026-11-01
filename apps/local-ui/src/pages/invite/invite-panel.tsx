@@ -20,6 +20,7 @@ import { createInviteApi, type CreatedInvite, type InviteApi } from '../contacts
 import { QrCode } from '../proofs/qr.js';
 import { CheckMark, CopyMark, MailIcon, ShareIcon } from './icons.js';
 import { INVITE_STRINGS as S, linkLabel, mailtoOf, worksFor } from './strings.js';
+import { forgetUnsent, rememberUnsent, unsentInvites } from './unsent-invites.js';
 import './invite.css';
 
 const DAY_MS = 86_400_000;
@@ -138,24 +139,58 @@ export function InvitePanel({
         void invites.cancel(id);
         return;
       }
+      // W5-INVITE-FEEDBACK: kept in this tab until it leaves the screen, so a reload cancels it.
+      if (!sharedRef.current) rememberUnsent(id);
       madeRef.current = next;
       setMade(next);
       setPhase('ready');
       onCreated?.();
       // The one it replaces never left the screen: it goes.
-      if (previous !== undefined && !sharedRef.current) void invites.cancel(previous.id);
+      if (previous !== undefined && !sharedRef.current) {
+        const gone = previous.id;
+        void invites.cancel(gone).then(() => forgetUnsent(gone));
+      }
     },
     [invites, onCreated],
   );
 
   useEffect(() => {
     live.current = true;
+    // W5-INVITE-FEEDBACK: links an earlier load of this tab made that never left the screen.
+    for (const id of unsentInvites()) {
+      void invites.cancel(id).then((outcome) => {
+        if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') forgetUnsent(id);
+      });
+    }
     void make('', false);
+    // A reload or a closed tab never unmounts: cancel what did not leave the screen as it hides.
+    let hidden: string | undefined;
+    const onHide = (): void => {
+      const last = madeRef.current;
+      if (last === undefined || sharedRef.current) return;
+      hidden = last.id;
+      void invites.cancel(last.id, { keepalive: true });
+    };
+    // Back from the browser's page cache: the link on screen was cancelled, so make a fresh one.
+    const onShow = (event: PageTransitionEvent): void => {
+      const last = madeRef.current;
+      if (!event.persisted || hidden === undefined || last?.id !== hidden) return;
+      hidden = undefined;
+      madeRef.current = undefined;
+      setMade(undefined);
+      void make(last.label, last.askedLong);
+    };
+    window.addEventListener('pagehide', onHide);
+    window.addEventListener('pageshow', onShow);
     return () => {
       live.current = false;
+      window.removeEventListener('pagehide', onHide);
+      window.removeEventListener('pageshow', onShow);
       const last = madeRef.current;
       // A link that never left the screen leaves no pending row behind.
-      if (last !== undefined && !sharedRef.current) void invites.cancel(last.id);
+      if (last !== undefined && !sharedRef.current) {
+        void invites.cancel(last.id).then(() => forgetUnsent(last.id));
+      }
     };
     // Made once per panel.
   }, []);
@@ -179,6 +214,7 @@ export function InvitePanel({
   const markShared = (): void => {
     sharedRef.current = true;
     setShared(true);
+    if (madeRef.current !== undefined) forgetUnsent(madeRef.current.id);
   };
 
   // IR-1 low (a): any copy whose selection holds the link counts as sent (the box, a triple-click,
@@ -198,6 +234,7 @@ export function InvitePanel({
       if (inBox || selection.toString().includes(url.slice(-12))) {
         sharedRef.current = true;
         setShared(true);
+        if (madeRef.current !== undefined) forgetUnsent(madeRef.current.id);
       }
     };
     document.addEventListener('copy', onCopy);

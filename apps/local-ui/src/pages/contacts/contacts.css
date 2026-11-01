@@ -154,3 +154,25 @@
     min-block-size: var(--al-size-control-lg);
   }
 }
+
+/* W5-INVITE-FEEDBACK: the contact that just connected. An overlay that pulses (opacity only,
+   the W4 kit's al-fade-out) and ends faded; with reduced motion (the system setting or the app's own) it only
+   fades once. */
+.ct-row.is-fresh {
+  position: relative;
+}
+.ct-row.is-fresh::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--al-color-accent-subtle);
+  box-shadow: inset 0 0 0 2px var(--al-color-accent-default);
+  opacity: 0;
+  animation: al-fade-out var(--al-duration-ambient) var(--al-easing-standard);
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion='reduced']) .ct-row.is-fresh::after {
+    animation: al-fade-out var(--al-duration-moment) var(--al-easing-standard) 5 alternate;
+  }
+}

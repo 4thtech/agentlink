@@ -122,6 +122,49 @@ export interface ContactView {
   };
   readonly createdAt: number;
   readonly updatedAt: number;
+  /**
+   * W5-INVITE-FEEDBACK (08 §1): when the kept pairing's `handshake` was made (unix seconds, its
+   * signed `createdAt`), for a completed pairing whose handshake is stored. A re-pair moves it
+   * forward on both sides (04 §2.9 keeps the later handshake), so the app can say "Connected again".
+   */
+  readonly pairedAt?: number;
+  /**
+   * W5-INVITE-FEEDBACK: this agent's role in the kept pairing: `inviter` when the `handshake` was
+   * received, `invitee` when it was sent. Present with `pairedAt`.
+   */
+  readonly pairedAs?: 'inviter' | 'invitee';
+}
+
+/**
+ * W5-INVITE-FEEDBACK (08 §1): one accept of this agent that waits for the inviter's answer (a staged
+ * `pairings` row of role `invitee`, not expired). Display fields only: never a card, key, link or
+ * pairing ID.
+ */
+export interface ConnectingContact {
+  /** The inviter's agentId (its contact ID once paired). */
+  readonly id: string;
+  /** The existing contact's shown name for a re-pair; else the inviter's name under the name rule. */
+  readonly display: ContactDisplayName;
+  readonly expiresAt: number;
+  /** False while the `handshake` still waits in the outbox (not published yet). */
+  readonly sent: boolean;
+  /** True when the agent is already an active, paired contact: a re-pair (04 §2.9). */
+  readonly again: boolean;
+}
+
+/** W5-INVITE-FEEDBACK: the kept `handshake` row's plain time and direction. */
+interface HandshakeMark {
+  readonly at: number;
+  readonly direction: 'in' | 'out';
+}
+
+/** `pairedAt` and `pairedAs` of a completed pairing whose handshake is stored. */
+function pairedFields(
+  row: Row<'contacts'>,
+  mark: HandshakeMark | undefined,
+): { readonly pairedAt?: number; readonly pairedAs?: 'inviter' | 'invitee' } {
+  if (row.pairing !== 'complete' || mark === undefined || !Number.isSafeInteger(mark.at)) return {};
+  return { pairedAt: mark.at, pairedAs: mark.direction === 'in' ? 'inviter' : 'invitee' };
 }
 
 /**
@@ -430,7 +473,11 @@ export class ContactBook {
     });
   }
 
-  async #view(row: Row<'contacts'>): Promise<ContactView> {
+  /**
+   * W5-INVITE-FEEDBACK: `paired` is the kept handshake row's time and direction when the caller
+   * read it already (list reads all of them in one query); otherwise it is read here.
+   */
+  async #view(row: Row<'contacts'>, paired?: HandshakeMark | null): Promise<ContactView> {
     const key = [row.contact_id];
     const card = await this.#card(row);
     const name = await open(this.#ctx, 'contacts', 'name', key, row.name);
@@ -461,7 +508,69 @@ export class ContactBook {
       ...(await this.#nameChange(row, short)),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      ...pairedFields(
+        row,
+        paired === undefined ? await this.#handshakeMark(row) : (paired ?? undefined),
+      ),
     };
+  }
+
+  /** W5-INVITE-FEEDBACK: the kept handshake's time and direction (plain columns), if any. */
+  async #handshakeMark(row: Row<'contacts'>): Promise<HandshakeMark | undefined> {
+    const id = row.handshake_envelope_id;
+    if (row.pairing !== 'complete' || id === null) return undefined;
+    return this.#ctx.store.transaction((tx) => {
+      const env = tx.get('envelopes', { envelope_id: id });
+      return env === undefined ? undefined : { at: env.created_at, direction: env.direction };
+    });
+  }
+
+  /**
+   * W5-INVITE-FEEDBACK (08 §1): this agent's accepts that wait for the inviter's answer, oldest
+   * first. Opens only the staged name (and, for a re-pair, the contact's shown name); nothing is
+   * written.
+   */
+  async connecting(): Promise<readonly ConnectingContact[]> {
+    const ctx = this.#ctx;
+    const now = nowOf(ctx);
+    const rows = await ctx.store.transaction((tx) =>
+      tx
+        .select('pairings', { role: 'invitee' }, { orderBy: [['created_at', 'asc']] })
+        .filter((r) => r.expires_at > now)
+        .map((r) => ({
+          row: r,
+          contact: tx.get('contacts', { contact_id: r.contact_id }),
+          delivery: tx.get('envelopes', { envelope_id: r.pairing_id })?.delivery ?? null,
+        })),
+    );
+    const out: ConnectingContact[] = [];
+    for (const { row, contact, delivery } of rows) {
+      const again = contact?.status === 'active' && contact.pairing === 'complete';
+      let display: ContactDisplayName;
+      try {
+        display =
+          again && contact !== undefined
+            ? (await this.#view(contact)).display
+            : {
+                name: restrictName(
+                  await open(ctx, 'pairings', 'name', [row.pairing_id], row.name),
+                  formatFingerprint(decodeHex(row.owner_fingerprint, { length: 32 }), 'short'),
+                ),
+                label: 'self-declared',
+                nameSource: 'counterparty',
+              };
+      } catch {
+        continue;
+      }
+      out.push({
+        id: row.contact_id,
+        display,
+        expiresAt: row.expires_at,
+        sent: delivery === 'sent',
+        again,
+      });
+    }
+    return out;
   }
 
   /** D-141: the unseen former-name note of a contact shown by its own name, if any. */
@@ -520,8 +629,8 @@ export class ContactBook {
 
   /** Contacts that are not removed, oldest first. */
   async list(): Promise<ContactView[]> {
-    const rows = await this.#ctx.store.transaction((tx) =>
-      tx.select(
+    const { rows, marks } = await this.#ctx.store.transaction((tx) => ({
+      rows: tx.select(
         'contacts',
         { status: { ne: 'removed' } },
         {
@@ -531,9 +640,18 @@ export class ContactBook {
           ],
         },
       ),
-    );
+      // W5-INVITE-FEEDBACK: every stored handshake's time and direction in one query (no N+1).
+      marks: new Map(
+        tx
+          .select('envelopes', { type: 'handshake' })
+          .map((e) => [e.envelope_id, { at: e.created_at, direction: e.direction }] as const),
+      ),
+    }));
     const out: ContactView[] = [];
-    for (const row of rows) out.push(await this.#view(row));
+    for (const row of rows) {
+      const id = row.handshake_envelope_id;
+      out.push(await this.#view(row, id === null ? null : (marks.get(id) ?? null)));
+    }
     return out;
   }
 

@@ -1,0 +1,5 @@
+---
+'@4thtech-io/agentlink': patch
+---
+
+W5-INVITE-FEEDBACK + W5-PASTE-ENTRY: the local app shows both sides of an invite live. The events stream (`GET /api/ui/events`) adds a `contacts` event (only `at`) when the open agent's contacts or invites change (core `pairing.changeMark`, compared on the host, never sent); the app reads again, shows "{name} accepted your invite" or "You're connected with {name}" and highlights the contact. `GET /api/ui/invites` also answers `connecting` (core `contacts.connecting()`: the accepts waiting for an answer, with `sent` and `again`); check answers `alreadyContact` and the paste screen asks "Connect again?"; accept answers `again`; contact rows carry `pairedAt` and `pairedAs` (the toast follows the pairing's role), so a re-pair shows "Connected again with {name}. Check the safety code again." A link that never left the Invite screen is cancelled when the page hides and on the next load. "Someone invited you? Paste link" on Home, in Get started and on People (`/contacts?paste`), with an opt-in clipboard check. No protocol change.

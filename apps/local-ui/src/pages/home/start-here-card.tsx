@@ -13,6 +13,7 @@ import { FIRST_RUN, type Platform } from '../first-run/strings.js';
 import type { StartHereModel } from './start-here-context.js';
 import type { StartView, StepId, StepView } from './start-here.js';
 import { AppMark } from './app-mark.js';
+import { PasteEntryLink } from '../invite/paste-entry.js';
 import {
   START_LINKS,
   START_STRINGS as T,
@@ -140,6 +141,8 @@ function Detail({
           <a className="al-btn al-btn-primary hm-start-action" href={ADD_CONTACT_HREF}>
             {T.addContact}
           </a>
+          {/* W5-PASTE-ENTRY: someone invited you instead. */}
+          <PasteEntryLink />
           <p className="hm-start-quiet al-text-body-sm al-muted">
             {T.noOneYet}{' '}
             <a className="hm-start-link" href={START_LINKS.agents}>

@@ -22,43 +22,17 @@ import { detectPlatform } from '../first-run/passkey.js';
 import type { Platform } from '../first-run/strings.js';
 import { JOIN_STRINGS as J } from '../join/strings.js';
 import { FingerprintIcon } from './icons.js';
-import { INVITE_STRINGS as S, PASTE_STRINGS as P, invitesYou, letterOf } from './strings.js';
+import { ClipboardOffer } from './paste-entry.js';
+import {
+  FEEDBACK_STRINGS as F,
+  INVITE_STRINGS as S,
+  PASTE_STRINGS as P,
+  invitesYou,
+  letterOf,
+} from './strings.js';
 
-/** The canonical invite link prefix (core INVITE_LINK_PREFIX). */
-const PREFIX = 'https://agentlink.4thtech.io/i#';
-const BARE = 'agentlink.4thtech.io/i#';
-/** Short link (04 §3.6.2): `2.` and the 43-character secret. */
-const SHORT = /^2\.[A-Za-z0-9_-]{43}$/;
-/** Long link (04 §3.6): strict base64url, at most the invite client's bound (invite-api.ts). */
-const PAYLOAD = /^[A-Za-z0-9_-]{1,8192}$/;
-/** More pasted text than any message with one link in it: refused unread. */
-const MAX_TEXT = 32_768;
-/** Punctuation a sentence or a quote may put around a link. */
-const EDGE = /^[("'<[{“‘]+|[)"'>\]}.,;:!?”’]+$/g;
-
-/**
- * The one AgentLink invite link in pasted text, as `https://agentlink.4thtech.io/i#<code>`, or
- * undefined. Every other text, another host or scheme, a look-alike host or two different links, is
- * refused (fail closed); the server checks the link again.
- */
-export function inviteLinkOf(text: string): string | undefined {
-  if (text.length > MAX_TEXT) return undefined;
-  const found = new Set<string>();
-  for (const raw of text.split(/\s+/)) {
-    const token = raw.replace(EDGE, '');
-    const rest = token.startsWith(PREFIX)
-      ? token.slice(PREFIX.length)
-      : token.startsWith(BARE)
-        ? token.slice(BARE.length)
-        : undefined;
-    if (rest === undefined) continue;
-    if (!SHORT.test(rest) && !PAYLOAD.test(rest)) return undefined;
-    found.add(rest);
-  }
-  if (found.size !== 1) return undefined;
-  const [code] = found;
-  return `${PREFIX}${code ?? ''}`;
-}
+export { inviteLinkOf } from './invite-link-of.js';
+import { inviteLinkOf } from './invite-link-of.js';
 
 const REFUSED: Readonly<Record<InviteRefusal, string>> = {
   expired: P.expired,
@@ -77,8 +51,15 @@ export interface PasteInviteProps {
   /** The passkey gesture. Default: passkeyProof. */
   readonly gesture?: (info: PasskeyInfo) => Promise<PresenceProof | undefined>;
   readonly platform?: Platform;
-  /** The invite was accepted; `name` is the name-rule output. The page follows the pairing. */
-  readonly onConnected?: (name: string) => void;
+  /**
+   * The invite was accepted; `name` is the name-rule output. The page follows the pairing.
+   * W5-INVITE-FEEDBACK: `sent` is false while the accept could not leave this computer yet, and
+   * `again` marks a re-pair with an existing contact.
+   */
+  readonly onConnected?: (
+    name: string,
+    info: { readonly sent: boolean; readonly again: boolean },
+  ) => void;
   /**
    * IR-W4-WIRE-2X-1: "Paste it" hands over to the page's own paste screen (one that makes no invite
    * of yours) instead of opening the field here.
@@ -166,7 +147,7 @@ export function PasteInvite({
         setText('');
         setLink('');
         setPhase({ k: 'closed' });
-        onConnected?.(shown);
+        onConnected?.(shown, { sent: outcome.sent !== false, again: outcome.again === true });
         return;
       }
       if (outcome.kind === 'presence_rejected') return setMessage(C.presenceRejected);
@@ -235,6 +216,14 @@ export function PasteInvite({
         </div>
         {phase.k === 'checking' ? <ProgressBar label={P.checking} indeterminate /> : null}
         {message === undefined ? null : <InlineError>{message}</InlineError>}
+        {phase.k === 'checking' ? null : (
+          <ClipboardOffer
+            onFound={(found) => {
+              setMessage(undefined);
+              setText(found);
+            }}
+          />
+        )}
       </form>
     );
   } else if (phase.k === 'refused') {
@@ -266,6 +255,13 @@ export function PasteInvite({
         <p className="al-text-body-sm al-muted inv-paste-note">
           {J.check(shown, invite.fingerprint)} · {J.until(until)}
         </p>
+        {invite.already === undefined ? null : (
+          // W5-INVITE-FEEDBACK (04 §2.9): a re-pair, said before Touch ID.
+          <div className="inv-again" role="note">
+            <p className="al-text-body">{F.already(invite.already.name)}</p>
+            <p className="al-text-body-sm al-muted">{F.againResets}</p>
+          </div>
+        )}
         {phase.code ? (
           <PresencePrompt
             summary={J.statement(shown, invite.fingerprint, P.thisAgent)}

@@ -14,6 +14,7 @@ import {
   decodeInviteLink,
   evaluate,
   type AcceptInviteAction,
+  type ConnectingContact,
   type OpenInvite,
   type PendingContact,
   type PolicyDecision,
@@ -533,6 +534,11 @@ export interface LocalUiInviteAcceptPort {
   resolve(link: string): Promise<string>;
   /** W4-INVITES-LIST: the open invites (ID, label, expiry; never a link). */
   list(): Promise<readonly OpenInvite[]>;
+  /**
+   * W5-INVITE-FEEDBACK: this agent's accepts that wait for the inviter's answer (display fields,
+   * expiry, `sent`, `again`; never a card, key or pairing ID). Optional so older fakes stay valid.
+   */
+  connecting?(): Promise<readonly ConnectingContact[]>;
   check(link: string): Promise<PendingContact>;
   decision(): Promise<PolicyDecision>;
   action(link: string): Promise<AcceptInviteAction>;
@@ -557,6 +563,7 @@ export function inviteAcceptPort(client: AgentLinkClient): LocalUiInviteAcceptPo
   return Object.freeze<LocalUiInviteAcceptPort>({
     resolve: (link) => client.pairing.resolveInviteLink(link),
     list: () => client.pairing.openInvites(),
+    connecting: () => client.contacts.connecting(),
     async check(link) {
       return (await client.pairing.acceptInvite({ link })).contact;
     },

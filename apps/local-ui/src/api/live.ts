@@ -45,6 +45,8 @@ const FAILURES_TO_FALL_BACK = 3;
 /** Relative times ("5 min ago") are redrawn this often while one is shown. */
 const AGO_TICK_MS = 30_000;
 const CHANGED = 'agentlink:agents-changed';
+/** W5-INVITE-FEEDBACK: contact-changes.ts CONTACTS_CHANGED (kept here so the two never import each other). */
+const CONTACTS_CHANGED = 'agentlink:contacts-changed';
 
 /** A plain status (08 §1): Working (pulsing) / Ready / Idle / Not running / Not set up / Paused. */
 export type LiveState = 'working' | 'ready' | 'idle' | 'off' | 'none' | 'paused' | 'removing';
@@ -465,6 +467,13 @@ function onStreamEvent(e: SseEvent): void {
   if (e.id !== '') lastEventId = e.id;
   if (!isObject(e.data)) return;
   const data = e.data;
+  // W5-INVITE-FEEDBACK: the open agent's contacts or invites changed. Only `at`; the views that
+  // show them read again. Not an agents change.
+  if (e.event === 'contacts') {
+    attempt = 0;
+    window.dispatchEvent(new Event(CONTACTS_CHANGED));
+    return;
+  }
   const generation = timeOf(data['generation']);
   if (e.event === 'snapshot') {
     records = parseRecords(data['agents']);
