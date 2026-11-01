@@ -93,6 +93,8 @@ const MAX_JOB_PAGES = 10;
 
 // Pages through the run's jobs (latest attempt) until the named job is found or the list ends.
 async function findJob({ api, repo, runId, name }) {
+  // `name` may be one job name or a list; the first page that holds any of them answers.
+  const names = Array.isArray(name) ? name : [name];
   for (let page = 1; page <= MAX_JOB_PAGES; page += 1) {
     const query = new URLSearchParams({
       filter: 'latest',
@@ -101,7 +103,7 @@ async function findJob({ api, repo, runId, name }) {
     });
     const body = await api(`/repos/${repo}/actions/runs/${runId}/jobs?${query}`);
     const jobs = body?.jobs ?? [];
-    const found = jobs.find((j) => j?.name === name);
+    const found = jobs.find((j) => names.includes(j?.name));
     if (found) return found;
     if (jobs.length < JOBS_PER_PAGE) return undefined;
   }
@@ -145,7 +147,16 @@ export async function checkOnce({ api, repo, sha, require, branch = 'main' }) {
       continue;
     }
     const newest = runs.reduce((a, b) => (Number(b.id) > Number(a.id) ? b : a));
-    const gate = await findJob({ api, repo, runId: newest.id, name: job });
+    // W5-WINDOWS: ci.yml names its gate `ci-gate` only on `main` and `ci-gate (push)` on every other
+    // branch push (it must not satisfy the required check there). A wave branch's own push run is
+    // exactly that run, so for a branch other than `main` the gate is either name. The match stays
+    // exact: no other job and no other suffix counts.
+    const gate = await findJob({
+      api,
+      repo,
+      runId: newest.id,
+      name: branch === 'main' ? job : [job, `${job} (push)`],
+    });
     const runCancelled = newest.status === 'completed' && newest.conclusion === 'cancelled';
 
     if (

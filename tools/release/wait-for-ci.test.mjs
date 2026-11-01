@@ -631,6 +631,36 @@ describe('--branch (main by default, or a wave integration branch)', () => {
     expect(runQueries.every((p) => p.includes('branch=wave-4'))).toBe(true);
   });
 
+  // W5-WINDOWS: ci.yml names the gate of every non-main push run `ci-gate (push)`, so a wave
+  // branch's own run never had a job called `ci-gate` and @next was blocked.
+  it('accepts the "ci-gate (push)" gate of a wave branch run, and its result decides', async () => {
+    const routes = (conclusion) =>
+      greenRoutes({
+        [runsPath('ci.yml')]: () => ({ workflow_runs: [w4run(11, 'ci.yml')] }),
+        [runsPath('security.yml')]: () => ({ workflow_runs: [w4run(22, 'security.yml')] }),
+        [jobsPath(11)]: () => ({ jobs: [job('ci-gate (push)', 'completed', conclusion)] }),
+      });
+    const opts = { repo: REPO, sha: SHA, require: REQUIRE, branch: 'wave-4' };
+    expect((await checkOnce({ api: fakeApi(routes('success')).api, ...opts })).state).toBe('green');
+    expect((await checkOnce({ api: fakeApi(routes('failure')).api, ...opts })).state).toBe('red');
+  });
+
+  it('on main only the exact "ci-gate" counts, and a wave branch rejects other suffixes', async () => {
+    const wave = greenRoutes({
+      [runsPath('ci.yml')]: () => ({ workflow_runs: [w4run(11, 'ci.yml')] }),
+      [runsPath('security.yml')]: () => ({ workflow_runs: [w4run(22, 'security.yml')] }),
+      [jobsPath(11)]: () => ({ jobs: [job('ci-gate (pull_request)', 'completed', 'success')] }),
+    });
+    const result = await checkOnce({
+      api: fakeApi(wave).api,
+      repo: REPO,
+      sha: SHA,
+      require: REQUIRE,
+      branch: 'wave-4',
+    });
+    expect(result.state).toBe('red');
+  });
+
   it('a main run of the same commit does not satisfy wave-4, and the reverse', async () => {
     const onWave = await checkOnce({
       api: fakeApi(greenRoutes()).api,

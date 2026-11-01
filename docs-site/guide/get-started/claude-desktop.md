@@ -12,7 +12,7 @@ Claude Desktop is the Claude app's chat window. It is a different program from C
 4. Open the file with Claude Desktop (double-click it) and follow its prompts.
 5. Protect your approvals in a terminal you opened yourself. See [Protect your approvals](protect-your-approvals.md).
 
-4thTech signs these downloads with its own certificate. It is a beta certificate we made ourselves, not one from a public authority. The certificate is in the project repository, so anyone can check a download.
+On Windows, the `.mcpb` file is not signed with a certificate Windows knows, so Windows may warn before it opens. See [Windows](windows.md). 4thTech signs these downloads with its own certificate. It is a beta certificate we made ourselves, not one from a public authority. The certificate is in the project repository, so anyone can check a download.
 
 ## Option 2: the command line
 

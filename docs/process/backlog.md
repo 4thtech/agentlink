@@ -5804,6 +5804,18 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 - **Scope:** state as a residual that two processes saving the same item at once can leave one extra copy with a suffix such as "name (2)"; nothing is lost, replaced or followed. Marked "proposed, owner confirms at merge".
 - **Acceptance:** the residual is in 04 §4.1 next to the other auto-save residuals; `node tools/docs-status/index.mjs --check` passes; changelog.d fragment
 
+#### W5-WINDOWS · Windows: `cmd /c npx` entries, a Windows smoke job in the release gate, a Windows guide (wave 5)
+- **Status:** in progress · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 (sensitive path `.github/**`) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/harness/`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `tools/ci/`, `tools/release/wait-for-ci.mjs`, `tools/desktop-extension/`, `docs-site/guide/`
+- **Depends on:** none
+- **Spec:** 06 §7; `docs/process/ci-cd.md`
+- **Invariants:** I-4 (no tool changes an entry), I-7
+- **Source:** Windows install research (v0.4.6): "spawn npx ENOENT" for apps that cannot start `npx.cmd`; no Windows start test anywhere; `release.yml` `ci-green` waiting for a job named `ci-gate` on `wave-4`, where it is named `ci-gate (push)`
+- **Scope:** on win32 every harness entry (JSON and Codex TOML) starts with `cmd /c npx`; `harness/conflict.ts` and `harness/entry.ts` recognise both forms and move an old entry on the next write. `windows-smoke` job (pinned Windows image; packs and installs the tarball; `--version`; `ui` without a terminal; `init` into a temporary profile asserting `cmd /c`; MCP `initialize`), in `ci-gate` and required in the merge queue, run on a PR only when the CLI is affected (`HEAVY_JOBS`). `node-os` joins `ci-gate` and the queue-required list. `release.yml`: `wait-for-ci` accepts `ci-gate (push)` on a wave branch; the win32 `.mcpb` is unzipped and its native modules loaded on a Windows runner before it is attached. User guide: Windows section, 0.4.6 links.
+- **Server on Windows:** `ui` needs an interactive terminal and never prints its link, so the job also runs `e2e/test/cli-first-run-smoke.test.ts` (approval server with the embedded app, temp home, keychain stand-in: 200, CSP, HTML, status API).
+- **Not in this card:** the inbox-folder guard test (own card).
+- **Acceptance:** unit tests for both forms and the migration; `wait-for-ci` tests for the wave gate name; CI green incl. `windows-smoke`; changeset and changelog.d fragment
+
 #### W4-CANCEL-INVITE-SWEEP · pairing: cancelling an invite does not wait for the clean-up (new, #718 low)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core/src/pairing.ts` (`cancelInvite`)

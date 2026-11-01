@@ -12,7 +12,7 @@
 //   TOML: the three lines AgentLink writes are replaced or removed; no other line changes.
 // - Errors are HarnessError codes with fixed text: never a path, a value or file content (I-7).
 import { HarnessError } from './errors.js';
-import { mcpArgs, type HarnessDef } from './harnesses.js';
+import { mcpArgs, startWords, tomlTableFor, type HarnessDef } from './harnesses.js';
 import {
   addJsonMcpServer,
   canonicalForm,
@@ -21,7 +21,7 @@ import {
   type Json,
   type Plain,
 } from './json-config.js';
-import { addTomlMcpServer, agentlinkTable, scanToml } from './toml-config.js';
+import { addTomlMcpServer, scanToml } from './toml-config.js';
 import { DEFAULT_AGENT_NAME, isAgentName } from '../runtime/agent-name.js';
 
 /** What the `agentlink` member of a config is, as far as the app may know. */
@@ -42,9 +42,15 @@ export function agentlinkArgs(agent: string): string[] {
 }
 
 /** The exact entry AgentLink writes for `agent` in this harness (TOML: its `command` and `args`). */
-export function agentlinkEntry(def: HarnessDef, agent: string): Plain {
+export function agentlinkEntry(
+  def: HarnessDef,
+  agent: string,
+  platform: NodeJS.Platform = process.platform,
+): Plain {
   const args = agentlinkArgs(agent);
-  return def.format.kind === 'json' ? def.format.entry(args) : { command: 'npx', args };
+  if (def.format.kind === 'json') return def.format.entry(args, platform);
+  const [command = 'npx', ...rest] = startWords(args, platform);
+  return { command, args: rest };
 }
 
 /** The agent an entry's words name: the value after `--agent`, else `default`. */
@@ -63,11 +69,20 @@ function wordsOf(entry: Json): readonly unknown[] {
   return Array.isArray(command) ? command : [];
 }
 
-/** The forms AgentLink writes for `agent`: ours, and for `default` also with `--agent default`. */
+const PLATFORMS: readonly NodeJS.Platform[] = ['win32', 'linux'];
+
+/**
+ * The forms AgentLink writes for `agent`: ours, and for `default` also with `--agent default`. Both
+ * start forms count (`npx …` and Windows' `cmd /c npx …`), so an entry written before a system
+ * switched forms (or copied between systems) is still ours; the next write brings it to this system's.
+ */
 function oursFor(def: HarnessDef, agent: string): Plain[] {
-  const forms = [agentlinkEntry(def, agent)];
-  if (agent === DEFAULT_AGENT_NAME && def.format.kind === 'json') {
-    forms.push(def.format.entry([...mcpArgs(DEFAULT_AGENT_NAME)]));
+  const forms: Plain[] = [];
+  for (const platform of PLATFORMS) {
+    forms.push(agentlinkEntry(def, agent, platform));
+    if (agent === DEFAULT_AGENT_NAME && def.format.kind === 'json') {
+      forms.push(def.format.entry([...mcpArgs(DEFAULT_AGENT_NAME)], platform));
+    }
   }
   return forms;
 }
@@ -146,8 +161,9 @@ function tomlTable(text: string): TomlTable | 'none' | 'foreign' {
   if (!Array.isArray(words)) return 'foreign';
   const agent = candidateAgent(words);
   if (agent === undefined) return 'foreign';
-  const table = agentlinkTable('npx', agentlinkArgs(agent));
-  if (lines.slice(at, at + 3).join('\n') !== table.join('\n')) return 'foreign';
+  const found = lines.slice(at, at + 3).join('\n');
+  const tables = PLATFORMS.map((p) => tomlTableFor(agentlinkArgs(agent), p).join('\n'));
+  if (!tables.includes(found)) return 'foreign';
   return { at, agent };
 }
 
@@ -201,7 +217,7 @@ function rewriteToml(text: string, agent: string | undefined): string {
   const replacement =
     agent === undefined
       ? []
-      : agentlinkTable('npx', agentlinkArgs(agent)).map((line) => (crlf ? `${line}\r` : line));
+      : tomlTableFor(agentlinkArgs(agent)).map((line) => (crlf ? `${line}\r` : line));
   lines.splice(table.at, 3, ...replacement);
   return lines.join('\n');
 }
@@ -217,7 +233,7 @@ export function setEntry(def: HarnessDef, text: string | undefined, agent: strin
     const edit =
       def.format.kind === 'json'
         ? addJsonMcpServer(text, agentlinkEntry(def, agent), def.format.key)
-        : addTomlMcpServer(text, agentlinkTable('npx', agentlinkArgs(agent)));
+        : addTomlMcpServer(text, tomlTableFor(agentlinkArgs(agent)));
     if (edit.status !== 'change') throw new HarnessError('changed');
     return edit.text;
   }

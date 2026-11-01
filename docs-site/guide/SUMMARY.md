@@ -15,6 +15,7 @@
   * [Cursor](get-started/cursor.md)
   * [Windsurf](get-started/windsurf.md)
   * [Claude Desktop](get-started/claude-desktop.md)
+  * [Windows](get-started/windows.md)
   * [ChatGPT (coming later)](get-started/chatgpt.md)
   * [Other AI apps](get-started/other-ai-apps.md)
 * [Protect your approvals](get-started/protect-your-approvals.md)

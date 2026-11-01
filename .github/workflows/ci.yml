@@ -86,6 +86,7 @@ jobs:
       run_storage_minio: ${{ steps.affected.outputs.run_storage_minio || 'true' }}
       run_bundle_check: ${{ steps.affected.outputs.run_bundle_check || 'true' }}
       run_e2e_deterministic: ${{ steps.affected.outputs.run_e2e_deterministic || 'true' }}
+      run_windows_smoke: ${{ steps.affected.outputs.run_windows_smoke || 'true' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -570,7 +571,8 @@ jobs:
 
   # OPS-CI-5: the Windows and POSIX path-guard tests (packages/node/src/allowed-path.test.ts, M1-15)
   # as a required check on the two OS families the Linux `checks` job cannot cover. `node-os` runs
-  # the whole @4thtech-io/node suite there but is not in `ci-gate` (unrelated flakes); this job runs
+  # the whole @4thtech-io/node suite there and is in `ci-gate` and required in the merge queue
+  # (W5-WINDOWS: a Windows-only failure must not sit unnoticed on `main`); this job runs
   # only the path-guard file and fails if it did not run, ran too few tests, or skipped any.
   # `path-guard` is in `ci-gate`'s `needs`. It needs allowed-path.test.ts from PR #208 on main, so
   # #208 must merge first.
@@ -668,6 +670,73 @@ jobs:
       - name: Run the @4thtech-io/node tests
         shell: bash
         run: pnpm --filter @4thtech-io/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts --exclude src/local-ui-first-run-browser.test.ts --exclude src/local-ui-passkey-upgrade-browser.test.ts --exclude src/approval-pay-confirm-browser.test.ts --exclude src/local-ui-welcome-browser.test.ts
+
+  # W5-WINDOWS: the packed CLI as a Windows user has it. Packs the tarball, installs it into an empty
+  # folder with npm, then runs tools/ci/windows-smoke.mjs: `--version`, `ui` without a terminal,
+  # `init` into a temporary profile (the entry must start with `cmd /c npx`) and an MCP `initialize`
+  # over stdio. On a pull request it runs only when the change reaches the CLI (HEAVY_JOBS in
+  # tools/ci/select-affected.mjs); on `main`, `wave-4` and in the merge queue it always runs, and the
+  # queue and `release.yml` (through `ci-gate`) require it. Same pinned image as `node-os`.
+  windows-smoke:
+    name: windows-smoke
+    needs: detect
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.run_windows_smoke == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4')
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build the CLI
+        shell: bash
+        run: pnpm exec turbo run build --filter='@4thtech-io/agentlink...'
+
+      # The publish directory (apps/cli/dist/package) is what `npm publish` ships.
+      - name: Pack the CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/pack"
+          (cd apps/cli/dist/package && npm pack --pack-destination "$RUNNER_TEMP/pack")
+
+      # `npm install` of the tarball this job just packed, without install scripts (the native modules
+      # ship as prebuilds, as in the desktop extension). The folder is empty, so nothing of the
+      # checkout is on the module path.
+      - name: Install the tarball into an empty folder
+        shell: bash
+        run: | # zizmor: ignore[adhoc-packages] the tarball this job packed from the checked-out commit, --ignore-scripts, scratch dir
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/install"
+          cd "$RUNNER_TEMP/install"
+          npm init -y > /dev/null
+          npm install --ignore-scripts --no-audit --no-fund "$RUNNER_TEMP"/pack/*.tgz
+
+      - name: "`agentlink --version` through npx"
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/install"
+          npx --no-install agentlink --version
+
+      - name: Smoke-test ui, init and mcp
+        shell: bash
+        run: node tools/ci/windows-smoke.mjs "$RUNNER_TEMP/install"
+
+      # The app server on Windows: the e2e smoke test starts the approval server with the built
+      # CLI's embedded app (a temp home and a keychain stand-in, never the OS keychain), then asserts
+      # 200 with the strict CSP and the app's HTML for the session link, the script asset, and the
+      # first-run status API. `agentlink ui` itself needs a terminal, so the server is started the way
+      # the e2e suite starts it; the TTY guard is not weakened.
+      - name: Start the app server and fetch the app (e2e smoke test)
+        shell: bash
+        run: pnpm --filter @4thtech-io/e2e exec vitest run test/cli-first-run-smoke.test.ts
 
   # M1-5b-b: the Node relay connector's Docker suite (packages/node/src/relay-docker.test.ts): the
   # pool and the outbox against real relays, strfry and rnostr, pinned by digest in the test file.
@@ -1097,7 +1166,7 @@ jobs:
     # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature
     # branch push publishes `ci-gate (push)` instead.
     name: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main') && 'ci-gate (push)' || 'ci-gate' }}
-    needs: [detect, checks, vectors, keychain, path-guard, context-budget, relays-docker, storage-minio, bundle-check, changesets, stale-precheck, e2e-deterministic]
+    needs: [detect, checks, vectors, keychain, path-guard, node-os, windows-smoke, context-budget, relays-docker, storage-minio, bundle-check, changesets, stale-precheck, e2e-deterministic]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -1112,7 +1181,7 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
           # CHORE-CI-SPEED-3: in the merge queue these must have run and passed (a skip fails),
           # whatever a pull request run selected. A docs-only group may skip all but `checks`.
-          QUEUE_REQUIRED: checks vectors keychain path-guard relays-docker storage-minio bundle-check e2e-deterministic
+          QUEUE_REQUIRED: checks vectors keychain path-guard node-os windows-smoke relays-docker storage-minio bundle-check e2e-deterministic
         run: |
           set -euo pipefail
           echo "Upstream job results: $RESULTS"

@@ -26,7 +26,7 @@ If something does not work, run `npx -y @4thtech-io/agentlink doctor` in your te
 
 **Prefer to let your AI connect itself?** Paste this into your AI app: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact change it proposes, and apply it only after I confirm." Protecting your approvals always stays with you; your AI does not open the setup page for you.
 
-**Using Claude Desktop?** There is a one-click download. See [Claude Desktop](claude-desktop.md).
+**Using Claude Desktop?** There is a one-click download. See [Claude Desktop](claude-desktop.md). **On Windows?** See [Windows](windows.md) for PowerShell steps and security prompts.
 
 ## Choose your AI app
 
