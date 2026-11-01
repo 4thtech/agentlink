@@ -1,11 +1,15 @@
 // CHORE-CI-SPEED-2: the PR test selection. A wrong answer here skips tests on a pull request (the
-// merge queue still runs everything), so every rule has a case, and the real workspace is checked too.
-import { readFileSync } from 'node:fs';
+// heavy lane on `main` still runs everything), so every rule has a case, and the real workspace is
+// checked too.
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
-  HEAVY_JOBS,
+  HEAVY_LANE,
+  INSTALL_FILES,
+  PACKAGE_JOBS,
+  heavyLane,
   jobOutputs,
   fastLane,
   loadWorkspace,
@@ -229,12 +233,13 @@ describe('the real workspace', () => {
   });
 });
 
-// CHORE-CI-SPEED-3: the heavy jobs follow the affected packages on a pull request. A wrong answer
-// skips a job on the PR only; the merge queue runs every job and ci-gate requires them there.
+// CHORE-CI-SPEED-3: the short Linux jobs follow the affected packages in the fast lane. A wrong answer
+// skips a job on the PR only; the heavy lane on `main` runs every job and ci-gate requires them there.
 // Before the selector exports the map, every case below must fail on its own (not the whole file).
-const HEAVY = HEAVY_JOBS ?? { 'heavy-jobs-missing': ['@4thtech-io/heavy-jobs-missing'] };
+const PKG = PACKAGE_JOBS ?? { 'package-jobs-missing': ['@4thtech-io/package-jobs-missing'] };
+const HEAVY = HEAVY_LANE ?? { 'heavy-lane-missing': ['heavy-lane-missing/'] };
 
-describe('heavy jobs: which ones a pull request runs', () => {
+describe('package jobs: which ones a pull request runs', () => {
   const ws = loadWorkspace(root);
   const jobsFor = (files) => selectAffected({ files, workspace: ws }).jobs ?? {};
   const running = (files) =>
@@ -242,23 +247,15 @@ describe('heavy jobs: which ones a pull request runs', () => {
       .filter(([, run]) => run)
       .map(([job]) => job)
       .sort();
-  const ALL = Object.keys(HEAVY).sort();
+  const ALL = Object.keys(PKG).sort();
 
-  it('maps each heavy job of ci.yml to the packages it tests', () => {
-    expect(ALL).toEqual([
-      'bundle-check',
-      'e2e-deterministic',
-      'keychain',
-      'relays-docker',
-      'storage-minio',
-      'vectors',
-      'windows-smoke',
-    ]);
+  it('maps each package job of ci.yml to the packages it tests', () => {
+    expect(ALL).toEqual(['bundle-check', 'keychain', 'relays-docker', 'storage-minio', 'vectors']);
   });
 
   it('names only packages that exist in the workspace (a renamed package must not silence a job)', () => {
     const names = new Set(ws.map((p) => p.name));
-    for (const [job, pkgs] of Object.entries(HEAVY)) {
+    for (const [job, pkgs] of Object.entries(PKG)) {
       expect(pkgs.length, job).toBeGreaterThan(0);
       for (const name of pkgs) expect(names.has(name), `${job}: ${name}`).toBe(true);
     }
@@ -281,26 +278,19 @@ describe('heavy jobs: which ones a pull request runs', () => {
     expect(running(files)).toEqual(ALL);
   });
 
-  it('a docs-only change runs no heavy job', () => {
+  it('a docs-only change runs no package job', () => {
     expect(running(['docs/process/ci-cd.md', 'changelog.d/x.md', 'README.md'])).toEqual([]);
   });
 
-  it('a CLI-only change runs keychain, bundle-check, the e2e and windows-smoke', () => {
-    expect(running(['apps/cli/src/server.ts'])).toEqual([
-      'bundle-check',
-      'e2e-deterministic',
-      'keychain',
-      'windows-smoke',
-    ]);
+  it('a CLI-only change runs keychain and bundle-check', () => {
+    expect(running(['apps/cli/src/server.ts'])).toEqual(['bundle-check', 'keychain']);
   });
 
-  it('a node change runs keychain, relays-docker, bundle-check and the e2e (node is under the CLI)', () => {
+  it('a node change runs keychain, relays-docker and bundle-check (node is under the CLI)', () => {
     expect(running(['packages/node/src/keystore.ts'])).toEqual([
       'bundle-check',
-      'e2e-deterministic',
       'keychain',
       'relays-docker',
-      'windows-smoke',
     ]);
   });
 
@@ -316,51 +306,161 @@ describe('heavy jobs: which ones a pull request runs', () => {
     expect(running(['packages/mcp-tools/src/send.ts'])).toContain('bundle-check');
   });
 
-  it('a chain change runs the vectors (the harness imports chain) and the e2e', () => {
-    const jobs = running(['packages/chain/src/index.ts']);
-    expect(jobs).toContain('vectors');
-    expect(jobs).toContain('e2e-deterministic');
+  it('a chain change runs the vectors (the harness imports chain)', () => {
+    expect(running(['packages/chain/src/index.ts'])).toContain('vectors');
   });
 
-  it('an e2e change runs the e2e only', () => {
-    expect(running(['e2e/test/world.ts'])).toEqual(['e2e-deterministic']);
+  it('an e2e change runs no package job', () => {
+    expect(running(['e2e/test/world.ts'])).toEqual([]);
   });
 
-  it('an invite page change runs the e2e (it builds the invite site)', () => {
-    expect(running(['apps/invite/site/index.html'])).toContain('e2e-deterministic');
-  });
-
-  it('a change to an app no heavy job tests (console, verify) runs none', () => {
+  it('a change to an app no package job tests (console, verify) runs none', () => {
     expect(running(['apps/console/src/x.ts', 'apps/verify/src/x.ts'])).toEqual([]);
   });
 
   it('a ui change runs the jobs of the CLI, which serves the approval pages', () => {
-    expect(running(['packages/ui/src/x.ts'])).toEqual([
-      'bundle-check',
+    expect(running(['packages/ui/src/x.ts'])).toEqual(['bundle-check', 'keychain']);
+  });
+});
+
+// OPS-FAST-LANE-1 (owner decision 54): the heavy-lane jobs run on a pull request only for a change in
+// their own area. A wrong answer delays a failure to the heavy lane on `main`; it never skips a job
+// there. The path lists are pinned here so a change to them is a reviewed, visible change.
+describe('heavy lane: which heavy jobs a pull request runs (by area)', () => {
+  const running = (files) =>
+    Object.entries(heavyLane(files))
+      .filter(([, run]) => run)
+      .map(([job]) => job)
+      .sort();
+  const ALL = Object.keys(HEAVY).sort();
+
+  it('maps each heavy-lane job of ci.yml', () => {
+    expect(ALL).toEqual([
       'e2e-deterministic',
-      'keychain',
+      'keychain-os',
+      'node-os',
+      'path-guard',
       'windows-smoke',
     ]);
+  });
+
+  it('every area prefix points at a path that exists (a moved file must not silence a job)', () => {
+    for (const [job, prefixes] of Object.entries(HEAVY)) {
+      expect(prefixes.length, job).toBeGreaterThan(0);
+      for (const prefix of prefixes) {
+        const full = join(root, prefix);
+        const dir = prefix.endsWith('/') ? full : dirname(full);
+        const base = prefix.endsWith('/') ? '' : prefix.slice(prefix.lastIndexOf('/') + 1);
+        const hit = existsSync(dir) && readdirSync(dir).some((n) => n.startsWith(base));
+        expect(hit, `${job}: ${prefix}`).toBe(true);
+      }
+    }
+  });
+
+  it.each([
+    ['an unreadable diff', null],
+    ['an empty diff', []],
+    ...INSTALL_FILES.map((f) => [`the install file ${f}`, [f]]),
+  ])('runs every heavy job: %s', (_label, files) => {
+    expect(running(files)).toEqual(ALL);
+  });
+
+  it('a UI-only change runs no heavy job', () => {
+    expect(
+      running([
+        'apps/local-ui/src/pages/home/start-here.tsx',
+        'packages/ui/src/components/surface.tsx',
+        'e2e/test/local-ui-sheet-close.test.ts',
+        'changelog.d/X.md',
+        'docs/process/backlog.md',
+      ]),
+    ).toEqual([]);
+  });
+
+  it('a docs-only change runs no heavy job, even a Windows guide', () => {
+    expect(
+      running(['docs-site/guide/get-started/windows.md', 'changelog.d/W5-WINDOWS.md']),
+    ).toEqual([]);
+  });
+
+  it('a harness change runs windows-smoke', () => {
+    expect(running(['apps/cli/src/harness/entry.ts'])).toEqual(['windows-smoke']);
+  });
+
+  it('a CLI init or runtime change runs windows-smoke', () => {
+    expect(running(['apps/cli/src/commands/init.ts'])).toEqual(['windows-smoke']);
+    expect(running(['apps/cli/src/runtime/cli-prefix.ts'])).toEqual(['windows-smoke']);
+  });
+
+  it('a file with a Windows name runs windows-smoke and node-os', () => {
+    expect(running(['apps/cli/src/harness/windows-entry.test.ts'])).toEqual([
+      'node-os',
+      'windows-smoke',
+    ]);
+    expect(running(['packages/node/src/win32-paths.ts'])).toEqual(['node-os', 'windows-smoke']);
+  });
+
+  it('an Inbox folder change runs node-os', () => {
+    expect(running(['packages/node/src/inbox-folder.ts'])).toEqual(['node-os']);
+  });
+
+  it('a path-guard change runs path-guard and node-os', () => {
+    expect(running(['packages/node/src/allowed-path.ts'])).toEqual(['node-os', 'path-guard']);
+    expect(running(['packages/core/src/path-guard.ts'])).toEqual(['node-os', 'path-guard']);
+  });
+
+  it('a keychain change runs the macOS and Windows keychain legs and node-os', () => {
+    expect(running(['packages/node/src/keychain.ts'])).toEqual(['keychain-os', 'node-os']);
+    expect(running(['apps/cli/test/two-process.keychain.test.ts'])).toEqual(['keychain-os']);
+  });
+
+  it('a crypto or KeyStore file change runs the macOS and Windows keychain legs and node-os', () => {
+    expect(running(['packages/crypto/src/index.ts'])).toEqual(['keychain-os', 'node-os']);
+    expect(running(['packages/node/src/file-keystore.ts'])).toEqual(['keychain-os', 'node-os']);
+    expect(running(['packages/node/src/file-keystore-fs.ts'])).toEqual(['keychain-os', 'node-os']);
+    expect(running(['packages/node/src/inter-process-lock.ts'])).toEqual(['node-os']);
+  });
+
+  it('an e2e scenario change runs the full e2e; an affected-area e2e test does not', () => {
+    expect(running(['e2e/src/relays.mjs'])).toEqual(['e2e-deterministic']);
+    expect(running(['e2e/test/pair-and-message.test.ts'])).toEqual(['e2e-deterministic']);
+    expect(running(['e2e/test/journey/x.test.ts'])).toEqual([]);
+  });
+
+  it('an ordinary CLI or node change runs no heavy job', () => {
+    expect(running(['apps/cli/src/commands/status.ts', 'packages/node/src/keystore.ts'])).toEqual(
+      [],
+    );
+  });
+
+  it('selectAffected carries the area answer even when the package scope is full', () => {
+    expect(
+      selectAffected({ files: ['packages/core/src/index.ts'], workspace: fake }).heavy,
+    ).toEqual(heavyLane(['packages/core/src/index.ts']));
   });
 });
 
 describe('jobOutputs', () => {
-  it('writes one run_<job> line per heavy job, true on a full run', () => {
-    const lines = jobOutputs({
-      scope: 'full',
-      reason: 'x',
-      jobs: selectAffected({ files: null, workspace: fake }).jobs,
-    });
-    expect(lines).toEqual(Object.keys(HEAVY).map((j) => `run_${j.replaceAll('-', '_')}=true`));
+  it('writes one run_<job> line per job, true on a full run with no file list', () => {
+    const lines = jobOutputs(selectAffected({ files: null, workspace: fake }));
+    expect(lines).toEqual(
+      [...Object.keys(PKG), ...Object.keys(HEAVY)].map((j) => `run_${j.replaceAll('-', '_')}=true`),
+    );
   });
 
   it('writes false for a job the change does not reach', () => {
     const r = selectAffected({ files: ['packages/ui/src/x.ts'], workspace: fake });
     expect(jobOutputs(r)).toContain('run_storage_minio=false');
+    expect(jobOutputs(r)).toContain('run_windows_smoke=false');
+    expect(jobOutputs(r)).toContain('run_e2e_deterministic=false');
+  });
+
+  it('a missing area answer runs the heavy job (fail towards running)', () => {
+    expect(jobOutputs({ scope: 'full', reason: 'x', jobs: {} })).toContain('run_node_os=true');
   });
 });
 
-describe('ci.yml wires the heavy-job selection', () => {
+describe('ci.yml wires the job selection', () => {
   const yml = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
   const job = (name) => {
     const start = yml.indexOf(`\n  ${name}:\n`);
@@ -369,69 +469,83 @@ describe('ci.yml wires the heavy-job selection', () => {
     const next = rest.slice(1).search(/\n {2}[a-z0-9-]+:\n/);
     return next === -1 ? rest : rest.slice(0, next + 1);
   };
+  const ALL = [...Object.keys(PKG), ...Object.keys(HEAVY)];
+  const jobName = (name) => (name === 'keychain-os' ? 'keychain' : name);
 
-  it.each(Object.keys(HEAVY))('%s runs only when detect selects it', (name) => {
+  it.each(ALL)('%s runs only when detect selects it', (name) => {
     const key = `run_${name.replaceAll('-', '_')}`;
-    expect(job(name)).toMatch(
-      new RegExp(`\\n    if: .*needs\\.detect\\.outputs\\.${key} == 'true'`),
-    );
+    expect(job(jobName(name))).toContain(`needs.detect.outputs.${key} == 'true'`);
   });
 
-  it.each(Object.keys(HEAVY))(
-    'detect defaults %s to true when the selector did not run (queue, push, crash)',
+  it.each(ALL)(
+    'detect defaults %s to true when the selector did not run (heavy lane, crash)',
     (name) => {
       const key = `run_${name.replaceAll('-', '_')}`;
       expect(job('detect')).toContain(`${key}: \${{ steps.affected.outputs.${key} || 'true' }}`);
     },
   );
 
-  it('ci-gate requires every heavy job and checks to succeed in the merge queue', () => {
+  it.each(['windows-smoke', 'node-os', 'path-guard', 'e2e-deterministic'])(
+    '%s always runs on main and wave-4 and never on a feature-branch push',
+    (name) => {
+      expect(job(name)).toContain(
+        "(github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4')",
+      );
+    },
+  );
+
+  it('keychain runs macOS and Windows only for its area or on main and wave-4', () => {
+    expect(job('keychain')).toContain(
+      "os: ${{ fromJSON((needs.detect.outputs.run_keychain_os == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4'))",
+    );
+  });
+
+  it('ci-gate requires every heavy job and checks to succeed in the heavy lane', () => {
     const gate = job('ci-gate');
-    expect(gate).toContain('merge_group');
-    for (const name of ['checks', ...Object.keys(HEAVY)]) {
-      expect(gate, name).toMatch(new RegExp(`QUEUE_REQUIRED:.*\\b${name}\\b`));
+    expect(gate).toContain('[ "$REF" = refs/heads/main ] || [ "$REF" = refs/heads/wave-4 ]');
+    expect(gate).not.toContain('QUEUE_REQUIRED');
+    for (const name of ['checks', ...Object.keys(PKG), ...Object.keys(HEAVY).map(jobName)]) {
+      expect(gate, name).toMatch(new RegExp(`HEAVY_REQUIRED:.*\\b${name}(\\s|$)`, 'm'));
     }
+  });
+
+  it('every push publishes ci-gate (push); only the pull request run is ci-gate', () => {
+    expect(job('ci-gate')).toContain(
+      "name: ${{ github.event_name == 'push' && 'ci-gate (push)' || 'ci-gate' }}",
+    );
   });
 });
 
-// CHORE-CI-DOCS-FASTLANE (owner decisions 2026-10-25, D1 and plan item B): which events narrow the work
-// for a docs-only change. Anything unknown fails towards running everything.
-describe('fastLane: the docs-only fast lane', () => {
+// CHORE-CI-DOCS-FASTLANE and OPS-FAST-LANE-1: which events take the fast lane. Anything unknown fails
+// towards running everything.
+describe('fastLane: the fast lane and the heavy lane', () => {
   const DOC = ['docs/process/ci-cd.md', 'changelog.d/X.md', 'README.md', '.changeset/a-b.md'];
   const CODE = ['apps/cli/src/index.ts'];
   const FULL = { codeChanged: true, selector: false };
   const FEATURE = 'refs/heads/feat/x';
+  const FAST_DOCS = { codeChanged: false, selector: true };
+  const FAST_CODE = { codeChanged: true, selector: true };
 
-  it('a merge group of docs-only PRs uses the selector and skips the heavy jobs', () => {
-    expect(fastLane({ event: 'merge_group', files: DOC })).toEqual({
-      codeChanged: false,
-      selector: true,
-    });
+  it('a pull request uses the selector, docs-only or not', () => {
+    expect(fastLane({ event: 'pull_request', files: DOC })).toEqual(FAST_DOCS);
+    expect(fastLane({ event: 'pull_request', files: CODE })).toEqual(FAST_CODE);
   });
 
-  it('a merge group with any code PR runs the full suite', () => {
-    expect(fastLane({ event: 'merge_group', files: [...DOC, ...CODE] })).toEqual(FULL);
+  it('a merge group (while the queue exists) is a fast lane like the pull request', () => {
+    expect(fastLane({ event: 'merge_group', files: DOC })).toEqual(FAST_DOCS);
+    expect(fastLane({ event: 'merge_group', files: [...DOC, ...CODE] })).toEqual(FAST_CODE);
   });
 
-  it('a merge group touching .github or tools runs the full suite', () => {
-    for (const f of ['.github/workflows/ci.yml', 'tools/ci/select-affected.mjs']) {
-      expect(fastLane({ event: 'merge_group', files: [...DOC, f] })).toEqual(FULL);
+  it('a push to a feature branch is a fast lane', () => {
+    expect(fastLane({ event: 'push', ref: FEATURE, files: DOC })).toEqual(FAST_DOCS);
+    expect(fastLane({ event: 'push', ref: FEATURE, files: CODE })).toEqual(FAST_CODE);
+  });
+
+  it('a push to main or wave-4 is the heavy lane, even for docs', () => {
+    for (const ref of ['refs/heads/main', 'refs/heads/wave-4']) {
+      expect(fastLane({ event: 'push', ref, files: DOC })).toEqual(FULL);
+      expect(fastLane({ event: 'push', ref, files: CODE })).toEqual(FULL);
     }
-  });
-
-  it('a docs-only push to a feature branch skips the heavy jobs and uses the selector', () => {
-    expect(fastLane({ event: 'push', ref: FEATURE, files: DOC })).toEqual({
-      codeChanged: false,
-      selector: true,
-    });
-  });
-
-  it('a code push to a feature branch runs everything', () => {
-    expect(fastLane({ event: 'push', ref: FEATURE, files: CODE })).toEqual(FULL);
-  });
-
-  it('a push to main always runs the full suite, even for docs', () => {
-    expect(fastLane({ event: 'push', ref: 'refs/heads/main', files: DOC })).toEqual(FULL);
   });
 
   it('an unknown base (no file list) or an empty diff runs everything', () => {
@@ -444,23 +558,12 @@ describe('fastLane: the docs-only fast lane', () => {
   it('an unknown event runs everything', () => {
     expect(fastLane({ event: 'workflow_dispatch', files: DOC })).toEqual(FULL);
   });
-
-  it('a pull request keeps using the selector, docs-only or not', () => {
-    expect(fastLane({ event: 'pull_request', files: DOC })).toEqual({
-      codeChanged: false,
-      selector: true,
-    });
-    expect(fastLane({ event: 'pull_request', files: CODE })).toEqual({
-      codeChanged: true,
-      selector: true,
-    });
-  });
 });
 
-describe('ci.yml wires the docs-only fast lane', () => {
+describe('ci.yml wires the fast lane', () => {
   const yml = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
 
-  it('the selector step runs when the scope step says so (pull request, docs-only queue group or push)', () => {
+  it('the selector step runs when the scope step says so (fast lane)', () => {
     const at = yml.indexOf('id: affected');
     const head = yml.slice(at, yml.indexOf('run: |', at));
     expect(head).toContain("steps.e2e_scope.outputs.use_selector == 'true'");
@@ -469,6 +572,10 @@ describe('ci.yml wires the docs-only fast lane', () => {
   it('a push to a feature branch diffs against its merge base with main', () => {
     expect(yml).toContain('git merge-base HEAD origin/main');
     expect(yml).toContain("fetch-depth: ${{ github.event_name == 'push' && '0' || '1' }}");
+  });
+
+  it('a .github/ or tools/ change runs everything before the selector is read', () => {
+    expect(yml).toContain('grep -Eq \'^(\\.github|tools)/\' "$list"');
   });
 
   it('the full suite still runs when the scope is not decided (outputs default to full)', () => {
