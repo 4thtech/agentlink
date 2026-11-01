@@ -1410,6 +1410,52 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # W5-WINDOWS: the win32 bundle is opened on a Windows runner before it is attached to the Release.
+  # It unzips the bundle, loads the two native modules (@napi-rs/keyring, better-sqlite3) with the
+  # runner's own node, as Claude Desktop would, and runs the entry point's `--version`. A prebuild for
+  # the wrong Node ABI, or a missing file, fails here instead of on a user's machine. No credentials.
+  desktop-extension-windows-check:
+    name: desktop-extension-windows-check
+    needs: [publish-latest, desktop-extension-build]
+    if: needs.desktop-extension-build.result == 'success' && needs.desktop-extension-build.outputs.version != ''
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 15
+    permissions:
+      contents: read # no credentials: this job runs the published code
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+          install: "false"
+
+      - name: Download the unsigned bundles
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-extension-unsigned
+          path: ${{ runner.temp }}/desktop-extension
+
+      - name: Unzip the win32 bundle and load its native modules
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.desktop-extension-build.outputs.version }}
+          DIR: ${{ runner.temp }}/desktop-extension
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Unexpected version.' }
+          $bundle = Join-Path $env:DIR "agentlink-$($env:VERSION)-win32-x64.mcpb"
+          $zip = Join-Path $env:DIR 'win32.zip'
+          $out = Join-Path $env:DIR 'win32'
+          Copy-Item -LiteralPath $bundle -Destination $zip
+          Expand-Archive -LiteralPath $zip -DestinationPath $out
+          node tools/desktop-extension/windows-check.mjs $out
+          if ($LASTEXITCODE -ne 0) { throw 'The win32 bundle failed to load.' }
+
   # Sign (when the key exists), hash, attest and attach to the GitHub Release v<version>, after a green
   # production smoke test. The signing key is the environment secret DESKTOP_EXT_SIGNING_KEY of
   # `npm-publish` (required reviewer), so this job waits for one approval click, like rollback-latest.
@@ -1417,8 +1463,8 @@ jobs:
   # with their SHA-256 and attestation, and the job stays green. Signature format: tools/desktop-extension/sign.sh.
   desktop-extension-release:
     name: desktop-extension-release
-    needs: [publish-latest, smoke-latest, desktop-extension-build]
-    if: needs.smoke-latest.result == 'success' && needs.desktop-extension-build.outputs.version != '' && vars.DEPLOY_FREEZE != 'true'
+    needs: [publish-latest, smoke-latest, desktop-extension-build, desktop-extension-windows-check]
+    if: needs.smoke-latest.result == 'success' && needs.desktop-extension-windows-check.result == 'success' && needs.desktop-extension-build.outputs.version != '' && vars.DEPLOY_FREEZE != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: npm-publish

@@ -213,9 +213,21 @@ describe('release.yml desktop extension jobs (D-91)', () => {
     expect(build).toMatch(/timeout-minutes: \d+/);
   });
 
+  it('opens the win32 bundle on a Windows runner before it is attached (W5-WINDOWS)', () => {
+    const check = job('desktop-extension-windows-check');
+    expect(check).not.toBe('');
+    expect(check).toMatch(/runs-on: windows-/);
+    expect(check).toMatch(/windows-check\.mjs/);
+    expect(check).not.toMatch(/environment:|secrets\.|id-token/);
+    expect(permissions(check)).toEqual(['contents: read']);
+  });
+
   it('signs, hashes, attests and attaches in the approved environment, after a green smoke test', () => {
     expect(release).not.toBe('');
-    expect(release).toMatch(/needs: \[publish-latest, smoke-latest, desktop-extension-build\]/);
+    expect(release).toMatch(
+      /needs: \[publish-latest, smoke-latest, desktop-extension-build, desktop-extension-windows-check\]/,
+    );
+    expect(release).toMatch(/needs\.desktop-extension-windows-check\.result == 'success'/);
     expect(release).toMatch(/needs\.smoke-latest\.result == 'success'/);
     expect(release).toMatch(/\n {4}environment: npm-publish\n/);
     expect(permissions(release).sort()).toEqual([

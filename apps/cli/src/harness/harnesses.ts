@@ -9,6 +9,9 @@
 // `--agent <name>` (the name is checked against 06 §6 first). Claude Desktop (M1-9w) has its own file
 // per system. Cursor and Windsurf are table entries too (M1-36g); VS Code and Cline follow.
 //
+// On Windows `npx` is `npx.cmd`, which many apps cannot spawn directly ("spawn npx ENOENT"), so every
+// entry there starts with `cmd /c npx …` (startWords). Entries written before that stay recognised.
+//
 // Nothing here puts a secret in a config: the entry holds the command and its arguments only.
 import { lstat, realpath, stat } from 'node:fs/promises';
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -108,7 +111,7 @@ export interface HarnessDef {
     | {
         readonly kind: 'json';
         readonly key: 'mcpServers' | 'mcp';
-        readonly entry: (args: readonly string[]) => Plain;
+        readonly entry: (args: readonly string[], platform?: NodeJS.Platform) => Plain;
       }
     | { readonly kind: 'toml' };
   readonly edit: (
@@ -118,6 +121,15 @@ export interface HarnessDef {
 }
 
 /** The entry's arguments: the default agent has no `--agent` (06 §7), any other one ends in it. */
+/** Codex's table lines for these `mcp` arguments, in this system's start form. */
+export function tomlTableFor(
+  args: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  const { command, args: rest } = split(args, platform);
+  return agentlinkTable(command, rest);
+}
+
 export const mcpArgs = (agent: string | undefined): string[] => [
   '-y',
   PACKAGE_NAME,
@@ -125,26 +137,42 @@ export const mcpArgs = (agent: string | undefined): string[] => [
   ...(agent === undefined ? [] : ['--agent', agent]),
 ];
 
+/**
+ * The words that start AgentLink: `npx …`, and on Windows `cmd /c npx …` (npx is a `.cmd` file there,
+ * which an app cannot spawn without the shell). `platform` is for tests; it defaults to this system.
+ */
+export const startWords = (
+  args: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): string[] => (platform === 'win32' ? ['cmd', '/c', 'npx', ...args] : ['npx', ...args]);
+
+/** `command` plus `args` for the entries that keep them apart. */
+const split = (args: readonly string[], platform: NodeJS.Platform) => {
+  const [command = 'npx', ...rest] = startWords(args, platform);
+  return { command, args: rest };
+};
+
 // The entries each harness gets (06 §7): one builder per form, shared by `edit` and `format`.
-const claudeCodeEntry = (args: readonly string[]): Plain => ({
+const claudeCodeEntry = (args: readonly string[], platform = process.platform): Plain => ({
   type: 'stdio',
-  command: 'npx',
-  args: [...args],
+  ...split(args, platform),
   env: {},
 });
-const stdioEntry = (args: readonly string[]): Plain => ({ command: 'npx', args: [...args] });
-const openCodeEntry = (args: readonly string[]): Plain => ({
+const stdioEntry = (args: readonly string[], platform = process.platform): Plain =>
+  split(args, platform);
+const openCodeEntry = (args: readonly string[], platform = process.platform): Plain => ({
   type: 'local',
-  command: ['npx', ...args],
+  command: startWords(args, platform),
   enabled: true,
 });
-const cursorEntry = (args: readonly string[]): Plain => ({
+const cursorEntry = (args: readonly string[], platform = process.platform): Plain => ({
   type: 'stdio',
-  command: 'npx',
-  args: [...args],
+  ...split(args, platform),
 });
-const json = (key: 'mcpServers' | 'mcp', entry: (args: readonly string[]) => Plain) =>
-  Object.freeze({ kind: 'json', key, entry }) as HarnessDef['format'];
+const json = (
+  key: 'mcpServers' | 'mcp',
+  entry: (args: readonly string[], platform?: NodeJS.Platform) => Plain,
+) => Object.freeze({ kind: 'json', key, entry }) as HarnessDef['format'];
 
 export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
   {
@@ -186,7 +214,7 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     installedMarks: [['.codex']],
     binary: 'codex',
     format: Object.freeze({ kind: 'toml' }),
-    edit: (text, args) => addTomlMcpServer(text, agentlinkTable('npx', args)),
+    edit: (text, args) => addTomlMcpServer(text, tomlTableFor(args)),
   },
   {
     id: 'gemini-cli',

@@ -82,6 +82,7 @@ export const HEAVY_JOBS = Object.freeze({
   'relays-docker': ['@4thtech-io/node', '@4thtech-io/transport-nostr'],
   'storage-minio': ['@4thtech-io/storage'],
   'bundle-check': ['@4thtech-io/agentlink'],
+  'windows-smoke': ['@4thtech-io/agentlink'],
   'e2e-deterministic': ['@4thtech-io/e2e', '@4thtech-io/chain', '@4thtech-io/invite'],
 });
 

@@ -18,8 +18,17 @@ function agentOf(tokens: readonly string[]): string | undefined {
   return isAgentName(value) ? value : undefined;
 }
 
+/** Drops Windows' `cmd /c` in front of `npx`, so both start forms compare as the same program. */
+function withoutShell(words: readonly string[]): readonly string[] {
+  const [first, flag, ...rest] = words;
+  return first !== undefined && /^cmd(\.exe)?$/i.test(first) && flag?.toLowerCase() === '/c'
+    ? rest
+    : words;
+}
+
 /** Compares the words of the start command (program and arguments) of the entry with ours. */
-function classify(existing: readonly string[], ours: readonly string[]): ConflictDifference {
+function classify(existingWords: readonly string[], ours: readonly string[]): ConflictDifference {
+  const existing = withoutShell(existingWords);
   const runsMcp = existing.includes('mcp') && existing.some((t) => t.includes('agentlink'));
   if (!runsMcp) return { kind: 'other_command' };
   const was = agentOf(existing);

@@ -252,6 +252,7 @@ describe('heavy jobs: which ones a pull request runs', () => {
       'relays-docker',
       'storage-minio',
       'vectors',
+      'windows-smoke',
     ]);
   });
 
@@ -284,11 +285,12 @@ describe('heavy jobs: which ones a pull request runs', () => {
     expect(running(['docs/process/ci-cd.md', 'changelog.d/x.md', 'README.md'])).toEqual([]);
   });
 
-  it('a CLI-only change runs keychain, bundle-check and the e2e', () => {
+  it('a CLI-only change runs keychain, bundle-check, the e2e and windows-smoke', () => {
     expect(running(['apps/cli/src/server.ts'])).toEqual([
       'bundle-check',
       'e2e-deterministic',
       'keychain',
+      'windows-smoke',
     ]);
   });
 
@@ -298,6 +300,7 @@ describe('heavy jobs: which ones a pull request runs', () => {
       'e2e-deterministic',
       'keychain',
       'relays-docker',
+      'windows-smoke',
     ]);
   });
 
@@ -336,6 +339,7 @@ describe('heavy jobs: which ones a pull request runs', () => {
       'bundle-check',
       'e2e-deterministic',
       'keychain',
+      'windows-smoke',
     ]);
   });
 });
