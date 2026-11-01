@@ -27,11 +27,19 @@ name: CI
 # draft condition; every other job needs `detect` and so skips with it; `stale-precheck` has its own).
 # `ready_for_review` runs the suite when a draft is marked ready, so the required `ci-gate` is reported
 # on drafts (all upstream jobs skipped = pass) and recomputed with the full suite before it can merge.
-# GitHub refuses to merge a draft. The merge queue (`merge_group`) runs everything, with one exception
-# (CHORE-CI-DOCS-FASTLANE, owner decision 2026-10-25): a group whose diff holds only docs runs `checks`
-# through the affected-package selector and no heavy job; any code PR in the group runs everything. The
-# push to `main` after the merge always runs the full suite. A docs-only push to a feature branch is
-# diffed against its merge base with `main`, so its heavy jobs skip; an unknown base runs everything.
+# GitHub refuses to merge a draft.
+#
+# OPS-FAST-LANE-1 (owner decision 54, 2026-11-01): two lanes.
+# - Fast lane: a pull request (and a push to a feature branch, a merge group while the queue still
+#   exists). `checks` lints, typechecks, builds and tests the affected packages and their dependents;
+#   the short Linux jobs run when the change reaches their packages; the heavy-lane jobs (macOS and
+#   Windows legs, windows-smoke, the full e2e scenario) run only when the change is in their own area
+#   (HEAVY_LANE in tools/ci/select-affected.mjs). A change under `.github/` or `tools/`, or an
+#   unreadable diff, runs everything. `ci-gate` requires what ran.
+# - Heavy lane: a push to `main` or `wave-4` (the release branches) runs everything, and `ci-gate`
+#   there requires every heavy job to have run and passed; release.yml requires that gate.
+# The `merge_group` trigger stays only so a queue that is still switched on is not left waiting; it
+# runs the fast lane. Breakage on `main` is fixed forward (decision 54 item 2).
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -77,16 +85,19 @@ jobs:
       test_scope: ${{ steps.affected.outputs.test_scope || 'full' }}
       turbo_filters: ${{ steps.affected.outputs.turbo_filters }}
       affected_playwright: ${{ steps.affected.outputs.needs_playwright || 'true' }}
-      # CHORE-CI-SPEED-3: which heavy jobs a pull request runs (tools/ci/select-affected.mjs,
-      # HEAVY_JOBS). A missing value (merge queue, push, a .github/ or tools/ change, an unreadable
-      # diff, a selector crash) is `true`: run the job.
+      # CHORE-CI-SPEED-3 and OPS-FAST-LANE-1: which jobs the fast lane runs (tools/ci/select-affected.mjs:
+      # PACKAGE_JOBS by package, HEAVY_LANE by area). A missing value (the heavy lane on `main`, a
+      # .github/ or tools/ change, an unreadable diff, a selector crash) is `true`: run the job.
       run_vectors: ${{ steps.affected.outputs.run_vectors || 'true' }}
       run_keychain: ${{ steps.affected.outputs.run_keychain || 'true' }}
       run_relays_docker: ${{ steps.affected.outputs.run_relays_docker || 'true' }}
       run_storage_minio: ${{ steps.affected.outputs.run_storage_minio || 'true' }}
       run_bundle_check: ${{ steps.affected.outputs.run_bundle_check || 'true' }}
-      run_e2e_deterministic: ${{ steps.affected.outputs.run_e2e_deterministic || 'true' }}
       run_windows_smoke: ${{ steps.affected.outputs.run_windows_smoke || 'true' }}
+      run_node_os: ${{ steps.affected.outputs.run_node_os || 'true' }}
+      run_path_guard: ${{ steps.affected.outputs.run_path_guard || 'true' }}
+      run_keychain_os: ${{ steps.affected.outputs.run_keychain_os || 'true' }}
+      run_e2e_deterministic: ${{ steps.affected.outputs.run_e2e_deterministic || 'true' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -170,14 +181,13 @@ jobs:
           fi
           out needs_playwright "$needs_playwright"
 
-      # OPS-CI-6 and CHORE-CI-DOCS-FASTLANE: which jobs does the change need? The heavy jobs run for any
-      # change outside docs and release notes, and whenever the diff cannot be computed (fail towards
-      # running). Diff base: the pull request base, the merge group base, or for a push to a branch
-      # other than `main` its merge base with `main`; a push to `main` has none (full suite).
-      # `use_selector`: `checks` may run through the affected-package selector. Always on a pull
-      # request; on a merge group or a branch push only when every changed file is a doc
-      # (tools/ci/select-affected.mjs `fastLane`). A change under `.github/` or `tools/` never reaches
-      # that script (decided here), so a change to the script cannot vouch for itself.
+      # OPS-CI-6, CHORE-CI-DOCS-FASTLANE and OPS-FAST-LANE-1: which lane, and does the change hold code?
+      # Diff base: the pull request base, the merge group base, or for a push to a branch other than
+      # `main` its merge base with `main`; a push to `main` has none (heavy lane, full suite).
+      # `use_selector`: the fast lane (affected packages, jobs by package and by area). A pull
+      # request, a merge group and a feature-branch push (tools/ci/select-affected.mjs `fastLane`);
+      # never a push to `main` or `wave-4`. A change under `.github/` or `tools/` never reaches that
+      # script (decided here), so a change to the script cannot vouch for itself: everything runs.
       # The ref and base commits come from the event through `env:`, never interpolated.
       - name: Decide which jobs the change needs
         id: e2e_scope
@@ -227,13 +237,13 @@ jobs:
       # CHORE-CI-SPEED-2: a pull request lints, typechecks, builds and tests only the packages it
       # touches, their dependents, and the packages whose tests read a changed doc
       # (tools/ci/select-affected.mjs, rules in docs/process/ci-cd.md "What runs where").
-      # CHORE-CI-SPEED-3: the same step decides which heavy jobs run (run_<job>).
-      # CHORE-CI-DOCS-FASTLANE: it also runs for a docs-only merge group and a docs-only push to a
-      # feature branch (`use_selector` of the step above). Any other merge group and every push to
-      # `main` run the full suite and never reach the selector. A change under `.github/` or `tools/`
-      # (the selector itself) runs everything before the selector is read. The step reads the changed
-      # files the step above wrote; without that list (unknown base) it runs everything.
-      - name: Select the affected packages (pull requests and docs-only changes)
+      # CHORE-CI-SPEED-3 and OPS-FAST-LANE-1: the same step decides which package jobs (by package)
+      # and heavy-lane jobs (by area) run (run_<job>). It runs in the fast lane only (`use_selector`
+      # of the step above); a push to `main` or `wave-4` runs everything and never reaches it. A
+      # change under `.github/` or `tools/` (the selector itself) runs everything before the selector
+      # is read. The step reads the changed files the step above wrote; without that list (unknown
+      # base) it runs everything.
+      - name: Select the affected packages and jobs (fast lane)
         id: affected
         if: steps.e2e_scope.outputs.use_selector == 'true' && steps.detect.outputs.has_skeleton == 'true'
         shell: bash
@@ -460,7 +470,8 @@ jobs:
     needs: detect
     # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
     # CHORE-CI-SPEED-3: on a pull request only when the change reaches the packages it tests.
-    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.run_keychain == 'true'
+    # OPS-FAST-LANE-1: `run_keychain_os` (heavy lane, by area) also starts the job for its macOS and Windows legs.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && (needs.detect.outputs.run_keychain == 'true' || needs.detect.outputs.run_keychain_os == 'true')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
@@ -471,9 +482,10 @@ jobs:
         # Exact runner images, no `*-latest` (M1-8a-d): an image change must not silently change the
         # keychain behaviour under test. These are the images `*-latest` resolved to when pinned
         # (2026-10-15); a bump is its own reviewed change.
-        # CHORE-CI-MATRIX-QUEUE-ONLY: macOS and Windows only in the merge queue and on `main`;
-        # a pull request or feature-branch push runs the Linux leg alone.
-        os: ${{ fromJSON((github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && '["macos-26","windows-2025-vs2026","ubuntu-24.04"]' || '["ubuntu-24.04"]') }}
+        # OPS-FAST-LANE-1: macOS and Windows are heavy lane: always on `main` and `wave-4`; on a pull
+        # request only when the change is in the keychain area (`run_keychain_os`); a feature-branch
+        # push runs the Linux leg alone.
+        os: ${{ fromJSON((needs.detect.outputs.run_keychain_os == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4')) && '["macos-26","windows-2025-vs2026","ubuntu-24.04"]' || '["ubuntu-24.04"]') }}
     env:
       AGENTLINK_REQUIRE_KEYCHAIN: "1"
     steps:
@@ -579,11 +591,10 @@ jobs:
   path-guard:
     name: path-guard (${{ matrix.os }})
     needs: detect
-    # CHORE-CI-MATRIX-QUEUE-ONLY: macOS and Windows run in the merge queue and on `main` only, not
-    # on a pull request or a feature-branch push. Skipped counts as success in `ci-gate`; the queue
-    # run is what must pass before a merge.
-    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
-    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    # OPS-FAST-LANE-1: heavy lane. Always on `main` and `wave-4` (where `ci-gate` requires it); on a
+    # pull request only when the change is in the path-guard area (`run_path_guard`, HEAVY_LANE in
+    # tools/ci/select-affected.mjs); never on a feature-branch push or a docs-only change.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.run_path_guard == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     permissions:
@@ -632,16 +643,15 @@ jobs:
           '
 
   # The whole @4thtech-io/node suite on macOS and Windows (it used to run inside the keychain job).
-  # Not part of `ci-gate`: OS-timing flakes in unrelated suites must not block merges, but a real
-  # OS-specific bug stays visible here. The keychain files themselves run in `keychain`.
+  # The keychain files themselves run in `keychain`.
   node-os:
     name: node-os (${{ matrix.os }})
     needs: detect
-    # CHORE-CI-MATRIX-QUEUE-ONLY: macOS and Windows run in the merge queue and on `main` only, not
-    # on a pull request or a feature-branch push. Skipped counts as success in `ci-gate`; the queue
-    # run is what must pass before a merge.
-    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
-    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    # OPS-FAST-LANE-1: heavy lane. Always on `main` and `wave-4` (where `ci-gate` requires it); on a
+    # pull request only when the change is in the OS-sensitive node area (Inbox folder, path guard,
+    # keychain, file system; `run_node_os`, HEAVY_LANE in tools/ci/select-affected.mjs); never on a
+    # feature-branch push or a docs-only change.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.run_node_os == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
@@ -674,9 +684,10 @@ jobs:
   # W5-WINDOWS: the packed CLI as a Windows user has it. Packs the tarball, installs it into an empty
   # folder with npm, then runs tools/ci/windows-smoke.mjs: `--version`, `ui` without a terminal,
   # `init` into a temporary profile (the entry must start with `cmd /c npx`) and an MCP `initialize`
-  # over stdio. On a pull request it runs only when the change reaches the CLI (HEAVY_JOBS in
-  # tools/ci/select-affected.mjs); on `main`, `wave-4` and in the merge queue it always runs, and the
-  # queue and `release.yml` (through `ci-gate`) require it. Same pinned image as `node-os`.
+  # over stdio. OPS-FAST-LANE-1: heavy lane. On `main` and `wave-4` it always runs and `ci-gate (push)`
+  # (so release.yml) requires it; on a pull request it runs only when the change is in the harness or
+  # Windows area (`run_windows_smoke`, HEAVY_LANE in tools/ci/select-affected.mjs). Same pinned image
+  # as `node-os`.
   windows-smoke:
     name: windows-smoke
     needs: detect
@@ -1148,24 +1159,26 @@ jobs:
             exit 1
           fi
 
-  # OPS-CI-6: the deterministic e2e (e2e.yml, M1-13a) is part of the merge gate. It is the same
-  # job, called as a reusable workflow, so it runs on pull requests, on `main` and in the merge
-  # queue and blocks `ci-gate`. Docs-only changes skip it (`detect`); a feature-branch push skips
-  # it too (the pull request run covers it). The LLM variant stays manual-only in e2e.yml.
+  # OPS-CI-6: the deterministic e2e (e2e.yml, M1-13a), the full e2e scenario, called as a reusable
+  # workflow. OPS-FAST-LANE-1: heavy lane. It always runs on `main` and `wave-4`, where `ci-gate`
+  # requires it; a pull request runs it only when the change is in its own area (HEAVY_LANE in
+  # tools/ci/select-affected.mjs: the scenario harness and its tests); the e2e package's own tests
+  # for the affected area run in `checks`. Docs-only changes and feature-branch pushes skip it. The
+  # LLM variant stays manual-only in e2e.yml.
   e2e-deterministic:
     name: e2e-deterministic
     needs: detect
-    # CHORE-CI-SPEED-3: on a pull request only when the change reaches the packages it tests.
-    if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.e2e_relevant == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main') && needs.detect.outputs.run_e2e_deterministic == 'true'
+    if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.e2e_relevant == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4') && needs.detect.outputs.run_e2e_deterministic == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/e2e.yml
 
   ci-gate:
-    # A push run on a feature branch tests the branch tip, while the pull request run tests the
-    # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature
-    # branch push publishes `ci-gate (push)` instead.
-    name: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main') && 'ci-gate (push)' || 'ci-gate' }}
+    # OPS-FAST-LANE-1: the pull request run publishes `ci-gate`, the one required status check (the
+    # fast lane). Every push run publishes `ci-gate (push)`, so a push can never satisfy the
+    # required check. On `main` (and `wave-4`) that push run is the heavy lane, and its
+    # `ci-gate (push)` is what release.yml and the deploy-*.yml workflows require.
+    name: ${{ github.event_name == 'push' && 'ci-gate (push)' || 'ci-gate' }}
     needs: [detect, checks, vectors, keychain, path-guard, node-os, windows-smoke, context-budget, relays-docker, storage-minio, bundle-check, changesets, stale-precheck, e2e-deterministic]
     if: always()
     runs-on: ubuntu-24.04
@@ -1177,20 +1190,21 @@ jobs:
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
           EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
           CODE_CHANGED: ${{ needs.detect.outputs.code_changed }}
           NEEDS: ${{ toJSON(needs) }}
-          # CHORE-CI-SPEED-3: in the merge queue these must have run and passed (a skip fails),
-          # whatever a pull request run selected. A docs-only group may skip all but `checks`.
-          QUEUE_REQUIRED: checks vectors keychain path-guard node-os windows-smoke relays-docker storage-minio bundle-check e2e-deterministic
+          # OPS-FAST-LANE-1: in the heavy lane (a push to `main` or `wave-4`) these must have run and
+          # passed (a skip fails), so the release cannot ship with a heavy job silently skipped.
+          HEAVY_REQUIRED: checks vectors keychain path-guard node-os windows-smoke relays-docker storage-minio bundle-check e2e-deterministic
         run: |
           set -euo pipefail
           echo "Upstream job results: $RESULTS"
-          if [ "$EVENT_NAME" = merge_group ]; then
-            for job in detect $QUEUE_REQUIRED; do
+          if [ "$EVENT_NAME" = push ] && { [ "$REF" = refs/heads/main ] || [ "$REF" = refs/heads/wave-4 ]; }; then
+            for job in detect $HEAVY_REQUIRED; do
               if [ "$job" != detect ] && [ "$job" != checks ] && [ "$CODE_CHANGED" != true ]; then continue; fi
               result="$(jq -r --arg j "$job" '.[$j].result // "missing"' <<< "$NEEDS")"
               if [ "$result" != success ]; then
-                echo "::error::In the merge queue the job '$job' must succeed; it ended as '$result'."
+                echo "::error::In the heavy lane the job '$job' must succeed; it ended as '$result'."
                 exit 1
               fi
             done

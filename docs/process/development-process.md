@@ -42,7 +42,7 @@ Approving production deployments (GitHub Environments `npm-publish` and `product
 
 **What GitHub enforces** (`ci-cd.md`, owner setup checklist):
 
-- **Required checks** `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate`. For S1/S2, `review-gate` checks the security class and the independent-review reference; for S2 it also checks the Threat note and Tests-first evidence (`audit-rules.md` §3.3). The owner removed the S2 approval check from `review-gate` (D-51).
+- **Required checks** `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate`. `review-gate` computes the security class from the paths; for S2 and sensitive paths it checks the independent-review reference (owner Decision 54); for S2 it also checks the Threat note and Tests-first evidence (`audit-rules.md` §3.3). The owner removed the S2 approval check from `review-gate` (D-51).
 - **Code-owner review is off** on `main`. CODEOWNERS only requests reviews and notifies.
 - **No bypass actors** on the `main` ruleset.
 

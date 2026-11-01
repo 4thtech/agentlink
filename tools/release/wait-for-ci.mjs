@@ -28,7 +28,8 @@ import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const WORKFLOW_FILE = /^[A-Za-z0-9_-]+\.ya?ml$/;
-const JOB_NAME = /^[A-Za-z0-9_. -]+$/;
+// Parentheses: the heavy lane's job on main is named `ci-gate (push)` (OPS-FAST-LANE-1/-3).
+const JOB_NAME = /^[A-Za-z0-9_. ()-]+$/;
 const BRANCH = /^(main|wave-[1-9][0-9]*)$/;
 
 export function parseArgs(argv) {

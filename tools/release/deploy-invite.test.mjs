@@ -122,7 +122,7 @@ describe('deploy-invite.yml structure', () => {
 
   it('waits for green CI before anything deploys', () => {
     expect(job('ci-green')).toMatch(/wait-for-ci\.mjs/);
-    expect(job('ci-green')).toMatch(/--require ci\.yml:ci-gate/);
+    expect(job('ci-green')).toMatch(/--require "ci\.yml:ci-gate \(push\)"/);
     expect(job('ci-green')).toMatch(/--require security\.yml:security-gate/);
     expect(job('guard')).toMatch(/needs: ci-green/);
   });
