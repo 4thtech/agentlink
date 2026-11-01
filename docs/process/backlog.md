@@ -6542,7 +6542,7 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - **Deploy (D-25)** block as in M1-19.
 
 #### M1-19-d · Invite page: production deploy (new, split from M1-19-b, owner decision 2026-10-24)
-- **Status:** blocked (trademark check; production domain decision) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
+- **Status:** in review (owner Decision 55: production on `agentlink.4thtech.io`; unblocked) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · `.github/workflows/deploy-invite.yml`, apps/invite/wrangler.toml
 - **Depends on:** M1-19-b; the trademark check and the production hostname (owner)
 - **Spec:** 04 §3.6; 08 §4; release-and-deployment.md §1.1, §4.6; D-25, D-52

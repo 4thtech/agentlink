@@ -133,7 +133,7 @@ async function go(r, paths = PATHS) {
 
 describe('pushPaths and pathMatches', () => {
   it('reads the push paths filter of each deploy workflow, comments left out', () => {
-    for (const name of ['deploy-submitter.yml', 'deploy-drop.yml']) {
+    for (const name of ['deploy-submitter.yml', 'deploy-drop.yml', 'deploy-invite.yml']) {
       const paths = pushPaths(read(name));
       expect(paths).toContain(`.github/workflows/${name}`);
       expect(paths).toContain('pnpm-lock.yaml');
@@ -435,7 +435,7 @@ describe('deploy-reconcile.yml', () => {
   });
 
   it('matches the deploy workflows it reads: dispatchable, the deploy step, the same CI gates', () => {
-    for (const name of ['deploy-submitter.yml', 'deploy-drop.yml']) {
+    for (const name of ['deploy-submitter.yml', 'deploy-drop.yml', 'deploy-invite.yml']) {
       const source = read(name);
       expect(source).toMatch(/\n {2}workflow_dispatch:\n/);
       const prod = source.slice(source.indexOf('\n  deploy-production:\n'));

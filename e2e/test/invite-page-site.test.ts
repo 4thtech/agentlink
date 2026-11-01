@@ -41,7 +41,7 @@ describe('_headers', () => {
 });
 
 describe('the pages', () => {
-  const pages = ['index.html', 'i/index.html'];
+  const pages = ['i/index.html'];
 
   for (const page of pages) {
     describe(page, () => {
@@ -125,8 +125,38 @@ describe('the pages', () => {
     });
   }
 
-  it('the two pages are the same page', () => {
-    expect(read('i/index.html')).toBe(read('index.html'));
+  // M1-19-d (owner Decision 55): the root of agentlink.4thtech.io is a minimal page. The invite
+  // lives at /i only (CANONICAL_PREFIX); the root reads no fragment and runs no script.
+  describe('index.html (the root)', () => {
+    const html = read('index.html');
+
+    it('is not the invite page and runs no script at all', () => {
+      expect(html).not.toBe(read('i/index.html'));
+      expect(html).not.toMatch(/<script\b/i);
+      expect(html).not.toMatch(/<(iframe|object|embed|form|img|base)\b/i);
+    });
+
+    it('says what AgentLink is in one line and links to the public repository', () => {
+      expect(html).toMatch(/<h1[^>]*>AgentLink<\/h1>/);
+      const lead = /<p class="lead">([^<]*)<\/p>/.exec(html)?.[1] ?? '';
+      expect(lead.length).toBeGreaterThan(20);
+      expect(lead).not.toMatch(/wallet|gas|seed phrase|transaction/i);
+      expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([
+        'https://github.com/4thtech/agentlink',
+      ]);
+      const anchors = [...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0]);
+      expect(anchors).toHaveLength(1);
+      expect(anchors[0]).toMatch(/\bhref="https:\/\/github\.com\/4thtech\/agentlink"/);
+      expect(anchors[0]).toMatch(/\brel="noopener noreferrer"/);
+    });
+
+    it('has one first-party style file, no inline style or handler, no analytics, no referrer', () => {
+      const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((m) => m[0]);
+      expect(links).toEqual(['<link rel="stylesheet" href="/invite.css" />']);
+      expect(html).not.toMatch(/<style\b|\sstyle\s*=|\son[a-z]+\s*=|javascript:/i);
+      expect(html).not.toMatch(/analytics|gtag|plausible|matomo|segment|pixel|beacon|hotjar/i);
+      expect(html).toMatch(/<meta name="referrer" content="no-referrer"\s*\/?>/);
+    });
   });
 
   it('the site folder holds only the files named here', () => {

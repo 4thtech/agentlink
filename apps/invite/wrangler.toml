@@ -1,7 +1,7 @@
-# The invite page (M1-19, M1-19-b, D-28, D-53): a static site served as Workers static assets, with no
-# Worker script. Deployed only by CI (.github/workflows/deploy-invite.yml, release-and-deployment.md
-# §4.6); never `wrangler deploy` from a workstation. Always pass --env: `staging` (workers.dev). There
-# is no production environment yet (card M1-19-d: after the trademark check and the domain decision).
+# The invite page (M1-19, M1-19-b, M1-19-d, D-28, D-53): a static site served as Workers static
+# assets, with no Worker script. Deployed only by CI (.github/workflows/deploy-invite.yml,
+# release-and-deployment.md §4.6); never `wrangler deploy` from a workstation. Always pass --env:
+# `staging` (workers.dev) or `production` (the Custom Domain agentlink.4thtech.io, owner Decision 55).
 #
 # The headers (CSP, Referrer-Policy and the rest, 08 §4) come from the `_headers` file in the built
 # site (site/_headers), which Cloudflare applies to every asset; the deploy workflow checks them on
@@ -61,4 +61,31 @@ enabled = false
 invocation_logs = false
 
 [env.staging.observability.traces]
+enabled = false
+
+# ---------------------------------------------------------------------------------------------------
+# Production (M1-19-d, owner Decision 55): the Custom Domain every invite link names
+# (https://agentlink.4thtech.io/i#..., CANONICAL_PREFIX in src/prompt.ts), deployed only after a green
+# staging smoke, through the GitHub environment `production`. The first deploy creates the DNS record
+# and the edge certificate for the hostname. No workers.dev, no preview URLs.
+[env.production]
+name = "agentlink-invite"
+workers_dev = false
+preview_urls = false
+logpush = false
+routes = [{ pattern = "agentlink.4thtech.io", custom_domain = true }]
+
+[env.production.assets]
+directory = "./dist/site"
+html_handling = "drop-trailing-slash"
+not_found_handling = "none"
+
+[env.production.observability]
+enabled = false
+
+[env.production.observability.logs]
+enabled = false
+invocation_logs = false
+
+[env.production.observability.traces]
 enabled = false
