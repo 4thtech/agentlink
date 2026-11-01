@@ -2,6 +2,8 @@
 // .github/workflows/pr-hygiene.yml) against fake pull requests, so a change to the section rules
 // is tested, not just read. The template itself is checked against the script too: a PR body made
 // from .github/pull_request_template.md, filled in, must pass.
+// OPS-FAST-LANE-2 (owner Decision 54): every formality (title, sections, Docs impact wording, the
+// class tick) is a warning; only AI attribution fails. `flagged` = a warning or an error names it.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -21,12 +23,14 @@ const source = block.map((line) => line.slice(indent)).join('\n');
 const AsyncFunction = Object.getPrototypeOf(async function noop() {}).constructor;
 const script = new AsyncFunction('context', 'core', source);
 
-/** Runs the script on a fake pull request and returns { failed, errors }. */
+/** Runs the script on a fake pull request and returns { failed, errors, warnings }. */
 async function check(body, title = 'CHORE docs check') {
   const errors = [];
+  const warnings = [];
   let failed = false;
   const core = {
     info() {},
+    warning: (message) => warnings.push(message),
     error: (message) => errors.push(message),
     setFailed: () => {
       failed = true;
@@ -45,7 +49,16 @@ async function check(body, title = 'CHORE docs check') {
     },
   };
   await script(context, core);
-  return { failed, errors };
+  return { failed, errors, warnings };
+}
+
+/** A formality: never fails, always warns with the message. */
+async function warns(body, title, text) {
+  const r = await check(body, title);
+  expect(r.failed).toBe(false);
+  expect(r.errors).toEqual([]);
+  expect(r.warnings.join('\n')).toContain(text);
+  return r;
 }
 
 // A filled-in body: every section of the template, with real content.
@@ -76,7 +89,7 @@ function body(overrides = {}, order = Object.keys(FILLED)) {
 
 describe('pr-hygiene: the Docs impact section', () => {
   it('passes a body that lists the docs updated', async () => {
-    expect(await check(body())).toEqual({ failed: false, errors: [] });
+    expect(await check(body())).toEqual({ failed: false, errors: [], warnings: [] });
   });
 
   it.each([
@@ -84,29 +97,39 @@ describe('pr-hygiene: the Docs impact section', () => {
     'None: tooling only, no documentation affected',
     'README.md Status, CHANGELOG',
   ])('accepts "%s"', async (text) => {
-    expect((await check(body({ 'Docs impact': text }))).failed).toBe(false);
+    expect(await check(body({ 'Docs impact': text }))).toEqual({
+      failed: false,
+      errors: [],
+      warnings: [],
+    });
   });
 
-  it('fails when the section is missing', async () => {
-    const { failed, errors } = await check(body({ 'Docs impact': undefined }));
-    expect(failed).toBe(true);
-    expect(errors.join('\n')).toContain('Missing section "Docs impact"');
+  it('warns when the section is missing', async () => {
+    await warns(body({ 'Docs impact': undefined }), undefined, 'Missing section "Docs impact"');
   });
 
   it('is not satisfied by the "Docs / spec updated" section, in either order', async () => {
     const without = Object.keys(FILLED).filter((name) => name !== 'Docs impact');
-    expect((await check(body({ 'Docs impact': undefined }, without))).failed).toBe(true);
-    // Docs impact first, and nothing under "Docs / spec updated": that one must still be required.
+    await warns(
+      body({ 'Docs impact': undefined }, without),
+      undefined,
+      'Missing section "Docs impact"',
+    );
+    // Docs impact first, and nothing under "Docs / spec updated": that one must still be asked for.
     const swapped = Object.keys(FILLED).filter((name) => name !== 'Docs / spec updated');
-    const result = await check(body({ 'Docs / spec updated': undefined }, swapped));
-    expect(result.failed).toBe(true);
-    expect(result.errors.join('\n')).toContain('Missing section "Docs / spec updated"');
+    await warns(
+      body({ 'Docs / spec updated': undefined }, swapped),
+      undefined,
+      'Missing section "Docs / spec updated"',
+    );
   });
 
-  it('fails when the section is empty', async () => {
-    const { failed, errors } = await check(body({ 'Docs impact': '<!-- only a comment -->' }));
-    expect(failed).toBe(true);
-    expect(errors.join('\n')).toContain('Section "Docs impact" is empty');
+  it('warns when the section is empty', async () => {
+    await warns(
+      body({ 'Docs impact': '<!-- only a comment -->' }),
+      undefined,
+      'Section "Docs impact" is empty',
+    );
   });
 
   it.each([
@@ -119,16 +142,16 @@ describe('pr-hygiene: the Docs impact section', () => {
     'None -',
     'none: <reason>',
     '<docs updated>',
-  ])('refuses the empty answer "%s"', async (text) => {
-    const { failed, errors } = await check(body({ 'Docs impact': text }));
-    expect(failed).toBe(true);
-    expect(errors.join('\n')).toContain('Section "Docs impact": list the docs updated');
+  ])('warns on the empty answer "%s"', async (text) => {
+    await warns(
+      body({ 'Docs impact': text }),
+      undefined,
+      'Section "Docs impact": list the docs updated',
+    );
   });
 
-  it('fails on the unedited template (comments only)', async () => {
-    const { failed, errors } = await check(template);
-    expect(failed).toBe(true);
-    expect(errors.join('\n')).toContain('Section "Docs impact" is empty');
+  it('warns, never fails, on the unedited template (comments only)', async () => {
+    await warns(template, undefined, 'Section "Docs impact" is empty');
   });
 });
 
@@ -141,30 +164,43 @@ describe('pr-hygiene: the existing rules still hold', () => {
         ['Independent review', 'Threat note', 'Tests-first evidence', 'Tests added'].includes(name)
       )
         continue;
-      const { failed, errors } = await check(body({ [name]: undefined }));
-      expect(failed, name).toBe(true);
-      expect(errors.length, name).toBeGreaterThan(0);
+      const { failed, warnings } = await check(body({ [name]: undefined }));
+      expect(failed, name).toBe(false);
+      expect(warnings.length, name).toBeGreaterThan(0);
     }
   });
 
-  it('requires exactly one security class', async () => {
-    expect((await check(body({ 'Security class': '- [ ] S0\n- [ ] S1' }))).failed).toBe(true);
-    expect((await check(body({ 'Security class': '- [x] S0\n- [x] S1' }))).failed).toBe(true);
+  it('asks for exactly one security class (a warning)', async () => {
+    await warns(body({ 'Security class': '- [ ] S0\n- [ ] S1' }), undefined, 'tick exactly one');
+    await warns(body({ 'Security class': '- [x] S0\n- [x] S1' }), undefined, 'tick exactly one');
   });
 
-  it('requires a task-ID title', async () => {
-    expect((await check(body(), 'update the docs')).failed).toBe(true);
+  it('asks for a task-ID title (a warning)', async () => {
+    await warns(body(), 'update the docs', 'Title should start with a task ID');
   });
 
-  it('accepts OPS-<WORD>-<n> task IDs (OPS-CI-3)', async () => {
-    for (const t of ['OPS-CI-3 ci: x', 'OPS-REL-12 release: x', 'OPS-7 x', 'OPS-L2 x']) {
-      expect((await check(body(), t)).failed, t).toBe(false);
+  it('accepts OPS-<WORD>[-<WORD>]-<n> task IDs (OPS-CI-3, OPS-FAST-LANE-2)', async () => {
+    for (const t of [
+      'OPS-CI-3 ci: x',
+      'OPS-REL-12 release: x',
+      'OPS-7 x',
+      'OPS-L2 x',
+      'OPS-FAST-LANE-2: x',
+    ]) {
+      expect(await check(body(), t), t).toEqual({ failed: false, errors: [], warnings: [] });
     }
   });
 
-  it('refuses malformed OPS titles', async () => {
-    for (const t of ['OPS-ci-3 x', 'OPS- x', 'OPS-CI x', 'OPS-CI- x', 'OPS-CI-x x']) {
-      expect((await check(body(), t)).failed, t).toBe(true);
+  it('warns on malformed OPS titles', async () => {
+    for (const t of [
+      'OPS-ci-3 x',
+      'OPS- x',
+      'OPS-CI x',
+      'OPS-CI- x',
+      'OPS-CI-x x',
+      'OPS-FAST-LANE x',
+    ]) {
+      await warns(body(), t, 'Title should start with a task ID');
     }
   });
 
@@ -178,7 +214,7 @@ describe('pr-hygiene: the existing rules still hold', () => {
       'CHORE: x',
       'DEPS: x',
     ]) {
-      expect((await check(body(), t)).failed, t).toBe(false);
+      expect(await check(body(), t), t).toEqual({ failed: false, errors: [], warnings: [] });
     }
   });
 
@@ -187,5 +223,33 @@ describe('pr-hygiene: the existing rules still hold', () => {
       if (name === 'Checklist') continue;
       expect(template.split('\n'), name).toContain(`## ${name}`);
     }
+  });
+});
+
+describe('pr-hygiene: the one failure is AI attribution (AGENTS.md)', () => {
+  it.each([
+    'Co-authored-by: Claude <noreply@anthropic.com>',
+    '  co-authored-by: GitHub Copilot <x@y>',
+    'Generated with [Claude Code](https://example.invalid)',
+    'generated by ChatGPT',
+  ])('fails on "%s" in the body', async (line) => {
+    const r = await check(`${body()}\n${line}\n`);
+    expect(r.failed).toBe(true);
+    expect(r.errors.join('\n')).toContain('AI attribution found');
+  });
+
+  it('fails on attribution in the title', async () => {
+    expect((await check(body(), 'CHORE: x, generated with Claude')).failed).toBe(true);
+  });
+
+  it('does not fail on a human co-author or on prose about the rule', async () => {
+    const text = `${body()}\nCo-authored-by: Denis <d@example.invalid>\nNo AI attribution anywhere (AGENTS.md).\n`;
+    expect((await check(text)).failed).toBe(false);
+  });
+
+  it('fails even when every formality is missing too', async () => {
+    const r = await check('Co-authored-by: Claude <x@y>', 'whatever');
+    expect(r.failed).toBe(true);
+    expect(r.warnings.length).toBeGreaterThan(0);
   });
 });

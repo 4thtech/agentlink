@@ -20,7 +20,7 @@ The orchestrator **plans, briefs, launches, audits, records reviews and arms mer
 | Plans and decomposes work; picks the next batch | Implements, edits code or docs itself, or fixes a PR itself |
 | Writes worker briefs (§7) and launches workers | Reads whole diffs or whole specs (it opens a section or a hunk at most) |
 | Audits with targeted checks: CI status, `git diff --stat`, a named hunk, a re-run test | Relays a worker's claim as verified |
-| Launches independent reviewers and records their line (§6) | Reviews work it integrated, for the record |
+| Launches independent reviewers for S2 and sensitive paths and records their line (§6) | Reviews work it integrated, for the record |
 | Arms auto-merge when the gates are met (§5) | Merges with admin bypass, pushes to `main`, approves PRs or deployments |
 | Keeps the Curator handoff and its own sync file current | Lets workers write Curator state |
 
@@ -69,7 +69,7 @@ When in doubt, **route up**. A failure is never a reason to route down (`develop
 
 ## 5. Merge-queue procedures
 
-Agents arm merges only behind the GitHub-enforced gates and only after `development-process.md` §5 is complete; S2 and sensitive-path PRs additionally need the owner's "merge" in chat, recorded in the PR body (`AGENTS.md` § Merging and releases).
+Agents arm merges only behind the GitHub-enforced gates and only after `development-process.md` §5 is complete; S2 and sensitive-path PRs additionally need the independent review and the owner's "merge" in chat, recorded in the PR body (`AGENTS.md` § Merging and releases). S0 and S1 PRs outside the sensitive paths need no review: arm them once the checks are green (owner Decision 54).
 
 **Owner standing order.** The owner may give, in chat, a standing order to merge PRs once their review passed and CI is green. It is the owner's, given in chat, **revocable at any time**, and **re-confirmed by the owner each session**; the orchestrator never infers or extends it. It never covers npm `latest`, deployment or environment approvals, mainnet, Safe operations, production secrets or `DEPLOY_FREEZE`, and it never replaces a per-PR "merge" where the owner asked for one (`development-process.md` §1.1, §8). Only while the order stands does the orchestrator pass `--owner-merge "<the owner's wording>"` to `record-ir.py` (§6); otherwise it records the owner's per-PR "merge" in the body when given, or waits.
 
@@ -131,6 +131,7 @@ IR-<ID>-<n>: PASS (mechanical) at <full sha> (Haiku 5.5, D-126 verifier; <summar
 ```
 
 - Record with `tools/orchestrator/record-ir.py <pr> "<line>"`. It replaces `Pending (orchestrator).` or appends below earlier lines, adds the owner's merge line once only when `--owner-merge` is passed (§5; default: none), and refuses a non-PASS line, a body without the section, or a section that would contain "verdict … fail" text. `--dry-run` prints the new body without editing; `--body-file <path>` reads the body from a file (offline use, tests).
+- Only S2 and sensitive-path PRs get an IR line (owner Decision 54). For S0 and S1 elsewhere, `open-pr.mjs` writes `Not required: …` and nothing is recorded; a moved head needs no review either (§5.3 applies to reviewed PRs).
 - Never write "verdict … fail" text in the section; `review-gate` reads it. A failed round is fixed and reviewed again; only the PASS line is recorded.
 - **Reviewers** get the spec sections and the diff only, start in a fresh context, and work read-only (a scratch worktree or git reads). They never see the builder's report, rationale or transcript (`audit-rules.md` §4). Their first output line is exactly the IR line, or the same line with `FAIL`.
 - **Max 2 review rounds unless a High finding remains**; lows become cards.
@@ -169,7 +170,7 @@ Every builder, keeper and reviewer reads these before starting.
 - No AI attribution (no co-author trailers, no "Generated with"). Never run Prettier on `.md` files.
 - Backlog card-count rows are **generated**: run `node tools/docs-status/index.mjs`, never hand-edit counts. Edit only your own card's status row.
 - A published-package change needs a changeset (test-only: an empty changeset). A user-visible, spec or process change needs a `changelog.d/` fragment. Spec edits are marked "proposed, owner confirms at merge" unless Tali decided in chat.
-- **PR**: fill every template section; derive the class from the changed paths (`packages/core|node` → S2; `docs/foundation|docs/process` → S1; `.github` → sensitive). The title uses an allowed prefix (task ID, `CHORE`, `DOCS`). S2 needs a threat note and real tests-first evidence. Leave "Independent review" as `Pending (orchestrator).`; **never write an IR verdict**. No auto-merge, no dequeue or arming. Push once at the end.
+- **PR**: open it with `node tools/pr/open-pr.mjs --task <ID> --summary "<what and why>"` (`--dry-run` first to see it). It computes the class from the paths with `review-gate`'s rules, fills every template section, adds a missing changeset or changelog stub and normalizes the title; then replace each `EDIT:` placeholder with `gh pr edit`. S2 needs a threat note and real tests-first evidence, which it never generates. Leave "Independent review" as generated (`Pending (orchestrator).` for S2 and sensitive paths); **never write an IR verdict**. No auto-merge, no dequeue or arming. Push once at the end.
 - **UX north star**: no wallet, gas, seed phrase, transaction, chain choice, addresses or hashes in the default UI or tool summaries (Advanced only); one obvious next action; plain words per 11 §5.
 - **Reviewers**: fresh context, scratch worktree or git reads only, read-only; first output line exactly `IR-<ID>-<n>: PASS|FAIL at <full sha> (<model>, fresh context; summary)`. For moved heads, review the delta with `git show --remerge-diff`.
 - Reports ≤ 250 words; details go into a scratch file named after your task ID.
