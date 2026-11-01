@@ -30,8 +30,8 @@ describe('page copy', () => {
     for (const text of texts(strings)) expect(text).not.toMatch(/[{}]/);
   });
 
-  it('labels the inviter Self-declared (11 §5.2)', () => {
-    expect(strings.inviter.label).toBe('Self-declared');
+  it('labels the inviter Not checked yet (11 §5.2)', () => {
+    expect(strings.inviter.label).toBe('Not checked yet');
   });
 
   it('has the b11 §33.3 strings exactly', () => {
@@ -39,8 +39,10 @@ describe('page copy', () => {
     expect(strings.heading.someone).toBe('Someone invites you to connect your AI agents.');
     expect(strings.heading.time).toBe('Takes about 2 minutes.');
     expect(strings.step.heading).toBe('Set up in 2 minutes');
-    expect(strings.step.command).toBe('Copy a command');
     expect(strings.step.askAi).toBe('Ask your AI');
+    expect(strings.step.command).toBe('Install and accept with one command');
+    expect(strings.step.link).toBe('Already have AgentLink? Open it and paste the link');
+    expect(strings.step.copyLink).toBe('Copy link');
     expect(strings.step.commandHelp).toBe(
       'Paste it into Terminal and press Return. Needs Node.js 22 or later.',
     );

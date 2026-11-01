@@ -8,13 +8,12 @@ import { evaluateFragment } from './invite-state.js';
 import { render } from './view.js';
 
 const hash = window.location.hash;
-const host = window.location.host;
 const fetchObject = inviteFetcher((input, init) => window.fetch(input, init));
 const copy = (text: string): Promise<void> => navigator.clipboard.writeText(text);
 
 async function show(): Promise<void> {
   const view = await evaluateFragment(hash, Math.floor(Date.now() / 1000), fetchObject);
-  render(document, view, host, copy, () => {
+  render(document, view, copy, () => {
     void show();
   });
 }

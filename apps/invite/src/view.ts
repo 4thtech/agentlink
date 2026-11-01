@@ -4,9 +4,11 @@
 // element, and nothing derived from the invite becomes one.
 //
 // U3-invite: the step section ("Set up in 2 minutes") sits under our own heading, apart from the
-// inviter section, and holds no payload text: only the fixed command or sentence with the canonical
-// link. The Copy button copies the string the script holds for the selected way, never text read back
-// from the page, and with no trailing line break. The "Need Node.js?" link is fixed in the HTML.
+// inviter section, and holds no payload text: only the fixed sentence, command and canonical link.
+// W6-INVITE-DESIGN: the three ways to accept are three cards, in this order: the sentence for the
+// person's AI, the command, and the link to paste into AgentLink. Each Copy button copies the string
+// the script holds for its card, never text read back from the page, with no trailing line break.
+// The "Need Node.js?" link is fixed in the HTML.
 import type { InviteView } from './invite-state.js';
 import { expiredFor, invitesHeading, nextFor, strings } from './strings.js';
 
@@ -25,10 +27,16 @@ export function formatExpiry(seconds: number): string {
   return `${strings.inviter.expiryPrefix}${day}${strings.inviter.expirySuffix}`;
 }
 
+/** "agentlink.4thtech.io/i#jVPL…mfnHw": the host, the path and the ends of the fragment. */
+export function shorten(link: string): string {
+  const at = link.indexOf('#');
+  const head = link.slice(0, at + 1).replace(/^https:\/\//, '');
+  const rest = link.slice(at + 1);
+  return rest.length <= 14 ? head + rest : `${head}${rest.slice(0, 4)}…${rest.slice(-5)}`;
+}
+
 /** How long "Copied" stays (b11 §6 row 6). */
 const COPIED_MS = 1600;
-
-type Way = 'command' | 'askAi';
 
 /**
  * Shows `view`. `copy` writes a string to the clipboard; the page never pastes or opens anything.
@@ -37,7 +45,6 @@ type Way = 'command' | 'askAi';
 export function render(
   doc: Document,
   view: InviteView,
-  host: string,
   copy: (text: string) => Promise<void>,
   retry?: () => void,
 ): void {
@@ -46,31 +53,56 @@ export function render(
   const inviter = element(doc, 'inviter');
   const step = element(doc, 'step');
   const next = element(doc, 'next');
-  const stepText = element(doc, 'step-text');
-  const copyButton = element(doc, 'copy') as HTMLButtonElement;
   const copyStatus = element(doc, 'copy-status');
-  const tabCommand = element(doc, 'tab-command') as HTMLButtonElement;
-  const tabAi = element(doc, 'tab-ai') as HTMLButtonElement;
-  const switcher = element(doc, 'switch');
-  const nodeHelp = element(doc, 'node-help');
-  const panelLabel = element(doc, 'panel-label');
-  const stepHelp = element(doc, 'step-help');
-  const panel = element(doc, 'panel');
+  const wayCommand = element(doc, 'way-command');
+  // The three cards, in order: Ask your AI, the command, the link. `text` is what the card shows
+  // and its button copies; `label` is the button's resting text.
+  const cards = [
+    {
+      card: 'way-ai',
+      title: strings.step.askAi,
+      help: 'ai-help',
+      helpText: strings.step.askAiHelp,
+      text: undefined,
+      button: 'copy-ai',
+      label: strings.step.copy,
+      title_id: 'way-ai-title',
+    },
+    {
+      card: 'way-command',
+      title: strings.step.command,
+      help: 'step-help',
+      helpText: strings.step.commandHelp,
+      text: 'step-text',
+      button: 'copy',
+      label: strings.step.copy,
+      title_id: 'way-command-title',
+    },
+    {
+      card: 'way-link',
+      title: strings.step.link,
+      help: 'link-help',
+      helpText: strings.step.linkHelp,
+      text: 'link-text',
+      button: 'copy-link',
+      label: strings.step.copyLink,
+      title_id: 'way-link-title',
+    },
+  ] as const;
 
   // Start from nothing shown: a state never shows a command or a sentence.
   inviter.hidden = true;
   step.hidden = true;
   next.hidden = true;
   next.textContent = '';
-  stepText.textContent = '';
   copyStatus.textContent = '';
-  copyButton.onclick = null;
-  tabCommand.onclick = null;
-  tabAi.onclick = null;
+  for (const c of cards) {
+    if (c.text !== undefined) element(doc, c.text).textContent = '';
+    (element(doc, c.button) as HTMLButtonElement).onclick = null;
+  }
   retryButton.onclick = null;
   retryButton.hidden = true;
   retryButton.disabled = false;
-  element(doc, 'inviter-host').textContent = host;
 
   state.dataset['state'] = view.kind;
   state.textContent =
@@ -96,67 +128,59 @@ export function render(
     element(doc, 'invite-heading').textContent = who.fallback
       ? strings.heading.someone
       : invitesHeading(who.name);
-    // The quotes are ours; the name between them is text.
-    element(doc, 'inviter-name').textContent = `“${who.name}”`;
+    // The name is text.
+    element(doc, 'inviter-name').textContent = who.name;
     element(doc, 'inviter-label').textContent = strings.inviter.label;
     element(doc, 'inviter-fingerprint').textContent = who.fingerprint;
     element(doc, 'inviter-expiry').textContent = formatExpiry(who.expiresAt);
     inviter.hidden = false;
 
-    // Held by the script; the button copies one of these strings, never the page's text.
-    const texts: Readonly<Record<Way, string | undefined>> = {
-      command: view.command,
-      askAi: view.sentence,
+    // Held by the script; each button copies one of these strings, never the page's text.
+    const texts: Readonly<Record<(typeof cards)[number]['card'], string | undefined>> = {
+      'way-ai': view.sentence,
+      'way-command': view.command,
+      'way-link': view.inviteUrl,
     };
-    let way: Way = view.command === undefined ? 'askAi' : 'command';
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const show = (chosen: Way): void => {
-      way = chosen;
-      const command = chosen === 'command';
-      tabCommand.setAttribute('aria-selected', String(command));
-      tabAi.setAttribute('aria-selected', String(!command));
-      tabCommand.tabIndex = command ? 0 : -1;
-      tabAi.tabIndex = command ? -1 : 0;
-      panel.setAttribute('aria-labelledby', command ? 'tab-command' : 'tab-ai');
-      panelLabel.textContent = command ? strings.step.commandLabel : strings.step.askAiLabel;
-      stepHelp.textContent = command ? strings.step.commandHelp : strings.step.askAiHelp;
-      nodeHelp.hidden = !command;
-      stepText.textContent = texts[chosen] ?? '';
-      copyStatus.textContent = '';
-      copyButton.textContent = strings.step.copy;
-    };
-    // Too long for a command (08 §4): no switch, only the sentence.
-    switcher.hidden = view.command === undefined;
-    tabCommand.onclick = (): void => {
-      show('command');
-    };
-    tabAi.onclick = (): void => {
-      show('askAi');
-    };
-    switcher.onkeydown = (event: KeyboardEvent): void => {
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-      const to: Way = way === 'command' ? 'askAi' : 'command';
-      show(to);
-      (to === 'command' ? tabCommand : tabAi).focus();
-    };
-    copyButton.onclick = (): void => {
-      const text = texts[way];
-      if (text === undefined) return;
-      copy(text).then(
-        () => {
-          copyButton.textContent = strings.step.copied;
-          copyStatus.textContent = strings.step.copied;
-          if (timer !== undefined) clearTimeout(timer);
-          timer = setTimeout(() => {
-            copyButton.textContent = strings.step.copy;
-          }, COPIED_MS);
-        },
-        () => {
-          copyStatus.textContent = strings.step.copyFailed;
-        },
-      );
-    };
-    show(way);
+    const timers = new Map<string, ReturnType<typeof setTimeout>>();
+    for (const c of cards) {
+      const text = texts[c.card];
+      const button = element(doc, c.button) as HTMLButtonElement;
+      element(doc, c.title_id).textContent = c.title;
+      element(doc, c.help).textContent = c.helpText;
+      // One short line (the link is shortened), never the whole link; the button copies all of it.
+      if (c.text !== undefined) {
+        element(doc, c.text).textContent = (text ?? '')
+          .split(view.inviteUrl)
+          .join(shorten(view.inviteUrl));
+      }
+      button.textContent = c.label;
+      // Too long for a command (08 §4): that card is left out, the others stay.
+      element(doc, c.card).hidden = text === undefined;
+      button.onclick = (): void => {
+        if (text === undefined) return;
+        copy(text).then(
+          () => {
+            for (const other of cards) {
+              (element(doc, other.button) as HTMLButtonElement).textContent = other.label;
+            }
+            button.textContent = strings.step.copied;
+            copyStatus.textContent = strings.step.copied;
+            const pending = timers.get(c.button);
+            if (pending !== undefined) clearTimeout(pending);
+            timers.set(
+              c.button,
+              setTimeout(() => {
+                button.textContent = c.label;
+              }, COPIED_MS),
+            );
+          },
+          () => {
+            copyStatus.textContent = strings.step.copyFailed;
+          },
+        );
+      };
+    }
+    wayCommand.hidden = texts['way-command'] === undefined;
     step.hidden = false;
     next.textContent = who.fallback ? strings.step.nextSomeone : nextFor(who.name);
     next.hidden = false;
