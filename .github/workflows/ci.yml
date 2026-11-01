@@ -706,16 +706,17 @@ jobs:
           mkdir "$RUNNER_TEMP/pack"
           (cd apps/cli/dist/package && npm pack --pack-destination "$RUNNER_TEMP/pack")
 
-      # A plain `npm install` as a user runs it (the dependencies' own install steps run; this is the
-      # point of the test). The folder is empty, so nothing of the checkout is on the module path.
+      # `npm install` of the tarball this job just packed, without install scripts (the native modules
+      # ship as prebuilds, as in the desktop extension). The folder is empty, so nothing of the
+      # checkout is on the module path.
       - name: Install the tarball into an empty folder
         shell: bash
-        run: |
+        run: | # zizmor: ignore[adhoc-packages] the tarball this job packed from the checked-out commit, --ignore-scripts, scratch dir
           set -euo pipefail
           mkdir "$RUNNER_TEMP/install"
           cd "$RUNNER_TEMP/install"
           npm init -y > /dev/null
-          npm install --no-audit --no-fund "$RUNNER_TEMP"/pack/*.tgz
+          npm install --ignore-scripts --no-audit --no-fund "$RUNNER_TEMP"/pack/*.tgz
 
       - name: "`agentlink --version` through npx"
         shell: bash
