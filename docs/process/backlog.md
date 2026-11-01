@@ -10653,6 +10653,13 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M3-11 | Provide the GitBook MCP; merge the GitBook change request |
 | Releases | Approve every npm `latest` publish with one click on the waiting deployment (D-25, D-52); remove the `production` Environment's required reviewer when the first deployable app exists (M1b) |
 
+#### OPS-MERGE-FRICTION · fewer manual steps at merge time (wave 5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `tools/orchestrator/{record-ir.py,retrigger-version-pr.py,merge-friction.test.mjs}`; `docs/process/orchestrator-playbook.md` §6
+- **Depends on:** none
+- **Spec:** `audit-rules.md` §3; `release-and-deployment.md`
+- **Done when:** `record-ir.py` re-runs only a failed latest `review-gate` run for the PR head after recording; `retrigger-version-pr.py` closes and reopens a bot "Version packages" PR whose runs wait for approval; both tested offline with a fake `gh`; no gate weakened. **Owner proposal (not built):** give the version step a GitHub App token or fine-grained PAT as `github-token:` so the PR's checks start by themselves.
+
 #### W5-SHEET-CLOSE + W5-SAFETY-STEP · local app: side panels always close; Home's safety-code step opens the code (wave 5)
 - **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/{surface.tsx,layers.ts,inert.ts,pay-confirm.tsx,depth.css}`; `apps/local-ui/src/pages/{contacts,home,agents}/**`; `e2e/test/local-ui-sheet-close.test.ts`
