@@ -209,7 +209,7 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     expect(result.structured).toEqual({
       status: 'ok',
       summary:
-        '2 new messages from Marko Novak (not checked yet). To read them, call agentlink_inbox. 1 request from an unknown sender is waiting in your AgentLink app.',
+        '2 new messages from \u201cMarko Novak\u201d (self-declared). To read them, call agentlink_inbox. 1 request from an unknown sender is waiting in your AgentLink app.',
       agent: { name: 'default', id: A, fingerprint: '1111\u00b72222' },
       owner: { fingerprint: '3333\u00b74444' },
       contacts: 2,
@@ -260,7 +260,7 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
       },
     ]);
     expect(result.structured.summary).toBe(
-      '2 open offers from Marko Novak (not checked yet) are waiting for an answer. 1 open offer from Ana (safety-code-checked) is waiting for an answer. To see them, call agentlink_inbox with openOffers true.',
+      '2 open offers from \u201cMarko Novak\u201d (self-declared) are waiting for an answer. 1 open offer from \u201cAna\u201d (safety-code-checked) is waiting for an answer. To see them, call agentlink_inbox with openOffers true.',
     );
     // Counts and names only: never an envelope or terms ID in the summary (I-5).
     expect(result.structured.summary).not.toContain('EEEE');
@@ -286,7 +286,7 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     expect(inbox[0]!.contact['ownerFingerprint']).toBe('1111\u00b72222');
     expect(inbox[1]!.contact['ownerFingerprint']).toBeUndefined();
     expect(result.structured.summary).toContain('(owner 1111\u00b72222)');
-    expect(result.structured.summary).not.toContain('Ana (not checked yet) (owner');
+    expect(result.structured.summary).not.toContain('Ana\u201d (self-declared) (owner');
   });
 
   it('M1-22: unread messages come first, then open offers', async () => {
@@ -297,7 +297,7 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     });
     const result = await callTool('agentlink_status', {}, context(client));
     expect(result.structured.summary).toBe(
-      '1 new message from Marko Novak (not checked yet). To read it, call agentlink_inbox. 1 open offer from Marko Novak (not checked yet) is waiting for an answer. To see them, call agentlink_inbox with openOffers true.',
+      '1 new message from \u201cMarko Novak\u201d (self-declared). To read it, call agentlink_inbox. 1 open offer from \u201cMarko Novak\u201d (self-declared) is waiting for an answer. To see them, call agentlink_inbox with openOffers true.',
     );
   });
 
@@ -328,7 +328,7 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     const result = await callTool('agentlink_status', {}, context(client, logger));
     expect(result.structured.status).toBe('ok');
     expect(result.structured.summary).toBe(
-      '1 new message from Marko Novak (not checked yet). To read it, call agentlink_inbox.',
+      '1 new message from \u201cMarko Novak\u201d (self-declared). To read it, call agentlink_inbox.',
     );
     expect(result.structured.nextStep).toBe(copy('chat.inbox.incompleteNextStep'));
     expect(result.structured.nextStep).not.toMatch(/\d|relay/i);
@@ -558,7 +558,7 @@ describe('agentlink_list_contacts (06 §2.1)', () => {
       expect.objectContaining({ id: C, pairing: 'pending', unread: 0 }),
     ]);
     expect(result.structured.summary).toBe(
-      'You are connected with 2 people: Marko (not checked yet), Ana (not checked yet).',
+      'You have 2 contacts: \u201cMarko\u201d (self-declared), \u201cAna\u201d (self-declared).',
     );
     expect(client.calls).not.toContain('catchUp');
     expect(dump(result).toLowerCase()).not.toContain('safety code');
@@ -574,7 +574,7 @@ describe('agentlink_list_contacts (06 §2.1)', () => {
     });
     const result = await callTool('agentlink_list_contacts', {}, context(client));
     expect(result.structured.summary).toBe(
-      'You are connected with 3 people: oc-test (not checked yet) (owner 1111\u00b72222), oc-test (not checked yet) (owner 3333\u00b74444), Ana (not checked yet).',
+      'You have 3 contacts: \u201coc-test\u201d (self-declared) (owner 1111\u00b72222), \u201coc-test\u201d (self-declared) (owner 3333\u00b74444), \u201cAna\u201d (self-declared).',
     );
   });
 
@@ -582,13 +582,13 @@ describe('agentlink_list_contacts (06 §2.1)', () => {
     const result = await callTool('agentlink_list_contacts', {}, context(fakeClient()));
     expect(result.structured).toEqual({
       status: 'ok',
-      summary: 'You are not connected with anyone yet. Create an invite to connect with someone.',
+      summary: 'You have no contacts yet. Create an invite to connect with someone.',
       contacts: [],
     });
   });
 
   it('names at most five contacts in the summary', () => {
-    const names = Array.from({ length: 8 }, (_, i) => `N${i} (not checked yet)`);
+    const names = Array.from({ length: 8 }, (_, i) => `\u201cN${i}\u201d (self-declared)`);
     expect(contactsSummary(names)).toContain('and 3 more');
   });
 });

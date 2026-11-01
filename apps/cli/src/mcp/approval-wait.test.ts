@@ -85,7 +85,7 @@ function setup(states: readonly string[]): { context: ToolContext; reads: () => 
         expiresAt: VALID_UNTIL,
         card: {
           decision: 'accept',
-          counterparty: { agentId: B, display: display('Marko'), shown: 'Marko (not checked yet)' },
+          counterparty: { agentId: B, display: display('Marko'), shown: '“Marko” (self-declared)' },
           version: 3,
           terms: { termsId: ENVELOPE, version: 3 } as unknown as Terms,
           changes: null,

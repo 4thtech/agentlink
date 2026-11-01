@@ -36,7 +36,7 @@ const display = (name: string): ContactDisplayName =>
 const card = (): CommitmentCard =>
   ({
     decision: 'accept',
-    counterparty: { agentId: B, display: display(CANARY), shown: `${CANARY} (not checked yet)` },
+    counterparty: { agentId: B, display: display(CANARY), shown: `“${CANARY}” (self-declared)` },
     version: 3,
     terms: { termsId: ENVELOPE, version: 3 } as unknown as Terms,
     changes: null,

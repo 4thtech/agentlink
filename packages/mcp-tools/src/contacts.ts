@@ -50,7 +50,7 @@ export function displayRef(id: string, display: ContactDisplayName): ContactRef 
   });
 }
 
-/** The name as summaries show it: then its label, e.g. `Marko Novak (not checked yet)`. */
+/** The name as summaries show it: quoted, then its label, e.g. `“Marko Novak” (self-declared)`. */
 export function renderRef(ref: ContactRef): string {
   const name = renderContactName({
     name: ref.name,

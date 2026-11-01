@@ -406,7 +406,7 @@ describe('contacts (06 §2.1)', () => {
     expect(BIDI.test(text)).toBe(false);
     expect(text).not.toContain('evil.example');
     expect(text).not.toContain('approve');
-    expect(text).toContain('Contact 7F3A·19C2 (not checked yet)');
+    expect(text).toContain('“Contact 7F3A·19C2” (self-declared)');
   });
 
   it('says so when there are no contacts, and has no --verify', async () => {
@@ -438,7 +438,7 @@ describe('status (06 §2.0, D-73)', () => {
     });
     const brief = await harness(f).run(['status', '--brief']);
     expect(brief.out).toEqual([
-      '2 new messages from Marko (not checked yet).',
+      '2 new messages from “Marko” (self-declared).',
       '3 requests from unknown senders.',
     ]);
     const full = await harness(f).run(['status']);
@@ -532,7 +532,7 @@ describe('status (06 §2.0, D-73)', () => {
     expect(text.split('\n').length).toBeLessThanOrEqual(2);
     expect(text).not.toContain(canary);
     expect(text).not.toMatch(/https?:|0x[0-9a-f]{8}/i);
-    expect(text).toContain('(not checked yet)');
+    expect(text).toContain('(self-declared)');
   });
 
   it('with a pending handshake it adds no contact and marks nothing read (M1-29)', async () => {

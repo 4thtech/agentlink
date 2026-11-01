@@ -248,7 +248,7 @@ describe('D-74 characters: UCD 15.0.0 Cc, Cf, Zl, Zp, Co, Cs, Cn refused, and NF
       'Café',
       'Спецификация v2',
       '仕様 第3段階',
-      'Deliver 🚀 — now',
+      'Deliver 🚀 — “now”',
       'a',
       'x\u{10EFD}́',
     ]) {

@@ -161,7 +161,7 @@ function fakeSource(): ApprovalServerSource & {
       paid,
       details: {
         headline: summary,
-        who: 'Ana (not checked yet)',
+        who: '“Ana” (self-declared)',
         what: summary,
         cost: paid ? '$0.10' : 'Free',
         expires: '12 Oct 2026 14:02 UTC',

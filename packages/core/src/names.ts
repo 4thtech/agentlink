@@ -145,8 +145,7 @@ export function isRestrictedAlias(alias: unknown): alias is string {
   return typeof alias === 'string' && alias !== '' && restrictName(alias, '\u00b7') === alias;
 }
 
-/** A shown name, followed by its identity label, e.g. `Marko Novak (not checked yet)`. */
+/** A shown name: quoted, followed by its identity label, e.g. `“Marko Novak” (self-declared)`. */
 export function renderContactName(display: ContactDisplayName): string {
-  const label = display.label === 'self-declared' ? 'not checked yet' : display.label;
-  return `${display.name} (${label})`;
+  return `“${display.name}” (${display.label})`;
 }

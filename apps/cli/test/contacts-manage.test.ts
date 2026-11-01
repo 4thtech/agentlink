@@ -379,7 +379,7 @@ describe('contacts rename <id> <alias> † (M1-9za; 06 §2.1 rule 1, §8)', () =
     expect(renamed.code).toBe(0);
     expect(codeEntries).toEqual(['contact.rename']);
     // The owner sees the contact by its current name and the new alias before the code.
-    expect(summaries[0]).toContain('oc-test (not checked yet)');
+    expect(summaries[0]).toContain('“oc-test” (self-declared)');
     expect(summaries[0]).toContain('Tali laptop');
 
     const toBob = await call(aliceMcp, 'agentlink_send', { to: 'Tali laptop', text: 'hi bob' });
@@ -435,7 +435,7 @@ describe('contacts remove <id> † (M1-9za; 07 §3 `removed`, 02 F-14)', () => {
     const removed = await run(['contacts', 'remove', carol.client.agentId]);
     expect(removed.code).toBe(0);
     expect(codeEntries).toEqual(['contact.remove']);
-    expect(summaries[0]).toContain('oc-test (not checked yet)');
+    expect(summaries[0]).toContain('“oc-test” (self-declared)');
     expect(net.published).toBe(before);
 
     expect((await contactRow(carol.client.agentId))?.status).toBe('removed');

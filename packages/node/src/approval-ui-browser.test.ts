@@ -459,8 +459,8 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
 describe('the approvals as the owner sees them (M1-11a-ux; Chromium)', () => {
   const INVITE =
     'https://agentlink.4thtech.io/i#c2VjcmV0LWludml0ZS1ib2R5LXRoYXQtaXMtcXVpdGUtbG9uZw';
-  const WHO = 'Ana (not checked yet) · owner 7F3A·19C2 · not in your contacts yet';
-  const HEADLINE = 'Connect with Ana (not checked yet)';
+  const WHO = '“Ana” (self-declared) · owner 7F3A·19C2 · not in your contacts yet';
+  const HEADLINE = 'Connect with “Ana” (self-declared)';
   const HINT = 'Paste the backup code AgentLink showed you when you set up';
   const addInvite = (source: FakeSource): void => {
     source.add(1, {

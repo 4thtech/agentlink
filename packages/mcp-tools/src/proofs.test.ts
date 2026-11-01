@@ -1676,7 +1676,7 @@ describe('requestReceipt on agentlink_notarize and agentlink_send (06 §2.4, 11 
     expect(calls.notarize).toEqual([{ envelopeId: ENVELOPE, requestReceipt: true }]);
     expect(r.structured).toMatchObject({ status: 'ok', proof: { status: 'ok' } });
     expect(r.structured.summary).toContain(
-      copy('common.privacy.proofReceipt', { contactName: 'Contact 7F3A·19C2 (not checked yet)' }),
+      copy('common.privacy.proofReceipt', { contactName: '“Contact 7F3A·19C2” (self-declared)' }),
     );
     expectOurTextClean(r);
   });

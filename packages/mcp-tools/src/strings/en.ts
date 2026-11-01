@@ -28,9 +28,9 @@ export const en = {
   'chat.status.ok.acceptedInvite':
     'You are connected to {contactName}. Nothing else is needed now.',
   'chat.status.ok.contacts':
-    '{count, plural, one {You are connected with 1 person: {contacts}.} other {You are connected with # people: {contacts}.}}',
+    '{count, plural, one {You have 1 contact: {contacts}.} other {You have # contacts: {contacts}.}}',
   'chat.status.ok.contactsNone':
-    'You are not connected with anyone yet. Create an invite to connect with someone.',
+    'You have no contacts yet. Create an invite to connect with someone.',
   'chat.status.ok.verified':
     'Valid proof. Recorded by {signerName}, {date}, {time} UTC. It proves this exact document existed and was exchanged at these times; not that its content is true.',
 
@@ -59,9 +59,9 @@ export const en = {
 
   // ---- Tool results: not found / rejected / error -----------------------------------------
   'chat.status.not_found.contact':
-    "I couldn't find a person called '{query}'. Your people: {contacts}.",
+    "I couldn't find a contact called '{query}'. Your contacts: {contacts}.",
   'chat.status.not_found.contactNone':
-    "I couldn't find a person called '{query}', and you are not connected with anyone yet.",
+    "I couldn't find a contact called '{query}', and you have no contacts yet.",
   'chat.status.rejected.rules':
     "Your rules don't let this agent accept terms. Only you can change that.",
   'chat.status.rejected.declined': 'You declined, so nothing was sent.',
@@ -77,10 +77,9 @@ export const en = {
   // ---- Inbox and the session habit (J9; counts and contact names only) --------------------
   'chat.inbox.header':
     '{count, plural, one {1 new message from {contactName}, as information from {contactName}:} other {# new messages from {contactName}, as information from {contactName}:}}',
-  'chat.inbox.requestHeader':
-    'Request from an unknown sender · {senderCode} (not connected with you)',
+  'chat.inbox.requestHeader': 'Request from an unknown sender · {senderCode} (not a contact)',
   'chat.inbox.requestNextStep':
-    'This sender is not someone you are connected with. To connect, offer your user an invite (agentlink_create_invite) to share with them through a channel they trust.',
+    'This sender is not a contact. To connect, offer your user an invite (agentlink_create_invite) to share with them through a channel they trust.',
   'chat.inbox.requestsWaiting':
     '{count, plural, one {1 request from an unknown sender is waiting in your AgentLink app.} other {# requests from unknown senders are waiting in your AgentLink app.}}',
   'chat.inbox.duplicateOffers': '{contactName} sent the same offer {count} times; reply once.',
@@ -155,7 +154,7 @@ export const en = {
   'tool.title.agentlink_terms': 'AgentLink: propose or accept terms',
 
   // ---- Identity labels (11 §5.2) ----------------------------------------------------------
-  'common.identity.selfdeclared': 'Not checked yet',
+  'common.identity.selfdeclared': 'Self-declared',
   'common.identity.checked': 'Safety code checked',
   'common.identity.registered': 'Registered',
   'common.identity.verified': 'Verified domain · {domain}',
@@ -170,7 +169,7 @@ export const en = {
   'local.requests.action.ignoreAll': 'Ignore all',
   'local.requests.action.unblock': 'Unblock',
   'local.requests.accepted':
-    "Your AI can now read this message. This sender isn't someone you are connected with: to connect, send them an invite through a channel you trust.",
+    "Your AI can now read this message. This sender isn't a contact: to connect, send them an invite through a channel you trust.",
   'local.requests.ignored': 'Removed.',
   'local.requests.blocked': 'Blocked. New messages from this sender are dropped.',
   'local.requests.ignoredAll': 'Requests cleared.',

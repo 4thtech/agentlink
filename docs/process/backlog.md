@@ -5958,7 +5958,7 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 - **Scope:**
   - Get started completes when you are connected with someone (2 of 2); "Check a safety code" is a gentle suggestion, never counted, never faked.
   - Go to "Files" opens Home (each person's files); the old Inbox page is removed and `/inbox` redirects to Home.
-  - "People" everywhere (page title, Go to, counts, toasts, AI-facing status lines); no curly quotes around names; "Self-declared" reads "Not checked yet".
+  - "People" everywhere (page title, Go to, counts, toasts); no curly quotes around names; "Self-declared" reads "Not checked yet". AI-facing text keeps the 06 form (quoted, self-declared).
 - **Acceptance:** unit and DOM tests updated; CSS budget unchanged; motion-lint clean.
 
 ### Classroom wave 6 (W6, golden-path QA of 1 Nov)

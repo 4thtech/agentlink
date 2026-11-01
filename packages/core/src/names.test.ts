@@ -64,6 +64,6 @@ describe('restrictName (06 §2.1)', () => {
         label: 'self-declared',
         nameSource: 'counterparty',
       }),
-    ).toBe('Marko Novak (not checked yet)');
+    ).toBe('“Marko Novak” (self-declared)');
   });
 });

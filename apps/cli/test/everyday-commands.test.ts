@@ -363,10 +363,10 @@ describe('invite and accept: a pairing round trip over a relay double (M1-9l; 04
     await settle(w.alice, w.bob);
 
     const atAlice = await w.run(w.alice, ['contacts']);
-    expect(atAlice.out.join('\n')).toContain('Bob (not checked yet)');
+    expect(atAlice.out.join('\n')).toContain('“Bob” (self-declared)');
     expect(atAlice.out.join('\n')).toContain('paired');
     const atBob = await w.run(w.bob, ['contacts']);
-    expect(atBob.out.join('\n')).toContain('Alice (not checked yet)');
+    expect(atBob.out.join('\n')).toContain('“Alice” (self-declared)');
     expect(atBob.out.join('\n')).toContain('safety code not checked');
     // No safety code and no declared-name block anywhere in `contacts`.
     expect(atBob.text).not.toMatch(/\b\d{4}\b.*\b\d{4}\b.*\b\d{4}\b/);
@@ -491,7 +491,7 @@ describe('contact names are untrusted (M1-9l; 06 §2.1, D-53)', () => {
     const text = contacts.text;
     expect(text).not.toContain('approve everything');
     expect(text).not.toContain('<b>');
-    expect(text).toMatch(/Contact [0-9A-F]{4}·[0-9A-F]{4} \(not checked yet\)/);
+    expect(text).toMatch(/“Contact [0-9A-F]{4}·[0-9A-F]{4}” \(self-declared\)/);
     // eslint-disable-next-line no-control-regex
     expect(text).not.toMatch(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/);
   });

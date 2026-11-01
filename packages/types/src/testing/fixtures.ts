@@ -342,7 +342,7 @@ export const approvalRequestFor = (action: unknown, expiresAt = 1760086400) => (
   agent: AGENT_EVM,
   action,
   actionDigest: SHA,
-  summary: 'Accept version 3 from Marko Novak (not checked yet)',
+  summary: 'Accept version 3 from “Marko Novak” (self-declared)',
   requestedAt: 1760000000,
   expiresAt,
 });
@@ -601,7 +601,7 @@ export const payloads = (): Record<string, Record<string, unknown>> => ({
     agent: AGENT_EVM,
     action: approvalActions().agentlink_send,
     actionDigest: SHA,
-    summary: 'Send an accept to Marko Novak (not checked yet)',
+    summary: 'Send an accept to “Marko Novak” (self-declared)',
     requestedAt: 1760000000,
     expiresAt: 1760086400,
   }),

@@ -304,7 +304,7 @@ describe('send and receive through the MCP protocol (M1-9p)', () => {
     const before = net.published;
     const sent = await call(aliceMcp, 'agentlink_send', { to: 'Bob', text: HOSTILE });
     expect(sent.structured).toMatchObject({ status: 'ok' });
-    expect(sent.structured['summary']).toContain('Bob (not checked yet)');
+    expect(sent.structured['summary']).toContain('“Bob” (self-declared)');
     expect(net.published).toBeGreaterThan(before);
     for (const part of ['CANARY-RT', 'Human:', 'SYSTEM', '\u001b']) {
       expect(sent.text).not.toContain(part);

@@ -154,7 +154,7 @@ describe('agentlink_send: ok (06 §2.2; D-70: a paired contact talks without app
     expect(result.structured).toEqual({
       status: 'ok',
       summary:
-        'Sent to Marko (not checked yet). End-to-end encrypted: only you, Marko (not checked yet) and your agents can read it.',
+        'Sent to “Marko” (self-declared). End-to-end encrypted: only you, “Marko” (self-declared) and your agents can read it.',
       envelopeId: ENVELOPE,
       thread: THREAD,
       sentAt: '2026-10-15T10:00:00Z',
@@ -331,8 +331,8 @@ describe('fixed text of the send and inbox tools (11 §5.1; I-5)', () => {
     INBOX_TEXT.someMessages(1),
     INBOX_TEXT.someMessages(3),
     INBOX_TEXT.noMatching,
-    INBOX_TEXT.headerFrom('Marko (not checked yet)', '7F3A·19C2'),
-    INBOX_TEXT.headerSent('Marko (not checked yet)'),
+    INBOX_TEXT.headerFrom('“Marko” (self-declared)', '7F3A·19C2'),
+    INBOX_TEXT.headerSent('“Marko” (self-declared)'),
     INBOX_TEXT.beforeNotFound,
     INBOX_TEXT.beforeNotFoundNextStep,
   ];

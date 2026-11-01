@@ -393,9 +393,9 @@ describe('agentlink_inbox: sync and query (06 §2.2, §6)', () => {
     const result = await inbox({ openOffers: true }, client);
     const [message] = messagesOf(result);
     expect(message!['termsParties']).toEqual({
-      parties: ['you', 'Marko (not checked yet)'],
+      parties: ['you', '“Marko” (self-declared)'],
       payer: 'you',
-      deliverablesBy: ['Marko (not checked yet)', null],
+      deliverablesBy: ['“Marko” (self-declared)', null],
     });
     expect(String(result.structured.summary)).not.toMatch(/0x[0-9a-f]{40}/);
     const roles = JSON.stringify(message!['termsParties']);
@@ -428,7 +428,7 @@ describe('agentlink_inbox: sync and query (06 §2.2, §6)', () => {
     });
     const result = await inbox({ openOffers: true }, client);
     const hint = copy('chat.inbox.duplicateOffers', {
-      contactName: 'Marko (not checked yet)',
+      contactName: '“Marko” (self-declared)',
       count: 2,
     });
     expect(String(result.structured.summary)).toBe(`${INBOX_TEXT.someOpenOffers(3)} ${hint}`);
@@ -568,7 +568,7 @@ describe('agentlink_inbox: item shapes (06 §2.2)', () => {
     expect(String(message!.untrusted['text'])).toContain('CANARY-INBOX');
     expect(
       message!.block.startsWith(
-        `[AgentLink] ${INBOX_TEXT.headerFrom('Marko (not checked yet)', '7F3A·19C2')}\n`,
+        `[AgentLink] ${INBOX_TEXT.headerFrom('“Marko” (self-declared)', '7F3A·19C2')}\n`,
       ),
     ).toBe(true);
     expect(message!.block).toContain(
@@ -590,7 +590,7 @@ describe('agentlink_inbox: item shapes (06 §2.2)', () => {
     expect(message).not.toHaveProperty('read');
     expect(message!.block).toContain('from="you"');
     expect(message!.block.split('\n')[0]).toBe(
-      `[AgentLink] ${INBOX_TEXT.headerSent('Marko (not checked yet)')}`,
+      `[AgentLink] ${INBOX_TEXT.headerSent('“Marko” (self-declared)')}`,
     );
     expect(Object.keys(message!.untrusted)).toEqual(['body']);
   });
@@ -863,7 +863,7 @@ describe('agentlink_inbox: delivery receipt requests (06 §2.2, 11 §5.6, D-109)
     expect(message).toMatchObject({ receiptRequested: true });
     expect(result.structured.summary).toBe(
       `${INBOX_TEXT.someMessages(1)} ${copy('common.privacy.receiptRequest', {
-        contactName: 'Marko (not checked yet)',
+        contactName: '“Marko” (self-declared)',
       })}`,
     );
     expect(result.structured.nextStep).toBe(copy('chat.inbox.receiptRequestNextStep'));
@@ -887,8 +887,8 @@ describe('agentlink_inbox: delivery receipt requests (06 §2.2, 11 §5.6, D-109)
       asked({ envelopeId: E3, from: sender(C, 'Ana') }),
     ];
     const result = await inbox({}, fake({ items }));
-    const marko = copy('common.privacy.receiptRequest', { contactName: 'Marko (not checked yet)' });
-    const ana = copy('common.privacy.receiptRequest', { contactName: 'Ana (not checked yet)' });
+    const marko = copy('common.privacy.receiptRequest', { contactName: '“Marko” (self-declared)' });
+    const ana = copy('common.privacy.receiptRequest', { contactName: '“Ana” (self-declared)' });
     expect(result.structured.summary).toBe(`${INBOX_TEXT.someMessages(3)} ${marko} ${ana}`);
     for (const part of CANARY_PARTS) {
       expect(String(result.structured.summary)).not.toContain(part);
