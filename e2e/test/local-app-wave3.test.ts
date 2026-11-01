@@ -90,15 +90,15 @@ async function switchTo(
 
 /** Opens Home by address; Get started opens first while no AI app is connected, so skip it. */
 async function toHome(page: Page): Promise<void> {
-  const skip = page.getByRole('link', { name: 'Skip to Home' }).or(page.getByText('Skip to Home'));
-  if (
-    await skip
-      .first()
-      .isVisible({ timeout: 3000 })
-      .catch(() => false)
-  ) {
-    await skip.first().click();
-  }
+  const skip = page
+    .getByRole('button', { name: 'Skip to Home' })
+    .or(page.getByRole('link', { name: 'Skip to Home' }));
+  const shown = await skip
+    .first()
+    .waitFor({ state: 'visible', timeout: 8000 })
+    .then(() => true)
+    .catch(() => false);
+  if (shown) await skip.first().click();
 }
 
 /** Home: opens the conversation with `contact` and returns the page text. */
