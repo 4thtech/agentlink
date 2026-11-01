@@ -5816,6 +5816,17 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 - **Not in this card:** the inbox-folder guard test (own card).
 - **Acceptance:** unit tests for both forms and the migration; `wait-for-ci` tests for the wave gate name; CI green incl. `windows-smoke`; changeset and changelog.d fragment
 
+#### OPS-FAST-LANE-3 · every merge testable as `@next`; `latest` needs the heavy lane green (owner Decision 54 items 1 and 5)
+- **Status:** in progress · **Size:** M · **Tier:** Sonnet build · **Security:** S1 (sensitive path `.github/**`; supply-chain publish flow, no new secret) · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/release.yml`, `tools/release/` (`next-preview.mjs`, `wait-for-ci.mjs`, tests), `.changeset/config.json`, `docs/process/`, `docs/runbooks/merge-and-release.md`, `README.md`
+- **Depends on:** the `ci.yml` card that makes `ci-gate (push)` on `main` the heavy lane (merge that one first)
+- **Spec:** `docs/process/release-and-deployment.md` §4.1; D-25, D-52
+- **Invariants:** I-7
+- **Source:** Decision 54: a one-line fix took 10–20 h; every merge must be testable within minutes; a release cannot ship with heavy red
+- **Scope:** (1) the preview lane (`preview-gate`, `pack-preview`, `publish-preview`, `smoke-preview`) now also runs on `main`: snapshot `x.y.z-next.snap.<UTC datetime>` to `next` after each push, waiting only for "still the head of `main`", no owner click (`npm-next` has no reviewer, deployment branch `main`), smoke `npx -y @4thtech-io/agentlink@next --version`; skipped without a pending changeset or in pre mode. (2) `ci-green` is main only and requires `ci-gate (push)` + `security-gate`; `pack` (so `publish-next`, `publish-latest`, desktop extension) needs it; the Version packages PR and the snapshot do not. (3) `wait-for-ci` keeps the W5-WINDOWS wave-branch rule (`ci-gate` or `ci-gate (push)`), main stays exact; job names may contain parentheses. (4) docs.
+- **Acceptance:** `tools` tests green (next-preview, wait-for-ci structure and behaviour); YAML valid; changelog.d fragment
+- **Owner settings:** none (checked: `npm-next` has no required reviewers and allows `main`)
+
 #### W4-CANCEL-INVITE-SWEEP · pairing: cancelling an invite does not wait for the clean-up (new, #718 low)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core/src/pairing.ts` (`cancelInvite`)

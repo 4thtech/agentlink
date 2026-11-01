@@ -5,11 +5,14 @@
 #
 # ---------------------------------------------------------------------------
 # CI-GREEN (OPS-CI-2)
-#   The first job, `ci-green`, waits for this commit's push runs of ci.yml and security.yml and
-#   stops the whole run unless `ci-gate` and `security-gate` succeeded (tools/release/wait-for-ci.mjs).
+#   (OPS-FAST-LANE-3, owner Decision 54 item 1) The job `ci-green` (main only) waits for this commit's
+#   push runs of ci.yml and security.yml and stops the PUBLISH path (`pack`, `publish-next`,
+#   `publish-latest`, the desktop extension) unless the heavy lane `ci-gate (push)` and `security-gate`
+#   succeeded (tools/release/wait-for-ci.mjs): a release can never ship with heavy red. It does not hold
+#   back the Version packages PR or the `next` snapshot (see FAST @NEXT).
 #   SUPERSEDED (CHORE-CI-SUPERSEDED): when this commit's CI run was cancelled before it ran because a
 #   newer push to main took its pending slot, and main has moved on past this commit, `ci-green`
-#   ends green with result=superseded and every later job is skipped. The newer commit's own run
+#   ends green with result=superseded and the publish path is skipped. The newer commit's own run
 #   of this workflow (every push to main starts one) releases main's state.
 #
 # GUARD
@@ -27,22 +30,34 @@
 #     publish-latest  otherwise. Environment `npm-publish`: waits for the owner's approval click.
 #   These channels run only for pushes to `main` (select-mode is main-only).
 #
-# PREVIEW LANE (W4-NEXT-PREVIEW, owner Decision 44 A1)
-#   A push to the `wave-4` integration branch runs ci-green and guard for that branch, then
+# FAST @NEXT (OPS-FAST-LANE-3, owner Decision 54 item 5)
+#   Every push to `main` with a pending changeset publishes a snapshot `x.y.z-next.snap.<UTC datetime>`
+#   to npm `next` within minutes, so any merge is testable as `npx -y @4thtech-io/agentlink@next`. It is
+#   the preview lane below, now also for `main`: it waits only for `preview-gate` (main: nothing but
+#   "still the head of main"; the PR's quick checks passed before the merge and `pack-preview` builds
+#   the commit), never for the heavy lane. No owner click: environment `npm-next` has no reviewer.
+#   Nothing is committed; `latest` is never touched (checked after publishing). The owner clicks stay
+#   only for `latest` and the desktop release.
+#
+# PREVIEW LANE (W4-NEXT-PREVIEW, owner Decision 44 A1; also `main` since OPS-FAST-LANE-3)
+#   A push to the `wave-4` integration branch runs preview-gate (the CI wait) and guard for that branch, then
 #     pack-preview     no publish rights: `changeset version --snapshot next` (never committed),
 #                      build, `changeset publish-plan`, every entry forced onto the `next` dist-tag
 #                      and checked to be an `@4thtech-io/*` snapshot `x.y.z-next.wave4.<UTC datetime>`
 #                      (tools/release/next-preview.mjs; `.changeset/config.json` `snapshot`), pack.
+#                      Skipped in pre mode (the pre-mode `publish-next` channel owns `next` then) and when
+#                      the commit is no longer the head of its branch (the newer commit publishes).
 #     publish-preview  environment `npm-next`, OIDC + provenance: re-checks the packed plan, publishes
 #                      it with no git tags and no GitHub Release, then the same registry check as
 #                      publish-next (next updated, latest untouched, provenance, signatures).
-#     smoke-preview    `npx -y @4thtech-io/agentlink@<version> --version` without credentials.
+#     smoke-preview    `npx -y @4thtech-io/agentlink@<version> --version`, then `@next --version`
+#                      (retried while npm's tag propagates), without credentials.
 #   The main-lane jobs (Version packages PR, publish-next, publish-latest, desktop extension,
-#   rollback, freeze, record) never run for wave-4. Snapshot versions cannot collide with a real
+#   rollback, freeze, record) never depend on the preview jobs. Snapshot versions cannot collide with a real
 #   release (`x.y.z` or the main pre-mode `x.y.z-next.<n>`). Nothing is committed, so there is no
 #   pre mode to exit when wave-4 merges into main; guard refuses `.changeset/pre.json` on wave-4
 #   and a committed snapshot version on either branch (next-preview.mjs check-tree).
-#   No freeze job for this lane (deploy-freeze allows main only): a registry check that finds
+#   No freeze job for this lane (a snapshot never moves `latest`): a registry check that finds
 #   `latest` moved fails red, and the orchestrator or the owner sets DEPLOY_FREEZE by hand.
 #   Why not "publish to next, then promote with a dist-tag": Changesets v3 publishes from the
 #   packed artifacts ("artifact mode") so that build code never runs in the job holding
@@ -101,8 +116,9 @@
 #
 # MANUAL SETTINGS REQUIRED (docs/process/ci-cd.md, "Owner setup checklist", sections 4, 5 and 8)
 #   1. GitHub Environments:
-#        npm-next       no required reviewer; deployment branches: main and wave-4 (the preview
-#                       lane; wave-4 has its own ruleset: required checks, no force push, no
+#        npm-next       no required reviewer (the `next` snapshot of every merge to main needs no
+#                       click; OPS-FAST-LANE-3); deployment branches: main (and wave-4 while that
+#                       integration branch has its own ruleset: required checks, no force push, no
 #                       deletion); no secrets.
 #        npm-publish    required reviewer @talirezun, "Prevent self-review" OFF;
 #                       deployment branches: main and tags; one secret, DESKTOP_EXT_SIGNING_KEY
@@ -140,18 +156,22 @@ env:
   NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
 
 jobs:
-  # OPS-CI-2: nothing happens for a commit whose CI is not green. Waits for the push runs of this
-  # exact commit and requires their gate jobs (`ci-gate` of ci.yml, `security-gate` of
-  # security.yml) to have succeeded. Fails closed: red, cancelled or skipped, no run within 10
-  # minutes, still pending after 45, or an API that keeps failing. After a CI re-run turns green,
+  # OPS-CI-2 / OPS-FAST-LANE-3: nothing is PUBLISHED for a commit whose heavy lane is not green. Waits
+  # for the push runs of this exact `main` commit and requires their gate jobs (`ci-gate (push)` of
+  # ci.yml, the heavy lane that runs on main after the merge, and `security-gate` of security.yml) to
+  # have succeeded. Fails closed: red, cancelled or skipped, no run within 10 minutes, still pending
+  # after 90 (the heavy lane is long), or an API that keeps failing. After a CI re-run turns green,
   # re-run this workflow's failed jobs. Reads workflow-run metadata only (`actions: read`).
   # Superseded (--superseded-ok): CI cancelled because main moved on ends green with
-  # result=superseded; `guard` requires result == 'green', so nothing else runs.
+  # result=superseded; `pack` requires result == 'green', so nothing is published.
+  # Main only: the wave-4 preview waits in `preview-gate`. Only `pack` (and so publish-next,
+  # publish-latest and the desktop jobs) depends on this job; the Version packages PR and the `next`
+  # snapshot do not wait for it.
   ci-green:
     name: ci-green
-    if: github.repository_owner == '4thtech'
+    if: github.repository_owner == '4thtech' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    timeout-minutes: 95
     permissions:
       actions: read
       contents: read
@@ -163,8 +183,47 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Wait for this commit's CI and require it green
+      - name: Wait for this commit's heavy CI and require it green
         id: wait
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          node tools/release/wait-for-ci.mjs \
+            --branch "$BRANCH" \
+            --require "ci.yml:ci-gate (push)" \
+            --require security.yml:security-gate \
+            --timeout-minutes 90 \
+            --interval-seconds 30 \
+            --missing-grace-minutes 10 \
+            --superseded-ok
+
+  # OPS-FAST-LANE-3: the gate of the preview lane, fast on purpose.
+  #  - wave-4: as ci-green used to be: waits for that branch's push runs (`ci-gate`, `security-gate`).
+  #  - main: no CI wait. The PR's quick checks passed before the merge (no merge queue, Decision 54)
+  #    and `pack-preview` builds this commit. The only check here is that the commit is still the head
+  #    of main: an older commit never publishes a snapshot over a newer one (result=superseded).
+  preview-gate:
+    name: preview-gate
+    if: github.repository_owner == '4thtech'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      result: ${{ steps.result.outputs.result }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Wait for this wave branch's CI and require it green (wave-4)
+        id: wait
+        if: github.ref != 'refs/heads/main'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -180,11 +239,39 @@ jobs:
             --missing-grace-minutes 10 \
             --superseded-ok
 
+      - name: Check that this commit is still the head of main (main)
+        id: head
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          head="$(gh api "repos/$REPOSITORY/commits/$BRANCH" --jq .sha)"
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "result=green" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main has moved on to a newer commit; its own run publishes the snapshot."
+            echo "result=superseded" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report the result
+        id: result
+        shell: bash
+        env:
+          WAIT_RESULT: ${{ steps.wait.outputs.result }}
+          HEAD_RESULT: ${{ steps.head.outputs.result }}
+        run: |
+          set -euo pipefail
+          echo "result=${WAIT_RESULT:-$HEAD_RESULT}" >> "$GITHUB_OUTPUT"
+
   guard:
     name: guard
-    needs: ci-green
-    # A superseded ci-green exits 0 with result=superseded: nothing after it may run.
-    if: github.repository_owner == '4thtech' && needs.ci-green.outputs.result == 'green'
+    # OPS-FAST-LANE-3: guard no longer waits for CI. The publish path waits in `pack` (ci-green, heavy),
+    # the preview lane in `preview-gate`.
+    if: github.repository_owner == '4thtech'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -311,8 +398,11 @@ jobs:
 
   pack:
     name: pack
-    needs: select-mode
-    if: needs.select-mode.outputs.mode == 'publish'
+    # OPS-FAST-LANE-3: a release is packed, and so published, only for a commit whose heavy lane
+    # (`ci-gate (push)`) and security gate are green. A superseded or red ci-green skips this job and
+    # everything downstream (publish-next, publish-latest, desktop extension).
+    needs: [select-mode, ci-green]
+    if: needs.select-mode.outputs.mode == 'publish' && needs.ci-green.outputs.result == 'green'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -547,18 +637,19 @@ jobs:
           esac
 
   # ---------------------------------------------------------------------------
-  # Preview lane (W4-NEXT-PREVIEW): every green push to `wave-4` publishes a snapshot to `next`.
+  # Preview lane (W4-NEXT-PREVIEW; OPS-FAST-LANE-3): every green push to `wave-4` and every push to
+  # `main` that is still its head publishes a snapshot to `next`, within minutes of the merge.
   # Never `latest`, never a git tag or GitHub Release, never the desktop extension.
   pack-preview:
     name: pack-preview
-    needs: guard
-    if: needs.guard.outputs.enabled == 'true' && github.ref == 'refs/heads/wave-4'
+    needs: [guard, preview-gate]
+    if: needs.guard.outputs.enabled == 'true' && needs.preview-gate.outputs.result == 'green' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read # no publish rights: build code never sees the OIDC token
     outputs:
-      publish: ${{ steps.plan.outputs.publish }}
+      publish: ${{ steps.fresh.outputs.publish }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -582,7 +673,7 @@ jobs:
           set -euo pipefail
           node tools/release/next-preview.mjs pending >> "$GITHUB_OUTPUT"
           if ! grep -qx 'pending=true' "$GITHUB_OUTPUT"; then
-            echo "::notice::Nothing to publish: no pending changeset on wave-4."
+            echo "::notice::Nothing to publish: no pending changeset (or pre mode, where publish-next owns next)."
           fi
 
       # Versions every package with a pending changeset as x.y.z-next.wave4.<UTC datetime>
@@ -619,15 +710,35 @@ jobs:
             echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Pack the snapshot
+      # OPS-FAST-LANE-3: building took minutes; if a newer commit reached the branch meanwhile, this
+      # one publishes nothing and the newer run's snapshot is the one on `next`.
+      - name: Check that this commit is still the head of its branch
         if: steps.plan.outputs.publish == 'true'
+        id: fresh
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          head="$(gh api "repos/$REPOSITORY/commits/$BRANCH" --jq .sha)"
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::$BRANCH has moved on to a newer commit; its own run publishes the snapshot."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pack the snapshot
+        if: steps.fresh.outputs.publish == 'true'
         shell: bash
         run: |
           set -euo pipefail
           pnpm exec changeset pack --from-publish-plan "$RUNNER_TEMP/publish-plan.next.json" --out-dir "$RUNNER_TEMP/preview-pack"
 
       - name: Upload the packed snapshot
-        if: steps.plan.outputs.publish == 'true'
+        if: steps.fresh.outputs.publish == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: preview-pack
@@ -638,11 +749,12 @@ jobs:
   publish-preview:
     name: publish-preview
     needs: pack-preview
-    if: needs.pack-preview.result == 'success' && needs.pack-preview.outputs.publish == 'true' && github.ref == 'refs/heads/wave-4' && vars.DEPLOY_FREEZE != 'true'
+    if: needs.pack-preview.result == 'success' && needs.pack-preview.outputs.publish == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4') && vars.DEPLOY_FREEZE != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # Same environment and trusted publisher as publish-next (no reviewer). Its deployment branches
-    # must list wave-4 (owner setting); without it GitHub refuses this job before it starts.
+    # Same environment and trusted publisher as publish-next (no reviewer, so no owner click for a
+    # `main` snapshot). Its deployment branches must list the branch (main; wave-4 is an owner
+    # setting); without it GitHub refuses this job before it starts.
     environment: npm-next
     concurrency:
       group: release-npm-preview
@@ -824,7 +936,7 @@ jobs:
           PACKAGES: ${{ needs.publish-preview.outputs.packages }}
         run: |
           set -euo pipefail
-          version_re='^[0-9]+\.[0-9]+\.[0-9]+-next\.wave4\.[0-9]{14}$'
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+-next\.snap\.[0-9]{14}$'
           cli="$(jq -r '.[] | select(.name == "@4thtech-io/agentlink") | .version' <<< "$PACKAGES")"
           if [ -z "$cli" ]; then
             echo "::notice::@4thtech-io/agentlink is not part of this snapshot; nothing to smoke-test."
@@ -834,9 +946,35 @@ jobs:
           cd "$RUNNER_TEMP"
           out="$(npx -y "@4thtech-io/agentlink@$cli" --version)"
           case "$out" in
-            *"$cli"*) echo "CLI $cli runs. Try it: npx -y @4thtech-io/agentlink@next" ;;
+            *"$cli"*) echo "CLI $cli runs." ;;
             *) echo "::error::@4thtech-io/agentlink@$cli --version did not print $cli."; exit 1 ;;
           esac
+          # OPS-FAST-LANE-3: the command the owner types. `@next` can lag behind the publish for a
+          # while on npm's side, so it is retried; if a newer snapshot took the tag meanwhile, that
+          # is fine (the newer run smoke-tests its own).
+          matched=false
+          for _ in $(seq 1 12); do
+            tag_now="$(npm view @4thtech-io/agentlink dist-tags.next 2> /dev/null || true)"
+            if [ "$tag_now" != "$cli" ]; then
+              if [ -n "$tag_now" ] && [[ "$tag_now" =~ $version_re ]] && [ "${tag_now##*.}" -gt "${cli##*.}" ]; then
+                echo "::notice::A newer snapshot ($tag_now) already holds next; skipping the @next check."
+                matched=true
+                break
+              fi
+              sleep 15
+              continue
+            fi
+            out="$(npx -y "@4thtech-io/agentlink@next" --version)"
+            case "$out" in
+              *"$cli"*) matched=true; break ;;
+            esac
+            sleep 15
+          done
+          if [ "$matched" != "true" ]; then
+            echo "::error::npx -y @4thtech-io/agentlink@next --version did not print $cli."
+            exit 1
+          fi
+          echo "next runs $cli. Try it: npx -y @4thtech-io/agentlink@next"
 
   # ---------------------------------------------------------------------------
   # Production: stable releases to `latest`, after the owner's approval click.

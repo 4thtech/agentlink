@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // W4-NEXT-PREVIEW (owner Decision 44 A1): checks for the preview lane of release.yml, which
 // publishes every green state of the `wave-4` integration branch to npm `next` as a Changesets
-// snapshot (`x.y.z-next.wave4.<UTC datetime>`, `.changeset/config.json` `snapshot`). Nothing the
+// snapshot (`x.y.z-next.snap.<UTC datetime>`, `.changeset/config.json` `snapshot`). Nothing the
 // lane computes is committed, so there is no pre mode to exit when wave-4 merges into main.
 //
 //   node tools/release/next-preview.mjs check-tree --lane <main|wave-4> [--root <dir>]
@@ -30,11 +30,13 @@ import { pathToFileURL } from 'node:url';
 
 export const PREVIEW_BRANCH = 'wave-4';
 export const PREVIEW_TAG = 'next';
-// `{tag}.wave4.{datetime}` on the calculated version. A main pre-mode prerelease is
-// `x.y.z-next.<n>` (numeric second identifier), so the two schemes can never produce the same version.
+// `{tag}.snap.{datetime}` on the calculated version (OPS-FAST-LANE-3: `main` publishes them too; they
+// were `{tag}.wave4.{datetime}` for the wave-4 branch, which stay recognised as leaked below). A main
+// pre-mode prerelease is `x.y.z-next.<n>` (numeric second identifier), so the two schemes can never
+// produce the same version.
 const PREVIEW_VERSION =
-  /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-next\.wave4\.[0-9]{14}$/;
-const LEAKED_VERSION = /-next\.wave4\./;
+  /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-next\.snap\.[0-9]{14}$/;
+const LEAKED_VERSION = /-next\.(snap|wave4)\./;
 const SCOPED_NAME = /^@4thtech-io\/[a-z0-9][a-z0-9._-]*$/;
 const LANES = new Set(['main', PREVIEW_BRANCH]);
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.turbo', 'coverage']);
@@ -65,7 +67,7 @@ function checkRelease(release) {
   }
   if (!isPreviewVersion(release.version)) {
     throw new Error(
-      `${label}: not a preview snapshot (x.y.z-next.wave4.<datetime>); wave-4 never publishes a real release`,
+      `${label}: not a preview snapshot (x.y.z-next.snap.<datetime>); the preview lane never publishes a real release`,
     );
   }
 }
@@ -117,6 +119,17 @@ export function hasPendingChangesets(root) {
   );
 }
 
+/** True when `.changeset/pre.json` puts the tree in Changesets pre mode. */
+export function inPreMode(root) {
+  const file = join(root, '.changeset/pre.json');
+  if (!existsSync(file)) return false;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8')).mode === 'pre';
+  } catch {
+    return true; // unreadable: do not snapshot
+  }
+}
+
 /** Problems that forbid a release from `lane` in the tree at `root` (empty when clean). */
 export function checkTree({ root, lane }) {
   if (!LANES.has(lane))
@@ -164,7 +177,9 @@ export function run(argv, log = console.log) {
     const { command, opts } = parse(argv);
     switch (command) {
       case 'pending': {
-        log(`pending=${hasPendingChangesets(resolve(opts.root ?? '.'))}`);
+        const dir = resolve(opts.root ?? '.');
+        // Snapshots are refused in pre mode, and there the pre-mode channel owns `next`.
+        log(`pending=${hasPendingChangesets(dir) && !inPreMode(dir)}`);
         return 0;
       }
       case 'check-tree': {
