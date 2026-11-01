@@ -147,10 +147,25 @@
   outline-offset: 2px;
 }
 .al-sheet-close {
+  min-width: 44px;
+  min-height: 44px;
+  margin: -8px -10px -8px 0;
   border: 0;
   background: transparent;
   color: inherit;
+  font-size: 1.5rem;
+  line-height: 1;
   cursor: pointer;
+}
+/* W5-SHEET-CLOSE: the layer holds the sheet and a clickable backdrop; the page behind is inert. */
+.al-sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--al-z-overlay);
+}
+.al-sheet-backdrop {
+  position: absolute;
+  inset: 0;
 }
 .al-sheet-body {
   flex: 1;

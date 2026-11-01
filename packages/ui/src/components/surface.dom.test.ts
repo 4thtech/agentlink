@@ -204,3 +204,96 @@ describe('DialogFrame', () => {
     expect(host.querySelector('#b')).not.toBeNull();
   });
 });
+
+// W5-SHEET-CLOSE: a panel that cannot be left was the owner's bug. Escape is on the document, the
+// backdrop and the route change close, and `inert` never outlives the layer.
+describe('Sheet: never trapped (W5-SHEET-CLOSE)', () => {
+  const page = (open: boolean, onClose: () => void, extra: ReactNode = null): ReactNode =>
+    h(
+      'div',
+      null,
+      h('main', { id: 'page' }, h('button', { id: 'opener' }, 'Open')),
+      h(Sheet, { open, title: 'Marko', onClose }, h('p', { id: 'text' }, 'Not focusable'), extra),
+    );
+  const bare = (): ReactNode => h('div', null, h('main', { id: 'page' }, 'page'));
+
+  it('Escape on the document closes it even when focus fell to the page', () => {
+    const onClose = vi.fn();
+    render(page(true, onClose));
+    (document.activeElement as HTMLElement).blur();
+    expect(document.activeElement).toBe(document.body);
+    key(document.body, 'Escape');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('only the top layer answers Escape', () => {
+    const lower = vi.fn();
+    const upper = vi.fn();
+    render(
+      h(
+        'div',
+        null,
+        h(Sheet, { open: true, title: 'A', onClose: lower }),
+        h(Sheet, { open: true, title: 'B', onClose: upper }),
+      ),
+    );
+    key(document.body, 'Escape');
+    expect(upper).toHaveBeenCalledTimes(1);
+    expect(lower).not.toHaveBeenCalled();
+  });
+
+  it('a click on the backdrop closes it; a click inside does not', () => {
+    const onClose = vi.fn();
+    render(page(true, onClose));
+    act(() => (host.querySelector('#text') as HTMLElement).click());
+    expect(onClose).not.toHaveBeenCalled();
+    const backdrop = host.querySelector('.al-sheet-backdrop') as HTMLElement;
+    expect(backdrop.closest('[inert]')).toBeNull();
+    act(() => backdrop.click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes on a route change, but not on a navigation to the same address', () => {
+    const onClose = vi.fn();
+    render(page(true, onClose));
+    act(() => {
+      window.dispatchEvent(new Event('agentlink:navigate'));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    history.pushState(null, '', '/elsewhere');
+    act(() => {
+      window.dispatchEvent(new Event('agentlink:navigate'));
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    history.pushState(null, '', '/');
+  });
+
+  it('takes focus back when it falls to the page', () => {
+    vi.useFakeTimers();
+    try {
+      render(page(true, () => undefined, h('button', { id: 'gone' }, 'x')));
+      const gone = host.querySelector('#gone') as HTMLElement;
+      gone.focus();
+      act(() => {
+        gone.blur();
+        vi.runAllTimers();
+      });
+      expect(document.activeElement).toBe(host.querySelector('.al-sheet-title'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears inert on close and on unmount, and sweeps a stray hold', () => {
+    render(page(true, () => undefined));
+    expect(host.querySelector('#page')?.hasAttribute('inert')).toBe(true);
+    render(page(false, () => undefined));
+    expect(host.querySelector('#page')?.hasAttribute('inert')).toBe(false);
+    render(page(true, () => undefined));
+    act(() => root.unmount());
+    expect(document.querySelectorAll('[inert]')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-al-inert]')).toHaveLength(0);
+    root = createRoot(host);
+    render(bare());
+  });
+});

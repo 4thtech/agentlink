@@ -10578,3 +10578,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M3-15 | **DECISION NEEDED (optional):** welcome credits, eligibility and budget |
 | M3-11 | Provide the GitBook MCP; merge the GitBook change request |
 | Releases | Approve every npm `latest` publish with one click on the waiting deployment (D-25, D-52); remove the `production` Environment's required reviewer when the first deployable app exists (M1b) |
+
+#### W5-SHEET-CLOSE + W5-SAFETY-STEP · local app: side panels always close; Home's safety-code step opens the code (wave 5)
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/{surface.tsx,layers.ts,inert.ts,pay-confirm.tsx,depth.css}`; `apps/local-ui/src/pages/{contacts,home,agents}/**`; `e2e/test/local-ui-sheet-close.test.ts`
+- **Depends on:** W4-Z (0.4.6)
+- **Spec:** 11 §5; 04 §3.6.1 (`contact.check` is owner-signed, I-4); 08 (join flow)
+- **Done when:** in real Chromium the contact panel closes with Escape after a click on non-focusable content, with the ×, with a click on the backdrop and on a route change, and `inert` is always cleared; the same holds for the Agents, AI apps, dialog and payment layers (top layer answers Escape; a removal in flight can be closed after 10 s). Home's "Compare safety code" opens `/contacts?check=<ref>` for the first unchecked answered contact with the panel open, and Home and the panel share one predicate (`canCompareCode`). Completion stays the signed "They match"; no unsigned "mark done".

@@ -13,6 +13,7 @@
 // owner-confirmed alias does. Names are returned as plain text for React to render as text.
 import { formatContactName } from '@4thtech-io/ui';
 import type { ContactRow } from '../contacts/data.js';
+import { firstToCompare } from '../contacts/safety.js';
 import { startHello } from './strings.js';
 
 export type StepId = 'protect' | 'name' | 'connect' | 'invite' | 'check' | 'send' | 'reply' | 'kit';
@@ -72,8 +73,10 @@ export interface StepView {
   readonly state: StepState;
   /** The safety code and reply rows: the owner-confirmed name of the contact we wait for. */
   readonly name?: string | undefined;
-  /** The safety code row only: an answered contact exists, so "Compare safety code" is offered. */
+  /** The safety code row only: a contact whose code can be compared exists, so "Compare safety code" is offered. */
   readonly compare?: boolean | undefined;
+  /** The safety code row only: the first such contact, whose panel the link opens at its code. */
+  readonly compareRef?: string | undefined;
   /** Connect only: the open agent's AI app (plain text), or null. */
   readonly appName?: string | null | undefined;
   /** Connect only: the app has run AgentLink (Running), else it needs a restart. */
@@ -145,6 +148,8 @@ export function deriveStart(signals: Signals, remembered: ReadonlySet<StepId>): 
   const nextId = unknown ? null : (firstUndone ?? null);
 
   const answered = rows?.find((r) => r.status === 'active' && r.pairing === 'complete');
+  // The detail panel's own rule (contacts/safety.ts), so Home never offers what the panel lacks.
+  const toCompare = rows === undefined ? undefined : firstToCompare(rows);
   const waitingFor = rows?.find((r) => r.status === 'active' && r.pairing === 'pending');
   const hello = rows === undefined ? undefined : pick(rows);
   const helloName = hello === undefined ? null : ownerName(hello);
@@ -169,10 +174,15 @@ export function deriveStart(signals: Signals, remembered: ReadonlySet<StepId>): 
       return { id, state: 'done' };
     }
     if (id === 'check') {
-      if (answered === undefined && waitingFor !== undefined) {
+      if (toCompare === undefined && answered === undefined && waitingFor !== undefined) {
         return { id, state: 'waiting', name: ownerName(waitingFor) ?? undefined };
       }
-      return { id, state: 'later', compare: answered !== undefined };
+      return {
+        id,
+        state: 'later',
+        compare: toCompare !== undefined,
+        compareRef: toCompare?.ref,
+      };
     }
     if (id === 'reply') {
       return { id, state: id === nextId ? 'next' : 'later', name: helloName ?? undefined };

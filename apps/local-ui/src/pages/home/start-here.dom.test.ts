@@ -18,6 +18,7 @@ import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { ListAnswer } from '../approvals/client.js';
 import type { ContactRow } from '../contacts/data.js';
 import { ADD_CONTACT_HREF } from '../contacts/add-contact-link.js';
+import { checkHref } from '../contacts/safety.js';
 import { HomePage, type HomePageProps } from './index.js';
 import { START_STRINGS } from './strings.js';
 import { START_DONE_KEY, type AgentSignal, type StartHereReads } from './start-here.js';
@@ -264,7 +265,8 @@ describe('Start here: the card', () => {
     await mount(props(reads(live)));
     const link = step('check').querySelector('a');
     expect(link?.textContent).toBe('Compare safety code');
-    expect(link?.getAttribute('href')).toBe('/settings/contacts');
+    // W5-SAFETY-STEP: the link opens that contact's panel at its safety code.
+    expect(link?.getAttribute('href')).toBe(checkHref(contact().ref));
     expect(link?.classList.contains('al-btn-primary')).toBe(false);
     expect(step('send').getAttribute('data-state')).toBe('next');
   });

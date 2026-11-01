@@ -83,6 +83,7 @@ import {
   type PresenceProof,
 } from './owner.js';
 import { PresencePrompt } from './presence-prompt.js';
+import { canCompareCode, clearCheckParam, peekCheckRef } from './safety.js';
 import { useInviteFirst } from '../home/start-here-empty.js';
 import { ConnectedMoment, type ConnectedMomentProps } from '../invite/connected.js';
 import { useOwnName } from '../invite/own-name.js';
@@ -341,10 +342,7 @@ function Detail({
 }): ReactElement {
   const ref = contact.ref;
   const name = shownName(contact);
-  const compare =
-    contact.status === 'active' &&
-    contact.pairing === 'complete' &&
-    contact.label === 'self-declared';
+  const compare = canCompareCode(contact);
   const [code, setCode] = useState<CodeState>({ kind: 'loading' });
   const [codeTick, setCodeTick] = useState(0);
   const [skipped, setSkipped] = useState(false);
@@ -785,6 +783,8 @@ export function ContactsPage({
   const [removed, setRemoved] = useState(false);
   const [kept, setKept] = useState(loadKept);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // W5-SAFETY-STEP: Home's "Compare safety code" link (`?check=<ref>`) opens that contact's panel.
+  const wantsCheck = useRef(peekCheckRef());
   const [rows, setRows] = useState<readonly OpenInvite[]>([]);
   const [highlight, setHighlight] = useState<string | undefined>(undefined);
   const [justCreated, setJustCreated] = useState(false);
@@ -848,6 +848,16 @@ export function ContactsPage({
           if (fresh !== undefined) {
             expecting.current = false;
             setArrived(fresh);
+          }
+        }
+        const wanted = wantsCheck.current;
+        if (wanted !== undefined) {
+          wantsCheck.current = undefined;
+          clearCheckParam();
+          if (answer.contacts.some((c) => c.ref === wanted)) {
+            setSelected(wanted);
+            setSheetOpen(true);
+            return;
           }
         }
         setSelected((current) =>

@@ -24,6 +24,7 @@ import {
 } from 'react';
 import { Button, TextField } from './forms.js';
 import { holdInert } from './inert.js';
+import { refocusOnLoss, useLayer } from './layers.js';
 
 /** Every word the sheet shows (11 §5; b11 §19.6). `{name}` and the like are filled in. */
 export const PAY_CONFIRM_STRINGS = Object.freeze({
@@ -385,14 +386,17 @@ export function PayConfirmSheet(props: PayConfirmSheetProps): ReactElement {
             ? notice.text
             : '';
 
+  // W5-SHEET-CLOSE: Escape (on the document), a click outside the sheet and a route change all end
+  // it the same way, except while the proof is being recorded or Touch ID is being waited for.
+  const dismiss = (): void => {
+    if (phase === 'recording' || phase === 'waiting') return;
+    if (closed === true || phase === 'done') props.onClose();
+    else props.onCancel();
+  };
+  useLayer(true, dismiss, dismiss);
+  const onBlur = refocusOnLoss(sheetRef, titleRef);
+
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      if (phase === 'recording' || phase === 'waiting') return;
-      event.preventDefault();
-      if (closed === true || phase === 'done') props.onClose();
-      else props.onCancel();
-      return;
-    }
     if (event.key !== 'Tab' || sheetRef.current === null) return;
     const list = [
       ...sheetRef.current.querySelectorAll<HTMLElement>('button, input, a[href]'),
@@ -416,7 +420,12 @@ export function PayConfirmSheet(props: PayConfirmSheetProps): ReactElement {
   const forId = `${id}-for`;
 
   return (
-    <div className="al-pay-overlay">
+    <div
+      className="al-pay-overlay"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) dismiss();
+      }}
+    >
       <div
         ref={sheetRef}
         className="al-pay-sheet"
@@ -426,6 +435,7 @@ export function PayConfirmSheet(props: PayConfirmSheetProps): ReactElement {
         aria-describedby={`${amountId} ${forId}`}
         data-motion={reducedMotion ? 'reduced' : 'full'}
         onKeyDown={onKeyDown}
+        onBlur={onBlur}
       >
         <div className="al-pay-grab" aria-hidden="true" />
         <h2 id={`${id}-title`} ref={titleRef} tabIndex={-1} className="al-pay-title">

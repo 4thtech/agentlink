@@ -10,6 +10,7 @@
 //   that is copied to the AI (the spirit of 11 §6.5).
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ContactRow } from '../contacts/data.js';
+import { canCompareCode } from '../contacts/safety.js';
 import {
   COUNTED,
   deriveStart,
@@ -187,6 +188,50 @@ describe('deriveStart: the safety code never holds the card', () => {
     expect(step?.state).toBe('later');
     expect(step?.compare).toBe(true);
     expect(v.nextId).toBe('send');
+  });
+
+  it('W5-SAFETY-STEP: it points at the first unchecked answered contact, oldest first', () => {
+    const v = deriveStart(
+      all({
+        contacts: [
+          contact({ ref: ref(1), label: 'safety-code-checked' }),
+          contact({ ref: ref(2), since: 1_760_000_500 }),
+          contact({ ref: ref(3), since: 1_760_000_100 }),
+          contact({ ref: ref(4), pairing: 'pending', since: 1_750_000_000 }),
+        ],
+        ...fewer,
+      }),
+      new Set<StepId>(),
+    );
+    // A checked contact elsewhere completes the step (the signed "They match" is its only way).
+    expect(v.steps.find((s) => s.id === 'check')?.state).toBe('done');
+    const open = deriveStart(
+      all({
+        contacts: [
+          contact({ ref: ref(2), since: 1_760_000_500 }),
+          contact({ ref: ref(3), since: 1_760_000_100 }),
+          contact({ ref: ref(4), pairing: 'pending', since: 1_750_000_000 }),
+        ],
+        ...fewer,
+      }),
+      new Set<StepId>(),
+    );
+    expect(open.steps.find((s) => s.id === 'check')?.compareRef).toBe(ref(3));
+  });
+
+  it('W5-SAFETY-STEP: Home and the panel agree on who can be compared', () => {
+    for (const c of [
+      contact(),
+      contact({ pairing: 'pending' }),
+      contact({ pairing: 'mismatch' }),
+      contact({ status: 'blocked' }),
+      contact({ label: 'safety-code-checked' }),
+    ]) {
+      const step = deriveStart(all({ contacts: [c], ...fewer }), NONE).steps.find(
+        (s) => s.id === 'check',
+      );
+      expect(step?.compare === true, JSON.stringify(c)).toBe(canCompareCode(c));
+    }
   });
 });
 

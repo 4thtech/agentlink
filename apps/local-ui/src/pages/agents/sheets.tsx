@@ -4,7 +4,7 @@
 // server signs. The routes of U3-d and U3-e may still be stubs (501): that reads as a plain
 // "not done" sentence and nothing is claimed. Labels are rendered as text only (I-5).
 import { Button, Sheet, TextField } from '@4thtech-io/ui';
-import { useId, useState, type FormEvent, type ReactElement } from 'react';
+import { useEffect, useId, useState, type FormEvent, type ReactElement } from 'react';
 import { navigate } from '../../router.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import { AppMark } from './app-mark.js';
@@ -17,6 +17,8 @@ import { AGENTS_STRINGS as S } from './strings.js';
 export const LABEL_MAX = 32;
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f]/;
+/** How long a removal in flight keeps its sheet against Esc, the backdrop and the close button. */
+const BUSY_GRACE_MS = 10_000;
 export function labelProblem(text: string): boolean {
   const t = text.trim();
   return t === '' || [...t].length > LABEL_MAX || CONTROL.test(t);
@@ -205,6 +207,17 @@ export function RemoveSheet({
   const nameId = useId();
   const matches = typed === row.label;
   const contacts = row.contacts ?? 0;
+  // W5-SHEET-CLOSE: a removal in flight keeps the sheet for a moment, never for good: after 10 s
+  // without an answer the owner can close it again.
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    if (!busy) {
+      setStuck(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setStuck(true), BUSY_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [busy]);
 
   const send =
     (anyway: boolean) =>
@@ -248,7 +261,7 @@ export function RemoveSheet({
       open
       title={title}
       onClose={() => {
-        if (!busy) onClose();
+        if (!busy || stuck) onClose();
       }}
       closeLabel={S.close}
       className="ag-sheet"
