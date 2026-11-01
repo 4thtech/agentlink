@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   checkTree,
   hasPendingChangesets,
+  inPreMode,
   isPreviewVersion,
   PREVIEW_BRANCH,
   PREVIEW_TAG,
@@ -14,13 +15,13 @@ import {
 } from './next-preview.mjs';
 
 // W4-NEXT-PREVIEW (owner Decision 44 A1): every green state of the `wave-4` integration branch is
-// published to npm `next` as a Changesets snapshot (`x.y.z-next.wave4.<UTC datetime>`), never to
+// published to npm `next` as a Changesets snapshot (`x.y.z-next.snap.<UTC datetime>`), never to
 // `latest`, never with a GitHub Release, from the `npm-next` environment with provenance. Nothing
 // the preview lane computes is committed, so no pre-mode file or snapshot version can reach `main`.
 
 const root = resolve(import.meta.dirname, '../..');
 const script = resolve(import.meta.dirname, 'next-preview.mjs');
-const SNAPSHOT = '0.4.5-next.wave4.20261029152018';
+const SNAPSHOT = '0.4.5-next.snap.20261029152018';
 
 const entry = (overrides = {}) => ({
   kind: 'publish',
@@ -41,7 +42,7 @@ const packed = (overrides = {}) =>
 describe('preview version scheme', () => {
   it('accepts the snapshot versions the Changesets config produces', () => {
     expect(isPreviewVersion(SNAPSHOT)).toBe(true);
-    expect(isPreviewVersion('1.0.0-next.wave4.20270101000000')).toBe(true);
+    expect(isPreviewVersion('1.0.0-next.snap.20270101000000')).toBe(true);
   });
 
   it('never matches a stable release or a main pre-mode prerelease (no collision)', () => {
@@ -50,11 +51,11 @@ describe('preview version scheme', () => {
       '0.4.6',
       '0.4.5-next.0',
       '0.4.5-next.12',
-      '0.4.5-next.wave4',
-      '0.4.5-next.wave4.2026102915',
-      '0.4.5-next.wave4.20261029152018.1',
+      '0.4.5-next.snap',
+      '0.4.5-next.snap.2026102915',
+      '0.4.5-next.snap.20261029152018.1',
       '0.0.0-next-20261029152018',
-      '00.4.5-next.wave4.20261029152018',
+      '00.4.5-next.snap.20261029152018',
       ` ${SNAPSHOT}`,
       42,
       undefined,
@@ -63,11 +64,11 @@ describe('preview version scheme', () => {
     }
   });
 
-  it('the Changesets config builds snapshots on the calculated version with the wave4 template', () => {
+  it('the Changesets config builds snapshots on the calculated version with the snap template', () => {
     const config = JSON.parse(readFileSync(join(root, '.changeset/config.json'), 'utf8'));
     expect(config.snapshot).toEqual({
       useCalculatedVersion: true,
-      prereleaseTemplate: '{tag}.wave4.{datetime}',
+      prereleaseTemplate: '{tag}.snap.{datetime}',
     });
     expect(PREVIEW_TAG).toBe('next');
     expect(PREVIEW_BRANCH).toBe('wave-4');
@@ -87,7 +88,7 @@ describe('preparePlan (pack-preview, before packing)', () => {
     expect(preparePlan(planOf()).plan).toEqual([]);
   });
 
-  it('refuses a stable or non-snapshot version (wave-4 never publishes a real release)', () => {
+  it('refuses a stable or non-snapshot version (the preview lane never publishes a real release)', () => {
     expect(() => preparePlan(planOf([entry({ version: '0.4.5' })]))).toThrow(/snapshot/);
     expect(() => preparePlan(planOf([entry({ version: '0.4.5-next.3' })]))).toThrow(/snapshot/);
   });
@@ -207,6 +208,17 @@ describe('pending changesets (snapshot versioning exits 1 without one)', () => {
     expect(hasPendingChangesets(mkdtempSync(join(tmpdir(), 'w4np-none-')))).toBe(false);
   });
 
+  it('is false in pre mode: the pre-mode channel owns next, snapshots are refused there', () => {
+    const dir = tree({ preJson: { mode: 'pre', tag: 'next' } });
+    writeFileSync(join(dir, '.changeset/brave-cats.md'), '---\n"x": patch\n---\n\nx\n');
+    expect(hasPendingChangesets(dir)).toBe(true);
+    expect(inPreMode(dir)).toBe(true);
+    expect(
+      execFileSync('node', [script, 'pending', '--root', dir], { encoding: 'utf8' }).trim(),
+    ).toBe('pending=false');
+    expect(inPreMode(tree({ preJson: { mode: 'exit', tag: 'next' } }))).toBe(false);
+  });
+
   it('is true with a changeset file, and the command line prints a step output line', () => {
     const dir = tree();
     writeFileSync(join(dir, '.changeset/brave-cats.md'), '---\n"x": patch\n---\n\nx\n');
@@ -283,6 +295,41 @@ describe('release.yml: triggers', () => {
     expect(ciGreen).toMatch(/\n {10}BRANCH: \$\{\{ github\.ref_name \}\}\n/);
   });
 
+  // OPS-FAST-LANE-3 (Decision 54): a release cannot ship with the heavy lane red, and the `next`
+  // snapshot does not wait for it.
+  it('ci-green is main only and requires the heavy lane "ci-gate (push)" plus security-gate', () => {
+    const ciGreen = jobOf(release, 'ci-green');
+    expect(ifOf(ciGreen)).toMatch(/github\.ref == 'refs\/heads\/main'/);
+    expect(ciGreen).toMatch(/--require "ci\.yml:ci-gate \(push\)"/);
+    expect(ciGreen).toMatch(/--require security\.yml:security-gate/);
+    expect(ciGreen).toMatch(/--superseded-ok/);
+  });
+
+  it('pack (so publish-next, publish-latest and the desktop jobs) needs a green ci-green', () => {
+    const pack = jobOf(release, 'pack');
+    expect(needsOf(pack)).toContain('ci-green');
+    expect(ifOf(pack)).toMatch(/needs\.ci-green\.outputs\.result == 'green'/);
+    for (const name of ['publish-next', 'publish-latest', 'desktop-extension-release']) {
+      expect(reaches(name, 'ci-green'), name).toBe(true);
+    }
+  });
+
+  it('neither guard, the Version packages PR nor the preview lane waits for the heavy lane', () => {
+    for (const name of ['guard', 'select-mode', 'version', ...PREVIEW_JOBS, 'preview-gate']) {
+      expect(reaches(name, 'ci-green'), name).toBe(false);
+    }
+  });
+
+  it('preview-gate on main only checks that the commit is still the head of main', () => {
+    const gate = jobOf(release, 'preview-gate');
+    expect(gate).toMatch(/commits\/\$BRANCH/);
+    expect(gate).toMatch(/result=superseded/);
+    // The CI wait is the wave-4 step only; a wave-4 push run publishes `ci-gate (push)`.
+    const wait = gate.slice(gate.indexOf('id: wait'), gate.indexOf('id: head'));
+    expect(wait).toMatch(/if: github\.ref != 'refs\/heads\/main'/);
+    expect(wait).toMatch(/--require "ci\.yml:ci-gate \(push\)"/);
+  });
+
   it('security.yml runs on push to wave-4 so ci-green can find its gate', () => {
     const on = /\non:\n((?: {2}.*\n|\s*\n)*)/.exec(workflow('security.yml'))?.[1] ?? '';
     expect(on).toMatch(/\n {2}push:\n {4}branches: \[main, wave-4\]\n/);
@@ -301,7 +348,8 @@ describe('release.yml: the main lane never runs for a wave-4 push', () => {
 
   it('every job outside the preview lane is ci-green, guard or downstream of select-mode', () => {
     for (const name of jobsOf(release)) {
-      if (['ci-green', 'guard', 'select-mode', ...PREVIEW_JOBS].includes(name)) continue;
+      if (['ci-green', 'preview-gate', 'guard', 'select-mode', ...PREVIEW_JOBS].includes(name))
+        continue;
       const job = jobOf(release, name);
       // Jobs with always() still only act on main-lane outputs, which are empty when skipped.
       const onMainLane = needsOf(job).some((n) => reaches(n, 'select-mode'));
@@ -327,10 +375,13 @@ describe('release.yml: the preview lane', () => {
     for (const job of [pack, publish, smoke]) expect(job).not.toBe('');
   });
 
-  it('runs only for wave-4 and only after guard', () => {
-    expect(needsOf(pack)).toEqual(['guard']);
+  it('runs for main and wave-4, after guard and the fast preview-gate', () => {
+    expect(needsOf(pack)).toEqual(['guard', 'preview-gate']);
     expect(ifOf(pack)).toMatch(/needs\.guard\.outputs\.enabled == 'true'/);
+    expect(ifOf(pack)).toMatch(/needs\.preview-gate\.outputs\.result == 'green'/);
+    expect(ifOf(pack)).toMatch(/github\.ref == 'refs\/heads\/main'/);
     expect(ifOf(pack)).toMatch(/github\.ref == 'refs\/heads\/wave-4'/);
+    expect(ifOf(publish)).toMatch(/github\.ref == 'refs\/heads\/main'/);
     expect(ifOf(publish)).toMatch(/github\.ref == 'refs\/heads\/wave-4'/);
     expect(ifOf(publish)).toMatch(/vars\.DEPLOY_FREEZE != 'true'/);
     expect(needsOf(publish)).toEqual(['pack-preview']);
@@ -395,8 +446,15 @@ describe('release.yml: the preview lane', () => {
     expect(smoke).not.toMatch(/id-token/);
   });
 
+  it('does not publish an older commit over a newer one, and smoke-tests the @next command', () => {
+    expect(pack).toMatch(/Check that this commit is still the head of its branch/);
+    expect(pack.indexOf('still the head')).toBeLessThan(pack.indexOf('changeset pack --from'));
+    expect(smoke).toMatch(/npx -y "@4thtech-io\/agentlink@next" --version/);
+    expect(smoke).toMatch(/-next\\\.snap\\\./);
+  });
+
   it('every ${{ }} in a preview run block comes in through env', () => {
-    for (const job of [pack, publish, smoke]) {
+    for (const job of [pack, publish, smoke, jobOf(release, 'preview-gate')]) {
       for (const block of job.matchAll(/\n( +)run: \|[^\n]*\n((?:\1 {2}.*\n|\s*\n)*)/g)) {
         expect(block[2]).not.toMatch(/\$\{\{/);
       }

@@ -164,6 +164,35 @@ describe('checkOnce', () => {
     expect(result.state).toBe('red');
   });
 
+  // OPS-FAST-LANE-3: on main the heavy lane is the job `ci-gate (push)`; it is asked for by that exact
+  // name, and the plain `ci-gate` of a pull request or merge queue does not satisfy it.
+  it('main: requiring "ci-gate (push)" takes that job, not a plain "ci-gate"', async () => {
+    const heavy = [
+      { workflow: 'ci.yml', job: 'ci-gate (push)' },
+      { workflow: 'security.yml', job: 'security-gate' },
+    ];
+    const okay = fakeApi(
+      greenRoutes({
+        [jobsPath(11)]: () => ({ jobs: [job('ci-gate (push)', 'completed', 'success')] }),
+      }),
+    );
+    expect((await checkOnce({ api: okay.api, repo: REPO, sha: SHA, require: heavy })).state).toBe(
+      'green',
+    );
+    const red = fakeApi(
+      greenRoutes({
+        [jobsPath(11)]: () => ({ jobs: [job('ci-gate (push)', 'completed', 'failure')] }),
+      }),
+    );
+    expect((await checkOnce({ api: red.api, repo: REPO, sha: SHA, require: heavy })).state).toBe(
+      'red',
+    );
+    const plain = fakeApi(greenRoutes());
+    expect((await checkOnce({ api: plain.api, repo: REPO, sha: SHA, require: heavy })).state).toBe(
+      'red',
+    );
+  });
+
   it('is red when the run completed without the gate job', async () => {
     const { api } = fakeApi(
       greenRoutes({ [jobsPath(11)]: () => ({ jobs: [job('detect', 'completed', 'success')] }) }),
@@ -349,6 +378,15 @@ describe('parseArgs', () => {
 
   it('refuses to run without a required gate', () => {
     expect(() => parseArgs([])).toThrow();
+  });
+
+  it('accepts a job name with parentheses (ci-gate (push)) and still refuses shell characters', () => {
+    expect(parseArgs(['--require', 'ci.yml:ci-gate (push)']).require).toEqual([
+      { workflow: 'ci.yml', job: 'ci-gate (push)' },
+    ]);
+    for (const bad of ['ci.yml:a;b', 'ci.yml:a$(x)', 'ci.yml:a`b`', 'ci.yml:a|b']) {
+      expect(() => parseArgs(['--require', bad]), bad).toThrow();
+    }
   });
 
   for (const bad of ['ci.yml', ':ci-gate', 'ci.yml:', '../x.yml:ci-gate', 'ci.yaml.sh:ci-gate']) {
@@ -570,12 +608,24 @@ describe('workflows that wait for CI', () => {
       (m) => m[1],
     );
 
-  for (const name of [
-    'release.yml',
-    'deploy-submitter.yml',
-    'deploy-drop.yml',
-    'deploy-invite.yml',
-  ]) {
+  // OPS-FAST-LANE-3: in release.yml the gate sits on `pack`, so the Version packages PR and the
+  // `next` snapshot do not wait for the heavy lane; a superseded or red ci-green still publishes nothing.
+  it('release.yml: ci-green publishes its result and pack requires it to be green', () => {
+    const source = read('release.yml');
+    const ciGreen = jobOf(source, 'ci-green');
+    expect(ciGreen).toMatch(/--superseded-ok/);
+    expect(ciGreen).toMatch(/outputs:\n {6}result: \$\{\{ steps\.wait\.outputs\.result \}\}/);
+    expect(ciGreen).toMatch(/id: wait\n/);
+    const pack = jobOf(source, 'pack');
+    expect(pack).toMatch(/needs: \[select-mode, ci-green\]\n/);
+    expect(pack).toMatch(/\n {4}if: .*needs\.ci-green\.outputs\.result == 'green'/);
+    for (const other of jobsOf(source)) {
+      if (['ci-green', 'pack'].includes(other)) continue;
+      expect(jobOf(source, other)).not.toMatch(/needs:.*ci-green/);
+    }
+  });
+
+  for (const name of ['deploy-submitter.yml', 'deploy-drop.yml', 'deploy-invite.yml']) {
     it(`${name}: ci-green publishes its result and guard requires it to be green`, () => {
       const source = read(name);
       const ciGreen = jobOf(source, 'ci-green');

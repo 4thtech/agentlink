@@ -156,7 +156,7 @@ New in 0.4.5 (29 Oct 2026), fixes to the new app:
 - **Removing an agent finishes**, including right after first run. Touch ID or your backup code is still asked before anything is deleted.
 - **Touch ID works when no agent is open**, and if it cannot be used the sheet tells you why. A computer set up before 0.3.0 can switch once, right there.
 - **Calmer top bar and a tidier invite box.** One status instead of two, a fixed line for a file that arrived but is not saved yet, and a paste box that grows with its text.
-- **Preview builds.** If you like to try things early, `npx -y @4thtech-io/agentlink@next` runs the newest work in progress. It never replaces the normal release.
+- **Preview builds.** If you like to try things early, `npx -y @4thtech-io/agentlink@next` runs the newest work in progress; every change that lands on `main` is published there within minutes. It never replaces the normal release.
 
 
 Coming next, not released yet: a Connections map, saved views and a way to open a file.
