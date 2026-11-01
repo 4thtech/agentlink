@@ -136,7 +136,7 @@ jobs:
         run: |
           set -euo pipefail
           node tools/release/wait-for-ci.mjs \
-            --require ci.yml:ci-gate \
+            --require "ci.yml:ci-gate (push)" \
             --require security.yml:security-gate \
             --timeout-minutes 45 \
             --interval-seconds 30 \
