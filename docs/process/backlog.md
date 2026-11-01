@@ -795,6 +795,20 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** Owner decisions (Tali, 2026-10-25): (D1) a merge group whose diff holds only docs runs `checks` through the affected-package selector instead of the full suite; any code PR in the group, an unreadable diff or a push to `main` runs the full suite. (Item B) a docs-only push to a feature branch is diffed against its merge base with `main`, so the heavy jobs skip; an unknown base runs everything. (D2) `review-gate` derives `docs-site/**` as S1 (the mirror that M0-25 and the docs-site check card left open), exempting only the generated page `docs-site/technical/project/status-and-roadmap.md`. (D3) spec review classes are unchanged.
 - **Acceptance:** no gate weakened (gitleaks, dependency review, CodeQL, zizmor, pr-hygiene, review-gate, context-budget, changesets, docs-status drift all keep running); no ruleset change, no `paths-ignore`, `ci-gate` unchanged; tests first in `tools/ci/select-affected.test.mjs` and `tools/ci/review-gate.test.mjs`.
 
+#### OPS-FAST-LANE-1 · CI fast lane on pull requests, heavy lane on main (new, 2026-11-01)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S1 by path (`.github/**`, `tools/release/` are sensitive paths; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `.github/workflows/security.yml` (CodeQL leg condition), `.github/workflows/deploy-{drop,invite,submitter}.yml` (gate name), `tools/ci/select-affected.mjs` and tests, `tools/release/{wait-for-ci,reconcile-deploy}.mjs` and tests, `docs/process/ci-cd.md`, `docs/runbooks/ci-red.md`
+- **Depends on:** —; pairs with OPS-FAST-LANE-3 (release.yml requires `ci-gate (push)` on `main`): merge both together
+- **Scope:** Owner decision 54 items 1 and 2. Pull requests (and feature-branch pushes) run the fast lane: affected-package `checks`, the short Linux jobs by package (`PACKAGE_JOBS`), and the heavy-lane jobs (macOS and Windows legs of `keychain`, `path-guard`, `node-os`, `windows-smoke`, `e2e-deterministic`) only when the change is in their own area (`HEAVY_LANE`, explicit and tested path lists; install files and Windows-named files included). A push to `main` or `wave-4` runs everything and publishes `ci-gate (push)`, which fails if any heavy job was skipped (`HEAVY_REQUIRED`, replaces `QUEUE_REQUIRED`); the deploy workflows and the deploy reconcile now require that name. `merge_group` stays as a harmless fast lane until the owner switches the queue off. CodeQL on a PR analyzes a leg only when the change holds its language. Only when jobs run changed; no test or assertion removed.
+- **Acceptance:** `tools` tests green; a UI-only PR starts no heavy-lane job; a `.github/` or `tools/` change, an unreadable diff and an install file still run everything; the heavy lane on `main` requires every heavy job.
+
+#### OPS-FAST-LANE-2 · Split the unit tests of `checks` across runners (new, 2026-11-01, follow-up to OPS-FAST-LANE-1)
+- **Status:** ready · **Size:** S · **Tier:** Sonnet · **Security:** S1 by path (`.github/**`; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `tools/ci/select-affected.mjs`, `tools/ci/auto-retry.mjs`
+- **Depends on:** OPS-FAST-LANE-1
+- **Scope:** After OPS-FAST-LANE-1 the critical path of a UI-only PR is `checks` alone (about 11 min, unit tests 8.4 min with `node`, `e2e`, `agentlink` and `local-ui` competing for 4 cores). Run the heaviest packages' tests as parallel matrix legs computed by the selector (every selected package in exactly one leg; the heavy lane keeps one full leg) to reach about 10 minutes or less. Update the flaky list and its tests.
+- **Acceptance:** no selected package's tests dropped (tested); measured PR wall time before and after.
+
 #### CHORE-BACKLOG-COUNTS-QUEUE · Card counts no longer conflict between PRs (new, 2026-10-25)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`docs/process`)
 - **Repo/path:** agentlink · `tools/docs-status`, `docs/process/backlog.md`, `docs/process/ci-cd.md`, `docs/process/repo-reference.md`
@@ -10656,3 +10670,20 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** W4-Z (0.4.6)
 - **Spec:** 11 §5; 04 §3.6.1 (`contact.check` is owner-signed, I-4); 08 (join flow)
 - **Done when:** in real Chromium the contact panel closes with Escape after a click on non-focusable content, with the ×, with a click on the backdrop and on a route change, and `inert` is always cleared; the same holds for the Agents, AI apps, dialog and payment layers (top layer answers Escape; a removal in flight can be closed after 10 s). Home's "Compare safety code" opens `/contacts?check=<ref>` for the first unchecked answered contact with the panel open, and Home and the panel share one predicate (`canCompareCode`). Completion stays the signed "They match"; no unsigned "mark done".
+
+#### OPS-FAST-LANE-2 · fast lane: paperwork fills itself in; AI review only for S2 and sensitive paths (owner Decision 54, items 3 and 4)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S1 on sensitive paths (`.github/**`, `AGENTS.md`; owner "merge", independent review)
+- **Repo/path:** agentlink · `tools/pr/{classes,open-pr}.mjs` and tests; `.github/workflows/{review-gate,pr-hygiene}.yml`; `.github/pull_request_template.md`; `tools/ci/review-gate.test.mjs`, `tools/pr-hygiene.test.mjs`; `AGENTS.md`; `docs/process/{audit-rules,delivery-process,orchestrator-playbook,ci-cd,development-process}.md`
+- **Depends on:** none (OPS-FAST-LANE-1 owns `ci.yml` and `release.yml`)
+- **Scope:**
+  - `open-pr.mjs`: from the branch diff, computes the class with `review-gate`'s own rules (one marked block, read by `classes.mjs`), fills every template section (`EDIT:` placeholders; never the IR line, nor the S2 threat note and tests-first evidence), adds an empty changeset or a `changelog.d` stub when the CI checks would ask for one, normalizes the title, pushes and runs `gh pr create`.
+  - `review-gate`: the class is computed; a missing or lower declaration warns; a higher one still raises the class. The IR line is required for S2 and the sensitive paths only; any stated FAIL verdict fails; S2 threat note and tests-first evidence unchanged; automated PRs keep the code-owner approval.
+  - `pr-hygiene`: title, sections, class tick and "Docs impact" wording warn; it fails only on AI attribution.
+- **Acceptance:** S2 review, threat note, tests-first evidence, DEPLOY_FREEZE, draft fail-fast and bot approvals unchanged; tests run the real gate scripts; AGENTS.md ≤ 8 KB.
+
+#### OPS-FAST-LANE-3 · sensitive path: `tools/desktop-extension/**` (follow-up from the #755 review)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1 on sensitive paths (`.github/**`)
+- **Repo/path:** agentlink · `.github/workflows/review-gate.yml` (marked block), `.github/CODEOWNERS`, `docs/process/audit-rules.md` §2.2, `tools/ci/review-gate.test.mjs`
+- **Depends on:** OPS-FAST-LANE-2
+- **Scope:** `release.yml` runs `tools/desktop-extension/sign.sh` with the extension signing key and `build.mjs` produces the shipped bundle. Decide with the owner whether `tools/desktop-extension/**` joins `tools/release/**` as an S1 sensitive path (IR line required, code-owned); if yes, add the RULES and SENSITIVE entries, the CODEOWNERS row and the §2.2 row, with a test.
+- **Acceptance:** rules, CODEOWNERS and §2.2 agree (SC-6); the real gate script is tested.

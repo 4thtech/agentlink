@@ -1,5 +1,11 @@
 # @4thtech-io/ui
 
+## 0.4.7
+
+### Patch Changes
+
+- d639d23: Side panels always close: Escape works from anywhere, a click outside, the bigger close button and a page change close them, and the page behind never stays locked (W5-SHEET-CLOSE).
+
 ## 0.4.6
 
 ### Patch Changes

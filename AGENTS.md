@@ -39,7 +39,7 @@ The main session is the **orchestrator**: it orchestrates, deploys workers and a
   - **Sonnet 5.5**: clear-spec builds, tests, CI, docs, UI, keepers.
   - **Opus 5.5** (medium): all S2 builds, architecture, planning, every independent review.
   - **Fable 5.1**: security audits (keys, crypto, owner presence, money, contracts, supply chain).
-- **Audit, don't relay.** Verify through targeted checks (tests, CI status, `git diff --stat`, specific hunks). For S1/S2, use an **independent auditor worker** that gets only the spec and the diff. Never present a worker's claim as verified.
+- **Audit, don't relay.** Verify through targeted checks (tests, CI status, `git diff --stat`, specific hunks). For S2 and sensitive paths, use an **independent auditor worker** that gets only the spec and the diff (Decision 54). Never present a worker's claim as verified.
 - **Load only what you need.** Open specs by section; use `grep`, `head` and line ranges; keep large outputs in files. Run workers in parallel, in the background.
 - **Save early.** Keep the Curator handoff and your sync file current; at about 60% context, save and suggest a fresh session.
 - **Respect the session-start budgets** (`docs/process/development-process.md` §3.6). Auto-loaded files never accumulate history.
@@ -69,8 +69,8 @@ The main session is the **orchestrator**: it orchestrates, deploys workers and a
   - details of unfixed vulnerabilities.
 - **OCC v1 is reference only** (EUPL-1.2 with a non-commercial rider). Never copy its code.
 - **Merging and releases (D-25, D-51, D-52):**
-  - agents work under Tali's GitHub account (D-51). Every task: develop → independent audit (S1/S2) → required checks green → auto-merge; improve CI, never skip it (D-52);
-  - S0/S1 PRs: enable GitHub auto-merge after the audit passes; GitHub merges when every required check is green;
+  - agents work under Tali's GitHub account (D-51). Every task: develop → independent audit (S2, sensitive paths) → checks green → auto-merge; improve CI, never skip it (D-52);
+  - S0/S1 PRs: no AI review (builder tests suffice); enable auto-merge, GitHub merges when checks are green;
   - S2 and sensitive-path PRs (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files) merge only after CI is green, the independent AI review passed and Tali has said "merge" in chat (process rule, owner-accepted; revisit before M3);
   - never use admin bypass, never push to `main`, never approve PRs or deployments;
   - services reach production only through CI, automatically once staging smoke is green; npm `latest` needs the owner's approval click; `DEPLOY_FREEZE` halts everything (D-52);
@@ -78,6 +78,6 @@ The main session is the **orchestrator**: it orchestrates, deploys workers and a
 - **No AI attribution anywhere.** No co-author trailers, "Generated with" footers or badges. Work ships under the operator's own git identity.
 - **New dependencies** need a justification in the PR. No `postinstall` scripts.
 - **UX first (D-39, D-40).** Users never need a wallet, browser extension, gas, seed phrase or chain choice. The only setup step is adding the MCP, and their agent can do it for them. Chains are picked automatically; a picker appears only under Advanced. User-facing strings follow 11 §5: no "wallet", "gas", "seed phrase" or "transaction" in the default UI or in tool summaries.
-- **PRs:** fill every section of `.github/pull_request_template.md`. `pr-hygiene` and `review-gate` check them.
+- **PRs:** open with `node tools/pr/open-pr.mjs` (fills the template, class from paths); formalities only warn.
 - **Versioning (D-43).** A PR that changes a published package adds a changeset. A user-visible, spec or process change adds a `changelog.d/` fragment (see its `README.md`). Never bump versions by hand (`docs/process/versioning.md`).
 - **We build in public.** `README.md` is the public face. Update its Status and Roadmap whenever a milestone, a release or a user-visible capability changes. Never claim unimplemented features. Licence: MIT. The contracts are BUSL-1.1 at mainnet.

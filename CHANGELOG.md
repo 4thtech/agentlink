@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-11-01
+
+### Added
+
+- Both sides see an invite happen, with no reload (W5-INVITE-FEEDBACK, S2; W5-PASTE-ENTRY, S1): the person who invited sees "{name} accepted your invite", the person who pasted sees "Connecting to {name}…" and then "You're connected with {name}", and the new contact is highlighted. Waiting rows stay after a reload, open invites can be cancelled, and a link that never left the Invite screen no longer lingers as a second invite. Pasting an invite from someone you are already connected to asks "Connect again?" first; afterwards both sides say "Connected again" and ask you to check the safety code again. When your accept could not leave this computer yet, the app says it is waiting for them to come online. "Someone invited you? Paste link" is now on Home, in Get started and on People, with an optional clipboard check that you turn on yourself.
+- A Windows section in the user guide: PowerShell steps, the Node.js version, the SmartScreen prompt and the unsigned download (W5-WINDOWS).
+
+### Changed
+
+- Correction to the 0.4.6 notes on files saved automatically (DOCS-README-046, W4-AUTO-SAVE): the app does not yet let you choose another Inbox folder, turn automatic saving off or set "Ask before saving" for one contact. AgentLink already respects these settings, but they are not in the app yet; they are coming in a later release. Until then files are saved to `~/AgentLink/Inbox`, and the user guide now says so.
+- Docs and status now say AgentLink 0.4.6 was released on 31 Oct 2026 (the new app in three layers: Get started, a simple Home and Under the hood; short invite links; files saved automatically into your Inbox folder; live AI app status; Pause and Resume), and name the Connections map, saved views and an Open file spec as coming next (DOCS-README-046).
+
+### Fixed
+
+- A right-hand panel (a contact, an agent, an AI app, a payment) can no longer get stuck open: Escape closes it even after a click on its text, so does a click outside it or changing page, and the close button is bigger (W5-SHEET-CLOSE, S1).
+- Home's "Compare safety code" now opens the first contact you have not checked yet, with its code showing; Home and the contact panel agree on who can be compared. Checking still needs "They match" with Touch ID (W5-SAFETY-STEP, S1).
+- AgentLink now starts from Claude Desktop, Claude Code, Cursor, Codex and the other AI apps on Windows: the entry `init` and the app write there starts with `cmd /c npx`, because those apps cannot start `npx` itself. Entries written before are still recognised and are updated the next time you connect (W5-WINDOWS, S1).
+- A new Windows check installs the packed CLI, runs it, connects an AI app into a temporary profile and starts the MCP server on every change to the CLI, and the Windows download is opened on a Windows machine before each release. The Windows suite of `@4thtech-io/node` is now required in the merge queue (W5-WINDOWS).
+- Releases to the `next` preview no longer stall waiting for a CI job that has a different name on integration branches (W5-WINDOWS).
+
 ## [0.4.6] - 2026-10-30
 
 ### Added
@@ -841,7 +861,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.6...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.7...HEAD
+[0.4.7]: https://github.com/4thtech/agentlink/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/4thtech/agentlink/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/4thtech/agentlink/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/4thtech/agentlink/compare/v0.4.3...v0.4.4

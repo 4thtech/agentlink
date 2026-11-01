@@ -4,7 +4,7 @@
 Find which required check failed and why, fix the cause in your own change, and never make a check green by weakening it.
 
 ## When to use
-Any red or cancelled required check on a PR or in the merge queue: `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate` (contracts repository: `contracts-gate`). A PR ejected from the merge queue (step 4). Red on `main` after a merge is an incident: go to [RB-11](rollback-and-freeze.md).
+Any red or cancelled required check on a PR or in the merge queue: `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate` (contracts repository: `contracts-gate`). A PR ejected from a merge queue that is still on (step 4). Red heavy lane (`ci-gate (push)`) on `main` after a merge: fix forward at once; when it blocks a release or is a security issue, go to [RB-11](rollback-and-freeze.md).
 
 ## Who runs it
 The orchestrator, or the builder that owns the change (Sonnet or above). The fix goes to whoever owns the failing files. Nobody edits `.github/**` to get green; that is an owner "merge" change of its own.
@@ -13,9 +13,10 @@ The orchestrator, or the builder that owns the change (Sonnet or above). The fix
 - The PR exists and CI has finished: `gh pr checks <n> --watch` has returned.
 - Know which run you are looking at (`ci.yml` and `security.yml` run per event, `ci-cd.md` "What runs where"):
   - **A draft PR** skips the whole suite; `ci-gate` and `security-gate` go green with every job skipped. That green says nothing about your code. Marking the PR ready (`ready_for_review`) starts the full suite, so red can first appear then.
-  - **A PR (not draft)** lints, typechecks, builds and tests only the packages the change touches, their dependents and `@4thtech-io/tools` (`tools/ci/select-affected.mjs`). A change under `.github/`, `tools/`, root config, the lockfile, `test-vectors/` or `packages/types`, `crypto`, `core` runs everything. The macOS and Windows legs do not run on a PR.
-  - **A branch push** (`ci-gate (push)`, not required) runs the full suite on the Ubuntu legs. It is the pre-review test; it is not the check that merges.
-  - **The merge queue** (`merge_group`) always runs the full suite on the merge of your PR with `main`, including macOS and Windows. A failure that only the queue sees is usually a package your change affects that the selector did not name, a platform leg, or a flake.
+  - **A PR (not draft) is the fast lane** (OPS-FAST-LANE-1, owner decision 54): lint, typecheck, build and unit tests of only the packages the change touches, their dependents and `@4thtech-io/tools` (`tools/ci/select-affected.mjs`), the short Linux jobs those packages reach, and a heavy-lane job (macOS and Windows legs, `windows-smoke`, the full e2e scenario) only when the change is in that job's own area (`HEAVY_LANE`). A change under `.github/` or `tools/` runs everything; root config, the lockfile, `test-vectors/` or `packages/types`, `crypto`, `core` run the full `checks`. `ci-gate` is the required check.
+  - **A branch push** (`ci-gate (push)`, not required) runs the same fast lane against its merge base with `main`, without heavy-lane jobs. It is the pre-review test; it is not the check that merges.
+  - **The push to `main` is the heavy lane** (`ci-gate (push)` on `main`): everything, including macOS, Windows, `windows-smoke` and the full e2e, and a skipped heavy job fails it. `release.yml` and the `deploy-*.yml` workflows wait for it. Red there after a merge is fixed forward at once (a fix PR, not a revert loop); if it blocks a release or is a security issue, it is an incident ([RB-11](rollback-and-freeze.md)). A failure only the heavy lane sees is usually a platform leg, a package outside the PR's selection, or a flake.
+  - **The merge queue** is switched off (decision 54 item 2). While it is still on, `merge_group` runs the fast lane like a PR.
 
 ## Steps
 1. See what failed and read only the failing log:
@@ -34,8 +35,9 @@ The orchestrator, or the builder that owns the change (Sonnet or above). The fix
    | `ci-gate` | `changesets` (PR only) | a published package changed without a changeset, or a user-visible, spec or process change without a `changelog.d/<card-id>.md` fragment | `pnpm changeset` (an empty one for a test-only change); add the fragment (`changelog.d/README.md`). Never edit `CHANGELOG.md` `[Unreleased]` |
    | `ci-gate` | `checks` | lint, typecheck, build or test failure | Reproduce the packages you touched and their dependents: `pnpm --filter '...<package>' test`; the whole set is `pnpm lint && pnpm typecheck && pnpm build && pnpm test` |
    | `ci-gate` | `vectors` | vector mismatch, or "playwright not found" | Vector mismatch: [RB-06](test-vectors.md). Playwright: lesson [LL-07](../lessons/LL-07-playwright-lockfile-heuristic.md); the install step caches the browsers, retries a failed download once and bounds apt, so a `::warning::` that it retried is not a failure |
-   | `ci-gate` | `e2e-deterministic`, `relays-docker`, `storage-minio`, `bundle-check` (code changes only; docs-only PRs skip them) | an end-to-end, relay, S3 or bundle-size failure | Read the failing step; `e2e` logs `::error::runner keychain unavailable` when the throwaway keyring died (infrastructure, a rerun candidate) |
-   | `ci-gate` | `keychain`, `path-guard`, `node-os` (merge queue and `main` only) | an OS-specific failure on macOS or Windows that a PR run never executes | Reproduce on that OS, or read the queue log; fix on your branch |
+   | `ci-gate` | `relays-docker`, `storage-minio`, `bundle-check` (code changes reaching their packages; docs-only PRs skip them) | a relay, S3 or bundle-size failure | Read the failing step |
+   | `ci-gate` or `ci-gate (push)` on `main` | `e2e-deterministic` (heavy lane: `main`, and a PR in the e2e scenario area) | an end-to-end failure | Read the failing step; `e2e` logs `::error::runner keychain unavailable` when the throwaway keyring died (infrastructure, a rerun candidate) |
+   | `ci-gate` or `ci-gate (push)` on `main` | macOS and Windows legs of `keychain`, `path-guard`, `node-os`, `windows-smoke` (heavy lane: `main`, and a PR in their area) | an OS-specific failure | Reproduce on that OS, or read the `main` run's log; fix forward with a PR. If your PR should have run the job, add the path to `HEAVY_LANE` in the same fix |
    | `ci-gate` | `context-budget` | `AGENTS.md` > 8192 bytes or `CLAUDE.md` > 1024 bytes | `wc -c AGENTS.md CLAUDE.md`; move detail into `docs/` and leave a pointer. Check that no tool rewrote `AGENTS.md` (lesson [LL-04](../lessons/LL-04-turbo-agent-guidance.md)) |
    | `security-gate` | `dependency-review` (not run on a draft or in the queue) | a vulnerable or disallowed-licence dependency | Another version or package ([RB-07](add-dependency.md)) |
    | `security-gate` | `secret-scan` | gitleaks found a secret | **Stop the line** (`audit-rules.md` §10.3): tell the owner at once. Do not push more commits or rewrite history on your own; the secret is already public and must be rotated |
@@ -52,7 +54,7 @@ The orchestrator, or the builder that owns the change (Sonnet or above). The fix
      ```
      If it passes, write "flake: <test>, run <id>" in the PR and open a fix card for it (`delivery-process.md` §2, step 8). If it fails again, it is not a flake: investigate. Never rerun in a loop: reruns spend the shared runner pool (lesson [LL-17](../lessons/LL-17-ci-starvation-stale-pr-ejections.md)). Flaky tests are fixed at the cause, not quarantined, unless the owner approves a quarantine with an issue (`development-process.md` §10). A PR whose checks look stuck: `gh pr checks <n>`, then `gh run list --branch <branch> --limit 5`; do not push empty commits to wake it.
    - *Coming (CHORE-CI-AUTORETRY, in review):* CI will retry a failed job once by itself. Until that merges, the manual single rerun above is the policy; after it merges, a red check has already been retried once, so treat it as real and do not rerun it again.
-4. **Ejected from the merge queue.** A PR that enters the queue is tested as the merge with `main` (and with the queued PRs ahead of it) and runs the full suite. If that fails, the queue removes the PR and it stays open.
+4. **Ejected from the merge queue** (only while the queue is still switched on; decision 54 turns it off). A PR that enters the queue is tested as the merge with `main` (and with the queued PRs ahead of it) and runs the fast lane. If that fails, the queue removes the PR and it stays open.
    ```bash
    gh pr view <n> --json state,autoMergeRequest,mergeStateStatus
    gh run list --workflow ci.yml --event merge_group --limit 20 --json databaseId,headBranch,conclusion

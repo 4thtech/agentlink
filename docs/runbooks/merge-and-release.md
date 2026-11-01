@@ -10,7 +10,7 @@ When a PR has passed the verification protocol and its review, and when cutting 
 The orchestrator (Opus) enables auto-merge and prepares releases. The owner gives the go-ahead, merges the PRs that are his to merge, and clicks the npm `latest` approval. Workers never merge.
 
 ## Preconditions
-- `development-process.md` §5 is complete and recorded in the PR body; the independent review line is present for S1/S2.
+- `development-process.md` §5 is complete and recorded in the PR body; the independent review line is present for S2 and sensitive paths (S0 and S1 elsewhere need none, owner Decision 54).
 - `gh pr checks <n>` is green, or will be (auto-merge waits for it).
 - `DEPLOY_FREEZE` is not `true`: `gh variable get DEPLOY_FREEZE`.
 
