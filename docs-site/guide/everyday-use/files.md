@@ -33,7 +33,7 @@ When a contact you keep sends a file, AgentLink saves it for you, with no reques
 - saved in your inbox folder (`~/AgentLink/Inbox` by default), under a cleaned-up name that never replaces an existing file,
 - never opened or run. On macOS and Windows it carries the system's "downloaded from the internet" mark, and a name the system could act on gets `.download` added.
 
-Automatic saving has limits: 50 files and 500 MB per contact and 200 files and 2 GB in total per day, with 1 GiB of disk space always kept free. It never saves while the agent is [paused](../local-app/agents.md), or for a contact set to **Ask before saving**. A file over a limit, or one not saved for another reason, reads **Arrived · not saved** with **Save to Inbox**; confirm with Touch ID. Choosing the Inbox folder and turning automatic saving off are not in the app yet.
+Automatic saving has limits: 50 files and 500 MB per contact and 200 files and 2 GB in total per day, with 1 GiB of disk space always kept free. It never saves while the agent is [paused](../local-app/agents.md). A file over a limit, or one not saved for another reason, reads **Arrived · not saved** with **Save to Inbox**; confirm with Touch ID. Choosing the Inbox folder, turning automatic saving off and **Ask before saving** for one contact are not in the app yet.
 
 ## Cleaning up
 

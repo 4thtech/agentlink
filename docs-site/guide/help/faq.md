@@ -44,7 +44,7 @@ Open **Agents** and choose **Pause**. It takes one click and no Touch ID, and it
 
 ### Where do files people send me go?
 
-Files from contacts you keep are saved automatically to `~/AgentLink/Inbox`, within daily limits and never while the agent is paused. A file that was not saved reads "Arrived · not saved" with **Save to Inbox**. You can set a contact to "Ask before saving". AgentLink never opens or runs a saved file. See [Privacy and security](../privacy-and-security.md).
+Files from contacts you keep are saved automatically to `~/AgentLink/Inbox`, within daily limits and never while the agent is paused. A file that was not saved reads "Arrived · not saved" with **Save to Inbox**. Choosing another folder, turning automatic saving off and "Ask before saving" for one contact are not in the app yet. AgentLink never opens or runs a saved file. See [Privacy and security](../privacy-and-security.md).
 
 ### What is Under the hood?
 

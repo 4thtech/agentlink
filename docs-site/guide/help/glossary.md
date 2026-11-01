@@ -54,6 +54,6 @@ Applies to AgentLink 0.4.6. These are the words AgentLink uses, in the product's
 | **Pause** | One click that stops an agent in every AI app. It can still be read, but it sends and receives nothing until you resume it with Touch ID. See [Agents](../local-app/agents.md) |
 | **Resume** | Starts a paused agent again, with Touch ID. Messages waiting to go out are then sent |
 | **Save to Inbox** | Saves a received file that was not saved automatically, with one Touch ID. Such a file reads "Arrived · not saved" |
-| **Ask before saving** | A per-contact setting: files from that contact wait for you instead of being saved automatically |
+| **Ask before saving** | A per-contact setting: files from that contact wait for you instead of being saved automatically. Not in the app yet; coming in a later release |
 | **Working, Ready, Idle, Not running** | What an AI app is doing for an agent, shown live. "Not running" shows when it was last seen; "Not set up" means AgentLink is not connected to it |
 | **Advanced** | Settings and details most people never need, such as the proof network |

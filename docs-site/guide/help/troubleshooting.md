@@ -65,7 +65,7 @@ Not running means the app is closed or crashed; start it again. Not set up means
 Open **Agents** and choose **Resume** (Touch ID). Messages that were waiting to go out are sent after that. Nothing is received while an agent is paused.
 
 **A file says "Arrived · not saved".**
-It was over a daily limit, from a contact set to "Ask before saving", or arrived while the agent was paused. Choose **Save to Inbox** (Touch ID) on Home, under the person. Saved files are in `~/AgentLink/Inbox`; **Show in Finder** (Show in Explorer on Windows, Show in folder on Linux) opens it.
+It was over a daily limit, or arrived while the agent was paused. Choose **Save to Inbox** (Touch ID) on Home, under the person. Saved files are in `~/AgentLink/Inbox`; **Show in Finder** (Show in Explorer on Windows, Show in folder on Linux) opens it.
 
 **Something else is wrong and I need details.**
 Turn on **Under the hood** (Cmd+Shift+U), then open Diagnostics for a copyable report. Include it when you ask for help, and never include your backup code.
