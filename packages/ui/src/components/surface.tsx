@@ -17,6 +17,7 @@ import {
   type RefObject,
 } from 'react';
 import { holdInert } from './inert.js';
+import { refocusOnLoss, useLayer } from './layers.js';
 import { cx } from './util.js';
 
 export type SurfaceLevel = 0 | 1 | 2 | 3 | 4 | 'recessed';
@@ -55,21 +56,26 @@ export function Surface({
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-/** Focus starts on the title, Tab stays inside, Escape closes, focus returns to the opener. */
+/**
+ * Focus starts on the title, Tab stays inside, focus that falls to the page comes back, and focus
+ * returns to the opener. Escape (on the document, the top layer first) and a route change close it
+ * (W5-SHEET-CLOSE). `hold` is what the page behind is made inert around: the frame, or the layer
+ * that also holds the backdrop, which must stay clickable.
+ */
 function useModalBehavior(
   active: boolean,
   frame: RefObject<HTMLElement | null>,
   title: RefObject<HTMLElement | null>,
   onClose: () => void,
-): (event: ReactKeyboardEvent<HTMLElement>) => void {
-  const close = useRef(onClose);
-  close.current = onClose;
+  hold: RefObject<HTMLElement | null> = frame,
+): { onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void; onBlur: () => void } {
+  useLayer(active, onClose, onClose);
   // A layout effect, so the background is inert before the first paint and released before the
   // focus goes back to the opener (below, in a passive effect's cleanup).
   useLayoutEffect(() => {
-    if (!active || frame.current === null) return undefined;
-    return holdInert(frame.current);
-  }, [active, frame]);
+    if (!active || hold.current === null) return undefined;
+    return holdInert(hold.current);
+  }, [active, hold]);
   useEffect(() => {
     if (!active) return undefined;
     const opener = document.activeElement as HTMLElement | null;
@@ -80,13 +86,7 @@ function useModalBehavior(
       }
     };
   }, [active, title]);
-  return (event) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      close.current();
-      return;
-    }
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLElement>): void => {
     if (event.key !== 'Tab' || frame.current === null) return;
     const list = [...frame.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
       (n) => !(n as HTMLButtonElement).disabled,
@@ -103,6 +103,7 @@ function useModalBehavior(
       first.focus();
     }
   };
+  return { onKeyDown, onBlur: refocusOnLoss(frame, title) };
 }
 
 export interface SheetProps {
@@ -128,28 +129,40 @@ export function Sheet({
   const id = useId();
   const frame = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  const onKeyDown = useModalBehavior(open, frame, heading, onClose);
+  const layer = useRef<HTMLDivElement>(null);
+  const { onKeyDown, onBlur } = useModalBehavior(open, frame, heading, onClose, layer);
   if (!open) return null;
+  // The layer holds the backdrop (a click on it closes) and the sheet; the page behind is inert
+  // around the layer, so the backdrop stays clickable (W5-SHEET-CLOSE).
   return (
-    <aside
-      ref={frame}
-      className={cx('al-surface', 'al-surface--l3', 'al-sheet', className)}
-      data-level="3"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={`${id}-title`}
-      onKeyDown={onKeyDown}
-    >
-      <header className="al-sheet-head">
-        <h2 id={`${id}-title`} ref={heading} className="al-sheet-title" tabIndex={-1}>
-          {title}
-        </h2>
-        <button type="button" className="al-sheet-close" aria-label={closeLabel} onClick={onClose}>
-          <span aria-hidden="true">×</span>
-        </button>
-      </header>
-      <div className="al-sheet-body">{children}</div>
-    </aside>
+    <div ref={layer} className="al-sheet-layer">
+      <div className="al-sheet-backdrop" onClick={onClose} />
+      <aside
+        ref={frame}
+        className={cx('al-surface', 'al-surface--l3', 'al-sheet', className)}
+        data-level="3"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${id}-title`}
+        onKeyDown={onKeyDown}
+        onBlur={onBlur}
+      >
+        <header className="al-sheet-head">
+          <h2 id={`${id}-title`} ref={heading} className="al-sheet-title" tabIndex={-1}>
+            {title}
+          </h2>
+          <button
+            type="button"
+            className="al-sheet-close"
+            aria-label={closeLabel}
+            onClick={onClose}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
+        <div className="al-sheet-body">{children}</div>
+      </aside>
+    </div>
   );
 }
 
@@ -202,10 +215,16 @@ export function DialogFrame({
   }, [open]);
 
   const shown = open && holding;
-  const onKeyDown = useModalBehavior(shown, frame, heading, onClose);
+  const { onKeyDown, onBlur } = useModalBehavior(shown, frame, heading, onClose);
   if (!shown) return null;
   return (
-    <div className="al-dialog-overlay">
+    <div
+      className="al-dialog-overlay"
+      onClick={(event) => {
+        // A click on the overlay itself (outside the frame) closes it.
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <section
         ref={frame}
         className={cx('al-surface', 'al-surface--l4', 'al-dialog', className)}
@@ -214,6 +233,7 @@ export function DialogFrame({
         aria-modal="true"
         aria-labelledby={`${id}-title`}
         onKeyDown={onKeyDown}
+        onBlur={onBlur}
       >
         <h2 id={`${id}-title`} ref={heading} className="al-dialog-title" tabIndex={-1}>
           {title}

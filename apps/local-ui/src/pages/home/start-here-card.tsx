@@ -6,7 +6,9 @@
 // be ticked by hand. Every value is React text (I-5).
 import { CopyPrompt, Icon, Skeleton } from '@4thtech-io/ui';
 import type { ReactElement, ReactNode } from 'react';
+import { INTERIM_PEOPLE_PATH } from '../../nav.js';
 import { ADD_CONTACT_HREF } from '../contacts/add-contact-link.js';
+import { checkHref } from '../contacts/safety.js';
 import { FIRST_RUN, type Platform } from '../first-run/strings.js';
 import type { StartHereModel } from './start-here-context.js';
 import type { StartView, StepId, StepView } from './start-here.js';
@@ -151,7 +153,10 @@ function Detail({
         return <p className="al-text-body-sm al-muted">{startWaiting(step.name ?? null)}</p>;
       }
       return step.state === 'later' && step.compare === true ? (
-        <a className="al-btn al-btn-secondary al-btn-sm hm-start-action" href="/settings/contacts">
+        <a
+          className="al-btn al-btn-secondary al-btn-sm hm-start-action"
+          href={step.compareRef === undefined ? INTERIM_PEOPLE_PATH : checkHref(step.compareRef)}
+        >
           {T.compare}
         </a>
       ) : null;

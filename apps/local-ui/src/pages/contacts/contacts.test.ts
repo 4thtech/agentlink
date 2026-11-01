@@ -589,3 +589,42 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     expect(host.querySelector('.ct-dup img')).toBeNull();
   });
 });
+
+describe('ContactsPage: the Home link to a safety code (W5-SAFETY-STEP)', () => {
+  const open = async (search: string): Promise<void> => {
+    history.replaceState(null, '', `/contacts${search}`);
+    const s = server({
+      'GET /api/owner/passkey': NO_PASSKEY,
+      [LIST]: { status: 'ok', contacts: [ana, marko] },
+      [`/api/ui/contacts/${MARKO}/safety-code`]: { status: 'ok', code: CODE },
+    });
+    const api = createApiClient({ fetch: s.fetch, token: 't' });
+    const owner = createOwnerClient({ fetch: s.fetch, token: 't' });
+    await act(async () => {
+      root.render(createElement<ContactsPageProps>(ContactsPage, { api, owner }));
+      await Promise.resolve();
+    });
+    await settle();
+  };
+  afterEach(() => history.replaceState(null, '', '/'));
+
+  it('?check=<ref> opens that contact panel at the code, and cleans the address', async () => {
+    await open(`?check=${MARKO}`);
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(host.querySelector('.al-sc-code')?.textContent?.replace(/\s/g, '')).toBe(
+      CODE.replace(/\s/g, ''),
+    );
+    expect(location.search).toBe('');
+    // Completion is still the signed "They match"; nothing here marks it done.
+    expect(button(S.theyMatch)).toBeDefined();
+  });
+
+  it('without the marker, or with a stranger ref, no panel opens by itself', async () => {
+    await open('');
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    act(() => root.unmount());
+    root = createRoot(host);
+    await open('?check=0x0000000000000000000000000000000000000009');
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+  });
+});

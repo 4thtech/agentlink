@@ -6,6 +6,8 @@
 // assistive technology stay on the layer. A count per element lets two layers stack; an element that
 // was already inert before is left alone and never released by us.
 const inertCounts = new Map<Element, number>();
+/** Marks what this helper made inert, so the final sweep never touches anyone else's. */
+const OURS = 'data-al-inert';
 
 /**
  * Makes everything behind `frame` inert and returns the release.
@@ -24,6 +26,7 @@ export function holdInert(frame: HTMLElement): () => void {
       if (count === undefined) {
         if (sibling.hasAttribute('inert')) continue;
         sibling.setAttribute('inert', '');
+        sibling.setAttribute(OURS, '');
         inertCounts.set(sibling, 1);
       } else {
         inertCounts.set(sibling, count + 1);
@@ -38,8 +41,17 @@ export function holdInert(frame: HTMLElement): () => void {
       if (count <= 0) {
         inertCounts.delete(el);
         el.removeAttribute('inert');
+        el.removeAttribute(OURS);
       } else {
         inertCounts.set(el, count);
+      }
+    }
+    // W5-SHEET-CLOSE: with no layer left, nothing of ours stays inert, whatever the counts say (a
+    // sibling swapped while a layer was open, a double release).
+    if (inertCounts.size === 0) {
+      for (const el of Array.from(document.querySelectorAll(`[${OURS}]`))) {
+        el.removeAttribute('inert');
+        el.removeAttribute(OURS);
       }
     }
   };
