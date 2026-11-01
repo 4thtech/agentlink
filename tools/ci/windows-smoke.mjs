@@ -10,7 +10,7 @@
 //   2. `ui` run by a program (no terminal) answers its fixed "run it in your own terminal" line.
 //      A real server start is not possible here: `ui` needs an interactive terminal and never prints
 //      its session link (G-1, 04 §2.5), and no CI-only switch may weaken that. The server itself is
-//      covered by `node-os`/`path-guard` on Windows in the merge queue.
+//      started and fetched by ci.yml's next step (e2e/test/cli-first-run-smoke.test.ts).
 //   3. `init --harness claude-desktop` into a temporary profile (HOME and USERPROFILE point at it):
 //      the first run prints a one-time code, the second confirms it. On win32 the written entry must
 //      start with `cmd /c npx` (not a bare `npx`).

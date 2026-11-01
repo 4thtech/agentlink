@@ -728,6 +728,15 @@ jobs:
         shell: bash
         run: node tools/ci/windows-smoke.mjs "$RUNNER_TEMP/install"
 
+      # The app server on Windows: the e2e smoke test starts the approval server with the built
+      # CLI's embedded app (a temp home and a keychain stand-in, never the OS keychain), then asserts
+      # 200 with the strict CSP and the app's HTML for the session link, the script asset, and the
+      # first-run status API. `agentlink ui` itself needs a terminal, so the server is started the way
+      # the e2e suite starts it; the TTY guard is not weakened.
+      - name: Start the app server and fetch the app (e2e smoke test)
+        shell: bash
+        run: pnpm --filter @4thtech-io/e2e exec vitest run test/cli-first-run-smoke.test.ts
+
   # M1-5b-b: the Node relay connector's Docker suite (packages/node/src/relay-docker.test.ts): the
   # pool and the outbox against real relays, strfry and rnostr, pinned by digest in the test file.
   # AGENTLINK_REQUIRE_DOCKER=1 turns a missing Docker daemon into a failed test instead of a skip.
