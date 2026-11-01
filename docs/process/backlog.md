@@ -10645,3 +10645,20 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** W4-Z (0.4.6)
 - **Spec:** 11 §5; 04 §3.6.1 (`contact.check` is owner-signed, I-4); 08 (join flow)
 - **Done when:** in real Chromium the contact panel closes with Escape after a click on non-focusable content, with the ×, with a click on the backdrop and on a route change, and `inert` is always cleared; the same holds for the Agents, AI apps, dialog and payment layers (top layer answers Escape; a removal in flight can be closed after 10 s). Home's "Compare safety code" opens `/contacts?check=<ref>` for the first unchecked answered contact with the panel open, and Home and the panel share one predicate (`canCompareCode`). Completion stays the signed "They match"; no unsigned "mark done".
+
+#### OPS-FAST-LANE-2 · fast lane: paperwork fills itself in; AI review only for S2 and sensitive paths (owner Decision 54, items 3 and 4)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S1 on sensitive paths (`.github/**`, `AGENTS.md`; owner "merge", independent review)
+- **Repo/path:** agentlink · `tools/pr/{classes,open-pr}.mjs` and tests; `.github/workflows/{review-gate,pr-hygiene}.yml`; `.github/pull_request_template.md`; `tools/ci/review-gate.test.mjs`, `tools/pr-hygiene.test.mjs`; `AGENTS.md`; `docs/process/{audit-rules,delivery-process,orchestrator-playbook,ci-cd,development-process}.md`
+- **Depends on:** none (OPS-FAST-LANE-1 owns `ci.yml` and `release.yml`)
+- **Scope:**
+  - `open-pr.mjs`: from the branch diff, computes the class with `review-gate`'s own rules (one marked block, read by `classes.mjs`), fills every template section (`EDIT:` placeholders; never the IR line, nor the S2 threat note and tests-first evidence), adds an empty changeset or a `changelog.d` stub when the CI checks would ask for one, normalizes the title, pushes and runs `gh pr create`.
+  - `review-gate`: the class is computed; a missing or lower declaration warns; a higher one still raises the class. The IR line is required for S2 and the sensitive paths only; any stated FAIL verdict fails; S2 threat note and tests-first evidence unchanged; automated PRs keep the code-owner approval.
+  - `pr-hygiene`: title, sections, class tick and "Docs impact" wording warn; it fails only on AI attribution.
+- **Acceptance:** S2 review, threat note, tests-first evidence, DEPLOY_FREEZE, draft fail-fast and bot approvals unchanged; tests run the real gate scripts; AGENTS.md ≤ 8 KB.
+
+#### OPS-FAST-LANE-3 · sensitive path: `tools/desktop-extension/**` (follow-up from the #755 review)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1 on sensitive paths (`.github/**`)
+- **Repo/path:** agentlink · `.github/workflows/review-gate.yml` (marked block), `.github/CODEOWNERS`, `docs/process/audit-rules.md` §2.2, `tools/ci/review-gate.test.mjs`
+- **Depends on:** OPS-FAST-LANE-2
+- **Scope:** `release.yml` runs `tools/desktop-extension/sign.sh` with the extension signing key and `build.mjs` produces the shipped bundle. Decide with the owner whether `tools/desktop-extension/**` joins `tools/release/**` as an S1 sensitive path (IR line required, code-owned); if yes, add the RULES and SENSITIVE entries, the CODEOWNERS row and the §2.2 row, with a test.
+- **Acceptance:** rules, CODEOWNERS and §2.2 agree (SC-6); the real gate script is tested.

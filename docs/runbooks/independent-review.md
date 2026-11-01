@@ -4,7 +4,7 @@
 Have a fresh reviewer, who never saw how the work was built, try to break it from the spec and the branch diff alone, and record the result as `IR-<TASK-ID>-<k>` so `review-gate` and the owner can see it. The review happens **before the PR exists**; the PR opens afterwards with the result already in it.
 
 ## When to use
-Every S1 and S2 branch before its PR is opened (`audit-rules.md` §3); optional (a Sonnet review) for S0. Again after fix commits: a **delta review** with the next number.
+Every S2 branch, and every branch that touches a sensitive path (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files), before its PR is opened (`audit-rules.md` §3). S0 and S1 elsewhere need none (owner Decision 54); a review MAY be requested. Again after fix commits: a **delta review** with the next number.
 
 ## Who runs it
 The orchestrator spawns it and handles the result. The reviewer is a **different, fresh-context Opus 5.5 worker** in read-only mode, or a non-author human engineer. Never the builder, and never the orchestrator that integrated the work (`development-process.md` §3.4).
