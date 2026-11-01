@@ -228,7 +228,7 @@ describe('reconcile', () => {
         // CI still running on the head.
         for (const k of Object.keys(gates)) {
           if (k.endsWith('/jobs'))
-            gates[k] = () => ({ jobs: [{ name: 'ci-gate', status: 'in_progress' }] });
+            gates[k] = () => ({ jobs: [{ name: 'ci-gate (push)', status: 'in_progress' }] });
         }
       }
       const { result, calls } = await go({ ...routes(), ...gates });
@@ -441,7 +441,9 @@ describe('deploy-reconcile.yml', () => {
       const prod = source.slice(source.indexOf('\n  deploy-production:\n'));
       expect(prod).toContain(`- name: ${DEPLOY_STEP}\n`);
       for (const { workflow, job } of REQUIRED_GATES) {
-        expect(source).toContain(`--require ${workflow}:${job}`);
+        // A job name with a space (`ci-gate (push)`) is passed quoted.
+        const arg = job.includes(' ') ? `"${workflow}:${job}"` : `${workflow}:${job}`;
+        expect(source).toContain(`--require ${arg}`);
       }
     }
   });
