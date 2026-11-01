@@ -2,6 +2,7 @@
 // side of the Inbox folder rules, the held directory and the quarantine mark.
 import { execFileSync } from 'node:child_process';
 import {
+  type Stats,
   chmodSync,
   lstatSync,
   mkdirSync,
@@ -33,6 +34,18 @@ function scratch(): string {
 afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
+
+/**
+ * The same stat with a POSIX `mode` (type bits included). Only a Windows host needs it: there
+ * lstat has no POSIX permission bits (libuv reports 0o777 for every writable directory), so a
+ * simulated macOS or Linux check would read them as "writable by others".
+ */
+function withPosixMode(stat: Stats, mode: number): Stats {
+  if (process.platform !== 'win32') return stat;
+  return Object.assign(Object.create(Object.getPrototypeOf(stat) as object) as Stats, stat, {
+    mode,
+  });
+}
 
 describe('inboxFolderProblem: the folder rules (04 §4.1)', () => {
   it('passes an own folder (0700) outside the send folders', async () => {
@@ -113,7 +126,10 @@ describe('inboxFolderProblem: the folder rules (04 §4.1)', () => {
     mkdirSync(lib, { recursive: true, mode: 0o700 });
     chmodSync(join(home, 'Library'), 0o700);
     chmodSync(lib, 0o700);
-    const stat = lstatSync(lib);
+    // The seam stat stands in for a macOS lstat of a 0700 folder. A Windows host cannot produce
+    // one (libuv reports every writable directory as 0o777), so the POSIX mode is set by hand there;
+    // on macOS and Linux the real stat is used.
+    const stat = withPosixMode(lstatSync(lib), 0o40700);
     const darwin = (realpath: string) =>
       inboxFolderProblem({ realpath, home, sendFolders: [], stat, platform: 'darwin' });
     expect(await darwin(join(home, 'Library'))).toBe('os_folder');
@@ -140,6 +156,42 @@ describe('inboxFolderProblem: the folder rules (04 §4.1)', () => {
       expect(await win(p), p).toBe('os_folder');
     }
     expect(await win('C:\\Users\\ana\\Documents\\Inbox')).toBeUndefined();
+  });
+
+  it('W5-WIN-INBOX: a Windows-shaped stat (0o777, no POSIX owner) is read per platform', async () => {
+    // What a Windows host reports for any writable directory. On win32 the permission bits carry
+    // no meaning and the OS-folder rule still decides; on macOS the same bits mean shared.
+    const home = scratch();
+    const real = lstatSync(home);
+    const stat = Object.assign(
+      Object.create(Object.getPrototypeOf(real) as object) as Stats,
+      real,
+      {
+        mode: 0o40777,
+      },
+    );
+    const win = (realpath: string) =>
+      inboxFolderProblem({
+        realpath,
+        home: 'C:\\Users\\ana',
+        sendFolders: [],
+        stat,
+        platform: 'win32',
+      });
+    expect(await win('C:\\Users\\ana\\Documents\\Inbox')).toBeUndefined();
+    expect(await win('C:\\Users\\ana\\AppData\\Local\\In')).toBe('os_folder');
+    expect(await win('C:\\Program Files\\In')).toBe('os_folder');
+    expect(await win('C:\\Windows\\Temp')).toBe('os_folder');
+    expect(
+      await inboxFolderProblem({
+        realpath: '/Users/ana/Library/In',
+        home: '/Users/ana',
+        sendFolders: [],
+        stat,
+        uid: stat.uid,
+        platform: 'darwin',
+      }),
+    ).toBe('shared_writable');
   });
 
   it('refuses a file and a missing path', async () => {

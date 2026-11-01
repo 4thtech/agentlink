@@ -5774,6 +5774,16 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 - **Scope:** (1) the failed-code type includes `files_unavailable` instead of a narrowing cast; (2) `file.save` confirms the item was received before it asks for presence, so an unknown item makes no owner prompt; (3) when the download fails for a transient reason after the owner approved, the owner is not asked twice, or the copy says plainly why they are; verify on `wave-4` first and close this part if it no longer applies; (4) the K3 test asserts exactly one file was saved, so it fails if the second save is not suppressed.
 - **Acceptance:** RED tests first for (1), (2) and (4); (3) has a test or a note that it no longer applies; the `file.save` and `agentlink_fetch_file` schemas are unchanged
 
+#### W5-WIN-INBOX · files: Windows folder checks for the Inbox folder (wave 5, Windows research 4)
+- **Status:** in progress · **Size:** S · **Tier:** Fable 5.1 triage, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/inbox-folder.test.ts`
+- **Depends on:** W4-AUTO-SAVE
+- **Spec:** 04 §4.1; D-142
+- **Invariants:** I-5, I-7
+- **Source:** `node-os (windows)` red on `main` runs 41133075360 and 41180605868 (W5 Windows research, finding 4)
+- **Scope:** triage the failing test "refuses OS and app folders" on the Windows runner: a real guard gap (an OS or app folder accepted, or refused for the wrong reason) is fixed in `inbox-folder.ts` with tests; a test or environment quirk is fixed in the test without weakening the guard. Propose `node-os (windows)` for `ci-gate` (proposal only; `ci.yml` is edited by another card).
+- **Acceptance:** `inbox-folder.test.ts` passes on macOS, Linux and the Windows runner; a test pins how a Windows-shaped stat is read on each platform (the permission bits mean nothing on win32 and the OS-folder rule still decides; on macOS they mean shared); no rejection code, rule or default is weakened; `changelog.d` fragment
+
 #### W4-AUTO-SAVE-RESIDUAL-DOC · 04 §4.1: name the cross-process race in saving (new, K3 low)
 - **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (spec path) · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/foundation/04-security-and-crypto.md`
