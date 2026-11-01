@@ -5924,6 +5924,18 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
   - Opt-in clipboard check: "Paste from clipboard" reads only on a click; "Check the clipboard for an invite link when I come back to AgentLink" (off by default, this browser only) reads on window focus and only offers "Use the invite link you copied?". Only one AgentLink invite link counts; the clipboard text never leaves the page.
 - **Acceptance:** DOM tests (no read without a click or the opt-in, no request from the clipboard alone); vocabulary lint; CSS budget unchanged.
 
+#### W6-UI-POLISH · classroom QA polish: Get started completes, Files has a home, one name for people (wave 6, QA 1 Nov)
+- **Status:** in review (wave 6) · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/{nav.ts,router.tsx,lazy/pages.ts,pages/start/**,pages/contacts/**,pages/join/**}`, `packages/{ui,core,mcp-tools}` name strings, `apps/invite`
+- **Depends on:** W5-PASTE-ENTRY
+- **Spec:** 11 §5.2 (name rule, edit proposed, owner confirms at merge); 08 §1
+- **Invariants:** I-4 (the safety code is checked only by the signed "They match"), I-5
+- **Scope:**
+  - Get started completes when you are connected with someone (2 of 2); "Check a safety code" is a gentle suggestion, never counted, never faked.
+  - Go to "Files" opens Home (each person's files); the old Inbox page is removed and `/inbox` redirects to Home.
+  - "People" everywhere (page title, Go to, counts, toasts, AI-facing status lines); no curly quotes around names; "Self-declared" reads "Not checked yet".
+- **Acceptance:** unit and DOM tests updated; CSS budget unchanged; motion-lint clean.
+
 ### Usability wave 3 (U3, 0.4.4)
 
 Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The owner (Tali) decided on 2026-10-29 to take all recommended options of §11: (1) 0.4.4 with every card, and if Remove (U3-e) has not passed its Fable security audit when the rest is ready, 0.4.4 ships without it and Remove follows in 0.4.5; (2) one app, one agent open at a time, switching without Touch ID; (3) name and Touch ID on one screen; (4) Remove with Touch ID, typed label, export offer, always retired, contacts told; (5) AI app connect with the exact entry shown, Touch ID and a backup; (6) existing agents kept, last used opens, one-time "Tidy up" note, the terminal never asks which agent; (7) new screens from the new b11 sections, styled from the D2 screens, with the owner's screenshot review in each PR; (8) live view: Agents page map and the moving-row mark in Messages and Files in 0.4.4, Home, Contacts and compact view in 0.4.5, no preview on hover. Spec edits are marked "proposed, owner confirms at merge". S2 cards: tests first, Opus independent review, Fable where marked, Tali's "merge". UI cards: screenshots at 1440 and 360, light and dark. All new local routes sit behind the session, CSRF, `Host`, `Origin`, fetch-metadata and octet-stream gate; every presence route signs an owner action (D-68); errors are fixed codes; no route takes a path from the page.

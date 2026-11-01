@@ -71,8 +71,8 @@ describe('acceptInviteAction (UX2-d1, moved from mcp-tools)', () => {
   });
 
   it('the approval summary is fixed text around the name-rule name', () => {
-    expect(acceptInviteApprovalSummary('“Marko” (self-declared)')).toBe(
-      'Accept an invite from “Marko” (self-declared)',
+    expect(acceptInviteApprovalSummary('Marko (not checked yet)')).toBe(
+      'Accept an invite from Marko (not checked yet)',
     );
   });
 });
@@ -98,7 +98,7 @@ describe('acceptInviteSummary (IR UX2-d1 M: 04 §3.6 Accept step 2)', () => {
 
   it('names the contact under the name rule, its label and the short owner fingerprint', () => {
     expect(acceptInviteSummary(contact('Marko'))).toBe(
-      'Accept an invite from “Marko” (self-declared) (owner AB12·CD34)',
+      'Accept an invite from Marko (not checked yet) (owner AB12·CD34)',
     );
     expect(acceptInviteSummary(contact('Marko'))).toContain('AB12·CD34');
   });

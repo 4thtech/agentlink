@@ -16,7 +16,7 @@ import {
 const SAMPLES: Record<string, string | number> = {
   contactName: 'Marko',
   contactFirstName: 'Marko',
-  signerName: '“Tali’s agent” (Registered)',
+  signerName: 'Tali’s agent (Registered)',
   contacts: 'Marko Novak, Ana Kovač, Denis',
   query: 'Marco',
   date: '20 Oct 2026',
@@ -198,7 +198,7 @@ describe('copy catalogue (M1-9g)', () => {
 
   it('keeps the D-72 request actions and outcomes verbatim (11 §9)', () => {
     expect(en['local.requests.accepted']).toBe(
-      "Your AI can now read this message. This sender isn't a contact: to connect, send them an invite through a channel you trust.",
+      "Your AI can now read this message. This sender isn't someone you are connected with: to connect, send them an invite through a channel you trust.",
     );
     expect(en['local.requests.ignored']).toBe('Removed.');
     expect(en['local.requests.blocked']).toBe(

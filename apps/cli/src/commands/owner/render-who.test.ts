@@ -52,14 +52,14 @@ const request = {
 describe('accept-invite approval: who is inviting (M1-9zb)', () => {
   it('shows the self-declared name and the owner fingerprint', async () => {
     const facts = await cardFacts(fakeClient('oc-test'), request);
-    expect(facts.who).toBe(`“oc-test” (self-declared) · owner ${FP} · not in your contacts yet`);
+    expect(facts.who).toBe(`oc-test (not checked yet) · owner ${FP} · not in your contacts yet`);
     expect(cardLines(request, facts)).toContain(`Who:      ${facts.who}`);
     expect(facts.summary).toContain(`owner ${FP}`);
   });
 
   it('heads the card with a plain sentence: who it connects to, labelled (M1-11a-ux)', async () => {
     const facts = await cardFacts(fakeClient('oc-test'), request);
-    expect(facts.headline).toBe('Connect with “oc-test” (self-declared)');
+    expect(facts.headline).toBe('Connect with oc-test (not checked yet)');
     expect(facts.headline).not.toContain('agentlink.4thtech.io');
     for (const missing of [undefined, '', BIDI]) {
       expect((await cardFacts(fakeClient(missing), request)).headline).toBe(

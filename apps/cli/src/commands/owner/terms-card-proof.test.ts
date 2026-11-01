@@ -23,7 +23,7 @@ const display = {
   label: 'self-declared' as const,
   nameSource: 'counterparty' as const,
 };
-const WHO = '“Bob” (self-declared)';
+const WHO = 'Bob (not checked yet)';
 
 function stored(subject: string, self = SELF, other = OTHER): Terms {
   const r = termsFromInput(

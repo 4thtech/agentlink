@@ -81,7 +81,7 @@ const storedTerms = {
 function card(over: Partial<CommitmentCard> = {}): CommitmentCard {
   return {
     decision: 'accept',
-    counterparty: { agentId: B, display: display('Marko'), shown: '“Marko” (self-declared)' },
+    counterparty: { agentId: B, display: display('Marko'), shown: 'Marko (not checked yet)' },
     version: 3,
     terms: storedTerms,
     changes: null,
@@ -217,7 +217,7 @@ describe('agentlink_propose_terms (06 §2.2a)', () => {
     expect(result.structured).toEqual({
       status: 'ok',
       summary:
-        'Sent version 1 of your terms. Waiting for “Marko” (self-declared) to accept; valid until 23 Oct 2025.',
+        'Sent version 1 of your terms. Waiting for Marko (not checked yet) to accept; valid until 23 Oct 2025.',
       envelopeId: ENVELOPE,
       thread: THREAD,
       termsId: TERMS_ID,
@@ -317,8 +317,8 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
       approvalId: APPROVAL,
       decision: 'accept',
       summary: withDisclosure(
-        TERMS_TEXT.askAccept(3, '“Marko” (self-declared)'),
-        proofDisclosure('“Marko” (self-declared)'),
+        TERMS_TEXT.askAccept(3, 'Marko (not checked yet)'),
+        proofDisclosure('Marko (not checked yet)'),
       ),
       nextStep: `${nextStepOf(APPROVAL)} To check the decision, call agentlink_get_approval.`,
     });
@@ -330,9 +330,9 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
     for (const [over, summary] of [
       [
         { decision: 'confirm', lateAccept: { acceptedVersion: 3, newestOwnVersion: 4 } },
-        TERMS_TEXT.askLate(3, 4, '“Marko” (self-declared)'),
+        TERMS_TEXT.askLate(3, 4, 'Marko (not checked yet)'),
       ],
-      [{ decision: 'confirm' }, TERMS_TEXT.askConfirm(3, '“Marko” (self-declared)')],
+      [{ decision: 'confirm' }, TERMS_TEXT.askConfirm(3, 'Marko (not checked yet)')],
     ] as const) {
       const client = fake({
         respond: () =>
@@ -347,7 +347,7 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
       });
       const result = await respond({ envelopeId: ENVELOPE, decision: 'accept' }, client);
       expect(result.structured.summary).toBe(
-        withDisclosure(summary, proofDisclosure('“Marko” (self-declared)')),
+        withDisclosure(summary, proofDisclosure('Marko (not checked yet)')),
       );
     }
   });
@@ -362,7 +362,7 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
           summary: 'x',
           expiresAt: VALID_UNTIL,
           card: card({
-            counterparty: { agentId: B, display: display('M'), shown: '“M‮\nX” (self-declared)' },
+            counterparty: { agentId: B, display: display('M'), shown: 'M‮\nX (not checked yet)' },
           }),
         }),
     });
@@ -397,7 +397,7 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
     expect(accepted.structured).toEqual({
       status: 'ok',
       summary:
-        "Accepted version 3. If “Marko” (self-declared) records these terms by 23 Oct 2025, your acceptance is added to that record automatically. You don't need to approve anything else.",
+        "Accepted version 3. If Marko (not checked yet) records these terms by 23 Oct 2025, your acceptance is added to that record automatically. You don't need to approve anything else.",
       decision: 'accept',
       thread: THREAD,
       termsId: TERMS_ID,
@@ -411,13 +411,13 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
       fake(),
     );
     expect(rejected.structured.summary).toBe(
-      "Told “Marko” (self-declared) you don't accept version 3. They can still send a new version.",
+      "Told Marko (not checked yet) you don't accept version 3. They can still send a new version.",
     );
     const countered = await respond(
       { envelopeId: ENVELOPE, decision: 'counter', terms: termsInput, note: CANARY },
       fake(),
     );
-    expect(countered.structured.summary).toBe(TERMS_TEXT.counterSent(3, '“Marko” (self-declared)'));
+    expect(countered.structured.summary).toBe(TERMS_TEXT.counterSent(3, 'Marko (not checked yet)'));
     for (const r of [accepted, rejected, countered]) expectNoCanary(r);
   });
 
@@ -636,7 +636,7 @@ describe('terms tools: clientRequestId idempotency (06 §1 rule 6, 07 §3.3; M1-
 });
 
 describe('fixed text of the terms tools (11 §5.1; I-5)', () => {
-  const name = '“Marko” (self-declared)';
+  const name = 'Marko (not checked yet)';
   const texts = [
     ...(Object.values(TERMS_TEXT) as unknown[]).filter((v): v is string => typeof v === 'string'),
     TERMS_TEXT.offerSent(2, name, '20 Oct'),

@@ -157,7 +157,7 @@ describe('sanitizeUntrustedValue (06 \u00a72.2: every string leaf and object key
 
 describe('untrustedBlock and untrustedText (06 \u00a74 format)', () => {
   const block = untrustedBlock({
-    header: '1 new message from \u201cMarko\u201d (self-declared)',
+    header: '1 new message from Marko (not checked yet)',
     from: "Marko's agent",
     envelope: 'Q2xhZGU',
     type: 'request',
@@ -167,7 +167,7 @@ describe('untrustedBlock and untrustedText (06 \u00a74 format)', () => {
   it('has the header line, the element and the content in 06 \u00a74 form', () => {
     expect(block).toBe(
       [
-        '[AgentLink] 1 new message from \u201cMarko\u201d (self-declared)',
+        '[AgentLink] 1 new message from Marko (not checked yet)',
         '<untrusted_content source="agentlink" from="Marko\'s agent" envelope="Q2xhZGU" type="request">',
         'Please send the final invoice.',
         CLOSE,

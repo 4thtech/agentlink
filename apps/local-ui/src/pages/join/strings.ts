@@ -7,7 +7,7 @@ import { SENSOR } from '../first-run/strings.js';
 export const JOIN_STRINGS = {
   title: (name: string): string => `Accept ${name}'s invite?`,
   check: (name: string, fingerprint: string): string => `Check it's ${name}: ${fingerprint}`,
-  selfDeclared: 'Self-declared',
+  selfDeclared: 'Not checked yet',
   fingerprintLabel: 'FINGERPRINT',
   until: (date: string): string => `until ${date}`,
   isThisWho: 'Is this who you expected?',
@@ -35,6 +35,6 @@ export const JOIN_STRINGS = {
   offline: "Couldn't reach AgentLink on this computer. Try again in a moment.",
   /** The owner statement before the gesture (04 §3.6 Accept step 2). */
   statement: (name: string, fingerprint: string, agent: string): string =>
-    `Accept an invite from ${name} (Self-declared, owner ${fingerprint}) for ${agent}`,
+    `Accept an invite from ${name} (Not checked yet, owner ${fingerprint}) for ${agent}`,
   regionLabel: 'Who invites you',
 } as const;

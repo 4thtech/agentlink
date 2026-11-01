@@ -213,7 +213,7 @@ describe('W4-WIRE-2: a pasted invite link on the Invite screen (Decision 52 (3))
       await new Promise((r) => setTimeout(r, 60));
     });
     await settle();
-    expect(text()).toContain('You and “Marko” are connected');
+    expect(text()).toContain('You and Marko are connected');
     // IR-W4-WIRE-2X-1: pasting someone's invite makes no invite of your own.
     expect(state.created ?? 0).toBe(0);
   });
@@ -247,7 +247,7 @@ describe("People: the inviter's Connected moment (A7)", () => {
     });
     await settle();
     // The name rule quotes a name the contact gave itself (I-5).
-    expect(text()).toContain('You and “Marko” are connected');
+    expect(text()).toContain('You and Marko are connected');
     expect(text()).toContain('4821');
     await click(I.done);
     expect(text()).not.toContain('are connected');
@@ -266,7 +266,7 @@ describe('People: the person ⋯ menu', () => {
       document.querySelector<HTMLButtonElement>('.ct-row')?.click();
     });
     await settle();
-    await click('More for “Marko”');
+    await click('More for Marko');
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
     expect(items).toEqual([I.rename, I.checkCode, I.remove]);
     await click(I.rename);

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { TERMS_CARD_TEXT } from './terms-card.js';
 
 describe('fixed text of the terms card (11 §5.1, §6.10; I-5)', () => {
-  const name = '“Marko” (self-declared)';
+  const name = 'Marko (not checked yet)';
   const texts = [
     ...(Object.values(TERMS_CARD_TEXT) as unknown[]).filter(
       (v): v is string => typeof v === 'string',

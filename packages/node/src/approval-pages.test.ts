@@ -246,8 +246,8 @@ describe('the fixed pages (M1-11b-2c; 11 §6.2.1)', () => {
 
 describe('what the app is given for an accept-invite request (M1-11a-ux; I-5)', () => {
   const details: ApprovalDetails = {
-    headline: 'Connect with “Ana” (self-declared)',
-    who: '“Ana” (self-declared) · owner 7F3A·19C2 · not in your contacts yet',
+    headline: 'Connect with Ana (not checked yet)',
+    who: 'Ana (not checked yet) · owner 7F3A·19C2 · not in your contacts yet',
     what: 'Connect with a new contact',
     cost: 'Free',
     expires: '12 Oct 2026 14:02 UTC',
@@ -273,7 +273,7 @@ describe('what the app is given for an accept-invite request (M1-11a-ux; I-5)', 
       expect(res.status, path).toBe(200);
       expect(res.body, path).not.toContain(INVITE);
       expect(res.body, path).not.toContain('inviteUrl');
-      expect(res.body, path).toContain('Connect with “Ana” (self-declared)');
+      expect(res.body, path).toContain('Connect with Ana (not checked yet)');
       expect(res.body, path).toContain('"note"');
     }
   });

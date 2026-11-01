@@ -142,7 +142,7 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
     expect(text()).not.toMatch(/\d{4} \d{4} \d{4}/);
     // IR-1 low (c): the owner sees what Touch ID signs before the gesture.
     expect(text()).toContain(
-      'Accept an invite from Marko (Self-declared, owner 7F3A·19C2) for Claude Code agent',
+      'Accept an invite from Marko (Not checked yet, owner 7F3A·19C2) for Claude Code agent',
     );
     expect(button('Accept with Touch ID')).toBeDefined();
     expect(button('Not now')).toBeDefined();

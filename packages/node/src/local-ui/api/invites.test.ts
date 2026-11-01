@@ -441,7 +441,7 @@ describe('accept an invite: owner presence (UX2-d1, decision 1.1)', () => {
     expect(w.seen.requested).toEqual([{ action: ACTION, summary: acceptInviteSummary(CONTACT) }]);
     // IR UX2-d1 M: the same summary as the MCP tool and the CLI, with the owner fingerprint.
     expect(w.seen.requested[0]?.summary).toBe(
-      'Accept an invite from “Marko” (self-declared) (owner AB12·CD34)',
+      'Accept an invite from Marko (not checked yet) (owner AB12·CD34)',
     );
     expect(w.seen.signed).toHaveLength(1);
     const [request] = w.seen.signed[0] ?? [];

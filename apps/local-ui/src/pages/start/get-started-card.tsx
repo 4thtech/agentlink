@@ -123,6 +123,12 @@ export function GetStartedCard({
           ),
         )}
       </ul>
+      {progress.suggestion.done ? null : (
+        <p className="st-card-suggest al-text-body-sm al-muted">
+          {T.suggestLead}{' '}
+          <a href={stepHref(progress.suggestion)}>{stepWords(progress.suggestion)}</a>
+        </p>
+      )}
     </section>
   );
 }

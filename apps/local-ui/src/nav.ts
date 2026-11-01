@@ -20,8 +20,9 @@ export const START_STEPS = ['/start/app', '/start/connect', '/start/connected', 
  * Interim (until U3 Home and U4 People land): today's Messages and Contacts pages stay reachable
  * from Cmd+K and Home's own links, out of the section menu. Their builders turn these paths into
  * redirects to Home.
+ * W6-UI-POLISH: the old Inbox page is gone; its path goes to Home, where each person's files are.
  */
-export const INTERIM_MESSAGES_PATH = '/inbox';
+export const LEGACY_INBOX_PATH = '/inbox';
 export const INTERIM_PEOPLE_PATH = '/contacts';
 /**
  * W4-WIRE: the Invite screen (U4), where every "Invite someone" and "Add contact" leads: Home, the
@@ -103,12 +104,7 @@ export function agentNameOf(path: string): string | undefined {
 
 /** The section a path belongs to (marked current in the menu), or undefined. */
 export function sectionOf(path: string): string | undefined {
-  if (
-    path === HOME_PATH ||
-    path.startsWith('/approve/') ||
-    path === INTERIM_MESSAGES_PATH ||
-    path === INTERIM_PEOPLE_PATH
-  ) {
+  if (path === HOME_PATH || path.startsWith('/approve/') || path === INTERIM_PEOPLE_PATH) {
     return 'home';
   }
   if (path === AGENTS_PATH || agentNameOf(path) !== undefined) return 'agents';
@@ -123,7 +119,6 @@ export function sectionOf(path: string): string | undefined {
 /** The title of a path (the phone menu button and the document title). */
 export function titleOf(path: string): string {
   if (path.startsWith('/start/')) return PAGE_TITLES.getStarted;
-  if (path === INTERIM_MESSAGES_PATH) return PAGE_TITLES.messages;
   if (path === INTERIM_PEOPLE_PATH) return PAGE_TITLES.people;
   if (agentNameOf(path) !== undefined) return PAGE_TITLES.agents;
   const settings = SETTINGS_PAGES.find((p) => p.path === path);
@@ -143,7 +138,8 @@ export const REDIRECTS: Readonly<Record<string, string>> = {
   '/first-run': START_PATH,
   '/start': START_PATH,
   '/settings/home': HOME_PATH,
-  '/settings/messages': INTERIM_MESSAGES_PATH,
+  [LEGACY_INBOX_PATH]: HOME_PATH,
+  '/settings/messages': HOME_PATH,
   '/settings/contacts': INTERIM_PEOPLE_PATH,
   '/settings/agents': AGENTS_PATH,
   '/settings/activity': ACTIVITY_PATH,
@@ -178,8 +174,14 @@ export function goToEntries(hood: boolean): readonly GoToEntry[] {
       path: INVITE_PATH,
       keywords: 'contact add person',
     },
-    { label: PAGE_TITLES.people, hint: go, path: INTERIM_PEOPLE_PATH, keywords: 'contacts' },
-    { label: PAGE_TITLES.messages, hint: go, path: INTERIM_MESSAGES_PATH, keywords: 'inbox files' },
+    {
+      label: PAGE_TITLES.people,
+      hint: go,
+      path: INTERIM_PEOPLE_PATH,
+      keywords: 'contacts connections',
+    },
+    // Files live with each person on Home (their conversation and files).
+    { label: PAGE_TITLES.files, hint: go, path: HOME_PATH, keywords: 'inbox messages received' },
     {
       label: 'New agent',
       hint: 'Action',

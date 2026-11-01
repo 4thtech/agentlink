@@ -318,7 +318,7 @@ describe('verify: who made the record (06 §2.1 name rule)', () => {
       },
     });
     expect((await contact.run(['verify', 'p.json'])).text).toContain(
-      'OK       Recorded by “Marko Novak” (Self-declared)',
+      'OK       Recorded by Marko Novak (Self-declared)',
     );
 
     const card = setup({

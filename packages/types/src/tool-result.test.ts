@@ -23,7 +23,7 @@ import {
 
 type Path = (string | number)[];
 
-const ok = () => ({ status: 'ok', summary: 'Sent to “Marko Novak” (self-declared).' });
+const ok = () => ({ status: 'ok', summary: 'Sent to Marko Novak (not checked yet).' });
 const notOk = (status: string) => ({
   status,
   summary: 'Could not send.',

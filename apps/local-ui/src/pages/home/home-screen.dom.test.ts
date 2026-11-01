@@ -136,7 +136,7 @@ const approval = (id: string, over: Partial<{ commitment: boolean; paid: boolean
   paid: over.paid ?? false,
   details: {
     headline: `Headline ${id.slice(4, 5)}`,
-    who: '“Denis” (self-declared)',
+    who: 'Denis (not checked yet)',
     what: 'Accept terms',
     cost: 'Free',
     expires: '12 Oct 2026 14:02 UTC',

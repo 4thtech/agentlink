@@ -96,8 +96,8 @@ export function render(
     element(doc, 'invite-heading').textContent = who.fallback
       ? strings.heading.someone
       : invitesHeading(who.name);
-    // The quotes are ours; the name between them is text.
-    element(doc, 'inviter-name').textContent = `“${who.name}”`;
+    // The name is text.
+    element(doc, 'inviter-name').textContent = who.name;
     element(doc, 'inviter-label').textContent = strings.inviter.label;
     element(doc, 'inviter-fingerprint').textContent = who.fingerprint;
     element(doc, 'inviter-expiry').textContent = formatExpiry(who.expiresAt);

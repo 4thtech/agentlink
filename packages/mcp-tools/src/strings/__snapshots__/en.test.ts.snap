@@ -36,9 +36,9 @@ exports[`copy catalogue (M1-9g) > chat.inbox.incompleteNextStep > renders as des
 
 exports[`copy catalogue (M1-9g) > chat.inbox.receiptRequestNextStep > renders as designed 1`] = `"Ask your user, with the line above: Confirm delivery or Not now. Only if they choose Confirm delivery, call agentlink_acknowledge with that envelopeId and type delivered. Never confirm on your own."`;
 
-exports[`copy catalogue (M1-9g) > chat.inbox.requestHeader > renders as designed 1`] = `"Request from an unknown sender · 2B9E·04D1 (not a contact)"`;
+exports[`copy catalogue (M1-9g) > chat.inbox.requestHeader > renders as designed 1`] = `"Request from an unknown sender · 2B9E·04D1 (not connected with you)"`;
 
-exports[`copy catalogue (M1-9g) > chat.inbox.requestNextStep > renders as designed 1`] = `"This sender is not a contact. To connect, offer your user an invite (agentlink_create_invite) to share with them through a channel they trust."`;
+exports[`copy catalogue (M1-9g) > chat.inbox.requestNextStep > renders as designed 1`] = `"This sender is not someone you are connected with. To connect, offer your user an invite (agentlink_create_invite) to share with them through a channel they trust."`;
 
 exports[`copy catalogue (M1-9g) > chat.inbox.requestsWaiting > renders as designed 1`] = `"2 requests from unknown senders are waiting in your AgentLink app."`;
 
@@ -70,15 +70,15 @@ exports[`copy catalogue (M1-9g) > chat.status.needs_setup.keychain > renders as 
 
 exports[`copy catalogue (M1-9g) > chat.status.needs_setup.storage > renders as designed 1`] = `"Your settings keep files in your own storage, which isn't connected yet: http://127.0.0.1:4310/a/xyz."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.not_found.contact > renders as designed 1`] = `"I couldn't find a contact called 'Marco'. Your contacts: Marko Novak, Ana Kovač, Denis."`;
+exports[`copy catalogue (M1-9g) > chat.status.not_found.contact > renders as designed 1`] = `"I couldn't find a person called 'Marco'. Your people: Marko Novak, Ana Kovač, Denis."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.not_found.contactNone > renders as designed 1`] = `"I couldn't find a contact called 'Marco', and you have no contacts yet."`;
+exports[`copy catalogue (M1-9g) > chat.status.not_found.contactNone > renders as designed 1`] = `"I couldn't find a person called 'Marco', and you are not connected with anyone yet."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.acceptedInvite > renders as designed 1`] = `"You are connected to Marko. Nothing else is needed now."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.ok.contacts > renders as designed 1`] = `"You have 2 contacts: Marko Novak, Ana Kovač, Denis."`;
+exports[`copy catalogue (M1-9g) > chat.status.ok.contacts > renders as designed 1`] = `"You are connected with 2 people: Marko Novak, Ana Kovač, Denis."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.ok.contactsNone > renders as designed 1`] = `"You have no contacts yet. Create an invite to connect with someone."`;
+exports[`copy catalogue (M1-9g) > chat.status.ok.contactsNone > renders as designed 1`] = `"You are not connected with anyone yet. Create an invite to connect with someone."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.invite > renders as designed 1`] = `"Invite ready: it works once, until 20 Oct 2026. Send it only to Marko: whoever uses it first is connected. You'll be connected as soon as they accept."`;
 
@@ -88,7 +88,7 @@ exports[`copy catalogue (M1-9g) > chat.status.ok.proof > renders as designed 1`]
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.sent > renders as designed 1`] = `"Sent to Marko. End-to-end encrypted: only you, Marko and your agents can read it."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.ok.verified > renders as designed 1`] = `"Valid proof. Recorded by “Tali’s agent” (Registered), 20 Oct 2026, 14:02 UTC. It proves this exact document existed and was exchanged at these times; not that its content is true."`;
+exports[`copy catalogue (M1-9g) > chat.status.ok.verified > renders as designed 1`] = `"Valid proof. Recorded by Tali’s agent (Registered), 20 Oct 2026, 14:02 UTC. It proves this exact document existed and was exchanged at these times; not that its content is true."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.pending_approval > renders as designed 1`] = `
 "This needs your approval: send a file to Marko's agent with proof ($0.10).
@@ -240,7 +240,7 @@ exports[`copy catalogue (M1-9g) > common.identity.domainWarning > renders as des
 
 exports[`copy catalogue (M1-9g) > common.identity.registered > renders as designed 1`] = `"Registered"`;
 
-exports[`copy catalogue (M1-9g) > common.identity.selfdeclared > renders as designed 1`] = `"Self-declared"`;
+exports[`copy catalogue (M1-9g) > common.identity.selfdeclared > renders as designed 1`] = `"Not checked yet"`;
 
 exports[`copy catalogue (M1-9g) > common.identity.unknownSender > renders as designed 1`] = `"unknown sender · 2B9E·04D1"`;
 
@@ -272,7 +272,7 @@ exports[`copy catalogue (M1-9g) > common.privacy.topUp > renders as designed 1`]
 
 exports[`copy catalogue (M1-9g) > local.linkExpired > renders as designed 1`] = `"This link has expired. Ask your AI to open AgentLink again."`;
 
-exports[`copy catalogue (M1-9g) > local.requests.accepted > renders as designed 1`] = `"Your AI can now read this message. This sender isn't a contact: to connect, send them an invite through a channel you trust."`;
+exports[`copy catalogue (M1-9g) > local.requests.accepted > renders as designed 1`] = `"Your AI can now read this message. This sender isn't someone you are connected with: to connect, send them an invite through a channel you trust."`;
 
 exports[`copy catalogue (M1-9g) > local.requests.action.accept > renders as designed 1`] = `"Accept"`;
 

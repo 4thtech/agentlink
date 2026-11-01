@@ -27,7 +27,7 @@ export type RememberReason =
 /** The name rule, plus "(Self-declared)" for a name the contact chose for itself (11 §5.2). */
 function nameWithLabel(contact: ContactNameInput): string {
   const n = formatContactName(contact);
-  return n.kind === 'restricted' ? `${n.text} (Self-declared)` : n.text;
+  return n.kind === 'restricted' ? `${n.text} (Not checked yet)` : n.text;
 }
 
 function ApprovalFooter(): ReactElement {

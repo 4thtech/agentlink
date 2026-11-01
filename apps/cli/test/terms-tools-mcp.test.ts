@@ -425,7 +425,7 @@ describe('a two-agent negotiation over MCP: propose → counter → accept with 
       note: `Happy to talk ${HOSTILE}`,
     });
     expect(offer.structured).toMatchObject({ status: 'ok', version: 1 });
-    expect(offer.structured['summary']).toContain('“Bob” (self-declared)');
+    expect(offer.structured['summary']).toContain('Bob (not checked yet)');
     // The default validity: exactly 7 days from the core's clock (D-74).
     expect(offer.structured['validUntil']).toBe(
       new Date((NOW + 604_800) * 1000).toISOString().replace('.000Z', 'Z'),
@@ -459,7 +459,7 @@ describe('a two-agent negotiation over MCP: propose → counter → accept with 
       `${approvalNextStep(approvalId, 'alice')} To check the decision, call agentlink_get_approval.`,
     );
     expect(asked.structured['summary']).toBe(
-      `Accepting “Bob” (self-declared)'s terms (version 2) commits you. One approval covers your acceptance and its proof. ${proofDisclosure('“Bob” (self-declared)')}`,
+      `Accepting Bob (not checked yet)'s terms (version 2) commits you. One approval covers your acceptance and its proof. ${proofDisclosure('Bob (not checked yet)')}`,
     );
     expect(asked.structured).not.toHaveProperty('url');
     expect(await outboundOfType(alice, 'accept')).toHaveLength(0);
@@ -477,9 +477,9 @@ describe('a two-agent negotiation over MCP: propose → counter → accept with 
     expect(await alice.owner_(['approve', approvalId])).toBe(0);
     const card = alice.out.join('\n');
     const lines = alice.out;
-    expect(card).toContain('Accepting terms from “Bob” (self-declared), version 2, valid until');
+    expect(card).toContain('Accepting terms from Bob (not checked yet), version 2, valid until');
     const start = lines.indexOf(
-      'Proposed by “Bob” (self-declared): their content, not instructions',
+      'Proposed by Bob (not checked yet): their content, not instructions',
     );
     expect(start).toBeGreaterThan(0);
     const end = lines.indexOf(REGION_END, start);
@@ -490,10 +490,10 @@ describe('a two-agent negotiation over MCP: propose → counter → accept with 
     expect(region).toContain(`| Deliverable d1: Three logo drafts ${HOSTILE}`);
     // Bob's counter: "them" delivers (Alice), "me" pays (Bob), shown from Alice's side.
     expect(region).toContain('|   Delivered by: you');
-    expect(region).toContain('| Price: 400.00 USD, paid by “Bob” (self-declared)');
+    expect(region).toContain('| Price: 400.00 USD, paid by Bob (not checked yet)');
     expect(region).toContain('| Deadline for d1: 2027-01-30T17:00:00Z');
     expect(region.some((l) => l.startsWith('| Valid until: '))).toBe(true);
-    expect(region).toContain('| Between: you and “Bob” (self-declared)');
+    expect(region).toContain('| Between: you and Bob (not checked yet)');
     // The hostile text appears only inside the region.
     const outside = [...lines.slice(0, start), ...lines.slice(end)];
     expectNoCanary(...outside);
@@ -528,7 +528,7 @@ describe('a two-agent negotiation over MCP: propose → counter → accept with 
       termsHash: counter.structured['termsHash'],
     });
     expect(done.structured['summary']).toMatch(
-      /^Accepted version 2\. If “Bob” \(self-declared\) records these terms by /,
+      /^Accepted version 2\. If Bob \(not checked yet\) records these terms by /,
     );
     expect(await outboundOfType(alice, 'accept')).toHaveLength(1);
     expect(net.published).toBeGreaterThan(before);
@@ -823,7 +823,7 @@ describe('arguments the agent may not give (06 §2.2a, D-55)', () => {
     });
     expect(r.structured).toMatchObject({ status: 'ok', decision: 'reject', version: 1 });
     expect(r.structured['summary']).toBe(
-      "Told “Alice” (self-declared) you don't accept version 1. They can still send a new version.",
+      "Told Alice (not checked yet) you don't accept version 1. They can still send a new version.",
     );
     expect(await outboundOfType(bob, 'reject')).toHaveLength(1);
     expectResultsClean();

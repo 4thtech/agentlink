@@ -101,7 +101,7 @@ const paidAction = (usd = '0.1'): JsonObject => ({
 });
 
 const DETAILS = {
-  who: '“Ana” (self-declared)',
+  who: 'Ana (not checked yet)',
   what: 'Record a proof',
   cost: '$0.10',
   expires: '12 Oct 2026 14:02 UTC',

@@ -27,7 +27,6 @@ export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   '/activity': activity,
   '/activity/live': part(async () => (await import('../pages/activity/live.js')).LiveActivityPage),
   // Interim: today's Messages and Contacts pages (U3, U4 fold them into Home).
-  '/inbox': part(async () => (await import('../pages/messages/index.js')).MessagesPage),
   '/contacts': part(async () => (await import('../pages/contacts/index.js')).ContactsPage),
   // Settings (A9).
   '/settings': part(async () => (await import('../pages/settings/index.js')).SettingsPage),

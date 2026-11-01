@@ -182,7 +182,7 @@ async function confirmWithCode(code = 'ABCD-EFGH'): Promise<void> {
 describe('ContactsPage: the list', () => {
   it('shows one next step when there are no contacts', async () => {
     await mount({ [LIST]: { status: 'ok', contacts: [] } });
-    expect(host.querySelector('h1')?.textContent).toBe('Contacts');
+    expect(host.querySelector('h1')?.textContent).toBe('People');
     const empty = host.querySelector('.al-empty');
     expect(empty?.textContent).toContain(S.emptyTitle);
     expect(empty?.textContent).toContain(`Try: ${S.emptyPrompt}`);
@@ -203,8 +203,8 @@ describe('ContactsPage: the list', () => {
 
   it('shows the label for a contact name and none of the web3 words', async () => {
     await mount({ [LIST]: { status: 'ok', contacts: [marko, ana] } });
-    expect(text()).toContain('“Marko Novak”');
-    expect(text()).toContain('Self-declared');
+    expect(text()).toContain('Marko Novak');
+    expect(text()).toContain('Not checked yet');
     expect(text()).toContain('Safety code checked');
     expect(text()).not.toMatch(/wallet|gas|seed phrase|transaction|address|hash|chain/i);
     // A paired contact never shows presence (X-11).
@@ -247,7 +247,7 @@ describe('ContactsPage: the safety code (04 §3.6.1)', () => {
     expect(host.querySelector('.al-sc-code')?.textContent?.replace(/\s/g, '')).toBe(
       CODE.replace(/\s/g, ''),
     );
-    expect(text()).toContain('Want to be sure it’s really “Marko Novak”?');
+    expect(text()).toContain('Want to be sure it’s really Marko Novak?');
     expect(button(S.theyMatch)).toBeDefined();
     expect(button(S.theyDontMatch)).toBeDefined();
     expect(button(S.skip)).toBeDefined();
@@ -260,11 +260,11 @@ describe('ContactsPage: the safety code (04 §3.6.1)', () => {
     );
   });
 
-  it('Skip hides the nudge and keeps the label Self-declared; it can come back', async () => {
+  it('Skip hides the nudge and keeps the label Not checked yet; it can come back', async () => {
     const calls = await mount(routes());
     await click(S.skip);
     expect(host.querySelector('.al-sc-code')).toBeNull();
-    expect(text()).toContain('Self-declared');
+    expect(text()).toContain('Not checked yet');
     expect(posts(calls)).toHaveLength(0);
     await click(S.compareCode);
     expect(host.querySelector('.al-sc-code')).not.toBeNull();
@@ -404,7 +404,7 @@ describe('the page markup', () => {
 });
 
 describe('ContactsPage: duplicate names (UX-031-QUICKWINS)', () => {
-  const SAME = 'Another contact has the same name.';
+  const SAME = 'Another person has the same name.';
 
   it('hints on both rows when two contacts show the same name', async () => {
     await mount({

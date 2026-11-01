@@ -3,19 +3,19 @@
 // 3b, 10a). A contact's name is never part of a fixed string: the helpers below take the name as
 // formatted by the ui name rule and the page renders the result as text.
 export const CONTACTS_STRINGS = {
-  listLabel: 'Your contacts',
-  detailTitle: 'Contact',
+  listLabel: 'Your people',
+  detailTitle: 'Person',
   closeSheet: 'Close',
   loading: 'Loading…',
   emptyTitle:
-    'No contacts yet. Ask your AI to create an invite and send it to someone you work with.',
+    'No people yet. Ask your AI to create an invite and send it to someone you work with.',
   emptyPrompt: 'Create an AgentLink invite for Marko.',
   notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
-  listUnavailable: "Your contacts can't be loaded right now. Try again in a minute.",
+  listUnavailable: "Your people can't be loaded right now. Try again in a minute.",
   blocked: 'Blocked',
-  blockedDetail: 'Blocked. Messages from this contact are dropped.',
+  blockedDetail: 'Blocked. Messages from this person are dropped.',
   revoked: 'No longer active',
-  revokedDetail: "This contact's agent was shut down by its owner. Messages from it are dropped.",
+  revokedDetail: "This person's agent was shut down by its owner. Messages from it are dropped.",
   waiting: 'Waiting for their agent',
   waitingDetail:
     'Waiting for their agent to answer the invite. The safety code shows here once it does.',
@@ -23,7 +23,7 @@ export const CONTACTS_STRINGS = {
   safetyCode: 'Safety code',
   safetyExplain:
     'Compare these 12 digits with the other person by call or in person; if they match, it’s really them.',
-  sameName: 'Another contact has the same name.',
+  sameName: 'Another person has the same name.',
   keepBoth: 'Keep both',
   removeOlder: 'Remove older',
   codeLoading: 'Loading the safety code…',
@@ -33,7 +33,7 @@ export const CONTACTS_STRINGS = {
   skip: 'Skip',
   compareCode: 'Compare safety code',
   checked: 'Safety code checked.',
-  matched: 'Matched. This contact now shows as Safety code checked.',
+  matched: 'Matched. This person now shows as Safety code checked.',
   mismatchTitle: 'The codes are different.',
   keep: 'Keep for now',
   rename: 'Rename',
@@ -42,14 +42,14 @@ export const CONTACTS_STRINGS = {
   saveName: 'Save name',
   renamed: 'Renamed.',
   aliasInvalid: 'Use letters, numbers and spaces, up to 32.',
-  aliasTaken: 'Another contact already has this name. Pick a different one.',
-  contactUnknown: 'This contact is no longer here. Reload the page.',
+  aliasTaken: 'Another person already has this name. Pick a different one.',
+  contactUnknown: 'This person is no longer here. Reload the page.',
   renameUnavailable: "The name can't be checked right now. Try again in a minute.",
   remove: 'Remove',
-  removeContact: 'Remove contact',
+  removeContact: 'Remove person',
   removeExplain:
-    'Remove this contact? Messages from its agent are dropped. To connect again, ask them for a new invite.',
-  removed: 'Contact removed.',
+    'Remove this person? Messages from its agent are dropped. To connect again, ask them for a new invite.',
+  removed: 'Removed.',
   cancel: 'Cancel',
   presenceIntro: 'Confirm it’s you. Never give your backup code to your AI.',
   usePasskey: 'Confirm with your passkey',
@@ -99,11 +99,11 @@ export const HOOD = {
   identity: 'Identity level',
   paired: 'Paired',
   checked: 'Safety code checked',
-  selfDeclared: 'Self-declared',
+  selfDeclared: 'Not checked yet',
 } as const;
 
 export function countLine(n: number): string {
-  return n === 1 ? '1 contact' : `${String(n)} contacts`;
+  return n === 1 ? '1 person' : `${String(n)} people`;
 }
 
 /** The safety-code nudge (UX audit 3b). `name` is the name-rule output. */
@@ -112,7 +112,7 @@ export function nudge(name: string): string {
 }
 
 export function mismatchBody(name: string): string {
-  return `The invite may have been copied or changed on the way. Remove this contact, then ask ${name} for a new invite through a channel you trust.`;
+  return `The invite may have been copied or changed on the way. Remove this person, then ask ${name} for a new invite through a channel you trust.`;
 }
 
 /**
@@ -138,6 +138,6 @@ export function waitSeconds(seconds: number): string {
 
 export const SUMMARY = {
   check: (name: string): string => `Mark ${name} as Safety code checked.`,
-  rename: (name: string, alias: string): string => `Rename ${name} to “${alias}”.`,
+  rename: (name: string, alias: string): string => `Rename ${name} to ${alias}.`,
   remove: (name: string): string => `Remove ${name}.`,
 } as const;

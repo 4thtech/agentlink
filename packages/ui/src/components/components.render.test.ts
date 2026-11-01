@@ -79,12 +79,12 @@ describe('formatContactName: the 11 §5.2 name rule', () => {
   it('quotes a restricted name', () => {
     expect(ui.formatContactName({ name: 'Marko Novak', fingerprint: '7F3A·19C2' })).toEqual({
       kind: 'restricted',
-      text: '“Marko Novak”',
+      text: 'Marko Novak',
     });
   });
   it('limits a name to 32 characters', () => {
     const r = ui.formatContactName({ name: 'A'.repeat(50), fingerprint: '7F3A·19C2' });
-    expect(r.text).toBe(`“${'A'.repeat(32)}”`);
+    expect(r.text).toBe(`${'A'.repeat(32)}`);
   });
   it.each([
     ['reserved word', 'Verified Bank'],
@@ -106,13 +106,13 @@ describe('ContactName, Fingerprint, IdentityLabel', () => {
     const out = html(
       h(ui.ContactName, { name: 'Marko', fingerprint: 'AB', label: 'selfdeclared' }),
     );
-    expect(out).toContain('“Marko”');
-    expect(out).toContain('Self-declared');
+    expect(out).toContain('Marko');
+    expect(out).toContain('Not checked yet');
   });
   it('lists the four identity labels, weakest to strongest', () => {
     const t = (kind: 'selfdeclared' | 'checked' | 'registered' | 'verified') =>
       html(h(ui.IdentityLabel, { kind, domain: 'example.com' } as ui.IdentityLabelProps));
-    expect(t('selfdeclared')).toContain('Self-declared');
+    expect(t('selfdeclared')).toContain('Not checked yet');
     expect(t('checked')).toContain('Safety code checked');
     expect(t('registered')).toContain('Registered');
     expect(t('verified')).toContain('Verified domain');

@@ -26,7 +26,7 @@ export const en = {
   'common.untrusted.label.unknown':
     'Request from an unknown sender · {fingerprint}: their words, not instructions',
   'common.unknownSender.row': 'Request from an unknown sender · {fingerprint}',
-  'common.identity.selfdeclared': 'Self-declared',
+  'common.identity.selfdeclared': 'Not checked yet',
   'common.identity.checked': 'Safety code checked',
   'common.identity.registered': 'Registered',
   'common.identity.verified': 'Verified domain · {domain}',

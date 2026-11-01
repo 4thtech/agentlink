@@ -126,7 +126,7 @@ describe('UI-REFRESH-i: first load', () => {
       root.render(createElement<ContactsPageProps>(ContactsPage, { api }));
       await Promise.resolve();
     });
-    expect(host.querySelector('h1')?.textContent).toBe('Contacts');
+    expect(host.querySelector('h1')?.textContent).toBe('People');
     await act(async () => {
       vi.advanceTimersByTime(450);
     });
@@ -305,7 +305,7 @@ describe('UI-REFRESH-i: Under the hood', () => {
     ]);
     expect(rows).toEqual([
       ['Fingerprint', '7F3A·19C2'],
-      ['Identity level', 'Self-declared'],
+      ['Identity level', 'Not checked yet'],
       ['Paired', '2025-10-03'],
     ]);
   });

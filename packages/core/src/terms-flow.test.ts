@@ -602,7 +602,7 @@ describe('accept: one approval per agreement (04 §3.4.2)', () => {
       fingerprint: offer.termsHash,
     });
     // The summary names the contact, the action and the version only (I-5).
-    expect(p.summary).toMatch(/^Accept version 1 of the terms from “.+” \(.+\)$/);
+    expect(p.summary).toMatch(/^Accept version 1 of the terms from .+ \(.+\)$/);
     expect(p.summary).not.toContain('Website');
     expect(await parts(b, p.approvalId)).toEqual({ envelope: 'unclaimed', receipt: 'unclaimed' });
     // The stored action carries the scope, bound to the offer.
