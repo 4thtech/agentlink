@@ -227,7 +227,12 @@ function tickClass(lines, cls) {
 
 /** The PR body: the template's headings, comments dropped, every section filled. */
 export function buildBody({ template, task, summary, verdict, files, stubs = [] }) {
-  const text = template.replace(/\r\n?/g, '\n').replace(/<!--[\s\S]*?-->\n?/g, '');
+  // Strip HTML comments until none is left (a comment hiding another, CodeQL js/incomplete-multi-character-sanitization).
+  let text = template.replace(/\r\n?/g, '\n');
+  for (let prev = null; prev !== text;) {
+    prev = text;
+    text = text.replace(/<!--[\s\S]*?-->\n?/g, '');
+  }
   const out = [];
   let current = null;
   const flush = () => {
@@ -295,6 +300,9 @@ export function parseArgs(argv) {
     throw new Error(`--changelog-section must be one of ${SECTIONS.join(', ')}`);
   }
   if (!/^[A-Za-z0-9._/-]+$/.test(opts.base)) throw new Error('--base: not a branch name');
+  // The task ID names the stub files (.changeset/<id>.md, changelog.d/<id>.md): one path segment only.
+  if (opts.task !== undefined && !/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(opts.task))
+    throw new Error('--task: letters, digits, - and _ only (one path segment)');
   return opts;
 }
 

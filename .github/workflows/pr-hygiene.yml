@@ -77,7 +77,7 @@ jobs:
             // 0. No AI attribution (AGENTS.md hard rule). This one fails.
             const ATTRIBUTION = [
               /^\s*co-authored-by:[^\n]*\b(claude|anthropic|copilot|chatgpt|openai|gemini|cursor|codex|devin)\b/im,
-              /\bgenerated (with|by) \[?(claude|chatgpt|copilot|gemini|cursor|codex|devin)\b/i,
+              /\bgenerated (with|by) \[?(claude|anthropic|chatgpt|openai|copilot|gemini|cursor|codex|devin)\b/i,
             ];
             for (const text of [title, body]) {
               if (ATTRIBUTION.some((re) => re.test(text))) {

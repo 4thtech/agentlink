@@ -144,6 +144,8 @@ describe('parseArgs', () => {
   it('refuses unknown options, missing values and odd bases', () => {
     expect(() => parseArgs(['--wat'])).toThrow();
     expect(() => parseArgs(['--task'])).toThrow();
+    expect(() => parseArgs(['--task', '../x'])).toThrow(/one path segment/);
+    expect(() => parseArgs(['--task', 'a/b'])).toThrow(/one path segment/);
     expect(() => parseArgs(['--base', 'main;rm'])).toThrow();
     expect(() => parseArgs(['--changelog-section', 'Misc'])).toThrow();
   });
