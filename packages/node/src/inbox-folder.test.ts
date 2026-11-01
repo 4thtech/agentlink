@@ -121,19 +121,19 @@ describe('inboxFolderProblem: the folder rules (04 §4.1)', () => {
   });
 
   it('refuses OS and app folders (IR SEC L1): Library, System, Applications, AppData, Program Files', async () => {
-    const home = scratch();
-    const lib = join(home, 'Library', 'Inbox');
-    mkdirSync(lib, { recursive: true, mode: 0o700 });
-    chmodSync(join(home, 'Library'), 0o700);
-    chmodSync(lib, 0o700);
     // The seam stat stands in for a macOS lstat of a 0700 folder. A Windows host cannot produce
     // one (libuv reports every writable directory as 0o777), so the POSIX mode is set by hand there;
     // on macOS and Linux the real stat is used.
-    const stat = withPosixMode(lstatSync(lib), 0o40700);
+    const stat = withPosixMode(lstatSync(scratch()), 0o40700);
+    // Each simulated platform gets paths in its own shape, as its realpath produces them: the rules
+    // use that platform's path module, so a host-shaped path (the runner's temp folder on Windows)
+    // would be a single opaque segment to the macOS rules and prove nothing.
+    const home = '/Users/ana';
     const darwin = (realpath: string) =>
       inboxFolderProblem({ realpath, home, sendFolders: [], stat, platform: 'darwin' });
-    expect(await darwin(join(home, 'Library'))).toBe('os_folder');
-    expect(await darwin(lib)).toBe('os_folder');
+    expect(await darwin('/Users/ana/Library')).toBe('os_folder');
+    expect(await darwin('/Users/ana/Library/Inbox')).toBe('os_folder');
+    expect(await darwin('/Users/ana/Documents/Inbox')).toBeUndefined();
     for (const p of ['/Library/In', '/System/In', '/Applications/In', '/Applications']) {
       expect(await darwin(p), p).toBe('os_folder');
     }

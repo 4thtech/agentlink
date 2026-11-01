@@ -5784,6 +5784,16 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 - **Scope:** triage the failing test "refuses OS and app folders" on the Windows runner: a real guard gap (an OS or app folder accepted, or refused for the wrong reason) is fixed in `inbox-folder.ts` with tests; a test or environment quirk is fixed in the test without weakening the guard. Propose `node-os (windows)` for `ci-gate` (proposal only; `ci.yml` is edited by another card).
 - **Acceptance:** `inbox-folder.test.ts` passes on macOS, Linux and the Windows runner; a test pins how a Windows-shaped stat is read on each platform (the permission bits mean nothing on win32 and the OS-folder rule still decides; on macOS they mean shared); no rejection code, rule or default is weakened; `changelog.d` fragment
 
+#### W5-WIN-INBOX-2 · files: the Inbox folder rules test simulates each platform in its own path shape (wave 5)
+- **Status:** in progress · **Size:** XS · **Tier:** Fable 5.1 triage, Opus review · **Security:** S2 (path) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/inbox-folder.test.ts`
+- **Depends on:** W5-WIN-INBOX
+- **Spec:** 04 §4.1; D-142
+- **Invariants:** I-5, I-7
+- **Source:** `node-os (windows)` still red after #747 (merge-queue run 41310469160): the simulated macOS cases built their paths from the runner's temp folder, so on Windows they were Windows-shaped and opaque to the macOS rules
+- **Scope:** test only; the simulated macOS half uses a POSIX home and POSIX paths, as the Windows half already uses `C:\Users\ana`; the stat still comes from a real 0700 scratch folder. No change to `inbox-folder.ts`.
+- **Acceptance:** `inbox-folder.test.ts` green on the Windows runner; the test still refuses `~/Library`, `~/Library/Inbox`, `/Library`, `/System`, `/Applications` and the Windows OS folders, and accepts `~/Documents/Inbox` on both; nothing in the guard weakened; empty changeset, `changelog.d` fragment
+
 #### W4-AUTO-SAVE-RESIDUAL-DOC · 04 §4.1: name the cross-process race in saving (new, K3 low)
 - **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1 (spec path) · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/foundation/04-security-and-crypto.md`
