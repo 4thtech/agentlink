@@ -510,6 +510,44 @@ describe('Home simple (A4)', () => {
   });
 });
 
+describe('W6-FLOW-FIXES: a connection the other side removed', () => {
+  const revoked = () =>
+    base({
+      [CONTACTS]: ok({
+        status: 'ok',
+        contacts: [{ ...contact(DENIS, true), status: 'revoked' }, contact(ANA)],
+      }),
+    });
+
+  it('the row says "{name} removed this connection", with no not-delivered mark', async () => {
+    await render(revoked());
+    const denis = q('[data-person][data-removed="true"]');
+    expect(denis?.textContent).toContain(fmtName(S.connectionRemoved, 'Denis'));
+    expect(denis?.textContent).not.toContain(S.notDelivered);
+    // Ana is untouched.
+    expect(row('Ana')?.textContent).not.toContain('removed this connection');
+  });
+
+  it('the conversation says sending is over; no "send it again", no safety code to check', async () => {
+    await render(revoked());
+    await click(row('Denis'));
+    expect(host.textContent).toContain(fmtName(S.connectionRemovedBody, 'Denis'));
+    expect(host.textContent).not.toContain(S.notDeliveredRetry);
+    // The history stays readable.
+    expect(host.textContent).toContain('Sending the brief.');
+    await click(all('button').find((b) => b.getAttribute('aria-label') === 'More for Denis'));
+    const items = all('[role="menuitem"]').map((e) => e.textContent?.trim());
+    expect(items).toEqual([S.rename, S.remove]);
+  });
+
+  it('under the hood, the last-message cell says so too', async () => {
+    setPref('hood', true);
+    await render(revoked());
+    const denis = q('[data-person][data-removed="true"]');
+    expect(denis?.textContent).toContain(fmtName(S.connectionRemoved, 'Denis'));
+  });
+});
+
 describe('Home pro (A10, Under the hood on)', () => {
   beforeEach(() => setPref('hood', true));
 

@@ -113,6 +113,16 @@ describe('the words (08 §1)', () => {
       'Offline · last seen 5 min ago',
     );
     expect(agentLine(row({ state: 'offline' }), NOW)).toBe('Offline');
+    // W6-FLOW-FIXES: set up but never run (no heartbeat yet): the honest state, not "Offline".
+    expect(
+      agentLine(row({ state: 'offline', appStates: [app('Claude Code', 'not_running')] }), NOW),
+    ).toBe('Connected · restart Claude Code to start');
+    expect(
+      agentLine(
+        row({ state: 'offline', appStates: [app('Claude Code', 'not_running', NOW - 60)] }),
+        NOW,
+      ),
+    ).toBe('Offline');
     expect(agentLine(row({ state: 'paused', paused: true }), NOW)).toBe('Paused');
     expect(agentLine(row({ removing: true }), NOW)).toBe('Removal not finished');
   });

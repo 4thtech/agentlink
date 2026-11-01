@@ -133,7 +133,14 @@ export function useThread(
 }
 
 /** The delivery word of a message your AI sent. */
-function Delivery({ status }: { readonly status: MessageItem['status'] }): ReactElement | null {
+function Delivery({
+  status,
+  removed = false,
+}: {
+  readonly status: MessageItem['status'];
+  /** W6-FLOW-FIXES: the connection is gone, so "send it again" is no advice. */
+  readonly removed?: boolean;
+}): ReactElement | null {
   if (status === 'sent') {
     return (
       <span className="hm-dl hm-f is-sent al-pop">
@@ -157,7 +164,7 @@ function Delivery({ status }: { readonly status: MessageItem['status'] }): React
           <Icon name="triangle-alert" size={13} />
           <span>{S.notDelivered}</span>
         </span>
-        <span className="hm-dl-hint">{S.notDeliveredRetry}</span>
+        {removed ? null : <span className="hm-dl-hint">{S.notDeliveredRetry}</span>}
       </>
     );
   }
@@ -275,6 +282,7 @@ export function Conversation({
   pro,
   thread,
   loadEarlier,
+  removed = false,
 }: {
   /** The person's name, as the name rule shows it (text only). */
   readonly name: string;
@@ -283,6 +291,8 @@ export function Conversation({
   readonly pro: boolean;
   readonly thread: Thread;
   readonly loadEarlier: () => Promise<void>;
+  /** W6-FLOW-FIXES: the other side removed this connection (contact status `revoked`). */
+  readonly removed?: boolean;
 }): ReactElement {
   const [loading, setLoading] = useState(false);
   if (thread.state === 'loading') {
@@ -357,7 +367,7 @@ export function Conversation({
                 </>
               )}
               <div className="hm-msg-actions hm-f">
-                {out ? <Delivery status={item.status} /> : null}
+                {out ? <Delivery status={item.status} removed={removed} /> : null}
                 <CopyText text={item.text} />
               </div>
               {pro ? <Details item={item} out={out} agent={agent} name={name} /> : null}

@@ -177,6 +177,14 @@ export function RenameEditor({
 
 // ------------------------------------------------------------------------------------------ Remove
 
+/** The AI apps that run the agent now (a live session); the row's apps when the read names none. */
+function runningApps(row: AgentRow): { readonly apps: readonly string[]; readonly named: boolean } {
+  const live = (row.appStates ?? [])
+    .filter((a) => a.state === 'working' || a.state === 'ready' || a.state === 'idle')
+    .map((a) => a.name);
+  return live.length > 0 ? { apps: live, named: true } : { apps: row.apps, named: false };
+}
+
 type RemovePhase =
   | { readonly kind: 'form' }
   | { readonly kind: 'presence'; readonly anyway: boolean }
@@ -219,6 +227,37 @@ export function RemoveSheet({
     return () => clearTimeout(timer);
   }, [busy]);
 
+  // W6-FLOW-FIXES: the AI apps the person must quit first (fresh read, else the row's apps).
+  // `named`: the read names the running apps; the server's `in_use` alone does not.
+  const [quit, setQuit] = useState<{ readonly apps: readonly string[]; readonly named: boolean }>({
+    apps: row.apps,
+    named: false,
+  });
+  const [checking, setChecking] = useState(false);
+  // W6-FLOW-FIXES: an AI app that runs the agent holds its folder, so the removal would stop at
+  // `in_use` after the Touch ID. The page reads the agents first and says "Quit {app} first" before
+  // any gesture. This is a hint only: the server's folder lock still decides, and presence is
+  // always asked before anything is signed (a failed read goes on to the Touch ID step).
+  const checkThenAsk = (): void => {
+    if (checking) return;
+    setChecking(true);
+    setError(undefined);
+    void api
+      .list()
+      .catch(() => ({ kind: 'error' }) as const)
+      .then((read) => {
+        setChecking(false);
+        const fresh =
+          read.kind === 'ok' ? read.list.agents.find((r) => r.name === row.name) : undefined;
+        if (fresh?.running === true) {
+          setQuit(runningApps(fresh));
+          setPhase({ kind: 'in_use' });
+          return;
+        }
+        setPhase({ kind: 'presence', anyway: false });
+      });
+  };
+
   const send =
     (anyway: boolean) =>
     (proof: PresenceProof): void => {
@@ -240,7 +279,10 @@ export function RemoveSheet({
           }
           const said = gateMessage(outcome);
           if (said !== undefined) return setError(said);
-          if (outcome.kind === 'in_use') return setPhase({ kind: 'in_use' });
+          if (outcome.kind === 'in_use') {
+            setQuit({ apps: row.apps, named: false });
+            return setPhase({ kind: 'in_use' });
+          }
           if (outcome.kind === 'contacts_unreachable') return setPhase({ kind: 'anyway' });
           if (outcome.kind === 'agent_removing') {
             // The agent is retired and shows as "Removal not finished" with Try again.
@@ -316,12 +358,9 @@ export function RemoveSheet({
               <Button
                 variant="danger"
                 icon="approval"
-                disabled={!matches}
+                disabled={!matches || checking}
                 aria-describedby={matches ? undefined : `${nameId}-why`}
-                onClick={() => {
-                  setError(undefined);
-                  setPhase({ kind: 'presence', anyway: false });
-                }}
+                onClick={checkThenAsk}
               >
                 {S.removeTouchId}
               </Button>
@@ -351,11 +390,15 @@ export function RemoveSheet({
         {phase.kind === 'in_use' ? (
           <>
             <p className="al-text-body" role="alert">
-              <strong>{S.quitAny(row.label)}</strong>
+              <strong>
+                {quit.named && quit.apps.length === 1
+                  ? S.quitApp(quit.apps[0] as string)
+                  : S.quitAny(row.label)}
+              </strong>
             </p>
-            {row.apps.length > 0 ? (
+            {quit.apps.length > 0 && !(quit.named && quit.apps.length === 1) ? (
               <ul className="ag-goes">
-                {row.apps.map((app) => (
+                {quit.apps.map((app) => (
                   <li key={app}>
                     <AppMark name={app} />
                   </li>
@@ -363,13 +406,7 @@ export function RemoveSheet({
               </ul>
             ) : null}
             <div className="ag-actions">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setError(undefined);
-                  setPhase({ kind: 'presence', anyway: false });
-                }}
-              >
+              <Button variant="primary" disabled={checking} onClick={checkThenAsk}>
                 {S.checkAgain}
               </Button>
               <Button variant="ghost" onClick={onClose}>

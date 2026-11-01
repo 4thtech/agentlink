@@ -318,6 +318,41 @@ describe('Remove', () => {
     expect(plain(host)).toContain('Quit any AI app that uses Work first.');
     expect(button(host, 'Check again')).toBeDefined();
   });
+  it('W6-FLOW-FIXES: says "Quit Codex first" before any Touch ID while Codex runs the agent', async () => {
+    const running = list([
+      ...FOUR.slice(0, 1),
+      agent('work', 'Work', {
+        contacts: 1,
+        running: true,
+        state: 'ready',
+        apps: [{ app: 'codex', state: 'ready' }],
+      }),
+      ...FOUR.slice(2),
+    ]);
+    answers['GET /api/ui/agents'] = { status: 200, body: running };
+    const sheet = await open('work');
+    await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
+    await click(button(sheet, 'Remove with Touch ID'));
+    expect(plain(host)).toContain('Quit Codex first.');
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
+    // Still running: Check again stays on the sentence, still without a gesture.
+    await click(button(host, 'Check again'));
+    expect(plain(host)).toContain('Quit Codex first.');
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    // Quit: Check again goes on to the Touch ID step, and the server still decides.
+    answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
+    await click(button(host, 'Check again'));
+    expect(code()).toBeTruthy();
+    expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
+  });
+  it('W6-FLOW-FIXES: a failed read goes on to the Touch ID step (presence is never skipped)', async () => {
+    const sheet = await open('work');
+    answers['GET /api/ui/agents'] = { status: 500, body: {} };
+    await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
+    await click(button(sheet, 'Remove with Touch ID'));
+    expect(code()).toBeTruthy();
+  });
   it('reads "not available" gracefully and never says it was removed', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 501, body: {} };
     const sheet = await open('work');

@@ -5949,6 +5949,21 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
   - Opt-in clipboard check: "Paste from clipboard" reads only on a click; "Check the clipboard for an invite link when I come back to AgentLink" (off by default, this browser only) reads on window focus and only offers "Use the invite link you copied?". Only one AgentLink invite link counts; the clipboard text never leaves the page.
 - **Acceptance:** DOM tests (no read without a click or the opt-in, no request from the clipboard alone); vocabulary lint; CSS budget unchanged.
 
+### Classroom wave 6 (W6, golden-path QA of 1 Nov)
+
+#### W6-FLOW-FIXES · local app: Remove says "Quit {app} first" before Touch ID; a removed connection shows; no "Offline" right after Connected (golden-path QA P1-2, P1-3, P1-4)
+- **Status:** in review (wave 6) · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/agents/{sheets.tsx,data.ts,strings.ts}`, `apps/local-ui/src/api/live.ts`, `apps/local-ui/src/pages/home/{home-screen.tsx,conversation.tsx,person-menu.tsx,people-strings.ts}`
+- **Depends on:** U3-e (removal), W4-LIVE-STATUS, W4-HOME
+- **Spec:** 08 §1 (Agents, Live AI-app status, Home); 04 §2.5 (removing an agent); 11 §5
+- **Invariants:** I-4, I-5
+- **Source:** golden-path QA (1 Nov), P1-2, P1-3, P1-4; the classroom uses the app in 5 days
+- **Scope:**
+  - Remove agent: "Remove with Touch ID" and "Check again" first read the agents list; while an AI app runs the agent (a live session), the sheet says "Quit {app} first." with Check again, before any gesture. The read is a hint only: a failed read goes on to the Touch ID step, and the server's folder lock (`in_use`) and presence requirement are unchanged.
+  - Removed connection: when the other side removed its agent (contact status `revoked`, already in `GET /api/ui/contacts`), Home's row says "{name} removed this connection", the conversation says the AI can't send to them any more, "Ask your AI to send it again" and Check safety code are hidden. No protocol or server change.
+  - Live status: an agent set up in an AI app that has never run it (no last seen, before the first heartbeat) reads "Connected · restart {app} to start" in the chip, the dropdown and the Agents card, not "Offline".
+- **Acceptance:** DOM and unit tests for each item; no server or wire change; vocabulary lint; changeset and changelog.d fragment.
+
 ### Usability wave 3 (U3, 0.4.4)
 
 Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The owner (Tali) decided on 2026-10-29 to take all recommended options of §11: (1) 0.4.4 with every card, and if Remove (U3-e) has not passed its Fable security audit when the rest is ready, 0.4.4 ships without it and Remove follows in 0.4.5; (2) one app, one agent open at a time, switching without Touch ID; (3) name and Touch ID on one screen; (4) Remove with Touch ID, typed label, export offer, always retired, contacts told; (5) AI app connect with the exact entry shown, Touch ID and a backup; (6) existing agents kept, last used opens, one-time "Tidy up" note, the terminal never asks which agent; (7) new screens from the new b11 sections, styled from the D2 screens, with the owner's screenshot review in each PR; (8) live view: Agents page map and the moving-row mark in Messages and Files in 0.4.4, Home, Contacts and compact view in 0.4.5, no preview on hover. Spec edits are marked "proposed, owner confirms at merge". S2 cards: tests first, Opus independent review, Fable where marked, Tali's "merge". UI cards: screenshots at 1440 and 360, light and dark. All new local routes sit behind the session, CSRF, `Host`, `Origin`, fetch-metadata and octet-stream gate; every presence route signs an owner action (D-68); errors are fixed codes; no route takes a path from the page.
