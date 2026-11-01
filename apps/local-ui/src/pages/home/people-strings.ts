@@ -114,6 +114,10 @@ export const HOME_STRINGS = {
   removeLabel: 'Remove contact',
   renamed: 'Renamed.',
   removed: '{name} removed.',
+  // W6-FLOW-FIXES: the other person removed their agent (its owner retired it, 04 §2.5).
+  connectionRemoved: '{name} removed this connection',
+  connectionRemovedBody:
+    "{name} removed this connection. Your AI can't send to them any more. Your conversation and saved files stay here.",
   checked: 'Safety code checked.',
   codeLead: 'Compare this code with {name}, on a call or in person.',
   codeLoading: 'Getting the safety code…',

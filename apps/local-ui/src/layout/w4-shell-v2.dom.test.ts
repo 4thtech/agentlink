@@ -42,6 +42,8 @@ interface World {
   agentReads: number;
   /** Claude Code runs for `default`. */
   running: boolean;
+  /** W6-FLOW-FIXES: Claude Code is set up for `default` but has never run it (no heartbeat yet). */
+  neverSeen?: boolean;
   requests: string[];
 }
 
@@ -73,7 +75,15 @@ const agentsOf = (w: World) => ({
       contacts: 2,
       running: w.running,
       state: w.running ? 'ready' : 'offline',
-      apps: [{ app: 'claude-code', state: w.running ? 'ready' : 'not_running' }],
+      // A stopped agent ran before: the host sends when it was last seen (W6-FLOW-FIXES).
+      apps: [
+        w.running
+          ? { app: 'claude-code', state: 'ready' }
+          : w.neverSeen === true
+            ? { app: 'claude-code', state: 'not_running' }
+            : { app: 'claude-code', state: 'not_running', lastSeenAt: 1_700_000_000 },
+      ],
+      ...(w.running || w.neverSeen === true ? {} : { lastSeenAt: 1_700_000_000 }),
     },
     {
       name: 'work',
@@ -284,6 +294,15 @@ describe('the top bar (A4)', () => {
 });
 
 describe('the live agent dropdown', () => {
+  it('W6-FLOW-FIXES: right after Connected, before the first heartbeat, the chip asks for a restart instead of Offline', async () => {
+    serve(world({ running: false, neverSeen: true }));
+    await mountAt('/');
+    act(() => setConnectionState('connected'));
+    await settle();
+    expect(chip()?.textContent).toContain('Connected · restart Claude Code to start');
+    expect(chip()?.textContent).not.toContain('Offline');
+  });
+
   it('lists every agent with its status and, per AI app, a dot and a word', async () => {
     serve(world());
     await mountAt('/');

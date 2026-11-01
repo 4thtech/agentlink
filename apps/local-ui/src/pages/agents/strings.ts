@@ -68,6 +68,7 @@ export const AGENTS_STRINGS = {
   typeNameDisabled: 'Type the name to enable this',
   removeTouchId: 'Remove with Touch ID',
   quitAny: (label: string): string => `Quit any AI app that uses ${iso(label)} first.`,
+  quitApp: (app: string): string => `Quit ${app} first.`,
   agentFolder: (folder: string): string => `Agent folder: ${folder}`,
   checkAgain: 'Check again',
   removeAnywayQ: "Remove anyway? Contacts can't be told now.",
