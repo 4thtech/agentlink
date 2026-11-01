@@ -139,6 +139,7 @@ describe('review-gate path classes', () => {
       '.gitleaks.toml',
       '.gitleaksignore',
       '.changeset/config.json',
+      'tools/release/next-preview.mjs',
     ]) {
       expect(isSensitive(p), p).toBe(true);
       expect(classify(p), p).toBeGreaterThanOrEqual(1);
@@ -148,6 +149,7 @@ describe('review-gate path classes', () => {
       'docs/process/x.md',
       'SECURITY.md',
       'tools/x.mjs',
+      'tools/desktop-extension/build.mjs',
       '.changeset/x.md',
     ]) {
       expect(isSensitive(p), p).toBe(false);

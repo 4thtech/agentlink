@@ -150,6 +150,8 @@ jobs:
               // which pnpm executes (audit-rules.md §2.2; the composite action refuses them).
               [1, /(^|\/)(\.npmrc|\.pnpmfile\.[^/]+)$/],
               [1, /^(\.gitleaks\.toml|\.gitleaksignore|\.changeset\/config\.json)$/],
+              // Release tooling: release.yml runs these scripts in jobs holding the npm OIDC token (CODEOWNERS).
+              [1, /^tools\/release\//],
               [1, /^docs\/(foundation|process)\//],
               [1, /^(AGENTS|CLAUDE|SECURITY)\.md$/],
               // Public docs, published on merge (D-57). Owner decision 2026-10-25 (CHORE-CI-DOCS-FASTLANE):
@@ -168,6 +170,7 @@ jobs:
               /^(renovate\.json|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json)$/,
               /(^|\/)(\.npmrc|\.pnpmfile\.[^/]+)$/,
               /^(\.gitleaks\.toml|\.gitleaksignore|\.changeset\/config\.json)$/,
+              /^tools\/release\//,
             ];
             const isSensitive = (path) => SENSITIVE.some((re) => re.test(path));
             // END path-classes

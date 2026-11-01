@@ -10655,3 +10655,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
   - `review-gate`: the class is computed; a missing or lower declaration warns; a higher one still raises the class. The IR line is required for S2 and the sensitive paths only; any stated FAIL verdict fails; S2 threat note and tests-first evidence unchanged; automated PRs keep the code-owner approval.
   - `pr-hygiene`: title, sections, class tick and "Docs impact" wording warn; it fails only on AI attribution.
 - **Acceptance:** S2 review, threat note, tests-first evidence, DEPLOY_FREEZE, draft fail-fast and bot approvals unchanged; tests run the real gate scripts; AGENTS.md ≤ 8 KB.
+
+#### OPS-FAST-LANE-3 · sensitive path: `tools/desktop-extension/**` (follow-up from the #755 review)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1 on sensitive paths (`.github/**`)
+- **Repo/path:** agentlink · `.github/workflows/review-gate.yml` (marked block), `.github/CODEOWNERS`, `docs/process/audit-rules.md` §2.2, `tools/ci/review-gate.test.mjs`
+- **Depends on:** OPS-FAST-LANE-2
+- **Scope:** `release.yml` runs `tools/desktop-extension/sign.sh` with the extension signing key and `build.mjs` produces the shipped bundle. Decide with the owner whether `tools/desktop-extension/**` joins `tools/release/**` as an S1 sensitive path (IR line required, code-owned); if yes, add the RULES and SENSITIVE entries, the CODEOWNERS row and the §2.2 row, with a test.
+- **Acceptance:** rules, CODEOWNERS and §2.2 agree (SC-6); the real gate script is tested.
