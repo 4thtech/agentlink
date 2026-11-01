@@ -51,7 +51,12 @@ function recordIr(name, runs, extra = []) {
   );
   return { r, log: f.log };
 }
-const run = (id, status, conclusion, createdAt) => ({ databaseId: id, status, conclusion, createdAt });
+const run = (id, status, conclusion, createdAt) => ({
+  databaseId: id,
+  status,
+  conclusion,
+  createdAt,
+});
 
 describe('record-ir.py review-gate re-run', () => {
   it('re-runs only the latest run when it failed', () => {
