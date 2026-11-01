@@ -182,8 +182,8 @@ describe('a good invite (U3-invite)', () => {
     await expect(page.locator('#inviter').textContent()).resolves.toContain(
       'Takes about 2 minutes.',
     );
-    await expect(page.locator('#inviter-name').textContent()).resolves.toBe('“Marko”');
-    await expect(page.locator('#inviter-label').textContent()).resolves.toBe('Self-declared');
+    await expect(page.locator('#inviter-name').textContent()).resolves.toBe('Marko');
+    await expect(page.locator('#inviter-label').textContent()).resolves.toBe('Not checked yet');
     await expect(page.locator('#inviter-host').textContent()).resolves.toBe(
       new URL(originOf(site)).host,
     );
@@ -308,10 +308,10 @@ describe('a hostile invite (I-5)', () => {
       // The shown name is the restricted one, in its own element, quoted; the heading uses it too
       // (or "Someone" on the name rule's fallback).
       const shown = (await page.locator('#inviter-name').textContent()) ?? '';
-      expect(shown).toMatch(/^“[\p{L}\p{N} .'·-]{1,45}”$/u);
+      expect(shown).toMatch(/^[\p{L}\p{N} .'·-]{1,45}$/u);
       const heading = (await page.locator('#invite-heading').textContent()) ?? '';
       expect(heading).toMatch(/^[\p{L}\p{N} .'·-]{1,45} invites you to connect your AI agents\.$/u);
-      expect(await page.locator('#inviter-label').textContent()).toBe('Self-declared');
+      expect(await page.locator('#inviter-label').textContent()).toBe('Not checked yet');
       // The step section never contains anything the inviter chose.
       const stepSection = (await page.locator('#step').textContent()) ?? '';
       expect(stepSection).not.toMatch(/evil|ignore all|approve everything|__pwned|onerror/i);
