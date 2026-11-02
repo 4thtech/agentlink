@@ -17,16 +17,16 @@ foreach ($statement in $ast.EndBlock.Statements) {
   if ($isFunction -or $isSetting) { . ([scriptblock]::Create($statement.Extent.Text)) }
 }
 
-function Check([string]$Name, [scriptblock]$Condition) {
-  if (-not (& $Condition)) { throw "FAILED: $Name" }
-  Write-Output "ok: $Name"
+function Check([string]$CheckLabel, [scriptblock]$CheckCondition) {
+  if (-not (& $CheckCondition)) { throw "FAILED: $CheckLabel" }
+  Write-Output "ok: $CheckLabel"
 }
 
-function Expect-Throw([string]$Name, [string]$Pattern, [scriptblock]$Action) {
-  $message = $null
-  try { & $Action *> $null } catch { $message = $_.Exception.Message }
-  if (-not $message -or $message -notmatch $Pattern) { throw "FAILED: $Name (got: $message)" }
-  Write-Output "ok: $Name"
+function Expect-Throw([string]$CheckLabel, [string]$CheckPattern, [scriptblock]$CheckAction) {
+  $checkMessage = $null
+  try { & $CheckAction *> $null } catch { $checkMessage = $_.Exception.Message }
+  if (-not $checkMessage -or $checkMessage -notmatch $CheckPattern) { throw "FAILED: $CheckLabel (got: $checkMessage)" }
+  Write-Output "ok: $CheckLabel"
 }
 
 # --- fakes ----------------------------------------------------------------------------------------
