@@ -16,7 +16,9 @@ describe('idWithApp', () => {
 
 describe('who is asking and the conversation sides', () => {
   it('names the ID that is asking', () => {
-    expect(fmt(S.askerApp, { app: 'Claude Code' })).toBe("Claude Code's ID is asking");
+    expect(fmt(S.askerApp, { name: 'Tali', app: 'Claude Code' })).toBe(
+      'Tali · Claude Code is asking',
+    );
     expect(fmt(S.askerId, { name: 'Tali' })).toBe('Tali is asking');
   });
   it('says You (app) and the contact by name', () => {

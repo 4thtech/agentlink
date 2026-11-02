@@ -10,7 +10,7 @@
 //
 // Nothing here signs (D-118); every server value is React text (I-5); the badge hears how many
 // still wait (a number only).
-import { Button, Icon, VT_CLASS } from '@4thtech-io/ui';
+import { AgentIcon, Button, Icon, VT_CLASS } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement } from 'react';
 import { announceDecided, announceWaiting } from '../approvals/badge.js';
 import {
@@ -162,6 +162,8 @@ export function HomeApprovals({
   sheet,
   pro,
   asker,
+  askerSeed,
+  askerLabel,
   onChanged,
 }: {
   readonly items: readonly ApprovalItem[];
@@ -171,6 +173,9 @@ export function HomeApprovals({
   readonly pro: boolean;
   /** W7-ID-B2: which ID is asking ("Claude Code's ID is asking"); from the live list, text only. */
   readonly asker?: string | undefined;
+  /** W7-ID-X1: the asking ID's colour seed (its folder name) and label, as the switcher draws it. */
+  readonly askerSeed?: string | undefined;
+  readonly askerLabel?: string | undefined;
   /** A decision was applied: read the list again. */
   readonly onChanged: () => void;
 }): ReactElement | null {
@@ -253,7 +258,12 @@ export function HomeApprovals({
   return (
     <section aria-label={S.approvalsLabel} className={`hm-approvals ${VT_CLASS.approval}`}>
       {asker === undefined || asker === '' ? null : (
-        <p className="hm-ap-asker al-text-body-sm al-muted">{asker}</p>
+        <p className="hm-ap-asker hm-f al-text-body-sm al-muted">
+          {askerSeed === undefined || askerLabel === undefined ? null : (
+            <AgentIcon label={askerLabel} seed={askerSeed} />
+          )}
+          <span>{asker}</span>
+        </p>
       )}
       {pro ? (
         <div className="hm-ap-top hm-f">
