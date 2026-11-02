@@ -39,7 +39,7 @@ afterAll(() => ch.stop());
 async function pauseAna(page: Page): Promise<void> {
   await openAgents(page);
   await agentCard(page, 'Ana')
-    .getByText(/^(Offline|Connected · restart|Ready|Working|Idle)/)
+    .getByText(/^(Not used by any AI app|Offline|Connected · restart|Ready|Working|Idle)/)
     .first()
     .waitFor();
   await agentCard(page, 'Ana').getByRole('button', { name: 'Pause', exact: true }).click();
