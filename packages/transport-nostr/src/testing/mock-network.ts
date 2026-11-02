@@ -191,7 +191,11 @@ export class MockSocket implements RelaySocket {
     this.network.fanOut(this.target.url, event);
     const ok = JSON.stringify(['OK', event.id, true, config.okMessage ?? '']);
     if (config.okDelayMs === undefined) this.push(ok);
-    else globalThis.setTimeout(() => this.push(ok), config.okDelayMs); // fake timers apply
+    else {
+      // read at call time, so fake timers apply
+      const timers = globalThis as unknown as { setTimeout(cb: () => void, ms: number): unknown };
+      timers.setTimeout(() => this.push(ok), config.okDelayMs);
+    }
   }
 
   /** Whether `event` matches the filter of subscription `subId`. */

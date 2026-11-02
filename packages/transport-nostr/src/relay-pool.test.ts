@@ -50,9 +50,12 @@ describe('publish and "sent"', () => {
     const event = makeWrapEvent();
     const outcome = await pool.publish(event, [a, b, c]);
     expect(outcome.sent).toBe(true);
-    expect(outcome.acked).toEqual([a, b, c]);
+    // W6-SEND-LATENCY: publish answers at the 2nd OK; the 3rd relay finishes in the background.
+    expect(outcome.acked).toEqual([a, b]);
     expect(outcome.results.every((r) => r.ok && r.reason === 'ok')).toBe(true);
     expect(net.storedOn(event.id).sort()).toEqual([a, b, c].sort());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pool.relayHealth().map((h) => h.successes)).toEqual([1, 1, 1]);
   });
 
   it('is not sent with a single OK, whichever way the others fail', async () => {

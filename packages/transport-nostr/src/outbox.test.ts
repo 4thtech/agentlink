@@ -129,7 +129,10 @@ describe('delivery', () => {
     const published = net.stored.map((s) => JSON.stringify(s.event));
     expect(published).toHaveLength(3);
     expect(new Set(published)).toEqual(new Set([row.wrapJson]));
-    expect(Object.keys(outbox.get(row.wrapId).acks).sort()).toEqual([...relays].sort());
+    // W6-SEND-LATENCY: the row is marked at the 2nd OK; the 3rd relay answers in the background.
+    const acked = Object.keys(outbox.get(row.wrapId).acks);
+    expect(acked).toHaveLength(2);
+    expect(acked.every((relay) => relays.includes(relay))).toBe(true);
   });
 
   it('marks a row sent at 2 OKs without waiting for a silent relay (W6-SEND-LATENCY)', async () => {
