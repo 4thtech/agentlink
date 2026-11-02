@@ -9,18 +9,18 @@ This page sets up AgentLink in Claude Code. You can ask Claude to do it, or run 
 The quick way is one command in your own terminal:
 
 ```bash
-npx -y @4thtech-io/agentlink init
+npx -y @4thtech-io/agentlink@latest init
 ```
 
 It shows the exact change and asks `y/N`. Or ask Claude to do it:
 
 Paste this into Claude Code:
 
-> Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart Claude Code when it's done.
+> Install AgentLink for me. Run `npx -y @4thtech-io/agentlink@latest init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart Claude Code when it's done.
 
 What happens:
 
-1. Claude runs `npx -y @4thtech-io/agentlink init`. It looks for your AI apps on your computer. It prints the exact change to each settings file, and a short confirmation code. It writes nothing yet.
+1. Claude runs `npx -y @4thtech-io/agentlink@latest init`. It looks for your AI apps on your computer. It prints the exact change to each settings file, and a short confirmation code. It writes nothing yet.
 2. Claude shows you the change. For Claude Code it adds one entry named `agentlink` to `~/.claude.json`. Check that it is the only change.
 3. If you agree, Claude runs the same command again with `--confirm <code>`. The code only works for exactly the change you were shown. Your old settings file is backed up first.
 4. Restart Claude Code.
@@ -33,7 +33,7 @@ Do this yourself, in a terminal you opened, never through Claude: [Protect your 
 
 ## 3. Check it works
 
-Ask Claude: "What's my AgentLink status?" It should tell you AgentLink is set up and how many contacts and new messages you have (none, at first). If not, run `npx -y @4thtech-io/agentlink doctor` in your own terminal.
+Ask Claude: "What's my AgentLink status?" It should tell you AgentLink is set up and how many contacts and new messages you have (none, at first). If not, run `npx -y @4thtech-io/agentlink@latest doctor` in your own terminal.
 
 ## Optional: keep your AI away from AgentLink's files
 
@@ -125,13 +125,13 @@ This is off until you ask for it. First install AgentLink on this computer, so t
 
 ```
 npm install -g @4thtech-io/agentlink
-npx -y @4thtech-io/agentlink init --hook
+npx -y @4thtech-io/agentlink@latest init --hook
 ```
 
 AgentLink shows you the exact change to `~/.claude/settings.json` and writes it only after you confirm. If you ask your AI to run it, it prints the change and a one-time code; you check the change and give the code back. A settings file that isn't valid is left alone.
 
 To turn it off, open `~/.claude/settings.json`, delete the AgentLink item under `SessionStart` (its command ends in `status --brief`) and restart Claude Code. You can instead copy back the backup AgentLink made next to the file, named `settings.json.agentlink-backup-` followed by a number; that also undoes any later change you made to the settings.
 
-To see what the note prints, run `npx -y @4thtech-io/agentlink status --brief` yourself.
+To see what the note prints, run `npx -y @4thtech-io/agentlink@latest status --brief` yourself.
 
 Next: [Pair with someone](pair-with-someone.md)

@@ -2,13 +2,13 @@
 
 *Applies to AgentLink 0.4.8. The Welcome page and the separate first-run steps from 0.4.4 are replaced by [Get started](get-started-wizard.md).*
 
-First run is the short path that sets you up as the owner of your agent. It takes one touch, and it is now the first part of [Get started](get-started-wizard.md).
+First run is the short path that sets you up as the owner of your ID. It takes one touch, and it is now the first part of [Get started](get-started-wizard.md).
 
 ## Steps
 
-1. Open a terminal yourself (not one inside your AI app) and run `npx -y @4thtech-io/agentlink`. On a new computer nothing else needs to be set up first: your browser opens on Get started. Keep the terminal window open while you use the app; it stops by itself after 30 minutes.
+1. Open a terminal yourself (not one inside your AI app) and run `npx -y @4thtech-io/agentlink@latest`. On a new computer nothing else needs to be set up first: your browser opens on Get started. Keep the terminal window open while you use the app; it stops by itself after 30 minutes.
 2. Pick your AI app, or **I'll choose later**.
-3. Confirm it is you with one Touch ID. It creates your agent, makes you its owner, protects your approvals and adds AgentLink to the AI app you picked. Restart that app to finish. If anything goes wrong, nothing is kept and you can start again.
+3. Confirm it is you with one Touch ID. It creates your ID, makes you its owner, protects your approvals and adds AgentLink to the AI app you picked. Restart that app to finish. If anything goes wrong, nothing is kept and you can start again.
 4. Invite someone, or **Skip to Home**.
 
 Coming from an invite link? The same steps run, and the page ends on **Accept** the inviter's **invite?** See [Join from an invite](../get-started/join-from-an-invite.md).

@@ -12,7 +12,7 @@
 
 - Installing, pairing and contacts
 - Messages
-- Files through the encrypted drop, within its limits (planned: 100 MB per file, 1 GB per agent per week). If you use your own storage, your storage provider may bill you; AgentLink does not.
+- Files through the encrypted drop, within its limits (planned: 100 MB per file, 1 GB per ID per week). If you use your own storage, your storage provider may bill you; AgentLink does not.
 - Rules and approvals
 - Checking a proof someone sent you
 - Receipts on a proof. The sender's fee covers up to 3 receipts, so the recipient pays nothing.
@@ -27,7 +27,7 @@ Prices will be in US dollars, and the same everywhere. AgentLink picks where to 
 
 Apps built by other companies on AgentLink may add their own fee. It would always be shown separately, as an **App fee**.
 
-There is another planned paid step, registration, which shows the link between your agent and its owner as **Registered**. Its price is not set yet.
+There is another planned paid step, registration, which shows the link between your ID and its owner as **Registered**. Its price is not set yet.
 
 ## How you will pay
 

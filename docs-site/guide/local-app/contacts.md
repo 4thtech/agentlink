@@ -4,7 +4,7 @@
 
 The page lists your contacts by name, each with its label (Self-declared or Safety code checked). For how contacts work, see [Contacts](../everyday-use/contacts.md).
 
-<figure><img src="../.gitbook/assets/local-contacts--list.png" alt="Three contacts on the left; the selected one on the right shows its name, a Safety code checked badge, and Rename and Remove buttons."><figcaption><p>Contacts, with made-up people. One contact is still waiting for their agent.</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/local-contacts--list.png" alt="Three contacts on the left; the selected one on the right shows its name, a Safety code checked badge, and Rename and Remove buttons."><figcaption><p>Contacts, with made-up people. One contact is still waiting for their AI.</p></figcaption></figure>
 
 ## Add a contact
 

@@ -13,7 +13,7 @@ AgentLink follows SemVer 2.0. During the beta, all public packages (the CLI and 
 | M1 gate | 0.2.0 | Local beta on testnets |
 | Usable local app | 0.3.0 | The local app served by the CLI |
 | Messages, Files, Touch ID upgrade, payment confirmation | 0.4.0 | The local app release that follows 0.3.0 (released 27 Oct 2026) |
-| The three-layer app | 0.4.6 | Get started, Home, Agents with live status and Pause, short invite links, automatic saving of received files (released 31 Oct 2026) |
+| The three-layer app | 0.4.6 | Get started, Home, Agents (IDs since 0.4.9) with live status and Pause, short invite links, automatic saving of received files (released 31 Oct 2026) |
 | Invite feedback, Windows support | 0.4.7 | Both sides see an invite happen, Paste link on Home, closable panels, AgentLink starts from AI apps on Windows (released 1 Nov 2026) |
 | Golden-path fixes, new invite page | 0.4.8 | Quit-first before Touch ID, removed connections on Home, no early "Offline", the public invite page styled like the app (released 2 Nov 2026) |
 | M2, cloud agent first | 0.5.0 | The self-hosted cloud agent, Claude on the web and phones (D-131) |

@@ -9,24 +9,24 @@ The problem it addresses: agents belonging to different people and companies can
 - **No shared channel.** Agents in different AI apps have no common way to reach each other.
 - **No end-to-end privacy.** Hand-offs go through email, chat apps or shared drives that can read them.
 - **No proof.** Nothing shows what was sent, when, or whether the other side received it.
-- **No owner supervision.** The person responsible for an agent has no clear view of, or control over, what it exchanges.
+- **No owner supervision.** The person responsible for an AI has no clear view of, or control over, what it exchanges.
 
 AgentLink adds a shared channel, privacy, proof and supervision.
 
 ## Who is it for?
 
-- **People who use AI agents for work** and want their agent to coordinate with a colleague's, a client's or a partner's agent without a third party seeing the content.
+- **People who use AI agents for work** and want their AI to coordinate with a colleague's, a client's or a partner's AI without a third party seeing the content.
 - **Teams whose agents run on different AI apps**, for example one developer on Claude Code and another on Codex.
 - **Anyone who needs a record** of what was handed over or agreed, which a third party can check.
 - **Builders** who want to build on an open protocol (see agentlink-technical.md).
 
 ## What does it do?
 
-- **Pair** two agents with a single-use invite link. Available.
+- **Pair** two IDs with a single-use invite link. Available.
 - **Talk**: send end-to-end encrypted messages, and negotiate terms (what, price, deadlines) with owner approval. Free. Available.
 - **Send files**: encrypted on the sender's device, no storage setup. Free within limits. Released in v0.2.0.
 - **Prove**: record a fingerprint of a message or file on a public record, with receipts from the other side. Anyone can check it. Paid, a small fee. Test-network version released in v0.2.0, paid from v1.0.0.
-- **Supervise**: the owner (the person or company responsible for an agent) can read what their agent sends and receives, and must approve important actions such as accepting a new contact or agreeing to terms.
+- **Supervise**: the owner (the person or company responsible for an ID) can read what their AI sends and receives, and must approve important actions such as accepting a new contact or agreeing to terms.
 
 ## Principles
 
@@ -40,7 +40,7 @@ AgentLink adds a shared channel, privacy, proof and supervision.
 
 ## How does it work, at a high level?
 
-You add AgentLink to your AI app (one command, or ask your agent to run it), protect your approvals with an owner code in a terminal you opened yourself, pair with someone through a single-use invite link, and then ask your agent in plain words to send, check or negotiate. AgentLink runs on your computer as an MCP server that your AI app starts; keys stay in your operating system's key storage. Messages travel as encrypted packages over open message servers that see only ciphertext. Step by step: agentlink-userguide.md. Design: agentlink-technical.md.
+You add AgentLink to your AI app (one command, or ask your AI to run it), protect your approvals with an owner code in a terminal you opened yourself, pair with someone through a single-use invite link, and then ask your AI in plain words to send, check or negotiate. AgentLink runs on your computer as an MCP server that your AI app starts; keys stay in your operating system's key storage. Messages travel as encrypted packages over open message servers that see only ciphertext. Step by step: agentlink-userguide.md. Design: agentlink-technical.md.
 
 Example uses (some planned):
 
@@ -52,12 +52,12 @@ Example uses (some planned):
 
 AgentLink is free to start: installing, pairing, messages and files cost nothing. You pay only to add proof. Nothing is charged today; paid proof starts only with the mainnet beta (v1.0.0, M3). During testing, proof is planned to use free test credits. Prices below are planned beta prices published in the public docs, not legal or tax advice.
 
-Free: install, identity, pairing and contacts; encrypted messages and acknowledgements; files through the encrypted drop within its limits (proposed 100 MB per file, 1 GB per agent per week; if you use your own storage, that provider may bill you, AgentLink does not); the owner console, rules and approvals; checking a proof someone sent you; receipts on a proof (the sender's price covers them, so the recipient pays nothing).
+Free: install, identity, pairing and contacts; encrypted messages and acknowledgements; files through the encrypted drop within its limits (proposed 100 MB per file, 1 GB per ID per week; if you use your own storage, that provider may bill you, AgentLink does not); the owner console, rules and approvals; checking a proof someone sent you; receipts on a proof (the sender's price covers them, so the recipient pays nothing).
 
 | Item | Planned price | Public upper limit | Who pays |
 |---|---|---|---|
 | Proof: one record including up to 3 receipts | $0.10 | $0.50 | Sender |
-| Registration of an agent (shows as Registered); once per agent, again after a key change | $5 | $25 | Owner |
+| Registration of an ID (shows as Registered); once per ID, again after a key change | $5 | $25 | Owner |
 | Batched receipts, deal records, arbitrator disclosure | Fee planned for later | n/a | n/a |
 
 Apps built by other companies on AgentLink may add their own fee, always shown separately as an "App fee".
@@ -72,7 +72,7 @@ Apps built by other companies on AgentLink may add their own fee, always shown s
 AgentLink is pre-alpha, last updated 2 Nov 2026, version v0.4.8. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.4.8 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. **AgentLink 0.4.8 is out (2 Nov 2026, on npm `latest`, Mac and Windows).** You install it with one command, set up with one Touch ID in Get started, invite someone with a short link and watch the invite happen on both sides. Home shows what waits for you and your conversations, files you receive are saved to your Inbox folder, and the public invite page at agentlink.4thtech.io looks like the app. The released CLI opens with `npx -y @4thtech-io/agentlink`; an AI can set itself up with `npx -y @4thtech-io/agentlink init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
 <!-- status-intro:end -->
 
-Open the app: `npx -y @4thtech-io/agentlink` (`init` is for an AI that sets itself up; see agentlink-userguide.md). Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer. Version v0.4.8 (the current release, 2 Nov 2026, on Mac and Windows) gives two agents on different AI apps pairing, messages, approvals, terms negotiation, files and proof on test networks, and the local app (Get started, Home, Agents, Activity and Settings, with an Under the hood view). The owner console and the desktop apps are not built, and the cloud agent is planned for 0.5.0; everything about them in this knowledge base describes the design. Supported AI tools in v0.4.8: Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity. ChatGPT is planned through your own always-on cloud agent; other AI apps that support MCP tools may work, support varies.
+Open the app: `npx -y @4thtech-io/agentlink@latest` (`init` is for an AI that sets itself up; see agentlink-userguide.md). Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer. Version v0.4.8 (the current release, 2 Nov 2026, on Mac and Windows) gives two agents on different AI apps pairing, messages, approvals, terms negotiation, files and proof on test networks, and the local app (Get started, Home, IDs, Activity and Settings, with an Under the hood view). The owner console and the desktop apps are not built, and the cloud agent is planned for 0.5.0; everything about them in this knowledge base describes the design. Supported AI tools in v0.4.8: Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity. ChatGPT is planned through your own always-on cloud agent; other AI apps that support MCP tools may work, support varies.
 
 <!-- status-summary:start -->
 ## Where things stand
@@ -130,7 +130,7 @@ Follow progress: https://github.com/4thtech/agentlink (README Status and CHANGEL
 
 **Can 4thTech read my messages or files?** No. They are encrypted on your device and 4thTech never gets what is needed to open them. Its optional services see only locked data, sizes, timing and IP addresses.
 
-**Who can read my messages?** Your agent, the other agent, and the owners of both agents. The owner is the person or company responsible for an agent.
+**Who can read my messages?** Your AI, the other person's AI, and the owners of both IDs. The owner is the person or company responsible for an ID.
 
 **Do I need a crypto app, an account or a balance?** No. Installing, pairing, messages and files need none of these. Credits are needed only to add proof.
 
@@ -138,9 +138,9 @@ Follow progress: https://github.com/4thtech/agentlink (README Status and CHANGEL
 
 **Can my AI act without asking me?** Only within your rules. New contacts, accepting terms and spending above your limit ask you first by default, and no tool exposed to your AI can approve for you. Once paired, messages with a contact need no approval by default (decision D-70); messages from unknown senders are queued; commitments and proofs need approval by default. In early versions, an AI app that can run any command on your computer might get around approvals, read the agent's own secrets and spend its credits; keep credits small (see agentlink-security-and-privacy.md).
 
-**What is proof for?** To show that a specific message or file existed and was exchanged at a certain time, with receipts from the other side, in a way anyone can check without trusting 4thTech. A proof of agreement combines the final terms with the other side's "accepted" receipt, showing that both agents agreed to exactly the same terms, and when.
+**What is proof for?** To show that a specific message or file existed and was exchanged at a certain time, with receipts from the other side, in a way anyone can check without trusting 4thTech. A proof of agreement combines the final terms with the other side's "accepted" receipt, showing that both sides agreed to exactly the same terms, and when.
 
-**Does a proof of agreement have legal effect?** AgentLink records that both agents agreed to the same terms, and when. That does not by itself give the agreement legal effect, and AgentLink moves no money. Ask a lawyer if the legal side matters.
+**Does a proof of agreement have legal effect?** AgentLink records that both sides agreed to the same terms, and when. That does not by itself give the agreement legal effect, and AgentLink moves no money. Ask a lawyer if the legal side matters.
 
 **What if 4thTech shuts down its services?** Messages travel over open message servers, and proofs can be checked against the public record without 4thTech. Files would need your own storage. You can export everything.
 
@@ -160,32 +160,34 @@ Follow progress: https://github.com/4thtech/agentlink (README Status and CHANGEL
 
 | Term | Meaning |
 |---|---|
-| Agent | An AI assistant in an AI app (Claude, ChatGPT, Codex, Gemini) that has AgentLink set up |
-| AI app (harness) | The application the agent runs in |
-| Owner | The person or company responsible for an agent; can read everything it sends and receives and approves what it does |
-| Contact | Another agent you have paired with |
+| ID | An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. (Internally: an agent.) |
+| ID number | The long public identifier of an ID (internally: the agent ID) |
+| ID card | What others learn about an ID when you pair: its name, its owner and how to reach it; signed by the owner (internally: the agent card) |
+| AI app (harness) | The application your AI runs in, such as Claude Code, Claude Desktop, Cursor or Codex |
+| Owner | The person or company responsible for an ID; can read everything it sends and receives and approves what it does |
+| Contact | Another person you have paired with |
 | Invite link | A single-use link to pair with someone; expires after 7 days |
 | Safety code | A 12-digit code both sides see after pairing; compare it by phone or in person |
 | Self-declared | A name chosen by its owner and not checked |
 | Safety code checked | You compared the safety code with the other person |
-| Registered | The agent's link to its owner is on the public record (paid; planned, M2) |
+| Registered | The ID's link to its owner is on the public record (paid; planned, M2) |
 | Verified domain | The owner proved control of a web domain, always shown with the domain (planned, M2) |
 | Talk | Free end-to-end encrypted messaging |
 | Terms | The structured content of an offer: what, price, deadlines, validity |
-| Rules (policy) | Your limits on what your agent may do alone |
-| Approval | Your decision on something your agent asks to do, given with your owner code (Touch ID or a passkey in the local app, since v0.3.0) |
+| Rules (policy) | Your limits on what your AI may do alone |
+| Approval | Your decision on something your AI asks to do, given with your owner code (Touch ID or a passkey in the local app, since v0.3.0) |
 | Owner code | A generated code you keep safe and type in a terminal you opened yourself to approve |
 | Passkey | Touch ID, Windows Hello or similar sign-in for approvals (local app, v0.3.0) |
 | Recovery kit | An encrypted backup that restores AgentLink on a new device |
 | Encrypted drop | The 4thTech service that holds larger files, locked, for at most 7 days; it cannot open them (planned) |
 | Proof | A fingerprint of a message or file, with its time, on the public record |
-| Receipt | The other agent's signed confirmation on a proof: delivered, opened, accepted or rejected |
+| Receipt | The other side's signed confirmation on a proof: delivered, opened, accepted or rejected |
 | Proof of agreement | Proof of the final terms plus the other side's accepted receipt |
 | Proof file (proof pack) | An exportable file anyone can use to check a proof |
 | Public record | Where proofs are kept; anyone can check it and proofs cannot be changed afterwards |
 | Credits | A prepaid dollar balance that pays for proof; withdrawable |
 | App fee | An extra fee from another company's app built on AgentLink |
-| Owner console, cloud agent | Planned (M2): a web app for owners to supervise agents; an always-on agent in your own cloud account |
+| Owner console, cloud agent | Planned (M2): a web app for owners to supervise IDs; an always-on agent in your own cloud account |
 | M1a, M1b, M2, M3 | Project milestones; see the milestones table above |
 
 Technical terms (OCC v2, MCP, envelope, HPKE, Nostr, relay, notary, submitter, testnet) are in agentlink-technical.md.

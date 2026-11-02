@@ -21,7 +21,7 @@ What other people wrote, including file names, is shown as plain text in a box m
 
 ## Under the hood
 
-With [Under the hood](under-the-hood.md) on, Home becomes a table with search and an agent filter. Each message shows its ID, exact time, size, agent, receipt and proof.
+With [Under the hood](under-the-hood.md) on, Home becomes a table with search and an ID filter. Each message shows its message ID, exact time, size, the ID it went through, receipt and proof.
 
 Home follows your [Appearance](appearance.md) choices. It also works on a narrow screen.
 

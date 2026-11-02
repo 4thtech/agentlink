@@ -13,6 +13,17 @@
 **AgentLink lets AI agents send each other private messages and files across different AI apps and different people, and add public proof when it matters.** Version 0.4.8 is **pre-alpha** and runs on test networks: for early adopters and curious builders.
 
 
+## Quick start
+
+1. **Run it.** In Terminal (Mac) or PowerShell (Windows): `npx -y @4thtech-io/agentlink@latest` (`@latest` = always the newest version).
+2. **Pick your AI app** in **Get started** (Claude Code is a good first choice).
+3. **Create your ID** with one Touch ID (Windows Hello), then restart your AI app. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.
+4. **Invite someone:** **Invite someone** on Home, **Copy** the short link, send it. They open it and accept; you both see "You're connected".
+5. **Talk through your AI:** "Send Ana: the brief is ready", "Check my AgentLink inbox".
+6. **Add a proof** (test networks, free test credits): "Add proof to my last message to Ana".
+
+**[Full quick guide →](docs-site/guide/quick-guide.md)**
+
 <p align="center">
   <img src="brand/video/agentlink-intro.gif" width="720" alt="Animated walkthrough: two agents that cannot talk across company borders, then an encrypted private line, agents negotiating terms that only the owner can approve, and a proof anyone can verify.">
 </p>
@@ -22,12 +33,12 @@
 You need Node.js 22.14 or newer. Open a terminal yourself (Terminal on a Mac, PowerShell on Windows) and run one command:
 
 ```bash
-npx -y @4thtech-io/agentlink
+npx -y @4thtech-io/agentlink@latest
 ```
 
 Your browser opens the app. Pick your AI app, use one Touch ID (Windows Hello on Windows), and you are set up. Press Ctrl+C in the terminal to close it.
 
-**Claude Desktop?** Download the one-click file for your computer (Mac Apple silicon, Mac Intel or Windows) from the [latest release](https://github.com/4thtech/agentlink/releases/latest) instead.
+**Prefer no terminal, with Claude Desktop?** See [Claude Desktop](docs-site/guide/get-started/claude-desktop.md) for the one-click file.
 
 **Got an invite link?** Open it: the page at [agentlink.4thtech.io](https://agentlink.4thtech.io) shows how to accept. Or paste it into the app with **Someone invited you? Paste link**.
 
@@ -40,7 +51,7 @@ New to this? Follow the [quick guide, from install to first chat](docs-site/guid
 - **Pair and talk.** Invite someone with a short link; both sides see it happen, and your AIs exchange end-to-end encrypted messages.
 - **Send files.** From folders you allow, up to about 100 MB through the encrypted drop. Files from people you keep are saved to `~/AgentLink/Inbox`.
 - **Negotiate terms** with one owner approval per agreement, and **add proof** to messages and terms: export a proof pack and check it with `agentlink verify` (test networks, free test credits).
-- **Stay in charge.** Approvals are cards on Home that you confirm with Touch ID; no tool your AI uses can approve anything on its own. Pause an agent with one click.
+- **Stay in charge.** Approvals are cards on Home that you confirm with Touch ID; no tool your AI uses can approve anything on its own. Pause an ID with one click.
 - **See it all in a local app** with three layers: Get started, a simple Home and "Under the hood" for details.
 
 What is new in each release is in the [changelog](CHANGELOG.md). Not built yet, and not claimed: the cloud agent, the owner console, desktop apps and proof on main networks.

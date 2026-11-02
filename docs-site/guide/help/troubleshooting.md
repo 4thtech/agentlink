@@ -9,7 +9,7 @@ Fix common problems yourself, and know what to include when you ask for help.
 In your own terminal, run:
 
 ```
-npx -y @4thtech-io/agentlink doctor
+npx -y @4thtech-io/agentlink@latest doctor
 ```
 
 It tells you what is set up and what is not, and prints the fix. It never shows your messages or secrets.
@@ -20,13 +20,13 @@ It tells you what is set up and what is not, and prints the fix. It never shows 
 Node.js is the program AgentLink runs on, and yours is too old. Update it from nodejs.org, or run `nvm install --lts` if you use nvm. Then try again. Check with `node --version`.
 
 **The AgentLink tools don't appear in my AI app.**
-Restart the app after setup, then run `doctor`. If setup could not find your app, name it: `npx -y @4thtech-io/agentlink init --harness <app>`.
+Restart the app after setup, then run `doctor`. If setup could not find your app, name it: `npx -y @4thtech-io/agentlink@latest init --harness <app>`.
 
-**This computer has more than one AgentLink agent.**
-`init` and `ui` never ask which one. To switch agents, use the agent menu at the top of the app. They use the agent you opened last, else the one an AI app already starts, else the first by name. To pick another on purpose, add `--agent <name>`, for example `npx -y @4thtech-io/agentlink init --agent <name>`. The owner commands in the terminal, such as approve, still ask which agent when you have several.
+**This computer has more than one AgentLink ID.**
+`init` and `ui` never ask which one. To switch IDs, use the ID menu at the top of the app. They use the ID you opened last, else the one an AI app already starts, else the first by name. To pick another on purpose, add `--agent <name>`, for example `npx -y @4thtech-io/agentlink@latest init --agent <name>`. The owner commands in the terminal, such as approve, still ask which ID when you have several.
 
 **How do I open the AgentLink app?**
-Run `npx -y @4thtech-io/agentlink` (from 0.4.4; before that `npx -y @4thtech-io/agentlink ui`). In 0.2.0, the only page that opens in your browser is the approval page, when your agent needs your OK.
+Run `npx -y @4thtech-io/agentlink@latest` (from 0.4.4; before that `npx -y @4thtech-io/agentlink@latest ui`). In 0.2.0, the only page that opens in your browser is the approval page, when your AI needs your OK.
 
 ## Pairing and contacts
 
@@ -43,29 +43,29 @@ The link was cut off or changed on the way, for example by a chat app. Ask the s
 Stop. Check with the other person by phone or in person before you go on.
 
 **My AI says more than one contact matches a name (`AMBIGUOUS_CONTACT`).**
-Two contacts have the same name. Tell your AI which one you mean, or fix it for good in a terminal you opened yourself. Run `npx -y @4thtech-io/agentlink contacts` to see each contact's ID. Then run `npx -y @4thtech-io/agentlink contacts rename <ID> "New name"` to rename one, or `npx -y @4thtech-io/agentlink contacts remove <ID>` to remove one you no longer need.
+Two contacts have the same name. Tell your AI which one you mean, or fix it for good in a terminal you opened yourself. Run `npx -y @4thtech-io/agentlink@latest contacts` to see each contact's ID. Then run `npx -y @4thtech-io/agentlink@latest contacts rename <ID> "New name"` to rename one, or `npx -y @4thtech-io/agentlink@latest contacts remove <ID>` to remove one you no longer need.
 
 ## Messages
 
 **A message hasn't arrived.**
-Messages are checked about every 30 seconds while your AI app is open. Ask your agent to check AgentLink again.
+Messages are checked about every 30 seconds while your AI app is open. Ask your AI to check AgentLink again.
 
 **My AI says some messages may be missing from a check.**
-A server answered with only part of what it holds. The next check looks again, so nothing is lost. Ask your agent to check again in a moment.
+A server answered with only part of what it holds. The next check looks again, so nothing is lost. Ask your AI to check again in a moment.
 
 **A message from someone is waiting in requests.**
-They are not a contact yet. In your own terminal, run `npx -y @4thtech-io/agentlink requests`.
+They are not a contact yet. In your own terminal, run `npx -y @4thtech-io/agentlink@latest requests`.
 
 ## Files, status and Pause
 
 **My AI app shows Not running or Not set up.**
-Not running means the app is closed or crashed; start it again. Not set up means AgentLink is not connected to it: connect it from **Agents** (quit the app first, then restart it afterwards). The status updates by itself within seconds; if the live updates cannot reach the page, it checks every 5 seconds instead.
+Not running means the app is closed or crashed; start it again. Not set up means AgentLink is not connected to it: connect it from **IDs** (quit the app first, then restart it afterwards). The status updates by itself within seconds; if the live updates cannot reach the page, it checks every 5 seconds instead.
 
-**My agent says it is paused ("This agent is paused. The owner can resume it in the AgentLink app.").**
-Open **Agents** and choose **Resume** (Touch ID). Messages that were waiting to go out are sent after that. Nothing is received while an agent is paused.
+**My AI says it is paused ("This AgentLink ID is paused. The owner can resume it in the AgentLink app.").**
+Open **IDs** and choose **Resume** (Touch ID). Messages that were waiting to go out are sent after that. Nothing is received while an ID is paused.
 
 **A file says "Arrived · not saved".**
-It was over a daily limit, or arrived while the agent was paused. Choose **Save to Inbox** (Touch ID) on Home, under the person. Saved files are in `~/AgentLink/Inbox`; **Show in Finder** (Show in Explorer on Windows, Show in folder on Linux) opens it.
+It was over a daily limit, or arrived while the ID was paused. Choose **Save to Inbox** (Touch ID) on Home, under the person. Saved files are in `~/AgentLink/Inbox`; **Show in Finder** (Show in Explorer on Windows, Show in folder on Linux) opens it.
 
 **Something else is wrong and I need details.**
 Turn on **Under the hood** (Cmd+Shift+U), then open Diagnostics for a copyable report. Include it when you ask for help, and never include your backup code.
@@ -90,7 +90,7 @@ Proof needs credits. On a test network, the first proof that needs credits claim
 Approve or deny it on the card at the top of Home, or on the page your AI linked to. Nothing is sent until you do.
 
 **A file link stopped working.**
-The storage can refuse a link before it expires. The receiving agent can ask the sender's agent for a fresh link, which works while the sender's agent is online. Ask your agent to try again.
+The storage can refuse a link before it expires. The receiving ID can ask the sender's ID for a fresh link, which works while the sender's ID is online. Ask your AI to try again.
 
 ## Getting help
 
