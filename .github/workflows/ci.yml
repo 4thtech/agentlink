@@ -80,6 +80,9 @@ jobs:
       needs_playwright: ${{ steps.detect.outputs.needs_playwright }}
       e2e_relevant: ${{ steps.e2e_scope.outputs.e2e_relevant }}
       code_changed: ${{ steps.e2e_scope.outputs.e2e_relevant }}
+      # OPS-DOCS-FASTLANE: true only for a fast-lane diff of documentation that no package reads
+      # (tools/ci/select-affected.mjs `docsOnly`); `checks` is skipped and `docs-checks` runs instead.
+      docs_only: ${{ steps.e2e_scope.outputs.docs_only || 'false' }}
       test_scope: ${{ steps.affected.outputs.test_scope || 'full' }}
       turbo_filters: ${{ steps.affected.outputs.turbo_filters }}
       affected_playwright: ${{ steps.affected.outputs.needs_playwright || 'true' }}
@@ -199,6 +202,7 @@ jobs:
           set -euo pipefail
           relevant=true
           use_selector=false
+          docs_only=false
           if [ "$EVENT_NAME" = pull_request ]; then use_selector=true; fi
           base=""
           case "$EVENT_NAME" in
@@ -218,9 +222,10 @@ jobs:
             if grep -Eq '^(\.github|tools)/' "$list"; then
               echo "Everything runs: the change touches .github/ or tools/"
             elif scope="$(node tools/ci/select-affected.mjs --scope "$EVENT_NAME" "$REF" "$list" 2> /dev/null)" \
-              && [[ "$scope" =~ ^e2e_relevant=(true|false)$'\n'use_selector=(true|false)$ ]]; then
+              && [[ "$scope" =~ ^e2e_relevant=(true|false)$'\n'use_selector=(true|false)$'\n'docs_only=(true|false)$ ]]; then
               relevant="${BASH_REMATCH[1]}"
               use_selector="${BASH_REMATCH[2]}"
+              docs_only="${BASH_REMATCH[3]}"
             else
               echo "::warning::The fast-lane decision failed; running everything."
             fi
@@ -230,6 +235,8 @@ jobs:
           fi
           echo "e2e_relevant=$relevant" >> "$GITHUB_OUTPUT"
           echo "use_selector=$use_selector" >> "$GITHUB_OUTPUT"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+          echo "Docs-only fast lane: $docs_only"
           echo "Heavy jobs needed: $relevant; affected-package selection: $use_selector"
 
       # CHORE-CI-SPEED-2: a pull request lints, typechecks, builds and tests only the packages it
@@ -267,9 +274,10 @@ jobs:
   checks:
     name: checks
     needs: detect
-    # CHORE-CI-MATRIX-QUEUE-ONLY: runs on EVERY change, docs-only included: it holds the doc-drift tests
-    # (spec, README, docs-site, knowledge), and listing them by hand would rot.
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: runs on every change that is not docs-only: it holds the doc-drift
+    # tests (spec, README, docs-site, knowledge). OPS-DOCS-FASTLANE: a diff of only documentation that
+    # no package reads (`docs_only`) runs `docs-checks` instead, which runs those doc checks directly.
+    if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.docs_only != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -357,6 +365,46 @@ jobs:
       - name: MCP tool surface and conformance
         if: needs.detect.outputs.has_test == 'true' && (needs.detect.outputs.test_scope != 'filtered' || contains(needs.detect.outputs.turbo_filters, '--filter=@4thtech-io/agentlink'))
         run: pnpm --filter @4thtech-io/agentlink exec vitest run test/tool-surface.test.ts test/mcp-conformance.test.ts
+
+  # OPS-DOCS-FASTLANE (owner decision, 2026-11-02): a documentation-only pull request (see
+  # tools/ci/select-affected.mjs `docsOnly`: Markdown and images in the doc trees that no package
+  # reads) skips `checks` and runs only the existing doc validations: install (cached, no build),
+  # knowledge size and links, docs-status drift, the retired-scope, vocabulary (11 section 5),
+  # networks-page and skill-file doc tests, and the Prettier check. The secret scan stays in
+  # security-gate. Target: a docs PR is green in about 2 to 3 minutes. ci-gate demands this job
+  # exactly when `docs_only` is true.
+  docs-checks:
+    name: docs-checks
+    needs: detect
+    if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.docs_only == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Knowledge size and links, docs-status drift
+        run: |
+          set -euo pipefail
+          node tools/check-knowledge-size.mjs
+          node tools/check-knowledge-links.mjs
+          node tools/docs-status/index.mjs --check
+
+      - name: Doc tests (vocabulary, retired scope, networks page, skill file, status, knowledge)
+        working-directory: tools
+        run: >-
+          pnpm exec vitest run vocabulary.test.mjs retired-scope.test.mjs networks-page.test.mjs
+          skill-file.test.mjs check-knowledge-links.test.mjs check-knowledge-size.test.mjs docs-status
+
+      - name: Prettier
+        run: pnpm exec prettier --check .
 
   vectors:
     name: vectors
@@ -1177,7 +1225,7 @@ jobs:
     # required check. On `main` (and `wave-4`) that push run is the heavy lane, and its
     # `ci-gate (push)` is what release.yml and the deploy-*.yml workflows require.
     name: ${{ github.event_name == 'push' && 'ci-gate (push)' || 'ci-gate' }}
-    needs: [detect, checks, vectors, keychain, path-guard, node-os, windows-smoke, context-budget, relays-docker, storage-minio, bundle-check, changesets, stale-precheck, e2e-deterministic]
+    needs: [detect, checks, docs-checks, vectors, keychain, path-guard, node-os, windows-smoke, context-budget, relays-docker, storage-minio, bundle-check, changesets, stale-precheck, e2e-deterministic]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -1190,6 +1238,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           REF: ${{ github.ref }}
           CODE_CHANGED: ${{ needs.detect.outputs.code_changed }}
+          DOCS_ONLY: ${{ needs.detect.outputs.docs_only }}
           NEEDS: ${{ toJSON(needs) }}
           # OPS-FAST-LANE-1: in the heavy lane (a push to `main` or `wave-4`) these must have run and
           # passed (a skip fails), so the release cannot ship with a heavy job silently skipped.
@@ -1206,6 +1255,20 @@ jobs:
                 exit 1
               fi
             done
+          fi
+          # OPS-DOCS-FASTLANE: `docs-checks` is accepted only as the docs-only outcome: when the classifier
+          # said docs-only it must have succeeded; otherwise it must not have run at all. A draft
+          # (detect skipped) leaves everything skipped.
+          docs_result="$(jq -r '.["docs-checks"].result // "missing"' <<< "$NEEDS")"
+          detect_result="$(jq -r '.detect.result // "missing"' <<< "$NEEDS")"
+          if [ "$DOCS_ONLY" = true ]; then
+            if [ "$docs_result" != success ]; then
+              echo "::error::Docs-only change: docs-checks must succeed; it ended as '$docs_result'."
+              exit 1
+            fi
+          elif [ "$docs_result" != skipped ] && [ "$detect_result" = success ]; then
+            echo "::error::docs-checks ran although the change is not docs-only ('$docs_result')."
+            exit 1
           fi
           # CHORE-CI-SPEED-1: on a draft pull request every upstream job is skipped, which passes here;
           # the suite runs when the draft is marked ready for review.
