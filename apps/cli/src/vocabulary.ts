@@ -90,7 +90,7 @@ export function lintVocabulary(text: string, allow: readonly string[] = []): str
  */
 export const HOOD_HARNESS_PHRASES: readonly string[] = Object.freeze([
   'AI app (harness)',
-  'Developers call these harnesses: the program that runs your AI and connects it to AgentLink.',
+  'AI apps: developers call them harnesses, the program that runs your AI and connects it to AgentLink.',
 ]);
 
 /** `lintVocabulary` for an Under the hood string: the exact phrases above are excused, nothing else. */

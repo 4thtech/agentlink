@@ -425,7 +425,7 @@ describe('Agents, Under the hood: the fleet (A11)', () => {
     await mount(true);
     expect(host.querySelectorAll('thead th')[2]?.textContent).toBe('AI app (harness)');
     expect(host.querySelector('[data-harness-hint]')?.textContent).toBe(
-      'Developers call these harnesses: the program that runs your AI and connects it to AgentLink.',
+      'AI apps: developers call them harnesses, the program that runs your AI and connects it to AgentLink.',
     );
   });
 

@@ -156,7 +156,7 @@ export const AGENTS_STRINGS = {
   colAgent: 'ID',
   colApps: 'AI app (harness)',
   harnessHint:
-    'Developers call these harnesses: the program that runs your AI and connects it to AgentLink.',
+    'AI apps: developers call them harnesses, the program that runs your AI and connects it to AgentLink.',
   colStatus: 'Status',
   colPeople: 'People',
   colLast: 'Last active',
