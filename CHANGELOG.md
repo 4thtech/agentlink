@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.10] - 2026-11-02
+
+### Changed
+
+- `knowledge/` is now exactly two compact documents for the website support chat, `agentlink-overview.md` and `agentlink-userguide.md` (DOCS-KNOWLEDGE-LEAN): the technical and security files and the folder README are folded in, the maintenance rule moved to `docs-site/MAINTAINING.md`, the size budget is 15,000 tokens (hard maximum 30,000) and the check fails on a third file.
+- The quick guide is now nine short steps from running the app to a first public proof on the test networks (DOCS-QUICKGUIDE-2), the README opens with a "Quick start", and user-facing install commands use `@latest` so students always get the newest version.
+- A pull request that changes only documentation now runs a short set of quick doc checks instead of the whole test suite, so it is ready to merge in a few minutes (OPS-DOCS-FASTLANE, S2): pull requests that touch code, the user guide pages the app tests read, or CI itself still run everything.
+- Specs now call the identity AgentLink creates for an AI app an "ID" (ID number, ID card, "Name · App" shown only on this computer, default name rule); "AI agents" stays for the AIs (W7-ID-B0, D-144, S0, 11 §5, 08 §1).
+- The first-run screens and Home now say "ID" instead of "agent": "Create Claude Code's ID", "Name people see" (asked for, required; prefilled with the owner's ID name when adding another ID). A small dismissible card explains what an ID is (W7-ID-B1, S1, D-144).
+- The simple app, Settings and shared messages say "ID" instead of "agent", show the AI app next to an ID on this computer ("Tali · Claude Code") and say which ID is asking in approvals (W7-ID-B2, S1, Decision 56).
+- The Agents page, the switcher and Under the hood now say "IDs" (W7-ID-B3, D-144, S1): "New ID", "Manage IDs", "Used by Claude Code, Cursor" on each ID (or "Not used by any AI app"), and the switcher shows the AI app next to the name ("Tali · Claude Code") on this computer only. `/ids` opens the page too; `/agents` still works. The empty IDs page explains what an ID is.
+- The CLI, the tool texts your AI reads and the AgentLink skill call your AI app's identity an "ID" (W7-ID-B4, S1, D-144, 06 §1, §2, §6.1, §7.1): "This AgentLink ID is paused", "Which ID?", "ID number" instead of "Agent ID", "ID card" instead of "agent profile". What a proof makes public now reads "your AgentLink ID recorded", "went to them" and "reached you", the same words as in the app. `--id <name>` works everywhere `--agent <name>` does, and `agentlink --help` shows it first. Tool names, schemas and results are unchanged.
+- The local app's server-side approval and error lines call your AgentLink identity an "ID" (W7-ID-B5, S2, D-144): removing, pausing, removing a contact, adding or withdrawing credits, and the app host's "No ID is open." and "The open ID changed.". A first ID created without a typed name is called "My ID" (Q5: the page prefills the owner's name, else the AI app's name).
+- The user guide, knowledge base, README and llms.txt call the identity AgentLink creates for an AI app an ID, not an agent (W7-ID-B6, D-144): "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it." The guide page Agents is now IDs (local-app/ids.md, the old link redirects); "AI agents" and the product tagline stay.
+- A vocabulary guard fails when user-facing copy or docs say "agent" for the ID ("your agent", "New agent", "agent name", "Agent ID", "agent card"); "AI agents", `--agent` and code identifiers stay allowed (W7-ID-B7, D-144, S1).
+- The user guide quotes the app's exact words after the ID rename (what a proof makes public, the paused line), and the empty IDs page shows the "What is an ID?" card (W7-ID-INTEGRATE, S1, D-144).
+- An ID that no AI app uses now reads "Not used by any AI app" everywhere (top bar, IDs card, fleet table), and the Get started links use the app's own link style instead of the browser's default blue (W7-ID-RENAME, S1, D-144).
+- Home: with more than one ID, chips filter People by ID and the list is grouped under the open ID; each ID keeps one colour on rows, the conversation header and approval cards; approvals read "Tali · Claude Code is asking" (W7-ID-X1, S1).
+- IDs: the New ID menu explains "New ID" vs "Connect another AI app to this ID" and wires the second to the AI apps flow; the rename hint on an ID card reads "People see this name." (W7-ID-X2, S0).
+- The instructions AgentLink gives your AI now say that the AI app has one AgentLink ID, used by every chat, and that a new ID is the owner's choice in the AgentLink app (W7-ID-X3, S1, D-144, 06 §5).
+
 ## [0.4.9] - 2026-11-02
 
 ### Changed
@@ -887,7 +908,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.9...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.10...HEAD
+[0.4.10]: https://github.com/4thtech/agentlink/compare/v0.4.9...v0.4.10
 [0.4.9]: https://github.com/4thtech/agentlink/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/4thtech/agentlink/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/4thtech/agentlink/compare/v0.4.6...v0.4.7

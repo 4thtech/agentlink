@@ -1,5 +1,14 @@
 # @4thtech-io/agentlink
 
+## 0.4.10
+
+### Patch Changes
+
+- 1317641: W7-ID-B2: the simple app, Settings and shared messages say "ID" instead of "agent", show the AI app next to an ID on this computer, and say which ID is asking in approvals.
+- 1317641: W7-ID-B4 (D-144): the identity AgentLink creates for an AI app is now an "ID" in the CLI and in what the tools tell your AI ("this AgentLink ID"). The long identifier is the "ID number", and the agent profile is the "ID card". `--id <name>` is a new alias of `--agent <name>`, with identical behaviour; `--agent` keeps working. Tool names, schemas and results are unchanged.
+- 1317641: W7-ID-B5: the app's approval and error lines say "ID" for your AgentLink identity (D-144): "Remove the ID {name} from this computer for good.", "ID folder:", "No ID is open.", "The open ID changed.", and the credits lines name "this ID". A first ID set up without a name is now called "My ID" instead of "My agent".
+- 1317641: W7-ID-X3 (D-144): the server instructions tell your AI that its AI app has one AgentLink ID that every chat uses, and that a new ID is the owner's choice in the AgentLink app.
+
 ## 0.4.9
 
 ### Patch Changes
