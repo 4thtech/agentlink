@@ -20,8 +20,9 @@
 #                      this commit's CI was cancelled because a newer push to main superseded it, it
 #                      ends green with result=superseded: nothing deploys, and catch-up runs.
 #   guard              main of 4thtech/agentlink only, and only once apps/invite/wrangler.toml exists.
-#   build              builds the site ONCE, stages it, checks that it has exactly the five expected
-#                      files (no source map, no second script) and hashes it. No credentials.
+#   build              builds the site ONCE, stages it, checks that it has exactly the seven expected
+#                      files (no source map, no second script; the two one-line installers of
+#                      INSTALLER-1 included) and hashes it. No credentials.
 #   deploy-staging     environment `staging`. Skips cleanly (green, with a notice) while the Cloudflare
 #                      credentials are missing. Deploys to workers.dev, then reads back the logging
 #                      settings.
@@ -78,6 +79,9 @@ on:
     branches: [main]
     paths:
       - "apps/invite/**"
+      # INSTALLER-1: the one-line installers are copied into the site by apps/invite/vite.config.ts.
+      - "installer/install.sh"
+      - "installer/install.ps1"
       - "packages/core/**"
       - "packages/crypto/**"
       - "packages/types/**"
@@ -195,9 +199,9 @@ jobs:
       - name: Build the invite page
         run: pnpm exec turbo run build --filter='@4thtech-io/invite...'
 
-      # The same site goes to both environments. The site has exactly five files (08 §4: one
-      # first-party script, one first-party style file, no source map, no second chunk); anything
-      # else fails the build.
+      # The same site goes to both environments. The site has exactly seven files (08 §4: one
+      # first-party script, one first-party style file, no source map, no second chunk; plus the two
+      # one-line installers of INSTALLER-1, plain text); anything else fails the build.
       - name: Stage the site and hash it
         id: site
         shell: bash
@@ -209,8 +213,8 @@ jobs:
           rm -rf "$SITE_DIR"
           cp -R apps/invite/dist/site "$SITE_DIR"
           found="$(cd "$SITE_DIR" && find . -type f | LC_ALL=C sort | tr '\n' ' ')"
-          if [ "$found" != "./_headers ./i/index.html ./index.html ./invite.css ./invite.js " ]; then
-            echo "::error::The built site is not exactly _headers, i/index.html, index.html, invite.css and invite.js."
+          if [ "$found" != "./_headers ./i/index.html ./index.html ./install.ps1 ./install.sh ./invite.css ./invite.js " ]; then
+            echo "::error::The built site is not exactly _headers, i/index.html, index.html, install.ps1, install.sh, invite.css and invite.js."
             exit 1
           fi
           # MANIFEST-BEGIN
@@ -444,7 +448,7 @@ jobs:
           }
           site_check() {
             local entry path asset name wanted_value seen want got
-            for entry in "/|index.html" "/i|i/index.html" "/invite.js|invite.js" "/invite.css|invite.css"; do
+            for entry in "/|index.html" "/i|i/index.html" "/invite.js|invite.js" "/invite.css|invite.css" "/install.sh|install.sh" "/install.ps1|install.ps1"; do
               path="${entry%%|*}"
               asset="${entry##*|}"
               fetch "$path"
@@ -469,6 +473,15 @@ jobs:
                   return 1
                 fi
               done
+              # INSTALLER-1: curl | sh and irm | iex get plain text (the `_headers` block of each).
+              case "$path" in
+                /install.*)
+                  if [ "$(header_of "$RUNNER_TEMP/site-headers.txt" content-type)" != "text/plain; charset=utf-8" ]; then
+                    echo "$path: content-type is not text/plain; charset=utf-8"
+                    return 1
+                  fi
+                  ;;
+              esac
               want="$(awk -v f="./$asset" '$2 == f { print $1 }' "$MANIFEST")"
               got="$(sha256sum "$RUNNER_TEMP/site-body.bin" | cut -d' ' -f1)"
               if [ -z "$want" ] || [ "$got" != "$want" ]; then
@@ -481,7 +494,7 @@ jobs:
               echo "An unknown path answered HTTP ${status:-none}, expected 404."
               return 1
             fi
-            echo "Healthy: the pages, the script and the style file equal the build, headers match, unknown path 404."
+            echo "Healthy: the pages, the script, the style file and the installers equal the build, headers match, unknown path 404."
             return 0
           }
           # SITE-CHECK-END
@@ -697,7 +710,7 @@ jobs:
           }
           site_check() {
             local entry path asset name wanted_value seen want got
-            for entry in "/|index.html" "/i|i/index.html" "/invite.js|invite.js" "/invite.css|invite.css"; do
+            for entry in "/|index.html" "/i|i/index.html" "/invite.js|invite.js" "/invite.css|invite.css" "/install.sh|install.sh" "/install.ps1|install.ps1"; do
               path="${entry%%|*}"
               asset="${entry##*|}"
               fetch "$path"
@@ -722,6 +735,15 @@ jobs:
                   return 1
                 fi
               done
+              # INSTALLER-1: curl | sh and irm | iex get plain text (the `_headers` block of each).
+              case "$path" in
+                /install.*)
+                  if [ "$(header_of "$RUNNER_TEMP/site-headers.txt" content-type)" != "text/plain; charset=utf-8" ]; then
+                    echo "$path: content-type is not text/plain; charset=utf-8"
+                    return 1
+                  fi
+                  ;;
+              esac
               want="$(awk -v f="./$asset" '$2 == f { print $1 }' "$MANIFEST")"
               got="$(sha256sum "$RUNNER_TEMP/site-body.bin" | cut -d' ' -f1)"
               if [ -z "$want" ] || [ "$got" != "$want" ]; then
@@ -734,7 +756,7 @@ jobs:
               echo "An unknown path answered HTTP ${status:-none}, expected 404."
               return 1
             fi
-            echo "Healthy: the pages, the script and the style file equal the build, headers match, unknown path 404."
+            echo "Healthy: the pages, the script, the style file and the installers equal the build, headers match, unknown path 404."
             return 0
           }
           # SITE-CHECK-END

@@ -34,6 +34,21 @@ describe('_headers', () => {
     expect(headers['cache-control']).toMatch(/no-store|no-cache|max-age=0/);
   });
 
+  // INSTALLER-1 (owner Decision 58): curl | sh and irm | iex read plain text; never cached, so an
+  // update of the installer is served at once.
+  it('serves the one-line installers as plain text, with the headers of every path', () => {
+    for (const path of ['/install.sh', '/install.ps1']) {
+      const own = headersFor(file, path);
+      expect(own['content-type'], path).toBe('text/plain; charset=utf-8');
+      expect(own['x-content-type-options'], path).toBe('nosniff');
+      expect(own['cache-control'], path).toBe('no-store');
+      expect(own['content-security-policy'], path).toBe(CSP);
+    }
+    // Only the installers get a content type of their own.
+    expect(headersFor(file, '/i')['content-type']).toBeUndefined();
+    expect(headersFor(file, '/')['content-type']).toBeUndefined();
+  });
+
   it('sets no cookie and allows no cross-origin use', () => {
     expect(file).not.toMatch(/set-cookie/i);
     expect(file).not.toMatch(/access-control-allow/i);

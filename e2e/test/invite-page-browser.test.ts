@@ -489,3 +489,23 @@ describe('framing', () => {
     await context.close();
   });
 });
+
+// INSTALLER-1 (owner Decision 58): the one-line installers are served from the built site, byte for
+// byte the files in installer/, as plain text with the headers of every path.
+describe('the one-line installers', () => {
+  for (const name of ['install.sh', 'install.ps1']) {
+    it(`serves /${name} as plain text, equal to installer/${name}`, async () => {
+      const response = await fetch(`${originOf(site)}/${name}`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+      expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('content-security-policy')).toBe(CSP);
+      const want = readFileSync(
+        fileURLToPath(new URL(`../../installer/${name}`, import.meta.url)),
+        'utf8',
+      );
+      expect(await response.text()).toBe(want);
+    });
+  }
+});

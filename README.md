@@ -15,7 +15,7 @@
 
 ## Quick start
 
-1. **Run it.** In Terminal (Mac) or PowerShell (Windows): `npx -y @4thtech-io/agentlink@latest` (`@latest` = always the newest version).
+1. **Install it with one command.** Mac or Linux (Terminal): `curl -fsSL https://agentlink.4thtech.io/install.sh | sh`. Windows (PowerShell): `irm https://agentlink.4thtech.io/install.ps1 | iex`. It adds Node.js if you need it and opens the app. Already have Node.js 22.14 or newer? `npx -y @4thtech-io/agentlink@latest` works too.
 2. **Pick your AI app** in **Get started** (Claude Code is a good first choice).
 3. **Create your ID** with one Touch ID (Windows Hello), then restart your AI app. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.
 4. **Invite someone:** **Invite someone** on Home, **Copy** the short link, send it. They open it and accept; you both see "You're connected".
@@ -30,7 +30,21 @@
 
 ## Install
 
-You need Node.js 22.14 or newer. Open a terminal yourself (Terminal on a Mac, PowerShell on Windows) and run one command:
+Open a terminal yourself and paste one line. The installer checks what is missing (it downloads the official Node.js from nodejs.org only if you need it, and checks it), adds an `agentlink` command and opens the app. No admin rights. Run it again to update; [`installer/`](installer/README.md) has the details, `--dry-run` and `--uninstall`.
+
+```bash
+# Mac or Linux (Terminal)
+curl -fsSL https://agentlink.4thtech.io/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://agentlink.4thtech.io/install.ps1 | iex
+# Windows (Command Prompt)
+powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"
+```
+
+Already have Node.js 22.14 or newer? Then this one command is all you need:
 
 ```bash
 npx -y @4thtech-io/agentlink@latest
@@ -65,7 +79,7 @@ Messages and files are encrypted on your computer. Relays and 4thTech services o
 <!-- status:start -->
 > **Version:** v0.4.10 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-02
 >
-> - **Components:** 78 merged, 13 in progress, 7 planned
+> - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** The cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
 > Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.

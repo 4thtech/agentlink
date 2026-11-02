@@ -158,6 +158,8 @@ jobs:
               [2, /^apps\/(console|cloud-agent|submitter|drop)\//],
               [2, /^test-vectors\//],
               [2, /^docs\/foundation\/04-security-and-crypto\.md$/],
+              // INSTALLER-1: the one-line installers download and run a runtime on users' computers.
+              [2, /^installer\//],
               [1, /^packages\/(chain|transport-nostr|storage|types|ui|mcp-tools)\//],
               [1, /^apps\/(cli|verify|invite)\//],
               [1, /^(e2e|skills)\//],
@@ -192,6 +194,10 @@ jobs:
               /^(\.gitleaks\.toml|\.gitleaksignore|\.changeset\/config\.json)$/,
               /^tools\/release\//,
               /^tools\/ci\//,
+              // INSTALLER-1: the installers, their tests and the site that serves them (curl | sh).
+              /^installer\//,
+              /^tools\/installer\//,
+              /^apps\/invite\//,
             ];
             const isSensitive = (path) => SENSITIVE.some((re) => re.test(path));
             // END path-classes

@@ -4,15 +4,13 @@ How to install and use AgentLink, step by step, in plain language. AgentLink is 
 
 ## What do I need?
 
-A Mac or a Windows 10 or 11 computer, an AI app (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode or Antigravity) and Node.js 22.14 or newer. Check with `node --version`; if it is older or missing, install the current LTS from nodejs.org and open a new terminal window. No account, crypto app, browser extension or payment.
+A Mac, a Windows 10 or 11 computer or a Linux computer, and an AI app (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode or Antigravity). AgentLink runs on Node.js 22.14 or newer; the installer adds it if needed. No account, crypto app, browser extension or payment.
 
 ## How do I install and open it?
 
-Open Terminal (Mac) or PowerShell (Windows) yourself and run:
+Open a terminal yourself and paste one line. Mac or Linux (Terminal): `curl -fsSL https://agentlink.4thtech.io/install.sh | sh`. Windows (PowerShell): `irm https://agentlink.4thtech.io/install.ps1 | iex` (Command Prompt: `powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"`). It downloads the official Node.js from nodejs.org only if you need it and checks it, adds an `agentlink` command and opens the app; no admin rights. Run it again to update; add `--uninstall` (Mac, Linux) to remove it. Next time, type `agentlink`.
 
-`npx -y @4thtech-io/agentlink@latest`
-
-`@latest` makes sure you run the newest version. Your browser opens the app. Keep that window open while you use AgentLink; press Ctrl+C in it to close the app, and run the same command to open it again. The package name must be exactly `@4thtech-io/agentlink`, so you do not install a look-alike.
+If you already have Node.js 22.14 or newer, you can instead run `npx -y @4thtech-io/agentlink@latest`. `@latest` makes sure you run the newest version. Your browser opens the app. Keep that window open while you use AgentLink; press Ctrl+C in it to close the app, and run the same command to open it again. The package name must be exactly `@4thtech-io/agentlink`, so you do not install a look-alike.
 
 **Windows.** If PowerShell refuses, run `cmd /c npx -y @4thtech-io/agentlink@latest`. If Windows says "Windows protected your PC", see https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/windows.md. AI apps on Windows start AgentLink through an entry that begins with `cmd /c npx`; the app writes it for you.
 
