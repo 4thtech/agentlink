@@ -10,7 +10,8 @@
 // docs (not the backlog), AGENTS.md. A refactor or other change that needs no entry adds a fragment
 // with `section: none` and a one-line reason, which records the decision and is dropped at the roll.
 // The Changesets "Version packages" pull request is exempt. Environment (from the workflow, never
-// interpolated into a shell): HEAD_REF, PR_AUTHOR, SAME_REPO.
+// interpolated into a shell): HEAD_REF, PR_AUTHOR, SAME_REPO,
+// RELEASE_BOT_LOGIN.
 
 import { spawnSync } from 'node:child_process';
 import { lstatSync, readFileSync } from 'node:fs';
@@ -125,6 +126,7 @@ async function main() {
       headRef: process.env.HEAD_REF ?? '',
       author: process.env.PR_AUTHOR ?? '',
       sameRepo: process.env.SAME_REPO === 'true',
+      releaseBot: (process.env.RELEASE_BOT_LOGIN ?? '').trim().toLowerCase(),
     },
   });
   process.exit(result.ok ? 0 : 1);

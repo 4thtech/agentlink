@@ -22,8 +22,9 @@
 # Exempt (title and body are machine-generated):
 #   - Renovate pull requests (author renovate[bot], branch in this repository);
 #     their titles are prefixed "DEPS:" through renovate.json anyway.
-#   - The Changesets "Version packages" pull request (author github-actions[bot],
-#     branch changeset-release/*, branch in this repository).
+#   - The Changesets "Version packages" pull request (author github-actions[bot] or the
+#     release GitHub App named by the repository variable RELEASE_BOT_LOGIN, `<slug>[bot]`,
+#     OPS-UNSTICK-B; branch changeset-release/*, branch in this repository).
 #
 # On merge_group runs the job is skipped, which GitHub treats as a pass for a
 # required check, so enabling a merge queue does not stall on this check.
@@ -56,6 +57,8 @@ jobs:
     steps:
       - name: Check PR title and description
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          RELEASE_BOT_LOGIN: ${{ vars.RELEASE_BOT_LOGIN }}
         with:
           script: |
             const pr = context.payload.pull_request;
@@ -68,8 +71,14 @@ jobs:
 
             // Machine-generated pull requests from this repository are exempt.
             const isRenovate = sameRepo && authorType === 'Bot' && author === 'renovate[bot]';
+            const releaseBot = (process.env.RELEASE_BOT_LOGIN ?? '').trim().toLowerCase();
+            const changesetsBots = ['github-actions[bot]'];
+            // Only a `<slug>[bot]` login that is not a generic bot (OPS-UNSTICK-B).
+            if (/^[a-z0-9-]+\[bot\]$/.test(releaseBot) && !['github-actions[bot]', 'renovate[bot]', 'dependabot[bot]'].includes(releaseBot)) {
+              changesetsBots.push(releaseBot);
+            }
             const isChangesets =
-              sameRepo && authorType === 'Bot' && author === 'github-actions[bot]' && headRef.startsWith('changeset-release/');
+              sameRepo && authorType === 'Bot' && changesetsBots.includes(author) && headRef.startsWith('changeset-release/');
             if (isRenovate || isChangesets) {
               core.info(`Exempt: automated pull request by ${author}.`);
               return;

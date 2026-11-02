@@ -1,12 +1,14 @@
 # Quick guide: from install to first chat
 
-*Applies to AgentLink 0.4.9, a pre-alpha release. Mac and Windows. No account, no payment.*
+*Applies to AgentLink 0.4.10, a pre-alpha release. Mac and Windows. No account, no payment.*
 
 Nine short steps, from nothing to a first conversation and a public proof. Every button name below is the one you see on screen.
 
 **You need:** a Mac or a Windows 10 or 11 computer, an AI app (this guide uses **Claude Code**; Claude Desktop, Codex, Gemini CLI, Cursor and Windsurf also work) and **Node.js 22.14 or newer**. To check, type `node --version` in a terminal. If it is older or missing, install the current LTS from [nodejs.org](https://nodejs.org), then open a new terminal window.
 
 ## 1. Run the app
+
+Need Node.js first? Install Node.js 22 or newer from [nodejs.org](https://nodejs.org), then open a new terminal window.
 
 Paste this into a terminal you opened yourself and press Return (Enter on Windows):
 

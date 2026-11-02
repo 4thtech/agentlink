@@ -8,18 +8,27 @@
 //   node tools/release/check-changesets.mjs --base origin/main
 //
 // The only exemption is the Changesets "Version packages" pull request itself (it consumes the
-// changesets): branch `changeset-release/*`, opened by `github-actions[bot]`, in this repository.
-// Environment (from the workflow, never interpolated into a shell): HEAD_REF, PR_AUTHOR, SAME_REPO.
+// changesets): branch `changeset-release/*`, opened by `github-actions[bot]` or by the release GitHub
+// App (repository variable RELEASE_BOT_LOGIN, `<slug>[bot]`, OPS-UNSTICK-B), in this repository.
+// Environment (from the workflow, never interpolated into a shell): HEAD_REF, PR_AUTHOR, SAME_REPO,
+// RELEASE_BOT_LOGIN.
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-export function isVersionPackagesPr({ headRef, author, sameRepo }) {
+export const GENERIC_BOTS = ['github-actions[bot]', 'renovate[bot]', 'dependabot[bot]'];
+
+export function isVersionPackagesPr({ headRef, author, sameRepo, releaseBot = '' }) {
+  const bots = ['github-actions[bot]'];
+  // Only a `<slug>[bot]` login that is not a generic bot (anyone's workflow can act as those).
+  if (/^[a-z0-9-]+\[bot\]$/.test(releaseBot) && !GENERIC_BOTS.includes(releaseBot)) {
+    bots.push(releaseBot);
+  }
   return (
     sameRepo === true &&
-    author === 'github-actions[bot]' &&
+    bots.includes(author) &&
     typeof headRef === 'string' &&
     headRef.startsWith('changeset-release/')
   );
@@ -116,6 +125,7 @@ async function main() {
       headRef: process.env.HEAD_REF ?? '',
       author: process.env.PR_AUTHOR ?? '',
       sameRepo: process.env.SAME_REPO === 'true',
+      releaseBot: (process.env.RELEASE_BOT_LOGIN ?? '').trim().toLowerCase(),
     },
   });
   process.exit(result.ok ? 0 : 1);
