@@ -13,7 +13,7 @@ Already have Node.js 22.14 or newer? `npx -y @4thtech-io/agentlink@latest` works
 ## What it does
 
 1. **Node.js.** If `node` 22.14 or newer (with `npx` next to it) is on your PATH, it uses that. Otherwise it downloads the official Node.js **22.23.4** (LTS) from `https://nodejs.org/dist/v22.23.4/` into a folder of its own: `~/.agentlink/runtime` (Mac, Linux) or `%LOCALAPPDATA%\AgentLink\runtime` (Windows). Before unpacking, the SHA-256 of the download must equal **both** the line in that release's `SHASUMS256.txt` (fetched over HTTPS from nodejs.org) **and** the hash written in the installer. Any mismatch stops the install and nothing is installed.
-2. **The `agentlink` command.** A small launcher that runs `npx -y @4thtech-io/agentlink@latest` with that Node.js: `~/.agentlink/bin/agentlink` (one marked line in `~/.profile`, and in `~/.zshrc` or your bash file, adds it to PATH) or `%LOCALAPPDATA%\AgentLink\bin\agentlink.cmd` (added to your user PATH). On Windows it is a `.cmd` file, so the PowerShell execution policy never blocks it.
+2. **The `agentlink` command.** A small launcher that runs `npx -y @4thtech-io/agentlink@latest` with that Node.js, with the npm registry pinned to `https://registry.npmjs.org/` on the command line (for the `@4thtech-io` scope too), so an `.npmrc` in the folder you start it from cannot point it elsewhere: `~/.agentlink/bin/agentlink` (one marked line in `~/.profile`, and in `~/.zshrc` or your bash file, adds it to PATH) or `%LOCALAPPDATA%\AgentLink\bin\agentlink.cmd` (added to your user PATH). On Windows it is a `.cmd` file, so the PowerShell execution policy never blocks it.
 3. **Opens the app**, when run from a terminal. Your browser opens on Welcome. Otherwise (for example in a script) it prints the command to run instead.
 
 No sudo or admin rights, no system settings, no telemetry. It never asks for or prints a secret. Your IDs, contacts and messages live in `~/.agentlink` (outside `runtime` and `bin`); the installer never touches them.
@@ -29,6 +29,11 @@ No sudo or admin rights, no system settings, no telemetry. It never asks for or 
 On Mac or Linux: `curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --uninstall`. On Windows, options need the script block form: `& ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Uninstall`.
 
 **Update:** run the same line again. AgentLink itself is always the newest version (`@latest`); a new installer brings a newer Node.js and replaces the old copy.
+
+## Good to know
+
+- **Windows uninstall and links.** `-Uninstall` deletes `%LOCALAPPDATA%\AgentLink\runtime` and `bin` recursively. Do not put a junction or symbolic link to another folder inside them: Windows PowerShell 5.1's `Remove-Item -Recurse` can follow a junction and delete the files it points to. The installer itself never creates one. (On Mac and Linux, `rm -rf` does not follow links.)
+- The launcher keeps the folder you start it from, because commands such as `agentlink verify ./pack` name files relative to it.
 
 ## Not covered
 

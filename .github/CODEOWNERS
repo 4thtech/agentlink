@@ -28,6 +28,12 @@
 /test-vectors/                                  @talirezun @denisjazbec
 /docs/foundation/04-security-and-crypto.md      @talirezun @denisjazbec
 
+# S2 (INSTALLER-1): the one-line installers (they download and run a runtime on users' computers),
+# their tests, and the invite site that serves them at agentlink.4thtech.io/install.sh and install.ps1.
+/installer/                                     @talirezun @denisjazbec
+/tools/installer/                               @talirezun @denisjazbec
+/apps/invite/                                   @talirezun @denisjazbec
+
 # CI, release and repository configuration (incl. this file, review-gate and release workflows)
 /.github/                                       @talirezun @denisjazbec
 

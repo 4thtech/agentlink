@@ -108,7 +108,7 @@ describe('install.ps1 source', () => {
     const urls = [...source.matchAll(/https?:\/\/[^\s"')]+/g)].map((m) => m[0]);
     for (const url of urls) {
       expect(url).toMatch(
-        /^https:\/\/(nodejs\.org\/dist\/|agentlink\.4thtech\.io|github\.com\/4thtech\/agentlink)/,
+        /^https:\/\/(nodejs\.org\/dist\/|registry\.npmjs\.org\/$|agentlink\.4thtech\.io|github\.com\/4thtech\/agentlink)/,
       );
     }
     expect(source).not.toMatch(/wallet|\bgas\b|seed phrase|transaction/i);

@@ -334,7 +334,7 @@ describe('install.sh source', () => {
     const urls = [...source.matchAll(/https?:\/\/[^\s"')]+/g)].map((m) => m[0]);
     for (const url of urls) {
       expect(url).toMatch(
-        /^https:\/\/(nodejs\.org\/dist\/|agentlink\.4thtech\.io|github\.com\/4thtech\/agentlink)/,
+        /^https:\/\/(nodejs\.org\/dist\/|registry\.npmjs\.org\/$|agentlink\.4thtech\.io|github\.com\/4thtech\/agentlink)/,
       );
     }
     expect(source).toContain("--proto '=https' --tlsv1.2");

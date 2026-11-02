@@ -92,6 +92,8 @@ main() {
 say() { printf '%s\n' "$*"; }
 fail() {
   printf 'AgentLink installer: %s\n' "$*" >&2
+  # The download folder, if any, goes with a failed install.
+  if [ -n "${tmp:-}" ]; then rm -rf "$tmp"; fi
   exit 1
 }
 
@@ -174,8 +176,8 @@ install_node() {
     say "  and unpack it into $runtime_root"
     return 0
   fi
-  tmp="$(mktemp -d "${TMPDIR:-/tmp}/agentlink-install.XXXXXX")"
-  trap 'rm -rf "$tmp"' EXIT
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/agentlink-install.XXXXXX")" ||
+    fail "Could not create a temporary folder."
   download "$NODE_DIST/$archive" "$tmp/$archive"
   download "$NODE_DIST/SHASUMS256.txt" "$tmp/SHASUMS256.txt"
   listed="$(awk -v f="$archive" '$2 == f { print $1 }' "$tmp/SHASUMS256.txt")"
@@ -185,10 +187,12 @@ install_node() {
   fi
   say "Checked: the download matches nodejs.org and this installer."
   ensure_base
-  mkdir -p "$runtime_root"
-  tar -xzf "$tmp/$archive" -C "$tmp"
+  mkdir -p "$runtime_root" || fail "Could not create $runtime_root."
+  tar -xzf "$tmp/$archive" -C "$tmp" || fail "Could not unpack the Node.js download."
   rm -rf "$runtime_root/node-v$NODE_VERSION-$platform"
-  mv "$tmp/node-v$NODE_VERSION-$platform" "$runtime_root/"
+  mv "$tmp/node-v$NODE_VERSION-$platform" "$runtime_root/" || fail "Could not install Node.js into $runtime_root."
+  rm -rf "$tmp"
+  tmp=""
   # Older AgentLink runtimes are replaced by this one.
   for old in "$runtime_root"/node-v*; do
     [ "$old" = "$runtime_root/node-v$NODE_VERSION-$platform" ] || rm -rf "$old"
@@ -219,7 +223,9 @@ write_launcher() {
     echo "# Remove with: curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --uninstall"
     echo "PATH=$(quote "$node_bin"):\"\$PATH\""
     echo 'export PATH'
-    echo "exec $(quote "$node_bin/npx") -y $PACKAGE \"\$@\""
+    # The registry is pinned on the command line, which beats any .npmrc in the folder the app is
+    # started from. The folder itself is kept: `agentlink verify ./pack` names files relative to it.
+    echo "exec $(quote "$node_bin/npx") -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ $PACKAGE \"\$@\""
   } >"$launcher.tmp"
   chmod 755 "$launcher.tmp"
   mv "$launcher.tmp" "$launcher"
