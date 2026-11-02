@@ -134,10 +134,10 @@ describe('deploy-invite.yml structure', () => {
     const build = job('build');
     expect(build).not.toMatch(/environment:|secrets\.|CLOUDFLARE/);
     expect(build).toMatch(
-      /exactly _headers, i\/index\.html, index\.html, invite\.css and invite\.js/,
+      /exactly _headers, i\/index\.html, index\.html, install\.ps1, install\.sh, invite\.css and invite\.js/,
     );
     expect(build).toContain(
-      'if [ "$found" != "./_headers ./i/index.html ./index.html ./invite.css ./invite.js " ]; then',
+      'if [ "$found" != "./_headers ./i/index.html ./index.html ./install.ps1 ./install.sh ./invite.css ./invite.js " ]; then',
     );
     expect(job('deploy-staging')).toMatch(/--assets "\$RUNNER_TEMP\/invite-site"/);
     expect(job('deploy-staging')).toMatch(/name: invite-site/);
@@ -380,6 +380,8 @@ describe('site check (what is served equals the build)', () => {
     '/i': ['i/index.html', '<!doctype html><title>Invite</title>'],
     '/invite.js': ['invite.js', 'export const x = 1;'],
     '/invite.css': ['invite.css', 'body { margin: 0; }'],
+    '/install.sh': ['install.sh', '#!/bin/sh\nmain "$@"\n'],
+    '/install.ps1': ['install.ps1', "Write-Host 'AgentLink'\n"],
   };
   const HEADERS = {
     'Content-Security-Policy': "default-src 'none'; script-src 'self'",
@@ -419,7 +421,10 @@ describe('site check (what is served equals the build)', () => {
       const entry = FILES[path];
       const answer = {
         status: entry ? 200 : 404,
-        headers: { ...HEADERS },
+        headers: {
+          ...HEADERS,
+          ...(path.startsWith('/install.') ? { 'Content-Type': 'text/plain; charset=utf-8' } : {}),
+        },
         body: entry ? entry[1] : 'not found',
       };
       tweak(path, answer);
@@ -502,6 +507,21 @@ describe('site check (what is served equals the build)', () => {
           },
         );
       }
+    }
+  });
+
+  it('INSTALLER-1: fails when an installer is not served as plain text', async () => {
+    for (const path of ['/install.sh', '/install.ps1']) {
+      await withServer(
+        (p, answer) => {
+          if (p === path) answer.headers['Content-Type'] = 'application/octet-stream';
+        },
+        async (origin) => {
+          const result = await check(origin, staged);
+          expect(result.rc, path).toBe(1);
+          expect(result.stdout).toContain(`${path}: content-type is not text/plain; charset=utf-8`);
+        },
+      );
     }
   });
 

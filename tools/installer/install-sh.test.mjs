@@ -1,0 +1,349 @@
+// INSTALLER-1 (owner Decision 58): installer/install.sh, the one-line installer for macOS and Linux.
+// Every run is sandboxed: HOME is a temporary folder and PATH holds only the tools the script needs
+// plus fakes. The fake `curl` serves files from a folder (no network), the fake `uname` picks the
+// platform, and a fake `node` stands in for a Node.js already on the computer. The Node.js archive is
+// a tiny fixture, so the tests run a copy of the script whose pinned linux-x64 hash is the fixture's;
+// the real pinned hashes are checked against nodejs.org's signed SHASUMS256.txt lines below.
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, describe, expect, it } from 'vitest';
+import { NODE_VERSION, SIGNED_SHASUMS, findTool, removeAll } from './fixtures.mjs';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const SCRIPT = join(root, 'installer/install.sh');
+const temps = [];
+const temp = (name) => {
+  const dir = mkdtempSync(join(tmpdir(), `agentlink-installer-${name}-`));
+  temps.push(dir);
+  return dir;
+};
+afterAll(() => removeAll(temps));
+
+const ARCHIVE = `node-v${NODE_VERSION}-linux-x64.tar.gz`;
+const TOOLS = [
+  'cat',
+  'chmod',
+  'cut',
+  'dirname',
+  'grep',
+  'mkdir',
+  'mktemp',
+  'mv',
+  'rm',
+  'sed',
+  'awk',
+  'tar',
+  'gzip',
+  'sha256sum',
+  'shasum',
+  'perl', // shasum on macOS is a Perl script
+];
+
+const exe = (path, body) => {
+  writeFileSync(path, `#!/bin/sh\n${body}\n`);
+  chmodSync(path, 0o755);
+};
+
+/** A sandbox: tools, fakes, the served files and a HOME. */
+function sandbox() {
+  const dir = temp('sandbox');
+  const bin = join(dir, 'bin');
+  const serve = join(dir, 'serve');
+  const home = join(dir, 'home');
+  for (const d of [bin, serve, home]) mkdirSync(d);
+  for (const tool of TOOLS) {
+    const real = findTool(tool);
+    if (real) symlinkSync(real, join(bin, tool));
+  }
+  exe(
+    join(bin, 'uname'),
+    'case "$1" in -s) echo "${MOCK_OS:-Linux}" ;; -m) echo "${MOCK_ARCH:-x86_64}" ;; *) echo "${MOCK_OS:-Linux}" ;; esac',
+  );
+  // curl -fsSL ... -o <file> <url>: copies serve/<basename of url>, or fails like curl -f.
+  exe(
+    join(bin, 'curl'),
+    [
+      'out="" url=""',
+      'while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2 ;; --proto|--retry) shift 2 ;; -*) shift ;; *) url="$1"; shift ;; esac; done',
+      'echo "$url" >> "$MOCK_LOG"',
+      'f="$MOCK_SERVE/${url##*/}"',
+      '[ -f "$f" ] || { echo "curl: (22) 404" >&2; exit 22; }',
+      'cat "$f" > "$out"',
+    ].join('\n'),
+  );
+
+  // The fixture Node.js: bin/node prints the version, bin/npx records its arguments.
+  const build = join(dir, 'build');
+  const nodeDir = join(build, `node-v${NODE_VERSION}-linux-x64/bin`);
+  mkdirSync(nodeDir, { recursive: true });
+  exe(join(nodeDir, 'node'), `echo ${NODE_VERSION}`);
+  exe(join(nodeDir, 'npx'), 'echo "npx($0) $*" >> "$MOCK_LOG"');
+  execFileSync('tar', ['-czf', join(serve, ARCHIVE), '-C', build, `node-v${NODE_VERSION}-linux-x64`]);
+  const sha = createHash('sha256')
+    .update(readFileSync(join(serve, ARCHIVE)))
+    .digest('hex');
+  writeFileSync(join(serve, 'SHASUMS256.txt'), `${'0'.repeat(64)}  other.tar.gz\n${sha}  ${ARCHIVE}\n`);
+
+  // The script under test, with the fixture's hash pinned for linux-x64 (only that line differs).
+  const real = readFileSync(SCRIPT, 'utf8');
+  const pinnedLine = /(linux-x64\) echo )[0-9a-f]{64}/;
+  expect(real).toMatch(pinnedLine);
+  const script = join(dir, 'install.sh');
+  writeFileSync(script, real.replace(pinnedLine, `$1${sha}`));
+
+  const log = join(dir, 'log');
+  writeFileSync(log, '');
+  return { dir, bin, serve, home, script, log, sha };
+}
+
+/** A fake Node.js already on PATH: its own folder with node (printing `version`) and npx. */
+function existingNode(box, version) {
+  const dir = join(box.dir, `user-node-${version}`);
+  mkdirSync(dir);
+  exe(join(dir, 'node'), `echo ${version}`);
+  exe(join(dir, 'npx'), 'echo "npx($0) $*" >> "$MOCK_LOG"');
+  return dir;
+}
+
+function run(box, args = [], { script = box.script, env = {}, shell = 'sh', pathExtra = [] } = {}) {
+  const result = spawnSync(findTool(shell) ?? shell, [script, ...args], {
+    encoding: 'utf8',
+    env: {
+      PATH: [...pathExtra, box.bin].join(':'),
+      HOME: box.home,
+      SHELL: '/bin/zsh',
+      TMPDIR: box.dir,
+      MOCK_SERVE: box.serve,
+      MOCK_LOG: box.log,
+      ...env,
+    },
+  });
+  return {
+    code: result.status,
+    out: `${result.stdout}${result.stderr}`,
+    log: readFileSync(box.log, 'utf8'),
+  };
+}
+
+const runtimeDir = (box) => join(box.home, `.agentlink/runtime/node-v${NODE_VERSION}-linux-x64`);
+const launcher = (box) => join(box.home, '.agentlink/bin/agentlink');
+
+/** Runs the installed launcher; returns what the fake npx recorded. */
+function launch(box, args = []) {
+  writeFileSync(box.log, '');
+  execFileSync(launcher(box), args, { env: { PATH: box.bin, MOCK_LOG: box.log } });
+  return readFileSync(box.log, 'utf8');
+}
+
+const shells = ['sh', ...(findTool('dash') ? ['dash'] : [])];
+
+describe.each(shells)('install.sh under %s', (shell) => {
+  it('downloads Node.js when there is none, checks it, installs the agentlink command', () => {
+    const box = sandbox();
+    const r = run(box, [], { shell });
+    expect(r.code, r.out).toBe(0);
+    expect(r.log).toContain(`https://nodejs.org/dist/v${NODE_VERSION}/${ARCHIVE}`);
+    expect(r.log).toContain(`https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt`);
+    expect(r.out).toMatch(/matches nodejs\.org and this installer/);
+    expect(existsSync(join(runtimeDir(box), 'bin/node'))).toBe(true);
+    // A new ~/.agentlink is private (it also holds the IDs).
+    expect(statSync(join(box.home, '.agentlink')).mode & 0o777).toBe(0o700);
+    expect(launch(box, ['ui'])).toBe(
+      `npx(${runtimeDir(box)}/bin/npx) -y @4thtech-io/agentlink@latest ui\n`,
+    );
+    // Not run from a terminal: it does not start the app, it says how.
+    expect(r.out).toContain(`To start it now, run: ${launcher(box)}`);
+    expect(r.out).not.toMatch(/Starting AgentLink/);
+    for (const profile of ['.profile', '.zshrc']) {
+      expect(readFileSync(join(box.home, profile), 'utf8')).toContain(
+        'export PATH="$HOME/.agentlink/bin:$PATH" # added by the AgentLink installer',
+      );
+    }
+  });
+
+  it('uses a Node.js 22.14 or newer that is already there, and downloads nothing', () => {
+    const box = sandbox();
+    const nodeDir = existingNode(box, '22.14.0');
+    const r = run(box, [], { shell, pathExtra: [nodeDir] });
+    expect(r.code, r.out).toBe(0);
+    expect(r.out).toContain('Using your Node.js 22.14.0.');
+    expect(r.log).toBe('');
+    expect(existsSync(join(box.home, '.agentlink/runtime'))).toBe(false);
+    expect(launch(box)).toBe(`npx(${nodeDir}/npx) -y @4thtech-io/agentlink@latest\n`);
+  });
+
+  it('downloads its own Node.js when the one there is older than 22.14', () => {
+    const box = sandbox();
+    const nodeDir = existingNode(box, '22.13.1');
+    const r = run(box, [], { shell, pathExtra: [nodeDir] });
+    expect(r.code, r.out).toBe(0);
+    expect(r.out).toMatch(/Your Node\.js 22\.13\.1 is older than 22\.14/);
+    expect(r.log).toContain(ARCHIVE);
+    expect(launch(box)).toContain(`npx(${runtimeDir(box)}/bin/npx)`);
+  });
+
+  it('stops, installing nothing, when the download does not match SHASUMS256.txt', () => {
+    const box = sandbox();
+    writeFileSync(join(box.serve, 'SHASUMS256.txt'), `${'a'.repeat(64)}  ${ARCHIVE}\n`);
+    const r = run(box, [], { shell });
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/did not pass its safety check \(SHA-256 mismatch\)/);
+    expect(existsSync(join(box.home, '.agentlink/runtime'))).toBe(false);
+    expect(existsSync(launcher(box))).toBe(false);
+    expect(readdirSync(box.dir).filter((f) => f.startsWith('agentlink-install.'))).toEqual([]);
+  });
+
+  it('stops when the download matches SHASUMS256.txt but not the hash pinned in the script', () => {
+    const box = sandbox();
+    // The unpatched script pins nodejs.org's real hash, which the fixture cannot have.
+    const r = run(box, [], { shell, script: SCRIPT });
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/SHA-256 mismatch/);
+    expect(existsSync(launcher(box))).toBe(false);
+  });
+
+  it('says plainly when the download fails', () => {
+    const box = sandbox();
+    writeFileSync(join(box.serve, 'SHASUMS256.txt'), '');
+    execFileSync('rm', [join(box.serve, ARCHIVE)]);
+    const r = run(box, [], { shell });
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/Could not download .*Check your internet connection/);
+  });
+
+  it('--dry-run prints the plan and changes nothing', () => {
+    const box = sandbox();
+    const r = run(box, ['--dry-run'], { shell });
+    expect(r.code, r.out).toBe(0);
+    expect(r.out).toMatch(/would download https:\/\/nodejs\.org\/dist\/v[\d.]+\/node-v[\d.]+-linux-x64\.tar\.gz/);
+    expect(r.out).toContain('Dry run: nothing was changed.');
+    expect(r.log).toBe('');
+    expect(readdirSync(box.home)).toEqual([]);
+  });
+
+  it('is safe to run again (an update): one PATH line, one runtime', () => {
+    const box = sandbox();
+    expect(run(box, [], { shell }).code).toBe(0);
+    const again = run(box, [], { shell });
+    expect(again.code, again.out).toBe(0);
+    expect(again.out).toContain('already installed');
+    const profile = readFileSync(join(box.home, '.zshrc'), 'utf8');
+    expect(profile.match(/added by the AgentLink installer/g)).toHaveLength(1);
+    expect(readdirSync(join(box.home, '.agentlink/runtime'))).toEqual([
+      `node-v${NODE_VERSION}-linux-x64`,
+    ]);
+  });
+
+  it('--uninstall removes the command, the runtime and the PATH lines, and keeps the IDs', () => {
+    const box = sandbox();
+    writeFileSync(join(box.home, '.zshrc'), 'alias ll="ls -l"\n');
+    expect(run(box, [], { shell }).code).toBe(0);
+    mkdirSync(join(box.home, '.agentlink/keystore'));
+    writeFileSync(join(box.home, '.agentlink/keystore/id.alks'), 'kept');
+    const r = run(box, ['--uninstall'], { shell });
+    expect(r.code, r.out).toBe(0);
+    expect(existsSync(join(box.home, '.agentlink/bin'))).toBe(false);
+    expect(existsSync(join(box.home, '.agentlink/runtime'))).toBe(false);
+    expect(readFileSync(join(box.home, '.agentlink/keystore/id.alks'), 'utf8')).toBe('kept');
+    expect(readFileSync(join(box.home, '.zshrc'), 'utf8')).toContain('alias ll="ls -l"');
+    expect(readFileSync(join(box.home, '.zshrc'), 'utf8')).not.toMatch(/AgentLink installer/);
+    expect(r.out).toMatch(/were kept/);
+  });
+
+  it('--uninstall --dry-run changes nothing', () => {
+    const box = sandbox();
+    expect(run(box, [], { shell }).code).toBe(0);
+    const r = run(box, ['--uninstall', '--dry-run'], { shell });
+    expect(r.code, r.out).toBe(0);
+    expect(r.out).toContain('would run: rm -rf');
+    expect(existsSync(launcher(box))).toBe(true);
+  });
+
+  it('refuses Windows and unknown processors in plain words', () => {
+    const box = sandbox();
+    const win = run(box, [], { shell, env: { MOCK_OS: 'MINGW64_NT-10.0' } });
+    expect(win.code).toBe(1);
+    expect(win.out).toMatch(/On Windows, use install\.ps1/);
+    const cpu = run(box, [], { shell, env: { MOCK_ARCH: 'riscv64' } });
+    expect(cpu.code).toBe(1);
+    expect(cpu.out).toMatch(/processor \(riscv64\) is not supported yet/);
+  });
+
+  it('picks the right archive on each supported platform', () => {
+    for (const [os, arch, want] of [
+      ['Darwin', 'arm64', 'darwin-arm64'],
+      ['Darwin', 'x86_64', 'darwin-x64'],
+      ['Linux', 'aarch64', 'linux-arm64'],
+      ['Linux', 'x86_64', 'linux-x64'],
+    ]) {
+      const box = sandbox();
+      const r = run(box, ['--dry-run'], {
+        shell,
+        script: SCRIPT,
+        env: { MOCK_OS: os, MOCK_ARCH: arch },
+      });
+      expect(r.code, r.out).toBe(0);
+      expect(r.out).toContain(`node-v${NODE_VERSION}-${want}.tar.gz`);
+      expect(r.out).toContain(SIGNED_SHASUMS[`node-v${NODE_VERSION}-${want}.tar.gz`]);
+    }
+  });
+});
+
+describe('install.sh source', () => {
+  const source = readFileSync(SCRIPT, 'utf8');
+
+  it('pins the hashes of nodejs.org signed SHASUMS256.txt for its Node.js version', () => {
+    expect(source).toContain(`NODE_VERSION=${NODE_VERSION}\n`);
+    for (const platform of ['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64']) {
+      const sha = SIGNED_SHASUMS[`node-v${NODE_VERSION}-${platform}.tar.gz`];
+      expect(source).toContain(`${platform}) echo ${sha} ;;`);
+    }
+  });
+
+  it('is POSIX sh, downloads only over HTTPS from nodejs.org, and needs no sudo', () => {
+    expect(source.startsWith('#!/bin/sh\n')).toBe(true);
+    const code = source.replace(/^\s*#.*$/gm, '');
+    expect(code).not.toMatch(/\bsudo\b|\[\[|\blocal\b|\bfunction\b|\$\{[A-Za-z_]+\/\//);
+    const urls = [...source.matchAll(/https?:\/\/[^\s"')]+/g)].map((m) => m[0]);
+    for (const url of urls) {
+      expect(url).toMatch(/^https:\/\/(nodejs\.org\/dist\/|agentlink\.4thtech\.io|github\.com\/4thtech\/agentlink)/);
+    }
+    expect(source).toContain("--proto '=https' --tlsv1.2");
+  });
+
+  it('runs everything from main on the last line (a cut-off download runs nothing)', () => {
+    expect(source.trimEnd().split('\n').at(-1)).toBe('main "$@"');
+  });
+
+  it('uses plain words: no wallet, gas, seed phrase or transaction', () => {
+    expect(source).not.toMatch(/wallet|\bgas\b|seed phrase|transaction/i);
+  });
+
+  it('is shellcheck-clean', () => {
+    const shellcheck = findTool('shellcheck');
+    if (!shellcheck) {
+      // CI images have shellcheck; a laptop without it skips only this check.
+      expect(process.env.CI, 'shellcheck is required on CI').toBeFalsy();
+      return;
+    }
+    const r = spawnSync(shellcheck, ['--shell=sh', '--severity=style', SCRIPT], {
+      encoding: 'utf8',
+    });
+    expect(`${r.stdout}${r.stderr}`).toBe('');
+    expect(r.status).toBe(0);
+  });
+});
