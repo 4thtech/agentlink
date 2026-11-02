@@ -43,7 +43,7 @@ jobs:
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40 # above 4 runs x 5 min settle wait (SETTLE_MS) plus the API calls
     permissions:
       actions: write # re-run the failed jobs of this repository's release and deploy runs; nothing else
       contents: read

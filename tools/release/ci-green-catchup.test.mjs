@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { catchUpCiGreen, MAX_ATTEMPTS, parseArgs, run } from './ci-green-catchup.mjs';
+import { catchUpCiGreen, MAX_ATTEMPTS, parseArgs, run, SETTLE_MS } from './ci-green-catchup.mjs';
 
 // OPS-CIGREEN-WAIT: release.yml and the deploy workflows start on the push to main and their
 // `ci-green` job waits for this commit's CI. When CI is red on its first attempt (a flake that
@@ -274,6 +274,81 @@ describe('catchUpCiGreen', () => {
     expect(reruns).toEqual([rerunPath(101), rerunPath(201)]);
     expect(outcomes(result)).toEqual({ 'release.yml': 'error', 'deploy-invite.yml': 'rerun' });
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('catchUpCiGreen: audit follow-ups (Fable, #779)', () => {
+  it('re-checks the head of main right before each re-run and skips once main moved on', async () => {
+    const { result, reruns } = await go(
+      routes({ [headPath]: (n) => ({ sha: n === 0 ? SHA : NEWER }) }),
+    );
+    expect(reruns).toEqual([]);
+    expect(outcomes(result)).toEqual({
+      'release.yml': 'moved-on',
+      'deploy-invite.yml': 'moved-on',
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('re-checks per run: the first re-runs, the second sees main moved on', async () => {
+    const { reruns, result } = await go(
+      routes({ [headPath]: (n) => ({ sha: n < 2 ? SHA : NEWER }) }),
+    );
+    expect(reruns).toEqual([rerunPath(101)]);
+    expect(outcomes(result)).toEqual({ 'release.yml': 'rerun', 'deploy-invite.yml': 'moved-on' });
+  });
+
+  it('fails closed when the head cannot be read before a re-run', async () => {
+    const { reruns, result } = await go(
+      routes({ [headPath]: (n) => ({ sha: n === 0 ? SHA : 'nope' }) }),
+    );
+    expect(reruns).toEqual([]);
+    expect(result.ok).toBe(false);
+  });
+
+  it('treats a 409 (already re-running, a sibling pick-up started it) as live, not an error', async () => {
+    const conflict = Object.assign(new Error('HTTP 409 for /x'), { status: 409 });
+    const { result } = await go(
+      routes({
+        [rerunPath(101)]: () => {
+          throw conflict;
+        },
+        [rerunPath(201)]: () => {
+          throw new Error('HTTP 409 for /repos/x/actions/runs/201/rerun-failed-jobs');
+        },
+      }),
+    );
+    expect(outcomes(result)).toEqual({ 'release.yml': 'live', 'deploy-invite.yml': 'live' });
+    expect(result.ok).toBe(true);
+  });
+
+  it(`waits ${SETTLE_MS / 60_000} min per run by default, and the job timeout covers four of them`, async () => {
+    expect(SETTLE_MS).toBe(5 * 60_000);
+    const pending = wfRun(101, 'release.yml', { status: 'in_progress', conclusion: null });
+    const clock = fakeClock();
+    const { api } = fakeApi(
+      routes({
+        [runsPath('release.yml')]: () => ({ workflow_runs: [pending] }),
+        [runPath(101)]: () => pending,
+      }),
+    );
+    const result = await catchUpCiGreen({
+      api,
+      repo: REPO,
+      sha: SHA,
+      workflows: ['release.yml'],
+      log: () => {},
+      ...clock,
+    });
+    expect(outcomes(result)['release.yml']).toBe('unsettled');
+    expect(clock.now()).toBeGreaterThanOrEqual(SETTLE_MS);
+    expect(clock.now()).toBeLessThan(SETTLE_MS + 60_000);
+    const source = readFileSync(
+      resolve(import.meta.dirname, '../../.github/workflows/ci-green-catchup.yml'),
+      'utf8',
+    );
+    const jobMinutes = Number(/timeout-minutes: (\d+)/.exec(source)?.[1]);
+    expect(jobMinutes * 60_000).toBeGreaterThan(4 * SETTLE_MS + 10 * 60_000);
   });
 });
 

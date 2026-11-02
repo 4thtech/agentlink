@@ -48,6 +48,8 @@ const PICK_UP = new Set(['failure', 'timed_out']);
 export const CI_GREEN_JOB = 'ci-green';
 /** A run is re-run only while its run_attempt is below this (attempt 1 plus two pick-ups). */
 export const MAX_ATTEMPTS = 3;
+/** How long to wait for a run whose ci-green failed to finish (its catch-up job), per run. */
+export const SETTLE_MS = 5 * 60_000;
 /** The gates every ci-green requires (release.yml and the deploy workflows). */
 export const REQUIRED_GATES = [
   { workflow: 'ci.yml', job: 'ci-gate (push)' },
@@ -156,9 +158,24 @@ async function pickUp({
     );
     return { workflow, outcome: 'exhausted', runId };
   }
+  // Re-checked right before the re-run (Fable audit of #779): main may have moved on while this
+  // waited for the run to finish; the newer commit's runs handle it then.
+  const headNow = await readHead({ api, repo });
+  if (headNow !== sha) {
+    log(
+      `${workflow}: main moved on to ${headNow} while run ${runId} finished; not re-running it (the newer commit's runs handle it).`,
+    );
+    return { workflow, outcome: 'moved-on', runId };
+  }
   try {
     await api(`/repos/${repo}/actions/runs/${runId}/rerun-failed-jobs`, { method: 'POST' });
   } catch (error) {
+    if (error?.status === 409 || /^HTTP 409\b/.test(String(error?.message))) {
+      log(
+        `${workflow}: run ${runId} is already being re-run (a sibling pick-up started it); nothing to do.`,
+      );
+      return { workflow, outcome: 'live', runId };
+    }
     log(`::error::${workflow}: could not re-run run ${runId}: ${error?.message ?? String(error)}`);
     summary(`- **Not picked up:** the re-run of run ${runId} of ${workflow} was refused.`);
     return { workflow, outcome: 'error', runId };
@@ -174,6 +191,15 @@ async function pickUp({
 
 const FAILED = new Set(['unsettled', 'exhausted', 'error']);
 
+/** main's head commit. Throws when it cannot be read (the caller fails closed). */
+async function readHead({ api, repo }) {
+  const head = (await api(`/repos/${repo}/commits/main`))?.sha;
+  if (typeof head !== 'string' || !SHA_RE.test(head)) {
+    throw new Error('could not read the head of main');
+  }
+  return head;
+}
+
 /**
  * Returns { action: 'frozen' | 'moved-on' | 'not-green' | 'checked', ok, results }. `ok` is false
  * when something could not be picked up (the command then exits 1).
@@ -184,7 +210,9 @@ export async function catchUpCiGreen({
   sha,
   workflows,
   freeze = false,
-  settleMs = 15 * 60_000,
+  // Per run; the target workflows are handled one after another, so the job timeout of
+  // ci-green-catchup.yml (40 min) must stay above 4 × settleMs plus the API calls.
+  settleMs = SETTLE_MS,
   intervalMs = 30_000,
   now = Date.now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -197,13 +225,9 @@ export async function catchUpCiGreen({
   }
   let head;
   try {
-    head = (await api(`/repos/${repo}/commits/main`))?.sha;
+    head = await readHead({ api, repo });
   } catch (error) {
     log(`::error::Could not read the head of main: ${error?.message ?? String(error)}`);
-    return { action: 'checked', ok: false, results: [] };
-  }
-  if (typeof head !== 'string' || !SHA_RE.test(head)) {
-    log('::error::Could not read the head of main.');
     return { action: 'checked', ok: false, results: [] };
   }
   if (head !== sha) {
