@@ -670,7 +670,7 @@ describe('ci.yml wires the docs fast lane', () => {
   const job = (name) => {
     const at = yml.indexOf(`\n  ${name}:\n`);
     expect(at, name).toBeGreaterThan(-1);
-    const next = yml.slice(at + 1).search(/\n  [a-z0-9-]+:\n/);
+    const next = yml.slice(at + 1).search(/\n {2}[a-z0-9-]+:\n/);
     return yml.slice(at, next < 0 ? undefined : at + 1 + next);
   };
 

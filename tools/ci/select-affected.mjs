@@ -426,7 +426,7 @@ function scope(argv) {
   const lane = fastLane({ event, ref, files });
   // Paths that a package (other than tools, whose checks `docs-checks` runs) names in its sources.
   // An unreadable workspace means not docs-only.
-  let docs = false;
+  let docs;
   try {
     const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
     const coupledRefs = loadWorkspace(root)
