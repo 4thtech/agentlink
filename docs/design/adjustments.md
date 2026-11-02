@@ -353,3 +353,5 @@ The 20 (b) rows map to 10 briefs (B-1…B-10); several rows share one brief.
 3. **Owner, next:** B-4 (own storage), B-8 (export), then the M1 invite page (M1-19-c) needs no brief.
 4. **Owner, for M2:** B-7 (verify), B-6 (pay page, only when the pay page is scheduled; it stays off until then), B-10 (Windows Hello).
 5. Owner decisions 1–4 are answered (D-117); B-3, B-4 and B-6 are written to match and can be briefed to Claude Design.
+
+D-144: UI "agent" → "ID" (ID number, ID card, "Name · App" locally); code copy wins over screen text.

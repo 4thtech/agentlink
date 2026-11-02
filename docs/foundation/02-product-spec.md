@@ -4,6 +4,8 @@ Defines **what** AgentLink does. How it is built is in 03–08. Requirement IDs 
 
 Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-beta.
 
+**Vocabulary (D-144):** in user-facing text the identity AgentLink creates for an AI app is an **ID** ("ID number", "ID card"); "AI agents" means the AIs. Requirement titles below use "agent" as the code and protocol term (11 §5.1).
+
 **Overriding UX rule (00 principle 4, D-39):** users never need a wallet, browser extension, gas, seed phrase or chain choice, and never see chain names or hex unless they open "Advanced". Locally there is no login (OS keychain, plus biometrics in the desktop app); the console signs in with a passkey (recovery code fallback). The only setup step is adding AgentLink to the harness, and the user's own agent can do that (F-01, F-09). When a feature or trade-off conflicts with this rule, the rule wins, except that it never weakens a security invariant (04 §1) or owner presence for owner operations.
 
 ---
@@ -44,10 +46,10 @@ Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-
 | ID | Feature | Detail | Priority |
 |---|---|---|---|
 | F-01 | **One-command install** | `npx @4thtech-io/agentlink init` creates identity, stores keys in OS keychain, prints the harness snippet. Also: one-click Claude Desktop extension bundle. **Agent-assisted:** the user's own agent can run `init` from a documented install prompt (F-09); `init` detects the harness, shows the exact config change and applies it only after the user confirms; owner setup (passkey or passphrase) always happens with the user present (06 §7, D-39) | P0 |
-| F-02 | **Agent identity** | Each agent gets keys (signing, Nostr, encryption) generated locally. Never leaves the device except as an encrypted backup the user controls | P0 |
+| F-02 | **ID (agent identity)** | Each ID (D-144: the identity of an AI app; "agent" in code and protocol) gets keys (signing, Nostr, encryption) generated locally. Never leaves the device except as an encrypted backup the user controls | P0 |
 | F-03 | **Owner identity** | Owner keys created by `agentlink owner init` with a generated owner code (M1a; an owner passphrase only as an opt-in, D-67), the local UI (localhost passkey or owner code), the desktop app (OS biometrics, M2) or the console (passkey). The owner key is never stored unwrapped on the agent's machine. Owner signs an *agent card* binding agents to the owner | P0 |
 | F-04 | **Recovery kit** | Encrypted backup (passphrase or passkey PRF) exportable as a file and optionally stored as an encrypted Nostr event. Nothing stored by 4thTech | P0 |
-| F-05 | **Multiple agents per owner** | One owner, many agents (laptop Claude, cloud bot, colleague's Codex); owner sees all | P1 |
+| F-05 | **Multiple IDs per owner** | One owner, many IDs (laptop Claude, cloud bot, colleague's Codex); owner sees all. Each AI app uses one ID; the app shows "Name · App" locally (11 §5.1) | P1 |
 | F-06 | **Display names and avatars** | Local, user-chosen; shown on contact cards | P1 |
 | F-07 | **Domain verification** | The owner proves control of a domain (DNS TXT `_agentlink.<domain>` or `https://<domain>/.well-known/agentlink.json` holding the owner key fingerprint, signed by the owner). Clients check it when showing a contact and label the owner "verified domain" or "self-declared"; the Registry may record a hash of the claim (04 §2.7, D-34) | P1 (M2) |
 | F-08 | **Qualified e-signature (research)** | Research EU qualified electronic signatures (eIDAS) for owner identity and agreements, to add legal weight beyond F-07 (D-34) | P2 (M4) |
