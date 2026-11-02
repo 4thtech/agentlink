@@ -15,7 +15,7 @@ Private procedures (incident response, secret rotation, deploy keys, Safe operat
 | RB-05 | [Writing tests](writing-tests.md) | Builder | Per the card |
 | RB-06 | [Cross-runtime test vectors](test-vectors.md) | Builder | Opus (S2) |
 | RB-07 | [Adding a dependency](add-dependency.md) | Builder proposes, orchestrator checks | Sonnet or above |
-| RB-08 | [CI is red: flake or real, rerun policy, merge-queue ejection](ci-red.md) | Orchestrator or builder | Sonnet or above |
+| RB-08 | [CI is red: flake or real, rerun policy, live-service traps](ci-red.md) | Orchestrator or builder | Sonnet or above |
 | RB-09 | [Merging, releases and changesets](merge-and-release.md) | Orchestrator; owner for his steps | Opus |
 | RB-10 | [Deploying and verifying by content (superseded runs, catch-up, reconcile)](deploy-and-verify.md) | CI deploys, orchestrator verifies | Opus |
 | RB-11 | [Rollback and `DEPLOY_FREEZE` (automatic rollback on failure, cancel or timeout)](rollback-and-freeze.md) | Any agent on a documented trigger sets the freeze; owner clears it | Opus |
@@ -28,6 +28,7 @@ Private procedures (incident response, secret rotation, deploy keys, Safe operat
 | RB-18 | [Releasing v0.1.0: owner checklist](release-v0.1.0.md) | Owner (Tali) | Owner |
 | RB-19 | [Submitter and faucet deploy: owner setup](submitter-deploy.md) | Owner (Tali) | Owner |
 | RB-20 | [M1 gate: tester runbook](m1-gate-testing.md) | Coordinator (orchestrator or Tali) with 10 internal testers | Sonnet (coordinator) |
+| RB-21 | [Owner feedback loop: local first, CI once](owner-feedback-loop.md) | Orchestrator; owner looks | Opus orchestrates, Sonnet builds |
 
 ## Template
 
