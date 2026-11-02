@@ -833,6 +833,7 @@ export function ContactsPage({
   // this set, not the last read. `acceptArrived`: it arrived before the accept returned.
   const acceptBase = useRef<ReadonlySet<string> | undefined>(undefined);
   const acceptArrived = useRef(false);
+  const acceptInFlight = useRef(false);
   const [arrived, setArrived] = useState<ContactRow | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const activity = usePulse(api);
@@ -1058,6 +1059,7 @@ export function ContactsPage({
   ): void => {
     setInviting(false);
     setPasting(false);
+    acceptInFlight.current = false;
     // W6-ACCEPT-CONNECTED: the new contact already arrived while the accept was on its way (the
     // Connected moment shows): nothing waits any more.
     if (acceptArrived.current) {
@@ -1074,6 +1076,13 @@ export function ContactsPage({
   const accepting = (): void => {
     acceptBase.current = known.current ?? new Set();
     acceptArrived.current = false;
+    acceptInFlight.current = true;
+  };
+  // W6-ACCEPT-CONNECTED: an accept that failed (refused, offline, presence) expects no arrival.
+  const acceptFailed = (): void => {
+    acceptBase.current = undefined;
+    acceptArrived.current = false;
+    acceptInFlight.current = false;
   };
   const status =
     notice === undefined ? null : (
@@ -1263,7 +1272,12 @@ export function ContactsPage({
             passkey={passkey}
             onConnected={accepted}
             onAccepting={accepting}
-            onDone={() => setPasting(false)}
+            onAcceptFailed={acceptFailed}
+            onDone={() => {
+              // Closed with no accept on its way: nothing is expected from it.
+              if (!acceptInFlight.current) acceptFailed();
+              setPasting(false);
+            }}
           />
         ) : (
           moment
@@ -1280,7 +1294,13 @@ export function ContactsPage({
         {arrived === undefined ? (
           <InviteScreen
             invites={invites}
-            paste={{ passkey, onConnected: accepted, onAccepting: accepting, onOpen: openPaste }}
+            paste={{
+              passkey,
+              onConnected: accepted,
+              onAccepting: accepting,
+              onAcceptFailed: acceptFailed,
+              onOpen: openPaste,
+            }}
             onCreated={() => {
               expecting.current = true;
               setJustCreated(true);

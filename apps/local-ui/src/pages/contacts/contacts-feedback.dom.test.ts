@@ -255,6 +255,43 @@ describe('W6-ACCEPT-CONNECTED: the accepter reaches the Connected moment', () =>
     expect(text()).not.toContain('Connecting to Ana…');
   });
 
+  it('an accept that failed expects nothing: a later, unrelated contact gets no moment', async () => {
+    const accept = deferred<AcceptOutcome>();
+    await acceptOnPasteScreen(accept.promise);
+    await act(async () => {
+      accept.resolve({ kind: 'not_connected' });
+    });
+    await settle();
+    // Someone else arrives later (for example through another way in): not this accept's moment.
+    contacts = [{ ...anaPaired, ref: MARKO, name: 'Marko' }];
+    await act(async () => {
+      announceContactsChanged();
+    });
+    await settle();
+    const moment = [...host.querySelectorAll('h1, h2, h3')].find((h) =>
+      /are connected$/.test(h.textContent ?? ''),
+    );
+    expect(moment).toBeUndefined();
+  });
+
+  it('an accept that was refused expects nothing either', async () => {
+    const accept = deferred<AcceptOutcome>();
+    await acceptOnPasteScreen(accept.promise);
+    await act(async () => {
+      accept.resolve({ kind: 'refused', why: 'expired' });
+    });
+    await settle();
+    contacts = [{ ...anaPaired, ref: MARKO, name: 'Marko' }];
+    await act(async () => {
+      announceContactsChanged();
+    });
+    await settle();
+    const moment = [...host.querySelectorAll('h1, h2, h3')].find((h) =>
+      /are connected$/.test(h.textContent ?? ''),
+    );
+    expect(moment).toBeUndefined();
+  });
+
   it('when the pairing completes after the accept returned', async () => {
     const accept = deferred<AcceptOutcome>();
     await acceptOnPasteScreen(accept.promise);
