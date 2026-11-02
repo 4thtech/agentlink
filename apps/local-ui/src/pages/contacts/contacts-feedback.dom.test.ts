@@ -11,6 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from '../../api/client.js';
 import { announceContactsChanged } from '../../api/contact-changes.js';
 import { ContactsPage, type ContactsPageProps } from './index.js';
+import type { AcceptOutcome, InviteApi } from './invite-api.js';
+import type { OwnerClient } from './owner.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -145,5 +147,165 @@ describe('W5-PASTE-ENTRY on People', () => {
     await mount();
     expect(host.querySelector('textarea[name="invite-link"]')).not.toBeNull();
     expect(location.search).toBe('');
+  });
+});
+
+// W6-ACCEPT-CONNECTED (golden-path QA 0.4.8, P1-B): over the real relays the accept's request waits
+// ~10 s for the relays, and the inviter answers within a second, so the pairing completes (and the
+// stream's `contacts` event reads the list again) BEFORE the accept returns. The page must still
+// reach the Connected moment and drop "Connecting to {name}…", not wait for an arrival it already
+// read during the accept.
+describe('W6-ACCEPT-CONNECTED: the accepter reaches the Connected moment', () => {
+  const ANA = `0x${'4e'.repeat(20)}`;
+  const anaPaired = {
+    ref: ANA,
+    name: 'Ana',
+    nameSource: 'counterparty',
+    label: 'self-declared',
+    status: 'active',
+    pairing: 'complete',
+    since: 1_800_000_000,
+    pairedAt: 1_800_000_000,
+    pairedAs: 'invitee',
+  };
+  const LINK = 'https://agentlink.4thtech.io/i#2.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcdE';
+
+  function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
+    let resolve: (v: T) => void = () => undefined;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  }
+
+  async function clickText(label: string): Promise<void> {
+    const button = [...host.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === label,
+    );
+    if (button === undefined) throw new Error(`no "${label}" in ${text()}`);
+    await act(async () => {
+      button.click();
+    });
+    await settle();
+  }
+
+  function typeInto(el: HTMLTextAreaElement | HTMLInputElement, value: string): void {
+    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
+    Object.getOwnPropertyDescriptor(proto.prototype, 'value')?.set?.call(el, value);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  /** People `?paste`: paste the link, Continue, accept with the backup code; the accept waits. */
+  async function acceptOnPasteScreen(accept: Promise<AcceptOutcome>): Promise<void> {
+    history.replaceState(null, '', '/contacts?paste');
+    const invites: InviteApi = {
+      create: () => Promise.resolve({ kind: 'failed' }),
+      cancel: () => Promise.resolve({ kind: 'cancelled' }),
+      check: () =>
+        Promise.resolve({
+          kind: 'ok',
+          invite: { name: 'Ana', fingerprint: '7F3A·19C2', expiresAt: Date.UTC(2999, 0, 1) },
+        }),
+      accept: () => accept,
+    };
+    const owner = {
+      passkey: () => Promise.resolve(undefined),
+      post: () => Promise.reject(new Error('not used')),
+    } as unknown as OwnerClient;
+    await act(async () => {
+      root.render(
+        createElement<ContactsPageProps>(ContactsPage, { api, owner, invites, pollMs: 60_000 }),
+      );
+    });
+    await settle();
+    const field = host.querySelector<HTMLTextAreaElement>('textarea[name="invite-link"]');
+    if (field === null) throw new Error(`no field in ${text()}`);
+    await act(async () => typeInto(field, LINK));
+    await clickText('Continue');
+    await clickText('Accept with your backup code');
+    const code = host.querySelector<HTMLInputElement>('input[type="password"]');
+    if (code === null) throw new Error(`no code field in ${text()}`);
+    await act(async () => typeInto(code, 'ABCD-EFGH-IJKL-MNOP'));
+    await act(async () => {
+      code.closest('form')?.requestSubmit();
+    });
+    await settle();
+  }
+
+  const connectedHeading = (): Element | undefined =>
+    [...host.querySelectorAll('h1, h2, h3')].find((h) =>
+      /^You and “?Ana”? are connected$/.test(h.textContent ?? ''),
+    );
+
+  it('when the pairing completes while the accept is still on its way (real relays)', async () => {
+    const accept = deferred<AcceptOutcome>();
+    await acceptOnPasteScreen(accept.promise);
+    // The inviter answered while the accept waits for the relays: the stream reads the list again.
+    contacts = [anaPaired];
+    await act(async () => {
+      announceContactsChanged();
+    });
+    await settle();
+    // Then the accept returns.
+    await act(async () => {
+      accept.resolve({ kind: 'pending', sent: true, again: false });
+    });
+    await settle();
+    expect(connectedHeading()).toBeDefined();
+    expect(text()).not.toContain('Connecting to Ana…');
+  });
+
+  it('an accept that failed expects nothing: a later, unrelated contact gets no moment', async () => {
+    const accept = deferred<AcceptOutcome>();
+    await acceptOnPasteScreen(accept.promise);
+    await act(async () => {
+      accept.resolve({ kind: 'not_connected' });
+    });
+    await settle();
+    // Someone else arrives later (for example through another way in): not this accept's moment.
+    contacts = [{ ...anaPaired, ref: MARKO, name: 'Marko' }];
+    await act(async () => {
+      announceContactsChanged();
+    });
+    await settle();
+    const moment = [...host.querySelectorAll('h1, h2, h3')].find((h) =>
+      /are connected$/.test(h.textContent ?? ''),
+    );
+    expect(moment).toBeUndefined();
+  });
+
+  it('an accept that was refused expects nothing either', async () => {
+    const accept = deferred<AcceptOutcome>();
+    await acceptOnPasteScreen(accept.promise);
+    await act(async () => {
+      accept.resolve({ kind: 'refused', why: 'expired' });
+    });
+    await settle();
+    contacts = [{ ...anaPaired, ref: MARKO, name: 'Marko' }];
+    await act(async () => {
+      announceContactsChanged();
+    });
+    await settle();
+    const moment = [...host.querySelectorAll('h1, h2, h3')].find((h) =>
+      /are connected$/.test(h.textContent ?? ''),
+    );
+    expect(moment).toBeUndefined();
+  });
+
+  it('when the pairing completes after the accept returned', async () => {
+    const accept = deferred<AcceptOutcome>();
+    await acceptOnPasteScreen(accept.promise);
+    await act(async () => {
+      accept.resolve({ kind: 'pending', sent: true, again: false });
+    });
+    await settle();
+    expect(text()).toContain('Connecting to Ana…');
+    contacts = [anaPaired];
+    await act(async () => {
+      announceContactsChanged();
+    });
+    await settle();
+    expect(connectedHeading()).toBeDefined();
+    expect(text()).not.toContain('Connecting to Ana…');
   });
 });

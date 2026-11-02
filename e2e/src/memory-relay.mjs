@@ -7,9 +7,17 @@
 // ["REQ", id, ...filters] (stored events first, then "EOSE", then live ones) and ["CLOSE", id]. A
 // filter matches `ids`, `authors`, `kinds`, `since`, `until` and `#x` tag lists; `limit` keeps the
 // newest. Nothing is logged and nothing leaves the process.
+//
+// W6-ACCEPT-CONNECTED: `okDelayMs` answers each "OK" that much later, while the event is stored and
+// delivered at once, as with the real public relays (one slow relay holds a publish for seconds
+// while the other side already has the event). Default 0: the answer comes at once.
 
-/** @returns {{ connector: { open: Function }, events: () => object[], count: () => number }} */
-export function memoryRelays() {
+/**
+ * @param {{ okDelayMs?: number }} [options]
+ * @returns {{ connector: { open: Function }, events: () => object[], count: () => number }}
+ */
+export function memoryRelays(options = {}) {
+  const okDelayMs = options.okDelayMs ?? 0;
   /** @type {object[]} */
   const store = [];
   /** @type {Set<{ subs: Map<string, object[]>, deliver: (text: string) => void }>} */
@@ -59,7 +67,12 @@ export function memoryRelays() {
                 }
               }
             }
-            socket.deliver(JSON.stringify(['OK', event.id, true, '']));
+            const ok = JSON.stringify(['OK', event.id, true, '']);
+            if (okDelayMs > 0) {
+              setTimeout(() => {
+                if (sockets.has(socket)) socket.deliver(ok);
+              }, okDelayMs);
+            } else socket.deliver(ok);
           } else if (frame[0] === 'REQ') {
             const id = frame[1];
             const filters = frame.slice(2);
