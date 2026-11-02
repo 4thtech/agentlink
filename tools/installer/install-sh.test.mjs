@@ -160,6 +160,54 @@ function launch(box, args = []) {
 
 const shells = ['sh', ...(findTool('dash') ? ['dash'] : [])];
 
+describe('the launcher against a hostile .npmrc in the folder it is started from (real npm)', () => {
+  const npm = join(dirname(process.execPath), 'npm');
+  // The npm options the launcher passes, read from the launcher itself (quotes removed).
+  function launcherOptions() {
+    const box = sandbox();
+    expect(run(box).code).toBe(0);
+    const exec = readFileSync(launcher(box), 'utf8')
+      .split('\n')
+      .find((l) => l.startsWith('exec '));
+    const options = exec
+      .split(' ')
+      .filter((w) => w.startsWith('--'))
+      .map((w) => w.replaceAll("'", ''));
+    return { box, options };
+  }
+  function npmConfig(box, cwd, options, key) {
+    return execFileSync(npm, [...options, 'config', 'get', key], {
+      cwd,
+      encoding: 'utf8',
+      env: { PATH: `${dirname(process.execPath)}:/usr/bin:/bin`, HOME: box.home },
+    }).trim();
+  }
+
+  it('ignores its node-options, https-proxy and strict-ssl (the launcher pins --prefix)', () => {
+    if (!existsSync(npm)) {
+      expect(process.env.CI, 'npm is required on CI').toBeFalsy();
+      return;
+    }
+    const { box, options } = launcherOptions();
+    expect(options[0]).toBe(`--prefix=${box.home}/.agentlink`);
+    const folder = join(box.dir, 'project');
+    mkdirSync(folder);
+    const inject = join(box.dir, 'inj.cjs');
+    writeFileSync(
+      join(folder, '.npmrc'),
+      `node-options=--require ${inject}\nhttps-proxy=http://127.0.0.1:9/\nstrict-ssl=false\n`,
+    );
+    // Control: without the launcher's options npm takes all three from the folder.
+    expect(npmConfig(box, folder, [], 'node-options')).toContain(inject);
+    expect(npmConfig(box, folder, [], 'strict-ssl')).toBe('false');
+    // With them, none.
+    expect(npmConfig(box, folder, options, 'node-options')).not.toContain(inject);
+    expect(npmConfig(box, folder, options, 'https-proxy')).not.toContain('127.0.0.1');
+    expect(npmConfig(box, folder, options, 'strict-ssl')).toBe('true');
+    expect(npmConfig(box, folder, options, 'registry')).toBe('https://registry.npmjs.org/');
+  });
+});
+
 describe.each(shells)('install.sh under %s', (shell) => {
   it('downloads Node.js when there is none, checks it, installs the agentlink command', () => {
     const box = sandbox();
@@ -172,7 +220,7 @@ describe.each(shells)('install.sh under %s', (shell) => {
     // A new ~/.agentlink is private (it also holds the IDs).
     expect(statSync(join(box.home, '.agentlink')).mode & 0o777).toBe(0o700);
     expect(launch(box, ['ui'])).toBe(
-      `npx(${runtimeDir(box)}/bin/npx) -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest ui\n`,
+      `npx(${runtimeDir(box)}/bin/npx) -y --prefix=${box.home}/.agentlink --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest ui\n`,
     );
     // Not run from a terminal: it does not start the app, it says how.
     expect(r.out).toContain(`To start it now, run: ${launcher(box)}`);
@@ -193,7 +241,7 @@ describe.each(shells)('install.sh under %s', (shell) => {
     expect(r.log).toBe('');
     expect(existsSync(join(box.home, '.agentlink/runtime'))).toBe(false);
     expect(launch(box)).toBe(
-      `npx(${nodeDir}/npx) -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest\n`,
+      `npx(${nodeDir}/npx) -y --prefix=${box.home}/.agentlink --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest\n`,
     );
   });
 
@@ -342,12 +390,12 @@ describe('install.sh source', () => {
 
   it('pins the npm registry on the command line, which beats any .npmrc in the folder you run it from', () => {
     expect(source).toContain(
-      'exec $(quote "$node_bin/npx") -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ $PACKAGE',
+      'exec $(quote "$node_bin/npx") -y --prefix=$(quote "$base") --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ $PACKAGE',
     );
   });
 
-  it('removes its temporary folder as soon as Node.js is unpacked, not when the app exits', () => {
-    expect(source).not.toMatch(/trap [^\n]*EXIT/);
+  it('removes its temporary folder as soon as Node.js is unpacked, and on any abort', () => {
+    expect(source).toMatch(/trap 'cleanup' EXIT\n\s*trap 'cleanup; exit 130' INT TERM/);
     expect(source).toMatch(/mv "\$tmp\/node-v[^\n]*\n\s*rm -rf "\$tmp"/);
   });
 

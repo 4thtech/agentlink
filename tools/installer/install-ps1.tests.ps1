@@ -80,14 +80,15 @@ Check 'x64 and arm64 Windows map to the nodejs.org archive names' {
 }
 Expect-Throw 'an unknown processor is refused in plain words' 'not supported yet' { Get-AgentLinkPlatform 'x86' }
 Check 'the launcher is a .cmd that runs npx from the chosen Node.js' {
-  $text = Format-Launcher 'C:\Users\Ana\AppData\Local\AgentLink\runtime\node'
+  $text = Format-Launcher 'C:\Users\Ana\AppData\Local\AgentLink\runtime\node' 'C:\Users\Ana\AppData\Local\AgentLink'
   $lines = $text -split "`r`n"
   $lines[0] -eq '@echo off' -and $lines -contains 'setlocal' -and
   $lines -contains 'set "PATH=C:\Users\Ana\AppData\Local\AgentLink\runtime\node;%PATH%"' -and
-  $lines[-1] -eq '"C:\Users\Ana\AppData\Local\AgentLink\runtime\node\npx.cmd" -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest %*'
+  $lines[-1] -eq '"C:\Users\Ana\AppData\Local\AgentLink\runtime\node\npx.cmd" -y --prefix="C:\Users\Ana\AppData\Local\AgentLink" --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest %*'
 }
 Check 'a % in a folder name cannot expand in cmd.exe' {
-  (Format-Launcher 'C:\100%\node') -match [regex]::Escape('"C:\100%%\node\npx.cmd"')
+  $text = Format-Launcher 'C:\100%\node' 'C:\100%\AgentLink'
+  $text.Contains('"C:\100%%\node\npx.cmd"') -and $text.Contains('--prefix="C:\100%%\AgentLink"')
 }
 
 # --- installs ------------------------------------------------------------------------------------
@@ -112,7 +113,7 @@ Check 'no Node.js: downloads it and SHASUMS256.txt from nodejs.org, checks, inst
   (Test-Path -LiteralPath (Join-Path $nodeDir 'npx.cmd'))
 }
 Check 'writes agentlink.cmd for that Node.js' {
-  (Get-Content -LiteralPath (Join-Path $bin 'agentlink.cmd') -Raw) -eq ((Format-Launcher $nodeDir) + "`r`n")
+  (Get-Content -LiteralPath (Join-Path $bin 'agentlink.cmd') -Raw) -eq ((Format-Launcher $nodeDir $root) + "`r`n")
 }
 Check 'adds the bin folder to the user PATH once, keeping the other entries unexpanded' {
   $script:UserPath -eq "C:\Tools;%USERPROFILE%\bin;$bin"
@@ -142,7 +143,7 @@ $null = Install-AgentLink -Root $root -Arch 'AMD64' 6>&1
 Check 'a new enough Node.js already there is used, nothing is downloaded' {
   $script:Downloads.Count -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $root 'runtime')) -and
   (Get-Content -LiteralPath (Join-Path (Join-Path $root 'bin') 'agentlink.cmd') -Raw) -match
-  [regex]::Escape('"C:\Program Files\nodejs\npx.cmd" -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest %*')
+  [regex]::Escape('"C:\Program Files\nodejs\npx.cmd" -y --prefix="' + $root + '" --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest %*')
 }
 $script:ExistingNode = $null
 
