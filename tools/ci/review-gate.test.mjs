@@ -171,6 +171,37 @@ describe('review-gate path classes', () => {
     }
   });
 
+  it('INSTALLER-1: the one-line installers are S2 and sensitive, and so is the site that serves them', () => {
+    for (const p of ['installer/install.sh', 'installer/install.ps1', 'installer/README.md']) {
+      expect(classify(p), p).toBe(2);
+      expect(isSensitive(p), p).toBe(true);
+    }
+    for (const p of [
+      'apps/invite/vite.config.ts',
+      'apps/invite/site/_headers',
+      'apps/invite/src/main.ts',
+      'tools/installer/install-sh.test.mjs',
+      'tools/installer/fixtures.mjs',
+    ]) {
+      expect(isSensitive(p), p).toBe(true);
+    }
+    expect(classify('apps/invite/site/_headers')).toBe(1);
+    expect(isSensitive('apps/invitex/a.ts')).toBe(false);
+    expect(isSensitive('tools/installerx.mjs')).toBe(false);
+    expect(classifyFiles(['installer/install.sh'])).toMatchObject({ cls: 2, reviewRequired: true });
+  });
+
+  it('INSTALLER-1: CODEOWNERS and audit-rules §2.2 list the installer paths', () => {
+    const codeowners = readFileSync(join(root, '.github/CODEOWNERS'), 'utf8');
+    for (const path of ['/installer/', '/apps/invite/', '/tools/installer/']) {
+      expect(codeowners).toMatch(
+        new RegExp(`^${path.replaceAll('/', '\\/')}\\s+@talirezun @denisjazbec$`, 'm'),
+      );
+    }
+    const rules = readFileSync(join(root, 'docs/process/audit-rules.md'), 'utf8');
+    expect(rules).toMatch(/^\| `installer\/\*\*` \| S2 \|/m);
+  });
+
   it('classifyFiles: the highest class wins; review only for S2 or sensitive', () => {
     expect(classifyFiles(['README.md'])).toMatchObject({ cls: 0, reviewRequired: false });
     expect(classifyFiles(['apps/cli/src/a.ts'])).toMatchObject({

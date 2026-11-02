@@ -10,7 +10,12 @@ $tokens = $null
 $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($Script, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count -gt 0) { throw "install.ps1 does not parse: $($parseErrors[0].Message)" }
-foreach ($statement in $ast.EndBlock.Statements) {
+$found = $ast.FindAll({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -or
+    $node -is [System.Management.Automation.Language.AssignmentStatementAst]
+  }, $true)
+foreach ($statement in $found) {
   $isFunction = $statement -is [System.Management.Automation.Language.FunctionDefinitionAst]
   $isSetting = $statement -is [System.Management.Automation.Language.AssignmentStatementAst] -and
     @('$NodeVersion', '$Package') -contains $statement.Left.Extent.Text
@@ -37,7 +42,8 @@ function Set-UserPath([string]$Value) { $script:UserPath = $Value }
 $serve = Join-Path $Work 'serve'
 New-Item -ItemType Directory -Path $serve | Out-Null
 $script:Downloads = @()
-function Invoke-WebRequest([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing) {
+function Invoke-WebRequest([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing, [int]$MaximumRedirection = -1) {
+  if ($MaximumRedirection -ne 0) { throw 'FAILED: downloads must refuse redirects (-MaximumRedirection 0)' }
   $script:Downloads += $Uri
   $file = Join-Path $serve ($Uri.Split('/')[-1])
   if (-not (Test-Path -LiteralPath $file)) { throw 'The remote server returned an error: (404) Not Found.' }
@@ -78,7 +84,7 @@ Check 'the launcher is a .cmd that runs npx from the chosen Node.js' {
   $lines = $text -split "`r`n"
   $lines[0] -eq '@echo off' -and $lines -contains 'setlocal' -and
   $lines -contains 'set "PATH=C:\Users\Ana\AppData\Local\AgentLink\runtime\node;%PATH%"' -and
-  $lines[-1] -eq '"C:\Users\Ana\AppData\Local\AgentLink\runtime\node\npx.cmd" -y @4thtech-io/agentlink@latest %*'
+  $lines[-1] -eq '"C:\Users\Ana\AppData\Local\AgentLink\runtime\node\npx.cmd" -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest %*'
 }
 Check 'a % in a folder name cannot expand in cmd.exe' {
   (Format-Launcher 'C:\100%\node') -match [regex]::Escape('"C:\100%%\node\npx.cmd"')
@@ -136,7 +142,7 @@ $null = Install-AgentLink -Root $root -Arch 'AMD64' 6>&1
 Check 'a new enough Node.js already there is used, nothing is downloaded' {
   $script:Downloads.Count -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $root 'runtime')) -and
   (Get-Content -LiteralPath (Join-Path (Join-Path $root 'bin') 'agentlink.cmd') -Raw) -match
-  [regex]::Escape('"C:\Program Files\nodejs\npx.cmd" -y @4thtech-io/agentlink@latest %*')
+  [regex]::Escape('"C:\Program Files\nodejs\npx.cmd" -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest %*')
 }
 $script:ExistingNode = $null
 

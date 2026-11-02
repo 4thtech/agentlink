@@ -172,7 +172,7 @@ describe.each(shells)('install.sh under %s', (shell) => {
     // A new ~/.agentlink is private (it also holds the IDs).
     expect(statSync(join(box.home, '.agentlink')).mode & 0o777).toBe(0o700);
     expect(launch(box, ['ui'])).toBe(
-      `npx(${runtimeDir(box)}/bin/npx) -y @4thtech-io/agentlink@latest ui\n`,
+      `npx(${runtimeDir(box)}/bin/npx) -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest ui\n`,
     );
     // Not run from a terminal: it does not start the app, it says how.
     expect(r.out).toContain(`To start it now, run: ${launcher(box)}`);
@@ -192,7 +192,9 @@ describe.each(shells)('install.sh under %s', (shell) => {
     expect(r.out).toContain('Using your Node.js 22.14.0.');
     expect(r.log).toBe('');
     expect(existsSync(join(box.home, '.agentlink/runtime'))).toBe(false);
-    expect(launch(box)).toBe(`npx(${nodeDir}/npx) -y @4thtech-io/agentlink@latest\n`);
+    expect(launch(box)).toBe(
+      `npx(${nodeDir}/npx) -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ @4thtech-io/agentlink@latest\n`,
+    );
   });
 
   it('downloads its own Node.js when the one there is older than 22.14', () => {
@@ -336,6 +338,17 @@ describe('install.sh source', () => {
       );
     }
     expect(source).toContain("--proto '=https' --tlsv1.2");
+  });
+
+  it('pins the npm registry on the command line, which beats any .npmrc in the folder you run it from', () => {
+    expect(source).toContain(
+      'exec $(quote "$node_bin/npx") -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ $PACKAGE',
+    );
+  });
+
+  it('removes its temporary folder as soon as Node.js is unpacked, not when the app exits', () => {
+    expect(source).not.toMatch(/trap [^\n]*EXIT/);
+    expect(source).toMatch(/mv "\$tmp\/node-v[^\n]*\n\s*rm -rf "\$tmp"/);
   });
 
   it('runs everything from main on the last line (a cut-off download runs nothing)', () => {

@@ -80,6 +80,24 @@ describe('install.ps1 source', () => {
     expect(source).not.toMatch(/HKLM:|'Machine'|RunAs|Set-ExecutionPolicy/);
   });
 
+  it('runs as one script block after param(): nothing leaks into the caller, a cut-off file runs nothing', () => {
+    const body = source.replace(/^\s*#.*$/gm, '').trim();
+    const afterParam = body.slice(body.indexOf('\n', body.indexOf('param(')) + 1).trim();
+    expect(afterParam.startsWith('& {')).toBe(true);
+    expect(afterParam).toMatch(/\} \$MyInvocation$/);
+  });
+
+  it('asks for TLS 1.2 or 1.3 only, puts the setting back, and refuses redirects', () => {
+    expect(source).not.toMatch(/SecurityProtocol -bor/);
+    expect(source).toContain(
+      '[Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13',
+    );
+    expect(source).toMatch(
+      /finally \{\s*\[Net\.ServicePointManager\]::SecurityProtocol = \$savedProtocol/,
+    );
+    expect(source).toContain('-MaximumRedirection 0');
+  });
+
   it('keeps to Windows PowerShell 5.1 syntax', () => {
     const code = source.replace(/^\s*#.*$/gm, '');
     // No PowerShell 7-only operators: null-coalescing, ternary, pipeline chains, -Parallel.
