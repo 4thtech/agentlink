@@ -120,7 +120,8 @@ export async function newComputer(
     createClient: (options) =>
       nodeRuntimeDeps.createClient({
         ...options,
-        ...(options.files === undefined
+        // A drop with a test `fetch` (the journey harness's fake drop) is left alone.
+        ...(options.files === undefined || options.files.drop?.fetch !== undefined
           ? {}
           : {
               files: {
