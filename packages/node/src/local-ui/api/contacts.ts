@@ -279,7 +279,7 @@ const CHECK_LINES = Object.freeze([
 ]);
 const RENAME_LINES = Object.freeze(['Rename this contact on this computer.']);
 const REMOVE_LINES = Object.freeze([
-  'Remove this contact. Messages from its agent are dropped from now on.',
+  'Remove this contact. Messages from them are dropped from now on.',
 ]);
 
 async function checkContact(

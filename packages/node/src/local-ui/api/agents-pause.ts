@@ -129,7 +129,7 @@ async function resumeAgent(
     shown =
       reading.status === 'verified'
         ? reading.label
-        : (context.agentsManage?.current() ?? 'this agent');
+        : (context.agentsManage?.current() ?? 'this ID');
     prepared = await (agent.prepareResume as NonNullable<Agent['prepareResume']>)();
   } catch {
     return UI_UNAVAILABLE;

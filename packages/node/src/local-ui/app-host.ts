@@ -216,8 +216,12 @@ export interface AppHostFirstRun {
   readonly aiApps?: Pick<LocalUiAiApps, 'plan'>;
 }
 
-/** U3-g-b: the first agent's label when first run is finished without one (b11 §28, prefilled). */
-export const FIRST_AGENT_LABEL = 'My agent';
+/**
+ * U3-g-b: the first agent's label when first run is finished without one (b11 §28, prefilled).
+ * W7-ID-B5 (D-144, Q5): the page prefills the owner's name, else the AI app's name; a begin without
+ * a label carries neither, so this backstop is the generic "My ID" (never "{App} agent").
+ */
+export const FIRST_AGENT_LABEL = 'My ID';
 
 /**
  * U3-g-b: the first agent's folder name (decided 2026-10-29): `default`, as `init` names it (D5), so
