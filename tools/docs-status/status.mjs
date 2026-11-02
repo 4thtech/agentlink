@@ -161,6 +161,11 @@ export function renderSiteHint(data) {
   return `> **Status: Current as of ${longDate(data.updated)} (${data.versionLabel}, ${data.version}).** Derived from the [build plan](${REPO}/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.`;
 }
 
+/** Release history, newest first, one line each (optional `releases` list in docs/status.yaml). */
+function releaseLines(data) {
+  return (data.releases ?? []).map((r) => `- **${r.version}** (${r.date}): ${r.summary}`);
+}
+
 /** Docs site and knowledge base: where we are, the deploy state and the component table. */
 export function renderSiteSummary(data) {
   const out = [
@@ -172,6 +177,9 @@ export function renderSiteSummary(data) {
     '',
     `**In progress:** ${data.inProgress}`,
     '',
+    ...(releaseLines(data).length
+      ? ['**Releases, newest first:**', '', ...releaseLines(data), '']
+      : []),
     `**Next:** ${data.next}`,
     '',
     '### Components',
@@ -233,6 +241,8 @@ export function renderKnowledgeSummary(data) {
     `- **In progress:** ${data.inProgress}`,
     `- **Does not exist yet:** ${data.notYet}`,
   );
+  if (releaseLines(data).length)
+    out.push('', '### Releases, newest first', '', ...releaseLines(data), '');
   return out.join('\n');
 }
 

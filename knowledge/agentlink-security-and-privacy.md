@@ -53,4 +53,4 @@ Further reading: privacy in plain language https://github.com/4thtech/agentlink/
 
 ## What does the invite page see?
 
-Nothing. The page at https://agentlink.4thtech.io is a static site. An invite link keeps its secret after the `#`, which a browser never sends to a server, and the page sends no request with it. A short link is stored only as ciphertext on the encrypted drop until it is used, cancelled or expires (at most 7 days); 4thTech cannot read it.
+Almost nothing. The page at https://agentlink.4thtech.io is a static site. An invite link keeps its secret after the `#`, which a browser never sends to a server. The page's only request fetches the encrypted short invite from the drop by an ID derived from the link; the secret, the link and the decrypted invite never leave the browser. A short link is stored only as ciphertext on the encrypted drop until it is used, cancelled or expires (at most 7 days); 4thTech cannot read it.

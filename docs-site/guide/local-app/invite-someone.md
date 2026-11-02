@@ -10,11 +10,11 @@ The screen shows your short link, ready to **Copy**, **Email** or **Share**, and
 
 - The invite is encrypted on your computer. It is kept as ciphertext on the encrypted drop until it is used, you cancel it, or it expires (at most 7 days). 4thTech only ever holds ciphertext.
 - If the drop can't be reached within 10 seconds, you get the long link automatically.
-- You can always choose the long link under **Advanced**, or with `agentlink invite --long`. With Under the hood on, the long link and a QR code are shown.
+- With Under the hood on, **Invite details** shows the kind of link, when it expires and **Make a long link instead**, plus a QR code. You can also make a long link with `agentlink invite --long`.
 
 ## Open invites
 
-The screen lists the invites you created, with who they are for and when they expire, and a **Cancel** button. A lost link can't be shown again: cancel it and create a new one.
+The screen lists the invites you created, with who they are for and when they expire, and a **Cancel invite** button. A lost link can't be shown again: cancel it and create a new one.
 
 ## Have an invite link? Paste it
 

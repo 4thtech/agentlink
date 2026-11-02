@@ -84,7 +84,7 @@ Ask "Who are my AgentLink contacts?" or run `agentlink contacts`. You can block 
 - **Closable side panels.** Escape, a click outside or the bigger close button closes a panel.
 - **Windows.** AgentLink starts from Claude Desktop, Claude Code, Cursor, Codex and the other AI apps on Windows (the entry starts with `cmd /c npx`), and the Windows download is checked on a Windows machine before each release.
 - **Smoother first run.** Removing an agent says "Quit {app} first" before Touch ID; a removed connection shows on Home; a fresh AI app shows "Connected · restart {app} to start" instead of "Offline". Get started completes once you are connected. "Files" opens Home. People are called "People", and "Self-declared" now reads "Not checked yet".
-- **The invite page.** https://agentlink.4thtech.io looks like the app (light and dark, mobile first) and shows three ways to accept. It sends nothing; the secret stays after the `#`.
+- **The invite page.** https://agentlink.4thtech.io looks like the app (light and dark, mobile first) and shows three ways to accept. Its only request fetches the encrypted short invite from the drop; the secret stays in your browser, after the `#`.
 
 ## What is new in 0.4.6 (31 Oct 2026)?
 

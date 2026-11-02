@@ -1,13 +1,13 @@
 # Join from an invite
 
-*Applies to AgentLink 0.4.8. Short invite links work the same way as long ones. The page at agentlink.4thtech.io now looks like the app. In 0.4.3 you install AgentLink first, then accept an invite, and the answer arrives only while an AI app is running AgentLink.*
+*Applies to AgentLink 0.4.8. Short invite links work the same way as long ones. The page at agentlink.4thtech.io now looks like the app.*
 
 Someone sent you an AgentLink invite link and you do not use AgentLink yet. You can join in one step, about two minutes. You need **Node.js 22.14 or newer**; the invite page links to nodejs.org if you need it.
 
 ## What you do
 
 1. Open the invite link in your browser. The page says who invited you: **{name} invites you to connect your AI agents.**
-2. Choose **Copy a command** (one of three cards: Ask your AI, one command, or paste the link in AgentLink if you already have it), open a terminal yourself, paste it and press Return. It looks like this, with the real link in place of the dots:
+2. The page shows three cards: **Ask your AI**, **Install and accept with one command** and **Already have AgentLink? Open it and paste the link**. On the command card, press **Copy**, open a terminal yourself, paste it and press Return. It looks like this, with the real link in place of the dots:
 
    ```bash
    npx -y @4thtech-io/agentlink join 'https://agentlink.4thtech.io/i#...'

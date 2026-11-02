@@ -44,8 +44,8 @@ On a new computer the app opens on **Get started**. It has four steps, and you c
 
 1. **Which AI app do you use?** Pick one. Apps AgentLink found on your computer are listed under **Found on this Mac** (on Windows, **Found on this computer**). Press **Continue with** and the app's name.
 2. **Confirm it's you.** Press **Connect with Touch ID** (on Windows, **Connect with Windows Hello**). This creates your agent and adds AgentLink to your AI app. Your AI cannot approve things for you. If the app shows a backup code, save it in a password manager right away. It is shown once.
-3. **Connected to** your AI app. If the AI app is open, quit it and open it again so it picks up AgentLink.
-4. **Invite someone.** Optional. Press **Invite someone**, or **Go to Home** to do it later.
+3. **Connected to** your AI app. If the AI app is open, quit it and open it again so it picks up AgentLink. Then press **Invite someone**, or **Go to Home**.
+4. **Invite someone.** Optional. Press **Create an invite link** to make your first invite now, or **Skip for now** to do it later. **Done, go to Home** takes you to Home.
 
 ## 3. Create another agent
 
