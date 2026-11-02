@@ -199,7 +199,10 @@ describe('deploy-invite.yml structure', () => {
   it('runs the same head-of-main check as the drop before production', () => {
     const copies = blocks('HEAD-CHECK');
     expect(copies.length).toBe(1);
-    expect(copies[0]).toBe(blocks('HEAD-CHECK', dropWorkflow)[0]);
+    // Same block as the drop's, apart from the workflow file name (OPS-UNSTICK-A, deploy-paths.mjs).
+    expect(copies[0]).toBe(
+      blocks('HEAD-CHECK', dropWorkflow)[0].replace('deploy-drop.yml', 'deploy-invite.yml'),
+    );
     const production = job('deploy-production');
     expect(production).toMatch(/id: ready\n {8}if: steps\.head\.outputs\.current == 'true'\n/);
   });
@@ -217,7 +220,10 @@ describe('deploy-invite.yml structure', () => {
   it('hands a superseded run to the catch-up job for this same workflow', () => {
     const catchUp = job('catch-up');
     expect(catchUp).toContain('catch-up-deploy.mjs --workflow deploy-invite.yml');
-    expect(catchUp).toMatch(/needs: \[ci-green, deploy-production\]\n/);
+    expect(catchUp).toMatch(
+      /needs: \[ci-green, build, deploy-staging, smoke-staging, deploy-production\]\n/,
+    );
+    expect(catchUp).toMatch(/contains\(needs\.\*\.result, 'cancelled'\)/);
     expect(catchUp).toMatch(/needs\.deploy-production\.outputs\.current == 'false'/);
     expect(catchUp).toMatch(/needs\.ci-green\.outputs\.result == 'superseded'/);
     expect(catchUp).toMatch(/needs\.ci-green\.result == 'failure'/);

@@ -606,54 +606,21 @@ describe('credential and Worker secret check', () => {
   });
 });
 
-describe('head-of-main check', () => {
+describe('head check (OPS-UNSTICK-A: path-aware, tools/release/deploy-paths.mjs)', () => {
   const copies = block('HEAD-CHECK');
   const script = copies[0] ?? '';
-  const SHA = 'a'.repeat(40);
-  const run = (head, commit = SHA) => {
-    const fakes = fakeTools({ head });
-    const summary = join(fakes.dir, 'step-summary');
-    writeFileSync(summary, '');
-    const result = runWithFakes(script, fakes, {
-      REPOSITORY: '4thtech/agentlink',
-      COMMIT: commit,
-      GITHUB_OUTPUT: fakes.output,
-      GITHUB_STEP_SUMMARY: summary,
-    });
-    return { ...result, summary: readFileSync(summary, 'utf8') };
-  };
 
   it('appears once, before the production deploy only', () => {
     expect(copies.length).toBe(1);
   });
 
-  it('is current when main still points at this commit', () => {
-    const result = run(SHA);
-    expect(result.ok).toBe(true);
-    expect(result.github).toContain('current=true');
-  });
-
-  it('is not current once main moved on (a newer run owns production)', () => {
-    const result = run('b'.repeat(40));
-    expect(result.ok).toBe(true);
-    expect(result.github).toContain('current=false');
-  });
-
-  it('fails when the head of main cannot be read', () => {
-    expect(run('').ok).toBe(false);
-    expect(run('not-a-sha').ok).toBe(false);
-  });
-
-  // CHORE-DEPLOY-CATCHUP: a superseded production job must not end silently green.
-  it('warns and writes a run summary line when main moved on, nothing when current', () => {
-    const NEWER = 'b'.repeat(40);
-    const moved = run(NEWER);
-    expect(moved.output).toMatch(/::warning::/);
-    expect(moved.summary).toMatch(/Superseded/);
-    expect(moved.summary).toContain(NEWER);
-    expect(moved.summary).toMatch(/did not change production/);
-    expect(moved.summary).toMatch(/catch-up/);
-    expect(run(SHA).summary).toBe('');
+  // The behaviour (skip only when a NEWER commit on main changes this service; deploy when only
+  // unrelated commits followed; fail closed) is tested in deploy-paths.test.mjs on a real repository.
+  it('runs deploy-paths.mjs head-check for this workflow, with no token', () => {
+    expect(script).toContain(
+      'node tools/release/deploy-paths.mjs head-check --workflow deploy-drop.yml',
+    );
+    expect(script).not.toMatch(/GH_TOKEN|gh api/);
   });
 });
 
