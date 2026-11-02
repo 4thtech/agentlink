@@ -15,6 +15,9 @@
 #   ci-green           waits for this commit's ci.yml and security.yml gates (as release.yml). If
 #                      this commit's CI was cancelled because a newer push to main superseded it, it
 #                      ends green with result=superseded: nothing deploys, and catch-up runs.
+#                      Waits up to 90 min (the heavy lane on main takes 50+). If it gives up, or sees a
+#                      red first attempt, and CI turns green later, ci-green-catchup.yml re-runs this
+#                      run's failed jobs (OPS-CIGREEN-WAIT).
 #   guard              main of 4thtech/agentlink only, and only once apps/drop/wrangler.toml exists.
 #   build              builds the Worker bundle ONCE (wrangler deploy --dry-run, no credentials) and
 #                      uploads it with its SHA-256; both environments deploy exactly these bytes.
@@ -111,7 +114,7 @@ jobs:
     name: ci-green
     if: github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    timeout-minutes: 95
     permissions:
       actions: read
       contents: read
@@ -133,7 +136,7 @@ jobs:
           node tools/release/wait-for-ci.mjs \
             --require "ci.yml:ci-gate (push)" \
             --require security.yml:security-gate \
-            --timeout-minutes 45 \
+            --timeout-minutes 90 \
             --interval-seconds 30 \
             --missing-grace-minutes 10 \
             --superseded-ok
