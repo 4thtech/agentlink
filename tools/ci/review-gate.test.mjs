@@ -344,3 +344,20 @@ describe('review-gate and pr-hygiene: no cancelled required checks', () => {
     expect(source).toMatch(/github\.rest\.pulls\.get\(/);
   });
 });
+
+// OPS-UNSTICK-A (IR F1): tools/ci/ holds the test quarantine and CI gate scripts; a change there can
+// relax a gate, so it is S1, sensitive and code-owned.
+describe('review-gate: tools/ci is sensitive', () => {
+  it('classes tools/ci files S1 and sensitive', () => {
+    for (const f of ['tools/ci/quarantine.json', 'tools/ci/quarantine.mjs', 'tools/ci/x/y.mjs']) {
+      expect(classify(f), f).toBe(1);
+      expect(isSensitive(f), f).toBe(true);
+    }
+    expect(isSensitive('tools/cix/a.mjs')).toBe(false);
+  });
+
+  it('CODEOWNERS owns /tools/ci/', () => {
+    const owners = readFileSync(join(root, '.github', 'CODEOWNERS'), 'utf8');
+    expect(owners).toMatch(/^\/tools\/ci\/\s+@talirezun @denisjazbec$/m);
+  });
+});

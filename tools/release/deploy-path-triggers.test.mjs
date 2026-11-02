@@ -140,3 +140,51 @@ describe('push paths filters cover every repo-local file the workflow runs', () 
     });
   }
 });
+
+// OPS-UNSTICK-A (IR F2): a deploy starts, and deploy-paths.mjs skips production, by
+// `on.push.paths`. A change in any workspace package the app depends on, directly or transitively,
+// changes its bundle, so every package of that closure must be covered by the filter.
+describe("push paths cover each deployed app's workspace dependency closure", () => {
+  const workspacePackages = new Map();
+  for (const dir of ['apps', 'packages']) {
+    for (const name of readdirSync(join(root, dir))) {
+      const manifest = join(root, dir, name, 'package.json');
+      if (!existsSync(manifest)) continue;
+      const pkg = JSON.parse(readFileSync(manifest, 'utf8'));
+      workspacePackages.set(pkg.name, { dir: `${dir}/${name}`, pkg });
+    }
+  }
+  const closure = (start) => {
+    const seen = new Set();
+    const visit = (name) => {
+      const entry = workspacePackages.get(name);
+      if (!entry || seen.has(entry.dir)) return;
+      seen.add(entry.dir);
+      const deps = {
+        ...entry.pkg.dependencies,
+        ...entry.pkg.devDependencies,
+        ...entry.pkg.peerDependencies,
+      };
+      for (const [dep, range] of Object.entries(deps)) {
+        if (String(range).startsWith('workspace:')) visit(dep);
+      }
+    };
+    visit(start);
+    return [...seen].sort();
+  };
+
+  for (const [workflow, app] of [
+    ['deploy-drop.yml', 'apps/drop'],
+    ['deploy-submitter.yml', 'apps/submitter'],
+    ['deploy-invite.yml', 'apps/invite'],
+  ]) {
+    it(`${workflow} covers every workspace package ${app} builds from`, () => {
+      const w = workflows.find((x) => x.name === workflow);
+      const appName = [...workspacePackages].find(([, e]) => e.dir === app)?.[0];
+      expect(appName, app).toBeTruthy();
+      const dirs = closure(appName);
+      expect(dirs).toContain(app);
+      expect(dirs.filter((d) => !covered(w.paths, `${d}/package.json`))).toEqual([]);
+    });
+  }
+});

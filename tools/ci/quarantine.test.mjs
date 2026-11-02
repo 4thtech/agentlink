@@ -63,6 +63,11 @@ describe('validate', () => {
     expect(validate(config(...many), TODAY).problems.join('\n')).toMatch(/at most/);
   });
 
+  // IR F4: an entry cannot be dated in the future (that would stretch its 14 days).
+  it('refuses an entry added after today', () => {
+    expect(validate(config(entry()), '2026-11-01').problems.join('\n')).toMatch(/added/);
+  });
+
   it('refuses missing or malformed fields and duplicates', () => {
     for (const bad of [
       { id: '' },
@@ -127,7 +132,7 @@ describe('evaluate', () => {
       today: TODAY,
       scope: 'node-os',
       exitCode: 1,
-      reports: [{ file: 'r.json', report: failing }],
+      reports: [{ file: 'r.json', report: failing, run: { unhandledErrors: 0, reason: 'failed' } }],
       root: ROOT,
       ...overrides,
     });
@@ -169,6 +174,18 @@ describe('evaluate', () => {
     ).toBe(false);
   });
 
+  // IR F3: the vitest JSON report does not list unhandled errors. The in-repo reporter
+  // (tools/ci/vitest-run-reporter.mjs) records them; a quarantined failure next to an unhandled
+  // error, an interrupted run, or a missing run record fails.
+  it('fails when the same run had an unhandled error, was interrupted, or left no run record', () => {
+    const withRun = (run) => go({ reports: [{ file: 'r.json', report: failing, run }] });
+    expect(withRun({ unhandledErrors: 0, reason: 'failed' }).ok).toBe(true);
+    expect(withRun({ unhandledErrors: 1, reason: 'failed' }).ok).toBe(false);
+    expect(withRun({ unhandledErrors: 0, reason: 'interrupted' }).ok).toBe(false);
+    expect(withRun(null).ok).toBe(false);
+    expect(withRun({ reason: 'failed' }).ok).toBe(false);
+  });
+
   it('fails for a file that failed outside any test', () => {
     const broken = report(FILE, [assertion('migrates a version 10 file', 'failed')], {
       status: 'failed',
@@ -198,6 +215,10 @@ describe('the command line', () => {
     reportFile,
     JSON.stringify(report(FILE, [assertion('migrates a version 10 file', 'failed')])),
   );
+  const runFile = join(dir, 'run.json');
+  writeFileSync(runFile, JSON.stringify({ unhandledErrors: 0, reason: 'failed' }));
+  const badRunFile = join(dir, 'bad-run.json');
+  writeFileSync(badRunFile, JSON.stringify({ unhandledErrors: 2, reason: 'failed' }));
   const go = (argv, env = {}) => {
     const lines = [];
     const code = run({ argv, env, root: ROOT, log: (l) => lines.push(l) });
@@ -211,7 +232,13 @@ describe('the command line', () => {
 
   it('evaluate with explicit reports', () => {
     const args = ['evaluate', '--file', file, '--today', TODAY, '--scope', 'node-os'];
-    expect(go([...args, '--exit-code', '1', '--report', reportFile]).code).toBe(0);
+    expect(
+      go([...args, '--exit-code', '1', '--report', reportFile, '--run-record', runFile]).code,
+    ).toBe(0);
+    expect(
+      go([...args, '--exit-code', '1', '--report', reportFile, '--run-record', badRunFile]).code,
+    ).toBe(1);
+    expect(go([...args, '--exit-code', '1', '--report', reportFile]).code).toBe(1);
     expect(go([...args, '--exit-code', '1', '--report', join(dir, 'missing.json')]).code).toBe(1);
     expect(go([...args, '--exit-code', '0']).code).toBe(0);
   });
@@ -224,6 +251,10 @@ describe('the command line', () => {
     mkdirSync(runs, { recursive: true });
     mkdirSync(join(repo, 'packages/node'), { recursive: true });
     mkdirSync(join(repo, 'packages/core'), { recursive: true });
+    writeFileSync(
+      join(repo, 'packages/node/.vitest-run.json'),
+      JSON.stringify({ unhandledErrors: 0, reason: 'failed' }),
+    );
     const tasks = (...list) =>
       writeFileSync(join(runs, 'run.json'), JSON.stringify({ tasks: list }));
     const task = (pkg, exitCode) => ({
@@ -337,5 +368,33 @@ describe('ci.yml wiring', () => {
     );
     expect(ci).toMatch(/node tools\/ci\/quarantine\.mjs evaluate --scope node-os [^\n]*--report/);
     expect(ci).toMatch(/turbo run test --continue --summarize/);
+    expect(ci).toContain('tools/ci/vitest-run-reporter.mjs');
+    expect(ci).toMatch(/--run-record "\$run_record"/);
+  });
+});
+
+describe('tools/ci/vitest-run-reporter.mjs', () => {
+  it('records the unhandled error count and the end reason next to the vitest root', async () => {
+    const { default: Reporter } = await import('./vitest-run-reporter.mjs');
+    const dir = mkdtempSync(join(tmpdir(), 'run-reporter-'));
+    const r = new Reporter();
+    r.onInit({ config: { root: dir } });
+    r.onTestRunEnd([], [new Error('boom')], 'failed');
+    expect(JSON.parse(readFileSync(join(dir, '.vitest-run.json'), 'utf8'))).toEqual({
+      unhandledErrors: 1,
+      reason: 'failed',
+    });
+  });
+
+  it('writes to VITEST_RUN_RECORD when set', async () => {
+    const { default: Reporter } = await import('./vitest-run-reporter.mjs');
+    const file = join(mkdtempSync(join(tmpdir(), 'run-reporter-')), 'run.json');
+    const r = new Reporter({ env: { VITEST_RUN_RECORD: file } });
+    r.onInit({ config: { root: '/nowhere' } });
+    r.onTestRunEnd([], [], 'passed');
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({
+      unhandledErrors: 0,
+      reason: 'passed',
+    });
   });
 });
