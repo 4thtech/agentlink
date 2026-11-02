@@ -161,6 +161,16 @@ export function renderSiteHint(data) {
   return `> **Status: Current as of ${longDate(data.updated)} (${data.versionLabel}, ${data.version}).** Derived from the [build plan](${REPO}/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.`;
 }
 
+/** Release history, newest first, one line each (optional `releases` list in docs/status.yaml). */
+export function releaseLines(data, limit = Infinity) {
+  return (data.releases ?? [])
+    .slice(0, limit)
+    .map((r) => `- **${r.version}** (${r.date}): ${r.summary}`);
+}
+
+/** The knowledge base shows only the newest releases and points at the changelog for the rest. */
+export const KNOWLEDGE_RELEASES = 3;
+
 /** Docs site and knowledge base: where we are, the deploy state and the component table. */
 export function renderSiteSummary(data) {
   const out = [
@@ -170,8 +180,12 @@ export function renderSiteSummary(data) {
     '',
     `**Testnet:** ${data.deploy.testnet.note} **Mainnet:** ${data.deploy.mainnet.note} **Services:** ${data.deploy.services.note}`,
     '',
-    `**In progress:** ${data.inProgress}`,
+    ...(data.current ? [`**Current release:** ${data.current}`, ''] : []),
+    `**Coming next:** ${data.inProgress}`,
     '',
+    ...(releaseLines(data).length
+      ? ['**Releases, newest first:**', '', ...releaseLines(data), '']
+      : []),
     `**Next:** ${data.next}`,
     '',
     '### Components',
@@ -210,7 +224,7 @@ export function renderKnowledgeIntro(data) {
   const names = open.map(
     (m) => `${m.id} (${m.name.toLowerCase()}) is ${m.stateNote ?? 'in progress'}`,
   );
-  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. The released CLI opens with \`npx -y @4thtech-io/agentlink\`; an AI can set itself up with \`npx -y @4thtech-io/agentlink init\`. This section mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
+  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. ${data.current ? `${data.current} ` : ''}The released CLI opens with \`npx -y @4thtech-io/agentlink\`; an AI can set itself up with \`npx -y @4thtech-io/agentlink init\`. This section mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
 }
 
 /** Knowledge base: where things stand, one line per area (done, in progress, planned). */
@@ -230,9 +244,19 @@ export function renderKnowledgeSummary(data) {
   out.push(
     `- **Testnet:** ${data.deploy.testnet.note}`,
     `- **Mainnet:** ${data.deploy.mainnet.note}`,
-    `- **In progress:** ${data.inProgress}`,
+    `- **Coming next:** ${data.inProgress}`,
     `- **Does not exist yet:** ${data.notYet}`,
   );
+  if (releaseLines(data).length) {
+    out.push(
+      '',
+      '### Latest releases',
+      '',
+      ...releaseLines(data, KNOWLEDGE_RELEASES),
+      '',
+      `Older releases and the full list: [CHANGELOG.md](${REPO}/blob/main/CHANGELOG.md).`,
+    );
+  }
   return out.join('\n');
 }
 

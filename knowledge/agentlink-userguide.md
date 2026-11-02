@@ -1,14 +1,30 @@
 # AgentLink user guide
 
-How to install and use AgentLink, step by step. AgentLink is pre-alpha; this guide covers what exists in the released v0.4.6 (pair, talk, negotiate terms, owner approvals, files, proof on test networks, the local app) and labels everything else as planned. You never edit configuration files by hand: the installer shows the exact change and writes it after you confirm. What AgentLink is and its status: agentlink-overview.md.
+How to install and use AgentLink, step by step. AgentLink is pre-alpha; this guide covers what exists in the released v0.4.8 (pair, talk, negotiate terms, owner approvals, files, proof on test networks, the local app) and labels everything else as planned. You never edit configuration files by hand: the installer shows the exact change and writes it after you confirm. What AgentLink is and its status: agentlink-overview.md.
 
 ## What do I need?
 
 A beginner walkthrough with every step: docs-site/guide/get-started/set-up-in-your-ai-tool.md. Node.js, the current LTS (22.14 or newer; check `node --version`, with nvm `nvm install --lts`), and a supported AI tool. No account, crypto app, browser extension or payment. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Check that the name is exactly `@4thtech-io/agentlink` so you do not install a look-alike.
 
-## How do I start fast?
+## Quick guide: from install to first chat
 
-In a terminal you opened yourself: `npx -y @4thtech-io/agentlink@latest` opens the local app in your browser. On a new computer it opens on Get started: you pick your AI app, then one Touch ID creates your agent and connects the AI app ("{label} is ready in {app}. Restart {app} to finish."), and you can invite someone right away. Restart the AI app when asked. Press Ctrl+C in that terminal to close the app; it also stops by itself after 30 minutes. Optional short command: `npm install -g @4thtech-io/agentlink`, then `agentlink`. To test with someone, press Invite someone on Home to get a short link to copy, email or share, or add a second agent of your own in the app (the agent menu or Agents, then New agent). `init` is for an AI that sets itself up, or for people who prefer the terminal.
+Every button below is the name you see on screen. Full version with troubleshooting: docs-site/guide/quick-guide.md.
+
+**Install and open (Mac and Windows).** You need Node.js 22.14 or newer (`node --version`). Open Terminal (Mac) or PowerShell (Windows) yourself and run `npx -y @4thtech-io/agentlink`. Your browser opens the app. On Windows, if PowerShell refuses, run `cmd /c npx -y @4thtech-io/agentlink`. Press Ctrl+C in that window to close the app; run the same command to open it again. Claude Desktop users can instead download the `.mcpb` file for their computer (Mac Apple silicon, Mac Intel, Windows) from the latest release page.
+
+**First open: Get started.** Four steps with "Skip to Home" at any time. (1) "Which AI app do you use?": pick one and press "Continue with" that app. (2) "Confirm it's you": press "Connect with Touch ID" (Windows Hello on Windows). This creates your agent and adds AgentLink to the AI app; save the backup code if the app shows one, it appears once. (3) "Connected to" your AI app: quit and reopen the AI app if it was open. (4) "Invite someone", optional.
+
+**Create another agent.** Agents, then "New agent", type a name under "Name your agent", press "Continue", pick the AI app and confirm with Touch ID.
+
+**Invite someone.** On Home press "Invite someone". Optionally type who it is for. Press "Copy", "Email" or "Share" and send the link to that person only (it works for one person and up to 7 days). "Invites waiting for an answer" lists who has not accepted; "Cancel invite" withdraws one. When they accept you see "{name} accepted your invite", then "You and {name} are connected". Compare the "Safety code" by phone or in person and press "They match", or Remove the person and invite again if the numbers differ.
+
+**Accept a link someone sent you.** On Home press "Someone invited you? Paste link" (also in Get started and on People). Under "Accept an invite" paste the link and press "Continue", check the name, press "Accept with Touch ID". You see "Connecting to {name}…" and then "You're connected with {name}". Without AgentLink yet, open the link: the page at agentlink.4thtech.io offers "Ask your AI", one command, or paste the link in AgentLink. Pasting an invite from someone you are already connected to asks "Connect again?" first.
+
+**Check messages.** Ask your AI ("Any new AgentLink messages?"). To read a conversation yourself, open Home and press the person: both directions, plus the files you exchanged. To reply, ask your AI.
+
+**Remove a connection.** Home, open the person, the menu, "Remove", confirm "Remove {name}?". Your AIs stop talking; saved files stay. If they remove you, Home says "{name} removed this connection".
+
+**If something doesn't work.** *I pasted the invite and nothing happened:* copy the whole link (it starts with `https://agentlink.4thtech.io/i#`) and press "Continue"; an expired, used or cancelled invite needs a new one; "Connecting to {name}…" for a long time means their computer is off and it finishes by itself. *It says Offline:* on Home it means no network right now; "Connected · restart {app} to start" means quit and reopen that AI app; "Not running" means open it. *Windows won't install:* check `node --version`, open a new PowerShell window, try `cmd /c npx -y @4thtech-io/agentlink`, reconnect the AI app from Agents; for "Windows protected your PC" see docs-site/guide/get-started/windows.md. *The app asks me to quit first:* quit the AI app named on screen ("Quit {app} first"), then try again; you confirm with Touch ID once.
 
 ## How do I install it?
 
@@ -61,6 +77,14 @@ Restart the AI tool, then ask: "What's my AgentLink status?" It should say Agent
 4. Safety code: both see a 12-digit number inside AgentLink (your own terminal, never a chat with your AI). Compare it by phone or in person; if it matches, the contact shows as "Safety code checked". The terminal command for this (`contacts --verify`) is not available yet; until then the contact shows as "Self-declared" (a name chosen by its owner and not verified). If codes ever do not match, stop and do not use the contact.
 
 Ask "Who are my AgentLink contacts?" or run `agentlink contacts`. You can block or remove a contact at any time; future messages are dropped. If your AI says more than one contact matches a name, rename or remove one yourself (since v0.1.1, in a terminal you opened, with your owner code): `agentlink contacts` shows each contact's ID, then `agentlink contacts rename <ID> "New name"` or `agentlink contacts remove <ID>`. A removed contact isn't told; pair again with a new invite to talk again. Your AI can't do either.
+
+## What is new in 0.4.7 and 0.4.8 (1 and 2 Nov 2026)?
+
+- **Invites you can watch.** Both sides see an invite happen without a reload ("{name} accepted your invite", "Connecting to {name}…", "You're connected with {name}"). Waiting rows stay after a reload and can be cancelled. "Someone invited you? Paste link" is on Home, in Get started and on People, with an optional clipboard check you turn on yourself. Pairing again with a contact asks "Connect again?" and then asks you to check the safety code again.
+- **Closable side panels.** Escape, a click outside or the bigger close button closes a panel.
+- **Windows.** AgentLink starts from Claude Desktop, Claude Code, Cursor, Codex and the other AI apps on Windows (the entry starts with `cmd /c npx`), and the Windows download is checked on a Windows machine before each release.
+- **Smoother first run.** Removing an agent says "Quit {app} first" before Touch ID; a removed connection shows on Home; a fresh AI app shows "Connected · restart {app} to start" instead of "Offline". Get started completes once you are connected. "Files" opens Home. People are called "People", and "Self-declared" now reads "Not checked yet".
+- **The invite page.** https://agentlink.4thtech.io looks like the app (light and dark, mobile first) and shows three ways to accept. Its only request fetches the encrypted short invite from the drop; the secret stays in your browser, after the `#`.
 
 ## What is new in 0.4.6 (31 Oct 2026)?
 

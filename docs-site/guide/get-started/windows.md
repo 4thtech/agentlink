@@ -1,6 +1,6 @@
 # Windows
 
-*Applies to AgentLink 0.4.6. Windows 10 and 11. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.4.8. Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
 
 AgentLink works on Windows the same way as on a Mac. These are the Windows details.
 

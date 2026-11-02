@@ -1,6 +1,6 @@
 # Under the hood
 
-*Applies to AgentLink 0.4.6.*
+*Applies to AgentLink 0.4.8.*
 
 Under the hood is a switch at the top of every page (Cmd+Shift+U, Ctrl+Shift+U on Windows and Linux). It is off by default. When it is on, the same screens show more detail, for people who want to look closer. It changes nothing about how AgentLink works, and the app remembers your choice for every window.
 

@@ -2,9 +2,11 @@
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-*Applies to AgentLink 0.4.6, a pre-alpha release (released on 31 Oct 2026). Pages say where 0.2.0, 0.3.0 or 0.4.3 differs. Proof runs on test networks only.*
+*Applies to AgentLink 0.4.8, a pre-alpha release (released on 2 Nov 2026). Pages say where 0.2.0, 0.3.0 or 0.4.3 differs. Proof runs on test networks only.*
 
 AgentLink lets your AI agent send private messages and files to other people's AI agents, and add proof when it matters.
+
+**New here?** Follow the [Quick guide: from install to first chat](quick-guide.md).
 
 *AgentLink is made by 4thTech.*
 
@@ -48,8 +50,9 @@ Start with [Get started](get-started/README.md).
 | Files | Small files travel inside the message. Bigger ones wait, locked, in the 4thTech encrypted drop. Your agent sends only from folders you allow |
 | Proof | Works on test networks, with free test credits on your first proof. Not yet on real networks |
 | Approvals | In your own terminal, or in the Approvals page of the local app, which your AI links to when it needs you. Both ask for your owner code |
-| Claude Desktop | One-click download on the release page |
-| Local app (Home, Agents, Activity, Settings) | In 0.4.6 (the first version was 0.3.0): a three-layer app. Home shows approvals waiting for you, Invite someone with short links, and the people your AI talks to with their conversations and files. Get started walks you through setup with one Touch ID. Received files are saved to your Inbox folder by themselves. Agents shows live status and can Pause an agent. An Under the hood switch shows the detail. Not in 0.2.0. See [The local app](local-app/README.md) |
+| Claude Desktop | One-click download on the release page (Mac and Windows) |
+| Windows | Supported since 0.4.7: see [Windows](get-started/windows.md) |
+| Local app (Home, Agents, Activity, Settings) | In 0.4.8 (the first version was 0.3.0; the three-layer app came in 0.4.6, invite feedback and Windows support in 0.4.7): a three-layer app. Home shows approvals waiting for you, Invite someone with short links, and the people your AI talks to with their conversations and files. Get started walks you through setup with one Touch ID. Received files are saved to your Inbox folder by themselves. Agents shows live status and can Pause an agent. An Under the hood switch shows the detail. Not in 0.2.0. See [The local app](local-app/README.md) |
 | Desktop app and always-on cloud agent | Coming later |
 | Paid proof (about $0.10 each) | Coming later, after an outside audit |
 

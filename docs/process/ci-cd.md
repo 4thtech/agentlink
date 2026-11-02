@@ -223,7 +223,7 @@ Everything below is manual (GitHub, npm or Cloudflare settings) and owner-only: 
 ### 1. Repository settings (Settings, General and Code security)
 
 - [ ] Merging: allow **squash merging only** (default message: pull request title and description); disable merge commits and rebase merging; auto-delete head branches. The PR title, which `pr-hygiene` validates, becomes the commit subject.
-- [ ] **Allow auto-merge: on** (D-25). Agents enable it per PR (`gh pr merge N --auto --match-head-commit <sha>`; the merge queue decides the method); GitHub merges when every required check is green. On S2 and sensitive paths the orchestrator enables it only after Tali's "merge" in chat (D-51, D-52).
+- [ ] **Allow auto-merge: on** (D-25). Agents enable it per PR (`gh pr merge N --auto --match-head-commit <sha>`; the repository sets the method; no merge queue, Decision 54); GitHub merges when every required check is green. On S2 and sensitive paths the orchestrator enables it only after Tali's "merge" in chat (D-51, D-52).
 - [ ] Private vulnerability reporting: **enable** (`SECURITY.md` depends on it).
 - [ ] Dependency graph and Dependabot alerts: **enable** (dependency review and Renovate's `vulnerabilityAlerts` use them). **Decision:** leave Dependabot *security updates* off, Renovate opens those PRs.
 - [ ] Secret scanning and **push protection**: **enable**.
@@ -364,7 +364,7 @@ The organisation stays on the **Free** plan (D-27); revisit before M3.
 - Rulesets, branch protection and environment required reviewers work for **public** repositories only. `4thtech/agentlink` enforces everything above. The private repositories (`occ-v2-contracts`, `agentlink-ops`) have no rulesets and no environment protection, so there: testnet keys only, low balances, process discipline (`contracts-gate` verified by the owner before every merge; the testnet deploy workflow triggered manually by the owner). Mainnet keys never touch GitHub.
 - Private repositories on Free also lack secret scanning, push protection and code scanning (GitHub Advanced Security features), and Actions minutes are limited (2,000 per month). The contracts template therefore runs the checks it can in CI and notes the rest.
 - Scheduled workflows in a public repository are disabled by GitHub after 60 days without activity; re-enable them if the weekly security scan stops.
-- Merge queue is optional. `ci.yml`, `security.yml`, `pr-hygiene.yml` and `review-gate.yml` already have `merge_group` triggers so a queue does not stall.
+- The merge queue is off (owner Decision 54, item 2). `ci.yml` has no `merge_group` trigger (OPS-FASTLANE-4); `security.yml`, `pr-hygiene.yml` and `review-gate.yml` still accept one so switching a queue on later would not stall.
 
 ## Contracts repository (private)
 

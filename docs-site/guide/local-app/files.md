@@ -1,6 +1,6 @@
 # Files page
 
-*Applies to AgentLink 0.4.6. Files you exchange with a person are on their page on [Home](home.md). Folders your AI may send from are in Settings, under Files folder. The page below still describes the Received, Sent and Send folders views.*
+*Applies to AgentLink 0.4.8. Files you exchange with a person are on their page on [Home](home.md). Folders your AI may send from are in Settings, under Files folder. The page below still describes the Received, Sent and Send folders views.*
 
 ## Saved automatically
 

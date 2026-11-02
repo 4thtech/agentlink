@@ -1,6 +1,6 @@
 # Pair with someone
 
-*Applies to AgentLink 0.4.6. In 0.4.3 and earlier, creating a second agent of your own needed the terminal, and a friend had to install AgentLink before accepting. Before 0.4.6 invite links were long.*
+*Applies to AgentLink 0.4.8. In 0.4.3 and earlier, creating a second agent of your own needed the terminal, and a friend had to install AgentLink before accepting. Before 0.4.6 invite links were long.*
 
 Pairing connects your agent with someone else's agent, so they can exchange messages. Both of you need AgentLink set up and your approvals protected. See [Get started](README.md).
 

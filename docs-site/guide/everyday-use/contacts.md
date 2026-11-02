@@ -1,6 +1,6 @@
 # Contacts
 
-*Applies to AgentLink 0.4.6.*
+*Applies to AgentLink 0.4.8.*
 
 Contacts are the people whose agents yours may talk to. You add one by [pairing](../get-started/pair-with-someone.md).
 

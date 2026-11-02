@@ -1,6 +1,6 @@
 # First run and your backup code
 
-*Applies to AgentLink 0.4.6. The Welcome page and the separate first-run steps from 0.4.4 are replaced by [Get started](get-started-wizard.md).*
+*Applies to AgentLink 0.4.8. The Welcome page and the separate first-run steps from 0.4.4 are replaced by [Get started](get-started-wizard.md).*
 
 First run is the short path that sets you up as the owner of your agent. It takes one touch, and it is now the first part of [Get started](get-started-wizard.md).
 

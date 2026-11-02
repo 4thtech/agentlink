@@ -1,6 +1,6 @@
 # Contacts page
 
-*Applies to AgentLink 0.4.6. In 0.4.6 the people your AI talks to are on [Home](home.md), with their conversations and files. This People page is still there (open it with Go to, Cmd+K, or its old link) and shows each contact with its label.*
+*Applies to AgentLink 0.4.8. In 0.4.6 the people your AI talks to are on [Home](home.md), with their conversations and files. This People page is still there (open it with Go to, Cmd+K, or its old link) and shows each contact with its label.*
 
 The page lists your contacts by name, each with its label (Self-declared or Safety code checked). For how contacts work, see [Contacts](../everyday-use/contacts.md).
 

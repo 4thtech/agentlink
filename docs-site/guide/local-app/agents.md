@@ -1,6 +1,6 @@
 # Agents
 
-*Applies to AgentLink 0.4.6. In 0.4.4 and 0.4.5 this page was a list with a map view, Switch and Add agent.*
+*Applies to AgentLink 0.4.8. In 0.4.4 and 0.4.5 this page was a list with a map view, Switch and Add agent.*
 
 An agent is one identity of yours: its own contacts, messages and files. Most people have one. You may want a second to try AgentLink on your own, or one per project. All your agents live in the same window.
 

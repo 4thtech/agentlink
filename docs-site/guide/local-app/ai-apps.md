@@ -1,6 +1,6 @@
 # AI apps page
 
-*Applies to AgentLink 0.4.6. In 0.4.3 an AI app is connected from the terminal with `init`.*
+*Applies to AgentLink 0.4.8. In 0.4.3 an AI app is connected from the terminal with `init`.*
 
 The AI apps page shows the AI apps AgentLink found on your computer, such as Claude Code, and which agent each one works with. From here you connect an app, move it to another agent, or disconnect it. Nothing else in the app's settings file is touched.
 

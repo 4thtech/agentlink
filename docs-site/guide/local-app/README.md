@@ -1,6 +1,6 @@
 # The local app
 
-*Applies to AgentLink 0.4.6 (released 31 Oct 2026). It is not in 0.2.0. The three-layer app described here is new in 0.4.6.*
+*Applies to AgentLink 0.4.8 (released 31 Oct 2026). It is not in 0.2.0. The three-layer app described here is new in 0.4.6.*
 
 The local app is a set of pages that open in your browser. They run on your own computer, and nothing on them is sent to 4thTech. Use them to see who your AI talks to, approve what needs you, and set up agents and AI apps.
 

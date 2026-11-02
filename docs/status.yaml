@@ -14,14 +14,14 @@
 # scalars, full-line comments), read by tools/docs-status/yaml.mjs. Pull requests are numbers
 # (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
 
-updated: "2026-10-31"
-version: "v0.4.6"
+updated: "2026-11-02"
+version: "v0.4.8"
 versionLabel: "M1b, files, proof, credits (pre-alpha, test networks)"
 milestone: "M1b Files, proof, credits"
-phase: "M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 and v0.1.2; M1b (files, proof, credits) released as v0.2.0 (pre-alpha, test networks only); the local app is released in 0.3.0 (26 Oct 2026), 0.4.0 (27 Oct 2026), 0.4.1, 0.4.2 and 0.4.3 (all 28 Oct 2026) 0.4.4 (29 Oct 2026), 0.4.5 (29 Oct 2026) and 0.4.6 (31 Oct 2026)"
+phase: "M0 Foundations nearly complete; M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, with the local app from 0.3.0; the current release is 0.4.8 (2 Nov 2026), pre-alpha, test networks only"
 
 # Components by area. state: done | in-progress | planned.
-# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.4.6) is published or user-runnable until a release says so.
+# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.4.8) is published or user-runnable until a release says so.
 areas:
   - id: m0
     title: "M0 Foundations"
@@ -463,8 +463,48 @@ deploy:
     note: "The encrypted drop Worker is deployed to production at drop.agentlink.4thtech.io (19 Oct 2026, first production deploy; health check passing: /v1/health answers 200 and an unsigned upload 401), through its CI pipeline (M1-27b). The released CLI uses it for files above about 12 KB (since v0.2.0). The submitter Worker is deployed to production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta on Base Sepolia, health ok) through its CI pipeline with owner approval (M1-10c); proofs work end to end on the testnet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "**New in 0.4.6 (31 Oct 2026):** the new app, in three layers. Get started is a short guided path (pick your AI app, one Touch ID that also creates your agent and connects the app, then invite someone), and it comes back from Help, Cmd+K and a Home card. Home is the first screen: what waits for your approval as cards on top, and the people your AI talks to, each with the conversation both ways and the files you exchanged. \"Under the hood\" turns the same screens into tables with more detail, a live activity stream, Relays & network and Diagnostics. Invite links are now under 80 characters (Copy, Email or Share), open invites can be cancelled, and Paste a link accepts one with Touch ID. Files you receive from your contacts are saved automatically into your Inbox folder (default `~/AgentLink/Inbox`) within daily limits, with Show in Finder. The app shows live, without a reload, which AI app is working with which agent. Agents has Pause (one click) and Resume (Touch ID), Rename that reaches your contacts, and Connect or Disconnect an AI app. Recovery kits restore again. v0.4.6 is on npm `latest` and a GitHub release (31 Oct 2026). Coming next, not released yet: the Connections map, saved views and an Open file spec. **In 0.4.5 (29 Oct 2026):** fixes to the new app: new contacts appear without a reload, removing an agent finishes, Touch ID is found when no agent is open, the top bar shows one status, and early previews are on `@next`. **In 0.4.4 (29 Oct 2026):** usability wave 3. A new computer opens straight on Welcome (`npx -y @4thtech-io/agentlink`): pick your AI app, name your agent, one Touch ID, then connect the AI app. The app holds all your agents with a switcher in the top bar and an Agents page (add, rename, remove, and a Live connections map), an AI apps page connects, moves or disconnects an AI app with a backup of its settings, Start here has seven steps and a way to try AgentLink with a second agent of your own, Messages and Files mark what is moving right now, and a friend can join from an invite link with one command (`agentlink join`). The terminal no longer asks which agent you mean, and agents from 0.4.3 are all listed and keep their history. Contacts see the name you typed for your agent, and Welcome lists your AI apps before the first agent exists. v0.4.4 is on npm `latest` and a GitHub release (29 Oct 2026; v0.4.3, v0.4.2 and v0.4.1 of 28 Oct 2026 and v0.4.0 of 27 Oct 2026 came before it). The Claude Desktop extension files for macOS (Apple silicon and Intel) and Windows are on the release page. **In 0.4.3:** Add contact on the Contacts page (create an invite and Copy, Share or show a QR code; paste one you received and check \"Is this who you expected?\" with a fingerprint before Touch ID); a Start here checklist on Home; Add credits shows three steps (Waiting, Arrived, Added) with the AgentLink waiting mark; each contact shows a 24-hour activity pulse and a word (Active now, Today, Quiet) with a Most active sort; and a compact view opened from Home. The Claude Desktop extension files for macOS (Apple silicon and Intel) and Windows are on the release page. **In 0.4.2:** Approvals sit side by side in a grid, with a Grid/List Layout control; choices (Messages Inbox/Sent, Files tabs, the Activity filter) look like the Under the hood switch; Rules shows an \"Unsaved\" marker; Files you send show live progress until they are delivered, and one sent more than a day ago with no receipt says \"Sent · no receipt yet\"; denied approvals fold away; the Messages count looks like the Approvals one; Settings pages load when first needed; a Proofs success-moment fix; approval text now wraps instead of being cut off, including on the approval link page; and some technical-panel hardening. The Claude Desktop extension files for macOS (Apple silicon and Intel) and Windows are on the release page. **In 0.4.1:** the local app has a visual refresh: a calmer look with light and dark themes, a Home page, an Appearance page (theme, reduce motion, transparency) with an optional \"Under the hood\" view, smoother page changes and better keyboard and screen-reader use. Approvals now open inside the app, and the old stand-alone approval page is gone. The Claude Desktop extension files for macOS (Apple silicon and Intel) and Windows are on the release page. **In 0.4.0:** the local app shows your conversations. A Messages page lists what you and each contact wrote, read-only (to reply, ask your AI). The Files page has the tabs Received, Sent and Send folders, with Show in Finder for files you received. Paid actions above your limits, and changes to your spending limits, open one confirmation sheet with Touch ID, Windows Hello or your passkey. An owner set up before 0.3.0 can switch to Touch ID once. The status bar shows whether AgentLink is running. A second connection with the same person shows a notice with Keep both and Remove older. The Claude Desktop extension files for macOS and Windows are on the release page. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23)."
-notYet: "confirming a verified registration (the sheet is ready for it), adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on test networks only. v0.4.6 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; open it with `npx -y @4thtech-io/agentlink`, or let your AI set itself up with `npx -y @4thtech-io/agentlink init`. Messages, the Files tabs, the status bar and paid-action confirmation are in 0.4.0 and later and are not in v0.3.0; the refreshed look and Approvals inside the app are in 0.4.1 and later and are not in v0.4.0; the Approvals grid, the switch-style controls and live Files progress are in 0.4.2 and later and are not in v0.4.1; Add contact, the Start here checklist, funding steps, the activity pulse and the compact view are in 0.4.3 and later and are not in v0.4.2; Welcome, the Agents page and switcher, the AI apps page, the live connections map, the seven-step Start here and joining from an invite link are in 0.4.4 and are not in v0.4.3; the new three-layer app (Get started, Home, Under the hood), short invite links, files saved automatically, live AI app status and Pause are in 0.4.6 and are not in v0.4.5."
+current: "**AgentLink 0.4.8 is out (2 Nov 2026, on npm `latest`, Mac and Windows).** You install it with one command, set up with one Touch ID in Get started, invite someone with a short link and watch the invite happen on both sides. Home shows what waits for you and your conversations, files you receive are saved to your Inbox folder, and the public invite page at agentlink.4thtech.io looks like the app."
+inProgress: "Coming next, not released yet: the Connections map, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23)."
+
+# Release history for the docs-site status page and the knowledge overview, newest first, one line each.
+releases:
+  - version: "0.4.8"
+    date: "2 Nov 2026"
+    summary: "The public invite page looks like the app (three ways to accept); Get started completes once you are connected; Files opens Home; removing an agent says \"Quit {app} first\" before Touch ID; a removed connection shows on Home; no \"Offline\" before the first heartbeat."
+  - version: "0.4.7"
+    date: "1 Nov 2026"
+    summary: "Both sides see an invite happen without a reload; \"Someone invited you? Paste link\" on Home, Get started and People; closable side panels; AgentLink starts from AI apps on Windows."
+  - version: "0.4.6"
+    date: "31 Oct 2026"
+    summary: "The new app in three layers (Get started, Home, Under the hood); short invite links; files saved to your Inbox folder; live AI app status; Pause and Resume; recovery kits restore again."
+  - version: "0.4.5"
+    date: "30 Oct 2026"
+    summary: "Fixes to the new app: new contacts appear without a reload, removing an agent finishes, Touch ID is found when no agent is open, one status in the top bar, early previews on `@next`."
+  - version: "0.4.4"
+    date: "29 Oct 2026"
+    summary: "Welcome and a short first run, all your agents in one window, an AI apps page, a live connections map (later replaced), seven-step Start here, and joining from an invite link with `agentlink join`."
+  - version: "0.4.3"
+    date: "28 Oct 2026"
+    summary: "Add contact with invite links (Copy, Share, QR code), a Start here checklist, adding credits in three steps, a 24-hour activity pulse and a compact view."
+  - version: "0.4.2"
+    date: "28 Oct 2026"
+    summary: "Approvals in a grid, switch-style choices, live progress for files you send."
+  - version: "0.4.1"
+    date: "28 Oct 2026"
+    summary: "A refreshed local app in light and dark, an Appearance page, an optional Under the hood view, approvals inside the app."
+  - version: "0.4.0"
+    date: "27 Oct 2026"
+    summary: "Messages page, Files tabs, paid-action confirmation with Touch ID, a status bar."
+  - version: "0.3.0"
+    date: "26 Oct 2026"
+    summary: "The local app and credits (test networks only)."
+  - version: "0.2.0"
+    date: "24 Oct 2026"
+    summary: "Files and proof on test networks (M1b)."
+  - version: "0.1.0 to 0.1.2"
+    date: "16 to 20 Oct 2026"
+    summary: "Pair, talk and negotiate terms with owner approvals (M1a)."
+notYet: "confirming a verified registration (the sheet is ready for it), adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on test networks only. v0.4.8 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; open it with `npx -y @4thtech-io/agentlink`, or let your AI set itself up with `npx -y @4thtech-io/agentlink init`."
 next: "The cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers."
 
 # Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the
@@ -491,7 +531,7 @@ roadmap:
   - id: "M1b"
     name: "Files, proof, credits"
     state: in-progress
-    stateNote: "v0.2.0, v0.3.0, v0.4.0, v0.4.1, v0.4.2, v0.4.3, v0.4.4, v0.4.5 and v0.4.6 (local app) released, test networks only; M1 gate with internal testers open"
+    stateNote: "v0.2.0 to v0.4.8 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open"
     version: "0.2.0 (M1 gate)"
     duration: "~3–4 weeks"
     outcome: "Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109)"
@@ -502,7 +542,7 @@ roadmap:
     state: planned
     version: "0.5.0 (cloud agent first) and later"
     duration: "~4–6+ weeks"
-    outcome: "Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109)"
+    outcome: "Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify page; accept in the browser (planned; today the live invite page at agentlink.4thtech.io shows how to accept in the app); verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109)"
     gate: "20 to 50 external early adopters on testnets; install to first message in under 5 minutes."
   - id: "M3"
     name: "Mainnet beta (Base, Gnosis)"

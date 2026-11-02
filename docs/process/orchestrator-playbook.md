@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Purpose** | What the orchestrator does, every session, step by step: delegate, keep workers busy, route by model, run the merge queue, record reviews. |
+| **Purpose** | What the orchestrator does, every session, step by step: delegate, keep workers busy, route by model, merge when green (no merge queue, Decision 54), record reviews. |
 | **Applies to** | The orchestrator (main session of the owner) and every worker it briefs. |
 | **Status** | Normative · v1.0 · 23 Oct 2026 · **owner instruction 2026-10-23** (Tali, in chat: every orchestrator session always orchestrates and delegates, with a four-model routing) |
 | **Companions** | `AGENTS.md` (hard rules, always win) · `development-process.md` §1 (roles), §3 (routing, context economy), §4 (briefs), §5 (verification) · `audit-rules.md` (classes, independent review) · `delivery-process.md` (lifecycle) · `sync-protocol.md` · `release-and-deployment.md` |
@@ -79,7 +79,7 @@ Agents arm merges only behind the GitHub-enforced gates and only after `developm
 gh pr merge <N> --auto --match-head-commit <full head sha>
 ```
 
-Never `--squash` (the merge queue sets the method) and never `--admin`. `--match-head-commit` pins the reviewed head: if the branch moved, arming fails, and the moved head needs its own review (§5.3).
+Never `--squash` (the merge method is set by the repository, not per PR; the merge queue is off, Decision 54) and never `--admin`. `--match-head-commit` pins the reviewed head: if the branch moved, arming fails, and the moved head needs its own review (§5.3).
 
 ### 5.2 Ejection
 
