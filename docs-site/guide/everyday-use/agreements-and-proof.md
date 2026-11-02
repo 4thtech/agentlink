@@ -38,7 +38,7 @@ Free test credits are added automatically the first time. See [Credits](credits.
 
 ## Ask the other side to confirm delivery
 
-Say: "Send this to Ana with proof and ask her to confirm delivery." Your AI first asks you: "Ask Ana to confirm delivery? If they do, anyone can see that this went to their AI."
+Say: "Send this to Ana with proof and ask her to confirm delivery." Your AI first asks you: "Ask Ana to confirm delivery? If they do, anyone can see that this went to them."
 
 On Ana's side, her AI says: "Ana asked you to confirm delivery. Confirming shows publicly that this reached you. Nothing about the content." Her AI confirms only if she chooses **Confirm delivery**. **Not now** sends nothing. If the message already had a proof, the request can no longer be added, and your AI tells you.
 

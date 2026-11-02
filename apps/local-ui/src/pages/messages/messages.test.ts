@@ -503,7 +503,7 @@ describe('copy', () => {
     const all = Object.values(S).filter((v) => typeof v === 'string') as string[];
     for (const s of all) expect(s).not.toMatch(NEVER);
     expect(S.nothingYet('Marko')).toBe(
-      "Nothing yet. When your AI and Marko exchange messages, they show here.",
+      'Nothing yet. When your AI and Marko exchange messages, they show here.',
     );
     expect(S.reply).toBe('To reply, ask your AI.');
     // W4-SHELL (owner, 29 Oct): the page reached by Inbox is the Inbox; no separate "Messages" name.

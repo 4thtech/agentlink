@@ -47,9 +47,10 @@ describe('chapter 1: onboarding', () => {
     // Step 2 (A1): "Confirm it's you": the agent card (renamed), Connect with Touch ID.
     await page.waitForURL((url) => url.pathname === '/start/connect');
     await page.getByRole('heading', { name: "Confirm it's you" }).waitFor();
-    await page.getByRole('button', { name: /^Change the ID's name/ }).click();
+    // W7-ID-B1: the name people see is asked for (empty on a fresh home); the gesture waits for it.
     const name = page.getByLabel('Name people see');
-    expect(await name.inputValue()).not.toBe('');
+    expect(await name.inputValue()).toBe('');
+    expect(await page.getByRole('button', { name: CONNECT_WITH }).isDisabled()).toBe(true);
     await name.fill('Home base');
     await page.getByRole('button', { name: CONNECT_WITH }).click();
     // The owner code is still shown once on first run.

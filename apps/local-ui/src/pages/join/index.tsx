@@ -10,7 +10,7 @@
 //   backup code) is the presence proof of one `POST /api/ui/join/accept {inviteId}`, bound to the ID
 //   this screen shows (another one is `invite_changed`, and nothing is signed). The server signs.
 // - "Not now" forgets the invite (`POST /api/ui/join/dismiss`) and goes to Home.
-// - After accepting: "Waiting for {name}'s agent to answer." (the 10-minute line after 10 minutes),
+// - After accepting: "Waiting for {name} to answer." (the 10-minute line after 10 minutes),
 //   then "Connected with {name}." and the safety-code step on Contacts. The safety code does not
 //   exist before the handshake-ack (04 §3.6.1), so it is never shown here before that.
 // W4-PEOPLE-INVITE (prototype v23 A6, A7): the card is the friend's screen, "{name} invites you to

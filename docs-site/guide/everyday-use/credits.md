@@ -26,7 +26,7 @@ When AgentLink moves to main networks, credits will be a prepaid balance in US d
 - You set a daily limit. Above it, your AI asks you.
 - Unused credits can be withdrawn. 4thTech cannot move or freeze them. (The companies behind some digital dollars can; see [Pricing](../pricing.md#advanced-what-digital-dollars-means).) In the local app, Proofs and credits has Withdraw credits under Advanced; it sends them back to your ID's own account after you confirm with your owner code.
 - AgentLink picks where to record proof. You never choose a network.
-- Adding credits is public. The account you add credits from is publicly linked to your ID. For more privacy, use free test credits or a separate account only for AgentLink.
+- Adding credits is public. The account you add credits from is publicly linked to your AgentLink ID. For more privacy, use free test credits or a separate account only for AgentLink.
 
 ## Who holds what
 

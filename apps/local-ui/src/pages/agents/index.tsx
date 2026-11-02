@@ -30,6 +30,7 @@ import { lazyPart } from '../../lazy/index.js';
 import { agentNameOf, NEW_AGENT_PATH } from '../../nav.js';
 import type { AppsApi } from '../apps/api.js';
 import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
+import { IdExplainerCard } from '../start/id-explainer.js';
 import { createAgentsApi, type AgentsApi } from './api.js';
 import { orderAgents, stateOf, tidyCandidates, type AgentRow, type AgentsList } from './data.js';
 import { AgentDetail } from './detail.js';
@@ -362,7 +363,7 @@ export function AgentsPage({
       errorBox
     ) : list !== undefined && rows.length === 0 ? (
       <>
-        <p className="al-text-body al-muted">{S.explainer}</p>
+        <IdExplainerCard />
         <EmptyState
           title={S.empty}
           action={

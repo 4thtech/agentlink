@@ -10,8 +10,7 @@ export const INBOX_STRINGS = {
   allCaughtUp: 'All caught up',
   allCaughtUpHint: 'Nothing needs you right now. New messages, files and approvals appear here.',
   noConversations: 'No conversations yet.',
-  noConversationsHint:
-    'Invite someone. When they write to you, the conversation appears here.',
+  noConversationsHint: 'Invite someone. When they write to you, the conversation appears here.',
   newMessage: 'New message',
   fileFrom: 'File from {name}',
   approvalLabel: 'Needs your approval',

@@ -35,9 +35,6 @@ export const AGENTS_STRINGS = {
   removalNotFinished: 'Removal not finished',
   removalReason: 'Removing it stopped part-way. Nothing else was affected.',
   empty: 'No IDs left. Add one to keep using AgentLink.',
-  /** The owner's sentence (D-144 improvement (b)); also on the empty IDs page. */
-  explainer:
-    "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.",
   loadError: "Couldn't load your IDs.",
   loading: 'Loading your IDs',
   findAgent: 'Find an ID',

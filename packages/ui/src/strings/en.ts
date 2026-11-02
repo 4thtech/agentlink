@@ -41,7 +41,7 @@ export const en = {
   'common.safetyCode.stopped.title': 'Pairing stopped. Nothing was shared.',
   // S-6: a key update by the same owner keeps the check (11, d1/MANIFEST.md drift).
   'common.safetyCode.changed':
-    "{contactName} updated its keys (same owner). Your safety code check still stands.",
+    '{contactName} updated its keys (same owner). Your safety code check still stands.',
   'common.suggestedPassOn': 'Suggested way to pass it on', // S-10 (was a never-say word)
   'common.empty.proof': 'Send a document and add proof to see it here.', // S-10
 

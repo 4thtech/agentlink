@@ -341,18 +341,18 @@ Proof is public by design, so the user is told what others can see, in plain wor
 
 | Where | String |
 |---|---|
-| First proof, and every approval that adds proof | "A proof is public. Anyone can see that your ID recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says." |
+| First proof, and every approval that adds proof | "A proof is public. Anyone can see that your AgentLink ID recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says." |
 | Same, second line | "If {contactName} confirms delivery, it also becomes public that it went to them." |
 | Asking for a delivery receipt (sender) | "Ask {contactName} to confirm delivery? If they do, anyone can see that this went to them." |
-| Receipt request (recipient) | "{contactName} asked you to confirm delivery. Confirming shows publicly that this reached your ID. Nothing about the content." Buttons: **Confirm delivery** · **Not now** |
-| Turn on automatic delivery confirmations for a contact | "Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached your ID." |
-| Opened, accepted or rejected receipt | "This is public: anyone can see that your ID {opened / accepted / rejected / received} it, and when." ("received" for a delivery the user confirmed, M1-33d) |
+| Receipt request (recipient) | "{contactName} asked you to confirm delivery. Confirming shows publicly that this reached you. Nothing about the content." Buttons: **Confirm delivery** · **Not now** |
+| Turn on automatic delivery confirmations for a contact | "Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached you." |
+| Opened, accepted or rejected receipt | "This is public: anyone can see that your AgentLink ID {opened / accepted / rejected / received} it, and when." ("received" for a delivery the user confirmed, M1-33d) |
 | Rules page, delivery confirmations (default off) | "Confirm deliveries publicly: Off (recommended). Turn on for contacts you trust." |
-| Owner re-sign while receipts are on from an older default (CLI, 06 §3, M1-33a) | "Delivery receipts are on from an older default. Each one shows publicly that a proof reached your ID, never the content." then "Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off." |
+| Owner re-sign while receipts are on from an older default (CLI, 06 §3, M1-33a) | "Delivery receipts are on from an older default. Each one shows publicly that a proof reached you, never the content." then "Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off." |
 | `agentlink doctor`, same case | "Delivery receipts are on from an older default; they will turn off unless you keep them." |
-| Top-up (each method, once) | "The account you add credits from is publicly linked to your ID. For more privacy, use free test credits or a separate account only for AgentLink." |
+| Top-up (each method, once) | "The account you add credits from is publicly linked to your AgentLink ID. For more privacy, use free test credits or a separate account only for AgentLink." |
 | Proof export | "This file shows the proof, your ID card and the message details. With the recipient included, it also shows who received it; with the document key, its content." |
-| Get the Registered badge (§6.13) | "Registering puts your ID's link to you on the public record. Your ID's name is not published." |
+| Get the Registered badge (§6.13) | "Registering puts your AgentLink ID's link to you on the public record. Your ID's name is not published." |
 
 Help text (user guide, privacy page) explains the same in full: what is public (who recorded, when, the kind, receipts and who gave them, which account paid for credits), what is never public (content, file and display names, terms, rules, approvals), and how to keep more private (delivery confirmations off, a separate top-up account, sharing proof files only when needed).
 

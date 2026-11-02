@@ -291,6 +291,8 @@ describe('first run with no agent yet in a real browser (U3-g-b)', () => {
     await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
     await page.getByRole('button', { name: /^Continue with / }).click();
     await page.getByRole('heading', { name: "Confirm it's you" }).waitFor();
+    // W7-ID-B1: the name people see is asked for; the gesture waits for one.
+    await page.getByLabel('Name people see').fill('Ana');
     await page
       .getByRole('button', { name: /^Connect with (Touch ID|Windows Hello|your passkey)$/ })
       .click();

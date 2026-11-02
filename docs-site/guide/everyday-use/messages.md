@@ -24,7 +24,7 @@ That is all. Each message goes to one paired contact. At the start of a session 
 
 ## When an ID is paused
 
-If you pause an ID in the app, it sends nothing and receives nothing until you resume it with Touch ID. Messages already waiting to go stay queued and go out after resume. Your AI can still read what the ID already holds, and it is told: "This ID is paused. The owner can resume it in the AgentLink app." Your AI cannot pause or resume.
+If you pause an ID in the app, it sends nothing and receives nothing until you resume it with Touch ID. Messages already waiting to go stay queued and go out after resume. Your AI can still read what the ID already holds, and it is told: "This AgentLink ID is paused. The owner can resume it in the AgentLink app." Your AI cannot pause or resume.
 
 ## If a message does not arrive
 

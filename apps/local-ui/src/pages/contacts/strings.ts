@@ -15,10 +15,9 @@ export const CONTACTS_STRINGS = {
   blocked: 'Blocked',
   blockedDetail: 'Blocked. Messages from this person are dropped.',
   revoked: 'No longer active',
-  revokedDetail: "This person turned this ID off. Messages from it are dropped.",
+  revokedDetail: 'This person turned this ID off. Messages from it are dropped.',
   waiting: 'Waiting for them',
-  waitingDetail:
-    'Waiting for them to answer the invite. The safety code shows here once it does.',
+  waitingDetail: 'Waiting for them to answer the invite. The safety code shows here once it does.',
   mismatchChip: 'Safety code did not match',
   safetyCode: 'Safety code',
   safetyExplain:

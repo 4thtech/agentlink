@@ -427,7 +427,9 @@ describe('ApprovalCard (C-1, LA-3…LA-9)', () => {
       h(ui.ApprovalCard, {
         ...base,
         type: 'proof',
-        disclosure: ['A proof is public. Anyone can see that your AgentLink ID recorded something.'],
+        disclosure: [
+          'A proof is public. Anyone can see that your AgentLink ID recorded something.',
+        ],
         receiptRequest: { contact: { alias: 'Marko' } },
       }),
     );

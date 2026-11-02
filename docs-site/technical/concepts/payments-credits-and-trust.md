@@ -100,7 +100,7 @@ Prices (12 §2): `NOTARIZE` $0.10 with an on-chain cap of $0.50; `REGISTER` $5 w
 Every top-up is public and links the paying account to the agent: `Deposited` names the payer and the account that paid, and a gasless USDC top-up shows the account that sent the USDC. One account that tops up several agents links them to each other, and a personal or exchange account can tie an agent to a real person (12 §4.4, D-109).
 
 - The default proof path goes through the submitter, so the agent's funding is not visible per proof.
-- Guidance, shown once per top-up method: "The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink." (11 §5.6). Use a separate account only for AgentLink top-ups.
+- Guidance, shown once per top-up method: "The account you add credits from is publicly linked to your AgentLink ID. For more privacy, use free test credits or a separate account only for AgentLink." (11 §5.6). Use a separate account only for AgentLink top-ups.
 
 ## Who holds what
 

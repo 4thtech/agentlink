@@ -22,8 +22,8 @@ export async function openAgents(page: Page): Promise<void> {
 export async function addAgent(page: Page, label: string): Promise<void> {
   await page.getByRole('button', { name: /^ID: / }).first().click();
   await page.getByRole('menuitem', { name: 'New ID' }).click();
-  await page.getByRole('heading', { name: 'Name your agent', level: 1 }).waitFor();
-  await page.getByLabel('Agent name').fill(label);
+  await page.getByRole('heading', { name: 'Name this ID', level: 1 }).waitFor();
+  await page.getByLabel('Name people see').fill(label);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
   await page.getByRole('button').filter({ hasText: 'Not found yet' }).first().click();
