@@ -216,13 +216,17 @@ export const HEAVY_LANE = Object.freeze({
 // when it touches macOS-specific code: the OS keychain and its KeyStore fallback, the owner-presence
 // approval (Touch ID / passkey) code, the CLI keychain tests, or a non-doc file whose name says
 // macOS or Darwin. The heavy lane on `main` and `wave-4` runs them always (ci.yml). Shared code such
-// as `packages/crypto/` and the path guard is tested on Linux and Windows in the pull request and on
+// as `packages/crypto/` is tested on Linux and Windows in the pull request and on
 // macOS after the merge. Keep this explicit: select-affected.test.mjs pins it.
 export const MACOS_PATHS = Object.freeze([
   'packages/node/src/keychain',
   'packages/node/src/os-keychain',
   'packages/node/src/file-keystore',
   'packages/node/src/approval-os',
+  'packages/node/src/inbox-folder',
+  'packages/node/src/allowed-path',
+  'packages/core/src/path-guard',
+  'packages/node/package.json',
   'apps/cli/test/two-process.keychain',
   'apps/cli/test/one-shot-exit.keychain',
 ]);
