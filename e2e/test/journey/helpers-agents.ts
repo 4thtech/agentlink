@@ -9,12 +9,9 @@ import { CONFIRM_PASSKEY } from './world.js';
  * is also a section of the menu). An in-app move, never `goto`.
  */
 export async function openAgents(page: Page): Promise<void> {
-  await page
-    .getByRole('button', { name: /^Agent: / })
-    .first()
-    .click();
-  await page.getByRole('menuitem', { name: 'Manage agents' }).click();
-  await page.getByRole('heading', { name: 'Agents', level: 1 }).first().waitFor();
+  await page.getByRole('button', { name: /^ID: / }).first().click();
+  await page.getByRole('menuitem', { name: 'Manage IDs' }).click();
+  await page.getByRole('heading', { name: 'IDs', level: 1 }).first().waitFor();
 }
 
 /**
@@ -23,13 +20,10 @@ export async function openAgents(page: Page): Promise<void> {
  * made it; no app moves to it) → one Touch ID → "{label} is ready" → Go to Home, in the app.
  */
 export async function addAgent(page: Page, label: string): Promise<void> {
-  await page
-    .getByRole('button', { name: /^Agent: / })
-    .first()
-    .click();
-  await page.getByRole('menuitem', { name: 'Add agent' }).click();
-  await page.getByRole('heading', { name: 'Name your agent', level: 1 }).waitFor();
-  await page.getByLabel('Agent name').fill(label);
+  await page.getByRole('button', { name: /^ID: / }).first().click();
+  await page.getByRole('menuitem', { name: 'New ID' }).click();
+  await page.getByRole('heading', { name: 'Name this ID', level: 1 }).waitFor();
+  await page.getByLabel('Name people see').fill(label);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
   await page.getByRole('button').filter({ hasText: 'Not found yet' }).first().click();

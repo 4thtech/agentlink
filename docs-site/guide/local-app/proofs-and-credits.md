@@ -8,9 +8,9 @@ This page lists your proofs, with when each was made and whether it was recorded
 
 If you have no proofs yet, the page suggests what to ask your AI.
 
-**Add credits** shows a QR code for your agent's account, with a copy button. On the test network, send test coins to that account, then wait on the panel: it shows **Waiting for your funds**, then **Arrived** with the amount once AgentLink has checked your agent's account. Choose **Add $X to your credits** and confirm with your backup code; the last step, **Added to credits**, appears once your credits show the new amount. A little stays with your agent to cover network costs. The account you add credits from is publicly linked to your agent. Adding real credits is not available yet.
+**Add credits** shows a QR code for your ID's account, with a copy button. On the test network, send test coins to that account, then wait on the panel: it shows **Waiting for your funds**, then **Arrived** with the amount once AgentLink has checked your ID's account. Choose **Add $X to your credits** and confirm with your backup code; the last step, **Added to credits**, appears once your credits show the new amount. A little stays with your AI to cover network costs. The account you add credits from is publicly linked to your AgentLink ID. Adding real credits is not available yet.
 
-Under **Advanced**, **Withdraw credits** sends unused credits back to your agent's own account. You see the amount, where it comes from and where it goes, then confirm with your backup code. Sending them to another account comes in a later update.
+Under **Advanced**, **Withdraw credits** sends unused credits back to your ID's own account. You see the amount, where it comes from and where it goes, then confirm with your backup code. Sending them to another account comes in a later update.
 
 From 0.4.0, a proof that costs more than your limit asks you to confirm with Touch ID, Windows Hello or your passkey first. Proofs inside your limits still run on their own. See [Confirming paid actions](confirm-paid-actions.md). The page says it too: **Your credits stay yours; 4thTech never holds them.**
 

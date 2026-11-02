@@ -361,6 +361,12 @@ describe('server instructions wording (M1-36h; 11 §5.1, I-5)', () => {
     );
   });
 
+  it("tell the model its AI app has one ID and a new ID is the owner's choice (W7-ID-X3, D-144)", () => {
+    expect(SERVER_INSTRUCTIONS).toContain(
+      "This AI app has one AgentLink ID; every chat and agent in this app uses it. Don't create a new ID per chat: a new ID is the owner's choice in the AgentLink app.",
+    );
+  });
+
   it('are fixed text: no placeholder, template or run-time value (I-5)', () => {
     expect(SERVER_INSTRUCTIONS).not.toMatch(/[{}]|\$\{/);
   });

@@ -8,7 +8,7 @@ import type { OwnerClient } from '../contacts/owner.js';
 import type { AppsApi } from '../apps/api.js';
 import type { AgentsApi } from './api.js';
 import { AppsPanel } from './apps-panel.js';
-import { agentLine, appsOf, dotOf, stateOf, type AgentRow } from './data.js';
+import { agentLine, appsOf, dotOf, stateOf, usedByNames, type AgentRow } from './data.js';
 import { AppChips, CardNameNote } from './parts.js';
 import { RenameEditor } from './sheets.js';
 import { AGENTS_STRINGS as S } from './strings.js';
@@ -66,6 +66,7 @@ export function AgentCard({
   const toggle = (panel: Panel): void =>
     a.setPanel(open === panel ? undefined : { name: row.name, panel });
   const running = appsOf(row).filter((x) => x.state !== 'not_set_up');
+  const usedBy = usedByNames(row);
 
   if (row.removing) {
     return (
@@ -111,6 +112,9 @@ export function AgentCard({
           </Button>
         )}
       </div>
+      <p className="ag-used-by al-text-body-sm al-muted">
+        {usedBy.length > 0 ? S.usedBy(usedBy) : S.notUsed}
+      </p>
       {running.length > 0 ? <AppChips apps={running} now={a.now} /> : null}
       <p className="al-text-body-sm al-muted">
         {S.contactsCount(row.contacts)}

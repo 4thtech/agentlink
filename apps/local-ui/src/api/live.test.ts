@@ -35,10 +35,10 @@ describe('liveAgent', () => {
     expect(a.apps[0]?.word).toBe(LIVE_WORDS.off);
   });
 
-  it('an agent with no AI app is Not set up', () => {
+  it('an agent with no AI app reads Not used by any AI app', () => {
     const a = liveAgent(row({ apps: [] }));
     expect(a.state).toBe('none');
-    expect(a.statusText).toBe('Not set up');
+    expect(a.statusText).toBe('Not used by any AI app');
   });
 
   it('removal not finished says so', () => {

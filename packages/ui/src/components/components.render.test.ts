@@ -427,13 +427,15 @@ describe('ApprovalCard (C-1, LA-3…LA-9)', () => {
       h(ui.ApprovalCard, {
         ...base,
         type: 'proof',
-        disclosure: ['A proof is public. Anyone can see that your agent recorded something.'],
+        disclosure: [
+          'A proof is public. Anyone can see that your AgentLink ID recorded something.',
+        ],
         receiptRequest: { contact: { alias: 'Marko' } },
       }),
     );
     expect(out).toContain('A proof is public.');
     expect(out).toContain(
-      'Ask Marko to confirm delivery? If they do, anyone can see that this went to their agent.',
+      'Ask Marko to confirm delivery? If they do, anyone can see that this went to them.',
     );
   });
   it('offers "Remember for this contact" only for a proof raised by Ask me or the per-proof limit (LA-4)', () => {

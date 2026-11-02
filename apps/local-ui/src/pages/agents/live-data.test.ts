@@ -109,10 +109,18 @@ describe('the words (08 §1)', () => {
       ),
     ).toBe('Ready in Cursor and 2 more');
     expect(agentLine(row({ state: 'idle', appStates: [app('Codex', 'idle')] }), NOW)).toBe('Idle');
-    expect(agentLine(row({ state: 'offline', lastSeenAt: NOW - 300 }), NOW)).toBe(
-      'Offline · last seen 5 min ago',
-    );
-    expect(agentLine(row({ state: 'offline' }), NOW)).toBe('Offline');
+    expect(
+      agentLine(
+        row({
+          state: 'offline',
+          lastSeenAt: NOW - 300,
+          appStates: [app('Claude Code', 'not_running', NOW - 300)],
+        }),
+        NOW,
+      ),
+    ).toBe('Offline · last seen 5 min ago');
+    // W7-ID-RENAME: no AI app uses the ID: one name, never "Offline".
+    expect(agentLine(row({ state: 'offline' }), NOW)).toBe('Not used by any AI app');
     // W6-FLOW-FIXES: set up but never run (no heartbeat yet): the honest state, not "Offline".
     expect(
       agentLine(row({ state: 'offline', appStates: [app('Claude Code', 'not_running')] }), NOW),

@@ -268,13 +268,14 @@ describe('the top bar (A4)', () => {
     await settle();
     expect(chip()?.querySelector('.al-agent-icon')?.textContent).toBe('T');
     expect(chip()?.querySelector('.al-agent-icon-dot.is-ready')).not.toBeNull();
-    expect(chip()?.textContent).toContain("Tali's agent");
+    // D-144 (a): the AI app next to the ID, here only.
+    expect(chip()?.textContent).toContain("Tali's agent · Claude Code");
     expect(chip()?.textContent).toContain('Ready in Claude Code');
     // Its name is its visible text after "Agent:" (WCAG 2.5.3 label in name).
     expect(chip()?.hasAttribute('aria-label')).toBe(false);
     // (The letter icon is aria-hidden: the name is the text beside it.)
     expect(chip()?.querySelector('.al-chip-text')?.textContent).toBe(
-      "Agent: Tali's agent Ready in Claude Code",
+      "ID: Tali's agent · Claude Code Ready in Claude Code",
     );
     expect(q('button.al-goto-btn')?.hasAttribute('aria-label')).toBe(false);
     expect(q('button.al-goto-btn')?.textContent).toContain('Go to…');
@@ -308,20 +309,23 @@ describe('the live agent dropdown', () => {
     await mountAt('/');
     await click(chip());
     const menu = q('[role="menu"]');
-    expect(menu?.getAttribute('aria-label')).toBe('Agents');
-    expect(menu?.textContent).toContain('Your agents · live');
+    expect(menu?.getAttribute('aria-label')).toBe('IDs');
+    expect(menu?.textContent).toContain('Your IDs · live');
     const rows = qa('.al-am-row');
     expect(rows.map((r) => r.querySelector('.al-am-name')?.textContent)).toEqual([
-      "Tali's agent",
-      'Work agent',
+      "Tali's agent · Claude Code",
+      'Work agent · Cursor',
       'Notes',
     ]);
+    // D-144 (c): which AI apps use each ID, or none.
+    expect(rows[0]?.textContent).toContain('Used by Claude Code');
+    expect(rows[2]?.textContent).toContain('Not used by any AI app');
     expect(rows[0]?.querySelector('[role="menuitemradio"][aria-checked="true"]')).not.toBeNull();
     expect(rows[0]?.textContent).toContain('Ready in Claude Code');
     expect(rows[0]?.querySelector('.al-am-app')?.textContent).toBe('Claude CodeReady');
     expect(rows[1]?.querySelector('.al-am-app')?.textContent).toBe('CursorNot running');
     expect(rows[1]?.querySelector('.al-ldot.is-off')).not.toBeNull();
-    expect(rows[2]?.textContent).toContain('Not set up');
+    expect(rows[2]?.textContent).toContain('Not used by any AI app');
     expect(rows[2]?.querySelector('.al-agent-icon-dot.is-none')).not.toBeNull();
   });
 
@@ -334,16 +338,45 @@ describe('the live agent dropdown', () => {
     expect(free?.textContent).toContain('Codex');
     expect(free?.querySelector('button')?.getAttribute('aria-label')).toBe('Connect Codex');
     const names = menuItems().map((m) => m.textContent?.trim());
-    expect(names.slice(-2)).toEqual(['Add agent', 'Manage agents']);
-    await click(menuItems().find((m) => m.textContent?.trim() === 'Manage agents'));
+    expect(names.slice(-2)).toEqual(['New ID', 'Manage IDs']);
+    await click(menuItems().find((m) => m.textContent?.trim() === 'Manage IDs'));
     expect(location.pathname).toBe('/agents');
+  });
+
+  it('W7-ID-X2: an ID keeps one colour: the chip icon and its menu row use the same tone', async () => {
+    serve(world());
+    await mountAt('/');
+    const tone = (el: Element | null | undefined): string | undefined =>
+      [...(el?.classList ?? [])].find((c) => /^is-(?!working|ready|idle|off|none|paused)/.test(c));
+    const inChip = chip()?.querySelector('[class*="agent-icon"], .al-agent-icon');
+    await click(chip());
+    const inMenu = q('[role="menuitemradio"][aria-checked="true"]')?.querySelector(
+      '[class*="agent-icon"], .al-agent-icon',
+    );
+    expect(inChip).not.toBeNull();
+    expect(inMenu).not.toBeNull();
+    expect(tone(inChip)).toBeDefined();
+    expect(tone(inChip)).toBe(tone(inMenu));
+  });
+
+  it('W7-ID-X2: the New ID menu explains New ID vs connecting another AI app, and connect opens the AI apps flow', async () => {
+    serve(world());
+    await mountAt('/');
+    await click(chip());
+    const menu = q('[role="menu"]')?.textContent ?? '';
+    expect(menu).toContain('A new identity with its own inbox and contacts.');
+    expect(menu).toContain('The AI app shares this ID.');
+    await click(
+      menuItems().find((m) => m.textContent?.trim() === 'Connect another AI app to this ID'),
+    );
+    expect(location.pathname).toBe('/settings/apps');
   });
 
   it('W4-WIRE-2: Add agent opens Get started in add mode (its Name your agent step), not a sheet', async () => {
     serve(world());
     await mountAt('/');
     await click(chip());
-    await click(menuItems().find((m) => m.textContent?.trim() === 'Add agent'));
+    await click(menuItems().find((m) => m.textContent?.trim() === 'New ID'));
     expect(location.pathname).toBe('/start/app');
     expect(location.search).toBe('?add=agent');
   });
@@ -408,10 +441,10 @@ describe('the section menu (Decision 48)', () => {
     await mountAt('/agents');
     expect(rail()?.getAttribute('aria-label')).toBe('Sections');
     expect(rail()?.dataset['expanded']).toBe('false');
-    expect(railLabels()).toEqual(['Home', 'Agents', 'Activity', 'Settings']);
+    expect(railLabels()).toEqual(['Home', 'IDs', 'Activity', 'Settings']);
     expect(
       qa('nav.al-rail [aria-current="page"]').map((a) => a.getAttribute('aria-label')),
-    ).toEqual(['Agents']);
+    ).toEqual(['IDs']);
     // Minimized: icons only; the name is on the link.
     expect(q('nav.al-rail .al-rail-label')).toBeNull();
     // Inbox and Contacts are no destinations any more.
@@ -430,7 +463,7 @@ describe('the section menu (Decision 48)', () => {
     expect(qa('nav.al-rail .al-rail-label').map((l) => l.textContent)).toEqual([
       'Collapse',
       'Home',
-      'Agents',
+      'IDs',
       'Activity',
       'Settings',
     ]);
@@ -475,7 +508,7 @@ describe('the section menu (Decision 48)', () => {
     const sheet = q('#al-section-sheet');
     expect([...(sheet?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual([
       'Home',
-      'Agents',
+      'IDs',
       'Activity',
       'Settings',
     ]);
@@ -629,7 +662,7 @@ describe('Cmd+K (kept from #715), in both modes', () => {
     serve(world());
     await mountAt('/');
     expect(await open()).not.toBeNull();
-    expect(options().slice(0, 4)).toEqual(['Home', 'Agents', 'Activity', 'Settings']);
+    expect(options().slice(0, 4)).toEqual(['Home', 'IDs', 'Activity', 'Settings']);
     expect(options()).toContain('Get started');
     expect(options()).toContain('Turn on Under the hood');
     expect(options()).toContain('Keyboard shortcuts');
@@ -791,8 +824,8 @@ describe('the agent dropdown as a menu of choices (IR-4, 9)', () => {
     expect(chip()).toBeNull();
     const plain = q('.al-chip.is-static');
     expect(plain?.tagName).toBe('SPAN');
-    expect(plain?.textContent).toBe('Open the AgentLink app to see your agents.');
-    expect(q('[aria-haspopup="menu"][aria-label^="Agent"]')).toBeNull();
+    expect(plain?.textContent).toBe('Open the AgentLink app to see your IDs.');
+    expect(q('[aria-haspopup="menu"][aria-label^="ID"]')).toBeNull();
   });
 });
 

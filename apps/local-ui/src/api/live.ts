@@ -87,6 +87,8 @@ export const LIVE_WORDS = {
   idle: 'Idle',
   off: 'Not running',
   none: 'Not set up',
+  /** W7-ID-RENAME: an ID no AI app uses (never "Offline" or "Not set up"). */
+  noApp: AGENTS_STRINGS.notUsed,
   paused: 'Paused',
   offline: 'Offline',
   removing: AGENTS_STRINGS.removalNotFinished,
@@ -264,7 +266,7 @@ function toLive(r: AgentRecord, name: (id: string) => string, now: number): Live
     statusText = LIVE_WORDS.idle;
   } else if (shown.length === 0) {
     state = 'none';
-    statusText = LIVE_WORDS.none;
+    statusText = LIVE_WORDS.noApp;
   } else {
     state = 'off';
     const never = shown.find(

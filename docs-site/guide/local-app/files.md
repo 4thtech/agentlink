@@ -8,7 +8,7 @@ From 0.4.6, a file from a contact you keep is downloaded, checked and saved for 
 
 - Limits per day: 50 files and 500 MB per contact, 200 files and 2 GB in total. A file over a limit waits for you.
 - 1 GiB of disk space is always kept free.
-- Nothing is saved while the agent is [paused](agents.md). Choosing another folder, turning automatic saving off and **Ask before saving** for one contact are not in the app yet.
+- Nothing is saved while the ID is [paused](ids.md). Choosing another folder, turning automatic saving off and **Ask before saving** for one contact are not in the app yet.
 - Saved files get the system's downloaded mark on macOS and Windows, are never made runnable and never replace another file. Names the system could act on get `.download` added.
 - AgentLink never opens a file.
 

@@ -30,6 +30,7 @@ import { lazyPart } from '../../lazy/index.js';
 import { agentNameOf, NEW_AGENT_PATH } from '../../nav.js';
 import type { AppsApi } from '../apps/api.js';
 import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
+import { IdExplainerCard } from '../start/id-explainer.js';
 import { createAgentsApi, type AgentsApi } from './api.js';
 import { orderAgents, stateOf, tidyCandidates, type AgentRow, type AgentsList } from './data.js';
 import { AgentDetail } from './detail.js';
@@ -361,14 +362,17 @@ export function AgentsPage({
     const content = failed ? (
       errorBox
     ) : list !== undefined && rows.length === 0 ? (
-      <EmptyState
-        title={S.empty}
-        action={
-          <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
-            {S.newAgent}
-          </a>
-        }
-      />
+      <>
+        <IdExplainerCard />
+        <EmptyState
+          title={S.empty}
+          action={
+            <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
+              {S.newAgent}
+            </a>
+          }
+        />
+      </>
     ) : hood && view === 'map' && MapView !== undefined ? (
       <MapView agents={rows} onShowList={() => setView('list')} onSwitch={doSwitch} />
     ) : hood ? (

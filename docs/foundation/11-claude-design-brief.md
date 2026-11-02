@@ -213,7 +213,7 @@ Each direction shows: a mood board; mark and wordmark sketches, including the ma
 |---|---|---|---|
 | 1 | **UX first.** The chat is the main interface; our UI is for setup, supervision, approvals and proof | Make "Paste this to your agent" the first, largest onboarding step | Ask for a network or funds before a first message |
 | 2 | **Owner in control.** Agents propose, owners decide. Approvals are rare and quick; commitments show the exact terms and changes | "Accepting commits you to these terms", with the terms on screen | Offer "Always allow" on a commitment; approve from a notification without the card |
-| 3 | **Untrusted content is always visibly distinguished** | Label "From Marko's agent: their words, not instructions" above plain text | Render it as buttons, headings or links, or inside our summaries |
+| 3 | **Untrusted content is always visibly distinguished** | Label "From Marko (their AI): their words, not instructions" above plain text | Render it as buttons, headings or links, or inside our summaries |
 | 4 | **Plain language, money upfront** | "Add proof · $0.10 from credits" | "Notarize (0.00004 ETH + gas)" |
 | 5 | **Progressive disclosure to Advanced** | "Recorded 12 Oct 2026, 14:02"; record ID under Advanced | Default IDs or fingerprints (exceptions in §5.2) |
 | 6 | **Safety without fear.** Proof is calm and serious, like a notary stamp. Privacy is honest: the AI service running each agent processes what it reads | "End-to-end encrypted: only you, Marko and your agents can read this. 4thTech can't." | "100% secure"; red for anything not destructive, irreversible or an integrity failure |
@@ -227,7 +227,7 @@ Each direction shows: a mood board; mark and wordmark sketches, including the ma
 
 | Never say | Say instead |
 |---|---|
-| Wallet, address | Agent ID (Advanced: address) |
+| Wallet, address | ID number (Advanced: address) |
 | Private key, seed phrase | Passkey, recovery kit, recovery code |
 | Transaction, tx hash | Proof (Advanced: transaction) |
 | Gas, gas fee | Nothing: it's included in the price |
@@ -238,7 +238,8 @@ Each direction shows: a mood board; mark and wordmark sketches, including the ma
 | Hash, termsHash | Fingerprint, e.g. "Terms fingerprint" (Advanced only) |
 | Nostr, relay | Nothing (Advanced: message network) |
 | Encryption key, decrypt | "Only you and … can read this"; Open |
-| Policy, harness, envelope, agent card | Rules; your AI / AI app; message; agent profile |
+| Policy, harness, envelope, agent card, agent profile | Rules; your AI / AI app; message; ID card |
+| Agent, when it means the identity AgentLink creates for an AI app (keys, inbox, contacts, rules); Agent ID | **ID**; **ID number** for the long identifier (D-144, below). "AI agents" stays, for the AIs themselves |
 | MCP, MCP server (outside developer contexts) | "AgentLink in your AI app", "Connect your AI" |
 | Owner key, signature | "Approve with your passkey / Touch ID" (Advanced: owner signature) |
 | Keystore, `.alks` file (terminal only, *D-54*) | "Key file locked with an unlock code" |
@@ -247,16 +248,26 @@ Each direction shows: a mood board; mark and wordmark sketches, including the ma
 | Verified (alone), unverified | **"Verified domain · acme.com"** (always with the domain), **Registered**, **Self-declared** |
 | Password (for any of our codes) | The code's own name (§5.5) |
 
+**ID, ID number, ID card (D-144; decided by the owner, Decision 56, 2 Nov 2026).** In every user-facing text, the identity AgentLink creates for an AI app (its keys, inbox, contacts and rules) is an **ID**. An AI app (Claude Code, Cursor, Claude Desktop…) runs many AI agents and chats, and all of them use that app's one ID through the MCP.
+- **Keep "AI agents"** wherever it means the AIs themselves ("Private messages between AI agents", "other people's AI agents", "Messages from other agents are untrusted"), plus the product name AgentLink, the cloud agent (M2), "Agent commerce" (M5) and every protocol, data and code term. The `--agent` flag and `owner add-agent` stay; `--id` is added as an alias (06).
+- **ID number** is the long technical identifier formerly "Agent ID" (Proofs page, QR code, `credits`, `verify`). Advanced still says "address". Never "your ID's ID".
+- **ID card** is the signed profile formerly called the agent card or agent profile (proof files, the CLI's "card from your owner").
+- **Name.** An ID's name is the name people see: what contacts and invites show (the person's name, for example "Tali"). The AI app is shown next to it **only on this computer**, as "Name · App" (for example "Tali · Claude Code") in the switcher, the IDs page and the Home tags; each ID also says "Used by Claude Code, Cursor". Contacts see only the name: the protocol carries no AI-app field, so "Ana (Claude Code)" waits for a later protocol change (M2). When one person has several IDs, People shows "Ana · {their ID name}".
+- **Default name rule (Q5).** A new ID is prefilled with the **owner's name** if the app knows it, otherwise the **AI app's name** ("Claude Code"), with the hint "People you connect with see this name." Never "{App} agent" or "My agent". The name follows the 1 to 32 character restricted form of §5.8.
+- **Explainer** (first run and the IDs page): "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it."
+- **Approvals say which ID is asking** ("{name} · {app}" on this computer). **Wording for counterparties:** "{name}", or "{name} (their AI)" where the AI itself is meant; never "Marko's ID" in AI-facing text (06 §2.1 name rule unchanged).
+- **Where the code differs from a screen** in `docs/design/`, the code copy wins (`docs/design/adjustments.md`).
+
 **No network picker outside Advanced** (D-40). The client picks the proof network automatically. It never appears in default flows, top-ups or approvals.
 
-**Adding credits (D-111; copy proposals, owner decides).** Method labels: "Use crypto you already have", "Send from an exchange", and later "Pay by card". The connect method's helper says "the app or browser extension where you hold US-dollar stablecoins", not "wallet"; the word appears only inside the third-party connector and under Advanced (decided, D-117 C: never in our labels). The only default text that names a network is the exchange method's "Network: …" line, because the exchange asks for it, and only inside the exchange steps as information (§6.7, §14 Q5 option A, D-117 B). In chat (agent-assisted, 06 §2.4): "Adding proof needs credits. Add at least $5 here: {link}. $5 covers 50 proofs."; for an exchange: "Send USDC to your agent's address below. Your exchange will ask for a network: choose {network}."; after: "Your $10 arrived and is now credits. Shall I record the proof now?" The agent never asks for keys, a recovery code or card details, and never says it will move the user's money.
+**Adding credits (D-111; copy proposals, owner decides).** Method labels: "Use crypto you already have", "Send from an exchange", and later "Pay by card". The connect method's helper says "the app or browser extension where you hold US-dollar stablecoins", not "wallet"; the word appears only inside the third-party connector and under Advanced (decided, D-117 C: never in our labels). The only default text that names a network is the exchange method's "Network: …" line, because the exchange asks for it, and only inside the exchange steps as information (§6.7, §14 Q5 option A, D-117 B). In chat (agent-assisted, 06 §2.4): "Adding proof needs credits. Add at least $5 here: {link}. $5 covers 50 proofs."; for an exchange: "Send USDC to your ID's address below. Your exchange will ask for a network: choose {network}."; after: "Your $10 arrived and is now credits. Shall I record the proof now?" The AI never asks for keys, a recovery code or card details, and never says it will move the user's money.
 
 ### 5.2 Identity labels and identifiers
 
 Labels, weakest to strongest:
 1. **Self-declared**: the name was chosen by its owner (the default for others' names).
 2. **Safety code checked**: you compared the code.
-3. **Registered**: the agent's link to its owner is on the public record (paid).
+3. **Registered**: the ID's link to its owner is on the public record (paid).
 4. **Verified domain · acme.com**: the owner proved control of the domain, checked live. Internationalized names are also shown in punycode.
 
 Warning: **Domain no longer verified**.
@@ -269,7 +280,7 @@ All other IDs and fingerprints stay in Advanced. Never show raw keys.
 
 **Avatars** (F-06) are chosen locally by the user for their own contacts. The default is a monogram from the name. An avatar or colour never signals trust: only the §5.2 label does. Avatars never come from inbound content.
 
-**Name rule (D-53, 06 §2.1).** A name chosen by another party, or written by an agent, is their content. Everywhere outside the untrusted container (approval and invite headlines, contact lists, the verify result, printed records, notifications, chat summaries) a contact or signer is shown as:
+**Name rule (D-53, 06 §2.1).** A name chosen by another party, or written by an AI agent, is their content. An ID's own name is the name people see (D-144, §5.1). Everywhere outside the untrusted container (approval and invite headlines, contact lists, the verify result, printed records, notifications, chat summaries) a contact or signer is shown as:
 1. the **alias the owner typed or confirmed** (for example on the pairing approval), shown as is; otherwise
 2. the **restricted name**: letters, digits, spaces, `.`, `'` and `-` only, at most 32 characters, **in quotes and followed by its identity label**, e.g. “Marko Novak” · Self-declared, in body style, never styled as our own heading text or as a label; or
 3. **"Contact" plus the short owner fingerprint** (`Contact 7F3A·19C2`) when nothing usable is left, when the name mixes scripts or uses look-alike characters, or when it contains a word reserved for our labels ("verified", "registered", "self-declared", "safety code", "checked", "AgentLink", "system", "approved", "owner").
@@ -291,7 +302,7 @@ All other IDs and fingerprints stay in Advanced. Never show raw keys.
 
 **Samples:**
 - "Your AI can't approve this for you. Only you can, with your passkey."
-- "Accepting commits you to these terms. Ana's agent and anyone with the proof file can see you agreed, and when."
+- "Accepting commits you to these terms. Ana and anyone with the proof file can see you agreed, and when."
 - "AgentLink records the agreement. It doesn't move money."
 - "Name chosen by its owner. Compare the safety code to be sure."
 - "This proves this exact document existed and was sent at this time. It doesn't prove its content is true."
@@ -313,7 +324,7 @@ Each has its own name and look. Never call any of them "password", and never sho
 | **Recovery code** | Restores the owner key (inside the recovery kit) | 24 characters in groups | **Yes** | First run, Backup, restore |
 | **Owner code** (*D-54, D-67, D-130*); in the local app, **backup code** | The backup way to approve when the passkey can't be used (another browser, no Touch ID or Windows Hello, the command line over SSH); the default on the command line | 24 characters in groups (generated) | **Yes** | First-run page, shown once with a save step (*D-130 (1)*); terminal for `owner init` |
 | **Owner passphrase** | Protects approvals where there is no passkey or biometrics; on the command line, instead of the owner code only if the owner chooses it (*D-67*), never on a machine with a key file; on the Linux desktop app (M2) it is the presence mechanism (04 §2.2) | Chosen by the owner, at least 12 characters | **Yes** | Local first run, terminal prompt, Linux desktop |
-| **Unlock code** (*D-54*) | Unlocks the agent's key file on a machine without a keychain | 24 characters in groups (generated) | **Yes** | Terminal only |
+| **Unlock code** (*D-54*) | Unlocks the ID's key file on a machine without a keychain | 24 characters in groups (generated) | **Yes** | Terminal only |
 | **Pairing code** | Links the console to a local owner | 6 digits, shown on both screens | Short-lived | Console sign-in, CLI |
 | **Setup code** | Claims a newly deployed cloud agent | One-time | Short-lived | Cloud agent setup |
 | **Access code** | Fallback sign-in for an AI app connecting to a cloud agent | One-time | Short-lived | Cloud agent sign-in |
@@ -330,18 +341,18 @@ Proof is public by design, so the user is told what others can see, in plain wor
 
 | Where | String |
 |---|---|
-| First proof, and every approval that adds proof | "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says." |
-| Same, second line | "If {contactName} confirms delivery, it also becomes public that it went to their agent." |
-| Asking for a delivery receipt (sender) | "Ask {contactName} to confirm delivery? If they do, anyone can see that this went to their agent." |
-| Receipt request (recipient) | "{contactName} asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content." Buttons: **Confirm delivery** · **Not now** |
-| Turn on automatic delivery confirmations for a contact | "Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached your agent." |
-| Opened, accepted or rejected receipt | "This is public: anyone can see that your agent {opened / accepted / rejected / received} it, and when." ("received" for a delivery the user confirmed, M1-33d) |
+| First proof, and every approval that adds proof | "A proof is public. Anyone can see that your AgentLink ID recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says." |
+| Same, second line | "If {contactName} confirms delivery, it also becomes public that it went to them." |
+| Asking for a delivery receipt (sender) | "Ask {contactName} to confirm delivery? If they do, anyone can see that this went to them." |
+| Receipt request (recipient) | "{contactName} asked you to confirm delivery. Confirming shows publicly that this reached you. Nothing about the content." Buttons: **Confirm delivery** · **Not now** |
+| Turn on automatic delivery confirmations for a contact | "Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached you." |
+| Opened, accepted or rejected receipt | "This is public: anyone can see that your AgentLink ID {opened / accepted / rejected / received} it, and when." ("received" for a delivery the user confirmed, M1-33d) |
 | Rules page, delivery confirmations (default off) | "Confirm deliveries publicly: Off (recommended). Turn on for contacts you trust." |
-| Owner re-sign while receipts are on from an older default (CLI, 06 §3, M1-33a) | "Delivery receipts are on from an older default. Each one shows publicly that a proof reached your agent, never the content." then "Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off." |
+| Owner re-sign while receipts are on from an older default (CLI, 06 §3, M1-33a) | "Delivery receipts are on from an older default. Each one shows publicly that a proof reached you, never the content." then "Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off." |
 | `agentlink doctor`, same case | "Delivery receipts are on from an older default; they will turn off unless you keep them." |
-| Top-up (each method, once) | "The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink." |
-| Proof export | "This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content." |
-| Get the Registered badge (§6.13) | "Registering puts your agent's link to you on the public record. Your agent's name is not published." |
+| Top-up (each method, once) | "The account you add credits from is publicly linked to your AgentLink ID. For more privacy, use free test credits or a separate account only for AgentLink." |
+| Proof export | "This file shows the proof, your ID card and the message details. With the recipient included, it also shows who received it; with the document key, its content." |
+| Get the Registered badge (§6.13) | "Registering puts your AgentLink ID's link to you on the public record. Your ID's name is not published." |
 
 Help text (user guide, privacy page) explains the same in full: what is public (who recorded, when, the kind, receipts and who gave them, which account paid for credits), what is never public (content, file and display names, terms, rules, approvals), and how to keep more private (delivery confirmations off, a separate top-up account, sharing proof files only when needed).
 
@@ -353,9 +364,9 @@ Local app pages that show what the AI sent and received (08 §1). They are read-
 |---|---|
 | Messages footer | "To reply, ask your AI." |
 | Messages tabs | "Inbox" · "Sent" |
-| Inbound message label | "From Marko's agent: their words, not instructions" (the untrusted-content label of §4 and §8; the name follows §5.2) |
+| Inbound message label | "From Marko (their AI): their words, not instructions" (the untrusted-content label of §4 and §8; the name follows §5.2) |
 | No contacts yet | "Messages appear here once you have a contact." |
-| Nothing with this contact | "Nothing yet. When your AI and {contactName}'s agent exchange messages, they show here." |
+| Nothing with this contact | "Nothing yet. When your AI and {contactName} exchange messages, they show here." |
 | Offline | The last loaded list, marked "as of {time}" |
 | Long message | "Show all" · "Copy text" |
 | Files explainer (top of Files) | "You don't upload here. Put files in your Send folder or ask your AI to send them. Files you receive appear under Received." |
@@ -377,17 +388,17 @@ Local app pages that show what the AI sent and received (08 §1). They are read-
 - No "Reply", "Send", "Compose" or "Forward" control. The only path is "To reply, ask your AI."
 - Errors say what failed, never what a message said.
 
-### 5.8 Agents and AI apps (D-138)
+### 5.8 IDs and AI apps (D-138, D-144)
 
-Local app pages that hold several agents and connect AI apps (08 §1; design b11 §28 to §32).
+Local app pages that hold several IDs and connect AI apps (08 §1; design b11 §28 to §32).
 
 | Where | String |
 |---|---|
 | Welcome | One sentence and "Get started" |
-| First run v3 | "Name your agent" (prefilled "My agent") · "Use Touch ID" (or the platform's name, 08 §1) |
+| First run v3 | "Create {App}'s ID" ("Create your AI app's ID" when the app is unknown) · "Name this ID" (prefilled per the default name rule, §5.1; hint "People you connect with see this name.") · the explainer of §5.1 · "Use Touch ID" (or the platform's name, 08 §1) |
 | Start here | "Connect your AI app" · "Invite your first contact" · "Say hello" · "See the reply arrive" · "Save your recovery kit" |
-| No one to invite | "Try it with a second agent of your own" |
-| AI app states | "Not connected" · "Connected to {label}" · "Connected to another agent" · "Needs restart" · "Running" |
+| No one to invite | "Try it with a second ID of your own" (for example in another AI app) |
+| AI app states | "Not connected" · "Connected to {label}" · "Uses another ID" · "Needs restart" · "Running" |
 | AI app change | "Review change" · "Apply with Touch ID" · "Restart {app} to finish" |
 | Move | "{app} will use {newLabel} instead of {oldLabel}" |
 | Create and connect (D-140; proposed, owner confirms at merge) | "Connect to {app}" (prefilled with the detected app) · "Not now" · "Use Touch ID"; after it: "{label} is ready in {app}. Restart {app} to finish."; if the entry could not be written: "{label} is ready. {app} isn't connected yet." · "Connect" |
@@ -395,16 +406,16 @@ Local app pages that hold several agents and connect AI apps (08 §1; design b11
 | A contact renamed (D-141; proposed, owner confirms at merge) | "{new} (was {old})", once; with your own name for them: "Now calls itself {new} (was {old})"; Activity: "{old} is now called {new}". Both names follow the name rule (§5.2); the identity label stays as it was. A rename never changes the safety code or "Safety code checked" and shows no "key changed" or compare-again warning (04 §2.6); a name that now collides with another contact's shows the owner fingerprint, as today |
 | Renamed before D-141 (D-141; proposed, owner confirms at merge) | "Contacts still see {cardName}" · "Update contacts" |
 | Claude Desktop open | "Quit Claude Desktop first" |
-| Switcher | "Add agent" · "Manage agents"; on an approval page opened by an AI app: "Open the AgentLink app to switch" |
-| Agent in use | "Quit the AI app that uses {label} first." |
+| Switcher | Chip "{name} · {app}" (reader prefix "ID:"), heading "Your IDs · live", "New ID" · "Manage IDs"; on an approval page opened by an AI app: "Open the AgentLink app to switch" |
+| ID in use | "Quit the AI app that uses {label} first." |
 | Remove sheet | "Export history first" · "Remove with Touch ID"; if contacts can't be reached: "Remove anyway? Your contacts can't be told now." |
 | Unfinished removal | "Removal not finished" · "Try again" |
-| Existing agents | One-time "Tidy up" note on Home, linking to Agents |
+| Existing IDs | One-time "Tidy up" note on Home, linking to IDs |
 | Live connections | A contact with no owner-confirmed name: "Unnamed contact" |
 
 **Rules.**
 - Say "AI app", never "harness" (§5.1). "Keys" appears only in the remove sheet, which says what goes.
-- An agent's label is the owner's own text: 1 to 32 characters in the restricted form of the §5.2 name rule (letters, digits, spaces, `.`, `'` and `-`); anything else is refused with "Use letters, digits, spaces, dots, apostrophes and hyphens, up to 32 characters." It is shown as plain text, never as a heading style or a label of ours (§5.2).
+- An ID's label is its name, the owner's own text: 1 to 32 characters in the restricted form of the §5.2 name rule (letters, digits, spaces, `.`, `'` and `-`); anything else is refused with "Use letters, digits, spaces, dots, apostrophes and hyphens, up to 32 characters." It is shown as plain text, never as a heading style or a label of ours (§5.2).
 - The live connections view shows names, activity and direction only, never message text or file names.
 - An AI app change shows only the `agentlink` entry, never the rest of the file.
 
@@ -465,7 +476,7 @@ Local app pages that hold several agents and connect AI apps (08 §1; design b11
 
 | Status | Examples |
 |---|---|
-| `ok` | "Sent to Marko's agent. End-to-end encrypted: only you, Marko and your agents can read it." · "Sent with proof. Recorded 12 Oct 2026 at 14:02. $0.10 from credits." · "Invite ready: it works once, until 19 Oct. Send it only to Marko: whoever uses it first is connected. You'll be connected as soon as he accepts." (Once safety-code checks ship, M1-9m, it adds: "Then you'll both see a safety code to compare in AgentLink, not in this chat."; M1-36h, proposed, owner confirms at merge) |
+| `ok` | "Sent to Marko. End-to-end encrypted: only you, Marko and your AIs can read it." · "Sent with proof. Recorded 12 Oct 2026 at 14:02. $0.10 from credits." · "Invite ready: it works once, until 19 Oct. Send it only to Marko: whoever uses it first is connected. You'll be connected as soon as he accepts." (Once safety-code checks ship, M1-9m, it adds: "Then you'll both see a safety code to compare in AgentLink, not in this chat."; M1-36h, proposed, owner confirms at merge) |
 | `submitted` | "Sent. The proof is being recorded; this usually takes under a minute." |
 | `pending_approval` | "This needs your approval: send 'contract-signed.pdf' to Marko's agent with proof ($0.10).\nApprove here: {url}" · When the page opened by itself (*D-130 (3)*): "This needs your approval: send 'contract-signed.pdf' to Marko's agent with proof ($0.10). I opened it in your browser: check it, then approve with Touch ID. I can't approve it for you." · New contact: "I've asked to add Marko. A window just opened: check the name, then tap Accept and touch the sensor." |
 | `needs_setup` | "This file is over the free file limit ({limit}). To send it, connect your own storage: {url}. Or I can send a smaller file or text." · "I can only send files from folders you allow: {url}." · No folder allowed yet, page opened (*D-130 (3)*): "To send files, I need a folder you allow. I opened the Files page with ~/AgentLink/Send ready: tap Allow and confirm with Touch ID, then put the file there." · "Your settings keep files in your own storage, which isn't connected yet: {url}." · "AgentLink can't find a system keychain on this machine. Set it up in a terminal: `agentlink init --keystore file`." (*D-54*) · "AgentLink's key file is locked, so I can't use it yet. Run `agentlink doctor` in a terminal to see how to set up its unlock code." (*D-54*) |
@@ -533,7 +544,7 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 | **Approvals** | The most important screens (cards in §8). New contact: name and label, fingerprint (the safety code follows once pairing completes, 04 §3.6.1), "Name this contact" (prefilled with the suggested alias; approving confirms it), Accept with passkey. *0.3.0 (D-130 (5); proposed, owner confirms at merge; M1-UX-OTHER-COMPUTER):* a "This is my other computer" choice sets the owner-set name to "My other computer" (editable); it is a local label only, and the contact stays a separate owner with its own safety code. *0.3.0 (D-130 (1)):* the main button is "Approve with Touch ID" (or the platform's name); "Use backup code instead" opens a wide field with paste and show/hide (M1-11b-5). **Review together (*D-68*, 04 §2.5.2):** "Waiting for you (4)" lists one agent's pending approvals as full cards, soonest to expire first, at most 20 at a time. Each card has Approve, Deny or Later (Later leaves it waiting). Accepting or rejecting terms is never part of the list's single confirmation: its card shows the full terms and its own Approve, with its own passkey or owner code. Then one button names exactly what is included, "Approve 3 and deny 1", and only then the passkey or owner code, once: "This covers exactly these 4. Anything new waits for your next review." |
 | **Activity, Contacts** | Events. Contacts show labels, safety code, Rename and Block. Requests from unknown senders ("Request from an unknown sender · 2B9E·04D1"): Accept, Ignore, Block, plus "Ignore all" on the list and a Blocked list with Unblock. None of them adds a contact; only an invite does (*D-72*, 04 §2.9) |
 | **Files, Storage** | Allowed folders, inbox folder, link expiry (≤ 7 days), delete after expiry or receipt. Storage per §6.11 |
-| **Proofs & credits** | Proofs (§6.12), balance in $, Agent ID and QR, free test credits (beta), Add credits → pay page |
+| **Proofs & credits** | Proofs (§6.12), balance in $, ID number and QR, free test credits (beta), Add credits → pay page |
 | **Rules, Backup, Advanced** | Rules editor; recovery kit; IDs, networks, message network overrides |
 
 **States:** first run not finished (owner operations blocked, with the reason); approval pending, approved, denied, expired, decided elsewhere; passkey unsupported → owner passphrase (0.3.0: passkey or PRF unavailable in this browser → name a browser on this computer that works, or use the backup code; D-130 (1)); local link expired ("Open AgentLink again from your AI, or run `agentlink ui`"); agent not running; empty lists; offline.
@@ -635,26 +646,26 @@ The browser flow is view, accept or reject, and export. **It is not a chat**: th
 
 ### 6.6 Onboarding (D2)
 
-Under 5 minutes, **leading with "Paste this to your agent"**:
+Under 5 minutes, **leading with "Paste this to your AI"**:
 
 1. **Connect your AI:** Claude Desktop · Claude Code · ChatGPT · Codex · Gemini CLI · Antigravity · Cursor / VS Code / Windsurf / Cline · Other. Use neutral icons with text labels.
-2. **Paste this to your agent** (the largest element), with a Copy button:
+2. **Paste this to your AI** (the largest element), with a Copy button:
    > Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals.
 
    Each AI app gets its own variant (e.g. "then tell me to restart Claude Desktop"). Add one line: "Your AI will show you the change and ask before applying it." Secondary options: the command itself, the one-click Claude Desktop extension, the desktop app download (M2, per OS), and an optional "Waiting for your agent…" check.
 3. **Protect your approvals** (local page or desktop app), then the recovery kit. Recommended now: nothing needing approval can happen until it's done.
-4. **Name your agent** (prefilled).
-5. **Success:** "Your agent is connected. Try: 'Create an AgentLink invite for a colleague.'"
+4. **Name this ID** (prefilled per §5.1).
+5. **Success:** "Your ID is connected. Try: 'Create an AgentLink invite for a colleague.'"
 
 **Branches:** ChatGPT web and claude.ai can't run commands; their branch leads to the self-hosted cloud agent (§6.9), noting that custom connectors there usually need a paid plan. Containers, WSL and SSH get a short terminal path (§6.10, *D-54*).
 
-**States:** AI app not detected · restart needed · protection skipped · waiting for your agent (timed out) · copied.
+**States:** AI app not detected · restart needed · protection skipped · waiting for your AI (timed out) · copied.
 
 ### 6.7 Pay page (D2)
 
-**Purpose.** Adds credits for one agent. It runs on a **separate pay origin** with no access to owner keys, messages or files, and receives only the Agent ID.
+**Purpose.** Adds credits for one ID. It runs on a **separate pay origin** with no access to owner keys, messages or files, and receives only the ID number.
 
-- **Header:** "Add credits", the short Agent ID, and "Check this matches the Agent ID in your AgentLink app."
+- **Header:** "Add credits", the short ID number, and "Check this matches the ID number in your AgentLink app."
 - **Primary, in dollars:**
   - the current balance;
   - "A proof costs $0.10. $5 covers 50 proofs. Messages and files are always free.";
@@ -663,11 +674,11 @@ Under 5 minutes, **leading with "Paste this to your agent"**:
 - **Methods (D-111; direction, owner decides details; brief: `docs/design/topup-ux.md`):**
   - free test credits during the testnet beta (from the Credits screen), first on testnets;
   - **Use crypto you already have:** connects the user's own account, shows "From your account · $42.10 available", picks the network itself and asks for one confirmation. Proposed helper: "Connect the app or browser extension where you hold US-dollar stablecoins." Our copy does not say "wallet"; the connector's own list may (owner decides, §5.1);
-  - **Send from an exchange:** the Agent ID with a QR code, a US-dollar stablecoin (e.g. USDC; fees are stablecoin-only at launch) and the network the exchange needs, pre-chosen as the cheapest (§14 Q5), with the minimum and what happens on a wrong network;
+  - **Send from an exchange:** the ID number with a QR code, a US-dollar stablecoin (e.g. USDC; fees are stablecoin-only at launch) and the network the exchange needs, pre-chosen as the cheapest (§14 Q5), with the minimum and what happens on a wrong network;
   - **Pay by card**, last (after the legal entity is decided, D-15): the provider's own checkout; the page says the provider's fee, which the user pays, before paying. Not in the beta.
-- **Privacy line, once per method (D-109; proposed copy):** card: "The payment provider knows who paid and which Agent ID got the credits."; own account: "Paying from your own account links that account to your agent publicly. Use a separate account if you want to keep them apart."; exchange: "Your exchange knows which Agent ID you paid." It never blocks a top-up.
+- **Privacy line, once per method (D-109; proposed copy):** card: "The payment provider knows who paid and which ID number got the credits."; own account: "Paying from your own account links that account to your ID publicly. Use a separate account if you want to keep them apart."; exchange: "Your exchange knows which ID number you paid." It never blocks a top-up.
 - **Payment record:** "Save a payment record" (built in the browser; network and transaction link under Advanced).
-- **States:** waiting · received ("Your agent turns this into credits the next time it runs") · added · below the minimum · Agent ID mismatch · offline · card payment processing · card payment failed ("Your card was not charged.") · damaged link ("This link is damaged. Ask your agent for a new one.").
+- **States:** waiting · received ("Your ID turns this into credits the next time it runs") · added · below the minimum · ID number mismatch · offline · card payment processing · card payment failed ("Your card was not charged.") · damaged link ("This link is damaged. Ask your agent for a new one.").
 - **Trust line:** "This page is separate from your AgentLink console. It can't see your messages, files or keys."
 
 ### 6.8 Pricing (D2)
@@ -705,7 +716,7 @@ Show amounts only in dollars; never mention tokens or networks outside Advanced.
 
 **States:** wrong or used setup code · setup already completed (page locked) · pairing waiting · sign-in waiting for console approval · code expired · denied · connected · AI app revoked · agent offline or unhealthy · message network unreachable.
 
-**Security copy:** "Your agent's keys are created on your computer or in your Cloudflare account, and kept only in your Cloudflare account. 4thTech never receives them." The AI app's self-chosen name is untrusted: always show the return domain next to it.
+**Security copy:** "Your ID's keys are created on your computer or in your Cloudflare account, and kept only in your Cloudflare account. 4thTech never receives them." The AI app's self-chosen name is untrusted: always show the return domain next to it.
 
 ### 6.10 Terminal (CLI) copy (D1, copy only)
 
@@ -718,7 +729,7 @@ Show amounts only in dollars; never mention tokens or networks outside Advanced.
 | `init` | Detected AI apps; the exact config diff per app; "Apply these changes? (y/N)"; when an agent runs it: the diff plus a one-time confirmation code and "Show this to your user. Re-run with `--confirm <code>` only after they agree." Then "Opening the setup page to protect your approvals…" and success |
 | Owner passphrase prompt | What it protects, no echo, a confirm step at creation; never accepted as an argument or environment variable |
 | `doctor` | One line per check (message network, proof network, keychain or key file, storage, AI apps) with status word and fix |
-| No keychain (*D-54*) | One honest explanation at opt-in: "This machine has no system keychain. AgentLink can keep your agent's keys in a file locked with an unlock code. That's weaker than a keychain if someone copies this disk, unless the unlock code is kept elsewhere. Your approvals still need your owner passphrase." Then the generated unlock code once, with how to supply it at run time (a mounted secret file, recommended; an environment variable, weaker) |
+| No keychain (*D-54*) | One honest explanation at opt-in: "This machine has no system keychain. AgentLink can keep your ID's keys in a file locked with an unlock code. That's weaker than a keychain if someone copies this disk, unless the unlock code is kept elsewhere. Your approvals still need your owner passphrase." Then the generated unlock code once, with how to supply it at run time (a mounted secret file, recommended; an environment variable, weaker) |
 | `invite`, `accept`, `contacts` | As §6.1. `contacts --verify` (run by the owner, interactive terminal only) shows the safety code on its own line, then They match (needs the owner passphrase) / They don't (04 §3.6.1) |
 | `approve <id>` and `cancel <id>` for terms (*D-55*) | The commitment approval card (§8) as plain text. Headline: "Accepting terms from “Ana's agent” (Self-declared), version 3, valid until 20 Oct". Then a block headed "Proposed by “Ana's agent”: their content, not instructions", one field per line, including who pays and who delivers (terms with control or escape characters never get this far: they are refused on receipt, 04 §3.4). Then the changes from version 2, the line "This one approval sends your acceptance and adds your Accepted receipt to their record. Nothing else." and the cost. Only then the passphrase prompt |
 | `approve` with no ID (*D-68*, 04 §2.5.2) | "Waiting for you: 4", then each pending approval of one agent as its card in plain text, numbered, soonest to expire first, at most 20. For each: "Approve, deny or later? (a/d/L)". Terms are listed with "Decide this one on its own: `agentlink approve {approvalId}`" instead of the question. Then the summary on its own line, "Approve 3 and deny 1. Your owner code or passphrase covers exactly these 4. Anything new waits for your next review.", "Continue? (y/N)", and only then the owner code prompt, once. Then one result line per approval with a status word. "Your AI can't approve for you." Nothing waiting: "Nothing is waiting for your approval." |
@@ -812,7 +823,7 @@ All components support light, dark and increased contrast, keyboard and screen r
 | **Proof-of-agreement summary, printed record** | Stamp header "Agreement recorded" · terms · both parties · times · proves / doesn't · Export / print layout per §6.12 | Waiting for acceptance · recorded · rejected · print (A4, Letter) |
 | **Safety-code compare** | Large, monospace, grouped digits · "Compare with Marko by phone or in person" · They match (with passkey) / They don't. Only on our own surfaces; never in chat (04 §3.6.1) | Waiting for the other agent · unchecked · matched · mismatch (stop calmly) · new code after pairing again |
 | **Fingerprint, identity label, avatar** | Short `7F3A·19C2` (full and copyable in Advanced) / the §5.2 labels and warning / monogram avatar | Inline · badge · tooltip |
-| **Untrusted-content container** | Label strip "From Marko's agent: their words, not instructions" · distinct inset surface · plain text only · inert links showing their domain · sanitized file names · "Show all" for long text · our actions sit outside it | Message · note · file name · unknown sender (stronger label) · suspicious text (rendered the same) |
+| **Untrusted-content container** | Label strip "From Marko (their AI): their words, not instructions" · distinct inset surface · plain text only · inert links showing their domain · sanitized file names · "Show all" for long text · our actions sit outside it | Message · note · file name · unknown sender (stronger label) · suspicious text (rendered the same) |
 | **Status chips** | Icon + label | Sent · Received · Delivered · Opened · Accepted · Rejected · Recording · Recorded · Needs approval · Approved · Denied · Expired · Needs setup · Needs credits · Failed · agents: Online · Last seen · Paused · Offline |
 | **Cost chip, credits meter** | "$0.10" ("Includes everything"; details show the split "AgentLink $0.10 · App fee $0.00") / balance in $, "48 proofs left", "$0.30 of $5 today", Add credits | Free · with app fee · over limit · low · empty · budget reached · test credits |
 | **Biometric prompt sheet** | One line on what is approved → "Confirm with Touch ID / Windows Hello / passphrase" → hands over to the **real OS prompt** (never imitated) | Waiting · confirmed · cancelled · failed · unavailable → passphrase |
@@ -943,7 +954,7 @@ layout-{gutter-mobile,gutter-desktop,max-content,max-page,sidebar-width} · brea
 | Storage | Encrypted drop: 212 MB of 1 GB this week; 100 MB per file · Google Drive connected as tali@example.com (desktop) |
 | Desktop | Version 0.3.0, update 0.3.1 ready · AI apps found: Claude Code, Claude Desktop, Codex |
 | AI app sign-in | "ChatGPT" (name as registered), returns to `chatgpt.com` |
-| Advanced only | Agent ID `0x71C4…9A2E` · network Base · record ID `0x9f2c…41ab` · terms fingerprint `e3b0…c442` |
+| Advanced only | ID number `0x71C4…9A2E` · network Base · record ID `0x9f2c…41ab` · terms fingerprint `e3b0…c442` |
 
 ---
 

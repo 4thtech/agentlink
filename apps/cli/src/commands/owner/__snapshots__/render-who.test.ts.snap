@@ -9,8 +9,8 @@ exports[`approval cards say what a proof or receipt makes public (M1-33b, 11 §5
   "What:     Record a proof",
   "Cost:     $0.10",
   "Expires:  12 Oct 2026 14:02 UTC",
-  "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
-  "If Ana confirms delivery, it also becomes public that it went to their agent.",
+  "A proof is public. Anyone can see that your AgentLink ID recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+  "If Ana confirms delivery, it also becomes public that it went to them.",
   "If you approve, your AI can do exactly this, once, before it expires. If you deny, nothing is sent.",
   "Your AI can't approve this for you.",
 ]
@@ -27,7 +27,7 @@ exports[`approval cards say what a proof or receipt makes public (M1-33b, 11 §5
   "What:     Record a proof",
   "Cost:     $0.10",
   "Expires:  12 Oct 2026 14:02 UTC",
-  "This is public: anyone can see that your agent opened it, and when.",
+  "This is public: anyone can see that your AgentLink ID opened it, and when.",
   "If you approve, your AI can do exactly this, once, before it expires. If you deny, nothing is sent.",
   "Your AI can't approve this for you.",
 ]
@@ -44,7 +44,7 @@ exports[`approval cards say what a proof or receipt makes public (M1-33b, 11 §5
   "What:     Record a proof",
   "Cost:     $0.10",
   "Expires:  12 Oct 2026 14:02 UTC",
-  "This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content.",
+  "This file shows the proof, your ID card and the message details. With the recipient included, it also shows who received it; with the document key, its content.",
   "If you approve, your AI can do exactly this, once, before it expires. If you deny, nothing is sent.",
   "Your AI can't approve this for you.",
 ]

@@ -223,6 +223,13 @@ export function stateOf(row: AgentRow): AgentState {
   return row.state ?? (row.running ? 'ready' : 'offline');
 }
 
+/** W7-ID-B3 (D-144 (c)): the names of the AI apps that use this ID (set up or running it). */
+export function usedByNames(row: AgentRow): readonly string[] {
+  return appsOf(row)
+    .filter((x) => x.state !== 'not_set_up')
+    .map((x) => x.name);
+}
+
 /** The AI apps of a row with their states (an older row: its names, Ready or Not running). */
 export function appsOf(row: AgentRow): readonly AppLive[] {
   if (row.appStates !== undefined) return row.appStates;
@@ -266,6 +273,8 @@ export function agentLine(row: AgentRow, now: number): string {
   }
   if (state === 'idle') return W.idle;
   if (state === 'ready' || state === 'working') return W.ready;
+  // W7-ID-RENAME: no AI app uses this ID: one name everywhere, never "Offline".
+  if (appsOf(row).every((a) => a.state === 'not_set_up')) return S.notUsed;
   if (row.lastSeenAt !== undefined) return W.lastSeen(W.offline, relativeTime(row.lastSeenAt, now));
   // W6-FLOW-FIXES: set up in an AI app that has never run it yet (no heartbeat): not "Offline".
   const setUp = appsOf(row).filter((a) => a.state !== 'not_set_up');

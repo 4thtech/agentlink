@@ -458,7 +458,7 @@ describe('POST /api/ui/proofs/withdraw: credits back to the agent account', () =
       params: { chainId: 10200, token: 'NATIVE', amount, to: AGENT },
     });
     expect(owner.reviews[0]?.lines.join(' ')).toContain('$2.00');
-    expect(owner.reviews[0]?.lines.join(' ')).toContain("agent's own account");
+    expect(owner.reviews[0]?.lines.join(' ')).toContain("this ID's own account");
     expect(calls.withdraw).toHaveLength(1);
     expect(calls.deposit).toHaveLength(0);
   });

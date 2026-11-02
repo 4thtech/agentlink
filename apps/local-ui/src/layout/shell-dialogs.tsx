@@ -40,7 +40,7 @@ export function reportText(what: string, facts: ReportFacts | undefined): string
       `AgentLink ${facts.version ?? 'unknown version'}`,
       `Status: ${facts.connection}`,
       `Under the hood: ${facts.hood ? 'on' : 'off'}`,
-      `Agents: ${String(facts.agents)}`,
+      `IDs: ${String(facts.agents)}`,
     );
   }
   return lines.join('\n');

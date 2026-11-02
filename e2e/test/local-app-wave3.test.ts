@@ -176,8 +176,7 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     // Name and one Touch ID: the first agent, its owner and its first rules, and (W4-ONE-TOUCH,
     // D-140) the Claude Code entry for the app picked.
     await page.getByRole('heading', { name: "Confirm it's you" }).waitFor();
-    await page.getByRole('button', { name: /^Change the agent's name/ }).click();
-    await page.getByLabel('Name your agent').fill('Home base');
+    await page.getByLabel('Name people see').fill('Home base');
     await page.getByRole('button', { name: CONNECT_WITH }).click();
     await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
     await page.getByRole('button', { name: 'I saved it' }).click();
@@ -213,8 +212,8 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     // W4-WIRE-2 (Decision 52 (2)): Add agent is Get started's add mode: "Name your agent", then an
     // AI app that is not on this computer (Claude Code stays with the first agent), one Touch ID.
     await page.goto(new URL('/start/app?add=agent', link).href);
-    await page.getByRole('heading', { name: 'Name your agent', level: 1 }).waitFor();
-    await page.getByLabel('Agent name').fill('Second agent');
+    await page.getByRole('heading', { name: 'Name this ID', level: 1 }).waitFor();
+    await page.getByLabel('Name people see').fill('Second agent');
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('button').filter({ hasText: 'Not found yet' }).first().click();
     await page
@@ -363,8 +362,7 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
       .getByRole('button', { name: /^Continue with / })
       .first()
       .click();
-    await page.getByRole('button', { name: /^Change the agent's name/ }).click();
-    await page.getByLabel('Name your agent').fill('Friend agent');
+    await page.getByLabel('Name people see').fill('Friend agent');
     await page.getByRole('button', { name: CONNECT_WITH }).click();
     await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
     await page.getByRole('button', { name: 'I saved it' }).click();
@@ -379,7 +377,7 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
     await page
       .getByRole('button', { name: /^Accept with (Touch ID|Windows Hello|your passkey)$/ })
       .click();
-    await page.getByText("Waiting for Ana's agent to answer.").waitFor();
+    await page.getByText('Waiting for Ana to answer.').waitFor();
 
     // The friend's AI app starts the agent; its sync brings Ana's answer, then the safety code.
     const friendMcp = await startAiAppMcp(friendPc, undefined);

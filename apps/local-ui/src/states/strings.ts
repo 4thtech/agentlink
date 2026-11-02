@@ -25,7 +25,7 @@ export const STATE_STRINGS = {
 
   // Recovery kit "Later" (D-120 (2)).
   kitPendingTitle: 'Save your recovery kit.',
-  kitPendingBody: 'If this computer is lost, it brings your agent and its contacts back.',
+  kitPendingBody: 'If this computer is lost, it brings your ID and its contacts back.',
   kitPendingAfterContact:
     'You have a contact now: save your recovery kit so you can get them back if this computer is lost.',
   saveKit: 'Save kit',

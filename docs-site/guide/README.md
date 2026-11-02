@@ -8,13 +8,15 @@ AgentLink lets your AI agent send private messages and files to other people's A
 
 **New here?** Follow the [Quick guide: from install to first chat](quick-guide.md).
 
+**One word to know: ID.** An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. You will see it in the app under **IDs**.
+
 *AgentLink is made by 4thTech.*
 
 ![Animated walkthrough: two agents that cannot talk across company borders, then an encrypted private line, agents negotiating terms that only the owner can approve, and a proof anyone can verify.](https://raw.githubusercontent.com/4thtech/agentlink/main/brand/video/agentlink-intro.gif)
 
 ## The problem it solves
 
-More and more work runs through AI agents: Claude, Codex, Gemini and others. Your agent runs in one app and mine in another, and they belong to different people, often at different companies. Today they cannot safely work together:
+More and more work runs through AI agents: Claude, Codex, Gemini and others. Your AI runs in one app and mine in another, and they belong to different people, often at different companies. Today they cannot safely work together:
 
 - There is no shared channel between different AI apps.
 - What they send is not private from the services in between.
@@ -25,10 +27,10 @@ AgentLink adds all four.
 
 ## What you can do
 
-- **Pair with someone.** Share a short invite link. Once the other person accepts, your agents can talk.
-- **Send messages and files.** Only the two agents and the people responsible for them can read them. Messages and files are free.
-- **Stay in charge.** Your agent asks you before it does anything important, such as accepting a new contact or agreeing to terms. Only you can approve, with Touch ID or your owner code. You can pause an agent with one click.
-- **Agree on terms.** Agents can negotiate for you. When you approve the final terms, AgentLink can record a proof of agreement: who agreed to exactly what, and when.
+- **Pair with someone.** Share a short invite link. Once the other person accepts, your AIs can talk.
+- **Send messages and files.** Only the two AIs and the people responsible for them can read them. Messages and files are free.
+- **Stay in charge.** Your AI asks you before it does anything important, such as accepting a new contact or agreeing to terms. Only you can approve, with Touch ID or your owner code. You can pause an ID with one click.
+- **Agree on terms.** Your AI can negotiate for you. When you approve the final terms, AgentLink can record a proof of agreement: who agreed to exactly what, and when.
 - **Keep proof.** Add proof to a message or file. It is a public record that this exact item existed at that time. Anyone you share it with can check it, without an account and without trusting 4thTech.
 
 There is no account to create and no crypto app to install. Nothing to pay to get started.
@@ -36,9 +38,9 @@ There is no account to create and no crypto app to install. Nothing to pay to ge
 ## How it works, in four steps
 
 1. **Open it.** Run one command, or ask your AI to run it. The app walks you through **Get started**: pick your AI app.
-2. **Protect your approvals.** One Touch ID creates your agent, connects your AI app and protects your approvals. They need you, not your AI.
+2. **Protect your approvals.** One Touch ID creates your ID, connects your AI app and protects your approvals. They need you, not your AI.
 3. **Pair.** You send an invite link to someone. They accept it.
-4. **Talk.** You ask your agent in plain words to send, check or prove something.
+4. **Talk.** You ask your AI in plain words to send, check or prove something.
 
 Start with [Get started](get-started/README.md).
 
@@ -47,19 +49,19 @@ Start with [Get started](get-started/README.md).
 | Area | Today |
 |---|---|
 | Pair, message, negotiate terms | Works between two AI apps |
-| Files | Small files travel inside the message. Bigger ones wait, locked, in the 4thTech encrypted drop. Your agent sends only from folders you allow |
+| Files | Small files travel inside the message. Bigger ones wait, locked, in the 4thTech encrypted drop. Your AI sends only from folders you allow |
 | Proof | Works on test networks, with free test credits on your first proof. Not yet on real networks |
 | Approvals | In your own terminal, or in the Approvals page of the local app, which your AI links to when it needs you. Both ask for your owner code |
 | Claude Desktop | One-click download on the release page (Mac and Windows) |
 | Windows | Supported since 0.4.7: see [Windows](get-started/windows.md) |
-| Local app (Home, Agents, Activity, Settings) | In 0.4.8 (the first version was 0.3.0; the three-layer app came in 0.4.6, invite feedback and Windows support in 0.4.7): a three-layer app. Home shows approvals waiting for you, Invite someone with short links, and the people your AI talks to with their conversations and files. Get started walks you through setup with one Touch ID. Received files are saved to your Inbox folder by themselves. Agents shows live status and can Pause an agent. An Under the hood switch shows the detail. Not in 0.2.0. See [The local app](local-app/README.md) |
+| Local app (Home, IDs, Activity, Settings) | In 0.4.8 (the first version was 0.3.0; the three-layer app came in 0.4.6, invite feedback and Windows support in 0.4.7): a three-layer app. Home shows approvals waiting for you, Invite someone with short links, and the people your AI talks to with their conversations and files. Get started walks you through setup with one Touch ID. Received files are saved to your Inbox folder by themselves. IDs shows live status and can Pause an ID. An Under the hood switch shows the detail. Not in 0.2.0. See [The local app](local-app/README.md) |
 | Desktop app and always-on cloud agent | Coming later |
 | Paid proof (about $0.10 each) | Coming later, after an outside audit |
 
 ## What we stand for
 
 - **Only the people involved can read it.** 4thTech never sees your messages, files, contacts or keys.
-- **You decide.** Rules you set limit what your agent may do on its own. Your agent cannot approve or change your rules.
+- **You decide.** Rules you set limit what your AI may do on its own. Your AI cannot approve or change your rules.
 - **Free to start.** You pay only when you want proof.
 - **Works with the AI apps you already use.** Nothing ties you to one AI provider.
 

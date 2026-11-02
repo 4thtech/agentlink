@@ -29,8 +29,8 @@ export async function getStartedWithTouchId(
     .first()
     .click();
   await page.getByRole('heading', { name: "Confirm it's you" }).waitFor();
-  await page.getByRole('button', { name: /^Change the agent's name/ }).click();
-  await page.getByLabel('Name your agent').fill(label);
+  // W7-ID-B1: the name people see is asked for on this screen (no rename button any more).
+  await page.getByLabel('Name people see').fill(label);
   await page.getByRole('button', { name: CONNECT_WITH }).click();
   await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
   await page.getByRole('button', { name: 'I saved it' }).click();

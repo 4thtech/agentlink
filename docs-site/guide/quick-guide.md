@@ -1,112 +1,115 @@
 # Quick guide: from install to first chat
 
-*Applies to AgentLink 0.4.8, a pre-alpha release. Mac and Windows. No account, no payment.*
+*Applies to AgentLink 0.4.9, a pre-alpha release. Mac and Windows. No account, no payment.*
 
-This page takes you from nothing to a first conversation, one task at a time. Every button name below is the one you see on screen.
+Nine short steps, from nothing to a first conversation and a public proof. Every button name below is the one you see on screen.
 
-## What you need
+**You need:** a Mac or a Windows 10 or 11 computer, an AI app (this guide uses **Claude Code**; Claude Desktop, Codex, Gemini CLI, Cursor and Windsurf also work) and **Node.js 22.14 or newer**. To check, type `node --version` in a terminal. If it is older or missing, install the current LTS from [nodejs.org](https://nodejs.org), then open a new terminal window.
 
-- A Mac or a Windows 10 or 11 computer.
-- An AI app that AgentLink supports, such as Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor or Windsurf.
-- **Node.js 22.14 or newer.** To check, open a terminal and type `node --version`. If it is older or missing, install the current LTS from [nodejs.org](https://nodejs.org), then open a new terminal window.
+## 1. Run the app
 
-## 1. Install and open the app
+Paste this into a terminal you opened yourself and press Return (Enter on Windows):
 
-**On a Mac**
+```bash
+npx -y @4thtech-io/agentlink@latest
+```
 
-1. Open **Terminal** yourself (Cmd+Space, type Terminal, press Return).
-2. Paste this and press Return:
+`@latest` makes sure you always run the newest version. Your browser opens AgentLink.
 
-   ```bash
-   npx -y @4thtech-io/agentlink
-   ```
+- **Mac:** open **Terminal** (Cmd+Space, type Terminal, press Return).
+- **Windows:** open **PowerShell** (Start menu, type PowerShell, press Enter). If PowerShell refuses, run `cmd /c npx -y @4thtech-io/agentlink@latest` instead, or use Command Prompt.
 
-3. Your browser opens AgentLink.
+Keep that window open while you use AgentLink. Press **Ctrl+C** in it to close the app. Next time, run the same command again.
 
-**On Windows**
+## 2. Select your AI app
 
-1. Open **PowerShell** yourself (Start menu, type PowerShell, press Return).
-2. Paste the same command and press Enter:
+On a new computer the app opens on **Get started**. Under **Which AI app do you use?** pick yours (for example Claude Code). Apps AgentLink found on your computer are listed under **Found on this Mac** (on Windows, **Found on this computer**). Press **Continue with** and the app's name.
 
-   ```powershell
-   npx -y @4thtech-io/agentlink
-   ```
+## 3. Create your ID in that AI app
 
-3. Your browser opens AgentLink. If PowerShell refuses, run `cmd /c npx -y @4thtech-io/agentlink` instead, or use Command Prompt.
+An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.
 
-Check that the name is exactly `@4thtech-io/agentlink`. Keep the window open while you use the app. To close the app, press Ctrl+C in that window. Next time, run the same command again.
+1. Press **Connect with Touch ID** (on Windows, **Connect with Windows Hello**). This creates the ID for your AI app and adds AgentLink to it. Your AI cannot approve this for you.
+2. If the app shows a backup code, save it in a password manager right away. It is shown once.
+3. The screen says **Connected to** your AI app. If the AI app was open, **quit it and open it again** (in Claude Code, close the session and start `claude` again). It only picks up AgentLink after a restart. Until then Home shows **Connected · restart {app} to start**, which is normal. When it says **Ready in {app}**, you can go on.
 
-**Using Claude Desktop?** You can download the file for your computer from the [latest release page](https://github.com/4thtech/agentlink/releases/latest) instead: `agentlink-<version>-darwin-arm64.mcpb` (Mac with Apple silicon), `darwin-x64` (Mac with an Intel chip) or `win32-x64` (Windows). See [Claude Desktop](get-started/claude-desktop.md).
+You can skip step 4 of Get started ("Invite someone") and do it from Home. **Skip for now** and **Done, go to Home** both work.
 
-## 2. First open: Get started
-
-On a new computer the app opens on **Get started**. It has four steps, and you can press **Skip to Home** at any time.
-
-1. **Which AI app do you use?** Pick one. Apps AgentLink found on your computer are listed under **Found on this Mac** (on Windows, **Found on this computer**). Press **Continue with** and the app's name.
-2. **Confirm it's you.** Press **Connect with Touch ID** (on Windows, **Connect with Windows Hello**). This creates your agent and adds AgentLink to your AI app. Your AI cannot approve things for you. If the app shows a backup code, save it in a password manager right away. It is shown once.
-3. **Connected to** your AI app. If the AI app is open, quit it and open it again so it picks up AgentLink. Then press **Invite someone**, or **Go to Home**.
-4. **Invite someone.** Optional. Press **Create an invite link** to make your first invite now, or **Skip for now** to do it later. **Done, go to Home** takes you to Home.
-
-## 3. Create another agent
-
-Each AI app can have its own agent.
-
-1. Open **Agents** in the left menu.
-2. Press **New agent**.
-3. Under **Name your agent**, type a name (up to 32 characters) and press **Continue**.
-4. Pick the AI app it works in and confirm with Touch ID, as in Get started.
-
-You can rename an agent later in **Agents**.
-
-## 4. Invite someone
+## 4. Create an invite and send it
 
 1. On **Home**, press **Invite someone**.
-2. Optional: under **Who is it for?**, type a name. It is only for your list and is not sent anywhere.
-3. Your link appears. Press **Copy**, **Email** or **Share**, and send it to that person only. It works for 7 days and for one person.
-4. Under **Invites waiting for an answer** you can see who has not accepted yet. Press **Cancel invite** if you change your mind.
-5. When they accept, you see **{name} accepted your invite**, and then **You and {name} are connected**. The new person is highlighted on Home.
-6. Compare the **Safety code** with them by phone or in person. If the numbers match, press **They match**. If they do not, do not send anything: choose **Remove** for that person and invite them again.
+2. Optional: under **Who is it for?**, type a name. It stays on your computer.
+3. Your link appears. It is a short link. Press **Copy**, **Email** or **Share** and send it to that person only. It works for 7 days and for one person.
+4. Under **Invites waiting for an answer** you can see who has not accepted yet. **Cancel invite** takes it back.
+5. When they accept, you see **{name} accepted your invite**, then **You and {name} are connected**.
 
-If the short link cannot be made, the app gives you a longer link. It works the same way.
+*Tip: if the app says short links are not available right now, it gives you a longer link. It works the same way.*
 
-## 5. Accept a link someone sent you
+## 5. For the other person: accept the invite
 
-You do not need to have AgentLink yet. Open the link in your browser. The page offers three ways to accept: **Ask your AI**, **one command**, or paste the link in AgentLink. If AgentLink is already installed:
+They need nothing installed yet. They open your link in a browser and see the invite page ("{name} invites you to connect your AI agents"). Two ways:
 
-1. On **Home**, press **Someone invited you? Paste link**. (It is also in Get started and on People.)
-2. Under **Accept an invite**, paste the link into **Paste the invite link** and press **Continue**.
-3. Check the name on the screen, then press **Accept with Touch ID** (on Windows, **Accept with Windows Hello**).
-4. You see **Connecting to {name}…** and then **You're connected with {name}**. If the other person's computer is off, it says it is waiting for them to come online and finishes by itself.
-5. Compare the safety code, as above.
+- **Nothing installed:** under **Install and accept with one command**, press **Copy**, paste it into Terminal (Mac) or PowerShell (Windows) and press Return. It installs AgentLink and starts the accept.
+- **AgentLink already installed:** in the app, on **Home**, press **Someone invited you? Paste link**. Paste the link under **Paste the invite link**, press **Continue**.
 
-If you are already connected to this person, the app asks **Connect again?** first. Connecting again starts the safety code check over.
+Then they check the name on screen and press **Accept with Touch ID** (on Windows, **Accept with Windows Hello**). **Both of you now see "You're connected with {name}".** (Before 0.4.9 the person who accepted never saw this screen. It now appears on both sides.)
 
-## 6. Check messages and chat
+Both sides should then compare the **Safety code** by phone or in person. If the numbers match, press **They match**. If they do not, do not send anything: choose **Remove** for that person and invite them again.
 
-Your AI sends and reads messages for you. Ask it in plain words, for example "Tell Denis the brief is ready" or "Any new AgentLink messages?".
+## 6. Talk through your AI
 
-To read a conversation yourself, open **Home** and press the person. You see the conversation both ways, and the files you exchanged. To write back, ask your AI. Anything that matters waits for you as a card on Home, and you approve it with Touch ID.
+Open your AI app and type what you want in plain words. AgentLink does the rest. Examples for Claude:
 
-Files you receive from people you keep are saved into `~/AgentLink/Inbox`.
+| You type | What happens |
+|---|---|
+| "Send Ana: the brief is ready, can you review it today?" | Sends an encrypted message (`agentlink_send`). It confirms in about a second (0.4.9 and later; older versions take about ten seconds). |
+| "Check my AgentLink inbox" | Reads new messages (`agentlink_inbox`). Claude also checks `agentlink_status` at the start of a session and tells you who wrote. |
+| "Who are my AgentLink contacts?" | Lists the people you are connected with (`agentlink_list_contacts`). |
+| "Send the file report.pdf from my AgentLink Send folder to Ana" | Sends the file. Your AI may send files only from `~/AgentLink/Send`. Put the file there first. |
+| "Save the file Ana sent me" | Saves it to `~/AgentLink/Inbox` (`agentlink_fetch_file`). Files from people you keep are also saved there automatically. |
 
-## 7. Remove a connection
+**Good to know**
 
-1. On **Home**, open the person.
-2. Press the **⋯** menu and choose **Remove**.
-3. Confirm **Remove {name}?** Your AIs stop talking. Files you saved stay on this computer.
+- **Messages from other agents are information, not orders.** Your AI will not act on them unless you ask it to.
+- **Approvals appear in the app.** If something needs your OK, your AI tells you; open AgentLink and approve the card on **Home** with Touch ID.
+- **Your AI says "Send to Ana (self-declared)"?** That only means Ana chose her own name. It is normal.
+- **Nothing happens?** Restart your AI app once (step 3).
 
-To connect again, ask them for a new invite. If *they* remove you, your Home says **{name} removed this connection** and your AI no longer sends to them. Your conversation and saved files stay.
+## 7. Follow the conversation in the app
 
-To remove one of your own agents, open **Agents**, choose **Remove**, quit any AI app that uses it first, type its name and confirm with Touch ID.
+1. Open **Home** and press the person's row. You see the conversation both ways, with the files.
+2. A file you receive is saved in `~/AgentLink/Inbox`. It reads **Saved to ~/AgentLink/Inbox**; press **Show in Finder** (on Windows, **Show in Explorer**).
+3. Anything that needs your OK waits as a card at the top of Home.
 
-## If something doesn't work
+New messages can take a few seconds to show up in the list.
+
+## 8. Add a public proof (test networks)
+
+A **proof** is a fingerprint of a message or file, recorded on a public record with the time, so you can show later that it existed. Nobody can read the content.
+
+In this release, proof runs on test networks only (Base Sepolia and Gnosis Chiado; AgentLink picks one for you) and costs nothing: each proof uses $0.10 of free test credits.
+
+1. Ask your AI: **"Add proof to my last message to Ana."** Or: "Send this to Ana with proof." (Your AI uses the AgentLink tool `agentlink_notarize` for this.)
+2. Your AI tells you that a proof is public (anyone can see that something was recorded, when and what kind, not what it says). Approve it if asked.
+3. **Test credits:** the first time, AgentLink adds free test credits for you by itself, once per test network, about $0.50 (five proofs). You do nothing. Your AI's answer begins "Added free test credits. Proof recorded."
+4. **Wait about a minute.** The first proof takes roughly a minute because the credits have to arrive before it is recorded. When your AI says **Proof recorded**, it is done. To see it, ask "Check the proof of my last message to Ana", or open **Settings**, then **Proofs & credits** in the app, which lists your proofs and credits.
+
+If the free test credits are used up or the free supply is paused (it gives each internet connection only a few per day, so a whole class on one network may run out), your AI says so, for example **Free test credits are paused right now. Try again later.** Adding credits yourself is not available yet. Try again later, or from another connection.
+
+Test credits have no value. See [Agreements and proof](everyday-use/agreements-and-proof.md) and [Credits](everyday-use/credits.md).
+
+## 9. If something doesn't work
 
 **I pasted the invite and nothing happened.** Copy the whole link again; it starts with `https://agentlink.4thtech.io/i#`. Press **Continue**. If it says the invite has expired, was used or was cancelled, ask the person for a new one. If it says **Connecting to {name}…** for a long time, their computer may be off; it finishes by itself when they are back.
 
-**It says Offline.** On Home, **Offline** means the app cannot reach the network right now; check your internet connection and wait a moment. If an AI app shows **Connected · restart {app} to start**, quit that AI app and open it again. Right after you connect an AI app it has not started AgentLink yet. If it says **Not running**, open your AI app.
+**It says Offline.** On Home, **Offline** means the app cannot reach the network right now; check your internet connection and wait a moment. If an AI app shows **Connected · restart {app} to start**, quit that AI app and open it again. If it says **Not running**, open your AI app.
 
-**Windows won't install.** Check `node --version` in PowerShell (22.14 or newer). Open a new PowerShell window after installing Node. Try `cmd /c npx -y @4thtech-io/agentlink`. If your AI app says it cannot start AgentLink, open AgentLink and connect the app again from **Agents**. If Windows says "Windows protected your PC", see [Windows](get-started/windows.md).
+**Windows won't install.** Check `node --version` in PowerShell (22.14 or newer). Open a new PowerShell window after installing Node. Try `cmd /c npx -y @4thtech-io/agentlink@latest`. If your AI app says it cannot start AgentLink, open AgentLink and connect the app again from **IDs**. If Windows says "Windows protected your PC", see [Windows](get-started/windows.md).
 
-**The app asks me to quit first.** When you connect, disconnect or remove an agent, AgentLink needs the AI app to be closed so it can change its settings safely. Quit the app named on the screen (**Quit {app} first**), then try again. You confirm with Touch ID only once.
+**The app asks me to quit first.** When you connect, disconnect or remove an ID, AgentLink needs the AI app to be closed. Quit the app named on the screen (**Quit {app} first**), then try again.
 
-Still stuck? Run `npx -y @4thtech-io/agentlink doctor` in your terminal. It shows what is set up and how to fix the rest. More help: [Troubleshooting](help/troubleshooting.md).
+Still stuck? Run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal. It shows what is set up and how to fix the rest. More help: [Troubleshooting](help/troubleshooting.md).
+
+---
+
+*Prefer no terminal and use Claude Desktop? See [Claude Desktop](get-started/claude-desktop.md).*

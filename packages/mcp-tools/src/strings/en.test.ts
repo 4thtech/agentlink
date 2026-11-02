@@ -160,7 +160,7 @@ describe('copy catalogue (M1-9g)', () => {
     const hostile = '{url} {count, plural, one {x} other {y}} #';
     const out = copy('chat.status.ok.sent', { contactName: hostile, contactFirstName: hostile });
     expect(out).toBe(
-      `Sent to ${hostile}. End-to-end encrypted: only you, ${hostile} and your agents can read it.`,
+      `Sent to ${hostile}. End-to-end encrypted: only you, ${hostile} and your AIs can read it.`,
     );
   });
 

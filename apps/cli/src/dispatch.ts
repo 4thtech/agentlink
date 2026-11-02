@@ -72,7 +72,9 @@ export type CommandName =
   | 'ui'
   | 'mcp';
 
-const AGENT: Options = { agent: { type: 'string' } };
+// W7-ID-B4 (D-144, owner Q6): `--id` is an alias of `--agent`, with identical behaviour. Both are
+// parsed here; the dispatcher folds `--id` into `agent` before any handler sees it.
+const AGENT: Options = { agent: { type: 'string' }, id: { type: 'string' } };
 
 /**
  * The commands of 06 §8, in its order. M1-9h adds `credits` and `verify`. Not here yet: the
@@ -84,8 +86,8 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   {
     name: 'init',
     usage: [
-      'agentlink init [--agent <name>] [--harness <id|none>] [--config <path>]',
-      'agentlink init --hook [--agent <name>]',
+      'agentlink init [--id <name>] [--harness <id|none>] [--config <path>]',
+      'agentlink init --hook [--id <name>]',
     ],
     guard: 'none',
     options: {
@@ -103,7 +105,7 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     name: 'owner',
     usage: [
       'agentlink owner init                     †',
-      'agentlink owner add-agent --agent <name>   †',
+      'agentlink owner add-agent --id <name>   †',
       'agentlink owner change-code              †',
     ],
     guard: 'owner',
@@ -140,8 +142,8 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     name: 'contacts',
     usage: [
       'agentlink contacts',
-      'agentlink contacts rename <contactId> <name> [--agent <name>]   †',
-      'agentlink contacts remove <contactId> [--agent <name>]   †',
+      'agentlink contacts rename <contactId> <name> [--id <name>]   †',
+      'agentlink contacts remove <contactId> [--id <name>]   †',
     ],
     guard: 'owner',
     // The `rename` and `remove` subcommands (M1-9za) are owner operations; the plain list is not.
@@ -162,33 +164,33 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     // `set <key> <value>` (commitments limits, the sell warning) is not registered, so it is not
     // listed (M1-36c).
     usage: [
-      'agentlink policy show [--agent <name>]   †',
-      'agentlink policy allow-folder <path> [--agent <name>]   †',
-      'agentlink policy remove-folder <path> [--agent <name>]   †',
-      'agentlink policy recover [--agent <name>]   †',
+      'agentlink policy show [--id <name>]   †',
+      'agentlink policy allow-folder <path> [--id <name>]   †',
+      'agentlink policy remove-folder <path> [--id <name>]   †',
+      'agentlink policy recover [--id <name>]   †',
       // M1-36b-2-c: the Send folder for an agent set up before its first rules.
-      'agentlink policy allow-send-folder [--agent <name>]   †',
+      'agentlink policy allow-send-folder [--id <name>]   †',
     ],
     guard: 'owner',
     options: AGENT,
   },
   {
     name: 'credits',
-    usage: ['agentlink credits [--topup] [--agent <name>]'],
+    usage: ['agentlink credits [--topup] [--id <name>]'],
     guard: 'none',
     options: { ...AGENT, topup: { type: 'boolean' } },
   },
   {
     name: 'verify',
-    usage: ['agentlink verify <proof.json> [--agent <name>]'],
+    usage: ['agentlink verify <proof.json> [--id <name>]'],
     guard: 'none',
     options: AGENT,
   },
   {
     name: 'approve',
     usage: [
-      'agentlink approve <approvalId> [--agent <name>]   †',
-      'agentlink approve [--agent <name>]     †',
+      'agentlink approve <approvalId> [--id <name>]   †',
+      'agentlink approve [--id <name>]     †',
     ],
     guard: 'owner',
     options: AGENT,
@@ -196,14 +198,14 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   },
   {
     name: 'deny',
-    usage: ['agentlink deny <approvalId> [--agent <name>]   †'],
+    usage: ['agentlink deny <approvalId> [--id <name>]   †'],
     guard: 'owner',
     options: AGENT,
     approvalIdAt: [0],
   },
   {
     name: 'cancel',
-    usage: ['agentlink cancel <approvalId> [--agent <name>]   †'],
+    usage: ['agentlink cancel <approvalId> [--id <name>]   †'],
     guard: 'owner',
     options: AGENT,
     approvalIdAt: [0],
@@ -211,7 +213,7 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   { name: 'doctor', usage: ['agentlink doctor'], guard: 'none', options: AGENT },
   // M1-11b-9: opens the local pages in the owner's own terminal; the handler checks the terminal
   // itself so an agent run gets one fixed line (ui.ts), not the generic guard text.
-  { name: 'ui', usage: ['agentlink ui [--agent <name>]'], guard: 'none', options: AGENT },
+  { name: 'ui', usage: ['agentlink ui [--id <name>]'], guard: 'none', options: AGENT },
   {
     name: 'mcp',
     // M1-36h: `--advanced` serves the Advanced tool surface (the `chain?` override, 06 §2.4).
@@ -289,9 +291,9 @@ const HELP_GROUPS: readonly { readonly title: string; readonly names: readonly C
   { title: 'More:', names: ['contacts', 'policy', 'credits', 'verify', 'doctor', 'ui', 'mcp'] },
 ];
 
-/** U3-b: `init` and `ui` never ask which agent, so their `--agent` is not shown by default. */
+/** U3-b: `init` and `ui` never ask which ID, so their `--id` is not shown by default. */
 const hideAgentFlag = (line: string): string =>
-  /^agentlink (init|ui)\b/.test(line) ? line.replace(/ ?\[--agent <name>\]/, '') : line;
+  /^agentlink (init|ui)\b/.test(line) ? line.replace(/ ?\[--id <name>\]/, '') : line;
 
 /** The `--help` text: exactly the registered commands of 06 §8, grouped. */
 export function helpText(): string {
@@ -311,12 +313,13 @@ export function helpText(): string {
       for (const line of spec?.usage ?? []) lines.push(`  ${hideAgentFlag(line)}`);
     }
   }
-  // U3-b: AgentLink never asks which agent; `--agent` is for people who run several on purpose.
+  // U3-b: AgentLink never asks which ID; `--id` is for people who run several on purpose.
   lines.push(
     '',
     'Advanced:',
-    '  `init` and `ui` use your last used agent, so they never ask which one. Add --agent <name> to use a specific agent.',
-    '  The owner commands marked † still ask which agent when you have several.',
+    '  `init` and `ui` use your last used ID, so they never ask which one. Add --id <name> to use a specific ID.',
+    '  The owner commands marked † still ask which ID when you have several.',
+    '  --id <name> and --agent <name> are the same option.',
   );
   lines.push('', 'Options: --help, --version');
   return lines.join('\n');
@@ -387,13 +390,20 @@ export function createDispatcher(
         allowPositionals: true,
         strict: true,
       });
-      const agentValue = result.values['agent'];
+      // W7-ID-B4: `--id` is `--agent` (D-144). Given both, they must name the same ID.
+      const { id: idValue, ...values } = result.values;
+      if (idValue !== undefined && values['agent'] !== undefined && idValue !== values['agent']) {
+        output.printError(DISPATCH_TEXT.badArguments);
+        return EXIT_USAGE;
+      }
+      if (idValue !== undefined) values['agent'] = idValue;
+      const agentValue = values['agent'];
       if (agentValue !== undefined && !isAgentName(agentValue)) {
         output.printError(RUNTIME_MESSAGES.agent_name_invalid);
         return EXIT_USAGE;
       }
       parsed = Object.freeze({
-        values: Object.freeze({ ...result.values }) as ParsedCommand['values'],
+        values: Object.freeze({ ...values }) as ParsedCommand['values'],
         positionals: Object.freeze([...result.positionals]),
         agent: typeof agentValue === 'string' ? agentValue : undefined,
       });

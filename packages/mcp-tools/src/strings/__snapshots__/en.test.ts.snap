@@ -86,7 +86,7 @@ exports[`copy catalogue (M1-9g) > chat.status.ok.inviteShare > renders as design
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.proof > renders as designed 1`] = `"Sent with proof. Recorded 20 Oct 2026 at 14:02. $0.10 from credits."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.ok.sent > renders as designed 1`] = `"Sent to Marko. End-to-end encrypted: only you, Marko and your agents can read it."`;
+exports[`copy catalogue (M1-9g) > chat.status.ok.sent > renders as designed 1`] = `"Sent to Marko. End-to-end encrypted: only you, Marko and your AIs can read it."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.verified > renders as designed 1`] = `"Valid proof. Recorded by “Tali’s agent” (Registered), 20 Oct 2026, 14:02 UTC. It proves this exact document existed and was exchanged at these times; not that its content is true."`;
 
@@ -104,7 +104,7 @@ exports[`copy catalogue (M1-9g) > chat.status.pending_approval.nextStep > render
 
 exports[`copy catalogue (M1-9g) > chat.status.rejected.declined > renders as designed 1`] = `"You declined, so nothing was sent."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.rejected.rules > renders as designed 1`] = `"Your rules don't let this agent accept terms. Only you can change that."`;
+exports[`copy catalogue (M1-9g) > chat.status.rejected.rules > renders as designed 1`] = `"Your rules don't let this AI accept terms. Only you can change that."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.rejected.termsExpired > renders as designed 1`] = `"These terms expired on 20 Oct 2026."`;
 
@@ -144,7 +144,7 @@ exports[`copy catalogue (M1-9g) > cli.doctor.keyLocked > renders as designed 1`]
          secret file or an environment variable."
 `;
 
-exports[`copy catalogue (M1-9g) > cli.doctor.keysFound > renders as designed 1`] = `"OK       Agent keys found"`;
+exports[`copy catalogue (M1-9g) > cli.doctor.keysFound > renders as designed 1`] = `"OK       ID keys found"`;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.networkDown > renders as designed 1`] = `
 "Problem  Can't reach the message network
@@ -154,14 +154,14 @@ exports[`copy catalogue (M1-9g) > cli.doctor.networkDown > renders as designed 1
 exports[`copy catalogue (M1-9g) > cli.doctor.networkOk > renders as designed 1`] = `"OK       Message network reachable"`;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.noOwnerCard > renders as designed 1`] = `
-"Problem  This agent has no card from your owner yet
+"Problem  This ID has no card from your owner yet
          Run \`npx -y @4thtech-io/agentlink owner add-agent --agent writer\` in your own terminal."
 `;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.noOwnerCardNoOthers > renders as designed 1`] = `
-"Problem  No agent on this computer has a card from an owner
+"Problem  No ID on this computer has a card from an owner
          If you have never set up an owner, \`npx -y @4thtech-io/agentlink owner add-agent\` tells you what to run first.
-         If an owner already exists here, \`npx -y @4thtech-io/agentlink owner add-agent --agent <name>\` adds this agent to it with your owner code."
+         If an owner already exists here, \`npx -y @4thtech-io/agentlink owner add-agent --agent <name>\` adds this ID to it with your owner code."
 `;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.restart > renders as designed 1`] = `
@@ -192,7 +192,7 @@ exports[`copy catalogue (M1-9g) > cli.keychain.optIn > renders as designed 1`] =
 exports[`copy catalogue (M1-9g) > cli.keychain.warning > renders as designed 1`] = `
 "Warning This machine has no system keychain.
 
-AgentLink can keep your agent's keys in a file locked
+AgentLink can keep your ID's keys in a file locked
 with an unlock code. That's weaker than a keychain if
 someone copies this disk, unless the unlock code is
 kept elsewhere. Your approvals still need your owner
@@ -246,29 +246,29 @@ exports[`copy catalogue (M1-9g) > common.identity.unknownSender > renders as des
 
 exports[`copy catalogue (M1-9g) > common.identity.verified > renders as designed 1`] = `"Verified domain · acme.com"`;
 
-exports[`copy catalogue (M1-9g) > common.privacy.export > renders as designed 1`] = `"This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content."`;
+exports[`copy catalogue (M1-9g) > common.privacy.export > renders as designed 1`] = `"This file shows the proof, your ID card and the message details. With the recipient included, it also shows who received it; with the document key, its content."`;
 
-exports[`copy catalogue (M1-9g) > common.privacy.proof > renders as designed 1`] = `"A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says."`;
+exports[`copy catalogue (M1-9g) > common.privacy.proof > renders as designed 1`] = `"A proof is public. Anyone can see that your AgentLink ID recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says."`;
 
-exports[`copy catalogue (M1-9g) > common.privacy.proofReceipt > renders as designed 1`] = `"If Marko confirms delivery, it also becomes public that it went to their agent."`;
+exports[`copy catalogue (M1-9g) > common.privacy.proofReceipt > renders as designed 1`] = `"If Marko confirms delivery, it also becomes public that it went to them."`;
 
-exports[`copy catalogue (M1-9g) > common.privacy.proofReceiptGeneric > renders as designed 1`] = `"If the recipient confirms delivery, it also becomes public that it went to their agent."`;
+exports[`copy catalogue (M1-9g) > common.privacy.proofReceiptGeneric > renders as designed 1`] = `"If the recipient confirms delivery, it also becomes public that it went to them."`;
 
-exports[`copy catalogue (M1-9g) > common.privacy.receiptAsk > renders as designed 1`] = `"Ask Marko to confirm delivery? If they do, anyone can see that this went to their agent."`;
+exports[`copy catalogue (M1-9g) > common.privacy.receiptAsk > renders as designed 1`] = `"Ask Marko to confirm delivery? If they do, anyone can see that this went to them."`;
 
-exports[`copy catalogue (M1-9g) > common.privacy.receiptAuto > renders as designed 1`] = `"Confirm deliveries from Marko automatically? Each confirmation shows publicly that their proof reached your agent."`;
+exports[`copy catalogue (M1-9g) > common.privacy.receiptAuto > renders as designed 1`] = `"Confirm deliveries from Marko automatically? Each confirmation shows publicly that their proof reached you."`;
 
-exports[`copy catalogue (M1-9g) > common.privacy.receiptPublic > renders as designed 1`] = `"This is public: anyone can see that your agent opened it, and when."`;
+exports[`copy catalogue (M1-9g) > common.privacy.receiptPublic > renders as designed 1`] = `"This is public: anyone can see that your AgentLink ID opened it, and when."`;
 
-exports[`copy catalogue (M1-9g) > common.privacy.receiptRequest > renders as designed 1`] = `"Marko asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content."`;
+exports[`copy catalogue (M1-9g) > common.privacy.receiptRequest > renders as designed 1`] = `"Marko asked you to confirm delivery. Confirming shows publicly that this reached you. Nothing about the content."`;
 
 exports[`copy catalogue (M1-9g) > common.privacy.receiptRequestConfirm > renders as designed 1`] = `"Confirm delivery"`;
 
 exports[`copy catalogue (M1-9g) > common.privacy.receiptRequestLater > renders as designed 1`] = `"Not now"`;
 
-exports[`copy catalogue (M1-9g) > common.privacy.registered > renders as designed 1`] = `"Registering puts your agent's link to you on the public record. Your agent's name is not published."`;
+exports[`copy catalogue (M1-9g) > common.privacy.registered > renders as designed 1`] = `"Registering puts your AgentLink ID's link to you on the public record. Your ID's name is not published."`;
 
-exports[`copy catalogue (M1-9g) > common.privacy.topUp > renders as designed 1`] = `"The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink."`;
+exports[`copy catalogue (M1-9g) > common.privacy.topUp > renders as designed 1`] = `"The account you add credits from is publicly linked to your AgentLink ID. For more privacy, use free test credits or a separate account only for AgentLink."`;
 
 exports[`copy catalogue (M1-9g) > local.linkExpired > renders as designed 1`] = `"This link has expired. Ask your AI to open AgentLink again."`;
 

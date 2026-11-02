@@ -2,9 +2,9 @@
 
 *Applies to AgentLink 0.4.8. In 0.4.3 an AI app is connected from the terminal with `init`.*
 
-The AI apps page shows the AI apps AgentLink found on your computer, such as Claude Code, and which agent each one works with. From here you connect an app, move it to another agent, or disconnect it. Nothing else in the app's settings file is touched.
+The AI apps page shows the AI apps AgentLink found on your computer, such as Claude Code, and which ID each one works with. From here you connect an app, move it to another ID, or disconnect it. Nothing else in the app's settings file is touched.
 
-Open it from **Connect** on an agent in [Agents](agents.md), or from [Get started](get-started-wizard.md). Getting started connects the AI app you pick for you, with the same one Touch ID that creates your agent.
+Open it from **Connect** on an ID in [IDs](ids.md), or from [Get started](get-started-wizard.md). Getting started connects the AI app you pick for you, with the same one Touch ID that creates your ID.
 
 ## Connect an AI app
 
@@ -13,15 +13,15 @@ Open it from **Connect** on an agent in [Agents](agents.md), or from [Get starte
 3. Press **Apply with Touch ID**.
 4. If the app is open, the page says **Restart** the app **to finish**. AgentLink never restarts it for you.
 
-A backup of the file is saved next to it first, with the same permissions. The agent folder the entry starts is named on the screen.
+A backup of the file is saved next to it first, with the same permissions. The ID folder the entry starts is named on the screen.
 
-## Move it to another agent
+## Move it to another ID
 
-Each AI app works with one agent at a time. If an app is connected to another agent, you are offered **Use** an agent **instead**. You see which entry goes and which comes, then confirm with Touch ID. The page says: the app **will use** the new agent **instead of** the old one.
+Each AI app works with one ID at a time. If an app is connected to another ID, it shows **Uses another ID** and you are offered **Use** this ID **instead**. You see which entry goes and which comes, then confirm with Touch ID. The page says: the app **will use** the new ID **instead of** the old one.
 
 ## Disconnect
 
-**Disconnect** removes the entry AgentLink added, with Touch ID, after showing it. The app then **will stop using** the agent. Your agent, contacts and messages stay.
+**Disconnect** removes the entry AgentLink added, with Touch ID, after showing it. The app then **will stop using** the ID. Your ID, contacts and messages stay.
 
 ## When it can't be done
 
@@ -29,7 +29,7 @@ Each AI app works with one agent at a time. If an app is connected to another ag
 - **This app already has an AgentLink entry we didn't write.** AgentLink does not change it. Connect by hand with **Show manual steps** if you want to.
 - **Not listed? Connect it by hand** shows what to add yourself. Nothing there is run by AgentLink.
 
-Whether an app is **Working**, **Ready**, **Idle**, **Not running** or **Not set up** shows live; see [Agents](agents.md#live-status).
+Whether an app is **Working**, **Ready**, **Idle**, **Not running** or **Not set up** shows live; see [IDs](ids.md#live-status).
 
 An AI app can only change what the page shows. Your AI cannot rewire itself: this needs your Touch ID.
 

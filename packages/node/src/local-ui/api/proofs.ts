@@ -361,8 +361,8 @@ async function moveCredits(
   };
   const lines =
     kind === 'deposit'
-      ? [`Add ${shown.usd} to your credits from funds your agent received on the ${network}.`]
-      : [`Withdraw ${shown.usd} of credits to your agent's own account on the ${network}.`];
+      ? [`Add ${shown.usd} to your credits from funds this ID received on the ${network}.`]
+      : [`Withdraw ${shown.usd} of credits to this ID's own account on the ${network}.`];
   const [signature] = await owner.sign({ lines }, [{ kind: 'owner-action', action }]);
   if (signature?.kind !== 'owner-action') return MOVE_REFUSED;
   const result =

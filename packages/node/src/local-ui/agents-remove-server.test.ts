@@ -860,7 +860,7 @@ describe('the statement before the gesture (04 §2.5, 11 §5)', () => {
   it('names the label and the folder, and says it is retired for good', () => {
     const lines = removeStatement('Work', 'work', 2);
     expect(lines[0]).toContain('Work');
-    expect(lines.join(' ')).toContain('Agent folder: work');
+    expect(lines.join(' ')).toContain('ID folder: work');
     expect(lines.join(' ')).toContain('cannot be restored');
     expect(lines.join(' ')).toContain('contacts are told');
     expect(removeStatement('Work', 'work', 0).join(' ')).not.toContain('are told');

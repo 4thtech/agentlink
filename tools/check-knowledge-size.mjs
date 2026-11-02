@@ -4,14 +4,34 @@
 // size costs money. Tokens are estimated as bytes / 4 (a deliberately simple, tokenizer-free method).
 //   - above TARGET_TOKENS: a warning (exit 0);
 //   - above MAX_TOKENS: a failure (exit 1).
-// The same numbers are stated in knowledge/README.md ("Size budget").
+// The folder is deliberately lean: exactly the two files in KNOWLEDGE_FILES (an overview and a user
+// guide). A third file fails the check; engineering depth lives in docs-site/technical.
 
 import { readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const TARGET_TOKENS = 30_000;
-export const MAX_TOKENS = 80_000;
+export const TARGET_TOKENS = 15_000;
+export const MAX_TOKENS = 30_000;
+
+/** The only files allowed in knowledge/. */
+export const KNOWLEDGE_FILES = ['agentlink-overview.md', 'agentlink-userguide.md'];
+
+/** Returns problems when knowledge/ does not hold exactly KNOWLEDGE_FILES. */
+export function checkFileSet(names) {
+  const problems = [];
+  for (const name of KNOWLEDGE_FILES) {
+    if (!names.includes(name)) problems.push(`knowledge/${name} is missing`);
+  }
+  for (const name of names) {
+    if (!KNOWLEDGE_FILES.includes(name)) {
+      problems.push(
+        `knowledge/${name} is not allowed: fold it into one of ${KNOWLEDGE_FILES.join(' or ')}`,
+      );
+    }
+  }
+  return problems;
+}
 
 /** Token estimate for a byte count: bytes / 4, rounded up. */
 export function estimateTokens(bytes) {
@@ -41,6 +61,11 @@ export function collectEntries(root) {
 
 function main() {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const setProblems = checkFileSet(readdirSync(join(root, 'knowledge')));
+  if (setProblems.length > 0) {
+    for (const problem of setProblems) console.error(`check-knowledge-size: ${problem}`);
+    process.exit(1);
+  }
   const { files, total, level } = evaluateBudget(collectEntries(root));
   for (const file of files) {
     console.log(`  ${String(file.tokens).padStart(6)} tokens  ${file.path}`);

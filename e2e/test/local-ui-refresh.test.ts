@@ -49,7 +49,7 @@ const BUDGET = { cssGzip: 15 * 1024, jsGzip: 10 * 1024 } as const; // plan §7
 // Advanced and Get started.
 const PAGES = [
   { path: '/', title: 'Home' },
-  { path: '/agents', title: 'Agents' },
+  { path: '/agents', title: 'IDs' },
   { path: '/activity', title: 'Activity' },
   // Interim: today's People page (U4 folds it into Home). W6-UI-POLISH: /inbox goes to Home.
   { path: '/contacts', title: 'People' },
@@ -498,9 +498,9 @@ async function timedNav(page: Page, label: string, title: string): Promise<numbe
  * Activity, there and back again.
  */
 const NAV_WALK: readonly (readonly [string, string])[] = [
-  ['Agents', 'Agents'],
+  ['IDs', 'IDs'],
   ['Activity', 'Activity'],
-  ['Agents', 'Agents'],
+  ['IDs', 'IDs'],
 ];
 
 beforeAll(async () => {
@@ -803,7 +803,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     try {
       await observeLayoutShift(page);
       await page.goto(`${origin}/agents`);
-      await settle(page, 'Agents');
+      await settle(page, 'IDs');
       await page.waitForTimeout(600);
       report['shellCls'] = await expectStableLayout(page);
 
@@ -882,7 +882,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         await page.route('**/api/ui/events', (route) => route.fulfill(json({ error: 'x' }, 404)));
         await observeLayoutShift(page);
         await page.goto(`${origin}/agents`);
-        await settle(page, 'Agents');
+        await settle(page, 'IDs');
         await page.locator('[aria-label="Live status"] li').first().waitFor();
         await page.waitForFunction(
           () => {

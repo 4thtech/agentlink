@@ -19,7 +19,7 @@
 export const en = {
   // ---- Tool results: ok -------------------------------------------------------------------
   'chat.status.ok.sent':
-    'Sent to {contactName}. End-to-end encrypted: only you, {contactFirstName} and your agents can read it.',
+    'Sent to {contactName}. End-to-end encrypted: only you, {contactFirstName} and your AIs can read it.',
   'chat.status.ok.proof': 'Sent with proof. Recorded {date} at {time}. {fee} from credits.',
   'chat.status.ok.invite':
     "Invite ready: it works once, until {date}. Send it only to {contactFirstName}: whoever uses it first is connected. You'll be connected as soon as they accept.",
@@ -63,7 +63,7 @@ export const en = {
   'chat.status.not_found.contactNone':
     "I couldn't find a contact called '{query}', and you have no contacts yet.",
   'chat.status.rejected.rules':
-    "Your rules don't let this agent accept terms. Only you can change that.",
+    "Your rules don't let this AI accept terms. Only you can change that.",
   'chat.status.rejected.declined': 'You declined, so nothing was sent.',
   'chat.status.rejected.termsExpired': 'These terms expired on {date}.',
   'chat.status.error.network': "I couldn't reach the message network. Nothing was sent.",
@@ -124,28 +124,28 @@ export const en = {
   // ---- What a proof makes public (11 §5.6, D-109; M1-33b) ---------------------------------
   // Fixed text. The only slots are the name-rule contact name and a fixed receipt word.
   'common.privacy.proof':
-    "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+    "A proof is public. Anyone can see that your AgentLink ID recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
   'common.privacy.proofReceipt':
-    'If {contactName} confirms delivery, it also becomes public that it went to their agent.',
+    'If {contactName} confirms delivery, it also becomes public that it went to them.',
   // Where the recipient is not named (the proof tool alone): same meaning, no name.
   'common.privacy.proofReceiptGeneric':
-    'If the recipient confirms delivery, it also becomes public that it went to their agent.',
+    'If the recipient confirms delivery, it also becomes public that it went to them.',
   'common.privacy.receiptAsk':
-    'Ask {contactName} to confirm delivery? If they do, anyone can see that this went to their agent.',
+    'Ask {contactName} to confirm delivery? If they do, anyone can see that this went to them.',
   'common.privacy.receiptRequest':
-    '{contactName} asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content.',
+    '{contactName} asked you to confirm delivery. Confirming shows publicly that this reached you. Nothing about the content.',
   'common.privacy.receiptRequestConfirm': 'Confirm delivery',
   'common.privacy.receiptRequestLater': 'Not now',
   'common.privacy.receiptAuto':
-    'Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached your agent.',
+    'Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached you.',
   'common.privacy.receiptPublic':
-    'This is public: anyone can see that your agent {receipt} it, and when.',
+    'This is public: anyone can see that your AgentLink ID {receipt} it, and when.',
   'common.privacy.topUp':
-    'The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.',
+    'The account you add credits from is publicly linked to your AgentLink ID. For more privacy, use free test credits or a separate account only for AgentLink.',
   'common.privacy.export':
-    'This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content.',
+    'This file shows the proof, your ID card and the message details. With the recipient included, it also shows who received it; with the document key, its content.',
   'common.privacy.registered':
-    "Registering puts your agent's link to you on the public record. Your agent's name is not published.",
+    "Registering puts your AgentLink ID's link to you on the public record. Your ID's name is not published.",
 
   // ---- Permission prompt titles (proposed in D1; engineering confirms) ---------------------
   'tool.title.agentlink_send': 'AgentLink: send a message or file',
@@ -199,11 +199,11 @@ export const en = {
   'cli.owner.prompt': '{codeName}:',
   'cli.owner.again': 'Again:',
   'cli.owner.done': 'OK Approvals are protected.',
-  'cli.doctor.keysFound': 'OK       Agent keys found',
+  'cli.doctor.keysFound': 'OK       ID keys found',
   'cli.doctor.noOwnerCard':
-    'Problem  This agent has no card from your owner yet\n         Run `{prefix} owner add-agent --agent {agent}` in your own terminal.',
+    'Problem  This ID has no card from your owner yet\n         Run `{prefix} owner add-agent --agent {agent}` in your own terminal.',
   'cli.doctor.noOwnerCardNoOthers':
-    'Problem  No agent on this computer has a card from an owner\n         If you have never set up an owner, `{prefix} owner add-agent` tells you what to run first.\n         If an owner already exists here, `{prefix} owner add-agent --agent <name>` adds this agent to it with your owner code.',
+    'Problem  No ID on this computer has a card from an owner\n         If you have never set up an owner, `{prefix} owner add-agent` tells you what to run first.\n         If an owner already exists here, `{prefix} owner add-agent --agent <name>` adds this ID to it with your owner code.',
   'cli.doctor.networkOk': 'OK       Message network reachable',
   'cli.doctor.networkDown':
     "Problem  Can't reach the message network\n         Check your connection and run `{prefix} doctor` again.",
@@ -212,7 +212,7 @@ export const en = {
   'cli.doctor.keyLocked':
     'Problem  Key file is locked\n         Supply the unlock code from a mounted\n         secret file or an environment variable.',
   'cli.keychain.warning':
-    "Warning This machine has no system keychain.\n\nAgentLink can keep your agent's keys in a file locked\nwith an unlock code. That's weaker than a keychain if\nsomeone copies this disk, unless the unlock code is\nkept elsewhere. Your approvals still need your owner\ncode or passphrase.",
+    "Warning This machine has no system keychain.\n\nAgentLink can keep your ID's keys in a file locked\nwith an unlock code. That's weaker than a keychain if\nsomeone copies this disk, unless the unlock code is\nkept elsewhere. Your approvals still need your owner\ncode or passphrase.",
   'cli.keychain.optIn': 'Use a key file? (y/N)',
   'cli.unlock.wrong': "That unlock code didn't work.",
   'cli.offline': "Can't reach the message network. Nothing was sent.",

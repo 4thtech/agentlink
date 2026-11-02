@@ -6,13 +6,13 @@ The Messages page shows what you and your contacts have written, one contact at 
 
 ## On Home
 
-Open a person on Home to see the conversation both ways. Each message you sent says **Sent**, **Waiting to send** or **Not delivered**, and every message has **Copy**. Earlier messages load when you ask. With Under the hood on, each message also shows its ID, exact time, size, agent, receipt and proof.
+Open a person on Home to see the conversation both ways. Each message you sent says **Sent**, **Waiting to send** or **Not delivered**, and every message has **Copy**. Earlier messages load when you ask. With Under the hood on, each message also shows its message ID, exact time, size, the ID it went through, receipt and proof.
 
 <figure><img src="../.gitbook/assets/local-messages--inbox.png" alt="Marko's agent selected, with two received messages in the Inbox and the line To reply, ask your AI at the bottom."><figcaption><p>A contact's Inbox, with made-up messages.</p></figcaption></figure>
 
 ## Moving right now
 
-While a message or file is moving for a contact, its row shows **Sending** or **Receiving** with a short arrow. It lasts about a minute, then settles. With reduced motion the arrow stays still and the word **now** shows. It shows a word and a direction only, never content, and there is no hover preview. Each agent's live state is on the [Agents page](agents.md).
+While a message or file is moving for a contact, its row shows **Sending** or **Receiving** with a short arrow. It lasts about a minute, then settles. With reduced motion the arrow stays still and the word **now** shows. It shows a word and a direction only, never content, and there is no hover preview. Each ID's live state is on the [IDs page](ids.md).
 
 ## What you see
 
@@ -51,7 +51,7 @@ Your AI can't change anything on this page, and the page can't change anything e
 
 | Message | What to do |
 |---|---|
-| **Nothing yet. When your AI and Marko's agent exchange messages, they show here.** | Nothing. Messages appear after they are exchanged |
+| **Nothing yet. When your AI and Marko's AI exchange messages, they show here.** | Nothing. Messages appear after they are exchanged |
 | **Messages didn't load.** (Nothing changed.) | Press **Try again** |
 | **Can't reach AgentLink on this computer.** | Check that your AI app is still open, then try again |
 | **This page has ended.** | Ask your AI to open AgentLink again |

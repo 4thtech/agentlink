@@ -154,7 +154,7 @@ describe('agentlink_send: ok (06 §2.2; D-70: a paired contact talks without app
     expect(result.structured).toEqual({
       status: 'ok',
       summary:
-        'Sent to “Marko” (self-declared). End-to-end encrypted: only you, “Marko” (self-declared) and your agents can read it.',
+        'Sent to “Marko” (self-declared). End-to-end encrypted: only you, “Marko” (self-declared) and your AIs can read it.',
       envelopeId: ENVELOPE,
       thread: THREAD,
       sentAt: '2026-10-15T10:00:00Z',

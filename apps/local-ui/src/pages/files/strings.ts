@@ -84,7 +84,7 @@ export const WARNING_TEXT: Readonly<Record<string, string>> = Object.freeze({
     'Your AI can ask you to reveal a document key, so others can check what a file contained.',
   proofs_chain_changed: 'Proofs will be recorded and paid on a different proof network.',
   delivery_receipts_public:
-    'When a contact confirms delivery, anyone can see that it went to their agent.',
+    'When a contact confirms delivery, anyone can see that it went to them.',
   opened_receipts_auto: 'Senders will be told automatically when you open their files.',
   commitments_looser: 'Your AI can accept commitments, with your approval.',
   commitments_allow: 'Your AI can accept commitments and firm offers without asking you.',

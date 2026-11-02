@@ -335,7 +335,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_status',
     title: 'AgentLink: check status',
     description:
-      "Call at the start of a session. Shows this agent's identity, the number of contacts, and how many new messages, requests and open offers waiting for an answer there are, by contact. Counts and contact names only, never message content. Read-only.",
+      "Call at the start of a session. Shows the user's AgentLink ID, the number of contacts, and how many new messages, requests and open offers waiting for an answer there are, by contact. Counts and contact names only, never message content. Read-only.",
     inputSchema: obj({}),
     outputSchema: output({
       agent: obj({ name: str(), id: agentId, fingerprint }, ['name', 'id', 'fingerprint']),
@@ -388,7 +388,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_create_invite',
     title: 'AgentLink: create an invite',
     description:
-      'Create a single-use invite link the user can send to someone whose AI agent should connect with this one. Returns ready-to-send text. Nothing leaves this device until the user shares it.',
+      'Create a single-use invite link the user can send to someone whose AI agent should connect with this AgentLink ID. Returns ready-to-send text. Nothing leaves this device until the user shares it.',
     inputSchema: obj({
       label: str({ minLength: 1, maxLength: MAX_DISPLAY_NAME_CODE_POINTS }),
       expiresInDays: int(1, { maximum: INVITE_DEFAULT_EXPIRY_DAYS }),
@@ -476,7 +476,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_send',
     title: 'AgentLink: send a message or file',
     description:
-      "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. To attach one file, give path: the full path of a file in a folder the user allows for sending (text then travels with it). Small files travel inside the message; larger ones are stored encrypted for up to 7 days for the contact to fetch. With notarize true, the message also gets a proof (a small fee from credits; mention it unless the user asked for proof). Set requestReceipt only when the user asked for a delivery receipt (it needs notarize true); a receipt, if the contact confirms, shows publicly that the message went to their agent. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms.",
+      "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. To attach one file, give path: the full path of a file in a folder the user allows for sending (text then travels with it). Small files travel inside the message; larger ones are stored encrypted for up to 7 days for the contact to fetch. With notarize true, the message also gets a proof (a small fee from credits; mention it unless the user asked for proof). Set requestReceipt only when the user asked for a delivery receipt (it needs notarize true); a receipt, if the contact confirms, shows publicly that the message went to them. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms.",
     inputSchema: obj(
       {
         to: str({ minLength: 1, maxLength: MAX_CONTACT_ARG }),
@@ -621,7 +621,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_notarize',
     title: 'AgentLink: add proof to a sent message',
     description:
-      'Add a proof to a message this agent already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to their agent.',
+      'Add a proof to a message this AgentLink ID already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to them.',
     // M1-36h: no `chain` here. The Advanced surface adds it (ADVANCED_NOTARIZE below).
     inputSchema: obj({ envelopeId, requestReceipt: bool(), approvalId, clientRequestId }, [
       'envelopeId',
@@ -634,7 +634,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_acknowledge',
     title: 'AgentLink: confirm a recorded message',
     description:
-      'Add a receipt to a message a contact recorded with proof. Use delivered only when the user confirms delivery, for example after the inbox said the contact asked for a delivery receipt; it shows publicly that the message reached this agent. Use opened only when the user actually asked you to open or read it. accepted and rejected commit the user and are final; the owner approves them. For offers, use agentlink_respond_to_terms instead.',
+      'Add a receipt to a message a contact recorded with proof. Use delivered only when the user confirms delivery, for example after the inbox said the contact asked for a delivery receipt; it shows publicly that the message reached this AgentLink ID. Use opened only when the user actually asked you to open or read it. accepted and rejected commit the user and are final; the owner approves them. For offers, use agentlink_respond_to_terms instead.',
     inputSchema: obj(
       {
         envelopeId,
@@ -662,7 +662,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_export_proof_pack',
     title: 'AgentLink: save a proof file',
     description:
-      "Save a proof file for a message this agent recorded into the user's AgentLink proofs folder, so others can check the proof. The message content goes into the file only with includeContentKey true, which the owner must approve first; the recipient is left out unless includeRecipient is true. Each call saves a new file.",
+      "Save a proof file for a message this AgentLink ID recorded into the user's AgentLink proofs folder, so others can check the proof. The message content goes into the file only with includeContentKey true, which the owner must approve first; the recipient is left out unless includeRecipient is true. Each call saves a new file.",
     inputSchema: obj({
       envelopeId,
       recordId,

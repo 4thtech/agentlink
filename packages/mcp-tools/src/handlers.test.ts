@@ -371,7 +371,7 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     expect(result.structured).toEqual({
       status: 'needs_setup',
       summary:
-        "This agent isn't set up with your owner yet. In a terminal you opened yourself, run `npx -y @4thtech-io/agentlink owner add-agent --agent default`. Your AI can't do this for you.",
+        "This AgentLink ID isn't set up with your owner yet. In a terminal you opened yourself, run `npx -y @4thtech-io/agentlink owner add-agent --agent default`. Your AI can't do this for you.",
       nextStep: TOOL_TEXT.noOwnerCardNextStep,
     });
     expect(JSON.stringify(result.structured)).not.toMatch(/\bcard\b/);

@@ -16,7 +16,7 @@ import { fail, type HandlerOutput } from './result.js';
 export const GET_PROOF_TEXT = Object.freeze({
   notFound: 'There is no proof for that message or record.',
   notFoundNextStep:
-    'Check the envelopeId or recordId. To add proof to a message this agent sent, use agentlink_notarize.',
+    'Check the envelopeId or recordId. To add proof to a message this AgentLink ID sent, use agentlink_notarize.',
 });
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>

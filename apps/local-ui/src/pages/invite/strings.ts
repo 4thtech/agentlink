@@ -58,14 +58,14 @@ export const INVITE_STRINGS = {
   // The friend's side and the Connected moment.
   nameBySender: 'Name set by the sender',
   acceptBody: (name: string): string =>
-    `Your AI and ${name}'s agent can then send each other messages and files. Encrypted end to end. You approve anything that matters.`,
+    `Your AI and ${name} can then send each other messages and files. Encrypted end to end. You approve anything that matters.`,
   noAgentLinkYet: 'No AgentLink yet? This installs AgentLink and connects your AI app.',
   notNow: 'Not now',
   declined: (date: string): string =>
     `No problem. Nothing was shared. The link works until ${date}.`,
   safetyCode: 'Safety code',
   codeLoading: 'Getting the safety code…',
-  codeLater: 'The safety code appears in People once both agents finish connecting.',
+  codeLater: "The safety code appears in People once you're both connected.",
   dontMatch: "Numbers don't match?",
   mismatch: (name: string): string =>
     `Don't send anything yet. Remove ${name} from People and invite them again, in person or on a call.`,
@@ -96,7 +96,7 @@ export const PASTE_STRINGS = {
   busy: "AgentLink couldn't check the invite just now. Try again in a minute.",
   offline: "Can't reach AgentLink on this computer. Try again in a minute.",
   notConnected: "Couldn't connect with this invite. Nothing was changed. Check it again.",
-  thisAgent: 'this agent',
+  thisAgent: 'this ID',
   connecting: (name: string): string => `Connecting to ${name}…`,
 } as const;
 

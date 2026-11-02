@@ -296,8 +296,16 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     // Step 2, "Confirm it's you": the agent card (renamed), one gesture; the folders it sets up.
     await page.getByRole('heading', { name: "Confirm it's you" }).waitFor();
     expect(await page.locator('main').textContent()).toContain('~/AgentLink/Send');
-    await page.getByRole('button', { name: /^Change the agent's name/ }).click();
-    expect(await page.getByLabel('Name your agent').inputValue()).toBe('Claude Code agent');
+    // W7-ID-B1: the name people see is asked for (empty, with an example); the gesture waits for it.
+    expect(await page.getByLabel('Name people see').inputValue()).toBe('');
+    expect(await page.getByLabel('Name people see').getAttribute('placeholder')).toBe(
+      'Your first name, e.g. Ana',
+    );
+    expect(
+      await page
+        .getByRole('button', { name: /^Connect with (Touch ID|Windows Hello|your passkey)$/ })
+        .isDisabled(),
+    ).toBe(true);
     await page.evaluate(
       'Promise.all(document.getAnimations().map((a) => a.finished)).then(() => true)',
     );
@@ -319,7 +327,7 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
       status: 200,
       body: { status: 'refused', reason: 'label_invalid' },
     });
-    await page.getByLabel('Name your agent').fill('Home base');
+    await page.getByLabel('Name people see').fill('Home base');
     await page
       .getByRole('button', { name: /^Connect with (Touch ID|Windows Hello|your passkey)$/ })
       .click();
@@ -385,9 +393,9 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     // server); owner setup is never offered again. W4-WIRE-2 (Decision 52 (2)): New agent names
     // the agent first, then the pick.
     await page.goto(`${server.origin}/first-run`);
-    await page.getByRole('heading', { name: 'Name your agent' }).waitFor();
+    await page.getByRole('heading', { name: 'Name this ID' }).waitFor();
     expect(await page.locator('main').textContent()).not.toContain('Welcome');
-    await page.getByLabel('Agent name').fill('Second');
+    await page.getByLabel('Name people see').fill('Second');
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
     expect(await page.locator('main').textContent()).not.toContain('Welcome');

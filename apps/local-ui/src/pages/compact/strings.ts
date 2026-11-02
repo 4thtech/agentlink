@@ -5,7 +5,7 @@ export const COMPACT_STRINGS = {
   title: 'AgentLink',
   openCompact: 'Open compact window',
   agentName: 'This computer',
-  agentList: 'Agents',
+  agentList: 'IDs',
   needsList: 'Waiting for you',
   mostActive: 'Most active',
   contactsList: 'Most active contacts',

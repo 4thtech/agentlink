@@ -666,3 +666,89 @@ function fmtName(t: string, name: string): string {
 function fmtCount(t: string, count: number): string {
   return t.replace('{count}', String(count));
 }
+
+describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
+  const idRow = (name: string, label: string, current: boolean, app: string) => ({
+    name,
+    label,
+    current,
+    available: true,
+    removing: false,
+    contacts: 2,
+    running: true,
+    state: 'ready',
+    apps: [{ app, state: 'ready' }],
+  });
+  const agentsAnswer = (n: number): Answers => ({
+    '/api/ui/agents': ok({
+      switchable: true,
+      generation: 1,
+      current: 'tali',
+      label: 'Tali',
+      agents: [
+        idRow('tali', 'Tali', true, 'claude-code'),
+        ...(n > 1 ? [idRow('tali-work', 'Tali work', false, 'cursor')] : []),
+      ],
+    }),
+    '/api/ui/apps': ok({
+      desktopRunning: false,
+      apps: [
+        { app: 'claude-code', name: 'Claude Code', state: 'connected', agent: 'tali' },
+        { app: 'cursor', name: 'Cursor', state: 'connected', agent: 'tali-work' },
+      ],
+    }),
+  });
+  const tone = (el: Element | null | undefined): string | undefined =>
+    [...(el?.classList ?? [])].find((c) => c.startsWith('is-') && c !== 'is-lg');
+
+  it('with one ID nothing changes: no chips, no group header, no ID icon', async () => {
+    await render(base(agentsAnswer(1)));
+    expect(row('Denis')).toBeTruthy();
+    expect(q('[data-id-chips]')).toBeNull();
+    expect(q('[data-id-group]')).toBeNull();
+    expect(q('.al-agent-icon')).toBeNull();
+  });
+
+  it('with two IDs shows All IDs and one chip per ID, groups people under the open ID, and colours rows', async () => {
+    await render(base(agentsAnswer(2)));
+    const chips = all('[data-id-chips] button');
+    expect(chips.map((c) => c.textContent)).toEqual([
+      `${S.allAgents}2`,
+      'TTali · Claude Code2',
+      'TTali work · Cursor',
+    ]);
+    expect(chips[0]?.getAttribute('aria-pressed')).toBe('true');
+    expect(q('[data-id-group]')?.textContent).toContain('Tali · Claude Code');
+    expect(row('Denis')?.querySelector('.al-agent-icon')).toBeTruthy();
+    // The same seed as the switcher gives the same colour on the chip and the row.
+    expect(tone(q('[data-id-chip="tali"] .al-agent-icon'))).toBe(
+      tone(row('Denis')?.querySelector('.al-agent-icon')),
+    );
+  });
+
+  it('names the asking ID with its app and draws its colour on the approval card', async () => {
+    await render(
+      base({ ...agentsAnswer(2), [APPROVALS]: ok({ approvals: [approval(APR_FREE)] }) }),
+    );
+    const asker = q('.hm-ap-asker');
+    expect(asker?.querySelector('span:last-child')?.textContent).toBe(
+      'Tali · Claude Code is asking',
+    );
+    expect(asker?.querySelector('.al-agent-icon')).toBeTruthy();
+  });
+
+  it('with one ID the approval says "Tali · Claude Code is asking" and draws no icon', async () => {
+    await render(
+      base({ ...agentsAnswer(1), [APPROVALS]: ok({ approvals: [approval(APR_FREE)] }) }),
+    );
+    const asker = q('.hm-ap-asker');
+    expect(asker?.textContent).toBe('Tali · Claude Code is asking');
+    expect(asker?.querySelector('.al-agent-icon')).toBeNull();
+  });
+
+  it('opening a person shows the ID in the conversation header', async () => {
+    await render(base(agentsAnswer(2)));
+    await click(row('Denis'));
+    expect(q('[data-thread-id]')?.textContent).toContain('Tali · Claude Code');
+  });
+});

@@ -8,6 +8,8 @@ import { PAGE_TITLES } from './strings.js';
 
 export const HOME_PATH = '/';
 export const AGENTS_PATH = '/agents';
+/** W7-ID-B3 (D-144): the same page under its new name; `/agents` keeps working. */
+export const IDS_PATH = '/ids';
 export const ACTIVITY_PATH = '/activity';
 export const LIVE_ACTIVITY_PATH = '/activity/live';
 export const SETTINGS_PATH = '/settings';
@@ -95,7 +97,7 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
 ];
 
 /** The agent name segment of `/agents/<name>` (the folder name rule: lower case, digits, dashes). */
-const AGENT_PAGE = /^\/agents\/([a-z0-9]+(?:-[a-z0-9]+)*)$/;
+const AGENT_PAGE = /^\/(?:agents|ids)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 
 /** The agent of a `/agents/<name>` path, or undefined. */
 export function agentNameOf(path: string): string | undefined {
@@ -107,7 +109,7 @@ export function sectionOf(path: string): string | undefined {
   if (path === HOME_PATH || path.startsWith('/approve/') || path === INTERIM_PEOPLE_PATH) {
     return 'home';
   }
-  if (path === AGENTS_PATH || agentNameOf(path) !== undefined) return 'agents';
+  if (path === AGENTS_PATH || path === IDS_PATH || agentNameOf(path) !== undefined) return 'agents';
   if (path === LIVE_ACTIVITY_PATH) return 'live';
   if (path === ACTIVITY_PATH) return 'activity';
   const advanced = ADVANCED_SECTIONS.find((s) => s.path === path);
@@ -183,10 +185,10 @@ export function goToEntries(hood: boolean): readonly GoToEntry[] {
     // Files live with each person on Home (their conversation and files).
     { label: PAGE_TITLES.files, hint: go, path: HOME_PATH, keywords: 'inbox messages received' },
     {
-      label: 'New agent',
+      label: 'New ID',
       hint: 'Action',
       path: NEW_AGENT_PATH,
-      keywords: 'add agent create',
+      keywords: 'add agent id create',
     },
     { label: PAGE_TITLES.getStarted, hint: 'Help', path: START_PATH, keywords: 'setup start' },
     {

@@ -13,6 +13,7 @@
 // again every few seconds while visible. Reading sends GETs only (I-4); whatever another party wrote
 // is shown only inside the untrusted container (I-5); Save and Show in Finder send only an item ID.
 import {
+  AgentIcon,
   Banner,
   Button,
   EmptyState,
@@ -69,7 +70,7 @@ import {
   type PeopleApi,
   type PersonSummary,
 } from './people-api.js';
-import { HOME_STRINGS as S, fmt } from './people-strings.js';
+import { HOME_STRINGS as S, fmt, idWithApp } from './people-strings.js';
 import { filesOf, PersonFiles, type Reveal } from './person-files.js';
 import { PersonMenu } from './person-menu.js';
 import { PersonName } from './person-name.js';
@@ -215,6 +216,8 @@ function PersonOpen({
   data,
   clients,
   agent,
+  app,
+  idSeed,
   pro,
   tick,
   passkey,
@@ -228,6 +231,10 @@ function PersonOpen({
   readonly data: HomeData;
   readonly clients: Clients;
   readonly agent: string;
+  /** The AI app that uses the open ID (for "You (Claude Code)"). */
+  readonly app?: string | undefined;
+  /** W7-ID-X1: the open ID's colour seed, set only when there is more than one ID. */
+  readonly idSeed?: string | undefined;
   readonly pro: boolean;
   readonly tick: number;
   readonly passkey: () => Promise<DecisionPasskey | undefined>;
@@ -289,6 +296,8 @@ function PersonOpen({
       <Conversation
         name={person.name}
         agent={agent}
+        app={app}
+        idSeed={idSeed}
         pro={pro}
         thread={thread}
         loadEarlier={loadEarlier}
@@ -446,7 +455,8 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   const vt = useViewTransition();
   const agents = useLiveAgents();
   const current = agents.find((a) => a.current);
-  const agentLabel = current?.label ?? '';
+  const appName = current?.apps[0]?.app;
+  const agentLabel = idWithApp(current?.label ?? '', appName);
   const [view, setView] = useState<View>({ state: 'loading' });
   const [summaries, setSummaries] = useState<ReadonlyMap<string, PersonSummary>>(new Map());
   const [approvals, setApprovals] = useState<readonly ApprovalItem[]>([]);
@@ -565,16 +575,50 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   const data = view.state === 'ready' ? view.data : undefined;
   const many = agents.length > 1;
   const otherAgent =
-    pro && filter !== 'all' && current !== undefined && filter !== current.name
+    filter !== 'all' && current !== undefined && filter !== current.name
       ? agents.find((a) => a.name === filter)
       : undefined;
   const q = query.trim().toLowerCase();
   const people = (data?.people ?? []).filter(
-    (p) => !pro || (otherAgent === undefined && (q === '' || p.name.toLowerCase().includes(q))),
+    (p) => otherAgent === undefined && (!pro || q === '' || p.name.toLowerCase().includes(q)),
   );
   const pending = props.pendingRows === undefined ? (data?.invites ?? []) : [];
   const connectingRows = props.pendingRows === undefined ? (data?.connecting ?? []) : [];
   const now = Date.now();
+
+  // W7-ID-X1: with more than one ID, chips filter by ID ("All IDs · Tali · Tali work"). Only the open
+  // ID's people are on this computer's page, so its chip carries their count; another ID's chip opens it.
+  const idChips = many ? (
+    <div className="hm-id-chips hm-f" role="group" aria-label={S.idChips} data-id-chips="">
+      <button
+        type="button"
+        className="hm-id-chip al-press"
+        aria-pressed={filter === 'all'}
+        onClick={() => setFilter('all')}
+      >
+        {S.allAgents}
+        {data === undefined ? null : (
+          <span className="hm-id-count al-text-code">{data.people.length}</span>
+        )}
+      </button>
+      {agents.map((a) => (
+        <button
+          key={a.name}
+          type="button"
+          className="hm-id-chip hm-f al-press"
+          data-id-chip={a.name}
+          aria-pressed={filter === a.name}
+          onClick={() => setFilter(a.name)}
+        >
+          <AgentIcon label={a.label} seed={a.name} />
+          <span>{idWithApp(a.label, a.apps[0]?.app)}</span>
+          {a.current && data !== undefined ? (
+            <span className="hm-id-count al-text-code">{data.people.length}</span>
+          ) : null}
+        </button>
+      ))}
+    </div>
+  ) : null;
 
   const peopleHead = (
     <div className="hm-people-head hm-f">
@@ -600,28 +644,6 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               onChange={(e) => setQuery(e.target.value)}
             />
           </span>
-          {many ? (
-            <>
-              <label className="al-visually-hidden" htmlFor="hm-agent">
-                {S.handledBy}
-              </label>
-              <span className="al-input-wrap hm-agent">
-                <select
-                  id="hm-agent"
-                  className="al-input"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                >
-                  <option value="all">{S.allAgents}</option>
-                  {agents.map((a) => (
-                    <option key={a.name} value={a.name}>
-                      {a.label}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            </>
-          ) : null}
           <a className="al-btn al-btn-primary al-btn-sm hm-invite-sm al-press" href={INVITE_HREF}>
             <Icon name="user-plus" size={16} />
             <span>{S.inviteSomeone}</span>
@@ -661,6 +683,15 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
             client={clients.approvals}
             sheet={sheet}
             pro={pro}
+            asker={
+              current === undefined
+                ? undefined
+                : appName === undefined
+                  ? fmt(S.askerId, { name: current.label })
+                  : fmt(S.askerApp, { name: current.label, app: appName })
+            }
+            askerSeed={many ? current?.name : undefined}
+            askerLabel={many ? agentLabel : undefined}
             onChanged={() => void loadApprovals()}
           />
           {notice === undefined ? null : (
@@ -681,6 +712,13 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
           {pro ? null : <PasteEntryLink className="inv-link-button" />}
           <section aria-labelledby="hm-people-h" className="hm-people hm-c">
             {peopleHead}
+            {idChips}
+            {many && current !== undefined && people.length > 0 ? (
+              <h3 className="hm-id-group hm-f al-text-label" data-id-group={current.name}>
+                <AgentIcon label={current.label} seed={current.name} />
+                <span>{agentLabel}</span>
+              </h3>
+            ) : null}
             {data !== undefined &&
             data.people.length === 0 &&
             pending.length === 0 &&
@@ -760,6 +798,9 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                               </button>
                             </span>
                             <span role="cell" className="hm-opt hm-cell hm-f">
+                              {many && current !== undefined ? (
+                                <AgentIcon label={current.label} seed={current.name} />
+                              ) : null}
                               <span className="hm-ellipsis">{agentLabel}</span>
                             </span>
                             <span role="cell" className="hm-cellbox hm-f">
@@ -804,7 +845,10 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                             <Avatar name={person.name} />
                             <span className="hm-row-main hm-c">
                               <PersonName name={person.name} />
-                              <span className="hm-sub al-text-body-sm">
+                              <span className="hm-sub hm-f al-text-body-sm">
+                                {many && current !== undefined ? (
+                                  <AgentIcon label={current.label} seed={current.name} />
+                                ) : null}
                                 {gone
                                   ? fmt(S.connectionRemoved, { name: person.name })
                                   : person.lastAt > 0
@@ -835,6 +879,8 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                               data={data}
                               clients={clients}
                               agent={agentLabel}
+                              app={appName}
+                              idSeed={many ? current?.name : undefined}
                               pro={pro}
                               tick={tick}
                               passkey={passkey}

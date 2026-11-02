@@ -50,7 +50,7 @@ describe('chapter 6: power user', () => {
       .toEqual(['Ana', 'Research', 'Work agent']);
 
     await page.getByLabel('Show').selectOption('paused');
-    await page.getByText('No agents match.').waitFor();
+    await page.getByText('No IDs match.').waitFor();
     await page.getByLabel('Show').selectOption('all');
 
     // A row opens the agent's own page, in the same document.
@@ -63,7 +63,7 @@ describe('chapter 6: power user', () => {
       await page.getByRole('heading', { name: section, level: 2 }).waitFor();
     }
     await emulateReducedMotion(page);
-    await page.getByRole('link', { name: 'Agents', exact: true }).first().click();
+    await page.getByRole('link', { name: 'IDs', exact: true }).first().click();
     await table.waitFor();
     await expectFadesOnly(page);
     expect((await layoutShiftScore(page)) - shifted).toBeLessThanOrEqual(CLS_BUDGET);

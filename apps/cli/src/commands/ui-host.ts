@@ -143,7 +143,7 @@ const NO_AGENT_SOURCE: ApprovalServerSource = Object.freeze<ApprovalServerSource
   context: () => Promise.resolve(undefined),
   list: () => Promise.resolve([]),
   get: () => Promise.resolve(undefined),
-  apply: () => Promise.reject(new Error('No agent is open.')),
+  apply: () => Promise.reject(new Error('No ID is open.')),
 });
 
 /**

@@ -202,7 +202,7 @@ describe('a 0.2.0 owner switches to a passkey in the local app (M1-UX-FIRSTRUN-V
     // W4-WIZARD: with the passkey on, Get started goes on for this owner (no switch offered).
     // W4-WIRE-2: no agent is open in this server, so it is New agent, which names the agent first.
     await page.goto(`${server.origin}/first-run`);
-    await page.getByRole('heading', { name: 'Name your agent' }).waitFor();
+    await page.getByRole('heading', { name: 'Name this ID' }).waitFor();
     expect(await page.getByLabel('Backup code').count()).toBe(0);
 
     // The backup code keeps approving (it is the recovery way when the passkey isn't there).

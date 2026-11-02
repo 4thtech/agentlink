@@ -440,3 +440,29 @@
   gap: var(--al-space-2);
   font-weight: var(--al-font-weight-medium);
 }
+/* W7-ID-RENAME: the app's own link style (fg-link, as .ag-link), not the browser's default blue. */
+.st-card-steps a,
+.st-card-suggest a {
+  color: var(--al-color-fg-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.st-card-steps a:hover,
+.st-card-suggest a:hover {
+  color: var(--al-color-fg-default);
+}
+.st-card-steps a:focus-visible,
+.st-card-suggest a:focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--al-radius-sm);
+}
+
+/* W7-ID-B1: the ID explainer is the Get started card with less padding and no bar. */
+.st-explainer {
+  gap: var(--al-space-2);
+  padding: var(--al-space-4) var(--al-space-5);
+}
+.st-explainer p {
+  margin: 0;
+}

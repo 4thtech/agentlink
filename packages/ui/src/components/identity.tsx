@@ -246,12 +246,12 @@ export function SafetyCode({
       </div>
       {state === 'changed' ? (
         <p className="al-text-body">
-          {`${contactName === undefined ? 'This contact' : who}'s agent updated its keys (same owner). The safety code changed. Compare it again.`}
+          {`${contactName === undefined ? 'This contact' : who} updated its keys (same owner). The safety code changed. Compare it again.`}
         </p>
       ) : null}
       {state === 'waiting' ? (
         <p className="al-text-body al-muted" role="status">
-          {`Waiting for ${who}'s agent to show its code…`}
+          {`Waiting for ${who} to show its code…`}
         </p>
       ) : null}
       {state === 'unchecked' || state === 'changed' ? (

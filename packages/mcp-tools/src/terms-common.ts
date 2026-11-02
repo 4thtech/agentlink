@@ -57,7 +57,7 @@ export const TERMS_TEXT = Object.freeze({
     'Call agentlink_inbox to see the newest version. Answer it only if the user asks you to.',
   expired: 'These terms have expired, so nothing was sent.',
   expiredNextStep: 'Tell the user. If they still want a deal, either side can send a new offer.',
-  notAParty: "This agent isn't one of the two sides of those terms, so nothing was sent.",
+  notAParty: "This AgentLink ID isn't one of the two sides of those terms, so nothing was sent.",
   notAPartyNextStep: 'Check the envelopeId from agentlink_inbox and call again.',
   notRecorded: "Their acceptance has no proof record yet, so there's nothing to add yours to.",
   notRecordedNextStep: 'Nothing else is needed now. Tell the user their acceptance arrived.',

@@ -40,7 +40,7 @@ const GO = {
   other: CONNECT_STEP.connect('your passkey'),
 } as const;
 /** Step 3 after a first run with no AI app found (the pick was "Claude Code", not found yet). */
-const READY = CONNECTED_STEP.notConnectedTitle('Claude Code agent');
+const READY = CONNECTED_STEP.notConnectedTitle('Ana');
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -163,6 +163,7 @@ async function mount(
       await Promise.resolve();
     });
     await settleAll();
+    await nameIt();
   }
 }
 
@@ -186,6 +187,20 @@ async function click(name: string): Promise<void> {
     await Promise.resolve();
   });
   await settleAll();
+}
+
+/**
+ * W7-ID-B1: the Confirm screen asks for the person's name and goes on only with one. Fills it the
+ * way a person types (React sees an input event), unless it is already there or the screen has no field.
+ */
+async function nameIt(value = 'Ana'): Promise<void> {
+  const input = host.querySelector<HTMLInputElement>('input[name="agent-name"]');
+  if (input === null || input.value !== '') return;
+  await act(async () => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    set?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 
 const text = (): string => host.textContent ?? '';
@@ -239,7 +254,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
     );
     await click(GO.other);
     expect(text()).toContain(
-      "Setup finished, but we couldn't confirm one step. Your agent may need a restart.",
+      "Setup finished, but we couldn't confirm one step. Your AI app may need a restart.",
     );
     expect(host.querySelector('.al-secret-val')?.textContent).toContain('UVWX');
     expect(host.querySelector('.al-fp')?.textContent).toContain(FP);
@@ -258,7 +273,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
     await mount(api);
     // For an owner: New agent (no agent is open here), never owner setup. W4-WIRE-2: New agent
     // starts with "Name your agent" (Decision 52 (2)).
-    expect(host.querySelector('h1')?.textContent).toBe('Name your agent');
+    expect(host.querySelector('h1')?.textContent).toBe('Name this ID');
     expect(text()).not.toContain(FIRST_RUN.foldersNote);
     expect(api.finished).toHaveLength(0);
   });

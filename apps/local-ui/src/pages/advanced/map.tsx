@@ -6,7 +6,7 @@ import type { ReactElement } from 'react';
 export const MAP_STRINGS = {
   title: 'Connections map',
   tag: 'Coming next',
-  body: 'A live map of your agents and the people they talk to. It is designed in the next round.',
+  body: 'A live map of your IDs and the people they talk to. It is designed in the next round.',
 } as const;
 
 export function ConnectionsMapPage(): ReactElement {

@@ -8,17 +8,17 @@
 export const iso = (label: string): string => `\u2068${label}\u2069`;
 
 export const AGENTS_STRINGS = {
-  title: 'Agents',
+  title: 'IDs',
   open: 'Open',
   worksFrom: 'Works from',
   notConnected: 'Not connected to an AI app',
   noAiApp: 'No AI app',
   noAppNoContacts: 'No AI app, no contacts',
-  add: 'Add agent',
-  manage: 'Manage agents',
+  add: 'Add ID',
+  manage: 'Manage IDs',
   // W4-SHELL (b11 §34.2): the switcher's menu.
-  newAgent: 'New agent',
-  manageAgentsApps: 'Manage agents & apps',
+  newAgent: 'New ID',
+  manageAgentsApps: 'Manage IDs & apps',
   notConnectedYet: 'Not connected yet',
   connectFreeApp: (app: string): string => `Connect ${app}`,
   switch: 'Switch',
@@ -34,17 +34,17 @@ export const AGENTS_STRINGS = {
   notRunning: 'Not running',
   removalNotFinished: 'Removal not finished',
   removalReason: 'Removing it stopped part-way. Nothing else was affected.',
-  empty: 'No agents left. Add one to keep using AgentLink.',
-  loadError: "Couldn't load your agents.",
-  loading: 'Loading your agents',
-  findAgent: 'Find an agent',
+  empty: 'No IDs left. Add one to keep using AgentLink.',
+  loadError: "Couldn't load your IDs.",
+  loading: 'Loading your IDs',
+  findAgent: 'Find an ID',
   openApp: 'Open the AgentLink app to switch.',
-  agentChanged: 'You switched agents. Nothing was changed.',
+  agentChanged: 'You switched IDs. Nothing was changed.',
   viewLabel: 'View',
   list: 'List',
   map: 'Map',
   mapSoon: 'The map arrives in an update. The list has everything you need.',
-  switcherLabel: 'Agents',
+  switcherLabel: 'IDs',
   renameField: 'Name',
   saveTouchId: 'Save with Touch ID',
   labelInvalid: "That name can't be used. Change it and try again.",
@@ -63,13 +63,13 @@ export const AGENTS_STRINGS = {
     `Your ${n} ${n === 1 ? 'contact' : 'contacts'} will be told ${iso(label)} is retired.`,
   cantUndo: "This can't be undone.",
   exportFirst: 'Export history first',
-  typeName: "Type the agent's name to confirm",
+  typeName: "Type the ID's name to confirm",
   typeNameLabel: (label: string): string => `Type ${iso(label)} to confirm`,
   typeNameDisabled: 'Type the name to enable this',
   removeTouchId: 'Remove with Touch ID',
   quitAny: (label: string): string => `Quit any AI app that uses ${iso(label)} first.`,
   quitApp: (app: string): string => `Quit ${app} first.`,
-  agentFolder: (folder: string): string => `Agent folder: ${folder}`,
+  agentFolder: (folder: string): string => `ID folder: ${folder}`,
   checkAgain: 'Check again',
   removeAnywayQ: "Remove anyway? Contacts can't be told now.",
   removeAnyway: 'Remove anyway',
@@ -80,23 +80,29 @@ export const AGENTS_STRINGS = {
   nowShowing: (label: string): string => `Now showing ${iso(label)}`,
   tidyNote: (n: number): string =>
     n === 1
-      ? "1 of your agents isn't connected to an AI app and has no contacts."
-      : `${n} of your agents aren't connected to an AI app and have no contacts.`,
+      ? "1 of your IDs isn't connected to an AI app and has no contacts."
+      : `${n} of your IDs aren't connected to an AI app and have no contacts.`,
   tidyHint: 'If they were only for testing, you can remove them.',
   tidyUp: 'Tidy up',
   contactsCount: (n: number | null): string =>
     n === null ? 'Contacts not readable just now' : `${n} ${n === 1 ? 'contact' : 'contacts'}`,
   switcherName: (label: string, apps: string, state: string): string =>
-    `Agent: ${label}, ${apps}, ${state}. Switch agent.`,
+    `ID: ${label}, ${apps}, ${state}. Switch ID.`,
   renameStatement: (from: string, to: string): string => `Rename ${iso(from)} to ${iso(to)}`,
   removeStatement: (label: string): string => `Remove ${iso(label)}`,
 
   // W4-AGENTS (W4 UX v2 "Agents"; 08 §1 "Live AI-app status" words; "AI app", never "harness").
-  intro: 'Each agent is one identity your AI apps use. Status updates by itself.',
+  intro: 'Each ID is the identity an AI app uses on AgentLink. Status updates by itself.',
   aiApps: 'AI apps',
+  /** D-144 improvement (c): which AI apps use this ID. */
+  usedBy: (apps: readonly string[]): string => `Used by ${apps.join(', ')}`,
+  notUsed: 'Not used by any AI app',
+  /** The local-only "Tali · Claude Code" (D-144 improvement (a)); the app is never sent to contacts. */
+  withApp: (label: string, apps: readonly string[]): string =>
+    apps.length === 0 ? label : `${label} · ${apps.join(', ')}`,
   backUp: 'Back up',
   disconnect: 'Disconnect',
-  noAppsYet: 'No AI app is set up for this agent yet.',
+  noAppsYet: 'No AI app is set up for this ID yet.',
   manageApps: 'All AI apps',
   useAppsPage: 'Open All AI apps to change this one.',
   quitFirstHint:
@@ -107,7 +113,7 @@ export const AGENTS_STRINGS = {
   backupLink: 'Back up recovery kit',
   switching: (label: string): string => `Opening ${iso(label)}…`,
 
-  // Pause (08 §1 "Pause an agent", D-143 (5)): one click, no Touch ID; Resume with Touch ID.
+  // Pause (08 §1 "Pause an ID", D-143 (5)): one click, no Touch ID; Resume with Touch ID.
   pause: 'Pause',
   resume: 'Resume',
   pauseTitle: (label: string): string => `Pause ${iso(label)}?`,
@@ -122,7 +128,7 @@ export const AGENTS_STRINGS = {
   notPaused: 'It is not paused any more.',
 
   // Rename (D-141, 11 §5.8).
-  renameHint: 'Your contacts will see the new name.',
+  renameHint: 'People see this name.',
   renameTouchId: 'Rename with Touch ID',
   renamedTold: (label: string): string =>
     `Renamed. Your contacts will see ${label} next time they're online.`,
@@ -137,7 +143,7 @@ export const AGENTS_STRINGS = {
   fleetSummary: (working: number, ready: number, rest: number): string =>
     `${working} working · ${ready} ready · ${rest} not running or paused`,
   search: 'Search',
-  searchPlaceholder: 'Agent or AI app',
+  searchPlaceholder: 'ID or AI app',
   show: 'Show',
   allStatuses: 'All statuses',
   aiApp: 'AI app',
@@ -146,24 +152,24 @@ export const AGENTS_STRINGS = {
   sortActivity: 'Most recent activity',
   sortName: 'Name',
   sortStatus: 'Status',
-  colAgent: 'Agent',
-  colApps: 'AI apps',
+  colAgent: 'ID',
+  colApps: 'Used by',
   colStatus: 'Status',
   colPeople: 'People',
   colLast: 'Last active',
   now: 'now',
   never: 'never',
-  selectAll: 'Select all agents',
+  selectAll: 'Select all IDs',
   selectOne: (label: string): string => `Select ${label}`,
-  selected: (n: number): string => (n === 1 ? '1 agent selected' : `${n} agents selected`),
-  selectedRegion: 'Selected agents',
+  selected: (n: number): string => (n === 1 ? '1 ID selected' : `${n} IDs selected`),
+  selectedRegion: 'Selected IDs',
   clear: 'Clear',
-  noMatch: 'No agents match.',
-  fleetCaption: 'Your agents',
+  noMatch: 'No IDs match.',
+  fleetCaption: 'Your IDs',
 
   // One agent's page.
-  backToAgents: 'Agents',
-  noSuchAgent: 'No agent called that on this computer.',
+  backToAgents: 'IDs',
+  noSuchAgent: 'No ID called that on this computer.',
   folder: (name: string): string => `Folder ${name}`,
   people: 'People',
   rules: 'Rules',
@@ -173,7 +179,7 @@ export const AGENTS_STRINGS = {
   reading: 'Loading…',
   peopleOther: (label: string): string => `Open ${iso(label)} to see its people.`,
   rulesOther: (label: string): string => `Open ${iso(label)} to see its rules.`,
-  openAgent: 'Open this agent',
+  openAgent: 'Open this ID',
   seeAllActivity: 'See all activity',
   seeRules: 'Change rules',
   noActivity: 'Nothing yet while this page is open.',

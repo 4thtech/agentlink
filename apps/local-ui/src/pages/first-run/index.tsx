@@ -64,6 +64,7 @@ import type { PasskeyInfo, PresenceProof } from '../contacts/owner.js';
 import { useTitleFocus } from '../welcome/index.js';
 import { CreateAgentGate } from '../apps/create-agent-gate.js';
 import type { CreateAgentApi } from '../apps/create-agent-api.js';
+import { IdExplainerCard } from '../start/id-explainer.js';
 import { readAgentSignal } from '../home/start-here-api.js';
 import type { AgentSignal } from '../home/start-here.js';
 import { markLeavingStart, skipToHome } from '../start/guard.js';
@@ -403,14 +404,14 @@ function ConnectFirstStep({
   onGo: (withoutPasskey: boolean) => void;
 }): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
-  const [renaming, setRenaming] = useState(false);
-  const editing = renaming || view.fieldError !== undefined;
   const press = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
     document.getElementById('fr-go')?.focus();
   };
-  const shown = name.trim() === '' ? N.suggested(appName) : name.trim();
+  // W7-ID-B1: the name is asked for (the owner's name is not known here); nothing goes on without it.
+  const shown = name.trim() === '' ? (appName ?? T.yourAiApp) : name.trim();
+  const unnamed = name.trim() === '';
   return (
     <section className="st-screen st-w-560" aria-labelledby="fr-h">
       <BackButton onBack={onBack} label={S.back} />
@@ -423,27 +424,13 @@ function ConnectFirstStep({
         </h1>
         <p className="st-lead">{S.body(appName ?? T.yourAiApp)}</p>
       </div>
-      <AgentCard
-        name={shown}
-        line={appName === undefined ? T.noAppYet : S.worksIn(appName)}
-        action={
-          editing ? null : (
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={S.renameLabel(shown)}
-              disabled={view.working}
-              onClick={() => setRenaming(true)}
-            >
-              {S.rename}
-            </Button>
-          )
-        }
-      />
-      {editing ? (
+      <IdExplainerCard />
+      <AgentCard name={shown} line={appName === undefined ? T.noAppYet : S.worksIn(appName)} />
+      {
         <TextField
           label={N.label}
           hint={N.hint}
+          placeholder={N.placeholder}
           name="agent-name"
           type="text"
           autoComplete="off"
@@ -453,12 +440,8 @@ function ConnectFirstStep({
           {...(view.fieldError === undefined ? {} : { error: view.fieldError })}
           onChange={(event) => onName(event.currentTarget.value)}
           onKeyDown={press}
-          onFocus={(event) => {
-            // Selected on open: the suggested name is replaced by typing.
-            event.currentTarget.select();
-          }}
         />
-      ) : null}
+      }
       {noPrf ? (
         <Banner tone="warning">{T.noPrf(SENSOR[platform], WORKING_BROWSER[platform])}</Banner>
       ) : null}
@@ -472,6 +455,7 @@ function ConnectFirstStep({
             variant="primary"
             size="lg"
             className="st-go al-press"
+            disabled={unnamed}
             onClick={() => onGo(noPrf)}
           >
             {noPrf ? null : <FingerprintGlyph />}
@@ -479,7 +463,7 @@ function ConnectFirstStep({
           </Button>
         )}
         {noPrf || view.working ? null : (
-          <Button variant="ghost" size="sm" onClick={() => onGo(true)}>
+          <Button variant="ghost" size="sm" disabled={unnamed} onClick={() => onGo(true)}>
             {N.backupInstead}
           </Button>
         )}
@@ -635,6 +619,7 @@ export function FirstRunPage({
   const [agents] = useState(() => givenAgents ?? createAgentsApi());
   // IR-W4-WIRE-2X-1: the names the owner's agents have, for the "already have" hint (Add agent).
   const [takenNames, setTakenNames] = useState<ReadonlySet<string>>(() => new Set());
+  const [prefilled, setPrefilled] = useState('');
   const setNamed = (value: boolean): void => {
     setNamedState(value);
     rememberWizard({ named: value });
@@ -803,6 +788,13 @@ export function FirstRunPage({
       (result) => {
         if (live && result.kind === 'ok') {
           setTakenNames(new Set(result.list.agents.map((a) => a.label)));
+          // W7-ID-B1: the person is the same owner, so the name field starts with their ID's name
+          // (never over something already typed or remembered).
+          const own = result.list.agents.find((row) => row.current) ?? result.list.agents[0];
+          if (own !== undefined && own.label.trim() !== '' && wizardMemory().name === undefined) {
+            setPrefilled(own.label);
+            setName(own.label);
+          }
         }
       },
       () => undefined,
@@ -828,7 +820,7 @@ export function FirstRunPage({
     toStep('connect');
   };
 
-  const label = name.trim() === '' ? N.suggested(pickedTile?.name) : name.trim();
+  const label = name.trim();
 
   const protect = useCallback(
     async (noPrf: boolean) => {
@@ -1236,7 +1228,7 @@ export function FirstRunPage({
       return frame(
         <ConnectFirstStep
           view={view}
-          name={name === '' ? label : name}
+          name={name}
           appName={chosenApp?.name}
           noPrf={noPrf}
           sensorWords={sensorWords}
@@ -1294,7 +1286,7 @@ export function FirstRunPage({
           value={name}
           onChange={setName}
           onContinue={() => void submitName()}
-          taken={takenNames.has(name.trim())}
+          taken={takenNames.has(name.trim()) && name.trim() !== prefilled}
           working={naming}
           {...(nameError === undefined ? {} : { error: nameError })}
         />

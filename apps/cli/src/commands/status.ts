@@ -59,7 +59,7 @@ export function createStatusHandler(deps: CommandDeps = createDeps()): CommandHa
       if (!brief) {
         const contacts = await client.contacts.list();
         lines.push(
-          fill('Agent: {name} ({agentId})', {
+          fill('ID: {name} ({agentId})', {
             name: terminalOneLine(name),
             agentId: terminalOneLine(agentId),
           }),

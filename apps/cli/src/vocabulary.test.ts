@@ -191,6 +191,9 @@ describe('the lint itself (self-test)', () => {
     ]);
     expect(lintVocabulary('Keep it in your password manager.')).toEqual([]);
     expect(lintVocabulary('Enter your password.')).toEqual(['password']);
+    // D-144: "agent" meaning the ID is banned; the AI meaning stays.
+    expect(lintVocabulary('Your agent has a new inbox.')).toEqual(['agent (the ID)']);
+    expect(lintVocabulary('Other AI agents, agent-to-agent, `--agent`.')).toEqual([]);
   });
 
   it('a planted violation in a real table is caught', () => {

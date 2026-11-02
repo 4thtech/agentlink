@@ -273,7 +273,7 @@ describe('verify: the verdict first, the test network labelled (D-95, 05 §9.1 (
           ownerBound: true,
           recordBound: true,
         },
-        /OK {7}Owner approval: the owner of the agent that made the record approved accepting these terms/,
+        /OK {7}Owner approval: the owner of the ID that made the record approved accepting these terms/,
       ],
       [
         {
@@ -304,7 +304,7 @@ describe('verify: who made the record (06 §2.1 name rule)', () => {
     const own = setup({
       verify: () => Promise.resolve(valid({ signer: AGENT_ID as `0x${string}` })),
     });
-    expect((await own.run(['verify', 'p.json'])).text).toContain('OK       Recorded by this agent');
+    expect((await own.run(['verify', 'p.json'])).text).toContain('OK       Recorded by this ID');
 
     const contact = setup({
       agent: {
@@ -334,13 +334,13 @@ describe('verify: who made the record (06 §2.1 name rule)', () => {
         ),
     });
     expect((await card.run(['verify', 'p.json'])).text).toMatch(
-      /OK {7}Recorded by an agent outside your contacts, owner [0-9A-F]{4}·[0-9A-F]{4}/,
+      /OK {7}Recorded by an ID outside your contacts, owner [0-9A-F]{4}·[0-9A-F]{4}/,
     );
 
     const bare = setup();
     const bareText = (await bare.run(['verify', 'p.json'])).text;
-    expect(bareText).toContain('OK       Recorded by an agent outside your contacts');
-    expect(bareText).toContain(`  Agent ID: ${SIGNER}`);
+    expect(bareText).toContain('OK       Recorded by an ID outside your contacts');
+    expect(bareText).toContain(`  ID number: ${SIGNER}`);
   });
 });
 

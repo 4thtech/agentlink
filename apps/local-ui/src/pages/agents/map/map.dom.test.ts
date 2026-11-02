@@ -154,7 +154,7 @@ describe('the map: boxes and words', () => {
     expect(host.querySelectorAll('ul li button').length).toBeGreaterThanOrEqual(3);
     expect(byLabel(/^Personal and Person 1, Active now\. Open conversation$/)).toBeDefined();
     expect(text()).toContain('Live connections');
-    expect(host.querySelector('.mp-summary')?.textContent).toContain('3 agents, 5 contacts.');
+    expect(host.querySelector('.mp-summary')?.textContent).toContain('3 IDs, 5 contacts.');
   });
 
   it('no content and no hover preview: no title attribute, no tooltip', async () => {
@@ -180,7 +180,7 @@ describe('the map: scale', () => {
     expect(host.querySelectorAll('.mp-contact').length).toBe(12);
   });
 
-  it('up to 8 agents and "+N more agents", which shows the List', async () => {
+  it('up to 8 agents and "+N more IDs", which shows the List', async () => {
     setWorld(0, []);
     const many = [
       AGENTS[0] as AgentRow,
@@ -191,7 +191,7 @@ describe('the map: scale', () => {
     const onShowList = vi.fn();
     await mount({ onShowList }, many);
     expect(host.querySelectorAll('.mp-agent').length).toBe(8);
-    const more = buttons().find((b) => /\+2 more agents/.test(b.textContent ?? ''));
+    const more = buttons().find((b) => /\+2 more IDs/.test(b.textContent ?? ''));
     expect(more).toBeDefined();
     await act(async () => more?.click());
     expect(onShowList).toHaveBeenCalled();

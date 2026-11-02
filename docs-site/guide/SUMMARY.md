@@ -33,7 +33,7 @@
   * [Invite someone](local-app/invite-someone.md)
   * [Approvals](local-app/approvals.md)
   * [First run and your backup code](local-app/first-run.md)
-  * [Agents](local-app/agents.md)
+  * [IDs](local-app/ids.md)
   * [AI apps page](local-app/ai-apps.md)
   * [Activity](local-app/activity.md)
   * [Proofs and credits](local-app/proofs-and-credits.md)

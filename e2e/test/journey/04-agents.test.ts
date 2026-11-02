@@ -39,7 +39,7 @@ afterAll(() => ch.stop());
 async function pauseAna(page: Page): Promise<void> {
   await openAgents(page);
   await agentCard(page, 'Ana')
-    .getByText(/^(Offline|Connected · restart|Ready|Working|Idle)/)
+    .getByText(/^(Not used by any AI app|Offline|Connected · restart|Ready|Working|Idle)/)
     .first()
     .waitFor();
   await agentCard(page, 'Ana').getByRole('button', { name: 'Pause', exact: true }).click();
@@ -103,10 +103,7 @@ describe('chapter 4: agents', () => {
     const probe = await jp.arm();
     const { page } = jp;
 
-    await page
-      .getByRole('button', { name: /^Agent: / })
-      .first()
-      .click();
+    await page.getByRole('button', { name: /^ID: / }).first().click();
     for (const [label, letter] of [
       ['Ana', 'A'],
       ['Side project', 'S'],
@@ -117,7 +114,7 @@ describe('chapter 4: agents', () => {
     }
     await page.getByRole('menuitemradio').filter({ hasText: 'Side project' }).first().click();
     await page
-      .getByRole('button', { name: /^Agent: Side project/ })
+      .getByRole('button', { name: /^ID: Side project/ })
       .first()
       .waitFor();
     await probe.check();
@@ -138,10 +135,7 @@ describe('chapter 4: agents', () => {
     const { page } = jp;
     const chip = page.locator('.al-chip-status').first();
     const appWord = async (): Promise<string> => {
-      await page
-        .getByRole('button', { name: /^Agent: / })
-        .first()
-        .click();
+      await page.getByRole('button', { name: /^ID: / }).first().click();
       const line = page.locator('.al-am-app').filter({ hasText: 'Claude Code' }).first();
       const word = (await line.locator('.al-am-app-word').innerText()).trim();
       await page.keyboard.press('Escape');
@@ -253,7 +247,7 @@ describe('chapter 4: agents', () => {
     // The switch mounts the views again; the page's own read then opens the sheet.
     await sheet.waitFor();
     await page
-      .getByRole('button', { name: /^Agent: Work/ })
+      .getByRole('button', { name: /^ID: Work/ })
       .first()
       .waitFor();
     await sheet.getByRole('button', { name: 'Pause', exact: true }).click();
@@ -262,7 +256,7 @@ describe('chapter 4: agents', () => {
     // Back to Ana; Resume on Work's card opens Work and asks for Touch ID once.
     await agentCard(page, 'Ana').getByRole('button', { name: 'Switch', exact: true }).click();
     await page
-      .getByRole('button', { name: /^Agent: Ana/ })
+      .getByRole('button', { name: /^ID: Ana/ })
       .first()
       .waitFor();
     // The switch mounts the views again: wait until the Agents page itself shows Ana open (its own
@@ -339,10 +333,7 @@ describe('chapter 4: agents', () => {
       const bProbe = await b.arm();
       await navTo(b.page, 'Contacts');
       await removeAgent(a.page, 'Ana');
-      await a.page
-        .getByRole('button', { name: /^Agent: / })
-        .first()
-        .click();
+      await a.page.getByRole('button', { name: /^ID: / }).first().click();
       expect(await a.page.getByRole('menuitemradio').filter({ hasText: 'Ana' }).count()).toBe(0);
       await eventually(
         'Bo sees Ana retired',
