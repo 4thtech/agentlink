@@ -33,7 +33,9 @@ const assertion = (title, status, ancestors = ['SqliteStore']) => ({
   failureMessages: status === 'failed' ? ['Error: Test timed out in 20000ms.'] : [],
 });
 const report = (file, assertions, extra = {}) => ({
-  testResults: [{ name: `${ROOT}/${file}`, status: 'passed', assertionResults: assertions, ...extra }],
+  testResults: [
+    { name: `${ROOT}/${file}`, status: 'passed', assertionResults: assertions, ...extra },
+  ],
 });
 
 describe('validate', () => {
@@ -280,7 +282,19 @@ describe('the command line', () => {
     it('fails when the summary is missing', () => {
       expect(
         run({
-          argv: ['evaluate', '--file', file, '--today', TODAY, '--scope', 'node-os', '--exit-code', '1', '--turbo-runs', join(repo, 'nope')],
+          argv: [
+            'evaluate',
+            '--file',
+            file,
+            '--today',
+            TODAY,
+            '--scope',
+            'node-os',
+            '--exit-code',
+            '1',
+            '--turbo-runs',
+            join(repo, 'nope'),
+          ],
           env: {},
           root: repo,
           log: () => {},
@@ -298,9 +312,7 @@ describe('the command line', () => {
 
 // The real list: it must stay valid and small; only evidence-backed flakes (OPS-UNSTICK-A).
 describe('tools/ci/quarantine.json', () => {
-  const real = JSON.parse(
-    readFileSync(resolve(import.meta.dirname, 'quarantine.json'), 'utf8'),
-  );
+  const real = JSON.parse(readFileSync(resolve(import.meta.dirname, 'quarantine.json'), 'utf8'));
 
   it('is well formed (expiry itself is checked by `quarantine.mjs check` in CI, on the real date)', () => {
     const first = real.entries.map((e) => e.added).sort()[0] ?? TODAY;
@@ -320,7 +332,9 @@ describe('ci.yml wiring', () => {
 
   it('checks the list (expiry) and evaluates the unit tests and the node-os tests through it', () => {
     expect(ci).toContain('node tools/ci/quarantine.mjs check');
-    expect(ci).toMatch(/node tools\/ci\/quarantine\.mjs evaluate --scope checks [^\n]*--turbo-runs/);
+    expect(ci).toMatch(
+      /node tools\/ci\/quarantine\.mjs evaluate --scope checks [^\n]*--turbo-runs/,
+    );
     expect(ci).toMatch(/node tools\/ci\/quarantine\.mjs evaluate --scope node-os [^\n]*--report/);
     expect(ci).toMatch(/turbo run test --continue --summarize/);
   });

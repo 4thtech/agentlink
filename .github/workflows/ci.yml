@@ -353,18 +353,34 @@ jobs:
             pnpm build
           fi
 
+      # OPS-UNSTICK-A: the visible, expiring test quarantine (tools/ci/quarantine.json). An expired or
+      # malformed entry fails here.
+      - name: Check the test quarantine
+        if: needs.detect.outputs.has_test == 'true'
+        run: node tools/ci/quarantine.mjs check
+
+      # OPS-UNSTICK-A: every package's tests run (--continue) and each vitest run writes a JSON report
+      # next to its package. The step then fails unless every failed turbo task left a report whose
+      # failures are all live quarantine entries for `checks` (tools/ci/quarantine.mjs); a quarantined
+      # failure shows as a warning and in the run summary. Any other failure, or a task that failed
+      # without a report (a crash, a failed build), fails as before.
       - name: Unit tests
         if: needs.detect.outputs.has_test == 'true'
         env:
           TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
           TURBO_FILTERS: ${{ needs.detect.outputs.turbo_filters }}
         run: |
+          reporters=(--reporter=default --reporter=github-actions --reporter=json --outputFile.json=.vitest-report.json)
+          set +e
           if [ "$TEST_SCOPE" = filtered ]; then
             # shellcheck disable=SC2086 # one word per --filter
-            pnpm exec turbo run test $TURBO_FILTERS
+            pnpm exec turbo run test --continue --summarize $TURBO_FILTERS -- "${reporters[@]}"
           else
-            pnpm test
+            pnpm exec turbo run test --continue --summarize -- "${reporters[@]}"
           fi
+          status=$?
+          set -e
+          node tools/ci/quarantine.mjs evaluate --scope checks --exit-code "$status" --turbo-runs .turbo/runs
 
       # Named so the MCP conformance gate (06 §9, M1-9e) is visible in the CI log: the tool-surface
       # snapshot and rules, and an MCP SDK client validating every tool over real stdio. Both also run
@@ -734,9 +750,17 @@ jobs:
       # M1-8e, M1-11a, M1-11b-1, M1-PAY-CONFIRM-b, U3-g-b (CHORE-OSMATRIX-BROWSER-EXCLUDE): the real-browser tests need Playwright's Chromium,
       # which only the `checks` job installs (and there a missing browser fails the test). They are
       # excluded here only.
+      # OPS-UNSTICK-A: a failure of a live `node-os` quarantine entry alone (tools/ci/quarantine.json)
+      # does not fail the step; any other failure, or no report, does.
       - name: Run the @4thtech-io/node tests
         shell: bash
-        run: pnpm --filter @4thtech-io/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts --exclude src/local-ui-first-run-browser.test.ts --exclude src/local-ui-passkey-upgrade-browser.test.ts --exclude src/approval-pay-confirm-browser.test.ts --exclude src/local-ui-welcome-browser.test.ts
+        run: |
+          report="$RUNNER_TEMP/node-os-vitest.json"
+          set +e
+          pnpm --filter @4thtech-io/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts --exclude src/local-ui-first-run-browser.test.ts --exclude src/local-ui-passkey-upgrade-browser.test.ts --exclude src/approval-pay-confirm-browser.test.ts --exclude src/local-ui-welcome-browser.test.ts --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$report"
+          status=$?
+          set -e
+          node tools/ci/quarantine.mjs evaluate --scope node-os --exit-code "$status" --report "$report"
 
   # W5-WINDOWS: the packed CLI as a Windows user has it. Packs the tarball, installs it into an empty
   # folder with npm, then runs tools/ci/windows-smoke.mjs: `--version`, `ui` without a terminal,

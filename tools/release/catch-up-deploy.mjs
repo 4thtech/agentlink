@@ -1,34 +1,39 @@
 #!/usr/bin/env node
-// CHORE-CI-SUPERSEDED: the `catch-up` job of deploy-submitter.yml and deploy-drop.yml. It runs when
-// a deploy run did not deploy its commit because main moved on: the commit's CI was cancelled as
-// superseded (wait-for-ci.mjs --superseded-ok), or deploy-production found a newer head of main.
-// The newer commits may not touch the workflow's `paths`, so no push run exists for main's head,
-// and the change would never deploy. This makes sure main's head has a run of the same workflow:
-// unless a run for that commit (push or dispatch) is still in flight or finished successfully, it
-// dispatches the workflow on main.
+// The `catch-up` job of deploy-submitter.yml, deploy-drop.yml and deploy-invite.yml
+// (CHORE-CI-SUPERSEDED, CHORE-DEPLOY-CATCHUP, OPS-UNSTICK-A). It runs when a deploy run did not
+// deploy its commit: the commit's CI was superseded (wait-for-ci.mjs --superseded-ok) or failed,
+// deploy-production found a NEWER commit on main that changes this service, or a job was cancelled
+// (GitHub keeps one pending job per concurrency group and cancels the older pending one). It makes
+// sure main's head still gets deployed for this service, and says which run does it.
 //
-// CHORE-DEPLOY-CATCHUP: it also runs when this commit's own CI failed (a flake), and a finished run
-// for the head that did not succeed no longer counts as handling it (76ad5c5c's run failed ci-green
-// on a Playwright install timeout and production stayed days behind). Each run's catch-up job runs
-// once and dispatches only for a head other than its own commit, so this cannot loop: a dispatched
-// run whose head is still red ends at ci-green, and its own catch-up finds itself at the head.
-// The run summary (GITHUB_STEP_SUMMARY, when set) says which head and which run deploy instead.
+// "Covered": a run of this same workflow on main (push or dispatch, not this run) that
+//   - is still going and whose commit contains the newest commit on main that changes this service
+//     (it deploys exactly what main's head builds for the service; tools/release/deploy-paths.mjs), or
+//   - finished successfully for main's head itself.
+// A finished run of an older commit does not count: it may have deployed nothing.
+//
+// Otherwise it dispatches this workflow on main, when main's head is another commit, or when this
+// run's own jobs were cancelled and this run was a push run (one re-dispatch; a cancelled DISPATCHED
+// run does not dispatch again, so this cannot loop). If nothing covers the head and nothing may be
+// dispatched (main's head is this commit and its CI is not green), it exits 1: a run that left
+// production behind is red, never silently green. The run summary (GITHUB_STEP_SUMMARY) says
+// "Superseded by <sha> ... deploying there", or that production keeps the previous version.
 //
 //   node tools/release/catch-up-deploy.mjs --workflow deploy-submitter.yml
 //
 // Environment: GH_TOKEN (the job's GITHUB_TOKEN with `actions: write`, which may dispatch workflows
-// of this repository and nothing more), GITHUB_REPOSITORY, GITHUB_SHA, GITHUB_API_URL and
-// GITHUB_STEP_SUMMARY (both optional).
+// of this repository and nothing more), GITHUB_REPOSITORY, GITHUB_SHA, GITHUB_RUN_ID,
+// GITHUB_EVENT_NAME, DEPLOY_CANCELLED ('true' when a needed job was cancelled), GITHUB_API_URL and
+// GITHUB_STEP_SUMMARY (both optional). Needs the full history of main (`fetch-depth: 0`).
 // The dispatched run is an ordinary run on main: it waits for the head's own green CI and goes
-// through staging, the smoke test, the production environment, DEPLOY_FREEZE and the head-of-main
-// check like any push run. Dispatching never deploys anything by itself. Prints no token.
+// through staging, the smoke test, the production environment, DEPLOY_FREEZE and the head check
+// like any push run. Dispatching never deploys anything by itself. Prints no token.
 
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { gitRunner, SHA_RE, WORKFLOW_FILE, workflowSpecs } from './deploy-paths.mjs';
 import { githubApi, readEnv } from './wait-for-ci.mjs';
 
-const WORKFLOW_FILE = /^[A-Za-z0-9_-]+\.ya?ml$/;
-const SHA_RE = /^[0-9a-f]{40}$/;
 const HANDLED_BY = new Set(['push', 'workflow_dispatch']);
 
 export function parseArgs(argv) {
@@ -38,59 +43,70 @@ export function parseArgs(argv) {
   return { workflow: argv[1] };
 }
 
-/** A run that is still going, or finished successfully, deploys (or deployed) its commit. */
-function handles(run) {
-  if (run?.status !== 'completed') return true;
-  return run?.conclusion === 'success';
-}
+const idOf = (run) => (Number.isSafeInteger(run?.id) ? run.id : String(run?.id));
 
 /**
- * Returns { action: 'none' | 'dispatched', head, runId? }. Throws when main's head cannot be read.
- * `summary` (optional) receives one Markdown line for the run summary.
+ * Returns { action: 'covered' | 'dispatched' | 'stranded', head, runId? }. Throws when main's head
+ * cannot be read. `summary` (optional) receives Markdown lines for the run summary.
  */
-export async function catchUp({ api, repo, sha, workflow, log = console.log, summary = () => {} }) {
-  const head = (await api(`/repos/${repo}/commits/main`))?.sha;
+export async function catchUp({
+  api,
+  git,
+  repo,
+  sha,
+  runId,
+  event,
+  cancelled = false,
+  workflow,
+  specs,
+  log = console.log,
+  summary = () => {},
+}) {
+  const head = git.head();
   if (typeof head !== 'string' || !SHA_RE.test(head)) {
     throw new Error('could not read the head of main');
   }
-  if (head === sha) {
-    log(`${sha} is still the head of main; nothing to catch up.`);
-    summary(
-      `**Not deployed:** \`${sha}\` is the head of main but did not pass every gate (for example its CI is not green); production keeps the previous version until a run for a newer green head of main, or a re-run of this one, deploys.`,
-    );
-    return { action: 'none', head };
-  }
-  const query = new URLSearchParams({ head_sha: head, branch: 'main', per_page: '50' });
+  const last = git.lastTouch(head, specs) ?? head;
+  const query = new URLSearchParams({ branch: 'main', per_page: '50' });
   const body = await api(`/repos/${repo}/actions/workflows/${workflow}/runs?${query}`);
-  const existing = (body?.workflow_runs ?? []).find(
-    (r) =>
-      r?.head_sha === head &&
-      r?.head_branch === 'main' &&
-      HANDLED_BY.has(r?.event) &&
-      r?.path === `.github/workflows/${workflow}` &&
-      handles(r),
-  );
-  if (existing) {
-    const runId = Number.isSafeInteger(existing.id) ? existing.id : String(existing.id);
+  const cover = (body?.workflow_runs ?? []).find((r) => {
+    if (String(r?.id) === String(runId)) return false;
+    if (r?.head_branch !== 'main' || !HANDLED_BY.has(r?.event)) return false;
+    if (r?.path !== `.github/workflows/${workflow}` || !SHA_RE.test(r?.head_sha ?? ''))
+      return false;
+    if (r.status !== 'completed') return git.contains(r.head_sha, last) !== false;
+    return r.conclusion === 'success' && r.head_sha === head;
+  });
+  if (cover) {
+    const id = idOf(cover);
     log(
-      `::notice::main moved on to ${head}; run ${runId} (${existing.event}, ${existing.status}) of ${workflow} handles it.`,
+      `::notice::Superseded by ${cover.head_sha}: run ${id} of ${workflow} (${cover.event}, ${cover.status}) deploys main's state for this service.`,
     );
     summary(
-      `**Superseded by \`${head}\`:** this run did not change production; run ${runId} of ${workflow} (${existing.event}, ${existing.status}) deploys main's head.`,
+      `**Superseded by \`${cover.head_sha}\`, deploying there:** this run did not change production; run ${id} of ${workflow} (${cover.event}, ${cover.status}) deploys main's state for this service.`,
     );
-    return { action: 'none', head, runId };
+    return { action: 'covered', head, runId: id };
   }
-  await api(`/repos/${repo}/actions/workflows/${workflow}/dispatches`, {
-    method: 'POST',
-    body: { ref: 'main' },
-  });
+  if (head !== sha || (cancelled && event === 'push')) {
+    await api(`/repos/${repo}/actions/workflows/${workflow}/dispatches`, {
+      method: 'POST',
+      body: { ref: 'main' },
+    });
+    log(
+      `::notice::Superseded by ${head}: no live or successful run of ${workflow} covers main's head, so a new run was dispatched on main. It deploys only once the head's own CI is green.`,
+    );
+    summary(
+      `**Superseded by \`${head}\`, deploying there:** this run did not change production; dispatched a new run of ${workflow} on main for that head (it deploys only once the head's own CI is green).`,
+    );
+    return { action: 'dispatched', head };
+  }
   log(
-    `::notice::main moved on to ${head} and no live or successful run of ${workflow} covers it: dispatched ${workflow} on main. That run deploys only once the head's own CI is green.`,
+    `::error::Nothing deploys main's head ${head} for ${workflow}: this run did not deploy it (its CI is not green, or a job was cancelled) and no other run covers it. Re-run the failed jobs once CI is green, or dispatch ${workflow} on main.`,
   );
   summary(
-    `**Superseded by \`${head}\`:** this run did not change production; dispatched a new run of ${workflow} on main for that head (it deploys only once the head's own CI is green).`,
+    `**Not deployed:** \`${head}\` is the head of main but this run did not pass every gate, and no other run covers it; production keeps the previous version until a re-run of this run, or a run for a newer head of main, deploys.`,
   );
-  return { action: 'dispatched', head };
+  return { action: 'stranded', head };
 }
 
 /** Appends one line to the run summary file, if the runner gave one. */
@@ -100,19 +116,26 @@ function summaryWriter(file) {
 }
 
 /** The command line. Returns the exit code. */
-export async function run({ argv, env, api, log = console.log }) {
+export async function run({ argv, env, api, git, cwd = process.cwd(), log = console.log }) {
   try {
     const { workflow } = parseArgs(argv);
     const { token, repo, sha, baseUrl } = readEnv(env);
-    await catchUp({
+    const runId = env.GITHUB_RUN_ID;
+    if (!/^[1-9][0-9]*$/.test(runId ?? '')) throw new Error('GITHUB_RUN_ID is malformed');
+    const result = await catchUp({
       api: api ?? githubApi({ token, baseUrl }),
+      git: git ?? gitRunner({ cwd }),
       repo,
       sha,
+      runId,
+      event: env.GITHUB_EVENT_NAME,
+      cancelled: env.DEPLOY_CANCELLED === 'true',
       workflow,
+      specs: workflowSpecs(workflow, cwd),
       log,
       summary: summaryWriter(env.GITHUB_STEP_SUMMARY),
     });
-    return 0;
+    return result.action === 'stranded' ? 1 : 0;
   } catch (error) {
     log(`::error::Deploy catch-up failed: ${error?.message ?? String(error)}`);
     return 1;

@@ -25,9 +25,10 @@
 #                      each served chain (a fresh agent with no credits and maxFee 0: the Notary's
 #                      simulation reverts, nothing is sent, no gas is spent); the faucet refuses a
 #                      mainnet chain ID (apps/submitter/test/smoke-remote.test.ts).
-#   deploy-production  environment `production`, only after a green staging smoke, and only while this
-#                      commit is still main's head. Records the live version (rollback target),
-#                      deploys to the Custom Domain, health-checks over HTTP (no repository code runs
+#   deploy-production  environment `production` (no approval click: the owner removed its required
+#                      reviewer, D-52), only after a green staging smoke, and only while no newer
+#                      commit on main changes this service (tools/release/deploy-paths.mjs). Records
+#                      the live version (rollback target), deploys to the Custom Domain, health-checks over HTTP (no repository code runs
 #                      against production), reads back the logging settings, and on any failure rolls
 #                      back automatically with `wrangler rollback`. Writes the deploy record draft to
 #                      the run summary. The health check waits up to 15 minutes while there is no TLS
@@ -38,13 +39,15 @@
 #                      naming the owner fix, when its token cannot set the variable.
 #   rollback-rehearsal manual dispatch with `rehearse-rollback`: on staging, rolls back to the
 #                      previous version, checks it, and rolls forward again (§4.5 "rehearsed").
-#   catch-up           only when this run did not deploy its commit because main moved on (CI
-#                      superseded, or deploy-production found a newer head) or its CI failed (a
-#                      flake): dispatches this workflow on main unless a run for main's head is in
-#                      flight or succeeded (a failed one does not count), and writes to the run
-#                      summary which run deploys instead. The newer commits may not
-#                      touch the paths above (tools/release/catch-up-deploy.mjs). The dispatched run
-#                      passes every gate again for the head commit: its own green CI, staging and
+#   catch-up           (OPS-UNSTICK-A) only when this run did not deploy main's state for this
+#                      service: its CI was superseded or failed, deploy-production found a newer commit
+#                      that changes this service, or any job was cancelled (a pending job replaced in
+#                      its concurrency group). Unless a live run already contains the newest change to
+#                      this service, or a run for main's head succeeded, it dispatches this workflow on
+#                      main (tools/release/catch-up-deploy.mjs). If nothing will deploy main's head it
+#                      FAILS: a run that left production behind is never green. Its run summary says
+#                      "Superseded by <sha>, deploying there" with the run that deploys. The dispatched
+#                      run passes every gate again for the head commit: its own green CI, staging and
 #                      the smoke test, the production environment, DEPLOY_FREEZE, the head check.
 #
 # SKIPPING VS FAILING: absent credentials, an absent Worker or an absent required Worker secret skip
@@ -87,6 +90,7 @@ on:
       - ".github/scripts/worker-logging-settings.jq"
       - "tools/release/wait-for-ci.mjs"
       - "tools/release/catch-up-deploy.mjs"
+      - "tools/release/deploy-paths.mjs"
       - ".github/workflows/deploy-submitter.yml"
   workflow_dispatch:
     inputs:
@@ -487,8 +491,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # deploy-paths.mjs head-check reads main's history
 
-      # Re-checked here: the environment may have waited for an approval click.
+      # Re-checked here: the job may have waited for its concurrency group (or an approval click).
       - name: Stop if DEPLOY_FREEZE is set
         shell: bash
         env:
@@ -500,30 +505,17 @@ jobs:
             exit 1
           fi
 
-      - name: Check that this commit is still the head of main
+      - name: Check that no newer commit on main changes this service
         id: head
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           # HEAD-CHECK-BEGIN
-          # Runs can finish out of order: only the run for main's current head may change production.
-          head="$(gh api "repos/$REPOSITORY/commits/main" --jq .sha)"
-          if ! [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Could not read the head of main."
-            exit 1
-          fi
-          if [ "$head" != "$COMMIT" ]; then
-            # CHORE-DEPLOY-CATCHUP: not silently green; the catch-up job names the run that deploys.
-            echo "::warning::main has moved on from $COMMIT to $head; this run did not change production. The catch-up job hands it to a run for $head."
-            echo "**Superseded by \`$head\`:** this run did not change production (main moved on from \`$COMMIT\`); see the catch-up job for the run that deploys it." >> "$GITHUB_STEP_SUMMARY"
-            echo "current=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "current=true" >> "$GITHUB_OUTPUT"
-          fi
+          # OPS-UNSTICK-A: runs can finish out of order. Production is skipped only when a NEWER commit
+          # on main changes this service's paths (on.push.paths): that commit's run deploys it. A newer
+          # unrelated commit builds the same bundle, so this run deploys. Writes current=true|false,
+          # a notice or warning, and the run summary line ("Superseded by <sha>").
+          node tools/release/deploy-paths.mjs head-check --workflow deploy-submitter.yml
           # HEAD-CHECK-END
 
       - name: Set up Node.js and pnpm
@@ -857,11 +849,11 @@ jobs:
   # dispatched run deploys nothing unless the head's own CI is green and every gate passes.
   catch-up:
     name: catch-up
-    needs: [ci-green, deploy-production]
+    needs: [ci-green, build, deploy-staging, smoke-staging, deploy-production]
     if: >-
       always() && github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main' &&
       (needs.ci-green.outputs.result == 'superseded' || needs.ci-green.result == 'failure' ||
-      needs.deploy-production.outputs.current == 'false')
+      needs.deploy-production.outputs.current == 'false' || contains(needs.*.result, 'cancelled'))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -872,11 +864,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # which runs cover main's head for this service (deploy-paths.mjs)
 
       - name: Make sure the head of main gets a deploy run
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          DEPLOY_CANCELLED: ${{ contains(needs.*.result, 'cancelled') }}
         run: |
           set -euo pipefail
           node tools/release/catch-up-deploy.mjs --workflow deploy-submitter.yml

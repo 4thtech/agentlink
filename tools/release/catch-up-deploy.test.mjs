@@ -161,9 +161,7 @@ describe('catchUp', () => {
       'action_required',
       null,
     ]) {
-      const { result, calls } = await go(
-        withRuns(wfRun(7, { status: 'completed', conclusion })),
-      );
+      const { result, calls } = await go(withRuns(wfRun(7, { status: 'completed', conclusion })));
       expect(result.action).toBe('dispatched');
       expect(dispatched(calls)).toHaveLength(1);
     }
@@ -224,9 +222,7 @@ describe('catchUp', () => {
   });
 
   it('throws, dispatching nothing, when the head of main cannot be read', async () => {
-    await expect(go(routes(), { git: fakeGit({ head: 'nope' }) })).rejects.toThrow(
-      /head of main/,
-    );
+    await expect(go(routes(), { git: fakeGit({ head: 'nope' }) })).rejects.toThrow(/head of main/);
     await expect(
       go(routes(), {
         git: fakeGit({
@@ -265,7 +261,7 @@ describe('run (the command line)', () => {
     expect(dispatched(found.calls)).toHaveLength(0);
   });
 
-  it('exits 1 when nothing will deploy main\'s head', async () => {
+  it("exits 1 when nothing will deploy main's head", async () => {
     const result = await invoke(routes(), { git: fakeGit({ head: SHA, last: SHA }) });
     expect(result.code).toBe(1);
     expect(result.lines).toMatch(/::error::/);
@@ -415,7 +411,7 @@ describe.each(CATCH_UP_WORKFLOWS)('%s catch-up job', (file) => {
     expect(writers).toEqual(['catch-up']);
   });
 
-  it('deploy-production publishes whether this run deploys main\'s state for the service', () => {
+  it("deploy-production publishes whether this run deploys main's state for the service", () => {
     const production = jobOf('deploy-production');
     expect(production).toMatch(
       /outputs:\n(?: {6}.*\n)* {6}current: \$\{\{ steps\.head\.outputs\.current \}\}\n/,
