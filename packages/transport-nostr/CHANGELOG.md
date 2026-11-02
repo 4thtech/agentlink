@@ -1,5 +1,14 @@
 # @4thtech-io/transport-nostr
 
+## 0.4.9
+
+### Patch Changes
+
+- 8b1eb27: W6-SEND-LATENCY: sending a message and accepting an invite return as soon as 2 relays have the message, instead of waiting up to 10 s for the slowest relay. The other relays still finish in the background and update relay health.
+- @4thtech-io/crypto@0.4.9
+  - @4thtech-io/log@0.4.9
+  - @4thtech-io/types@0.4.9
+
 ## 0.4.8
 
 ### Patch Changes

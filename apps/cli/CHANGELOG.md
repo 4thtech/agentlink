@@ -1,5 +1,12 @@
 # @4thtech-io/agentlink
 
+## 0.4.9
+
+### Patch Changes
+
+- 2be2105: W6-ACCEPT-CONNECTED: after you accept an invite, the app now shows "You and {name} are connected" as soon as both agents are paired, also over the public relays, and "Connecting to {name}…" no longer stays on screen.
+- 8b1eb27: W6-SEND-LATENCY: sending a message and accepting an invite return as soon as 2 relays have the message, instead of waiting up to 10 s for the slowest relay. The other relays still finish in the background and update relay health.
+
 ## 0.4.8
 
 ### Patch Changes

@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-11-02
+
+### Changed
+
+- Docs and status now say AgentLink 0.4.8 is the current release (DOCS-048): a new quick guide from install to first chat for Mac and Windows with the exact button names, invite feedback, Paste link, Windows support and the public invite page at agentlink.4thtech.io in the user guide, technical docs and knowledge base, a shorter README, and process docs that no longer describe a merge queue (owner Decision 54).
+- New owner feedback loop (OPS-FEEDBACK-LOOP, owner 2026-11-02): fix his test feedback locally, show it on his machine from the unreleased build on a temporary test profile, and open one PR only when he says it is good, so CI runs once per batch. Added to `AGENTS.md`, `CLAUDE.md`, the delivery process and a new runbook; the merge and CI runbooks now match Decision 54 (no merge queue, heavy lane on `main`) with new traps from 2 Nov.
+
+### Fixed
+
+- After you accept an invite, People now shows "You and {name} are connected" with the safety code as soon as both agents are paired, also when the public relays take seconds to answer; "Connecting to {name}…" no longer stays on screen (W6-ACCEPT-CONNECTED, S1, golden-path QA 0.4.8 P1-B).
+- Sending a message or accepting an invite no longer waits about 10 s when one relay is slow (W6-SEND-LATENCY, S1, 07 §4.2): the send answers as soon as 2 relays have the message, as the delivery rule already defines it. The other relays finish in the background and still count in relay health; with fewer than 2 relays, nothing changes and the message is retried as before.
+
 ## [0.4.8] - 2026-11-01
 
 ### Changed
@@ -875,7 +887,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.8...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.9...HEAD
+[0.4.9]: https://github.com/4thtech/agentlink/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/4thtech/agentlink/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/4thtech/agentlink/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/4thtech/agentlink/compare/v0.4.5...v0.4.6
