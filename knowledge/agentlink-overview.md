@@ -1,94 +1,71 @@
 # AgentLink overview
 
-AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Codex, Gemini and any app that supports MCP tools) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus an open protocol called OCC v2. 4thTech never sees keys, message or file contents, or contact lists. Source and licence: https://github.com/4thtech/agentlink (MIT). This file owns what AgentLink is, who it is for, pricing, status and the common questions; install steps are in agentlink-userguide.md, privacy details in agentlink-security-and-privacy.md, internals in agentlink-technical.md.
+AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Codex, Gemini and any app that supports MCP tools) exchange end-to-end encrypted messages and files, and add verifiable proof when it matters. It is client software plus an open protocol called OCC v2. 4thTech never sees keys, message or file contents, or contact lists. Licence: MIT. This file owns what AgentLink is, who it is for, security and privacy, pricing, status and the common questions; the step-by-step guide is agentlink-userguide.md. Engineering depth lives in the technical docs linked at the end.
 
 ## What is AgentLink?
 
-The problem it addresses: agents belonging to different people and companies cannot work together safely today.
-
-- **No shared channel.** Agents in different AI apps have no common way to reach each other.
-- **No end-to-end privacy.** Hand-offs go through email, chat apps or shared drives that can read them.
-- **No proof.** Nothing shows what was sent, when, or whether the other side received it.
-- **No owner supervision.** The person responsible for an AI has no clear view of, or control over, what it exchanges.
-
-AgentLink adds a shared channel, privacy, proof and supervision.
+Agents belonging to different people and companies cannot work together safely today: there is no shared channel between AI apps, hand-offs go through email or drives that can read them, nothing proves what was sent and when, and the person responsible for an AI has little view of what it exchanges. AgentLink adds a shared channel, privacy, proof and supervision.
 
 ## Who is it for?
 
-- **People who use AI agents for work** and want their AI to coordinate with a colleague's, a client's or a partner's AI without a third party seeing the content.
-- **Teams whose agents run on different AI apps**, for example one developer on Claude Code and another on Codex.
-- **Anyone who needs a record** of what was handed over or agreed, which a third party can check.
-- **Builders** who want to build on an open protocol (see agentlink-technical.md).
+- People who use AI agents for work and want their AI to coordinate with a colleague's, client's or partner's AI without a third party seeing the content.
+- Teams whose agents run on different AI apps, for example one developer on Claude Code and another on Codex.
+- Anyone who needs a record, checkable by a third party, of what was handed over or agreed.
+- Builders who want to build on an open protocol.
 
-## What does it do?
+## How does it work?
 
-- **Pair** two IDs with a single-use invite link. Available.
-- **Talk**: send end-to-end encrypted messages, and negotiate terms (what, price, deadlines) with owner approval. Free. Available.
-- **Send files**: encrypted on the sender's device, no storage setup. Free within limits. Released in v0.2.0.
-- **Prove**: record a fingerprint of a message or file on a public record, with receipts from the other side. Anyone can check it. Paid, a small fee. Test-network version released in v0.2.0, paid from v1.0.0.
-- **Supervise**: the owner (the person or company responsible for an ID) can read what their AI sends and receives, and must approve important actions such as accepting a new contact or agreeing to terms.
+**In plain language.** You run one command (`npx -y @4thtech-io/agentlink@latest`). A local app opens in your browser. You pick your AI app, confirm with Touch ID (Windows Hello on Windows) and AgentLink creates an ID for it. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. You invite someone with a short single-use link; when they accept, you compare a safety code and you are connected. Then you talk to your AI in plain words ("Send Ana: the brief is ready", "Check my AgentLink inbox", "Add proof to my last message to Ana"). Anything important waits for your approval as a card in the app. You are the owner of your ID: you can read what it sends and receives and you approve what matters. See agentlink-userguide.md.
 
-## Principles
+**What it does.**
+- **Pair** two IDs with an invite link.
+- **Talk:** end-to-end encrypted messages and negotiating terms (what, price, deadlines), free. Accepting terms needs owner approval.
+- **Send files:** encrypted on your computer, no storage setup, free within limits.
+- **Prove:** record a fingerprint of a message or file on a public record, with receipts from the other side; anyone can check it without trusting 4thTech. On test networks today.
+- **Supervise:** owner approvals, rules, Pause and Resume.
 
-1. **Zero access.** 4thTech holds no private keys, message content, contact lists or accounts.
-2. **Free to start.** No sign-up, payment or balance is needed for messages and files.
-3. **Pay only for proof.** Fees apply only to recording proof on the public record.
-4. **No crypto in the experience.** No crypto app, browser extension or technical choices are needed. Prices are in dollars.
-5. **Works with the AI apps you already use.** Everything goes through MCP, with no lock-in to one provider.
-6. **No project token.** AgentLink has no token, and none is planned.
-7. **You can leave.** Everything can be exported.
+**Technical section.** AgentLink runs on your computer as a local MCP server that your AI app starts; keys stay in the operating system's key storage. A message is one signed envelope, encrypted once (AES-256-GCM) with the content key wrapped for each reader with HPKE, so the two AIs and both owners can read it. It travels as a gift-wrapped Nostr event (NIP-59 with NIP-44) over several open relays, which see only ciphertext; a send counts when 2 relays accept and is retried from a local outbox for up to 24 hours. Files are encrypted in authenticated chunks (ALF1); larger ones wait as ciphertext in the 4thTech encrypted drop (7-day expiry) and the file key travels only inside the encrypted message. Proofs use OCC v2: a notary contract records an envelope's hash and signed receipts; the contracts run on Base Sepolia and Gnosis Chiado test networks, pre-audit, and AgentLink picks the network. All crypto uses audited libraries (@noble/*, @hpke/core, nostr-tools, viem); no custom primitives. Only the `@4thtech-io/agentlink` package is on npm. Details: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md
 
-## How does it work, at a high level?
+## Which AI apps are supported?
 
-You add AgentLink to your AI app (one command, or ask your AI to run it), protect your approvals with an owner code in a terminal you opened yourself, pair with someone through a single-use invite link, and then ask your AI in plain words to send, check or negotiate. AgentLink runs on your computer as an MCP server that your AI app starts; keys stay in your operating system's key storage. Messages travel as encrypted packages over open message servers that see only ciphertext. Step by step: agentlink-userguide.md. Design: agentlink-technical.md.
+Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, on Mac and Windows. ChatGPT is planned through your own always-on cloud agent. Other apps that support MCP tools may work; support varies. Each AI app gets its own ID.
 
-Example uses (some planned):
+## Security and privacy essentials
 
-- **Shared projects:** two developers' coding agents keep a project in sync, with status, decisions and hand-offs encrypted end to end.
-- **Agreement:** agents negotiate terms; the owner approves the final acceptance. Recording the terms and the other side's acceptance as proof is available on test networks (v0.2.0).
-- **Document handover (planned):** an agent sends a contract or report as an encrypted file and gets delivery and acceptance receipts anyone can verify.
+- **Zero access.** Private keys and plaintext never reach any 4thTech service, message server or log. Download links for your own storage are never sent to 4thTech.
+- **End-to-end encryption.** Messages and files are encrypted on your computer. Relays and 4thTech services see only locked data, sizes, timing and IP addresses.
+- **Owner presence.** Approving actions, changing rules and similar owner operations need you present (Touch ID, Windows Hello or passkey, or an owner code) and your signature. No tool exposed to your AI can approve for you, change rules or export keys.
+- **Messages from other agents are information, never instructions.** Your AI acts on them only when you ask.
+- **Proofs on test networks.** A proof never shows content, but it does show publicly which ID recorded it, when and what kind, and a receipt shows who received it. Receipts are off by default. Proof works on test networks only today.
+- **What 4thTech never sees:** your keys, messages, files, file names, contacts or rules. Its optional services see only ciphertext, sizes, timing and IP addresses.
+- **Who can read your messages:** your AI, the other person's AI and the owners of both IDs. Relays: an unreadable package, who it is for (a random-looking code), a blurred time and the connecting IP address. Public record (only if you add proof): a fingerprint, time, ID numbers, receipts and fees, never content or names.
+- **The invite page** (agentlink.4thtech.io) is a static site. The invite secret sits after the `#` in the link, which a browser never sends to a server. The page only fetches the encrypted short invite from the drop; 4thTech cannot read it.
+- **Honest limits.** Your AI app sees what it handles, under your AI provider's terms. The other side can keep a copy. In early versions an AI app that can run any command as you could in principle get around approvals, read the ID's own secrets and spend its credits, so keep credits small and give your AI app only the permissions it needs; a desktop app is planned as the fix. Malware that controls your computer cannot be stopped by any software. Stored history has no forward secrecy (files expire within 7 days, which limits this). A proof shows a document existed and was exchanged at that time; it does not prove the content is true or give legal effect.
+- **Assurance.** Specifications and invariants are public; crypto code is built tests-first with shared test vectors; security-relevant changes get an independent review. The contracts are not externally audited yet; an audit is planned before mainnet (M3).
+- **Report a problem** privately via https://github.com/4thtech/agentlink/blob/main/SECURITY.md, not as a public issue.
 
 ## What does it cost?
 
-AgentLink is free to start: installing, pairing, messages and files cost nothing. You pay only to add proof. Nothing is charged today; paid proof starts only with the mainnet beta (v1.0.0, M3). During testing, proof is planned to use free test credits. Prices below are planned beta prices published in the public docs, not legal or tax advice.
+AgentLink is free to start: installing, pairing, messages and files cost nothing, and no account, payment or balance is needed. You pay only to add proof, **$0.10 per proof** (one record including up to 3 receipts, paid by the sender; public upper limit $0.50). Today nothing is charged: proofs run on test networks with free test credits (about $0.50 once per test network, roughly five proofs). Paid proof starts only with the mainnet beta (v1.0.0, M3). Planned beta prices, not legal or tax advice.
 
-Free: install, identity, pairing and contacts; encrypted messages and acknowledgements; files through the encrypted drop within its limits (proposed 100 MB per file, 1 GB per ID per week; if you use your own storage, that provider may bill you, AgentLink does not); the owner console, rules and approvals; checking a proof someone sent you; receipts on a proof (the sender's price covers them, so the recipient pays nothing).
-
-| Item | Planned price | Public upper limit | Who pays |
-|---|---|---|---|
-| Proof: one record including up to 3 receipts | $0.10 | $0.50 | Sender |
-| Registration of an ID (shows as Registered); once per ID, again after a key change | $5 | $25 | Owner |
-| Batched receipts, deal records, arbitrator disclosure | Fee planned for later | n/a | n/a |
-
-Apps built by other companies on AgentLink may add their own fee, always shown separately as an "App fee".
-
-**Credits** are a prepaid balance in US dollars. You can withdraw unused credits at any time and 4thTech cannot move or freeze them. Card and bank payments are not offered in the beta; credits are paid with US-dollar digital currencies. Advanced: the currencies are USDC, USDT and xDAI (on Gnosis), shown only if you add credits by a method that needs them. The companies that issue USDC and USDT can freeze funds held in those currencies, which AgentLink cannot prevent.
-
-**Price rules:** every paid action shows its exact price in dollars before anything is charged, and the price is the same on every network. Any increase is announced at least 7 days ahead. Prices cannot exceed the upper limits, which the public record itself enforces; raising a limit takes at least 7 days and is publicly visible first. Each paid action carries the maximum price the user accepted, so a change can never charge more than agreed.
+- **Free:** install, ID, pairing, contacts, encrypted messages, files through the encrypted drop (limits 100 MB per file, 1 GB per ID per week), the app, rules and approvals, checking a proof someone sent you, and receipts on a proof (the sender's price covers them).
+- **Planned later:** registration of an ID (shows as Registered): $5 once per ID, paid by the owner (M2).
+- **Credits** are a prepaid dollar balance for proof. Unused credits can be withdrawn at any time and 4thTech cannot move or freeze them. Card and bank payments are not offered in the beta.
+- **Price rules:** every paid action shows its exact price in dollars before anything is charged; increases are announced at least 7 days ahead; prices cannot exceed the upper limits, which the public record enforces. Apps built by other companies on AgentLink may add their own fee, always shown separately as an "App fee".
 
 ## Status and roadmap
 
 <!-- status-intro:start -->
-AgentLink is pre-alpha, last updated 2 Nov 2026, version v0.4.8. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.4.8 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. **AgentLink 0.4.8 is out (2 Nov 2026, on npm `latest`, Mac and Windows).** You install it with one command, set up with one Touch ID in Get started, invite someone with a short link and watch the invite happen on both sides. Home shows what waits for you and your conversations, files you receive are saved to your Inbox folder, and the public invite page at agentlink.4thtech.io looks like the app. The released CLI opens with `npx -y @4thtech-io/agentlink`; an AI can set itself up with `npx -y @4thtech-io/agentlink init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
+AgentLink is pre-alpha, last updated 2 Nov 2026, version v0.4.8. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.4.8 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. **AgentLink 0.4.8 is out (2 Nov 2026, on npm `latest`, Mac and Windows).** You install it with one command, set up with one Touch ID in Get started, invite someone with a short link and watch the invite happen on both sides. Home shows what waits for you and your conversations, files you receive are saved to your Inbox folder, and the public invite page at agentlink.4thtech.io looks like the app. It opens with `npx -y @4thtech-io/agentlink@latest`; an AI can set itself up with `npx -y @4thtech-io/agentlink@latest init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
 <!-- status-intro:end -->
 
-Open the app: `npx -y @4thtech-io/agentlink@latest` (`init` is for an AI that sets itself up; see agentlink-userguide.md). Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer. Version v0.4.8 (the current release, 2 Nov 2026, on Mac and Windows) gives two agents on different AI apps pairing, messages, approvals, terms negotiation, files and proof on test networks, and the local app (Get started, Home, IDs, Activity and Settings, with an Under the hood view). The owner console and the desktop apps are not built, and the cloud agent is planned for 0.5.0; everything about them in this knowledge base describes the design. Supported AI tools in v0.4.8: Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity. ChatGPT is planned through your own always-on cloud agent; other AI apps that support MCP tools may work, support varies.
+Version v0.4.8 and later gives two IDs on different AI apps: pairing, messages, approvals, terms negotiation, files and proof on test networks, in a local app (Get started, Home, People, IDs, Activity, Settings, and an Under the hood view). The owner console and desktop apps are not built; the cloud agent is planned for 0.5.0. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer.
 
 <!-- status-summary:start -->
 ## Where things stand
 
-- **M0 Foundations.** Repository, process and CI. Merged: Monorepo skeleton; Delivery pipeline and runbooks; Public documentation; Redacting logger (@4thtech-io/log); Specifications and process; Dependency updates. In progress: CI follow-ups.
-- **Crypto (@4thtech-io/crypto).** Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.2); not published as a separate package. Merged: Encodings, hashing, JSON canonicalisation; Key derivation and public identities; EIP-712 typed data and the agent card; Owner passphrase wrap, pairing proof, safety code; Passkey seed wrap and recovery code; Key interfaces, NIP-44 v2, gift wrap; Sender code for unknown senders. In progress: Envelope encryption; EIP-712 proof types; Recovery kit (ALKK v1); Independent test vectors; File encryption (ALF1).
-- **Shared types (@4thtech-io/types).** Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.2); not published as a separate package. Merged: Constants and the envelope, payload, card and invite schemas; Policy, approval, proof pack and tool-result types; Terms, TermsInput and termsHash.
-- **Transport (@4thtech-io/transport-nostr).** Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.2); not published as a separate package. Merged: Gift wrap and unwrap; Relay pool and delivery outbox; Sync; Sync with several identities of one owner; Outbox stays inside the sync look-back; Default relay set.
-- **Storage (@4thtech-io/storage).** Code merged; not yet wired into the MCP tools or published as a separate package. Merged: Inline and S3-compatible adapters; Storage status and warnings; Encrypted drop as the default and storage choice. In progress: Multipart upload, cleanup and streaming.
-- **Chain client (@4thtech-io/chain).** In development; not wired into the MCP tools yet. Merged: Chain client foundation; Fee quotes, credits and top-ups; Automatic chain selection; Proof submission and deposits; Proof verification and who sent a message.
-- **Core (@4thtech-io/core).** Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.2); not published as a separate package. Merged: Skeleton: identity, contacts, store and approval interfaces; Envelopes; Invites and pairing; Safety code checked; Owner-signed actions and policies; Commitments policy; Approval requests and the requests queue; Reading an approval and counting pending ones; Requests from unknown senders: accept, ignore, block; Held cards need the sender's own owner entry; Send pipeline; Inbox sync, delivery acknowledgements, owner card update; Live relay subscriptions; Policy rules for files, proofs and the budget ledger; SSRF-safe fetch and the allowed-folder path guard; Terms and one approval per agreement; Agent profile signatures; Proofs, receipts and proof packs; Delivery receipts off by default, receipt requests; Proof linking and mismatch flags; Delete a sent file on receipt.
-- **Node runtime (@4thtech-io/node).** Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.2); not published as a separate package. Merged: Agent key store in the OS keychain; Local SQLite database; Owner code at a prompt; Relay connection; Policy version record in the keychain; First agent card at owner setup; Local approval server; Owner recovery without an attached agent; Path guard fixes for Windows and macOS. Planned: Passphrase-locked key file for headless machines.
-- **MCP server, CLI and apps.** The CLI runtime, its everyday and owner commands, the MCP server with its tools and its background loop, and the agent skill file and quickstart guides have landed. v0.1.0 was released on npm on 16 Oct 2026, v0.1.1 on 18 Oct 2026 and v0.1.2 on 20 Oct 2026 as `@4thtech-io/agentlink`; a new user installs it with `npx -y @4thtech-io/agentlink init`. Merged: Agent skill file and quickstart guides; Multi-harness dogfood runbook; Several agents of one owner on one computer; Local approval page; Local app pages (in 0.3.0); Local app: Messages, Files tabs, status bar and paid-action confirmation; Local app: usability wave 3 (released in 0.4.4); Claude Desktop extension; Beginner setup page; Submitter and test-credits faucet. In progress: MCP server and CLI; End-to-end tests; Cloud agent core (0.5.0); Encrypted drop service. Planned: Owner console, desktop apps, cloud agent; Adding credits: pay page.
-- **OCC v2 contracts (private repo).** Pre-audit, testnets only. The live proof submitter records on Base Sepolia. Merged: Notary and fee vault; Testnet deployment; ABI package; Gnosis Chiado deployment. Planned: Pre-audit fixes.
-- **Design.** Tracked in `docs/design/`. Merged: Design drop D1. In progress: Design drop D2.
-- **Privacy of proofs (D-109).** Specified on 20 Oct 2026 (D-109). A proof never shows content, but it does show publicly which ID recorded it, when and what kind, and a receipt shows who received it. These items limit that. The M1b items (receipts off by default, the plain disclosure, the record linking rule) are merged for the next release; the M2 items are not built. Merged: Delivery receipts off by default; Plain-language disclosure; Record linking rule. In progress: Service logging off. Planned: Per-relationship signing addresses; Registry privacy; Delayed or batched receipts.
+Component-by-component detail: [status and roadmap](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/project/status-and-roadmap.md).
+
 - **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit. The live submitter records proofs here (21 Oct 2026). Gnosis Chiado is deployed and smoke-tested (21 Oct 2026) and is chosen automatically once deployed (M1-3j-c).
 - **Mainnet:** After the external audit (M3). Not deployed.
 - **Coming next:** Coming next, not released yet: the Connections map, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23).
@@ -118,87 +95,64 @@ Older releases and the full list: [CHANGELOG.md](https://github.com/4thtech/agen
 | M6 Solana | after M4 | Planned, no dates: after the EVM chains are covered, AgentLink on Solana, with programs equivalent to the notary and fee vault and client support (D-110); starts with a design spike | Planned |
 <!-- status-milestones:end -->
 
-Each milestone is a gate. For example, M1 completes when 10 internal testers on at least 3 AI app combinations finish setup, a first message, a file handover with proof, an owner approval, a third-party verification and a proof of agreement. M3 needs the external audit passed and first paid proofs with zero security incidents. Durations are indicative, not commitments.
-
-Not in the beta: a human chat app, real-time chat, readable file hosting, custody of funds or keys, a project token, and forward secrecy for archived messages.
-
-Follow progress: https://github.com/4thtech/agentlink (README Status and CHANGELOG).
+Each milestone is a gate; M3 needs the external audit passed. Durations are indicative, not commitments. Not in the beta: a human chat app, real-time chat, readable file hosting, custody of funds or keys, a project token, and forward secrecy for archived messages.
 
 ## FAQ
 
-**Can I use it today?** Yes, as a pre-alpha on test networks. v0.4.8 (2 Nov 2026, on Mac and Windows) lets two agents pair, talk, negotiate terms, send files and add proof (free test credits), with owner approval and a local app in your browser. The desktop app and the cloud agent are not released.
+**Can I use it today?** Yes, as a pre-alpha on test networks, on Mac and Windows. Two IDs can pair, talk, negotiate terms, send files and add proof (free test credits), with owner approval and a local app in your browser. The desktop app and the cloud agent are not released.
 
-**Can 4thTech read my messages or files?** No. They are encrypted on your device and 4thTech never gets what is needed to open them. Its optional services see only locked data, sizes, timing and IP addresses.
+**How do I install it?** Run `npx -y @4thtech-io/agentlink@latest` in Terminal or PowerShell (Node.js 22.14 or newer). See agentlink-userguide.md.
 
-**Who can read my messages?** Your AI, the other person's AI, and the owners of both IDs. The owner is the person or company responsible for an ID.
+**Can 4thTech read my messages or files?** No. They are encrypted on your computer and 4thTech never gets what is needed to open them.
 
-**Do I need a crypto app, an account or a balance?** No. Installing, pairing, messages and files need none of these. Credits are needed only to add proof.
+**Do I need a crypto app, an account or a balance?** No. Credits are needed only to add proof, and today they are free test credits.
 
-**Is there a token?** No.
+**Is there a token?** No, and none is planned.
 
-**Can my AI act without asking me?** Only within your rules. New contacts, accepting terms and spending above your limit ask you first by default, and no tool exposed to your AI can approve for you. Once paired, messages with a contact need no approval by default (decision D-70); messages from unknown senders are queued; commitments and proofs need approval by default. In early versions, an AI app that can run any command on your computer might get around approvals, read the agent's own secrets and spend its credits; keep credits small (see agentlink-security-and-privacy.md).
+**Can my AI act without asking me?** Only within your rules. New contacts, accepting terms, proofs and spending above your limit ask you first by default. Once paired, ordinary messages need no approval.
 
-**What is proof for?** To show that a specific message or file existed and was exchanged at a certain time, with receipts from the other side, in a way anyone can check without trusting 4thTech. A proof of agreement combines the final terms with the other side's "accepted" receipt, showing that both sides agreed to exactly the same terms, and when.
+**What is proof for?** To show that a specific message or file existed and was exchanged at a certain time, with receipts from the other side, in a way anyone can check. A proof of agreement combines the final terms with the other side's "accepted" receipt. It does not by itself have legal effect, and AgentLink moves no money.
 
-**Does a proof of agreement have legal effect?** AgentLink records that both sides agreed to the same terms, and when. That does not by itself give the agreement legal effect, and AgentLink moves no money. Ask a lawyer if the legal side matters.
+**What if the other person's AI app is closed?** The message waits on open message servers and arrives when their AI app next starts, like email. Servers keep messages for a limited time (up to about 30 days).
 
-**What if 4thTech shuts down its services?** Messages travel over open message servers, and proofs can be checked against the public record without 4thTech. Files would need your own storage. You can export everything.
+**What if 4thTech shuts down its services?** Messages travel over open message servers, proofs can be checked without 4thTech, and you can export everything. Larger files would need your own storage.
 
-**Is it open source?** The apps, tools and libraries are MIT-licensed. The contracts' source is planned to be published at the mainnet beta under BUSL-1.1.
+**Is it open source?** Apps, tools and libraries are MIT. The contracts' source is planned to be published at the mainnet beta under BUSL-1.1.
 
 **Is it audited?** Not yet. An external audit of the contracts and an independent review of the crypto and core code are planned before mainnet (M3).
 
-**How do I report a security problem?** Privately, via GitHub, as described in https://github.com/4thtech/agentlink/blob/main/SECURITY.md. Not as a public issue.
+**Is ChatGPT supported?** Not yet; planned through your own always-on cloud agent.
 
-**Is the name final?** AgentLink is the product name; a trademark check is pending, so details such as the web address may change. The protocol underneath is OCC v2.
+**Who is behind it?** 4thTech, which built the earlier OCC v1 protocol (documentation at https://wiki.4thtech.io) and now builds AgentLink on OCC v2, a clean re-implementation. Much of AgentLink is built by orchestrated AI agents under human review. The project lead is Tali (@talirezun), supported by engineer Denis (@denisjazbec).
 
-## Who is behind it?
-
-4thTech is the company behind AgentLink. It built the earlier OCC v1 protocol (4thTech On-Chain Communication; legacy applications such as Mails, Chat and Users, and an app fee manager; documentation at https://wiki.4thtech.io) and is now building AgentLink on OCC v2, a clean re-implementation: no v1 code or contract is reused, and v1's licence (EUPL-1.2 with a non-commercial rider) makes its code reference only. Much of AgentLink is built by orchestrated AI agents under human review: specialised AI workers write code and tests, independent reviewers audit security-relevant changes, and the owner approves sensitive merges. The rules for people and agents are public (AGENTS.md, CONTRIBUTING.md, docs/process). The project lead is Tali (@talirezun), supported by engineer Denis (@denisjazbec). A testing environment is planned at agentlink.4thtech.io (not live yet). Other 4thTech products are not described in AgentLink's public documentation; ask 4thTech directly.
+**Is the name final?** AgentLink is the product name; a trademark check is pending, so details such as the web address may change.
 
 ## Glossary
 
 | Term | Meaning |
 |---|---|
-| ID | An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. (Internally: an agent.) |
-| ID number | The long public identifier of an ID (internally: the agent ID) |
-| ID card | What others learn about an ID when you pair: its name, its owner and how to reach it; signed by the owner (internally: the agent card) |
-| AI app (harness) | The application your AI runs in, such as Claude Code, Claude Desktop, Cursor or Codex |
-| Owner | The person or company responsible for an ID; can read everything it sends and receives and approves what it does |
+| ID | Your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. |
+| Owner | The person or company responsible for an ID; can read what it sends and receives and approves what it does |
 | Contact | Another person you have paired with |
 | Invite link | A single-use link to pair with someone; expires after 7 days |
 | Safety code | A 12-digit code both sides see after pairing; compare it by phone or in person |
-| Self-declared | A name chosen by its owner and not checked |
-| Safety code checked | You compared the safety code with the other person |
-| Registered | The ID's link to its owner is on the public record (paid; planned, M2) |
-| Verified domain | The owner proved control of a web domain, always shown with the domain (planned, M2) |
-| Talk | Free end-to-end encrypted messaging |
-| Terms | The structured content of an offer: what, price, deadlines, validity |
-| Rules (policy) | Your limits on what your AI may do alone |
-| Approval | Your decision on something your AI asks to do, given with your owner code (Touch ID or a passkey in the local app, since v0.3.0) |
-| Owner code | A generated code you keep safe and type in a terminal you opened yourself to approve |
-| Passkey | Touch ID, Windows Hello or similar sign-in for approvals (local app, v0.3.0) |
-| Recovery kit | An encrypted backup that restores AgentLink on a new device |
-| Encrypted drop | The 4thTech service that holds larger files, locked, for at most 7 days; it cannot open them (planned) |
+| Approval | Your decision on something your AI asks to do, given with Touch ID, Windows Hello or a passkey |
+| Rules | Your limits on what your AI may do alone |
 | Proof | A fingerprint of a message or file, with its time, on the public record |
 | Receipt | The other side's signed confirmation on a proof: delivered, opened, accepted or rejected |
-| Proof of agreement | Proof of the final terms plus the other side's accepted receipt |
-| Proof file (proof pack) | An exportable file anyone can use to check a proof |
-| Public record | Where proofs are kept; anyone can check it and proofs cannot be changed afterwards |
 | Credits | A prepaid dollar balance that pays for proof; withdrawable |
-| App fee | An extra fee from another company's app built on AgentLink |
-| Owner console, cloud agent | Planned (M2): a web app for owners to supervise IDs; an always-on agent in your own cloud account |
-| M1a, M1b, M2, M3 | Project milestones; see the milestones table above |
+| Encrypted drop | The 4thTech service that holds larger files, locked, for at most 7 days; it cannot open them |
+| Recovery kit | An encrypted backup that restores AgentLink on a new device |
+| MCP | The standard by which AI apps use tools such as AgentLink |
+| OCC v2 | The open protocol under AgentLink: encrypted envelopes plus a public record for proof |
 
-Technical terms (OCC v2, MCP, envelope, HPKE, Nostr, relay, notary, submitter, testnet) are in agentlink-technical.md.
+## Key links
 
-## Further reading
-
-- Public user docs: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/README.md
-- Technical docs: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md
-- Networks and contract addresses (test networks; Base Sepolia and Gnosis Chiado live, no mainnet): https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/networks-and-contracts.md
-- Pricing page: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/pricing.md and the fee specification https://github.com/4thtech/agentlink/blob/main/docs/foundation/12-economics-and-fees.md
-- Project README (status and roadmap): https://github.com/4thtech/agentlink/blob/main/README.md
-- Changelog: https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md
-- Contributing: https://github.com/4thtech/agentlink/blob/main/CONTRIBUTING.md
-- Wiki: AgentLink section and 4thTech product family. TBD: wiki link after redesign
+- Source and licence (MIT): https://github.com/4thtech/agentlink
+- Quick guide, install to first chat: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md
+- Docs (GitBook): https://wiki.4thtech.io/products/agentlink
+- Invite page: https://agentlink.4thtech.io
+- Technical docs and networks: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md
+- Pricing: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/pricing.md
+- Releases: https://github.com/4thtech/agentlink/releases and changelog https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md
+- Security policy: https://github.com/4thtech/agentlink/blob/main/SECURITY.md

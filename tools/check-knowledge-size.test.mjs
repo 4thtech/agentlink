@@ -5,6 +5,8 @@ import {
   collectEntries,
   estimateTokens,
   evaluateBudget,
+  checkFileSet,
+  KNOWLEDGE_FILES,
   MAX_TOKENS,
   TARGET_TOKENS,
 } from './check-knowledge-size.mjs';
@@ -51,7 +53,23 @@ describe('the committed knowledge base', () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..');
     const entries = collectEntries(root);
     expect(entries[0].path).toBe('llms.txt');
-    expect(entries.some((entry) => entry.path === 'knowledge/README.md')).toBe(true);
+    expect(entries.map((entry) => entry.path)).toEqual([
+      'llms.txt',
+      ...KNOWLEDGE_FILES.map((name) => `knowledge/${name}`),
+    ]);
     expect(evaluateBudget(entries).level).not.toBe('fail');
+  });
+});
+
+describe('checkFileSet', () => {
+  it('accepts exactly the two knowledge files', () => {
+    expect(checkFileSet([...KNOWLEDGE_FILES])).toEqual([]);
+    expect(KNOWLEDGE_FILES).toHaveLength(2);
+  });
+
+  it('rejects a missing and an extra file', () => {
+    const problems = checkFileSet(['agentlink-overview.md', 'README.md']);
+    expect(problems.join('\n')).toContain('agentlink-userguide.md is missing');
+    expect(problems.join('\n')).toContain('README.md is not allowed');
   });
 });

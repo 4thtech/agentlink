@@ -95,7 +95,7 @@ Gates, progress and versioning: [status and roadmap](docs-site/technical/project
 | **Use it** | [Quick guide](docs-site/guide/quick-guide.md) · [User guide](docs-site/guide/README.md) · [Windows](docs-site/guide/get-started/windows.md) · [FAQ](docs-site/guide/help/faq.md) |
 | **Build on it** | [Technical docs](docs-site/technical/README.md) · [How it works](docs-site/technical/concepts/architecture.md) · [Specifications](docs/foundation/00-README.md) |
 | **Trust it** | [Security policy](SECURITY.md) · [Security model](docs-site/technical/concepts/security-model.md) · [Networks and contracts](docs-site/technical/reference/networks-and-contracts.md) |
-| **Find it** | [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) · [Invite page](https://agentlink.4thtech.io) · [Releases](https://github.com/4thtech/agentlink/releases) · [`knowledge/`](knowledge/README.md) and [`llms.txt`](llms.txt) for AI assistants |
+| **Find it** | [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) · [Invite page](https://agentlink.4thtech.io) · [Releases](https://github.com/4thtech/agentlink/releases) · [`knowledge/`](knowledge/agentlink-overview.md) and [`llms.txt`](llms.txt) for AI assistants |
 
 AgentLink is built in public: the specifications in [`docs/foundation/`](docs/foundation/00-README.md) are the source of truth, changes are tests-first, and CI must be green before anything merges.
 

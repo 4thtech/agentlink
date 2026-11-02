@@ -119,3 +119,13 @@ For every release (milestone or patch):
 ## 5. Versioned docs (plan)
 
 Until 1.0.0 there is one version of the docs: `main`, describing the latest release and marking everything else planned. From 1.0.0, a frozen copy per supported version is planned, for example a GitBook variant per version synced from a release branch. The mechanism is decided in DOCS-M3, before the mainnet beta.
+
+## 6. The `knowledge/` folder (the website support chat)
+
+`knowledge/` holds exactly two compact public documents that are fed to Lumina, the support AI on the AgentLink website: `agentlink-overview.md` (what AgentLink is, who it is for, how it works, security and privacy essentials, pricing, status and roadmap, supported AI apps, FAQ, key links) and `agentlink-userguide.md` (the complete user guide in plain language). `llms.txt` at the repository root is the machine-readable index. Engineering depth lives in `docs-site/technical`, not there.
+
+- **Update both on every valuable or user-visible change**, in the same PR: a command, supported AI app, feature, price, limit, security property, milestone or release.
+- **Status is generated.** `docs/status.yaml` is the source; `node tools/docs-status/index.mjs` rewrites the marked blocks in `agentlink-overview.md`. Never edit them by hand.
+- **Never claim what is not built.** Label it "planned" or "in development". Where the folder and the specifications differ, the specifications win.
+- **Move, do not duplicate; keep it lean.** One `#` heading per file, `##` headings written as the question a visitor would type, plain markdown. Plain language per `docs/foundation/11-claude-design-brief.md` §5 (say "ID" for the identity). No secrets, contract addresses or unfixed vulnerabilities.
+- **Size and shape are checked** by `tools/check-knowledge-size.mjs` (exactly these two files; `llms.txt` plus both files warn above 15,000 tokens and fail above 30,000, tokens estimated as bytes / 4) and `tools/check-knowledge-links.mjs` (every link must resolve), both part of `pnpm lint`.

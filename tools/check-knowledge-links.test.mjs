@@ -27,13 +27,21 @@ describe('extractLinks', () => {
 describe('checkLinks', () => {
   it('accepts relative links that resolve from the file directory', () => {
     expect(
-      checkLinks('knowledge/README.md', '[o](agentlink-overview.md) [r](../README.md)', exists),
+      checkLinks(
+        'knowledge/agentlink-userguide.md',
+        '[o](agentlink-overview.md) [r](../README.md)',
+        exists,
+      ),
     ).toEqual([]);
   });
 
   it('rejects a relative link that does not resolve', () => {
-    expect(checkLinks('knowledge/README.md', '[x](missing.md)', exists)).toHaveLength(1);
-    expect(checkLinks('knowledge/README.md', '[x](../../outside.md)', exists)).toHaveLength(1);
+    expect(checkLinks('knowledge/agentlink-userguide.md', '[x](missing.md)', exists)).toHaveLength(
+      1,
+    );
+    expect(
+      checkLinks('knowledge/agentlink-userguide.md', '[x](../../outside.md)', exists),
+    ).toHaveLength(1);
   });
 
   it('accepts absolute links into this repository that exist, with or without a fragment', () => {
@@ -67,7 +75,11 @@ describe('the committed knowledge base', () => {
   it('has no broken links', () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..');
     const real = (path) => existsSync(join(root, path));
-    for (const file of ['llms.txt', 'knowledge/README.md', 'knowledge/agentlink-userguide.md']) {
+    for (const file of [
+      'llms.txt',
+      'knowledge/agentlink-overview.md',
+      'knowledge/agentlink-userguide.md',
+    ]) {
       expect(checkLinks(file, readFileSync(join(root, file), 'utf8'), real)).toEqual([]);
     }
   });
