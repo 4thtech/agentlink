@@ -28,7 +28,7 @@ export const FIRST_RUN = {
   loading: 'Checking this computer…',
 
   // U3-g (b11 §28.3): one screen names the agent and protects it.
-  protectTitle: 'Set up your agent',
+  protectTitle: "Create your AI app's ID",
   // 11 §6.2.1: the folders setup creates, shown before the gesture.
   foldersTitle: 'Your folders',
   folders: [
@@ -37,7 +37,7 @@ export const FIRST_RUN = {
     ['Proofs in', '~/AgentLink/Proofs'],
   ] as const,
   foldersNote:
-    'One confirmation protects approvals, sets up this agent and lets your AI send files you put in the Send folder. Changing folders is optional, later in Files.',
+    'One confirmation protects approvals, sets up this ID and lets your AI send files you put in the Send folder. Changing folders is optional, later in Files.',
   // The button names the platform (08 §1 first run v2).
   useTouchId: 'Use Touch ID',
   useWindowsHello: 'Use Windows Hello',
@@ -79,7 +79,7 @@ export const FIRST_RUN = {
   copy: 'Copy',
   copied: 'Copied',
   // 08 §1 `done_unconfirmed`.
-  unconfirmed: "Setup finished, but we couldn't confirm one step. Your agent may need a restart.",
+  unconfirmed: "Setup finished, but we couldn't confirm one step. Your AI app may need a restart.",
   unconfirmedTitle: 'Almost there.',
 
   // U3-a (D-138; 08 §1): the end of first run lands on Home.
@@ -89,7 +89,7 @@ export const FIRST_RUN = {
 
   alreadyTitle: 'Approvals are already protected on this computer',
   alreadyBody:
-    "If you didn't set this up yourself, don't use this agent: run `agentlink doctor` in your own terminal and compare the owner fingerprint.",
+    "If you didn't set this up yourself, don't use this ID: run `agentlink doctor` in your own terminal and compare the owner fingerprint.",
 
   unsupportedTitle: "This browser can't make a passkey",
   unsupportedBody:
@@ -112,7 +112,7 @@ export const FIRST_RUN = {
 export const SETUP_MESSAGES = {
   // b11 §28.3.
   cancelled: 'Not protected yet. Try again.',
-  no_agent: 'Set up your agent first.',
+  no_agent: 'Set up your ID first.',
   label_invalid:
     "That name can't be used. Use letters, numbers, single spaces and . ' - up to 32 characters.",
   expired: 'This step took too long. Nothing changed. Try again.',
@@ -234,11 +234,10 @@ export const PICK = {
 } as const;
 
 export const NAME = {
-  label: 'Name your agent',
-  hint: 'Shown to you and your contacts.',
-  /** The suggested name follows the chosen app; "My agent" with none (b11 §28.3). */
-  suggested: (app: string | undefined): string => (app === undefined ? 'My agent' : `${app} agent`),
-  empty: 'Give your agent a name.',
+  label: 'Name people see',
+  hint: 'People see this name on your invites.',
+  placeholder: 'Your first name, e.g. Ana',
+  empty: 'Give this ID a name.',
   /** The name must be 1 to 32 characters (06 §6 label rule). */
   tooLong: 'Use up to 32 characters.',
   change: 'Change',
@@ -249,7 +248,7 @@ export const NAME = {
   /** W4-ONE-TOUCH (D-140; 11 §5.8 "Create and connect"): prefilled; unticked = "Not now". */
   connectTo: (app: string): string => `Connect to ${app}`,
   notNow: 'Not now',
-  /** W4-ONE-TOUCH: New agent with the backup code. */
+  /** W4-ONE-TOUCH: New ID with the backup code. */
   confirmCode: 'Confirm with my backup code',
 } as const;
 
@@ -269,13 +268,13 @@ export const NAME_MAX = 32;
 
 /** b11 §30.3, §28.4: the connect step in the first-run shell. */
 export const CONNECT = {
-  title: (app: string, agent: string): string => `Connect ${app} to ${agent}`,
+  title: (app: string): string => `Connect ${app} to this ID`,
   intro: (app: string): string => `This adds one entry to ${app}'s settings.`,
   file: 'File',
   adds: 'Adds',
   entryRegion: 'The entry that will be added',
   folder: (folder: string): string =>
-    `Agent folder: ${folder}. A backup of the file is saved first. Nothing else in it changes.`,
+    `ID folder: ${folder}. A backup of the file is saved first. Nothing else in it changes.`,
   loading: 'Checking the settings…',
   apply: (sensor: string): string => `Apply with ${sensor}`,
   applyCode: 'Apply with my backup code',
@@ -298,7 +297,7 @@ export const CONNECT = {
   connected: (app: string): string => `${app} is connected.`,
   restart: (app: string): string => `Restart ${app} to finish`,
   restartNote: 'AgentLink never restarts it for you. Open it again when you are ready.',
-  alreadyDone: (app: string): string => `${app} already works with this agent.`,
+  alreadyDone: (app: string): string => `${app} already works with this ID.`,
   codeLabel: 'Backup code',
   presenceHint: 'Confirm it’s you. Never give your backup code to your AI.',
 } as const;

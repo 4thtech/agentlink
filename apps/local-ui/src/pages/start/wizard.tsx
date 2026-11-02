@@ -6,6 +6,7 @@
 //
 // Motion comes from the U0 kit only (al-reveal, al-pop, al-draw, al-press); under reduced motion the
 // kit turns every one into a fade. Names from the server (an app, the agent) are rendered as text.
+import { IdExplainerCard } from './id-explainer.js';
 import { Button, Icon, Lockup, Skeleton, TextField } from '@4thtech-io/ui';
 import type { FormEvent, MouseEvent, ReactElement, ReactNode } from 'react';
 import { useTitleFocus } from '../welcome/index.js';
@@ -284,6 +285,7 @@ export function NameStep({
         </h1>
         <p className="st-lead">{N.body}</p>
       </div>
+      <IdExplainerCard />
       <form className="st-actions" onSubmit={submit}>
         <TextField
           label={N.field}
@@ -293,11 +295,18 @@ export function NameStep({
           spellCheck={false}
           value={value}
           readOnly={working}
-          {...(taken ? { hint: N.taken } : {})}
+          placeholder={N.placeholder}
+          hint={taken ? N.taken : N.hint}
           {...(error === undefined ? {} : { error })}
           onChange={(event) => onChange(event.currentTarget.value)}
         />
-        <Button type="submit" variant="primary" size="lg" className="al-press" disabled={working}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          className="al-press"
+          disabled={working || value.trim() === ''}
+        >
           {N.next}
         </Button>
         {/* One line either way, so the check moves nothing. */}

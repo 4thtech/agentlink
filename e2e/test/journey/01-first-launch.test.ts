@@ -47,8 +47,8 @@ describe('chapter 1: onboarding', () => {
     // Step 2 (A1): "Confirm it's you": the agent card (renamed), Connect with Touch ID.
     await page.waitForURL((url) => url.pathname === '/start/connect');
     await page.getByRole('heading', { name: "Confirm it's you" }).waitFor();
-    await page.getByRole('button', { name: /^Change the agent's name/ }).click();
-    const name = page.getByLabel('Name your agent');
+    await page.getByRole('button', { name: /^Change the ID's name/ }).click();
+    const name = page.getByLabel('Name people see');
     expect(await name.inputValue()).not.toBe('');
     await name.fill('Home base');
     await page.getByRole('button', { name: CONNECT_WITH }).click();
