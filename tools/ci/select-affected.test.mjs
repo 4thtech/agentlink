@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   HEAVY_LANE,
+  MACOS_PATHS,
+  macosAffected,
   INSTALL_FILES,
   PACKAGE_JOBS,
   heavyLane,
@@ -445,7 +447,9 @@ describe('jobOutputs', () => {
   it('writes one run_<job> line per job, true on a full run with no file list', () => {
     const lines = jobOutputs(selectAffected({ files: null, workspace: fake }));
     expect(lines).toEqual(
-      [...Object.keys(PKG), ...Object.keys(HEAVY)].map((j) => `run_${j.replaceAll('-', '_')}=true`),
+      [...Object.keys(PKG), ...Object.keys(HEAVY)]
+        .map((j) => `run_${j.replaceAll('-', '_')}=true`)
+        .concat('run_macos=true'),
     );
   });
 
@@ -458,6 +462,57 @@ describe('jobOutputs', () => {
 
   it('a missing area answer runs the heavy job (fail towards running)', () => {
     expect(jobOutputs({ scope: 'full', reason: 'x', jobs: {} })).toContain('run_node_os=true');
+  });
+});
+
+// OPS-MACOS-QUEUE: the macOS legs run on a pull request only for macOS-specific code.
+describe('macOS legs (OPS-MACOS-QUEUE)', () => {
+  it('pins the macOS-specific path list', () => {
+    expect([...MACOS_PATHS]).toEqual([
+      'packages/node/src/keychain',
+      'packages/node/src/os-keychain',
+      'packages/node/src/file-keystore',
+      'packages/node/src/approval-os',
+      'apps/cli/test/two-process.keychain',
+      'apps/cli/test/one-shot-exit.keychain',
+    ]);
+  });
+
+  it.each([
+    'packages/node/src/keychain-native.ts',
+    'packages/node/src/os-keychain.ts',
+    'packages/node/src/file-keystore.ts',
+    'packages/node/src/approval-os.ts',
+    'apps/cli/test/two-process.keychain.test.ts',
+    'apps/cli/src/harness/darwin-paths.ts',
+    'apps/cli/src/harness/mac.ts',
+  ])('macOS-specific %s runs the macOS legs', (f) => {
+    expect(macosAffected([f, 'README.md'])).toBe(true);
+  });
+
+  it.each([
+    'apps/local-ui/src/pages/home/page.ts',
+    'packages/ui/src/button.ts',
+    'packages/crypto/src/hash.ts',
+    'packages/node/src/allowed-path.ts',
+    'packages/core/src/path-guard.ts',
+    'pnpm-lock.yaml',
+    'docs/process/macos-notes.md',
+  ])('an ordinary change (%s) skips the macOS legs', (f) => {
+    expect(macosAffected([f])).toBe(false);
+    expect(jobOutputs(selectAffected({ files: [f], workspace: fake }))).toContain(
+      'run_macos=false',
+    );
+  });
+
+  it('an unreadable or empty diff runs the macOS legs', () => {
+    expect(macosAffected(null)).toBe(true);
+    expect(macosAffected([])).toBe(true);
+    expect(macosAffected(['', '  '])).toBe(true);
+  });
+
+  it('a missing answer runs the macOS legs (fail towards running)', () => {
+    expect(jobOutputs({ scope: 'full', reason: 'x', jobs: {} })).toContain('run_macos=true');
   });
 });
 
@@ -499,6 +554,22 @@ describe('ci.yml wires the job selection', () => {
     expect(job('keychain')).toContain(
       "os: ${{ fromJSON((needs.detect.outputs.run_keychain_os == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4'))",
     );
+  });
+
+  it('macOS legs: on main and wave-4 always, on a pull request only for run_macos', () => {
+    const cond = "(github.event_name == 'push' || needs.detect.outputs.run_macos == 'true')";
+    for (const name of ['keychain', 'path-guard', 'node-os']) {
+      expect(job(name), name).toContain(cond);
+    }
+    expect(yml).toContain("run_macos: ${{ steps.affected.outputs.run_macos || 'true' }}");
+    // the push gate list is unchanged: the macOS jobs stay required there
+    expect(job('ci-gate')).toMatch(/HEAVY_REQUIRED:.*\bpath-guard\b/);
+  });
+
+  it('ci-gate names a macOS leg that never got a runner', () => {
+    const gate = job('ci-gate');
+    expect(gate).toContain('actions: read');
+    expect(gate).toContain('runner unavailable');
   });
 
   it('ci-gate requires every heavy job and checks to succeed in the heavy lane', () => {

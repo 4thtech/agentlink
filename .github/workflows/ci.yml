@@ -98,6 +98,9 @@ jobs:
       run_node_os: ${{ steps.affected.outputs.run_node_os || 'true' }}
       run_path_guard: ${{ steps.affected.outputs.run_path_guard || 'true' }}
       run_keychain_os: ${{ steps.affected.outputs.run_keychain_os || 'true' }}
+      # OPS-MACOS-QUEUE: the macOS legs start on a pull request only when this is true (macOS-specific
+      # paths, MACOS_PATHS in the selector); a push to `main` or `wave-4` always runs them.
+      run_macos: ${{ steps.affected.outputs.run_macos || 'true' }}
       run_e2e_deterministic: ${{ steps.affected.outputs.run_e2e_deterministic || 'true' }}
     steps:
       - name: Check out repository
@@ -559,7 +562,7 @@ jobs:
         # OPS-FAST-LANE-1: macOS and Windows are heavy lane: always on `main` and `wave-4`; on a pull
         # request only when the change is in the keychain area (`run_keychain_os`); a feature-branch
         # push runs the Linux leg alone.
-        os: ${{ fromJSON((needs.detect.outputs.run_keychain_os == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4')) && '["macos-26","windows-2025-vs2026","ubuntu-24.04"]' || '["ubuntu-24.04"]') }}
+        os: ${{ fromJSON((needs.detect.outputs.run_keychain_os == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4')) && ((github.event_name == 'push' || needs.detect.outputs.run_macos == 'true') && '["macos-26","windows-2025-vs2026","ubuntu-24.04"]' || '["windows-2025-vs2026","ubuntu-24.04"]') || '["ubuntu-24.04"]') }}
     env:
       AGENTLINK_REQUIRE_KEYCHAIN: "1"
     steps:
@@ -677,7 +680,8 @@ jobs:
       fail-fast: false
       matrix:
         # Same exact images as `keychain`; a bump is its own reviewed change.
-        os: [macos-26, windows-2025-vs2026]
+        # OPS-MACOS-QUEUE: the macOS leg on a pull request only for macOS-specific paths (`run_macos`).
+        os: ${{ fromJSON((github.event_name == 'push' || needs.detect.outputs.run_macos == 'true') && '["macos-26","windows-2025-vs2026"]' || '["windows-2025-vs2026"]') }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -734,7 +738,8 @@ jobs:
       fail-fast: false
       matrix:
         # The same exact images as `keychain` (no `*-latest`).
-        os: [macos-26, windows-2025-vs2026]
+        # OPS-MACOS-QUEUE: the macOS leg on a pull request only for macOS-specific paths (`run_macos`).
+        os: ${{ fromJSON((github.event_name == 'push' || needs.detect.outputs.run_macos == 'true') && '["macos-26","windows-2025-vs2026"]' || '["windows-2025-vs2026"]') }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1270,7 +1275,8 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    permissions: {}
+    permissions:
+      actions: read
     steps:
       - name: Require every upstream job to have succeeded or been skipped
         shell: bash
@@ -1321,4 +1327,23 @@ jobs:
                 exit 1
                 ;;
             esac
+          done
+
+      # OPS-MACOS-QUEUE: a macOS leg that was cancelled with no step run never got a runner (the Free
+      # plan's small macOS concurrency). Say so plainly, so nobody reads it as a test failure. The
+      # gate stays red (a cancelled job is not success); ci-auto-retry reruns it once.
+      - name: Report macOS legs that never got a runner
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[]
+            | select((.name | test("macos")) and .conclusion == "cancelled"
+                and ((.steps // []) | map(select(.status == "completed" and .conclusion != "skipped")) | length) == 0)
+            | .name' | while IFS= read -r name; do
+            echo "::error::runner unavailable: '$name' was cancelled before any step ran; no macOS runner was acquired. This is a capacity problem, not a test failure; re-run the job."
           done

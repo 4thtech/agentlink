@@ -25,6 +25,7 @@ export const FLAKY_JOBS = {
     },
     'bundle-check': { steps: ['Set up Node.js and pnpm'] },
     keychain: { matrix: true },
+    'path-guard': { matrix: true },
     'node-os': { matrix: true },
     'relays-docker': {},
     'storage-minio': {},

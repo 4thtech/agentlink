@@ -79,7 +79,7 @@ describe('decide', () => {
       'context-budget',
       'stale-precheck',
       'detect',
-      'path-guard (ubuntu-24.04)',
+      'docs-checks',
     ]) {
       const jobs = [...base.jobs, { name, conclusion: 'failure' }];
       const d = decide({ ...base, jobs });
@@ -174,6 +174,7 @@ describe('decide', () => {
         'e2e-deterministic / e2e-deterministic',
         'keychain',
         'node-os',
+        'path-guard',
         'relays-docker',
         'storage-minio',
         'vectors',
