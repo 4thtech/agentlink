@@ -1,5 +1,14 @@
 # @4thtech-io/invite
 
+## 0.0.11
+
+### Patch Changes
+
+- c70fd79: M1-19-d: production on the Custom Domain `agentlink.4thtech.io` (`env.production` in `wrangler.toml`, owner Decision 55), and the site root `/` is now a minimal page (what AgentLink is, a link to the repository) with no script. The invite page at `/i` is unchanged.
+- @4thtech-io/core@0.4.8
+  - @4thtech-io/crypto@0.4.8
+  - @4thtech-io/types@0.4.8
+
 ## 0.0.10
 
 ### Patch Changes

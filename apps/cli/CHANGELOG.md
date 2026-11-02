@@ -1,5 +1,12 @@
 # @4thtech-io/agentlink
 
+## 0.4.8
+
+### Patch Changes
+
+- 54815ae: W6-FLOW-FIXES: the local app's Remove agent sheet reads the agents list before the Touch ID step and says "Quit {app} first" while an AI app runs the agent (the server's `in_use` lock and presence are unchanged); Home marks a contact whose agent was retired (status `revoked`) as "{name} removed this connection" and hides the resend hint and the safety code check; an agent set up in an AI app that never ran it reads "Connected · restart {app} to start" instead of "Offline". No server or protocol change.
+- 6e748c3: W6-UI-POLISH: Get started completes when you are connected with someone, Files opens Home, people are called "People", and "Self-declared" reads "Not checked yet".
+
 ## 0.4.7
 
 ### Patch Changes

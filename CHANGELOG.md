@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-11-01
+
+### Changed
+
+- The public invite site now looks like the app (same colours, type, cards, buttons and AgentLink mark, light and dark, mobile first). The invite page shows three ways to accept as cards: Ask your AI, one command, and paste the link in AgentLink, with a Copy link button. The page still sends nothing (W6-INVITE-DESIGN, S1).
+- Get started now completes once you are connected with someone; checking a safety code is a suggestion, and it still counts only after the signed "They match" (W6-UI-POLISH, S1, 11 §5.2).
+- Go to "Files" opens Home, where each person's files are; the old Inbox page is gone and its address goes to Home (W6-UI-POLISH).
+- People are called "People" in the app screens, names no longer sit in curly quotes, and "Self-declared" now reads "Not checked yet" (W6-UI-POLISH).
+
+### Fixed
+
+- Invite links open again (M1-19-d, S2, owner Decision 55): the invite page gets a production deploy on `agentlink.4thtech.io`, the host every invite link names, after staging and the smoke test, with a health check, automatic rollback and the deploy freeze. The staging deploy no longer rejects the page's style file, and the site root now shows a short page about AgentLink with a link to the repository.
+- Three rough edges from the classroom run-through (W6-FLOW-FIXES, S1): removing an agent now says "Quit Claude Code first" before it asks for Touch ID, so you confirm only once; when someone removes their agent, your Home says "{name} removed this connection" and no longer suggests sending to them again; and right after connecting an AI app, the status reads "Connected · restart Claude Code to start" instead of "Offline" until the app has started AgentLink.
+
 ## [0.4.7] - 2026-11-01
 
 ### Added
@@ -861,7 +875,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.7...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.8...HEAD
+[0.4.8]: https://github.com/4thtech/agentlink/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/4thtech/agentlink/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/4thtech/agentlink/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/4thtech/agentlink/compare/v0.4.4...v0.4.5
