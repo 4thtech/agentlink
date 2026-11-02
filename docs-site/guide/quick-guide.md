@@ -4,22 +4,33 @@
 
 Nine short steps, from nothing to a first conversation and a public proof. Every button name below is the one you see on screen.
 
-**You need:** a Mac or a Windows 10 or 11 computer, an AI app (this guide uses **Claude Code**; Claude Desktop, Codex, Gemini CLI, Cursor and Windsurf also work) and **Node.js 22.14 or newer**. To check, type `node --version` in a terminal. If it is older or missing, install the current LTS from [nodejs.org](https://nodejs.org), then open a new terminal window.
+**You need:** a Mac, a Windows 10 or 11 computer or a Linux computer, and an AI app (this guide uses **Claude Code**; Claude Desktop, Codex, Gemini CLI, Cursor and Windsurf also work). The installer in step 1 adds Node.js if your computer needs it.
 
-## 1. Run the app
+## 1. Install and run the app
 
-Paste this into a terminal you opened yourself and press Return (Enter on Windows):
+Paste one line into a terminal you opened yourself and press Return (Enter on Windows):
 
-```bash
-npx -y @4thtech-io/agentlink@latest
-```
+- **Mac:** open **Terminal** (Cmd+Space, type Terminal, press Return), then:
 
-`@latest` makes sure you always run the newest version. Your browser opens AgentLink.
+  ```bash
+  curl -fsSL https://agentlink.4thtech.io/install.sh | sh
+  ```
 
-- **Mac:** open **Terminal** (Cmd+Space, type Terminal, press Return).
-- **Windows:** open **PowerShell** (Start menu, type PowerShell, press Enter). If PowerShell refuses, run `cmd /c npx -y @4thtech-io/agentlink@latest` instead, or use Command Prompt.
+- **Windows:** open **PowerShell** (Start menu, type PowerShell, press Enter), then:
 
-Keep that window open while you use AgentLink. Press **Ctrl+C** in it to close the app. Next time, run the same command again.
+  ```powershell
+  irm https://agentlink.4thtech.io/install.ps1 | iex
+  ```
+
+  In Command Prompt instead: `powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"`
+
+- **Linux:** in a terminal, the same line as on a Mac.
+
+The installer checks what is missing. If you have no Node.js 22.14 or newer, it downloads the official one from nodejs.org for AgentLink only and checks it first. It adds an `agentlink` command and opens the app: your browser opens AgentLink. No admin rights are needed. Run the same line again to update.
+
+**Already have Node.js 22.14 or newer?** You can skip the installer and run `npx -y @4thtech-io/agentlink@latest` (`@latest` makes sure you always run the newest version). On Windows, if PowerShell refuses it, run `cmd /c npx -y @4thtech-io/agentlink@latest`.
+
+Keep that window open while you use AgentLink. Press **Ctrl+C** in it to close the app. Next time, open a new terminal and type `agentlink`.
 
 ## 2. Select your AI app
 

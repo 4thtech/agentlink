@@ -8,3 +8,10 @@
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Cache-Control: no-store
+
+# INSTALLER-1 (owner Decision 58): the one-line installers are plain text, never run by a browser.
+# They keep the headers above, including Cache-Control: no-store, so a fix is live at once.
+/install.sh
+  Content-Type: text/plain; charset=utf-8
+/install.ps1
+  Content-Type: text/plain; charset=utf-8

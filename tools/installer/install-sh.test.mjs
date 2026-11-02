@@ -92,11 +92,20 @@ function sandbox() {
   mkdirSync(nodeDir, { recursive: true });
   exe(join(nodeDir, 'node'), `echo ${NODE_VERSION}`);
   exe(join(nodeDir, 'npx'), 'echo "npx($0) $*" >> "$MOCK_LOG"');
-  execFileSync('tar', ['-czf', join(serve, ARCHIVE), '-C', build, `node-v${NODE_VERSION}-linux-x64`]);
+  execFileSync('tar', [
+    '-czf',
+    join(serve, ARCHIVE),
+    '-C',
+    build,
+    `node-v${NODE_VERSION}-linux-x64`,
+  ]);
   const sha = createHash('sha256')
     .update(readFileSync(join(serve, ARCHIVE)))
     .digest('hex');
-  writeFileSync(join(serve, 'SHASUMS256.txt'), `${'0'.repeat(64)}  other.tar.gz\n${sha}  ${ARCHIVE}\n`);
+  writeFileSync(
+    join(serve, 'SHASUMS256.txt'),
+    `${'0'.repeat(64)}  other.tar.gz\n${sha}  ${ARCHIVE}\n`,
+  );
 
   // The script under test, with the fixture's hash pinned for linux-x64 (only that line differs).
   const real = readFileSync(SCRIPT, 'utf8');
@@ -229,7 +238,9 @@ describe.each(shells)('install.sh under %s', (shell) => {
     const box = sandbox();
     const r = run(box, ['--dry-run'], { shell });
     expect(r.code, r.out).toBe(0);
-    expect(r.out).toMatch(/would download https:\/\/nodejs\.org\/dist\/v[\d.]+\/node-v[\d.]+-linux-x64\.tar\.gz/);
+    expect(r.out).toMatch(
+      /would download https:\/\/nodejs\.org\/dist\/v[\d.]+\/node-v[\d.]+-linux-x64\.tar\.gz/,
+    );
     expect(r.out).toContain('Dry run: nothing was changed.');
     expect(r.log).toBe('');
     expect(readdirSync(box.home)).toEqual([]);
@@ -320,7 +331,9 @@ describe('install.sh source', () => {
     expect(code).not.toMatch(/\bsudo\b|\[\[|\blocal\b|\bfunction\b|\$\{[A-Za-z_]+\/\//);
     const urls = [...source.matchAll(/https?:\/\/[^\s"')]+/g)].map((m) => m[0]);
     for (const url of urls) {
-      expect(url).toMatch(/^https:\/\/(nodejs\.org\/dist\/|agentlink\.4thtech\.io|github\.com\/4thtech\/agentlink)/);
+      expect(url).toMatch(
+        /^https:\/\/(nodejs\.org\/dist\/|agentlink\.4thtech\.io|github\.com\/4thtech\/agentlink)/,
+      );
     }
     expect(source).toContain("--proto '=https' --tlsv1.2");
   });
@@ -329,8 +342,9 @@ describe('install.sh source', () => {
     expect(source.trimEnd().split('\n').at(-1)).toBe('main "$@"');
   });
 
-  it('uses plain words: no wallet, gas, seed phrase or transaction', () => {
+  it('uses plain words (no wallet, gas, seed phrase or transaction) and plain ASCII', () => {
     expect(source).not.toMatch(/wallet|\bgas\b|seed phrase|transaction/i);
+    expect(source).not.toMatch(/[^\t\n -~]/);
   });
 
   it('is shellcheck-clean', () => {

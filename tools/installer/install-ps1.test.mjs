@@ -93,5 +93,7 @@ describe('install.ps1 source', () => {
       );
     }
     expect(source).not.toMatch(/wallet|\bgas\b|seed phrase|transaction/i);
+    // irm in Windows PowerShell 5.1 may decode without a charset; ASCII reads the same either way.
+    expect(source).not.toMatch(/[^\t\n -~]/);
   });
 });

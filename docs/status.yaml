@@ -368,6 +368,9 @@ areas:
         state: done
         prs: [234]
         summary: "A docs-site page that walks a new user through adding AgentLink to their AI tool (DOCS-SETUP)."
+      - name: "One-line installer"
+        state: in-progress
+        summary: "One pasted line installs AgentLink on macOS, Linux and Windows (owner Decision 58, INSTALLER-1): it uses your Node.js 22.14 or newer, or downloads the official Node.js from nodejs.org for AgentLink only, checked against nodejs.org's list and a hash in the installer; adds an `agentlink` command with no admin rights and opens the app. Served from agentlink.4thtech.io/install.sh and install.ps1 once its deploy runs. A bridge until signed desktop apps."
       - name: "Submitter and test-credits faucet"
         state: done
         prs: [293, 298, 327, 330, 332, 338, 342, 349, 372, 377, 420, 439]
