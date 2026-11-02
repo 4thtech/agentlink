@@ -4,7 +4,7 @@
 Find which required check failed and why, fix the cause in your own change, and never make a check green by weakening it.
 
 ## When to use
-Any red or cancelled required check on a PR or in the merge queue: `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate` (contracts repository: `contracts-gate`). A PR ejected from a merge queue that is still on (step 4). Red heavy lane (`ci-gate (push)`) on `main` after a merge: fix forward at once; when it blocks a release or is a security issue, go to [RB-11](rollback-and-freeze.md).
+Any red or cancelled required check on a PR: `ci-gate`, `security-gate`, `pr-hygiene`, `review-gate` (contracts repository: `contracts-gate`). A PR that stays open after green checks (step 4). Red heavy lane (`ci-gate (push)`) on `main` after a merge: fix forward at once; when it blocks a release or is a security issue, go to [RB-11](rollback-and-freeze.md).
 
 ## Who runs it
 The orchestrator, or the builder that owns the change (Sonnet or above). The fix goes to whoever owns the failing files. Nobody edits `.github/**` to get green; that is an owner "merge" change of its own.
@@ -16,7 +16,7 @@ The orchestrator, or the builder that owns the change (Sonnet or above). The fix
   - **A PR (not draft) is the fast lane** (OPS-FAST-LANE-1, owner decision 54): lint, typecheck, build and unit tests of only the packages the change touches, their dependents and `@4thtech-io/tools` (`tools/ci/select-affected.mjs`), the short Linux jobs those packages reach, and a heavy-lane job (macOS and Windows legs, `windows-smoke`, the full e2e scenario) only when the change is in that job's own area (`HEAVY_LANE`). A change under `.github/` or `tools/` runs everything; root config, the lockfile, `test-vectors/` or `packages/types`, `crypto`, `core` run the full `checks`. `ci-gate` is the required check.
   - **A branch push** (`ci-gate (push)`, not required) runs the same fast lane against its merge base with `main`, without heavy-lane jobs. It is the pre-review test; it is not the check that merges.
   - **The push to `main` is the heavy lane** (`ci-gate (push)` on `main`): everything, including macOS, Windows, `windows-smoke` and the full e2e, and a skipped heavy job fails it. `release.yml` and the `deploy-*.yml` workflows wait for it. Red there after a merge is fixed forward at once (a fix PR, not a revert loop); if it blocks a release or is a security issue, it is an incident ([RB-11](rollback-and-freeze.md)). A failure only the heavy lane sees is usually a platform leg, a package outside the PR's selection, or a flake.
-  - **The merge queue** is switched off (decision 54 item 2). While it is still on, `merge_group` runs the fast lane like a PR.
+  - **There is no merge queue** (owner Decision 54 item 2; `ci.yml` has no `merge_group` trigger). Auto-merge merges the PR as soon as the required checks are green.
 
 ## Steps
 1. See what failed and read only the failing log:
@@ -47,29 +47,29 @@ The orchestrator, or the builder that owns the change (Sonnet or above). The fix
 
 3. **Flake or real failure?** Decide from the log before you rerun anything.
    - Looks like a flake (infrastructure or timing): a step that hit its `timeout-minutes` or `timeout`; an apt, CDN or registry download error; `Playwright ... failed once; retrying`; `runner keychain unavailable`; "The runner has received a shutdown signal"; a job in an area your diff does not touch that passes on the previous commit.
-   - Looks real: the assertion names code or a file your change touches; it fails the same way when you reproduce it locally; it fails on the merge-queue run as well as the PR run; a lint, type, build, `stale-precheck`, `changesets`, `pr-hygiene` or `review-gate` failure (those are deterministic, never reruns).
+   - Looks real: the assertion names code or a file your change touches; it fails the same way when you reproduce it locally; a lint, type, build, `stale-precheck`, `changesets`, `pr-hygiene` or `review-gate` failure (those are deterministic, never reruns).
    - **Rerun policy.** Re-run the failed jobs, not the whole run, at most once, and only for a suspected flake:
      ```bash
      gh run rerun <run-id> --failed
      ```
      If it passes, write "flake: <test>, run <id>" in the PR and open a fix card for it (`delivery-process.md` §2, step 8). If it fails again, it is not a flake: investigate. Never rerun in a loop: reruns spend the shared runner pool (lesson [LL-17](../lessons/LL-17-ci-starvation-stale-pr-ejections.md)). Flaky tests are fixed at the cause, not quarantined, unless the owner approves a quarantine with an issue (`development-process.md` §10). A PR whose checks look stuck: `gh pr checks <n>`, then `gh run list --branch <branch> --limit 5`; do not push empty commits to wake it.
    - *Coming (CHORE-CI-AUTORETRY, in review):* CI will retry a failed job once by itself. Until that merges, the manual single rerun above is the policy; after it merges, a red check has already been retried once, so treat it as real and do not rerun it again.
-4. **Ejected from the merge queue** (only while the queue is still switched on; decision 54 turns it off). A PR that enters the queue is tested as the merge with `main` (and with the queued PRs ahead of it) and runs the fast lane. If that fails, the queue removes the PR and it stays open.
+4. **The PR stays open after green checks, or `main` moved under it.** Auto-merge does not merge a PR that conflicts with `main` or whose head moved after you armed it.
    ```bash
    gh pr view <n> --json state,autoMergeRequest,mergeStateStatus
-   gh run list --workflow ci.yml --event merge_group --limit 20 --json databaseId,headBranch,conclusion
    ```
-   `state` still `OPEN` after the checks were green means it was ejected. The queue's branches are named `gh-readonly-queue/main/pr-<n>-<sha>`; take the run whose branch holds `pr-<n>-` and read it with `gh run view <run-id> --log-failed`. Then:
+   Then:
    1. **Conflict or stale tree:** the keeper (the orchestrator, or the owner of the branch) merges `origin/main` into the PR branch (never rebase, never force-push) and applies the `stale-precheck` fixes from step 2: status files regenerated, lockfile reinstalled. Do not "take ours" blindly: check that the PR's own files are all still in the diff against `origin/main` and that no conflict markers remain.
-   2. **A real failure that only the queue saw** (a platform leg, a package outside the PR's selection): fix it on the branch like step 2.
-   3. **A flake in the queue run:** one rerun of the failed jobs is allowed by step 3's policy; if the run cannot be rerun any more, push the fix or the merge commit and re-enqueue.
-   4. **Review after the merge.** The head moved, so the merge commit is a change the independent review did not see. For S1/S2, a delta review with the next number covers it ([RB-04](independent-review.md) step 4; the reviewer reads the delta between the old and new head and the merge commit's re-merge diff, and checks that nothing of the PR was dropped). *Coming (PROC-MECH-MERGE-IR, D-126, in review):* a lighter re-verification for a purely mechanical merge of `main`. Until it merges, use the delta review.
-   5. Re-enqueue and confirm it merged (`gh pr view <n> --json state,mergedAt`):
+   2. **Review after the merge.** The head moved, so the merge commit is a change the independent review (S2 and sensitive paths) did not see. A delta review with the next number covers it ([RB-04](independent-review.md) step 4; the reviewer reads the delta between the old and new head and the merge commit's re-merge diff, and checks that nothing of the PR was dropped). A purely mechanical merge of `main` (empty re-merge diff, own diff byte-identical) needs only the lightweight check recorded `PASS (mechanical)` (`audit-rules.md` §4.6, D-126).
+   3. Arm auto-merge again with the new head and confirm it merged (`gh pr view <n> --json state,mergedAt`):
       ```bash
-      gh pr merge <n> --auto --squash
+      gh pr merge <n> --auto --squash --match-head-commit <full head sha>
       ```
       Only for a PR that was cleared to merge ([RB-09](merge-and-release.md)); never an admin merge.
+   4. **A failure only the heavy lane saw** (a platform leg, a package outside the PR's selection) appears after the merge as red `ci-gate (push)` on `main`: fix forward (see "When to use").
 5. Push the fix as a new commit (do not rewrite history after review started) and wait for CI again. A push cancels the PR's older run; that is normal.
+
+6. **Trap: the same e2e test fails on several unrelated PRs at the same time.** Suspect a live-service dependency before suspecting the PRs: for example the production drop (`drop.agentlink.4thtech.io`) or another production service being down, slow or changed. Tests must never reach production services (the e2e suite uses the fake drop, `e2e/src/fake-drop.mjs`). Find the call in the failing log (`grep -n 'agentlink.4thtech.io' <log>`); if a test reached a real host, that is a bug in the test or its configuration: fix it there (a CI card), do not rerun until it passes and do not change the production service.
 
 ## Verify
 `gh pr checks <n>` shows all four required checks as `pass` on a non-draft PR (on a draft they are green with the suite skipped: mark it ready and look again). A skipped job is not evidence for an acceptance criterion (`development-process.md` §6.3).

@@ -18,6 +18,7 @@ import { createFakeDrop } from '../../src/fake-drop.mjs';
 import { memoryRelays } from '../../src/memory-relay.mjs';
 import {
   builtAppFiles,
+  createClientWithoutStub,
   launchBrowser,
   newComputer,
   openedLink,
@@ -59,8 +60,9 @@ export interface JourneyWorld {
   computer(): Promise<JourneyComputer>;
 }
 
-export function journeyWorld(): JourneyWorld {
-  const relays = memoryRelays();
+/** `okDelayMs` (W6-ACCEPT-CONNECTED): the relay answers each publish that much later (real relays). */
+export function journeyWorld(options: { readonly okDelayMs?: number } = {}): JourneyWorld {
+  const relays = memoryRelays(options);
   const drop = createFakeDrop();
   return {
     relays,
@@ -72,7 +74,7 @@ export function journeyWorld(): JourneyWorld {
       const runtime = {
         ...base,
         createClient: (options: Parameters<typeof base.createClient>[0]) =>
-          base.createClient({
+          createClientWithoutStub({
             ...options,
             ...(options.files === undefined
               ? {}

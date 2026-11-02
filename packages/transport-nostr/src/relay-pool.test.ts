@@ -50,9 +50,12 @@ describe('publish and "sent"', () => {
     const event = makeWrapEvent();
     const outcome = await pool.publish(event, [a, b, c]);
     expect(outcome.sent).toBe(true);
-    expect(outcome.acked).toEqual([a, b, c]);
+    // W6-SEND-LATENCY: publish answers at the 2nd OK; the 3rd relay finishes in the background.
+    expect(outcome.acked).toEqual([a, b]);
     expect(outcome.results.every((r) => r.ok && r.reason === 'ok')).toBe(true);
     expect(net.storedOn(event.id).sort()).toEqual([a, b, c].sort());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pool.relayHealth().map((h) => h.successes)).toEqual([1, 1, 1]);
   });
 
   it('is not sent with a single OK, whichever way the others fail', async () => {
@@ -138,6 +141,106 @@ describe('publish and "sent"', () => {
     });
     expect(ha?.lastOkAt).toBeTypeOf('number');
     expect(hb).toMatchObject({ successes: 0, failures: 1, lastFailure: 'rejected' });
+  });
+});
+
+// W6-SEND-LATENCY (07 §4.2): a wrap is delivered once 2 relays return OK, so publish answers then;
+// one slow or silent relay must not hold every send for the 10 s OK timeout.
+describe('publish answers at MIN_ACKS (W6-SEND-LATENCY)', () => {
+  /** Settles `pending` into a box without advancing time, so a test can see whether it resolved. */
+  function watch<T>(pending: Promise<T>): { value: T | undefined } {
+    const box: { value: T | undefined } = { value: undefined };
+    void pending.then((v) => {
+      box.value = v;
+    });
+    return box;
+  }
+
+  it('resolves as soon as 2 relays return OK while a slow relay is still answering', async () => {
+    const { net, pool } = setup();
+    const [a, b, slow] = relayUrls('fast', 3) as [string, string, string];
+    net.configure(a);
+    net.configure(b);
+    net.configure(slow, { okDelayMs: OK_TIMEOUT_MS - 1_000 });
+    const event = makeWrapEvent();
+    const box = watch(pool.publish(event, [a, b, slow]));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(box.value?.sent).toBe(true);
+    expect(box.value?.acked).toEqual([a, b]);
+    expect(box.value?.results.map((r) => r.relay)).toEqual([a, b]);
+    // The slow relay still finishes in the background and its health is recorded.
+    expect(pool.relayHealth().find((h) => h.relay === slow)).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(OK_TIMEOUT_MS);
+    expect(pool.relayHealth().find((h) => h.relay === slow)).toMatchObject({
+      successes: 1,
+      failures: 0,
+    });
+    expect(net.storedOn(event.id).sort()).toEqual([a, b, slow].sort());
+  });
+
+  it('records a silent relay as ok_timeout after the early answer', async () => {
+    const { net, pool } = setup();
+    const [a, b, quiet] = relayUrls('quiet', 3) as [string, string, string];
+    net.configure(a);
+    net.configure(b);
+    net.configure(quiet, { silent: true });
+    const box = watch(pool.publish(makeWrapEvent(), [a, b, quiet]));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(box.value?.sent).toBe(true);
+    await vi.advanceTimersByTimeAsync(OK_TIMEOUT_MS);
+    expect(pool.relayHealth().find((h) => h.relay === quiet)).toMatchObject({
+      successes: 0,
+      failures: 1,
+      lastFailure: 'ok_timeout',
+    });
+  });
+
+  it('with fewer than 2 fast OKs, waits for every relay and fails as before', async () => {
+    const { net, pool } = setup();
+    const [ok, quiet, slow] = relayUrls('few', 3) as [string, string, string];
+    net.configure(ok);
+    net.configure(quiet, { silent: true });
+    net.configure(slow, { okDelayMs: OK_TIMEOUT_MS + 1_000 }); // answers after the OK timeout
+    const box = watch(pool.publish(makeWrapEvent(), [ok, quiet, slow]));
+    await vi.advanceTimersByTimeAsync(OK_TIMEOUT_MS - 1);
+    expect(box.value).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(box.value?.sent).toBe(false);
+    expect(box.value?.acked).toEqual([ok]);
+    const reasons = Object.fromEntries((box.value?.results ?? []).map((r) => [r.relay, r.reason]));
+    expect(reasons).toEqual({ [ok]: 'ok', [quiet]: 'ok_timeout', [slow]: 'ok_timeout' });
+  });
+
+  it('counts a late OK within the timeout: the second ack ends the wait', async () => {
+    const { net, pool } = setup();
+    const [ok, slow, quiet] = relayUrls('late', 3) as [string, string, string];
+    net.configure(ok);
+    net.configure(slow, { okDelayMs: 2_000 });
+    net.configure(quiet, { silent: true });
+    const box = watch(pool.publish(makeWrapEvent(), [ok, slow, quiet]));
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(box.value).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(box.value?.sent).toBe(true);
+    expect(box.value?.acked).toEqual([ok, slow]);
+  });
+
+  it('leaves no timer or waiter behind once the pool closes with a relay still pending', async () => {
+    const { net, pool } = setup();
+    const [a, b, quiet] = relayUrls('leak', 3) as [string, string, string];
+    net.configure(a);
+    net.configure(b);
+    net.configure(quiet, { silent: true });
+    const box = watch(pool.publish(makeWrapEvent(), [a, b, quiet]));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(box.value?.sent).toBe(true);
+    pool.close(); // a one-shot command closes right after the send
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(pool.relayHealth().find((h) => h.relay === quiet)).toMatchObject({
+      failures: 1,
+      lastFailure: 'closed',
+    });
   });
 });
 

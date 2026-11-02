@@ -76,10 +76,10 @@ Agents arm merges only behind the GitHub-enforced gates and only after `developm
 ### 5.1 Arming
 
 ```bash
-gh pr merge <N> --auto --match-head-commit <full head sha>
+gh pr merge <N> --auto --squash --match-head-commit <full head sha>
 ```
 
-Never `--squash` (the merge method is set by the repository, not per PR; the merge queue is off, Decision 54) and never `--admin`. `--match-head-commit` pins the reviewed head: if the branch moved, arming fails, and the moved head needs its own review (§5.3).
+Always `--squash` (the only method the repository allows; gh needs the flag when non-interactive); the merge queue is off (Decision 54). Never `--admin`. `--match-head-commit` pins the reviewed head: if the branch moved, arming fails, and the moved head needs its own review (§5.3).
 
 ### 5.2 Ejection
 

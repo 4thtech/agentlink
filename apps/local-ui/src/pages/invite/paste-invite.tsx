@@ -14,7 +14,12 @@
 // - Accepted: the page shows the Connected moment once the new contact arrives (People).
 import { Button, InlineError, ProgressBar, TextArea, formatContactName } from '@4thtech-io/ui';
 import { useId, useState, type FormEvent, type ReactElement } from 'react';
-import type { CheckedInvite, InviteApi, InviteRefusal } from '../contacts/invite-api.js';
+import type {
+  AcceptOutcome,
+  CheckedInvite,
+  InviteApi,
+  InviteRefusal,
+} from '../contacts/invite-api.js';
 import { passkeyProof, type PasskeyInfo, type PresenceProof } from '../contacts/owner.js';
 import { PresencePrompt } from '../contacts/presence-prompt.js';
 import { CONTACTS_STRINGS as C, waitSeconds } from '../contacts/strings.js';
@@ -61,6 +66,13 @@ export interface PasteInviteProps {
     info: { readonly sent: boolean; readonly again: boolean },
   ) => void;
   /**
+   * W6-ACCEPT-CONNECTED: the accept is about to be sent. Over the real relays its request waits for
+   * the relays while the inviter already answers, so the page notes what it knew before the accept.
+   */
+  readonly onAccepting?: () => void;
+  /** W6-ACCEPT-CONNECTED: the accept that onAccepting announced did not start a pairing. */
+  readonly onAcceptFailed?: () => void;
+  /**
    * IR-W4-WIRE-2X-1: "Paste it" hands over to the page's own paste screen (one that makes no invite
    * of yours) instead of opening the field here.
    */
@@ -82,6 +94,8 @@ export function PasteInvite({
   gesture = passkeyProof,
   platform: givenPlatform,
   onConnected,
+  onAccepting,
+  onAcceptFailed,
   onOpen,
   startOpen = false,
 }: PasteInviteProps): ReactElement {
@@ -140,7 +154,9 @@ export function PasteInvite({
     const shown = formatContactName({ name: invite.name, fingerprint: invite.fingerprint }).text;
     setBusy(true);
     setMessage(undefined);
-    void invites.accept(link, proof).then((outcome) => {
+    onAccepting?.();
+    const accepted = invites.accept(link, proof).catch((): AcceptOutcome => ({ kind: 'failed' }));
+    void accepted.then((outcome) => {
       setBusy(false);
       if (outcome.kind === 'pending') {
         // The pasted text goes once the invite is used.
@@ -150,6 +166,8 @@ export function PasteInvite({
         onConnected?.(shown, { sent: outcome.sent !== false, again: outcome.again === true });
         return;
       }
+      // W6-ACCEPT-CONNECTED: every answer but `pending` ends the accept that onAccepting began.
+      onAcceptFailed?.();
       if (outcome.kind === 'presence_rejected') return setMessage(C.presenceRejected);
       if (outcome.kind === 'presence_required') return setMessage(C.presenceRequired);
       if (outcome.kind === 'wait') return setMessage(waitSeconds(outcome.seconds));

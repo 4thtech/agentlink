@@ -19,6 +19,8 @@ export interface MockRelayConfig {
   blackHole?: boolean;
   /** Accepts the connection but never answers an EVENT. */
   silent?: boolean;
+  /** W6-SEND-LATENCY: stores the EVENT at once but answers OK only after this many ms (a slow relay). */
+  okDelayMs?: number;
   /** Sends an AUTH challenge on connect and refuses EVENT until a valid AUTH (NIP-42). */
   requireAuth?: boolean;
   /** Advertised in NIP-11 and enforced on EVENT frames. */
@@ -187,7 +189,13 @@ export class MockSocket implements RelaySocket {
     }
     this.network.stored.push({ relay: this.target.url, event });
     this.network.fanOut(this.target.url, event);
-    this.push(JSON.stringify(['OK', event.id, true, config.okMessage ?? '']));
+    const ok = JSON.stringify(['OK', event.id, true, config.okMessage ?? '']);
+    if (config.okDelayMs === undefined) this.push(ok);
+    else {
+      // read at call time, so fake timers apply
+      const timers = globalThis as unknown as { setTimeout(cb: () => void, ms: number): unknown };
+      timers.setTimeout(() => this.push(ok), config.okDelayMs);
+    }
   }
 
   /** Whether `event` matches the filter of subscription `subId`. */

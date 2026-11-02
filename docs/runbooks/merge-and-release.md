@@ -31,10 +31,11 @@ The orchestrator (Opus) enables auto-merge and prepares releases. The owner give
 4. Mark ready (if it is a draft: a draft skips the full suite and GitHub refuses to merge it) and enable auto-merge (squash only):
    ```bash
    gh pr ready <n>
-   gh pr merge <n> --auto --squash
+   gh pr merge <n> --auto --squash --match-head-commit <full head sha>
    ```
+   `--match-head-commit` pins the head you checked: if the branch moved, arming fails and the new head needs its own check.
    Never `--admin`, never `gh pr review --approve`, never a push to `main` (lesson [LL-03](../lessons/LL-03-no-push-to-main.md)).
-   **What happens next.** Auto-merge waits for the four required checks (`ci-gate`, `security-gate`, `pr-hygiene`, `review-gate`). Then the PR enters the merge queue (ruleset `main protection`, as set on 2026-10-23: squash, up to 5 entries built at once, up to 5 merged together, `HEADGREEN` grouping, at least 5 minutes of waiting for more entries). The queue runs the **full** suite on the merge with `main` (the PR run tested only the affected packages), including the macOS and Windows legs, then merges. Expect tens of minutes, not seconds.
+   **What happens next.** Auto-merge waits for the four required checks (`ci-gate`, `security-gate`, `pr-hygiene`, `review-gate`). GitHub then merges it (squash). There is **no merge queue** (owner Decision 54; `ci.yml` has no `merge_group` trigger). The PR run is the fast lane: it tested only the affected packages. The **heavy lane** (everything, including macOS and Windows) runs afterwards on the push to `main` (`ci-gate (push)`); `release.yml` and the `deploy-*.yml` workflows wait for it. Breakage it finds is fixed forward at once ([RB-08](ci-red.md)).
 5. One PR at a time. When two PRs both add a decision-log entry, the later one merges `main` in and keeps **both** entries in chronological order.
 6. After the merge: release the board row and update your sync file ([RB-01](session-start-end.md)).
 
@@ -56,15 +57,17 @@ The orchestrator (Opus) enables auto-merge and prepares releases. The owner give
     - A PR opened by the bot does not start its checks: close and reopen it to run them.
     - The owner's approval must be on the current head commit; a new head (for example after the bot regenerates the PR) needs a fresh approval.
     - A `review-gate` run that failed before the approval stays as a stale failing check; re-run it after approving.
-    - An S2 release PR (crypto or contract changes) needs the `Threat note` and `Tests-first` sections added to the bot body after every regeneration.
-    - Watch the merge queue: a PR can be ejected silently, so confirm it merged (`Verify`). Ejection, the keeper merge of `main` and the review of that merge: [RB-08](ci-red.md) step 4.
+    - **The "Version packages" PR is S2** (it touches release and supply-chain files). Its bot body needs the `Threat note` and `Tests-first` evidence sections filled after every regeneration.
+    - **Editing the PR body starts a new `review-gate` run** (the workflow listens to `edited`) and, because the run's concurrency group has `cancel-in-progress`, it cancels a rerun that is still going. Edit the body first; rerun the failed gate only after the run the edit started has finished.
+    - **Find the release run by merge commit:** `gh run list --workflow release.yml --commit <merge sha> --json databaseId,status,conclusion,event`; do not pick the newest run by time, another merge may have started one.
+    - Confirm the PR merged (`Verify`); a merge that did not happen is a conflict or a red required check: [RB-08](ci-red.md).
 
 ## Verify
 - `gh pr view <n> --json state,mergedAt,mergeCommit` shows `MERGED`.
 - For a release: `npm view @4thtech-io/agentlink dist-tags` shows the new version on the expected tag, then verify by content ([RB-10](deploy-and-verify.md)).
 
 ## If it fails
-- **The PR sits `OPEN` after green checks, or left the queue:** it was ejected (conflict, stale lockfile or status files, a failure only the full suite saw): [RB-08](ci-red.md) step 4. Do not add `--admin`.
+- **The PR sits `OPEN` after green checks:** read `gh pr view <n> --json mergeStateStatus,autoMergeRequest`. Usual causes: the head moved after you armed it (arm again with the new `--match-head-commit`), a conflict or stale tree with `main` ([RB-08](ci-red.md) step 4), or a required check that is not green. Do not add `--admin`.
 - **Auto-merge enabled on the wrong PR:** `gh pr merge <n> --disable-auto` and tell the owner.
 - **A merged change is bad:** revert through a new PR; for a release, [RB-11](rollback-and-freeze.md).
 - **`publish-latest` health check fails:** it rolls back automatically and sets `DEPLOY_FREEZE`; the owner decides what next. The check first waits up to 15 minutes, with backoff, for npm to serve each new tarball, so a slow npm CDN no longer fails it.
