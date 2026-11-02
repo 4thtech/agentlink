@@ -345,7 +345,7 @@ describe('Agents, simple (A8)', () => {
     };
     await mount();
     await click(button(card('default'), 'Rename'));
-    expect(card('default').textContent).toContain('Your contacts will see the new name.');
+    expect(card('default').textContent).toContain('People see this name.');
     await type(card('default').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
     await click(button(card('default'), 'Rename with Touch ID'));
     await type(code(), '123456');

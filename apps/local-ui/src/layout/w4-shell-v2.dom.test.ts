@@ -343,6 +343,35 @@ describe('the live agent dropdown', () => {
     expect(location.pathname).toBe('/agents');
   });
 
+  it('W7-ID-X2: an ID keeps one colour: the chip icon and its menu row use the same tone', async () => {
+    serve(world());
+    await mountAt('/');
+    const tone = (el: Element | null | undefined): string | undefined =>
+      [...(el?.classList ?? [])].find((c) => /^is-(?!working|ready|idle|off|none|paused)/.test(c));
+    const inChip = chip()?.querySelector('[class*="agent-icon"], .al-agent-icon');
+    await click(chip());
+    const inMenu = q('[role="menuitemradio"][aria-checked="true"]')?.querySelector(
+      '[class*="agent-icon"], .al-agent-icon',
+    );
+    expect(inChip).not.toBeNull();
+    expect(inMenu).not.toBeNull();
+    expect(tone(inChip)).toBeDefined();
+    expect(tone(inChip)).toBe(tone(inMenu));
+  });
+
+  it('W7-ID-X2: the New ID menu explains New ID vs connecting another AI app, and connect opens the AI apps flow', async () => {
+    serve(world());
+    await mountAt('/');
+    await click(chip());
+    const menu = q('[role="menu"]')?.textContent ?? '';
+    expect(menu).toContain('A new identity with its own inbox and contacts.');
+    expect(menu).toContain('The AI app shares this ID.');
+    await click(
+      menuItems().find((m) => m.textContent?.trim() === 'Connect another AI app to this ID'),
+    );
+    expect(location.pathname).toBe('/settings/apps');
+  });
+
   it('W4-WIRE-2: Add agent opens Get started in add mode (its Name your agent step), not a sheet', async () => {
     serve(world());
     await mountAt('/');

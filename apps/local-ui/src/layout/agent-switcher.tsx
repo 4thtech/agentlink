@@ -44,6 +44,9 @@ export const CHIP_STRINGS = {
   connectApp: (app: string): string => `Connect ${app}`,
   addAgent: 'New ID',
   manageAgents: 'Manage IDs',
+  connectAnotherApp: 'Connect another AI app to this ID',
+  connectAnotherHelp: 'The AI app shares this ID.',
+  newIdHelp: 'A new identity with its own inbox and contacts.',
   chipPrefix: 'ID: ',
   openApp: 'Open the AgentLink app to see your IDs.',
 } as const;
@@ -275,12 +278,29 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
             type="button"
             role="menuitem"
             className="al-mitem"
+            aria-describedby={`${menuId}-connect-help`}
+            onClick={() => go(APPS_PAGE_PATH)}
+          >
+            <ShellIcon name="plus" size={16} />
+            {CHIP_STRINGS.connectAnotherApp}
+          </button>
+          <span id={`${menuId}-connect-help`} className="al-menu-note al-text-body-sm al-muted">
+            {CHIP_STRINGS.connectAnotherHelp}
+          </span>
+          <button
+            type="button"
+            role="menuitem"
+            className="al-mitem"
             // W4-WIRE-2 (Decision 52 (2)): Get started's add mode, starting with "Name your agent".
+            aria-describedby={`${menuId}-new-help`}
             onClick={() => go(NEW_AGENT_PATH)}
           >
             <ShellIcon name="plus" size={16} />
             {CHIP_STRINGS.addAgent}
           </button>
+          <span id={`${menuId}-new-help`} className="al-menu-note al-text-body-sm al-muted">
+            {CHIP_STRINGS.newIdHelp}
+          </span>
           <button
             type="button"
             role="menuitem"
