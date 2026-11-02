@@ -29,14 +29,20 @@
 #
 # Automated PRs (Renovate, Changesets "Version packages"): a PR is automated only when its AUTHOR
 # (`pull_request.user.login`, set by GitHub from the account or app that opened it) is
-# `renovate[bot]` or `github-actions[bot]`. Commit author names, e-mail addresses and the
+# `renovate[bot]`, `github-actions[bot]` or the release GitHub App (repository variable
+# RELEASE_BOT_LOGIN, `<slug>[bot]`). Commit author names, e-mail addresses and the
 # `verified` flag are NOT consulted: they can be forged by anyone who can push to the branch.
 # For an automated PR, (c) is satisfied only by an APPROVED review by @talirezun or @denisjazbec
 # on the current head commit (a new commit invalidates it); there is no report ID to cite.
 # (b) never fails for it. (d) applies unchanged for S2, including the
 # "Threat note" and "Tests-first evidence" sections: bot-supplied (renovate.json prBodyNotes),
 # approver confirms (owner decision 2026-10-15, audit-rules.md §3, §3.4).
-# The bot is the author, so any code owner's approval counts. There is no other exemption.
+# The bot is the author, so any code owner's approval counts.
+# The one exemption (OPS-UNSTICK-B, audit-rules.md §3 "Mechanical version PR"): a PR by the release
+# App on `changeset-release/*` in this repository whose diff has the version shape (block
+# `version-shape` below, checked on the API's patches; head commit unchanged since the event; file
+# list complete) is S0 with no review requirement. The App's key is only reachable from main
+# (environment release-bot), and the npm-publish click still gates the release.
 # Owner action (ci-cd.md checklist): restrict who may push to `renovate/**` and
 # `changeset-release/**` branches, so that nobody else can add commits to a bot-authored PR.
 #
@@ -79,6 +85,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+          RELEASE_BOT_LOGIN: ${{ vars.RELEASE_BOT_LOGIN }}
         with:
           script: |
             const problems = [];
@@ -130,7 +137,10 @@ jobs:
             const CODE_OWNERS = ['talirezun', 'denisjazbec'];
             // Automated PR: decided ONLY by the PR author, which GitHub sets and nobody can forge.
             // Commit author names, e-mail addresses and the "verified" flag are never consulted.
+            // OPS-UNSTICK-B: plus the release GitHub App (repository variable RELEASE_BOT_LOGIN, `<slug>[bot]`).
+            const RELEASE_BOT = (process.env.RELEASE_BOT_LOGIN ?? '').trim().toLowerCase();
             const BOT_AUTHORS = ['renovate[bot]', 'github-actions[bot]'];
+            if (/^[a-z0-9-]+\[bot\]$/.test(RELEASE_BOT)) BOT_AUTHORS.push(RELEASE_BOT);
             const isBotPr = BOT_AUTHORS.includes(author);
 
             // (a) Derive the class from the changed files (audit-rules.md §2.2; highest wins).
@@ -197,6 +207,80 @@ jobs:
               sensitive = true;
               core.warning(`Listed ${files.length} of ${pr.changed_files} changed files; treating the PR as S2.`);
             }
+
+            // OPS-UNSTICK-B: the Changesets "Version packages" PR opened by the release GitHub App is a mechanical
+            // S0 when the diff has the version shape (checked here line by line, never trusted from the PR text):
+            //   - `packages/<name>/package.json` or `apps/<name>/package.json`, modified, with a patch whose changed
+            //     lines are only `"version": "<semver>"` and `"@4thtech-io/<pkg>": "[workspace:][^~]<semver>"`, and the
+            //     same keys removed as added (no new or dropped dependency);
+            //   - `CHANGELOG.md` at the root or in `packages/<name>/` or `apps/<name>/`, added or modified;
+            //   - `.changeset/<name>.md` and `changelog.d/<name>.md` (not README.md), removed.
+            // Nothing is renamed. Every condition below must hold, otherwise it is an ordinary automated PR (code-owner
+            // approval on the head commit). RELEASE_BOT_LOGIN is a repository variable (admins only), never PR text.
+            // BEGIN version-shape
+            const SEMVER = String.raw`\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?`;
+            const VERSION_LINE = new RegExp(String.raw`^\s*"(version)":\s*"${SEMVER}",?\s*$`);
+            const DEP_LINE = new RegExp(String.raw`^\s*"(@4thtech-io\/[a-z0-9._-]+)":\s*"(?:workspace:)?[~^]?${SEMVER}",?\s*$`);
+            const versionShapeProblems = (list) => {
+              const bad = [];
+              for (const f of list) {
+                const path = f.filename;
+                if (f.previous_filename) {
+                  bad.push(`${path}: renamed`);
+                } else if (/^(packages|apps)\/[^/]+\/package\.json$/.test(path)) {
+                  if (f.status !== 'modified' || typeof f.patch !== 'string') {
+                    bad.push(`${path}: not a modified file with a patch`);
+                    continue;
+                  }
+                  const removedKeys = [];
+                  const addedKeys = [];
+                  for (const line of f.patch.split('\n')) {
+                    if (line.startsWith('@@') || line.startsWith('\\')) continue;
+                    const sign = line[0];
+                    if (sign !== '+' && sign !== '-') continue;
+                    const m = VERSION_LINE.exec(line.slice(1)) ?? DEP_LINE.exec(line.slice(1));
+                    if (!m) {
+                      bad.push(`${path}: a changed line is not a version or internal dependency range`);
+                      break;
+                    }
+                    (sign === '+' ? addedKeys : removedKeys).push(m[1]);
+                  }
+                  if (removedKeys.length === 0 || removedKeys.sort().join('\n') !== addedKeys.sort().join('\n')) {
+                    bad.push(`${path}: the removed and added keys differ`);
+                  }
+                } else if (/^((packages|apps)\/[^/]+\/)?CHANGELOG\.md$/.test(path)) {
+                  if (f.status !== 'modified' && f.status !== 'added') bad.push(`${path}: ${f.status}`);
+                } else if (/^(\.changeset|changelog\.d)\/(?!README\.md$)[^/]+\.md$/.test(path)) {
+                  if (f.status !== 'removed') bad.push(`${path}: ${f.status}, not removed`);
+                } else {
+                  bad.push(`${path}: not part of a version change`);
+                }
+              }
+              return bad;
+            };
+            // END version-shape
+            let mechanical = false;
+            if (RELEASE_BOT && author === RELEASE_BOT && BOT_AUTHORS.includes(author)) {
+              const why = [];
+              if (pr.user?.type !== 'Bot') why.push('the author is not a Bot account');
+              if (!(pr.head?.ref ?? '').startsWith('changeset-release/')) why.push('the branch is not changeset-release/*');
+              if (!pr.head?.repo || pr.head.repo.full_name !== pr.base?.repo?.full_name) why.push('the branch is not in this repository');
+              if (!fileListComplete) why.push('the file list is incomplete');
+              if (context.payload.pull_request?.head?.sha !== headSha) why.push('the head commit moved since this event');
+              if (files.length === 0) why.push('no changed files');
+              why.push(...versionShapeProblems(files));
+              if (why.length === 0) {
+                mechanical = true;
+                derived = 0;
+                sensitive = false;
+                sensitivePaths.length = 0;
+                core.info(`Mechanical version PR by ${show(author)}: version shape verified on ${files.length} file(s); class S0.`);
+              } else {
+                warnings.push(
+                  `Release App PR without the version shape, so it is an ordinary automated PR: ${why.slice(0, 10).map(show).join('; ')}`,
+                );
+              }
+            }
             core.info(`Computed security class from ${files.length} changed file(s): ${CLASS_NAMES[derived]}`);
             if (sensitivePaths.length > 0) {
               core.info(`Sensitive paths: ${sensitivePaths.slice(0, 10).map(show).join(', ')}`);
@@ -246,7 +330,7 @@ jobs:
                     '(tools/pr/open-pr.mjs ticks it for you).',
                 );
               }
-            } else {
+            } else if (!mechanical) {
               effective = Math.max(derived, declared);
               if (declared < derived) {
                 warnings.push(

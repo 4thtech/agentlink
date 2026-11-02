@@ -94,7 +94,16 @@
 #   desktop-extension-release  after a green smoke-latest: signs them when DESKTOP_EXT_SIGNING_KEY
 #                   exists (else ships unsigned with a notice), writes SHA256SUMS, attests build
 #                   provenance and attaches them to the GitHub Release v<version>. Environment
-#                   `npm-publish` (it holds the key), so one more approval click.
+#                   `desktop-sign` (it holds the key; no reviewer, main only, OPS-UNSTICK-B): it runs
+#                   only after the approved publish-latest, so the release needs no second click.
+#
+# RELEASE APP (OPS-UNSTICK-B)
+#   The `version` job opens the "Version packages" PR with an installation token of the release GitHub
+#   App (variable RELEASE_APP_CLIENT_ID, secret RELEASE_APP_PRIVATE_KEY in environment `release-bot`).
+#   Its checks then start normally (a GITHUB_TOKEN PR waits as action_required), review-gate recognises
+#   the App (variable RELEASE_BOT_LOGIN) and passes a version-shaped diff as a mechanical S0, and the
+#   job turns on auto-merge. The owner's only click per release is the `npm-publish` approval.
+#   Without the App the job falls back to GITHUB_TOKEN (the old manual path).
 #
 # GITHUB RELEASES (D-43)
 #   Releases exist only for the product tag `v<version>` of stable versions. The Changesets publish
@@ -121,8 +130,12 @@
 #                       integration branch has its own ruleset: required checks, no force push, no
 #                       deletion); no secrets.
 #        npm-publish    required reviewer @talirezun, "Prevent self-review" OFF;
-#                       deployment branches: main and tags; one secret, DESKTOP_EXT_SIGNING_KEY
-#                       (optional, M1-9f: the desktop extension signing key, RSA PEM; unset = unsigned).
+#                       deployment branches: main and tags; no secrets.
+#        desktop-sign   no required reviewer; deployment branches: main only; one secret,
+#                       DESKTOP_EXT_SIGNING_KEY (optional, M1-9f: the desktop extension signing key,
+#                       RSA PEM; unset = unsigned). OPS-UNSTICK-B.
+#        release-bot    no required reviewer; deployment branches: main only; one secret,
+#                       RELEASE_APP_PRIVATE_KEY (the release App's private key). OPS-UNSTICK-B.
 #        deploy-freeze  no required reviewer; deployment branches: main only;
 #                       secret DEPLOY_FREEZE_TOKEN (can write repository variables, nothing else).
 #   2. On npmjs.com, for EVERY published package, two trusted publishers (GitHub Actions,
@@ -135,10 +148,10 @@
 #   3. Each package.json: "publishConfig": {"access": "public"} (no "registry"), a correct
 #      "repository" field (needed for provenance); @changesets/cli ^3 as a root devDependency
 #      (changesets/action v2 refuses CLI v2). The CLI prints its version for `--version`.
-#   4. Settings -> Actions -> General: "Allow GitHub Actions to create and approve pull requests"
-#      ON for the version job, OR a GitHub App token as `github-token:` (owner decision, see the
-#      checklist). Pull requests opened with GITHUB_TOKEN do not trigger other workflows: close
-#      and reopen the "Version packages" PR to run the required checks.
+#   4. The release GitHub App (OPS-UNSTICK-B): repository permissions Contents and Pull requests
+#      read and write (Metadata read), installed on this repository only; repository variables
+#      RELEASE_APP_CLIENT_ID and RELEASE_BOT_LOGIN (`<app-slug>[bot]`). Without it the version job
+#      falls back to GITHUB_TOKEN ("Allow GitHub Actions to create and approve pull requests" ON).
 #   5. No NPM_TOKEN secret is needed or used. Do not add one.
 #
 # Publishing needs npm >= 11.5.1; jobs that may roll `latest` back need npm >= 11.21.0 (or
@@ -367,12 +380,15 @@ jobs:
     if: needs.select-mode.outputs.mode == 'version'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # OPS-UNSTICK-B: the release GitHub App's key lives in this environment (no reviewer, deployment
+    # branch main only), so no pull-request workflow can read it. See RELEASE APP above.
+    environment: release-bot
     concurrency:
       group: release-version
       cancel-in-progress: false
     permissions:
-      contents: write # push the release branch
-      pull-requests: write # open/update the "Version packages" pull request
+      contents: write # push the release branch (used only without the release App)
+      pull-requests: write # open/update the "Version packages" PR (used only without the release App)
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -384,18 +400,61 @@ jobs:
         with:
           cache: "false"
 
+      # Only a boolean leaves this step; the key itself is never echoed.
+      - name: Check for the release App
+        id: app
+        shell: bash
+        env:
+          KEY_SET: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
+          CLIENT_ID: ${{ vars.RELEASE_APP_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          if [ "$KEY_SET" = "true" ] && [ -n "${CLIENT_ID:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::The release App is not set up (variable RELEASE_APP_CLIENT_ID, secret RELEASE_APP_PRIVATE_KEY in environment release-bot). The Version packages PR is opened with GITHUB_TOKEN: its checks need a close and reopen, and it needs a code-owner approval."
+          fi
+
+      # A short-lived installation token for this repository only, with exactly the two permissions the
+      # next steps need. The action revokes it when the job ends.
+      - name: Create the release App token
+        id: app-token
+        if: steps.app.outputs.enabled == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       # Title and commit message use the CHORE prefix so they satisfy pr-hygiene's title rule.
       # The root script `version-packages` runs `changeset version` and then rolls the root CHANGELOG.md
       # (tools/release/roll-changelog.mjs, OPS-REL-3, docs/process/versioning.md §5): for a stable version
       # [Unreleased] becomes "## [<version>] - <date>" and an empty [Unreleased] is added; an empty
-      # [Unreleased] fails this job; prereleases leave the file alone. The PR branch is push-restricted,
-      # so nobody can do it by hand there.
+      # [Unreleased] fails this job; prereleases leave the file alone. With the release App token the PR
+      # and its commits are authored by the App, so its checks start normally and review-gate recognises it.
       - name: Open or update the Version packages pull request
+        id: version
         uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
+          github-token: ${{ steps.app-token.outputs.token || github.token }}
           script: pnpm run version-packages
           commit-message: "CHORE: Version packages"
           pr-title: "CHORE: Version packages"
+
+      # GitHub squash-merges it once the four required checks are green. review-gate passes it as a
+      # mechanical S0 only when the diff has the version shape; otherwise it waits for a code-owner
+      # approval as before. Idempotent when the PR is only updated.
+      - name: Turn on auto-merge for the Version packages pull request
+        if: steps.app.outputs.enabled == 'true' && steps.version.outputs.pr-number != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ steps.version.outputs.pr-number }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --auto --squash
 
   pack:
     name: pack
@@ -1597,7 +1656,8 @@ jobs:
 
   # Sign (when the key exists), hash, attest and attach to the GitHub Release v<version>, after a green
   # production smoke test. The signing key is the environment secret DESKTOP_EXT_SIGNING_KEY of
-  # `npm-publish` (required reviewer), so this job waits for one approval click, like rollback-latest.
+  # `desktop-sign` (no reviewer, deployment branch main only, OPS-UNSTICK-B). The job needs the approved
+  # publish-latest, so the owner's one npm-publish click covers it: no second click.
   # Without the key (or with the certificate still the empty placeholder) the bundles ship unsigned,
   # with their SHA-256 and attestation, and the job stays green. Signature format: tools/desktop-extension/sign.sh.
   desktop-extension-release:
@@ -1606,7 +1666,7 @@ jobs:
     if: needs.smoke-latest.result == 'success' && needs.desktop-extension-windows-check.result == 'success' && needs.desktop-extension-build.outputs.version != '' && vars.DEPLOY_FREEZE != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    environment: npm-publish
+    environment: desktop-sign
     concurrency:
       group: release-desktop-extension
       cancel-in-progress: false
@@ -1656,7 +1716,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${SIGNING_KEY:-}" ]; then
-            echo "::notice::DESKTOP_EXT_SIGNING_KEY is not set in environment npm-publish, so the desktop extension bundles are not signed. They still get a SHA-256 and a build provenance attestation (D-91)."
+            echo "::notice::DESKTOP_EXT_SIGNING_KEY is not set in environment desktop-sign, so the desktop extension bundles are not signed. They still get a SHA-256 and a build provenance attestation (D-91)."
             exit 0
           fi
           if ! grep -q -- '-----BEGIN CERTIFICATE-----' "$CERT"; then

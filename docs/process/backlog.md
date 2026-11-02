@@ -10743,3 +10743,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** OPS-FAST-LANE-2
 - **Scope:** `release.yml` runs `tools/desktop-extension/sign.sh` with the extension signing key and `build.mjs` produces the shipped bundle. Decide with the owner whether `tools/desktop-extension/**` joins `tools/release/**` as an S1 sensitive path (IR line required, code-owned); if yes, add the RULES and SENSITIVE entries, the CODEOWNERS row and the §2.2 row, with a test.
 - **Acceptance:** rules, CODEOWNERS and §2.2 agree (SC-6); the real gate script is tested.
+
+#### OPS-UNSTICK-B · one-click release: App-opened version PR as mechanical S0; desktop signing without a second click (owner priority 1, 2026-11-02)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable security audit · **Security:** S2 (release path, supply chain; sensitive paths `.github/**`, `tools/release/**`)
+- **Repo/path:** agentlink · `.github/workflows/{release,review-gate,pr-hygiene,ci}.yml`; `tools/release/check-changesets.mjs`; `tools/ci/review-gate.test.mjs`; `docs/process/{release-and-deployment,versioning,audit-rules,ci-cd,orchestrator-playbook}.md`; `docs/runbooks/merge-and-release.md`; removes `tools/orchestrator/retrigger-version-pr.py`
+- **Depends on:** owner setup (release GitHub App, environments `release-bot` and `desktop-sign`, variables `RELEASE_APP_CLIENT_ID` and `RELEASE_BOT_LOGIN`)
+- **Spec:** OPS-UNSTICK report changes C2 and C4; D-25, D-52; `audit-rules.md` §3
+- **Done when:** the `version` job opens the PR with the App token and turns on auto-merge; `review-gate` classes an App-authored, version-shaped diff as S0 with no review requirement and anything else as an ordinary automated PR (tests on the real gate script, RED commit first); `desktop-extension-release` uses `desktop-sign`; the npm-publish click is the only owner click; the retrigger workaround and the hand-filled body are gone from docs and tools.

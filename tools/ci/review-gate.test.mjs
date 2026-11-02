@@ -385,6 +385,11 @@ describe('review-gate: mechanical version PR (OPS-UNSTICK-B)', () => {
       ...over,
     });
   const approved = [{ user: { login: 'talirezun' }, state: 'APPROVED', commit_id: HEAD }];
+  // Not mechanical: falls back to the automated-PR rule, so it fails without an approval, and says why.
+  const notMechanical = (r, label) => {
+    expect(r.failed, label).toBe(true);
+    expect(r.warnings.join('\n'), label).toContain('without the version shape');
+  };
 
   it('passes as S0 with no IR, threat note, tests-first evidence or approval', async () => {
     const r = await versionPr();
@@ -426,13 +431,13 @@ describe('review-gate: mechanical version PR (OPS-UNSTICK-B)', () => {
         ...versionFiles(),
         pkg('packages/node/package.json', '0.4.9', '0.4.10', extra),
       ];
-      expect((await versionPr({ files })).failed, extra).toBe(true);
+      notMechanical(await versionPr({ files }), extra);
     }
   });
 
   it('rejects a version value that is not a plain semver', async () => {
     const files = [...versionFiles(), pkg('packages/node/package.json', '0.4.9', 'file:../x')];
-    expect((await versionPr({ files })).failed).toBe(true);
+    notMechanical(await versionPr({ files }));
   });
 
   it('rejects a package.json without a patch (too large to diff)', async () => {
@@ -440,7 +445,7 @@ describe('review-gate: mechanical version PR (OPS-UNSTICK-B)', () => {
       ...versionFiles(),
       { filename: 'packages/node/package.json', status: 'modified' },
     ];
-    expect((await versionPr({ files })).failed).toBe(true);
+    notMechanical(await versionPr({ files }));
   });
 
   it('rejects the root package.json, added changesets, renames and non-markdown deletions', async () => {
@@ -459,7 +464,7 @@ describe('review-gate: mechanical version PR (OPS-UNSTICK-B)', () => {
       { filename: '.changeset/pre.json', status: 'modified', patch: '@@ -1 +1 @@\n-a\n+b\n' },
     ]) {
       const files = [...versionFiles(), f];
-      expect((await versionPr({ files })).failed, f.filename).toBe(true);
+      notMechanical(await versionPr({ files }), f.filename);
     }
   });
 
@@ -477,11 +482,11 @@ describe('review-gate: mechanical version PR (OPS-UNSTICK-B)', () => {
   });
 
   it('only when the head commit has not moved since the event', async () => {
-    expect((await versionPr({ eventHeadSha: 'b'.repeat(40) })).failed).toBe(true);
+    notMechanical(await versionPr({ eventHeadSha: 'b'.repeat(40) }));
   });
 
   it('a truncated file list is never mechanical', async () => {
-    expect((await versionPr({ changedFiles: 3001 })).failed).toBe(true);
+    notMechanical(await versionPr({ changedFiles: 3001 }));
   });
 
   it('DEPLOY_FREEZE still fails it', async () => {

@@ -222,14 +222,15 @@ describe('release.yml desktop extension jobs (D-91)', () => {
     expect(permissions(check)).toEqual(['contents: read']);
   });
 
-  it('signs, hashes, attests and attaches in the approved environment, after a green smoke test', () => {
+  it('signs, hashes, attests and attaches in desktop-sign, after the approved publish and a green smoke test', () => {
     expect(release).not.toBe('');
     expect(release).toMatch(
       /needs: \[publish-latest, smoke-latest, desktop-extension-build, desktop-extension-windows-check\]/,
     );
     expect(release).toMatch(/needs\.desktop-extension-windows-check\.result == 'success'/);
     expect(release).toMatch(/needs\.smoke-latest\.result == 'success'/);
-    expect(release).toMatch(/\n {4}environment: npm-publish\n/);
+    // OPS-UNSTICK-B: the key is in `desktop-sign` (no reviewer, main only); publish-latest carries the one click.
+    expect(release).toMatch(/\n {4}environment: desktop-sign\n/);
     expect(permissions(release).sort()).toEqual([
       'attestations: write',
       'contents: write',
