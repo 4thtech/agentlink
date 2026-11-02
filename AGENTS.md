@@ -74,7 +74,7 @@ The main session is the **orchestrator**: it orchestrates, deploys workers and a
   - S2 and sensitive-path PRs (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files) merge only after CI is green, the independent AI review passed and Tali has said "merge" in chat (process rule, owner-accepted; revisit before M3);
   - never use admin bypass, never push to `main`, never approve PRs or deployments;
   - services reach production only through CI, once staging smoke is green; npm `latest` needs the owner's approval click; `DEPLOY_FREEZE` halts everything (D-52);
-  - **Owner feedback: local first, CI once (2026-11-02).** Fix on a branch, no PR per fix; run the unreleased build on a temp-HOME profile (never his real `~/.agentlink`, keychain or AI-app configs), send the localhost link and exact clicks; repeat until he says it's good; then one PR, CI once, auto-merge, release (`docs/runbooks/owner-feedback-loop.md`);
+  - **Owner feedback: local first, CI once (2026-11-02).** Fix on a branch, no PR per fix; run the unreleased build on a temp-HOME profile (never his real `~/.agentlink`, keychain or AI-app configs), he starts it and gets the exact clicks; repeat until he says it's good; then one PR, CI once, auto-merge, release (`docs/runbooks/owner-feedback-loop.md`);
   - owner-only: mainnet contracts, contract upgrades, Safe operations, production secrets and clearing `DEPLOY_FREEZE` (`docs/process/release-and-deployment.md`).
 - **No AI attribution anywhere.** No co-author trailers, "Generated with" footers or badges. Work ships under the operator's own git identity.
 - **New dependencies** need a PR justification. No `postinstall` scripts.

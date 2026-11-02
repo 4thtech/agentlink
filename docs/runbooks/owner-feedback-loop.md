@@ -22,8 +22,8 @@ The orchestrator (Opus) deploys the builders; Sonnet builds the fixes. The owner
    HOME="$PREVIEW_HOME" node apps/cli/dist/agentlink.js ui
    ```
    - `HOME` is the only switch: the CLI keeps its data under `<home>/.agentlink` (agents, `app.json`), so a temporary `HOME` never touches the owner's real `~/.agentlink`. A fresh profile starts at the first-run page (Welcome), which also tests that path.
-   - The OS opens the browser at a one-shot `localhost` session link. The CLI never prints that link and an agent without a terminal cannot start the page (G-1, [`ui.ts`](../../apps/cli/src/commands/ui.ts)). So run the command in a terminal tab the owner can see (`mcp__terminal__run_in_terminal` when the harness has it) or give him the three lines to paste. The server runs until Ctrl+C.
-   - Do **not** run `init` or `mcp` for an AI app from this profile: that would write the AI apps' real configuration files (they live under the user's real directories, not the temp `HOME`). Test the app pages only, unless the owner asks for an AI-app check and says which.
+   - The OS opens the browser at a one-shot `localhost` session link. The CLI never prints that link and an agent without a terminal cannot start the page (G-1, [`ui.ts`](../../apps/cli/src/commands/ui.ts)). So the owner starts it himself: give him the three lines to paste in his own terminal (do not start `ui` through a terminal tool, that bypasses the terminal guard). A browser tab opens by itself. The server runs until Ctrl+C.
+   - Do **not** run `init` or `mcp` for an AI app from this profile: paths that follow environment variables (`XDG_CONFIG_HOME`, `CLAUDE_CONFIG_DIR`) can still point at the real AI-app configuration files, whatever `HOME` says. Test the app pages only, unless the owner asks for an AI-app check and says which.
    - The OS keychain belongs to the OS user, not to `HOME`. A fresh profile has no agents, so it finds none of the owner's keychain items; name any test agent `preview-<date>` so it cannot clash, and delete it at the end.
 3. **Send the owner what he needs, and nothing else:** the build (branch and short commit), the `localhost` address once the page opened (or: "a browser tab opens by itself"), and the exact clicks, one per line, for each fix, for example: "1. Welcome → Create agent. 2. Home → Files: the empty state shows the folder icon." Say which feedback item each click checks.
 4. **Repeat.** He looks and answers. Fix again, rebuild (step 2 builds again), send the next clicks. Stop the server (Ctrl+C) and delete the profile between rounds if the state is in the way: `rm -rf "$PREVIEW_HOME"`.
@@ -37,7 +37,7 @@ The orchestrator (Opus) deploys the builders; Sonnet builds the fixes. The owner
 - Exactly one PR for the batch; its CI ran once on its final head.
 
 ## If it fails
-- **No browser opens or the command prints a single line telling you to use your own terminal:** it ran without a terminal. Start it in a visible terminal tab, not through a plain shell call.
+- **No browser opens or the command prints a single line telling you to use your own terminal:** it ran without a terminal. Ask the owner to paste the commands in his own terminal.
 - **The first-run page is not what you want to check:** the owner's real state cannot be copied in (keys, owner passphrase); describe the screen and click path instead, or make the test profile as the owner would on a new machine.
 - **CI is red on the one PR:** [RB-08](ci-red.md). Do not split the batch to get green.
 - **The owner sends new feedback while the PR is open:** if it is small, push it to the same branch before the merge; otherwise start the next batch.
