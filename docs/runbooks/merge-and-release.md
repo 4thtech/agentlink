@@ -31,7 +31,7 @@ The orchestrator (Opus) enables auto-merge and prepares releases. The owner give
 4. Mark ready (if it is a draft: a draft skips the full suite and GitHub refuses to merge it) and enable auto-merge (squash only):
    ```bash
    gh pr ready <n>
-   gh pr merge <n> --auto --match-head-commit <full head sha>
+   gh pr merge <n> --auto --squash --match-head-commit <full head sha>
    ```
    `--match-head-commit` pins the head you checked: if the branch moved, arming fails and the new head needs its own check.
    Never `--admin`, never `gh pr review --approve`, never a push to `main` (lesson [LL-03](../lessons/LL-03-no-push-to-main.md)).
