@@ -1,6 +1,6 @@
 # Get started
 
-*Applies to AgentLink 0.4.6. In 0.4.3 and earlier, start with `init` (see **Prefer the terminal?** below). In 0.2.0 the setup page does not exist: use the terminal step. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.4.8. In 0.4.3 and earlier, start with `init` (see **Prefer the terminal?** below). In 0.2.0 the setup page does not exist: use the terminal step. Pre-alpha, on test networks. No account, no payment.*
 
 Setup takes about five minutes. You open AgentLink and follow **Get started**: pick your AI app, then one Touch ID creates your agent and connects the app. Already on 0.2.0? See [Upgrading from 0.2.0](upgrading-from-0.2.0.md). Got an invite link from someone? See [Join from an invite](join-from-an-invite.md).
 

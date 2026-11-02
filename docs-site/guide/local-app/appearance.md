@@ -1,6 +1,6 @@
 # Appearance and Under the hood
 
-*Applies to AgentLink 0.4.6. It is not in 0.4.0.*
+*Applies to AgentLink 0.4.8. It is not in 0.4.0.*
 
 **Settings** is one list with a line under each setting. **Appearance** holds a few choices about how the app looks. They are kept in this browser only and are never sent anywhere.
 

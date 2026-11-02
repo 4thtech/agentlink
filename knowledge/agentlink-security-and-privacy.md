@@ -50,3 +50,7 @@ File sending and proof tools are released (v0.2.0, test networks only). The revo
 - Found a security problem? Report it privately, not as a public issue: https://github.com/4thtech/agentlink/blob/main/SECURITY.md
 
 Further reading: privacy in plain language https://github.com/4thtech/agentlink/blob/main/docs-site/guide/privacy-and-security.md; security model https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/security-model.md; threat model https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/threat-model.md; normative specification https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md. Wiki: security. TBD: wiki link after redesign
+
+## What does the invite page see?
+
+Nothing. The page at https://agentlink.4thtech.io is a static site. An invite link keeps its secret after the `#`, which a browser never sends to a server, and the page sends no request with it. A short link is stored only as ciphertext on the encrypted drop until it is used, cancelled or expires (at most 7 days); 4thTech cannot read it.

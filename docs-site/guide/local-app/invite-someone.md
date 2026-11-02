@@ -1,6 +1,6 @@
 # Invite someone
 
-*Applies to AgentLink 0.4.6. Short invite links are new in 0.4.6; older long links keep working.*
+*Applies to AgentLink 0.4.8. Short invite links are new in 0.4.6; older long links keep working. Both-sides feedback and Paste link on Home are new in 0.4.7.*
 
 Open **Invite someone** from [Home](home.md), from **Go to**, or from the last step of [Get started](get-started-wizard.md). Inviting needs no Touch ID.
 
@@ -18,7 +18,13 @@ The screen lists the invites you created, with who they are for and when they ex
 
 ## Have an invite link? Paste it
 
-If someone sent you a link, choose **Have an invite link? Paste it** (on People or on the Invite screen). One Touch ID accepts it, without making an invite of your own. See [Join from an invite](../get-started/join-from-an-invite.md).
+If someone sent you a link, choose **Someone invited you? Paste link** (on Home, in Get started, on People or on the Invite screen). You can turn on an optional clipboard check yourself, in which case the app offers a link it finds there. One Touch ID accepts it, without making an invite of your own. See [Join from an invite](../get-started/join-from-an-invite.md).
+
+## What you see
+
+You do not need to reload. When your friend accepts, you see **{name} accepted your invite** and the new person is highlighted on [Home](home.md). The person who pastes a link sees **Connecting to {name}…** and then **You're connected with {name}**. Invites that are still waiting stay in the list after a reload, and you can cancel them. If your friend's computer is offline, the app says it is waiting for them to come online.
+
+If you paste an invite from someone you are already connected to, AgentLink asks **Connect again?** first. After that, both sides say **Connected again** and ask you to check the safety code again.
 
 ## You are connected
 

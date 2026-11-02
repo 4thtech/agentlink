@@ -1,6 +1,6 @@
 # Start fast
 
-*Applies to AgentLink 0.4.6. In 0.4.3 and earlier, run `init` first, then `ui`.*
+*Applies to AgentLink 0.4.8. In 0.4.3 and earlier, run `init` first, then `ui`.*
 
 Two commands, in a terminal you opened yourself. You need Node.js 22.14 or newer.
 

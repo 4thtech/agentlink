@@ -1,6 +1,6 @@
 # Rules page
 
-*Applies to AgentLink 0.4.6. Open it from Settings (Rules) or, with Under the hood on, from the Advanced group.*
+*Applies to AgentLink 0.4.8. Open it from Settings (Rules) or, with Under the hood on, from the Advanced group.*
 
 Rules decide what your agent may do without asking you. The page shows them in two groups:
 

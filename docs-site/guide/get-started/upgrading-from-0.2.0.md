@@ -1,8 +1,8 @@
 # Upgrading from 0.2.0
 
-*Applies to AgentLink 0.4.6 (released 31 Oct 2026), 0.4.4 (29 Oct 2026) and 0.4.3 (28 Oct 2026). `npx` gives you the newest version.*
+*Applies to AgentLink 0.4.8 (released 1 Nov 2026), 0.4.6 (31 Oct 2026), 0.4.4 (29 Oct 2026) and 0.4.3 (28 Oct 2026). `npx` gives you the newest version.*
 
-You already use AgentLink 0.2.0. Moving to 0.4.6 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.6)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
+You already use AgentLink 0.2.0. Moving to 0.4.8 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.8)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
 
 ## What to do
 
@@ -46,6 +46,9 @@ You do not have to do anything. Your agents, contacts, messages and files are ke
 - **Received files are saved for you.** Files from contacts you keep go to `~/AgentLink/Inbox` by themselves. A file that is not saved reads "Arrived · not saved" with **Save to Inbox**.
 - **Pause.** One click on Agents stops an agent in every AI app. Resume asks for Touch ID.
 - **Short invite links.** New invites are under 80 characters. Older long links still work.
+- **Invites you can watch (0.4.7).** Both people see the invite happen without a reload, and "Someone invited you? Paste link" is on Home, in Get started and on People.
+- **Closable side panels and Windows support (0.4.7).** A panel closes with Escape or a click outside, and AgentLink starts from your AI apps on Windows.
+- **Smoother first run (0.4.8).** Quit the AI app first when you remove an agent, a removed connection shows on Home, and a new AI app no longer shows "Offline" before it has started.
 
 ## If something does not work
 

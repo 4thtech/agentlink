@@ -1,6 +1,6 @@
 # Get started
 
-*Applies to AgentLink 0.4.6.*
+*Applies to AgentLink 0.4.8.*
 
 Get started is a short guided path: pick your AI app, confirm it is you with one Touch ID, see that you are connected, then invite someone if you like.
 
