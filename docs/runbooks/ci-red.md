@@ -63,7 +63,7 @@ The orchestrator, or the builder that owns the change (Sonnet or above). The fix
    2. **Review after the merge.** The head moved, so the merge commit is a change the independent review (S2 and sensitive paths) did not see. A delta review with the next number covers it ([RB-04](independent-review.md) step 4; the reviewer reads the delta between the old and new head and the merge commit's re-merge diff, and checks that nothing of the PR was dropped). A purely mechanical merge of `main` (empty re-merge diff, own diff byte-identical) needs only the lightweight check recorded `PASS (mechanical)` (`audit-rules.md` §4.6, D-126).
    3. Arm auto-merge again with the new head and confirm it merged (`gh pr view <n> --json state,mergedAt`):
       ```bash
-      gh pr merge <n> --auto --squash --match-head-commit <full head sha>
+      gh pr merge <n> --auto --match-head-commit <full head sha>
       ```
       Only for a PR that was cleared to merge ([RB-09](merge-and-release.md)); never an admin merge.
    4. **A failure only the heavy lane saw** (a platform leg, a package outside the PR's selection) appears after the merge as red `ci-gate (push)` on `main`: fix forward (see "When to use").
