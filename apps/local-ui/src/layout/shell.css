@@ -706,3 +706,7 @@
 .al-toasts > .al-toast {
   pointer-events: auto;
 }
+.al-menu-note {
+  display: block;
+  padding: 0 10px 6px 34px;
+}

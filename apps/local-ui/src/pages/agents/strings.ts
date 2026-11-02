@@ -128,7 +128,7 @@ export const AGENTS_STRINGS = {
   notPaused: 'It is not paused any more.',
 
   // Rename (D-141, 11 §5.8).
-  renameHint: 'Your contacts will see the new name.',
+  renameHint: 'People see this name.',
   renameTouchId: 'Rename with Touch ID',
   renamedTold: (label: string): string =>
     `Renamed. Your contacts will see ${label} next time they're online.`,
