@@ -12,6 +12,7 @@ import {
   heavyLane,
   jobOutputs,
   fastLane,
+  docsOnly,
   loadWorkspace,
   selectAffected,
   turboFilters,
@@ -580,5 +581,166 @@ describe('ci.yml wires the fast lane', () => {
 
   it('the full suite still runs when the scope is not decided (outputs default to full)', () => {
     expect(yml).toContain("test_scope: ${{ steps.affected.outputs.test_scope || 'full' }}");
+  });
+});
+
+// OPS-DOCS-FASTLANE: a docs-only pull request runs the quick docs-checks job and skips install,
+// build and the package suites. When unsure it is not docs-only.
+describe('docsOnly: the docs fast lane', () => {
+  const pr = (files, coupledRefs = []) => docsOnly({ event: 'pull_request', files, coupledRefs });
+
+  it('is true when every path is prose or an image in a doc tree', () => {
+    expect(pr(['docs/process/ci-cd.md'])).toBe(true);
+    expect(pr(['docs/foundation/00-README.md', 'docs/lessons/new.md'])).toBe(true);
+    expect(pr(['docs-site/technical/project/x.md', 'docs-site/guide/.gitbook/assets/a.png'])).toBe(
+      true,
+    );
+    expect(pr(['knowledge/agentlink-overview.md'])).toBe(true);
+    expect(pr(['changelog.d/ops-docs-fastlane.md'])).toBe(true);
+    expect(pr(['README.md', 'CHANGELOG.md', 'llms.txt', 'brand/logo/mark.svg'])).toBe(true);
+  });
+
+  it('is false for anything that can change behaviour or generated checks', () => {
+    for (const f of [
+      'packages/core/src/a.ts',
+      'apps/cli/src/main.ts',
+      'tools/ci/select-affected.mjs',
+      '.github/workflows/ci.yml',
+      'e2e/test/a.test.ts',
+      'test-vectors/a.json',
+      'package.json',
+      'pnpm-lock.yaml',
+      'AGENTS.md',
+      'CLAUDE.md',
+      '.claude/settings.json',
+      '.changeset/brave-owls.md',
+    ]) {
+      expect(pr([f]), f).toBe(false);
+    }
+  });
+
+  it('tricky cases: status.yaml, .github markdown, package READMEs, non-doc files in doc trees', () => {
+    expect(pr(['docs/status.yaml'])).toBe(false);
+    expect(pr(['.github/pull_request_template.md'])).toBe(false);
+    expect(pr(['.github/CODEOWNERS'])).toBe(false);
+    expect(pr(['packages/core/README.md'])).toBe(false); // a package publishes its README
+    expect(pr(['apps/cli/README.md'])).toBe(false);
+    expect(pr(['docs/design/d1/tokens/tokens.css'])).toBe(false);
+    expect(pr(['docs/design/d1/components/reference/bundle.js'])).toBe(false);
+    expect(pr(['docs/x/../../packages/core/src/a.md'])).toBe(false);
+    expect(pr(['docs/runbook.sh'])).toBe(false);
+    expect(pr(['docs/a.sol'])).toBe(false);
+    expect(pr(['AGENTS.md.bak'])).toBe(false);
+    expect(pr(['README.md.sh'])).toBe(false);
+  });
+
+  it('one non-doc file makes the whole diff not docs-only', () => {
+    expect(pr(['docs/process/ci-cd.md', 'packages/core/src/a.ts'])).toBe(false);
+    expect(pr(['docs/process/ci-cd.md', 'docs/status.yaml'])).toBe(false);
+  });
+
+  it('a doc that a package source names is not docs-only', () => {
+    const refs = ['docs-site/guide/get-started/codex.md', 'docs/design/d1/'];
+    expect(pr(['docs-site/guide/get-started/codex.md'], refs)).toBe(false);
+    expect(pr(['docs/design/d1/copy/notes.md'], refs)).toBe(false);
+    expect(pr(['docs/process/ci-cd.md'], refs)).toBe(true);
+  });
+
+  it('is false when the diff is unknown or empty, and in the heavy lane', () => {
+    expect(docsOnly({ event: 'pull_request', files: null })).toBe(false);
+    expect(docsOnly({ event: 'pull_request', files: [] })).toBe(false);
+    expect(docsOnly({ event: 'pull_request', files: ['', '  '] })).toBe(false);
+    expect(docsOnly({ event: 'unknown', files: ['docs/a.md'] })).toBe(false);
+    expect(docsOnly({ event: 'push', ref: 'refs/heads/main', files: ['docs/a.md'] })).toBe(false);
+    expect(docsOnly({ event: 'push', ref: 'refs/heads/wave-4', files: ['docs/a.md'] })).toBe(false);
+    expect(docsOnly({ event: 'push', ref: 'refs/heads/feat', files: ['docs/a.md'] })).toBe(true);
+  });
+
+  it('docs-only is always a subset of the existing docs rule (no heavy job for it)', () => {
+    for (const f of ['docs/a.md', 'knowledge/a.md', 'README.md', 'llms.txt', 'brand/a.png']) {
+      if (docsOnly({ event: 'pull_request', files: [f] })) {
+        expect(fastLane({ event: 'pull_request', files: [f] }).codeChanged, f).toBe(false);
+      }
+    }
+  });
+});
+
+describe('ci.yml wires the docs fast lane', () => {
+  const yml = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
+  const job = (name) => {
+    const at = yml.indexOf(`\n  ${name}:\n`);
+    expect(at, name).toBeGreaterThan(-1);
+    const next = yml.slice(at + 1).search(/\n {2}[a-z0-9-]+:\n/);
+    return yml.slice(at, next < 0 ? undefined : at + 1 + next);
+  };
+
+  it('checks is skipped only when detect says docs-only; docs-checks runs only then', () => {
+    expect(job('checks')).toContain("needs.detect.outputs.docs_only != 'true'");
+    expect(job('docs-checks')).toContain("needs.detect.outputs.docs_only == 'true'");
+  });
+
+  it('docs_only defaults to false and the scope output is validated as three lines', () => {
+    expect(yml).toContain("docs_only: ${{ steps.e2e_scope.outputs.docs_only || 'false' }}");
+    expect(yml).toContain("use_selector=(true|false)$'\\n'docs_only=(true|false)$");
+  });
+
+  it('docs-checks runs the existing docs validations, no build', () => {
+    const j = job('docs-checks');
+    for (const cmd of [
+      'check-knowledge-size.mjs',
+      'check-knowledge-links.mjs',
+      'docs-status/index.mjs --check',
+      'vocabulary.test.mjs',
+      'retired-scope.test.mjs',
+      'prettier --check .',
+    ]) {
+      expect(j, cmd).toContain(cmd);
+    }
+    expect(j).not.toMatch(/pnpm (build|test|typecheck)|turbo run/);
+  });
+
+  it('ci-gate needs docs-checks and demands it exactly when docs-only', () => {
+    const gate = job('ci-gate');
+    expect(gate).toMatch(/needs: \[[^\]]*docs-checks/);
+    expect(gate).toContain('DOCS_ONLY: ${{ needs.detect.outputs.docs_only }}');
+    expect(gate).toContain('docs-checks');
+  });
+});
+
+describe('docsOnly: odd diff lists and events', () => {
+  const ev = (event, files, ref = '') => docsOnly({ event, ref, files });
+
+  it('upper-case extensions are not docs', () => {
+    expect(ev('pull_request', ['docs/A.MD'])).toBe(false);
+    expect(ev('pull_request', ['docs/a.PNG'])).toBe(false);
+    expect(ev('pull_request', ['README.MD'])).toBe(false);
+  });
+
+  it('a rename out of code lists both paths (CI diffs with --no-renames), so it is not docs-only', () => {
+    expect(ev('pull_request', ['packages/x/notes.md', 'docs/x.md'])).toBe(false);
+    expect(ev('pull_request', ['docs/x.md', 'packages/x/src/a.ts'])).toBe(false);
+  });
+
+  it('CRLF and trailing whitespace in the list do not change the answer', () => {
+    expect(ev('pull_request', ['docs/a.md\r', ' knowledge/b.md  ', ''])).toBe(true);
+    expect(ev('pull_request', ['docs/a.md\r', 'packages/core/src/a.ts\r'])).toBe(false);
+  });
+
+  it('merge_group and feature-branch pushes follow the same rules; main does not', () => {
+    expect(ev('merge_group', ['docs/a.md'])).toBe(true);
+    expect(ev('merge_group', ['docs/a.md', 'tools/x.mjs'])).toBe(false);
+    expect(ev('push', ['docs/a.md'], 'refs/heads/feat')).toBe(true);
+    expect(ev('push', ['docs/a.md'], 'refs/heads/main')).toBe(false);
+    expect(ev('workflow_dispatch', ['docs/a.md'])).toBe(false);
+  });
+
+  it('ci.yml refuses docs-only for a symlink or submodule (modes 120000 and 160000)', () => {
+    const yml = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
+    expect(yml).toContain('git diff --no-renames --raw "$base" HEAD');
+    const re = /^:(1[26]0000 [0-9]+|[0-9]+ 1[26]0000) /;
+    expect(re.test(':120000 000000 abc def D\tdocs/link.md')).toBe(true);
+    expect(re.test(':000000 120000 abc def A\tdocs/link.md')).toBe(true);
+    expect(re.test(':000000 160000 abc def A\tdocs/sub')).toBe(true);
+    expect(re.test(':100644 100644 abc def M\tdocs/a.md')).toBe(false);
   });
 });
