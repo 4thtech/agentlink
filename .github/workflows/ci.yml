@@ -370,7 +370,8 @@ jobs:
           TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
           TURBO_FILTERS: ${{ needs.detect.outputs.turbo_filters }}
         run: |
-          reporters=(--reporter=default --reporter=github-actions --reporter=json --outputFile.json=.vitest-report.json)
+          # tools/ci/vitest-run-reporter.mjs records unhandled errors (not in the JSON report): <package>/.vitest-run.json.
+          reporters=(--reporter=default --reporter=github-actions --reporter=json --outputFile.json=.vitest-report.json "--reporter=$GITHUB_WORKSPACE/tools/ci/vitest-run-reporter.mjs")
           set +e
           if [ "$TEST_SCOPE" = filtered ]; then
             # shellcheck disable=SC2086 # one word per --filter
@@ -756,11 +757,13 @@ jobs:
         shell: bash
         run: |
           report="$RUNNER_TEMP/node-os-vitest.json"
+          run_record="$RUNNER_TEMP/node-os-vitest-run.json"
+          export VITEST_RUN_RECORD="$run_record"
           set +e
-          pnpm --filter @4thtech-io/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts --exclude src/local-ui-first-run-browser.test.ts --exclude src/local-ui-passkey-upgrade-browser.test.ts --exclude src/approval-pay-confirm-browser.test.ts --exclude src/local-ui-welcome-browser.test.ts --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$report"
+          pnpm --filter @4thtech-io/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts --exclude src/local-ui-first-run-browser.test.ts --exclude src/local-ui-passkey-upgrade-browser.test.ts --exclude src/approval-pay-confirm-browser.test.ts --exclude src/local-ui-welcome-browser.test.ts --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$report" "--reporter=$GITHUB_WORKSPACE/tools/ci/vitest-run-reporter.mjs"
           status=$?
           set -e
-          node tools/ci/quarantine.mjs evaluate --scope node-os --exit-code "$status" --report "$report"
+          node tools/ci/quarantine.mjs evaluate --scope node-os --exit-code "$status" --report "$report" --run-record "$run_record"
 
   # W5-WINDOWS: the packed CLI as a Windows user has it. Packs the tarball, installs it into an empty
   # folder with npm, then runs tools/ci/windows-smoke.mjs: `--version`, `ui` without a terminal,

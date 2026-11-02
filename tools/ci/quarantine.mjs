@@ -13,12 +13,15 @@
 // `evaluate` re-checks the list. Fix the test, or delete its entry, before it expires.
 //
 //   node tools/ci/quarantine.mjs check
-//   node tools/ci/quarantine.mjs evaluate --scope node-os --exit-code "$status" --report <vitest.json>
+//   node tools/ci/quarantine.mjs evaluate --scope node-os --exit-code "$status" --report <vitest.json> \
+//     --run-record <run.json>
 //   node tools/ci/quarantine.mjs evaluate --scope checks --exit-code "$status" --turbo-runs .turbo/runs
 //
 // `--turbo-runs`: the tests ran as `turbo run test --continue --summarize -- --reporter=json
 // --outputFile.json=.vitest-report.json`; every task whose exit code is not 0 must have left
-// `<its directory>/.vitest-report.json`. Optional: --file <list> and --today <YYYY-MM-DD> (tests).
+// `<its directory>/.vitest-report.json` and `.vitest-run.json`. The run record comes from
+// tools/ci/vitest-run-reporter.mjs: an unhandled error or an interrupted run is never quarantinable
+// (the JSON report does not list unhandled errors). Optional: --file <list> and --today <YYYY-MM-DD> (tests).
 // Writes the run summary to GITHUB_STEP_SUMMARY when set.
 
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -34,6 +37,7 @@ const TEST_FILE_RE = /^[\w.@-]+(?:\/[\w.@-]+)*\.test\.(?:ts|tsx|mjs|js)$/;
 const DEFAULT_FILE = resolve(import.meta.dirname, 'quarantine.json');
 const REPO_ROOT = resolve(import.meta.dirname, '../..');
 const REPORT_NAME = '.vitest-report.json';
+const RUN_NAME = '.vitest-run.json'; // tools/ci/vitest-run-reporter.mjs
 
 const dayOf = (text) => {
   if (!DATE_RE.test(text ?? '')) return null;
@@ -77,6 +81,11 @@ export function validate(config, today) {
       if (expires < added || expires - added > MAX_DAYS) {
         problems.push(`${where}: expires must be within ${MAX_DAYS} days after added`);
       }
+      if (now !== null && added > now) {
+        problems.push(
+          `${where}: added (${e.added}) is after today; date an entry on the day it is added`,
+        );
+      }
       if (now !== null && now > expires) {
         problems.push(
           `${where}: the quarantine expired on ${e.expires}. Fix the test or delete the entry (owner ${e.owner}).`,
@@ -110,7 +119,8 @@ export function failuresOf(report, root) {
 }
 
 /**
- * Decides a test step. `reports`: [{ file, report }] (report null when missing or unreadable).
+ * Decides a test step. `reports`: [{ file, report, run }] (report null when missing or unreadable;
+ * run: the record of tools/ci/vitest-run-reporter.mjs, { unhandledErrors, reason }, or null).
  * Returns { ok, lines, summary }.
  */
 export function evaluate({ config, today, scope, exitCode, reports, root }) {
@@ -123,11 +133,23 @@ export function evaluate({ config, today, scope, exitCode, reports, root }) {
   const failed = [];
   const fileErrors = [];
   let missing = false;
-  for (const { file, report } of reports) {
+  for (const { file, report, run } of reports) {
     if (!report) {
       missing = true;
       lines.push(`::error::Test quarantine: no readable test report at ${file}.`);
       continue;
+    }
+    // IR F3: the JSON report does not list unhandled errors; the run record does.
+    if (exitCode !== 0) {
+      if (!Number.isInteger(run?.unhandledErrors) || typeof run?.reason !== 'string') {
+        missing = true;
+        lines.push(`::error::Test quarantine: no run record (unhandled errors) for ${file}.`);
+      } else if (run.unhandledErrors > 0 || run.reason === 'interrupted') {
+        missing = true;
+        lines.push(
+          `::error::Test quarantine: ${file}: ${run.unhandledErrors} unhandled error(s), run ${run.reason}; not quarantinable.`,
+        );
+      }
     }
     const f = failuresOf(report, root);
     failed.push(...f.failed);
@@ -190,7 +212,11 @@ function turboReports(runsDir, root) {
     const dir = typeof task?.directory === 'string' ? task.directory : '';
     const file = join(root, dir, REPORT_NAME);
     const ok = typeof code === 'number' && dir !== '' && !dir.split(/[\\/]/).includes('..');
-    out.push({ file: `${task?.taskId ?? 'a task'}: ${file}`, report: ok ? readJson(file) : null });
+    out.push({
+      file: `${task?.taskId ?? 'a task'}: ${file}`,
+      report: ok ? readJson(file) : null,
+      run: ok ? readJson(join(root, dir, RUN_NAME)) : null,
+    });
   }
   return out;
 }
@@ -199,7 +225,7 @@ function parse(argv) {
   const [command, ...rest] = argv;
   if (command !== 'check' && command !== 'evaluate')
     throw new Error('usage: quarantine.mjs check|evaluate ...');
-  const args = { command, reports: [] };
+  const args = { command, reports: [], runRecords: [] };
   for (let i = 0; i < rest.length; i += 2) {
     const [flag, value] = [rest[i], rest[i + 1]];
     if (value === undefined) throw new Error(`missing value for ${flag}`);
@@ -208,6 +234,7 @@ function parse(argv) {
     else if (flag === '--scope') args.scope = value;
     else if (flag === '--exit-code') args.exitCode = value;
     else if (flag === '--report') args.reports.push(value);
+    else if (flag === '--run-record') args.runRecords.push(value);
     else if (flag === '--turbo-runs') args.turboRuns = value;
     else throw new Error(`unknown argument ${flag}`);
   }
@@ -239,7 +266,11 @@ export function run({ argv, env = process.env, root = REPO_ROOT, log = console.l
       ? exitCode === 0
         ? []
         : turboReports(args.turboRuns, root)
-      : args.reports.map((file) => ({ file, report: readJson(file) }));
+      : args.reports.map((file, i) => ({
+          file,
+          report: readJson(file),
+          run: args.runRecords[i] ? readJson(args.runRecords[i]) : null,
+        }));
     const result = evaluate({ config, today, scope: args.scope, exitCode, reports, root });
     for (const l of result.lines) log(l);
     for (const l of result.summary) write(l);

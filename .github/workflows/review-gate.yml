@@ -156,6 +156,8 @@ jobs:
               [1, /^(\.gitleaks\.toml|\.gitleaksignore|\.changeset\/config\.json)$/],
               // Release tooling: release.yml runs these scripts in jobs holding the npm OIDC token (CODEOWNERS).
               [1, /^tools\/release\//],
+              // CI gate tooling, including the test quarantine (OPS-UNSTICK-A): a change can relax a gate.
+              [1, /^tools\/ci\//],
               [1, /^docs\/(foundation|process)\//],
               [1, /^(AGENTS|CLAUDE|SECURITY)\.md$/],
               // Public docs, published on merge (D-57). Owner decision 2026-10-25 (CHORE-CI-DOCS-FASTLANE):
@@ -175,6 +177,7 @@ jobs:
               /(^|\/)(\.npmrc|\.pnpmfile\.[^/]+)$/,
               /^(\.gitleaks\.toml|\.gitleaksignore|\.changeset\/config\.json)$/,
               /^tools\/release\//,
+              /^tools\/ci\//,
             ];
             const isSensitive = (path) => SENSITIVE.some((re) => re.test(path));
             // END path-classes

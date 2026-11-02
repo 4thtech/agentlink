@@ -81,6 +81,13 @@ on:
       - "packages/core/**"
       - "packages/crypto/**"
       - "packages/types/**"
+      # The rest of apps/invite's workspace dependency closure (via packages/core; OPS-UNSTICK-A,
+      # tools/release/deploy-path-triggers.test.mjs checks the closure is covered).
+      - "packages/chain/**"
+      - "packages/log/**"
+      - "packages/occ-v2-abi/**"
+      - "packages/storage/**"
+      - "packages/transport-nostr/**"
       - "pnpm-lock.yaml"
       - "package.json"
       - ".nvmrc"
