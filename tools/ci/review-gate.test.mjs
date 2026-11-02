@@ -402,8 +402,9 @@ describe('review-gate: mechanical version PR (OPS-UNSTICK-B)', () => {
       filename: 'apps/invite/package.json',
       status: 'modified',
       patch:
-        '@@ -10,4 +10,4 @@\n   "dependencies": {\n-    "@4thtech-io/core": "^0.4.9",\n+    "@4thtech-io/core": "^0.4.10",\n' +
-        '-    "@4thtech-io/types": "workspace:0.4.9"\n+    "@4thtech-io/types": "workspace:0.4.10"\n   }\n',
+        '@@ -10,4 +10,4 @@\n   "dependencies": {\n-    "@4thtech-io/core": "^0.4.9",\n' +
+        '-    "@4thtech-io/types": "workspace:0.4.9"\n+    "@4thtech-io/core": "^0.4.10",\n' +
+        '+    "@4thtech-io/types": "workspace:0.4.10"\n   }\n',
     });
     expect((await versionPr({ files })).failed).toBe(false);
   });
@@ -433,6 +434,20 @@ describe('review-gate: mechanical version PR (OPS-UNSTICK-B)', () => {
       ];
       notMechanical(await versionPr({ files }), extra);
     }
+  });
+
+  it('rejects a dependency that moves between blocks (Fable IR, low)', async () => {
+    const files = [
+      ...versionFiles(),
+      {
+        filename: 'apps/invite/package.json',
+        status: 'modified',
+        patch:
+          '@@ -10,8 +10,8 @@\n   "dependencies": {\n-    "@4thtech-io/core": "^0.4.9"\n+    "@4thtech-io/types": "^0.4.10"\n' +
+          '   },\n   "devDependencies": {\n-    "@4thtech-io/types": "^0.4.9"\n+    "@4thtech-io/core": "^0.4.10"\n   }\n',
+      },
+    ];
+    notMechanical(await versionPr({ files }));
   });
 
   it('rejects a version value that is not a plain semver', async () => {
@@ -478,6 +493,14 @@ describe('review-gate: mechanical version PR (OPS-UNSTICK-B)', () => {
       { headRepo: 'someone/agentlink' },
     ]) {
       expect((await versionPr(over)).failed, JSON.stringify(over)).toBe(true);
+    }
+  });
+
+  it('ignores RELEASE_BOT_LOGIN when it names a generic bot (Fable IR, low)', async () => {
+    for (const generic of ['github-actions[bot]', 'renovate[bot]', 'dependabot[bot]']) {
+      const r = await versionPr({ author: generic, releaseBot: generic });
+      expect(r.failed, generic).toBe(true);
+      expect(r.warnings.join('\n'), generic).not.toContain('without the version shape');
     }
   });
 

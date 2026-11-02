@@ -69,7 +69,10 @@ jobs:
             const isRenovate = sameRepo && authorType === 'Bot' && author === 'renovate[bot]';
             const releaseBot = (process.env.RELEASE_BOT_LOGIN ?? '').trim().toLowerCase();
             const changesetsBots = ['github-actions[bot]'];
-            if (/^[a-z0-9-]+\[bot\]$/.test(releaseBot)) changesetsBots.push(releaseBot);
+            // Only a `<slug>[bot]` login that is not a generic bot (OPS-UNSTICK-B).
+            if (/^[a-z0-9-]+\[bot\]$/.test(releaseBot) && !['github-actions[bot]', 'renovate[bot]', 'dependabot[bot]'].includes(releaseBot)) {
+              changesetsBots.push(releaseBot);
+            }
             const isChangesets =
               sameRepo && authorType === 'Bot' && changesetsBots.includes(author) && headRef.startsWith('changeset-release/');
             if (isRenovate || isChangesets) {

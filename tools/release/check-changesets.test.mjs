@@ -34,6 +34,10 @@ describe('isVersionPackagesPr', () => {
     expect(isVersionPackagesPr({ ...bot, author: 'talirezun', releaseBot: 'talirezun' })).toBe(
       false,
     );
+    // A generic bot in the variable adds nothing (renovate and dependabot stay non-exempt).
+    for (const generic of ['renovate[bot]', 'dependabot[bot]']) {
+      expect(isVersionPackagesPr({ ...bot, author: generic, releaseBot: generic })).toBe(false);
+    }
     expect(
       isVersionPackagesPr({ ...app, releaseBot: 'agentlink-release[bot]', sameRepo: false }),
     ).toBe(false);

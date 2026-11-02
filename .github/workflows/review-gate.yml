@@ -138,9 +138,13 @@ jobs:
             // Automated PR: decided ONLY by the PR author, which GitHub sets and nobody can forge.
             // Commit author names, e-mail addresses and the "verified" flag are never consulted.
             // OPS-UNSTICK-B: plus the release GitHub App (repository variable RELEASE_BOT_LOGIN, `<slug>[bot]`).
-            const RELEASE_BOT = (process.env.RELEASE_BOT_LOGIN ?? '').trim().toLowerCase();
+            // Accepted only as a `<slug>[bot]` login that is not a generic bot (anyone's workflow can act as those).
+            const GENERIC_BOTS = ['github-actions[bot]', 'renovate[bot]', 'dependabot[bot]'];
+            const releaseBotRaw = (process.env.RELEASE_BOT_LOGIN ?? '').trim().toLowerCase();
+            const RELEASE_BOT =
+              /^[a-z0-9-]+\[bot\]$/.test(releaseBotRaw) && !GENERIC_BOTS.includes(releaseBotRaw) ? releaseBotRaw : '';
             const BOT_AUTHORS = ['renovate[bot]', 'github-actions[bot]'];
-            if (/^[a-z0-9-]+\[bot\]$/.test(RELEASE_BOT)) BOT_AUTHORS.push(RELEASE_BOT);
+            if (RELEASE_BOT) BOT_AUTHORS.push(RELEASE_BOT);
             const isBotPr = BOT_AUTHORS.includes(author);
 
             // (a) Derive the class from the changed files (audit-rules.md §2.2; highest wins).
@@ -232,21 +236,33 @@ jobs:
                     bad.push(`${path}: not a modified file with a patch`);
                     continue;
                   }
-                  const removedKeys = [];
-                  const addedKeys = [];
+                  // Each run of consecutive changed lines must remove and add the same keys in the same order, so
+                  // a value changes in place: no new or dropped key, and nothing moves between blocks
+                  // (for example from devDependencies to dependencies), which needs a context line in between.
+                  const runs = [];
+                  let run = null;
+                  let shapeOk = true;
                   for (const line of f.patch.split('\n')) {
-                    if (line.startsWith('@@') || line.startsWith('\\')) continue;
+                    if (line.startsWith('\\')) continue;
                     const sign = line[0];
-                    if (sign !== '+' && sign !== '-') continue;
+                    if (sign !== '+' && sign !== '-') {
+                      run = null; // a context line or a hunk header ends the run
+                      continue;
+                    }
                     const m = VERSION_LINE.exec(line.slice(1)) ?? DEP_LINE.exec(line.slice(1));
                     if (!m) {
                       bad.push(`${path}: a changed line is not a version or internal dependency range`);
+                      shapeOk = false;
                       break;
                     }
-                    (sign === '+' ? addedKeys : removedKeys).push(m[1]);
+                    if (!run) runs.push((run = { removed: [], added: [] }));
+                    (sign === '+' ? run.added : run.removed).push(m[1]);
                   }
-                  if (removedKeys.length === 0 || removedKeys.sort().join('\n') !== addedKeys.sort().join('\n')) {
-                    bad.push(`${path}: the removed and added keys differ`);
+                  if (
+                    shapeOk &&
+                    (runs.length === 0 || runs.some((r) => r.removed.join('\n') !== r.added.join('\n')))
+                  ) {
+                    bad.push(`${path}: a changed key does not change in place`);
                   }
                 } else if (/^((packages|apps)\/[^/]+\/)?CHANGELOG\.md$/.test(path)) {
                   if (f.status !== 'modified' && f.status !== 'added') bad.push(`${path}: ${f.status}`);

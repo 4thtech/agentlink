@@ -18,9 +18,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+export const GENERIC_BOTS = ['github-actions[bot]', 'renovate[bot]', 'dependabot[bot]'];
+
 export function isVersionPackagesPr({ headRef, author, sameRepo, releaseBot = '' }) {
   const bots = ['github-actions[bot]'];
-  if (/^[a-z0-9-]+\[bot\]$/.test(releaseBot)) bots.push(releaseBot);
+  // Only a `<slug>[bot]` login that is not a generic bot (anyone's workflow can act as those).
+  if (/^[a-z0-9-]+\[bot\]$/.test(releaseBot) && !GENERIC_BOTS.includes(releaseBot)) {
+    bots.push(releaseBot);
+  }
   return (
     sameRepo === true &&
     bots.includes(author) &&
