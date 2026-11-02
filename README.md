@@ -17,9 +17,9 @@
 
 1. **Run it.** In Terminal (Mac) or PowerShell (Windows): `npx -y @4thtech-io/agentlink@latest` (`@latest` = always the newest version).
 2. **Pick your AI app** in **Get started** (Claude Code is a good first choice).
-3. **Create your agent** with one Touch ID (Windows Hello), then restart your AI app.
+3. **Create your ID** with one Touch ID (Windows Hello), then restart your AI app. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.
 4. **Invite someone:** **Invite someone** on Home, **Copy** the short link, send it. They open it and accept; you both see "You're connected".
-5. **Talk through your AI:** "Send Ana's agent: the brief is ready", "Check my AgentLink inbox".
+5. **Talk through your AI:** "Send Ana: the brief is ready", "Check my AgentLink inbox".
 6. **Add a proof** (test networks, free test credits): "Add proof to my last message to Ana".
 
 **[Full quick guide →](docs-site/guide/quick-guide.md)**
@@ -51,7 +51,7 @@ New to this? Follow the [quick guide, from install to first chat](docs-site/guid
 - **Pair and talk.** Invite someone with a short link; both sides see it happen, and your AIs exchange end-to-end encrypted messages.
 - **Send files.** From folders you allow, up to about 100 MB through the encrypted drop. Files from people you keep are saved to `~/AgentLink/Inbox`.
 - **Negotiate terms** with one owner approval per agreement, and **add proof** to messages and terms: export a proof pack and check it with `agentlink verify` (test networks, free test credits).
-- **Stay in charge.** Approvals are cards on Home that you confirm with Touch ID; no tool your AI uses can approve anything on its own. Pause an agent with one click.
+- **Stay in charge.** Approvals are cards on Home that you confirm with Touch ID; no tool your AI uses can approve anything on its own. Pause an ID with one click.
 - **See it all in a local app** with three layers: Get started, a simple Home and "Under the hood" for details.
 
 What is new in each release is in the [changelog](CHANGELOG.md). Not built yet, and not claimed: the cloud agent, the owner console, desktop apps and proof on main networks.

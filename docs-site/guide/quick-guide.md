@@ -25,9 +25,11 @@ Keep that window open while you use AgentLink. Press **Ctrl+C** in it to close t
 
 On a new computer the app opens on **Get started**. Under **Which AI app do you use?** pick yours (for example Claude Code). Apps AgentLink found on your computer are listed under **Found on this Mac** (on Windows, **Found on this computer**). Press **Continue with** and the app's name.
 
-## 3. Create your agent in that AI app
+## 3. Create your ID in that AI app
 
-1. Press **Connect with Touch ID** (on Windows, **Connect with Windows Hello**). This creates your agent and adds AgentLink to your AI app. Your AI cannot approve this for you.
+An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.
+
+1. Press **Connect with Touch ID** (on Windows, **Connect with Windows Hello**). This creates the ID for your AI app and adds AgentLink to it. Your AI cannot approve this for you.
 2. If the app shows a backup code, save it in a password manager right away. It is shown once.
 3. The screen says **Connected to** your AI app. If the AI app was open, **quit it and open it again** (in Claude Code, close the session and start `claude` again). It only picks up AgentLink after a restart. Until then Home shows **Connected · restart {app} to start**, which is normal. When it says **Ready in {app}**, you can go on.
 
@@ -60,7 +62,7 @@ Open your AI app and type what you want in plain words. AgentLink does the rest.
 
 | You type | What happens |
 |---|---|
-| "Send Ana's agent: the brief is ready, can you review it today?" | Sends an encrypted message (`agentlink_send`). It confirms in about a second (0.4.9 and later; older versions take about ten seconds). |
+| "Send Ana: the brief is ready, can you review it today?" | Sends an encrypted message (`agentlink_send`). It confirms in about a second (0.4.9 and later; older versions take about ten seconds). |
 | "Check my AgentLink inbox" | Reads new messages (`agentlink_inbox`). Claude also checks `agentlink_status` at the start of a session and tells you who wrote. |
 | "Who are my AgentLink contacts?" | Lists the people you are connected with (`agentlink_list_contacts`). |
 | "Send the file report.pdf from my AgentLink Send folder to Ana" | Sends the file. Your AI may send files only from `~/AgentLink/Send`. Put the file there first. |
@@ -102,9 +104,9 @@ Test credits have no value. See [Agreements and proof](everyday-use/agreements-a
 
 **It says Offline.** On Home, **Offline** means the app cannot reach the network right now; check your internet connection and wait a moment. If an AI app shows **Connected · restart {app} to start**, quit that AI app and open it again. If it says **Not running**, open your AI app.
 
-**Windows won't install.** Check `node --version` in PowerShell (22.14 or newer). Open a new PowerShell window after installing Node. Try `cmd /c npx -y @4thtech-io/agentlink@latest`. If your AI app says it cannot start AgentLink, open AgentLink and connect the app again from **Agents**. If Windows says "Windows protected your PC", see [Windows](get-started/windows.md).
+**Windows won't install.** Check `node --version` in PowerShell (22.14 or newer). Open a new PowerShell window after installing Node. Try `cmd /c npx -y @4thtech-io/agentlink@latest`. If your AI app says it cannot start AgentLink, open AgentLink and connect the app again from **IDs**. If Windows says "Windows protected your PC", see [Windows](get-started/windows.md).
 
-**The app asks me to quit first.** When you connect, disconnect or remove an agent, AgentLink needs the AI app to be closed. Quit the app named on the screen (**Quit {app} first**), then try again.
+**The app asks me to quit first.** When you connect, disconnect or remove an ID, AgentLink needs the AI app to be closed. Quit the app named on the screen (**Quit {app} first**), then try again.
 
 Still stuck? Run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal. It shows what is set up and how to fix the rest. More help: [Troubleshooting](help/troubleshooting.md).
 

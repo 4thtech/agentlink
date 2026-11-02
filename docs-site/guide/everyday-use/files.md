@@ -2,7 +2,7 @@
 
 *Applies to AgentLink 0.4.8.*
 
-Your agent can send files to your contacts' agents and save the ones they send you. Files are free and locked on your computer before they leave it.
+Your AI can send files to your contacts' AIs and save the ones they send you. Files are free and locked on your computer before they leave it.
 
 ## How files travel
 
@@ -13,16 +13,16 @@ Your agent can send files to your contacts' agents and save the ones they send y
 
 ## Send a file
 
-1. Make sure the file is in a folder your agent may send from. Setup creates one for you: `AgentLink/Send` in your home folder. To allow another, see [Folders for sending files](allowed-folders.md).
+1. Make sure the file is in a folder your AI may send from. Setup creates one for you: `AgentLink/Send` in your home folder. To allow another, see [Folders for sending files](allowed-folders.md).
 2. Put the file in the folder and ask: "Send AgentLink/Send/report.pdf to Marko with a short note."
 
 Before anything is read, AgentLink checks that:
 
-- The file is inside an allowed folder. If not, nothing is read or sent, and your agent tells you what to do.
+- The file is inside an allowed folder. If not, nothing is read or sent, and your AI tells you what to do.
 - It is not a hidden file (such as `.env`) or in a private folder (such as `~/.ssh`). Those are never sent.
-- It is not too big for the drop. If it is, your agent tells you it needs your own storage.
+- It is not too big for the drop. If it is, your AI tells you it needs your own storage.
 
-Your agent sees the file's name, size, fingerprint, how it travelled and when the link expires. It never sees the download link or the key that unlocks the file.
+Your AI sees the file's name, size, fingerprint, how it travelled and when the link expires. It never sees the download link or the key that unlocks the file.
 
 ## Receive a file
 
@@ -33,13 +33,13 @@ When a contact you keep sends a file, AgentLink saves it for you, with no reques
 - saved in your inbox folder (`~/AgentLink/Inbox` by default), under a cleaned-up name that never replaces an existing file,
 - never opened or run. On macOS and Windows it carries the system's "downloaded from the internet" mark, and a name the system could act on gets `.download` added.
 
-Automatic saving has limits: 50 files and 500 MB per contact and 200 files and 2 GB in total per day, with 1 GiB of disk space always kept free. It never saves while the agent is [paused](../local-app/agents.md). A file over a limit, or one not saved for another reason, reads **Arrived · not saved** with **Save to Inbox**; confirm with Touch ID. Choosing the Inbox folder, turning automatic saving off and **Ask before saving** for one contact are not in the app yet.
+Automatic saving has limits: 50 files and 500 MB per contact and 200 files and 2 GB in total per day, with 1 GiB of disk space always kept free. It never saves while the ID is [paused](../local-app/ids.md). A file over a limit, or one not saved for another reason, reads **Arrived · not saved** with **Save to Inbox**; confirm with Touch ID. Choosing the Inbox folder, turning automatic saving off and **Ask before saving** for one contact are not in the app yet.
 
 ## Cleaning up
 
-- When a file expires, the stored copy is deleted and both agents forget what they need to open it.
+- When a file expires, the stored copy is deleted and both sides forget what they need to open it.
 - If you set `files.deleteAfter: receipt` in your rules, a file you sent is deleted from storage once the contact's delivery receipt is on record. Without a receipt, it stays until it expires.
-- If the storage refuses a file's link before it expires, the receiving agent can ask the sender's agent for a fresh link. It works when the sender's agent is online.
+- If the storage refuses a file's link before it expires, the receiving AI can ask the sender's AI for a fresh link. It works when the sender's AI app is open.
 
 ## Prove a file was sent
 

@@ -2,7 +2,7 @@
 
 *Applies to AgentLink 0.4.8.*
 
-Contacts are the people whose agents yours may talk to. You add one by [pairing](../get-started/pair-with-someone.md).
+Contacts are the people your AI may talk to. You add one by [pairing](../get-started/pair-with-someone.md).
 
 ## How contacts work
 
@@ -27,7 +27,7 @@ In a terminal you opened yourself:
 2. `npx -y @4thtech-io/agentlink@latest contacts rename <ID> "New name"` gives it your own name. Use letters, numbers, spaces, dots, apostrophes and hyphens, at most 32 characters. Words like "verified" or "owner" are not allowed, and the name must differ from your other contacts.
 3. `npx -y @4thtech-io/agentlink@latest contacts remove <ID>` removes it. Your AI can no longer send to it. The other person is not told. To talk again, pair with a new invite.
 
-Both ask for your owner code. Your AI cannot rename or remove a contact. Add `--agent <name>` if you have several agents.
+Both ask for your owner code. Your AI cannot rename or remove a contact. Add `--agent <name>` if you have several IDs.
 
 ## Messages from strangers
 

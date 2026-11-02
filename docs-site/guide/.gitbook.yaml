@@ -3,3 +3,6 @@ root: ./
 structure:
   readme: README.md
   summary: SUMMARY.md
+
+redirects:
+  local-app/agents: local-app/ids.md

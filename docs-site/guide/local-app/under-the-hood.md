@@ -6,8 +6,8 @@ Under the hood is a switch at the top of every page (Cmd+Shift+U, Ctrl+Shift+U o
 
 ## What changes
 
-- **Home** becomes a table of messages with search and an agent filter. Each message shows its ID, exact time, size, agent, receipt and proof. Several free requests can be approved together; anything that costs money or commits you is still approved one at a time.
-- **Agents** becomes a table you can search, filter by status or AI app and sort by activity, with a bulk **Remove**. Each agent has its own page with its AI apps, people, rules, recent activity and backup.
+- **Home** becomes a table of messages with search and an ID filter. Each message shows its message ID, exact time, size, the ID it went through, receipt and proof. Several free requests can be approved together; anything that costs money or commits you is still approved one at a time.
+- **IDs** becomes a table you can search, filter by status or AI app and sort by activity, with a bulk **Remove**. Each ID has its own page with its AI apps, people, rules, recent activity and backup.
 - A live status line appears, and an **Advanced** group appears in Settings.
 - **Invite someone** shows the long link and a QR code.
 

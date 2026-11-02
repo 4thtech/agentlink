@@ -36,15 +36,15 @@ No. They are locked on your computer before they leave it, and 4thTech never get
 
 ### Who can read my messages?
 
-Your agent, the other agent, and the owners of both agents. The owner is the person or company responsible for an agent.
+Your AI, the other person's AI, and the owners of both IDs. The owner is the person or company responsible for an ID.
 
-### How do I stop my agent right away?
+### How do I stop my ID right away?
 
-Open **Agents** and choose **Pause**. It takes one click and no Touch ID, and it stops the agent in every AI app. Your AI can still read, but sends, offers, proof, invites and file fetches are refused with "This agent is paused. The owner can resume it in the AgentLink app." Resume needs Touch ID, and your AI cannot pause or resume. See [Agents](../local-app/agents.md).
+Open **IDs** and choose **Pause**. It takes one click and no Touch ID, and it stops the ID in every AI app. Your AI can still read, but sends, offers, proof, invites and file fetches are refused with "This AgentLink ID is paused. The owner can resume it in the AgentLink app." Resume needs Touch ID, and your AI cannot pause or resume. See [IDs](../local-app/ids.md).
 
 ### Where do files people send me go?
 
-Files from contacts you keep are saved automatically to `~/AgentLink/Inbox`, within daily limits and never while the agent is paused. A file that was not saved reads "Arrived · not saved" with **Save to Inbox**. Choosing another folder, turning automatic saving off and "Ask before saving" for one contact are not in the app yet. AgentLink never opens or runs a saved file. See [Privacy and security](../privacy-and-security.md).
+Files from contacts you keep are saved automatically to `~/AgentLink/Inbox`, within daily limits and never while the ID is paused. A file that was not saved reads "Arrived · not saved" with **Save to Inbox**. Choosing another folder, turning automatic saving off and "Ask before saving" for one contact are not in the app yet. AgentLink never opens or runs a saved file. See [Privacy and security](../privacy-and-security.md).
 
 ### What is Under the hood?
 
@@ -56,7 +56,7 @@ Only within the rules you set. New contacts, accepting terms and spending above 
 
 ### What does a proof make public?
 
-Anyone can see that your agent recorded something, when, and what kind it was (a message, a file or an offer). They can't see what it says. Your agent tells you this before it records anything. See [What a proof makes public](../privacy-and-security.md#what-a-proof-makes-public).
+Anyone can see that your AgentLink ID recorded something, when, and what kind it was (a message, a file or an offer). They can't see what it says. Your AI tells you this before it records anything. See [What a proof makes public](../privacy-and-security.md#what-a-proof-makes-public).
 
 ### What does "test network" mean?
 
@@ -64,13 +64,13 @@ It is a practice version of the public record, where nothing has real value. Pro
 
 ## Using it
 
-### Can my agent negotiate for me?
+### Can my AI negotiate for me?
 
-Yes. It can send an offer, counter an offer or reject one, and that is free. Accepting commits you, so your agent only accepts when you ask, and the owner approves it once. See [Negotiating terms](../everyday-use/negotiating-terms.md).
+Yes. It can send an offer, counter an offer or reject one, and that is free. Accepting commits you, so your AI only accepts when you ask, and the owner approves it once. See [Negotiating terms](../everyday-use/negotiating-terms.md).
 
 ### Does a proof of agreement have legal effect?
 
-AgentLink records the agreement: that both agents agreed to exactly the same terms, and when. That record does not by itself give the agreement legal effect, and AgentLink doesn't move money. Ask a lawyer if the legal side matters to you.
+AgentLink records the agreement: that both sides agreed to exactly the same terms, and when. That record does not by itself give the agreement legal effect, and AgentLink doesn't move money. Ask a lawyer if the legal side matters to you.
 
 ### Can I use AgentLink with ChatGPT or claude.ai?
 
@@ -78,11 +78,11 @@ Not directly yet. They need an always-on agent in your own cloud account, which 
 
 ### How do I open the AgentLink app?
 
-Run `npx -y @4thtech-io/agentlink@latest` in a terminal you opened yourself (`ui` does the same). On a new computer it opens on Get started; afterwards on Home, and Get started stays in the **?** Help menu. In 0.2.0, the only page that opens in your browser is the approval page, when your agent needs your OK.
+Run `npx -y @4thtech-io/agentlink@latest` in a terminal you opened yourself (`ui` does the same). On a new computer it opens on Get started; afterwards on Home, and Get started stays in the **?** Help menu. In 0.2.0, the only page that opens in your browser is the approval page, when your AI needs your OK.
 
 ### What if I lose my computer?
 
-Your keys live on your computer. Back up an agent from **Agents** to get a recovery kit that you keep safe; restoring from a kit works again in 0.4.6. Keep your backup code safe as well.
+Your keys live on your computer. Back up an ID from **IDs** to get a recovery kit that you keep safe; restoring from a kit works again in 0.4.6. Keep your backup code safe as well.
 
 ## The project
 

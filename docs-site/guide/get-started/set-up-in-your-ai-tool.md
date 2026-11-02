@@ -14,7 +14,7 @@ You never edit a settings file by hand. The installer shows the exact change and
 
 ## 2. Install into your AI tool
 
-Pick a **name** for the agent, for example `claude`, `codex` or `gemini`. It is just a label on your computer. Each AI tool gets its own agent. Run the line for your tool in a terminal and replace `<name>` with your label.
+Pick a **name** for the ID, for example `claude`, `codex` or `gemini`. It is just a label on your computer. Each AI tool gets its own ID. Run the line for your tool in a terminal and replace `<name>` with your label.
 
 | AI tool | Copy and paste |
 |---|---|
@@ -33,13 +33,13 @@ You can also paste this into your AI tool and let it run the command: "Install A
 
 ### Claude Desktop is not Claude Code
 
-**Claude Desktop** is the Claude app's chat window, the one where you add connectors. It is a different program from Claude Code, with its own settings, so it needs its own agent. It is available on macOS and Windows. There is also a one-click download: see [Claude Desktop](claude-desktop.md).
+**Claude Desktop** is the Claude app's chat window, the one where you add connectors. It is a different program from Claude Code, with its own settings, so it needs its own ID. It is available on macOS and Windows. There is also a one-click download: see [Claude Desktop](claude-desktop.md).
 
 ## 3. Protect your approvals
 
 This is the one thing your AI can never do for you. Run it **in your own terminal**: open your normal terminal app, not the one inside your AI tool, and never let your AI run it.
 
-- **Your first agent on this computer:** in 0.3.0 and later, `init` already opens the app on Get started in your browser (see [Get started in the app](../local-app/get-started-wizard.md)); use it. Or, in the terminal (the only way in 0.2.0):
+- **Your first ID on this computer:** in 0.3.0 and later, `init` already opens the app on Get started in your browser (see [Get started in the app](../local-app/get-started-wizard.md)); use it. Or, in the terminal (the only way in 0.2.0):
 
   ```bash
   npx -y @4thtech-io/agentlink@latest owner init --agent <name>
@@ -47,7 +47,7 @@ This is the one thing your AI can never do for you. Run it **in your own termina
 
   It shows a generated owner code once and asks you to type its last four characters back. Keep the code in your password manager. Never type it into a chat with your AI.
 
-- **Every further agent on the same computer** (a second AI tool): in 0.4.6 you can add it in the app (the agent menu at the top or **Agents**, then **New agent**: name, AI app, one Touch ID; see [Agents](../local-app/agents.md)). In the terminal, run `init` for it as in step 2, then, in your own terminal:
+- **Every further ID on the same computer** (a second AI tool): in 0.4.6 you can add it in the app (the ID menu at the top or **IDs**, then **New ID**: name, AI app, one Touch ID; see [IDs](../local-app/ids.md)). In the terminal, run `init` for it as in step 2, then, in your own terminal:
 
   ```bash
   npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>
@@ -55,7 +55,7 @@ This is the one thing your AI can never do for you. Run it **in your own termina
 
   It asks for your owner code once and does not change it. A second `owner init` is refused.
 
-The same step also creates an empty `AgentLink/Send` folder in your home folder. It is the first place your agent may send files from. Details: [Protect your approvals](protect-your-approvals.md).
+The same step also creates an empty `AgentLink/Send` folder in your home folder. It is the first place your AI may send files from. Details: [Protect your approvals](protect-your-approvals.md).
 
 ## 4. Restart and test
 
@@ -63,7 +63,7 @@ Restart your AI tool, then ask it: **"What's my AgentLink status?"**
 
 A good answer says AgentLink is set up, and how many contacts and new messages you have (none, at first).
 
-If it says **"This agent has no card from your owner yet"**, the agent exists but you have not vouched for it yet. In your own terminal, run `npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>` (or `owner init --agent <name>` if this is your first agent), then ask again.
+If it says **"This ID has no card from your owner yet"**, the ID exists but you have not vouched for it yet. In your own terminal, run `npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>` (or `owner init --agent <name>` if this is your first ID), then ask again.
 
 ## 5. Pair two of your own tools
 
@@ -81,8 +81,8 @@ Pairing with another person works the same way: [Pair with someone](pair-with-so
 
 1. **The AgentLink tools do not show up.** Restart the AI tool completely. Then run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal. It shows what is set up and prints the fix. If `init` could not find your tool, name it with `--harness`.
 2. **`npx` fails, or "Node too old".** Run `node --version`. You need 22.14 or newer. Install the current LTS, then open a new terminal.
-3. **"This agent has no card from your owner yet".** Run `owner add-agent --agent <name>` in your own terminal (step 4).
+3. **"This ID has no card from your owner yet".** Run `owner add-agent --agent <name>` in your own terminal (step 4).
 4. **`owner` says it looks like a terminal your AI controls.** That is on purpose. Open a new terminal window yourself and run it there.
-5. **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one. If a message has not arrived, wait up to a minute and ask your agent to check again.
+5. **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one. If a message has not arrived, wait up to a minute and ask your AI to check again.
 
 Next: [Send your first message](first-message.md)

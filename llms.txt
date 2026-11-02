@@ -13,7 +13,7 @@
 ## Optional
 
 - [Project README](https://github.com/4thtech/agentlink/blob/main/README.md): the public face of the project, with the current Status
-- [Quick guide: install to first chat](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md): run the app, pick an AI app, create an agent, invite, accept a link, talk through your AI, follow the conversation, add a proof on test networks, troubleshooting
+- [Quick guide: install to first chat](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md): run the app, pick an AI app, create your AI app's ID, invite, accept a link, talk through your AI, follow the conversation, add a proof on test networks, troubleshooting
 - [Public user guide](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/README.md): the user documentation, with planned features marked
 - [Set up in your AI tool](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/set-up-in-your-ai-tool.md): beginner walkthrough with the Node check, install per tool, owner step, test, pairing and troubleshooting
 - [How messages are delivered](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/everyday-use/how-messages-are-delivered.md): live and mailbox delivery, status-first habit, relay limits
