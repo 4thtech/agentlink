@@ -153,3 +153,24 @@ A change is done only when all ten are true:
 | "Test it" | A real end-to-end run on testnets or staging with proof (logs, response, received message), cleaned up afterwards |
 | "Release" (stable) | The Version packages PR merges; `publish-latest` waits for your approval click; health check and rollback path are ready |
 | "Stop" or `DEPLOY_FREEZE` | Everything halts; auto-merge is disabled on open PRs; you decide when to clear it |
+
+---
+
+## 7. Owner feedback loop: local first, CI once
+
+Owner rule of 2026-11-02. When the owner tests the app and sends feedback (screenshots, notes), CI runs once per agreed batch, not once per small fix.
+
+1. **Fix locally on one branch.** No PR per fix.
+2. **Show it on his machine from the unreleased build**, on a separate test profile: a temporary `HOME`, so his real `~/.agentlink`, keychain items and AI-app configurations are never touched. Send him the `localhost` link (the app opens it in his browser) and the exact clicks to check each item.
+3. **Repeat** fix, look, until he says it is good.
+4. **Only then one PR** for the batch (independent review if it is S2 or touches a sensitive path), CI once, auto-merge, and the release with his clicks (npm `latest` needs his approval).
+
+Starting the preview, from the repository root of the branch (the `ui` command needs a real terminal and opens the browser itself; it never prints the session link):
+
+```bash
+pnpm --filter '@4thtech-io/agentlink...' build
+export PREVIEW_HOME="$(mktemp -d)"
+HOME="$PREVIEW_HOME" node apps/cli/dist/agentlink.js ui
+```
+
+Step by step, with the traps: [RB-21](../runbooks/owner-feedback-loop.md).

@@ -30,6 +30,7 @@ CI deploys; nobody deploys from a workstation. The orchestrator (Opus) verifies.
    - Staging skipped with a notice (Cloudflare credentials or a required Worker secret not set): green, nothing deployed.
    - The head's own CI failed (a flake): the run ends at `ci-green`; `catch-up` hands it to a new run for the head. If no run follows, the hourly `Deploy reconcile` workflow (`deploy-reconcile.yml`, minute 23) compares the commit production runs with `main`'s head and dispatches the deploy when a commit in between touched the deploy paths and the head's CI is green (at most twice per head). It does nothing while `DEPLOY_FREEZE` is `true`.
    - The run waits for the `production` approval: it is "waiting", not failed ([RB-19](submitter-deploy.md) step 18).
+   - **Trap (2 Nov 2026): a run approved after `main` moved on goes green but skips production.** The `deploy-production` step finds that its commit is no longer `main`'s head, logs "main has moved on", changes nothing and ends green. The `catch-up` job starts a **new** run for the new head, and that run waits for the approval again. So: read the run summary ("Superseded by `<sha>`"), approve the newest run, and verify the live route (step 4), never the run colour. Avoid merging to `main` while a production approval is waiting; wait for the deploy to finish first.
    To see which commit production runs: the newest `push` or `workflow_dispatch` run of the workflow whose `deploy-production` job succeeded with its deploy step run (the reconcile script uses the same rule).
 2. Confirm staging went first and its smoke tests passed in the same run, then production.
 3. **Compare content with the record.**
@@ -46,6 +47,7 @@ CI deploys; nobody deploys from a workstation. The orchestrator (Opus) verifies.
      ```
      compare with the integrity CI recorded for the packed tarball, and check provenance in a clean directory with `npm audit signatures` after installing that exact version.
 4. **One live observation only the new code produces**: a response field, a header, a version string, a smoke-test result. Choose it before the deploy and name it in the PR or release note.
+   - **After a release, check that production serves the new routes**, not only that the old ones answer. Example, for a drop release that added the invite route: `curl -s -o /dev/null -w '%{http_code}\n' https://drop.agentlink.4thtech.io/v1/invite` (a GET) must answer `405` (the route exists and accepts only a signed POST, `apps/drop/src/worker.ts`); a `404` means the old Worker is still live.
 5. Write the result into the deploy record draft for the orchestrator to complete and file privately (`release-and-deployment.md` §5.2), and label it **verified** in your report to the owner.
 
 ## Verify
