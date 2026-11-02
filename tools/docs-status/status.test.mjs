@@ -19,6 +19,8 @@ import {
   formatBacklogCounts,
   renderReadmeRoadmap,
   renderReadmeStatus,
+  renderKnowledgeSummary,
+  releaseLines,
   renderSiteMilestones,
   renderSiteSummary,
   replaceBlock,
@@ -306,5 +308,48 @@ describe('the backlog card counts', () => {
       expect(problems).toContain(BACKLOG);
       expect(problems).toContain('--counts');
     });
+  });
+});
+
+describe('the releases list', () => {
+  const data = {
+    ...real(),
+    releases: [
+      { version: '0.9.2', date: '3 Dec 2026', summary: 'Newest.' },
+      { version: '0.9.1', date: '2 Dec 2026', summary: 'Middle.' },
+      { version: '0.9.0', date: '1 Dec 2026', summary: 'Oldest.' },
+      { version: '0.8.0', date: '1 Nov 2026', summary: 'Earlier.' },
+    ],
+  };
+
+  it('renders one bullet per release, newest first, in the order given', () => {
+    expect(releaseLines(data)).toEqual([
+      '- **0.9.2** (3 Dec 2026): Newest.',
+      '- **0.9.1** (2 Dec 2026): Middle.',
+      '- **0.9.0** (1 Dec 2026): Oldest.',
+      '- **0.8.0** (1 Nov 2026): Earlier.',
+    ]);
+    const site = renderSiteSummary(data);
+    expect(site.indexOf('0.9.2')).toBeLessThan(site.indexOf('0.9.1'));
+    expect(site).toContain('- **0.8.0** (1 Nov 2026): Earlier.');
+  });
+
+  it('shows only the newest three in the knowledge base, with a link to the changelog', () => {
+    const knowledge = renderKnowledgeSummary(data);
+    expect(knowledge).toContain('- **0.9.0** (1 Dec 2026): Oldest.');
+    expect(knowledge).not.toContain('0.8.0');
+    expect(knowledge).toContain('CHANGELOG.md');
+  });
+
+  it('emits nothing for an empty or absent list', () => {
+    expect(releaseLines({ ...data, releases: [] })).toEqual([]);
+    expect(releaseLines({ ...data, releases: undefined })).toEqual([]);
+    for (const releases of [[], undefined]) {
+      const site = renderSiteSummary({ ...data, releases });
+      expect(site).not.toContain('Releases, newest first');
+      const knowledge = renderKnowledgeSummary({ ...data, releases });
+      expect(knowledge).not.toContain('Latest releases');
+      expect(knowledge).not.toContain('CHANGELOG.md');
+    }
   });
 });

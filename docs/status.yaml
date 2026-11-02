@@ -18,7 +18,7 @@ updated: "2026-11-02"
 version: "v0.4.8"
 versionLabel: "M1b, files, proof, credits (pre-alpha, test networks)"
 milestone: "M1b Files, proof, credits"
-phase: "M0 Foundations nearly complete; M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, with the local app from 0.3.0; the current release is 0.4.8 (1 Nov 2026), pre-alpha, test networks only"
+phase: "M0 Foundations nearly complete; M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, with the local app from 0.3.0; the current release is 0.4.8 (2 Nov 2026), pre-alpha, test networks only"
 
 # Components by area. state: done | in-progress | planned.
 # `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.4.8) is published or user-runnable until a release says so.
@@ -463,12 +463,13 @@ deploy:
     note: "The encrypted drop Worker is deployed to production at drop.agentlink.4thtech.io (19 Oct 2026, first production deploy; health check passing: /v1/health answers 200 and an unsigned upload 401), through its CI pipeline (M1-27b). The released CLI uses it for files above about 12 KB (since v0.2.0). The submitter Worker is deployed to production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta on Base Sepolia, health ok) through its CI pipeline with owner approval (M1-10c); proofs work end to end on the testnet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "**AgentLink 0.4.8 is out (1 Nov 2026, on npm `latest`, Mac and Windows).** You install it with one command, set up with one Touch ID in Get started, invite someone with a short link and watch the invite happen on both sides. Home shows what waits for you and your conversations, files you receive are saved to your Inbox folder, and the public invite page at agentlink.4thtech.io looks like the app. Coming next, not released yet: the Connections map, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23)."
+current: "**AgentLink 0.4.8 is out (2 Nov 2026, on npm `latest`, Mac and Windows).** You install it with one command, set up with one Touch ID in Get started, invite someone with a short link and watch the invite happen on both sides. Home shows what waits for you and your conversations, files you receive are saved to your Inbox folder, and the public invite page at agentlink.4thtech.io looks like the app."
+inProgress: "Coming next, not released yet: the Connections map, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23)."
 
 # Release history for the docs-site status page and the knowledge overview, newest first, one line each.
 releases:
   - version: "0.4.8"
-    date: "1 Nov 2026"
+    date: "2 Nov 2026"
     summary: "The public invite page looks like the app (three ways to accept); Get started completes once you are connected; Files opens Home; removing an agent says \"Quit {app} first\" before Touch ID; a removed connection shows on Home; no \"Offline\" before the first heartbeat."
   - version: "0.4.7"
     date: "1 Nov 2026"
@@ -477,11 +478,11 @@ releases:
     date: "31 Oct 2026"
     summary: "The new app in three layers (Get started, Home, Under the hood); short invite links; files saved to your Inbox folder; live AI app status; Pause and Resume; recovery kits restore again."
   - version: "0.4.5"
-    date: "29 Oct 2026"
+    date: "30 Oct 2026"
     summary: "Fixes to the new app: new contacts appear without a reload, removing an agent finishes, Touch ID is found when no agent is open, one status in the top bar, early previews on `@next`."
   - version: "0.4.4"
     date: "29 Oct 2026"
-    summary: "Welcome and a short first run, all your agents in one window, an AI apps page, a live connections map, seven-step Start here, and joining from an invite link with `agentlink join`."
+    summary: "Welcome and a short first run, all your agents in one window, an AI apps page, a live connections map (later replaced), seven-step Start here, and joining from an invite link with `agentlink join`."
   - version: "0.4.3"
     date: "28 Oct 2026"
     summary: "Add contact with invite links (Copy, Share, QR code), a Start here checklist, adding credits in three steps, a 24-hour activity pulse and a compact view."

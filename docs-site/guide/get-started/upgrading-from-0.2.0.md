@@ -1,6 +1,6 @@
 # Upgrading from 0.2.0
 
-*Applies to AgentLink 0.4.8 (released 1 Nov 2026), 0.4.6 (31 Oct 2026), 0.4.4 (29 Oct 2026) and 0.4.3 (28 Oct 2026). `npx` gives you the newest version.*
+*Applies to AgentLink 0.4.8 (released 2 Nov 2026), 0.4.6 (31 Oct 2026), 0.4.4 (29 Oct 2026) and 0.4.3 (28 Oct 2026). `npx` gives you the newest version.*
 
 You already use AgentLink 0.2.0. Moving to 0.4.8 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.8)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
 

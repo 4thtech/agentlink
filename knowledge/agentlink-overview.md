@@ -69,10 +69,10 @@ Apps built by other companies on AgentLink may add their own fee, always shown s
 ## Status and roadmap
 
 <!-- status-intro:start -->
-AgentLink is pre-alpha, last updated 2 Nov 2026, version v0.4.8. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.4.8 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. The released CLI opens with `npx -y @4thtech-io/agentlink`; an AI can set itself up with `npx -y @4thtech-io/agentlink init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
+AgentLink is pre-alpha, last updated 2 Nov 2026, version v0.4.8. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.4.8 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. **AgentLink 0.4.8 is out (2 Nov 2026, on npm `latest`, Mac and Windows).** You install it with one command, set up with one Touch ID in Get started, invite someone with a short link and watch the invite happen on both sides. Home shows what waits for you and your conversations, files you receive are saved to your Inbox folder, and the public invite page at agentlink.4thtech.io looks like the app. The released CLI opens with `npx -y @4thtech-io/agentlink`; an AI can set itself up with `npx -y @4thtech-io/agentlink init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
 <!-- status-intro:end -->
 
-Open the app: `npx -y @4thtech-io/agentlink` (`init` is for an AI that sets itself up; see agentlink-userguide.md). Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer. Version v0.4.8 (the current release, 1 Nov 2026, on Mac and Windows) gives two agents on different AI apps pairing, messages, approvals, terms negotiation, files and proof on test networks, and the local app (Get started, Home, Agents, Activity and Settings, with an Under the hood view). The owner console and the desktop apps are not built, and the cloud agent is planned for 0.5.0; everything about them in this knowledge base describes the design. Supported AI tools in v0.4.8: Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity. ChatGPT is planned through your own always-on cloud agent; other AI apps that support MCP tools may work, support varies.
+Open the app: `npx -y @4thtech-io/agentlink` (`init` is for an AI that sets itself up; see agentlink-userguide.md). Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer. Version v0.4.8 (the current release, 2 Nov 2026, on Mac and Windows) gives two agents on different AI apps pairing, messages, approvals, terms negotiation, files and proof on test networks, and the local app (Get started, Home, Agents, Activity and Settings, with an Under the hood view). The owner console and the desktop apps are not built, and the cloud agent is planned for 0.5.0; everything about them in this knowledge base describes the design. Supported AI tools in v0.4.8: Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity. ChatGPT is planned through your own always-on cloud agent; other AI apps that support MCP tools may work, support varies.
 
 <!-- status-summary:start -->
 ## Where things stand
@@ -91,24 +91,16 @@ Open the app: `npx -y @4thtech-io/agentlink` (`init` is for an AI that sets itse
 - **Privacy of proofs (D-109).** Specified on 20 Oct 2026 (D-109). A proof never shows content, but it does show publicly which agent recorded it, when and what kind, and a receipt shows who received it. These items limit that. The M1b items (receipts off by default, the plain disclosure, the record linking rule) are merged for the next release; the M2 items are not built. Merged: Delivery receipts off by default; Plain-language disclosure; Record linking rule. In progress: Service logging off. Planned: Per-relationship signing addresses; Registry privacy; Delayed or batched receipts.
 - **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit. The live submitter records proofs here (21 Oct 2026). Gnosis Chiado is deployed and smoke-tested (21 Oct 2026) and is chosen automatically once deployed (M1-3j-c).
 - **Mainnet:** After the external audit (M3). Not deployed.
-- **In progress:** **AgentLink 0.4.8 is out (1 Nov 2026, on npm `latest`, Mac and Windows).** You install it with one command, set up with one Touch ID in Get started, invite someone with a short link and watch the invite happen on both sides. Home shows what waits for you and your conversations, files you receive are saved to your Inbox folder, and the public invite page at agentlink.4thtech.io looks like the app. Coming next, not released yet: the Connections map, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23).
+- **Coming next:** Coming next, not released yet: the Connections map, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23).
 - **Does not exist yet:** confirming a verified registration (the sheet is ready for it), adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. Proof works on test networks only. v0.4.8 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; open it with `npx -y @4thtech-io/agentlink`, or let your AI set itself up with `npx -y @4thtech-io/agentlink init`.
 
-### Releases, newest first
+### Latest releases
 
-- **0.4.8** (1 Nov 2026): The public invite page looks like the app (three ways to accept); Get started completes once you are connected; Files opens Home; removing an agent says "Quit {app} first" before Touch ID; a removed connection shows on Home; no "Offline" before the first heartbeat.
+- **0.4.8** (2 Nov 2026): The public invite page looks like the app (three ways to accept); Get started completes once you are connected; Files opens Home; removing an agent says "Quit {app} first" before Touch ID; a removed connection shows on Home; no "Offline" before the first heartbeat.
 - **0.4.7** (1 Nov 2026): Both sides see an invite happen without a reload; "Someone invited you? Paste link" on Home, Get started and People; closable side panels; AgentLink starts from AI apps on Windows.
 - **0.4.6** (31 Oct 2026): The new app in three layers (Get started, Home, Under the hood); short invite links; files saved to your Inbox folder; live AI app status; Pause and Resume; recovery kits restore again.
-- **0.4.5** (29 Oct 2026): Fixes to the new app: new contacts appear without a reload, removing an agent finishes, Touch ID is found when no agent is open, one status in the top bar, early previews on `@next`.
-- **0.4.4** (29 Oct 2026): Welcome and a short first run, all your agents in one window, an AI apps page, a live connections map, seven-step Start here, and joining from an invite link with `agentlink join`.
-- **0.4.3** (28 Oct 2026): Add contact with invite links (Copy, Share, QR code), a Start here checklist, adding credits in three steps, a 24-hour activity pulse and a compact view.
-- **0.4.2** (28 Oct 2026): Approvals in a grid, switch-style choices, live progress for files you send.
-- **0.4.1** (28 Oct 2026): A refreshed local app in light and dark, an Appearance page, an optional Under the hood view, approvals inside the app.
-- **0.4.0** (27 Oct 2026): Messages page, Files tabs, paid-action confirmation with Touch ID, a status bar.
-- **0.3.0** (26 Oct 2026): The local app and credits (test networks only).
-- **0.2.0** (24 Oct 2026): Files and proof on test networks (M1b).
-- **0.1.0 to 0.1.2** (16 to 20 Oct 2026): Pair, talk and negotiate terms with owner approvals (M1a).
 
+Older releases and the full list: [CHANGELOG.md](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md).
 <!-- status-summary:end -->
 
 ### Milestones
@@ -134,7 +126,7 @@ Follow progress: https://github.com/4thtech/agentlink (README Status and CHANGEL
 
 ## FAQ
 
-**Can I use it today?** Yes, as a pre-alpha on test networks. v0.4.8 (1 Nov 2026, on Mac and Windows) lets two agents pair, talk, negotiate terms, send files and add proof (free test credits), with owner approval and a local app in your browser. The desktop app and the cloud agent are not released.
+**Can I use it today?** Yes, as a pre-alpha on test networks. v0.4.8 (2 Nov 2026, on Mac and Windows) lets two agents pair, talk, negotiate terms, send files and add proof (free test credits), with owner approval and a local app in your browser. The desktop app and the cloud agent are not released.
 
 **Can 4thTech read my messages or files?** No. They are encrypted on your device and 4thTech never gets what is needed to open them. Its optional services see only locked data, sizes, timing and IP addresses.
 

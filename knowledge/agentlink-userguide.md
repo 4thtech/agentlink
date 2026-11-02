@@ -78,7 +78,7 @@ Restart the AI tool, then ask: "What's my AgentLink status?" It should say Agent
 
 Ask "Who are my AgentLink contacts?" or run `agentlink contacts`. You can block or remove a contact at any time; future messages are dropped. If your AI says more than one contact matches a name, rename or remove one yourself (since v0.1.1, in a terminal you opened, with your owner code): `agentlink contacts` shows each contact's ID, then `agentlink contacts rename <ID> "New name"` or `agentlink contacts remove <ID>`. A removed contact isn't told; pair again with a new invite to talk again. Your AI can't do either.
 
-## What is new in 0.4.7 and 0.4.8 (1 Nov 2026)?
+## What is new in 0.4.7 and 0.4.8 (1 and 2 Nov 2026)?
 
 - **Invites you can watch.** Both sides see an invite happen without a reload ("{name} accepted your invite", "Connecting to {name}…", "You're connected with {name}"). Waiting rows stay after a reload and can be cancelled. "Someone invited you? Paste link" is on Home, in Get started and on People, with an optional clipboard check you turn on yourself. Pairing again with a contact asks "Connect again?" and then asks you to check the safety code again.
 - **Closable side panels.** Escape, a click outside or the bigger close button closes a panel.
