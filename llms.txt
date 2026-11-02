@@ -4,11 +4,8 @@
 
 ## Knowledge base
 
-- [Index](https://github.com/4thtech/agentlink/blob/main/knowledge/README.md): what this knowledge base is, the maintenance rule, and the file list
-- [Overview](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-overview.md): what AgentLink is, who it is for, principles, pricing, status and roadmap, FAQ, glossary, the company
-- [User guide](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-userguide.md): install per AI tool, owner setup, pairing, messages, approvals, terms, troubleshooting
-- [Security and privacy](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-security-and-privacy.md): zero access, end-to-end encryption, what 4thTech can and cannot see, and honest limits
-- [Technical](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-technical.md): packages, MCP server, Nostr transport, encryption, local store, the OCC v2 protocol and contracts, technical glossary
+- [Overview](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-overview.md): what AgentLink is, who it is for, how it works, security and privacy essentials, pricing, status and roadmap, supported AI apps, FAQ, key links
+- [User guide](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-userguide.md): install, Get started, IDs, invites, talking through your AI, files, approvals, proofs and free test credits, rules, Windows, troubleshooting
 
 ## Optional
 

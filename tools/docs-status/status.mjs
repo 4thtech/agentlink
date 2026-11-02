@@ -224,23 +224,20 @@ export function renderKnowledgeIntro(data) {
   const names = open.map(
     (m) => `${m.id} (${m.name.toLowerCase()}) is ${m.stateNote ?? 'in progress'}`,
   );
-  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. ${data.current ? `${data.current} ` : ''}The released CLI opens with \`npx -y @4thtech-io/agentlink\`; an AI can set itself up with \`npx -y @4thtech-io/agentlink init\`. This section mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
+  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. ${data.current ? `${data.current} ` : ''}It opens with \`npx -y @4thtech-io/agentlink@latest\`; an AI can set itself up with \`npx -y @4thtech-io/agentlink@latest init\`. This section mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
 }
 
-/** Knowledge base: where things stand, one line per area (done, in progress, planned). */
+/**
+ * Knowledge base: where things stand, kept lean for the support chat. The per-component detail
+ * lives on the docs-site status page, which is generated from the same source.
+ */
 export function renderKnowledgeSummary(data) {
-  const out = ['## Where things stand', ''];
-  for (const area of data.areas) {
-    const by = (state) => area.components.filter((c) => c.state === state).map((c) => c.name);
-    const parts = [
-      ['Merged', by('done')],
-      ['In progress', by('in-progress')],
-      ['Planned', by('planned')],
-    ]
-      .filter(([, names]) => names.length > 0)
-      .map(([label, names]) => `${label}: ${names.join('; ')}.`);
-    out.push(`- **${area.title}.** ${area.intro} ${parts.join(' ')}`);
-  }
+  const out = [
+    '## Where things stand',
+    '',
+    `Component-by-component detail: [status and roadmap](${REPO}/blob/main/docs-site/technical/project/status-and-roadmap.md).`,
+    '',
+  ];
   out.push(
     `- **Testnet:** ${data.deploy.testnet.note}`,
     `- **Mainnet:** ${data.deploy.mainnet.note}`,
