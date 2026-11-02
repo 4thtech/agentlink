@@ -64,6 +64,7 @@ import type { PasskeyInfo, PresenceProof } from '../contacts/owner.js';
 import { useTitleFocus } from '../welcome/index.js';
 import { CreateAgentGate } from '../apps/create-agent-gate.js';
 import type { CreateAgentApi } from '../apps/create-agent-api.js';
+import { IdExplainerCard } from '../start/id-explainer.js';
 import { readAgentSignal } from '../home/start-here-api.js';
 import type { AgentSignal } from '../home/start-here.js';
 import { markLeavingStart, skipToHome } from '../start/guard.js';
@@ -423,6 +424,7 @@ function ConnectFirstStep({
         </h1>
         <p className="st-lead">{S.body(appName ?? T.yourAiApp)}</p>
       </div>
+      <IdExplainerCard />
       <AgentCard
         name={shown}
         line={appName === undefined ? T.noAppYet : S.worksIn(appName)}

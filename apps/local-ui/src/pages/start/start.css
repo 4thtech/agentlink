@@ -440,3 +440,12 @@
   gap: var(--al-space-2);
   font-weight: var(--al-font-weight-medium);
 }
+
+/* W7-ID-B1: the ID explainer is the Get started card with less padding and no bar. */
+.st-explainer {
+  gap: var(--al-space-2);
+  padding: var(--al-space-4) var(--al-space-5);
+}
+.st-explainer p {
+  margin: 0;
+}

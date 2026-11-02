@@ -170,7 +170,7 @@ describe('Start here: the card', () => {
     expect(ids).toEqual(['protect', 'name', 'connect', 'invite', 'check', 'send', 'reply', 'kit']);
     const text = card()?.textContent ?? '';
     expect(text).toContain('Protect approvals');
-    expect(text).toContain('Name your agent');
+    expect(text).toContain('Name this ID');
     expect(text).toContain('Connect your AI app');
     expect(text).toContain('Invite your first contact');
     expect(text).toContain('Check the safety code with them');
@@ -568,7 +568,8 @@ describe('Start here v2 (U3-j): name, connect, reply and the second-agent path',
     const row = step('invite');
     expect(row.textContent).toContain('No one to invite yet?');
     const link = [...row.querySelectorAll('a')].find(
-      (a) => a.textContent === 'Try it with a second agent of your own',
+      (a) =>
+        a.textContent === 'Try it with a second ID of your own (for example in another AI app)',
     );
     expect(link?.getAttribute('href')).toBe('/settings/agents');
     expect(link?.classList.contains('al-btn-primary')).toBe(false);
@@ -684,8 +685,10 @@ describe('Start here v2 (U3-j): name, connect, reply and the second-agent path',
   it('the new copy uses none of the never-say words (11 §5.1)', () => {
     const words = ['wallet', 'gas', 'seed phrase', 'transaction', 'private key', 'blockchain'];
     const strings = Object.values(START_STRINGS).map((v) => String(v));
-    expect(strings).toContain('Name your agent');
-    expect(strings).toContain('Try it with a second agent of your own');
+    expect(strings).toContain('Name this ID');
+    expect(strings).toContain(
+      'Try it with a second ID of your own (for example in another AI app)',
+    );
     for (const s of strings) for (const w of words) expect(s.toLowerCase()).not.toContain(w);
   });
 

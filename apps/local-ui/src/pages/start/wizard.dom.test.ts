@@ -20,6 +20,7 @@ import { RECOVERY_KIT_LATER_KEY } from '../../states/index.js';
 import {
   CONNECTED_STEP,
   CONNECT_STEP,
+  ID_EXPLAINER,
   INVITE_STEP,
   PICK_STEP,
   WIZARD,
@@ -321,8 +322,10 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     expect(went).toEqual(['/start/connect']);
     expect(h1()).toBe(CONNECT_STEP.title);
     expect(text()).toContain(CONNECT_STEP.eyebrow('Claude Code'));
-    expect(text()).toContain('Claude Code agent');
+    expect(text()).toContain('Claude Code');
     expect(text()).toContain(CONNECT_STEP.worksIn('Claude Code'));
+    // W7-ID-B1: the explainer card is on the Confirm screen.
+    expect(text()).toContain(ID_EXPLAINER.body);
     expect(text()).toContain(WIZARD.stepLabel(2, WIZARD.stepNames.connect));
     expect(button(CONNECT_STEP.connect('Touch ID')).className).toContain('al-btn-primary');
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
@@ -333,7 +336,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     const { went } = await mount({ api: setup });
     await click(PICK_STEP.next('Claude Code'));
     await click(CONNECT_STEP.connect('Touch ID'));
-    expect(setup.begun).toEqual([{ label: 'Claude Code agent', app: 'claude-code' }]);
+    expect(setup.begun).toEqual([{ label: 'Claude Code', app: 'claude-code' }]);
     expect(setup.finished).toHaveLength(1);
     expect(h1()).toBe('Your backup code');
     expect(host.querySelector('.al-secret-val')?.textContent?.replace(/\s/g, '')).toBe(
@@ -388,7 +391,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     await click(/^CodexNot found yet/);
     await click(PICK_STEP.next('Codex'));
     await click(CONNECT_STEP.connect('Touch ID'));
-    expect(setup.begun).toEqual([{ label: 'Codex agent', app: undefined }]);
+    expect(setup.begun).toEqual([{ label: 'Codex', app: undefined }]);
   });
 
   it('E1: created_not_connected keeps the agent: "{agent} is ready" and Connect Claude Code', async () => {
@@ -396,7 +399,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     await click(PICK_STEP.next('Claude Code'));
     await click(CONNECT_STEP.connect('Touch ID'));
     await click('I saved it');
-    expect(h1()).toBe(CONNECTED_STEP.notConnectedTitle('Claude Code agent'));
+    expect(h1()).toBe(CONNECTED_STEP.notConnectedTitle('Claude Code'));
     expect(text()).toContain(CONNECTED_STEP.notConnectedBody('Claude Code'));
     expect(button(CONNECTED_STEP.connect('Claude Code'))).toBeDefined();
     expect(host.querySelector('.al-draw')).toBeNull();
@@ -561,7 +564,7 @@ describe('W4-WIZARD: the same steps for an owner who has one already', () => {
       passkeysAvailable: () => true,
     });
     // W4-WIRE-2 (Decision 52 (2)): New agent names the agent first, then the pick.
-    expect(h1()).toBe('Name your agent');
+    expect(h1()).toBe('Name this ID');
     await typeName('Cursor agent');
     await click('Continue');
     expect(text()).toContain(PICK_STEP.eyebrowAdd);
@@ -641,13 +644,13 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
         createAgentApi: create,
       }),
     );
-    expect(h1()).toBe('Name your agent');
+    expect(h1()).toBe('Name this ID');
     const bar = host.querySelector('[role="progressbar"]');
-    expect(bar?.getAttribute('aria-valuetext')).toBe('Step 1 of 4 · Name your agent');
+    expect(bar?.getAttribute('aria-valuetext')).toBe('Step 1 of 4 · Name this ID');
     const input = host.querySelector<HTMLInputElement>('input[name="agent-name"]');
     expect(input).not.toBeNull();
     expect(host.querySelector(`label[for="${input?.id ?? ''}"]`)?.textContent).toContain(
-      'Agent name',
+      'Name people see',
     );
     await typeName('Side project');
     await click('Continue');
@@ -671,7 +674,7 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     await mount(asAdd({ api: Object.assign(fakeSetup({ status: OWNER }), { labelCheck }) }));
     await typeName('   ');
     await click('Continue');
-    expect(text()).toContain('Give your agent a name.');
+    expect(text()).toContain('Give this ID a name.');
     await typeName('x'.repeat(33));
     await click('Continue');
     expect(text()).toContain('Use up to 32 characters.');
@@ -681,7 +684,7 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     await typeName('Refused name');
     await click('Continue');
     expect(labelCheck).toHaveBeenCalledTimes(1);
-    expect(h1()).toBe('Name your agent');
+    expect(h1()).toBe('Name this ID');
     expect(host.querySelector('[aria-invalid="true"]')).not.toBeNull();
   });
 
@@ -690,7 +693,7 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     await typeName('Side project');
     await click('Continue');
     await click(CONNECT_STEP.back);
-    expect(h1()).toBe('Name your agent');
+    expect(h1()).toBe('Name this ID');
     expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe(
       'Side project',
     );
@@ -699,7 +702,7 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
   it('a new Add agent starts with no name from an earlier run', async () => {
     rememberWizard({ name: 'Old name', choice: 'cursor', outcome: { label: 'Old name' } });
     await mount(asAdd());
-    expect(h1()).toBe('Name your agent');
+    expect(h1()).toBe('Name this ID');
     expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe('');
   });
 
@@ -720,7 +723,7 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     root = createRoot(host);
     history.replaceState(null, '', '/start/app?add=agent');
     await mount(asAdd());
-    expect(h1()).toBe('Name your agent');
+    expect(h1()).toBe('Name this ID');
     expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe('');
   });
 
@@ -728,9 +731,9 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     const agentsApi = fakeAgents();
     await mount(asAdd({ agentsApi }));
     await typeName('Work');
-    expect(text()).toContain('You already have an agent with this name.');
+    expect(text()).toContain('You already have an ID with this name.');
     await typeName('Side project');
-    expect(text()).not.toContain('You already have an agent with this name.');
+    expect(text()).not.toContain('You already have an ID with this name.');
   });
 
   it('IR-W4-WIRE-2X-SEC-1: bidi and invisible format characters never reach the server', async () => {
@@ -739,7 +742,7 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     for (const bad of ['Evil\u202Ename', 'Zero\u200Bwidth', 'Iso\u2066late', 'B\uFEFFom']) {
       await typeName(bad);
       await click('Continue');
-      expect(h1()).toBe('Name your agent');
+      expect(h1()).toBe('Name this ID');
     }
     expect(labelCheck).not.toHaveBeenCalled();
   });

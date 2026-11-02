@@ -25,23 +25,23 @@ export const WIZARD = {
  * Touch ID).
  */
 export const NAME_STEP = {
-  stepName: 'Name your agent',
-  eyebrow: 'New agent',
-  title: 'Name your agent',
-  body: 'You and the people you connect with see this name. You can rename it later in Agents.',
-  field: 'Agent name',
+  stepName: 'Name this ID',
+  eyebrow: 'New ID',
+  title: 'Name this ID',
+  body: 'People you connect with see this name. You can rename it later in IDs.',
+  field: 'Name people see',
   next: 'Continue',
   checking: 'Checking the name…',
   then: 'Next, pick the AI app it works in.',
   /** IR-W4-WIRE-2X-1: the old Add sheet's hint, kept (a hint only; the name may still be used). */
-  taken: 'You already have an agent with this name.',
+  taken: 'You already have an ID with this name.',
 } as const;
 
 /** A1, step 1: pick your AI app. */
 export const PICK_STEP = {
   eyebrow: 'Welcome',
   /** Add agent and Connect another AI app reuse the step with their own eyebrow. */
-  eyebrowAdd: 'New agent',
+  eyebrowAdd: 'New ID',
   eyebrowConnect: 'Connect another AI app',
   title: 'Which AI app do you use?',
   body: 'Pick one. We set it up for you, nothing to copy or paste.',
@@ -58,15 +58,15 @@ export const PICK_STEP = {
 /** A1, step 2: connect with Touch ID. */
 export const CONNECT_STEP = {
   back: 'Back',
-  eyebrow: (app: string): string => `Connect ${app}`,
+  eyebrow: (app: string): string => `Create ${app}'s ID`,
   title: "Confirm it's you",
   body: (app: string): string =>
-    `We create your agent and add AgentLink to ${app}. Touch ID proves it's you. Your AI can't approve things for you.`,
+    `We create ${app}'s ID and add AgentLink to ${app}. Touch ID proves it's you. Your AI can't approve things for you.`,
   bodyConnect: (app: string, agent: string): string =>
-    `We add AgentLink to ${app} for ${agent}. Touch ID proves it's you. Your AI can't approve things for you.`,
+    `We add AgentLink to ${app}, using the ID ${agent}. Touch ID proves it's you. Your AI can't approve things for you.`,
   worksIn: (app: string): string => `Will work in ${app}`,
   rename: 'Change name',
-  renameLabel: (name: string): string => `Change the agent's name (${name})`,
+  renameLabel: (name: string): string => `Change the ID's name (${name})`,
   connect: (sensor: string): string => `Connect with ${sensor}`,
   restartNote: (app: string): string =>
     `Nothing to copy or paste. If ${app} is open, we ask you to restart it.`,
@@ -77,10 +77,10 @@ export const CONNECT_STEP = {
 export const CONNECTED_STEP = {
   title: (app: string): string => `Connected to ${app}`,
   body: 'Your AI can now talk to people you invite.',
-  /** E1 (D-140): the agent is kept; the app's entry could not be written. */
+  /** E1 (D-140): the ID is kept; the app's entry could not be written. */
   notConnectedTitle: (agent: string): string => `${agent} is ready`,
   notConnectedBody: (app: string): string =>
-    `${app} isn't connected yet. Nothing else changed. Connect it now, or later from Agents.`,
+    `${app} isn't connected yet. Nothing else changed. Connect it now, or later in IDs.`,
   connect: (app: string): string => `Connect ${app}`,
   restart: (app: string): string =>
     `If ${app} is open, quit it and open it again so it picks up AgentLink.`,
@@ -111,4 +111,14 @@ export const CARD = {
   invite: 'Invite someone',
   check: (name: string | null): string =>
     name === null ? 'Check a safety code' : `Check ${name}'s safety code`,
+} as const;
+
+/**
+ * W7-ID-B1 (improvement b; D-144): the first-run explainer card, also for the empty IDs page. The
+ * sentence is the owner's, word for word.
+ */
+export const ID_EXPLAINER = {
+  title: 'What is an ID?',
+  body: "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.",
+  hide: 'Hide this',
 } as const;

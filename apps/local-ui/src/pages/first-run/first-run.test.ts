@@ -40,7 +40,7 @@ const GO = {
   other: CONNECT_STEP.connect('your passkey'),
 } as const;
 /** Step 3 after a first run with no AI app found (the pick was "Claude Code", not found yet). */
-const READY = CONNECTED_STEP.notConnectedTitle('Claude Code agent');
+const READY = CONNECTED_STEP.notConnectedTitle('Claude Code');
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -239,7 +239,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
     );
     await click(GO.other);
     expect(text()).toContain(
-      "Setup finished, but we couldn't confirm one step. Your agent may need a restart.",
+      "Setup finished, but we couldn't confirm one step. Your AI app may need a restart.",
     );
     expect(host.querySelector('.al-secret-val')?.textContent).toContain('UVWX');
     expect(host.querySelector('.al-fp')?.textContent).toContain(FP);
@@ -258,7 +258,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
     await mount(api);
     // For an owner: New agent (no agent is open here), never owner setup. W4-WIRE-2: New agent
     // starts with "Name your agent" (Decision 52 (2)).
-    expect(host.querySelector('h1')?.textContent).toBe('Name your agent');
+    expect(host.querySelector('h1')?.textContent).toBe('Name this ID');
     expect(text()).not.toContain(FIRST_RUN.foldersNote);
     expect(api.finished).toHaveLength(0);
   });

@@ -323,11 +323,11 @@ describe('W4-WIZARD (was U3-g name and protect): step 2', () => {
   it('suggests "{App} agent" from the chosen app, with Touch ID as the one primary', async () => {
     await toName();
     expect(h1()).toBe(CONNECT_STEP.title);
-    expect(field().value).toBe('Claude Code agent');
+    expect(field().value).toBe('Claude Code');
     expect([...host.querySelectorAll('label')].map((l) => l.textContent)).toContain(
-      'Name your agent',
+      'Name people see',
     );
-    expect(text()).toContain('Shown to you and your contacts.');
+    expect(text()).toContain('People you connect with see this name.');
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     expect(button(GO).className).toContain('al-btn-primary');
     expect(buttonNames()).toContain('Use a backup code instead');
@@ -468,7 +468,7 @@ describe('W4-WIZARD (was U3-g the end of first run): step 3 and E1', () => {
     const { home } = await toBackupCode(apps);
     await click('I saved it');
     await settle();
-    expect(h1()).toBe(CONNECTED_STEP.notConnectedTitle('Claude Code agent'));
+    expect(h1()).toBe(CONNECTED_STEP.notConnectedTitle('Claude Code'));
     expect(buttonNames()).toContain(CONNECTED_STEP.connect('Claude Code'));
     await click(CONNECTED_STEP.home);
     expect(apps.applied).toEqual([]);
@@ -485,7 +485,7 @@ describe('W4-WIZARD (was U3-g the end of first run): step 3 and E1', () => {
     const apps = fakeApps();
     const home = await toConnect(apps);
     expect(apps.previews).toEqual([['claude-code', 'default']]);
-    expect(h1()).toBe('Connect Claude Code to Claude Code agent');
+    expect(h1()).toBe('Connect Claude Code to Claude Code');
     expect(text()).toContain("This adds one entry to Claude Code's settings.");
     expect(text()).toContain('~/.claude.json');
     const entry = host.querySelector('[aria-label="The entry that will be added"]');
@@ -493,7 +493,7 @@ describe('W4-WIZARD (was U3-g the end of first run): step 3 and E1', () => {
     expect(entry?.textContent).toContain('"--agent"');
     expect(entry?.textContent).toContain('"default"');
     expect(text()).toContain(
-      'Agent folder: default. A backup of the file is saved first. Nothing else in it changes.',
+      'ID folder: default. A backup of the file is saved first. Nothing else in it changes.',
     );
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     expect(button('Apply with Touch ID').className).toContain('al-btn-primary');
@@ -621,7 +621,7 @@ describe('W4-WIZARD (was U3-g): accessibility', () => {
     expect(await violations()).toEqual([]);
     await click(CONNECTED_STEP.connect('Claude Code'));
     await settle();
-    expect(h1()).toBe('Connect Claude Code to Claude Code agent');
+    expect(h1()).toBe('Connect Claude Code to Claude Code');
     expect(await violations()).toEqual([]);
   });
 
@@ -664,7 +664,7 @@ describe('U3-g: the clients speak what the server parses', () => {
         );
       },
     });
-    const begun = await api.begin('Claude Code agent', 'claude-code');
+    const begun = await api.begin('Claude Code', 'claude-code');
     expect(begun).toMatchObject({
       kind: 'ready',
       nonce: NONCE,
@@ -674,7 +674,7 @@ describe('U3-g: the clients speak what the server parses', () => {
     const b64 = (value: unknown): string =>
       btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     expect(seen.map((s) => s.input)).toEqual([
-      b64({ label: 'Claude Code agent', app: 'claude-code' }),
+      b64({ label: 'Claude Code', app: 'claude-code' }),
       b64({ nonce: NONCE }),
     ]);
     expect(seen.every((s) => s.type === 'application/octet-stream')).toBe(true);
@@ -759,7 +759,7 @@ describe('U3-g: the clients speak what the server parses', () => {
     expect(await apps.preview('claude-code', 'default')).toEqual({ kind: 'not_available' });
   });
 
-  it('a 409 no_agent is a plain "Set up your agent first." and a stay, never unknown or failed', async () => {
+  it('a 409 no_agent is a plain "Set up your ID first." and a stay, never unknown or failed', async () => {
     const fetch = (): Promise<Response> => Promise.resolve(json(409, { error: 'no_agent' }));
     expect(await createSetupApi({ token: 't', fetch }).labelCheck('x')).toEqual({
       kind: 'error',

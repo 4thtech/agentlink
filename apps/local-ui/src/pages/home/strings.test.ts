@@ -79,7 +79,7 @@ describe('Home copy (11 §5.1)', () => {
   it('has the briefed sentences', () => {
     expect(HOME_STRINGS.agentRunningLine).toBe('Ready to send and receive.');
     expect(HOME_STRINGS.waitingNone).toBe('Nothing is waiting.');
-    expect(HOME_STRINGS.agentNotRunningLine).toBe('Start your AI app to bring your agent online.');
+    expect(HOME_STRINGS.agentNotRunningLine).toBe('Start your AI app to bring this ID online.');
     expect(HOME_STRINGS.errorLine).toBe("Couldn't read the latest. Trying again.");
     expect(creditsLine('$4.80', 48)).toBe('$4.80, about 48 proofs');
     expect(minutesLeft(9)).toBe('9 min left');
