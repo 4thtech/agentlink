@@ -267,6 +267,12 @@ export class RelayPool {
   /**
    * Publishes `event` to exactly the relays in `relays` and to no other (07 §4.3). All attempts run
    * concurrently. Never rejects for a relay problem: each relay's outcome is in the result.
+   *
+   * W6-SEND-LATENCY: a wrap is delivered once MIN_ACKS relays return OK (07 §4.2), so the promise
+   * resolves as soon as MIN_ACKS relays have, with `sent` true and `results` holding only the relays
+   * that had answered by then (in list order). The other attempts go on in the background, to the
+   * same relays only, and still record relay health; they never reject. With fewer than MIN_ACKS
+   * OKs it waits for every relay, as before, and `results` covers the whole list.
    * @throws TransportError `invalid_relays` for an empty list or one over 32 entries.
    */
   async publish(event: NostrEvent, relays: readonly string[]): Promise<PublishOutcome> {
@@ -276,11 +282,29 @@ export class RelayPool {
     const unique = [...new Set(relays)];
     const frame = JSON.stringify(['EVENT', event]);
     const frameBytes = encodeUtf8(frame).length;
-    const results = await Promise.all(
-      unique.map((relay) => this.publishOne(event, frame, frameBytes, relay)),
-    );
-    const acked = results.filter((r) => r.ok).map((r) => r.relay);
-    return { results, acked, sent: acked.length >= MIN_ACKS };
+    const slots: (RelayPublishResult | undefined)[] = unique.map(() => undefined);
+    return new Promise<PublishOutcome>((resolve) => {
+      let settled = 0;
+      let acks = 0;
+      let done = false;
+      const settle = (index: number, result: RelayPublishResult): void => {
+        slots[index] = result;
+        settled += 1;
+        if (result.ok) acks += 1;
+        if (done || (acks < MIN_ACKS && settled < unique.length)) return;
+        done = true;
+        const results = slots.filter((r): r is RelayPublishResult => r !== undefined);
+        const acked = results.filter((r) => r.ok).map((r) => r.relay);
+        resolve({ results, acked, sent: acked.length >= MIN_ACKS });
+      };
+      unique.forEach((relay, index) => {
+        this.publishOne(event, frame, frameBytes, relay).then(
+          (result) => settle(index, result),
+          // publishOne does not reject; if it ever did, it is a failed relay, never a rejection
+          () => settle(index, { relay, ok: false, reason: 'closed' }),
+        );
+      });
+    });
   }
 
   /** Per-relay health for every relay seen so far. */
