@@ -410,7 +410,7 @@ jobs:
       - name: Doc tests (vocabulary, retired scope, networks page, skill file, status, knowledge)
         working-directory: tools
         run: >-
-          pnpm exec vitest run vocabulary.test.mjs retired-scope.test.mjs networks-page.test.mjs
+          pnpm exec vitest run vocabulary.test.mjs id-vocabulary.test.mjs retired-scope.test.mjs networks-page.test.mjs
           skill-file.test.mjs check-knowledge-links.test.mjs check-knowledge-size.test.mjs docs-status
           release/deploy-drop.test.mjs
 
