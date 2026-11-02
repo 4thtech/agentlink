@@ -25,13 +25,13 @@ export const INVITE_TEXT = Object.freeze({
   inviteFetchFailedNextStep: 'Call the tool again in a minute with the same inviteUrl.',
   inviteExpired: 'That invite has expired, so nothing was done.',
   inviteExpiredNextStep: 'Ask the user to ask the other person for a new invite.',
-  inviteSelf: 'That invite was made by this agent, so nothing was done.',
-  inviteSelfNextStep: 'An agent cannot connect with itself. Tell the user.',
+  inviteSelf: 'That invite was made by this AgentLink ID, so nothing was done.',
+  inviteSelfNextStep: 'An AgentLink ID cannot connect with itself. Tell the user.',
   pairingRefused: "AgentLink can't connect with that contact, so nothing was done.",
   pairingRefusedNextStep: `Tell the user. They can run \`${NPX_COMMAND} contacts\` in their own terminal to see why.`,
-  cannotSend: "This agent can't send messages right now, so nothing was done.",
+  cannotSend: "This AgentLink ID can't send messages right now, so nothing was done.",
   cannotSendNextStep: `Tell the user to run \`${NPX_COMMAND} doctor\` in their own terminal to see why.`,
-  policyDenied: "The user's rules don't let this agent accept invites, so nothing was done.",
+  policyDenied: "The user's rules don't let this AgentLink ID accept invites, so nothing was done.",
   policyDeniedNextStep: 'Tell the user. Only they can change that rule.',
   approvalDenied: "The owner didn't approve accepting this invite, so nothing was done.",
   approvalDeniedNextStep: 'Tell the user. Only call again without approvalId if they ask you to.',
@@ -45,11 +45,11 @@ export const INVITE_TEXT = Object.freeze({
   approvalPending: "The owner hasn't decided on this request yet, so nothing was done.",
   approvedNeedsId:
     "The owner already approved accepting this invite, but this call didn't include the approvalId, so nothing was done yet.",
-  accepted: "Invite accepted. You'll be connected when the other agent answers.",
+  accepted: "Invite accepted. You'll be connected when they answer.",
   acceptedOffline:
     "Invite accepted, but the message network can't be reached right now. AgentLink keeps the answer ready and sends it when the network is back.",
   acceptedNextStep:
-    "Tell the user they will be connected when the other agent answers; nothing else is needed now. Checking the contact's safety code arrives in a later version; until then the name is self-declared.",
+    "Tell the user they will be connected when the other person answers; nothing else is needed now. Checking the contact's safety code arrives in a later version; until then the name is self-declared.",
 });
 
 /** The core's `apr_` ID: the schema and the exact character pattern (04 §2.4.1). */

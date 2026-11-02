@@ -88,16 +88,16 @@ export const VERIFY_CLI_TEXT = Object.freeze({
   record: 'OK       Record found on the public record, made {date}, {time} UTC{finality}',
   finalityFinal: ' (final)',
   finalityLatest: ' (recent, not final yet)',
-  byThisAgent: 'OK       Recorded by this agent',
+  byThisAgent: 'OK       Recorded by this ID',
   byContact: 'OK       Recorded by {name}',
-  byOwner: 'OK       Recorded by an agent outside your contacts, owner {fingerprint}',
-  byUnknown: 'OK       Recorded by an agent outside your contacts (its agent ID is below)',
-  byAccount: '         Its agent ID is an account with its own approval rules.',
+  byOwner: 'OK       Recorded by an ID outside your contacts, owner {fingerprint}',
+  byUnknown: 'OK       Recorded by an ID outside your contacts (its ID number is below)',
+  byAccount: '         Its ID number is an account with its own approval rules.',
   noReceipts: 'OK       Receipts: none recorded',
   receipt: 'OK       {type} {date}, {time} UTC',
   receiptLinkChecked: '         Its link on the public record checks out.',
   contentNotIncluded: '--       Content: not included in this proof',
-  contentVerified: 'OK       Content: included, opened, and sent by the agent that made the record',
+  contentVerified: 'OK       Content: included, opened, and sent by the ID that made the record',
   contentUnattributed: 'Warning  Content: {message}',
   contentFailed: 'Warning  Content not proven: {message}',
   approvalNone: '--       Owner approval: none included',
@@ -110,7 +110,7 @@ export const VERIFY_CLI_TEXT = Object.freeze({
   notice: 'Warning  {message}',
   details: 'Details:',
   detailRecord: '  Record ID: {recordId}',
-  detailAgent: '  Agent ID: {agentId}',
+  detailAgent: '  ID number: {agentId}',
   regionWho: 'the proof file',
   pathNotAllowed:
     "That file isn't in your AgentLink proofs or inbox folder, so it wasn't read. Move it into one of them and run the command again.",
@@ -139,10 +139,10 @@ export const VERIFY_FAILURE_TEXT: Readonly<Record<chain.ProofPackFailure, string
   envelope_hash_mismatch: 'the message fingerprint does not match the record.',
   commitment_mismatch: 'the recipient in the proof does not match the record.',
   record_mismatch: 'the record details in the proof do not match the recorded ones.',
-  signature_invalid: 'the record is not validly signed by the agent that made it.',
-  card_invalid: 'the agent profile in it is not signed by its owner.',
-  card_expired: 'the agent profile had expired when the record was made.',
-  card_pop_invalid: "the agent profile in it is not confirmed by the agent's own keys.",
+  signature_invalid: 'the record is not validly signed by the ID that made it.',
+  card_invalid: 'the ID card in it is not signed by its owner.',
+  card_expired: 'the ID card had expired when the record was made.',
+  card_pop_invalid: "the ID card in it is not confirmed by the ID's own keys.",
   recipient_mismatch: 'the disclosed recipient does not match the record.',
   receipt_not_on_chain: 'it lists a receipt that was never recorded.',
   receipt_mismatch: 'a receipt time in it does not match the recorded one.',
@@ -156,11 +156,11 @@ export const VERIFY_CONTENT_TEXT: Readonly<Record<chain.ProofContentFailure, str
     envelope_hash_mismatch: 'the included message is not the one recorded.',
     envelope_signature_invalid: 'the included message is not signed by its sender.',
     sender_mismatch:
-      'the included message was sent by someone other than the agent that made the record.',
+      'the included message was sent by someone other than the ID that made the record.',
     sender_not_bound:
-      "included and opened, but the proof doesn't show that the agent that made the record sent it.",
+      "included and opened, but the proof doesn't show that the ID that made the record sent it.",
     card_pop_missing:
-      "included and opened, but the proof doesn't confirm that the agent that made the record sent it.",
+      "included and opened, but the proof doesn't confirm that the ID that made the record sent it.",
     key_commitment_mismatch: 'the shared content key is not the key this message was sealed with.',
     decrypt_failed: 'the included message could not be opened with the shared key.',
     payload_invalid: 'the opened message is not in the expected format.',
@@ -259,8 +259,7 @@ function approvalLine(approval: chain.OwnerApprovalResult): string {
       if (!approval.ownerBound) return VERIFY_CLI_TEXT.approvalOwnerUnknown;
       if (!approval.recordBound) return VERIFY_CLI_TEXT.approvalUnbound;
       return fill(VERIFY_CLI_TEXT.approvalSigned, {
-        who:
-          approval.approver === 'signer' ? 'of the agent that made the record' : 'of the recipient',
+        who: approval.approver === 'signer' ? 'of the ID that made the record' : 'of the recipient',
         what: DECISION_WORD[approval.decision] ?? 'this',
       });
   }

@@ -177,7 +177,7 @@ export const POLICY_TEXT = Object.freeze({
 
   // M1-33a (06 §3 "Existing policies", D-109; 11 §5.6): delivery receipts on from an older default
   receiptsOlderDefault:
-    'Delivery receipts are on from an older default. Each one shows publicly that a proof reached your agent, never the content.',
+    'Delivery receipts are on from an older default. Each one shows publicly that a proof reached you, never the content.',
   keepReceiptsQuestion:
     'Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off.',
   receiptsTurnOff: 'Delivery receipts turn off.',
@@ -246,10 +246,10 @@ const PROBLEM_TEXT: Readonly<Record<PolicyProblem, string>> = Object.freeze({
   unreadable: "your saved rules can't be read.",
   invalid: "your saved rules aren't in a form this version of AgentLink accepts.",
   signature_invalid: "your saved rules aren't signed by you.",
-  agent_mismatch: 'your saved rules belong to another agent.',
+  agent_mismatch: 'your saved rules belong to another ID.',
   owner_mismatch: "your saved rules aren't signed by you.",
   mark_unavailable: "AgentLink can't read the version it last confirmed.",
-  identity_unavailable: "AgentLink can't read this agent's profile.",
+  identity_unavailable: "AgentLink can't read this ID's card.",
 });
 
 type Leaf = string | number | boolean | null | readonly unknown[];
@@ -311,7 +311,7 @@ export const POLICY_REVIEW_ROWS: readonly PolicyReviewRow[] = Object.freeze([
   },
   {
     path: 'contacts.allowed',
-    label: 'Who can message your agent',
+    label: 'Who can message this ID',
     read: (v) => (v === 'paired' ? 'your contacts' : list('nobody')(v)),
   },
   { path: 'contacts.rateLimitPerContactPerHour', label: 'Messages per contact per hour, at most' },

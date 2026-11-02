@@ -333,7 +333,7 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
   });
 
   it('is listed in --help as an owner command (06 §8)', () => {
-    expect(helpText()).toContain('agentlink owner add-agent --agent <name>');
+    expect(helpText()).toContain('agentlink owner add-agent --id <name>');
     expect(helpText()).toMatch(/agentlink init .*--harness <id\|none>.*--config <path>/);
   });
 });

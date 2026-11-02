@@ -222,15 +222,14 @@ export const INIT_TEXT = Object.freeze({
     "That confirmation code isn't right. Run `{prefix} init` again to see the changes and the code.",
   codeMismatch:
     "That confirmation code doesn't match the changes proposed now (they may have changed). Run `{prefix} init` again to see them and the new code.",
-  identity: "AgentLink will create this agent's identity and keep it in your system keychain.",
-  identityDone: 'OK       Agent identity created',
+  identity: "AgentLink will create this ID's keys and keep them in your system keychain.",
+  identityDone: 'OK       ID keys created',
   nothingToDo: 'OK AgentLink is already set up. Nothing to change.',
   present: 'OK       {appName} is already set up for AgentLink',
   conflict:
     '{appName} already has an entry named agentlink that is different, so AgentLink left it as it is. Nothing was changed there.',
   // M1-UX-MULTI-AGENT: what differs, and how to replace. Only fixed text and valid agent names.
-  conflictOtherAgent:
-    '          It starts the agent {existing}, but this run is for the agent {wanted}.',
+  conflictOtherAgent: '          It starts the ID {existing}, but this run is for the ID {wanted}.',
   conflictOtherCommand:
     '          It starts AgentLink in another way (for example an older command or another version).',
   conflictUnknown: "          AgentLink couldn't tell how it differs.",
@@ -263,9 +262,9 @@ export const INIT_TEXT = Object.freeze({
     '  {appName}: blocked. It already has a different entry named agentlink, left as it is.',
   // D-78 (06 §7).
   declinedKept:
-    'No app was changed. Your agent identity is kept. To set up one app later, run `{prefix} init --harness <app>`.',
+    'No app was changed. Your ID is kept. To set up one app later, run `{prefix} init --harness <app>`.',
   ownerStepAdd:
-    "One step left, and you must do it yourself: run `{prefix} owner add-agent --agent {name}` in your own terminal, so this agent gets a card from your owner. Don't let your AI run it or see what you type.",
+    "One step left, and you must do it yourself: run `{prefix} owner add-agent --agent {name}` in your own terminal, so this ID gets a card from your owner. Don't let your AI run it or see what you type.",
   configPlace: '<the same path>',
   // M1-36b (D1). Fixed text: the command is a constant, nothing from a file or the user.
   installOffer:

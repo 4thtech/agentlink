@@ -136,14 +136,14 @@ export type OpenAgentResult =
     };
 
 /** `needs_setup` `no_agent`: nothing is set up for this name. Fixed text; never names the agent. */
-export const NO_AGENT_MESSAGE = `AgentLink is not set up for this agent on this machine yet. Run \`${NPX_PREFIX} init\` yourself, in your own terminal.`;
+export const NO_AGENT_MESSAGE = `AgentLink is not set up for this ID on this machine yet. Run \`${NPX_PREFIX} init\` yourself, in your own terminal.`;
 
 /**
  * `needs_setup` `agent_removing` (U3-e): the agent was removed or its removal did not finish. Fixed
  * text; never names the agent.
  */
 export const AGENT_REMOVING_MESSAGE =
-  'This agent was removed, or its removal did not finish. Open the AgentLink app to finish removing it; it cannot be used any more.';
+  'This ID was removed, or its removal did not finish. Open the AgentLink app to finish removing it; it cannot be used any more.';
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
 

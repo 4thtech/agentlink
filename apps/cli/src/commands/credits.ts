@@ -50,7 +50,7 @@ export interface CreditsDeps extends CommandDeps {
 }
 
 export const CREDITS_TEXT = Object.freeze({
-  agentId: 'Agent ID: {agentId}',
+  agentId: 'ID number: {agentId}',
   credits: 'Credits: {usd}',
   creditsUnknown: "Credits: can't be checked right now. Try again in a few minutes.",
   price: 'Adding proof costs {fee}. Messages and files are free.',
@@ -62,7 +62,7 @@ export const CREDITS_TEXT = Object.freeze({
   topUpNoLink: "Can't make the link to add credits right now.",
   topUpNotLive: 'Adding credits is not available yet in this version of AgentLink.',
   openedBrowser: 'Opened it in your browser.',
-  qrIntro: 'Or scan this to copy your agent ID to your phone:',
+  qrIntro: 'Or scan this to copy your ID number to your phone:',
   get topUpHelp(): string {
     return `To see how much to add, run \`${commandPrefix()} credits --topup\`.`;
   },

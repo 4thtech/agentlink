@@ -114,7 +114,7 @@ describe('skill file covers files and proof (M1-12c)', () => {
 
   it('privacy disclosure: what a proof makes public (11 §5.6)', () => {
     expect(skill).toContain(
-      "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+      "A proof is public. Anyone can see that your AgentLink ID recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
     );
     expect(skill).toContain('who it went to');
   });
@@ -125,7 +125,7 @@ describe('skill file covers files and proof (M1-12c)', () => {
     expect(s).toContain('includeContentKey');
     expect(s).toContain('includeRecipient');
     expect(s).toContain('agentlink_verify_proof_pack');
-    expect(s).toContain('This file shows the proof, your agent profile and the message details.');
+    expect(s).toContain('This file shows the proof, your ID card and the message details.');
   });
 
   it('proof of agreement for final terms goes through the terms tools', () => {

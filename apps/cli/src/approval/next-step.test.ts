@@ -26,7 +26,7 @@ describe('approvalNextStep (06 §2.5 step 2)', () => {
       const id = newId();
       const text = approvalNextStep(id, name);
       expect(text).toBe(
-        `Tell the user: Approval needed. In your own terminal, run \`${P} approve ${id}\`. If you have more than one agent, add --agent with this agent's name. Your AI can't approve this for you. After they approve, call the same tool again with approvalId.`,
+        `Tell the user: Approval needed. In your own terminal, run \`${P} approve ${id}\`. If you have more than one AgentLink ID, add --agent with this ID's name. Your AI can't approve this for you. After they approve, call the same tool again with approvalId.`,
       );
       if (name !== '') expect(text).not.toContain(`--agent ${name}`);
     },

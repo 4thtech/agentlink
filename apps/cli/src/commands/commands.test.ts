@@ -442,7 +442,7 @@ describe('status (06 §2.0, D-73)', () => {
       '3 requests from unknown senders.',
     ]);
     const full = await harness(f).run(['status']);
-    expect(full.out[0]).toBe(`Agent: default (0x${'1'.repeat(40)})`);
+    expect(full.out[0]).toBe(`ID: default (0x${'1'.repeat(40)})`);
     expect(full.out[1]).toBe('Contacts: 1');
     const names = f.calls.filter((c) => c !== 'close');
     expect(names).not.toContain('syncInbox');
@@ -498,11 +498,11 @@ describe('status (06 §2.0, D-73)', () => {
       expect(f.calls).not.toContain('catchUp');
       expect(result.out).toContain('1 request from an unknown sender.');
       expect(result.text).toContain(
-        'This agent is paused. The owner can resume it in the AgentLink app.',
+        'This AgentLink ID is paused. The owner can resume it in the AgentLink app.',
       );
       const doctor = await harness(f).run(['doctor']);
       expect(f.calls).not.toContain('catchUp');
-      expect(doctor.text).toContain('This agent is paused.');
+      expect(doctor.text).toContain('This AgentLink ID is paused.');
     }
   });
 
@@ -592,12 +592,12 @@ describe('doctor (07 §9.4)', () => {
     const result = await harness(noCard()).run(['doctor']);
     expect(result.code).toBe(EXIT_FAILED);
     const text = result.out.join('\n');
-    expect(text).toContain('Problem  This agent has no card from your owner yet');
+    expect(text).toContain('Problem  This ID has no card from your owner yet');
     expect(text).toContain('`npx -y @4thtech-io/agentlink owner add-agent --agent default`');
     expect(text).not.toContain('agentlink init');
     expect(text).not.toContain('OK       Message network');
     // No other agent on this machine has a card either: the state is named.
-    expect(text).toContain('No agent on this computer has a card from an owner');
+    expect(text).toContain('No ID on this computer has a card from an owner');
   });
 
   it('does not add the machine-wide line when another agent has a card (M1-9u)', async () => {
@@ -617,7 +617,7 @@ describe('doctor (07 §9.4)', () => {
       expect(result.code).toBe(EXIT_FAILED);
       const text = result.out.join('\n');
       expect(text).toContain('add-agent --agent default');
-      expect(text).not.toContain('No agent on this computer');
+      expect(text).not.toContain('No ID on this computer');
     } finally {
       await rm(home, { recursive: true, force: true });
     }
@@ -627,10 +627,10 @@ describe('doctor (07 §9.4)', () => {
     const result = await harness(fakeAgent()).run(['doctor']);
     expect(result.code).toBe(EXIT_OK);
     const text = result.out.join('\n');
-    expect(text).toContain('OK       Agent keys found');
-    expect(text).toContain('OK       Message network: 1 server for this agent');
+    expect(text).toContain('OK       ID keys found');
+    expect(text).toContain('OK       Message network: 1 server for this ID');
     expect(text).toContain('OK       Message network reachable');
-    expect(text).toContain('OK       This agent can send and sign');
+    expect(text).toContain('OK       This ID can send and sign');
     expect(text).toContain('Not checked in this version');
   });
 
@@ -647,8 +647,8 @@ describe('doctor (07 §9.4)', () => {
     expect(result.code).toBe(EXIT_FAILED);
     const text = result.out.join('\n');
     expect(text).toContain("Problem  Can't reach the message network");
-    expect(text).toContain('Problem  This agent has no message network servers');
-    expect(text).toContain("Problem  This agent can't send or sign right now");
+    expect(text).toContain('Problem  This ID has no message network servers');
+    expect(text).toContain("Problem  This ID can't send or sign right now");
     expect(text).not.toContain('secret detail');
   });
 
@@ -691,7 +691,7 @@ describe('doctor (07 §9.4)', () => {
       open: () => Promise.reject(new Error('/home/me/.agentlink/secret-path')),
     });
     const b = await other.run(['doctor']);
-    expect(b.out.join('\n')).toContain("Problem  Couldn't open this agent");
+    expect(b.out.join('\n')).toContain("Problem  Couldn't open this ID");
     expect(b.text).not.toContain('secret-path');
   });
 
@@ -816,6 +816,7 @@ describe('accept and invite argument checks', () => {
   });
 
   it('W4-PAUSE (IR-W4-PAUSE-1): invite and accept refuse while paused with the fixed paused text', async () => {
+    // packages/core's AGENT_PAUSED_TEXT (core copy is deferred, W7-ID-RENAME plan §4).
     const PAUSED = 'This agent is paused. The owner can resume it in the AgentLink app.';
     // Core's own refusal (any message): the CLI prints the one fixed sentence (06 §6).
     const paused = (): Promise<never> => Promise.reject(new CoreError('agent_paused', 'paused'));
