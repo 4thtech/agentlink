@@ -29,53 +29,6 @@ const ALLOWED = [
     reason: 'the release history names v0.4.4 as shipped ("all your agents in one window")',
   },
   {
-    file: 'knowledge/README.md',
-    phrase: 'your agents',
-    reason: 'the release history names v0.4.4 as shipped ("all your agents in one window")',
-  },
-  {
-    file: 'knowledge/agentlink-overview.md',
-    phrase: 'agent id',
-    reason: 'the glossary maps ID number to its internal name (the agent ID) on purpose',
-  },
-  {
-    file: 'knowledge/agentlink-overview.md',
-    phrase: 'agent card',
-    reason:
-      'the glossary maps ID card to its internal name, and the milestone list names the protocol artifact',
-  },
-  {
-    file: 'knowledge/agentlink-overview.md',
-    phrase: 'agent profile',
-    reason: 'the milestone list names the protocol artifact (Agent profile signatures)',
-  },
-  {
-    file: 'knowledge/agentlink-technical.md',
-    phrase: 'agent card',
-    reason: 'the technical document names the signed protocol artifact (EIP-712 agent card)',
-  },
-  {
-    file: 'knowledge/agentlink-technical.md',
-    phrase: 'agent cards',
-    reason: 'the technical document names the signed protocol artifact (EIP-712 agent cards)',
-  },
-  {
-    file: 'knowledge/agentlink-technical.md',
-    phrase: 'another agent',
-    reason:
-      'the generation-number rule is about the internal agent record, in the technical document',
-  },
-  {
-    file: 'knowledge/agentlink-technical.md',
-    phrase: 'each agent',
-    reason: 'relay lists are per internal agent record, in the technical document',
-  },
-  {
-    file: 'knowledge/agentlink-technical.md',
-    phrase: "sender's agent",
-    reason: 'the signer of a record is the internal agent key, in the technical document',
-  },
-  {
     file: 'docs-site/guide/local-app/ids.md',
     phrase: 'add agent',
     reason:
