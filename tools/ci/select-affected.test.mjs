@@ -706,3 +706,41 @@ describe('ci.yml wires the docs fast lane', () => {
     expect(gate).toContain('docs-checks');
   });
 });
+
+describe('docsOnly: odd diff lists and events', () => {
+  const ev = (event, files, ref = '') => docsOnly({ event, ref, files });
+
+  it('upper-case extensions are not docs', () => {
+    expect(ev('pull_request', ['docs/A.MD'])).toBe(false);
+    expect(ev('pull_request', ['docs/a.PNG'])).toBe(false);
+    expect(ev('pull_request', ['README.MD'])).toBe(false);
+  });
+
+  it('a rename out of code lists both paths (CI diffs with --no-renames), so it is not docs-only', () => {
+    expect(ev('pull_request', ['packages/x/notes.md', 'docs/x.md'])).toBe(false);
+    expect(ev('pull_request', ['docs/x.md', 'packages/x/src/a.ts'])).toBe(false);
+  });
+
+  it('CRLF and trailing whitespace in the list do not change the answer', () => {
+    expect(ev('pull_request', ['docs/a.md\r', ' knowledge/b.md  ', ''])).toBe(true);
+    expect(ev('pull_request', ['docs/a.md\r', 'packages/core/src/a.ts\r'])).toBe(false);
+  });
+
+  it('merge_group and feature-branch pushes follow the same rules; main does not', () => {
+    expect(ev('merge_group', ['docs/a.md'])).toBe(true);
+    expect(ev('merge_group', ['docs/a.md', 'tools/x.mjs'])).toBe(false);
+    expect(ev('push', ['docs/a.md'], 'refs/heads/feat')).toBe(true);
+    expect(ev('push', ['docs/a.md'], 'refs/heads/main')).toBe(false);
+    expect(ev('workflow_dispatch', ['docs/a.md'])).toBe(false);
+  });
+
+  it('ci.yml refuses docs-only for a symlink or submodule (modes 120000 and 160000)', () => {
+    const yml = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
+    expect(yml).toContain('git diff --no-renames --raw "$base" HEAD');
+    const re = /^:(1[26]0000 [0-9]+|[0-9]+ 1[26]0000) /;
+    expect(re.test(':120000 000000 abc def D\tdocs/link.md')).toBe(true);
+    expect(re.test(':000000 120000 abc def A\tdocs/link.md')).toBe(true);
+    expect(re.test(':000000 160000 abc def A\tdocs/sub')).toBe(true);
+    expect(re.test(':100644 100644 abc def M\tdocs/a.md')).toBe(false);
+  });
+});

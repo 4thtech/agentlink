@@ -233,6 +233,13 @@ jobs:
             rm -f "$list"
             echo "Diff base unknown or unreadable: everything runs"
           fi
+          # OPS-DOCS-FASTLANE: a symlink or submodule (mode 120000 or 160000, old or new) is never docs.
+          if [ "$docs_only" = true ] \
+            && { ! git diff --no-renames --raw "$base" HEAD 2> /dev/null > "$RUNNER_TEMP/changed-raw.txt" \
+              || grep -Eq '^:(1[26]0000 [0-9]+|[0-9]+ 1[26]0000) ' "$RUNNER_TEMP/changed-raw.txt"; }; then
+            docs_only=false
+            echo "Not docs-only: a symlink or submodule changed, or the diff could not be read"
+          fi
           echo "e2e_relevant=$relevant" >> "$GITHUB_OUTPUT"
           echo "use_selector=$use_selector" >> "$GITHUB_OUTPUT"
           echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
@@ -396,12 +403,16 @@ jobs:
           node tools/check-knowledge-size.mjs
           node tools/check-knowledge-links.mjs
           node tools/docs-status/index.mjs --check
+          # Hard rule: no Solidity source in this public repo. The script scans every tracked file,
+          # Markdown included (it ran in the lint step of `checks`).
+          node tools/check-no-solidity.mjs
 
       - name: Doc tests (vocabulary, retired scope, networks page, skill file, status, knowledge)
         working-directory: tools
         run: >-
           pnpm exec vitest run vocabulary.test.mjs retired-scope.test.mjs networks-page.test.mjs
           skill-file.test.mjs check-knowledge-links.test.mjs check-knowledge-size.test.mjs docs-status
+          release/deploy-drop.test.mjs
 
       - name: Prettier
         run: pnpm exec prettier --check .
