@@ -98,6 +98,9 @@ export interface Computer {
   readonly directory: ReturnType<typeof agentDirectory>;
 }
 
+/** The shipped client factory, with no drop stub: a harness that injects its own fake drop calls this. */
+export const createClientWithoutStub = nodeRuntimeDeps.createClient;
+
 export async function newComputer(
   relays: Relays = memoryRelays(),
   base?: string,
@@ -120,8 +123,7 @@ export async function newComputer(
     createClient: (options) =>
       nodeRuntimeDeps.createClient({
         ...options,
-        // A drop with a test `fetch` (the journey harness's fake drop) is left alone.
-        ...(options.files === undefined || options.files.drop?.fetch !== undefined
+        ...(options.files === undefined
           ? {}
           : {
               files: {
