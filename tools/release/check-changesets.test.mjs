@@ -25,6 +25,24 @@ describe('isVersionPackagesPr', () => {
     expect(isVersionPackagesPr({ ...bot, author: 'renovate[bot]' })).toBe(false);
   });
 
+  it('recognises the release GitHub App once RELEASE_BOT_LOGIN names it (OPS-UNSTICK-B)', () => {
+    const app = { ...bot, author: 'agentlink-release[bot]' };
+    expect(isVersionPackagesPr(app)).toBe(false);
+    expect(isVersionPackagesPr({ ...app, releaseBot: 'agentlink-release[bot]' })).toBe(true);
+    expect(isVersionPackagesPr({ ...app, releaseBot: 'other[bot]' })).toBe(false);
+    // Only a `<slug>[bot]` login counts: a user login in the variable exempts nobody.
+    expect(isVersionPackagesPr({ ...bot, author: 'talirezun', releaseBot: 'talirezun' })).toBe(
+      false,
+    );
+    // A generic bot in the variable adds nothing (renovate and dependabot stay non-exempt).
+    for (const generic of ['renovate[bot]', 'dependabot[bot]']) {
+      expect(isVersionPackagesPr({ ...bot, author: generic, releaseBot: generic })).toBe(false);
+    }
+    expect(
+      isVersionPackagesPr({ ...app, releaseBot: 'agentlink-release[bot]', sameRepo: false }),
+    ).toBe(false);
+  });
+
   it('does not exempt a fork or another branch', () => {
     expect(isVersionPackagesPr({ ...bot, sameRepo: false })).toBe(false);
     expect(isVersionPackagesPr({ ...bot, headRef: 'feature/changeset-release/main' })).toBe(false);
