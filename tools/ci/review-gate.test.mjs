@@ -369,6 +369,45 @@ describe('review-gate: automated PRs keep the code-owner approval', () => {
   });
 });
 
+// OPS-UNSTICK-A (report RC-2, RC-5, C3): with cancel-in-progress, a close/reopen or an edit that
+// adds the IR line cancelled the run in flight and left a cancelled required check (#772, #770,
+// #761). Runs now queue: the newest pending run replaces an older pending one, nothing in flight is
+// cancelled, and the last run reads the PR's current state, so the final state is what counts.
+describe('review-gate and pr-hygiene: no cancelled required checks', () => {
+  const hygiene = readFileSync(join(root, '.github', 'workflows', 'pr-hygiene.yml'), 'utf8');
+  for (const [name, text] of [
+    ['review-gate', yml],
+    ['pr-hygiene', hygiene],
+  ]) {
+    it(`${name} never cancels a run in progress`, () => {
+      expect(text).toMatch(/\nconcurrency:\n {2}group: [^\n]+\n {2}cancel-in-progress: false\n/);
+      expect(text).not.toMatch(/cancel-in-progress: true/);
+    });
+  }
+
+  it('review-gate re-runs when the body is edited and reads the current PR, not the payload', () => {
+    expect(yml).toMatch(/types: \[opened, edited, synchronize, reopened, ready_for_review\]/);
+    expect(source).toMatch(/github\.rest\.pulls\.get\(/);
+  });
+});
+
+// OPS-UNSTICK-A (IR F1): tools/ci/ holds the test quarantine and CI gate scripts; a change there can
+// relax a gate, so it is S1, sensitive and code-owned.
+describe('review-gate: tools/ci is sensitive', () => {
+  it('classes tools/ci files S1 and sensitive', () => {
+    for (const f of ['tools/ci/quarantine.json', 'tools/ci/quarantine.mjs', 'tools/ci/x/y.mjs']) {
+      expect(classify(f), f).toBe(1);
+      expect(isSensitive(f), f).toBe(true);
+    }
+    expect(isSensitive('tools/cix/a.mjs')).toBe(false);
+  });
+
+  it('CODEOWNERS owns /tools/ci/', () => {
+    const owners = readFileSync(join(root, '.github', 'CODEOWNERS'), 'utf8');
+    expect(owners).toMatch(/^\/tools\/ci\/\s+@talirezun @denisjazbec$/m);
+  });
+});
+
 // OPS-UNSTICK-B: the Changesets "Version packages" PR opened by the release GitHub App is a mechanical
 // S0 when its diff has the version shape: `packages|apps/*/package.json` version and internal
 // dependency-range lines only, CHANGELOG.md files, and deleted `.changeset/*.md` / `changelog.d/*.md`.

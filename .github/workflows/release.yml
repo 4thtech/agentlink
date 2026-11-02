@@ -13,7 +13,9 @@
 #   SUPERSEDED (CHORE-CI-SUPERSEDED): when this commit's CI run was cancelled before it ran because a
 #   newer push to main took its pending slot, and main has moved on past this commit, `ci-green`
 #   ends green with result=superseded and the publish path is skipped. The newer commit's own run
-#   of this workflow (every push to main starts one) releases main's state.
+#   of this workflow (every push to main starts one) releases main's state: OPS-UNSTICK-A, select-mode
+#   sets `publish` whenever main holds versions npm does not have, also in `version` mode (a feature
+#   merge with a pending changeset), so a superseded release is never silently left unpublished.
 #
 # GUARD
 #   This workflow does nothing until the repository is ready: the `guard` job checks for
@@ -30,7 +32,9 @@
 #     publish-latest  otherwise. Environment `npm-publish`: waits for the owner's approval click.
 #   These channels run only for pushes to `main` (select-mode is main-only).
 #
-# FAST @NEXT (OPS-FAST-LANE-3, owner Decision 54 item 5)
+# FAST @NEXT (OPS-FAST-LANE-3, owner Decision 54 item 5) -- SWITCHED OFF ON MAIN (OPS-UNSTICK-A)
+#   npm 404 in 8 of 17 runs: npm accepts one trusted publisher per package. `pack-preview` runs on
+#   main only while the repository variable NEXT_SNAPSHOT_ON_MAIN is 'true' (unset = off).
 #   Every push to `main` with a pending changeset publishes a snapshot `x.y.z-next.snap.<UTC datetime>`
 #   to npm `next` within minutes, so any merge is testable as `npx -y @4thtech-io/agentlink@next`. It is
 #   the preview lane below, now also for `main`: it waits only for `preview-gate` (main: nothing but
@@ -358,6 +362,12 @@ jobs:
       contents: read
     outputs:
       mode: ${{ steps.select.outputs.mode }}
+      # OPS-UNSTICK-A (R-1): the publish path runs in `publish` mode AND whenever main holds versions
+      # npm does not have, in any mode. A Version packages merge whose own run was superseded by a
+      # feature merge (ci-green result=superseded) is then published by the feature merge's run,
+      # which is in `version` mode. Every publish gate stays: ci-green (this commit's heavy CI),
+      # DEPLOY_FREEZE, the npm-publish approval click.
+      publish: ${{ steps.select.outputs.mode == 'publish' || steps.unpublished.outputs.unpublished == 'true' }}
       publish-plan-artifact-id: ${{ steps.select.outputs.publish-plan-artifact-id }}
     steps:
       - name: Check out repository
@@ -373,6 +383,19 @@ jobs:
       - name: Decide between version and publish
         id: select
         uses: changesets/action/select-mode@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+
+      # OPS-UNSTICK-A (R-1): in `version` mode, ask Changesets' own publish plan (it reads the
+      # registry; pending changesets do not change package.json) whether main's versions are on npm.
+      # `pack` then runs without a plan artifact and packs exactly those (changeset pack).
+      - name: Check for versions on main that npm does not have
+        id: unpublished
+        if: steps.select.outputs.mode == 'version'
+        shell: bash
+        run: |
+          set -euo pipefail
+          plan="$RUNNER_TEMP/unpublished/publish-plan.json"
+          pnpm exec changeset publish-plan --output "$plan"
+          node tools/release/unpublished.mjs --plan "$plan" >> "$GITHUB_OUTPUT"
 
   version:
     name: version
@@ -462,7 +485,7 @@ jobs:
     # (`ci-gate (push)`) and security gate are green. A superseded or red ci-green skips this job and
     # everything downstream (publish-next, publish-latest, desktop extension).
     needs: [select-mode, ci-green]
-    if: needs.select-mode.outputs.mode == 'publish' && needs.ci-green.outputs.result == 'green'
+    if: needs.select-mode.outputs.publish == 'true' && needs.ci-green.outputs.result == 'green'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -506,7 +529,7 @@ jobs:
   publish-next:
     name: publish-next
     needs: [guard, select-mode, pack]
-    if: needs.select-mode.outputs.mode == 'publish' && needs.guard.outputs.channel == 'next' && vars.DEPLOY_FREEZE != 'true'
+    if: needs.select-mode.outputs.publish == 'true' && needs.guard.outputs.channel == 'next' && vars.DEPLOY_FREEZE != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: npm-next
@@ -700,10 +723,15 @@ jobs:
   # Preview lane (W4-NEXT-PREVIEW; OPS-FAST-LANE-3): every green push to `wave-4` and every push to
   # `main` that is still its head publishes a snapshot to `next`, within minutes of the merge.
   # Never `latest`, never a git tag or GitHub Release, never the desktop extension.
+  # OPS-UNSTICK-A: SWITCHED OFF ON MAIN. Its publish failed with npm 404 in 8 of 17 runs since
+  # 1 Nov (npm accepts one trusted publisher per package, and that is `npm-publish`), so main showed a
+  # red Release run after half of all merges. The code path stays: it runs on main again only when
+  # the repository variable NEXT_SNAPSHOT_ON_MAIN is 'true' (owner, once npm accepts the `npm-next`
+  # publisher). Unset = off. The wave-4 lane is unchanged.
   pack-preview:
     name: pack-preview
     needs: [guard, preview-gate]
-    if: needs.guard.outputs.enabled == 'true' && needs.preview-gate.outputs.result == 'green' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/wave-4')
+    if: needs.guard.outputs.enabled == 'true' && needs.preview-gate.outputs.result == 'green' && ((github.ref == 'refs/heads/main' && vars.NEXT_SNAPSHOT_ON_MAIN == 'true') || github.ref == 'refs/heads/wave-4')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -1041,7 +1069,7 @@ jobs:
   publish-latest:
     name: publish-latest
     needs: [guard, select-mode, pack]
-    if: needs.select-mode.outputs.mode == 'publish' && needs.guard.outputs.channel == 'latest' && vars.DEPLOY_FREEZE != 'true'
+    if: needs.select-mode.outputs.publish == 'true' && needs.guard.outputs.channel == 'latest' && vars.DEPLOY_FREEZE != 'true'
     runs-on: ubuntu-24.04
     # 45, not 30: the health check may wait up to 15 minutes for npm's CDN to serve the tarballs.
     timeout-minutes: 45

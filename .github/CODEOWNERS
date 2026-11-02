@@ -49,6 +49,8 @@
 # holding the npm OIDC token (publish-preview, W4-NEXT-PREVIEW), and .changeset/ decides versions
 # and the snapshot scheme.
 /tools/release/                                 @talirezun @denisjazbec
+# CI gate tooling, including the test quarantine (OPS-UNSTICK-A): a change can relax a gate.
+/tools/ci/                                      @talirezun @denisjazbec
 /.changeset/                                    @talirezun @denisjazbec
 
 # Agent rules and harness settings

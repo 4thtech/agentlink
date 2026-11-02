@@ -66,9 +66,13 @@ on:
 
 permissions: {}
 
+# OPS-UNSTICK-A: never cancel a run in progress. A close/reopen or an edit (the IR line added after
+# the PR opened) used to cancel the run in flight and leave a cancelled required check (#772,
+# #770, #761). Runs of one PR now queue: GitHub keeps only the newest pending run, nothing in
+# flight is cancelled, and the last run decides the check. The job takes seconds.
 concurrency:
   group: review-gate-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   review-gate:
@@ -168,6 +172,8 @@ jobs:
               [1, /^(\.gitleaks\.toml|\.gitleaksignore|\.changeset\/config\.json)$/],
               // Release tooling: release.yml runs these scripts in jobs holding the npm OIDC token (CODEOWNERS).
               [1, /^tools\/release\//],
+              // CI gate tooling, including the test quarantine (OPS-UNSTICK-A): a change can relax a gate.
+              [1, /^tools\/ci\//],
               [1, /^docs\/(foundation|process)\//],
               [1, /^(AGENTS|CLAUDE|SECURITY)\.md$/],
               // Public docs, published on merge (D-57). Owner decision 2026-10-25 (CHORE-CI-DOCS-FASTLANE):
@@ -187,6 +193,7 @@ jobs:
               /(^|\/)(\.npmrc|\.pnpmfile\.[^/]+)$/,
               /^(\.gitleaks\.toml|\.gitleaksignore|\.changeset\/config\.json)$/,
               /^tools\/release\//,
+              /^tools\/ci\//,
               // INSTALLER-1: the installers, their tests and the site that serves them (curl | sh).
               /^installer\//,
               /^tools\/installer\//,

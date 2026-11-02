@@ -39,9 +39,13 @@ on:
 
 permissions: {}
 
+# OPS-UNSTICK-A: never cancel a run in progress. A close/reopen or an edit (the IR line added after
+# the PR opened) used to cancel the run in flight and leave a cancelled required check (#772,
+# #770, #761). Runs of one PR now queue: GitHub keeps only the newest pending run, nothing in
+# flight is cancelled, and the last run decides the check. The job takes seconds.
 concurrency:
   group: pr-hygiene-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   pr-hygiene:
