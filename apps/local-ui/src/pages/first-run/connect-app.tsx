@@ -72,7 +72,6 @@ export function ConnectApp({
   appId,
   appName,
   folder,
-  agentLabel,
   sensor,
   passkeyProof,
   onDone,
@@ -205,7 +204,7 @@ export function ConnectApp({
     const status = view.status;
     return (
       <section className="fr-card" aria-labelledby="fr-connect-h">
-        {heading(T.title(appName, agentLabel))}
+        {heading(T.title(appName))}
         {named}
         {status === 'quit_first' ? (
           <>
@@ -252,7 +251,7 @@ export function ConnectApp({
   const failed = view.k === 'failed';
   return (
     <section className="fr-card" aria-labelledby="fr-connect-h">
-      {heading(T.title(change.name, agentLabel))}
+      {heading(T.title(change.name))}
       {named}
       <p className="al-text-body">{T.intro(change.name)}</p>
       <div className="fr-entry">

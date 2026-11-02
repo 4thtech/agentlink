@@ -205,12 +205,28 @@ function button(name: string | RegExp): HTMLButtonElement {
   if (found === undefined) throw new Error(`no button ${String(name)}: ${text()}`);
   return found;
 }
-async function click(name: string | RegExp): Promise<void> {
+async function click(name: string | RegExp, fill = true): Promise<void> {
   await act(async () => {
     button(name).click();
     await Promise.resolve();
   });
   await settle();
+  // Step 2 of a first run asks for the name; most tests only need one there.
+  if (fill && typeof name === 'string' && name.startsWith('Continue with')) await nameIt();
+}
+
+/**
+ * W7-ID-B1: the Confirm screen asks for the person's name and goes on only with one. Fills it the
+ * way a person types (React sees an input event), unless it is already there or the screen has no field.
+ */
+async function nameIt(value = 'Ana'): Promise<void> {
+  const input = host.querySelector<HTMLInputElement>('input[name="agent-name"]');
+  if (input === null || input.value !== '') return;
+  await act(async () => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    set?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 
 interface Mounted {
@@ -336,7 +352,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     const { went } = await mount({ api: setup });
     await click(PICK_STEP.next('Claude Code'));
     await click(CONNECT_STEP.connect('Touch ID'));
-    expect(setup.begun).toEqual([{ label: 'Claude Code', app: 'claude-code' }]);
+    expect(setup.begun).toEqual([{ label: 'Ana', app: 'claude-code' }]);
     expect(setup.finished).toHaveLength(1);
     expect(h1()).toBe('Your backup code');
     expect(host.querySelector('.al-secret-val')?.textContent?.replace(/\s/g, '')).toBe(
@@ -369,11 +385,12 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     expect(went).not.toContain('/start/connected');
   });
 
-  it('"Change name" opens the field; the typed name is the one begin carries', async () => {
+  it('the name is asked for on the Confirm screen: empty, required, and the typed name is the one begin carries', async () => {
     const setup = fakeSetup();
     await mount({ api: setup });
-    await click(PICK_STEP.next('Claude Code'));
-    await click(CONNECT_STEP.rename);
+    await click(PICK_STEP.next('Claude Code'), false);
+    expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe('');
+    expect(button(CONNECT_STEP.connect('Touch ID')).disabled).toBe(true);
     const input = host.querySelector<HTMLInputElement>('input[name="agent-name"]');
     expect(input).not.toBeNull();
     await act(async () => {
@@ -391,7 +408,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     await click(/^CodexNot found yet/);
     await click(PICK_STEP.next('Codex'));
     await click(CONNECT_STEP.connect('Touch ID'));
-    expect(setup.begun).toEqual([{ label: 'Codex', app: undefined }]);
+    expect(setup.begun).toEqual([{ label: 'Ana', app: undefined }]);
   });
 
   it('E1: created_not_connected keeps the agent: "{agent} is ready" and Connect Claude Code', async () => {
@@ -399,7 +416,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     await click(PICK_STEP.next('Claude Code'));
     await click(CONNECT_STEP.connect('Touch ID'));
     await click('I saved it');
-    expect(h1()).toBe(CONNECTED_STEP.notConnectedTitle('Claude Code'));
+    expect(h1()).toBe(CONNECTED_STEP.notConnectedTitle('Ana'));
     expect(text()).toContain(CONNECTED_STEP.notConnectedBody('Claude Code'));
     expect(button(CONNECTED_STEP.connect('Claude Code'))).toBeDefined();
     expect(host.querySelector('.al-draw')).toBeNull();
@@ -592,7 +609,10 @@ function fakeAgents(): NonNullable<FirstRunPageProps['agentsApi']> & {
           generation: 3,
           current: 'work',
           label: 'Work',
-          agents: [{ name: 'work', label: 'Work', current: true, apps: [] }],
+          agents: [
+            { name: 'work', label: 'Work', current: true, apps: [] },
+            { name: 'side', label: 'Side', current: false, apps: [] },
+          ],
         },
       } as unknown as Awaited<ReturnType<NonNullable<FirstRunPageProps['agentsApi']>['list']>>),
     switchTo: (name: string, generation: number) => {
@@ -673,8 +693,8 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     const labelCheck = vi.fn(() => Promise.resolve({ kind: 'refused' } as const));
     await mount(asAdd({ api: Object.assign(fakeSetup({ status: OWNER }), { labelCheck }) }));
     await typeName('   ');
-    await click('Continue');
-    expect(text()).toContain('Give this ID a name.');
+    // W7-ID-B1: Continue waits for a name, so an empty one is never sent.
+    expect(button('Continue').disabled).toBe(true);
     await typeName('x'.repeat(33));
     await click('Continue');
     expect(text()).toContain('Use up to 32 characters.');
@@ -730,7 +750,10 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
   it('IR-W4-WIRE-2X-1: a name another agent has says so (a hint; it may still be used)', async () => {
     const agentsApi = fakeAgents();
     await mount(asAdd({ agentsApi }));
-    await typeName('Work');
+    // The person is the same owner: the field starts with their ID's name, with no hint on it.
+    expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe('Work');
+    expect(text()).not.toContain('You already have an ID with this name.');
+    await typeName('Side');
     expect(text()).toContain('You already have an ID with this name.');
     await typeName('Side project');
     expect(text()).not.toContain('You already have an ID with this name.');

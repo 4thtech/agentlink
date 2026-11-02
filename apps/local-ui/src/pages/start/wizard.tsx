@@ -295,11 +295,18 @@ export function NameStep({
           spellCheck={false}
           value={value}
           readOnly={working}
-          {...(taken ? { hint: N.taken } : {})}
+          placeholder={N.placeholder}
+          hint={taken ? N.taken : N.hint}
           {...(error === undefined ? {} : { error })}
           onChange={(event) => onChange(event.currentTarget.value)}
         />
-        <Button type="submit" variant="primary" size="lg" className="al-press" disabled={working}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          className="al-press"
+          disabled={working || value.trim() === ''}
+        >
           {N.next}
         </Button>
         {/* One line either way, so the check moves nothing. */}

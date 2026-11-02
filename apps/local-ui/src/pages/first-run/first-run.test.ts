@@ -40,7 +40,7 @@ const GO = {
   other: CONNECT_STEP.connect('your passkey'),
 } as const;
 /** Step 3 after a first run with no AI app found (the pick was "Claude Code", not found yet). */
-const READY = CONNECTED_STEP.notConnectedTitle('Claude Code');
+const READY = CONNECTED_STEP.notConnectedTitle('Ana');
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -163,6 +163,7 @@ async function mount(
       await Promise.resolve();
     });
     await settleAll();
+    await nameIt();
   }
 }
 
@@ -186,6 +187,20 @@ async function click(name: string): Promise<void> {
     await Promise.resolve();
   });
   await settleAll();
+}
+
+/**
+ * W7-ID-B1: the Confirm screen asks for the person's name and goes on only with one. Fills it the
+ * way a person types (React sees an input event), unless it is already there or the screen has no field.
+ */
+async function nameIt(value = 'Ana'): Promise<void> {
+  const input = host.querySelector<HTMLInputElement>('input[name="agent-name"]');
+  if (input === null || input.value !== '') return;
+  await act(async () => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    set?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 
 const text = (): string => host.textContent ?? '';

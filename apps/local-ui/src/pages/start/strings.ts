@@ -30,6 +30,8 @@ export const NAME_STEP = {
   title: 'Name this ID',
   body: 'People you connect with see this name. You can rename it later in IDs.',
   field: 'Name people see',
+  placeholder: 'Your first name, e.g. Ana',
+  hint: 'People see this name on your invites.',
   next: 'Continue',
   checking: 'Checking the name…',
   then: 'Next, pick the AI app it works in.',

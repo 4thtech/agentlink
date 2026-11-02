@@ -235,9 +235,8 @@ export const PICK = {
 
 export const NAME = {
   label: 'Name people see',
-  hint: 'People you connect with see this name.',
-  /** W7 Q5: the suggested name is the AI app's name (the owner's name is not known here); "My ID" with none (b11 §28.3). */
-  suggested: (app: string | undefined): string => (app === undefined ? 'My ID' : app),
+  hint: 'People see this name on your invites.',
+  placeholder: 'Your first name, e.g. Ana',
   empty: 'Give this ID a name.',
   /** The name must be 1 to 32 characters (06 §6 label rule). */
   tooLong: 'Use up to 32 characters.',
@@ -269,7 +268,7 @@ export const NAME_MAX = 32;
 
 /** b11 §30.3, §28.4: the connect step in the first-run shell. */
 export const CONNECT = {
-  title: (app: string, agent: string): string => `Connect ${app} to ${agent}`,
+  title: (app: string): string => `Connect ${app} to this ID`,
   intro: (app: string): string => `This adds one entry to ${app}'s settings.`,
   file: 'File',
   adds: 'Adds',
