@@ -18,6 +18,7 @@ import { createFakeDrop } from '../../src/fake-drop.mjs';
 import { memoryRelays } from '../../src/memory-relay.mjs';
 import {
   builtAppFiles,
+  createClientWithoutStub,
   launchBrowser,
   newComputer,
   openedLink,
@@ -73,7 +74,7 @@ export function journeyWorld(options: { readonly okDelayMs?: number } = {}): Jou
       const runtime = {
         ...base,
         createClient: (options: Parameters<typeof base.createClient>[0]) =>
-          base.createClient({
+          createClientWithoutStub({
             ...options,
             ...(options.files === undefined
               ? {}
