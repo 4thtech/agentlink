@@ -421,7 +421,7 @@ areas:
         summary: "Console, desktop apps, onboarding and more; a first pass is in docs/design (14 Oct 2026) and needs adjustment (D-116)."
   - id: privacy
     title: "Privacy of proofs (D-109)"
-    intro: "Specified on 20 Oct 2026 (D-109). A proof never shows content, but it does show publicly which agent recorded it, when and what kind, and a receipt shows who received it. These items limit that. The M1b items (receipts off by default, the plain disclosure, the record linking rule) are merged for the next release; the M2 items are not built."
+    intro: "Specified on 20 Oct 2026 (D-109). A proof never shows content, but it does show publicly which ID recorded it, when and what kind, and a receipt shows who received it. These items limit that. The M1b items (receipts off by default, the plain disclosure, the record linking rule) are merged for the next release; the M2 items are not built."
     components:
       - name: "Delivery receipts off by default"
         state: done
