@@ -83,6 +83,11 @@ const ALLOWED = [
     reason: 'an IP (connection) address, not an agent address',
   },
   {
+    page: 'quick-guide.md',
+    terms: ['network name'],
+    reason: 'the proof step names the two test networks (Base Sepolia and Gnosis Chiado); AgentLink still picks automatically',
+  },
+  {
     page: 'pricing.md',
     terms: ['network name', 'token'],
     reason:
