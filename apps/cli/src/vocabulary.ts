@@ -13,6 +13,27 @@ export interface BannedTerm {
   readonly pattern: RegExp;
 }
 
+/**
+ * D-144 (Decision 56): "agent" meaning the ID (the identity AgentLink creates for an AI app) is
+ * never user-facing; the word is "ID". Context-aware: it matches "agent" only after a determiner or
+ * verb that points at the ID ("your agent", "New agent", "Add agent", "the open agent"), as a
+ * possessive ("Ana's agent"), or in a compound that names an ID thing ("agent name", "Agent ID",
+ * "agent card"). It leaves the AI meaning alone:
+ * "AI agents", "other agents", "agent-to-agent", "cloud agent", `--agent`, `add-agent` (a hyphen
+ * is not a word gap here) and code identifiers.
+ */
+export const AGENT_AS_ID: RegExp = new RegExp(
+  [
+    String.raw`\b(?:your|this|their|new|add|manage|the open|each|every|my|another|which|remove|removed|switch|delete|rename|retire)\s+agents?\b(?!-)`,
+    String.raw`['\u2019]s\s+agents?\b(?!-)`,
+    String.raw`\bagent\s+(?:names?|ids?|cards?|profiles?)\b`,
+  ].join('|'),
+  'i',
+);
+
+/** The nav word "Agents" as a whole text, now "IDs" (lint nav and title strings, never paths). */
+export const AGENTS_NAV: RegExp = /^\s*agents\s*$/i;
+
 /** 11 §5.1, "Never say" (default UI and in-chat copy), plus the §5.3 tone markers. */
 export const NEVER_SAY: readonly BannedTerm[] = Object.freeze([
   { name: 'wallet', pattern: /\bwallets?\b/i },
@@ -31,7 +52,8 @@ export const NEVER_SAY: readonly BannedTerm[] = Object.freeze([
   { name: 'nostr/relay', pattern: /\bnostr\b|\brelays?\b/i },
   { name: 'encryption key', pattern: /\bdecrypt\w*|\bencryption keys?\b/i },
   { name: 'policy', pattern: /\bpolic(y|ies)\b/i },
-  { name: 'harness/envelope', pattern: /\bharness(es)?\b|\benvelopes?\b|\bagent cards?\b/i },
+  { name: 'harness/envelope', pattern: /\bharness(es)?\b|\benvelopes?\b/i },
+  { name: 'agent (the ID)', pattern: AGENT_AS_ID },
   { name: 'MCP', pattern: /\bMCP\b/i },
   { name: 'owner key', pattern: /\bowner keys?\b/i },
   { name: 'signature', pattern: /\bsignatures?\b/i },

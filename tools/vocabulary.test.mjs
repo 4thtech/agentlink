@@ -27,6 +27,24 @@ const GUIDE = join(root, 'docs-site/guide');
  */
 const ALLOWED = [
   {
+    page: 'local-app/ids.md',
+    terms: ['agent (the ID)'],
+    reason:
+      'the version note quotes the old button name ("Switch and Add agent") to say what it became (D-144)',
+  },
+  {
+    page: 'local-app/contacts.md',
+    terms: ['agent (the ID)'],
+    reason:
+      'alt text of a screenshot taken before the rename that still shows the old word; remove when retaken (D-144)',
+  },
+  {
+    page: 'local-app/messages.md',
+    terms: ['agent (the ID)'],
+    reason:
+      'alt text of a screenshot taken before the rename that still shows the old word; remove when retaken (D-144)',
+  },
+  {
     page: 'get-started/README.md',
     terms: ['MCP', 'harness/envelope'],
     reason:
