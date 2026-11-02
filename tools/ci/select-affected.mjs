@@ -50,7 +50,8 @@ const FULL_PREFIXES = [
 ];
 
 // The same docs set as `detect`'s docs-only rule in ci.yml.
-const DOCS = /^(docs\/|docs-site\/|knowledge\/|changelog\.d\/|\.changeset\/[^/]+\.md$|[^/]+\.md$)/;
+const DOCS =
+  /^(docs\/|docs-site\/|knowledge\/|changelog\.d\/|\.changeset\/[^/]+\.md$|[^/]+\.md$|llms\.txt$|brand\/.+\.(?:png|jpe?g|gif|svg|webp)$)/;
 
 // OPS-FAST-LANE-1: a push to one of these refs is the heavy lane (everything runs; release.yml
 // requires that run's gate). Every other push, every pull request and every merge group is the
@@ -77,6 +78,46 @@ export function fastLane({ event, ref = '', files }) {
   const list = files.map((f) => f.trim()).filter(Boolean);
   if (list.length === 0) return full;
   return { codeChanged: !list.every((f) => DOCS.test(f)), selector: true };
+}
+
+// OPS-DOCS-FASTLANE (owner decision, 2026-11-02): a diff that holds only documentation runs the quick
+// `docs-checks` job instead of install, build and the package suites. Narrower than DOCS on purpose;
+// when unsure it is not docs-only. Only prose and images: Markdown and common image files under the
+// doc trees, plus the root README.md, CHANGELOG.md and llms.txt. Excluded on purpose (they stay in
+// the normal path): packages/, apps/, tools/, .github/ (even its *.md), e2e/, test-vectors/, package
+// manifests and lockfiles, AGENTS.md, CLAUDE.md, .claude/, docs/status.yaml (the status generator and
+// its tests, review-gate and release tooling read it), `.changeset/` (it decides versions), and any
+// path a workspace package's source names (`coupledRefs`: a package test that reads a doc, such as the
+// guide pages in apps/cli tests or docs/design/d1 in the ui tests). packages/*/README.md is excluded
+// by the first rule: a package publishes its README.
+const IMAGE = '(?:png|jpe?g|gif|svg|webp)';
+const DOCS_ONLY = [
+  new RegExp(`^docs/.+\\.(?:md|${IMAGE})$`),
+  new RegExp(`^docs-site/.+\\.(?:md|${IMAGE})$`),
+  /^knowledge\/.+\.md$/,
+  /^changelog\.d\/.+\.md$/,
+  new RegExp(`^brand/.+\\.${IMAGE}$`),
+  /^(?:README|CHANGELOG)\.md$/,
+  /^llms\.txt$/,
+];
+
+/**
+ * OPS-DOCS-FASTLANE: is every changed file documentation, in the fast lane, and not read by any
+ * package's code or tests? Unknown or empty diffs, and the heavy lane, are never docs-only.
+ *
+ * @param {{ event: string, ref?: string, files: string[] | null, coupledRefs?: string[] }} input
+ * @returns {boolean}
+ */
+export function docsOnly({ event, ref = '', files, coupledRefs = [] }) {
+  if (!fastLane({ event, ref, files }).selector || files == null) return false;
+  const list = files.map((f) => f.trim()).filter(Boolean);
+  if (list.length === 0) return false;
+  return list.every(
+    (f) =>
+      !f.split('/').includes('..') &&
+      DOCS_ONLY.some((re) => re.test(f)) &&
+      !coupledRefs.some((r) => f.startsWith(r)),
+  );
 }
 
 const NAME = /^@4thtech-io\/[a-z0-9][a-z0-9-]*$/;
@@ -235,7 +276,7 @@ function selectPackages({ files, workspace }) {
     if (FULL_PREFIXES.some((p) => file.startsWith(p))) {
       return { scope: 'full', reason: `global trigger: ${file}` };
     }
-    if (!file.includes('/') && !file.endsWith('.md')) {
+    if (!file.includes('/') && !DOCS.test(file)) {
       return { scope: 'full', reason: `root file: ${file}` };
     }
     const pkg = owner(file);
@@ -383,9 +424,22 @@ function scope(argv) {
   const files =
     listFile && existsSync(listFile) ? readFileSync(listFile, 'utf8').split('\n') : null;
   const lane = fastLane({ event, ref, files });
-  // Two lines on stdout; ci.yml validates them before it writes its outputs.
+  // Paths that a package (other than tools, whose checks `docs-checks` runs) names in its sources.
+  // An unreadable workspace means not docs-only.
+  let docs;
+  try {
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+    const coupledRefs = loadWorkspace(root)
+      .filter((p) => p.name !== TOOLS_PACKAGE)
+      .flatMap((p) => p.refs);
+    docs = docsOnly({ event, ref, files, coupledRefs });
+  } catch {
+    docs = false;
+  }
+  // Three lines on stdout; ci.yml validates them before it writes its outputs.
   console.log(`e2e_relevant=${lane.codeChanged}`);
   console.log(`use_selector=${lane.selector}`);
+  console.log(`docs_only=${docs && !lane.codeChanged}`);
 }
 
 function main(argv) {
