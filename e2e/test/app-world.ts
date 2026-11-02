@@ -114,6 +114,24 @@ export async function newComputer(
     transport: () =>
       nostrTransport({ connector: relays.connector as never, addressCheck: 'platform' }),
     proofs: () => undefined,
+    // No test reaches the real 4thTech drop: its short-invite route (`/v1/invite`, live since 2 Nov
+    // 2026) would turn invites into short links that `runJoin` cannot resolve. A drop that answers
+    // 404, as the drop did before that route, keeps invites on the long, deterministic form.
+    createClient: (options) =>
+      nodeRuntimeDeps.createClient({
+        ...options,
+        ...(options.files === undefined
+          ? {}
+          : {
+              files: {
+                ...options.files,
+                drop: {
+                  endpoint: 'https://drop.agentlink.4thtech.io',
+                  fetch: () => Promise.resolve(new Response(null, { status: 404 })),
+                },
+              },
+            }),
+      }),
   };
   void base;
   return {
