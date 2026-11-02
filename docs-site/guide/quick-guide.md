@@ -60,7 +60,7 @@ Open your AI app and type what you want in plain words. AgentLink does the rest.
 
 | You type | What happens |
 |---|---|
-| "Send Ana's agent: the brief is ready, can you review it today?" | Sends an encrypted message (`agentlink_send`). It confirms in about a second. |
+| "Send Ana's agent: the brief is ready, can you review it today?" | Sends an encrypted message (`agentlink_send`). It confirms in about a second (0.4.9 and later; older versions take about ten seconds). |
 | "Check my AgentLink inbox" | Reads new messages (`agentlink_inbox`). Claude also checks `agentlink_status` at the start of a session and tells you who wrote. |
 | "Who are my AgentLink contacts?" | Lists the people you are connected with (`agentlink_list_contacts`). |
 | "Send the file report.pdf from my AgentLink Send folder to Ana" | Sends the file. Your AI may send files only from `~/AgentLink/Send`. Put the file there first. |
@@ -85,12 +85,14 @@ New messages can take a few seconds to show up in the list.
 
 A **proof** is a fingerprint of a message or file, recorded on a public record with the time, so you can show later that it existed. Nobody can read the content.
 
-In this release, proof runs on test networks only (Base Sepolia and Gnosis Chiado; AgentLink picks one for you) and is free.
+In this release, proof runs on test networks only (Base Sepolia and Gnosis Chiado; AgentLink picks one for you) and costs nothing: each proof uses $0.10 of free test credits.
 
-1. Ask your AI: **"Add proof to my last message to Ana."** Or: "Send this to Ana with proof."
-2. Your AI explains that a proof is public (anyone can see that something was recorded, when and what kind, not what it says). Approve it if asked.
-3. **Test credits:** the first time, AgentLink adds a small amount of free test credits for you, once, and says so in one line. You do nothing. If the free supply is paused it says **Free test credits are paused right now. Try again later.** Try again later.
-4. The proof is recorded about a minute later. To see it, ask "Check the proof of my last message to Ana", or open **Settings**, then **Proofs & credits** in the app, which lists your proofs and credits.
+1. Ask your AI: **"Add proof to my last message to Ana."** Or: "Send this to Ana with proof." (Your AI uses the AgentLink tool `agentlink_notarize` for this.)
+2. Your AI tells you that a proof is public (anyone can see that something was recorded, when and what kind, not what it says). Approve it if asked.
+3. **Test credits:** the first time, AgentLink adds free test credits for you by itself, once per test network, about $0.50 (five proofs). You do nothing. Your AI's answer begins "Added free test credits. Proof recorded."
+4. **Wait about a minute.** The first proof takes roughly a minute because the credits have to arrive before it is recorded. When your AI says **Proof recorded**, it is done. To see it, ask "Check the proof of my last message to Ana", or open **Settings**, then **Proofs & credits** in the app, which lists your proofs and credits.
+
+If the free test credits are used up or the free supply is paused (it gives each internet connection only a few per day, so a whole class on one network may run out), your AI says so, for example **Free test credits are paused right now. Try again later.** Adding credits yourself is not available yet. Try again later, or from another connection.
 
 Test credits have no value. See [Agreements and proof](everyday-use/agreements-and-proof.md) and [Credits](everyday-use/credits.md).
 
