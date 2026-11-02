@@ -76,7 +76,7 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
     - the changeset files are consumed and nothing else changed.
 12. Approve #124 (a code-owner approval on its head commit is what `review-gate` waits for), then say **"merge"** in chat. Agents enable auto-merge only after that word and never approve.
 13. After the merge, `release.yml` runs on `main`:
-    1. `ci-green` waits for this commit's CI and security checks and stops unless both are green. If red: fix, re-run CI, then re-run the release's failed jobs.
+    1. `ci-green` waits for this commit's CI and security checks and stops unless both are green. If red: fix, re-run CI; once CI is green, `ci-green-catchup.yml` re-runs the release's failed jobs automatically (OPS-CIGREEN-WAIT).
     2. `guard`, `select-mode`, then `pack` (build and tarballs, no publish rights).
     3. `publish-latest` **pauses for your approval**: GitHub mobile, or Actions → the run → "Review deployments" → tick `npm-publish` → **Approve and deploy**. It re-checks `DEPLOY_FREEZE` after your click.
     4. It publishes `@4thtech-io/agentlink@0.1.0` over OIDC with provenance, checks that `latest` is 0.1.0 and the provenance attestation exists (`npm audit signatures`), then creates the GitHub Release `v0.1.0` from the CHANGELOG section, and the git tags.
@@ -105,7 +105,7 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
 ## If it fails
 - **Never `npm unpublish`.** Roll back with `npm deprecate "@4thtech-io/agentlink@0.1.0" "Broken, do not use"` (owner, 2FA) and move `latest` back (`npm dist-tag add @4thtech-io/agentlink@0.0.1 latest`, or let the `rollback-latest` job do it after your click). Publish a fixed patch through the same flow. Edit or delete the GitHub Release. Details: [RB-11](rollback-and-freeze.md), `release-and-deployment.md` §8.
 - **Publish step fails with an OIDC, 404 or 403 error:** the trusted publisher entry is wrong or expired (2-day rule). Delete and re-create it (step 4) and re-run the failed job.
-- **`ci-green` red or "no run":** [RB-08](ci-red.md); re-run the release's failed jobs after CI is green.
+- **`ci-green` red or "no run":** [RB-08](ci-red.md); once CI is green, `ci-green-catchup.yml` re-runs the release's failed jobs (re-run them by hand only if that pick-up run is red).
 - **Frozen:** only you clear `DEPLOY_FREEZE`.
 
 ## Related

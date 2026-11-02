@@ -1,0 +1,73 @@
+# ci-green pick-up (OPS-CIGREEN-WAIT): a release or deploy whose `ci-green` gave up is never left
+# undone. release.yml and deploy-{submitter,drop,invite}.yml start on the push to main and their
+# `ci-green` job waits for this commit's CI (tools/release/wait-for-ci.mjs). When CI is red on its
+# first attempt (a flake that ci-auto-retry.yml re-runs) or slower than the wait, ci-green fails and
+# nothing is released or deployed, although CI turns green later. When a CI or Security run of a
+# main push completes green, this re-runs the failed jobs of those runs of the same commit, if the
+# commit is still main's head and both gates are green (tools/release/ci-green-catchup.mjs).
+#
+# Why a re-run and not a `workflow_run`-triggered release/deploy: the re-run is the original push run,
+# so its own ci-green verifies the gates again (fail closed), and the environments, approval clicks,
+# DEPLOY_FREEZE checks, concurrency groups, path filters, head-of-main checks and catch-up of #776
+# apply unchanged. Nothing here publishes or deploys.
+#
+# Security posture (as ci-auto-retry.yml): `workflow_run` runs this file from the default branch with
+# a token that can write Actions state. It never checks out or executes code of the triggering run:
+# it checks out only the two decision scripts at `github.sha` (the default branch head for this
+# event), runs them with the runner's Node (no install), and passes the event's head_sha through
+# `env:` only; the script validates it as a 40-hex commit and requires it to be main's head. Only
+# push runs of main from this repository count. No secrets; `actions: write` re-runs runs of this
+# repository and nothing more. At most 3 attempts per run (no loop). While DEPLOY_FREEZE is set it
+# does nothing.
+name: ci-green pick-up
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers] no checkout or execution of the triggering run's code; API calls with a validated head sha only
+    workflows: [CI, Security]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: ci-green-catchup-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  pick-up:
+    name: pick-up
+    if: >-
+      github.repository == '4thtech/agentlink' &&
+      vars.DEPLOY_FREEZE != 'true' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      actions: write # re-run the failed jobs of this repository's release and deploy runs; nothing else
+      contents: read
+    steps:
+      - name: Check out the decision scripts from the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            tools/release/ci-green-catchup.mjs
+            tools/release/wait-for-ci.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Re-run releases and deploys of this commit whose ci-green gave up
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          node tools/release/ci-green-catchup.mjs \
+            --workflow release.yml \
+            --workflow deploy-submitter.yml \
+            --workflow deploy-drop.yml \
+            --workflow deploy-invite.yml

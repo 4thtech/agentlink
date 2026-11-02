@@ -177,7 +177,9 @@ describe('catchUpCiGreen', () => {
       routes({
         [jobsPath(101)]: () => ({ jobs: [job('ci-green', 'completed', 'success')] }),
         [runsPath('deploy-invite.yml')]: () => ({
-          workflow_runs: [wfRun(201, 'deploy-invite.yml', { status: 'in_progress', conclusion: null })],
+          workflow_runs: [
+            wfRun(201, 'deploy-invite.yml', { status: 'in_progress', conclusion: null }),
+          ],
         }),
         [jobsPath(201)]: () => ({ jobs: [job('ci-green', 'in_progress', null)] }),
       }),
@@ -228,7 +230,9 @@ describe('catchUpCiGreen', () => {
           workflow_runs: [wfRun(101, 'release.yml', { status: 'in_progress', conclusion: null })],
         }),
         [runPath(101)]: (n) =>
-          n < 2 ? wfRun(101, 'release.yml', { status: 'in_progress', conclusion: null }) : wfRun(101, 'release.yml'),
+          n < 2
+            ? wfRun(101, 'release.yml', { status: 'in_progress', conclusion: null })
+            : wfRun(101, 'release.yml'),
       }),
     );
     expect(reruns).toEqual([rerunPath(101), rerunPath(201)]);
@@ -240,7 +244,8 @@ describe('catchUpCiGreen', () => {
         [runsPath('release.yml')]: () => ({
           workflow_runs: [wfRun(101, 'release.yml', { status: 'in_progress', conclusion: null })],
         }),
-        [runPath(101)]: () => wfRun(101, 'release.yml', { status: 'in_progress', conclusion: null }),
+        [runPath(101)]: () =>
+          wfRun(101, 'release.yml', { status: 'in_progress', conclusion: null }),
       }),
     );
     expect(reruns).toEqual([rerunPath(201)]);
@@ -325,11 +330,15 @@ describe('ci-green-catchup.yml', () => {
   );
 
   it('runs on completed CI and Security runs of main pushes from this repository only', () => {
-    expect(source).toMatch(/workflow_run:[^\n]*\n\s+workflows: \[CI, Security\]\n\s+types: \[completed\]/);
+    expect(source).toMatch(
+      /workflow_run:[^\n]*\n\s+workflows: \[CI, Security\]\n\s+types: \[completed\]/,
+    );
     expect(source).toContain("github.event.workflow_run.conclusion == 'success'");
     expect(source).toContain("github.event.workflow_run.event == 'push'");
     expect(source).toContain("github.event.workflow_run.head_branch == 'main'");
-    expect(source).toContain('github.event.workflow_run.head_repository.full_name == github.repository');
+    expect(source).toContain(
+      'github.event.workflow_run.head_repository.full_name == github.repository',
+    );
   });
 
   it('never checks out the triggering run, holds only actions: write and contents: read', () => {
