@@ -1,5 +1,11 @@
 # @4thtech-io/invite
 
+## 0.0.14
+
+### Patch Changes
+
+- 83908db: The invite site also serves the one-line installers at /install.sh and /install.ps1 (INSTALLER-1).
+
 ## 0.0.13
 
 ### Patch Changes
