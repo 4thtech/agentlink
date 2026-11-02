@@ -95,11 +95,8 @@ describe('chapter 5: upgrade', () => {
 
     // W4-SHELL-V2: the Agents page opens from the agent chip's dropdown, top left; the history is on
     // today's Messages page (Go to), until Home (U3) holds it.
-    await jp.page
-      .getByRole('button', { name: /^Agent: / })
-      .first()
-      .click();
-    await jp.page.getByRole('menuitem', { name: 'Manage agents' }).click();
+    await jp.page.getByRole('button', { name: /^ID: / }).first().click();
+    await jp.page.getByRole('menuitem', { name: 'Manage IDs' }).click();
     await jp.page.getByText('work', { exact: true }).first().waitFor();
     const listed = await text(jp.page);
     for (const shown of ['Ana', 'work']) expect(listed).toContain(shown);
@@ -146,11 +143,8 @@ describe('chapter 5: upgrade', () => {
       .first()
       .waitFor();
     expect(new URL(jp.page.url()).pathname).toBe('/');
-    await jp.page
-      .getByRole('button', { name: /^Agent: / })
-      .first()
-      .click();
-    await jp.page.getByText('Your agents · live').first().waitFor();
+    await jp.page.getByRole('button', { name: /^ID: / }).first().click();
+    await jp.page.getByText('Your IDs · live').first().waitFor();
     for (const label of ['Ana', 'work']) {
       await jp.page.getByRole('menuitemradio').filter({ hasText: label }).first().waitFor();
     }

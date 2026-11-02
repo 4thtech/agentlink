@@ -10,6 +10,7 @@ import {
   agentLine,
   appChoices,
   appsOf,
+  usedByNames,
   dotOf,
   fleetRows,
   relativeTime,
@@ -251,6 +252,9 @@ export function Fleet({
                 </td>
                 <td className="ag-col-opt">
                   <span className="ag-cell-apps">
+                    {usedByNames(r).length === 0 ? (
+                      <span className="al-muted al-text-body-sm">{S.notUsed}</span>
+                    ) : null}
                     {appsOf(r)
                       .filter((x) => x.state !== 'not_set_up')
                       .map((x) => (

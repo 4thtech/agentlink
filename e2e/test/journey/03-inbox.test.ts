@@ -240,7 +240,7 @@ describe('chapter 3: inbox', () => {
       `Home's first load shifted: ${await shiftsSince(b.page, seenBefore)}`,
     ).toBeLessThanOrEqual(CLS_BUDGET);
     const clsBefore = await layoutShiftScore(b.page);
-    await navTo(b.page, 'Agents');
+    await navTo(b.page, 'IDs');
     await navTo(b.page, 'Home');
     await b.page.getByRole('heading', { name: 'People' }).waitFor();
     await b.page.waitForTimeout(500);

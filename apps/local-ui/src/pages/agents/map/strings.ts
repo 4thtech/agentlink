@@ -12,7 +12,7 @@ export const MAP_STRINGS = {
   sendingTo: (name: string): string => `Sending to ${name}`,
   receivingFrom: (name: string): string => `Receiving from ${name}`,
   moreContacts: (n: number): string => `+${String(n)} more`,
-  moreAgents: (n: number): string => `+${String(n)} more agents`,
+  moreAgents: (n: number): string => `+${String(n)} more IDs`,
   empty: 'No one to talk to yet.',
   addContact: 'Add contact',
   noActivity: 'Nothing has moved in the last 24 hours.',
@@ -25,7 +25,7 @@ export const MAP_STRINGS = {
   open: 'Open conversation',
   contactsCount: (n: number): string => plural(n, 'contact', 'contacts'),
   summary: (agents: number, contacts: number, talking?: { name: string; agent: string }): string =>
-    `${plural(agents, 'agent', 'agents')}, ${plural(contacts, 'contact', 'contacts')}.` +
+    `${plural(agents, 'ID', 'IDs')}, ${plural(contacts, 'contact', 'contacts')}.` +
     (talking === undefined ? '' : ` ${talking.name} is talking with ${talking.agent} now.`),
   fileFrom: (name: string, agent: string): string => `${name} is sending a file to ${agent}`,
   reply: (name: string): string => `Reply from ${name}`,

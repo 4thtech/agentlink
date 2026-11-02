@@ -8,7 +8,7 @@ import { AGENTS_PATH } from './data.js';
 describe('Agents navigation', () => {
   it('is a section of the menu and reached from Cmd+K; the old path redirects', () => {
     expect(SECTIONS.find((s) => s.id === 'agents')?.path).toBe('/agents');
-    expect(goToEntries(false).find((e) => e.label === 'Agents')?.path).toBe('/agents');
+    expect(goToEntries(false).find((e) => e.label === 'IDs')?.path).toBe('/agents');
     expect(REDIRECTS[AGENTS_PATH]).toBe('/agents');
   });
   it('is a lazy page', () => {

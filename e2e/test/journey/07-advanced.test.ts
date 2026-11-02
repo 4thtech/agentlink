@@ -155,13 +155,13 @@ describe('chapter 7: advanced', () => {
       expect(await sections(page).count()).toBe(0);
     };
     await viaSheet('Activity', 'Activity');
-    await viaSheet('Agents', 'Agents');
+    await viaSheet('IDs', 'IDs');
     await page.getByRole('switch', { name: /Under the hood/ }).click();
     await viaSheet('Activity', 'Activity');
     await viaSheet('Settings', 'Settings');
     // Go to (the search button on a phone) reaches Activity as well, also from the fleet table,
     // whose own filters are comboboxes too (the walkthrough's helper picked theirs).
-    await viaSheet('Agents', 'Agents');
+    await viaSheet('IDs', 'IDs');
     await goTo(page, 'Activity');
     await page.getByRole('heading', { name: 'Activity', level: 1 }).first().waitFor();
     // navTo opens the sheet itself on a phone.

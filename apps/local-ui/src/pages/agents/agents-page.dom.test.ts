@@ -141,13 +141,16 @@ const code = (): HTMLInputElement =>
 describe('the Agents page', () => {
   it('lists every agent with its AI apps, contacts and the open one', async () => {
     await mountPage();
-    expect(host.querySelector('h1')?.textContent).toBe('Agents');
+    expect(host.querySelector('h1')?.textContent).toBe('IDs');
     expect(host.querySelectorAll('[data-agent]')).toHaveLength(4);
     const personal = rowOf('default');
     expect(personal.textContent).toContain('Open');
     expect(personal.textContent).toContain('Ready in Claude Code and 1 more');
     expect(personal.textContent).toContain('Claude Code');
     expect(personal.textContent).toContain('Claude Desktop');
+    // D-144 (c): which AI apps use the ID, or none.
+    expect(personal.textContent).toContain('Used by Claude Code, Claude Desktop');
+    expect(rowOf('second').textContent).toContain('Not used by any AI app');
     expect(personal.textContent).toContain('4 contacts');
     expect(button(personal, 'Switch')).toBeUndefined();
     expect(button(rowOf('work'), 'Switch')).toBeDefined();
@@ -158,7 +161,7 @@ describe('the Agents page', () => {
     const second = rowOf('second');
     expect(second.textContent).toContain('Offline');
     await click(button(second, 'AI apps'));
-    expect(rowOf('second').textContent).toContain('No AI app is set up for this agent yet.');
+    expect(rowOf('second').textContent).toContain('No AI app is set up for this ID yet.');
     const old = rowOf('old');
     expect(old.textContent).toContain('Removal not finished');
     expect(old.textContent).toContain('Removing it stopped part-way. Nothing else was affected.');
@@ -184,14 +187,18 @@ describe('the Agents page', () => {
       body: list([], { current: null, label: null }),
     };
     await mountPage();
-    expect(plain(host)).toContain('No agents left. Add one to keep using AgentLink.');
-    const links = [...host.querySelectorAll('a')].filter((a) => a.textContent === 'New agent');
+    expect(plain(host)).toContain('No IDs left. Add one to keep using AgentLink.');
+    // D-144 (b): the owner's explainer sentence on the empty page.
+    expect(plain(host)).toContain(
+      "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.",
+    );
+    const links = [...host.querySelectorAll('a')].filter((a) => a.textContent === 'New ID');
     expect(links.map((a) => a.getAttribute('href'))).toContain('/start/app?add=agent');
   });
-  it('says "Couldn\'t load your agents." with Try again when the read fails', async () => {
+  it('says "Couldn\'t load your IDs." with Try again when the read fails', async () => {
     answers['GET /api/ui/agents'] = { status: 500, body: {} };
     await mountPage();
-    expect(plain(host)).toContain("Couldn't load your agents.");
+    expect(plain(host)).toContain("Couldn't load your IDs.");
     expect(button(host, 'Try again')).toBeDefined();
   });
   it('marks the Tidy up agents "No AI app, no contacts"', async () => {
@@ -210,14 +217,14 @@ describe('the Agents page', () => {
     expect(JSON.parse(post.body)).toEqual({ name: 'work', generation: 7 });
     expect(reload).toHaveBeenCalledTimes(1);
   });
-  it('says "You switched agents. Nothing was changed." on agent_changed, and re-reads', async () => {
+  it('says "You switched IDs. Nothing was changed." on agent_changed, and re-reads', async () => {
     answers['POST /api/ui/agents/switch'] = { status: 409, body: { status: 'agent_changed' } };
     await mountPage();
     const reads = (): number =>
       calls.filter((c) => c.url === '/api/ui/agents' && c.method === 'GET').length;
     const before = reads();
     await click(button(rowOf('work'), 'Switch'));
-    expect(plain(host)).toContain('You switched agents. Nothing was changed.');
+    expect(plain(host)).toContain('You switched IDs. Nothing was changed.');
     // The page's read and the shared live store's read.
     expect(reads()).toBeGreaterThan(before);
   });
@@ -297,7 +304,7 @@ describe('Remove', () => {
     expect(plain(sheet)).toContain('Its entry in Codex');
     expect(plain(sheet)).toContain('Your 1 contact will be told Work is retired.');
     expect(plain(sheet)).toContain("This can't be undone.");
-    expect(plain(sheet)).toContain('Agent folder: work');
+    expect(plain(sheet)).toContain('ID folder: work');
     expect(button(sheet, 'Export history first')).toBeDefined();
     expect(button(sheet, 'Remove with Touch ID')!.disabled).toBe(true);
     const field = sheet.querySelector<HTMLInputElement>('input[type="text"]')!;
@@ -376,7 +383,7 @@ describe('Remove', () => {
     const sheet = await open('work');
     await confirmTyped(sheet);
     expect(host.querySelector('[role="dialog"]')).toBeNull();
-    expect(plain(host)).toContain('You switched agents. Nothing was changed.');
+    expect(plain(host)).toContain('You switched IDs. Nothing was changed.');
   });
   it('after a removal the sheet closes and a note names it', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 200, body: { status: 'done' } };
