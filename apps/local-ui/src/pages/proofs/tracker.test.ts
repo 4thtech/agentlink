@@ -391,7 +391,7 @@ describe('step 2: Arrived', () => {
     expect(two?.textContent).toContain('Arrived · $5.00');
     expect(two?.getAttribute('aria-current')).toBe('step');
     expect(button('Add $4.99 to your credits')).toBeDefined();
-    expect(two?.textContent).toContain('A little stays with your agent to cover network costs.');
+    expect(two?.textContent).toContain('A little stays with this ID to cover network costs.');
     // Arrived and done steps show the time they were reached.
     expect(steps()[0]?.querySelector('time')).not.toBeNull();
     expect(two?.querySelector('time')).not.toBeNull();

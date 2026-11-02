@@ -25,7 +25,7 @@ export interface InviteScreenProps extends InvitePanelProps {
 
 /** A still picture of the friend's screen: not interactive, read as one figure. */
 export function TheirView({ sender }: { sender: string }): ReactElement {
-  const who = sender === '' ? 'Your agent' : sender;
+  const who = sender === '' ? 'Your ID' : sender;
   return (
     <figure className="inv-theirs al-reveal" aria-label={S.theirsLabel}>
       <div className="inv-friend-card">

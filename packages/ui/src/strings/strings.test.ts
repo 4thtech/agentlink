@@ -155,7 +155,7 @@ describe('spec-faithful chat and terminal lines (IR-M1-35c-1)', () => {
 
   it('keeps backup commands on the terminal surface and warns about the old copy', () => {
     for (const k of Object.keys(en)) expect(k.startsWith('chat.backup.'), k).toBe(false);
-    expect(en['cli.backup.restored']).toMatch(/Stop the agent on your old computer now/);
+    expect(en['cli.backup.restored']).toMatch(/Stop AgentLink on your old computer now/);
     expect(en['cli.backup.restored']).toContain('agentlink storage connect');
   });
 
@@ -174,30 +174,30 @@ describe('spec-faithful chat and terminal lines (IR-M1-35c-1)', () => {
 describe('11 §5.6 disclosure lines (D-109)', () => {
   it('ships every line verbatim', () => {
     expect(en['common.public.proof']).toBe(
-      "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+      "A proof is public. Anyone can see that your AgentLink ID recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
     );
     expect(en['common.public.proof.receipt']).toBe(
-      'If {contactName} confirms delivery, it also becomes public that it went to their agent.',
+      'If {contactName} confirms delivery, it also becomes public that it went to them.',
     );
     expect(en['common.public.receiptAsk']).toBe(
-      'Ask {contactName} to confirm delivery? If they do, anyone can see that this went to their agent.',
+      'Ask {contactName} to confirm delivery? If they do, anyone can see that this went to them.',
     );
     expect(en['common.public.receiptRequest']).toBe(
-      '{contactName} asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content.',
+      '{contactName} asked you to confirm delivery. Confirming shows publicly that this reached you. Nothing about the content.',
     );
     expect(en['common.public.receiptRequest.confirm']).toBe('Confirm delivery');
     expect(en['common.public.receiptRequest.later']).toBe('Not now');
     expect(en['common.public.autoConfirm']).toBe(
-      'Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached your agent.',
+      'Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached you.',
     );
     expect(en['common.public.receipt']).toBe(
-      'This is public: anyone can see that your agent {action, select, opened {opened} accepted {accepted} rejected {rejected} other {received}} it, and when.',
+      'This is public: anyone can see that your AgentLink ID {action, select, opened {opened} accepted {accepted} rejected {rejected} other {received}} it, and when.',
     );
     expect(en['local.rules.receipts']).toBe(
       'Confirm deliveries publicly: Off (recommended). Turn on for contacts you trust.',
     );
     expect(en['cli.receipts.olderDefault']).toBe(
-      'Delivery receipts are on from an older default. Each one shows publicly that a proof reached your agent, never the content.',
+      'Delivery receipts are on from an older default. Each one shows publicly that a proof reached you, never the content.',
     );
     expect(en['cli.receipts.keepPrompt']).toBe(
       'Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off.',
@@ -206,13 +206,13 @@ describe('11 §5.6 disclosure lines (D-109)', () => {
       'Delivery receipts are on from an older default; they will turn off unless you keep them.',
     );
     expect(en['common.public.topup']).toBe(
-      'The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.',
+      'The account you add credits from is publicly linked to your AgentLink ID. For more privacy, use free test credits or a separate account only for AgentLink.',
     );
     expect(en['common.public.export']).toBe(
-      'This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content.',
+      'This file shows the proof, your ID card and the message details. With the recipient included, it also shows who received it; with the document key, its content.',
     );
     expect(en['common.public.register']).toBe(
-      "Registering puts your agent's link to you on the public record. Your agent's name is not published.",
+      "Registering puts your AgentLink ID's link to you on the public record. Your ID's name is not published.",
     );
   });
 });

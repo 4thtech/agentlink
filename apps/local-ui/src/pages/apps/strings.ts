@@ -5,7 +5,7 @@ export const APPS_STRINGS = {
   forAgent: (label: string): string => `for ${label}`,
   notConnected: 'Not connected',
   connectedTo: (label: string): string => `Connected to ${label}`,
-  connectedToAnother: 'Connected to another agent',
+  connectedToAnother: 'Uses another ID',
   uses: (label: string): string => `Uses ${label}`,
   running: 'Running',
   needsRestart: 'Needs restart',
@@ -34,7 +34,7 @@ export const APPS_STRINGS = {
   removes: 'Removes',
   entryRegion: 'The entry that will be added',
   removedRegion: 'The entry that will be removed',
-  folder: (name: string): string => `Agent folder: ${name}.`,
+  folder: (name: string): string => `ID folder: ${name}.`,
   backup: 'A backup of the file is saved first. Nothing else in it changes.',
   willUse: (app: string, label: string, other: string): string =>
     `${app} will use ${label} instead of ${other}.`,
@@ -44,7 +44,7 @@ export const APPS_STRINGS = {
   changed: 'The file changed. Review it again.',
   notChangedYet: 'Not connected yet. Try again.',
   couldntChange: (app: string): string => `Couldn't change ${app}'s settings. Nothing was changed.`,
-  agentChanged: 'The open agent changed. Review it again.',
+  agentChanged: 'The open ID changed. Review it again.',
   offline: "Can't reach AgentLink on this computer. Try again in a minute.",
   // Statements for the presence prompt (what Touch ID approves).
   statementConnect: (app: string, label: string): string => `Connect ${app} to ${label}`,

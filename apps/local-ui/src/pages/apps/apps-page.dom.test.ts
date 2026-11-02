@@ -158,10 +158,10 @@ describe('the AI apps page: cards and states', () => {
     expect(c.getAttribute('aria-label')).toBe('Claude Code, Connected to Personal');
   });
 
-  it('Connected to another agent: "Uses Work" and "Use Personal instead"', async () => {
+  it('Uses another ID: "Uses Work" and "Use Personal instead"', async () => {
     await mountPage();
     const c = card('codex');
-    expect(c.textContent).toContain('Connected to another agent');
+    expect(c.textContent).toContain('Uses another ID');
     expect(c.textContent).toContain('Uses Work');
     expect(button(c, 'Use Personal instead')).toBeDefined();
   });
@@ -234,7 +234,7 @@ describe('Review change: the exact entry, then Touch ID', () => {
     expect(entry?.textContent).toContain('"agentlink"');
     expect(entry?.textContent).toContain('"--agent"');
     expect(entry?.textContent).toContain('"personal"');
-    expect(s.textContent).toContain('Agent folder: personal');
+    expect(s.textContent).toContain('ID folder: personal');
     expect(s.textContent).toContain(
       'A backup of the file is saved first. Nothing else in it changes.',
     );

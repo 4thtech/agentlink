@@ -161,6 +161,7 @@ export function HomeApprovals({
   client,
   sheet,
   pro,
+  asker,
   onChanged,
 }: {
   readonly items: readonly ApprovalItem[];
@@ -168,6 +169,8 @@ export function HomeApprovals({
   readonly client: ApprovalsClient;
   readonly sheet: SheetOptions;
   readonly pro: boolean;
+  /** W7-ID-B2: which ID is asking ("Claude Code's ID is asking"); from the live list, text only. */
+  readonly asker?: string | undefined;
   /** A decision was applied: read the list again. */
   readonly onChanged: () => void;
 }): ReactElement | null {
@@ -249,6 +252,9 @@ export function HomeApprovals({
 
   return (
     <section aria-label={S.approvalsLabel} className={`hm-approvals ${VT_CLASS.approval}`}>
+      {asker === undefined || asker === '' ? null : (
+        <p className="hm-ap-asker al-text-body-sm al-muted">{asker}</p>
+      )}
       {pro ? (
         <div className="hm-ap-top hm-f">
           {canPick(first) ? (

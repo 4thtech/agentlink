@@ -281,7 +281,7 @@ export function ApprovalCard({
       ) : null}
       {receiptRequest === undefined ? null : (
         <p className="al-disclosure-line al-text-body-sm">
-          {`Ask ${nameWithLabel(receiptRequest.contact)} to confirm delivery? If they do, anyone can see that this went to their agent.`}
+          {`Ask ${nameWithLabel(receiptRequest.contact)} to confirm delivery? If they do, anyone can see that this went to them.`}
         </p>
       )}
       {children === undefined ? null : <div className="al-approval-extra">{children}</div>}

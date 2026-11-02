@@ -306,7 +306,7 @@ export function JoinPage({
       </p>
       {askCode ? (
         <PresencePrompt
-          summary={S.statement(name, fingerprint, agent === '' ? 'this agent' : agent)}
+          summary={S.statement(name, fingerprint, agent === '' ? 'this ID' : agent)}
           passkey={undefined}
           busy={busy}
           error={error}
@@ -317,7 +317,7 @@ export function JoinPage({
         <div className="jn-accept">
           {/* IR-1 low (c): what Touch ID signs, shown before the gesture (04 §3.6 Accept step 2). */}
           <p className="al-text-body-sm jn-statement">
-            {S.statement(name, fingerprint, agent === '' ? 'this agent' : agent)}
+            {S.statement(name, fingerprint, agent === '' ? 'this ID' : agent)}
           </p>
           <Button
             variant="primary"

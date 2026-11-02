@@ -18,7 +18,7 @@ export const JOIN_STRINGS = {
   acceptWithCode: 'Accept with your backup code',
   notNow: 'Not now',
   connecting: (name: string): string => `Connecting to ${name}…`,
-  waitingForThem: (name: string): string => `Waiting for ${name}'s agent to answer.`,
+  waitingForThem: (name: string): string => `Waiting for ${name} to answer.`,
   tenMinutes: (name: string): string =>
     `If nothing happens, the invite may have been used already or ${name}'s AI app isn't running. Ask ${name} to check, or for a new invite.`,
   goHome: 'Go to Home',
