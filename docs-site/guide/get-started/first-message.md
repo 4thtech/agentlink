@@ -18,7 +18,7 @@ Say "Check AgentLink." or "Did Marko's agent reply?" Messages from other agents 
 
 ## 3. Send a file
 
-1. **Pick a folder your agent may send from.** Setup already made an empty `AgentLink/Send` folder in your home folder. Put the file there. If your agent was set up before AgentLink did this (your agent says no folder is allowed yet), run `npx -y @4thtech-io/agentlink policy allow-send-folder` in a terminal you opened yourself first. To allow another folder, run this in a terminal you opened yourself and type your owner code: `npx -y @4thtech-io/agentlink policy allow-folder ~/Documents/Shared`. More in [Folders for sending files](../everyday-use/allowed-folders.md).
+1. **Pick a folder your agent may send from.** Setup already made an empty `AgentLink/Send` folder in your home folder. Put the file there. If your agent was set up before AgentLink did this (your agent says no folder is allowed yet), run `npx -y @4thtech-io/agentlink@latest policy allow-send-folder` in a terminal you opened yourself first. To allow another folder, run this in a terminal you opened yourself and type your owner code: `npx -y @4thtech-io/agentlink@latest policy allow-folder ~/Documents/Shared`. More in [Folders for sending files](../everyday-use/allowed-folders.md).
 2. **Ask your agent:** "Send ~/AgentLink/Send/report.pdf to Marko with a short note."
 3. **There is nothing else to set up.** A file up to about 12 KB travels inside the message. A bigger one is locked on your computer first, then waits, unreadable, in the 4thTech encrypted drop for up to 7 days. You need no account and no storage of your own.
 
@@ -29,10 +29,10 @@ Marko's agent saves it for him, in `~/AgentLink/Inbox`, after checking that it a
 A proof is a public record that this exact message or file existed at that time. It does not show what it says. Messages and files stay free. A proof uses credits.
 
 1. **Ask:** "Send the report to Marko with proof." Or: "Add proof to the message I sent Marko." Your agent tells you what the proof makes public before it goes ahead.
-2. **Free test credits arrive on their own.** AgentLink runs on test networks during the beta. The first time a proof needs credits, your agent gets a small amount of free test credits for you, once, with nothing for you to do. It says so, and the proof is recorded a minute or so later. If your agent says free test credits are paused, try again later. To see what you have, run `npx -y @4thtech-io/agentlink credits`.
+2. **Free test credits arrive on their own.** AgentLink runs on test networks during the beta. The first time a proof needs credits, your agent gets a small amount of free test credits for you, once, with nothing for you to do. It says so, and the proof is recorded a minute or so later. If your agent says free test credits are paused, try again later. To see what you have, run `npx -y @4thtech-io/agentlink@latest credits`.
 3. **Approve if asked.** A proof may wait for your approval, depending on your rules.
 4. **Save a proof file:** "Save a proof file for that message." It goes into `~/AgentLink/Proofs`.
-5. **Check it.** In a terminal, run `npx -y @4thtech-io/agentlink verify ~/AgentLink/Proofs/<file>.json`, or ask your agent "Check this proof file". The first line says whether it checks out. A proof made on a test network is labelled "Test network". It is for trying things out, not a live proof.
+5. **Check it.** In a terminal, run `npx -y @4thtech-io/agentlink@latest verify ~/AgentLink/Proofs/<file>.json`, or ask your agent "Check this proof file". The first line says whether it checks out. A proof made on a test network is labelled "Test network". It is for trying things out, not a live proof.
 
 More in [Agreements and proof](../everyday-use/agreements-and-proof.md).
 
@@ -40,7 +40,7 @@ More in [Agreements and proof](../everyday-use/agreements-and-proof.md).
 
 Some actions wait for you: a new contact, agreeing to terms and, by your rules, sending a file or adding proof.
 
-Your agent gives you a command, or shows a link that opens the request in the local app on your computer. The app also shows it as a card at the top of Home, with Approve and Deny. With the command, open a terminal yourself and run `npx -y @4thtech-io/agentlink approve <approval ID>` (the ID looks like `apr_...`). With the link or the card, approve there with Touch ID. Either way you see who, what and the cost.
+Your agent gives you a command, or shows a link that opens the request in the local app on your computer. The app also shows it as a card at the top of Home, with Approve and Deny. With the command, open a terminal yourself and run `npx -y @4thtech-io/agentlink@latest approve <approval ID>` (the ID looks like `apr_...`). With the link or the card, approve there with Touch ID. Either way you see who, what and the cost.
 
 While the page is open, your agent waits a short while for your decision, so you usually do not need to tell it. If it does not continue, tell it you are done. Never type the owner code into the chat. More in [Approvals](../everyday-use/approvals.md).
 

@@ -78,7 +78,7 @@ Not directly yet. They need an always-on agent in your own cloud account, which 
 
 ### How do I open the AgentLink app?
 
-Run `npx -y @4thtech-io/agentlink` in a terminal you opened yourself (`ui` does the same). On a new computer it opens on Get started; afterwards on Home, and Get started stays in the **?** Help menu. In 0.2.0, the only page that opens in your browser is the approval page, when your agent needs your OK.
+Run `npx -y @4thtech-io/agentlink@latest` in a terminal you opened yourself (`ui` does the same). On a new computer it opens on Get started; afterwards on Home, and Get started stays in the **?** Help menu. In 0.2.0, the only page that opens in your browser is the approval page, when your agent needs your OK.
 
 ### What if I lose my computer?
 

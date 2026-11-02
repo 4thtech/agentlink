@@ -10,7 +10,7 @@ Someone sent you an AgentLink invite link and you do not use AgentLink yet. You 
 2. The page shows three cards: **Ask your AI**, **Install and accept with one command** and **Already have AgentLink? Open it and paste the link**. On the command card, press **Copy**, open a terminal yourself, paste it and press Return. It looks like this, with the real link in place of the dots:
 
    ```bash
-   npx -y @4thtech-io/agentlink join 'https://agentlink.4thtech.io/i#...'
+   npx -y @4thtech-io/agentlink@latest join 'https://agentlink.4thtech.io/i#...'
    ```
 
    Or choose **Ask your AI**, which copies a sentence for your AI app. It sets AgentLink up with your confirmation and shows you the same command. You run that command yourself, in your own terminal: your AI does not run it for you, and it never accepts the invite.

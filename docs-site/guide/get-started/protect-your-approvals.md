@@ -13,11 +13,11 @@ This takes about a minute.
 This is the terminal way. In 0.3.0 the [setup page](#the-setup-page-030) opens from `init` and does the same job. Use the terminal way if no browser opens or you prefer it.
 
 1. **Open a terminal window yourself.** Use your normal terminal app, not the one inside your AI app, and not one your AI started.
-2. **Run `npx -y @4thtech-io/agentlink owner init`.**
+2. **Run `npx -y @4thtech-io/agentlink@latest owner init`.**
 3. **Write down the owner code it shows.** AgentLink shows it once and asks you to type its last four characters back, to be sure you have it. Save it in your password manager right away. Nobody can recover it, not even 4thTech: without it you cannot approve anything for this agent, and you would have to set up a new agent and pair again. It is 24 characters and generated for you, so it is far harder to guess than anything you would make up. Setup also creates an empty `AgentLink/Send` folder in your home folder, the first place your agent may send files from.
 4. **Never type the owner code into your chat with your AI**, and don't let your AI run this command or see its output.
 
-You approve a waiting action in the same kind of terminal. Your AI tells you the exact command, for example `npx -y @4thtech-io/agentlink approve <approval ID>`. AgentLink shows who, what and the cost, and asks for your owner code. Some approvals open a page on your computer instead. It asks for the same code. Each time you type it, it covers one approval, or one list you review together when you run `approve` with no ID (agreements are still decided one by one).
+You approve a waiting action in the same kind of terminal. Your AI tells you the exact command, for example `npx -y @4thtech-io/agentlink@latest approve <approval ID>`. AgentLink shows who, what and the cost, and asks for your owner code. Some approvals open a page on your computer instead. It asks for the same code. Each time you type it, it covers one approval, or one list you review together when you run `approve` with no ID (agreements are still decided one by one).
 
 What can wait for you in a first session: a new contact, agreeing to terms and, depending on your rules, a file you ask your agent to send or a proof it adds. Free test credits for your first proof need no approval. They are added once for you, on test networks only.
 
@@ -27,8 +27,8 @@ If the command says it looks like a terminal your AI controls, that is on purpos
 
 You set up the owner once per computer user. Every further agent, for example one for each AI app, joins the same owner. In 0.4.6 the easy way is in the app: the agent menu at the top or **Agents**, then **New agent**: name, AI app, one Touch ID (see [Agents](../local-app/agents.md)). The terminal way still works:
 
-1. Create the agent for that app: `npx -y @4thtech-io/agentlink init --agent <name> --harness <app>` (for example `--agent opencode --harness opencode`).
-2. In a terminal you opened yourself, run `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`. It shows your owner fingerprint and which agent it is for, then asks for your owner code once. That entry signs this one agent's card and nothing else. It never changes your owner code.
+1. Create the agent for that app: `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness <app>` (for example `--agent opencode --harness opencode`).
+2. In a terminal you opened yourself, run `npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>`. It shows your owner fingerprint and which agent it is for, then asks for your owner code once. That entry signs this one agent's card and nothing else. It never changes your owner code.
 
 If you removed every agent that had a card but your owner is still set up on this computer, `owner add-agent` still works: your owner code unlocks the saved owner first, then it shows your owner fingerprint and asks you to confirm it's the one you saw at `owner init` before it signs the card.
 
@@ -39,7 +39,7 @@ Each agent has its own identity, contacts and approvals: an approval you give on
 If your owner code was exposed, for example typed into a chat with your AI or into a terminal your AI can read, replace it:
 
 1. **Open a terminal window yourself**, as for `owner init`.
-2. **Run `npx -y @4thtech-io/agentlink owner change-code`.** It asks for your current owner code first. Three wrong entries end the command and nothing changes.
+2. **Run `npx -y @4thtech-io/agentlink@latest owner change-code`.** It asks for your current owner code first. Three wrong entries end the command and nothing changes.
 3. **Write down the new owner code it shows**, and type its last four characters back. Keep your current code too until the command says the owner code changed; only then discard the old one.
 
 Your owner fingerprint stays the same and your agents keep their cards, so your contacts see no change. From then on only the new code works. If anything fails before the change is complete, your current code keeps working. If a change was interrupted, `doctor` says so: run `owner change-code` again, and it finishes or cleans up the earlier change. If you saved a recovery kit, it isn't changed: it has its own recovery code.
@@ -76,6 +76,6 @@ More on what stays on your computer: [What leaves your computer](../privacy-and-
 
 ## Check it
 
-In your own terminal, run `npx -y @4thtech-io/agentlink doctor`. It tells you what is set up and what is not.
+In your own terminal, run `npx -y @4thtech-io/agentlink@latest doctor`. It tells you what is set up and what is not.
 
 Next: [Pair with someone](pair-with-someone.md)

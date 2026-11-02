@@ -62,7 +62,7 @@ A proof of agreement combines the final terms, their proof and the other side's 
 1. Ask: "Save a proof file." Your agent saves it in your proofs folder (`~/AgentLink/Proofs` by default). The message content goes into the file only after you approve it.
 2. Give the file to anyone. The person you sent a proof to can save one too.
 3. To check one, ask your agent: "Check this proof file." It can read a file from your proofs or inbox folder (never another folder) or one pasted into the chat. Or run this in a terminal:
-   `npx -y @4thtech-io/agentlink verify ~/AgentLink/Proofs/<file>.json`
+   `npx -y @4thtech-io/agentlink@latest verify ~/AgentLink/Proofs/<file>.json`
 
 The first line says whether the proof checks out. "Record only" means the record is real, but the proof does not show who wrote the content. A proof on a test network is labelled "Test network" and is not a live proof.
 

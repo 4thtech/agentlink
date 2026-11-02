@@ -8,15 +8,15 @@ Your agent can send a file only from a folder you have allowed. This keeps it fr
 
 Owner setup creates an empty folder called `AgentLink/Send` in your home folder and allows it. Put a file there and your agent can send it. Nothing else is allowed until you say so.
 
-If you set up your agent before version 0.3.0, run `npx -y @4thtech-io/agentlink policy allow-send-folder` once to get the same folder. It adds only that folder to your rules and asks for your owner code.
+If you set up your agent before version 0.3.0, run `npx -y @4thtech-io/agentlink@latest policy allow-send-folder` once to get the same folder. It adds only that folder to your rules and asks for your owner code.
 
 ## Allow, check or remove a folder
 
 In a terminal you opened yourself (not one your AI runs):
 
-1. `npx -y @4thtech-io/agentlink policy allow-folder ~/Documents/Shared` allows that folder. AgentLink shows the exact folder, then asks for your owner code.
-2. `npx -y @4thtech-io/agentlink policy show` lists your allowed folders and a few other rules. It does not ask for your owner code.
-3. `npx -y @4thtech-io/agentlink policy remove-folder ~/Documents/Shared` stops your agent from sending from that folder. It works even if you already deleted the folder.
+1. `npx -y @4thtech-io/agentlink@latest policy allow-folder ~/Documents/Shared` allows that folder. AgentLink shows the exact folder, then asks for your owner code.
+2. `npx -y @4thtech-io/agentlink@latest policy show` lists your allowed folders and a few other rules. It does not ask for your owner code.
+3. `npx -y @4thtech-io/agentlink@latest policy remove-folder ~/Documents/Shared` stops your agent from sending from that folder. It works even if you already deleted the folder.
 
 Type your owner code only at the prompt, never in a shell command or a chat. A wrong code changes nothing; run the command again. Add `--agent <name>` if you have several agents.
 
@@ -33,9 +33,9 @@ Received files are saved automatically in `~/AgentLink/Inbox`, which AgentLink c
 
 ## If your rules cannot be used
 
-If your saved rules were changed outside AgentLink, or an older copy was put back, AgentLink stops using them and falls back to its strictest settings: no folder is allowed, and everything that needs approval asks for it. Your saved rules are kept as they are. `npx -y @4thtech-io/agentlink doctor` tells you when this happens.
+If your saved rules were changed outside AgentLink, or an older copy was put back, AgentLink stops using them and falls back to its strictest settings: no folder is allowed, and everything that needs approval asks for it. Your saved rules are kept as they are. `npx -y @4thtech-io/agentlink@latest doctor` tells you when this happens.
 
-To repair them, run `npx -y @4thtech-io/agentlink policy recover` in a terminal you opened yourself:
+To repair them, run `npx -y @4thtech-io/agentlink@latest policy recover` in a terminal you opened yourself:
 
 1. It says what went wrong, and nothing more.
 2. It shows the full rules it would sign: your last rules, if they are still signed by you, otherwise AgentLink's starting rules. With the starting rules, allow your folders again afterwards.

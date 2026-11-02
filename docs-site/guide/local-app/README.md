@@ -7,7 +7,7 @@ The local app is a set of pages that open in your browser. They run on your own 
 ## Open it
 
 1. Open a terminal window yourself (not one inside your AI app).
-2. Run `npx -y @4thtech-io/agentlink` with nothing after it, or `npx -y @4thtech-io/agentlink ui`. They do the same.
+2. Run `npx -y @4thtech-io/agentlink@latest` with nothing after it, or `npx -y @4thtech-io/agentlink@latest ui`. They do the same.
 3. Your browser opens on [Home](home.md). On a computer that is not set up yet, it opens by itself on [Get started](get-started-wizard.md), which takes you from choosing your AI app to your first invite. Nothing else needs to be set up first.
 4. Keep that terminal window open while you use the app. Press Ctrl+C when you are done. It also stops by itself after 30 minutes.
 

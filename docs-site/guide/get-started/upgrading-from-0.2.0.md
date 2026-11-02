@@ -9,7 +9,7 @@ You already use AgentLink 0.2.0. Moving to 0.4.8 ([release notes](https://github
 1. Open a terminal window yourself (not one inside your AI app).
 2. Run `npx -y @4thtech-io/agentlink@latest init`. The `@latest` makes sure you get the newest version rather than one `npx` kept from before. It reuses the agent you already have and shows the exact change it wants to make to your AI app's settings. Nothing is written until you say yes. If your AI app's settings already have the `agentlink` entry, nothing needs to change.
 3. Restart your AI app, then ask it: "What's my AgentLink status?"
-4. To see the local app, run `npx -y @4thtech-io/agentlink` yourself (`ui` does the same). Your browser opens on Home (or on Get started, until you are set up). Press Ctrl+C when you are done. See [The local app](../local-app/README.md).
+4. To see the local app, run `npx -y @4thtech-io/agentlink@latest` yourself (`ui` does the same). Your browser opens on Home (or on Get started, until you are set up). Press Ctrl+C when you are done. See [The local app](../local-app/README.md).
 
 ## What stays the same
 
@@ -20,7 +20,7 @@ You already use AgentLink 0.2.0. Moving to 0.4.8 ([release notes](https://github
 ## What is different for you
 
 - **Switching to Touch ID.** The first-run page is for a new setup and does not open for a computer that already has an owner. In 0.4.0 the local app shows **Switch to Touch ID** (or Windows Hello, or a passkey). It asks for your owner code once, then one touch. Your agent keeps the same owner, and the code keeps working as your backup code.
-- **Sending files.** The `AgentLink/Send` folder is where your AI may send files from. If your AI says no folder is allowed, run `npx -y @4thtech-io/agentlink policy allow-send-folder` in your own terminal. It creates the folder if it is missing and asks for your owner code. It adds only that folder. If your rules still have delivery receipts on from an older default, it asks about them first and turns them off unless you choose to keep them; rules made by 0.2.0 already have them off, so this only affects older rules. See [Folders for sending files](../everyday-use/allowed-folders.md).
+- **Sending files.** The `AgentLink/Send` folder is where your AI may send files from. If your AI says no folder is allowed, run `npx -y @4thtech-io/agentlink@latest policy allow-send-folder` in your own terminal. It creates the folder if it is missing and asks for your owner code. It adds only that folder. If your rules still have delivery receipts on from an older default, it asks about them first and turns them off unless you choose to keep them; rules made by 0.2.0 already have them off, so this only affects older rules. See [Folders for sending files](../everyday-use/allowed-folders.md).
 - **New in 0.3.0.** The [local app](../local-app/README.md), first as separate pages for Activity, Proofs and credits (add test credits by QR code, withdraw credits), Contacts, Files and Rules, and a plainer approval page.
 - **New in 0.4.0.** Messages, Files tabs for what you received and sent, a status bar, a confirmation sheet for paid actions, and a notice when you paired twice with the same person.
 
@@ -30,7 +30,7 @@ The first time 0.4.3 or a later version runs, it upgrades your local data. After
 
 ## Upgrading to 0.4.4
 
-You do not have to do anything. `npx -y @4thtech-io/agentlink` (or `ui`) opens the app on your newest version.
+You do not have to do anything. `npx -y @4thtech-io/agentlink@latest` (or `ui`) opens the app on your newest version.
 
 - **All your agents are there.** Every agent folder that 0.4.3 left on your computer is listed on the [Agents page](../local-app/agents.md), under the name it had. None is lost, renamed or changed by the update.
 - **Switching shows each one's own history.** Pick an agent in the top bar and its contacts, messages and files are the ones it had. Switching asks for no Touch ID.
@@ -52,7 +52,7 @@ You do not have to do anything. Your agents, contacts, messages and files are ke
 
 ## If something does not work
 
-Run `npx -y @4thtech-io/agentlink doctor` in your terminal. It shows what is set up and how to fix the rest. More help: [Troubleshooting](../help/troubleshooting.md).
+Run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal. It shows what is set up and how to fix the rest. More help: [Troubleshooting](../help/troubleshooting.md).
 
 <details>
 <summary>For the technically curious</summary>

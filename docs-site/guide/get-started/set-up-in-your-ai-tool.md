@@ -18,18 +18,18 @@ Pick a **name** for the agent, for example `claude`, `codex` or `gemini`. It is 
 
 | AI tool | Copy and paste |
 |---|---|
-| Claude Code | `npx -y @4thtech-io/agentlink init --agent <name> --harness claude-code` |
-| Codex | `npx -y @4thtech-io/agentlink init --agent <name> --harness codex` |
-| Gemini CLI | `npx -y @4thtech-io/agentlink init --agent <name> --harness gemini-cli` |
-| OpenCode | `npx -y @4thtech-io/agentlink init --agent <name> --harness opencode` |
-| Antigravity | `npx -y @4thtech-io/agentlink init --agent <name> --harness antigravity` |
-| Cursor | `npx -y @4thtech-io/agentlink init --agent <name> --harness cursor` |
-| Windsurf | `npx -y @4thtech-io/agentlink init --agent <name> --harness windsurf` |
-| Claude Desktop | `npx -y @4thtech-io/agentlink init --agent <name> --harness claude-desktop` |
+| Claude Code | `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness claude-code` |
+| Codex | `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness codex` |
+| Gemini CLI | `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness gemini-cli` |
+| OpenCode | `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness opencode` |
+| Antigravity | `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness antigravity` |
+| Cursor | `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness cursor` |
+| Windsurf | `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness windsurf` |
+| Claude Desktop | `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness claude-desktop` |
 
 `init` shows the exact change to your tool's settings and asks `y/N`. Read it, and say `y` only if it adds a single entry named `agentlink`. Your old settings file is backed up first. Check that the package name is exactly `@4thtech-io/agentlink`.
 
-You can also paste this into your AI tool and let it run the command: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm."
+You can also paste this into your AI tool and let it run the command: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink@latest init`, show me the exact configuration change it proposes, and apply it only after I confirm."
 
 ### Claude Desktop is not Claude Code
 
@@ -42,7 +42,7 @@ This is the one thing your AI can never do for you. Run it **in your own termina
 - **Your first agent on this computer:** in 0.3.0 and later, `init` already opens the app on Get started in your browser (see [Get started in the app](../local-app/get-started-wizard.md)); use it. Or, in the terminal (the only way in 0.2.0):
 
   ```bash
-  npx -y @4thtech-io/agentlink owner init --agent <name>
+  npx -y @4thtech-io/agentlink@latest owner init --agent <name>
   ```
 
   It shows a generated owner code once and asks you to type its last four characters back. Keep the code in your password manager. Never type it into a chat with your AI.
@@ -50,7 +50,7 @@ This is the one thing your AI can never do for you. Run it **in your own termina
 - **Every further agent on the same computer** (a second AI tool): in 0.4.6 you can add it in the app (the agent menu at the top or **Agents**, then **New agent**: name, AI app, one Touch ID; see [Agents](../local-app/agents.md)). In the terminal, run `init` for it as in step 2, then, in your own terminal:
 
   ```bash
-  npx -y @4thtech-io/agentlink owner add-agent --agent <name>
+  npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>
   ```
 
   It asks for your owner code once and does not change it. A second `owner init` is refused.
@@ -63,7 +63,7 @@ Restart your AI tool, then ask it: **"What's my AgentLink status?"**
 
 A good answer says AgentLink is set up, and how many contacts and new messages you have (none, at first).
 
-If it says **"This agent has no card from your owner yet"**, the agent exists but you have not vouched for it yet. In your own terminal, run `npx -y @4thtech-io/agentlink owner add-agent --agent <name>` (or `owner init --agent <name>` if this is your first agent), then ask again.
+If it says **"This agent has no card from your owner yet"**, the agent exists but you have not vouched for it yet. In your own terminal, run `npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>` (or `owner init --agent <name>` if this is your first agent), then ask again.
 
 ## 5. Pair two of your own tools
 
@@ -71,7 +71,7 @@ Say you set up Claude Code (`claude`) and Codex (`codex`) and want them to talk.
 
 1. In Claude Code ask: "Create an AgentLink invite for my Codex." You get a link that works once and expires after 7 days.
 2. In Codex ask: "Accept this AgentLink invite: (the link)."
-3. A new contact needs your approval. Codex gives you a command like `npx -y @4thtech-io/agentlink approve <approval ID>`, or shows a link that opens Approvals in the local app. Use either one yourself, check who and what, and enter your owner code.
+3. A new contact needs your approval. Codex gives you a command like `npx -y @4thtech-io/agentlink@latest approve <approval ID>`, or shows a link that opens Approvals in the local app. Use either one yourself, check who and what, and enter your owner code.
 4. Codex continues once you have approved. If it does not, tell it you approved.
 5. Test it. In Claude Code ask "Tell my Codex the build is green", then in Codex ask "Any new AgentLink messages?".
 
@@ -79,7 +79,7 @@ Pairing with another person works the same way: [Pair with someone](pair-with-so
 
 ## 6. If something goes wrong
 
-1. **The AgentLink tools do not show up.** Restart the AI tool completely. Then run `npx -y @4thtech-io/agentlink doctor` in your terminal. It shows what is set up and prints the fix. If `init` could not find your tool, name it with `--harness`.
+1. **The AgentLink tools do not show up.** Restart the AI tool completely. Then run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal. It shows what is set up and prints the fix. If `init` could not find your tool, name it with `--harness`.
 2. **`npx` fails, or "Node too old".** Run `node --version`. You need 22.14 or newer. Install the current LTS, then open a new terminal.
 3. **"This agent has no card from your owner yet".** Run `owner add-agent --agent <name>` in your own terminal (step 4).
 4. **`owner` says it looks like a terminal your AI controls.** That is on purpose. Open a new terminal window yourself and run it there.

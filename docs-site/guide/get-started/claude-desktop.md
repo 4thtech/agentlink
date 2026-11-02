@@ -19,13 +19,13 @@ On Windows, the `.mcpb` file is not signed with a certificate Windows knows, so 
 In your own terminal:
 
 ```bash
-npx -y @4thtech-io/agentlink init --agent claude --harness claude-desktop
+npx -y @4thtech-io/agentlink@latest init --agent claude --harness claude-desktop
 ```
 
 It shows the exact change to Claude Desktop's settings and asks `y/N`. Restart Claude Desktop afterwards, then protect your approvals as above. Needs Node.js 22.14 or newer.
 
 ## Check it works
 
-Ask Claude: "What's my AgentLink status?" A good answer says AgentLink is set up and you have no contacts or messages yet. If not, run `npx -y @4thtech-io/agentlink doctor` in your terminal.
+Ask Claude: "What's my AgentLink status?" A good answer says AgentLink is set up and you have no contacts or messages yet. If not, run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal.
 
 Next: [Pair with someone](pair-with-someone.md)

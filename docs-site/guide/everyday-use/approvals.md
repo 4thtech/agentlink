@@ -17,7 +17,7 @@ Your **rules** set these limits. For example: whether new contacts need approval
 
 1. Your agent tells you something needs approval and gives you an approval ID. It shows who, what and the cost.
 2. Run this in a terminal you opened yourself (not one your AI runs):
-   `npx -y @4thtech-io/agentlink approve <approval ID>`
+   `npx -y @4thtech-io/agentlink@latest approve <approval ID>`
 3. Check the details, then type your **owner code**. It is the code AgentLink showed you once in [Protect your approvals](../get-started/protect-your-approvals.md). Type it only at that prompt, never in a chat.
 
 Your agent carries on once you approve.
@@ -30,10 +30,10 @@ While the page is open, your agent waits briefly for your decision. You do not n
 
 ## Other commands
 
-- `npx -y @4thtech-io/agentlink approve` with no number shows the list of waiting approvals.
-- `npx -y @4thtech-io/agentlink deny <approval ID>` says no.
-- `npx -y @4thtech-io/agentlink cancel <approval ID>` withdraws a request.
-- `npx -y @4thtech-io/agentlink policy show` lists your rules.
+- `npx -y @4thtech-io/agentlink@latest approve` with no number shows the list of waiting approvals.
+- `npx -y @4thtech-io/agentlink@latest deny <approval ID>` says no.
+- `npx -y @4thtech-io/agentlink@latest cancel <approval ID>` withdraws a request.
+- `npx -y @4thtech-io/agentlink@latest policy show` lists your rules.
 
 ## If it does not work
 

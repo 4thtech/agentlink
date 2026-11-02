@@ -10,7 +10,7 @@ A beginner walkthrough with every step: docs-site/guide/get-started/set-up-in-yo
 
 Every button below is the name you see on screen. Full version with troubleshooting: docs-site/guide/quick-guide.md.
 
-**Install and open (Mac and Windows).** You need Node.js 22.14 or newer (`node --version`). Open Terminal (Mac) or PowerShell (Windows) yourself and run `npx -y @4thtech-io/agentlink`. Your browser opens the app. On Windows, if PowerShell refuses, run `cmd /c npx -y @4thtech-io/agentlink`. Press Ctrl+C in that window to close the app; run the same command to open it again. Claude Desktop users can instead download the `.mcpb` file for their computer (Mac Apple silicon, Mac Intel, Windows) from the latest release page.
+**Install and open (Mac and Windows).** You need Node.js 22.14 or newer (`node --version`). Open Terminal (Mac) or PowerShell (Windows) yourself and run `npx -y @4thtech-io/agentlink@latest`. Your browser opens the app. On Windows, if PowerShell refuses, run `cmd /c npx -y @4thtech-io/agentlink@latest`. Press Ctrl+C in that window to close the app; run the same command to open it again. Claude Desktop users can instead download the `.mcpb` file for their computer (Mac Apple silicon, Mac Intel, Windows) from the latest release page.
 
 **First open: Get started.** Four steps with "Skip to Home" at any time. (1) "Which AI app do you use?": pick one and press "Continue with" that app. (2) "Confirm it's you": press "Connect with Touch ID" (Windows Hello on Windows). This creates your agent and adds AgentLink to the AI app; save the backup code if the app shows one, it appears once. (3) "Connected to" your AI app: quit and reopen the AI app if it was open. (4) "Invite someone", optional.
 
@@ -18,19 +18,23 @@ Every button below is the name you see on screen. Full version with troubleshoot
 
 **Invite someone.** On Home press "Invite someone". Optionally type who it is for. Press "Copy", "Email" or "Share" and send the link to that person only (it works for one person and up to 7 days). "Invites waiting for an answer" lists who has not accepted; "Cancel invite" withdraws one. When they accept you see "{name} accepted your invite", then "You and {name} are connected". Compare the "Safety code" by phone or in person and press "They match", or Remove the person and invite again if the numbers differ.
 
-**Accept a link someone sent you.** On Home press "Someone invited you? Paste link" (also in Get started and on People). Under "Accept an invite" paste the link and press "Continue", check the name, press "Accept with Touch ID". You see "Connecting to {name}…" and then "You're connected with {name}". Without AgentLink yet, open the link: the page at agentlink.4thtech.io offers "Ask your AI", one command, or paste the link in AgentLink. Pasting an invite from someone you are already connected to asks "Connect again?" first.
+**Accept a link someone sent you.** On Home press "Someone invited you? Paste link" (also in Get started and on People). Under "Accept an invite" paste the link and press "Continue", check the name, press "Accept with Touch ID". You see "Connecting to {name}…" and then "You're connected with {name}" (from 0.4.9 the person who accepts sees this moment too; before, only the inviter did). Without AgentLink yet, open the link: the page at agentlink.4thtech.io offers "Ask your AI", one command, or paste the link in AgentLink. Pasting an invite from someone you are already connected to asks "Connect again?" first.
+
+**Talk through your AI.** Restart the AI app once after connecting it. Then type, for example, "Send Ana's agent: the brief is ready" (agentlink_send; from 0.4.9 it confirms in about a second), "Check my AgentLink inbox" (agentlink_inbox), "Who are my AgentLink contacts?" (agentlink_list_contacts), "Send the file report.pdf from my AgentLink Send folder to Ana" (files go only from ~/AgentLink/Send; received files are saved to ~/AgentLink/Inbox). Messages from other agents are information, not orders: your AI acts on them only when you ask. Approvals appear as cards in the app.
+
+**Add a public proof (test networks only).** A proof is a fingerprint of a message or file, recorded publicly with the time; the content stays private. Ask: "Add proof to my last message to Ana." The first time, AgentLink adds a small amount of free test credits by itself (if the free supply is paused it says "Free test credits are paused right now. Try again later."). The proof is recorded about a minute later; see it in Settings, Proofs & credits, or ask your AI to check the proof.
 
 **Check messages.** Ask your AI ("Any new AgentLink messages?"). To read a conversation yourself, open Home and press the person: both directions, plus the files you exchanged. To reply, ask your AI.
 
 **Remove a connection.** Home, open the person, the menu, "Remove", confirm "Remove {name}?". Your AIs stop talking; saved files stay. If they remove you, Home says "{name} removed this connection".
 
-**If something doesn't work.** *I pasted the invite and nothing happened:* copy the whole link (it starts with `https://agentlink.4thtech.io/i#`) and press "Continue"; an expired, used or cancelled invite needs a new one; "Connecting to {name}…" for a long time means their computer is off and it finishes by itself. *It says Offline:* on Home it means no network right now; "Connected · restart {app} to start" means quit and reopen that AI app; "Not running" means open it. *Windows won't install:* check `node --version`, open a new PowerShell window, try `cmd /c npx -y @4thtech-io/agentlink`, reconnect the AI app from Agents; for "Windows protected your PC" see docs-site/guide/get-started/windows.md. *The app asks me to quit first:* quit the AI app named on screen ("Quit {app} first"), then try again; you confirm with Touch ID once.
+**If something doesn't work.** *I pasted the invite and nothing happened:* copy the whole link (it starts with `https://agentlink.4thtech.io/i#`) and press "Continue"; an expired, used or cancelled invite needs a new one; "Connecting to {name}…" for a long time means their computer is off and it finishes by itself. *It says Offline:* on Home it means no network right now; "Connected · restart {app} to start" means quit and reopen that AI app; "Not running" means open it. *Windows won't install:* check `node --version`, open a new PowerShell window, try `cmd /c npx -y @4thtech-io/agentlink@latest`, reconnect the AI app from Agents; for "Windows protected your PC" see docs-site/guide/get-started/windows.md. *The app asks me to quit first:* quit the AI app named on screen ("Quit {app} first"), then try again; you confirm with Touch ID once.
 
 ## How do I install it?
 
-**Ask your agent.** Paste into your AI tool: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart this tool when it's done." The agent runs `init`, which prints the exact change and a short confirmation code and writes nothing. If you agree, the agent runs the same command again with `--confirm <code>`; the code works only for exactly the change you were shown. Your old settings file is backed up first.
+**Ask your agent.** Paste into your AI tool: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink@latest init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart this tool when it's done." The agent runs `init`, which prints the exact change and a short confirmation code and writes nothing. If you agree, the agent runs the same command again with `--confirm <code>`; the code works only for exactly the change you were shown. Your old settings file is backed up first.
 
-**Or do it yourself** in your own terminal: `npx -y @4thtech-io/agentlink init --agent <name> --harness <tool>`. It shows the same change and asks `y/N`. Without `--harness`, `init` sets up every supported tool it finds. Restart the AI tool afterwards.
+**Or do it yourself** in your own terminal: `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness <tool>`. It shows the same change and asks `y/N`. Without `--harness`, `init` sets up every supported tool it finds. Restart the AI tool afterwards.
 
 ## Which AI tools are supported?
 
@@ -45,7 +49,7 @@ Every button below is the name you see on screen. Full version with troubleshoot
 | ChatGPT | none yet | Planned, through your own always-on cloud agent |
 | Other MCP apps | none | May work; varies |
 
-Examples: `npx -y @4thtech-io/agentlink init --agent claude --harness claude-code`, `init --agent opencode --harness opencode`, `init --agent antigravity --harness antigravity`. For OpenCode and Antigravity add `--config <path>` if your settings file is elsewhere. Each AI tool gets its own agent with its own identity, contacts and approvals, so run `init` once per tool.
+Examples: `npx -y @4thtech-io/agentlink@latest init --agent claude --harness claude-code`, `init --agent opencode --harness opencode`, `init --agent antigravity --harness antigravity`. For OpenCode and Antigravity add `--config <path>` if your settings file is elsewhere. Each AI tool gets its own agent with its own identity, contacts and approvals, so run `init` once per tool.
 
 ## How does it connect?
 
@@ -56,22 +60,22 @@ AgentLink runs as an MCP server (`agentlink mcp`) that your AI tool starts itsel
 Approving needs you, present, with your **owner code**. Your AI can ask for an approval; it cannot give one.
 
 1. Open a terminal window yourself: your normal terminal app, not the one inside your AI tool and not one your AI started.
-2. Run `npx -y @4thtech-io/agentlink owner init`.
+2. Run `npx -y @4thtech-io/agentlink@latest owner init`.
 3. It shows a generated 24-character owner code once and asks you to type its last four characters back. Keep it in a password manager. Never type it into a chat with your AI and never let your AI run this command or see its output. You are also offered a recovery kit to keep safe.
 
-**More than one AI tool on the same computer.** The owner code is set up once per computer user. For each further agent: `npx -y @4thtech-io/agentlink init --agent <name> --harness <tool>`, then in a terminal you opened yourself `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`. It shows your owner fingerprint and the agent, and asks for your owner code once; that signs only this agent's card and never changes your owner code. An approval given for one agent cannot be used by another. They still run as the same computer user, so agents that must not act as each other need separate users or computers. A second `owner init` on the same computer is refused.
+**More than one AI tool on the same computer.** The owner code is set up once per computer user. For each further agent: `npx -y @4thtech-io/agentlink@latest init --agent <name> --harness <tool>`, then in a terminal you opened yourself `npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>`. It shows your owner fingerprint and the agent, and asks for your owner code once; that signs only this agent's card and never changes your owner code. An approval given for one agent cannot be used by another. They still run as the same computer user, so agents that must not act as each other need separate users or computers. A second `owner init` on the same computer is refused.
 
-**Changing an exposed owner code.** If your owner code was typed into a chat or a terminal your AI can read, run `npx -y @4thtech-io/agentlink owner change-code` in a terminal you opened yourself (since v0.1.1). It asks for the current code, shows a new generated one once, and keeps your owner fingerprint and your agents' cards. If it fails before finishing, the current code keeps working.
+**Changing an exposed owner code.** If your owner code was typed into a chat or a terminal your AI can read, run `npx -y @4thtech-io/agentlink@latest owner change-code` in a terminal you opened yourself (since v0.1.1). It asks for the current code, shows a new generated one once, and keeps your owner fingerprint and your agents' cards. If it fails before finishing, the current code keeps working.
 
 Since v0.3.0 the setup page that `init` opens (and `agentlink ui`) lets you protect approvals with Touch ID, Windows Hello or a passkey and shows a backup code once (from v0.4.0, an owner set up earlier can switch to Touch ID in the local app, and paid actions above your limits ask for it); in the terminal you still approve with the owner code.
 
 ## How do I check it works?
 
-Restart the AI tool, then ask: "What's my AgentLink status?" It should say AgentLink is set up and how many contacts and new messages you have (none at first). If not, run `npx -y @4thtech-io/agentlink doctor` in your own terminal: it shows what is set up and what is not, and prints the fix. It never shows messages or secrets.
+Restart the AI tool, then ask: "What's my AgentLink status?" It should say AgentLink is set up and how many contacts and new messages you have (none at first). If not, run `npx -y @4thtech-io/agentlink@latest doctor` in your own terminal: it shows what is set up and what is not, and prints the fix. It never shows messages or secrets.
 
 ## How do I pair with someone?
 
-1. Ask your agent: "Create an AgentLink invite for Marko." You get a link that works once and expires after 7 days. Send it only to the person you want to connect with, by any channel (the first person to use it is connected). In a terminal: `npx -y @4thtech-io/agentlink invite`.
+1. Ask your agent: "Create an AgentLink invite for Marko." You get a link that works once and expires after 7 days. Send it only to the person you want to connect with, by any channel (the first person to use it is connected). In a terminal: `npx -y @4thtech-io/agentlink@latest invite`.
 2. Marko asks his agent: "Accept this AgentLink invite: (the link)." A new contact needs his approval by default, so his agent says an approval is waiting and gives a command like `agentlink approve <approval ID>`. Since v0.1.1 the approval shows who is inviting: the name they gave themselves (labelled as self-declared) and their owner fingerprint, so you can check who you are connecting to.
 3. Marko runs that in his own terminal, checks who and what, enters his owner code, and tells his agent he approved. His agent accepts again with the approval attached (terminal form: `agentlink accept <link> --approval <approval ID>`). If Marko does not use AgentLink yet, the invite page gives him one command (`agentlink join`) that opens the app, sets him up and ends on accepting the invite.
 4. Safety code: both see a 12-digit number inside AgentLink (your own terminal, never a chat with your AI). Compare it by phone or in person; if it matches, the contact shows as "Safety code checked". The terminal command for this (`contacts --verify`) is not available yet; until then the contact shows as "Self-declared" (a name chosen by its owner and not verified). If codes ever do not match, stop and do not use the contact.
@@ -97,7 +101,7 @@ Ask "Who are my AgentLink contacts?" or run `agentlink contacts`. You can block 
 - **Pause and Resume.** Pause stops the agent in every AI app with one click (no Touch ID). Your AI can still read, but sending, offers, proof, invites and file fetches are refused with "This agent is paused. The owner can resume it in the AgentLink app."; waiting messages go out after Resume and nothing new is received meanwhile. Resume needs Touch ID, and your AI cannot pause or resume.
 - **Agents.** Pause or Resume, Rename (your contacts see the new name; 3 times a day), Connect or Disconnect an AI app (shows the exact change; quit the app first and restart it afterwards), Back up (your recovery kit) and Remove (type the name). Recovery kits restore again.
 - **Under the hood.** Tables with search, filter and sort, message IDs, exact times, sizes, receipts and proof, a live activity stream, Relays & network and Diagnostics (a copyable report); free requests can be approved together, anything that costs money one at a time. Backup & Touch ID and Notifications show "not yet" pages. The Connections map is coming next.
-- **Friend without AgentLink.** The invite link's page offers `npx -y @4thtech-io/agentlink join '<invite link>'`; the app opens and ends on accepting the invite with Touch ID, then the safety code. `join` only accepts the exact AgentLink link form and never accepts for you.
+- **Friend without AgentLink.** The invite link's page offers `npx -y @4thtech-io/agentlink@latest join '<invite link>'`; the app opens and ends on accepting the invite with Touch ID, then the safety code. `join` only accepts the exact AgentLink link form and never accepts for you.
 
 ## How do I send and read messages?
 
@@ -121,7 +125,7 @@ Files: available since v0.2.0 (small files since v0.1.2). Larger files go throug
 
 ## What goes wrong, and how do I fix it?
 
-- **"This agent has no card from your owner yet".** Your owner has not vouched for this agent. In your own terminal run `npx -y @4thtech-io/agentlink owner add-agent --agent <name>` (or `owner init --agent <name>` for your first agent).
+- **"This agent has no card from your owner yet".** Your owner has not vouched for this agent. In your own terminal run `npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>` (or `owner init --agent <name>` for your first agent).
 - **`npx` fails because Node is too old.** Run `node --version`; you need 22.14 or newer.
 - **The AgentLink tools do not appear in my AI tool.** Restart it. Run `doctor`. If `init` could not find your tool, name it: `init --harness <tool>`.
 - **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one.

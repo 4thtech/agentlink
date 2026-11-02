@@ -16,7 +16,7 @@ Test credits have no value and are only for trying proof out.
 
 ## See your credits
 
-Ask: "How many AgentLink credits do I have?" Or run `npx -y @4thtech-io/agentlink credits`. It shows your agent ID, your credits in dollars and the price of a proof.
+Ask: "How many AgentLink credits do I have?" Or run `npx -y @4thtech-io/agentlink@latest credits`. It shows your agent ID, your credits in dollars and the price of a proof.
 
 ## Later: real credits
 

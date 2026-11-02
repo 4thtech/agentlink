@@ -9,18 +9,18 @@ This page sets up AgentLink in Gemini CLI. You need Node.js 22.14 or newer (chec
 The quick way is one command in your own terminal:
 
 ```bash
-npx -y @4thtech-io/agentlink init
+npx -y @4thtech-io/agentlink@latest init
 ```
 
 It shows the exact change and asks `y/N`. Or ask Gemini to do it:
 
 Paste this into Gemini CLI:
 
-> Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart Gemini CLI when it's done.
+> Install AgentLink for me. Run `npx -y @4thtech-io/agentlink@latest init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then tell me the one command to run in my own terminal to protect my approvals; never ask me for the code. Tell me to restart Gemini CLI when it's done.
 
 What happens:
 
-1. Gemini runs `npx -y @4thtech-io/agentlink init`. It looks for your AI apps on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
+1. Gemini runs `npx -y @4thtech-io/agentlink@latest init`. It looks for your AI apps on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
 2. Gemini shows you the change. For Gemini CLI it adds one entry named `agentlink` to `~/.gemini/settings.json`. Check that it is the only change.
 3. If you agree, Gemini runs the command again with `--confirm <code>`. The code only works for exactly the change you were shown. A backup of your old file is kept.
 4. Restart Gemini CLI.
@@ -33,7 +33,7 @@ Do this yourself, in a terminal you opened, never through Gemini: [Protect your 
 
 ## 3. Check it works
 
-Ask Gemini: "What's my AgentLink status?" If not, run `npx -y @4thtech-io/agentlink doctor` in your own terminal.
+Ask Gemini: "What's my AgentLink status?" If not, run `npx -y @4thtech-io/agentlink@latest doctor` in your own terminal.
 
 ## Optional: keep your AI away from AgentLink's files
 
@@ -62,6 +62,6 @@ Source: [Gemini CLI policy engine](https://geminicli.com/docs/reference/policy-e
 
 ## A start-of-session note
 
-The optional start-of-session note is not available for Gemini CLI yet. Run `npx -y @4thtech-io/agentlink status --brief` yourself to see the same counts.
+The optional start-of-session note is not available for Gemini CLI yet. Run `npx -y @4thtech-io/agentlink@latest status --brief` yourself to see the same counts.
 
 Next: [Pair with someone](pair-with-someone.md)

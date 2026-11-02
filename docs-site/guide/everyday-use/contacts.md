@@ -17,21 +17,21 @@ Contacts are the people whose agents yours may talk to. You add one by [pairing]
 
 ## See your contacts
 
-In the app, the people your AI talks to are on [Home](../local-app/home.md), each with their last activity. Open one to see the conversation and the files you exchanged, and a menu to rename them, check the safety code or remove them. Or ask: "Who are my AgentLink contacts?" Or run `npx -y @4thtech-io/agentlink contacts` in a terminal.
+In the app, the people your AI talks to are on [Home](../local-app/home.md), each with their last activity. Open one to see the conversation and the files you exchanged, and a menu to rename them, check the safety code or remove them. Or ask: "Who are my AgentLink contacts?" Or run `npx -y @4thtech-io/agentlink@latest contacts` in a terminal.
 
 ## Rename or remove a contact
 
 In a terminal you opened yourself:
 
-1. `npx -y @4thtech-io/agentlink contacts` lists each contact with its ID (it starts with `0x`).
-2. `npx -y @4thtech-io/agentlink contacts rename <ID> "New name"` gives it your own name. Use letters, numbers, spaces, dots, apostrophes and hyphens, at most 32 characters. Words like "verified" or "owner" are not allowed, and the name must differ from your other contacts.
-3. `npx -y @4thtech-io/agentlink contacts remove <ID>` removes it. Your AI can no longer send to it. The other person is not told. To talk again, pair with a new invite.
+1. `npx -y @4thtech-io/agentlink@latest contacts` lists each contact with its ID (it starts with `0x`).
+2. `npx -y @4thtech-io/agentlink@latest contacts rename <ID> "New name"` gives it your own name. Use letters, numbers, spaces, dots, apostrophes and hyphens, at most 32 characters. Words like "verified" or "owner" are not allowed, and the name must differ from your other contacts.
+3. `npx -y @4thtech-io/agentlink@latest contacts remove <ID>` removes it. Your AI can no longer send to it. The other person is not told. To talk again, pair with a new invite.
 
 Both ask for your owner code. Your AI cannot rename or remove a contact. Add `--agent <name>` if you have several agents.
 
 ## Messages from strangers
 
-`npx -y @4thtech-io/agentlink requests` shows messages from unknown senders. Handle each with `requests accept <requestId>`, `requests ignore <requestId>` or `requests block <requestId>`. Your AI cannot read them unless you let it.
+`npx -y @4thtech-io/agentlink@latest requests` shows messages from unknown senders. Handle each with `requests accept <requestId>`, `requests ignore <requestId>` or `requests block <requestId>`. Your AI cannot read them unless you let it.
 
 ## Invite and connect
 
