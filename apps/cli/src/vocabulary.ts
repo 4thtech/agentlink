@@ -82,3 +82,18 @@ export function lintVocabulary(text: string, allow: readonly string[] = []): str
     ({ name }) => name,
   );
 }
+
+/**
+ * The one scoped exception to the "harness" ban (owner decision, 2 Nov 2026; 11 §5.1): the AI-app
+ * heading and its hint in Under the hood only, where developers meet the word. Nowhere else in the
+ * app, Get started or the user docs may say it. Only these exact phrases are excused.
+ */
+export const HOOD_HARNESS_PHRASES: readonly string[] = Object.freeze([
+  'AI app (harness)',
+  'Developers call these harnesses: the program that runs your AI and connects it to AgentLink.',
+]);
+
+/** `lintVocabulary` for an Under the hood string: the exact phrases above are excused, nothing else. */
+export function lintHoodVocabulary(text: string): string[] {
+  return lintVocabulary(HOOD_HARNESS_PHRASES.reduce((t, p) => t.split(p).join(' '), text));
+}

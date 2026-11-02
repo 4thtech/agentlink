@@ -239,6 +239,9 @@ Each direction shows: a mood board; mark and wordmark sketches, including the ma
 | Nostr, relay | Nothing (Advanced: message network) |
 | Encryption key, decrypt | "Only you and … can read this"; Open |
 | Policy, harness, envelope, agent card, agent profile | Rules; your AI / AI app; message; ID card |
+
+**Exception (owner decision, 2 Nov 2026): "harness" is allowed in Under the hood only.** There the AI-app column and filter read "AI app (harness)", with the hint "Developers call these harnesses: the program that runs your AI and connects it to AgentLink." Everywhere else (simple app, Get started, user docs) the word stays banned; say "AI app". The glossaries link the two words.
+
 | Agent, when it means the identity AgentLink creates for an AI app (keys, inbox, contacts, rules); Agent ID | **ID**; **ID number** for the long identifier (D-144, below). "AI agents" stays, for the AIs themselves |
 | MCP, MCP server (outside developer contexts) | "AgentLink in your AI app", "Connect your AI" |
 | Owner key, signature | "Approve with your passkey / Touch ID" (Advanced: owner signature) |

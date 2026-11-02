@@ -39,7 +39,13 @@ import { en } from '@4thtech-io/mcp-tools/strings/en.js';
 import { TERMS_TEXT } from '@4thtech-io/mcp-tools/terms-common.js';
 import { TOOL_TEXT } from '@4thtech-io/mcp-tools/text.js';
 import { VERIFY_TEXT } from '@4thtech-io/mcp-tools/verify-proof-pack.js';
-import { NEVER_SAY, lintVocabulary, proseOf } from './vocabulary.js';
+import {
+  HOOD_HARNESS_PHRASES,
+  NEVER_SAY,
+  lintHoodVocabulary,
+  lintVocabulary,
+  proseOf,
+} from './vocabulary.js';
 
 /** Sample arguments for the text functions: plain words, so they add no banned term. */
 const SAMPLE_ARGS: readonly unknown[] = ['Sample', 'Sample', 'Sample', 'Sample'];
@@ -231,5 +237,13 @@ describe('the lint itself (self-test)', () => {
     for (const term of ['wallet', 'gas', 'seed phrase', 'transaction', 'chain', 'address']) {
       expect(names).toContain(term);
     }
+  });
+
+  it('Under the hood may say "harness" only in the AI-app heading and its hint', () => {
+    for (const phrase of HOOD_HARNESS_PHRASES) {
+      expect(lintVocabulary(phrase)).toContain('harness/envelope');
+      expect(lintHoodVocabulary(phrase)).toEqual([]);
+    }
+    expect(lintHoodVocabulary('Open your harness settings.')).toEqual(['harness/envelope']);
   });
 });
