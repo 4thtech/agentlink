@@ -17,6 +17,6 @@ describe('W4-WIRE: the ways to invite', () => {
   it('Go to (Cmd+K): Invite someone opens the Invite screen; New agent opens the Get started steps', () => {
     const entries = goToEntries(false);
     expect(entries.find((e) => e.label === 'Invite someone')?.path).toBe('/contacts?invite');
-    expect(entries.find((e) => e.label === 'New agent')?.path).toBe('/start/app?add=agent');
+    expect(entries.find((e) => e.label === 'New ID')?.path).toBe('/start/app?add=agent');
   });
 });

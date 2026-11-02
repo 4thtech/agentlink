@@ -173,7 +173,7 @@ const posts = (url: string): Call[] => calls.filter((c) => c.method === 'POST' &
 describe('Agents, simple (A8)', () => {
   it('lists each agent with its letter icon, its label isolated, and its live line', async () => {
     await mount();
-    expect(host.querySelector('h1')?.textContent).toBe('Agents');
+    expect(host.querySelector('h1')?.textContent).toBe('IDs');
     const personal = card('default');
     expect(personal.querySelector('.al-agent-icon')?.textContent).toBe('P');
     expect(personal.querySelector('.al-agent-icon-dot.is-working')).not.toBeNull();
@@ -183,7 +183,7 @@ describe('Agents, simple (A8)', () => {
     expect(card('work').textContent).toContain('Ready in Cursor');
     expect(card('research').textContent).toContain('Offline · last seen 5 min ago');
     expect(card('invoices').textContent).toContain('Paused');
-    const add = [...host.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'New agent');
+    const add = [...host.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'New ID');
     expect(add?.getAttribute('href')).toBe('/start/app?add=agent');
   });
 
@@ -435,7 +435,7 @@ describe('Agents, Under the hood: the fleet (A11)', () => {
     await choose(host.querySelector<HTMLSelectElement>('select[name="sort"]')!, 'name');
     expect(rowNames()).toEqual(['invoices', 'default', 'research', 'work']);
     await type(host.querySelector<HTMLInputElement>('input[type="search"]')!, 'nobody');
-    expect(plain(host)).toContain('No agents match.');
+    expect(plain(host)).toContain('No IDs match.');
   });
 
   it('bulk select: Remove goes one agent at a time, each with its name typed', async () => {
@@ -443,10 +443,10 @@ describe('Agents, Under the hood: the fleet (A11)', () => {
     const box = (name: string) =>
       host.querySelector<HTMLInputElement>(`tr[data-agent="${name}"] input[type="checkbox"]`)!;
     await click(box('research'));
-    expect(plain(host)).toContain('1 agent selected');
+    expect(plain(host)).toContain('1 ID selected');
     expect(button(host, 'Pause')).toBeDefined();
     await click(box('invoices'));
-    expect(plain(host)).toContain('2 agents selected');
+    expect(plain(host)).toContain('2 IDs selected');
     // Pause applies to the open agent (08 §1): several at once is not offered.
     expect(button(host.querySelector('[data-bulk]')!, 'Pause')).toBeUndefined();
     await click(button(host.querySelector('[data-bulk]')!, 'Remove'));
@@ -510,6 +510,6 @@ describe("one agent's page (/agents/<name>)", () => {
   it('says plainly when there is no such agent', async () => {
     history.replaceState(null, '', '/agents/nobody');
     await mount();
-    expect(plain(host)).toContain('No agent called that on this computer.');
+    expect(plain(host)).toContain('No ID called that on this computer.');
   });
 });

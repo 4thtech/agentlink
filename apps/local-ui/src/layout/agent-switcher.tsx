@@ -37,15 +37,15 @@ export interface SwitcherChip {
 }
 
 export const CHIP_STRINGS = {
-  menu: 'Your agents · live',
-  menuName: 'Agents',
+  menu: 'Your IDs · live',
+  menuName: 'IDs',
   anotherApp: 'Another AI app',
   connect: 'Connect',
   connectApp: (app: string): string => `Connect ${app}`,
-  addAgent: 'Add agent',
-  manageAgents: 'Manage agents',
-  chipPrefix: 'Agent: ',
-  openApp: 'Open the AgentLink app to see your agents.',
+  addAgent: 'New ID',
+  manageAgents: 'Manage IDs',
+  chipPrefix: 'ID: ',
+  openApp: 'Open the AgentLink app to see your IDs.',
 } as const;
 
 const DOT: Readonly<Record<LiveState, AgentDotState>> = {
@@ -144,6 +144,8 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
   const agents = live.agents;
   const current = agents.find((a) => a.current);
   const label = current?.label ?? list?.label ?? A.switcherLabel;
+  // D-144 (a): the AI app next to the ID, on this computer only ("Tali · Claude Code").
+  const shown = A.withApp(label, current === undefined ? [] : current.apps.map((x) => x.app));
   const seed = current?.name ?? label;
   const down = connectionWord(chip);
   const status = down ?? current?.statusText ?? (list === undefined ? '' : A.notRunning);
@@ -185,7 +187,7 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
         <span className="al-chip-text">
           {/* The name is the visible text (WCAG 2.5.3), after a word for screen readers. */}
           <span className="al-sr-only">{CHIP_STRINGS.chipPrefix}</span>
-          <span className="al-chip-name">{label}</span>{' '}
+          <span className="al-chip-name">{shown}</span>{' '}
           <span className="al-chip-status">{status}</span>
         </span>
         <ShellIcon
@@ -219,8 +221,16 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
               >
                 <AgentIcon label={agent.label} seed={agent.name} size="lg" dot={DOT[agent.state]} />
                 <span className="al-am-main">
-                  <span className="al-am-name">{agent.label}</span>
+                  <span className="al-am-name">
+                    {A.withApp(
+                      agent.label,
+                      agent.apps.map((x) => x.app),
+                    )}
+                  </span>
                   <span className="al-am-status">{agent.statusText}</span>
+                  <span className="al-am-status">
+                    {agent.apps.length > 0 ? A.usedBy(agent.apps.map((x) => x.app)) : A.notUsed}
+                  </span>
                 </span>
                 {agent.current ? (
                   <ShellIcon name="check" size={16} className="al-am-check" />

@@ -361,14 +361,17 @@ export function AgentsPage({
     const content = failed ? (
       errorBox
     ) : list !== undefined && rows.length === 0 ? (
-      <EmptyState
-        title={S.empty}
-        action={
-          <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
-            {S.newAgent}
-          </a>
-        }
-      />
+      <>
+        <p className="al-text-body al-muted">{S.explainer}</p>
+        <EmptyState
+          title={S.empty}
+          action={
+            <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
+              {S.newAgent}
+            </a>
+          }
+        />
+      </>
     ) : hood && view === 'map' && MapView !== undefined ? (
       <MapView agents={rows} onShowList={() => setView('list')} onSwitch={doSwitch} />
     ) : hood ? (

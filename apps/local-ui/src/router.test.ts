@@ -48,7 +48,9 @@ const currentSection = (): string | null | undefined =>
 /** Path, the page's own heading (today's page), and the section marked current. */
 const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/', 'Home', 'Home'],
-  ['/agents', 'Agents', 'Agents'],
+  ['/agents', 'IDs', 'IDs'],
+  // W7-ID-B3 (D-144): the same page under its new name.
+  ['/ids', 'IDs', 'IDs'],
   ['/activity', 'Activity', 'Activity'],
   ['/activity/live', 'Live activity stream', null],
   ['/contacts', 'People', 'Home'],
@@ -102,7 +104,7 @@ describe('routes', () => {
     expect(location.pathname).toBe('/agents/work');
     // The Agents page draws the agent's page (its heading is the agent's label once read).
     expect(host.querySelector('main.ag-page')).not.toBeNull();
-    expect(currentSection()).toBe('Agents');
+    expect(currentSection()).toBe('IDs');
   });
 
   it('shows the not-found state for an unknown path, still in the layout', () => {
@@ -153,10 +155,10 @@ describe('routes', () => {
 });
 
 describe('the sections (nav.ts)', () => {
-  it('Home, Agents, Activity, Settings; Advanced holds six pages', () => {
+  it('Home, IDs, Activity, Settings; Advanced holds six pages', () => {
     expect(SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Home', '/'],
-      ['Agents', '/agents'],
+      ['IDs', '/agents'],
       ['Activity', '/activity'],
       ['Settings', '/settings'],
     ]);
@@ -201,7 +203,9 @@ describe('the sections (nav.ts)', () => {
     expect(sectionOf('/advanced/network')).toBe('network');
     expect(titleOf('/settings/rules')).toBe('Rules');
     expect(titleOf('/start/connect')).toBe('Get started');
-    expect(titleOf('/agents/work')).toBe('Agents');
+    expect(titleOf('/agents/work')).toBe('IDs');
+    expect(titleOf('/ids/work')).toBe('IDs');
+    expect(sectionOf('/ids/work')).toBe('agents');
   });
 
   it('shows the Settings sub-navigation on a Settings page only', () => {

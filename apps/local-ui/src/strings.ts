@@ -75,7 +75,7 @@ export const PAGE_TITLES = {
   activity: 'Activity',
   messages: 'Messages',
   contacts: 'People',
-  agents: 'Agents',
+  agents: 'IDs',
   apps: 'AI apps',
   files: 'Files',
   storage: 'Storage',

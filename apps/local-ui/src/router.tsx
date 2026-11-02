@@ -47,6 +47,8 @@ export const ROUTES: readonly RouteDef[] = [
   // waiting approvals are its card on top.
   { path: HOME_PATH, page: ApprovalsPage },
   { path: '/agents', page: lazyPage('/agents') },
+  // W7-ID-B3 (D-144): "IDs" is the page's new name; both paths show it.
+  { path: '/ids', page: lazyPage('/agents') },
   { path: '/activity', page: lazyPage('/activity') },
   { path: LIVE_ACTIVITY_PATH, page: lazyPage(LIVE_ACTIVITY_PATH) },
   // Get started (U2 builds the steps; today's first run until then), in the focused shell.

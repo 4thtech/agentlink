@@ -215,7 +215,7 @@ describe('buildMap', () => {
 
   it('summary: counts and who is talking, with plurals', () => {
     const one = buildMap({ ...base, contacts: [contact(1)], pulse: pulseOf([[1, 1, 'today']]) });
-    expect(one.summary).toBe('1 agent, 1 contact.');
+    expect(one.summary).toBe('1 ID, 1 contact.');
     const talking = buildMap({
       ...base,
       agents: [agent('a', { current: true, label: 'Personal' }), agent('b')],
@@ -226,6 +226,6 @@ describe('buildMap', () => {
       ]),
       flow: mergeFlow(NO_FLOW, [item(1)]),
     });
-    expect(talking.summary).toBe('2 agents, 2 contacts. Person 1 is talking with Personal now.');
+    expect(talking.summary).toBe('2 IDs, 2 contacts. Person 1 is talking with Personal now.');
   });
 });
