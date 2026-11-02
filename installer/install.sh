@@ -92,9 +92,13 @@ main() {
 say() { printf '%s\n' "$*"; }
 fail() {
   printf 'AgentLink installer: %s\n' "$*" >&2
-  # The download folder, if any, goes with a failed install.
-  if [ -n "${tmp:-}" ]; then rm -rf "$tmp"; fi
   exit 1
+}
+
+# Removes the download folder, if there is one.
+cleanup() {
+  if [ -n "${tmp:-}" ]; then rm -rf "$tmp"; fi
+  tmp=""
 }
 
 # Runs a command, or only prints it with --dry-run.
@@ -178,6 +182,9 @@ install_node() {
   fi
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/agentlink-install.XXXXXX")" ||
     fail "Could not create a temporary folder."
+  # Removed right after the move below, and on any abort before that (Ctrl+C included).
+  trap 'cleanup' EXIT
+  trap 'cleanup; exit 130' INT TERM
   download "$NODE_DIST/$archive" "$tmp/$archive"
   download "$NODE_DIST/SHASUMS256.txt" "$tmp/SHASUMS256.txt"
   listed="$(awk -v f="$archive" '$2 == f { print $1 }' "$tmp/SHASUMS256.txt")"
@@ -191,8 +198,8 @@ install_node() {
   tar -xzf "$tmp/$archive" -C "$tmp" || fail "Could not unpack the Node.js download."
   rm -rf "$runtime_root/node-v$NODE_VERSION-$platform"
   mv "$tmp/node-v$NODE_VERSION-$platform" "$runtime_root/" || fail "Could not install Node.js into $runtime_root."
-  rm -rf "$tmp"
-  tmp=""
+  cleanup
+  trap - EXIT INT TERM
   # Older AgentLink runtimes are replaced by this one.
   for old in "$runtime_root"/node-v*; do
     [ "$old" = "$runtime_root/node-v$NODE_VERSION-$platform" ] || rm -rf "$old"
@@ -223,9 +230,10 @@ write_launcher() {
     echo "# Remove with: curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --uninstall"
     echo "PATH=$(quote "$node_bin"):\"\$PATH\""
     echo 'export PATH'
-    # The registry is pinned on the command line, which beats any .npmrc in the folder the app is
-    # started from. The folder itself is kept: `agentlink verify ./pack` names files relative to it.
-    echo "exec $(quote "$node_bin/npx") -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ $PACKAGE \"\$@\""
+    # npm reads a project .npmrc from the folder it is started in (node-options, proxies, TLS...).
+    # --prefix points that lookup at our own folder instead, and the registry is pinned on the
+    # command line. The start folder is kept: `agentlink verify ./pack` names files relative to it.
+    echo "exec $(quote "$node_bin/npx") -y --prefix=$(quote "$base") --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ $PACKAGE \"\$@\""
   } >"$launcher.tmp"
   chmod 755 "$launcher.tmp"
   mv "$launcher.tmp" "$launcher"

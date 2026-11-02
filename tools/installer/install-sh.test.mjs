@@ -396,7 +396,7 @@ describe('install.sh source', () => {
 
   it('removes its temporary folder as soon as Node.js is unpacked, and on any abort', () => {
     expect(source).toMatch(/trap 'cleanup' EXIT\n\s*trap 'cleanup; exit 130' INT TERM/);
-    expect(source).toMatch(/mv "\$tmp\/node-v[^\n]*\n\s*rm -rf "\$tmp"/);
+    expect(source).toMatch(/mv "\$tmp\/node-v[^\n]*\n\s*cleanup\n\s*trap - EXIT INT TERM\n/);
   });
 
   it('runs everything from main on the last line (a cut-off download runs nothing)', () => {

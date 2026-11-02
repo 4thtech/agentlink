@@ -85,17 +85,19 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart)
   }
 
   # The text of agentlink.cmd. % is doubled so a folder name cannot expand inside cmd.exe.
-  function Format-Launcher([string]$NodeDir) {
+  function Format-Launcher([string]$NodeDir, [string]$Root) {
     $dir = $NodeDir.Replace('%', '%%')
+    $prefix = $Root.Replace('%', '%%')
     return @(
       '@echo off'
       'rem AgentLink launcher, written by https://agentlink.4thtech.io/install.ps1.'
       'rem Remove with: irm https://agentlink.4thtech.io/install.ps1 | iex, run with -Uninstall.'
       'setlocal'
       "set `"PATH=$dir;%PATH%`""
-      # The registry is pinned on the command line, which beats any .npmrc in the folder the app is
-      # started from. The folder itself is kept: `agentlink verify .\pack` names files relative to it.
-      "`"$dir\npx.cmd`" -y --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ $Package %*"
+      # npm reads a project .npmrc from the folder it is started in (node-options, proxies, TLS...).
+      # --prefix points that lookup at our own folder instead, and the registry is pinned on the
+      # command line. The start folder is kept: `agentlink verify .\pack` names files relative to it.
+      "`"$dir\npx.cmd`" -y --prefix=`"$prefix`" --registry=https://registry.npmjs.org/ --@4thtech-io:registry=https://registry.npmjs.org/ $Package %*"
     ) -join "`r`n"
   }
 
@@ -198,7 +200,7 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart)
       return
     }
     New-Item -ItemType Directory -Path $binDir -Force | Out-Null
-    [IO.File]::WriteAllText($launcher, (Format-Launcher $nodeDir) + "`r`n", (New-Object Text.UTF8Encoding($false)))
+    [IO.File]::WriteAllText($launcher, (Format-Launcher $nodeDir $Root) + "`r`n", (New-Object Text.UTF8Encoding($false)))
     Add-UserPath $binDir
     if (-not (($env:Path -split ';') -contains $binDir)) { $env:Path = "$binDir;$env:Path" }
 
