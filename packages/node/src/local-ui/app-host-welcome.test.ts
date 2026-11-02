@@ -696,7 +696,10 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     );
   }, 60_000);
 
-  it(`with no label the first agent is named "${FIRST_AGENT_LABEL}"`, async () => {
+  it('W7-ID-B5 (Q5): with no label the first ID is named "My ID", never "{App} agent"', async () => {
+    // Q5: the owner's name, else the AI app's name, is the page's prefill; a begin without a label
+    // carries neither, so the server's backstop is the generic "My ID".
+    expect(FIRST_AGENT_LABEL).toBe('My ID');
     const h = await harness();
     const s = await h.session();
     const { finish } = await firstRun(h, s, undefined);
@@ -726,14 +729,14 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     });
   }, 60_000);
 
-  it(`U3-d-b: with no label typed, contacts see "${FIRST_AGENT_LABEL}", not the folder`, async () => {
+  it('U3-d-b: with no label typed, contacts see "My ID", not the folder', async () => {
     const h = await harness();
     const s = await h.session();
     const { finish } = await firstRun(h, s, undefined);
     expect(finish?.status).toBe(200);
     const client = h.w.clients.get('default');
     if (client === undefined) throw new Error('no client');
-    expect((await client.identity.signedCard()).name).toBe(FIRST_AGENT_LABEL);
+    expect((await client.identity.signedCard()).name).toBe('My ID');
   }, 60_000);
 
   it('refuses a label that is not restricted before any seed or folder exists', async () => {
