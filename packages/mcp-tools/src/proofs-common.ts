@@ -83,25 +83,25 @@ export const PROOF_TEXT = Object.freeze({
   recordingNextStep:
     'Call agentlink_get_proof with this envelopeId in a minute to check that it was recorded.',
   // M1-36f: what is missing, in dollars.
-  needsCredits: 'Adding proof costs {fee}. This agent needs {usd} more in credits.',
+  needsCredits: 'Adding proof costs {fee}. This AgentLink ID needs {usd} more in credits.',
   needsCreditsPriceOnly:
-    "Adding proof costs {fee}, and this agent doesn't have enough credits for it.",
-  needsCreditsShortOnly: 'This agent needs {usd} more in credits to add proof.',
-  needsCreditsNoFee: "This agent doesn't have enough credits to add proof.",
+    "Adding proof costs {fee}, and this AgentLink ID doesn't have enough credits for it.",
+  needsCreditsShortOnly: 'This AgentLink ID needs {usd} more in credits to add proof.',
+  needsCreditsNoFee: "This AgentLink ID doesn't have enough credits to add proof.",
   needsCreditsNextStep:
     'Adding proof needs credits. Tell the user to add at least {usd} here: {url}. {covers}Messages and files stay free. Then call this tool again.',
   needsCreditsNextStepNoAmount:
     'Adding proof needs credits. Tell the user to add credits here: {url}. {covers}Messages and files stay free. Then call this tool again.',
   covers: '$5 covers {n} proofs. ',
   needsCreditsNoLink:
-    'Tell the user this agent needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
+    'Tell the user this AgentLink ID needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
   approval: "Adding proof needs the owner's approval, so nothing was recorded yet.",
   failed: "The proof couldn't be recorded.",
   failedNextStep: `Tell the user the proof was not recorded. They can run \`${NPX_COMMAND} doctor\` in their own terminal to see why.`,
   unavailable: "Adding proof isn't available on this machine, so nothing was recorded.",
   unavailableNextStep: `Tell the user proof needs AgentLink set up with proof support. They can run \`${NPX_COMMAND} doctor\` to check.`,
   notFound:
-    "That message wasn't found among the messages this agent sent, so nothing was recorded.",
+    "That message wasn't found among the messages this AgentLink ID sent, so nothing was recorded.",
   notFoundNextStep: 'Check the envelopeId in agentlink_inbox (with includeSent), then call again.',
   notNotarizable: "This kind of message can't get a proof, so nothing was recorded.",
   notNotarizableNextStep: 'Add proof only to a text, note, request, delivery or file message.',
@@ -112,8 +112,8 @@ export const PROOF_TEXT = Object.freeze({
   policyDenied: "The owner's rules don't allow adding proof here, so nothing was recorded.",
   policyDeniedNextStep:
     'Tell the user their AgentLink rules blocked this. Only they can change the rules.',
-  cardExpired: "This agent's profile expires too soon to add proof, so nothing was recorded.",
-  cardExpiredNextStep: `Tell the user to renew this agent's profile in their own terminal (\`${NPX_COMMAND} owner\`), then try again.`,
+  cardExpired: "This AgentLink ID's card expires too soon to add proof, so nothing was recorded.",
+  cardExpiredNextStep: `Tell the user to renew this AgentLink ID's card in their own terminal (\`${NPX_COMMAND} owner\`), then try again.`,
   network: "Proof recording can't be reached right now, so nothing was recorded.",
   networkNextStep: `Try again in a few minutes. If it keeps failing, the user can run \`${NPX_COMMAND} doctor\`.`,
   unsupported: "That proof option isn't supported in this version, so nothing was recorded.",

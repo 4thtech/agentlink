@@ -1211,7 +1211,7 @@ describe('notarize on the terms tools (06 §2.2a, D-55; M1-9d-3)', () => {
     // so nextStep carries the fixed no-link text (M1-26-e), with neither a link nor the agent ID.
     expect(r.structured.url).toBeUndefined();
     expect(r.structured.nextStep).toBe(
-      'Tell the user this agent needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
+      'Tell the user this AgentLink ID needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
     );
     expect(dump(r)).not.toMatch(/https?:\/\/|pay\.agentlink|#v=1/);
     expect(r.structured.summary).toContain('Nothing was sent.');
@@ -2483,7 +2483,7 @@ describe('needs_credits says what is missing (M1-36f)', () => {
     const { client } = fake({ notarize: () => route('1.00', '0.10') });
     const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
     expect(r.structured.summary).toBe(
-      'Adding proof costs $0.10. This agent needs $1.00 more in credits.',
+      'Adding proof costs $0.10. This AgentLink ID needs $1.00 more in credits.',
     );
     expect(r.structured.nextStep).toContain('Tell the user to add at least $1.00 here: ');
     expect(r.structured.nextStep).toContain('Then call this tool again.');
@@ -2494,11 +2494,13 @@ describe('needs_credits says what is missing (M1-36f)', () => {
     const priceOnly = fake({ notarize: () => route(undefined, '0.10') });
     const a = await call('agentlink_notarize', { envelopeId: ENVELOPE }, priceOnly.client);
     expect(a.structured.summary).toBe(
-      "Adding proof costs $0.10, and this agent doesn't have enough credits for it.",
+      "Adding proof costs $0.10, and this AgentLink ID doesn't have enough credits for it.",
     );
     const nothing = fake({ notarize: () => ({ status: 'needs_credits', recordId: RECORD }) });
     const b = await call('agentlink_notarize', { envelopeId: ENVELOPE }, nothing.client);
-    expect(b.structured.summary).toBe("This agent doesn't have enough credits to add proof.");
+    expect(b.structured.summary).toBe(
+      "This AgentLink ID doesn't have enough credits to add proof.",
+    );
     for (const r of [a, b]) {
       expect(`${r.structured.summary} ${r.structured.nextStep}`).not.toMatch(JARGON);
     }
@@ -2511,7 +2513,7 @@ describe('needs_credits says what is missing (M1-36f)', () => {
     });
     expect(r.structured.nextStep).toBe(PROOF_TEXT.needsCreditsNoLink);
     expect(r.structured.nextStep).toBe(
-      'Tell the user this agent needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
+      'Tell the user this AgentLink ID needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
     );
     expect(dump(r)).not.toMatch(/https?:\/\/|#v=1/);
     expect(`${r.structured.summary} ${r.structured.nextStep}`).not.toMatch(JARGON);

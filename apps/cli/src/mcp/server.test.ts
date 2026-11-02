@@ -179,7 +179,7 @@ describe('MCP server (stdio binding, 06 §1)', () => {
 
   it('needs_setup and not_found results validate too', async () => {
     const setup = await connect({
-      needsSetup: { message: 'AgentLink is not set up for this agent on this machine yet.' },
+      needsSetup: { message: 'AgentLink is not set up for this ID on this machine yet.' },
       logger: silent,
     });
     await setup.client.listTools();
@@ -343,7 +343,7 @@ describe('agentlink mcp command', () => {
           status: 'needs_setup',
           reason: 'no_agent',
           message:
-            'AgentLink is not set up for this agent on this machine yet. Run `agentlink init` yourself, in your own terminal.',
+            'AgentLink is not set up for this ID on this machine yet. Run `agentlink init` yourself, in your own terminal.',
         }),
       transport: () => serverSide,
       version: '0',

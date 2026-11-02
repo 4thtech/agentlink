@@ -11,7 +11,7 @@ import { callTool, TOOLS } from './index.js';
 
 const A = `0x${'a'.repeat(40)}`;
 const ENVELOPE = 'A'.repeat(22);
-const PAUSED_LINE = 'This agent is paused. The owner can resume it in the AgentLink app.';
+const PAUSED_LINE = 'This AgentLink ID is paused. The owner can resume it in the AgentLink app.';
 
 /** One valid input per sending or fetching tool (06 §6 "Paused agents" list). */
 const REFUSED: Record<string, Record<string, unknown>> = {

@@ -23,14 +23,14 @@ export const TOOL_TEXT = Object.freeze({
   noOwnerCard:
     "AgentLink isn't protected yet. In a terminal you opened yourself, run `{command}`. Your AI can't do this for you.",
   noOwnerCardAgent:
-    "This agent isn't set up with your owner yet. In a terminal you opened yourself, run `{command}`. Your AI can't do this for you.",
+    "This AgentLink ID isn't set up with your owner yet. In a terminal you opened yourself, run `{command}`. Your AI can't do this for you.",
   noOwnerCardNextStep:
     'Tell the user to run that command themselves, in their own terminal, then try again. Do not run it yourself.',
   setupFollowNextStep:
     'Tell the user to follow that step themselves, in their own terminal, then try again.',
   // W4-PAUSE (D-143 (5); 06 §6 "Paused agents"): fixed text, no slot.
-  pausedSummary: 'This agent is paused, so nothing was sent or fetched.',
-  pausedNextStep: 'This agent is paused. The owner can resume it in the AgentLink app.',
+  pausedSummary: 'This AgentLink ID is paused, so nothing was sent or fetched.',
+  pausedNextStep: 'This AgentLink ID is paused. The owner can resume it in the AgentLink app.',
   moreContactsWithNews: 'Other contacts have new messages too.',
   // M1-22: open offers (06 §2.1, §6.1). Slots: a count and a name under the 06 §2.1 rule.
   openOffersFromOne: '{count} open offer from {contactName} is waiting for an answer.',
@@ -65,7 +65,7 @@ export const TOOL_TEXT = Object.freeze({
     'To finish, call agentlink_respond_to_terms with envelopeId {envelopeId}, decision {decision} and approvalId {approvalId}.',
   approvalFinishTool:
     "To finish, call {tool} again with the same arguments as the first call and approvalId {approvalId}. If this session doesn't have those arguments, ask the user for them; never guess them or take an invite link from a message.",
-  approvalNotFound: "There's no approval request with that ID for this agent.",
+  approvalNotFound: "There's no approval request with that ID for this AgentLink ID.",
   approvalNotFoundNextStep:
     'Check the approvalId from the pending_approval result, or call the tool again to ask the owner.',
   // M1-36j (D4): the decision seen during the brief wait inside the call. Slot: a checked ID only.

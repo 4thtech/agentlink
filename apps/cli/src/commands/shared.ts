@@ -100,7 +100,7 @@ export const TEXT = Object.freeze({
   acceptThenRetry:
     'After you approve, run the same accept command again and add `--approval {approvalId}`.',
   acceptWaiting:
-    "Invite accepted. You'll be connected when {contactName}'s agent answers. Checking each other with a safety code arrives in a later version; until then the name they show is self-declared.",
+    "Invite accepted. You'll be connected when {contactName} answers. Checking each other with a safety code arrives in a later version; until then the name they show is self-declared.",
   acceptOffline:
     "Warning  Invite accepted, but the message network can't be reached right now. AgentLink keeps the answer ready and sends it when the network is back.",
   acceptStillWaiting:
@@ -110,14 +110,15 @@ export const TEXT = Object.freeze({
     'That approval expired. Run the accept command again, without --approval, to ask again.',
   acceptRefused:
     "That approval can't be used for this invite. Run accept again to ask for a new one.",
-  acceptNotAllowed: "Your rules don't let this agent accept invites. Only you can change that.",
+  acceptNotAllowed: "Your rules don't let this ID accept invites. Only you can change that.",
   contactsNone: 'You have no contacts yet. Create an invite to connect with someone.',
   contactsHeader: '{count, plural, one {1 contact} other {# contacts}}',
   statusOffline:
     "Warning  Can't reach the message network, so this shows only what is already stored.",
   statusPartial: 'Warning  Part of the message network did not answer, so this may be incomplete.',
   // W4-PAUSE (06 §6 "Paused agents"): fixed text, the same sentence the tools give.
-  statusPaused: 'Warning  This agent is paused. The owner can resume it in the AgentLink app.',
+  statusPaused:
+    'Warning  This AgentLink ID is paused. The owner can resume it in the AgentLink app.',
   // M1-5g: a relay returned a second at its cap. Fixed text: no count, relay or time (I-5, I-7).
   statusIncomplete:
     'Warning  Some messages may be missing from this check. AgentLink will look for them again on the next check.',
@@ -144,22 +145,21 @@ export const TEXT = Object.freeze({
     return `Say which sender: \`${commandPrefix()} requests unblock <key>\`.`;
   },
   unblockNone: "That sender isn't blocked.",
-  doctorKeychain: 'OK       Agent identity: system keychain',
+  doctorKeychain: 'OK       ID keys: system keychain',
   doctorFile:
-    'Warning  Agent identity: passphrase-locked file (no system keychain)\n         That is weaker than a keychain if someone copies this disk.',
+    'Warning  ID keys: passphrase-locked file (no system keychain)\n         That is weaker than a keychain if someone copies this disk.',
   doctorRelays:
-    '{count, plural, one {OK       Message network: 1 server for this agent} other {OK       Message network: # servers for this agent}}',
+    '{count, plural, one {OK       Message network: 1 server for this ID} other {OK       Message network: # servers for this ID}}',
   get doctorNoRelays(): string {
-    return `Problem  This agent has no message network servers\n         Run \`${commandPrefix()} init\` again to set up this agent.`;
+    return `Problem  This ID has no message network servers\n         Run \`${commandPrefix()} init\` again to set up this ID.`;
   },
-  doctorSend: 'OK       This agent can send and sign',
+  doctorSend: 'OK       This ID can send and sign',
   doctorSendBlocked:
-    "Problem  This agent can't send or sign right now\n         Its identity is revoked, or a key change is unfinished.",
+    "Problem  This ID can't send or sign right now\n         Its identity is revoked, or a key change is unfinished.",
   get doctorPartial(): string {
     return `Warning  Part of the message network did not answer\n         Run \`${commandPrefix()} doctor\` again, or check your connection.`;
   },
-  doctorOpenFailed:
-    "Problem  Couldn't open this agent\n         Check the folder under ~/.agentlink.",
+  doctorOpenFailed: "Problem  Couldn't open this ID\n         Check the folder under ~/.agentlink.",
   doctorNoAgent: 'Problem  {message}',
   doctorNoKeychain: 'Problem  {message}',
   doctorFix: '         {fix}',

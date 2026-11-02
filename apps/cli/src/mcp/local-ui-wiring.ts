@@ -155,7 +155,7 @@ export function logOwnerSetupEvent(logger: Logger, event: ApprovalServerEvent): 
   if (!ownerSetupDone(event) || event.kind !== 'owner_setup') return;
   if (event.fingerprint === undefined) return;
   logger.info(
-    `Approvals on this computer are now protected by a new owner, set up on the setup page. If you did not do this yourself, do not use this agent; check with \`${cliPrefix()} doctor\`.`,
+    `Approvals on this computer are now protected by a new owner, set up on the setup page. If you did not do this yourself, do not use this ID; check with \`${cliPrefix()} doctor\`.`,
     { fingerprint: event.fingerprint },
   );
 }

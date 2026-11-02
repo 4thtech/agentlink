@@ -58,7 +58,7 @@ export const SEND_TEXT = Object.freeze({
     'Use agentlink_propose_terms to make an offer, or agentlink_respond_to_terms to answer one.',
   contactNotReady: "That contact isn't connected yet, so nothing was sent.",
   contactNotReadyNextStep:
-    'The pairing finishes when their agent answers. Call agentlink_list_contacts later to check.',
+    'The pairing finishes when they answer. Call agentlink_list_contacts later to check.',
   keyReused: 'That clientRequestId was already used for a different message, so nothing was sent.',
   keyReusedNextStep:
     'Use a new clientRequestId for a new message, or the same request to repeat it.',
@@ -68,8 +68,8 @@ export const SEND_TEXT = Object.freeze({
   policyDeniedNextStep:
     'Tell the user their AgentLink rules blocked this message. Only they can change the rules.',
   networkNextStep: `Try again in a minute. If it keeps failing, the user can run \`${NPX_COMMAND} doctor\`.`,
-  revoked: 'The owner has turned this agent off, so nothing was sent.',
-  revokedNextStep: 'Tell the user this agent was revoked. Only they can set up a new one.',
+  revoked: 'The owner has turned this AgentLink ID off, so nothing was sent.',
+  revokedNextStep: 'Tell the user this AgentLink ID was revoked. Only they can set up a new one.',
   tooLarge: 'The message is too large to send, so nothing was sent.',
   tooLargeNextStep: 'Send a shorter message, or split it into several.',
   replyNotFound: "The message this replies to wasn't found, so nothing was sent.",

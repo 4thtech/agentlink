@@ -481,7 +481,7 @@ describe('agentlink_accept_invite under the default policy', () => {
       'pairing',
       'safetyCodeChecked',
     ]);
-    expect(ok.structured.nextStep).toContain('connected when the other agent answers');
+    expect(ok.structured.nextStep).toContain('connected when the other person answers');
     expect(ok.structured.nextStep).not.toContain('--verify');
     expect((await rows(w.bob)).pairings).toHaveLength(1);
     const published = w.net.eventCount();

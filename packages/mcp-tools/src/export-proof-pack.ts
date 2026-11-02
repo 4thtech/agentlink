@@ -36,7 +36,7 @@ export const EXPORT_TEXT = Object.freeze({
   notRecordedNextStep:
     'Add proof first with agentlink_notarize, or check its state with agentlink_get_proof.',
   received:
-    "A proof file can be saved only for messages this agent recorded, so there's nothing to save.",
+    "A proof file can be saved only for messages this AgentLink ID recorded, so there's nothing to save.",
   receivedNextStep: 'Ask the contact who recorded it to share their proof file.',
   folder: "The AgentLink proofs folder can't take files right now, so nothing was saved.",
   folderNextStep:

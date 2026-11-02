@@ -19,7 +19,7 @@ const APPROVAL_ID_CHARS = /^apr_[A-Za-z0-9_-]{22}$/;
 const LEAD = 'Tell the user: Approval needed. In your own terminal, run ';
 const TAIL =
   " Your AI can't approve this for you. After they approve, call the same tool again with approvalId.";
-const ADD_AGENT = " If you have more than one agent, add --agent with this agent's name.";
+const ADD_AGENT = " If you have more than one AgentLink ID, add --agent with this ID's name.";
 
 /** True only for a canonical approval ID (both the schema and the character pattern). */
 export function isApprovalId(value: unknown): value is string {

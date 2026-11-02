@@ -25,18 +25,18 @@ export type RuntimeErrorCode =
 
 export const RUNTIME_MESSAGES: Readonly<Record<RuntimeErrorCode, string>> = Object.freeze({
   get agent_name_invalid(): string {
-    return `That agent name isn't valid. Agent names use lower-case letters, digits and -, start with a letter and have at most 32 characters. Check the name, or run \`${commandPrefix()} init --agent <name>\` yourself to create one.`;
+    return `That ID name isn't valid. ID names use lower-case letters, digits and -, start with a letter and have at most 32 characters. Check the name, or run \`${commandPrefix()} init --agent <name>\` yourself to create one.`;
   },
   get agent_config_invalid(): string {
-    return `This agent's local settings are damaged. Run \`${commandPrefix()} doctor\` in your own terminal to see how to fix them.`;
+    return `This ID's local settings are damaged. Run \`${commandPrefix()} doctor\` in your own terminal to see how to fix them.`;
   },
   get agent_path_invalid(): string {
-    return `This agent's folder under ~/.agentlink must be a private folder of yours, with no links, readable only by you. Run \`${commandPrefix()} doctor\` in your own terminal to see how to fix it.`;
+    return `This ID's folder under ~/.agentlink must be a private folder of yours, with no links, readable only by you. Run \`${commandPrefix()} doctor\` in your own terminal to see how to fix it.`;
   },
   agent_exists:
-    'An agent with this name is already set up on this machine. AgentLink never replaces it. Choose another name with --agent.',
+    'An ID with this name is already set up on this machine. AgentLink never replaces it. Choose another name with --id.',
   get agent_open_failed(): string {
-    return `AgentLink couldn't open this agent on this machine. Run \`${commandPrefix()} doctor\` in your own terminal to see why.`;
+    return `AgentLink couldn't open this ID on this machine. Run \`${commandPrefix()} doctor\` in your own terminal to see why.`;
   },
   agent_label_invalid:
     'Use letters, digits, spaces, dots, apostrophes and hyphens, up to 32 characters.',

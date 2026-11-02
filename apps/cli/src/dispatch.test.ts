@@ -2,6 +2,7 @@
 import { encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import { describe, expect, it } from 'vitest';
 import {
+  COMMANDS,
   COMMAND_NAMES,
   DISPATCH_TEXT,
   EXIT_FAILED,
@@ -73,7 +74,7 @@ describe('--help (06 §8)', () => {
     for (const usage of [
       'agentlink init',
       'agentlink owner init',
-      'agentlink owner add-agent --agent <name>',
+      'agentlink owner add-agent --id <name>',
       'agentlink owner change-code',
       'agentlink init [--harness <id|none>] [--config <path>]',
       'agentlink status [--brief]',
@@ -81,24 +82,24 @@ describe('--help (06 §8)', () => {
       'agentlink accept <url>',
       'agentlink contacts',
       // M1-9za.
-      'agentlink contacts rename <contactId> <name> [--agent <name>]',
-      'agentlink contacts remove <contactId> [--agent <name>]',
+      'agentlink contacts rename <contactId> <name> [--id <name>]',
+      'agentlink contacts remove <contactId> [--id <name>]',
       'agentlink requests [accept | ignore | block <requestId>]',
       // M1-9m.
-      'agentlink policy show [--agent <name>]',
-      'agentlink policy allow-folder <path> [--agent <name>]',
-      'agentlink policy remove-folder <path> [--agent <name>]',
+      'agentlink policy show [--id <name>]',
+      'agentlink policy allow-folder <path> [--id <name>]',
+      'agentlink policy remove-folder <path> [--id <name>]',
       // M1-9m-b (D-100).
-      'agentlink policy recover [--agent <name>]',
+      'agentlink policy recover [--id <name>]',
       // M1-36b-2-c.
-      'agentlink policy allow-send-folder [--agent <name>]',
+      'agentlink policy allow-send-folder [--id <name>]',
       // M1-9h.
-      'agentlink credits [--topup] [--agent <name>]',
-      'agentlink verify <proof.json> [--agent <name>]',
-      'agentlink approve <approvalId> [--agent <name>]',
-      'agentlink approve [--agent <name>]',
-      'agentlink deny <approvalId> [--agent <name>]',
-      'agentlink cancel <approvalId> [--agent <name>]',
+      'agentlink credits [--topup] [--id <name>]',
+      'agentlink verify <proof.json> [--id <name>]',
+      'agentlink approve <approvalId> [--id <name>]',
+      'agentlink approve [--id <name>]',
+      'agentlink deny <approvalId> [--id <name>]',
+      'agentlink cancel <approvalId> [--id <name>]',
       'agentlink doctor',
       'agentlink mcp [--advanced]',
       // M1-11b-9.
@@ -127,18 +128,18 @@ describe('--help (06 §8)', () => {
     }
   });
 
-  it('U3-b: init and ui do not show --agent by default; the owner commands still do', () => {
+  it('U3-b: init and ui do not show --id by default; the owner commands still do', () => {
     const lines = helpText().split('\n');
     const advanced = lines.findIndex((l) => l.startsWith('Advanced'));
     expect(advanced).toBeGreaterThan(0);
     const shown = lines.slice(0, advanced);
     for (const l of shown.filter((x) => /^ {2}agentlink (init|ui)\b/.test(x))) {
-      expect(l).not.toContain('--agent');
+      expect(l).not.toContain('--id');
     }
-    expect(shown.filter((l) => l.includes('agentlink approve'))[0]).toContain('[--agent <name>]');
+    expect(shown.filter((l) => l.includes('agentlink approve'))[0]).toContain('[--id <name>]');
     const note = lines.slice(advanced).join('\n');
     expect(note).toContain('never ask which one');
-    expect(note).toContain('still ask which agent');
+    expect(note).toContain('still ask which ID');
   });
 
   it('U3-b: bare `agentlink` is the ui command with no arguments', async () => {
@@ -219,6 +220,66 @@ describe('dispatching', () => {
       expect(t.err).toEqual([RUNTIME_MESSAGES.agent_name_invalid]);
     }
     expect(r.calls).toHaveLength(0);
+  });
+
+  describe('W7-ID-B4 (D-144): --id is an alias of --agent', () => {
+    it('--id <name> and --id=<name> give the handler exactly what --agent gives', async () => {
+      for (const argv of [
+        ['status', '--brief', '--id', 'work'],
+        ['status', '--brief', '--id=work'],
+      ]) {
+        const viaId = recorder();
+        const viaAgent = recorder();
+        expect(await createDispatcher({ status: viaId.handler })(argv, io().value)).toBe(EXIT_OK);
+        expect(
+          await createDispatcher({ status: viaAgent.handler })(
+            ['status', '--brief', '--agent', 'work'],
+            io().value,
+          ),
+        ).toBe(EXIT_OK);
+        expect(viaId.calls[0]?.parsed).toEqual(viaAgent.calls[0]?.parsed);
+        expect(viaId.calls[0]?.parsed.agent).toBe('work');
+        expect(viaId.calls[0]?.parsed.values['agent']).toBe('work');
+        expect(viaId.calls[0]?.parsed.values).not.toHaveProperty('id');
+      }
+    });
+
+    it('--id and --agent together are fine when they name the same ID', async () => {
+      const r = recorder();
+      const dispatch = createDispatcher({ status: r.handler });
+      expect(await dispatch(['status', '--id', 'work', '--agent', 'work'], io().value)).toBe(
+        EXIT_OK,
+      );
+      expect(r.calls[0]?.parsed.agent).toBe('work');
+    });
+
+    it('refuses --id and --agent naming different IDs, before the handler and without echoing', async () => {
+      const r = recorder();
+      const dispatch = createDispatcher({ status: r.handler });
+      const t = io();
+      expect(await dispatch(['status', '--id', 'work', '--agent', 'home'], t.value)).toBe(
+        EXIT_USAGE,
+      );
+      expect(t.err).toEqual([DISPATCH_TEXT.badArguments]);
+      expect(r.calls).toHaveLength(0);
+    });
+
+    it('applies the same name rule to --id, without echoing it', async () => {
+      const r = recorder();
+      const dispatch = createDispatcher({ status: r.handler });
+      for (const bad of ['-x', 'Work', 'a b', 'work\n', '$(id)']) {
+        const t = io();
+        expect(await dispatch(['status', `--id=${bad}`], t.value)).toBe(EXIT_USAGE);
+        expect(t.err).toEqual([RUNTIME_MESSAGES.agent_name_invalid]);
+      }
+      expect(r.calls).toHaveLength(0);
+    });
+
+    it('every command that takes --agent also takes --id', () => {
+      for (const spec of COMMANDS) {
+        if ('agent' in spec.options) expect(spec.options).toHaveProperty('id');
+      }
+    });
   });
 
   it('refuses a malformed approval ID before the handler', async () => {

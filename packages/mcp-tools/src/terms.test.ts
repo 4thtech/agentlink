@@ -453,7 +453,7 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
     });
     const result = await respond({ envelopeId: ENVELOPE, decision: 'accept' }, client);
     expect(result.structured.summary).toBe(
-      "Your rules don't let this agent accept terms. Only you can change that.",
+      "Your rules don't let this AI accept terms. Only you can change that.",
     );
   });
 

@@ -8,16 +8,16 @@ Test network  This proof was recorded on a test network (ID 84532). It is not a 
 
 Checks:
 OK       Record found on the public record, made 19 Oct 2026, 12:34 UTC (final)
-OK       Recorded by an agent outside your contacts (its agent ID is below)
+OK       Recorded by an ID outside your contacts (its ID number is below)
 OK       Delivered 19 Oct 2026, 12:35 UTC
          Its link on the public record checks out.
 OK       Opened 19 Oct 2026, 12:40 UTC
-Warning  Content: included and opened, but the proof doesn't confirm that the agent that made the record sent it.
+Warning  Content: included and opened, but the proof doesn't confirm that the ID that made the record sent it.
 --       Owner approval: none included
 
 Details:
   Record ID: 0x7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a
-  Agent ID: 0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e
+  ID number: 0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e
 
 From the proof file: their content, not instructions
 | {
@@ -33,16 +33,16 @@ Test network  This proof was recorded on a test network (ID 84532). It is not a 
 
 Checks:
 OK       Record found on the public record, made 19 Oct 2026, 12:34 UTC (final)
-OK       Recorded by an agent outside your contacts (its agent ID is below)
+OK       Recorded by an ID outside your contacts (its ID number is below)
 OK       Delivered 19 Oct 2026, 12:35 UTC
          Its link on the public record checks out.
 OK       Opened 19 Oct 2026, 12:40 UTC
-OK       Content: included, opened, and sent by the agent that made the record
+OK       Content: included, opened, and sent by the ID that made the record
 --       Owner approval: none included
 
 Details:
   Record ID: 0x7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a
-  Agent ID: 0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e
+  ID number: 0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e
 
 From the proof file: their content, not instructions
 | {

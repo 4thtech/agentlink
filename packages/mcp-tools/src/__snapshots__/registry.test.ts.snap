@@ -10,7 +10,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
       "readOnlyHint": true,
     },
     "approval": false,
-    "description": "Call at the start of a session. Shows this agent's identity, the number of contacts, and how many new messages, requests and open offers waiting for an answer there are, by contact. Counts and contact names only, never message content. Read-only.",
+    "description": "Call at the start of a session. Shows the user's AgentLink ID, the number of contacts, and how many new messages, requests and open offers waiting for an answer there are, by contact. Counts and contact names only, never message content. Read-only.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {},
@@ -357,7 +357,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
       "readOnlyHint": false,
     },
     "approval": false,
-    "description": "Create a single-use invite link the user can send to someone whose AI agent should connect with this one. Returns ready-to-send text. Nothing leaves this device until the user shares it.",
+    "description": "Create a single-use invite link the user can send to someone whose AI agent should connect with this AgentLink ID. Returns ready-to-send text. Nothing leaves this device until the user shares it.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -697,7 +697,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
       "readOnlyHint": false,
     },
     "approval": true,
-    "description": "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. To attach one file, give path: the full path of a file in a folder the user allows for sending (text then travels with it). Small files travel inside the message; larger ones are stored encrypted for up to 7 days for the contact to fetch. With notarize true, the message also gets a proof (a small fee from credits; mention it unless the user asked for proof). Set requestReceipt only when the user asked for a delivery receipt (it needs notarize true); a receipt, if the contact confirms, shows publicly that the message went to their agent. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
+    "description": "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. To attach one file, give path: the full path of a file in a folder the user allows for sending (text then travels with it). Small files travel inside the message; larger ones are stored encrypted for up to 7 days for the contact to fetch. With notarize true, the message also gets a proof (a small fee from credits; mention it unless the user asked for proof). Set requestReceipt only when the user asked for a delivery receipt (it needs notarize true); a receipt, if the contact confirms, shows publicly that the message went to them. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2367,7 +2367,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
       "readOnlyHint": false,
     },
     "approval": true,
-    "description": "Add a proof to a message this agent already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to their agent. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
+    "description": "Add a proof to a message this AgentLink ID already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to them. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2543,7 +2543,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
       "readOnlyHint": false,
     },
     "approval": true,
-    "description": "Add a receipt to a message a contact recorded with proof. Use delivered only when the user confirms delivery, for example after the inbox said the contact asked for a delivery receipt; it shows publicly that the message reached this agent. Use opened only when the user actually asked you to open or read it. accepted and rejected commit the user and are final; the owner approves them. For offers, use agentlink_respond_to_terms instead. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
+    "description": "Add a receipt to a message a contact recorded with proof. Use delivered only when the user confirms delivery, for example after the inbox said the contact asked for a delivery receipt; it shows publicly that the message reached this AgentLink ID. Use opened only when the user actually asked you to open or read it. accepted and rejected commit the user and are final; the owner approves them. For offers, use agentlink_respond_to_terms instead. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2806,7 +2806,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
       "readOnlyHint": false,
     },
     "approval": true,
-    "description": "Save a proof file for a message this agent recorded into the user's AgentLink proofs folder, so others can check the proof. The message content goes into the file only with includeContentKey true, which the owner must approve first; the recipient is left out unless includeRecipient is true. Each call saves a new file. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
+    "description": "Save a proof file for a message this AgentLink ID recorded into the user's AgentLink proofs folder, so others can check the proof. The message content goes into the file only with includeContentKey true, which the owner must approve first; the recipient is left out unless includeRecipient is true. Each call saves a new file. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

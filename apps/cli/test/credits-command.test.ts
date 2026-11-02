@@ -140,7 +140,7 @@ describe('credits (06 §8)', () => {
     const r = await t.run(['credits']);
     expect(r.code).toBe(EXIT_OK);
     expect(r.out).toEqual([
-      `Agent ID: ${AGENT_ID}`,
+      `ID number: ${AGENT_ID}`,
       'Credits: $1.75',
       'Adding proof costs $0.10. Messages and files are free.',
       CREDITS_TEXT.testCredits,

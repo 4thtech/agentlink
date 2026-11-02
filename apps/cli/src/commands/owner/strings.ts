@@ -31,7 +31,8 @@ export const OWNER_TEXT = Object.freeze({
   cannotApprove: "Your AI can't approve this for you.",
 
   // Finding the request.
-  notFound: 'No approval with that ID is waiting on this machine. Check the ID, or add --agent.',
+  notFound:
+    'No approval with that ID is waiting on this machine. Check the approval ID, or add --id <name>.',
   notPending:
     "That approval isn't waiting for a decision any more: it was already decided, cancelled or has expired.",
   problem:
@@ -41,10 +42,10 @@ export const OWNER_TEXT = Object.freeze({
   problemListed:
     "Problem  One approval doesn't match what was requested, so it isn't offered. Ask your AI to make the request again.",
   get noIdentity(): string {
-    return `This agent isn't fully set up yet, so there is nothing to approve. Run \`${prefix()} doctor\` in your own terminal.`;
+    return `This ID isn't fully set up yet, so there is nothing to approve. Run \`${prefix()} doctor\` in your own terminal.`;
   },
-  severalAgents: 'Which agent? Type its number:',
-  agentNotChosen: 'No agent was chosen. Nothing was changed.',
+  severalAgents: 'Which ID? Type its number:',
+  agentNotChosen: 'No ID was chosen. Nothing was changed.',
 
   // Batch review (04 §2.5.2, D-68).
   nothingDecided: 'Nothing was decided. Everything stays waiting.',
@@ -63,21 +64,21 @@ export const OWNER_TEXT = Object.freeze({
   cancelFailed: "Problem  The cancel didn't go through. Nothing was changed.",
 
   // Owner add-agent (M1-9t, D-78; 04 §2.8).
-  addAgentDone: 'OK       This agent can now pair. Restart the app that runs it.',
+  addAgentDone: 'OK       This ID can now pair. Restart the app that uses it.',
   get addAgentUnknown(): string {
-    return `AgentLink is not set up for this agent on this machine yet. Run \`${prefix()} init --agent <name>\` yourself first, in your own terminal.`;
+    return `AgentLink is not set up for this ID on this machine yet. Run \`${prefix()} init --agent <name>\` yourself first, in your own terminal.`;
   },
   addAgentHasCard:
-    'This agent already has a card from an owner. AgentLink never replaces a card. Nothing was changed.',
+    'This ID already has a card from an owner. AgentLink never replaces a card. Nothing was changed.',
   // IR-M1-9x-1 M-2: names only local agent names that passed isAgentName (I-5).
   addAgentUnreadable: (agents: readonly string[]): string =>
-    `AgentLink couldn't read these agents on this computer, so it can't tell which owner they name: ${agents.join(', ')}. Nothing was changed. Run \`${prefix()} doctor\` in your own terminal, then try again.`,
+    `AgentLink couldn't read these IDs on this computer, so it can't tell which owner they name: ${agents.join(', ')}. Nothing was changed. Run \`${prefix()} doctor\` in your own terminal, then try again.`,
   get addAgentSeveralOwners(): string {
-    return `The agents on this computer name different owners, so AgentLink can't tell which one to use. Nothing was changed. Run \`${prefix()} doctor\` in your own terminal.`;
+    return `The IDs on this computer name different owners, so AgentLink can't tell which one to use. Nothing was changed. Run \`${prefix()} doctor\` in your own terminal.`;
   },
 
   // Owner change-code (M1-9z; 04 §2.8 "Changing the owner code").
-  changeCodeDone: 'OK       Use your new owner code from now on, for every agent on this computer.',
+  changeCodeDone: 'OK       Use your new owner code from now on, for every ID on this computer.',
 
   // The owner code prompt (M1-9zd; 11 §5.5, §6.10). Printed right before every owner code prompt,
   // and after a wrong code: the code goes only at the prompt, never into a command or a chat.
@@ -90,6 +91,6 @@ export const OWNER_TEXT = Object.freeze({
 
   // Owner init.
   get ownerUnknownAgent(): string {
-    return `AgentLink is not set up for this agent on this machine yet. Run \`${prefix()} init\` yourself, in your own terminal.`;
+    return `AgentLink is not set up for this ID on this machine yet. Run \`${prefix()} init\` yourself, in your own terminal.`;
   },
 });
