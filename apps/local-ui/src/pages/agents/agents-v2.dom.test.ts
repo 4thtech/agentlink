@@ -181,7 +181,7 @@ describe('Agents, simple (A8)', () => {
     expect(personal.textContent).toContain('Working in Claude Code');
     expect(personal.textContent).toContain('Not running · last seen 10 min ago');
     expect(card('work').textContent).toContain('Ready in Cursor');
-    expect(card('research').textContent).toContain('Offline · last seen 5 min ago');
+    expect(card('research').textContent).toContain('Not used by any AI app');
     expect(card('invoices').textContent).toContain('Paused');
     const add = [...host.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'New ID');
     expect(add?.getAttribute('href')).toBe('/start/app?add=agent');

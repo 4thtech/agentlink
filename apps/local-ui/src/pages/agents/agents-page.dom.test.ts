@@ -156,10 +156,10 @@ describe('the Agents page', () => {
     expect(button(rowOf('work'), 'Switch')).toBeDefined();
     expect(rowOf('work').textContent).toContain('1 contact');
   });
-  it('an agent with no AI app reads Offline with its AI apps panel; Removal not finished with Try again', async () => {
+  it('an agent with no AI app reads Not used by any AI app with its AI apps panel; Removal not finished with Try again', async () => {
     await mountPage();
     const second = rowOf('second');
-    expect(second.textContent).toContain('Offline');
+    expect(second.textContent).toContain('Not used by any AI app');
     await click(button(second, 'AI apps'));
     expect(rowOf('second').textContent).toContain('No AI app is set up for this ID yet.');
     const old = rowOf('old');

@@ -325,7 +325,7 @@ describe('the live agent dropdown', () => {
     expect(rows[0]?.querySelector('.al-am-app')?.textContent).toBe('Claude CodeReady');
     expect(rows[1]?.querySelector('.al-am-app')?.textContent).toBe('CursorNot running');
     expect(rows[1]?.querySelector('.al-ldot.is-off')).not.toBeNull();
-    expect(rows[2]?.textContent).toContain('Not set up');
+    expect(rows[2]?.textContent).toContain('Not used by any AI app');
     expect(rows[2]?.querySelector('.al-agent-icon-dot.is-none')).not.toBeNull();
   });
 
