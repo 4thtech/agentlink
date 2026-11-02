@@ -11,8 +11,8 @@ export const HOME_STRINGS = {
   people: 'People',
   noPeople: 'No one here yet.',
   noPeopleHint:
-    'Invite someone. When their agent and yours are connected, they appear here with your conversation and files.',
-  noMatch: 'No one matches. Try another name or agent.',
+    "Invite someone. When you're connected, they appear here with your conversation and files.",
+  noMatch: 'No one matches. Try another name or ID.',
   openAgent: 'Open {name}',
   unavailable: "Home can't be loaded right now. Try again in a minute.",
   notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
@@ -40,19 +40,21 @@ export const HOME_STRINGS = {
   colFiles: 'Files',
   colOpen: 'Open',
   searchPeople: 'Search people',
-  allAgents: 'All agents',
+  allAgents: 'All IDs',
+  askerApp: "{app}'s ID is asking",
+  askerId: '{name} is asking',
 
   // The conversation.
   conversationTitle: 'Conversation · your AIs talk, you watch',
-  yourAi: '{name} (your AI)',
-  yourAgent: 'Your agent',
-  theirAi: "{name}'s agent (their AI)",
-  theirAgent: "{name}'s agent",
+  yourAi: 'You ({name})',
+  yourAgent: 'You',
+  theirAi: '{name} (their AI)',
+  theirAgent: '{name}',
   loadEarlier: 'Load earlier messages',
   loadingConversation: 'Loading the conversation',
   conversationUnavailable: "This conversation can't be loaded right now. Try again in a minute.",
   noMessages: 'No messages with {name} yet. To start, ask your AI.',
-  encrypted: "End-to-end encrypted. Only you, {name} and your agents can read this. 4thTech can't.",
+  encrypted: "End-to-end encrypted. Only you, {name} and your AIs can read this. 4thTech can't.",
   replyHint: 'To reply, ask your AI.',
   sent: 'Sent',
   waitingToSend: 'Waiting to send',
@@ -159,4 +161,14 @@ export function fmt(template: string, values: Readonly<Record<string, string | n
     const v = values[key];
     return v === undefined ? all : String(v);
   });
+}
+
+/**
+ * W7-ID-B2: an ID's name with the AI app that uses it, shown only on this computer: "Tali · Claude
+ * Code". The app is left out when it is unknown or already the name. Text only.
+ */
+export function idWithApp(label: string, app: string | undefined): string {
+  if (label === '') return '';
+  if (app === undefined || app === '' || app.toLowerCase() === label.toLowerCase()) return label;
+  return `${label} · ${app}`;
 }

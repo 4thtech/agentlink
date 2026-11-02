@@ -405,7 +405,7 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
     expect(qr?.querySelectorAll('rect').length).toBeGreaterThan(50);
     // The 11 §5.6 privacy note, once for this method.
     expect(panel?.textContent).toContain(
-      'The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.',
+      'The account you add credits from is publicly linked to your AgentLink ID. For more privacy, use free test credits or a separate account only for AgentLink.',
     );
     expect(panel?.textContent).toContain('Base test network: coming soon');
   });
@@ -481,7 +481,7 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
     await click(PROOFS_STRINGS.withdraw);
     const confirm = host.querySelector('section[aria-label="Confirm"]');
     expect(confirm?.textContent).toContain('$2.00');
-    expect(confirm?.textContent).toContain("Your agent's own account");
+    expect(confirm?.textContent).toContain("This ID's own account");
     expect(confirm?.textContent).toContain(AGENT);
     await typeCode('7K2M-9QXA');
     await click(PROOFS_STRINGS.confirm);

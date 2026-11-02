@@ -69,7 +69,7 @@ import {
   type PeopleApi,
   type PersonSummary,
 } from './people-api.js';
-import { HOME_STRINGS as S, fmt } from './people-strings.js';
+import { HOME_STRINGS as S, fmt, idWithApp } from './people-strings.js';
 import { filesOf, PersonFiles, type Reveal } from './person-files.js';
 import { PersonMenu } from './person-menu.js';
 import { PersonName } from './person-name.js';
@@ -215,6 +215,7 @@ function PersonOpen({
   data,
   clients,
   agent,
+  app,
   pro,
   tick,
   passkey,
@@ -228,6 +229,8 @@ function PersonOpen({
   readonly data: HomeData;
   readonly clients: Clients;
   readonly agent: string;
+  /** The AI app that uses the open ID (for "You (Claude Code)"). */
+  readonly app?: string | undefined;
   readonly pro: boolean;
   readonly tick: number;
   readonly passkey: () => Promise<DecisionPasskey | undefined>;
@@ -289,6 +292,7 @@ function PersonOpen({
       <Conversation
         name={person.name}
         agent={agent}
+        app={app}
         pro={pro}
         thread={thread}
         loadEarlier={loadEarlier}
@@ -446,7 +450,8 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   const vt = useViewTransition();
   const agents = useLiveAgents();
   const current = agents.find((a) => a.current);
-  const agentLabel = current?.label ?? '';
+  const appName = current?.apps[0]?.app;
+  const agentLabel = idWithApp(current?.label ?? '', appName);
   const [view, setView] = useState<View>({ state: 'loading' });
   const [summaries, setSummaries] = useState<ReadonlyMap<string, PersonSummary>>(new Map());
   const [approvals, setApprovals] = useState<readonly ApprovalItem[]>([]);
@@ -615,7 +620,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                   <option value="all">{S.allAgents}</option>
                   {agents.map((a) => (
                     <option key={a.name} value={a.name}>
-                      {a.label}
+                      {idWithApp(a.label, a.apps[0]?.app)}
                     </option>
                   ))}
                 </select>
@@ -661,6 +666,13 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
             client={clients.approvals}
             sheet={sheet}
             pro={pro}
+            asker={
+              current === undefined
+                ? undefined
+                : appName === undefined
+                  ? fmt(S.askerId, { name: current.label })
+                  : fmt(S.askerApp, { app: appName })
+            }
             onChanged={() => void loadApprovals()}
           />
           {notice === undefined ? null : (
@@ -835,6 +847,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                               data={data}
                               clients={clients}
                               agent={agentLabel}
+                              app={appName}
                               pro={pro}
                               tick={tick}
                               passkey={passkey}

@@ -14,7 +14,7 @@ export const MESSAGES_STRINGS = {
   reply: 'To reply, ask your AI.',
   noContacts: 'Conversations appear here once you have a contact.',
   nothingYet: (contactName: string): string =>
-    `Nothing yet. When your AI and ${contactName}'s agent exchange messages, they show here.`,
+    `Nothing yet. When your AI and ${contactName} exchange messages, they show here.`,
   asOf: (time: string): string => `as of ${time}`,
   showAll: 'Show all',
   showLess: 'Show less',

@@ -41,7 +41,7 @@ export const en = {
   'common.safetyCode.stopped.title': 'Pairing stopped. Nothing was shared.',
   // S-6: a key update by the same owner keeps the check (11, d1/MANIFEST.md drift).
   'common.safetyCode.changed':
-    "{contactName}'s agent updated its keys (same owner). Your safety code check still stands.",
+    "{contactName} updated its keys (same owner). Your safety code check still stands.",
   'common.suggestedPassOn': 'Suggested way to pass it on', // S-10 (was a never-say word)
   'common.empty.proof': 'Send a document and add proof to see it here.', // S-10
 
@@ -52,7 +52,7 @@ export const en = {
   'common.proof.proves':
     'Proves this exact document existed and was exchanged at these times; not that its content is true.',
   'common.agreement.proves':
-    'Both agents, each bound to its owner, assented to these exact terms at these times.',
+    'Both sides, each bound to its owner, assented to these exact terms at these times.',
   'common.agreement.doesntProve':
     'Legal enforceability, authority to agree, or that the work was delivered.',
   'common.agreement.noMoney': "AgentLink records the agreement. It doesn't move money.",
@@ -73,25 +73,25 @@ export const en = {
 
   // ---- common: what a proof makes public (11 §5.6, D-109), verbatim ---------------------------
   'common.public.proof':
-    "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+    "A proof is public. Anyone can see that your AgentLink ID recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
   'common.public.proof.receipt':
-    'If {contactName} confirms delivery, it also becomes public that it went to their agent.',
+    'If {contactName} confirms delivery, it also becomes public that it went to them.',
   'common.public.receiptAsk':
-    'Ask {contactName} to confirm delivery? If they do, anyone can see that this went to their agent.',
+    'Ask {contactName} to confirm delivery? If they do, anyone can see that this went to them.',
   'common.public.receiptRequest':
-    '{contactName} asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content.',
+    '{contactName} asked you to confirm delivery. Confirming shows publicly that this reached you. Nothing about the content.',
   'common.public.receiptRequest.confirm': 'Confirm delivery',
   'common.public.receiptRequest.later': 'Not now',
   'common.public.autoConfirm':
-    'Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached your agent.',
+    'Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached you.',
   'common.public.receipt':
-    'This is public: anyone can see that your agent {action, select, opened {opened} accepted {accepted} rejected {rejected} other {received}} it, and when.',
+    'This is public: anyone can see that your AgentLink ID {action, select, opened {opened} accepted {accepted} rejected {rejected} other {received}} it, and when.',
   'common.public.topup':
-    'The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.',
+    'The account you add credits from is publicly linked to your AgentLink ID. For more privacy, use free test credits or a separate account only for AgentLink.',
   'common.public.export':
-    'This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content.',
+    'This file shows the proof, your ID card and the message details. With the recipient included, it also shows who received it; with the document key, its content.',
   'common.public.register':
-    "Registering puts your agent's link to you on the public record. Your agent's name is not published.",
+    "Registering puts your AgentLink ID's link to you on the public record. Your ID's name is not published.",
 
   // ---- common: states -------------------------------------------------------------------------
   'common.state.offline': "Can't reach the message network. Showing what's saved here.",
@@ -103,7 +103,7 @@ export const en = {
   'common.state.quotaReached':
     "You've used the free file allowance for the last 7 days. More room frees up as older files pass the 7-day mark.",
   'common.state.connectorExpired': '{provider} needs you to sign in again',
-  'common.state.revoked': '{contactName} revoked this agent on {date}. History stays readable.',
+  'common.state.revoked': '{contactName} turned this ID off on {date}. History stays readable.',
   'common.state.blocked': 'Blocked. New messages are dropped.',
   'common.state.termsExpired': 'Expired {date}',
   'common.state.waitingAcceptance': 'Waiting for {contactName} · valid until {date}',
@@ -114,7 +114,7 @@ export const en = {
   // ---- chat: tool results (11 §6.1) -----------------------------------------------------------
   // S-4: no text derived from a counterparty name, so {contactName} only.
   'chat.status.ok.sent.summary':
-    'Sent to {contactName}. End-to-end encrypted: only you, {contactName} and your agents can read it.',
+    'Sent to {contactName}. End-to-end encrypted: only you, {contactName} and your AIs can read it.',
   'chat.status.ok.proof.summary': 'Sent with proof. Recorded {date} at {time}. {fee} from credits.',
   // S-4, S-5: who to send it to, and where the safety code is compared (never in chat).
   'chat.status.ok.invite.summary':
@@ -139,18 +139,18 @@ export const en = {
   'chat.status.not_found.contact':
     "I couldn't find a contact called '{query}'. Your contacts: {contacts}.",
   'chat.status.rejected.rules':
-    "Your rules don't let this agent accept terms. Only you can change that.",
+    "Your rules don't let this AI accept terms. Only you can change that.",
   'chat.status.rejected.declined': 'You declined, so nothing was sent.',
   'chat.status.rejected.termsExpired': 'These terms expired on {date}.',
   'chat.status.error.network': "I couldn't reach the message network. Nothing was sent.",
   'chat.status.error.proof': "The message was sent, but its proof couldn't be recorded. Retry?",
   // S-9: receipts, export, flagged contacts, brief status, storage and backup.
   'chat.receipt.requested':
-    'Sent, and asked {contactName} to confirm delivery. If they do, anyone can see that this went to their agent.',
+    'Sent, and asked {contactName} to confirm delivery. If they do, anyone can see that this went to them.',
   'chat.receipt.delivered':
-    'Delivery confirmed. It is now public that this reached your agent, never the content.',
+    'Delivery confirmed. It is now public that this reached you, never the content.',
   'chat.export.summary':
-    'Proof file ready: {path}. It shows the proof, your agent profile and the message details.{recipient, select, yes { It also shows who received it.} other {}}{documentKey, select, yes { It includes the document key, so anyone with the file can read the content.} other {}}',
+    'Proof file ready: {path}. It shows the proof, your ID card and the message details.{recipient, select, yes { It also shows who received it.} other {}}{documentKey, select, yes { It includes the document key, so anyone with the file can read the content.} other {}}',
   'chat.contact.flagged':
     'Something from {contactName} failed a safety check, so it was refused and {contactName} is flagged. It is shown in your activity feed. Check it there before you rely on anything from that contact.',
   'chat.status.brief.nothingNew': 'Nothing new on AgentLink.',
@@ -198,7 +198,7 @@ export const en = {
 
   // ---- cli: terminal copy (11 §6.10) ----------------------------------------------------------
   'cli.receipts.olderDefault':
-    'Delivery receipts are on from an older default. Each one shows publicly that a proof reached your agent, never the content.',
+    'Delivery receipts are on from an older default. Each one shows publicly that a proof reached you, never the content.',
   'cli.receipts.keepPrompt':
     'Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off.',
   'cli.doctor.receiptsOlderDefault':
@@ -212,7 +212,7 @@ export const en = {
     'Recovery kit saved. Its recovery code is shown once and only opens this kit. Keep the kit and the code apart.',
   'cli.backup.exported': 'Recovery kit saved to {path}. Keep the kit and its recovery code apart.',
   'cli.backup.restored':
-    'Restored. Your owner fingerprint: {fingerprint}. Stop the agent on your old computer now: two running copies act as the same agent. If you used your own storage, connect it again with `agentlink storage connect`. Nothing on this device was overwritten.',
+    'Restored. Your owner fingerprint: {fingerprint}. Stop AgentLink on your old computer now: two running copies act as the same ID. If you used your own storage, connect it again with `agentlink storage connect`. Nothing on this device was overwritten.',
   'cli.backup.restore.safe': 'Restoring never overwrites what is already on this device.',
   'cli.credits.notLive': 'Adding credits is not available yet in this version of AgentLink.',
   'cli.policy.recover':
@@ -225,14 +225,14 @@ export const en = {
   'desktop.update.ready': 'Update ready, restart to apply',
   'desktop.update.installed': 'Updated to {version}',
   'desktop.unlocked': 'Unlocked · Lock now',
-  'onboarding.paste.title': 'Paste this to your agent',
+  'onboarding.paste.title': 'Paste this into your AI app',
   // X-9, the @4thtech-io scope (D-116).
   'onboarding.paste.prompt':
     'Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then open the AgentLink setup page so I can protect my approvals.',
   'onboarding.paste.note': 'Your AI will show you the change and ask before applying it.',
-  'onboarding.waiting': 'Waiting for your agent…',
+  'onboarding.waiting': 'Waiting for your AI app…',
   'onboarding.success':
-    "Your agent is connected. Try: 'Create an AgentLink invite for a colleague.'",
+    "Your AI app is connected. Try: 'Create an AgentLink invite for a colleague.'",
   'invite.headline': '{inviterName} wants to connect with your AI agent.',
   'invite.copyPrompt.title':
     'Copy this to your AI. It installs AgentLink if needed and accepts the invite.',
@@ -242,9 +242,9 @@ export const en = {
   'verify.trustLine':
     "Checked in your browser against the public record. Your file isn't uploaded.",
   'pay.title': 'Add credits',
-  'pay.checkAgentId': 'Check this matches the Agent ID in your AgentLink app.',
+  'pay.checkAgentId': 'Check this matches the ID number in your AgentLink app.',
   'pay.explainer': 'A proof costs $0.10. $5 covers 50 proofs. Messages and files are always free.',
-  'pay.received': 'Your agent turns this into credits the next time it runs',
+  'pay.received': 'Your AI turns this into credits the next time it runs',
   // PA-1, B-6: the exchange asks for a network, so it is information inside the exchange steps
   // only, filled from the funded network and never a choice (D-40, 11 §5.1).
   'pay.exchange.network': 'Your exchange will ask for a network: {network}.',
@@ -252,7 +252,7 @@ export const en = {
     "This page is separate from your AgentLink console. It can't see your messages, files or keys.",
   'pricing.changes': 'Price changes are announced at least 7 days ahead.',
   'cloud.securityLine':
-    "Your agent's keys are created on your computer or in your Cloudflare account, and kept only in your Cloudflare account. 4thTech never receives them.",
+    "Your ID's keys are created on your computer or in your Cloudflare account, and kept only in your Cloudflare account. 4thTech never receives them.",
   'print.checkedOn': 'Checked on {date} against the public record',
   'print.qr.withKey': 'Anyone who scans this can check this proof',
   'print.qr.withoutKey': 'Check it with the proof file at {verifyHost}',

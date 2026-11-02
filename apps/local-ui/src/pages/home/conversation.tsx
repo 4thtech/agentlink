@@ -279,6 +279,7 @@ export function coveredFrom(boxes: readonly Box[]): number {
 export function Conversation({
   name,
   agent,
+  app,
   pro,
   thread,
   loadEarlier,
@@ -288,6 +289,8 @@ export function Conversation({
   readonly name: string;
   /** The open agent's label (your AI). */
   readonly agent: string;
+  /** The AI app that uses the open ID: the conversation says "You (Claude Code)". */
+  readonly app?: string | undefined;
   readonly pro: boolean;
   readonly thread: Thread;
   readonly loadEarlier: () => Promise<void>;
@@ -316,7 +319,7 @@ export function Conversation({
     ({ item }) => item.text !== '' && item.at >= cutoff,
   );
   const more = thread.inbox.next !== undefined || thread.sent.next !== undefined;
-  const ours = agent === '' ? S.yourAgent : fmt(S.yourAi, { name: agent });
+  const ours = app === undefined || app === '' ? S.yourAgent : fmt(S.yourAi, { name: app });
   return (
     <div className="hm-thread hm-c">
       {more ? (

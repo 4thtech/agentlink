@@ -3,11 +3,11 @@
 // confirm screen are in warnings.ts (D-119).
 
 export const RULES_STRINGS = {
-  eyebrow: 'What your agent may do without asking',
+  eyebrow: 'What your AI may do with this ID without asking',
   savingNote: 'Saving asks for your passkey',
   loading: 'Loading your rules…',
   summaryTitle: 'Rules in force',
-  summaryNote: 'This is what your agent follows right now.',
+  summaryNote: 'This is what your AI follows right now.',
   hoodVersion: 'Rules version',
   everyday: 'Everyday',
   moreRules: 'More rules',
@@ -25,7 +25,7 @@ export const RULES_STRINGS = {
 
   proofTitle: 'Add proof',
   proofHelp: 'Each proof uses credits and is public.',
-  proofOff: 'Your agent never adds proof.',
+  proofOff: 'Your AI never adds proof.',
   budget: 'Proof budget in any 24 hours',
   askOver: 'Ask me over',
   invitesTitle: 'New contacts',
@@ -35,7 +35,7 @@ export const RULES_STRINGS = {
 
   unknownTitle: 'Requests from unknown senders',
   unknownHelp: 'Only an invite adds a contact.',
-  whoTitle: 'Who can message your agent',
+  whoTitle: 'Who can message this ID',
   whoPaired: 'Paired contacts',
   whoListed: (n: number): string =>
     n === 1 ? 'Only the 1 contact you listed' : `Only the ${String(n)} contacts you listed`,
@@ -48,7 +48,7 @@ export const RULES_STRINGS = {
   exportsHelp: 'Anyone with such an export can read the document.',
 
   limitsTitle: 'Limits for accepting terms',
-  limitsHelp: 'Your agent accepts on its own only within these limits.',
+  limitsHelp: 'Your AI accepts on its own only within these limits.',
   buyTitle: 'Auto-accept when I pay, for listed contacts',
   buyHelp: (max: string, n: number): string =>
     `Up to ${max} per agreement, US-dollar terms only. ${n === 1 ? '1 contact' : `${String(n)} contacts`} listed.`,
@@ -59,7 +59,7 @@ export const RULES_STRINGS = {
   sellMin: 'At least, per agreement ($)',
   sellWarningTitle: 'Before you turn this on:',
   sellWarning: (amount: string): string =>
-    `Your agent will commit you to deliver whatever this contact writes, for at least ${amount}. Only turn this on for contacts you trust.`,
+    `Your AI will commit you to deliver whatever this contact writes, for at least ${amount}. Only turn this on for contacts you trust.`,
   someAmount: 'the amount you set',
   noListed: 'No contacts are listed for this yet.',
 
@@ -71,11 +71,11 @@ export const RULES_STRINGS = {
   invalidSize: 'Enter a size from 1 to 10240 MB.',
 
   confirmTitle: 'Before you save',
-  confirmIntro: 'These changes let your agent do more without asking. Tick each one to confirm.',
-  noWarnings: "These changes don't let your agent do more without asking.",
+  confirmIntro: 'These changes let your AI do more without asking. Tick each one to confirm.',
+  noWarnings: "These changes don't let your AI do more without asking.",
   keepTitle: 'Keep delivery receipts on',
   keepText:
-    'Delivery receipts are on from an older default. Each one shows publicly that a proof reached your agent, never the content.',
+    'Delivery receipts are on from an older default. Each one shows publicly that a proof reached you, never the content.',
   codeLabel: 'Backup code or owner passphrase',
   codeHint: 'Never give it to your AI.',
   save: 'Save with passkey',

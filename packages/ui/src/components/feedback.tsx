@@ -144,7 +144,7 @@ export interface CopyPromptProps {
   size?: 'default' | 'hero';
 }
 
-/** The "Paste this to your agent" block and terminal commands. */
+/** The "Paste this into your AI app" block and terminal commands. */
 export function CopyPrompt({
   prompt,
   command,
@@ -165,7 +165,7 @@ export function CopyPrompt({
         <span className="al-copy-title">
           <Icon name={isCommand ? 'terminal' : 'agent'} size={14} />
           <span className="al-text-label">
-            {title ?? (isCommand ? 'Terminal' : 'Paste this to your agent')}
+            {title ?? (isCommand ? 'Terminal' : 'Paste this into your AI app')}
           </span>
         </span>
         <Button

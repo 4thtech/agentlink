@@ -136,7 +136,7 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
     expect(text()).toContain("Check it's Marko: 7F3A·19C2");
     expect(text()).toContain('Name set by the sender');
     expect(text()).toContain(
-      "Your AI and Marko's agent can then send each other messages and files. Encrypted end to end. You approve anything that matters.",
+      "Your AI and Marko can then send each other messages and files. Encrypted end to end. You approve anything that matters.",
     );
     expect(text()).toContain('For: Claude Code agent');
     expect(text()).not.toMatch(/\d{4} \d{4} \d{4}/);
@@ -170,7 +170,7 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
     await render({ api, passkey: PASSKEY, gesture: () => Promise.resolve(proof) });
     await click('Accept with Touch ID');
     expect(calls.accepted).toEqual([{ id: INVITE.inviteId, proof }]);
-    expect(host.querySelector('h1')?.textContent).toBe("Waiting for Marko's agent to answer.");
+    expect(host.querySelector('h1')?.textContent).toBe("Waiting for Marko to answer.");
     expect(text()).not.toMatch(/safety code with Marko$/);
   });
 

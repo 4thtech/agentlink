@@ -15,10 +15,10 @@ export const CONTACTS_STRINGS = {
   blocked: 'Blocked',
   blockedDetail: 'Blocked. Messages from this person are dropped.',
   revoked: 'No longer active',
-  revokedDetail: "This person's agent was shut down by its owner. Messages from it are dropped.",
-  waiting: 'Waiting for their agent',
+  revokedDetail: "This person turned this ID off. Messages from it are dropped.",
+  waiting: 'Waiting for them',
   waitingDetail:
-    'Waiting for their agent to answer the invite. The safety code shows here once it does.',
+    'Waiting for them to answer the invite. The safety code shows here once it does.',
   mismatchChip: 'Safety code did not match',
   safetyCode: 'Safety code',
   safetyExplain:
@@ -48,7 +48,7 @@ export const CONTACTS_STRINGS = {
   remove: 'Remove',
   removeContact: 'Remove person',
   removeExplain:
-    'Remove this person? Messages from its agent are dropped. To connect again, ask them for a new invite.',
+    'Remove this person? Messages from them are dropped. To connect again, ask them for a new invite.',
   removed: 'Removed.',
   cancel: 'Cancel',
   presenceIntro: 'Confirm it’s you. Never give your backup code to your AI.',
