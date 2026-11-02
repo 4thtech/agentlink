@@ -40,13 +40,14 @@ describe('install.ps1 behaviour (pwsh)', () => {
         '-Work',
         work,
       ],
-      { encoding: 'utf8', timeout: 120_000 },
+      { encoding: 'utf8', timeout: 140_000 },
     );
     const out = `${r.stdout}${r.stderr}`;
     expect(r.status, out).toBe(0);
     expect(out).toContain('all install.ps1 checks passed');
     expect(out.match(/^ok: /gm)?.length ?? 0, out).toBeGreaterThanOrEqual(18);
-  });
+    // pwsh start-up plus zipping and unzipping the fixture several times: well over the 20 s default.
+  }, 150_000);
 
   it('refuses to run on macOS or Linux, pointing to install.sh', () => {
     if (!needPwsh()) return;
@@ -56,7 +57,7 @@ describe('install.ps1 behaviour (pwsh)', () => {
     });
     expect(r.status).toBe(1);
     expect(`${r.stdout}${r.stderr}`).toMatch(/This installer is for Windows.*install\.sh \| sh/);
-  });
+  }, 90_000);
 });
 
 describe('install.ps1 source', () => {
