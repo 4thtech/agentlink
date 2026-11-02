@@ -895,7 +895,7 @@ class ConfirmRequired extends Error {
 /** U3-c: the open agent changed after the request arrived (the re-check before acting). */
 class AgentChanged extends Error {
   constructor() {
-    super('The open agent changed.');
+    super('The open ID changed.');
     this.name = 'AgentChanged';
   }
 }
@@ -930,7 +930,7 @@ const NO_AGENT_SOURCE: ApprovalServerSource = Object.freeze<ApprovalServerSource
   context: () => Promise.resolve(undefined),
   list: () => Promise.resolve([]),
   get: () => Promise.resolve(undefined),
-  apply: () => Promise.reject(new Error('No agent is open.')),
+  apply: () => Promise.reject(new Error('No ID is open.')),
 });
 
 /**
@@ -974,7 +974,7 @@ function listOnlyAiApps(
   const list = reader.list.bind(reader);
   return Object.freeze<LocalUiAiApps>({
     list: () => list(),
-    plan: () => Promise.reject(new Error('No agent is open.')),
+    plan: () => Promise.reject(new Error('No ID is open.')),
     agentIdOf: () => Promise.resolve(undefined),
   });
 }

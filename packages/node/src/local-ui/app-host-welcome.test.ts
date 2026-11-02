@@ -448,14 +448,17 @@ async function harness(
   };
 }
 
-/** The whole first run: begin {label} and finish {label} with one passkey gesture. */
+/**
+ * The whole first run: begin {label} and finish {label} with one passkey gesture. `null` sends no
+ * label at all (a default parameter would turn `undefined` back into the typed 'My agent').
+ */
 async function firstRun(
   h: Harness,
   s: { cookie: string; csrf: string; generation: string },
-  label: string | undefined = 'My agent',
+  label: string | null = 'My agent',
 ): Promise<{ begin: Response; finish?: Response }> {
   const extra: Record<string, string> =
-    label === undefined ? {} : { 'X-AgentLink-Input': input({ label }) };
+    label === null ? {} : { 'X-AgentLink-Input': input({ label }) };
   const begin = await h.post(BEGIN, s, new Uint8Array(0), extra);
   if (begin.status !== 200) return { begin };
   const begun = JSON.parse(begin.body) as BeginBody;
@@ -702,7 +705,7 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     expect(FIRST_AGENT_LABEL).toBe('My ID');
     const h = await harness();
     const s = await h.session();
-    const { finish } = await firstRun(h, s, undefined);
+    const { finish } = await firstRun(h, s, null);
     expect(finish?.status).toBe(200);
     expect(h.w.log[0]).toBe(`create ${FIRST_AGENT_LABEL} as default`);
     expect(h.w.labels).toEqual([['default', FIRST_AGENT_LABEL]]);
@@ -732,7 +735,7 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
   it('U3-d-b: with no label typed, contacts see "My ID", not the folder', async () => {
     const h = await harness();
     const s = await h.session();
-    const { finish } = await firstRun(h, s, undefined);
+    const { finish } = await firstRun(h, s, null);
     expect(finish?.status).toBe(200);
     const client = h.w.clients.get('default');
     if (client === undefined) throw new Error('no client');

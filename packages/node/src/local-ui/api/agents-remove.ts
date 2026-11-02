@@ -147,8 +147,8 @@ export function removeStatement(
   anyway = false,
 ): string[] {
   return [
-    `Remove the agent ${label} from this computer for good.`,
-    `Agent folder: ${folder}`,
+    `Remove the ID ${label} from this computer for good.`,
+    `ID folder: ${folder}`,
     'Its keys, messages and files on this computer are deleted. It is retired and cannot be restored.',
     contacts === 0
       ? 'It has no contacts to tell.'
