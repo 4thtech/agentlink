@@ -132,6 +132,26 @@ describe('delivery', () => {
     expect(Object.keys(outbox.get(row.wrapId).acks).sort()).toEqual([...relays].sort());
   });
 
+  it('marks a row sent at 2 OKs without waiting for a silent relay (W6-SEND-LATENCY)', async () => {
+    const { net, outbox, worker } = setup();
+    const [a, b, quiet] = relayUrls('quick', 3) as [string, string, string];
+    net.configure(a);
+    net.configure(b);
+    net.configure(quiet, { silent: true });
+    const row = makeRow([a, b, quiet]);
+    outbox.add(row);
+    let summary: unknown;
+    void worker()
+      .processDue()
+      .then((s) => {
+        summary = s;
+      });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(summary).toMatchObject({ sent: 1, retrying: 0, notDelivered: 0, failed: 0 });
+    expect(outbox.get(row.wrapId).state).toBe('sent');
+    expect(Object.keys(outbox.get(row.wrapId).acks).sort()).toEqual([a, b].sort());
+  });
+
   it('is not sent with 1 OK: it keeps the ack, backs off, and then publishes only to the others', async () => {
     const { net, outbox, worker } = setup();
     const [good, down, late] = relayUrls('part', 3) as [string, string, string];
