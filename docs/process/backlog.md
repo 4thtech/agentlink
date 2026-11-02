@@ -5963,6 +5963,18 @@ Cards from the lows and notes of the wave 4 reviews (PRs #714, #716, #718, #720,
 
 ### Classroom wave 6 (W6, golden-path QA of 1 Nov)
 
+#### W6-ACCEPT-CONNECTED · local app: the accepter reaches the Connected moment over the real relays (golden-path QA 0.4.8, P1-B)
+- **Status:** in review (wave 6) · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/{contacts/index.tsx,invite/paste-invite.tsx}`, `e2e/src/memory-relay.mjs`, `e2e/test/journey/{world.ts,02-invite.test.ts}`
+- **Depends on:** W5-INVITE-FEEDBACK, W4-WIRE-2
+- **Spec:** 08 §1 (People, Invite, `GET /api/ui/events` `contacts`); 11 §5
+- **Invariants:** I-5
+- **Source:** golden-path QA (2 Nov, published 0.4.8, real relays, also with a real-Touch-ID inviter): the accepter's People keeps "Connecting to {name}…" (72 s+) and never shows "You and {name} are connected", although both agents are paired.
+- **Scope:**
+  - Cause: the accept's request waits for the relays' answers (~10 s on the public relays) while the inviter answers within a second, so the pairing completes (often in the AI app's own MCP server) before the accept returns. A read during the accept already held the new contact, so the page's "new contact since the last read" never fired and the "Connecting to {name}…" notice was never cleared.
+  - Fix: the paste screen tells the page when the accept is sent; the arrival is told against the contacts known at that moment, the Connected moment shows as soon as the contact is paired (even before the accept returns), and the notice goes. No server or wire change.
+- **Acceptance:** DOM test (pairing completes while the accept is on its way, and after it returned); journey test with an opt-in slow relay answer (`okDelayMs`) and the separate MCP server handle; both fail before the fix. Changeset and changelog.d fragment.
+
 #### W6-FLOW-FIXES · local app: Remove says "Quit {app} first" before Touch ID; a removed connection shows; no "Offline" right after Connected (golden-path QA P1-2, P1-3, P1-4)
 - **Status:** in review (wave 6) · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/agents/{sheets.tsx,data.ts,strings.ts}`, `apps/local-ui/src/api/live.ts`, `apps/local-ui/src/pages/home/{home-screen.tsx,conversation.tsx,person-menu.tsx,people-strings.ts}`

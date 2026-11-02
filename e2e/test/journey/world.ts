@@ -59,8 +59,9 @@ export interface JourneyWorld {
   computer(): Promise<JourneyComputer>;
 }
 
-export function journeyWorld(): JourneyWorld {
-  const relays = memoryRelays();
+/** `okDelayMs` (W6-ACCEPT-CONNECTED): the relay answers each publish that much later (real relays). */
+export function journeyWorld(options: { readonly okDelayMs?: number } = {}): JourneyWorld {
+  const relays = memoryRelays(options);
   const drop = createFakeDrop();
   return {
     relays,

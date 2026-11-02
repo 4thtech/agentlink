@@ -61,6 +61,11 @@ export interface PasteInviteProps {
     info: { readonly sent: boolean; readonly again: boolean },
   ) => void;
   /**
+   * W6-ACCEPT-CONNECTED: the accept is about to be sent. Over the real relays its request waits for
+   * the relays while the inviter already answers, so the page notes what it knew before the accept.
+   */
+  readonly onAccepting?: () => void;
+  /**
    * IR-W4-WIRE-2X-1: "Paste it" hands over to the page's own paste screen (one that makes no invite
    * of yours) instead of opening the field here.
    */
@@ -82,6 +87,7 @@ export function PasteInvite({
   gesture = passkeyProof,
   platform: givenPlatform,
   onConnected,
+  onAccepting,
   onOpen,
   startOpen = false,
 }: PasteInviteProps): ReactElement {
@@ -140,6 +146,7 @@ export function PasteInvite({
     const shown = formatContactName({ name: invite.name, fingerprint: invite.fingerprint }).text;
     setBusy(true);
     setMessage(undefined);
+    onAccepting?.();
     void invites.accept(link, proof).then((outcome) => {
       setBusy(false);
       if (outcome.kind === 'pending') {

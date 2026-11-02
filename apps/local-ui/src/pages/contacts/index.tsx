@@ -827,6 +827,12 @@ export function ContactsPage({
   // invite, or a pasted one that is connecting).
   const known = useRef<ReadonlySet<string> | undefined>(undefined);
   const expecting = useRef(false);
+  // W6-ACCEPT-CONNECTED: the contacts known when a pasted invite's accept was sent. Over the real
+  // relays the accept's request waits ~10 s for the relays while the inviter answers within a
+  // second, so a read during the accept already holds the new contact: the arrival is told against
+  // this set, not the last read. `acceptArrived`: it arrived before the accept returned.
+  const acceptBase = useRef<ReadonlySet<string> | undefined>(undefined);
+  const acceptArrived = useRef(false);
   const [arrived, setArrived] = useState<ContactRow | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const activity = usePulse(api);
@@ -899,13 +905,16 @@ export function ContactsPage({
           }
         }
         // A new paired contact while an invite was open (or a pasted one was connecting).
-        const before = known.current;
+        const before = acceptBase.current ?? known.current;
         known.current = new Set(answer.contacts.map((c) => c.ref));
-        if (before !== undefined && expecting.current) {
+        if (before !== undefined && (expecting.current || acceptBase.current !== undefined)) {
           const fresh = arrival(before, answer.contacts);
           if (fresh !== undefined) {
+            if (acceptBase.current !== undefined) acceptArrived.current = true;
             expecting.current = false;
+            acceptBase.current = undefined;
             setArrived(fresh);
+            setNotice(undefined);
           }
         }
         const wanted = wantsCheck.current;
@@ -1049,11 +1058,22 @@ export function ContactsPage({
   ): void => {
     setInviting(false);
     setPasting(false);
+    // W6-ACCEPT-CONNECTED: the new contact already arrived while the accept was on its way (the
+    // Connected moment shows): nothing waits any more.
+    if (acceptArrived.current) {
+      acceptArrived.current = false;
+      setTick((n) => n + 1);
+      return;
+    }
     // W5-INVITE-FEEDBACK: honest about an accept that could not leave this computer yet.
     setNotice(info?.sent === false ? F.waitingOnline(name) : connectingTo(name));
     setConnectingSince(Date.now());
     expecting.current = true;
     setTick((n) => n + 1);
+  };
+  const accepting = (): void => {
+    acceptBase.current = known.current ?? new Set();
+    acceptArrived.current = false;
   };
   const status =
     notice === undefined ? null : (
@@ -1242,6 +1262,7 @@ export function ContactsPage({
             invites={invites}
             passkey={passkey}
             onConnected={accepted}
+            onAccepting={accepting}
             onDone={() => setPasting(false)}
           />
         ) : (
@@ -1259,7 +1280,7 @@ export function ContactsPage({
         {arrived === undefined ? (
           <InviteScreen
             invites={invites}
-            paste={{ passkey, onConnected: accepted, onOpen: openPaste }}
+            paste={{ passkey, onConnected: accepted, onAccepting: accepting, onOpen: openPaste }}
             onCreated={() => {
               expecting.current = true;
               setJustCreated(true);

@@ -193,6 +193,27 @@ describe('chapter 2: contacts and invites', () => {
     await aProbe.check();
   }, 180_000);
 
+  // W6-ACCEPT-CONNECTED (golden-path QA 0.4.8, P1-B): over the real relays the accept's request
+  // waits for the relays' answers (~10 s) while the inviter already answered, so the pairing
+  // completes (in the AI app's own MCP server, another agent handle on the same store) before the
+  // accept returns. The accepter still gets "You and Ana are connected", and "Connecting to Ana…"
+  // goes.
+  it('the accepter reaches the Connected moment when the relays answer slowly', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld({ okDelayMs: 5_000 });
+    const { a, b, mcpB } = await twoOwners(ready.browser, ready.files, world, ch.closers);
+    const link = await inviteFromScreen(a, 'Bo');
+    await acceptInviteInApp(b, link, 'Ana');
+    // The AI app's MCP server completes the pairing while the accept still waits for the relays.
+    await until('Bo is paired with Ana', () => pairedWith(mcpB, 'Ana'), 30_000);
+    await seesConnected(b.page, 'Ana');
+    // Once the accept has returned (the relays answered), nothing says it is still connecting.
+    await new Promise((r) => setTimeout(r, 6_000));
+    await seesConnected(b.page, 'Ana');
+    expect(await text(b.page)).not.toContain('Connecting to Ana…');
+  }, 180_000);
+
   // Gate: the same pairing follow as the test above it ("both Contacts pages reach the safety code
   // by themselves"): neither page completes the pairing in 30 s while nothing calls the MCP server.
   it.runIf(WAVE4)(
