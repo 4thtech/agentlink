@@ -9,7 +9,7 @@
 //
 // Under the hood adds each message's ID, exact time, size, sending agent, delivery receipt and
 // proof. Reading here sends GETs only and never marks anything read for the AI.
-import { Banner, Button, Icon, SkeletonLine, UntrustedContent } from '@4thtech-io/ui';
+import { AgentIcon, Banner, Button, Icon, SkeletonLine, UntrustedContent } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { sizeText } from '../files/io.js';
 import type { MessageItem, MessagePage, MessagesApi } from '../messages/api.js';
@@ -284,6 +284,7 @@ export function Conversation({
   thread,
   loadEarlier,
   removed = false,
+  idSeed,
 }: {
   /** The person's name, as the name rule shows it (text only). */
   readonly name: string;
@@ -296,6 +297,8 @@ export function Conversation({
   readonly loadEarlier: () => Promise<void>;
   /** W6-FLOW-FIXES: the other side removed this connection (contact status `revoked`). */
   readonly removed?: boolean;
+  /** W7-ID-X1: with more than one ID, the open ID's colour seed: a header names it. */
+  readonly idSeed?: string | undefined;
 }): ReactElement {
   const [loading, setLoading] = useState(false);
   if (thread.state === 'loading') {
@@ -322,6 +325,12 @@ export function Conversation({
   const ours = app === undefined || app === '' ? S.yourAgent : fmt(S.yourAi, { name: app });
   return (
     <div className="hm-thread hm-c">
+      {idSeed === undefined || agent === '' ? null : (
+        <p className="hm-thread-id hm-f al-text-caption al-muted" data-thread-id="">
+          <AgentIcon label={agent} seed={idSeed} />
+          <span>{agent}</span>
+        </p>
+      )}
       {more ? (
         <Button
           variant="ghost"

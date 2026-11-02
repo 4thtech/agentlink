@@ -13,6 +13,8 @@ export const HOME_STRINGS = {
   noPeopleHint:
     "Invite someone. When you're connected, they appear here with your conversation and files.",
   noMatch: 'No one matches. Try another name or ID.',
+  idChips: 'Show people by ID',
+  chipCount: '{count} people',
   openAgent: 'Open {name}',
   unavailable: "Home can't be loaded right now. Try again in a minute.",
   notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
@@ -41,7 +43,7 @@ export const HOME_STRINGS = {
   colOpen: 'Open',
   searchPeople: 'Search people',
   allAgents: 'All IDs',
-  askerApp: "{app}'s ID is asking",
+  askerApp: '{name} · {app} is asking',
   askerId: '{name} is asking',
 
   // The conversation.

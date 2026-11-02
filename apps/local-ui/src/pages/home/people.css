@@ -401,3 +401,41 @@
     display: none !important;
   }
 }
+
+/* W7-ID-X1: ID chips, the ID group header and the small ID icon, drawn with the AgentIcon colour. */
+.hm-id-chips {
+  flex-wrap: wrap;
+  gap: var(--al-space-2);
+}
+.hm-id-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  min-block-size: 32px;
+  padding-inline: var(--al-space-3);
+  border: 1px solid var(--al-color-border-default);
+  border-radius: 999px;
+  background: var(--al-color-bg-default);
+  color: var(--al-color-fg-default);
+  font: inherit;
+  font-size: var(--al-text-caption-size);
+  cursor: pointer;
+}
+.hm-id-chip[aria-pressed='true'] {
+  background: var(--al-color-bg-sunken);
+  border-color: var(--al-color-fg-muted);
+}
+.hm-id-count {
+  color: var(--al-color-fg-muted);
+}
+.hm-id-group,
+.hm-thread-id,
+.hm-ap-asker {
+  align-items: center;
+  gap: var(--al-space-2);
+  margin: 0;
+}
+.hm-sub {
+  align-items: center;
+  gap: var(--al-space-2);
+}
