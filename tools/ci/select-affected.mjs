@@ -30,6 +30,8 @@
 //      the full e2e scenario) runs in the fast lane only when a changed file is in its own area (the
 //      explicit path lists below), whatever the package selection says. An unreadable or empty diff
 //      runs every one; the heavy lane on `main` runs them all regardless.
+//   9. OPS-MACOS-QUEUE: the macOS legs of those jobs run in the fast lane only when a changed file is
+//      macOS-specific (MACOS_PATHS); output `run_macos`. The heavy lane on `main` always runs them.
 //
 // Usage: node tools/ci/select-affected.mjs <changed-files.txt>
 // Writes test_scope, turbo_filters, needs_playwright and one run_<job> per package job and per
@@ -209,6 +211,40 @@ export const HEAVY_LANE = Object.freeze({
   ],
 });
 
+// OPS-MACOS-QUEUE (owner priority 1, 2 Nov 2026): the macOS legs (keychain, path-guard, node-os on
+// `macos-26`) cannot always get a runner on the GitHub Free plan, so a pull request runs them only
+// when it touches macOS-specific code: the OS keychain and its KeyStore fallback, the owner-presence
+// approval (Touch ID / passkey) code, the CLI keychain tests, or a non-doc file whose name says
+// macOS or Darwin. The heavy lane on `main` and `wave-4` runs them always (ci.yml). Shared code such
+// as `packages/crypto/` is tested on Linux and Windows in the pull request and on
+// macOS after the merge. Keep this explicit: select-affected.test.mjs pins it.
+export const MACOS_PATHS = Object.freeze([
+  'packages/node/src/keychain',
+  'packages/node/src/os-keychain',
+  'packages/node/src/file-keystore',
+  'packages/node/src/approval-os',
+  'packages/node/src/inbox-folder',
+  'packages/node/src/allowed-path',
+  'packages/core/src/path-guard',
+  'packages/node/package.json',
+  'apps/cli/test/two-process.keychain',
+  'apps/cli/test/one-shot-exit.keychain',
+]);
+const MACOS_NAME = /(?:^|[/._-])(?:mac|macos|darwin)(?:[/._-]|$)/i;
+
+/**
+ * Whether the fast lane runs the macOS legs. An unreadable or empty diff runs them.
+ * @param {string[] | null} files
+ */
+export function macosAffected(files) {
+  if (files == null) return true;
+  const list = files.map((f) => f.trim()).filter(Boolean);
+  if (list.length === 0) return true;
+  return list.some(
+    (f) => MACOS_PATHS.some((p) => f.startsWith(p)) || (!DOCS.test(f) && MACOS_NAME.test(f)),
+  );
+}
+
 const allJobs = (map, run) => Object.fromEntries(Object.keys(map).map((j) => [j, run]));
 
 /**
@@ -242,12 +278,14 @@ export function heavyLane(files) {
 export function selectAffected({ files, workspace }) {
   const result = selectPackages({ files, workspace });
   const heavy = heavyLane(files);
-  if (result.scope === 'full') return { ...result, jobs: allJobs(PACKAGE_JOBS, true), heavy };
+  const macos = macosAffected(files);
+  if (result.scope === 'full')
+    return { ...result, jobs: allJobs(PACKAGE_JOBS, true), heavy, macos };
   const selected = new Set(result.packages);
   const jobs = Object.fromEntries(
     Object.entries(PACKAGE_JOBS).map(([job, pkgs]) => [job, pkgs.some((p) => selected.has(p))]),
   );
-  return { ...result, jobs, heavy };
+  return { ...result, jobs, heavy, macos };
 }
 
 /** The run_<job> lines for $GITHUB_OUTPUT: PACKAGE_JOBS, then HEAVY_LANE, in map order. */
@@ -259,6 +297,8 @@ export function jobOutputs(result) {
     ),
     // A missing answer runs the job (fail towards running).
     ...Object.keys(HEAVY_LANE).map((job) => `${key(job)}=${result.heavy?.[job] !== false}`),
+    // OPS-MACOS-QUEUE: whether the macOS legs of the jobs above start on a pull request.
+    `run_macos=${result.macos !== false}`,
   ];
 }
 
