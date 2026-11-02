@@ -14,7 +14,7 @@ An optional one-click package of AgentLink for Claude Desktop. The product stays
 `release.yml` (jobs `desktop-extension-build` and `desktop-extension-release`), after a stable npm `latest` publish:
 
 1. `tools/desktop-extension/build.mjs` installs exactly `@4thtech-io/agentlink@<version>` from npm into `server/node_modules` for each platform (`darwin-arm64`, `darwin-x64`, `win32-x64`) with that platform's native modules, without install scripts, with dependency resolution frozen at the version's publish time, and writes a reproducible zip `agentlink-<version>-<platform>.mcpb` (same version, same bytes).
-2. After a green production smoke test, in environment `npm-publish`, the bundles are signed with the environment secret `DESKTOP_EXT_SIGNING_KEY` when it exists (`tools/desktop-extension/sign.sh`), checked against `4thtech-signing.crt` (`verify.sh`), listed in `SHA256SUMS`, given a build provenance attestation, and attached to the GitHub Release `v<version>`.
+2. After a green production smoke test, in environment `desktop-sign` (no reviewer, `main` only; it runs only after the approved npm publish), the bundles are signed with the environment secret `DESKTOP_EXT_SIGNING_KEY` when it exists (`tools/desktop-extension/sign.sh`), checked against `4thtech-signing.crt` (`verify.sh`), listed in `SHA256SUMS`, given a build provenance attestation, and attached to the GitHub Release `v<version>`.
 
 Build one locally (network access to the npm registry; runs no package code):
 
@@ -33,7 +33,7 @@ On your own machine, never in chat or in a repository:
 1. `mkdir -p -m 700 ~/agentlink-signing`
 2. `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out ~/agentlink-signing/ext.key && chmod 600 ~/agentlink-signing/ext.key`
 3. `openssl req -new -x509 -key ~/agentlink-signing/ext.key -out ~/agentlink-signing/4thtech-signing.crt -days 1095 -sha256 -subj "/O=4thTech/CN=AgentLink Desktop Extension"`
-4. GitHub, repository Settings, Environments, `npm-publish`, Add environment secret: name `DESKTOP_EXT_SIGNING_KEY`, value the whole content of `ext.key` (`pbcopy < ~/agentlink-signing/ext.key`, paste, then `pbcopy < /dev/null`).
+4. GitHub, repository Settings, Environments, `desktop-sign`, Add environment secret: name `DESKTOP_EXT_SIGNING_KEY`, value the whole content of `ext.key` (`pbcopy < ~/agentlink-signing/ext.key`, paste, then `pbcopy < /dev/null`).
 5. Back up `ext.key` offline; then delete the local copy if you do not need it.
 6. Commit only `4thtech-signing.crt` to this folder (a PR). Check the fingerprint with `openssl x509 -in apps/cli/desktop-extension/4thtech-signing.crt -noout -fingerprint -sha256`.
 

@@ -1,5 +1,5 @@
-// OPS-MERGE-FRICTION: record-ir.py re-runs only a failed review-gate run after recording, and
-// retrigger-version-pr.py closes/reopens a bot version PR only when its runs wait for approval.
+// OPS-MERGE-FRICTION: record-ir.py re-runs only a failed review-gate run after recording.
+// (retrigger-version-pr.py was removed by OPS-UNSTICK-B: the release App opens the version PR.)
 // A fake `gh` (shell script) logs every call and answers from a JSON fixture; nothing is networked.
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -93,43 +93,5 @@ describe('record-ir.py review-gate re-run', () => {
     );
     expect(r.status).toBe(0);
     expect(calls(log).some((c) => c.startsWith('run '))).toBe(false);
-  });
-});
-
-describe('retrigger-version-pr.py', () => {
-  const pr = (o = {}) => ({
-    state: 'OPEN',
-    author: { login: 'app/github-actions' },
-    headRefName: 'changeset-release/main',
-    headRefOid: SHA,
-    ...o,
-  });
-  function go(name, prInfo, runs) {
-    const f = fakeGh(name, { pr: prInfo, runs });
-    const r = spawnSync('python3', ['-I', join(here, 'retrigger-version-pr.py'), '9'], {
-      encoding: 'utf8',
-      env: { ...process.env, RECORD_IR_GH: f.gh },
-    });
-    return { r, c: calls(f.log) };
-  }
-  const closed = (c) => c.some((x) => /^pr (close|reopen)/.test(x));
-
-  it('closes and reopens when a run waits for approval', () => {
-    const { r, c } = go('v1', pr(), [{ databaseId: 1, conclusion: 'action_required' }]);
-    expect(r.status).toBe(0);
-    expect(c.filter((x) => /^pr (close|reopen)/.test(x))).toEqual([
-      'pr close 9 --repo 4thtech/agentlink',
-      'pr reopen 9 --repo 4thtech/agentlink',
-    ]);
-  });
-
-  it('does nothing when no run waits', () => {
-    expect(closed(go('v2', pr(), [{ databaseId: 1, conclusion: 'success' }]).c)).toBe(false);
-  });
-
-  it('never touches a human PR or a non-release branch', () => {
-    const runs = [{ databaseId: 1, conclusion: 'action_required' }];
-    expect(closed(go('v3', pr({ author: { login: 'talirezun' } }), runs).c)).toBe(false);
-    expect(closed(go('v4', pr({ headRefName: 'feature/x' }), runs).c)).toBe(false);
   });
 });

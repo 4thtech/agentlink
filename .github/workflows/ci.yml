@@ -1092,7 +1092,8 @@ jobs:
   # changeset. `changeset status --since <merge base with main>` fails otherwise; docs-only changes
   # and private packages pass. Pull requests only: the push run of a branch is not a merge
   # candidate. The one exemption is the Changesets "Version packages" PR (it consumes the
-  # changesets): branch `changeset-release/*` by `github-actions[bot]` in this repository. The PR
+  # changesets): branch `changeset-release/*` by `github-actions[bot]` or the release GitHub App
+  # (repository variable RELEASE_BOT_LOGIN, OPS-UNSTICK-B) in this repository. The PR
   # fields reach the script through `env:` only.
   changesets:
     name: changesets
@@ -1119,6 +1120,7 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          RELEASE_BOT_LOGIN: ${{ vars.RELEASE_BOT_LOGIN }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
@@ -1133,6 +1135,7 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          RELEASE_BOT_LOGIN: ${{ vars.RELEASE_BOT_LOGIN }}
         run: |
           set -euo pipefail
           node tools/release/check-changelog-fragment.mjs --base origin/main
