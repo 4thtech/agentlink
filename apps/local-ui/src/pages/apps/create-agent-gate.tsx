@@ -276,9 +276,17 @@ export function CreateAgentGate({
   const plan = async (
     keep: boolean,
   ): Promise<
-    { nonce: string; pk?: Parameters<CreateAgentApi['finishPasskey']>[1] } | undefined
+    | {
+        nonce: string;
+        pk?: Parameters<CreateAgentApi['finishPasskey']>[1];
+        /** A new plan replaced the one on screen: show it and wait for a fresh click. */
+        renewed?: boolean;
+      }
+    | undefined
   > => {
     const id = app?.id;
+    // IR L1: shown = approved. The statement on screen when the person pressed.
+    const shown = statement;
     const kept = held.current;
     if (kept !== undefined && kept.app === id) {
       if (keep) return { nonce: kept.nonce };
@@ -301,9 +309,15 @@ export function CreateAgentGate({
       );
       return undefined;
     }
-    held.current = { nonce: begun.nonce, app: id };
     if (begun.publicKey.allowCredentials.length === 0) setCanPasskey(false);
-    if (moveLine(begun.statement) !== undefined) setStatement(begun.statement);
+    // Always the new plan's statement (its move line, or none for a plain connect).
+    setStatement(moveLine(begun.statement) === undefined ? undefined : begun.statement);
+    if (shown !== undefined) {
+      // A move line was on screen but this is another plan: it is held (fresh) for the next click.
+      held.current = { nonce: begun.nonce, app: id, pk: begun.publicKey, at: Date.now() };
+      return { nonce: begun.nonce, pk: begun.publicKey, renewed: true };
+    }
+    held.current = { nonce: begun.nonce, app: id };
     return { nonce: begun.nonce, pk: begun.publicKey };
   };
 
@@ -312,7 +326,7 @@ export function CreateAgentGate({
     setError(undefined);
     try {
       const begun = await plan(false);
-      if (begun?.pk === undefined) return;
+      if (begun?.pk === undefined || begun.renewed === true) return;
       if (begun.pk.allowCredentials.length === 0) {
         setUseCode(true);
         return;
@@ -330,7 +344,8 @@ export function CreateAgentGate({
     setError(undefined);
     try {
       const begun = await plan(true);
-      if (begun === undefined) return;
+      // IR L1: a new plan is shown first; the code stays in the field for the next press.
+      if (begun === undefined || begun.renewed === true) return;
       const typed = code;
       setCode('');
       settle(await api.finishCode(begun.nonce, typed));

@@ -131,6 +131,18 @@ function fields(list: readonly Uint8Array[]): Uint8Array {
   return out;
 }
 
+/**
+ * W8-S5 (IR L3): the replaced ID's label as the server names it. A label longer than an ID label
+ * (32 characters) is shortened for display, never refused; anything past this bound is refused.
+ */
+const OLD_LABEL_MAX = 256;
+const SHOWN_LABEL_MAX = 32;
+const shortLabel = (label: string | null): string | null => {
+  if (label === null) return null;
+  const chars = [...label];
+  return chars.length <= SHOWN_LABEL_MAX ? label : `${chars.slice(0, SHOWN_LABEL_MAX).join('')}…`;
+};
+
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -164,7 +176,7 @@ export function parseStatement(value: unknown): CreateStatement | undefined {
       !(
         oldLabel === undefined ||
         oldLabel === null ||
-        (typeof oldLabel === 'string' && oldLabel.length > 0 && [...oldLabel].length <= 32)
+        (typeof oldLabel === 'string' && oldLabel.length > 0 && oldLabel.length <= OLD_LABEL_MAX)
       ) ||
       !(oldGone === undefined || typeof oldGone === 'boolean')
     ) {
@@ -174,7 +186,7 @@ export function parseStatement(value: unknown): CreateStatement | undefined {
       id,
       name,
       kind,
-      ...(oldLabel === undefined ? {} : { oldLabel }),
+      ...(oldLabel === undefined ? {} : { oldLabel: shortLabel(oldLabel) }),
       ...(oldGone === undefined ? {} : { oldGone }),
     };
   }
