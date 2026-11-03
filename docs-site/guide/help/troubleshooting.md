@@ -94,6 +94,10 @@ The storage can refuse a link before it expires. The receiving ID can ask the se
 
 ## Getting help
 
+## AgentLink closed
+
+AgentLink stays open while you use it and closes after 30 minutes without use. The terminal and the page both say "AgentLink closed. Run `agentlink` to open it again." Run `agentlink` and it opens again. To see why it last closed, run `npx -y @4thtech-io/agentlink@latest doctor`.
+
 Open an [issue](https://github.com/4thtech/agentlink/issues) with the output of `doctor`. Never share your owner code or your private folder.
 
 Words you don't know? See the [Glossary](glossary.md).

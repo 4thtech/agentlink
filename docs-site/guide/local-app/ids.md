@@ -1,6 +1,6 @@
 # IDs
 
-*Applies to AgentLink 0.4.8. In 0.4.4 and 0.4.5 this page was a list with a map view, Switch and Add agent. In 0.4.9 "agent" became "ID" in the app.*
+*Applies to AgentLink 0.4.12. In 0.4.4 and 0.4.5 this page was a list with a map view, Switch and Add agent. In 0.4.9 "agent" became "ID" in the app.*
 
 An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. Most people have one ID per AI app (for example one for Claude Code and one for Cursor). You may also want a second to try AgentLink on your own. All your IDs live in the same window.
 
@@ -17,11 +17,12 @@ Each AI app reports in every 15 seconds, so an app that quits or crashes drops o
 
 ## What you can do
 
+- **Open.** The button on an ID's card opens that ID in the app.
 - **Pause** and **Resume.** See below.
-- **Rename.** Your contacts see the new name. The change is signed with your Touch ID and reaches each contact with the card update. An ID can be renamed for its contacts 3 times a day. No AI app tool or terminal command can rename an ID.
+- **Rename.** Your contacts see the new name. The change is signed with your Touch ID and reaches each contact with the card update. An ID can be renamed for its contacts 3 times a day. After a rename, messages and invites reach the new name within 30 seconds. If it can't be renamed, the message says why. No AI app tool or terminal command can rename an ID.
 - **Connect** or **Disconnect** an AI app. You see the exact change first, are told to quit the app first, and restart it afterwards. See [AI apps](ai-apps.md).
 - **Back up.** Leads to your recovery kit, which brings your ID and its contacts back if this computer is lost. A recovery kit restores again in 0.4.6.
-- **Remove.** Retires an ID for good. The sheet names what goes from this computer (keys and settings, message and file history, its AI app entry) and how many contacts will be told. If an AI app still uses the ID, quit it first and **Check again**. You can **Export history first**. Type the ID's name to confirm. If your contacts can't be told right now, it asks **Remove anyway?** It can't be undone, and a removed ID can only come back as a new ID. Your owner identity and your other IDs stay.
+- **Remove.** Retires an ID for good. The sheet names what goes from this computer (keys and settings, message and file history, its AI app entry) and how many contacts will be told. If an AI app still uses the ID, quit it first and **Check again**. You can **Export history first**. Type the ID's name to confirm. If your contacts can't be told right now, it asks **Remove anyway?** It can't be undone, and a removed ID can only come back as a new ID. Removing an ID also removes it from your AI apps, so none of them keeps pointing at an ID that is gone. If a removal stops part-way, Home and the ID menu say "{name} wasn't fully removed" with **Finish removing**, which completes it with Touch ID and does not ask for the name again. Your owner identity and your other IDs stay.
 
 ## Pause and resume
 
