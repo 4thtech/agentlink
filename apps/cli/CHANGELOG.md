@@ -1,5 +1,11 @@
 # @4thtech-io/agentlink
 
+## 0.4.12
+
+### Patch Changes
+
+- d541327: Renaming an ID no longer leaves the AI app deaf to new invites and messages for minutes: the live inbox reopens on the new keys within 30 seconds. A failed rename now says why.
+
 ## 0.4.11
 
 ### Patch Changes

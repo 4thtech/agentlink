@@ -1,5 +1,9 @@
 # @4thtech-io/types
 
+## 0.4.12
+
+No changes in this release.
+
 ## 0.4.11
 
 No changes in this release.
