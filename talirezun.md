@@ -29,3 +29,6 @@ _Updated 2026-10-28 evening · claude-code / claude-opus-5-5 · orchestrator, ha
 
 ## Feedback log
 - None recorded in this file yet.
+
+## 2026-11-03 handoff
+- 0.4.10, one-line installer and one-click release LIVE; no open PRs. GitBook installer docs waiting on sync. Next: Tali testing feedback, Windows installer test, classroom dry run (~6 Nov).
