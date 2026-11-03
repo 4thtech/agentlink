@@ -42,7 +42,8 @@ export type Relays = ReturnType<typeof memoryRelays>;
 export const WAVE4 = process.env['JOURNEY_WAVE4'] === '1';
 
 export const TOUCH_ID = /^Use (Touch ID|Windows Hello|a passkey)$/;
-export const CONFIRM_PASSKEY = 'Confirm with your passkey';
+/** F24: the presence prompt's passkey button names the platform's own sensor. */
+export const CONFIRM_PASSKEY = /^Confirm with (Touch ID|Windows Hello|your passkey)$/;
 /** Format 1 (D-69) links: the whole card in the fragment. */
 export const LONG_INVITE = /https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_.-]+/;
 /** Format 2 (D-139): `https://<invite-host>/i#2.<43 characters>`. */
