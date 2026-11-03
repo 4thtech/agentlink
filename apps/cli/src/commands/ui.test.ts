@@ -12,6 +12,7 @@ import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../dispatch.js';
 import type { TerminalContext } from '../runtime/guards.js';
+import { OPEN_TEXT, setupOpenedLine } from '../runtime/open-watch.js';
 import {
   UI_TEXT,
   UI_WAIT_MS,
@@ -249,6 +250,76 @@ describe('agentlink ui in the owner terminal (M1-11b-9)', () => {
       expectNoLink(p);
     },
   );
+});
+
+// F40: the opened line says "Opening…"; when no one-shot link is used within the check time, one
+// follow-up asks for Enter, which opens a fresh link. Nothing printed holds the link.
+describe('agentlink ui when the browser does not show the page (F40)', () => {
+  function withWatch(used: () => number) {
+    const p = probe(TTY);
+    let press: (() => void) | undefined;
+    let stop: (() => void) | undefined;
+    let opened = 0;
+    const deps: UiDeps = {
+      start: () =>
+        Promise.resolve({
+          page: 'home' as const,
+          activity: { lastAt: () => Date.now(), openStreams: () => 0, linksUsed: used },
+          open: () => {
+            opened += 1;
+            return Promise.resolve(true);
+          },
+          close: () => Promise.resolve(),
+        }),
+      waitMs: 5_000,
+      openCheckMs: 10,
+      onEnter: (handler) => {
+        press = handler;
+        return () => {
+          press = undefined;
+        };
+      },
+      interrupt: (handler) => {
+        stop = handler;
+        return () => undefined;
+      },
+    };
+    return { p, deps, enter: () => press?.(), stop: () => stop?.(), opened: () => opened };
+  }
+
+  it('no link used: the follow-up, Enter opens again, Ctrl+C closes', async () => {
+    const h = withWatch(() => 0);
+    const run = uiStep(h.p.context, h.deps, PREFIX);
+    await new Promise((r) => setTimeout(r, 40));
+    expect(h.p.out).toEqual([UI_TEXT.opened, OPEN_TEXT.notOpened]);
+    h.enter();
+    await new Promise((r) => setTimeout(r, 1));
+    expect(h.opened()).toBe(2);
+    expect(h.p.out.at(-1)).toBe(OPEN_TEXT.retrying);
+    h.stop();
+    await expect(run).resolves.toBe(EXIT_OK);
+    expectNoLink(h.p);
+  });
+
+  it('a link used: no follow-up', async () => {
+    let used = 0;
+    const h = withWatch(() => used);
+    const run = uiStep(h.p.context, h.deps, PREFIX);
+    await new Promise((r) => setTimeout(r, 1));
+    used = 1;
+    await new Promise((r) => setTimeout(r, 40));
+    h.stop();
+    await expect(run).resolves.toBe(EXIT_OK);
+    expect(h.p.out).toEqual([UI_TEXT.opened, UI_TEXT.closed(PREFIX)]);
+  });
+
+  it('the opened lines say "Opening", never that the browser opened (F40, F41)', () => {
+    expect(UI_TEXT.opened.startsWith('Opening AgentLink')).toBe(true);
+    expect(UI_TEXT.openedSetup).toBe(setupOpenedLine(process.platform));
+    for (const line of [UI_TEXT.opened, UI_TEXT.openedSetup]) {
+      expect(line).not.toMatch(/browser opened|setup page/i);
+    }
+  });
 });
 
 describe('agentlink ui run by an agent (M1-11b-9)', () => {

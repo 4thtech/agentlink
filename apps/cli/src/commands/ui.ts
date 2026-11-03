@@ -53,6 +53,13 @@ import { removeAppHostRecord, writeAppHostRecord } from '../runtime/app-host-rec
 import { writeLastExit, type LastExitReason } from '../runtime/last-exit.js';
 import { guardProcess, type FatalReason } from '../runtime/ui-lifecycle.js';
 import { cliVersion } from '../runtime/cli-version.js';
+import {
+  OPEN_CHECK_MS,
+  openAndWatch,
+  setupOpenedLine,
+  stdinEnter,
+  type OpenWatch,
+} from '../runtime/open-watch.js';
 
 /**
  * How long `ui` keeps serving with nobody using it (06 §5 sets "a time limit (30 minutes)"; F25: it
@@ -89,10 +96,11 @@ function isPortError(error: unknown): boolean {
 
 /** Fixed text (11 §5 plain words). Nothing from a file, the page or the user is inserted. */
 export const UI_TEXT = Object.freeze({
+  /** F40: "Opening", never "opened": the OS opener cannot prove a page loaded (open-watch.ts). */
   opened:
-    "Your browser opened AgentLink on Home. Keep this window open while you use it; press Ctrl+C when you're done.",
-  openedSetup:
-    "Your browser opened the AgentLink setup page. Protect approvals there with a passkey. Keep this window open while you use the page; press Ctrl+C when you're done.",
+    "Opening AgentLink Home in your browser… Keep this window open while you use it; press Ctrl+C when you're done.",
+  /** F41: the platform's word for the gesture (Touch ID, Windows Hello, a passkey); no "setup page". */
+  openedSetup: setupOpenedLine(process.platform),
   /** R1: no browser could be started, but the app is healthy: it keeps serving. */
   noBrowser:
     "AgentLink couldn't open your browser, but it's still running. Keep this window open; press Ctrl+C when you're done.",
@@ -155,7 +163,7 @@ export interface UiServer {
    * F25: whether the app is in use (absent: only the time since start counts). `lastAt` is a time in
    * ms of the last page request; `openStreams` the open pages.
    */
-  readonly activity?: { lastAt(): number; openStreams(): number };
+  readonly activity?: { lastAt(): number; openStreams(): number; linksUsed?(): number };
   /** Stops the server and closes the agent. */
   close(): Promise<void>;
 }
@@ -202,6 +210,10 @@ export interface UiDeps {
   guard?(onFatal: (reason: FatalReason) => void): () => void;
   /** R1: writes why this run closed (~/.agentlink/last-exit.json). Must not throw. */
   recordExit?(reason: LastExitReason): Promise<void>;
+  /** F40: Enter in this terminal (absent: no "press Enter to try again"). Returns the unsubscribe. */
+  onEnter?(press: () => void): () => void;
+  /** F40: how long the page has to use its link before the follow-up (default OPEN_CHECK_MS). */
+  readonly openCheckMs?: number;
 }
 
 /** The command. Returns the process exit code. */
@@ -275,25 +287,33 @@ export async function serveUi(
   let unsubscribe: (() => void) | undefined;
   let unguard: (() => void) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let watch: OpenWatch | undefined;
   try {
     const fatal = new Promise<FatalReason>((resolve) => {
       unguard = deps.guard?.(resolve);
     });
-    const opened = await server.open().catch(() => false);
-    if (!opened) {
-      // R1: a browser that will not open does not stop a healthy host.
-      output.print(
-        server.origin === undefined ? UI_TEXT.noBrowser : UI_TEXT.noBrowserServing(server.origin),
-      );
-    } else {
-      output.print(
-        join !== undefined
-          ? join.opened
-          : server.page === 'first-run'
-            ? UI_TEXT.openedSetup
-            : UI_TEXT.opened,
-      );
-    }
+    // F40: "Opening…", then, if no one-shot link is used in time, "press Enter to try again".
+    // R1: a browser that will not open does not stop a healthy host.
+    const linksUsed = server.activity?.linksUsed?.bind(server.activity);
+    watch = await openAndWatch(
+      {
+        open: () => server.open(),
+        linksUsed,
+        print: (line) => output.print(line),
+        onEnter: deps.onEnter?.bind(deps),
+        checkMs: deps.openCheckMs ?? OPEN_CHECK_MS,
+      },
+      {
+        opened:
+          join !== undefined
+            ? join.opened
+            : server.page === 'first-run'
+              ? UI_TEXT.openedSetup
+              : UI_TEXT.opened,
+        failed:
+          server.origin === undefined ? UI_TEXT.noBrowser : UI_TEXT.noBrowserServing(server.origin),
+      },
+    );
     const stopped = new Promise<string | undefined>((resolve) => {
       unsubscribe = deps.interrupt(resolve);
     });
@@ -337,11 +357,18 @@ export async function serveUi(
     );
     return EXIT_OK;
   } finally {
+    watch?.stop();
     if (timer !== undefined) clearTimeout(timer);
     unsubscribe?.();
     unguard?.();
     await server.close().catch(() => undefined);
   }
+}
+
+/** F40: the production Enter, only while standard input is a terminal. */
+function optionalEnter(): Pick<UiDeps, 'onEnter'> {
+  const enter = stdinEnter();
+  return enter === undefined ? {} : { onEnter: enter };
 }
 
 /**
@@ -513,6 +540,8 @@ export function nodeUiDeps(): UiDeps {
     },
     waitMs: UI_WAIT_MS,
     interrupt: (stop) => onStopSignals(stop),
+    // F40: Enter in the owner's terminal tries the browser again with a fresh one-shot link.
+    ...optionalEnter(),
     // R1: stray background errors are logged with a fixed code and the host keeps serving.
     guard: (onFatal) => guardProcess({ log: logger, onFatal }),
     recordExit: (reason) => writeLastExit(homedir(), { reason, version: cliVersion() }),

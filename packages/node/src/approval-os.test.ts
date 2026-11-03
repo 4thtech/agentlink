@@ -11,7 +11,11 @@ import {
 } from './approval-os.js';
 
 const URL_ = 'http://localhost:47321/approve/apr_AAAAAAAAAAAAAAAAAAAAAA?t=abc;rm -rf ~ $(x)';
-const ALLOWED = new Set<string>([...Object.values(OS_PROGRAMS), 'D:\\Windows\\explorer.exe']);
+const ALLOWED = new Set<string>([
+  ...Object.values(OS_PROGRAMS),
+  'D:\\Windows\\explorer.exe',
+  'D:\\Windows\\System32\\rundll32.exe',
+]);
 
 interface Call {
   file: string;
@@ -44,7 +48,6 @@ describe('the browser opener (L-2, L-4)', () => {
     ['darwin', '/usr/bin/open'],
     ['linux', '/usr/bin/xdg-open'],
     ['freebsd', '/usr/bin/xdg-open'],
-    ['win32', 'C:\\Windows\\explorer.exe'],
   ] as const)('on %s runs %s with shell false and the url as one argument', async (p, program) => {
     const { seams: s, calls } = seams(p);
     expect(await browserOpenerWith(s)(URL_)).toBe(true);
@@ -56,11 +59,60 @@ describe('the browser opener (L-2, L-4)', () => {
     expect(call.options['shell']).toBe(false);
   });
 
+  // F40 (Windows 11, 0.4.10): explorer.exe <url> exits 1 whether or not a browser opened, so a
+  // silent failure read as "opened". rundll32 url.dll,FileProtocolHandler hands the url to the
+  // default browser and reports a failure to start; explorer.exe stays the fallback. Never cmd.exe
+  // or `start` (their command line would parse the url).
+  it('on win32 runs System32\\rundll32.exe url.dll,FileProtocolHandler <url>: shell false, one url argument', async () => {
+    const { seams: s, calls } = seams('win32');
+    expect(await browserOpenerWith(s)(URL_)).toBe(true);
+    expect(calls).toHaveLength(1);
+    const call = calls[0] as Call;
+    expect(call.file).toBe('C:\\Windows\\System32\\rundll32.exe');
+    expect(ALLOWED.has(call.file)).toBe(true);
+    expect(call.args).toEqual(['url.dll,FileProtocolHandler', URL_]);
+    expect(call.options['shell']).toBe(false);
+    expect(call.options['windowsHide']).toBe(true);
+    expect(call.options['windowsVerbatimArguments']).toBeUndefined();
+    expect(call.options['timeout']).toBeGreaterThan(0);
+  });
+
+  it('on win32 falls back to explorer.exe when rundll32 is missing or fails, and never to cmd', async () => {
+    const missing = seams('win32', { executable: (path) => !path.endsWith('rundll32.exe') });
+    expect(await browserOpenerWith(missing.seams)(URL_)).toBe(true);
+    expect(missing.calls.map((c) => c.file)).toEqual(['C:\\Windows\\explorer.exe']);
+    expect(missing.calls[0]?.args).toEqual([URL_]);
+
+    const calls: Call[] = [];
+    const failing = seams('win32', {
+      execFile: (file, args, options, callback) => {
+        calls.push({ file, args: [...args], options: { ...options } });
+        callback(file.endsWith('rundll32.exe') ? Object.assign(new Error('x'), { code: 1 }) : null);
+      },
+    });
+    expect(await browserOpenerWith(failing.seams)(URL_)).toBe(true);
+    expect(calls.map((c) => c.file)).toEqual([
+      'C:\\Windows\\System32\\rundll32.exe',
+      'C:\\Windows\\explorer.exe',
+    ]);
+    for (const c of calls) {
+      expect(c.file.toLowerCase()).not.toMatch(/cmd\.exe|powershell/);
+      expect(c.args).not.toContain('start');
+      expect(c.options['shell']).toBe(false);
+    }
+  });
+
+  it('on win32 resolves false when neither rundll32 nor explorer is there', async () => {
+    const { seams: s, calls } = seams('win32', { executable: () => false });
+    expect(await browserOpenerWith(s)(URL_)).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
   it('uses SystemRoot only when it is a plain drive:\\Windows', async () => {
     for (const [root, program] of [
-      ['D:\\Windows', 'D:\\Windows\\explorer.exe'],
-      ['C:\\Users\\me\\bin', 'C:\\Windows\\explorer.exe'],
-      ['\\\\evil\\share\\Windows', 'C:\\Windows\\explorer.exe'],
+      ['D:\\Windows', 'D:\\Windows\\System32\\rundll32.exe'],
+      ['C:\\Users\\me\\bin', 'C:\\Windows\\System32\\rundll32.exe'],
+      ['\\\\evil\\share\\Windows', 'C:\\Windows\\System32\\rundll32.exe'],
     ] as const) {
       const { seams: s, calls } = seams('win32', { env: { SystemRoot: root } });
       await browserOpenerWith(s)(URL_);

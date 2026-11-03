@@ -65,8 +65,9 @@ export const JOIN_TEXT = Object.freeze({
     "AgentLink couldn't fetch this invite. Check your connection, then run the command again.",
   waiting: 'Finish or close the invite already open in AgentLink, then run the command again.',
   handedOff: 'AgentLink opened the invite in your browser. Check who it is, then accept it there.',
+  /** F40: "Opening", never "opened" (the opener cannot prove a page loaded). */
   opened:
-    "Your browser opened AgentLink with the invite. Set it up there, then accept the invite. Keep this window open while you use it; press Ctrl+C when you're done.",
+    "Opening AgentLink in your browser with the invite. Set it up there, then accept the invite. Keep this window open while you use it; press Ctrl+C when you're done.",
   agentRun:
     "You must do this yourself: run the command from the invite page in your own terminal. It opens AgentLink in your browser so you can accept the invite there. Don't let your AI accept it for you.",
 });

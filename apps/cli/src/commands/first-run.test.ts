@@ -27,6 +27,7 @@ import {
   type FirstRunSeams,
 } from './first-run.js';
 import type { OwnerAgent } from './owner/deps.js';
+import { OPEN_TEXT, setupOpenedLine } from '../runtime/open-watch.js';
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 const AGENT: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } };
@@ -119,6 +120,56 @@ function expectNoLink(p: Probe): void {
   expect(all).not.toContain('?t=');
   expect(all).not.toContain('localhost');
 }
+
+// F40, F41: "Opening…" (no "setup page"), and the Enter retry when no one-shot link was used.
+describe('firstRunStep when the browser does not show the page (F40)', () => {
+  it('no link used: the follow-up, and Enter opens a fresh link', async () => {
+    const p = probe(TTY);
+    let press: (() => void) | undefined;
+    let stop: (() => void) | undefined;
+    let opened = 0;
+    const deps: FirstRunDeps = {
+      available: () => Promise.resolve(true),
+      start: () =>
+        Promise.resolve({
+          openFirstRun: () => {
+            opened += 1;
+            return Promise.resolve(true);
+          },
+          linksUsed: () => 0,
+          close: () => Promise.resolve(),
+        }),
+      waitMs: 5_000,
+      openCheckMs: 10,
+      onEnter: (handler) => {
+        press = handler;
+        return () => {
+          press = undefined;
+        };
+      },
+      interrupt: (handler) => {
+        stop = handler;
+        return () => undefined;
+      },
+    };
+    const run = firstRunStep(p.context, 'default', true, PREFIX, deps);
+    await new Promise((r) => setTimeout(r, 40));
+    expect(p.out).toEqual([FIRST_RUN_TEXT.opened, OPEN_TEXT.notOpened]);
+    press?.();
+    await new Promise((r) => setTimeout(r, 1));
+    expect(opened).toBe(2);
+    expect(p.out.at(-1)).toBe(OPEN_TEXT.retrying);
+    stop?.();
+    await expect(run).resolves.toBe(false);
+    expect(press).toBeUndefined();
+    expectNoLink(p);
+  });
+
+  it('the lines say "Opening" and never "setup page" (F41)', () => {
+    expect(FIRST_RUN_TEXT.opened).toBe(setupOpenedLine(process.platform));
+    expect(FIRST_RUN_TEXT.noBrowser).toBe("AgentLink couldn't open your browser.");
+  });
+});
 
 describe('firstRunStep in the owner terminal (M1-11b-6)', () => {
   it('opens the first-run page, waits for setup and the settings pages, then stops on Ctrl+C', async () => {

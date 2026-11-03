@@ -920,6 +920,23 @@ describe('the agent-visible approval url (M1-11a-b, 06 §2.5, I-4)', () => {
     expect(JSON.stringify(h.events)).not.toContain(token);
   });
 
+  // F40: the CLI cannot see whether the OS opener really showed a browser (Windows explorer.exe
+  // exits 1 either way); it watches whether a one-shot link was used. A count only, no token.
+  it('F40: activity.linksUsed counts one-shot links used, not minted, refused or reused ones', async () => {
+    const h = await harness();
+    const start = h.server.activity.linksUsed();
+    const at = h.opened.length;
+    await h.server.openHome();
+    expect(h.server.activity.linksUsed()).toBe(start);
+    const link = new URL(h.opened[at] ?? '');
+    expect((await send(h.port, `${link.pathname}${link.search}`)).status).toBe(303);
+    expect(h.server.activity.linksUsed()).toBe(start + 1);
+    // Used again, or a made-up token: refused, not counted.
+    expect((await send(h.port, `${link.pathname}${link.search}`)).status).toBe(401);
+    expect((await send(h.port, `/settings/home?t=${'A'.repeat(43)}`)).status).toBe(401);
+    expect(h.server.activity.linksUsed()).toBe(start + 1);
+  });
+
   it('U3-a: openHome takes no argument and replaces openActivity', async () => {
     const h = await harness();
     expect(h.server.openHome.length).toBe(0);
