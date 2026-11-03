@@ -1,6 +1,6 @@
 # Windows
 
-*Applies to AgentLink 0.4.8. Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.4.12. Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
 
 AgentLink works on Windows the same way as on a Mac. These are the Windows details.
 
@@ -17,7 +17,7 @@ In PowerShell:
 npx -y @4thtech-io/agentlink@latest
 ```
 
-Your browser opens on **Welcome**. Set up there, as in [Get started](README.md). Keep the PowerShell window open while you use the app and press Ctrl+C when you are done. Check that the package name is exactly `@4thtech-io/agentlink`.
+Your browser opens on **Welcome**. The first line in the window says "Opening AgentLink in your browser…". If the page has not loaded after 15 seconds, the window says "Your browser didn't open AgentLink. Press Enter here to try again." Set up there, as in [Get started](README.md). Keep the PowerShell window open while you use the app. AgentLink stays open while you use it and closes after 30 minutes without use; the window and the page both say "AgentLink closed. Run `agentlink` to open it again." Press Ctrl+C to close it yourself. Check that the package name is exactly `@4thtech-io/agentlink`.
 
 If PowerShell refuses to run it, run the command from **Command Prompt** (`cmd`) instead, or run `cmd /c npx -y @4thtech-io/agentlink@latest` in PowerShell.
 
@@ -33,4 +33,4 @@ On Windows, AgentLink adds this to your AI app's settings: `cmd /c npx -y @4thte
 
 ## If something does not work
 
-Run `npx -y @4thtech-io/agentlink@latest doctor` in PowerShell. It shows what is set up and how to fix the rest.
+Run `npx -y @4thtech-io/agentlink@latest doctor` in PowerShell. It shows what is set up, why AgentLink last closed, whether anything was left behind, and how to fix the rest.

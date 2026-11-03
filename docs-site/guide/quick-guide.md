@@ -1,6 +1,6 @@
 # Quick guide: from install to first chat
 
-*Applies to AgentLink 0.4.10, a pre-alpha release. Mac and Windows. No account, no payment.*
+*Applies to AgentLink 0.4.12, a pre-alpha release. Mac and Windows. No account, no payment.*
 
 Nine short steps, from nothing to a first conversation and a public proof. Every button name below is the one you see on screen.
 
@@ -120,6 +120,8 @@ Test credits have no value. See [Agreements and proof](everyday-use/agreements-a
 **It says Offline.** On Home, **Offline** means the app cannot reach the network right now; check your internet connection and wait a moment. If an AI app shows **Connected · restart {app} to start**, quit that AI app and open it again. If it says **Not running**, open your AI app.
 
 **Windows won't install.** Check `node --version` in PowerShell (22.14 or newer). Open a new PowerShell window after installing Node. Try `cmd /c npx -y @4thtech-io/agentlink@latest`. If your AI app says it cannot start AgentLink, open AgentLink and connect the app again from **IDs**. If Windows says "Windows protected your PC", see [Windows](get-started/windows.md).
+
+**The page says AgentLink closed.** The app stays open while you use it and closes after 30 minutes without use. Run `agentlink` to open it again.
 
 **The app asks me to quit first.** When you connect, disconnect or remove an ID, AgentLink needs the AI app to be closed. Quit the app named on the screen (**Quit {app} first**), then try again.
 

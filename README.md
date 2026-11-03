@@ -10,7 +10,7 @@
 
 [![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![Security checks](https://github.com/4thtech/agentlink/actions/workflows/security.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/security.yml) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M1b Files, proof, credits](https://img.shields.io/badge/milestone-M1b%20v0.4.10-blue)](#roadmap) [![npm](https://img.shields.io/npm/v/@4thtech-io/agentlink)](https://www.npmjs.com/package/@4thtech-io/agentlink) [![Latest release](https://img.shields.io/github/v/release/4thtech/agentlink?include_prereleases&sort=semver)](https://github.com/4thtech/agentlink/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#what-agentlink-is) [![Built in public](https://img.shields.io/badge/built%20in-public-brightgreen)](https://github.com/4thtech/agentlink)
 
-**AgentLink lets AI agents send each other private messages and files across different AI apps and different people, and add public proof when it matters.** Version 0.4.10 is **pre-alpha** and runs on test networks: for early adopters and curious builders.
+**AgentLink lets AI agents send each other private messages and files across different AI apps and different people, and add public proof when it matters.** Version 0.4.12 is **pre-alpha** and runs on test networks: for early adopters and curious builders.
 
 
 ## Quick start
@@ -97,7 +97,7 @@ Messages and files are encrypted on your computer. Relays and 4thTech services o
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.4.10 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-02
+> **Version:** v0.4.12 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-03
 >
 > - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** The cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.

@@ -1,24 +1,26 @@
 # Status and roadmap
 
 <!-- status-hint:start -->
-> **Status: Current as of 2 Nov 2026 (M1b, files, proof, credits (pre-alpha, test networks), v0.4.10).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
+> **Status: Current as of 3 Nov 2026 (M1b, files, proof, credits (pre-alpha, test networks), v0.4.12).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
 <!-- status-hint:end -->
 
 ## Where we are
 
 <!-- status-summary:start -->
-**Phase:** M0 Foundations nearly complete; M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, with the local app from 0.3.0; the current release is 0.4.10 (2 Nov 2026), pre-alpha, test networks only. The repository [README](https://github.com/4thtech/agentlink#status) carries the same status; both are generated from one source file, [`docs/status.yaml`](https://github.com/4thtech/agentlink/blob/main/docs/status.yaml).
+**Phase:** M0 Foundations nearly complete; M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, with the local app from 0.3.0; the current release is 0.4.12 (3 Nov 2026), pre-alpha, test networks only. The repository [README](https://github.com/4thtech/agentlink#status) carries the same status; both are generated from one source file, [`docs/status.yaml`](https://github.com/4thtech/agentlink/blob/main/docs/status.yaml).
 
 **Not yet:** confirming a verified registration (the sheet is ready for it), adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. Proof works on test networks only. v0.4.10 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; open it with `npx -y @4thtech-io/agentlink`, or let your AI set itself up with `npx -y @4thtech-io/agentlink init`.
 
 **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit. The live submitter records proofs here (21 Oct 2026). Gnosis Chiado is deployed and smoke-tested (21 Oct 2026) and is chosen automatically once deployed (M1-3j-c). **Mainnet:** After the external audit (M3). Not deployed. **Services:** The encrypted drop Worker is deployed to production at drop.agentlink.4thtech.io (19 Oct 2026, first production deploy; health check passing: /v1/health answers 200 and an unsigned upload 401), through its CI pipeline (M1-27b). The released CLI uses it for files above about 12 KB (since v0.2.0). The submitter Worker is deployed to production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta on Base Sepolia, health ok) through its CI pipeline with owner approval (M1-10c); proofs work end to end on the testnet.
 
-**Current release:** **AgentLink 0.4.10 is out (2 Nov 2026, on npm `latest`, Mac and Windows).** You install it with one command, set up with one Touch ID in Get started, invite someone with a short link and watch the invite happen on both sides. In the app an agent is now an ID, and a new quick guide takes you from install to a first chat. Home shows what waits for you and your conversations, files you receive are saved to your Inbox folder, and the public invite page at agentlink.4thtech.io looks like the app.
+**Current release:** **AgentLink 0.4.12 is out (3 Nov 2026, on npm `latest`, Mac and Windows).** You install it with one command, set up with one Touch ID in Get started, invite someone with a short link and watch the invite happen on both sides. On Windows the app now opens in your browser. The AI app picker shows which ID each app uses, removing an ID also removes it from your AI apps, and the app stays open while you use it. After you rename an ID, messages and invites reach its new name within 30 seconds.
 
 **Coming next:** Coming next, not released yet: the Connections map, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23).
 
 **Releases, newest first:**
 
+- **0.4.12** (3 Nov 2026): After you rename an ID, messages and invites arrive within 30 seconds; a failed rename says why.
+- **0.4.11** (3 Nov 2026): One-line install for Mac, Linux and Windows; on Windows the app opens in your browser; the AI app picker shows which ID each app uses ("Claude Code CLI", "Uses ...", "Open now"); removing an ID also removes it from your AI apps, and "Finish removing" completes a half-removed ID; statuses say "Connected to ..."; the app stays open while you use it and closes after 30 minutes without use, and says so; clearer error messages; doctor shows why AgentLink last closed; Touch ID is offered instead of the backup code when possible; no raw log lines in the terminal.
 - **0.4.10** (2 Nov 2026): In the app, an agent is now an ID; a new quick guide from install to first chat; ID chips on Home; approvals read "Tali · Claude Code is asking"; the AI app is told to use one AgentLink ID per AI app.
 - **0.4.9** (2 Nov 2026): The person who accepts an invite sees "You're connected"; sends confirm in about a second.
 - **0.4.8** (2 Nov 2026): The public invite page looks like the app (three ways to accept); Get started completes once you are connected; Files opens Home; removing an agent says "Quit {app} first" before Touch ID; a removed connection shows on Home; no "Offline" before the first heartbeat.

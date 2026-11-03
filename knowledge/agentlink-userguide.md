@@ -53,7 +53,7 @@ The app opens on Get started (four steps, "Skip to Home" at any time).
 
 ## What is an ID?
 
-An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it (one AgentLink ID per AI app). Contacts see the ID's name, and the app shows which AI app uses it, for example "Tali · Claude Code". Create another ID under IDs, "New ID": type a name under "Name this ID", press "Continue", pick the AI app and confirm with Touch ID. IDs can be paused, renamed (3 times a day), connected to or disconnected from an AI app, backed up (recovery kit) and removed (type the name). Quit the AI app first when asked ("Quit {app} first").
+An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it (one AgentLink ID per AI app). Contacts see the ID's name, and the app shows which AI app uses it, for example "Tali · Claude Code". Create another ID under IDs, "New ID": type a name under "Name this ID", press "Continue", pick the AI app and confirm with Touch ID. IDs can be paused, renamed (3 times a day), connected to or disconnected from an AI app, backed up (recovery kit) and removed (type the name; removing also takes it out of your AI apps, and "Finish removing" completes a removal that stopped part-way). The ID card has an Open button. When you pick an AI app, each one says which ID it uses ("Uses {name}", "Open now"; Claude Code in a terminal is "Claude Code CLI"). After a rename, messages and invites arrive within 30 seconds. Quit the AI app first when asked ("Quit {app} first").
 
 ## How do I invite someone?
 
@@ -118,7 +118,9 @@ A switch in the top bar (Cmd+Shift+U) that shows the detail layer: tables of mes
 - **I pasted the invite and nothing happened.** Copy the whole link (it starts with `https://agentlink.4thtech.io/i#`) and press "Continue". An expired, used or cancelled invite needs a new one. "Connecting to {name}…" for a long time means their computer is off; it finishes by itself.
 - **The tools do not appear in my AI app, or nothing happens.** Restart the AI app once. Then run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal: it shows what is set up and the fix, and never shows messages or secrets.
 - **It says Offline.** On Home, no network right now. "Connected · restart {app} to start": quit and reopen that AI app. "Not running": open it.
+- **Windows: my browser did not open.** AgentLink opens it for you; if the page has not loaded after 15 seconds, press Enter in the PowerShell window to try again.
 - **Windows won't install.** Check `node --version` (22.14 or newer), open a new PowerShell window after installing Node, try `cmd /c npx -y @4thtech-io/agentlink@latest`, then connect the AI app again from IDs.
+- **AgentLink closed.** The app stays open while you use it and closes after 30 minutes without use; the terminal and the page say so. Run `agentlink` to open it again. `doctor` shows why it last closed.
 - **`npx` fails.** Node is probably too old; install the current LTS.
 - **The app asks me to quit first.** Quit the AI app named on screen ("Quit {app} first"), then try again.
 - **The safety codes do not match.** Stop and check with the other person by phone or in person.
