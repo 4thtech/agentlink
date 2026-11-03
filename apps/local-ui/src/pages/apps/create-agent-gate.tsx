@@ -36,6 +36,11 @@ const MESSAGES: Partial<Record<CreateFinish['kind'] | string, string>> = {
   label_invalid: SETUP_MESSAGES.label_invalid,
   session: SETUP_MESSAGES.session_expired,
   offline: SETUP_MESSAGES.offline,
+  // F4: begin's fixed 409 `no_agent` with no ID left on this computer (the owner stays after the
+  // last ID is removed). New ID builds its plan from a card naming the owner, so it can't run here
+  // yet; the terminal path (init, then owner add-agent, 04 §2.8 M1-9x) can.
+  no_agent:
+    "No ID is left on this computer, so a new one can't be made here yet. Nothing changed. In your own terminal, run `agentlink init`, then the `agentlink owner add-agent` step it shows.",
 };
 
 /** Refusals after which the same plan may be tried again (Decision 45: the plan is kept). */

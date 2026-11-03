@@ -177,5 +177,21 @@ describe('Remove in the session first run started (HOTFIX-045-REMOVE-FIRSTRUN)',
     // The signed `agent.revoke` is kept in the owner's revoked list (never deleted with the agent).
     expect(await readdir(join(pc.home, '.agentlink', 'revoked'))).toHaveLength(1);
     expect(auth.gestures).toBe(2);
+
+    // F4: the owner stays with zero IDs. First run is closed to them (an owner exists) and New ID
+    // has no card naming the owner to build its plan from, so begin is refused with the fixed
+    // no_agent before anything is created (the page maps it to the terminal add-agent path). Pinned
+    // until the zero-ID New ID design lands; nothing is signed or written here.
+    const state = await send(port, '/api/ui/first-run', { headers: base });
+    expect(JSON.parse(state.body)).toEqual({ owner: 'set_up' });
+    const again = await post('/api/ui/agents/begin', new Uint8Array(0), {
+      'X-AgentLink-Input': input({ label: 'Ana two' }),
+    });
+    expect({ status: again.status, body: JSON.parse(again.body) as unknown }).toEqual({
+      status: 409,
+      body: { status: 'no_agent' },
+    });
+    expect(await pc.directory.list()).toEqual([]);
+    expect(auth.gestures).toBe(2);
   }, 60_000);
 });
