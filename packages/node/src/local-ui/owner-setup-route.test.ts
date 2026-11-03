@@ -1282,6 +1282,30 @@ describe('M1-UX-FIRSTRUN-V2: one gesture sets up the owner, the card and the fir
     return { h, s, begun, res, done: JSON.parse(res.body) as DoneBody };
   }
 
+  // W1 (Windows 0.4.12): an ID with keys and no card yet (as `agentlink init` leaves it) and a home
+  // folder that already holds `agentlink` in lower case. On a case-insensitive file system (NTFS;
+  // APFS by default) that folder answers to `AgentLink`: setup succeeds and the rules name it as it
+  // really is. A retry after the old refusal starts from exactly this state (begin made nothing).
+  it('W1: an existing `agentlink` folder in another case is used under its real name', async () => {
+    const real = await withHome();
+    await mkdir(join(real, 'agentlink'));
+    const caseInsensitive =
+      (await lstat(join(real, 'AGENTLINK')).catch(() => undefined)) !== undefined;
+    const parent = join(real, caseInsensitive ? 'agentlink' : 'AgentLink');
+    const agent = await initAgent();
+    const { res, done } = await runSetup(agent);
+    expect(res.status).toBe(200);
+    expect(done.status).toBe('done');
+    expect(done.sendFolder).toBe('allowed');
+    const effective = await agent.client.ownerActions.loadPolicy();
+    expect(effective.mode).toBe('signed');
+    if (effective.mode !== 'signed') return;
+    expect(effective.policy.files.allowedFolders).toEqual([join(parent, 'Send')]);
+    for (const name of ['Send', 'Inbox', 'Proofs']) {
+      expect((await lstat(join(parent, name))).isDirectory()).toBe(true);
+    }
+  });
+
   it('one confirmation: a verified card, a signed first policy with Send allowed, and the folders', async () => {
     const real = await withHome();
     const agent = await initAgent();
