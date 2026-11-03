@@ -22,13 +22,24 @@
 // notice and exits 0. The caller MUST gate every later job on `result == 'green'`; a superseded run
 // deploys and releases nothing (the newer commit's run, or the deploy catch-up, does). It needs a
 // step output file and refuses to run without one.
+//
+// --reuse-version-only-parent (RELEASE-VERSION-ONLY-REUSE, owner decision 2026-11-03; release.yml
+// `ci-green` on main only): when this commit is a version-only commit relative to its first parent,
+// computed from the git trees by tools/release/version-only.mjs (never from a message, title or
+// actor), and that parent's push runs on the same branch have every required gate green, the parent's
+// verdict is reused: result=green, `reused_from=<parent>` and "reused CI verdict of <parent>:
+// version-only" in the run summary. Anything else (not version-only, the parent red, cancelled,
+// without a run, or a classifier error) falls back to waiting for this commit's own CI as before.
+// It needs the checkout of this commit with its parent (fetch-depth 2).
 // It reads only workflow-run and commit metadata; it prints no token and no event data.
 
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { classifyVersionOnly } from './version-only.mjs';
 
 const WORKFLOW_FILE = /^[A-Za-z0-9_-]+\.ya?ml$/;
 // Parentheses: the heavy lane's job on main is named `ci-gate (push)` (OPS-FAST-LANE-1/-3).
+const SHA_RE = /^[0-9a-f]{40}$/;
 const JOB_NAME = /^[A-Za-z0-9_. ()-]+$/;
 const BRANCH = /^(main|wave-[1-9][0-9]*)$/;
 
@@ -39,6 +50,7 @@ export function parseArgs(argv) {
     intervalMs: 30_000,
     missingGraceMs: 10 * 60_000,
     supersededOk: false,
+    reuseVersionOnlyParent: false,
     branch: 'main',
   };
   const positive = (flag, value, unit) => {
@@ -51,6 +63,10 @@ export function parseArgs(argv) {
     const value = argv[i + 1];
     if (flag === '--superseded-ok') {
       out.supersededOk = true;
+      continue;
+    }
+    if (flag === '--reuse-version-only-parent') {
+      out.reuseVersionOnlyParent = true;
       continue;
     }
     switch (flag) {
@@ -201,8 +217,6 @@ export async function checkOnce({ api, repo, sha, require, branch = 'main' }) {
   return { state, reasons, missing, cancelled };
 }
 
-const SHA_RE = /^[0-9a-f]{40}$/;
-
 // The head of `branch` when it has moved on to a descendant of `sha`, otherwise undefined.
 // Throws when the head cannot be read (the caller retries, then fails closed).
 export async function supersededBy({ api, repo, sha, branch = 'main' }) {
@@ -227,15 +241,37 @@ export async function waitForGreen({
   missingGraceMs,
   supersededOk = false,
   branch = 'main',
+  reuseParent,
   now = Date.now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   log = console.log,
 }) {
   const start = now();
   let last;
+  // The parent of a version-only commit: its verdict is reused once both gates are green; a red,
+  // cancelled or missing parent run drops the reuse for good and this commit's own CI decides.
+  let parent =
+    typeof reuseParent === 'string' && SHA_RE.test(reuseParent) ? reuseParent : undefined;
   for (;;) {
     const elapsed = now() - start;
     try {
+      if (parent) {
+        const p = await checkOnce({ api, repo, sha: parent, require, branch });
+        for (const reason of p.reasons) log(`parent ${parent}: ${reason}`);
+        if (p.state === 'green') {
+          return {
+            ok: true,
+            reused: parent,
+            reasons: [...p.reasons, `reused CI verdict of ${parent}: version-only`],
+          };
+        }
+        if (p.state !== 'pending' || p.missing.length > 0) {
+          log(
+            `Not reusing the CI verdict of ${parent} (${p.state}); waiting for this commit's own CI.`,
+          );
+          parent = undefined;
+        }
+      }
       const result = await checkOnce({ api, repo, sha, require, branch });
       last = result;
       for (const reason of result.reasons) log(reason);
@@ -319,18 +355,48 @@ export function readEnv(env) {
  * The command line. Returns the exit code. `writeOutput` appends one `key=value` line to the step
  * output (GITHUB_OUTPUT); `api` defaults to the GitHub REST API.
  */
-export async function run({ argv, env, api, log = console.log, writeOutput, now, sleep }) {
+export async function run({
+  argv,
+  env,
+  api,
+  log = console.log,
+  writeOutput,
+  writeSummary,
+  classify = classifyVersionOnly,
+  now,
+  sleep,
+}) {
   try {
     const args = parseArgs(argv);
     const { token, repo, sha, baseUrl } = readEnv(env);
     if (args.supersededOk && !writeOutput) {
       throw new Error('--superseded-ok needs GITHUB_OUTPUT: the result must gate the next job');
     }
+    let reuseParent;
+    if (args.reuseVersionOnlyParent) {
+      let verdict;
+      try {
+        verdict = classify({ cwd: process.cwd(), sha });
+      } catch (error) {
+        verdict = { versionOnly: false, reasons: [error?.message ?? String(error)] };
+      }
+      if (verdict?.versionOnly === true && SHA_RE.test(String(verdict.parent))) {
+        reuseParent = verdict.parent;
+        log(
+          `${sha} is version-only relative to ${reuseParent}; the parent's CI verdict may be reused.`,
+        );
+      } else {
+        log(
+          `${sha} is not version-only (${(verdict?.reasons ?? []).slice(0, 5).join('; ')}); its own CI decides.`,
+        );
+      }
+    }
     log(
       `Waiting for ${args.require.map((r) => `${r.workflow}:${r.job}`).join(', ')} on ${sha} (${args.branch})`,
     );
     const result = await waitForGreen({
       ...args,
+      reuseParent,
       api: api ?? githubApi({ token, baseUrl }),
       repo,
       sha,
@@ -350,6 +416,12 @@ export async function run({ argv, env, api, log = console.log, writeOutput, now,
       return 1;
     }
     writeOutput?.('result=green');
+    if (result.reused) {
+      writeOutput?.(`reused_from=${result.reused}`);
+      writeSummary?.(`reused CI verdict of ${result.reused}: version-only`);
+      log(`::notice::reused CI verdict of ${result.reused}: version-only`);
+      return 0;
+    }
     log('CI of this commit is green.');
     return 0;
   } catch (error) {
@@ -360,9 +432,11 @@ export async function run({ argv, env, api, log = console.log, writeOutput, now,
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const outputFile = process.env.GITHUB_OUTPUT;
+  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
   process.exitCode = await run({
     argv: process.argv.slice(2),
     env: process.env,
     writeOutput: outputFile ? (line) => appendFileSync(outputFile, `${line}\n`) : undefined,
+    writeSummary: summaryFile ? (line) => appendFileSync(summaryFile, `${line}\n`) : undefined,
   });
 }
