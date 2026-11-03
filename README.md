@@ -97,7 +97,7 @@ Messages and files are encrypted on your computer. Relays and 4thTech services o
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.4.12 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-03
+> **Version:** v0.4.13 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-03
 >
 > - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** The cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.

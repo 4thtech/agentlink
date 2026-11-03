@@ -12,7 +12,7 @@ In your own terminal, run:
 npx -y @4thtech-io/agentlink@latest doctor
 ```
 
-It tells you what is set up and what is not, and prints the fix. It never shows your messages or secrets.
+It tells you what is set up and what is not, and prints the fix. It lists every ID on your computer by its name, with the AI apps that start it, and ends each one with an OK or Problem line. If a Problem needs a change, it points you to the AgentLink app in plain words. It never shows your messages or secrets.
 
 ## Setup
 

@@ -117,6 +117,9 @@ A switch in the top bar (Cmd+Shift+U) that shows the detail layer: tables of mes
 
 - **I pasted the invite and nothing happened.** Copy the whole link (it starts with `https://agentlink.4thtech.io/i#`) and press "Continue". An expired, used or cancelled invite needs a new one. "Connecting to {name}…" for a long time means their computer is off; it finishes by itself.
 - **The tools do not appear in my AI app, or nothing happens.** Restart the AI app once. Then run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal: it shows what is set up and the fix, and never shows messages or secrets.
+- **`doctor` output.** `doctor` lists every ID on your computer by its name, with the AI apps that start it, and ends each with an OK or Problem line; fixes are in plain words and point to the AgentLink app.
+- **Setup stopped at "Confirm it's you" (Windows or Mac).** Fixed in 0.4.13: a folder named `agentlink` in another letter case in your home folder is now used under its own name. Update with `agentlink`.
+- **An AI app showed grey though connected, or Claude Code in the Claude app showed as "Another AI app".** Fixed in 0.4.13: connected apps stay green and it shows as Claude Code.
 - **It says Offline.** On Home, no network right now. "Connected · restart {app} to start": quit and reopen that AI app. "Not running": open it.
 - **Windows: my browser did not open.** AgentLink opens it for you; if the page has not loaded after 15 seconds, press Enter in the PowerShell window to try again.
 - **Windows won't install.** Check `node --version` (22.14 or newer), open a new PowerShell window after installing Node, try `cmd /c npx -y @4thtech-io/agentlink@latest`, then connect the AI app again from IDs.

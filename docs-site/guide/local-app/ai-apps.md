@@ -1,12 +1,12 @@
 # AI apps page
 
-*Applies to AgentLink 0.4.12. In 0.4.3 an AI app is connected from the terminal with `init`.*
+*Applies to AgentLink 0.4.13. In 0.4.3 an AI app is connected from the terminal with `init`.*
 
 The AI apps page shows the AI apps AgentLink found on your computer, such as Claude Code, and which ID each one works with. From here you connect an app, move it to another ID, or disconnect it. Nothing else in the app's settings file is touched.
 
 Open it from **Connect** on an ID in [IDs](ids.md), or from [Get started](get-started-wizard.md). Getting started connects the AI app you pick for you, with the same one Touch ID that creates your ID.
 
-Each app on the list shows which ID it uses now: **Uses** the ID's name, **Uses a removed ID**, or **Set up by hand**. An app that is open at the moment says **Open now**. Claude Code in a terminal is listed as **Claude Code CLI**. If you pick an app that another ID uses, the confirm screen tells you before Touch ID: the app will use the new ID instead of the old one. A removed ID is also removed from your AI apps.
+Each app on the list shows which ID it uses now: **Uses** the ID's name, **Uses a removed ID**, or **Set up by hand**. An app that is open at the moment says **Open now**. Claude Code in a terminal is listed as **Claude Code CLI**. Claude Code run inside the Claude app (its Code tab) shows as **Claude Code**, not "Another AI app". An app that is connected stays green with "Connected", even when it has made no request for a while. If you pick an app that another ID uses, the confirm screen tells you before Touch ID: the app will use the new ID instead of the old one. A removed ID is also removed from your AI apps.
 
 ## Connect an AI app
 
