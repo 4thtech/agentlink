@@ -390,6 +390,30 @@ describe('GET /api/ui/events: the gate (04 §2.5, 08 §1)', () => {
     servers.splice(0);
     await s.ended;
   });
+
+  // F25: the owner's app quit with no word; an open page now hears that the host is closing.
+  it('tells open streams "closing" before the host stops', async () => {
+    const h = await harness();
+    const s = await h.stream();
+    await s.until((t) => t.includes('event: snapshot'));
+    await h.server.close();
+    servers.splice(0);
+    await s.ended;
+    expect(dataOf(s.text(), 'closing')).toEqual([{}]);
+    expect(s.text().indexOf('event: closing')).toBeGreaterThan(s.text().indexOf('event: snapshot'));
+  });
+
+  it('reports activity: a read moves lastAt and a stream counts as an open page', async () => {
+    const h = await harness();
+    expect(h.server.activity.openStreams()).toBe(0);
+    const before = h.server.activity.lastAt();
+    await new Promise((r) => setTimeout(r, 15));
+    const s = await h.stream();
+    await s.until((t) => t.includes('event: snapshot'));
+    expect(h.server.activity.openStreams()).toBe(1);
+    expect(h.server.activity.lastAt()).toBeGreaterThan(before);
+    s.close();
+  });
 });
 
 describe('GET /api/ui/events: what it carries (08 §1)', () => {

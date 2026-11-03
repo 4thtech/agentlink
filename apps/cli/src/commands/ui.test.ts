@@ -8,10 +8,19 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../dispatch.js';
 import type { TerminalContext } from '../runtime/guards.js';
-import { UI_TEXT, UI_WAIT_MS, openUiPage, uiStep, type UiDeps, type UiPage } from './ui.js';
+import {
+  UI_TEXT,
+  UI_WAIT_MS,
+  onStopSignals,
+  openUiPage,
+  uiStep,
+  type UiDeps,
+  type UiPage,
+} from './ui.js';
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 const AGENT: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } };
@@ -36,6 +45,8 @@ interface Script {
   readonly opens?: boolean | 'throws';
   readonly stop?: 'soon' | 'never';
   readonly waitMs?: number;
+  /** F25: the host's page activity (absent: none reported). */
+  readonly activity?: { lastAt(): number; openStreams(): number };
   /** The local agent names on this computer. */
   readonly agents?: readonly string[];
   /** U3-b: the last used agent (app.json). */
@@ -90,6 +101,7 @@ function fakeDeps(script: Script) {
       if (script.start === 'throws') return Promise.reject(new Error('keychain locked'));
       if (script.start === 'none') return Promise.resolve(undefined);
       return Promise.resolve({
+        ...(script.activity === undefined ? {} : { activity: script.activity }),
         page: script.page ?? 'home',
         open: () => {
           calls.opened += 1;
@@ -132,7 +144,10 @@ describe('agentlink ui in the owner terminal (M1-11b-9)', () => {
       await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
       expect(calls).toMatchObject({ start: 1, opened: 1, closed: 1 });
       expect(calls.unsubscribed).toBeGreaterThan(0);
-      expect(p.out).toEqual([page === 'home' ? UI_TEXT.opened : UI_TEXT.openedSetup]);
+      expect(p.out).toEqual([
+        page === 'home' ? UI_TEXT.opened : UI_TEXT.openedSetup,
+        UI_TEXT.closed(PREFIX),
+      ]);
       expect(p.err).toEqual([]);
       expectNoLink(p);
     },
@@ -144,6 +159,61 @@ describe('agentlink ui in the owner terminal (M1-11b-9)', () => {
     await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
     expect(calls.closed).toBe(1);
   });
+
+  it('stops after the idle limit and says so in one plain line (F25)', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ stop: 'never', waitMs: 30 });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls.closed).toBe(1);
+    expect(p.out).toEqual([UI_TEXT.opened, UI_TEXT.closedIdle(PREFIX)]);
+    expect(p.err).toEqual([]);
+  });
+
+  it('page activity resets the idle limit (F25)', async () => {
+    const p = probe(TTY);
+    let lastAt = Date.now();
+    const started = Date.now();
+    setTimeout(() => {
+      lastAt = Date.now();
+    }, 70);
+    const activity = { lastAt: () => lastAt, openStreams: () => 0 };
+    const { deps } = fakeDeps({ stop: 'never', waitMs: 100, activity });
+    await uiStep(p.context, deps, PREFIX);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(165);
+  });
+
+  it('an open page (live stream) keeps it open (F25)', async () => {
+    const p = probe(TTY);
+    const started = Date.now();
+    const activity = {
+      lastAt: () => started,
+      openStreams: () => (Date.now() - started < 200 ? 1 : 0),
+    };
+    const { deps } = fakeDeps({ stop: 'never', waitMs: 60, activity });
+    await uiStep(p.context, deps, PREFIX);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(255);
+  });
+
+  it('the idle line uses the prefix and the Ctrl+C line names no number (F25)', () => {
+    expect(UI_TEXT.closedIdle(PREFIX)).toBe(
+      `AgentLink closed after 30 minutes without use. Run \`${PREFIX}\` to open it again.`,
+    );
+    expect(UI_TEXT.closed(PREFIX)).toBe(`AgentLink closed. Run \`${PREFIX}\` to open it again.`);
+  });
+
+  it.each(['SIGINT', 'SIGTERM', 'SIGHUP'] as const)(
+    '%s stops the host cleanly and unsubscribes (F25)',
+    (signal) => {
+      const proc = new EventEmitter();
+      let stopped = 0;
+      const off = onStopSignals(() => (stopped += 1), proc as unknown as NodeJS.Process);
+      proc.emit(signal);
+      expect(stopped).toBe(1);
+      off();
+      expect(proc.listenerCount('SIGINT') + proc.listenerCount('SIGTERM')).toBe(0);
+      expect(proc.listenerCount('SIGHUP')).toBe(0);
+    },
+  );
 
   it('the limit is 30 minutes', () => {
     expect(UI_WAIT_MS).toBe(30 * 60_000);
