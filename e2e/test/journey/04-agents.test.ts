@@ -28,6 +28,7 @@ import {
   startUiRun,
   text,
   WAVE4,
+  withDiagnostics,
 } from './world.js';
 import { skipGetStartedIfShown } from './helpers-wizard.js';
 
@@ -265,8 +266,15 @@ describe('chapter 4: agents', () => {
     await agentCard(page, 'Work').getByText('Paused', { exact: true }).first().waitFor();
     const before = jp.gestures.total();
     await agentCard(page, 'Work').getByRole('button', { name: 'Resume', exact: true }).click();
-    // Switch to Work, its own read, then the Resume gate (Touch ID).
-    await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    // Switch to Work, its own read, then the Resume gate (Touch ID). Wait for the switch first (the
+    // chip names Work), so the gate is looked for on the views that stay.
+    await page
+      .getByRole('button', { name: /^ID: Work/ })
+      .first()
+      .waitFor({ timeout: 60_000 });
+    await withDiagnostics(page, 'Resume asks for Touch ID', () =>
+      page.getByRole('button', { name: CONFIRM_PASSKEY }).click({ timeout: 60_000 }),
+    );
     await eventually(
       'Work resumed',
       async () => !(await text(page)).includes('Work is paused'),

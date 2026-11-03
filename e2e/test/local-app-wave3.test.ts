@@ -36,6 +36,7 @@ import {
   type Computer,
 } from './app-world.js';
 
+import { fillNameAfterPrefill } from './journey/helpers-agents.js';
 // W4-WIZARD: first run is Get started (journey/helpers-wizard.ts).
 const CONNECT_WITH = /^Connect with (Touch ID|Windows Hello|your passkey)$/;
 // The long link, or W4-SHORT-INVITE's short one (`2.` and 43 characters).
@@ -213,7 +214,7 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     // AI app that is not on this computer (Claude Code stays with the first agent), one Touch ID.
     await page.goto(new URL('/start/app?add=agent', link).href);
     await page.getByRole('heading', { name: 'Name this ID', level: 1 }).waitFor();
-    await page.getByLabel('Name people see').fill('Second agent');
+    await fillNameAfterPrefill(page, 'Second agent');
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('button').filter({ hasText: 'Not found yet' }).first().click();
     await page
@@ -221,7 +222,9 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
       .first()
       .click();
     await page.getByRole('button', { name: CONNECT_WITH }).click();
-    await page.getByRole('heading', { name: /Second agent.? is ready$/ }).waitFor();
+    await page
+      .getByRole('heading', { name: /Second agent.? is ready$/ })
+      .waitFor({ timeout: 60_000 });
     await page.getByRole('button', { name: 'Go to Home' }).click();
     expect((await pc.directory.list()).map((e) => e.name)).toEqual(['default', 'second-agent']);
 

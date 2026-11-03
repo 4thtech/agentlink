@@ -2,7 +2,7 @@
 // a click in the app (never `goto`), so the no-reload probe of world.ts holds.
 import type { Page } from 'playwright';
 import { CONNECT_WITH } from './helpers-wizard.js';
-import { CONFIRM_PASSKEY } from './world.js';
+import { CONFIRM_PASSKEY, withDiagnostics } from './world.js';
 
 /**
  * W4-SHELL-V2: the agent chip's dropdown, top left, opens the Agents page ("Manage agents"; Agents
@@ -20,21 +20,57 @@ export async function openAgents(page: Page): Promise<void> {
  * made it; no app moves to it) → one Touch ID → "{label} is ready" → Go to Home, in the app.
  */
 export async function addAgent(page: Page, label: string): Promise<void> {
-  await page.getByRole('button', { name: /^ID: / }).first().click();
-  await page.getByRole('menuitem', { name: 'New ID' }).click();
-  await page.getByRole('heading', { name: 'Name this ID', level: 1 }).waitFor();
-  await page.getByLabel('Name people see').fill(label);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
-  await page.getByRole('button').filter({ hasText: 'Not found yet' }).first().click();
+  await withDiagnostics(page, `add agent "${label}"`, async () => {
+    await page.getByRole('button', { name: /^ID: / }).first().click();
+    await page.getByRole('menuitem', { name: 'New ID' }).click();
+    await page.getByRole('heading', { name: 'Name this ID', level: 1 }).waitFor();
+    await fillNameAfterPrefill(page, label);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
+    await page.getByRole('button').filter({ hasText: 'Not found yet' }).first().click();
+    await page
+      .getByRole('button', { name: /^Continue with / })
+      .first()
+      .click();
+    await page.getByRole('button', { name: CONNECT_WITH }).click();
+    // The app answers "{label} is ready" or shows an alert. Wait for either: a refusal fails at
+    // once with the app's own words, and a slow host gets the time the signing needs.
+    const ready = page.getByRole('heading', { name: labelled('', label, ' is ready') });
+    const refused = page.getByRole('alert').first();
+    const won = await Promise.race([
+      ready.waitFor({ timeout: 60_000 }).then(() => 'ready' as const),
+      refused.waitFor({ timeout: 60_000 }).then(() => 'refused' as const),
+    ]);
+    if (won === 'refused') {
+      throw new Error(`the app refused: ${(await refused.innerText()).slice(0, 300)}`);
+    }
+    await page.getByRole('button', { name: 'Go to Home', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Sections' }).first().waitFor();
+  });
+}
+
+/**
+ * The name field starts with the open ID's name once the list of IDs has been read. Wait for that
+ * read first, so what is typed is not overwritten by it (or typed over it).
+ */
+export async function fillNameAfterPrefill(page: Page, label: string): Promise<void> {
   await page
-    .getByRole('button', { name: /^Continue with / })
-    .first()
-    .click();
-  await page.getByRole('button', { name: CONNECT_WITH }).click();
-  await page.getByRole('heading', { name: labelled('', label, ' is ready') }).waitFor();
-  await page.getByRole('button', { name: 'Go to Home', exact: true }).click();
-  await page.getByRole('navigation', { name: 'Sections' }).first().waitFor();
+    .waitForFunction(
+      () => {
+        const input = document.querySelector<HTMLInputElement>('input[name="agent-name"]');
+        return input !== null && input.value !== '';
+      },
+      undefined,
+      { timeout: 10_000 },
+    )
+    .catch(() => undefined);
+  await page.getByLabel('Name people see').fill(label);
+  await page.waitForFunction(
+    (expected) =>
+      document.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value === expected,
+    label,
+    { timeout: 5_000 },
+  );
 }
 
 /** A label as the app words it in titles and statements: inside U+2068 … U+2069 (bidi isolates). */
