@@ -20,7 +20,12 @@ import { AgentFolderLockError, withAgentFolderExclusive } from '@4thtech-io/node
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { recordRevokedEntry, writeAgentConfig } from './agent-dir.js';
 import { RUNTIME_MESSAGES } from './errors.js';
-import { NO_AGENT_MESSAGE, openAgent, type RuntimeDeps } from './open-agent.js';
+import {
+  AGENT_GONE_MESSAGE,
+  NO_AGENT_MESSAGE,
+  openAgent,
+  type RuntimeDeps,
+} from './open-agent.js';
 
 const NOW = 1_800_000_000;
 const NO_KEYCHAIN_COPY =
@@ -239,6 +244,25 @@ describe('openAgent (M1-9k)', () => {
       reason: 'no_agent',
       message: NO_AGENT_MESSAGE,
     });
+    expect(rec.probes + rec.keyStores.length + rec.stores.length).toBe(0);
+  });
+
+  // W8-S3 (F16): an AI app entry left behind by a removal names a folder that is gone. "Run init"
+  // is the wrong advice there: the ID was removed, so the copy points to the app (fixed text).
+  it('a removed ID (no folder, the owner revoked list has entries) → `no_agent` with the removed-ID copy', async () => {
+    const disk = new Disk();
+    const { deps, rec } = processDeps(disk);
+    await recordRevokedEntry(home, `0x${encodeHex(randomBytes(20))}`, 'x');
+    const result = await open(deps, 'ag-test');
+    expect(result).toEqual({
+      status: 'needs_setup',
+      reason: 'no_agent',
+      message: AGENT_GONE_MESSAGE,
+    });
+    expect(AGENT_GONE_MESSAGE).toBe(
+      "This ID isn't on this computer any more. Open the AgentLink app to connect this AI app to another ID.",
+    );
+    expect(AGENT_GONE_MESSAGE).not.toContain('ag-test');
     expect(rec.probes + rec.keyStores.length + rec.stores.length).toBe(0);
   });
 

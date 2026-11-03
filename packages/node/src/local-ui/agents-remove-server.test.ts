@@ -60,10 +60,13 @@ import { VirtualPrfAuthenticator } from '../passkey-authenticator.fixture.js';
 import type { OwnerTerminal } from '../owner-terminal.js';
 import {
   removeStatement,
+  runFinishSteps,
+  runRemovalSteps,
   statementLabel,
   type AgentRemovalPort,
   type RemovalAgent,
 } from './api/agents-remove.js';
+import type { LocalUiOwnerOperation } from './route-types.js';
 import type { AgentDirectory, AgentDirectoryEntry, AppHostAgent } from './app-host.js';
 import type { LocalUiAssets } from './context.js';
 
@@ -244,6 +247,8 @@ interface Faults {
   record?: boolean;
   mark?: boolean;
   apps?: boolean;
+  /** Claude Desktop runs: its entry cannot be written (step 5 fails before the keys). */
+  desktop?: boolean;
   folder?: boolean;
   contacts?: number;
   delivery?: 'delivered' | 'undeliverable';
@@ -258,6 +263,8 @@ interface World {
   readonly revoked: Map<string, string>;
   readonly carriers: { text: string; keys: EnvelopeKeys }[];
   readonly entries: Map<string, AgentDirectoryEntry & { readonly agentId: string }>;
+  /** W8-S3: the AI app entries on this computer: app id -> the agent folder its entry runs. */
+  readonly apps: Map<string, string>;
   readonly faults: Faults;
   readonly ownerStores: number[];
   readonly events: ApprovalServerEvent[];
@@ -275,13 +282,22 @@ afterEach(async () => {
  * `solo`: a computer with one agent (HOTFIX-045-REMOVE B2): only `work` is listed and opens.
  * `noneOpen`: the host starts with no agent open (HOTFIX-045-TOUCHID).
  */
-async function world(options: { solo?: boolean; noneOpen?: true } = {}): Promise<World> {
-  const work = await makeAgent('work');
+async function world(
+  options: { solo?: boolean; noneOpen?: true; workName?: string } = {},
+): Promise<World> {
+  const workName = options.workName ?? 'work';
+  const work = await makeAgent(workName);
   const other = await makeAgent('default');
   const agents = new Map([
-    ['work', work],
+    [workName, work],
     ['default', other],
   ]);
+  const apps = new Map<string, string>();
+  const APP_NAMES: Record<string, string> = {
+    antigravity: 'Antigravity',
+    cursor: 'Cursor',
+    'claude-desktop': 'Claude Desktop',
+  };
   const log: string[] = [];
   const revoked = new Map<string, string>();
   const carriers: { text: string; keys: EnvelopeKeys }[] = [];
@@ -301,8 +317,8 @@ async function world(options: { solo?: boolean; noneOpen?: true } = {}): Promise
       },
     ],
     [
-      'work',
-      { name: 'work', label: 'Work', available: true, removing: false, agentId: work.agentId },
+      workName,
+      { name: workName, label: 'Work', available: true, removing: false, agentId: work.agentId },
     ],
   ]);
   if (options.solo === true) {
@@ -414,15 +430,29 @@ async function world(options: { solo?: boolean; noneOpen?: true } = {}): Promise
       if (!revoked.has(agentId)) revoked.set(agentId, text);
       return Promise.resolve();
     },
-    removeAppEntries: (name) => {
+    // W8-S3: entry-only, exactly ours for this folder (the CLI's real desk is tested in ui-remove).
+    appEntries: (name) =>
+      Promise.resolve(
+        [...apps]
+          .filter(([, runs]) => runs === name)
+          .map(([app]) => ({ app, name: APP_NAMES[app] ?? app })),
+      ),
+    removeAppEntries: (name, agentId, shown) => {
       if (faults.apps === true) return Promise.reject(new Error('apps'));
+      if (agentId !== agents.get(name)?.agentId) return Promise.reject(new Error('mismatch'));
+      for (const { app } of shown) {
+        if (app === 'claude-desktop' && faults.desktop === true) {
+          return Promise.reject(new Error('quit_first'));
+        }
+      }
+      for (const { app } of shown) if (apps.get(app) === name) apps.delete(app);
       log.push(`apps ${name}`);
       return Promise.resolve();
     },
   };
   const opened: string[] = [];
   // HOTFIX-045-TOUCHID: `noneOpen` starts the host with no agent open (as after a failed removal).
-  const initial = options.noneOpen === true ? undefined : hostAgent('work');
+  const initial = options.noneOpen === true ? undefined : hostAgent(workName);
   const server = await startApprovalServerWith(
     {
       source: initial?.source ?? sourceOf(work),
@@ -456,6 +486,7 @@ async function world(options: { solo?: boolean; noneOpen?: true } = {}): Promise
     revoked,
     carriers,
     entries,
+    apps,
     faults,
     ownerStores,
     events,
@@ -838,6 +869,229 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
       expectFixedEvents(w);
     },
   );
+});
+
+/** The owner's own signed agent.revoke for `agentId`, as the revoked list holds it. */
+async function ownerRevoke(agentId: string): Promise<string> {
+  const { body } = buildAgentRevokeBody({
+    agent: agentId,
+    owner: encodeHex(owner.ownerNostr),
+    issuedAt: 1_761_700_000,
+  });
+  const store = await KeychainOwnerKeyStore.open(keychain, owner);
+  const session = await store.unlock({ kind: 'passphrase', secret: encodeUtf8(code) });
+  try {
+    const sig = await session.signOwnerAction(body as unknown as JsonObject);
+    return canonicalize({ body, sig } as never);
+  } finally {
+    await session.close();
+    await store.close();
+  }
+}
+
+// W8-S3 (F16): 04 §2.5 step 5 was never wired, so every removal left the AI app entry behind, and
+// the app offered no way to finish a stopped removal.
+describe('W8-S3: AI app entries (04 §2.5 step 5) and finishing a removal', () => {
+  it('the observed state (revoked entry + folder, no mark, an AI app runs --agent ag-test) finishes: entry gone, folder gone', async () => {
+    const w = await world({ workName: 'ag-test', solo: true, noneOpen: true });
+    // 29 Oct, U3-e build: the revoke was recorded, then the removal stopped. No mark in config.json.
+    const recorded = await ownerRevoke(w.work.agentId);
+    w.revoked.set(w.work.agentId, recorded);
+    w.apps.set('antigravity', 'ag-test');
+    w.apps.set('cursor', 'default');
+    // Finishing a retired ID: presence, no typed name (W8-FINISH-REMOVE; owner confirms at merge).
+    const res = await remove(w, { name: 'ag-test' }, { generation: (await generationOf(w)) ?? '0' });
+    expect(res.json).toEqual({ status: 'removed' });
+    expect(w.apps.has('antigravity')).toBe(false);
+    // An entry that runs another folder is never touched.
+    expect(w.apps.get('cursor')).toBe('default');
+    expect(w.log).toContain('removeFolder ag-test');
+    expect(itemsOf(w.work.agentId)).toEqual([]);
+    // The recorded entry is kept and is never replaced.
+    expect(w.revoked.get(w.work.agentId)).toBe(recorded);
+    const steps = w.log.filter((l) => /^(apps|removeFolder)/.test(l));
+    expect(steps).toEqual(['apps ag-test', 'removeFolder ag-test']);
+  });
+
+  it('the observed state also finishes with the typed name (the IDs page Try again)', async () => {
+    const w = await world({ workName: 'ag-test' });
+    w.revoked.set(w.work.agentId, await ownerRevoke(w.work.agentId));
+    w.apps.set('antigravity', 'ag-test');
+    const res = await remove(w, { name: 'ag-test', typedLabel: 'Work' });
+    expect(res.json).toEqual({ status: 'removed' });
+    expect(w.apps.has('antigravity')).toBe(false);
+    expect(w.log).toContain('removeFolder ag-test');
+  });
+
+  it('a removal removes the AI app entries that run this folder, before the keys, and no other', async () => {
+    const w = await world();
+    w.apps.set('antigravity', 'work');
+    w.apps.set('cursor', 'default');
+    const res = await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(res.json).toEqual({ status: 'removed' });
+    expect([...w.apps]).toEqual([['cursor', 'default']]);
+  });
+
+  it('GAP B (keys erased, folder present): finishing removes the AI app entry and the folder, and the s3 items the backend names', async () => {
+    const w = await world({ solo: true, noneOpen: true });
+    w.revoked.set(w.work.agentId, await ownerRevoke(w.work.agentId));
+    // The seed and the store key are gone (the store no longer opens); the storage items stayed.
+    keychain.items.delete(w.work.agentId);
+    keychain.items.delete(keychainAccount(w.work.agentId, 'store-key'));
+    expect(itemsOf(w.work.agentId)).toContain(`${w.work.agentId}:s3:0123456789abcdef`);
+    w.apps.set('antigravity', 'work');
+    w.apps.set('cursor', 'default');
+    const res = await remove(w, { name: 'work' }, { generation: (await generationOf(w)) ?? '0' });
+    expect(res.json).toEqual({ status: 'removed' });
+    expect(w.log).toContain('removal-open-failed work');
+    expect(w.apps.has('antigravity')).toBe(false);
+    expect(w.apps.get('cursor')).toBe('default');
+    expect(w.log.filter((l) => /^(apps|removeFolder)/.test(l))).toEqual([
+      'apps work',
+      'removeFolder work',
+    ]);
+    expect(itemsOf(w.work.agentId)).toEqual([]);
+  });
+
+  it('Claude Desktop running: step 5 fails before the keys are erased, and Try again finishes', async () => {
+    const w = await world();
+    w.apps.set('claude-desktop', 'work');
+    w.faults.desktop = true;
+    const res = await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(res.status).toBe(500);
+    expect(res.json).toEqual({ status: 'failed' });
+    expect(w.events).toContainEqual({ kind: 'remove', outcome: 'failed', step: 'apps' });
+    // Retired and marked, but the keys and the folder are still there, and so is the entry.
+    expect(w.revoked.has(w.work.agentId)).toBe(true);
+    expect(itemsOf(w.work.agentId)).toHaveLength(4);
+    expect(w.log).not.toContain('removeFolder work');
+    expect(w.apps.get('claude-desktop')).toBe('work');
+    w.faults.desktop = false;
+    const retry = await remove(w, { name: 'work' }, { generation: (await generationOf(w)) ?? '1' });
+    expect(retry.json).toEqual({ status: 'removed' });
+    expect(w.apps.has('claude-desktop')).toBe(false);
+    expect(itemsOf(w.work.agentId)).toEqual([]);
+    expectFixedEvents(w);
+  });
+
+  it('without the typed name, an ID that is not retired is refused (invalid) and nothing is touched', async () => {
+    const w = await world();
+    w.apps.set('antigravity', 'work');
+    const res = await remove(w, { name: 'work' });
+    expect(res.status).toBe(400);
+    expect(res.json).toEqual({ status: 'invalid' });
+    expect(w.ownerStores).toEqual([]);
+    expect(w.revoked.size).toBe(0);
+    expect(w.apps.get('antigravity')).toBe('work');
+    expect(itemsOf(w.work.agentId)).toHaveLength(4);
+    // A typed name is still checked when it is sent for a retired ID.
+    w.revoked.set(w.work.agentId, await ownerRevoke(w.work.agentId));
+    const wrong = await remove(w, { name: 'work', typedLabel: 'work' });
+    expect(wrong.json).toEqual({ status: 'label_mismatch' });
+  });
+
+  it("without the typed name, a revoked entry signed by another owner is not this owner's retirement (invalid)", async () => {
+    const w = await world();
+    const stranger = new MemoryOwnerKeyStore(randomBytes(32), {
+      kind: 'passphrase',
+      secret: encodeUtf8('stranger passphrase'),
+    });
+    const keys = await stranger.getPublicKeys();
+    const { body } = buildAgentRevokeBody({
+      agent: w.work.agentId,
+      owner: encodeHex(keys.ownerNostr),
+      issuedAt: 1_760_000_000,
+    });
+    const session = await stranger.unlock({
+      kind: 'passphrase',
+      secret: encodeUtf8('stranger passphrase'),
+    });
+    const sig = await session.signOwnerAction(body as unknown as JsonObject);
+    await session.close();
+    w.revoked.set(w.work.agentId, canonicalize({ body, sig } as never));
+    const res = await remove(w, { name: 'work' });
+    expect(res.json).toEqual({ status: 'invalid' });
+    expect(w.log).not.toContain('removeFolder work');
+    expect(itemsOf(w.work.agentId)).toHaveLength(4);
+  });
+
+  it('the port must remove AI app entries: a port without the step 5 methods does not typecheck', () => {
+    const partial = {
+      exclusive: <T>(_name: string, fn: () => Promise<T>) => fn(),
+      open: () => Promise.resolve(undefined),
+      keys: () => Promise.resolve(undefined),
+      readRevoked: () => Promise.resolve({ kind: 'none' as const }),
+      recordRevoked: () => Promise.resolve(),
+    };
+    // @ts-expect-error: appEntries and removeAppEntries are required (04 §2.5 step 5).
+    const port: AgentRemovalPort = partial;
+    expect(typeof port.exclusive).toBe('function');
+  });
+
+  it('the statement lists each AI app entry that is removed, before the gesture', async () => {
+    const seen: string[][] = [];
+    const ownerOp: LocalUiOwnerOperation = {
+      sign: (review) => {
+        seen.push([...review.lines]);
+        return Promise.reject(new Error('cancelled'));
+      },
+    };
+    const agentId = `0x${'ab'.repeat(20)}`;
+    const shown = [{ app: 'antigravity', name: 'Antigravity' }];
+    const port = {
+      appEntries: (name: string) => Promise.resolve(name === 'ag-test' ? shown : []),
+      removeAppEntries: () => Promise.reject(new Error('never before the gesture')),
+    } as unknown as AgentRemovalPort;
+    const client = {
+      removal: {
+        facts: () =>
+          Promise.resolve({
+            agentId,
+            contacts: 0,
+            storageIds: [],
+            ownerNostr: `0x${encodeHex(owner.ownerNostr)}`,
+          }),
+        prepareRevoke: () => Promise.resolve({}),
+      },
+      ownerActions: { loadLabel: () => Promise.resolve({ status: 'verified', label: 'Test' }) },
+    } as unknown as AgentLinkClient;
+    const never = (): Promise<never> => Promise.reject(new Error('never'));
+    await expect(
+      runRemovalSteps({
+        name: 'ag-test',
+        agentId,
+        label: 'Test',
+        anyway: false,
+        agent: { client, context: never, close: () => Promise.resolve() },
+        port,
+        markRemoving: never,
+        removeFolder: never,
+        erase: { eraseAgentKeys: never },
+        owner: ownerOp,
+      }),
+    ).rejects.toThrow('cancelled');
+    expect(seen[0]).toContain('Antigravity will stop using Test.');
+    await expect(
+      runFinishSteps({
+        name: 'ag-test',
+        label: 'Test',
+        agentId,
+        recorded: '{}',
+        ownerNostr: encodeHex(owner.ownerNostr),
+        port,
+        removeFolder: never,
+        erase: { eraseAgentKeys: never },
+        owner: ownerOp,
+        now: () => 1_761_700_000,
+      }),
+    ).rejects.toThrow('cancelled');
+    expect(seen[1]).toContain('Antigravity will stop using ag-test.');
+    // Nothing to remove: no such line.
+    expect(removeStatement('Work', 'work', 0).join(' ')).not.toContain('will stop using');
+    expect(removeStatement('Work', 'work', 0, false, shown)).toContain(
+      'Antigravity will stop using Work.',
+    );
+  });
 });
 
 describe('the statement before the gesture (04 §2.5, 11 §5)', () => {
