@@ -294,6 +294,10 @@ export function nodeUiDeps(): UiDeps {
               close: () => agent.close(),
             },
             open: (other) => openUiHostAgent(hostDeps, other),
+            // F2: Welcome's "Which AI app" list also works when a switch left no agent open.
+            aiAppsList: Object.freeze({
+              list: () => createAiAppsDesk({ home: homedir(), env: process.env }).list(),
+            }),
             // U3-e: removing an agent (the folder lock, its own open, the revoked list).
             removal: uiRemovalPort(),
             // U3-invite (08 §4): the invite `join` checked, held in memory by the host only.
