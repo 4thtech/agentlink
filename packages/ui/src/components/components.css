@@ -213,6 +213,11 @@ body {
   padding-left: var(--al-space-3);
   color: var(--al-color-fg-subtle);
 }
+.al-input-suffix {
+  display: flex;
+  align-items: center;
+  padding-right: var(--al-space-1);
+}
 .al-input {
   flex: 1;
   min-width: 0;

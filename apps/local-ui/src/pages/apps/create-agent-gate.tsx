@@ -15,7 +15,7 @@
 // W8-S5 (F7; 04 §2.8; 11 §5.8): an AI app whose entry names another ID (or one that was removed) is
 // a move. Begin then runs as soon as that app is the one to connect, and the screen shows begin's
 // own replacement line ("{app} will use {label} instead of {old}") before the one gesture.
-import { Banner, Button, TextField } from '@4thtech-io/ui';
+import { Banner, Button } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 import { AppMark } from '../first-run/pick-app.js';
@@ -28,13 +28,19 @@ import {
 } from '../contacts/passkey-switch.js';
 import { CONTACTS_STRINGS as C, PASSKEY_WHY } from '../contacts/strings.js';
 import { detectPlatform } from '../first-run/passkey.js';
+import { BackupCodeField } from '../first-run/backup-code.js';
+import {
+  forgetSwitchUnsupported,
+  otherBrowser,
+  rememberSwitchUnsupported,
+  switchUnsupportedHere,
+} from '../first-run/passkey-nudge.js';
 import {
   NAME,
   SENSOR,
   SETUP_MESSAGES,
   UPGRADE,
   UPGRADE_MESSAGES,
-  WORKING_BROWSER,
   type Platform,
 } from '../first-run/strings.js';
 import {
@@ -80,7 +86,7 @@ const MESSAGES: Partial<Record<CreateFinish['kind'] | string, string>> = {
 
 /** The switch's outcome in plain words, as the presence sheet says it (presence-prompt.tsx). */
 function switchNote(outcome: PasskeySwitchOutcome, platform: Platform): string {
-  const unsupported = PASSKEY_WHY.switchUnsupported(SENSOR[platform], WORKING_BROWSER[platform]);
+  const unsupported = PASSKEY_WHY.switchUnsupported(SENSOR[platform], otherBrowser(platform));
   if (outcome.kind === 'cancelled') return PASSKEY_WHY.switchCancelled;
   if (outcome.kind === 'unsupported') return unsupported;
   if (outcome.kind !== 'error') return UPGRADE_MESSAGES.failed;
@@ -168,6 +174,7 @@ export function CreateAgentGate({
   const [status, setStatus] = useState<PasskeyStatus | undefined>(undefined);
   const [switching, setSwitching] = useState(false);
   const [switched, setSwitched] = useState(false);
+  const [noSwitch, setNoSwitch] = useState(switchUnsupportedHere);
   const [note, setNote] = useState<string | undefined>(undefined);
   const mounted = useRef(true);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
@@ -339,7 +346,12 @@ export function CreateAgentGate({
 
   const withCode = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    if (working || code.length === 0) return;
+    if (working) return;
+    if (code.trim().length === 0) {
+      setNote(UPGRADE_MESSAGES.empty);
+      return;
+    }
+    setNote(undefined);
     setWorking(true);
     setError(undefined);
     try {
@@ -354,7 +366,9 @@ export function CreateAgentGate({
     }
   };
 
-  const switchTo = status?.kind === 'unavailable' && !switched ? status.switchTo : undefined;
+  // F49: a switch that already failed here for lack of PRF is not pushed again (UI nudge only).
+  const switchTo =
+    status?.kind === 'unavailable' && !switched && !noSwitch ? status.switchTo : undefined;
   // The server says this computer has no passkey for this owner: the Touch ID button could only
   // fall back to the code, so the code form (with why) is shown at once. Without the switch values
   // (no ID open) the switch can't be offered here (`POST /api/owner/passkey` needs an open ID).
@@ -385,6 +399,7 @@ export function CreateAgentGate({
         if (!mounted.current) return;
         setWorking(false);
         if (read.kind === 'ready') {
+          forgetSwitchUnsupported();
           setStatus(read);
           setSwitched(true);
           setSwitching(false);
@@ -396,6 +411,15 @@ export function CreateAgentGate({
         return;
       }
       setWorking(false);
+      if (
+        outcome.kind === 'unsupported' ||
+        (outcome.kind === 'error' && outcome.problem === 'passkey_unsupported')
+      ) {
+        rememberSwitchUnsupported();
+        setNoSwitch(true);
+        setSwitching(false);
+        setUseCode(true);
+      }
       setNote(switchNote(outcome, platform));
     })();
   };
@@ -404,8 +428,10 @@ export function CreateAgentGate({
   const why =
     status?.kind === 'unavailable' && !switched
       ? status.reason === 'browser'
-        ? PASSKEY_WHY.browser(sensor, WORKING_BROWSER[platform])
-        : PASSKEY_WHY[status.reason](sensor)
+        ? PASSKEY_WHY.browser(sensor, otherBrowser(platform))
+        : noSwitch && status.reason === 'not_set_up_here'
+          ? PASSKEY_WHY.noSwitchHere(sensor)
+          : PASSKEY_WHY[status.reason](sensor)
       : undefined;
   const back =
     onCancel === undefined ? null : (
@@ -413,7 +439,7 @@ export function CreateAgentGate({
         {NAME.back}
       </Button>
     );
-  const switchButton = (variant: 'primary' | 'secondary'): ReactElement => (
+  const switchButton = (variant: 'primary' | 'ghost'): ReactElement => (
     <Button
       variant={variant}
       icon="key-round"
@@ -428,19 +454,14 @@ export function CreateAgentGate({
     </Button>
   );
   const codeField = (
-    <TextField
+    <BackupCodeField
       label="Backup code"
       hint={EARLIER_OWNER_CODE_HINT}
       name="backup-code"
-      type="password"
       autoComplete="current-password"
-      autoCapitalize="off"
-      autoCorrect="off"
-      spellCheck={false}
-      mono
       value={code}
       disabled={working}
-      onChange={(e) => setCode(e.currentTarget.value)}
+      onValue={setCode}
     />
   );
 
@@ -499,7 +520,7 @@ export function CreateAgentGate({
             </p>
           )}
         </form>
-      ) : useCode || !canPasskey || (switchTo === undefined && noneHere) ? (
+      ) : useCode || !canPasskey || noneHere ? (
         <form className="ag-code-form" autoComplete="on" onSubmit={(e) => void withCode(e)}>
           {why === undefined ? null : (
             <p className="al-text-body-sm al-muted" role="status">
@@ -508,12 +529,17 @@ export function CreateAgentGate({
           )}
           {codeField}
           <div className="ag-actions">
-            <Button type="submit" variant="primary" disabled={working || code.length === 0}>
+            <Button type="submit" variant="primary" disabled={working} data-confirm-code="">
               {NAME.confirmCode}
             </Button>
-            {switchTo === undefined ? null : switchButton('secondary')}
+            {switchTo === undefined ? null : switchButton('ghost')}
             {back}
           </div>
+          {note === undefined ? null : (
+            <p className="al-text-body-sm" role="alert">
+              {note}
+            </p>
+          )}
         </form>
       ) : switchTo !== undefined ? (
         <>

@@ -48,6 +48,7 @@ import type {
 } from './client.js';
 import { APPROVAL_ID } from './client.js';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
+import { normaliseBackupCode } from '../first-run/backup-code.js';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 
 /** The owner as the page knows it: set up or not, and the decision passkey when registered. */
@@ -297,7 +298,8 @@ export function CodeForm({
     event.preventDefault();
     const field = input.current;
     if (field === null || busy) return;
-    const code = field.value;
+    // F49: pasted invisible separators removed (a code's shape only; a passphrase is sent as typed).
+    const code = normaliseBackupCode(field.value);
     field.value = '';
     setShown(false);
     setBusy(true);

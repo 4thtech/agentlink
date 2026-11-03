@@ -224,7 +224,7 @@ describe('UI-REFRESH-i: waiting, codes match, duplicate notice', () => {
       );
       field.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    await click(button(S.confirm));
+    await click(button(S.confirmWithCode));
     expect(host.querySelectorAll('.al-moment[data-kind="codes"]')).toHaveLength(1);
     expect(text()).toContain(S.matched);
   });

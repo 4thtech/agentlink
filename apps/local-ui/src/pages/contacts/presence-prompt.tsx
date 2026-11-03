@@ -6,11 +6,18 @@
 // falling back to the backup code silently, and an owner without a passkey on this computer can
 // switch once inside the sheet (passkey-switch.ts): the backup code and one touch register the
 // passkey; then the operation itself is confirmed with its own touch (one entry, one operation).
-import { Button, TextField } from '@4thtech-io/ui';
+import { Button } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 import { detectPlatform } from '../first-run/passkey.js';
-import { SENSOR, UPGRADE, UPGRADE_MESSAGES, WORKING_BROWSER } from '../first-run/strings.js';
+import { BackupCodeField } from '../first-run/backup-code.js';
+import {
+  forgetSwitchUnsupported,
+  otherBrowser,
+  rememberSwitchUnsupported,
+  switchUnsupportedHere,
+} from '../first-run/passkey-nudge.js';
+import { SENSOR, UPGRADE, UPGRADE_MESSAGES } from '../first-run/strings.js';
 import {
   passkeyProof,
   readPasskeyStatus,
@@ -52,6 +59,8 @@ export function PresencePrompt({
   const [working, setWorking] = useState(false);
   const [switchNote, setSwitchNote] = useState<string | undefined>(undefined);
   const [switched, setSwitched] = useState(false);
+  // F49: a switch already failed in this browser for lack of PRF, so it is not offered again here.
+  const [noSwitch, setNoSwitch] = useState(switchUnsupportedHere);
   const mounted = useRef(true);
   const platform = detectPlatform();
   const sensor = SENSOR[platform];
@@ -86,7 +95,12 @@ export function PresencePrompt({
 
   const submitCode = (event: FormEvent): void => {
     event.preventDefault();
-    if (code === '' || busy) return;
+    if (busy) return;
+    if (code.trim() === '') {
+      setSwitchNote(UPGRADE_MESSAGES.empty);
+      return;
+    }
+    setSwitchNote(undefined);
     const proof: PresenceProof = { kind: 'code', code };
     setCode('');
     onSubmit(proof);
@@ -123,6 +137,7 @@ export function PresencePrompt({
         if (!mounted.current) return;
         setWorking(false);
         if (status.kind === 'ready') {
+          forgetSwitchUnsupported();
           setFound(status.info);
           setWhy(undefined);
           setSwitching(false);
@@ -135,14 +150,19 @@ export function PresencePrompt({
       }
       setWorking(false);
       if (outcome.kind === 'cancelled') return setSwitchNote(PASSKEY_WHY.switchCancelled);
-      if (outcome.kind === 'unsupported') {
-        return setSwitchNote(PASSKEY_WHY.switchUnsupported(sensor, WORKING_BROWSER[platform]));
+      if (
+        outcome.kind === 'unsupported' ||
+        (outcome.kind === 'error' && outcome.problem === 'passkey_unsupported')
+      ) {
+        // F49: this computer's passkey gives no PRF. Back to the backup code, which confirms this
+        // operation now; the switch is not pushed again in this browser (a UI nudge only).
+        rememberSwitchUnsupported();
+        setNoSwitch(true);
+        setSwitching(false);
+        return setSwitchNote(PASSKEY_WHY.switchUnsupported(sensor, otherBrowser(platform)));
       }
       const problem = outcome.problem;
       if (problem === 'wait') return setSwitchNote(UPGRADE_MESSAGES.wait(outcome.retryAfter ?? 1));
-      if (problem === 'passkey_unsupported') {
-        return setSwitchNote(PASSKEY_WHY.switchUnsupported(sensor, WORKING_BROWSER[platform]));
-      }
       if (
         problem === 'presence_rejected' ||
         problem === 'presence_required' ||
@@ -161,9 +181,11 @@ export function PresencePrompt({
     why === undefined
       ? undefined
       : why.reason === 'browser'
-        ? PASSKEY_WHY.browser(sensor, WORKING_BROWSER[platform])
-        : PASSKEY_WHY[why.reason](sensor);
-  const canSwitch = why?.switchTo !== undefined;
+        ? PASSKEY_WHY.browser(sensor, otherBrowser(platform))
+        : noSwitch && why.reason === 'not_set_up_here'
+          ? PASSKEY_WHY.noSwitchHere(sensor)
+          : PASSKEY_WHY[why.reason](sensor);
+  const canSwitch = why?.switchTo !== undefined && !noSwitch;
 
   return (
     <section className="ct-presence" aria-label={S.presenceIntro}>
@@ -180,17 +202,13 @@ export function PresencePrompt({
         <form className="ct-presence-form" onSubmit={submitSwitch} autoComplete="off">
           <p className="al-text-body-sm al-muted">{PASSKEY_WHY.switchIntro(sensor)}</p>
           {/* As the approval card's code field (11 §5): no autofill invitation. */}
-          <TextField
+          <BackupCodeField
             label={S.ownerCode}
             hint={EARLIER_OWNER_CODE_HINT}
             name="owner-code"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            mono
             value={code}
             disabled={working}
-            onChange={(e) => setCode(e.currentTarget.value)}
+            onValue={setCode}
           />
           <div className="ct-actions">
             <Button type="submit" variant="primary" icon="key-round" disabled={working || busy}>
@@ -222,38 +240,44 @@ export function PresencePrompt({
             </p>
           )}
           <form className="ct-presence-form" onSubmit={submitCode}>
-            <TextField
+            <BackupCodeField
               label={S.ownerCode}
               hint={EARLIER_OWNER_CODE_HINT}
               name="owner-code"
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              mono
               value={code}
-              onChange={(e) => setCode(e.currentTarget.value)}
+              onValue={setCode}
             />
+            {/* F49: one primary action, the backup code confirms. The switch is a quiet link. */}
             <div className="ct-actions">
-              <Button type="submit" variant="primary" disabled={busy || code === ''}>
-                {S.confirm}
+              <Button type="submit" variant="primary" disabled={busy} data-confirm-code="">
+                {S.confirmWithCode}
               </Button>
-              {canSwitch ? (
-                <Button
-                  variant="secondary"
-                  icon="key-round"
-                  onClick={() => {
-                    setSwitching(true);
-                    setCode('');
-                  }}
-                  disabled={busy}
-                >
-                  {UPGRADE.bannerAction(platform)}
-                </Button>
-              ) : null}
               <Button variant="ghost" onClick={onCancel} disabled={busy}>
                 {S.cancel}
               </Button>
             </div>
+            {switchNote === undefined ? null : (
+              <p className="al-text-body-sm ct-error" role="alert">
+                {switchNote}
+              </p>
+            )}
+            {canSwitch ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon="key-round"
+                className="ct-switch-link"
+                data-switch-passkey=""
+                onClick={() => {
+                  setSwitching(true);
+                  setSwitchNote(undefined);
+                  setCode('');
+                }}
+                disabled={busy}
+              >
+                {UPGRADE.bannerAction(platform)}
+              </Button>
+            ) : null}
           </form>
         </>
       ) : (

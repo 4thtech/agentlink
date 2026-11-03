@@ -332,7 +332,7 @@ describe('Agents, simple (A8)', () => {
       );
       code().dispatchEvent(new Event('input', { bubbles: true }));
     });
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     const [post] = posts('/api/ui/agents/resume');
     expect(post!.body).toBe('123456');
     expect(post!.headers.get('X-AgentLink-Input')).toBe('e30');
@@ -349,7 +349,7 @@ describe('Agents, simple (A8)', () => {
     await type(card('default').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
     await click(button(card('default'), 'Rename with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     expect(plain(host)).toContain("Renamed. Your contacts will see Home next time they're online.");
 
     answers['POST /api/ui/agents/label'] = {
@@ -360,7 +360,7 @@ describe('Agents, simple (A8)', () => {
     await type(card('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Job');
     await click(button(card('work'), 'Rename with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     expect(plain(host)).toMatch(/You can rename Work again at \S/);
   });
 
@@ -378,7 +378,7 @@ describe('Agents, simple (A8)', () => {
     expect(personal.textContent).toContain('Contacts still see My agent');
     await click(button(personal, 'Update contacts'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     const [post] = posts('/api/ui/agents/label');
     expect(post).toBeDefined();
   });

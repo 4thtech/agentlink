@@ -166,12 +166,18 @@ async function mount(
 }
 
 describe('W8-F13: the New ID gate offers Touch ID to an owner without one here', () => {
-  it('no passkey here: "Switch to Touch ID" first, the backup code as the other way', async () => {
+  it('no passkey here (F49): the backup code confirms (primary), the switch is a quiet link', async () => {
     await mount(NO_PASSKEY);
-    expect(labels()).toContain(UPGRADE.bannerAction('mac'));
-    expect(labels()).toContain(NAME.backupInstead);
+    const confirm = [...host.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === NAME.confirmCode,
+    );
+    expect(confirm?.className).toContain('al-btn-primary');
+    const sw = [...host.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === UPGRADE.bannerAction('mac'),
+    );
+    expect(sw?.className).toContain('al-btn-ghost');
+    expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     expect(labels()).not.toContain('Connect with Touch ID');
-    expect(host.textContent).toContain(UPGRADE.bannerBody);
   });
 
   it('with a passkey here: the one Touch ID button, no switch', async () => {

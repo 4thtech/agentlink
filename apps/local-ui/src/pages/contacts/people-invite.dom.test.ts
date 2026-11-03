@@ -206,7 +206,7 @@ describe('W4-WIRE-2: a pasted invite link on the Invite screen (Decision 52 (3))
       );
       code.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    await click(S.confirm);
+    await click(S.confirmWithCode);
     expect(state.accepted).toBe(1);
     state.contacts = [marko];
     await act(async () => {
