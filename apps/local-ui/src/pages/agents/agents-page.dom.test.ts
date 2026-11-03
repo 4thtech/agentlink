@@ -241,7 +241,7 @@ describe('Rename', () => {
     await click(button(rowOf('work'), 'Rename with Touch ID'));
     expect(plain(host)).toContain('Rename Work to Home');
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     const post = calls.find((c) => c.url === '/api/ui/agents/label')!;
     expect(post.body).toBe('123456');
     expect(post.headers.get('X-AgentLink-Input')).toBeTruthy();
@@ -253,7 +253,7 @@ describe('Rename', () => {
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
     await click(button(rowOf('work'), 'Rename with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     expect(plain(host)).toContain('Not renamed yet. Try again.');
     expect(rowOf('work')).toBeTruthy();
   });
@@ -280,7 +280,7 @@ describe('label check and removal states', () => {
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     expect(host.querySelector('[role="dialog"]')).toBeNull();
   });
 });
@@ -295,7 +295,7 @@ describe('Remove', () => {
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
   };
   it('names what goes and keeps the button off until the exact label is typed', async () => {
     const sheet = await open('work');
@@ -575,7 +575,7 @@ describe('W8-S4: finish removing, and one "Not used" line', () => {
     expect(button(sheet, 'Export history first')).toBeDefined();
     await click(button(sheet, 'Finish with Touch ID'));
     await type(host.querySelector<HTMLInputElement>('input[name="owner-code"]')!, '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     const post = calls.find((c) => c.url === '/api/ui/agents/remove')!;
     const sent = JSON.parse(
       atob(post.headers.get('X-AgentLink-Input')!.replace(/-/g, '+').replace(/_/g, '/')),

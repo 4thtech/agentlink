@@ -8,6 +8,10 @@
 // Where the browser reports no PRF, the page offers "continue with a backup code only", which asks
 // for any passkey (no attachment): the gesture still proves presence, and the server keeps the
 // backup code as the way to approve.
+//
+// M1-11s-c-c (F48): where create() returns `prf.enabled` without a PRF output, a second gesture
+// (get() for the new credential) follows at once in the same owner operation; its PRF output and
+// assertion go to `finish`, which checks the assertion before using the output.
 import type { CreationValues, UpgradeValues } from './setup-api.js';
 import type { Platform } from './strings.js';
 
@@ -75,6 +79,8 @@ function fromBase64url(text: string): Uint8Array<ArrayBuffer> {
 /**
  * The `finish` body (owner-setup.ts encodeSetupRegistration): credential ID, authenticator data,
  * clientDataJSON and the PRF output (empty without PRF), each after its 16-bit big-endian length.
+ * M1-11s-c-c: when the PRF output came from a get(), that get()'s credential ID, authenticator data,
+ * clientDataJSON and signature follow in the same form.
  */
 export function encodeRegistration(fields: readonly Uint8Array[]): Uint8Array {
   const out = new Uint8Array(fields.reduce((n, f) => n + 2 + f.length, 0));
@@ -98,10 +104,6 @@ export function passkeysAvailable(): boolean {
     navigator.credentials !== undefined &&
     typeof navigator.credentials.create === 'function'
   );
-}
-
-interface PrfResults {
-  readonly prf?: { readonly results?: { readonly first?: ArrayBuffer | ArrayBufferView } };
 }
 
 function bytesOf(value: ArrayBuffer | ArrayBufferView | undefined): Uint8Array {
@@ -152,19 +154,66 @@ export async function createSetupPasskey(
     return { kind: 'cancelled' };
   const response = credential.response as AuthenticatorAttestationResponse;
   if (typeof response.getAuthenticatorData !== 'function') return { kind: 'unsupported' };
-  const prf = bytesOf((credential.getClientExtensionResults() as PrfResults).prf?.results?.first);
+  const created = [
+    new Uint8Array(credential.rawId),
+    new Uint8Array(response.getAuthenticatorData()),
+    new Uint8Array(response.clientDataJSON),
+  ];
+  const ext = credential.getClientExtensionResults() as PrfFlag;
+  const prf = bytesOf(ext.prf?.results?.first);
   try {
+    if (prf.length === 32 || ext.prf?.enabled !== true) {
+      return {
+        kind: 'ok',
+        body: encodeRegistration([...created, prf.length === 32 ? prf : new Uint8Array(0)]),
+      };
+    }
+  } finally {
+    prf.fill(0);
+  }
+  // M1-11s-c-c (F48; 04 §2.5; 08 §1): PRF only on use (Windows Hello, some iCloud Keychain paths).
+  // The second gesture follows at once, in the same owner operation: get() for the new credential
+  // only, user verification required, the same salt and the begin's challenge. Its assertion goes
+  // with the PRF output so the server can check the gesture (signature with the creation's key).
+  let used: Credential | null;
+  try {
+    used = await navigator.credentials.get({
+      publicKey: {
+        challenge: fromBase64url(values.challenge),
+        rpId: values.rpId,
+        allowCredentials: [{ type: 'public-key', id: new Uint8Array(credential.rawId) }],
+        userVerification: 'required',
+        extensions: {
+          prf: { eval: { first: fromBase64url(values.prfSalt) } },
+        } as AuthenticationExtensionsClientInputs,
+      },
+    });
+  } catch (error) {
+    const name = (error as { name?: unknown } | null)?.name;
+    if (name === 'NotSupportedError' || name === 'SecurityError') return { kind: 'unsupported' };
+    return { kind: 'cancelled' };
+  }
+  if (used === null || !(used instanceof PublicKeyCredential)) return { kind: 'cancelled' };
+  const asserted = used.response as AuthenticatorAssertionResponse;
+  const second = bytesOf((used.getClientExtensionResults() as PrfFlag).prf?.results?.first);
+  try {
+    if (second.length !== 32) {
+      // No PRF on use either: the creation alone, and the backup code is the way to approve.
+      return { kind: 'ok', body: encodeRegistration([...created, new Uint8Array(0)]) };
+    }
     return {
       kind: 'ok',
       body: encodeRegistration([
-        new Uint8Array(credential.rawId),
-        new Uint8Array(response.getAuthenticatorData()),
-        new Uint8Array(response.clientDataJSON),
-        prf.length === 32 ? prf : new Uint8Array(0),
+        ...created,
+        second,
+        new Uint8Array(used.rawId),
+        new Uint8Array(asserted.authenticatorData),
+        new Uint8Array(asserted.clientDataJSON),
+        new Uint8Array(asserted.signature),
       ]),
     };
   } finally {
-    prf.fill(0);
+    second.fill(0);
   }
 }
 

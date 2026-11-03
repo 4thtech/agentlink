@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactElement } from 're
 import { createApiClient } from '../../api/client.js';
 import { useFileMarks } from '../moving/use-file-marks.js';
 import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
+import { BackupCodeField } from '../first-run/backup-code.js';
 import {
   COMMIT_PATH,
   LIST_PATH,
@@ -212,16 +213,13 @@ function Confirm({
         </fieldset>
       ) : null}
       {useCode ? (
-        <TextField
+        <BackupCodeField
           name="owner-code"
-          type="password"
-          autoComplete="off"
           label={S.ownerCode}
           hint={`${S.ownerCodeHint} ${EARLIER_OWNER_CODE_HINT}`}
           value={code}
-          onChange={(e) => setCode(e.target.value)}
+          onValue={setCode}
           disabled={sending}
-          mono
         />
       ) : (
         <p className="al-text-caption al-muted">{S.withPasskey}</p>

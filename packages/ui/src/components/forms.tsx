@@ -79,6 +79,8 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   /** For codes, domains, IDs and amounts. */
   mono?: boolean;
   prefix?: string;
+  /** F49: a control at the end of the well (e.g. a code's Show/Hide toggle). */
+  suffix?: ReactNode;
 }
 
 /** Labelled single-line input on a sunken well. Codes accept paste and password managers. */
@@ -88,6 +90,7 @@ export function TextField({
   error,
   mono,
   prefix,
+  suffix,
   className,
   id: givenId,
   ...rest
@@ -113,6 +116,7 @@ export function TextField({
           aria-invalid={error === undefined ? undefined : 'true'}
           aria-describedby={described ? `${id}-d` : undefined}
         />
+        {suffix === undefined ? null : <span className="al-input-suffix">{suffix}</span>}
       </div>
       {described ? (
         <div

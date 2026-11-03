@@ -16,10 +16,10 @@
 //   a submitted owner operation is not "added", and a failed read keeps the step. The waiting mark
 //   (UX2-e1, the one brand exception) turns only on step 1.
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
+import { BackupCodeField } from '../first-run/backup-code.js';
 import {
   Button,
   ProgressBar,
-  TextField,
   WaitingMark,
   useReducedMotion,
   useVisibilityPause,
@@ -774,14 +774,11 @@ export function ConfirmMove({
       </dl>
       <p className="al-text-caption al-muted">{deposit ? S.reserveNote : S.withdrawNote}</p>
       <form className="pf-confirm-form" onSubmit={submit}>
-        <TextField
+        <BackupCodeField
           label={S.ownerCode}
           hint={EARLIER_OWNER_CODE_HINT}
-          type="password"
-          autoComplete="off"
-          mono
           value={code}
-          onChange={(e) => setCode(e.currentTarget.value)}
+          onValue={setCode}
         />
         {line === undefined ? null : (
           <p className="al-text-body-sm" role="alert">

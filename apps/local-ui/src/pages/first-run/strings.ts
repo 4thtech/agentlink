@@ -46,14 +46,19 @@ export const FIRST_RUN = {
   passkeyNote:
     'Your browser shows its own dialog for Touch ID, Windows Hello or your passkey. AgentLink never draws that dialog.',
   // M1-UX-PRF-MATRIX copy (11 §6.2.1): no passkey AgentLink can use in this browser.
-  noPrf: (sensor: string, browser: string): string =>
-    `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to use it, or continue with a backup code only.`,
+  // F49: `browser` is undefined when the page already runs in the browser that would be suggested.
+  noPrf: (sensor: string, browser: string | undefined): string =>
+    browser === undefined
+      ? `${sensor} on this computer can't protect approvals yet. Continue with a backup code only.`
+      : `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to use it, or continue with a backup code only.`,
   backupOnly: 'Continue with a backup code only',
   waiting: 'Waiting for your passkey…',
 
   // 11 §5.5 "Backup code at first run" (D-130 (1)).
   backupTitle: 'Your backup code',
   doneBody: 'Approvals on this computer are protected.',
+  // M1-11s-c-c: shown prominently, before the code, when no passkey protects approvals.
+  doneNoPasskeyTitle: 'Save your backup code — you need it to approve.',
   doneNoPasskeyBody:
     "This browser can't protect approvals with a passkey here, so this backup code is how you approve on this computer.",
   backupBody: (sensor: string): string =>
@@ -79,6 +84,11 @@ export const FIRST_RUN = {
   shownOnce: 'Shown once',
   copy: 'Copy',
   copied: 'Copied',
+  // F49: Copy never fails silently; "Save as file" downloads a small .txt (local only).
+  copyFailed: "Couldn't copy here. Select the code above and copy it, or save it as a file.",
+  saveFile: 'Save as file',
+  fileSaved: 'Saved to your Downloads folder as agentlink-backup-code.txt. Keep that file private.',
+  fileFailed: "Couldn't save a file here. Copy the code or save it in your password manager.",
   // 08 §1 `done_unconfirmed`.
   unconfirmed: "Setup finished, but we couldn't confirm one step. Your AI app may need a restart.",
   unconfirmedTitle: 'Almost there.',
@@ -189,8 +199,11 @@ export const UPGRADE = {
   codeLabel: 'Backup code',
   // 0.2.0 owners know the code by its terminal name (the one shared hint, src/strings.ts).
   codeHint: EARLIER_OWNER_CODE_HINT,
-  noPrf: (sensor: string, browser: string): string =>
-    `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to switch. Until then, approve with your backup code.`,
+  // F49: `browser` is undefined when the page already runs in the browser that would be suggested.
+  noPrf: (sensor: string, browser: string | undefined): string =>
+    browser === undefined
+      ? `${sensor} on this computer can't protect approvals yet, so AgentLink uses your backup code.`
+      : `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to switch. Until then, approve with your backup code.`,
   doneTitle: (platform: Platform): string => ON_TITLE[platform],
   doneBody: (sensor: string): string =>
     `Next time, approve with ${sensor}. Your backup code still works if ${sensor} isn't available, so keep it saved.`,
@@ -208,8 +221,11 @@ export const UPGRADE_MESSAGES = {
   presence_rejected: "That backup code didn't work. Check it and try again. Nothing changed.",
   presence_required: "Your browser didn't send the backup code. Nothing changed. Try again.",
   cancelled: "The passkey wasn't created. Nothing changed. Try again when you're ready.",
-  unsupported: (browser: string): string =>
-    `This passkey can't protect approvals here. Nothing changed. Keep approving with your backup code, or open this page in ${browser}.`,
+  // F49: `browser` is undefined when the page already runs in the browser that would be suggested.
+  unsupported: (browser: string | undefined, sensor = 'This passkey'): string =>
+    browser === undefined
+      ? `${sensor} on this computer can't protect approvals yet, so AgentLink uses your backup code. Nothing changed.`
+      : `This passkey can't protect approvals here. Nothing changed. Keep approving with your backup code, or open this page in ${browser}.`,
   busy: SETUP_MESSAGES.busy,
   wait: SETUP_MESSAGES.wait,
   failed: "The switch didn't finish. Run `agentlink doctor` in your own terminal for details.",

@@ -384,7 +384,7 @@ describe('W4-WIRE-2: Paste it on the Invite screen', () => {
     expect(document.querySelector('input[name="owner-code"]')).toBeNull();
     await click('Accept with your backup code');
     await type(document.querySelector('input[name="owner-code"]') as HTMLInputElement, 'ABCD-EFGH');
-    await click(S.confirm);
+    await click(S.confirmWithCode);
     const accepts = posts(calls, ACCEPT);
     expect(accepts.length).toBe(1);
     const [accept] = accepts;
