@@ -208,6 +208,7 @@ describe('create an invite (UX2-d1, decision 1.1)', () => {
       ['identity_missing', 409, 'not_set_up'],
       ['identity_revoked', 409, 'cannot_send'],
       ['rotation_pending', 409, 'cannot_send'],
+      ['concurrent_rotation', 409, 'cannot_send'],
       ['store_unavailable', 503, 'unavailable'],
     ];
     for (const [code, status, error] of cases) {

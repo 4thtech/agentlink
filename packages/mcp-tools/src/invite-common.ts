@@ -87,6 +87,7 @@ export function inviteFailure(error: unknown): HandlerOutput | undefined {
     case 'identity_revoked':
     case 'rotation_pending':
     case 'key_epoch_mismatch':
+    case 'concurrent_rotation':
       return fail(
         'rejected',
         INVITE_TEXT.cannotSend,

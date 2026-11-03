@@ -143,6 +143,7 @@ const CANNOT_SEND_CODES: ReadonlySet<string> = new Set([
   'identity_revoked',
   'rotation_pending',
   'key_epoch_mismatch',
+  'concurrent_rotation',
 ]);
 const CANNOT_PAIR_CODES: ReadonlySet<string> = new Set([
   'contact_revoked',
