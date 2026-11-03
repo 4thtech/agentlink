@@ -3109,6 +3109,7 @@ export async function startApprovalServerWith(
     if (planned.kind === 'disconnect') return 'app_unavailable';
     const change = changeOf(planned, app, folder, agentId);
     if (change === undefined) return 'app_unavailable';
+    const old = await oldIdOf(change.kind === 'move' ? planned.oldAgent : null);
     return {
       planned: { app, name, folder, ...change, desk },
       shown: {
@@ -3119,8 +3120,29 @@ export async function startApprovalServerWith(
         oldEntry: copy(planned.oldEntry),
         newEntry: copy(planned.newEntry),
         oldAgent: planned.oldAgent,
+        oldLabel: old.oldLabel,
+        oldGone: old.oldGone,
       },
     };
+  };
+
+  /**
+   * W8-S5 (F7; 04 §2.8 Begin): the agent a move takes the AI app from, as the statement names it.
+   * Server-side from the directory only: the open agent's verified label, another agent's
+   * config.json label, else its folder name; `oldGone` when its folder is absent or its removal did
+   * not finish. Without the directory (outside the app host, or a failed read) the folder name.
+   */
+  const oldIdOf = async (
+    oldAgent: string | null,
+  ): Promise<{ readonly oldLabel: string | null; readonly oldGone: boolean }> => {
+    if (oldAgent === null) return { oldLabel: null, oldGone: false };
+    const slot = host;
+    const entries = await slot?.directory.list().catch(() => undefined);
+    if (slot === undefined || entries === undefined) return { oldLabel: oldAgent, oldGone: false };
+    const entry = entries.find((e) => e.name === oldAgent);
+    if (entry === undefined) return { oldLabel: null, oldGone: true };
+    const label = entry.name === slot.current ? (agentLabel ?? entry.name) : entry.label;
+    return { oldLabel: label === '' ? entry.name : label, oldGone: entry.removing };
   };
 
   /**

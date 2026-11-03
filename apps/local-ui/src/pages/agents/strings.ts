@@ -34,6 +34,12 @@ export const AGENTS_STRINGS = {
   notRunning: 'Not running',
   removalNotFinished: 'Removal not finished',
   removalReason: 'Removing it stopped part-way. Nothing else was affected.',
+  // W8-S4 (F16, F21; 04 §2.5 "Finishing a removal"; 11 §5.8 "Unfinished removal").
+  notFullyRemoved: (label: string): string => `${iso(label)} wasn't fully removed`,
+  finishRemoving: 'Finish removing',
+  finishTitle: (label: string): string => `Finish removing ${iso(label)}`,
+  finishTouchId: 'Finish with Touch ID',
+  finishStatement: (label: string): string => `Finish removing ${iso(label)}`,
   empty: 'No IDs left. Add one to keep using AgentLink.',
   loadError: "Couldn't load your IDs.",
   loading: 'Loading your IDs',
@@ -106,6 +112,16 @@ export const AGENTS_STRINGS = {
   /** The local-only "Tali · Claude Code" (D-144 improvement (a)); the app is never sent to contacts. */
   withApp: (label: string, apps: readonly string[]): string =>
     apps.length === 0 ? label : `${label} · ${apps.join(', ')}`,
+  /**
+   * W8-S4 (F20): the same, short enough for one line (the switcher): "Tali · Claude Code and 1
+   * more", as the card's "Ready in Claude Code and 1 more".
+   */
+  withAppShort: (label: string, apps: readonly string[]): string =>
+    apps.length === 0
+      ? label
+      : apps.length === 1
+        ? `${label} · ${apps[0] ?? ''}`
+        : `${label} · ${apps[0] ?? ''} and ${apps.length - 1} more`,
   backUp: 'Back up',
   disconnect: 'Disconnect',
   noAppsYet: 'No AI app is set up for this ID yet.',

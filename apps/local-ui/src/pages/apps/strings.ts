@@ -7,6 +7,9 @@ export const APPS_STRINGS = {
   connectedTo: (label: string): string => `Connected to ${label}`,
   connectedToAnother: 'Uses another ID',
   uses: (label: string): string => `Uses ${label}`,
+  /** W8-S5 (F7; 11 §5.8 "AI app states"). */
+  usesRemoved: 'Uses a removed ID',
+  byHand: 'Set up by hand',
   running: 'Running',
   needsRestart: 'Needs restart',
   restartToFinish: (app: string): string => `Restart ${app} to finish`,
@@ -50,6 +53,9 @@ export const APPS_STRINGS = {
   statementConnect: (app: string, label: string): string => `Connect ${app} to ${label}`,
   statementMove: (app: string, label: string, other: string): string =>
     `${app} will use ${label} instead of ${other}`,
+  /** W8-S5 (F7; 11 §5.8 "Move to a removed ID"): the app's entry names an ID that is gone. */
+  statementMoveRemoved: (app: string, label: string): string =>
+    `${app} will use ${label} instead of an ID that was removed`,
   statementDisconnect: (app: string, label: string): string => `${app} will stop using ${label}`,
   // Manual steps (b11 §30.4).
   manualTitle: (app: string): string => `Connect ${app} by hand`,

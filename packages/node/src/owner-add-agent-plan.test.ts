@@ -191,3 +191,31 @@ describe('IR-W4-ONE-TOUCH L-1: the card is signed only as the whole descriptor',
     await expect(session.sign712(typed(cardMessage()))).rejects.toThrow();
   });
 });
+
+// W8-S5 (F7; IR L5): the replaced ID the screen names is part of the statement, so a changed
+// oldLabel or oldGone gives another challenge (the gesture approves exactly what was shown).
+describe('W8-S5: the move statement is bound', () => {
+  it('a changed oldLabel or oldGone changes the challenge', () => {
+    const p = plan();
+    const nonce = randomBytes(32);
+    const moved = (oldLabel: string | null, oldGone: boolean): PlanStatement => ({
+      ...statement(),
+      app: {
+        app: 'claude-code',
+        name: 'Claude Code',
+        kind: 'move',
+        path: '~/.claude.json',
+        oldEntry: null,
+        newEntry: null,
+        oldAgent: 'tali',
+        oldLabel,
+        oldGone,
+      },
+    });
+    const c = createConnectChallenge(nonce, moved('Tali', false), p);
+    expect(createConnectChallenge(nonce, moved('Tali', false), p)).toEqual(c);
+    expect(createConnectChallenge(nonce, moved('Tali work', false), p)).not.toEqual(c);
+    expect(createConnectChallenge(nonce, moved('Tali', true), p)).not.toEqual(c);
+    expect(createConnectChallenge(nonce, moved(null, true), p)).not.toEqual(c);
+  });
+});

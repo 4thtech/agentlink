@@ -67,8 +67,12 @@ export interface AgentsApi {
   labelCheck(label: string): Promise<'ok' | 'refused' | 'unavailable'>;
   switchTo(name: string, generation: number): Promise<SwitchOutcome>;
   rename(input: { name: string; label: string }, proof: PresenceProof): Promise<OwnerOutcome>;
+  /**
+   * W8-S4 (04 §2.5 "Finishing a removal"): `typedLabel` is left out to finish removing an ID that
+   * is already retired for good; the server decides whether that is allowed.
+   */
   remove(
-    input: { name: string; typedLabel: string; anyway?: boolean },
+    input: { name: string; typedLabel?: string; anyway?: boolean },
     proof: PresenceProof,
   ): Promise<OwnerOutcome>;
   /** W4-PAUSE: pause the open agent (one click, no presence). */
@@ -300,7 +304,7 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
         `${AGENTS}/remove`,
         {
           name: input.name,
-          typedLabel: input.typedLabel,
+          ...(input.typedLabel === undefined ? {} : { typedLabel: input.typedLabel }),
           ...(input.anyway === true ? { anyway: true } : {}),
         },
         proof,

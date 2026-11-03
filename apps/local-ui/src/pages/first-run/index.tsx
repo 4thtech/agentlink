@@ -93,6 +93,7 @@ import {
   WizardFrame,
   appTiles,
   defaultChoice,
+  type KnownId,
   stepOf,
   stepPath,
 } from '../start/wizard.js';
@@ -619,6 +620,8 @@ export function FirstRunPage({
   const [agents] = useState(() => givenAgents ?? createAgentsApi());
   // IR-W4-WIRE-2X-1: the names the owner's agents have, for the "already have" hint (Add agent).
   const [takenNames, setTakenNames] = useState<ReadonlySet<string>>(() => new Set());
+  // W8-S5 (F7): the owner's IDs, so the pick says which ID an AI app uses now (or a removed one).
+  const [knownIds, setKnownIds] = useState<readonly KnownId[] | undefined>(undefined);
   const [prefilled, setPrefilled] = useState('');
   const setNamed = (value: boolean): void => {
     setNamedState(value);
@@ -634,8 +637,9 @@ export function FirstRunPage({
         : appTiles(
             list.k === 'ok' ? list.apps : undefined,
             mode?.k === 'more' ? mode.folder : undefined,
+            knownIds,
           ),
-    [list, mode],
+    [list, mode, knownIds],
   );
   const picked = choice !== '' ? choice : tiles === 'loading' ? '' : defaultChoice(tiles);
   const pickedTile = tiles === 'loading' ? undefined : tiles.find((t) => t.id === picked);
@@ -788,6 +792,13 @@ export function FirstRunPage({
       (result) => {
         if (live && result.kind === 'ok') {
           setTakenNames(new Set(result.list.agents.map((a) => a.label)));
+          setKnownIds(
+            result.list.agents.map((a) => ({
+              name: a.name,
+              label: a.label,
+              removing: a.removing === true,
+            })),
+          );
           // W7-ID-B1: the person is the same owner, so the name field starts with their ID's name
           // (never over something already typed or remembered).
           const own = result.list.agents.find((row) => row.current) ?? result.list.agents[0];

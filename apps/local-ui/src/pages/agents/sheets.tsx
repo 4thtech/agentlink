@@ -234,7 +234,10 @@ export function RemoveSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const nameId = useId();
-  const matches = typed === row.label;
+  // W8-S4 (04 §2.5 "Finishing a removal"): an ID whose removal stopped part-way is already retired
+  // for good, so finishing asks for presence only, never the typed name again.
+  const finishing = row.removing;
+  const matches = finishing || typed === row.label;
   const contacts = row.contacts ?? 0;
   // W5-SHEET-CLOSE: a removal in flight keeps the sheet for a moment, never for good: after 10 s
   // without an answer the owner can close it again.
@@ -287,7 +290,14 @@ export function RemoveSheet({
       setBusy(true);
       setError(undefined);
       void api
-        .remove({ name: row.name, typedLabel: typed, ...(anyway ? { anyway: true } : {}) }, proof)
+        .remove(
+          {
+            name: row.name,
+            ...(finishing ? {} : { typedLabel: typed }),
+            ...(anyway ? { anyway: true } : {}),
+          },
+          proof,
+        )
         .then((outcome) => {
           setBusy(false);
           if (outcome.kind === 'done') {
@@ -319,7 +329,11 @@ export function RemoveSheet({
     };
 
   const inProgress = busy && phase.kind === 'presence';
-  const title = inProgress ? S.removingTitle(row.label) : S.removeTitle(row.label);
+  const title = inProgress
+    ? S.removingTitle(row.label)
+    : finishing
+      ? S.finishTitle(row.label)
+      : S.removeTitle(row.label);
   return (
     <Sheet
       open
@@ -333,6 +347,7 @@ export function RemoveSheet({
       <div className="ag-sheet-body">
         {phase.kind === 'form' || phase.kind === 'presence' ? (
           <>
+            {finishing ? <p className="al-text-body">{S.removalReason}</p> : null}
             <p className="al-text-body">{S.removeIntro}</p>
             <ul className="ag-goes">
               <li>{S.keysAndSettings(row.label)}</li>
@@ -341,7 +356,7 @@ export function RemoveSheet({
                 <li key={app}>{S.itsEntry(app)}</li>
               ))}
             </ul>
-            {contacts > 0 ? (
+            {contacts > 0 && !finishing ? (
               <p className="al-text-body">{S.contactsTold(row.label, contacts)}</p>
             ) : null}
             <p className="al-text-body">
@@ -365,17 +380,19 @@ export function RemoveSheet({
                 {S.exportFirst}
               </Button>
             </div>
-            <TextField
-              id={nameId}
-              label={S.typeName}
-              aria-label={S.typeNameLabel(row.label)}
-              name="confirm-label"
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              value={typed}
-              onChange={(e) => setTyped(e.currentTarget.value)}
-            />
+            {finishing ? null : (
+              <TextField
+                id={nameId}
+                label={S.typeName}
+                aria-label={S.typeNameLabel(row.label)}
+                name="confirm-label"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                value={typed}
+                onChange={(e) => setTyped(e.currentTarget.value)}
+              />
+            )}
             <div className="ag-actions">
               <Button
                 variant="danger"
@@ -384,7 +401,7 @@ export function RemoveSheet({
                 aria-describedby={matches ? undefined : `${nameId}-why`}
                 onClick={checkThenAsk}
               >
-                {S.removeTouchId}
+                {finishing ? S.finishTouchId : S.removeTouchId}
               </Button>
               <Button variant="ghost" onClick={onClose}>
                 {S.cancel}
@@ -400,7 +417,7 @@ export function RemoveSheet({
 
         {phase.kind === 'presence' ? (
           <OwnerGate
-            summary={S.removeStatement(row.label)}
+            summary={finishing ? S.finishStatement(row.label) : S.removeStatement(row.label)}
             passkey={passkey}
             busy={busy}
             error={error}

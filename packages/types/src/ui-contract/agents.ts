@@ -281,6 +281,8 @@ export const AGENTS_OWNER = {
               args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'home'],
             },
             oldAgent: null,
+            oldLabel: null,
+            oldGone: false,
           },
         },
         expiresInMs: 120000,
