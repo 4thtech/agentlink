@@ -347,7 +347,101 @@ describe('W8-S5 (F7): the replacement is shown before the gesture', () => {
       parseStatement({ ...base, app: { ...app, oldLabel: 7, oldGone: false } }),
     ).toBeUndefined();
     expect(
-      parseStatement({ ...base, app: { ...app, oldLabel: 'x'.repeat(33), oldGone: false } }),
+      parseStatement({ ...base, app: { ...app, oldLabel: 'x'.repeat(300), oldGone: false } }),
     ).toBeUndefined();
+  });
+});
+
+// W8-S5 (IR L1, L3): what is shown is what is approved. When the plan begun to show a move has
+// aged out and the gesture's own begin answers another statement, the screen shows the new one and
+// waits for a fresh click; a long label from the server is shortened for display, never refused.
+describe('W8-S5: shown = approved', () => {
+  it('an aged-out preview: the new begin replaces the line and the gesture waits for a fresh click', async () => {
+    let n = 0;
+    const withPasskey: string[] = [];
+    const statements = [
+      { kind: 'move', oldLabel: 'Work', oldGone: false },
+      undefined, // the entry changed meanwhile: a plain connect
+    ] as const;
+    const api = {
+      begin: () => {
+        const app = statements[Math.min(n, 1)];
+        n += 1;
+        return Promise.resolve({
+          kind: 'ready',
+          nonce: String(n).repeat(43),
+          statement: {
+            label: 'Side',
+            agentFingerprint: '1111·2222',
+            ownerFingerprint: '3333·4444',
+            folder: 'side',
+            ...(app === undefined
+              ? { app: { id: 'claude-code', name: 'Claude Code', kind: 'connect' } }
+              : { app: { id: 'claude-code', name: 'Claude Code', ...app } }),
+          },
+          publicKey: {
+            rpId: 'localhost',
+            challenge: 'AQID',
+            allowCredentials: ['Y3JlZA'],
+            prfSalt: 'c2FsdA',
+            timeoutMs: 120_000,
+          },
+        } as const);
+      },
+      finishPasskey: (nonce: string) => {
+        withPasskey.push(nonce);
+        return Promise.resolve(DONE);
+      },
+      finishCode: () => Promise.resolve(DONE),
+    } as unknown as CreateAgentApi;
+    const start = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(start);
+    await act(async () => {
+      root.render(
+        createElement(CreateAgentGate, {
+          label: 'Side',
+          summary: '',
+          app: {
+            id: 'claude-code',
+            name: 'Claude Code',
+            path: '~/.claude.json',
+            state: 'connected',
+            agent: 'work',
+            quitFirst: false,
+          },
+          goLabel: 'Connect with Touch ID',
+          platform: 'mac',
+          api,
+          appsApi: noApps,
+          onDone: vi.fn(),
+          passkeyStatus: () => Promise.resolve(READY),
+        }),
+      );
+    });
+    await flush();
+    expect(host.textContent).toContain('Claude Code will use Side instead of Work');
+    clock.mockReturnValue(start + 100_000);
+    await click('Connect with Touch ID');
+    // A new plan was begun; its statement is shown and nothing was approved yet.
+    expect(n).toBe(2);
+    expect(withPasskey).toEqual([]);
+    expect(host.textContent).not.toContain('instead of Work');
+    await click('Connect with Touch ID');
+    expect(withPasskey).toEqual(['2'.repeat(43)]);
+    expect(n).toBe(2);
+    clock.mockRestore();
+  });
+
+  it('a long replaced label is shortened for display; an absurd one is refused', () => {
+    const base = {
+      label: 'Side',
+      agentFingerprint: '1111·2222',
+      ownerFingerprint: '3333·4444',
+      folder: 'side',
+    };
+    const app = { app: 'claude-code', name: 'Claude Code', kind: 'move', oldGone: false };
+    const long = parseStatement({ ...base, app: { ...app, oldLabel: 'x'.repeat(40) } });
+    expect(long?.app?.oldLabel).toBe(`${'x'.repeat(32)}…`);
+    expect(parseStatement({ ...base, app: { ...app, oldLabel: 'x'.repeat(300) } })).toBeUndefined();
   });
 });
