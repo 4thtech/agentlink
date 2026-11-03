@@ -82,6 +82,27 @@ describe('per AI app state (08 §1)', () => {
     expect(s.apps[0]?.lastSeenAt).toBeUndefined();
   });
 
+  it('a heartbeat-only session that is 11 min old is idle and still live (L1)', () => {
+    const started = NOW - 3600;
+    const s = liveStatus(
+      input({ sessions: [{ app: 'codex', startedAt: started, lastToolAt: null }] }),
+      NOW,
+    );
+    expect(s.apps[0]?.state).toBe('idle');
+    expect(
+      liveStatus(
+        input({ sessions: [{ app: 'codex', startedAt: NOW - 660, lastToolAt: null }] }),
+        NOW,
+      ).apps[0]?.state,
+    ).toBe('idle');
+    expect(
+      liveStatus(
+        input({ sessions: [{ app: 'codex', startedAt: NOW - 600, lastToolAt: null }] }),
+        NOW,
+      ).apps[0]?.state,
+    ).toBe('ready');
+  });
+
   it('several sessions of one app count once, with the most active state', () => {
     const s = liveStatus(
       input({

@@ -32,8 +32,8 @@ export function agentIconTone(key: string): AgentIconTone {
 }
 
 /**
- * W4-SHELL-V2: the live dot in the icon's corner (prototype v23): filled for Working and Ready, a
- * ring for Not running and Paused, a dashed ring for Not set up. Decoration only: the status is
+ * W4-SHELL-V2: the live dot in the icon's corner (prototype v23): filled for Working, Ready and Idle
+ * (all connected), a ring for Not running and Paused, a dashed ring for Not set up. Decoration only: the status is
  * always said in words next to the icon (never colour alone).
  */
 export const AGENT_DOT_STATES = ['working', 'ready', 'idle', 'off', 'paused', 'none'] as const;

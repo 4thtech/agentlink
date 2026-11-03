@@ -7,10 +7,10 @@ import type { LocalUiAiApps } from '@4thtech-io/node';
 import { homedir } from 'node:os';
 import process from 'node:process';
 import { createAiAppsDesk } from '../harness/app-desk.js';
+import { HARNESSES } from '../harness/harnesses.js';
 import { agentDirectory } from '../runtime/agent-dir.js';
 import { isAgentName } from '../runtime/agent-name.js';
 import { pidAlive, readAppHostRecord } from '../runtime/app-host-record.js';
-import { commandPrefix } from '../runtime/cli-prefix.js';
 import { readLastExit, type LastExitReason } from '../runtime/last-exit.js';
 
 /** 11 §5 plain words. The app's name and the ID folder name are the only inserted values. */
@@ -32,12 +32,12 @@ export const DOCTOR_LOCAL_TEXT = Object.freeze({
     start_failed: "it couldn't start",
   }),
   get staleHost(): string {
-    return `Problem  AgentLink left a note that it is running, but it isn't. Run \`${commandPrefix()}\` to start it fresh.`;
+    return `Problem  AgentLink left a note that it is running, but it isn't. Run \`agentlink\` to start it fresh.`;
   },
   halfRemoved: (count: number): string =>
-    `Problem  ${String(count)} ${count === 1 ? 'ID was' : 'IDs were'} only half removed. Run \`${commandPrefix()}\` to open AgentLink and finish removing ${count === 1 ? 'it' : 'them'}.`,
+    `Problem  ${String(count)} ${count === 1 ? 'ID was' : 'IDs were'} only half removed. Run \`agentlink\` to open AgentLink and finish removing ${count === 1 ? 'it' : 'them'}.`,
   appMissingId: (app: string, id: string): string =>
-    `Problem  ${app} starts an ID that isn't here any more (${id}). In AgentLink, connect ${app} to another ID.`,
+    `Problem  ${app} starts the ID "${id}", which isn't on this computer any more. Open AgentLink (run \`agentlink\`), go to AI apps and connect ${app} to another ID.`,
 });
 
 /** The reasons that mean something went wrong, not that the person closed AgentLink. */
@@ -48,16 +48,34 @@ export interface LocalChecksOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly platform?: NodeJS.Platform;
   /** The ID folders (name and whether half removed); default: the agent directory under `home`. */
-  readonly ids?: () => Promise<readonly { readonly name: string; readonly removing: boolean }[]>;
+  readonly ids?: () => Promise<
+    readonly {
+      readonly name: string;
+      readonly removing: boolean;
+      /** The display name; absent: the folder name. */
+      readonly label?: string;
+    }[]
+  >;
   /** The AI apps' entries, read-only (default: the harness desk, never asking the OS about apps). */
   readonly apps?: Pick<LocalUiAiApps, 'list'>;
+  /** The AI app ids with a live session for an ID (default: the ID's store, as the app reads it). */
+  readonly liveApps?: (name: string) => Promise<readonly string[]>;
   /** Whether a process is alive (default: signal 0). */
   readonly alive?: (pid: number) => boolean;
+}
+
+/** One ID that can be checked: its folder name, its display name and the AI apps that start it. */
+export interface LocalDoctorId {
+  readonly name: string;
+  readonly label: string;
+  readonly apps: readonly string[];
 }
 
 export interface LocalChecks {
   readonly lines: readonly string[];
   readonly problems: number;
+  /** Every ID on this computer that is not half removed, by display name (empty: none/unreadable). */
+  readonly ids?: readonly LocalDoctorId[];
 }
 
 /** The checks; never throws. A check that cannot be read says nothing. */
@@ -65,6 +83,7 @@ export async function localDoctorChecks(options: LocalChecksOptions = {}): Promi
   const home = options.home ?? homedir();
   const lines: string[] = [];
   let problems = 0;
+  let checkable: LocalDoctorId[] | undefined;
 
   const last = await readLastExit(home);
   if (last !== undefined) {
@@ -82,7 +101,11 @@ export async function localDoctorChecks(options: LocalChecksOptions = {}): Promi
   const ids = await (
     options.ids ??
     (async () =>
-      (await agentDirectory(home).list()).map((e) => ({ name: e.name, removing: e.removing })))
+      (await agentDirectory(home).list()).map((e) => ({
+        name: e.name,
+        removing: e.removing,
+        label: e.label,
+      })))
   )().catch(() => undefined);
   if (ids !== undefined) {
     const half = ids.filter((id) => id.removing).length;
@@ -101,13 +124,44 @@ export async function localDoctorChecks(options: LocalChecksOptions = {}): Promi
       });
     const usable = new Set(ids.filter((id) => !id.removing).map((id) => id.name));
     const listed = await apps.list().catch(() => undefined);
+    const appsOf = new Map<string, string[]>();
     for (const app of listed?.apps ?? []) {
       if (app.state.kind !== 'agent') continue;
       const id = app.state.agent;
-      if (!isAgentName(id) || usable.has(id)) continue;
+      if (!isAgentName(id)) continue;
+      if (usable.has(id)) {
+        appsOf.set(id, [...(appsOf.get(id) ?? []), app.name]);
+        continue;
+      }
       lines.push(DOCTOR_LOCAL_TEXT.appMissingId(app.name, id));
       problems += 1;
     }
+    // The app's "Used by" shows the AI apps with a live session too (agent-peek); doctor agrees.
+    const nameOfApp = (id: string): string =>
+      HARNESSES.find((h) => h.id === id)?.appName ?? 'Another AI app';
+    const liveOf =
+      options.liveApps ??
+      (async (name: string): Promise<readonly string[]> =>
+        ((await agentDirectory(home).stats(name))?.sessions ?? []).map((s) => s.app));
+    checkable = [];
+    for (const id of ids.filter((i) => !i.removing && isAgentName(i.name))) {
+      const live = new Set(
+        (await liveOf(id.name).catch(() => [] as readonly string[])).map(nameOfApp),
+      );
+      const names = [
+        ...(appsOf.get(id.name) ?? []),
+        ...[...live].filter((n) => !(appsOf.get(id.name) ?? []).includes(n)),
+      ];
+      checkable.push({
+        name: id.name,
+        label: id.label !== undefined && id.label.length > 0 ? id.label : id.name,
+        apps: Object.freeze(names.map((n) => (live.has(n) ? `${n} (connected now)` : n))),
+      });
+    }
   }
-  return Object.freeze({ lines: Object.freeze(lines), problems });
+  return Object.freeze({
+    lines: Object.freeze(lines),
+    problems,
+    ...(checkable === undefined ? {} : { ids: Object.freeze(checkable) }),
+  });
 }

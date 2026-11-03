@@ -764,3 +764,71 @@ describe('M1-UX-FIRSTRUN-V2-b: the first rules apply only to the Send folder tha
     expect(result).toEqual({ status: 'not_allowed', reason: 'failed' });
   });
 });
+
+// W1 (Windows 0.4.12, blocks the classroom): a folder that already exists as `agentlink` in the home
+// folder answers to `AgentLink` on a case-insensitive file system (NTFS; APFS by default), and
+// realpath names it as it is on disk. Send under it is a real, empty folder, not a link: it is used
+// under its real name, so the first rules name the folder where it really is.
+describe('W1: an existing home folder named `agentlink` in another case', () => {
+  async function lowercaseParent(): Promise<string> {
+    const realHome = await realpath(home);
+    await mkdir(join(realHome, 'agentlink'));
+    const caseInsensitive =
+      (await lstat(join(realHome, 'AGENTLINK')).catch(() => undefined)) !== undefined;
+    return caseInsensitive
+      ? join(realHome, 'agentlink', 'Send')
+      : join(realHome, 'AgentLink', 'Send');
+  }
+
+  it('prepareSendFolder is ready and names Send where it really is', async () => {
+    const expected = await lowercaseParent();
+    const plan = await prepareSendFolder(home);
+    expect(plan.status).toBe('ready');
+    if (plan.status !== 'ready') return;
+    expect(plan.folder).toBe(expected);
+    expect(plan.pin.path).toBe(expected);
+    expect(await realpath(plan.folder)).toBe(plan.folder);
+  });
+
+  it('owner init signs the first rules for that real folder', async () => {
+    const expected = await lowercaseParent();
+    const alice = await initAgent('alice');
+    const run = ownerAtInit();
+    const result = await initOwnerWith(
+      keychain,
+      run.terminal,
+      { backend: 'keychain', env: {}, firstCard: withPolicy(alice, 'alice') },
+      { kdf: KDF },
+    );
+    expect(result.sendFolder).toEqual({ status: 'allowed', folder: expected });
+    const effective = await alice.client.ownerActions.loadPolicy();
+    expect(effective.mode).toBe('signed');
+    if (effective.mode !== 'signed') return;
+    expect(canonicalize(effective.policy)).toBe(defaultsWith([expected]));
+  });
+
+  it('a link named `agentlink` is still never used', async () => {
+    const realHome = await realpath(home);
+    const target = join(dir, 'elsewhere');
+    await mkdir(target);
+    await symlink(target, join(realHome, 'agentlink'), 'junction');
+    const caseInsensitive =
+      (await lstat(join(realHome, 'AGENTLINK')).catch(() => undefined)) !== undefined;
+    const plan = await prepareSendFolder(home);
+    if (caseInsensitive) {
+      // `AgentLink` answers to the link: it is refused, and nothing is created through it.
+      expect(plan).toEqual({ status: 'unavailable', reason: 'folder_unavailable' });
+    } else {
+      // Case-sensitive file system: `agentlink` (the link) and `AgentLink` are different names, so
+      // the real `AgentLink/Send` is created and the link is left alone.
+      expect(plan.status).toBe('ready');
+      if (plan.status !== 'ready') return;
+      expect(plan.folder).toBe(join(realHome, 'AgentLink', 'Send'));
+      expect(await realpath(plan.folder)).toBe(plan.folder);
+      expect((await lstat(join(realHome, 'AgentLink'))).isSymbolicLink()).toBe(false);
+      expect((await lstat(join(realHome, 'agentlink'))).isSymbolicLink()).toBe(true);
+      expect(await realpath(join(realHome, 'agentlink'))).toBe(await realpath(target));
+    }
+    expect(await readdir(target)).toEqual([]);
+  });
+});

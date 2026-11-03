@@ -39,6 +39,7 @@ export default defineConfig({
         /moving\.css/,
         /welcome\.css/,
         /agents\.css/,
+        /shell\.css/,
         // The real-browser layout test reads the shared UI stylesheets as text (HOTFIX-045-PASTE-FIELD).
         /ui\/src\/(components|tokens)\/.*\.css/,
       ],

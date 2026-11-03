@@ -34,7 +34,7 @@ const deadPid = (): number => {
 describe('doctor: why AgentLink closed last time (R1)', () => {
   it('says nothing when there is no record', async () => {
     const r = await localDoctorChecks({ home, ids: () => Promise.resolve([]), apps: noApps });
-    expect(r).toEqual({ lines: [], problems: 0 });
+    expect(r).toEqual({ lines: [], problems: 0, ids: [] });
   });
 
   it.each([
@@ -122,6 +122,56 @@ describe('doctor: AI apps that start an ID that is gone (R1)', () => {
     expect(r.lines).toEqual([DOCTOR_LOCAL_TEXT.appMissingId('Claude Code', 'gone')]);
     expect(r.problems).toBe(1);
     expect(r.lines.join('\n')).not.toContain('~/.claude.json');
+  });
+
+  it('also lists an AI app with a live session for the ID, as the app does', async () => {
+    const r = await localDoctorChecks({
+      home,
+      ids: () =>
+        Promise.resolve([
+          { name: 'work', removing: false, label: 'Work' },
+          { name: 'ops', removing: false, label: 'Ops' },
+        ]),
+      apps: {
+        list: () => Promise.resolve({ apps: [app('Claude Code', 'ops')], desktopRunning: false }),
+      },
+      liveApps: () => Promise.resolve(['claude-code']),
+    });
+    expect(r.ids?.map((i) => i.apps)).toEqual([
+      ['Claude Code (connected now)'],
+      ['Claude Code (connected now)'],
+    ]);
+  });
+
+  it('lists every ID by display name with the AI apps that start it', async () => {
+    const r = await localDoctorChecks({
+      home,
+      ids: () =>
+        Promise.resolve([
+          { name: 'work', removing: false, label: 'My work ID' },
+          { name: 'spare', removing: false },
+          { name: 'old', removing: true },
+        ]),
+      apps: {
+        list: () =>
+          Promise.resolve({
+            apps: [app('Cursor', 'work'), app('Codex', 'work')],
+            desktopRunning: false,
+          }),
+      },
+    });
+    expect(r.ids).toEqual([
+      { name: 'work', label: 'My work ID', apps: ['Cursor', 'Codex'] },
+      { name: 'spare', label: 'spare', apps: [] },
+    ]);
+  });
+
+  it('the missing-ID line names the app and the ID and points to the app, never a command to type', () => {
+    const line = DOCTOR_LOCAL_TEXT.appMissingId('Cursor', 'old');
+    expect(line).toContain('Cursor');
+    expect(line).toContain('"old"');
+    expect(line).toContain('connect Cursor to another ID');
+    expect(line).not.toContain('add-agent');
   });
 
   it('an app that starts a half-removed ID is also flagged', async () => {

@@ -145,10 +145,12 @@ export async function prepareSendFolder(home: string = homedir()): Promise<SendF
       return giveUp(unavailable);
     }
   }
-  const folder = current;
   // M1-UX-FIRSTRUN-V2-b: pinned here, before the owner secret is asked; also its realpath check.
-  const pin = await pinFolder(folder);
+  const pin = await pinFolder(current);
   if (pin === undefined) return giveUp(unavailable);
+  // W1: from here on the folder is named as it really is (an existing `agentlink` answers to
+  // `AgentLink` where the file system ignores case), so the rules name its real path.
+  const folder = pin.path;
   try {
     if ((await readdir(folder)).length > 0) {
       return giveUp({ status: 'unavailable', reason: 'folder_not_empty' });

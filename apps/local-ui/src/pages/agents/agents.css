@@ -56,7 +56,8 @@
   color: var(--al-color-fg-muted);
 }
 .ag-line.is-working,
-.ag-line.is-ready {
+.ag-line.is-ready,
+.ag-line.is-idle {
   color: var(--al-color-status-success-fg);
 }
 .ag-line.is-paused {

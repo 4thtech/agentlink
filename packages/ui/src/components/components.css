@@ -1385,8 +1385,8 @@ body {
   color: var(--al-color-status-neutral-fg);
   border-color: var(--al-color-status-neutral-border);
 }
-/* W4-SHELL-V2 (prototype v23): the live dot in the icon's corner. Filled for Working and Ready, a
-   ring for Not running, Idle and Paused, a dashed ring for Not set up. The icon positions it. */
+/* W4-SHELL-V2 (prototype v23): the live dot in the icon's corner. Filled for Working, Ready and Idle
+   (all connected), a ring for Not running and Paused, a dashed ring for Not set up. The icon positions it. */
 .al-agent-icon {
   position: relative;
 }
@@ -1403,7 +1403,8 @@ body {
   box-shadow: 0 0 0 2px var(--al-color-bg-surface);
 }
 .al-agent-icon-dot.is-working,
-.al-agent-icon-dot.is-ready {
+.al-agent-icon-dot.is-ready,
+.al-agent-icon-dot.is-idle {
   border-color: var(--al-color-status-success-icon);
   background: var(--al-color-status-success-icon);
 }
