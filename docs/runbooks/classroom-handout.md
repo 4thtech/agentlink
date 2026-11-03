@@ -2,7 +2,7 @@
 
 For students and the teacher. Mac and Windows. About 10 minutes.
 
-> Where to link it: the user guide in `docs-site/guide/` (next to `quick-guide.md`) when it is published. Not linked there yet.
+> Linked from the quick guide: `docs-site/guide/quick-guide.md`.
 
 ## Students
 

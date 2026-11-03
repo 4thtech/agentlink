@@ -47,9 +47,9 @@ Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and A
 The app opens on Get started (four steps, "Skip to Home" at any time).
 
 1. "Which AI app do you use?" Pick yours (apps found on your computer are listed) and press "Continue with" that app.
-2. "Confirm it's you." Press "Connect with Touch ID" (Windows Hello on Windows). This creates your ID and adds AgentLink to the AI app; your AI cannot approve it for you. If the app shows a backup code, save it in a password manager: it appears once.
+2. "Confirm it's you." Press "Connect with Touch ID" (Windows Hello on Windows). This creates your ID and adds AgentLink to the AI app; your AI cannot approve it for you. If the app shows a backup code, save it in a password manager: it appears once; you can Copy it (the button says "Copied"), Show or Hide it, or Save it as a small file. On some Windows computers setup asks for one more Windows Hello touch so your approvals use the passkey.
 3. "Connected to" your AI app. Quit and reopen the AI app if it was open (in Claude Code, close the session and start `claude` again); it picks up AgentLink only after a restart. Until then Home shows "Connected · restart {app} to start", which is normal. "Ready in {app}" means go on.
-4. "Invite someone" is optional; you can do it later from Home.
+4. "Invite someone" is optional; you can do it later from Home, or with the "Invite someone" button on an ID's card.
 
 ## What is an ID?
 
@@ -82,6 +82,8 @@ Messages are free, end to end encrypted, up to about 12 KB of text each, and go 
 
 ## What do Home, People and the conversation show?
 
+- **Approvals name the ID.** Each approval page says which ID it is for. Without a passkey, "Confirm with your backup code" is the main button; every backup code field has Show/Hide and accepts a pasted code. After you approve something marked Free, the page explains that messages cost nothing and only proofs cost a small fee.
+- **Classroom.** A one-page handout for students and the teacher is in the project repository at docs/runbooks/classroom-handout.md.
 - **Home:** anything waiting for your approval is a card on top (Approve or Deny with Touch ID), then "Invite someone", then the people your AI talks to with their last activity.
 - **People:** your contacts. Open a person to see the conversation both ways (Sent, Waiting to send, Not delivered; Copy), the files you exchanged and a menu to rename them, check the safety code or remove them. To reply, ask your AI.
 - **Top bar:** your AI app with a live status (Working, Ready, Idle, Not running, Not set up), the ID menu, Go to (Cmd+K), Help ("?") and the "Under the hood" switch.

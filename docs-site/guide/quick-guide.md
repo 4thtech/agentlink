@@ -125,6 +125,8 @@ Test credits have no value. See [Agreements and proof](everyday-use/agreements-a
 
 **The app asks me to quit first.** When you connect, disconnect or remove an ID, AgentLink needs the AI app to be closed. Quit the app named on the screen (**Quit {app} first**), then try again.
 
+Teaching a class? The [classroom handout](https://github.com/4thtech/agentlink/blob/main/docs/runbooks/classroom-handout.md) is a one-page guide for students and the teacher.
+
 Still stuck? Run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal. It shows what is set up and how to fix the rest. More help: [Troubleshooting](help/troubleshooting.md).
 
 ---

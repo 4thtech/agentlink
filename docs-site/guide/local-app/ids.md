@@ -18,6 +18,7 @@ Each AI app reports in every 15 seconds, so an app that quits or crashes drops o
 ## What you can do
 
 - **Open.** The button on an ID's card opens that ID in the app.
+- **Invite someone.** The button on an ID's card starts an invite for that ID. See [Invite someone](invite-someone.md).
 - **Pause** and **Resume.** See below.
 - **Rename.** Your contacts see the new name. The change is signed with your Touch ID and reaches each contact with the card update. An ID can be renamed for its contacts 3 times a day. After a rename, messages and invites reach the new name within 30 seconds. If it can't be renamed, the message says why. No AI app tool or terminal command can rename an ID.
 - **Connect** or **Disconnect** an AI app. You see the exact change first, are told to quit the app first, and restart it afterwards. See [AI apps](ai-apps.md).

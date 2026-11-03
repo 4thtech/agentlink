@@ -17,6 +17,8 @@ Coming from an invite link? The same steps run, and the page ends on **Accept** 
 
 The backup code approves things when Touch ID is not available, for example in another browser. Nobody can get it back for you, not even 4thTech. Never give it to your AI or paste it into a chat.
 
+When the app shows your code once, you can **Copy** it (the button then says **Copied**; if copying is blocked you are told), select it in one piece, or **Save as file** to keep it as a small text file on your computer. Every backup code field has **Show** and **Hide**, and accepts a pasted code even with line breaks or long dashes. If you set up without a passkey, the last screen says "Save your backup code — you need it to approve."
+
 ## If you set up before 0.3.0
 
 If you set up AgentLink in the terminal before the local app, your approvals use a code. The app offers **Switch to Touch ID** (**Switch to Windows Hello** or **Switch to a passkey** on other computers), and the note goes away as soon as Touch ID is set up.
