@@ -183,7 +183,7 @@ describe('W8-F13: the New ID gate offers Touch ID to an owner without one here',
   it('the switch: the backup code once, then the ID is created with its own touch', async () => {
     const { api, onDone, switches } = await mount(NO_PASSKEY);
     await click(UPGRADE.bannerAction('mac'));
-    expect(host.textContent).toContain(NAME.codeWhat);
+    expect((host.textContent ?? '').split(NAME.codeWhat).length - 1).toBe(1);
     await type('ABCD-EFGH');
     await submit();
     expect(switches).toEqual([[SWITCH_TO, 'ABCD-EFGH']]);
@@ -224,7 +224,9 @@ describe('W8-F12/F11: the backup-code form', () => {
   it('says what the backup code is, in one plain line', async () => {
     await mount(READY);
     await click(NAME.backupInstead);
-    expect(host.querySelector('form')?.textContent).toContain(NAME.codeWhat);
+    const text = host.querySelector('form')?.textContent ?? '';
+    // Once only: the field's hint, not also a line above it.
+    expect(text.split(NAME.codeWhat).length - 1).toBe(1);
   });
 
   it('spaces the field and the buttons (a flex column with a gap)', async () => {

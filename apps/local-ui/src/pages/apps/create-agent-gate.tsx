@@ -476,7 +476,6 @@ export function CreateAgentGate({
       {switching && switchTo !== undefined ? (
         <form className="ag-code-form" autoComplete="off" onSubmit={submitSwitch}>
           <p className="al-text-body-sm al-muted">{PASSKEY_WHY.switchIntro(sensor)}</p>
-          <p className="al-text-body-sm al-muted">{NAME.codeWhat}</p>
           {codeField}
           <div className="ag-actions">
             <Button type="submit" variant="primary" icon="key-round" disabled={working}>
@@ -507,7 +506,6 @@ export function CreateAgentGate({
               {why}
             </p>
           )}
-          <p className="al-text-body-sm al-muted">{NAME.codeWhat}</p>
           {codeField}
           <div className="ag-actions">
             <Button type="submit" variant="primary" disabled={working || code.length === 0}>
