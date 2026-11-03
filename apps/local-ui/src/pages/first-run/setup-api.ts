@@ -7,6 +7,8 @@
 // app's JSON client (api/client.ts), so this file makes its own same-origin call with the page's
 // CSRF token, exactly as that client does.
 
+import { FAILURE_REASON_CODES, type FailureReasonCode } from '../../api/failure-reasons.js';
+
 export const STATUS_PATH = '/api/ui/first-run';
 export const BEGIN_PATH = '/api/ui/first-run/owner/begin';
 export const FINISH_PATH = '/api/ui/first-run/owner/finish';
@@ -41,7 +43,8 @@ export type SetupProblem =
   | 'rolled_back'
   | 'keychain'
   | 'check_failed'
-  | 'internal'
+  /** R2: the fixed reasons of api/failure-reasons.ts (storage, network, keychain, busy, internal). */
+  | FailureReasonCode
   | 'offline'
   | 'session_expired'
   | 'forbidden'
@@ -135,7 +138,7 @@ const REASONS: ReadonlySet<string> = new Set<SetupProblem>([
   'rolled_back',
   'keychain',
   'check_failed',
-  'internal',
+  ...FAILURE_REASON_CODES,
 ]);
 const BASE64URL = /^[A-Za-z0-9_-]{1,2048}$/;
 /** W4-ONE-TOUCH: the begin nonce (32 bytes, base64url). */

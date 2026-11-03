@@ -268,7 +268,10 @@ describe('commit: the write', () => {
 });
 
 describe('R2: is Claude Desktop open? (pgrep exit codes)', () => {
-  const run = (code: number, out = '') => () => Promise.resolve({ code, out });
+  const run =
+    (code: number, out = '') =>
+    () =>
+      Promise.resolve({ code, out });
   it('macOS: exit 0 is running, exit 1 is not running, anything else is unknown', async () => {
     expect(await claudeDesktopState('darwin', run(0))).toBe('running');
     expect(await claudeDesktopState('darwin', run(1))).toBe('not_running');

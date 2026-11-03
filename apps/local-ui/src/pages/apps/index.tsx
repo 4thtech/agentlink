@@ -132,6 +132,7 @@ function Card({
       break;
     case 'not_connected':
       word = S.notConnected;
+      if (row.checkFailed === true) detail = S.cantCheckOpen(row.name);
       actions = (
         <Button variant={primary ? 'primary' : 'secondary'} onClick={onReview}>
           {S.reviewChange}

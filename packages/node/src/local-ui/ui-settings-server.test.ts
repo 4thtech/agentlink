@@ -357,7 +357,9 @@ describe('R2: a handler that throws answers a fixed reason', () => {
     });
     const h = await harness({ routes });
     const get = () =>
-      send(h.port, '/api/ui/test/boom', { headers: { Cookie: h.cookie, 'X-AgentLink-CSRF': h.csrf } });
+      send(h.port, '/api/ui/test/boom', {
+        headers: { Cookie: h.cookie, 'X-AgentLink-CSRF': h.csrf },
+      });
     const down = await get();
     expect(down.status).toBe(500);
     expect(JSON.parse(down.body)).toEqual({ status: 'failed', reason: 'storage_unreachable' });

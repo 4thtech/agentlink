@@ -194,6 +194,7 @@ import {
   type FileRevealer,
   type OsNotifier,
 } from './approval-os.js';
+import { failedBody } from './local-ui/failure-reasons.js';
 import { revealSavedFile } from './local-ui/reveal-file.js';
 import { EXPIRED_HTML, NO_APP_HTML } from './approval-pages.js';
 import { NodeKeyStoreError } from './errors.js';
@@ -2041,7 +2042,7 @@ export async function startApprovalServerWith(
       result.status >= 200 &&
       result.status <= 599;
     if (!ok) {
-      sendJson(res, 500, { status: 'failed' });
+      sendJson(res, 500, failedBody());
       return;
     }
     sendJson(res, result.status, result.body);
@@ -4291,8 +4292,8 @@ export async function startApprovalServerWith(
     let result: LocalUiResult;
     try {
       result = await route.handler(uiContext, id, revealFile);
-    } catch {
-      sendJson(res, 500, { status: 'failed' });
+    } catch (error) {
+      sendJson(res, 500, failedBody(error));
       return;
     }
     sendResult(res, result);
@@ -4365,8 +4366,8 @@ export async function startApprovalServerWith(
       let result: LocalUiResult;
       try {
         result = await route.handler(uiContext, parsed as JsonObject, invitesDesk);
-      } catch {
-        sendJson(res, 500, { status: 'failed' });
+      } catch (error) {
+        sendJson(res, 500, failedBody(error));
         return;
       }
       sendResult(res, result);
@@ -4652,8 +4653,8 @@ export async function startApprovalServerWith(
           query: url.searchParams,
           ...(input === undefined ? {} : { input }),
         });
-      } catch {
-        refusal = { status: 500, body: { status: 'failed' } };
+      } catch (error) {
+        refusal = { status: 500, body: failedBody(error) };
       }
       if (refusal !== undefined) {
         req.resume();
@@ -5328,8 +5329,8 @@ export async function startApprovalServerWith(
     let result: LocalUiResult;
     try {
       result = await route.handler(uiContext, change);
-    } catch {
-      sendJson(res, 500, { status: 'failed' });
+    } catch (error) {
+      sendJson(res, 500, failedBody(error));
       return;
     }
     stamp(res);
@@ -5537,8 +5538,8 @@ export async function startApprovalServerWith(
   }
 
   dispatch = (req, res) => {
-    handle(req, res).catch(() => {
-      if (!res.headersSent) sendJson(res, 500, { status: 'failed' });
+    handle(req, res).catch((error: unknown) => {
+      if (!res.headersSent) sendJson(res, 500, failedBody(error));
       else res.destroy();
     });
   };

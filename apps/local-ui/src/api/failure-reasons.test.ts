@@ -2,7 +2,7 @@
 // a generic line plus "Run `agentlink doctor` for details". Server text never reaches the page.
 import { describe, expect, it } from 'vitest';
 import { createOwnerClient } from '../pages/contacts/owner.js';
-import { createSetupApi, FINISH_PATH } from '../pages/first-run/setup-api.js';
+import { createSetupApi } from '../pages/first-run/setup-api.js';
 import { setupMessage } from '../pages/first-run/index.js';
 import { FAILURE_COPY, FAILURE_REASON_CODES, failureCopy } from './failure-reasons.js';
 
@@ -40,14 +40,13 @@ describe('where the reason is read', () => {
   it('the setup call keeps a known reason as the problem, with specific words', async () => {
     const api = createSetupApi({
       token: 't',
-      fetch: ((path: string) =>
+      fetch: (() =>
         Promise.resolve(
           new Response(JSON.stringify({ status: 'failed', reason: 'storage_unreachable' }), {
             status: 500,
           }),
         )) as unknown as typeof fetch,
     });
-    expect(FINISH_PATH).toBeTruthy();
     const result = await api.finish(new Uint8Array([1, 2, 3]), 'N'.repeat(43));
     expect(result).toEqual({ kind: 'error', problem: 'storage_unreachable' });
     expect(setupMessage({ problem: 'storage_unreachable' } as never)).toBe(
