@@ -900,7 +900,11 @@ describe('W8-S3: AI app entries (04 §2.5 step 5) and finishing a removal', () =
     w.apps.set('antigravity', 'ag-test');
     w.apps.set('cursor', 'default');
     // Finishing a retired ID: presence, no typed name (W8-FINISH-REMOVE; owner confirms at merge).
-    const res = await remove(w, { name: 'ag-test' }, { generation: (await generationOf(w)) ?? '0' });
+    const res = await remove(
+      w,
+      { name: 'ag-test' },
+      { generation: (await generationOf(w)) ?? '0' },
+    );
     expect(res.json).toEqual({ status: 'removed' });
     expect(w.apps.has('antigravity')).toBe(false);
     // An entry that runs another folder is never touched.

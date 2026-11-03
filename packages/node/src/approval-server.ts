@@ -5341,7 +5341,9 @@ export async function startApprovalServerWith(
    * U3-e: `POST /api/ui/agents/remove` `{name, typedLabel, anyway?}` (08 §1; 04 §2.5 "Removing an
    * agent"), the remove kind. The caller checked the session, CSRF, Origin, fetch metadata, the
    * octet-stream type and the generation (the request's hold). No query. In order: the strict input;
-   * the name must be a listed agent and the typed label its label exactly (`label_mismatch`); the app
+   * the name must be a listed agent and the typed label its label exactly (`label_mismatch`), or,
+   * with no typed label, the agent must already be retired by this owner (W8-FINISH-REMOVE, else
+   * `invalid`); the app
    * closes the agent if it has it open (same generation: a refused removal opens it again); the
    * folder lock is taken EXCLUSIVE, or `in_use` before any presence is used; the agent is opened for
    * its removal under that lock; then ownerGate checks presence against the owner its own card names
@@ -5387,7 +5389,7 @@ export async function startApprovalServerWith(
         return;
       }
       // The typed label is the confirmation (b11 §29): exactly the label shown, never normalised.
-      if (input.typedLabel !== entry.label) {
+      if (input.typedLabel !== undefined && input.typedLabel !== entry.label) {
         finishRemove('label_mismatch');
         return;
       }
@@ -5395,6 +5397,23 @@ export async function startApprovalServerWith(
       if (keys === undefined) {
         finishRemove('unknown_agent');
         return;
+      }
+      // W8-FINISH-REMOVE (proposed, owner confirms at merge): without the typed label only an agent
+      // already retired for good is finished: listed `removing`, with a revoked-list entry that
+      // verifies for its own ID. Its owner is checked below against the owner of the gesture (the
+      // agent's own card, or the stored owner unlocked for the entry's signer). Presence is the same.
+      let retiredOwner: string | undefined;
+      if (input.typedLabel === undefined) {
+        const recorded = entry.removing
+          ? await removal.readRevoked(keys.agentId).catch(() => undefined)
+          : undefined;
+        const checked =
+          recorded?.kind === 'entry' ? verifyRevokedEntry(recorded.text, keys.agentId) : undefined;
+        if (checked?.ok !== true) {
+          finishRemove('invalid');
+          return;
+        }
+        retiredOwner = checked.owner;
       }
       const erase = createKeyEraseControl(
         keys.backend === 'keychain'
@@ -5408,7 +5427,7 @@ export async function startApprovalServerWith(
       await removal.exclusive(input.name, async () => {
         const agent = await removal.open(input.name);
         if (agent === undefined) {
-          // GAP B: a retired agent whose keys are gone no longer opens; steps 6 and 7 finish it.
+          // GAP B: a retired agent whose keys are gone no longer opens; steps 5 to 7 finish it.
           const recorded = entry.removing
             ? await removal.readRevoked(keys.agentId).catch(() => undefined)
             : undefined;
@@ -5437,6 +5456,7 @@ export async function startApprovalServerWith(
                   agentId: keys.agentId,
                   recorded: text,
                   ownerNostr,
+                  port: removal,
                   removeFolder: (name) => slot.directory.removeFolder(name),
                   erase,
                   owner,
@@ -5458,6 +5478,14 @@ export async function startApprovalServerWith(
           return;
         }
         try {
+          if (retiredOwner !== undefined) {
+            // Without the typed label: the entry must be signed by the owner the agent's card names.
+            const context = await agent.context().catch(() => undefined);
+            if (context === undefined || encodeHex(context.owner.ownerNostr) !== retiredOwner) {
+              finishRemove('invalid');
+              return;
+            }
+          }
           await ownerGate(
             req,
             res,

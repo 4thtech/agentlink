@@ -256,7 +256,12 @@ describe('the removal port (U3-e, 06 §6 "Open agents and removal")', () => {
 describe('W8-S3: AI app entries in a removal (04 §2.5 step 5)', () => {
   const stdio = (agent?: string) => ({
     command: 'npx',
-    args: ['-y', '@4thtech-io/agentlink', 'mcp', ...(agent === undefined ? [] : ['--agent', agent])],
+    args: [
+      '-y',
+      '@4thtech-io/agentlink',
+      'mcp',
+      ...(agent === undefined ? [] : ['--agent', agent]),
+    ],
   });
   const other = { command: 'other', env: { API_KEY: 'other-server-private-value' } };
   const ANTIGRAVITY = ['.gemini', 'config', 'mcp_config.json'];
@@ -290,10 +295,15 @@ describe('W8-S3: AI app entries in a removal (04 §2.5 step 5)', () => {
     desktopRuns = false;
     const agentId = newId();
     await writeAgentConfig(home, { v: 1, name: 'ag-test', agentId, keyStore: 'keychain' });
-    await writeAgentConfig(home, { v: 1, name: 'personal', agentId: newId(), keyStore: 'keychain' });
+    await writeAgentConfig(home, {
+      v: 1,
+      name: 'personal',
+      agentId: newId(),
+      keyStore: 'keychain',
+    });
     const antigravity = await config(ANTIGRAVITY, { other, agentlink: stdio('ag-test') });
     const cursor = await config(CURSOR, {
-      agentlink: { type: 'stdio', ...stdio('personal'), env: {} },
+      agentlink: { type: 'stdio', ...stdio('personal') },
     });
     // Not exactly ours: same key, another program. Never touched, never listed.
     const claudeCode = await config(CLAUDE_CODE, {

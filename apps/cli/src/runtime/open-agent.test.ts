@@ -20,12 +20,7 @@ import { AgentFolderLockError, withAgentFolderExclusive } from '@4thtech-io/node
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { recordRevokedEntry, writeAgentConfig } from './agent-dir.js';
 import { RUNTIME_MESSAGES } from './errors.js';
-import {
-  AGENT_GONE_MESSAGE,
-  NO_AGENT_MESSAGE,
-  openAgent,
-  type RuntimeDeps,
-} from './open-agent.js';
+import { AGENT_GONE_MESSAGE, NO_AGENT_MESSAGE, openAgent, type RuntimeDeps } from './open-agent.js';
 
 const NOW = 1_800_000_000;
 const NO_KEYCHAIN_COPY =
