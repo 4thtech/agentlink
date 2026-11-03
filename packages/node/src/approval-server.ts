@@ -874,6 +874,15 @@ export interface ApprovalServer {
   openJoin(): Promise<boolean>;
   /** Raises the fixed OS notification for a new request and returns its approvalUrl. */
   notifyNewApproval(approvalId: string): Promise<string>;
+  /**
+   * F25: whether the app is in use, for the `ui` command's idle limit. `lastAt` is the time (ms) of
+   * the last request to the page API (`/api/ui/`), `openStreams` the open live streams (open tabs).
+   * Counts and a time only.
+   */
+  readonly activity: {
+    lastAt(): number;
+    openStreams(): number;
+  };
   close(): Promise<void>;
 }
 
@@ -4670,6 +4679,7 @@ export async function startApprovalServerWith(
     );
   }
 
+  let lastActivityAt = Date.now();
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     setCommonHeaders(res);
     // U3-d: the open agent's verified label is known before anything is stamped with it.
@@ -4697,6 +4707,8 @@ export async function startApprovalServerWith(
     const url = new URL(raw, origin);
     const path = url.pathname;
     const method = req.method ?? 'GET';
+    // F25: page API activity (a poll, a read, a write) keeps `ui` open; static files do not.
+    if (path.startsWith('/api/ui/')) lastActivityAt = Date.now();
     if (!path.startsWith(SETUP_PATH_PREFIX)) sweepSetup();
 
     if (path.startsWith(ASSETS_PREFIX)) {
@@ -5556,6 +5568,10 @@ export async function startApprovalServerWith(
     port,
     address: () => ({ host: APPROVAL_SERVER_HOST, port, addresses }),
     approvalUrl,
+    activity: Object.freeze({
+      lastAt: () => lastActivityAt,
+      openStreams: () => liveEvents.size,
+    }),
     open: async (approvalId?: string) => {
       // A malformed ID rejects the returned promise (never a synchronous throw).
       const path = approvalId === undefined ? '/' : new URL(approvalUrl(approvalId)).pathname;
@@ -5577,7 +5593,8 @@ export async function startApprovalServerWith(
       // U3-invite: the handoff record goes first, so no `join` hands over to a closing host.
       if (handoffWritten) await options.host?.handoff?.remove().catch(() => undefined);
       joinDesk?.dismiss();
-      // W4-LIVE-STATUS: every event stream ends when the host stops.
+      // F25: open pages hear "closing" first; W4-LIVE-STATUS: every event stream ends when the host stops.
+      liveEvents.closing();
       liveEvents.close();
       await Promise.all(listeners.map(closeServer));
       // U3-c: the app host closes the agent it has open (whichever the owner switched to).

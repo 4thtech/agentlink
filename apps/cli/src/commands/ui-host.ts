@@ -120,7 +120,7 @@ export interface UiWelcomeDeps {
   /** Starts the approval server (startApprovalServer). */
   startServer(
     options: ApprovalServerOptions,
-  ): Promise<Pick<ApprovalServer, 'openFirstRun' | 'openJoin' | 'close'>>;
+  ): Promise<Pick<ApprovalServer, 'openFirstRun' | 'openJoin' | 'close' | 'activity'>>;
   /** Fixed-value events (I-7). */
   readonly onEvent?: (event: ApprovalServerEvent) => void;
   /** U3-invite: the canonical link `join` checked (held in memory by the host only). */
@@ -134,6 +134,8 @@ export interface UiWelcomeDeps {
 /** U3-g-b: the running no-agent app host: it always opens on the first-run page (Welcome). */
 export interface UiWelcomeServer {
   readonly page: 'first-run';
+  /** F25: page use, for the idle limit (see UiServer.activity). */
+  readonly activity: { lastAt(): number; openStreams(): number };
   open(): Promise<boolean>;
   close(): Promise<void>;
 }
@@ -148,12 +150,14 @@ const NO_AGENT_SOURCE: ApprovalServerSource = Object.freeze<ApprovalServerSource
 
 /**
  * U3-g-b: starts the app host with no agent open, or undefined (nothing started) when any agent
- * folder exists (even one marked `removing`), the keychain cannot hold a new agent, or this build has
+ * folder is usable or unreadable (R1: folders marked `removing` do not count), the keychain cannot
+ * hold a new agent, or this build has
  * no app. The server closes whichever agent first run opened.
  */
 export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServer | undefined> {
   const entries = await deps.directory.list().catch(() => undefined);
-  if (entries === undefined || entries.length !== 0) return undefined;
+  // R1: half-removed IDs do not count: only a usable (or unreadable) folder keeps Welcome away.
+  if (entries === undefined || entries.some((e) => !e.removing)) return undefined;
   if (!(await deps.keychainUsable().catch(() => false))) return undefined;
   const assets = deps.assets();
   if (assets.files.has('index.html') !== true) return undefined;
@@ -185,6 +189,7 @@ export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServ
   });
   return Object.freeze<UiWelcomeServer>({
     page: 'first-run',
+    activity: server.activity,
     // U3-invite: openJoin goes to first run while no owner exists; first run then ends on the
     // waiting invite (the link is never in the URL).
     open: () => (deps.waitingInvite === undefined ? server.openFirstRun() : server.openJoin()),

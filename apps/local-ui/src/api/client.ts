@@ -3,6 +3,8 @@
 // page does). The browser never signs: owner actions are server calls (D-118). Statuses become typed
 // results; bodies and the token are never logged.
 
+import { noteHostReached, noteHostUnreachable } from './host-closed.js';
+
 export type ApiResult<T> =
   | { readonly kind: 'ok'; readonly status: number; readonly data: T }
   | { readonly kind: 'session_expired' }
@@ -105,8 +107,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     try {
       res = await doFetch(path, init);
     } catch {
+      noteHostUnreachable();
       return { kind: 'offline' };
     }
+    noteHostReached();
     const parsed = await readJson(res);
     if (parsed.ok && isPresenceRequired(parsed.value)) return { kind: 'presence_required' };
     if (res.status === 401) return { kind: 'session_expired' };
@@ -133,8 +137,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         cache: 'no-store',
       });
     } catch {
+      noteHostUnreachable();
       return { kind: 'offline' };
     }
+    noteHostReached();
     const parsed = await readJson(res);
     const value = parsed.ok ? parsed.value : undefined;
     const gate =

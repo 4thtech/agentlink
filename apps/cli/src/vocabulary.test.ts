@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { CREDITS_TEXT } from './commands/credits.js';
 import { DOCTOR_PROOF_TEXT, DOCTOR_TEXT } from './commands/doctor.js';
+import { DOCTOR_LOCAL_TEXT } from './commands/doctor-local.js';
 import { FIRST_RUN_TEXT } from './commands/first-run.js';
 import { UI_TEXT } from './commands/ui.js';
 import { HOOK_TEXT, INIT_TEXT } from './commands/init.js';
@@ -76,6 +77,7 @@ function stringsOf(table: string, value: unknown): [string, string][] {
 /** The user-facing text tables of the CLI. */
 const TABLES: Readonly<Record<string, unknown>> = {
   CREDITS_TEXT,
+  DOCTOR_LOCAL_TEXT,
   DOCTOR_PROOF_TEXT,
   DOCTOR_TEXT,
   FIRST_RUN_TEXT,

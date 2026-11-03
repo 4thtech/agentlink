@@ -24,6 +24,7 @@ import {
 import { createDispatcher } from './dispatch.js';
 import { mcpCommand } from './mcp/index.js';
 import { createOutput } from './output.js';
+import { setCliVersion } from './runtime/cli-version.js';
 
 function packageVersion(): string {
   try {
@@ -38,6 +39,7 @@ function packageVersion(): string {
 }
 
 const version = packageVersion();
+setCliVersion(version);
 const dispatch = createDispatcher({
   init: createInitHandler(nodeInitDeps()),
   invite: inviteHandler,
