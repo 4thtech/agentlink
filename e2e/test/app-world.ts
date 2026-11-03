@@ -208,6 +208,16 @@ export function startServerOf(
   };
 }
 
+/** Optional seams of a run: the host clock (seconds), its wait, and a wrapper of the removal port (fault points). */
+export interface UiDepsSeams {
+  readonly now?: () => number;
+  /** How long the host waits for the person before it quits (default 30 min). */
+  readonly waitMs?: number;
+  readonly wrapRemoval?: (
+    port: ReturnType<typeof uiRemovalPort>,
+  ) => ReturnType<typeof uiRemovalPort>;
+}
+
 /**
  * The `UiDeps` of `agentlink ui` / `join` on this computer: the same steps as the CLI's nodeUiDeps
  * (apps/cli commands/ui.ts), over the seams above. `serveUi` is the shipped command logic.
@@ -215,12 +225,17 @@ export function startServerOf(
 export function uiDepsOf(
   pc: Computer,
   assets: Map<string, Uint8Array>,
+  seams: UiDepsSeams = {},
 ): UiDeps & {
   stop(): void;
   readonly servers: UiServer[];
 } {
   const wiring = wiringOf(pc, assets);
-  const now = (): number => Math.floor(Date.now() / 1000);
+  const now = seams.now ?? ((): number => Math.floor(Date.now() / 1000));
+  const removal = (): ReturnType<typeof uiRemovalPort> => {
+    const port = uiRemovalPort({ home: pc.home, runtime: pc.runtime });
+    return seams.wrapRemoval === undefined ? port : seams.wrapRemoval(port);
+  };
   const owner = {
     open: async (name?: string) => {
       let opened: Awaited<ReturnType<typeof openAgentStoreWith>> | undefined;
@@ -284,7 +299,7 @@ export function uiDepsOf(
         // U3-g-c: the same harness desk as `ui` (list only on Welcome).
         aiApps: () => wiring.aiApps(),
         // HOTFIX-045-REMOVE-FIRSTRUN: Remove works in the session first run started.
-        removal: uiRemovalPort({ home: pc.home, runtime: pc.runtime }),
+        removal: removal(),
       });
       if (server !== undefined) servers.push(server);
       return server;
@@ -315,7 +330,7 @@ export function uiDepsOf(
           },
           open: (other) => openUiHostAgent(hostDeps, other),
           aiAppsList: { list: () => wiring.aiApps().list() },
-          removal: uiRemovalPort({ home: pc.home, runtime: pc.runtime }),
+          removal: removal(),
           ...(invite === undefined ? {} : { waitingInvite: invite }),
         },
       });
@@ -330,7 +345,7 @@ export function uiDepsOf(
       servers.push(ui);
       return ui;
     },
-    waitMs: 30 * 60_000,
+    waitMs: seams.waitMs ?? 30 * 60_000,
     interrupt: (stop) => {
       stopWait = stop;
       return () => {
@@ -345,12 +360,15 @@ export function uiDepsOf(
 export function runUi(
   pc: Computer,
   assets: Map<string, Uint8Array>,
-  options: { readonly invite?: string } = {},
+  options: { readonly invite?: string; readonly seams?: UiDepsSeams } = {},
 ): {
   readonly deps: ReturnType<typeof uiDepsOf>;
   readonly done: Promise<{ code: number; printed: string[]; errors: string[] }>;
+  /** The lines printed so far (live). */
+  readonly printed: string[];
+  readonly errors: string[];
 } {
-  const deps = uiDepsOf(pc, assets);
+  const deps = uiDepsOf(pc, assets, options.seams);
   const printed: string[] = [];
   const errors: string[] = [];
   const context = {
@@ -369,7 +387,7 @@ export function runUi(
     'agentlink',
     options.invite === undefined ? undefined : { invite: options.invite, opened: 'opened' },
   ).then((code) => ({ code, printed, errors }));
-  return { deps, done };
+  return { deps, done, printed, errors };
 }
 
 /** Waits until the link `ui` handed to the opener is there. */
