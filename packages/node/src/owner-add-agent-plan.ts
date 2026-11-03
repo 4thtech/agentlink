@@ -72,6 +72,14 @@ export interface PlanStatementApp {
   readonly newEntry: JsonObject | null;
   /** For a move, the folder name of the agent the app leaves. */
   readonly oldAgent: string | null;
+  /**
+   * W8-S5 (F7): for a move, the label of the agent the app leaves, resolved by the server from the
+   * directory (the open agent's verified label, another's config.json label, else its folder name);
+   * null when its folder is gone. Never from the page.
+   */
+  readonly oldLabel: string | null;
+  /** W8-S5 (F7): the agent the app leaves is gone (no folder) or its removal did not finish. */
+  readonly oldGone: boolean;
 }
 
 /** What the screen shows before the gesture, rendered only from begin's answer (04 §2.8). */

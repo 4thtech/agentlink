@@ -25,7 +25,17 @@ export interface CreateStatement {
   readonly agentFingerprint: string;
   readonly ownerFingerprint: string;
   readonly folder: string;
-  readonly app?: { readonly id: string; readonly name: string; readonly kind: 'connect' | 'move' };
+  readonly app?: {
+    readonly id: string;
+    readonly name: string;
+    readonly kind: 'connect' | 'move';
+    /**
+     * W8-S5 (F7): for a move, the ID the app leaves as the server names it (null when it is gone),
+     * and whether it was removed. Shown as text only.
+     */
+    readonly oldLabel?: string | null;
+    readonly oldGone?: boolean;
+  };
 }
 
 export interface CreatePublicKey {
@@ -144,17 +154,29 @@ export function parseStatement(value: unknown): CreateStatement | undefined {
   let shown: CreateStatement['app'];
   if (app !== undefined) {
     if (!isObject(app)) return undefined;
-    const { app: id, name, kind } = app;
+    const { app: id, name, kind, oldLabel, oldGone } = app;
     if (
       typeof id !== 'string' ||
       !APP_ID.test(id) ||
       typeof name !== 'string' ||
       !APP_NAME.test(name) ||
-      (kind !== 'connect' && kind !== 'move')
+      (kind !== 'connect' && kind !== 'move') ||
+      !(
+        oldLabel === undefined ||
+        oldLabel === null ||
+        (typeof oldLabel === 'string' && oldLabel.length > 0 && [...oldLabel].length <= 32)
+      ) ||
+      !(oldGone === undefined || typeof oldGone === 'boolean')
     ) {
       return undefined;
     }
-    shown = { id, name, kind };
+    shown = {
+      id,
+      name,
+      kind,
+      ...(oldLabel === undefined ? {} : { oldLabel }),
+      ...(oldGone === undefined ? {} : { oldGone }),
+    };
   }
   return { label, agentFingerprint, ownerFingerprint, folder, ...(shown ? { app: shown } : {}) };
 }

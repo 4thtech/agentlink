@@ -9,6 +9,9 @@
 // seconds; per AI app Working with the U0 pulse / Ready / Idle / Not running · last seen / Not set up
 // in the words of 08 §1). Switching needs no Touch ID (it only changes what you look at) and never
 // reloads the page.
+// W8-S4 (F20, F21): a half-removed ID's row says "{label} wasn't fully removed" with Finish removing
+// (the Remove sheet in finish mode); names read "{label} · {first app} and N more" on one line; an
+// ID no AI app uses says so once.
 // Labels and app names are text only (I-5).
 import { AgentIcon, Pulse, type AgentDotState, type LiveDotState } from '@4thtech-io/ui';
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
@@ -22,8 +25,11 @@ import {
 } from '../api/live.js';
 import { AGENTS_PATH, NEW_AGENT_PATH } from '../nav.js';
 import { navigate } from '../router.js';
-import type { AgentsApi } from '../pages/agents/api.js';
+import { createAgentsApi, type AgentsApi } from '../pages/agents/api.js';
+import type { AgentRow } from '../pages/agents/data.js';
+import { FinishRemoveSheet } from '../pages/agents/finish-remove.js';
 import { AGENTS_STRINGS as A } from '../pages/agents/strings.js';
+import { createOwnerClient, type OwnerClient } from '../pages/contacts/owner.js';
 import { createAppsApi, type AppsApi } from '../pages/apps/api.js';
 import { APPS_PAGE_PATH } from '../pages/apps/data.js';
 import { ShellIcon } from './shell-icons.js';
@@ -130,10 +136,18 @@ export interface AgentSwitcherProps {
   readonly appsApi?: AppsApi;
   /** The connection; when it is not up the chip says that instead of the agent's status. */
   readonly chip?: SwitcherChip;
+  /** W8-S4 test seam: the owner calls of Finish removing (default: the app's own). */
+  readonly owner?: OwnerClient;
 }
 
-export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): ReactElement {
+export function AgentSwitcher({ api, appsApi, chip, owner }: AgentSwitcherProps): ReactElement {
   const live = useLive(api);
+  // W8-S4 (F21): Finish removing opens the Remove sheet in finish mode, here.
+  const [finishing, setFinishing] = useState<AgentRow | undefined>(undefined);
+  const [calls] = useState(() => ({
+    agents: api ?? createAgentsApi(),
+    owner: owner ?? createOwnerClient(),
+  }));
   const free = useFreeApps(appsApi);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -148,12 +162,23 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
   const current = agents.find((a) => a.current);
   const label = current?.label ?? list?.label ?? A.switcherLabel;
   // D-144 (a): the AI app next to the ID, on this computer only ("Tali · Claude Code").
-  const shown = A.withApp(label, current === undefined ? [] : current.apps.map((x) => x.app));
+  // W8-F20: short enough for one line ("Tali · Claude Code and 1 more"), never cut mid-name.
+  const shown = A.withAppShort(label, current === undefined ? [] : current.apps.map((x) => x.app));
   const seed = current?.name ?? label;
   const down = connectionWord(chip);
   const status = down ?? current?.statusText ?? (list === undefined ? '' : A.notRunning);
   const dot: AgentDotState | undefined =
     down !== undefined ? 'off' : current === undefined ? undefined : DOT[current.state];
+
+  const finishSheet =
+    finishing === undefined ? null : (
+      <FinishRemoveSheet
+        row={finishing}
+        api={calls.agents}
+        owner={calls.owner}
+        onClose={() => setFinishing(undefined)}
+      />
+    );
 
   if (list !== undefined && !list.switchable) {
     return (
@@ -209,45 +234,85 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
           <span className="al-menu-head" role="presentation">
             {CHIP_STRINGS.menu}
           </span>
-          {agents.map((agent) => (
-            <div key={agent.name} className="al-am-row">
-              <button
-                type="button"
-                role="menuitemradio"
-                aria-checked={agent.current}
-                {...(agent.apps.length > 0
-                  ? { 'aria-describedby': `${menuId}-${agent.name}` }
-                  : {})}
-                className="al-mitem al-am-item"
-                aria-disabled={agent.removing ? 'true' : undefined}
-                onClick={() => choose(agent)}
-              >
-                <AgentIcon label={agent.label} seed={agent.name} size="lg" dot={DOT[agent.state]} />
-                <span className="al-am-main">
-                  <span className="al-am-name">
-                    {A.withApp(
-                      agent.label,
-                      agent.apps.map((x) => x.app),
+          {agents.map((agent) => {
+            const row = agent.removing
+              ? list?.agents.find((r) => r.name === agent.name)
+              : undefined;
+            if (agent.removing) {
+              // W8-S4 (F21): never a usable ID: what happened, and Finish removing.
+              return (
+                <div key={agent.name} className="al-am-row" data-unfinished={agent.name}>
+                  <div className="al-mitem al-am-item" aria-disabled="true">
+                    <AgentIcon label={agent.label} seed={agent.name} size="lg" dot={DOT.removing} />
+                    <span className="al-am-main">
+                      <span className="al-am-name">{agent.label}</span>
+                      <span className="al-am-status">{A.notFullyRemoved(agent.label)}</span>
+                    </span>
+                  </div>
+                  {row === undefined ? null : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="al-mitem al-am-connect"
+                      onClick={() => {
+                        close(false);
+                        setFinishing(row);
+                      }}
+                    >
+                      {A.finishRemoving}
+                    </button>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div key={agent.name} className="al-am-row">
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={agent.current}
+                  {...(agent.apps.length > 0
+                    ? { 'aria-describedby': `${menuId}-${agent.name}` }
+                    : {})}
+                  className="al-mitem al-am-item"
+                  aria-disabled={agent.removing ? 'true' : undefined}
+                  onClick={() => choose(agent)}
+                >
+                  <AgentIcon
+                    label={agent.label}
+                    seed={agent.name}
+                    size="lg"
+                    dot={DOT[agent.state]}
+                  />
+                  <span className="al-am-main">
+                    <span className="al-am-name">
+                      {A.withAppShort(
+                        agent.label,
+                        agent.apps.map((x) => x.app),
+                      )}
+                    </span>
+                    <span className="al-am-status">{agent.statusText}</span>
+                    {/* W8-S4 (F20): never "Not used by any AI app" twice. */}
+                    {agent.apps.length > 0 ? (
+                      <span className="al-am-status">{A.usedBy(agent.apps.map((x) => x.app))}</span>
+                    ) : agent.statusText === A.notUsed ? null : (
+                      <span className="al-am-status">{A.notUsed}</span>
                     )}
                   </span>
-                  <span className="al-am-status">{agent.statusText}</span>
-                  <span className="al-am-status">
-                    {agent.apps.length > 0 ? A.usedBy(agent.apps.map((x) => x.app)) : A.notUsed}
+                  {agent.current ? (
+                    <ShellIcon name="check" size={16} className="al-am-check" />
+                  ) : null}
+                </button>
+                {agent.apps.length > 0 ? (
+                  <span id={`${menuId}-${agent.name}`} className="al-am-apps">
+                    {agent.apps.map((app) => (
+                      <AppLine key={app.app} app={app} />
+                    ))}
                   </span>
-                </span>
-                {agent.current ? (
-                  <ShellIcon name="check" size={16} className="al-am-check" />
                 ) : null}
-              </button>
-              {agent.apps.length > 0 ? (
-                <span id={`${menuId}-${agent.name}`} className="al-am-apps">
-                  {agent.apps.map((app) => (
-                    <AppLine key={app.app} app={app} />
-                  ))}
-                </span>
-              ) : null}
-            </div>
-          ))}
+              </div>
+            );
+          })}
           {free.names.length > 0 ? (
             <>
               <div className="al-menu-sep" role="separator" />
@@ -312,6 +377,7 @@ export function AgentSwitcher({ api, appsApi, chip }: AgentSwitcherProps): React
           </button>
         </ShellMenu>
       ) : null}
+      {finishSheet}
     </div>
   );
 }

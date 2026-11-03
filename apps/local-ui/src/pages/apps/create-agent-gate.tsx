@@ -11,6 +11,10 @@
 // decides what it accepts; the gate offers the switch only when `GET /api/owner/passkey` gives the
 // values for it. W8-F12: the code form says what the backup code is. W8-F11: one Back (none in
 // Get started, whose own Back is on the screen), and the form spaces its field and buttons.
+//
+// W8-S5 (F7; 04 §2.8; 11 §5.8): an AI app whose entry names another ID (or one that was removed) is
+// a move. Begin then runs as soon as that app is the one to connect, and the screen shows begin's
+// own replacement line ("{app} will use {label} instead of {old}") before the one gesture.
 import { Banner, Button, TextField } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
@@ -33,7 +37,14 @@ import {
   WORKING_BROWSER,
   type Platform,
 } from '../first-run/strings.js';
-import { createAgentApi, type CreateAgentApi, type CreateFinish } from './create-agent-api.js';
+import {
+  createAgentApi,
+  type CreateAgentApi,
+  type CreateFinish,
+  type CreatePublicKey,
+  type CreateStatement,
+} from './create-agent-api.js';
+import { APPS_STRINGS as A } from './strings.js';
 
 /** What the sheet shows after the one gesture. */
 export interface CreatedAgent {
@@ -87,6 +98,23 @@ function switchNote(outcome: PasskeySwitchOutcome, platform: Platform): string {
     return UPGRADE_MESSAGES[problem];
   }
   return UPGRADE_MESSAGES.failed;
+}
+
+/**
+ * W8-S5 (F7): a plan begun to show a move's replacement line is used by the first gesture while it
+ * is this fresh (the server holds it for 120 s); after that the gesture begins again.
+ */
+const PREVIEW_FRESH_MS = 90_000;
+
+/** W8-S5 (F7; 11 §5.8): the replacement line of a move, in the words of begin's statement. */
+export function moveLine(statement: CreateStatement | undefined): string | undefined {
+  const shown = statement?.app;
+  if (statement === undefined || shown === undefined || shown.kind !== 'move') return undefined;
+  if (shown.oldGone === true) return A.statementMoveRemoved(shown.name, statement.label);
+  if (typeof shown.oldLabel === 'string') {
+    return A.statementMove(shown.name, statement.label, shown.oldLabel);
+  }
+  return undefined;
 }
 
 /** Refusals after which the same plan may be tried again (Decision 45: the plan is kept). */
@@ -145,7 +173,18 @@ export function CreateAgentGate({
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const sensor = SENSOR[platform];
   // The held plan's nonce for retries with the backup code (Decision 45), and the app it was for.
-  const held = useRef<{ nonce: string; app: string | undefined } | undefined>(undefined);
+  // W8-S5: a plan begun early to show a move keeps its challenge for the first gesture.
+  const held = useRef<
+    | {
+        nonce: string;
+        app: string | undefined;
+        pk?: CreatePublicKey;
+        at?: number;
+      }
+    | undefined
+  >(undefined);
+  // W8-S5 (F7): begin's statement, when the screen shows its move line.
+  const [statement, setStatement] = useState<CreateStatement | undefined>(undefined);
   // The one button, worded as every presence sheet of the app (Contacts, Rename, Remove).
   const useLabel = C.usePasskey;
 
@@ -187,6 +226,32 @@ export function CreateAgentGate({
 
   const app = free !== undefined && connect ? free : undefined;
 
+  // W8-S5 (F7; 04 §2.8 Begin): an app whose entry names another ID is a move. Begin fixes the plan
+  // now (no gesture, nothing signed) so the screen shows the server's replacement line before the
+  // one gesture approves exactly that plan.
+  useEffect(() => {
+    setStatement(undefined);
+    if (app === undefined || app.state !== 'connected') return undefined;
+    let live = true;
+    void api.begin(label, app.id).then((begun) => {
+      if (!live || !mounted.current) return;
+      if (begun.kind !== 'ready') {
+        setError(
+          begun.kind === 'refused'
+            ? (MESSAGES[begun.status] ?? SETUP_MESSAGES.unknown)
+            : (MESSAGES[begun.kind] ?? SETUP_MESSAGES.unknown),
+        );
+        return;
+      }
+      held.current = { nonce: begun.nonce, app: app.id, pk: begun.publicKey, at: Date.now() };
+      if (begun.publicKey.allowCredentials.length === 0) setCanPasskey(false);
+      setStatement(begun.statement);
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, label, app]);
+
   const settle = (outcome: CreateFinish): void => {
     if (outcome.kind === 'done' || outcome.kind === 'created_not_connected') {
       held.current = undefined;
@@ -214,8 +279,18 @@ export function CreateAgentGate({
     { nonce: string; pk?: Parameters<CreateAgentApi['finishPasskey']>[1] } | undefined
   > => {
     const id = app?.id;
-    if (keep && held.current !== undefined && held.current.app === id) {
-      return { nonce: held.current.nonce };
+    const kept = held.current;
+    if (kept !== undefined && kept.app === id) {
+      if (keep) return { nonce: kept.nonce };
+      // W8-S5: the plan begun to show the move line, once, while fresh.
+      if (
+        kept.pk !== undefined &&
+        kept.at !== undefined &&
+        Date.now() - kept.at < PREVIEW_FRESH_MS
+      ) {
+        held.current = { nonce: kept.nonce, app: id };
+        return { nonce: kept.nonce, pk: kept.pk };
+      }
     }
     const begun = await api.begin(label, id);
     if (begun.kind !== 'ready') {
@@ -228,6 +303,7 @@ export function CreateAgentGate({
     }
     held.current = { nonce: begun.nonce, app: id };
     if (begun.publicKey.allowCredentials.length === 0) setCanPasskey(false);
+    if (moveLine(begun.statement) !== undefined) setStatement(begun.statement);
     return { nonce: begun.nonce, pk: begun.publicKey };
   };
 
@@ -356,6 +432,11 @@ export function CreateAgentGate({
   return (
     <div className="ag-sheet-body">
       {summary === '' ? null : <p className="al-text-title-3">{summary}</p>}
+      {moveLine(statement) === undefined ? null : (
+        <p className="al-text-body" role="status" data-move-line="">
+          {moveLine(statement)}
+        </p>
+      )}
       {free === undefined || givenApp !== undefined ? null : (
         <label className="ag-check">
           <input

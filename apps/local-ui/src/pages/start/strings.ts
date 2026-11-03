@@ -53,6 +53,11 @@ export const PICK_STEP = {
   openNow: ' · Open now',
   notFound: 'Not found yet',
   connected: 'Connected',
+  /** W8-S5 (F7; 11 §5.8 "AI app states"): what a found app uses now. */
+  uses: (label: string): string => `Uses ${label}`,
+  usesRemoved: 'Uses a removed ID',
+  usesAnother: 'Uses another ID',
+  byHand: 'Set up by hand',
   next: (app: string): string => `Continue with ${app}`,
   later: 'You can connect more AI apps later.',
   loading: 'Looking for AI apps…',
