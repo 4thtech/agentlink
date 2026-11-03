@@ -268,6 +268,29 @@ describe('first run: protect approvals (D-120 (1))', () => {
     expect(button(FIRST_RUN.savedIt)).toBeDefined();
   });
 
+  it('M1-11s-c-c: without a passkey, a prominent warning says the backup code is needed to approve', async () => {
+    await mount(fakeApi({ finish: done({ passkey: false }) }));
+    await click(GO.other);
+    const banner = host.querySelector('[data-testid="backup-needed"]');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain(FIRST_RUN.doneNoPasskeyTitle);
+    expect(FIRST_RUN.doneNoPasskeyTitle).toMatch(/Save your backup code/);
+    expect(FIRST_RUN.doneNoPasskeyTitle).toMatch(/you need it to approve/);
+    // It comes before the code itself.
+    const code = host.querySelector('.al-secret-val');
+    expect(
+      banner !== null &&
+        code !== null &&
+        (banner.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    ).toBe(true);
+  });
+
+  it('M1-11s-c-c: with a passkey, no such warning', async () => {
+    await mount(fakeApi({ finish: done({ passkey: true }) }));
+    await click(GO.other);
+    expect(host.querySelector('[data-testid="backup-needed"]')).toBeNull();
+  });
+
   it('owner already set up: Get started goes on for that owner (New agent) and never offers setup', async () => {
     const api = fakeApi({ status: { kind: 'ok', owner: 'set_up' } });
     await mount(api);
