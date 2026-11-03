@@ -592,6 +592,28 @@ describe('W4-WIZARD: the same steps for an owner who has one already', () => {
     expect(went.at(-1)).toBe('/start/connected');
     expect(h1()).toBe(CONNECTED_STEP.title('Cursor'));
   });
+
+  it('F4: an owner with no ID left whose begin is refused no_agent gets the real reason, not "Setup didn\'t finish"', async () => {
+    const create = fakeCreate({ kind: 'done', name: 'x', label: 'x' });
+    const refusing: CreateAgentApi = {
+      ...create,
+      begin: () => Promise.resolve({ kind: 'refused', status: 'no_agent' } as const),
+    };
+    await mount({
+      api: fakeSetup({ status: OWNER }),
+      upgradeApi: registered,
+      appsApi: fakeApps({ agent: null }),
+      createAgentApi: refusing,
+      passkeysAvailable: () => true,
+    });
+    await typeName('Cursor agent');
+    await click('Continue');
+    await click(/^CursorFound/);
+    await click(PICK_STEP.next('Cursor'));
+    await click(CONNECT_STEP.connect('Touch ID'));
+    expect(text()).not.toContain("Setup didn't finish");
+    expect(text()).toContain('agentlink owner add-agent');
+  });
 });
 
 /** The agents the name step and "Open {name}" read: "Work" is taken; switches are recorded. */
