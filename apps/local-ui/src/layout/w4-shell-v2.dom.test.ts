@@ -322,7 +322,7 @@ describe('the live agent dropdown', () => {
     expect(rows[2]?.textContent).toContain('Not used by any AI app');
     expect(rows[0]?.querySelector('[role="menuitemradio"][aria-checked="true"]')).not.toBeNull();
     expect(rows[0]?.textContent).toContain('Connected to Claude Code');
-    expect(rows[0]?.querySelector('.al-am-app')?.textContent).toBe('Claude CodeReady');
+    expect(rows[0]?.querySelector('.al-am-app')?.textContent).toBe('Claude CodeConnected');
     expect(rows[1]?.querySelector('.al-am-app')?.textContent).toBe('CursorNot connected');
     expect(rows[1]?.querySelector('.al-ldot.is-off')).not.toBeNull();
     expect(rows[2]?.textContent).toContain('Not used by any AI app');
@@ -602,7 +602,7 @@ describe('Under the hood (kept by the app)', () => {
     expect(location.pathname).toBe('/agents');
     const strip = q('[aria-label="Live status"]');
     expect(strip?.textContent).toContain('Claude Code');
-    expect(strip?.textContent).toContain("Tali's agent ready");
+    expect(strip?.textContent).toContain("Tali's agent connected");
     expect(strip?.textContent).toContain('AgentLink');
     expect(q('.al-app')?.getAttribute('data-hood')).toBe('on');
   });
@@ -791,7 +791,7 @@ describe('the agent dropdown as a menu of choices (IR-4, 9)', () => {
     expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
     const described = radios[0]?.getAttribute('aria-describedby') ?? '';
     expect(described).not.toBe('');
-    expect(document.getElementById(described)?.textContent).toContain('Claude CodeReady');
+    expect(document.getElementById(described)?.textContent).toContain('Claude CodeConnected');
     expect(radios[2]?.hasAttribute('aria-describedby')).toBe(false);
   });
 

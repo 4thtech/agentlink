@@ -364,7 +364,7 @@ describe('the shared live subscription over the events stream', () => {
       }),
     );
     await flush();
-    expect(getLive().agents[0]?.statusText).toBe('Connected');
+    expect(getLive().agents[0]?.statusText).toBe('Connected to Claude Code');
     expect(liveMode()).toBe('stream');
   });
 
