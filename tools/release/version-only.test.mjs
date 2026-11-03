@@ -28,6 +28,8 @@ describe('classifyVersionOnly on a fixture repository', () => {
     mkdirSync(dirname(join(dir, path)), { recursive: true });
     writeFileSync(join(dir, path), content);
   };
+  // Paths inside the temporary fixture repository, not the real doc trees.
+  const remove = (path) => rmSync(join(dir, path));
   const commit = (msg = 'chore: version packages') => {
     git('add', '-A');
     git('commit', '-q', '--allow-empty', '-m', msg);
@@ -62,8 +64,8 @@ describe('classifyVersionOnly on a fixture repository', () => {
     write('packages/crypto/package.json', json({ name: '@4thtech-io/crypto', version: '0.4.11' }));
     write('packages/core/CHANGELOG.md', '# core\n\n## 0.4.11\n\n- Fix.\n');
     write('CHANGELOG.md', '# AgentLink\n\n## 0.4.11\n');
-    rmSync(join(dir, '.changeset/brave-fox.md'));
-    rmSync(join(dir, 'changelog.d/123-fix.md'));
+    remove('.changeset/brave-fox.md');
+    remove('changelog.d/123-fix.md');
   };
 
   it('accepts a Changesets version commit and names its parent', () => {
@@ -174,7 +176,7 @@ describe('classifyVersionOnly on a fixture repository', () => {
       () => write('packages/core/postinstall.js', 'x\n'),
       () => write('.changeset/new-one.md', '---\n---\n'),
       () => write('.changeset/pre.json', '{"mode":"pre","tag":"next"}\n'),
-      () => rmSync(join(dir, 'changelog.d/README.md')),
+      () => remove('changelog.d/README.md'),
       () => write('packages/core/README.md', 'changed\n'),
     ];
     for (const change of cases) {
@@ -194,14 +196,14 @@ describe('classifyVersionOnly on a fixture repository', () => {
 
     git('reset', '-q', '--hard', base);
     versionBump();
-    rmSync(join(dir, 'packages/core/CHANGELOG.md'));
+    remove('packages/core/CHANGELOG.md');
     symlinkSync('../../pnpm-lock.yaml', join(dir, 'packages/core/CHANGELOG.md'));
     commit();
     expect(classify().versionOnly).toBe(false);
   });
 
   it('rejects a commit without package.json changes and an empty commit', () => {
-    rmSync(join(dir, '.changeset/brave-fox.md'));
+    remove('.changeset/brave-fox.md');
     commit();
     expect(classify().versionOnly).toBe(false);
     commit('empty');

@@ -184,6 +184,14 @@ jobs:
   # Main only: the wave-4 preview waits in `preview-gate`. Only `pack` (and so publish-next,
   # publish-latest and the desktop jobs) depends on this job; the Version packages PR and the `next`
   # snapshot do not wait for it.
+  # Version-only reuse (RELEASE-VERSION-ONLY-REUSE, owner decision 2026-11-03,
+  # --reuse-version-only-parent): when the git trees show this commit differs from its single parent
+  # only by version bookkeeping (package.json `version` and internal `@4thtech-io/*` ranges, CHANGELOG.md
+  # files, consumed changesets and changelog.d fragments; pnpm-lock.yaml identical), and the parent's
+  # push runs have `ci-gate (push)` and `security-gate` green, the parent's verdict is reused
+  # (result=green, "reused CI verdict of <sha>: version-only" in the summary). Never from a commit
+  # message, title or actor; any doubt waits for this commit's own CI as before. `pack` and the
+  # publish jobs still build this commit, and the owner's npm-publish click is unchanged.
   ci-green:
     name: ci-green
     if: github.repository_owner == '4thtech' && github.ref == 'refs/heads/main'
@@ -199,6 +207,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The parent commit too: the version-only check compares the two trees.
+          fetch-depth: 2
 
       - name: Wait for this commit's heavy CI and require it green
         id: wait
@@ -215,7 +225,8 @@ jobs:
             --timeout-minutes 90 \
             --interval-seconds 30 \
             --missing-grace-minutes 10 \
-            --superseded-ok
+            --superseded-ok \
+            --reuse-version-only-parent
 
   # OPS-FAST-LANE-3: the gate of the preview lane, fast on purpose.
   #  - wave-4: as ci-green used to be: waits for that branch's push runs (`ci-gate (push)`, the name
