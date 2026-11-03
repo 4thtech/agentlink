@@ -14,9 +14,10 @@ describe('mcpAppIdFor (06 §6)', () => {
       'gemini-cli-mcp-client': 'gemini-cli',
       opencode: 'opencode',
       'cursor-vscode': 'cursor',
+      'antigravity-client': 'antigravity',
+      windsurf: 'windsurf',
+      'windsurf-client': 'windsurf',
     });
-    // Windsurf and Antigravity are not pinned until their names are checked against the clients;
-    // until then they show as "Another AI app" (`other`), which is safe (the id is a display hint).
     for (const id of Object.values(CLIENT_APP_IDS)) expect(AI_APP_IDS).toContain(id);
   });
 
@@ -25,6 +26,9 @@ describe('mcpAppIdFor (06 §6)', () => {
     expect(mcpAppIdFor('Claude-Code')).toBe('claude-code');
     expect(mcpAppIdFor('CODEX-MCP-CLIENT')).toBe('codex');
     expect(mcpAppIdFor('claude-ai')).toBe('claude-desktop');
+    expect(mcpAppIdFor('antigravity-client')).toBe('antigravity');
+    expect(mcpAppIdFor('Windsurf')).toBe('windsurf');
+    expect(mcpAppIdFor('windsurf-client')).toBe('windsurf');
   });
 
   it.each([

@@ -107,8 +107,10 @@ describe('the words (08 §1)', () => {
         }),
         NOW,
       ),
-    ).toBe('Ready in Cursor and 2 more');
-    expect(agentLine(row({ state: 'idle', appStates: [app('Codex', 'idle')] }), NOW)).toBe('Idle');
+    ).toBe('Connected to Cursor and 2 more');
+    expect(agentLine(row({ state: 'idle', appStates: [app('Codex', 'idle')] }), NOW)).toBe(
+      'Connected to Codex',
+    );
     expect(
       agentLine(
         row({
@@ -137,12 +139,12 @@ describe('the words (08 §1)', () => {
 
   it('an AI app: Working, Ready, Idle, Not running · last seen, Not set up', () => {
     expect(appWord(app('Claude Code', 'working'), NOW)).toBe('Working');
-    expect(appWord(app('Claude Code', 'ready'), NOW)).toBe('Ready');
-    expect(appWord(app('Claude Code', 'idle'), NOW)).toBe('Idle');
+    expect(appWord(app('Claude Code', 'ready'), NOW)).toBe('Connected');
+    expect(appWord(app('Claude Code', 'idle'), NOW)).toBe('Connected');
     expect(appWord(app('Codex', 'not_running', NOW - 3600), NOW)).toBe(
-      'Not running · last seen 1 h ago',
+      'Not connected · last seen 1 h ago',
     );
-    expect(appWord(app('Codex', 'not_running'), NOW)).toBe('Not running');
+    expect(appWord(app('Codex', 'not_running'), NOW)).toBe('Not connected');
     expect(appWord(app('Cursor', 'not_set_up'), NOW)).toBe('Not set up');
   });
 

@@ -13,9 +13,13 @@
 // | `gemini-cli-mcp-client` | Gemini CLI     | the M1-36j table                                   |
 // | `opencode`              | OpenCode       | the name OpenCode sends                            |
 // | `cursor-vscode`         | Cursor         | the name Cursor sends                              |
+// | `antigravity-client`    | Antigravity    | apify/mcp-client-capabilities mcp-clients.json     |
+// | `windsurf`, `windsurf-client` | Windsurf | apify/mcp-client-capabilities mcp-clients.json     |
 //
-// Windsurf and Antigravity are not listed until their names are checked against the clients; until
-// then they show as `other`. The table is pinned by client-app.test.ts.
+// The last two rows come from that community index of MCP clients (secondary source, 11-03; the
+// index keys are the clients' `clientInfo.name`); not yet checked against the clients themselves.
+// Claude Code inside the Claude desktop app has no known separate name (unconfirmed): it shows as
+// `other` unless it sends `claude-code`. The table is pinned by client-app.test.ts.
 import type { AiAppId } from '@4thtech-io/types';
 
 /** The one fixed table (06 §6): a known client name to its AI app id. */
@@ -26,6 +30,9 @@ export const CLIENT_APP_IDS: Readonly<Record<string, AiAppId>> = Object.freeze({
   'gemini-cli-mcp-client': 'gemini-cli',
   opencode: 'opencode',
   'cursor-vscode': 'cursor',
+  'antigravity-client': 'antigravity',
+  windsurf: 'windsurf',
+  'windsurf-client': 'windsurf',
 });
 
 /** At most this many characters are compared; a longer name is `other`. */

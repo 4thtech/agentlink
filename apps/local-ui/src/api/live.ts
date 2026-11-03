@@ -83,17 +83,18 @@ export type LiveMode = 'stream' | 'poll' | 'idle';
 
 export const LIVE_WORDS = {
   working: 'Working',
-  ready: 'Ready',
-  idle: 'Idle',
-  off: 'Not running',
+  // 06 §5.8 (F19): any live session reads Connected, whatever its age; no live session, Not connected.
+  ready: 'Connected',
+  idle: 'Connected',
+  off: 'Not connected',
   none: 'Not set up',
   /** W7-ID-RENAME: an ID no AI app uses (never "Offline" or "Not set up"). */
   noApp: AGENTS_STRINGS.notUsed,
   paused: 'Paused',
   offline: 'Offline',
   removing: AGENTS_STRINGS.removalNotFinished,
-  readyIn: (app: string): string => `Ready in ${app}`,
-  readyInMore: (app: string, n: number): string => `Ready in ${app} and ${n} more`,
+  readyIn: (app: string): string => `Connected to ${app}`,
+  readyInMore: (app: string, n: number): string => `Connected to ${app} and ${n} more`,
   workingIn: (app: string): string => `Working in ${app}`,
   lastSeen: (word: string, ago: string): string => `${word} · last seen ${ago}`,
   /**
@@ -263,7 +264,7 @@ function toLive(r: AgentRecord, name: (id: string) => string, now: number): Live
         : LIVE_WORDS.readyIn(name(first.app));
   } else if (r.state === 'idle' && first !== undefined) {
     state = 'idle';
-    statusText = LIVE_WORDS.idle;
+    statusText = LIVE_WORDS.readyIn(name(first.app));
   } else if (shown.length === 0) {
     state = 'none';
     statusText = LIVE_WORDS.noApp;

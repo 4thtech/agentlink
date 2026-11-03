@@ -28,7 +28,6 @@ const STATUSES: readonly { value: FleetStatus; label: string }[] = [
   { value: 'all', label: S.allStatuses },
   { value: 'working', label: W.working },
   { value: 'ready', label: W.ready },
-  { value: 'idle', label: W.idle },
   { value: 'offline', label: W.offline },
   { value: 'paused', label: W.paused },
 ];

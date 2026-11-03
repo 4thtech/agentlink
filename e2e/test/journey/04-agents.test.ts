@@ -39,7 +39,7 @@ afterAll(() => ch.stop());
 async function pauseAna(page: Page): Promise<void> {
   await openAgents(page);
   await agentCard(page, 'Ana')
-    .getByText(/^(Not used by any AI app|Offline|Connected · restart|Ready|Working|Idle)/)
+    .getByText(/^(Not used by any AI app|Offline|Connected|Working)/)
     .first()
     .waitFor();
   await agentCard(page, 'Ana').getByRole('button', { name: 'Pause', exact: true }).click();
@@ -146,16 +146,16 @@ describe('chapter 4: agents', () => {
       'Connected before the first heartbeat',
       async () => (await chip.innerText()).trim() === 'Connected · restart Claude Code to start',
     );
-    expect(await appWord()).toBe('Not running');
+    expect(await appWord()).toBe('Not connected');
 
     const mcp = await startAiAppMcp(pc, undefined);
     ch.closers.push(() => mcp.close());
     await eventually(
-      'Ready in Claude Code',
-      async () => (await chip.innerText()).trim() === 'Ready in Claude Code',
+      'Connected to Claude Code',
+      async () => (await chip.innerText()).trim() === 'Connected to Claude Code',
       20_000,
     );
-    expect(await appWord()).toBe('Ready');
+    expect(await appWord()).toBe('Connected');
 
     await mcp.call('agentlink_status');
     await eventually(
@@ -171,7 +171,7 @@ describe('chapter 4: agents', () => {
       async () => (await chip.innerText()).startsWith('Offline'),
       20_000,
     );
-    expect(await appWord()).toMatch(/^Not running/);
+    expect(await appWord()).toMatch(/^Not connected/);
     await probe.check();
   }, 180_000);
 
