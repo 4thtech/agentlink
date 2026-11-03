@@ -26,7 +26,13 @@ For students and the teacher. Mac and Windows. About 10 minutes.
 
    > ## SAVE YOUR BACKUP CODE
    >
-   > **Write it down or put it in your password manager now.** You will need it once, later, to approve with Touch ID or Windows Hello. Without it you cannot approve removing or renaming an ID.
+   > **Press Copy and keep the code** in your password manager or a note only you can open. You can also press **Save as file** or **Save in my password manager**. You need it later to approve things such as removing or renaming an ID. Without it you cannot approve those.
+   >
+   > **Never give your backup code to your AI** or paste it into the chat.
+
+   When AgentLink asks for it later: paste the code, press **Show** to check it, then press **Confirm with your backup code**.
+
+   On a Windows computer where Windows Hello can't protect approvals, every approval uses the backup code. That is expected.
 
 4. **Restart your AI app completely.** Quit it and open it again. Do this after every AgentLink update too.
 
@@ -60,8 +66,8 @@ For students and the teacher. Mac and Windows. About 10 minutes.
 
 ### Known limits this week
 
-- Your contacts may see your ID's internal name instead of your display name.
 - Renames do not reach your contacts yet.
+- IDs made in the app show your contacts the name you typed. An ID made from the terminal may show its folder name instead.
 
 ## Teacher
 
@@ -74,12 +80,13 @@ For students and the teacher. Mac and Windows. About 10 minutes.
 ### In class
 
 1. Pair students up. Each pair invites each other: one invites, the other accepts.
-2. Ask everyone to say "backup code saved" before step 4.
+2. Ask everyone to say "backup code saved" before step 4, and remind them never to give it to their AI.
 3. Walk the room at step 4: most problems are an AI app that was not fully restarted.
 
 ### A student is stuck
 
 1. Ask for the output of `agentlink doctor` and read the first line that is not OK.
 2. Restart the AI app completely, then check for the green dot.
-3. If they lost the backup code, do not guess: they cannot approve removals or renames. Make a new ID and re-invite.
-4. Still stuck: pair them with a working student and move on.
+3. An approval asks for the backup code instead of Touch ID or Windows Hello: that is expected on some Windows computers. Paste the code, press **Show** to check it, then **Confirm with your backup code**.
+4. If they lost the backup code, do not guess: they cannot approve removals or renames. Make a new ID and re-invite.
+5. Still stuck: pair them with a working student and move on.
