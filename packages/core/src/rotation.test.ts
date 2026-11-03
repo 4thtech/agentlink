@@ -253,7 +253,7 @@ describe('identity.rotate with the epoch advance (M1-1g-d)', () => {
       await s.control.advanceEpoch(expected, owner);
     });
     await expect(s.client.identity.rotate(await s.rotateInput(race))).rejects.toMatchObject({
-      code: 'key_epoch_mismatch',
+      code: 'concurrent_rotation',
     });
     // The other advance went through once; this one changed nothing.
     expect((await s.keyStore.getPublicBundle()).keyEpoch).toBe(1);
@@ -273,7 +273,7 @@ describe('identity.rotate with the epoch advance (M1-1g-d)', () => {
     expect(won).toHaveLength(1);
     for (const r of results) {
       if (r.status === 'rejected') {
-        expect(r.reason).toMatchObject({ code: 'key_epoch_mismatch' });
+        expect(r.reason).toMatchObject({ code: 'concurrent_rotation' });
       }
     }
     const bundle = await s.keyStore.getPublicBundle();
@@ -576,7 +576,7 @@ describe('review IR-M1-1g-d-1 fixes', () => {
       (error: unknown) => error,
     );
     expect(rejected).toBeInstanceOf(CoreError);
-    expect(rejected).toMatchObject({ code: 'key_epoch_mismatch' });
+    expect(rejected).toMatchObject({ code: 'concurrent_rotation' });
     expect(late.advances).toBe(0);
     expect((await identityRow(s.store)).pending_card_json).toBeNull();
   });

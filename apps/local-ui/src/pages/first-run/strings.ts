@@ -141,6 +141,7 @@ export const SETUP_MESSAGES = {
   ai_app_running: FAILURE_COPY.ai_app_running,
   ai_app_config_unwritable: FAILURE_COPY.ai_app_config_unwritable,
   keychain_unavailable: FAILURE_COPY.keychain_unavailable,
+  concurrent_change: FAILURE_COPY.concurrent_change,
   internal: FAILURE_COPY.internal,
   offline: "AgentLink isn't answering. Ask your AI to open AgentLink again.",
   session_expired: 'This link has expired. Ask your AI to open AgentLink again.',

@@ -2298,7 +2298,11 @@ export async function startApprovalServerWith(
             if (error instanceof AgentChanged) finishOwner(res, 409, 'agent_changed');
             else if (error instanceof ConfirmRequired) finishOwner(res, 409, 'confirm_required');
             else if (error instanceof NodeKeyStoreError) finishOwner(res, 409, 'refused');
-            else finishOwner(res, 500, 'failed');
+            else {
+              // F23: a specific fixed reason (never the error text); `internal` stays unsaid.
+              const reason = failedBody(error).reason;
+              finishOwner(res, 500, 'failed', reason === 'internal' ? {} : { reason });
+            }
             return;
           } finally {
             carriersOpen = false;

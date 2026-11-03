@@ -11,6 +11,7 @@ export const FAILURE_REASONS = [
   'ai_app_config_unwritable',
   'keychain_unavailable',
   'busy',
+  'concurrent_change',
   'internal',
 ] as const;
 
@@ -57,6 +58,8 @@ export function failureReasonOf(error: unknown): FailureReason {
     return code !== undefined && KEYCHAIN_CODES.has(code) ? 'keychain_unavailable' : 'internal';
   }
   if (name === 'AgentFolderLockError') return 'busy';
+  // A rename or rotation raced another change of the same ID (core compare-and-set): retry.
+  if (name === 'CoreError' && code === 'concurrent_rotation') return 'concurrent_change';
   if (name === 'HarnessError') {
     return code === 'write_failed' || code === 'unsafe_path' || code === 'changed'
       ? 'ai_app_config_unwritable'

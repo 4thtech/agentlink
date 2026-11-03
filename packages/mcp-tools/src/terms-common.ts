@@ -345,6 +345,7 @@ export function termsCoreError(error: unknown): HandlerOutput | undefined {
       return fail('error', SEND_TEXT.revoked, SEND_TEXT.revokedNextStep, 'AGENT_REVOKED');
     case 'rotation_pending':
     case 'key_epoch_mismatch':
+    case 'concurrent_rotation':
       return fail(
         'rejected',
         INVITE_TEXT.cannotSend,

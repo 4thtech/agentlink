@@ -442,6 +442,11 @@ export class AgentLinkClient {
     return this.#sync.subscribeInbox(options);
   }
 
+  /** The current key epoch (public). The background loop reopens a live subscription when it moves. */
+  currentKeyEpoch(): Promise<number> {
+    return this.#sync.currentKeyEpoch();
+  }
+
   /**
    * The fetch-only catch-up for read-only callers (M1-7h addendum, D-73; 06 §2.0): fetches and
    * stores envelopes and counts them by sender. Processes nothing: no handshake, ack, card update,

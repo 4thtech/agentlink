@@ -91,6 +91,8 @@ export interface LoopLease {
 /** A live subscription as the loop uses it (core `InboxSubscription`; M1-9s). */
 export interface LoopSubscription {
   readonly closed: boolean;
+  /** The key epoch the subscription listens on (core `InboxSubscription.keyEpoch`). */
+  readonly keyEpoch?: number;
   close(): Promise<void>;
 }
 
@@ -120,6 +122,11 @@ export interface LoopClient {
    * Optional: without it the loop never pauses (test doubles of the M1-9 passes).
    */
   paused?(): Promise<boolean>;
+  /**
+   * NEW-INVITE-STUCK: the current key epoch (public). A rename rotates the keys; while live the loop
+   * compares it with the subscription's and reopens the subscription on a change. Optional.
+   */
+  currentKeyEpoch?(): Promise<number>;
 }
 
 /** One-shot timers. Tests pass a manual scheduler; production uses unref'd `setTimeout`. */
@@ -361,6 +368,13 @@ export class BackgroundLoop {
     // W4-PAUSE: every loop step checks the pause row first; while paused it does nothing at all.
     this.#setPaused(await this.#readPaused());
     if (this.#paused || !this.holding) return false;
+    if (this.live && (await this.#keysMoved())) {
+      // NEW-INVITE-STUCK: a rename rotated the keys. Reopen on the new keys after a catch-up now,
+      // not after the 5 min fallback.
+      this.#log.info('live subscription reopened for new keys');
+      this.#closeSubscription();
+      this.#sinceCatchUp = this.#catchUpMs;
+    }
     if (this.live && this.#sinceCatchUp + this.#syncMs < this.#catchUpMs) {
       // Live (M1-9s): the subscription receives; this pass only delivers due outbox rows.
       this.#sinceCatchUp += this.#syncMs;
@@ -399,6 +413,18 @@ export class BackgroundLoop {
       await autoSave.run();
     } catch (error) {
       this.#log.warn('auto-save failed', errorCode(error));
+    }
+  }
+
+  /** True when the key epoch moved past the open subscription's. Never rejects; false if unknown. */
+  async #keysMoved(): Promise<boolean> {
+    const subscribedWith = this.#subscription?.keyEpoch;
+    const current = this.#client.currentKeyEpoch;
+    if (subscribedWith === undefined || current === undefined) return false;
+    try {
+      return (await current.call(this.#client)) !== subscribedWith;
+    } catch {
+      return false;
     }
   }
 

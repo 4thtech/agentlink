@@ -17,6 +17,7 @@ describe('failureCopy', () => {
       'ai_app_config_unwritable',
       'keychain_unavailable',
       'busy',
+      'concurrent_change',
       'internal',
     ]);
     const lines = FAILURE_REASON_CODES.map((r) => failureCopy(r));

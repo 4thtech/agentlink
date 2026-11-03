@@ -16,6 +16,9 @@ describe('failureReasonOf', () => {
     expect(failureReasonOf(named('AgentFolderLockError', 'in_use'))).toBe('busy');
     expect(failureReasonOf(named('HarnessError', 'write_failed'))).toBe('ai_app_config_unwritable');
     expect(failureReasonOf(named('Error', 'ECONNREFUSED'))).toBe('relay_unreachable');
+    // F23: a rename that raced another change of the ID has its own reason (core concurrent_rotation).
+    expect(failureReasonOf(named('CoreError', 'concurrent_rotation'))).toBe('concurrent_change');
+    expect(failureReasonOf(named('CoreError', 'key_epoch_mismatch'))).toBe('internal');
   });
   it('answers internal for anything else, including non-errors', () => {
     for (const v of [new Error('x'), undefined, null, 'text', 5, {}, { code: 5 }]) {
