@@ -124,6 +124,25 @@ describe('doctor: AI apps that start an ID that is gone (R1)', () => {
     expect(r.lines.join('\n')).not.toContain('~/.claude.json');
   });
 
+  it('also lists an AI app with a live session for the ID, as the app does', async () => {
+    const r = await localDoctorChecks({
+      home,
+      ids: () =>
+        Promise.resolve([
+          { name: 'work', removing: false, label: 'Work' },
+          { name: 'ops', removing: false, label: 'Ops' },
+        ]),
+      apps: {
+        list: () => Promise.resolve({ apps: [app('Claude Code', 'ops')], desktopRunning: false }),
+      },
+      liveApps: () => Promise.resolve(['claude-code']),
+    });
+    expect(r.ids?.map((i) => i.apps)).toEqual([
+      ['Claude Code (connected now)'],
+      ['Claude Code (connected now)'],
+    ]);
+  });
+
   it('lists every ID by display name with the AI apps that start it', async () => {
     const r = await localDoctorChecks({
       home,

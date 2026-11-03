@@ -699,7 +699,7 @@ describe('doctor (07 §9.4)', () => {
     expect(text).toContain('OK       Message network: 1 server for this ID');
     expect(text).toContain('OK       Message network reachable');
     expect(text).toContain('OK       This ID can send and sign');
-    expect(text).toContain('Not checked in this version');
+    expect(text).toContain("File storage isn't checked yet.");
   });
 
   it('reports a network problem and a blocked agent as Problem, with a failing exit code', async () => {

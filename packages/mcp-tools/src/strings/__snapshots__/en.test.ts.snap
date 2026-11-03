@@ -148,7 +148,7 @@ exports[`copy catalogue (M1-9g) > cli.doctor.keysFound > renders as designed 1`]
 
 exports[`copy catalogue (M1-9g) > cli.doctor.networkDown > renders as designed 1`] = `
 "Problem  Can't reach the message network
-         Check your connection and run \`npx -y @4thtech-io/agentlink doctor\` again."
+         Check your connection and try again."
 `;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.networkOk > renders as designed 1`] = `"OK       Message network reachable"`;

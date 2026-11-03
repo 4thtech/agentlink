@@ -206,7 +206,7 @@ export const en = {
     "Problem  AgentLink isn't set up on this computer yet\n         Open AgentLink to set it up: run `{prefix}`.",
   'cli.doctor.networkOk': 'OK       Message network reachable',
   'cli.doctor.networkDown':
-    "Problem  Can't reach the message network\n         Check your connection and run `{prefix} doctor` again.",
+    "Problem  Can't reach the message network\n         Check your connection and try again.",
   'cli.doctor.connected': 'OK       {appName} connected',
   'cli.doctor.restart': 'Warning  {appName} needs a restart\n         Quit and reopen {appName}.',
   'cli.doctor.keyLocked':

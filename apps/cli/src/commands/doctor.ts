@@ -8,6 +8,7 @@
 // Reachability uses the same fetch-only `catchUp` as `status`: it stores raw envelopes and processes
 // nothing. Every line is fixed text or a count; no path, agent name, account name or error text is
 // printed (I-5, I-7), only the fixed sentences of the runtime and of node (07 §9.4).
+import { commandPrefix } from '../runtime/cli-prefix.js';
 import process from 'node:process';
 import {
   EXIT_FAILED,
@@ -21,7 +22,6 @@ import { hasOwnerOnMachine, hasUnfinishedOwnerCodeChange, nodeRpcFetch } from '@
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { localDoctorChecks, type LocalChecks } from './doctor-local.js';
 import { isAgentName } from '../runtime/agent-name.js';
-import { cliPrefix, commandPrefix } from '../runtime/cli-prefix.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
 import { copy, renderCopy } from '@4thtech-io/mcp-tools/strings/index.js';
 import {
@@ -36,7 +36,7 @@ import {
 
 /**
  * D-100: the rules line (11 §5: "rules", never "policy", except in the command itself). M1-36e: the
- * command starts with `commandPrefix()`, never the bare name.
+ * command starts with the bare `agentlink` (the installer adds it).
  */
 export const DOCTOR_TEXT = Object.freeze({
   rulesOk: 'OK       Your rules are in use',
@@ -48,7 +48,7 @@ export const DOCTOR_TEXT = Object.freeze({
   idProblem: 'Problem  {label} has a problem (see above)',
   /** W8-FEEDBACK-S1 (F8): there is an owner on this computer but no ID yet. */
   get noIdsYet(): string {
-    return `Problem  You have no IDs yet. Open AgentLink to create one: run \`${commandPrefix()}\`.`;
+    return `Problem  You have no IDs yet. Open AgentLink to create one: run \`agentlink\`.`;
   },
   get rulesFailClosed(): string {
     return `Problem  Your rules can't be used, so AgentLink uses its strictest settings\n         In a terminal you opened yourself, run \`${commandPrefix()} policy recover\` to review and confirm them again.`;
@@ -84,13 +84,11 @@ export interface DoctorDeps extends CommandDeps {
 export const DOCTOR_PROOF_TEXT = Object.freeze({
   ok: 'OK       The public record answers, so proofs can be added and checked',
   get partial(): string {
-    return `Warning  Part of the public record did not answer\n         Proofs still work where it answers. Run \`${commandPrefix()} doctor\` again later.`;
+    return `Warning  Part of the public record did not answer\n         Proofs still work where it answers. Check your connection and try again later.`;
   },
   down: "Problem  The public record can't be reached\n         Proofs can't be added or checked right now; messages and files still work. Check your connection.",
   none: 'Problem  This version of AgentLink has no public record to add proofs to\n         Update AgentLink.',
-  get notChecked(): string {
-    return `Not checked in this version: file storage and AI apps (\`${commandPrefix()} doctor\` adds them later).`;
-  },
+  notChecked: "File storage isn't checked yet.",
 });
 
 /** The default check: one `eth_blockNumber` per automatically selectable chain, in parallel. */
@@ -220,10 +218,10 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
         // (no KeyStore secret); the later checks would only fail in confusing ways.
         const view = await agent.client.identity.get().catch(() => undefined);
         if (view === undefined) {
-          emit(copy('cli.doctor.noOwnerCard', { prefix: cliPrefix() }), true);
+          emit(copy('cli.doctor.noOwnerCard', { prefix: 'agentlink' }), true);
           await agent.close();
           if (!(await otherAgentHasCard(deps, agent.name))) {
-            emit(copy('cli.doctor.noOwnerCardNoOthers', { prefix: cliPrefix() }));
+            emit(copy('cli.doctor.noOwnerCardNoOthers', { prefix: 'agentlink' }));
           }
           return true;
         }
@@ -252,7 +250,7 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
             const caught = await client.catchUp({ budgetMs: 3_000 });
             emit(caught.partial ? TEXT.doctorPartial : copy('cli.doctor.networkOk'));
           } catch {
-            emit(copy('cli.doctor.networkDown', { prefix: cliPrefix() }), true);
+            emit(copy('cli.doctor.networkDown'), true);
           }
         }
 
