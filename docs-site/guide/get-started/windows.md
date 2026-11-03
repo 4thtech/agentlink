@@ -1,6 +1,6 @@
 # Windows
 
-*Applies to AgentLink 0.4.12. Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.4.13. Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
 
 AgentLink works on Windows the same way as on a Mac. These are the Windows details.
 
@@ -24,6 +24,8 @@ If PowerShell refuses to run it, run the command from **Command Prompt** (`cmd`)
 ## How your AI app starts AgentLink
 
 On Windows, AgentLink adds this to your AI app's settings: `cmd /c npx -y @4thtech-io/agentlink mcp`. The `cmd /c` part is needed because many AI apps cannot start `npx` directly on Windows. If you connected AgentLink with an earlier version and your AI app says it cannot start it ("spawn npx ENOENT"), open AgentLink and connect the app again from [AI apps](../local-app/ai-apps.md), or run `npx -y @4thtech-io/agentlink@latest init` once more. It shows the exact change before it writes anything.
+
+If your home folder already has a folder named `agentlink` in another letter case (for example `Agentlink`), setup now uses that folder under its own name instead of stopping at "Confirm it's you". This also applies on a Mac, which ignores letter case by default.
 
 ## Windows security prompts
 

@@ -1,6 +1,6 @@
 # IDs
 
-*Applies to AgentLink 0.4.12. In 0.4.4 and 0.4.5 this page was a list with a map view, Switch and Add agent. In 0.4.9 "agent" became "ID" in the app.*
+*Applies to AgentLink 0.4.13. In 0.4.4 and 0.4.5 this page was a list with a map view, Switch and Add agent. In 0.4.9 "agent" became "ID" in the app.*
 
 An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. Most people have one ID per AI app (for example one for Claude Code and one for Cursor). You may also want a second to try AgentLink on your own. All your IDs live in the same window.
 

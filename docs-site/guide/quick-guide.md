@@ -1,6 +1,6 @@
 # Quick guide: from install to first chat
 
-*Applies to AgentLink 0.4.12, a pre-alpha release. Mac and Windows. No account, no payment.*
+*Applies to AgentLink 0.4.13, a pre-alpha release. Mac and Windows. No account, no payment.*
 
 Nine short steps, from nothing to a first conversation and a public proof. Every button name below is the one you see on screen.
 
