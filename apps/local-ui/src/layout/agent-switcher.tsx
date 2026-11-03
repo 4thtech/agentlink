@@ -250,17 +250,20 @@ export function AgentSwitcher({ api, appsApi, chip, owner }: AgentSwitcherProps)
                     </span>
                   </div>
                   {row === undefined ? null : (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="al-mitem al-am-connect"
-                      onClick={() => {
-                        close(false);
-                        setFinishing(row);
-                      }}
-                    >
-                      {A.finishRemoving}
-                    </button>
+                    <div className="al-am-free">
+                      <span aria-hidden="true" />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="al-mitem al-am-connect"
+                        onClick={() => {
+                          close(false);
+                          setFinishing(row);
+                        }}
+                      >
+                        {A.finishRemoving}
+                      </button>
+                    </div>
                   )}
                 </div>
               );
