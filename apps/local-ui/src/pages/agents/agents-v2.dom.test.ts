@@ -383,6 +383,22 @@ describe('Agents, simple (A8)', () => {
     expect(post).toBeDefined();
   });
 
+  it('F23: no "Contacts still see" note while the ID has no contacts to tell', async () => {
+    answers['GET /api/ui/agents/card-name'] = {
+      status: 200,
+      body: { status: 'differs', cardName: 'My agent' },
+    };
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list([
+        agent('default', 'Personal', { current: true, contacts: 0, state: 'ready' }),
+      ]),
+    };
+    await mount();
+    expect(card('default').textContent).not.toContain('Contacts still see');
+    expect(button(card('default'), 'Update contacts')).toBeUndefined();
+  });
+
   it('AI apps: each app with its word, Connect or Disconnect, and the quit-first guidance', async () => {
     await mount();
     await click(button(card('default'), 'AI apps'));
