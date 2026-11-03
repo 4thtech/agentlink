@@ -15,6 +15,8 @@ export type CoreErrorCode =
   /** U3-e: an owner-signed carrier did not verify under the owner key it names. */
   | 'owner_key_mismatch'
   | 'key_epoch_mismatch'
+  /** The identity changed while a rotation or rename was issued (compare-and-set); retry. */
+  | 'concurrent_rotation'
   | 'rotation_pending'
   /** W4-RENAME-REACHES-CONTACTS (D-141): more than RENAMES_PER_DAY renames in 24 h. */
   | 'rename_limited'

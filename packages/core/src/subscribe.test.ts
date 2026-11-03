@@ -23,7 +23,13 @@ import {
   passphrase,
   seed,
 } from './testing/fixtures.js';
-import { pairWith, rotate, textPayload, type TestAgent, type TestOwner } from './testing/envelopes.js';
+import {
+  pairWith,
+  rotate,
+  textPayload,
+  type TestAgent,
+  type TestOwner,
+} from './testing/envelopes.js';
 import { nostrTransport, type Transport, type TransportFactory } from './transport.js';
 
 const RELAYS_A = Object.freeze(['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net']);

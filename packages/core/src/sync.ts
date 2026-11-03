@@ -129,6 +129,12 @@ export interface InboxSubscription {
   /** True once `close()` was called, or the client closed it. */
   readonly closed: boolean;
   /**
+   * The key epoch (a public number) whose keys this subscription listens on. A rename rotates the
+   * keys; the subscription keeps its keys until reopened, so the loop compares this with
+   * `currentKeyEpoch()` and reopens it on a change.
+   */
+  readonly keyEpoch: number;
+  /**
    * Ends the transport subscription (CLOSE on each relay, no reconnect), then waits for a handler
    * or processing run in flight. Idempotent; never rejects. Call it before the store closes.
    */
@@ -393,6 +399,7 @@ export class SyncService {
     const routes = await outbox.routes(undefined);
     const relays = [...new Set(routes.flatMap((r) => r.relays))];
     const identities = await this.#identities();
+    const keyEpoch = identities[0]?.epoch ?? 0;
     const ctx = this.#ctx;
     const log = ctx.log;
 
@@ -489,6 +496,7 @@ export class SyncService {
     this.#live.add(entry);
     log.info('live subscription open', { relays: relays.length });
     return {
+      keyEpoch,
       get closed() {
         return closed;
       },
@@ -629,6 +637,11 @@ export class SyncService {
   }
 
   /** The agent's Nostr key at every epoch, newest first, at most MAX_SYNC_IDENTITIES. */
+  /** The current key epoch (a public number), for a live subscription to compare with its own. */
+  async currentKeyEpoch(): Promise<number> {
+    return (await this.#ctx.keyStore.getPublicBundle()).keyEpoch;
+  }
+
   async #identities(): Promise<SyncIdentity[]> {
     const keyStore = this.#ctx.keyStore;
     const current = await keyStore.getPublicBundle();

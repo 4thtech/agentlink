@@ -596,7 +596,7 @@ describe('a late cardPop is a compare-and-set (identity #addCardPop)', () => {
     };
     const error = await a.client.identity.signedCard().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(CoreError);
-    expect(error).toMatchObject({ code: 'key_epoch_mismatch' });
+    expect(error).toMatchObject({ code: 'concurrent_rotation' });
     expect((await a.client.identity.get())?.cardPop).toBeNull();
   });
 });

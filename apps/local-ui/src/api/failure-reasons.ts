@@ -8,6 +8,7 @@ export const FAILURE_REASON_CODES = [
   'ai_app_config_unwritable',
   'keychain_unavailable',
   'busy',
+  'concurrent_change',
   'internal',
 ] as const;
 
@@ -24,6 +25,7 @@ export const FAILURE_COPY: Readonly<Record<FailureReasonCode, string>> = {
   keychain_unavailable:
     "Your computer's keychain isn't available. Unlock it, then try again. Nothing was changed.",
   busy: 'AgentLink is busy with another step. Wait a moment, then try again.',
+  concurrent_change: 'Something else changed this ID at the same moment. Try again.',
   internal:
     'Something went wrong inside AgentLink. Nothing was changed. Run `agentlink doctor` in your own terminal for details.',
 };

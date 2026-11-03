@@ -8,6 +8,7 @@
 // Resume is a presence route like Rename (input `{}`, signs `agent.resume`; 08 §1, D-143 (5)). A
 // rename answers how many contacts are told, or `rename_limited` with its time (D-141).
 import { createApiClient, type ApiClient } from '../../api/client.js';
+import { knownFailureReason, type FailureReasonCode } from '../../api/failure-reasons.js';
 import type { PresenceProof } from '../contacts/owner.js';
 import { appNameOf, parseAppNames } from './app-names.js';
 import { parseAgents, type AgentsList } from './data.js';
@@ -48,6 +49,8 @@ export interface OwnerOutcome {
   readonly retryAt?: number;
   /** A rename that reaches contacts: how many will be told (D-141). */
   readonly contacts?: number;
+  /** `failed`: the server's fixed reason code (failure-reasons.ts), when it sent a known one. */
+  readonly reason?: FailureReasonCode;
 }
 
 /** W4-PAUSE: the answer to Pause (`done` = paused). */
@@ -202,7 +205,8 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
     if (word === 'wait') return { kind: 'wait' };
     if (word !== undefined && WORDS.has(word)) return { kind: word as OwnerKind };
     if (res.status === 403) return { kind: 'session' };
-    return { kind: 'failed' };
+    const reason = knownFailureReason(answer['reason']);
+    return reason === undefined ? { kind: 'failed' } : { kind: 'failed', reason };
   }
 
   return {

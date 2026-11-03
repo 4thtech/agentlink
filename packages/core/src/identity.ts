@@ -751,7 +751,7 @@ function nextEpochMismatch(): CoreError {
 
 function concurrentRotation(): CoreError {
   return new CoreError(
-    'key_epoch_mismatch',
+    'concurrent_rotation',
     'The identity changed while the new card was issued. Try again.',
   );
 }

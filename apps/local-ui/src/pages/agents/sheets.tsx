@@ -5,10 +5,11 @@
 // "not done" sentence and nothing is claimed. Labels are rendered as text only (I-5).
 import { Button, Sheet, TextField } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type FormEvent, type ReactElement } from 'react';
+import { FAILURE_COPY } from '../../api/failure-reasons.js';
 import { navigate } from '../../router.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import { AppMark } from './app-mark.js';
-import type { AgentsApi } from './api.js';
+import type { AgentsApi, OwnerOutcome } from './api.js';
 import type { AgentRow } from './data.js';
 import { gateMessage, OwnerGate, RETRY_IN_PLACE, usePasskey } from './owner-gate.js';
 import { AGENTS_STRINGS as S } from './strings.js';
@@ -106,7 +107,7 @@ export function RenameEditor({
           ? S.labelInvalid
           : outcome.kind === 'not_applied' || outcome.kind === 'not_available'
             ? S.notRenamed
-            : S.renameFailed,
+            : renameFailedCopy(outcome),
       );
       if (!RETRY_IN_PLACE.has(outcome.kind)) setStep('edit');
     });
@@ -498,4 +499,10 @@ export function RemoveSheet({
       </div>
     </Sheet>
   );
+}
+
+/** F23: a failed rename says why when the server sent a fixed reason; else the generic line. */
+function renameFailedCopy(outcome: OwnerOutcome): string {
+  const reason = outcome.kind === 'failed' ? outcome.reason : undefined;
+  return reason === undefined || reason === 'internal' ? S.renameFailed : FAILURE_COPY[reason];
 }

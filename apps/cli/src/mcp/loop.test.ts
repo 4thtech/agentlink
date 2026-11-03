@@ -356,7 +356,7 @@ type Processed = (r: { readonly stored: number; readonly reports: readonly unkno
 /** A live subscription double: records close calls; `onProcessed` is the core's callback. */
 class StubSubscription implements LoopSubscription {
   closed = false;
-  keyEpoch: number | undefined;
+  keyEpoch?: number;
   closes = 0;
   constructor(
     readonly onProcessed: Processed | undefined,
