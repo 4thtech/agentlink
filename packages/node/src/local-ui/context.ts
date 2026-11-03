@@ -124,6 +124,8 @@ export interface LocalUiAiAppView {
   readonly state: LocalUiAiAppEntryState;
   /** Claude Desktop runs now: it is not written ("Quit Claude Desktop first"). */
   readonly quitFirst: boolean;
+  /** R2: the check whether the app runs could not be made (not the same as "quit first"). */
+  readonly checkFailed?: boolean;
 }
 
 /** U3-f: how a planned write ended. */

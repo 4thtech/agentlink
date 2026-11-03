@@ -14,6 +14,9 @@ export const APPS_STRINGS = {
   needsRestart: 'Needs restart',
   restartToFinish: (app: string): string => `Restart ${app} to finish`,
   quitFirst: (app: string): string => `Quit ${app} first.`,
+  // R2 (new copy, owner confirms at merge): the check whether the app is open could not be made.
+  cantCheckOpen: (app: string): string =>
+    `Couldn't check whether ${app} is open. If it is, quit it before you connect.`,
   checkAgain: 'Check again',
   reviewChange: 'Review change',
   disconnect: 'Disconnect',

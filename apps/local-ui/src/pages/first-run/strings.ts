@@ -5,6 +5,7 @@
 // M1-UX-FIRSTRUN-V2 (D-130 (1), (2); 11 §5.5, §6.2.1; copy proposed, owner confirms at merge): the
 // passkey-first flow, Protect approvals (with the folders) → Your backup code (save form, "I saved
 // it") → Recovery kit → Ready. The button names the platform. The backup code is never "password".
+import { FAILURE_COPY } from '../../api/failure-reasons.js';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 
 /** The platform the page runs on, for the button and the browser hint (11 §6.2.1). */
@@ -134,11 +135,17 @@ export const SETUP_MESSAGES = {
     "Your computer's keychain refused the request. Unlock it, then run `agentlink doctor` in your own terminal.",
   check_failed:
     "We couldn't check this computer's setup. Run `agentlink doctor` in your own terminal.",
-  internal: "Setup didn't finish. Run `agentlink doctor` in your own terminal.",
+  // R2: one line per fixed reason (api/failure-reasons.ts); new copy, owner confirms at merge.
+  storage_unreachable: FAILURE_COPY.storage_unreachable,
+  relay_unreachable: FAILURE_COPY.relay_unreachable,
+  ai_app_running: FAILURE_COPY.ai_app_running,
+  ai_app_config_unwritable: FAILURE_COPY.ai_app_config_unwritable,
+  keychain_unavailable: FAILURE_COPY.keychain_unavailable,
+  internal: FAILURE_COPY.internal,
   offline: "AgentLink isn't answering. Ask your AI to open AgentLink again.",
   session_expired: 'This link has expired. Ask your AI to open AgentLink again.',
   forbidden: "This page couldn't be checked. Ask your AI to open AgentLink again.",
-  unknown: "Setup didn't finish. Run `agentlink doctor` in your own terminal.",
+  unknown: "Setup didn't finish. Run `agentlink doctor` in your own terminal for details.",
   // W4-ONE-TOUCH (D-140; 11 §5.8): the AI app picked on the same screen.
   quit_first: 'Quit Claude Desktop first. Nothing changed. Then try again.',
   app_unavailable:
@@ -204,7 +211,7 @@ export const UPGRADE_MESSAGES = {
     `This passkey can't protect approvals here. Nothing changed. Keep approving with your backup code, or open this page in ${browser}.`,
   busy: SETUP_MESSAGES.busy,
   wait: SETUP_MESSAGES.wait,
-  failed: "The switch didn't finish. Run `agentlink doctor` in your own terminal.",
+  failed: "The switch didn't finish. Run `agentlink doctor` in your own terminal for details.",
   offline: SETUP_MESSAGES.offline,
   session_expired: SETUP_MESSAGES.session_expired,
   forbidden: SETUP_MESSAGES.forbidden,

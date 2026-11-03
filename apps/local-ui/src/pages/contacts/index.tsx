@@ -110,6 +110,7 @@ import {
   waitSeconds,
   waitingFor,
 } from './strings.js';
+import { failureCopy } from '../../api/failure-reasons.js';
 import './contacts.css';
 
 type ListState =
@@ -328,7 +329,7 @@ const MESSAGE: Readonly<Record<Exclude<OwnerResult['kind'], 'done' | 'wait'>, st
   not_applied: S.notApplied,
   busy: S.busy,
   session: S.sessionExpired,
-  failed: S.failed,
+  failed: failureCopy(undefined),
 };
 
 function Detail({
@@ -418,7 +419,7 @@ function Detail({
           }
           // Nothing was changed: close the prompt and say so; a check compares again.
           setPending(undefined);
-          setNotice(MESSAGE[result.kind]);
+          setNotice(result.kind === 'failed' ? failureCopy(result.reason) : MESSAGE[result.kind]);
           if (pending.what === 'check') setCodeTick((n) => n + 1);
         });
     },

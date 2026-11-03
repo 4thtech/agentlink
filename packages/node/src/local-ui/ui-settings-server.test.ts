@@ -136,7 +136,12 @@ interface Harness {
 }
 
 async function harness(
-  options: { host?: boolean; initial?: boolean; withSettings?: boolean } = {},
+  options: {
+    host?: boolean;
+    initial?: boolean;
+    withSettings?: boolean;
+    routes?: ReturnType<typeof createLocalUiRoutes>;
+  } = {},
 ): Promise<Harness> {
   const opened: string[] = [];
   const ownerStores: number[] = [];
@@ -168,6 +173,7 @@ async function harness(
         return Promise.resolve(true);
       },
       notifier: () => Promise.resolve(true),
+      ...(options.routes === undefined ? {} : { routes: options.routes }),
       openOwnerStore: () => {
         ownerStores.push(1);
         return Promise.reject(new Error('no owner store here'));
@@ -333,6 +339,34 @@ describe('outside the app host', () => {
     const h = await harness({ withSettings: false });
     expect(JSON.parse((await h.read()).body)).toEqual({});
     expect((await h.put({ underTheHood: true })).status).toBe(501);
+  });
+});
+
+describe('R2: a handler that throws answers a fixed reason', () => {
+  it('names the kind of failure and never the error text', async () => {
+    let thrown: Error = Object.assign(new Error('SECRET /home/me/key'), {
+      name: 'StorageError',
+      code: 'network',
+    });
+    const routes = createLocalUiRoutes();
+    routes.register({
+      method: 'GET',
+      path: '/api/ui/test/boom',
+      presence: false,
+      handler: () => Promise.reject(thrown),
+    });
+    const h = await harness({ routes });
+    const get = () =>
+      send(h.port, '/api/ui/test/boom', {
+        headers: { Cookie: h.cookie, 'X-AgentLink-CSRF': h.csrf },
+      });
+    const down = await get();
+    expect(down.status).toBe(500);
+    expect(JSON.parse(down.body)).toEqual({ status: 'failed', reason: 'storage_unreachable' });
+    expect(down.body).not.toContain('SECRET');
+    thrown = new Error('SECRET unknown');
+    const other = await get();
+    expect(JSON.parse(other.body)).toEqual({ status: 'failed', reason: 'internal' });
   });
 });
 

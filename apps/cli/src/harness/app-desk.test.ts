@@ -21,7 +21,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createAiAppsDesk, type AiAppsDeskOptions } from './app-desk.js';
+import { claudeDesktopState, createAiAppsDesk, type AiAppsDeskOptions } from './app-desk.js';
 
 const POSIX = process.platform !== 'win32';
 const SENTINEL = 'other-server-private-value';
@@ -264,5 +264,54 @@ describe('commit: the write', () => {
     if (plan.status !== 'change') throw new Error('expected a change');
     await plan.commit(WORK);
     expect(logs.join('\n')).not.toContain(SENTINEL);
+  });
+});
+
+describe('R2: is Claude Desktop open? (pgrep exit codes)', () => {
+  const run =
+    (code: number, out = '') =>
+    () =>
+      Promise.resolve({ code, out });
+  it('macOS: exit 0 is running, exit 1 is not running, anything else is unknown', async () => {
+    expect(await claudeDesktopState('darwin', run(0))).toBe('running');
+    expect(await claudeDesktopState('darwin', run(1))).toBe('not_running');
+    for (const code of [2, 3, 127, Number.NaN]) {
+      expect(await claudeDesktopState('darwin', run(code))).toBe('unknown');
+    }
+  });
+  it('Windows: the list decides; a failed tasklist is unknown', async () => {
+    expect(await claudeDesktopState('win32', run(0, '"Claude.exe","1"'))).toBe('running');
+    expect(await claudeDesktopState('win32', run(0, 'INFO: none'))).toBe('not_running');
+    expect(await claudeDesktopState('win32', run(1))).toBe('unknown');
+  });
+  it('other systems have no Claude Desktop to wait for', async () => {
+    expect(await claudeDesktopState('linux', run(2))).toBe('not_running');
+  });
+
+  async function withDesktop() {
+    await mkdir(join(home, 'Library', 'Application Support', 'Claude'), { recursive: true });
+  }
+  it('an unknown check does not block with "Quit first": the row says it could not check', async () => {
+    await withDesktop();
+    const d = desk({ desktopState: () => Promise.resolve('unknown') });
+    const list = await d.list();
+    expect(list.desktopRunning).toBe(false);
+    const row = list.apps.find((a) => a.app === 'claude-desktop');
+    expect(row?.quitFirst).toBe(false);
+    expect(row?.checkFailed).toBe(true);
+    const plan = await d.plan('claude-desktop', 'work');
+    expect(plan.status).toBe('change');
+  });
+  it('a check that throws is unknown, not running', async () => {
+    await withDesktop();
+    const d = desk({ desktopState: () => Promise.reject(new Error('boom')) });
+    const row = (await d.list()).apps.find((a) => a.app === 'claude-desktop');
+    expect(row?.quitFirst).toBe(false);
+    expect(row?.checkFailed).toBe(true);
+  });
+  it('running still blocks', async () => {
+    await withDesktop();
+    const d = desk({ desktopState: () => Promise.resolve('running') });
+    expect((await d.plan('claude-desktop', 'work')).status).toBe('quit_first');
   });
 });
