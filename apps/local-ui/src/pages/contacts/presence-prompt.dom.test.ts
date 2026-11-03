@@ -9,6 +9,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readPasskeyStatus, type PasskeyStatus, type PresenceProof } from './owner.js';
 import type { PasskeySwitchOutcome } from './passkey-switch.js';
+import { detectPlatform } from '../first-run/passkey.js';
+import { SENSOR } from '../first-run/strings.js';
 import { PresencePrompt } from './presence-prompt.js';
 import { CONTACTS_STRINGS as S } from './strings.js';
 
@@ -94,7 +96,7 @@ async function render(
 describe('HOTFIX-045-TOUCHID: the presence sheet says why and offers the switch', () => {
   it('a passkey the caller missed is still offered (owner store answered after all)', async () => {
     await render(() => Promise.resolve(READY));
-    expect(buttons()).toContain(S.usePasskey);
+    expect(buttons()).toContain(S.usePasskeyOn(SENSOR[detectPlatform()]));
     expect(host.querySelector('input[type="password"]')).toBeNull();
   });
 
@@ -132,8 +134,26 @@ describe('HOTFIX-045-TOUCHID: the presence sheet says why and offers the switch'
     // The switch submitted nothing for the operation: it still needs its own gesture.
     expect(r.submitted).toEqual([]);
     expect(host.textContent).toMatch(/ is on\. Now confirm with /);
-    expect(buttons()).toContain(S.usePasskey);
+    expect(buttons()).toContain(S.usePasskeyOn(SENSOR[detectPlatform()]));
     expect(host.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it('F24: the passkey button uses the platform word (Touch ID on a Mac, Windows Hello, else passkey)', async () => {
+    const ua = Object.getOwnPropertyDescriptor(navigator, 'userAgent');
+    try {
+      for (const [agent, label] of [
+        ['Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)', 'Confirm with Touch ID'],
+        ['Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Confirm with Windows Hello'],
+        ['Mozilla/5.0 (X11; Linux x86_64)', 'Confirm with your passkey'],
+      ] as const) {
+        Object.defineProperty(navigator, 'userAgent', { value: agent, configurable: true });
+        await render(() => Promise.resolve(READY));
+        expect(buttons()).toContain(label);
+      }
+    } finally {
+      if (ua === undefined) delete (navigator as { userAgent?: string }).userAgent;
+      else Object.defineProperty(navigator, 'userAgent', ua);
+    }
   });
 
   it('a wrong backup code in the switch says so and changes nothing', async () => {
@@ -148,7 +168,7 @@ describe('HOTFIX-045-TOUCHID: the presence sheet says why and offers the switch'
     await flush();
     expect(r.switches.length).toBe(1);
     expect(host.querySelector('[role="alert"]')?.textContent).toMatch(/didn't work/);
-    expect(buttons()).not.toContain(S.usePasskey);
+    expect(buttons()).not.toContain(S.usePasskeyOn(SENSOR[detectPlatform()]));
   });
 
   it("another owner's passkey: says why, and no switch is offered (a second one is refused)", async () => {
