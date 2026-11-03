@@ -412,9 +412,7 @@ export function RemoveSheet({
         {phase.kind === 'in_use' ? (
           <>
             <p className="al-text-body" role="alert">
-              <strong>
-                {quitSentence(quit, row.label)}
-              </strong>
+              <strong>{quitSentence(quit, row.label)}</strong>
             </p>
             {quit.apps.length > 0 && !(quit.named && quit.apps.length === 1) ? (
               <ul className="ag-goes">

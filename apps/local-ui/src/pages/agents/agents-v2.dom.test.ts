@@ -390,9 +390,7 @@ describe('Agents, simple (A8)', () => {
     };
     answers['GET /api/ui/agents'] = {
       status: 200,
-      body: list([
-        agent('default', 'Personal', { current: true, contacts: 0, state: 'ready' }),
-      ]),
+      body: list([agent('default', 'Personal', { current: true, contacts: 0, state: 'ready' })]),
     };
     await mount();
     expect(card('default').textContent).not.toContain('Contacts still see');

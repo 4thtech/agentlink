@@ -1,0 +1,34 @@
+// Unit tests: the repository-wide 20 s test timeout (M0-10e); DOM tests opt into jsdom with a
+// per-file `@vitest-environment` comment.
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  resolve: { dedupe: ['react','react-dom'] },
+  test: {
+    // Tests that read their stylesheet as text (`?raw`) need it listed here; the default config would replace it with "".
+    css: {
+      include: [
+        /messages\.css/,
+        /home\.css/,
+        /contacts\.css/,
+        /approvals\.css/,
+        /board\.css/,
+        /activity\.css/,
+        /pulse\.css/,
+        /about\.css/,
+        /proofs\.css/,
+        /app\.css/,
+        /compact\.css/,
+        /map\.css/,
+        /moving\.css/,
+        /welcome\.css/,
+        /agents\.css/,
+        // The real-browser layout test reads the shared UI stylesheets as text (HOTFIX-045-PASTE-FIELD).
+        /ui\/src\/(components|tokens)\/.*\.css/,
+      ],
+    },
+    // Loads the lazy parts once, so tests can render them synchronously (UI-REFRESH-u).
+    setupFiles: ['./src/test-setup.ts'],
+    testTimeout: 20_000,
+  },
+});

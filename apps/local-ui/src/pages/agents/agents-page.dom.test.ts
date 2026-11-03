@@ -368,12 +368,16 @@ describe('Remove', () => {
     const sheet = await open('work');
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
-    expect(plain(host)).toContain('Claude Code sessions in Terminal are still using this ID. Close them, then check again.');
+    expect(plain(host)).toContain(
+      'Claude Code sessions in Terminal are still using this ID. Close them, then check again.',
+    );
     expect(host.querySelector('input[name="owner-code"]')).toBeNull();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
     // Still running: Check again stays on the sentence, still without a gesture.
     await click(button(host, 'Check again'));
-    expect(plain(host)).toContain('Claude Code sessions in Terminal are still using this ID. Close them, then check again.');
+    expect(plain(host)).toContain(
+      'Claude Code sessions in Terminal are still using this ID. Close them, then check again.',
+    );
     expect(host.querySelector('input[name="owner-code"]')).toBeNull();
     // Quit: Check again goes on to the Touch ID step, and the server still decides.
     answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
@@ -396,12 +400,16 @@ describe('Remove', () => {
     const sheet = await open('work');
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
-    expect(plain(host)).toContain('OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.');
+    expect(plain(host)).toContain(
+      'OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.',
+    );
     expect(host.querySelector('input[name="owner-code"]')).toBeNull();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
     // Still running: Check again stays on the sentence, still without a gesture.
     await click(button(host, 'Check again'));
-    expect(plain(host)).toContain('OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.');
+    expect(plain(host)).toContain(
+      'OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.',
+    );
     expect(host.querySelector('input[name="owner-code"]')).toBeNull();
     // Quit: Check again goes on to the Touch ID step, and the server still decides.
     answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
