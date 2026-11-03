@@ -812,8 +812,23 @@ describe('W1: an existing home folder named `agentlink` in another case', () => 
     const target = join(dir, 'elsewhere');
     await mkdir(target);
     await symlink(target, join(realHome, 'agentlink'), 'junction');
+    const caseInsensitive =
+      (await lstat(join(realHome, 'AGENTLINK')).catch(() => undefined)) !== undefined;
     const plan = await prepareSendFolder(home);
-    expect(plan).toEqual({ status: 'unavailable', reason: 'folder_unavailable' });
+    if (caseInsensitive) {
+      // `AgentLink` answers to the link: it is refused, and nothing is created through it.
+      expect(plan).toEqual({ status: 'unavailable', reason: 'folder_unavailable' });
+    } else {
+      // Case-sensitive file system: `agentlink` (the link) and `AgentLink` are different names, so
+      // the real `AgentLink/Send` is created and the link is left alone.
+      expect(plan.status).toBe('ready');
+      if (plan.status !== 'ready') return;
+      expect(plan.folder).toBe(join(realHome, 'AgentLink', 'Send'));
+      expect(await realpath(plan.folder)).toBe(plan.folder);
+      expect((await lstat(join(realHome, 'AgentLink'))).isSymbolicLink()).toBe(false);
+      expect((await lstat(join(realHome, 'agentlink'))).isSymbolicLink()).toBe(true);
+      expect(await realpath(join(realHome, 'agentlink'))).toBe(await realpath(target));
+    }
     expect(await readdir(target)).toEqual([]);
   });
 });
