@@ -1782,6 +1782,8 @@ describe('PRF only on get(): the second gesture of the same setup (M1-11s-c-c, F
     origin?: string;
     badSignature?: boolean;
     prf?: Uint8Array;
+    /** A creation key this build cannot verify (an RS256 key, say). */
+    unverifiableKey?: boolean;
   }
 
   /** A platform authenticator with a real ES256 key whose PRF answers only on get(). */
@@ -1801,7 +1803,9 @@ describe('PRF only on get(): the second gesture of the same setup (M1-11s-c-c, F
         new Uint8Array(16),
         new Uint8Array([id.length >> 8, id.length & 0xff]),
         id,
-        this.#key.coseKey,
+        tamper.unverifiableKey === true
+          ? new Uint8Array([0xa3, 0x01, 0x03, 0x03, 0x39, 0x01, 0x00]) // kty RSA, alg RS256
+          : this.#key.coseKey,
       );
       const createClient = encodeUtf8(
         JSON.stringify({
@@ -1868,6 +1872,43 @@ describe('PRF only on get(): the second gesture of the same setup (M1-11s-c-c, F
     await store.close();
     expect(allZero(h.seeds[0] as Uint8Array)).toBe(true);
     expect(setupEvents(h)).toEqual(['ready', 'done']);
+  }, 60_000);
+
+  it('a creation key this build cannot verify: no passkey, the owner code only, nothing of the PRF kept', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const res = await post(
+      h,
+      FINISH,
+      s,
+      new PrfOnGetAuthenticator().finishBody(begun.publicKey, h.origin, { unverifiableKey: true }),
+    );
+    expect(res.status).toBe(200);
+    expect((JSON.parse(res.body) as { passkey: boolean }).passkey).toBe(false);
+    expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(true);
+    expect(agent.keychain.items.has(OWNER_PASSKEY_ACCOUNT)).toBe(false);
+    expect(agent.keychain.items.has(OWNER_PASSKEY_KEY_ACCOUNT)).toBe(false);
+  }, 60_000);
+
+  it('refuses a body of seven fields (an assertion without its signature)', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const full = new PrfOnGetAuthenticator().finishBody(begun.publicKey, h.origin);
+    // Drop the last field (the signature) and its length: seven fields.
+    let at = 0;
+    const ends: number[] = [];
+    while (at < full.length) {
+      at += 2 + (((full[at] as number) << 8) | (full[at + 1] as number));
+      ends.push(at);
+    }
+    const seven = full.slice(0, ends[6]);
+    const res = await post(h, FINISH, s, seven);
+    expect(res.status).toBe(403);
+    expect([...agent.keychain.items.keys()].filter((k) => k.startsWith('owner'))).toEqual([]);
   }, 60_000);
 
   const bad: [string, Tamper][] = [

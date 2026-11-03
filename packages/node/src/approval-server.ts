@@ -3559,9 +3559,13 @@ export async function startApprovalServerWith(
       registration = undefined;
     }
     let accepted = false;
+    // M1-11s-c-c: a get() assertion whose signature this build cannot verify gives no passkey.
+    let codeOnly = false;
     if (registration !== undefined) {
       try {
-        checkSetupRegistration(registration, { challenge: held.challenge, origin });
+        codeOnly =
+          checkSetupRegistration(registration, { challenge: held.challenge, origin }) ===
+          'code_only';
         accepted = true;
       } catch {
         accepted = false;
@@ -3581,6 +3585,9 @@ export async function startApprovalServerWith(
       return;
     }
     const proof = registration as SetupRegistration;
+    // M1-11s-c-c: an unverifiable get() leaves the owner code as the only way; its PRF output goes now.
+    if (codeOnly) wipe(proof.prfOutput);
+    const prfOutput = codeOnly ? new Uint8Array(0) : proof.prfOutput;
     // Single-use from here: taken before any await; wiped whatever happens below.
     pendingSetup = undefined;
     clearTimeout(held.timer);
@@ -3694,7 +3701,7 @@ export async function startApprovalServerWith(
             seed: held.seed,
             keys: held.keys,
             credentialId: proof.credentialId,
-            prfOutput: proof.prfOutput,
+            prfOutput,
             authenticatorData: proof.authenticatorData,
             firstCard,
             ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),

@@ -1263,7 +1263,16 @@ export function FirstRunPage({
               {T.unconfirmed}
             </Banner>
           )}
-          <p className="st-lead">{done.passkey ? T.doneBody : T.doneNoPasskeyBody}</p>
+          {done.passkey ? (
+            <p className="st-lead">{T.doneBody}</p>
+          ) : (
+            // M1-11s-c-c: without a passkey the backup code is the only way to approve here.
+            <div data-testid="backup-needed">
+              <Banner tone="warning" title={T.doneNoPasskeyTitle}>
+                {T.doneNoPasskeyBody}
+              </Banner>
+            </div>
+          )}
           {line === undefined ? null : (
             <Banner tone={done.sendFolder === 'allowed' ? 'success' : 'warning'}>{line}</Banner>
           )}

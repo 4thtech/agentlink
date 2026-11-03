@@ -54,6 +54,8 @@ export const FIRST_RUN = {
   // 11 §5.5 "Backup code at first run" (D-130 (1)).
   backupTitle: 'Your backup code',
   doneBody: 'Approvals on this computer are protected.',
+  // M1-11s-c-c: shown prominently, before the code, when no passkey protects approvals.
+  doneNoPasskeyTitle: 'Save your backup code — you need it to approve.',
   doneNoPasskeyBody:
     "This browser can't protect approvals with a passkey here, so this backup code is how you approve on this computer.",
   backupBody: (sensor: string): string =>
