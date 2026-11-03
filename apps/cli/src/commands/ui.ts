@@ -30,7 +30,12 @@ import { homedir } from 'node:os';
 import process from 'node:process';
 import type { Logger } from '@4thtech-io/log';
 import { cliLogger } from '../runtime/log-level.js';
-import { probeOsKeychain, selectKeyStoreBackend, startApprovalServer } from '@4thtech-io/node';
+import {
+  hasOwnerOnMachine,
+  probeOsKeychain,
+  selectKeyStoreBackend,
+  startApprovalServer,
+} from '@4thtech-io/node';
 import { createAiAppsDesk } from '../harness/app-desk.js';
 import { embeddedLocalUiAssets } from '../mcp/local-ui-assets.js';
 import { createUiApprovalSource } from '../approval/ui-source.js';
@@ -45,6 +50,9 @@ import { nodeOwnerDeps } from './owner/deps.js';
 import { openUiHostAgent, startUiWelcome, withoutAssets, type UiHostDeps } from './ui-host.js';
 import { uiRemovalPort } from './ui-remove.js';
 import { removeAppHostRecord, writeAppHostRecord } from '../runtime/app-host-record.js';
+import { writeLastExit, type LastExitReason } from '../runtime/last-exit.js';
+import { guardProcess, type FatalReason } from '../runtime/ui-lifecycle.js';
+import { cliVersion } from '../runtime/cli-version.js';
 
 /**
  * How long `ui` keeps serving with nobody using it (06 §5 sets "a time limit (30 minutes)"; F25: it
@@ -56,13 +64,43 @@ export const UI_WAIT_MS = 30 * 60_000;
 /** While a page is open, `ui` looks again this often, so a closed tab starts the idle time soon. */
 const OPEN_PAGE_CHECK_MS = 15_000;
 
+/** R1: why `ui` could not start. */
+export type StartFailure =
+  'no_owner' | 'no_ids' | 'only_removing' | 'port' | 'keychain' | 'open' | 'failed';
+
+const START_EXIT: Readonly<Record<StartFailure, LastExitReason>> = Object.freeze({
+  no_owner: 'start_no_owner',
+  no_ids: 'start_no_ids',
+  only_removing: 'start_removing',
+  port: 'start_port',
+  keychain: 'start_keychain',
+  open: 'start_open',
+  failed: 'start_failed',
+});
+
+/** Bind failures: the local page cannot be served (a fixed set of codes, never the text). */
+const PORT_CODES = new Set(['EADDRINUSE', 'EADDRNOTAVAIL', 'EACCES']);
+
+function isPortError(error: unknown): boolean {
+  const code =
+    typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : '';
+  return typeof code === 'string' && PORT_CODES.has(code);
+}
+
 /** Fixed text (11 §5 plain words). Nothing from a file, the page or the user is inserted. */
 export const UI_TEXT = Object.freeze({
   opened:
     "Your browser opened AgentLink on Home. Keep this window open while you use it; press Ctrl+C when you're done.",
   openedSetup:
     "Your browser opened the AgentLink setup page. Protect approvals there with a passkey. Keep this window open while you use the page; press Ctrl+C when you're done.",
-  noBrowser: "AgentLink couldn't open your browser.",
+  /** R1: no browser could be started, but the app is healthy: it keeps serving. */
+  noBrowser:
+    "AgentLink couldn't open your browser, but it's still running. Keep this window open; press Ctrl+C when you're done.",
+  noBrowserServing: (origin: string): string =>
+    `AgentLink couldn't open your browser, but it's still running at ${origin}. Keep this window open; press Ctrl+C when you're done.`,
+  /** R1: a problem AgentLink could not carry on through (the run ended, cleanly). */
+  closedProblem: (prefix: string): string =>
+    `AgentLink closed because of an unexpected problem. Run \`${prefix}\` to open it again, or \`${prefix} doctor\` if it keeps happening.`,
   /** F25: Ctrl+C, closing the terminal or a stop signal: one plain line, no link. */
   closed: (prefix: string): string => `AgentLink closed. Run \`${prefix}\` to open it again.`,
   /** F25: the idle limit (UI_WAIT_MS) ended the run. */
@@ -71,6 +109,23 @@ export const UI_TEXT = Object.freeze({
   /** `prefix`: the command as this run was started (M1-36a), never a typed value. */
   notReady: (prefix: string): string =>
     `AgentLink isn't set up here yet. Run \`${prefix} init\` in your own terminal first.`,
+  /** R1: why it could not start, one line each; only `no_owner` asks for init. */
+  startFailure: Object.freeze<Record<StartFailure, (prefix: string) => string>>({
+    no_owner: (prefix) =>
+      `AgentLink isn't set up here yet. Run \`${prefix} init\` in your own terminal first.`,
+    no_ids: (prefix) =>
+      `AgentLink couldn't open the app to make your first ID. Run \`${prefix} doctor\` to see why.`,
+    only_removing: (prefix) =>
+      `Some of your IDs were only half removed, so AgentLink couldn't start. Run \`${prefix} doctor\` to see what is left.`,
+    port: (prefix) =>
+      `AgentLink couldn't start its page on this computer. Close any other open AgentLink, then run \`${prefix}\` again.`,
+    keychain: (prefix) =>
+      `AgentLink can't reach your computer's keychain. Unlock it, then run \`${prefix}\` again.`,
+    open: (prefix) =>
+      `AgentLink couldn't open your ID. Your IDs are still here. Run \`${prefix} doctor\` to see why.`,
+    failed: (prefix) =>
+      `AgentLink couldn't start. Your IDs are still here. Run \`${prefix} doctor\` to see why.`,
+  }),
   agentRun: (prefix: string): string =>
     `You must do this yourself: run \`${prefix} ui\` in your own terminal. It opens your AgentLink pages in your browser. Don't let your AI open them or run this for you.`,
 });
@@ -94,6 +149,8 @@ export interface UiServer {
   readonly page: UiPage;
   /** Opens the browser at a one-shot link to `page`; false when no browser could be started. */
   open(): Promise<boolean>;
+  /** R1: the local address (`http://localhost:<port>`, never a session link), for when no browser opens. */
+  readonly origin?: string;
   /**
    * F25: whether the app is in use (absent: only the time since start counts). `lastAt` is a time in
    * ms of the last page request; `openStreams` the open pages.
@@ -134,8 +191,17 @@ export interface UiDeps {
   startWelcome?(options?: { readonly invite?: string }): Promise<UiServer | undefined>;
   /** The longest time with no use, in milliseconds (F25: idle, not wall-clock). */
   readonly waitMs: number;
-  /** Calls `stop` on Ctrl+C, SIGTERM or SIGHUP; returns the unsubscribe. */
-  interrupt(stop: () => void): () => void;
+  /** Calls `stop` on Ctrl+C, SIGTERM or SIGHUP (with the signal's name); returns the unsubscribe. */
+  interrupt(stop: (signal?: string) => void): () => void;
+  /**
+   * R1: why `start` found nothing to start (no owner, no IDs, only half-removed IDs, no keychain …).
+   * Absent: the line for "not set up here yet".
+   */
+  diagnose?(): Promise<StartFailure>;
+  /** R1: stray background errors keep the host up; `onFatal` ends it. Returns the unsubscribe. */
+  guard?(onFatal: (reason: FatalReason) => void): () => void;
+  /** R1: writes why this run closed (~/.agentlink/last-exit.json). Must not throw. */
+  recordExit?(reason: LastExitReason): Promise<void>;
 }
 
 /** The command. Returns the process exit code. */
@@ -186,27 +252,49 @@ export async function serveUi(
     none && deps.startWelcome !== undefined
       ? await deps.startWelcome(startOptions).catch(() => undefined)
       : undefined;
-  server ??= await deps.start(agent, startOptions).catch(() => undefined);
+  let thrown: unknown;
+  server ??= await deps.start(agent, startOptions).catch((error: unknown) => {
+    thrown = error;
+    return undefined;
+  });
   if (server === undefined) {
-    output.printError(UI_TEXT.notReady(prefix));
+    // R1: say what went wrong; "run init" only when nothing is set up. Nothing from the error is shown.
+    const failure: StartFailure = isPortError(thrown)
+      ? 'port'
+      : thrown === undefined
+        ? await (deps.diagnose?.() ?? Promise.resolve('no_owner' as const)).catch(
+            () => 'failed' as const,
+          )
+        : await (deps.diagnose?.() ?? Promise.resolve('failed' as const)).catch(
+            () => 'failed' as const,
+          );
+    output.printError(UI_TEXT.startFailure[failure](prefix));
+    await deps.recordExit?.(START_EXIT[failure]);
     return EXIT_FAILED;
   }
   let unsubscribe: (() => void) | undefined;
+  let unguard: (() => void) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    const fatal = new Promise<FatalReason>((resolve) => {
+      unguard = deps.guard?.(resolve);
+    });
     const opened = await server.open().catch(() => false);
     if (!opened) {
-      output.printError(UI_TEXT.noBrowser);
-      return EXIT_FAILED;
+      // R1: a browser that will not open does not stop a healthy host.
+      output.print(
+        server.origin === undefined ? UI_TEXT.noBrowser : UI_TEXT.noBrowserServing(server.origin),
+      );
+    } else {
+      output.print(
+        join !== undefined
+          ? join.opened
+          : server.page === 'first-run'
+            ? UI_TEXT.openedSetup
+            : UI_TEXT.opened,
+      );
     }
-    output.print(
-      join !== undefined
-        ? join.opened
-        : server.page === 'first-run'
-          ? UI_TEXT.openedSetup
-          : UI_TEXT.opened,
-    );
-    const stopped = new Promise<void>((resolve) => {
+    const stopped = new Promise<string | undefined>((resolve) => {
       unsubscribe = deps.interrupt(resolve);
     });
     const idle = new Promise<'idle'>((resolve) => {
@@ -227,12 +315,31 @@ export async function serveUi(
       };
       timer = setTimeout(check, deps.waitMs);
     });
-    const reason = await Promise.race([stopped.then(() => 'stop' as const), idle]);
-    output.print(reason === 'idle' ? UI_TEXT.closedIdle(prefix) : UI_TEXT.closed(prefix));
+    const reason = await Promise.race([
+      stopped.then((signal) => ({ kind: 'stop' as const, signal })),
+      idle.then(() => ({ kind: 'idle' as const })),
+      fatal.then((why) => ({ kind: 'fatal' as const, why })),
+    ]);
+    if (reason.kind === 'fatal') {
+      output.print(UI_TEXT.closedProblem(prefix));
+      await deps.recordExit?.(reason.why);
+      return EXIT_FAILED;
+    }
+    output.print(reason.kind === 'idle' ? UI_TEXT.closedIdle(prefix) : UI_TEXT.closed(prefix));
+    await deps.recordExit?.(
+      reason.kind === 'idle'
+        ? 'idle'
+        : reason.signal === 'SIGTERM'
+          ? 'sigterm'
+          : reason.signal === 'SIGHUP'
+            ? 'sighup'
+            : 'ctrl_c',
+    );
     return EXIT_OK;
   } finally {
     if (timer !== undefined) clearTimeout(timer);
     unsubscribe?.();
+    unguard?.();
     await server.close().catch(() => undefined);
   }
 }
@@ -247,6 +354,34 @@ export function onStopSignals(stop: () => void, proc: NodeJS.Process = process):
   return () => {
     for (const signal of signals) proc.off(signal, stop);
   };
+}
+
+/**
+ * R1: why nothing could be started, from what is on this computer now (names, counts and a keychain
+ * probe only; no secret is read). Never throws.
+ */
+export async function diagnoseStart(
+  home: string,
+  probes: {
+    readonly keychainUsable?: () => Promise<boolean>;
+    readonly ownerOnMachine?: () => Promise<boolean>;
+  } = {},
+): Promise<StartFailure> {
+  try {
+    const keychainUsable =
+      probes.keychainUsable ??
+      (async () => selectKeyStoreBackend(await probeOsKeychain(), { fileOptIn: false }).ok);
+    const entries = await agentDirectory(home).list();
+    if (entries.length > 0) {
+      if (entries.every((e) => e.removing)) return 'only_removing';
+      return (await keychainUsable().catch(() => false)) ? 'open' : 'keychain';
+    }
+    if (!(await keychainUsable().catch(() => false))) return 'keychain';
+    const owner = await (probes.ownerOnMachine ?? hasOwnerOnMachine)().catch(() => false);
+    return owner ? 'no_ids' : 'no_owner';
+  } catch {
+    return 'failed';
+  }
 }
 
 /** The production step: the OS user's home, the OS keychain, the OS browser opener. */
@@ -363,6 +498,7 @@ export function nodeUiDeps(): UiDeps {
         return Object.freeze<UiServer>({
           page,
           activity: server.activity,
+          origin: server.origin,
           // U3-invite: first run (no owner yet) or the join screen; never a link with the invite.
           open: () => (invite === undefined ? openUiPage(page, server) : server.openJoin()),
           close: async () => {
@@ -377,6 +513,10 @@ export function nodeUiDeps(): UiDeps {
     },
     waitMs: UI_WAIT_MS,
     interrupt: (stop) => onStopSignals(stop),
+    // R1: stray background errors are logged with a fixed code and the host keeps serving.
+    guard: (onFatal) => guardProcess({ log: logger, onFatal }),
+    recordExit: (reason) => writeLastExit(homedir(), { reason, version: cliVersion() }),
+    diagnose: () => diagnoseStart(homedir()),
   });
 }
 

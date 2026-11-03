@@ -150,12 +150,14 @@ const NO_AGENT_SOURCE: ApprovalServerSource = Object.freeze<ApprovalServerSource
 
 /**
  * U3-g-b: starts the app host with no agent open, or undefined (nothing started) when any agent
- * folder exists (even one marked `removing`), the keychain cannot hold a new agent, or this build has
+ * folder is usable or unreadable (R1: folders marked `removing` do not count), the keychain cannot
+ * hold a new agent, or this build has
  * no app. The server closes whichever agent first run opened.
  */
 export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServer | undefined> {
   const entries = await deps.directory.list().catch(() => undefined);
-  if (entries === undefined || entries.length !== 0) return undefined;
+  // R1: half-removed IDs do not count: only a usable (or unreadable) folder keeps Welcome away.
+  if (entries === undefined || entries.some((e) => !e.removing)) return undefined;
   if (!(await deps.keychainUsable().catch(() => false))) return undefined;
   const assets = deps.assets();
   if (assets.files.has('index.html') !== true) return undefined;

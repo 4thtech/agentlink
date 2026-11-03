@@ -2,7 +2,7 @@
 // app-host.json, half-removed IDs, AI-app entries that name an ID that is gone. Temp HOME only;
 // read-only; nothing but fixed words, app names and ID folder names is printed.
 import { spawnSync } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
@@ -19,7 +19,7 @@ import { createDeps } from './shared.js';
 const TOKEN = 'T'.repeat(43);
 let home = '';
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), 'agentlink-r1-doctor-'));
+  home = await realpath(await mkdtemp(join(tmpdir(), 'agentlink-r1-doctor-')));
 });
 afterEach(async () => {
   await rm(home, { recursive: true, force: true });
@@ -53,7 +53,7 @@ describe('doctor: why AgentLink closed last time (R1)', () => {
     async (reason) => {
       await writeLastExit(home, { reason, version: '1.0.0', at: 1 });
       const r = await localDoctorChecks({ home, ids: () => Promise.resolve([]), apps: noApps });
-      expect(r.lines[0]).toMatch(/^Warning  Last time AgentLink closed because /);
+      expect(r.lines[0]).toMatch(/^Warning {2}Last time AgentLink closed because /);
       expect(r.problems).toBe(0);
     },
   );
@@ -128,7 +128,9 @@ describe('doctor: AI apps that start an ID that is gone (R1)', () => {
     const r = await localDoctorChecks({
       home,
       ids: () => Promise.resolve([{ name: 'old', removing: true }]),
-      apps: { list: () => Promise.resolve({ apps: [app('Cursor', 'old')], desktopRunning: false }) },
+      apps: {
+        list: () => Promise.resolve({ apps: [app('Cursor', 'old')], desktopRunning: false }),
+      },
     });
     expect(r.lines).toContain(DOCTOR_LOCAL_TEXT.appMissingId('Cursor', 'old'));
   });
@@ -136,15 +138,21 @@ describe('doctor: AI apps that start an ID that is gone (R1)', () => {
   it('reads the real harness config of a temp home, read-only', async () => {
     await chmod(home, 0o700);
     const path = join(home, '.claude.json');
-    const text = JSON.stringify({
-      mcpServers: { agentlink: agentlinkEntry(harnessById('claude-code'), 'gone') },
-    });
+    const text = `${JSON.stringify(
+      {
+        numStartups: 3,
+        mcpServers: { agentlink: agentlinkEntry(harnessById('claude-code'), 'gone') },
+      },
+      null,
+      2,
+    )}\n`;
     await writeFile(path, text, { mode: 0o600 });
     await chmod(path, 0o600);
     await mkdir(join(home, '.claude'), { mode: 0o700 });
     const r = await localDoctorChecks({
       home,
       env: {},
+      platform: 'darwin',
       ids: () => Promise.resolve([]),
     });
     expect(r.lines).toEqual([DOCTOR_LOCAL_TEXT.appMissingId('Claude Code', 'gone')]);
@@ -172,8 +180,7 @@ describe('doctor runs the local checks even with no ID (R1)', () => {
     });
     const handler = createDoctorHandler({
       ...deps,
-      local: () =>
-        Promise.resolve({ lines: ['Problem  Local line'], problems: 1 }),
+      local: () => Promise.resolve({ lines: ['Problem  Local line'], problems: 1 }),
     });
     const code = await createDispatcher({ doctor: handler })(['doctor'], {
       output: { print: (t) => out.push(t), printError: (t) => out.push(t) },
@@ -188,8 +195,7 @@ describe('doctor runs the local checks even with no ID (R1)', () => {
   it('OK lines are printed too', async () => {
     const out: string[] = [];
     const deps = createDeps({
-      open: () =>
-        Promise.resolve({ status: 'needs_setup', reason: 'no_agent', message: 'x' }),
+      open: () => Promise.resolve({ status: 'needs_setup', reason: 'no_agent', message: 'x' }),
       home: '/nonexistent-home',
     });
     const handler = createDoctorHandler({

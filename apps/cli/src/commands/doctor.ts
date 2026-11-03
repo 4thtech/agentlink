@@ -8,6 +8,7 @@
 // Reachability uses the same fetch-only `catchUp` as `status`: it stores raw envelopes and processes
 // nothing. Every line is fixed text or a count; no path, agent name, account name or error text is
 // printed (I-5, I-7), only the fixed sentences of the runtime and of node (07 §9.4).
+import process from 'node:process';
 import {
   EXIT_FAILED,
   EXIT_OK,
@@ -18,6 +19,7 @@ import {
 import * as chain from '@4thtech-io/chain';
 import { hasOwnerOnMachine, hasUnfinishedOwnerCodeChange, nodeRpcFetch } from '@4thtech-io/node';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
+import { localDoctorChecks, type LocalChecks } from './doctor-local.js';
 import { isAgentName } from '../runtime/agent-name.js';
 import { cliPrefix, commandPrefix } from '../runtime/cli-prefix.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
@@ -68,6 +70,8 @@ export interface DoctorDeps extends CommandDeps {
    * "no IDs yet" line is never chosen and doctor keeps its set-up line.
    */
   readonly ownerOnMachine?: () => Promise<boolean>;
+  /** R1: the local checks (last exit, leftover host note, half-removed IDs, AI apps). Absent: none. */
+  readonly local?: () => Promise<LocalChecks>;
 }
 
 /** M1-9h doctor lines (11 §5: "public record", never chain, RPC or a network name). */
@@ -149,6 +153,13 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
       if (problem) problems += 1;
       printAll(context, text.split('\n'));
     };
+
+    // R1: these read only local files, so they come first and also help when no ID can be opened.
+    const local = await deps.local?.().catch(() => undefined);
+    if (local !== undefined) {
+      for (const line of local.lines) emit(line);
+      problems += local.problems;
+    }
 
     let opened;
     try {
@@ -308,4 +319,5 @@ export const doctorHandler: CommandHandler = createDoctorHandler({
   ...createDeps({ unfinishedOwnerCodeChange: hasUnfinishedOwnerCodeChange }),
   proofNetwork: nodeProofNetworkCheck(),
   ownerOnMachine: hasOwnerOnMachine,
+  local: () => localDoctorChecks({ env: process.env }),
 });
