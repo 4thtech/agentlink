@@ -94,6 +94,11 @@ jobs:
       run_relays_docker: ${{ steps.affected.outputs.run_relays_docker || 'true' }}
       run_storage_minio: ${{ steps.affected.outputs.run_storage_minio || 'true' }}
       run_bundle_check: ${{ steps.affected.outputs.run_bundle_check || 'true' }}
+      # CI-E2E-BROWSER: the Playwright suites' own job, and the turbo filters of the two test steps
+      # on a filtered run (empty on a full run: the jobs then use their full-run filters).
+      run_e2e_browser: ${{ steps.affected.outputs.run_e2e_browser || 'true' }}
+      checks_test_filters: ${{ steps.affected.outputs.checks_test_filters }}
+      e2e_browser_filters: ${{ steps.affected.outputs.e2e_browser_filters }}
       run_windows_smoke: ${{ steps.affected.outputs.run_windows_smoke || 'true' }}
       run_node_os: ${{ steps.affected.outputs.run_node_os || 'true' }}
       run_path_guard: ${{ steps.affected.outputs.run_path_guard || 'true' }}
@@ -367,20 +372,31 @@ jobs:
       # failures are all live quarantine entries for `checks` (tools/ci/quarantine.mjs); a quarantined
       # failure shows as a warning and in the run summary. Any other failure, or a task that failed
       # without a report (a crash, a failed build), fails as before.
+      # CI-E2E-BROWSER: the real-browser suites run in `e2e-browser`, not here: the e2e package is
+      # left out (`--filter=!@4thtech-io/e2e`, or the selector's checks_test_filters) and
+      # AGENTLINK_CI_BROWSER_TESTS=skip drops the `*browser.test.*` files of the packages that split
+      # them (their vitest configs; tools/ci/select-affected.mjs BROWSER_TEST_PACKAGES).
       - name: Unit tests
         if: needs.detect.outputs.has_test == 'true'
         env:
           TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
-          TURBO_FILTERS: ${{ needs.detect.outputs.turbo_filters }}
+          CHECKS_TEST_FILTERS: ${{ needs.detect.outputs.checks_test_filters }}
+          AGENTLINK_CI_BROWSER_TESTS: skip
         run: |
           # tools/ci/vitest-run-reporter.mjs records unhandled errors (not in the JSON report): <package>/.vitest-run.json.
           reporters=(--reporter=default --reporter=github-actions --reporter=json --outputFile.json=.vitest-report.json "--reporter=$GITHUB_WORKSPACE/tools/ci/vitest-run-reporter.mjs")
           set +e
           if [ "$TEST_SCOPE" = filtered ]; then
+            # Never empty in practice (@4thtech-io/tools is always selected); an empty list would
+            # make turbo test every package, so it fails instead.
+            if [ -z "$CHECKS_TEST_FILTERS" ]; then
+              echo "::error::No test filters for a filtered run."
+              exit 1
+            fi
             # shellcheck disable=SC2086 # one word per --filter
-            pnpm exec turbo run test --continue --summarize $TURBO_FILTERS -- "${reporters[@]}"
+            pnpm exec turbo run test --continue --summarize $CHECKS_TEST_FILTERS -- "${reporters[@]}"
           else
-            pnpm exec turbo run test --continue --summarize -- "${reporters[@]}"
+            pnpm exec turbo run test --continue --summarize '--filter=!@4thtech-io/e2e' -- "${reporters[@]}"
           fi
           status=$?
           set -e
@@ -392,6 +408,101 @@ jobs:
       - name: MCP tool surface and conformance
         if: needs.detect.outputs.has_test == 'true' && (needs.detect.outputs.test_scope != 'filtered' || contains(needs.detect.outputs.turbo_filters, '--filter=@4thtech-io/agentlink'))
         run: pnpm --filter @4thtech-io/agentlink exec vitest run test/tool-surface.test.ts test/mcp-conformance.test.ts
+
+  # CI-E2E-BROWSER (owner-approved CI reliability fix, 2026-11-03): the real-browser (Playwright)
+  # suites in their own job, so their 30 s UI waits no longer compete for CPU with every other
+  # package's tests in `checks` (6 of 7 red first attempts on `main`, 1 to 3 Nov, were these waits).
+  # It runs the whole e2e package (the journeys, `local-app-wave3`, the invite page) and the
+  # `*browser.test.*` files of @4thtech-io/node and @4thtech-io/local-ui
+  # (AGENTLINK_CI_BROWSER_TESTS=only); `checks` runs everything else, so no test runs twice
+  # (tools/ci/e2e-browser-split.test.mjs). Same selection as `checks` had for these packages: on
+  # `main` and `wave-4` always (ci-gate's HEAVY_REQUIRED), on a pull request when the selection
+  # reaches one of them (`run_e2e_browser`, PACKAGE_JOBS in tools/ci/select-affected.mjs), never for a
+  # docs-only change. Packages run one at a time (`--concurrency=1`); the same quarantine rules apply
+  # under the scope `e2e-browser`.
+  e2e-browser:
+    name: e2e-browser
+    needs: detect
+    if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.docs_only != 'true' && needs.detect.outputs.has_test == 'true' && needs.detect.outputs.run_e2e_browser == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # The full-run selection (a push to `main`, a .github/ or tools/ change): BROWSER_JOB_PACKAGES.
+      FULL_BROWSER_FILTERS: --filter=@4thtech-io/e2e --filter=@4thtech-io/local-ui --filter=@4thtech-io/node
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      # The journeys and the node and local-ui browser files use Chromium only.
+      - name: Install Playwright browsers
+        if: needs.detect.outputs.needs_playwright == 'true'
+        timeout-minutes: 12
+        uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium
+
+      # The same build as `checks` before its tests (the tests read built apps, such as the local
+      # app's dist); the test step below then finds every dependency in turbo's local cache.
+      - name: Build
+        env:
+          TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
+          TURBO_FILTERS: ${{ needs.detect.outputs.turbo_filters }}
+        run: |
+          if [ "$TEST_SCOPE" = filtered ]; then
+            # shellcheck disable=SC2086 # one word per --filter
+            pnpm exec turbo run build $TURBO_FILTERS
+          else
+            pnpm build
+          fi
+
+      - name: Check the test quarantine
+        run: node tools/ci/quarantine.mjs check
+
+      # As `checks` -> Unit tests: every report is evaluated against the live `e2e-browser`
+      # quarantine entries; any other failure, or a failure without a report, fails the step.
+      - name: Browser tests
+        env:
+          TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
+          E2E_BROWSER_FILTERS: ${{ needs.detect.outputs.e2e_browser_filters }}
+          AGENTLINK_CI_BROWSER_TESTS: only
+        run: |
+          reporters=(--reporter=default --reporter=github-actions --reporter=json --outputFile.json=.vitest-report.json "--reporter=$GITHUB_WORKSPACE/tools/ci/vitest-run-reporter.mjs")
+          filters="$FULL_BROWSER_FILTERS"
+          if [ "$TEST_SCOPE" = filtered ]; then filters="$E2E_BROWSER_FILTERS"; fi
+          if [ -z "$filters" ]; then
+            echo "::error::The job was selected but no browser package is in the selection."
+            exit 1
+          fi
+          set +e
+          # shellcheck disable=SC2086 # one word per --filter
+          pnpm exec turbo run test --continue --summarize --concurrency=1 $filters -- "${reporters[@]}"
+          status=$?
+          set -e
+          node tools/ci/quarantine.mjs evaluate --scope e2e-browser --exit-code "$status" --turbo-runs .turbo/runs
+
+      # On a failure: the screenshots the journeys' failure diagnostics write
+      # (`agentlink-e2e-*.png` in the temp folder, e2e/test/journey/world.ts) and the vitest reports.
+      # Test data only (throwaway test agents on local relays and the fake drop); this job holds no
+      # secret and no real user's data. Kept 7 days.
+      - name: Upload the failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-browser-diagnostics
+          path: |
+            /tmp/agentlink-e2e-*.png
+            e2e/.vitest-report.json
+            packages/node/.vitest-report.json
+            apps/local-ui/.vitest-report.json
+          retention-days: 7
+          if-no-files-found: ignore
 
   # OPS-DOCS-FASTLANE (owner decision, 2026-11-02): a documentation-only pull request (see
   # tools/ci/select-affected.mjs `docsOnly`: Markdown and images in the doc trees that no package
@@ -1271,7 +1382,7 @@ jobs:
     # required check. On `main` (and `wave-4`) that push run is the heavy lane, and its
     # `ci-gate (push)` is what release.yml and the deploy-*.yml workflows require.
     name: ${{ github.event_name == 'push' && 'ci-gate (push)' || 'ci-gate' }}
-    needs: [detect, checks, docs-checks, vectors, keychain, path-guard, node-os, windows-smoke, context-budget, relays-docker, storage-minio, bundle-check, changesets, stale-precheck, e2e-deterministic]
+    needs: [detect, checks, e2e-browser, docs-checks, vectors, keychain, path-guard, node-os, windows-smoke, context-budget, relays-docker, storage-minio, bundle-check, changesets, stale-precheck, e2e-deterministic]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -1286,16 +1397,18 @@ jobs:
           REF: ${{ github.ref }}
           CODE_CHANGED: ${{ needs.detect.outputs.code_changed }}
           DOCS_ONLY: ${{ needs.detect.outputs.docs_only }}
+          HAS_TEST: ${{ needs.detect.outputs.has_test }}
+          RUN_E2E_BROWSER: ${{ needs.detect.outputs.run_e2e_browser }}
           NEEDS: ${{ toJSON(needs) }}
           # OPS-FAST-LANE-1: in the heavy lane (a push to `main` or `wave-4`) these must have run and
           # passed (a skip fails), so the release cannot ship with a heavy job silently skipped.
-          HEAVY_REQUIRED: checks vectors keychain path-guard node-os windows-smoke relays-docker storage-minio bundle-check e2e-deterministic
+          HEAVY_REQUIRED: checks e2e-browser vectors keychain path-guard node-os windows-smoke relays-docker storage-minio bundle-check e2e-deterministic
         run: |
           set -euo pipefail
           echo "Upstream job results: $RESULTS"
           if [ "$EVENT_NAME" = push ] && { [ "$REF" = refs/heads/main ] || [ "$REF" = refs/heads/wave-4 ]; }; then
             for job in detect $HEAVY_REQUIRED; do
-              if [ "$job" != detect ] && [ "$job" != checks ] && [ "$CODE_CHANGED" != true ]; then continue; fi
+              if [ "$job" != detect ] && [ "$job" != checks ] && [ "$job" != e2e-browser ] && [ "$CODE_CHANGED" != true ]; then continue; fi
               result="$(jq -r --arg j "$job" '.[$j].result // "missing"' <<< "$NEEDS")"
               if [ "$result" != success ]; then
                 echo "::error::In the heavy lane the job '$job' must succeed; it ended as '$result'."
@@ -1315,6 +1428,14 @@ jobs:
             fi
           elif [ "$docs_result" != skipped ] && [ "$detect_result" = success ]; then
             echo "::error::docs-checks ran although the change is not docs-only ('$docs_result')."
+            exit 1
+          fi
+          # CI-E2E-BROWSER: the browser suites left `checks`; whenever `checks` ran and the selection
+          # holds a browser package, `e2e-browser` must have run and passed (a skip fails), in every lane.
+          checks_result="$(jq -r '.checks.result // "missing"' <<< "$NEEDS")"
+          browser_result="$(jq -r '.["e2e-browser"].result // "missing"' <<< "$NEEDS")"
+          if [ "$checks_result" != skipped ] && [ "$HAS_TEST" = true ] && [ "$RUN_E2E_BROWSER" = true ] && [ "$browser_result" != success ]; then
+            echo "::error::The browser suites were selected: e2e-browser must succeed; it ended as '$browser_result'."
             exit 1
           fi
           # CHORE-CI-SPEED-1: on a draft pull request every upstream job is skipped, which passes here;

@@ -32,7 +32,8 @@ jobs:
       (github.event.workflow_run.event == 'pull_request' ||
        (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'))
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    # CI-E2E-BROWSER: room for the one delayed rerun of a macOS leg that got no runner (5 min wait).
+    timeout-minutes: 12
     permissions:
       actions: write
       contents: read
@@ -59,7 +60,7 @@ jobs:
             exit 1
           fi
           gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/attempts/1/jobs?per_page=100" \
-            --jq '.jobs[] | {name, conclusion, failedSteps: [(.steps // [])[] | select(.conclusion == "failure") | .name]} | tojson' > "$RUNNER_TEMP/auto-retry-jobs.jsonl"
+            --jq '.jobs[] | {name, conclusion, failedSteps: [(.steps // [])[] | select(.conclusion == "failure") | .name], ranSteps: ([(.steps // [])[] | select(.status == "completed" and .conclusion != "skipped")] | length)} | tojson' > "$RUNNER_TEMP/auto-retry-jobs.jsonl"
 
       - name: Decide
         id: decide
@@ -76,6 +77,22 @@ jobs:
         run: |
           set -euo pipefail
           JOBS_FILE="$RUNNER_TEMP/auto-retry-jobs.jsonl" node tools/ci/auto-retry.mjs
+
+      # CI-E2E-BROWSER (CI reliability plan item 7): a macOS leg cancelled before any step ran never
+      # got a runner; rerunning at once meets the same empty pool, so wait first (one rerun only).
+      - name: Wait before rerunning a macOS leg that got no runner
+        if: steps.decide.outputs.rerun == 'true' && steps.decide.outputs.delay_seconds != '0'
+        shell: bash
+        env:
+          DELAY_SECONDS: ${{ steps.decide.outputs.delay_seconds }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$DELAY_SECONDS" =~ ^[0-9]{1,3}$ ]] || [ "$DELAY_SECONDS" -gt 600 ]; then
+            echo "::error::Delay is not a number of seconds up to 600."
+            exit 1
+          fi
+          echo "A macOS leg got no runner; waiting $DELAY_SECONDS s before the rerun." >> "$GITHUB_STEP_SUMMARY"
+          sleep "$DELAY_SECONDS"
 
       - name: Rerun the failed jobs once
         if: steps.decide.outputs.rerun == 'true'

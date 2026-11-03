@@ -157,6 +157,16 @@ describe('evaluate', () => {
 
   it('fails for a quarantined test outside its scope', () => {
     expect(go({ scope: 'checks' }).ok).toBe(false);
+    expect(go({ scope: 'e2e-browser' }).ok).toBe(false);
+  });
+
+  // CI-E2E-BROWSER: the browser suites moved from `checks` to their own job and scope.
+  it('accepts an entry scoped to the e2e-browser job, only in that job', () => {
+    const scoped = config(entry({ scope: 'e2e-browser' }));
+    expect(validate(scoped, TODAY).problems).toEqual([]);
+    expect(go({ config: scoped, scope: 'e2e-browser' }).ok).toBe(true);
+    expect(go({ config: scoped, scope: 'checks' }).ok).toBe(false);
+    expect(go({ config: scoped, scope: 'node-os' }).ok).toBe(false);
   });
 
   it('fails once the entry expired, even when the test passed', () => {
@@ -367,6 +377,9 @@ describe('ci.yml wiring', () => {
       /node tools\/ci\/quarantine\.mjs evaluate --scope checks [^\n]*--turbo-runs/,
     );
     expect(ci).toMatch(/node tools\/ci\/quarantine\.mjs evaluate --scope node-os [^\n]*--report/);
+    expect(ci).toMatch(
+      /node tools\/ci\/quarantine\.mjs evaluate --scope e2e-browser [^\n]*--turbo-runs/,
+    );
     expect(ci).toMatch(/turbo run test --continue --summarize/);
     expect(ci).toContain('tools/ci/vitest-run-reporter.mjs');
     expect(ci).toMatch(/--run-record "\$run_record"/);

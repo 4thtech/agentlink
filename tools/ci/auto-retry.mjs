@@ -16,6 +16,8 @@ import { pathToFileURL } from 'node:url';
 export const FLAKY_JOBS = {
   CI: {
     checks: { steps: ['Unit tests', 'MCP tool surface and conformance'] },
+    // CI-E2E-BROWSER: the Playwright suites' own job (moved out of `checks` -> Unit tests).
+    'e2e-browser': { steps: ['Install Playwright browsers', 'Browser tests'] },
     vectors: {
       steps: [
         'Install Playwright browsers',
@@ -42,6 +44,21 @@ export const FLAKY_JOBS = {
 const GATES = new Set(['ci-gate', 'ci-gate (push)', 'security-gate']);
 const FAILED = new Set(['failure', 'timed_out', 'cancelled']);
 const EVENTS = new Set(['pull_request', 'push']);
+
+// CI-E2E-BROWSER (CI reliability plan item 7): a macOS leg cancelled before any step ran never got
+// a runner (the Free plan's small macOS pool). Rerunning at once usually meets the same empty pool,
+// so such a rerun waits this long first. Still one rerun only.
+export const MACOS_RETRY_DELAY_SECONDS = 300;
+
+// A matrix leg "<job> (macos-...)" that was cancelled with no completed step (`ranSteps` from the
+// workflow's job listing; a missing count is not treated as "no runner").
+export function noRunner(job) {
+  return (
+    /\(macos[^()]*\)$/.test(String(job?.name)) &&
+    job?.conclusion === 'cancelled' &&
+    job?.ranSteps === 0
+  );
+}
 
 // The allowlist entry for an exact job name, or for "<name> (<leg>)" of a matrix job; else null.
 export function flakyEntry(workflow, name) {
@@ -72,7 +89,7 @@ export function parseRunId(value) {
 }
 
 export function decide({ workflow, event, conclusion, attempt, repo, headRepo, headBranch, jobs }) {
-  const no = (reason) => ({ rerun: false, reason, jobs: [] });
+  const no = (reason) => ({ rerun: false, reason, jobs: [], delaySeconds: 0 });
   if (!Object.hasOwn(FLAKY_JOBS, workflow)) return no('not a workflow this retries');
   if (attempt !== '1') return no('not the first attempt');
   if (conclusion !== 'failure') return no(`run ended ${conclusion || 'unknown'}, not failure`);
@@ -90,12 +107,17 @@ export function decide({ workflow, event, conclusion, attempt, repo, headRepo, h
       rerun: false,
       reason: 'a failed job or step is not on the flaky list',
       jobs: deterministic,
+      delaySeconds: 0,
     };
   }
+  const delayed = failed.some(noRunner);
   return {
     rerun: true,
-    reason: 'first attempt failed only in flaky-prone jobs or steps',
+    reason: delayed
+      ? 'first attempt failed only in flaky-prone jobs or steps; a macOS leg got no runner, so the rerun waits'
+      : 'first attempt failed only in flaky-prone jobs or steps',
     jobs: failed.map((j) => String(j.name)),
+    delaySeconds: delayed ? MACOS_RETRY_DELAY_SECONDS : 0,
   };
 }
 
@@ -133,7 +155,12 @@ function main() {
   const line = summaryLine(decision, env.WORKFLOW_NAME, runId);
   console.log(line);
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, `${line}\n`);
-  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `rerun=${decision.rerun}\n`);
+  if (env.GITHUB_OUTPUT) {
+    appendFileSync(
+      env.GITHUB_OUTPUT,
+      `rerun=${decision.rerun}\ndelay_seconds=${decision.delaySeconds}\n`,
+    );
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

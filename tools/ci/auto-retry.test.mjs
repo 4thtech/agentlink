@@ -6,7 +6,15 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { FLAKY_JOBS, decide, flakyEntry, parseRunId, summaryLine } from './auto-retry.mjs';
+import {
+  FLAKY_JOBS,
+  MACOS_RETRY_DELAY_SECONDS,
+  decide,
+  flakyEntry,
+  noRunner,
+  parseRunId,
+  summaryLine,
+} from './auto-retry.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const wf = readFileSync(join(root, '.github/workflows/ci-auto-retry.yml'), 'utf8');
@@ -171,6 +179,7 @@ describe('decide', () => {
       [
         'bundle-check',
         'checks',
+        'e2e-browser',
         'e2e-deterministic / e2e-deterministic',
         'keychain',
         'node-os',
@@ -181,6 +190,11 @@ describe('decide', () => {
       ].sort(),
     );
     expect(FLAKY_JOBS.CI.checks.steps).toEqual(['Unit tests', 'MCP tool surface and conformance']);
+    // CI-E2E-BROWSER: only the browser download and the browser tests; never its build step.
+    expect(FLAKY_JOBS.CI['e2e-browser'].steps).toEqual([
+      'Install Playwright browsers',
+      'Browser tests',
+    ]);
     for (const j of ['pr-hygiene', 'review-gate', 'changesets', 'context-budget', 'detect', 'e2e'])
       expect(flakyEntry('CI', j)).toBeNull();
   });
@@ -189,6 +203,65 @@ describe('decide', () => {
     for (const [job, entry] of Object.entries(FLAKY_JOBS.CI))
       for (const step of entry.steps ?? [])
         expect(ci, `${job}: ${step}`).toContain(`- name: ${step}\n`);
+  });
+});
+
+// CI-E2E-BROWSER: the browser suites' own job is retried like `checks`, by failed step.
+describe('e2e-browser', () => {
+  const job = (failedSteps, conclusion = 'failure') => ({
+    ...base,
+    jobs: [
+      { name: 'e2e-browser', conclusion, failedSteps },
+      { name: 'ci-gate', conclusion: 'failure' },
+    ],
+  });
+
+  it('reruns a failure in the browser tests or the browser download', () => {
+    expect(decide(job(['Browser tests'])).rerun).toBe(true);
+    expect(decide(job(['Install Playwright browsers'])).rerun).toBe(true);
+  });
+
+  it('does not rerun a failed build or quarantine check, or a job with no failed step', () => {
+    expect(decide(job(['Build'])).rerun).toBe(false);
+    expect(decide(job(['Check the test quarantine'])).rerun).toBe(false);
+    expect(decide(job(['Browser tests', 'Build'])).rerun).toBe(false);
+    expect(decide(job([], 'cancelled')).rerun).toBe(false);
+  });
+});
+
+// CI-E2E-BROWSER (CI reliability plan item 7): a macOS leg that never got a runner is rerun once,
+// after a wait, instead of at once into the same empty pool.
+describe('macOS leg with no runner: one delayed rerun', () => {
+  const run = (jobs) => decide({ ...base, event: 'push', headBranch: 'main', jobs });
+  const noRunnerLeg = { name: 'node-os (macos-26)', conclusion: 'cancelled', ranSteps: 0 };
+
+  it('detects a cancelled macOS leg with no completed step', () => {
+    expect(noRunner(noRunnerLeg)).toBe(true);
+    expect(noRunner({ ...noRunnerLeg, ranSteps: 3 })).toBe(false);
+    expect(noRunner({ ...noRunnerLeg, ranSteps: undefined })).toBe(false);
+    expect(noRunner({ ...noRunnerLeg, conclusion: 'failure' })).toBe(false);
+    expect(noRunner({ ...noRunnerLeg, name: 'node-os (windows-2025-vs2026)' })).toBe(false);
+    expect(noRunner({ ...noRunnerLeg, name: 'checks' })).toBe(false);
+  });
+
+  it('reruns it once, with the delay', () => {
+    const d = run([noRunnerLeg, { name: 'ci-gate (push)', conclusion: 'failure' }]);
+    expect(d.rerun).toBe(true);
+    expect(d.delaySeconds).toBe(MACOS_RETRY_DELAY_SECONDS);
+    expect(MACOS_RETRY_DELAY_SECONDS).toBe(300);
+  });
+
+  it('no delay for an ordinary flaky failure, and never a rerun on attempt 2', () => {
+    expect(decide(base).delaySeconds).toBe(0);
+    expect(
+      decide({ ...base, event: 'push', headBranch: 'main', attempt: '2', jobs: [noRunnerLeg] }),
+    ).toMatchObject({ rerun: false, delaySeconds: 0 });
+  });
+
+  it('a deterministic failure next to it still blocks the rerun', () => {
+    const d = run([noRunnerLeg, { name: 'checks', conclusion: 'failure', failedSteps: ['Lint'] }]);
+    expect(d.rerun).toBe(false);
+    expect(d.delaySeconds).toBe(0);
   });
 });
 
@@ -275,6 +348,19 @@ describe('ci-auto-retry.yml', () => {
   it('pins every action to a full commit SHA and has a timeout', () => {
     for (const u of wf.match(/uses: \S+/g) ?? []) expect(u).toMatch(/@[0-9a-f]{40}$/);
     expect(wf).toMatch(/timeout-minutes: \d+/);
+  });
+
+  it('lists the completed steps per job and waits, bounded, before a no-runner macOS rerun', () => {
+    expect(wf).toContain(
+      'ranSteps: ([(.steps // [])[] | select(.status == "completed" and .conclusion != "skipped")] | length)',
+    );
+    expect(wf).toContain(
+      "if: steps.decide.outputs.rerun == 'true' && steps.decide.outputs.delay_seconds != '0'",
+    );
+    expect(wf).toContain('DELAY_SECONDS: ${{ steps.decide.outputs.delay_seconds }}');
+    expect(wf).toContain('[ "$DELAY_SECONDS" -gt 600 ]');
+    const timeout = Number(/timeout-minutes: (\d+)/.exec(wf)?.[1]);
+    expect(timeout * 60).toBeGreaterThan(MACOS_RETRY_DELAY_SECONDS + 120);
   });
 
   it('reruns only the failed jobs, once, and writes a job summary', () => {

@@ -99,7 +99,8 @@ describe('install-playwright time budget (CHORE-CI-PLAYWRIGHT-3)', () => {
     const limits = [
       ...ci.matchAll(/timeout-minutes: (\d+)\n\s+uses: \.\/\.github\/actions\/install-playwright/g),
     ];
-    expect(limits.length).toBe(2);
+    // checks, vectors and e2e-browser (CI-E2E-BROWSER)
+    expect(limits.length).toBe(3);
     // at least 3 minutes for what the action cannot bound itself (cache restores, saves, kill grace)
     for (const l of limits) expect(budget + 180).toBeLessThanOrEqual(Number(l[1]) * 60);
   });
@@ -307,7 +308,11 @@ describe('ci.yml callers', () => {
         /uses: \.\/\.github\/actions\/install-playwright\n(\s+with:\n\s+browsers: [a-z ]+)?/g,
       ),
     ];
-    expect(uses.length).toBe(2);
-    for (const m of uses) expect(m[1]).toMatch(/browsers: chromium firefox webkit/);
+    // checks and vectors: all three; e2e-browser (CI-E2E-BROWSER): Chromium, all its suites use.
+    expect(uses.map((m) => m[1]?.trim().split(/\s+/).slice(2).join(' '))).toEqual([
+      'chromium firefox webkit',
+      'chromium',
+      'chromium firefox webkit',
+    ]);
   });
 });
