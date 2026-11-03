@@ -12,6 +12,7 @@ import {
   lstat,
   mkdir,
   readFile,
+  readdir,
   realpath,
   rm,
   stat,
@@ -24,6 +25,7 @@ import { join } from 'node:path';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { AgentFolderLockError, holdAgentFolderShared } from '@4thtech-io/node';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createAiAppsDesk } from '../harness/app-desk.js';
 import {
   agentDirectory,
   readRevokedEntry,
@@ -244,5 +246,145 @@ describe('the removal port (U3-e, 06 §6 "Open agents and removal")', () => {
     await port.recordRevoked(agentId, 'text');
     expect(await port.readRevoked(agentId)).toEqual({ kind: 'entry', text: 'text' });
     expect((await lstat(revokedPath(agentId))).isFile()).toBe(true);
+  });
+});
+
+// W8-S3 (F16; 04 §2.5 step 5, "Writing AI app configs"; 06 §7): the AI app entries that run the
+// agent being removed. Real files in a temp home, the real harness desk: only an entry that is
+// exactly AgentLink's for this folder, at the fixed per-harness path, is removed; nothing else in
+// any file changes; Claude Desktop is never written while it runs.
+describe('W8-S3: AI app entries in a removal (04 §2.5 step 5)', () => {
+  const stdio = (agent?: string) => ({
+    command: 'npx',
+    args: [
+      '-y',
+      '@4thtech-io/agentlink',
+      'mcp',
+      ...(agent === undefined ? [] : ['--agent', agent]),
+    ],
+  });
+  const other = { command: 'other', env: { API_KEY: 'other-server-private-value' } };
+  const ANTIGRAVITY = ['.gemini', 'config', 'mcp_config.json'];
+  const CURSOR = ['.cursor', 'mcp.json'];
+  const CLAUDE_CODE = ['.claude.json'];
+  const DESKTOP = ['Library', 'Application Support', 'Claude', 'claude_desktop_config.json'];
+
+  async function config(parts: readonly string[], servers: Record<string, unknown>) {
+    const path = join(home, ...parts);
+    await mkdir(join(path, '..'), { recursive: true, mode: 0o700 });
+    await writeFile(path, `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`, { mode: 0o600 });
+    return path;
+  }
+
+  let desktopRuns = false;
+  const portFor = () =>
+    uiRemovalPort({
+      home,
+      aiApps: () =>
+        createAiAppsDesk({
+          home,
+          env: {},
+          platform: 'darwin',
+          now: () => 1_800_000_000,
+          desktopRunning: () => Promise.resolve(desktopRuns),
+        }),
+    });
+
+  /** The observed state: ag-test's folder (config.json) and Antigravity running `--agent ag-test`. */
+  async function observed() {
+    desktopRuns = false;
+    const agentId = newId();
+    await writeAgentConfig(home, { v: 1, name: 'ag-test', agentId, keyStore: 'keychain' });
+    await writeAgentConfig(home, {
+      v: 1,
+      name: 'personal',
+      agentId: newId(),
+      keyStore: 'keychain',
+    });
+    const antigravity = await config(ANTIGRAVITY, { other, agentlink: stdio('ag-test') });
+    const cursor = await config(CURSOR, {
+      agentlink: { type: 'stdio', ...stdio('personal') },
+    });
+    // Not exactly ours: same key, another program. Never touched, never listed.
+    const claudeCode = await config(CLAUDE_CODE, {
+      agentlink: { type: 'stdio', command: 'evil', args: ['--agent', 'ag-test'], env: {} },
+    });
+    return { agentId, antigravity, cursor, claudeCode };
+  }
+
+  it('lists only the apps whose entry is exactly ours for this folder', async () => {
+    await observed();
+    const port = portFor();
+    expect(await port.appEntries('ag-test')).toEqual([{ app: 'antigravity', name: 'Antigravity' }]);
+    expect(await port.appEntries('personal')).toEqual([{ app: 'cursor', name: 'Cursor' }]);
+    expect(await port.appEntries('nobody')).toEqual([]);
+    await expect(port.appEntries('../etc')).rejects.toThrow();
+  });
+
+  it('removes exactly that entry; every other member and every other file stays as it was', async () => {
+    const { agentId, antigravity, cursor, claudeCode } = await observed();
+    const cursorBefore = await readFile(cursor, 'utf8');
+    const claudeBefore = await readFile(claudeCode, 'utf8');
+    const port = portFor();
+    const shown = await port.appEntries('ag-test');
+    await port.removeAppEntries('ag-test', agentId, shown);
+    const after = JSON.parse(await readFile(antigravity, 'utf8')) as {
+      mcpServers: Record<string, unknown>;
+    };
+    expect(after.mcpServers).toEqual({ other });
+    expect(await readFile(cursor, 'utf8')).toBe(cursorBefore);
+    expect(await readFile(claudeCode, 'utf8')).toBe(claudeBefore);
+    // A backup of the original is kept next to it.
+    const names = await readdir(join(home, '.gemini', 'config'));
+    expect(names.some((n) => n.startsWith('mcp_config.json.agentlink-backup-'))).toBe(true);
+    // Try again: nothing left to remove, nothing written.
+    expect(await port.appEntries('ag-test')).toEqual([]);
+    await port.removeAppEntries('ag-test', agentId, []);
+    expect((await readdir(join(home, '.gemini', 'config'))).length).toBe(names.length);
+  });
+
+  it('refuses when the folder records another agent ID, and writes nothing', async () => {
+    const { antigravity } = await observed();
+    const before = await readFile(antigravity, 'utf8');
+    const port = portFor();
+    const shown = await port.appEntries('ag-test');
+    await expect(port.removeAppEntries('ag-test', newId(), shown)).rejects.toThrow();
+    expect(await readFile(antigravity, 'utf8')).toBe(before);
+  });
+
+  it('Claude Desktop running: refuses before writing anything; once it quits the entry goes', async () => {
+    const { agentId } = await observed();
+    const desktop = await config(DESKTOP, { other, agentlink: stdio('ag-test') });
+    const before = await readFile(desktop, 'utf8');
+    const port = portFor();
+    const shown = await port.appEntries('ag-test');
+    expect(shown.map((a) => a.app).sort()).toEqual(['antigravity', 'claude-desktop']);
+    desktopRuns = true;
+    await expect(port.removeAppEntries('ag-test', agentId, shown)).rejects.toThrow();
+    expect(await readFile(desktop, 'utf8')).toBe(before);
+    desktopRuns = false;
+    await port.removeAppEntries('ag-test', agentId, await port.appEntries('ag-test'));
+    const after = JSON.parse(await readFile(desktop, 'utf8')) as {
+      mcpServers: Record<string, unknown>;
+    };
+    expect(after.mcpServers).toEqual({ other });
+  });
+
+  it('an entry that was not shown before the gesture is never written: refused, so Try again shows it', async () => {
+    const { agentId, antigravity } = await observed();
+    const before = await readFile(antigravity, 'utf8');
+    const port = portFor();
+    await expect(port.removeAppEntries('ag-test', agentId, [])).rejects.toThrow();
+    expect(await readFile(antigravity, 'utf8')).toBe(before);
+  });
+
+  it('an entry that moved to another ID after the statement is left alone', async () => {
+    const { agentId, antigravity } = await observed();
+    const port = portFor();
+    const shown = await port.appEntries('ag-test');
+    await config(ANTIGRAVITY, { other, agentlink: stdio('personal') });
+    const moved = await readFile(antigravity, 'utf8');
+    await port.removeAppEntries('ag-test', agentId, shown);
+    expect(await readFile(antigravity, 'utf8')).toBe(moved);
   });
 });

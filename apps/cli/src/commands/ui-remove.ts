@@ -11,18 +11,26 @@
 //   (it holds no shared lock itself, which the exclusive hold would refuse); anything else refuses.
 // - `readRevoked` / `recordRevoked`: the owner's revoked list, `~/.agentlink/revoked/<agentId>.json`,
 //   the exact signed `agent.revoke` (agent-dir.ts), never replaced once written.
+// - W8-S3 (04 §2.5 step 5): `appEntries` / `removeAppEntries`, the AI app entries that run the agent,
+//   through the same harness desk as `app.disconnect` (harness/app-desk.ts: the fixed per-harness
+//   paths, entry-only parse, realpath and no links, identity pinned, atomic write with a backup,
+//   never while Claude Desktop runs, the folder's agentId checked). Only an entry that is exactly
+//   AgentLink's for this folder is touched; no `app.disconnect` is signed (the statement covers it).
 //
 // I-4: nothing here takes presence, holds an owner key or adds an MCP tool. I-7: failures are fixed
 // codes; no name, path or ID is logged.
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import process from 'node:process';
 import type { AgentLinkClient } from '@4thtech-io/core';
 import { decodeHex0x } from '@4thtech-io/crypto';
 import {
   withAgentFolderExclusive,
   type AgentRemovalPort,
+  type LocalUiAiApps,
   type RemovalAgent,
 } from '@4thtech-io/node';
+import { createAiAppsDesk } from '../harness/app-desk.js';
 import {
   checkAgentLockJournal,
   readAgentConfig,
@@ -43,7 +51,16 @@ export interface UiRemovalOptions extends OwnerCheck {
   readonly runtime?: RuntimeDeps;
   /** Test seam: the keystore folder of file-KeyStore agents. Default `<home>/.agentlink/keystore`. */
   readonly keystoreDir?: string;
+  /**
+   * Test seam: the harness desk step 5 goes through. Default createAiAppsDesk over `home`; with an
+   * explicit `home` (a test home) it never follows this process's environment (XDG_CONFIG_HOME,
+   * APPDATA, CLAUDE_CONFIG_DIR) to the real AI app files.
+   */
+  readonly aiApps?: () => LocalUiAiApps;
 }
+
+/** Step 5 could not remove an entry: fixed text only (I-7; the gate names the step, nothing more). */
+const appsFailed = (): Error => new Error('An AI app entry was not removed.');
 
 /** The owner context of the agent's own card (as the owner commands read it). */
 async function contextOf(client: AgentLinkClient) {
@@ -67,6 +84,25 @@ export function uiRemovalPort(options: UiRemovalOptions = {}): AgentRemovalPort 
   const keystoreDir = options.keystoreDir ?? join(home, '.agentlink', 'keystore');
   /** The agents this port holds exclusive right now: `open` works only for these. */
   const held = new Set<string>();
+  const aiApps =
+    options.aiApps ??
+    (() =>
+      createAiAppsDesk({
+        home,
+        env: options.home === undefined ? process.env : {},
+        ...(options.uid === undefined ? {} : { uid: options.uid }),
+      }));
+
+  /** The apps whose entry is exactly AgentLink's for this folder (entry-only, desk.list). */
+  const ownEntries = async (name: string) => {
+    if (!isAgentName(name)) throw new RuntimeError('agent_name_invalid');
+    const { apps } = await aiApps().list();
+    return Object.freeze(
+      apps
+        .filter((view) => view.state.kind === 'agent' && view.state.agent === name)
+        .map((view) => Object.freeze({ app: view.app, name: view.name })),
+    );
+  };
 
   const configOf = async (name: string) => {
     if (!isAgentName(name)) throw new RuntimeError('agent_name_invalid');
@@ -129,5 +165,26 @@ export function uiRemovalPort(options: UiRemovalOptions = {}): AgentRemovalPort 
     readRevoked: (agentId: string) => readRevokedEntry(home, agentId, check),
     recordRevoked: (agentId: string, text: string) =>
       recordRevokedEntry(home, agentId, text, check),
+
+    appEntries: ownEntries,
+
+    removeAppEntries: async (name, agentId, shown) => {
+      // The change written is the change shown: an entry for this folder the statement did not
+      // list refuses the step (Try again shows it), before anything is written.
+      const listed = new Set(shown.map((entry) => entry.app));
+      if ((await ownEntries(name)).some((entry) => !listed.has(entry.app))) throw appsFailed();
+      const desk = aiApps();
+      for (const { app } of shown) {
+        const plan = await desk.plan(app, name);
+        // Gone (the app or the file), or no longer exactly ours: nothing of ours to remove.
+        if (plan.status === 'not_found' || plan.status === 'conflict') continue;
+        // Claude Desktop runs, or the file cannot be read: the keys stay, Try again.
+        if (plan.status !== 'change') throw appsFailed();
+        // Only the entry that runs this folder; one that runs another agent is left alone.
+        if (plan.kind !== 'disconnect' || plan.oldAgent !== name) continue;
+        // The desk checks Claude Desktop again and that the folder records `agentId`.
+        if ((await plan.commit(agentId)) !== 'written') throw appsFailed();
+      }
+    },
   });
 }
