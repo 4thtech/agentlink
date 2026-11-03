@@ -122,6 +122,7 @@ describe('startUiWelcome (U3-g-b)', () => {
         startServer: (options) => {
           started.push(options);
           return Promise.resolve({
+            activity: { lastAt: () => Date.now(), openStreams: () => 0 },
             openFirstRun: () => {
               log.push('openFirstRun');
               return Promise.resolve(true);
@@ -194,6 +195,7 @@ describe('startUiWelcome (U3-g-b)', () => {
       startServer: (options) => {
         w.started.push(options);
         return Promise.resolve({
+          activity: { lastAt: () => Date.now(), openStreams: () => 0 },
           openFirstRun: () => {
             log.push('openFirstRun');
             return Promise.resolve(true);

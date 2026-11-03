@@ -82,6 +82,7 @@ function fakeServer(origin = 'http://localhost:47321'): FakeServer {
     openFirstRun: () => Promise.resolve(true),
     openHome: () => Promise.resolve(true),
     openJoin: () => Promise.resolve(true),
+    activity: { lastAt: () => Date.now(), openStreams: () => 0 },
     notifyNewApproval: (id) => {
       notified.push(id);
       return Promise.resolve(`${origin}/approve/${id}`);
