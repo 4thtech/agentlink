@@ -180,13 +180,15 @@ export function appTiles(
 }
 
 /**
- * The app picked by default: the first found one no ID uses yet; else (W8-S5) the first found one
+ * The app picked by default: the first found one no ID uses yet and that is not open now (it would
+ * need quitting); else the first free one that is open; else (W8-S5) the first found one
  * whose ID was removed; else the first one free to pick. Never one another ID uses.
  */
 export function defaultChoice(tiles: readonly AppTile[]): string {
   const free = (t: AppTile): boolean => !t.connected && !t.byHand && t.uses === undefined;
   return (
     (
+      tiles.find((t) => t.found && free(t) && !t.open) ??
       tiles.find((t) => t.found && free(t)) ??
       tiles.find((t) => t.found && t.uses?.kind === 'removed') ??
       tiles.find(free)

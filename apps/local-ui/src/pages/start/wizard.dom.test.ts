@@ -960,6 +960,13 @@ describe('W8-S5 (F7): New ID offers an AI app that another or a removed ID uses'
     ).toBe('claude-desktop');
   });
 
+  it('the default pick skips a free app that is open now while a free one is not', () => {
+    const open = app('claude-desktop', 'Claude Desktop', { quitFirst: true });
+    const closed = app('codex', 'Codex');
+    expect(defaultChoice(appTiles([open, closed], undefined, IDS))).toBe('codex');
+    expect(defaultChoice(appTiles([open], undefined, IDS))).toBe('claude-desktop');
+  });
+
   it("the tiles say it, the by-hand one is off, and picking a used app shows begin's replacement line", async () => {
     history.replaceState(null, '', '/start/app?add=agent');
     const create = fakeCreate({
