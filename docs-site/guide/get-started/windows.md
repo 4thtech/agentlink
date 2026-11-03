@@ -31,7 +31,7 @@ If your home folder already has a folder named `agentlink` in another letter cas
 
 - **SmartScreen.** Windows may say "Windows protected your PC" when you open a downloaded file. That is not specific to AgentLink: it appears for any file that few people have downloaded yet. Check the file against `SHA256SUMS` on the release page (`certutil -hashfile <file> SHA256`), then choose **More info** and **Run anyway** only if the fingerprint matches.
 - **The `.mcpb` download is not signed with a certificate Windows knows.** 4thTech signs it with its own beta certificate, so Windows and Claude Desktop can warn. The one-click download for Claude Desktop is optional; the command line works without it. See [Claude Desktop](claude-desktop.md).
-- **Windows Hello.** Use it as your passkey when the setup page asks. See [Protect your approvals](protect-your-approvals.md).
+- **Windows Hello.** Use it as your passkey when the setup page asks. On some Windows computers setup asks for one more touch right away; that lets your approvals use the passkey instead of the backup code. See [Protect your approvals](protect-your-approvals.md).
 
 ## If something does not work
 
