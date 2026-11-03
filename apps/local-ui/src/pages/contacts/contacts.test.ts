@@ -176,7 +176,7 @@ const posts = (calls: Call[]): Call[] => calls.filter((c) => c.method === 'POST'
 
 async function confirmWithCode(code = 'ABCD-EFGH'): Promise<void> {
   await type('input[name="owner-code"]', code);
-  await click(S.confirm);
+  await click(S.confirmWithCode);
 }
 
 describe('ContactsPage: the list', () => {

@@ -53,6 +53,7 @@ import {
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
 import type { RelayConnector, RelaySocket, RelaySocketHandlers } from '@4thtech-io/transport-nostr';
+import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from '../agent-store.js';
 import {
@@ -72,6 +73,7 @@ import {
   OWNER_PASSKEY_ACCOUNT,
   newOwnerSeed,
 } from '../owner-keystore.js';
+import { OWNER_PASSKEY_KEY_ACCOUNT } from '../owner-passkey.js';
 import {
   SETUP_HOLD_MS,
   defaultOwnerFiles,
@@ -1780,4 +1782,191 @@ describe('U3-d: first run with a name (one gesture, the first agent.label)', () 
     }
     expect(await readFile(join(home(), '.codex', 'config.toml'), 'utf8')).toBe('');
   }, 60_000);
+});
+
+// M1-11s-c-c (F48; 04 §2.3.1, §2.5; 08 §1): some authenticators (Windows Hello, some iCloud Keychain
+// paths) answer create() with `prf.enabled` only and give the PRF output on a following get(). The
+// page then asks for that second gesture at once, with the begin's challenge, and sends the get()
+// assertion after the creation fields: credential ID, authenticator data, clientDataJSON and the
+// signature. finish checks it (same credential, `webauthn.get` for this begin, this origin, rpIdHash,
+// UP, UV, and the signature with the key from the creation response) before the PRF output is used;
+// the owner-passkey item is then stored as with a create() PRF output.
+describe('PRF only on get(): the second gesture of the same setup (M1-11s-c-c, F48)', () => {
+  /** The finish body with the get() assertion, encoded here (independent of the server encoder). */
+  const lengthPrefixed = (fields: readonly Uint8Array[]): Uint8Array =>
+    concatBytes(...fields.flatMap((f) => [new Uint8Array([f.length >> 8, f.length & 0xff]), f]));
+
+  interface Tamper {
+    getId?: Uint8Array;
+    rpId?: string;
+    up?: boolean;
+    uv?: boolean;
+    type?: string;
+    challenge?: string;
+    origin?: string;
+    badSignature?: boolean;
+    prf?: Uint8Array;
+    /** A creation key this build cannot verify (an RS256 key, say). */
+    unverifiableKey?: boolean;
+  }
+
+  /** A platform authenticator with a real ES256 key whose PRF answers only on get(). */
+  class PrfOnGetAuthenticator {
+    readonly credentialId = randomBytes(16);
+    readonly #prfSecret = randomBytes(32);
+    readonly #key = newWebauthnTestCredential();
+    prf(salt: Uint8Array): Uint8Array {
+      return hkdfSha256(this.#prfSecret, salt, encodeUtf8('virtual-authenticator-prf'), 32);
+    }
+    finishBody(begun: BeginBody['publicKey'], origin: string, tamper: Tamper = {}): Uint8Array {
+      const id = this.credentialId;
+      const createAuth = concatBytes(
+        sha256(encodeUtf8('localhost')),
+        new Uint8Array([0x01 | 0x04 | 0x40]),
+        new Uint8Array([0, 0, 0, 0]),
+        new Uint8Array(16),
+        new Uint8Array([id.length >> 8, id.length & 0xff]),
+        id,
+        tamper.unverifiableKey === true
+          ? new Uint8Array([0xa3, 0x01, 0x03, 0x03, 0x39, 0x01, 0x00]) // kty RSA, alg RS256
+          : this.#key.coseKey,
+      );
+      const createClient = encodeUtf8(
+        JSON.stringify({
+          type: 'webauthn.create',
+          challenge: begun.challenge,
+          origin,
+          crossOrigin: false,
+        }),
+      );
+      let flags = 0;
+      if (tamper.up ?? true) flags |= 0x01;
+      if (tamper.uv ?? true) flags |= 0x04;
+      const getAuth = concatBytes(
+        sha256(encodeUtf8(tamper.rpId ?? 'localhost')),
+        new Uint8Array([flags]),
+        new Uint8Array([0, 0, 0, 0]),
+      );
+      const getClient = encodeUtf8(
+        JSON.stringify({
+          type: tamper.type ?? 'webauthn.get',
+          challenge: tamper.challenge ?? begun.challenge,
+          origin: tamper.origin ?? origin,
+          crossOrigin: false,
+        }),
+      );
+      const signature = this.#key.sign(getAuth, getClient);
+      if (tamper.badSignature === true) {
+        signature[signature.length - 1] = (signature[signature.length - 1] as number) ^ 0x01;
+      }
+      return lengthPrefixed([
+        id,
+        createAuth,
+        createClient,
+        tamper.prf ?? this.prf(decodeBase64url(begun.prfSalt)),
+        tamper.getId ?? id,
+        getAuth,
+        getClient,
+        signature,
+      ]);
+    }
+  }
+
+  it('finishes with the get() PRF output: the owner-passkey item unlocks the owner, the key is kept', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const authenticator = new PrfOnGetAuthenticator();
+    const res = await post(h, FINISH, s, authenticator.finishBody(begun.publicKey, h.origin));
+    expect(res.status).toBe(200);
+    const done = JSON.parse(res.body) as { status: string; passkey: boolean; ownerCode: string };
+    expect(done.status).toBe('done');
+    expect(done.passkey).toBe(true);
+    expect(agent.keychain.items.has(OWNER_PASSKEY_ACCOUNT)).toBe(true);
+    expect(agent.keychain.items.has(OWNER_PASSKEY_KEY_ACCOUNT)).toBe(true);
+    const owner = await ownerOf(begun, agent);
+    if (owner === undefined) throw new Error('no owner');
+    const store = await KeychainOwnerKeyStore.open(agent.keychain, owner);
+    const byPasskey = await store.unlock(
+      { kind: 'passkey-prf', prfOutput: authenticator.prf(ownerPrfSalt()) },
+      { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
+    );
+    await byPasskey.close();
+    await store.close();
+    expect(allZero(h.seeds[0] as Uint8Array)).toBe(true);
+    expect(setupEvents(h)).toEqual(['ready', 'done']);
+  }, 60_000);
+
+  it('a creation key this build cannot verify: no passkey, the owner code only, nothing of the PRF kept', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const res = await post(
+      h,
+      FINISH,
+      s,
+      new PrfOnGetAuthenticator().finishBody(begun.publicKey, h.origin, { unverifiableKey: true }),
+    );
+    expect(res.status).toBe(200);
+    expect((JSON.parse(res.body) as { passkey: boolean }).passkey).toBe(false);
+    expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(true);
+    expect(agent.keychain.items.has(OWNER_PASSKEY_ACCOUNT)).toBe(false);
+    expect(agent.keychain.items.has(OWNER_PASSKEY_KEY_ACCOUNT)).toBe(false);
+  }, 60_000);
+
+  it('refuses a body of seven fields (an assertion without its signature)', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const full = new PrfOnGetAuthenticator().finishBody(begun.publicKey, h.origin);
+    // Drop the last field (the signature) and its length: seven fields.
+    let at = 0;
+    const ends: number[] = [];
+    while (at < full.length) {
+      at += 2 + (((full[at] as number) << 8) | (full[at + 1] as number));
+      ends.push(at);
+    }
+    const seven = full.slice(0, ends[6]);
+    const res = await post(h, FINISH, s, seven);
+    expect(res.status).toBe(403);
+    expect([...agent.keychain.items.keys()].filter((k) => k.startsWith('owner'))).toEqual([]);
+  }, 60_000);
+
+  const bad: [string, Tamper][] = [
+    ['a get() for another credential', { getId: randomBytes(16) }],
+    ['a get() for another RP ID', { rpId: 'evil.example' }],
+    ['a get() without user presence', { up: false }],
+    ['a get() without user verification', { uv: false }],
+    ['a second create, not a get', { type: 'webauthn.create' }],
+    ['a get() for another challenge', { challenge: encodeBase64url(randomBytes(32)) }],
+    ['a get() from another origin', { origin: 'http://localhost:1' }],
+    ['a get() whose signature does not verify', { badSignature: true }],
+    ['a get() without a PRF output', { prf: new Uint8Array(0) }],
+  ];
+  for (const [what, tamper] of bad) {
+    it(`refuses ${what}: 403, nothing stored, the hold kept`, async () => {
+      const agent = await initAgent();
+      const h = await harness(agent);
+      const s = await h.session();
+      const begun = await begin(h, s);
+      const authenticator = new PrfOnGetAuthenticator();
+      const res = await post(
+        h,
+        FINISH,
+        s,
+        authenticator.finishBody(begun.publicKey, h.origin, tamper),
+      );
+      expect(res.status).toBe(403);
+      expect([...agent.keychain.items.keys()].filter((k) => k.startsWith('owner'))).toEqual([]);
+      expect(await agent.client.identity.get()).toBeUndefined();
+      expect(allZero(h.seeds[0] as Uint8Array)).toBe(false);
+      // The right answer still finishes (the plan was kept).
+      const right = await post(h, FINISH, s, authenticator.finishBody(begun.publicKey, h.origin));
+      expect(right.status).toBe(200);
+      expect((JSON.parse(right.body) as { passkey: boolean }).passkey).toBe(true);
+    }, 60_000);
+  }
 });

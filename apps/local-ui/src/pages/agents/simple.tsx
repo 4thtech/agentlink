@@ -30,6 +30,8 @@ export interface CardActions {
   readonly onSwitch: (row: AgentRow) => void;
   readonly onRemove: (row: AgentRow) => void;
   readonly onAppsElsewhere: (row: AgentRow) => void;
+  /** F27: start the Invite flow for this ID. */
+  readonly onInvite: (row: AgentRow) => void;
   readonly onRenamed: (label: string, told: boolean) => void;
   readonly onCardUpdated: (told: boolean) => void;
   readonly onChanged: () => void;
@@ -152,6 +154,9 @@ export function AgentCard({
             onClick={() => (state === 'paused' ? a.onResume(row) : a.onPause(row))}
           >
             {state === 'paused' ? S.resume : S.pause}
+          </Button>
+          <Button variant="ghost" size="sm" icon="user-plus" onClick={() => a.onInvite(row)}>
+            {S.inviteSomeone}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setRenaming(true)}>
             {S.rename}

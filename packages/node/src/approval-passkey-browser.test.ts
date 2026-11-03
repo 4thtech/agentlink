@@ -329,7 +329,12 @@ describe('the localhost app with a PRF passkey (M1-8e, M1-31; Chromium)', () => 
     await page.goto(`${server.origin}/first-run`);
     await page.getByLabel('Backup code').fill(code);
     await page.getByRole('button', { name: USE_PASSKEY }).click();
-    await page.getByText("This passkey can't protect approvals here.", { exact: false }).waitFor();
+    // F49: in the browser the copy would suggest (Chrome on Linux) it says so plainly instead.
+    await page
+      .getByText(
+        /This passkey can't protect approvals here\.|can't protect approvals yet, so AgentLink uses your backup code/,
+      )
+      .waitFor();
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).toBeNull();
 
     source.add(1);

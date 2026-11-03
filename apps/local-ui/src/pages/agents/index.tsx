@@ -27,7 +27,8 @@ import {
 } from 'react';
 import { getLive, subscribeLive } from '../../api/live.js';
 import { lazyPart } from '../../lazy/index.js';
-import { agentNameOf, NEW_AGENT_PATH } from '../../nav.js';
+import { agentNameOf, INVITE_PATH, NEW_AGENT_PATH } from '../../nav.js';
+import { navigate } from '../../router.js';
 import type { AppsApi } from '../apps/api.js';
 import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import { IdExplainerCard } from '../start/id-explainer.js';
@@ -224,6 +225,17 @@ export function AgentsPage({
   const onPause = (row: AgentRow): void => firstOpen(row, 'pause');
   const onResume = (row: AgentRow): void => firstOpen(row, 'resume');
   const onAppsElsewhere = (row: AgentRow): void => firstOpen(row, 'apps');
+  /** F27: Invite someone for this ID: the open ID goes straight to the Invite screen; another opens first. */
+  const onInvite = (row: AgentRow): void => {
+    if (row.current) return navigate(INVITE_PATH);
+    setNotice(undefined);
+    void switchTo(row.name).then((outcome) => {
+      if (outcome.kind === 'done') return navigate(INVITE_PATH);
+      if (outcome.kind === 'agent_changed') setNotice(S.agentChanged);
+      pressedHere.current = false;
+      forgetIntent();
+    });
+  };
   const onRenamed = (label: string, told: boolean): void => {
     setNotice(told ? S.renamedTold(label) : undefined);
   };
@@ -404,6 +416,7 @@ export function AgentsPage({
               onSwitch: doSwitch,
               onRemove: (r) => setRemoveQueue([r]),
               onAppsElsewhere,
+              onInvite,
               onRenamed,
               onCardUpdated: (told) => {
                 setCardName(undefined);

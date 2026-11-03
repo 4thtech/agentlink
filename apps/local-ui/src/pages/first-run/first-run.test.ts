@@ -268,6 +268,29 @@ describe('first run: protect approvals (D-120 (1))', () => {
     expect(button(FIRST_RUN.savedIt)).toBeDefined();
   });
 
+  it('M1-11s-c-c: without a passkey, a prominent warning says the backup code is needed to approve', async () => {
+    await mount(fakeApi({ finish: done({ passkey: false }) }));
+    await click(GO.other);
+    const banner = host.querySelector('[data-testid="backup-needed"]');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain(FIRST_RUN.doneNoPasskeyTitle);
+    expect(FIRST_RUN.doneNoPasskeyTitle).toMatch(/Save your backup code/);
+    expect(FIRST_RUN.doneNoPasskeyTitle).toMatch(/you need it to approve/);
+    // It comes before the code itself.
+    const code = host.querySelector('.al-secret-val');
+    expect(
+      banner !== null &&
+        code !== null &&
+        (banner.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    ).toBe(true);
+  });
+
+  it('M1-11s-c-c: with a passkey, no such warning', async () => {
+    await mount(fakeApi({ finish: done({ passkey: true }) }));
+    await click(GO.other);
+    expect(host.querySelector('[data-testid="backup-needed"]')).toBeNull();
+  });
+
   it('owner already set up: Get started goes on for that owner (New agent) and never offers setup', async () => {
     const api = fakeApi({ status: { kind: 'ok', owner: 'set_up' } });
     await mount(api);
@@ -422,12 +445,57 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(text()).not.toMatch(/password\b(?! manager)/i);
   });
 
+  it('F49: Copy says Copied, falls back, and says so when it cannot; Show reveals; Save as file', async () => {
+    const writeText = vi.fn(() => Promise.reject(new Error('NotAllowedError')));
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const exec = vi.fn((cmd: string) => cmd === 'copy');
+    Object.defineProperty(document, 'execCommand', { value: exec, configurable: true });
+    await mount(fakeApi());
+    await click(GO.other);
+    // The once-shown code selects as one piece, and a copy of it is the code on one line.
+    const grid = host.querySelector<HTMLElement>('[data-backup-code]')!;
+    expect(grid.className).toContain('fr-code-select');
+    const field = host.querySelector<HTMLInputElement>('input[autocomplete="new-password"]')!;
+    expect(field.type).toBe('password');
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-reveal-code]')?.click());
+    expect(field.type).toBe('text');
+    await click(FIRST_RUN.copy);
+    await act(async () => {
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenCalledWith(CODE);
+    expect(exec).toHaveBeenCalledWith('copy');
+    expect(host.querySelector('[data-copy-status]')?.textContent).toContain(FIRST_RUN.copied);
+    Object.defineProperty(document, 'execCommand', { value: () => false, configurable: true });
+    await click(FIRST_RUN.copied);
+    await act(async () => {
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    });
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(FIRST_RUN.copyFailed);
+    Object.defineProperty(URL, 'createObjectURL', { value: () => 'blob:x', configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: () => undefined, configurable: true });
+    const anchorClick = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+    await click(FIRST_RUN.saveFile);
+    expect(anchorClick).toHaveBeenCalledTimes(1);
+    expect(text()).toContain(FIRST_RUN.fileSaved);
+    anchorClick.mockRestore();
+    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
+  });
+
   it('continues only after "I saved it": saving or copying never moves on', async () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     await mount(fakeApi());
     await click(GO.other);
-    expect(buttons()).toEqual([FIRST_RUN.saveToManager, FIRST_RUN.copy, FIRST_RUN.savedIt]);
+    expect(buttons()).toEqual([
+      'Show',
+      FIRST_RUN.saveToManager,
+      FIRST_RUN.copy,
+      FIRST_RUN.saveFile,
+      FIRST_RUN.savedIt,
+    ]);
     await act(async () => {
       host.querySelector('form')?.requestSubmit();
       await Promise.resolve();

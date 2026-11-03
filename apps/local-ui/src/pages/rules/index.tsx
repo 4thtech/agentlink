@@ -35,6 +35,7 @@ import {
 } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
+import { BackupCodeField } from '../first-run/backup-code.js';
 import {
   RULES_PATH,
   checkDraft,
@@ -699,14 +700,11 @@ function ConfirmStep({
           />
         ) : null}
         {confirm.passkey === null && !confirm.spending ? (
-          <TextField
+          <BackupCodeField
             label={S.codeLabel}
             hint={`${S.codeHint} ${EARLIER_OWNER_CODE_HINT}`}
-            type="password"
-            autoComplete="off"
-            mono
             value={code}
-            onChange={(e) => onCode(e.currentTarget.value)}
+            onValue={onCode}
           />
         ) : null}
         {confirm.error === undefined ? null : (

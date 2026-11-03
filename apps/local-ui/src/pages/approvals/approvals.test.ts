@@ -495,6 +495,119 @@ describe('one request: its own Approve or Deny, then presence', () => {
   });
 });
 
+describe('F29-F31: the ID, the words and one primary button', () => {
+  const primaries = (): number => host.querySelectorAll('.al-btn-primary').length;
+  const strict = (): void => {
+    expect(Object.values(S).join(' ')).not.toMatch(/passphrase/i);
+    expect(Object.values(S).join(' ')).not.toContain('0.3.0');
+  };
+
+  it('no approvals word mentions an owner passphrase or 0.3.0', () => {
+    strict();
+  });
+
+  it('the code step has one orange button: Confirm; Approve steps back to plain', async () => {
+    await mount({
+      [LIST]: [ok({ approvals: [item('D', { commitment: true })] })],
+    });
+    expect(primaries()).toBe(1);
+    await click(buttonNamed(S.approve, cardOf('D') as ParentNode));
+    expect(primaries()).toBe(1);
+    expect(buttonNamed(S.confirmApproval)?.classList.contains('al-btn-primary')).toBe(true);
+  });
+
+  it('with a passkey the passkey button is the one orange button, the code form is plain', async () => {
+    const srv = server({
+      [PASSKEY]: [
+        ok({
+          passkey: {
+            rpId: 'localhost',
+            registered: true,
+            credentialId: 'CQ',
+            prfSalt: 'BQY',
+            userId: 'AQ',
+          },
+        }),
+      ],
+      [LIST]: [ok({ approvals: [item('D', { commitment: true })] })],
+    });
+    act(() =>
+      root.render(
+        createElement<ApprovalsPageProps>(ApprovalsBoard, {
+          client: createApprovalsClient({ fetch: srv.fetch, token: 't' }),
+          canPasskey: true,
+        }),
+      ),
+    );
+    await flush();
+    await click(buttonNamed(S.approve, cardOf('D') as ParentNode));
+    expect(primaries()).toBe(1);
+    expect(buttonNamed(S.approveWithPasskey)?.classList.contains('al-btn-primary')).toBe(true);
+  });
+
+  it('F32: approving something Free says what Free means', async () => {
+    await mount({
+      [LIST]: [ok({ approvals: [item('D', { commitment: true })] })],
+      [`/api/approvals/${id('D')}/approve`]: [ok({ status: 'applied', decision: 'approve' })],
+    });
+    await click(buttonNamed(S.approve, cardOf('D') as ParentNode));
+    setValue(cardOf('D')?.querySelector('input[type="password"]') ?? null, 'owner-code');
+    await click(buttonNamed(S.confirmApproval));
+    expect(statuses()).toContain(S.freeExplained);
+    expect(S.freeExplained).toBe(
+      'Free means your messages travel over the network at no cost. Only proofs cost a small fee.',
+    );
+    expect(S.freeExplained).not.toMatch(/transaction|gas|wallet/i);
+  });
+
+  it('F32: a cost that is not Free adds no explanation', async () => {
+    await mount({
+      [LIST]: [
+        ok({
+          approvals: [
+            item('D', { commitment: true, details: { ...item('D').details, cost: '$0.10' } }),
+          ],
+        }),
+      ],
+      [`/api/approvals/${id('D')}/approve`]: [ok({ status: 'applied', decision: 'approve' })],
+    });
+    await click(buttonNamed(S.approve, cardOf('D') as ParentNode));
+    setValue(cardOf('D')?.querySelector('input[type="password"]') ?? null, 'owner-code');
+    await click(buttonNamed(S.confirmApproval));
+    expect(statuses()).not.toContain(S.freeExplained);
+  });
+
+  it('the approval page says which ID it is for (display name, as text)', async () => {
+    const srv = server({
+      [PASSKEY]: [PASSKEY_NONE],
+      '/api/ui/agents': [
+        ok({
+          switchable: true,
+          generation: 1,
+          current: 'work',
+          label: 'Maths <b>class</b>',
+          agents: [{ name: 'work', label: 'Maths <b>class</b>', current: true, available: true }],
+        }),
+      ],
+      [`/api/approvals/${id('A')}`]: [ok({ approval: item('A') })],
+    });
+    vi.stubGlobal('fetch', srv.fetch);
+    history.replaceState(null, '', `/approve/${id('A')}`);
+    act(() =>
+      root.render(
+        createElement<ApprovalsPageProps>(ApprovePage, {
+          client: createApprovalsClient({ fetch: srv.fetch, token: 't' }),
+          canPasskey: false,
+        }),
+      ),
+    );
+    await flush();
+    const line = host.querySelector('[data-approval-for]');
+    expect(line?.textContent).toBe('For your ID Maths <b>class</b>');
+    expect(line?.querySelector('b')).toBeNull();
+  });
+});
+
 describe('/approve/<id>: the deep link renders inside the app shell', () => {
   it('the router shows the one request with Home current in the section menu (W4-SHELL-V2)', async () => {
     const srv = server({

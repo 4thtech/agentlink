@@ -137,3 +137,10 @@
     gap: var(--al-space-2);
   }
 }
+
+/* F49: the once-shown code selects as one piece (one click selects all of it). */
+.fr-code-select {
+  user-select: all;
+  -webkit-user-select: all;
+  cursor: text;
+}

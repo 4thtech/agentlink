@@ -48,12 +48,27 @@
 // (challenge, origin, type), to `localhost` (rpIdHash) and to a gesture with user verification
 // (UP, UV), and names the credential the PRF output belongs to. A same-user process can forge all of
 // it; it gains nothing it could not get by setting up an owner directly while none exists.
+//
+// M1-11s-c-c (F48; 04 §2.5 "the second gesture that follows at once in the same flow belongs to the
+// same owner operation and signs nothing more"; proposed, owner confirms at merge): an authenticator
+// that answers create() with `prf.enabled` only (Windows Hello, some iCloud Keychain paths) gives the
+// PRF output on a following get() for the new credential. The page then sends that get() assertion
+// after the creation fields (SetupAssertion). Before its PRF output is used, finish checks it like the
+// creation and more: the same credential ID; clientDataJSON a `webauthn.get` for this begin's
+// challenge and exactly this origin, not cross-origin; rpIdHash = SHA-256("localhost"), UP and UV;
+// and the assertion signature, verified (@4thtech-io/crypto verifyWebauthnSignature) with the
+// credential public key of the checked creation response. A key that cannot be verified here (RS256,
+// or one the decoder refuses) gives no passkey: the PRF output is wiped and unused, and the owner
+// code stays the way to approve (fail closed, as without PRF). The second gesture signs nothing and
+// stores nothing of its own; it only supplies the PRF output that wraps the same owner seed.
 import {
   decodeUtf8,
   encodeBase64url,
   encodeUtf8,
   equalBytes,
   sha256,
+  verifyWebauthnSignature,
+  webauthnPublicKeyFromAuthenticatorData,
   wipe,
   type AgentCard,
   type Argon2idParams,
@@ -104,9 +119,39 @@ const PRF_LENGTH = 32;
 const FLAG_UP = 0x01;
 const FLAG_UV = 0x04;
 const FLAG_AT = 0x40;
-/** The largest finish body: four length-prefixed fields at their limits. */
+/** M1-11s-c-c: an assertion's authenticator data is at least rpIdHash ‖ flags ‖ signCount. */
+const MIN_ASSERTION_AUTH_DATA = 37;
+const MAX_SIGNATURE = 512;
+/**
+ * The largest finish body: four length-prefixed fields at their limits, then (M1-11s-c-c) the four
+ * fields of a get() assertion at theirs.
+ */
 export const MAX_SETUP_REGISTRATION_BYTES =
-  8 + MAX_CREDENTIAL_ID + MAX_AUTH_DATA + MAX_CLIENT_DATA + PRF_LENGTH;
+  8 +
+  MAX_CREDENTIAL_ID +
+  MAX_AUTH_DATA +
+  MAX_CLIENT_DATA +
+  PRF_LENGTH +
+  8 +
+  MAX_CREDENTIAL_ID +
+  MAX_AUTH_DATA +
+  MAX_CLIENT_DATA +
+  MAX_SIGNATURE;
+
+/**
+ * M1-11s-c-c: the get() that follows a create() which returned `prf.enabled` without a PRF output.
+ * Its PRF output is the registration's `prfOutput`.
+ */
+export interface SetupAssertion {
+  /** The asserted credential's raw ID: must be the created one. */
+  readonly credentialId: Uint8Array;
+  /** `response.authenticatorData`: rpIdHash ‖ flags ‖ signCount (‖ extensions). */
+  readonly authenticatorData: Uint8Array;
+  /** `response.clientDataJSON`, as sent by the browser. */
+  readonly clientDataJSON: Uint8Array;
+  /** `response.signature` over authenticatorData ‖ SHA-256(clientDataJSON). */
+  readonly signature: Uint8Array;
+}
 
 /** What the page sends to `finish` after navigator.credentials.create with `prf.eval`. */
 export interface SetupRegistration {
@@ -116,14 +161,22 @@ export interface SetupRegistration {
   readonly authenticatorData: Uint8Array;
   /** `response.clientDataJSON`, as sent by the browser. */
   readonly clientDataJSON: Uint8Array;
-  /** `prf.results.first` (32 bytes), or empty when the authenticator gave none. */
+  /**
+   * `prf.results.first` (32 bytes), or empty when the authenticator gave none. With `assertion`, the
+   * PRF output of that get() (then always 32 bytes).
+   */
   readonly prfOutput: Uint8Array;
+  /** M1-11s-c-c: the get() assertion when the PRF output came from it. */
+  readonly assertion?: SetupAssertion;
 }
 
 const refused = (): NodeKeyStoreError =>
   new NodeKeyStoreError('owner_operation_refused', 'The passkey response was not accepted.');
 
-/** The binary `finish` body: the four fields, each after its 16-bit big-endian length. */
+/**
+ * The binary `finish` body: the four fields, each after its 16-bit big-endian length; with an
+ * assertion (M1-11s-c-c), its four fields after them in the same form.
+ */
 export function encodeSetupRegistration(registration: SetupRegistration): Uint8Array {
   const fields = [
     registration.credentialId,
@@ -131,6 +184,15 @@ export function encodeSetupRegistration(registration: SetupRegistration): Uint8A
     registration.clientDataJSON,
     registration.prfOutput,
   ];
+  const assertion = registration.assertion;
+  if (assertion !== undefined) {
+    fields.push(
+      assertion.credentialId,
+      assertion.authenticatorData,
+      assertion.clientDataJSON,
+      assertion.signature,
+    );
+  }
   const out = new Uint8Array(fields.reduce((n, f) => n + 2 + f.length, 0));
   let at = 0;
   for (const field of fields) {
@@ -145,13 +207,14 @@ export function encodeSetupRegistration(registration: SetupRegistration): Uint8A
 
 /**
  * Parses a `finish` body into fresh copies (the caller wipes `bytes` and the PRF output). A malformed
- * body or a field out of bounds is refused, with any copied PRF output wiped.
+ * body or a field out of bounds is refused, with any copied PRF output wiped. M1-11s-c-c: exactly
+ * four fields, or eight with a get() assertion, whose PRF output must then be 32 bytes.
  */
 export function parseSetupRegistration(bytes: Uint8Array): SetupRegistration {
   const out: Uint8Array[] = [];
   let at = 0;
   try {
-    for (let i = 0; i < 4; i += 1) {
+    while (at < bytes.length && out.length < 8) {
       if (at + 2 > bytes.length) throw refused();
       const length = ((bytes[at] as number) << 8) | (bytes[at + 1] as number);
       at += 2;
@@ -159,7 +222,7 @@ export function parseSetupRegistration(bytes: Uint8Array): SetupRegistration {
       out.push(bytes.slice(at, at + length));
       at += length;
     }
-    if (at !== bytes.length) throw refused();
+    if (at !== bytes.length || (out.length !== 4 && out.length !== 8)) throw refused();
     const [credentialId, authenticatorData, clientDataJSON, prfOutput] = out as [
       Uint8Array,
       Uint8Array,
@@ -177,7 +240,44 @@ export function parseSetupRegistration(bytes: Uint8Array): SetupRegistration {
     ) {
       throw refused();
     }
-    return Object.freeze({ credentialId, authenticatorData, clientDataJSON, prfOutput });
+    if (out.length === 4) {
+      return Object.freeze({ credentialId, authenticatorData, clientDataJSON, prfOutput });
+    }
+    const [, , , , getId, getAuth, getClient, signature] = out as [
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+    ];
+    if (
+      prfOutput.length !== PRF_LENGTH ||
+      getId.length < 1 ||
+      getId.length > MAX_CREDENTIAL_ID ||
+      getAuth.length < MIN_ASSERTION_AUTH_DATA ||
+      getAuth.length > MAX_AUTH_DATA ||
+      getClient.length < 1 ||
+      getClient.length > MAX_CLIENT_DATA ||
+      signature.length < 1 ||
+      signature.length > MAX_SIGNATURE
+    ) {
+      throw refused();
+    }
+    return Object.freeze({
+      credentialId,
+      authenticatorData,
+      clientDataJSON,
+      prfOutput,
+      assertion: Object.freeze({
+        credentialId: getId,
+        authenticatorData: getAuth,
+        clientDataJSON: getClient,
+        signature,
+      }),
+    });
   } catch (error) {
     wipe(...out);
     throw error;
@@ -192,20 +292,15 @@ export interface SetupExpectation {
   readonly origin: string;
 }
 
-/**
- * Checks a creation response before its PRF output is used (proposed, owner confirms at merge):
- * clientDataJSON is a `webauthn.create` for this begin's challenge and exactly this origin, not
- * cross-origin; the authenticator data has rpIdHash = SHA-256("localhost") and flags UP, UV and AT;
- * its attested credential ID is the credential ID sent. `owner_operation_refused` otherwise. The
- * attestation statement is not verified (format "none"; see the threat note above).
- */
-export function checkSetupRegistration(
-  registration: SetupRegistration,
+/** clientDataJSON of `type` for this begin's challenge and exactly this origin; refused otherwise. */
+function checkClientData(
+  clientDataJSON: Uint8Array,
+  type: 'webauthn.create' | 'webauthn.get',
   expected: SetupExpectation,
 ): void {
   let clientData: unknown;
   try {
-    clientData = JSON.parse(decodeUtf8(registration.clientDataJSON));
+    clientData = JSON.parse(decodeUtf8(clientDataJSON));
   } catch {
     throw refused();
   }
@@ -214,7 +309,7 @@ export function checkSetupRegistration(
   }
   const data = clientData as Record<string, unknown>;
   if (
-    data['type'] !== 'webauthn.create' ||
+    data['type'] !== type ||
     data['challenge'] !== encodeBase64url(expected.challenge) ||
     data['origin'] !== expected.origin ||
     (data['crossOrigin'] !== undefined && data['crossOrigin'] !== false) ||
@@ -222,6 +317,27 @@ export function checkSetupRegistration(
   ) {
     throw refused();
   }
+}
+
+/** What the checked response gives the setup: the passkey, or (M1-11s-c-c) the owner code only. */
+export type SetupCheck = 'passkey' | 'code_only';
+
+/**
+ * Checks a creation response before its PRF output is used (proposed, owner confirms at merge):
+ * clientDataJSON is a `webauthn.create` for this begin's challenge and exactly this origin, not
+ * cross-origin; the authenticator data has rpIdHash = SHA-256("localhost") and flags UP, UV and AT;
+ * its attested credential ID is the credential ID sent. `owner_operation_refused` otherwise. The
+ * attestation statement is not verified (format "none"; see the threat note above).
+ *
+ * M1-11s-c-c: with a get() assertion, that too (checkSetupAssertion). Answers `code_only` when the
+ * assertion's signature cannot be verified because the creation's key is not one this build verifies:
+ * the caller then wipes the PRF output and sets up with the owner code only.
+ */
+export function checkSetupRegistration(
+  registration: SetupRegistration,
+  expected: SetupExpectation,
+): SetupCheck {
+  checkClientData(registration.clientDataJSON, 'webauthn.create', expected);
   const auth = registration.authenticatorData;
   const flags = auth[32] as number;
   if (
@@ -242,6 +358,53 @@ export function checkSetupRegistration(
   ) {
     throw refused();
   }
+  if (registration.assertion === undefined) return 'passkey';
+  return checkSetupAssertion(registration, registration.assertion, expected);
+}
+
+/**
+ * M1-11s-c-c: the get() assertion of a creation already checked by checkSetupRegistration. Refused
+ * (`owner_operation_refused`) unless it names the created credential, its clientDataJSON is a
+ * `webauthn.get` for this begin's challenge and exactly this origin, its authenticator data has
+ * rpIdHash = SHA-256("localhost") with UP and UV, and its signature verifies with the creation's
+ * credential public key. `code_only` when that key is not one this build verifies (RS256, or one the
+ * COSE decoder refuses): the PRF output is then not used.
+ */
+function checkSetupAssertion(
+  registration: SetupRegistration,
+  assertion: SetupAssertion,
+  expected: SetupExpectation,
+): SetupCheck {
+  if (
+    registration.prfOutput.length !== PRF_LENGTH ||
+    !equalBytes(assertion.credentialId, registration.credentialId)
+  ) {
+    throw refused();
+  }
+  checkClientData(assertion.clientDataJSON, 'webauthn.get', expected);
+  const auth = assertion.authenticatorData;
+  const flags = auth[32] as number;
+  if (
+    auth.length < MIN_ASSERTION_AUTH_DATA ||
+    !equalBytes(auth.subarray(0, 32), sha256(encodeUtf8(PASSKEY_RP_ID))) ||
+    (flags & FLAG_UP) === 0 ||
+    (flags & FLAG_UV) === 0
+  ) {
+    throw refused();
+  }
+  let coseKey: Uint8Array;
+  try {
+    coseKey = webauthnPublicKeyFromAuthenticatorData(
+      registration.authenticatorData,
+      registration.credentialId,
+    );
+  } catch {
+    return 'code_only';
+  }
+  if (!verifyWebauthnSignature(coseKey, auth, assertion.clientDataJSON, assertion.signature)) {
+    throw refused();
+  }
+  return 'passkey';
 }
 
 /**

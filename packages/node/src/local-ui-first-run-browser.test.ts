@@ -380,6 +380,23 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     );
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).not.toBeNull();
 
+    // F49 (owner, Windows Chrome: "impossible to copy"): Copy puts the code on the clipboard as one
+    // string and says Copied; Show reveals the masked field; a copy of the selected grid is the code
+    // on one line, not broken groups.
+    const codeField = page.locator('form input[autocomplete="new-password"]');
+    const theCode = await codeField.inputValue();
+    expect(await codeField.getAttribute('type')).toBe('password');
+    await page.locator('[data-reveal-code]').click();
+    expect(await codeField.getAttribute('type')).toBe('text');
+    await page.getByRole('button', { name: 'Copy', exact: true }).click();
+    await page.locator('[data-copy-status]').getByText('Copied').waitFor();
+    expect(await page.evaluate('navigator.clipboard.readText()')).toBe(theCode);
+    await page.evaluate('navigator.clipboard.writeText("")');
+    await page.locator('[data-backup-code]').click();
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+C' : 'Control+C');
+    expect(await page.evaluate('navigator.clipboard.readText()')).toBe(theCode);
+    expect(await page.getByRole('button', { name: 'Save as file' }).count()).toBe(1);
+
     // "I saved it": step 3; no AI app was found, so the agent is ready and Home is one click away;
     // the kit is put off.
     await page.getByRole('button', { name: 'I saved it' }).click();

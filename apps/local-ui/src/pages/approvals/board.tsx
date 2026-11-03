@@ -384,7 +384,8 @@ function ApprovalsList({
           <div className="al-bar">
             {locked ? null : (
               <Button
-                variant="primary"
+                // F30/F31: orange only once there is something to review; one orange button per screen.
+                {...(picked.length === 0 ? {} : { variant: 'primary' as const })}
                 size="lg"
                 block
                 disabled={picked.length === 0}

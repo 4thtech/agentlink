@@ -57,6 +57,8 @@ export const CONTACTS_STRINGS = {
   useCode: 'Use your backup code instead',
   ownerCode: 'Backup code',
   confirm: 'Confirm',
+  // F49: the one primary action when no passkey is set up here (the backup code confirms).
+  confirmWithCode: 'Confirm with your backup code',
   presenceRejected: "That didn't match your backup code or passkey. Nothing was changed.",
   presenceRequired: 'Enter your backup code or use your passkey. Nothing was changed.',
   passkeyNotUsed: "The passkey wasn't used. Nothing was changed. You can enter your backup code.",
@@ -81,8 +83,14 @@ export const PASSKEY_WHY = {
     `${cap(sensor)} isn't set up for AgentLink on this computer yet, so this asks for your backup code.`,
   other_owner: (sensor: string): string =>
     `${cap(sensor)} on this computer was set up for a different owner, so this asks for your backup code.`,
-  browser: (sensor: string, browser: string): string =>
-    `This browser can't use ${sensor} for AgentLink. Enter your backup code, or open AgentLink in ${browser}.`,
+  // F49: `browser` is undefined when the page already runs in the browser that would be suggested.
+  browser: (sensor: string, browser: string | undefined): string =>
+    browser === undefined
+      ? `This browser can't use ${sensor} for AgentLink yet, so this asks for your backup code.`
+      : `This browser can't use ${sensor} for AgentLink. Enter your backup code, or open AgentLink in ${browser}.`,
+  // F49: a switch already failed in this browser (no PRF), so the sheet stops offering it.
+  noSwitchHere: (sensor: string): string =>
+    `${cap(sensor)} on this computer can't protect approvals yet, so this asks for your backup code.`,
   unknown: (sensor: string): string =>
     `Couldn't check ${sensor} just now, so this asks for your backup code.`,
   switchIntro: (sensor: string): string =>
@@ -90,8 +98,10 @@ export const PASSKEY_WHY = {
   switchCancel: 'Not now',
   switched: (sensor: string): string => `${cap(sensor)} is on. Now confirm with ${sensor}.`,
   switchCancelled: "The switch didn't happen. Nothing changed. You can still use your backup code.",
-  switchUnsupported: (sensor: string, browser: string): string =>
-    `${cap(sensor)} can't protect approvals in this browser. Nothing changed. Keep using your backup code, or open AgentLink in ${browser}.`,
+  switchUnsupported: (sensor: string, browser: string | undefined): string =>
+    browser === undefined
+      ? `${cap(sensor)} on this computer can't protect approvals yet, so AgentLink uses your backup code. Nothing changed.`
+      : `${cap(sensor)} can't protect approvals in this browser. Nothing changed. Keep using your backup code, or open AgentLink in ${browser}.`,
 } as const;
 
 /** Under the hood labels and values (B-11 §16). */

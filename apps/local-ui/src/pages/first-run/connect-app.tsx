@@ -5,7 +5,7 @@
 //
 // What the page asks of the server is in apps-api.ts; every answer is a fixed word, an app name, a
 // display path or AgentLink's own entry, shown as text only.
-import { Banner, Button, ProgressBar, TextField } from '@4thtech-io/ui';
+import { Banner, Button, ProgressBar } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { LinkExpiredState, LoadingState, NotRunningState } from '../../states/index.js';
 import { useTitleFocus } from '../welcome/index.js';
@@ -18,6 +18,7 @@ import type {
   PreviewResult,
 } from './apps-api.js';
 import { AppMark } from './pick-app.js';
+import { BackupCodeField } from './backup-code.js';
 import { CONNECT as T, FIRST_RUN, SETUP_MESSAGES } from './strings.js';
 import './first-run.css';
 
@@ -291,16 +292,12 @@ export function ConnectApp({
       ) : (
         <div className="fr-actions">
           {useCode ? (
-            <TextField
+            <BackupCodeField
               label={T.codeLabel}
               hint={T.presenceHint}
               name="owner-code"
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              mono
               value={code}
-              onChange={(event) => setCode(event.currentTarget.value)}
+              onValue={setCode}
             />
           ) : null}
           <Button

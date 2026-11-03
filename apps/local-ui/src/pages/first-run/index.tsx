@@ -38,6 +38,7 @@ import { Banner, Button, CopyPrompt, Fingerprint, ProgressBar, TextField } from 
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -124,6 +125,17 @@ import {
   type UpgradeValues,
 } from './setup-api.js';
 import './first-run.css';
+import {
+  BACKUP_CODE_FIELD,
+  BackupCodeField,
+  copyBackupCode,
+  saveBackupCodeFile,
+} from './backup-code.js';
+import {
+  forgetSwitchUnsupported,
+  otherBrowser,
+  rememberSwitchUnsupported,
+} from './passkey-nudge.js';
 import { createJoinApi, type JoinRead } from '../join/api.js';
 import {
   FIRST_RUN as T,
@@ -133,7 +145,6 @@ import {
   SETUP_MESSAGES,
   UPGRADE as U,
   UPGRADE_MESSAGES,
-  WORKING_BROWSER,
   type Platform,
 } from './strings.js';
 
@@ -289,7 +300,37 @@ export function setupMessage(problem: SetupError | { readonly problem: 'cancelle
   return SETUP_MESSAGES[problem.problem];
 }
 
-/** The once-shown backup code: readable text, a real save form, Copy, and "I saved it". */
+/** F49: the save form's masked code field, with Show/Hide so the person can check it. */
+function RevealCodeField({ code }: { code: string }): ReactElement {
+  const [shown, setShown] = useState(false);
+  const id = useId();
+  return (
+    <TextField
+      id={id}
+      label={T.backupLabel}
+      name="password"
+      type={shown ? 'text' : 'password'}
+      autoComplete="new-password"
+      value={code}
+      readOnly
+      mono
+      suffix={
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-pressed={shown}
+          aria-controls={id}
+          data-reveal-code=""
+          onClick={() => setShown(!shown)}
+        >
+          {shown ? BACKUP_CODE_FIELD.hide : BACKUP_CODE_FIELD.show}
+        </Button>
+      }
+    />
+  );
+}
+
+/** The once-shown backup code: readable text, a real save form, Copy, Save as file, "I saved it". */
 function BackupCode({
   code,
   computer,
@@ -301,7 +342,8 @@ function BackupCode({
   sensor: string;
   onSaved: () => void;
 }): ReactElement {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'no' | 'yes' | 'failed'>('no');
+  const [file, setFile] = useState<'no' | 'yes' | 'failed'>('no');
   const [asked, setAsked] = useState(false);
   // A real form: submitting it lets the browser's own save sheet appear. It never navigates and
   // never sends anything (no action; the page's CSP has form-action 'none').
@@ -315,7 +357,16 @@ function BackupCode({
         <span className="al-text-label">{T.backupLabel}</span>
         <span className="al-text-caption al-muted">{T.shownOnce}</span>
       </div>
-      <div className="al-secret-val al-text-code-lg">
+      {/* F49: one selectable code. A click selects all of it, and a copy of the selection is the
+          code as one line (the grid's groups otherwise copy as broken lines). */}
+      <div
+        className="al-secret-val al-text-code-lg fr-code-select"
+        data-backup-code=""
+        onCopy={(event) => {
+          event.preventDefault();
+          event.clipboardData.setData('text/plain', code);
+        }}
+      >
         {code.split(' ').map((g, i) => (
           <span key={i}>{g}</span>
         ))}
@@ -330,33 +381,40 @@ function BackupCode({
           value={T.savedAsLabel(computer)}
           readOnly
         />
-        <TextField
-          label={T.backupLabel}
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          value={code}
-          readOnly
-          mono
-        />
+        <RevealCodeField code={code} />
         <div className="al-secret-actions">
           <Button type="submit" variant="primary" icon="key-round">
             {T.saveToManager}
           </Button>
           <Button
             size="sm"
-            icon={copied ? 'check' : 'copy'}
+            icon={copied === 'yes' ? 'check' : 'copy'}
+            data-copy-code=""
             onClick={() => {
-              void navigator.clipboard
-                ?.writeText(code)
-                .then(() => setCopied(true))
-                .catch(() => setCopied(false));
+              void copyBackupCode(code).then((ok) => setCopied(ok ? 'yes' : 'failed'));
             }}
           >
-            {copied ? T.copied : T.copy}
+            {copied === 'yes' ? T.copied : T.copy}
+          </Button>
+          <Button
+            size="sm"
+            icon="download"
+            data-save-code-file=""
+            onClick={() => setFile(saveBackupCodeFile(code, sensor) ? 'yes' : 'failed')}
+          >
+            {T.saveFile}
           </Button>
         </div>
       </form>
+      <p className="al-text-body-sm" role="status" aria-live="polite" data-copy-status="">
+        {copied === 'yes' ? T.copied : ''}
+        {file === 'yes' ? ` ${T.fileSaved}` : ''}
+      </p>
+      {copied === 'failed' || file === 'failed' ? (
+        <p className="al-text-body-sm ct-error" role="alert">
+          {copied === 'failed' ? T.copyFailed : T.fileFailed}
+        </p>
+      ) : null}
       <p className="al-text-caption al-muted">{T.clipboardWarning}</p>
       <p className="al-text-caption al-muted" role="status" aria-live="polite">
         {asked ? T.saveAsked : ''}
@@ -444,7 +502,7 @@ function ConnectFirstStep({
         />
       }
       {noPrf ? (
-        <Banner tone="warning">{T.noPrf(SENSOR[platform], WORKING_BROWSER[platform])}</Banner>
+        <Banner tone="warning">{T.noPrf(SENSOR[platform], otherBrowser(platform))}</Banner>
       ) : null}
       {view.message === undefined ? null : <Banner tone="warning">{view.message}</Banner>}
       <div className="st-actions">
@@ -936,12 +994,18 @@ export function FirstRunPage({
         if (clear) setCode('');
         setView({ k: 'upgrade', values, working: false, noPrf, message });
       };
+      // F49: this computer's passkey gives no PRF. Say so plainly (no "open Chrome" in Chrome) and
+      // stop pushing the switch in this browser (a UI nudge only; the backup code keeps working).
+      const unsupportedHere = (): string => {
+        rememberSwitchUnsupported();
+        return UPGRADE_MESSAGES.unsupported(otherBrowser(platform), SENSOR[platform]);
+      };
       if (typed.length === 0) return again(UPGRADE_MESSAGES.empty, false);
       setView({ k: 'upgrade', values, working: true, noPrf });
       const made = await createUpgradePasskey(values, { platform: !noPrf });
       if (made.kind === 'cancelled') return again(UPGRADE_MESSAGES.cancelled, false);
       if (made.kind === 'unsupported') {
-        return again(UPGRADE_MESSAGES.unsupported(WORKING_BROWSER[platform]), true);
+        return again(unsupportedHere(), true);
       }
       const secret = new TextEncoder().encode(typed);
       let body: Uint8Array;
@@ -960,14 +1024,17 @@ export function FirstRunPage({
         body.fill(0);
       }
       setCode('');
-      if (result.kind === 'registered') return setView({ k: 'upgraded' });
+      if (result.kind === 'registered') {
+        forgetSwitchUnsupported();
+        return setView({ k: 'upgraded' });
+      }
       const problem = result.problem;
       if (problem === 'passkey_exists') return setView({ k: 'already' });
       if (problem === 'session_expired') return setView({ k: 'expired' });
       if (problem === 'offline') return setView({ k: 'down' });
       if (problem === 'wait') return again(UPGRADE_MESSAGES.wait(result.retryAfter ?? 1), true);
       if (problem === 'passkey_unsupported') {
-        return again(UPGRADE_MESSAGES.unsupported(WORKING_BROWSER[platform]), true);
+        return again(unsupportedHere(), true);
       }
       if (
         problem === 'presence_rejected' ||
@@ -1136,7 +1203,7 @@ export function FirstRunPage({
           </h1>
           <p className="st-lead">{U.body(sensor)}</p>
           {noPrf ? (
-            <Banner tone="warning">{U.noPrf(SENSOR[platform], WORKING_BROWSER[platform])}</Banner>
+            <Banner tone="warning">{U.noPrf(SENSOR[platform], otherBrowser(platform))}</Banner>
           ) : null}
           {view.message === undefined ? null : <Banner tone="warning">{view.message}</Banner>}
           {/* A real form so a password manager can fill the code; it never navigates (no action;
@@ -1148,19 +1215,14 @@ export function FirstRunPage({
               if (!view.working) void upgrade(values, noPrf, code);
             }}
           >
-            <TextField
+            <BackupCodeField
               label={U.codeLabel}
               hint={U.codeHint}
               name="backup-code"
-              type="password"
               autoComplete="current-password"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              mono
               value={code}
               disabled={view.working}
-              onChange={(event) => setCode(event.currentTarget.value)}
+              onValue={setCode}
             />
             <Button
               type="submit"
@@ -1263,7 +1325,16 @@ export function FirstRunPage({
               {T.unconfirmed}
             </Banner>
           )}
-          <p className="st-lead">{done.passkey ? T.doneBody : T.doneNoPasskeyBody}</p>
+          {done.passkey ? (
+            <p className="st-lead">{T.doneBody}</p>
+          ) : (
+            // M1-11s-c-c: without a passkey the backup code is the only way to approve here.
+            <div data-testid="backup-needed">
+              <Banner tone="warning" title={T.doneNoPasskeyTitle}>
+                {T.doneNoPasskeyBody}
+              </Banner>
+            </div>
+          )}
           {line === undefined ? null : (
             <Banner tone={done.sendFolder === 'allowed' ? 'success' : 'warning'}>{line}</Banner>
           )}

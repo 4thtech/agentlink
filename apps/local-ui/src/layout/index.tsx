@@ -36,6 +36,10 @@ import {
   PASSKEY_REGISTERED_EVENT,
   passkeyRegisteredHere,
 } from '../pages/first-run/setup-api.js';
+import {
+  SWITCH_UNSUPPORTED_EVENT,
+  switchUnsupportedHere,
+} from '../pages/first-run/passkey-nudge.js';
 import type { Platform } from '../pages/first-run/strings.js';
 import { StartHereContext } from '../pages/home/start-here-context.js';
 import type { StartHereReads } from '../pages/home/start-here.js';
@@ -235,7 +239,8 @@ export function Layout({
     nextStep().then(
       (needed) => {
         // W4-WIRE: a read that began before a registration on this page and answers after it is stale.
-        if (live) setSwitchNeeded(needed && !passkeyRegisteredHere());
+        // F49: not after a switch already failed in this browser for lack of PRF (UI nudge only).
+        if (live) setSwitchNeeded(needed && !passkeyRegisteredHere() && !switchUnsupportedHere());
       },
       () => {
         if (live) setSwitchNeeded(false);
@@ -250,7 +255,11 @@ export function Layout({
   useEffect(() => {
     const done = (): void => setSwitchNeeded(false);
     window.addEventListener(PASSKEY_REGISTERED_EVENT, done);
-    return () => window.removeEventListener(PASSKEY_REGISTERED_EVENT, done);
+    window.addEventListener(SWITCH_UNSUPPORTED_EVENT, done);
+    return () => {
+      window.removeEventListener(PASSKEY_REGISTERED_EVENT, done);
+      window.removeEventListener(SWITCH_UNSUPPORTED_EVENT, done);
+    };
   }, []);
   const facts = useCallback(
     () => ({

@@ -178,7 +178,7 @@ const pick = (page: Page, n: number) =>
     name: `Select Send a message to Contact ${String(n)}`,
     exact: true,
   });
-const CODE_LABEL = 'Backup code or owner passphrase';
+const CODE_LABEL = 'Backup code';
 /** The wrong-code backoff's free attempts (approval-server.ts), pinned. */
 const FREE_ATTEMPTS = 3;
 const XSS = '<img src=x onerror="window.__xss=1"><script>window.__xss=2</script>';
@@ -358,7 +358,12 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     await page.goto(`${server.origin}/first-run`);
     await page.getByLabel('Backup code').fill(world.code);
     await page.getByRole('button', { name: USE_PASSKEY }).click();
-    await page.getByText("This passkey can't protect approvals here.", { exact: false }).waitFor();
+    // F49: in the browser the copy would suggest (Chrome on Linux) it says so plainly instead.
+    await page
+      .getByText(
+        /This passkey can't protect approvals here\.|can't protect approvals yet, so AgentLink uses your backup code/,
+      )
+      .waitFor();
     expect(await world.keychain.get(OWNER_PASSKEY_ACCOUNT)).toBeNull();
 
     source.add(1);

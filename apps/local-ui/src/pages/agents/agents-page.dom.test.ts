@@ -230,6 +230,37 @@ describe('the Agents page', () => {
   });
 });
 
+describe('F27: Invite someone on each ID card', () => {
+  it('the open ID goes straight to the Invite screen', async () => {
+    await mountPage();
+    await click(button(rowOf('default'), 'Invite someone'));
+    expect(location.pathname + location.search).toBe('/contacts?invite');
+    expect(calls.some((c) => c.url === '/api/ui/agents/switch')).toBe(false);
+  });
+  it('another ID opens first, then goes to the Invite screen', async () => {
+    answers['POST /api/ui/agents/switch'] = {
+      status: 200,
+      body: { status: 'done', generation: 8, current: 'work' },
+    };
+    await mountPage();
+    await click(button(rowOf('work'), 'Invite someone'));
+    const post = calls.find((c) => c.url === '/api/ui/agents/switch')!;
+    expect(JSON.parse(post.body)).toEqual({ name: 'work', generation: 7 });
+    expect(location.pathname + location.search).toBe('/contacts?invite');
+  });
+  it('a refused switch stays on the IDs page', async () => {
+    answers['POST /api/ui/agents/switch'] = { status: 409, body: { status: 'agent_changed' } };
+    await mountPage();
+    await click(button(rowOf('work'), 'Invite someone'));
+    expect(location.pathname).toBe('/agents');
+    expect(plain(host)).toContain('You switched IDs. Nothing was changed.');
+  });
+  it('a removing ID has no Invite someone', async () => {
+    await mountPage();
+    expect(button(rowOf('old'), 'Invite someone')).toBeUndefined();
+  });
+});
+
 describe('Rename', () => {
   it('uses the Touch ID wording, the code, and posts to the label route', async () => {
     answers['POST /api/ui/agents/label'] = { status: 200, body: { status: 'done' } };
@@ -241,7 +272,7 @@ describe('Rename', () => {
     await click(button(rowOf('work'), 'Rename with Touch ID'));
     expect(plain(host)).toContain('Rename Work to Home');
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     const post = calls.find((c) => c.url === '/api/ui/agents/label')!;
     expect(post.body).toBe('123456');
     expect(post.headers.get('X-AgentLink-Input')).toBeTruthy();
@@ -253,7 +284,7 @@ describe('Rename', () => {
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
     await click(button(rowOf('work'), 'Rename with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     expect(plain(host)).toContain('Not renamed yet. Try again.');
     expect(rowOf('work')).toBeTruthy();
   });
@@ -280,7 +311,7 @@ describe('label check and removal states', () => {
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     expect(host.querySelector('[role="dialog"]')).toBeNull();
   });
 });
@@ -295,7 +326,7 @@ describe('Remove', () => {
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
   };
   it('names what goes and keeps the button off until the exact label is typed', async () => {
     const sheet = await open('work');
@@ -575,7 +606,7 @@ describe('W8-S4: finish removing, and one "Not used" line', () => {
     expect(button(sheet, 'Export history first')).toBeDefined();
     await click(button(sheet, 'Finish with Touch ID'));
     await type(host.querySelector<HTMLInputElement>('input[name="owner-code"]')!, '123456');
-    await click(button(host, 'Confirm'));
+    await click(button(host, 'Confirm with your backup code'));
     const post = calls.find((c) => c.url === '/api/ui/agents/remove')!;
     const sent = JSON.parse(
       atob(post.headers.get('X-AgentLink-Input')!.replace(/-/g, '+').replace(/_/g, '/')),
