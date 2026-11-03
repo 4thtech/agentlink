@@ -23,6 +23,7 @@ export const AGENTS_STRINGS = {
   connectFreeApp: (app: string): string => `Connect ${app}`,
   switch: 'Open',
   rename: 'Rename',
+  inviteSomeone: 'Invite someone',
   connect: 'Connect',
   remove: 'Remove',
   more: 'More',

@@ -53,8 +53,7 @@ export const INBOX_STRINGS = {
     not_set_up: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
     unavailable: "Couldn't save it. Try again.",
   } satisfies Readonly<Record<FileSaveOutcome, string>>,
-  presenceRejected:
-    "That didn't match your passkey, backup code or owner passphrase. Nothing was saved.",
+  presenceRejected: "That didn't match your passkey or backup code. Nothing was saved.",
   presenceNotUsed:
     "The passkey wasn't used. Nothing was saved. You can enter your backup code instead.",
   busy: 'Another change is in progress. Try again in a moment.',

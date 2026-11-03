@@ -176,6 +176,9 @@ export function ApprovedMoment(): ReactElement {
   );
 }
 
+/** The cost the server shows for an approval that costs nothing. */
+const FREE = 'Free';
+
 /** Status lines, each its own polite live region (as the page's `say`). */
 export function Statuses({ lines }: { lines: readonly string[] }): ReactElement | null {
   if (lines.length === 0) return null;
@@ -283,10 +286,13 @@ export function CodeForm({
   label,
   submit,
   onCode,
+  primary = true,
 }: {
   label: string;
   submit: string;
   onCode: (code: string) => Promise<unknown>;
+  /** F30/F31: one orange button per screen; false when the passkey button above is the primary. */
+  primary?: boolean;
 }): ReactElement {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -336,7 +342,13 @@ export function CodeForm({
       <p id={`${hintId}-earlier`} className="al-field-hint">
         {EARLIER_OWNER_CODE_HINT}
       </p>
-      <Button type="submit" variant="primary" size="lg" block disabled={busy}>
+      <Button
+        type="submit"
+        {...(primary ? { variant: 'primary' as const } : {})}
+        size="lg"
+        block
+        disabled={busy}
+      >
         {submit}
       </Button>
     </form>
@@ -390,7 +402,7 @@ export function OwnerStep({
           <p className="al-or">{S.orCode}</p>
         </>
       ) : null}
-      <CodeForm label={S.codeLabel} submit={codeSubmit} onCode={onCode} />
+      <CodeForm label={S.codeLabel} submit={codeSubmit} onCode={onCode} primary={!passkey} />
     </div>
   );
 }
@@ -461,6 +473,15 @@ export function SingleApproval({
       onDecided?.();
     }
     say(decisionText(a));
+    // F32: after approving something marked Free, say in plain words what that means.
+    if (
+      a.kind === 'status' &&
+      a.status === 'applied' &&
+      a.decision === 'approve' &&
+      item.details?.cost === FREE
+    ) {
+      say(S.freeExplained);
+    }
     if (a.kind === 'status' && RETRY.has(a.status)) setActions(true);
   };
 
@@ -500,7 +521,12 @@ export function SingleApproval({
               <Button size="lg" onClick={() => open('deny')}>
                 {S.deny}
               </Button>
-              <Button variant="primary" size="lg" onClick={() => open('approve')}>
+              {/* F30/F31: while the confirm step is open, its button is the one orange button. */}
+              <Button
+                {...(step === undefined ? { variant: 'primary' as const } : {})}
+                size="lg"
+                onClick={() => open('approve')}
+              >
                 {S.approve}
               </Button>
             </div>

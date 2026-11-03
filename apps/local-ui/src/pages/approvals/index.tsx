@@ -34,7 +34,16 @@ import {
   type SetupState,
 } from '../start/setup-state.js';
 import { Surface, type PayPlatform } from '@4thtech-io/ui';
-import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
+import { getLive, subscribeLive } from '../../api/live.js';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import type { OwnerState } from './card.js';
 import { createApprovalsClient, type ApprovalsClient } from './client.js';
@@ -155,7 +164,17 @@ export function Results({ lines }: { lines: readonly string[] }): ReactElement |
  * The page head every approvals view shares. `end` sits at the end of the title row (the Approvals
  * page's Layout control, B-11 §26.2); without it the head is unchanged.
  */
+const LIVE_EMPTY = { list: undefined, agents: [], error: false };
+
+/** F29: the display name of the open ID, which every approval here is for (text only, I-5). */
+function useOpenIdLabel(): string | undefined {
+  const snap = useSyncExternalStore(subscribeLive, getLive, () => LIVE_EMPTY);
+  const label = snap.list?.label ?? snap.agents.find((a) => a.current)?.label;
+  return label === undefined || label.trim() === '' ? undefined : label;
+}
+
 export function ApprovalsHead({ end }: { end?: ReactNode } = {}): ReactElement {
+  const forId = useOpenIdLabel();
   return (
     <>
       {end === undefined ? (
@@ -167,6 +186,12 @@ export function ApprovalsHead({ end }: { end?: ReactNode } = {}): ReactElement {
         </div>
       )}
       <p className="al-lede">{S.cannotApprove}</p>
+      {forId === undefined ? null : (
+        <p className="al-lede" data-approval-for>
+          {S.forId}
+          <bdi>{forId}</bdi>
+        </p>
+      )}
     </>
   );
 }

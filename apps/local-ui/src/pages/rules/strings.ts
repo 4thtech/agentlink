@@ -76,7 +76,7 @@ export const RULES_STRINGS = {
   keepTitle: 'Keep delivery receipts on',
   keepText:
     'Delivery receipts are on from an older default. Each one shows publicly that a proof reached you, never the content.',
-  codeLabel: 'Backup code or owner passphrase',
+  codeLabel: 'Backup code',
   codeHint: 'Never give it to your AI.',
   save: 'Save with passkey',
   saveCode: 'Save',
