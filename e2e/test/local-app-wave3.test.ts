@@ -505,7 +505,9 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
     run.deps.stop();
     const ended = await run.done;
     expect(ended.errors).toEqual([]);
-    expect(ended.printed).toHaveLength(1);
+    // The "opened" line and F25's closing line: no terminal picker.
+    expect(ended.printed).toHaveLength(2);
+    expect(ended.printed[1]).toMatch(/^AgentLink closed\. Run `.+` to open it again\.$/);
     expect(ended.code).toBe(0);
   }, 240_000);
 });

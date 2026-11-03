@@ -113,8 +113,9 @@ describe('chapter 5: upgrade', () => {
     run.deps.stop();
     const ended = await run.done;
     expect(ended.errors).toEqual([]);
-    // Nothing but the "opened" line: no terminal picker.
-    expect(ended.printed).toHaveLength(1);
+    // Nothing but the "opened" line and F25's closing line: no terminal picker.
+    expect(ended.printed).toHaveLength(2);
+    expect(ended.printed[1]).toMatch(/^AgentLink closed\. Run `.+` to open it again\.$/);
     expect(ended.code).toBe(0);
   }, 240_000);
 
