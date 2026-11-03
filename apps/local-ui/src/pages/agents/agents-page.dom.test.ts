@@ -145,7 +145,7 @@ describe('the Agents page', () => {
     expect(host.querySelectorAll('[data-agent]')).toHaveLength(4);
     const personal = rowOf('default');
     expect(personal.textContent).toContain('Open');
-    expect(personal.textContent).toContain('Ready in Claude Code and 1 more');
+    expect(personal.textContent).toContain('Connected to Claude Code and 1 more');
     expect(personal.textContent).toContain('Claude Code');
     expect(personal.textContent).toContain('Claude Desktop');
     // D-144 (c): which AI apps use the ID, or none.

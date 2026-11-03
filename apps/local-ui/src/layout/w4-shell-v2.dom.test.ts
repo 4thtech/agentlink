@@ -270,12 +270,12 @@ describe('the top bar (A4)', () => {
     expect(chip()?.querySelector('.al-agent-icon-dot.is-ready')).not.toBeNull();
     // D-144 (a): the AI app next to the ID, here only.
     expect(chip()?.textContent).toContain("Tali's agent · Claude Code");
-    expect(chip()?.textContent).toContain('Ready in Claude Code');
+    expect(chip()?.textContent).toContain('Connected to Claude Code');
     // Its name is its visible text after "Agent:" (WCAG 2.5.3 label in name).
     expect(chip()?.hasAttribute('aria-label')).toBe(false);
     // (The letter icon is aria-hidden: the name is the text beside it.)
     expect(chip()?.querySelector('.al-chip-text')?.textContent).toBe(
-      "ID: Tali's agent · Claude Code Ready in Claude Code",
+      "ID: Tali's agent · Claude Code Connected to Claude Code",
     );
     expect(q('button.al-goto-btn')?.hasAttribute('aria-label')).toBe(false);
     expect(q('button.al-goto-btn')?.textContent).toContain('Go to…');
@@ -321,9 +321,9 @@ describe('the live agent dropdown', () => {
     expect(rows[0]?.textContent).toContain('Used by Claude Code');
     expect(rows[2]?.textContent).toContain('Not used by any AI app');
     expect(rows[0]?.querySelector('[role="menuitemradio"][aria-checked="true"]')).not.toBeNull();
-    expect(rows[0]?.textContent).toContain('Ready in Claude Code');
+    expect(rows[0]?.textContent).toContain('Connected to Claude Code');
     expect(rows[0]?.querySelector('.al-am-app')?.textContent).toBe('Claude CodeReady');
-    expect(rows[1]?.querySelector('.al-am-app')?.textContent).toBe('CursorNot running');
+    expect(rows[1]?.querySelector('.al-am-app')?.textContent).toBe('CursorNot connected');
     expect(rows[1]?.querySelector('.al-ldot.is-off')).not.toBeNull();
     expect(rows[2]?.textContent).toContain('Not used by any AI app');
     expect(rows[2]?.querySelector('.al-agent-icon-dot.is-none')).not.toBeNull();
@@ -776,7 +776,7 @@ describe('the live status strip says only what it knows (IR-1, 2)', () => {
       removing: false,
       apps: [{ app: 'Codex', state, word: '' }],
     });
-    expect(stripItems([agent('idle')], 'connected')[0]?.value).toBe('Ana idle');
+    expect(stripItems([agent('idle')], 'connected')[0]?.value).toBe('Ana connected');
     expect(stripItems([agent('none')], 'connected')[0]?.value).toBe('not set up');
     expect(stripItems([agent('working')], 'connected')[0]?.value).toBe('Ana working');
   });

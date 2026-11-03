@@ -206,7 +206,7 @@ describe('the shared live subscription over the events stream', () => {
       block('B.0', 'snapshot', { generation: 1, current: 'default', agents: [record()], at: NOW }),
     );
     await flush();
-    expect(getLive().agents[0]?.statusText).toBe('Ready in Claude Code');
+    expect(getLive().agents[0]?.statusText).toBe('Connected to Claude Code');
     const reads = s.agentReads;
 
     // Claude Code quits.
@@ -227,7 +227,7 @@ describe('the shared live subscription over the events stream', () => {
     await flush();
     const quit = getLive().agents[0];
     expect(quit?.apps.map((a) => `${a.app}: ${a.word}`)).toEqual([
-      'Claude Code: Not running · last seen just now',
+      'Claude Code: Not connected · last seen just now',
     ]);
     expect(quit?.statusText).toBe('Offline · last seen just now');
     expect(quit?.state).toBe('off');
@@ -282,7 +282,7 @@ describe('the shared live subscription over the events stream', () => {
     );
     await flush();
     expect(getLive().agents.map((a) => a.name)).toEqual(['default']);
-    expect(getLive().agents[0]?.statusText).toBe('Ready in Another AI app');
+    expect(getLive().agents[0]?.statusText).toBe('Connected to Another AI app');
   });
 
   it('a generation event re-reads the agents once (the generation guard sees the switch)', async () => {
@@ -364,7 +364,7 @@ describe('the shared live subscription over the events stream', () => {
       }),
     );
     await flush();
-    expect(getLive().agents[0]?.statusText).toBe('Idle');
+    expect(getLive().agents[0]?.statusText).toBe('Connected');
     expect(liveMode()).toBe('stream');
   });
 

@@ -23,8 +23,8 @@ describe('liveAgent', () => {
     const a = liveAgent(row({ apps: ['Claude Code', 'Codex'] }));
     expect(a.state).toBe('ready');
     // 08 §1: with several apps, "Ready in {app} and {n} more".
-    expect(a.statusText).toBe('Ready in Claude Code and 1 more');
-    expect(a.apps.map((x) => `${x.app}:${x.word}`)).toEqual(['Claude Code:Ready', 'Codex:Ready']);
+    expect(a.statusText).toBe('Connected to Claude Code and 1 more');
+    expect(a.apps.map((x) => `${x.app}:${x.word}`)).toEqual(['Claude Code:Connected', 'Codex:Connected']);
   });
 
   it('a stopped agent is Offline, and each of its apps Not running', () => {

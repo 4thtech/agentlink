@@ -167,7 +167,7 @@ describe('the agent dropdown follows the events stream (the owner’s bug)', () 
     await settle();
     // Only the AI apps set up for an agent are listed under it (Codex is not set up for Tali's).
     expect(appLines(0)).toEqual(['Claude CodeReady']);
-    expect(appLines(1)).toEqual(['CodexNot running']);
+    expect(appLines(1)).toEqual(['CodexNot connected']);
 
     await send(
       'agents',
@@ -191,7 +191,7 @@ describe('the agent dropdown follows the events stream (the owner’s bug)', () 
       'B.1',
     );
     expect(q('[role="menu"]'), 'the dropdown stays open').not.toBeNull();
-    expect(appLines(0)).toEqual(['Claude CodeNot running · last seen 3 min ago']);
+    expect(appLines(0)).toEqual(['Claude CodeNot connected · last seen 3 min ago']);
     expect(qa('.al-am-row')[0]?.textContent).toContain('Offline · last seen 3 min ago');
     expect(chip()?.textContent).toContain('Offline · last seen 3 min ago');
 
@@ -201,7 +201,7 @@ describe('the agent dropdown follows the events stream (the owner’s bug)', () 
       'B.2',
     );
     expect(appLines(0)).toEqual(['Claude CodeReady']);
-    expect(chip()?.textContent).toContain('Ready in Claude Code');
+    expect(chip()?.textContent).toContain('Connected to Claude Code');
 
     await send(
       'agents',
