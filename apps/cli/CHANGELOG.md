@@ -1,5 +1,15 @@
 # @4thtech-io/agentlink
 
+## 0.4.11
+
+### Patch Changes
+
+- cd2ce87: R2-REASONS: catch-all failed answers of the local app carry a fixed `reason` code from a closed set; the page maps each to specific words; the Claude Desktop check treats only pgrep exit 0 as running (exit 1 not running, anything else could not be checked). No protocol change.
+- cd2ce87: W8-F13-TOUCHID: the local app's New ID gate reads `GET /api/owner/passkey` and, when the owner has no passkey on this computer and the server gives the switch values, offers "Switch to Touch ID" first: the backup code once registers the passkey through the existing switch (`POST /api/owner/passkey`), then the ID is created with its own touch. The backup-code form says what the backup code is and why Touch ID isn't offered, spaces its field and buttons, and shows one Back in Get started. No server or protocol change.
+- cd2ce87: W8-F40-WIN-OPEN: on Windows the browser opener runs `System32\rundll32.exe url.dll,FileProtocolHandler` (absolute path, no shell) and falls back to explorer.exe, which exits 1 even when it worked. The CLI says "Opening AgentLink in your browser…", and when no one-shot link is used within 15 seconds it says "Your browser didn't open AgentLink. Press Enter here to try again."; Enter opens a fresh one-shot link. The link is never printed. F41: the first-run line names Touch ID, Windows Hello or a passkey instead of "setup page".
+- cd2ce87: Removing an ID now also removes the AI app entries that ran it, and the sheet lists each one before you confirm. A removal that stopped half-way can be finished without typing the name again, and an AI app that still points at a removed ID says so instead of asking you to run init.
+- cd2ce87: W8-S4/S5: New ID's pick says what each AI app uses now ("Uses {label}", "Uses a removed ID", "Set up by hand") and the confirm screen shows begin's replacement line for a move; begin's statement names the replaced ID (`oldLabel`, `oldGone`, resolved by the server). Home and the ID switcher show a half-removed ID as "{label} wasn't fully removed" with Finish removing (the Remove sheet in finish mode, without the typed name); "Not used by any AI app" shows once; the switcher shortens app lists.
+
 ## 0.4.10
 
 ### Patch Changes

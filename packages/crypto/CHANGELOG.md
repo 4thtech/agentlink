@@ -1,5 +1,9 @@
 # @4thtech-io/crypto
 
+## 0.4.11
+
+No changes in this release.
+
 ## 0.4.10
 
 No changes in this release.

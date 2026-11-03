@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.11] - 2026-11-03
+
+### Added
+
+- One line installs AgentLink on macOS, Linux and Windows (INSTALLER-1, owner Decision 58): `curl -fsSL https://agentlink.4thtech.io/install.sh | sh` or, on Windows, `irm https://agentlink.4thtech.io/install.ps1 | iex`. It uses your Node.js 22.14 or newer, or downloads the official Node.js from nodejs.org for AgentLink only and checks it against nodejs.org's list and a hash in the installer. It adds an `agentlink` command with no admin rights and opens the app. Run it again to update; `--dry-run` and `--uninstall` are there too.
+
+### Changed
+
+- DOCS-0410: Status, README, knowledge base and llms.txt are current to 0.4.10 (an agent is now an ID in the app); the quick guide tells people without Node.js where to get it before the install command.
+- A pull request no longer waits for a macOS runner unless it touches macOS-specific code (OPS-MACOS-QUEUE, S2, CI): the macOS legs of `keychain`, `path-guard` and `node-os` run on a pull request only for the OS keychain, KeyStore, approval and CLI keychain-test files (or a file named for macOS), and always on `main`, where the release gate still requires them. A macOS leg cancelled before any step ran is reported as "runner unavailable", and `ci-auto-retry` now also retries `path-guard` once.
+- Releases and deploys no longer get stuck (OPS-UNSTICK-A, process): a service deploys to production unless a newer merge changes that service, a deploy run that was cancelled or superseded hands off to the run that deploys (and turns red when none will), review checks no longer cancel each other, a release overtaken by another merge is still published, the broken automatic `next` snapshot from `main` is switched off, and known flaky tests sit in a visible quarantine that expires after at most 14 days.
+- A release now needs one owner click (OPS-UNSTICK-B, S2, release process): a release GitHub App opens the "Version packages" pull request, so its checks start by themselves; `review-gate` passes it as a mechanical S0 when its diff only bumps versions, rolls changelogs and removes consumed changesets and fragments; it merges automatically; and the desktop extension signs in a new reviewer-less `desktop-sign` environment after the approved npm publish. The `npm-publish` approval stays the one click. `tools/orchestrator/retrigger-version-pr.py` and the hand-filled version PR body are gone.
+- Under the hood now labels the AI-app column "AI app (harness)" with a short hint for developers; the rest of the app and the user docs keep saying "AI app" (W7-HARNESS-TERM, S0, 11 §5.1).
+- The ID card's button now says Open (it opens that ID in the app); the removal sheet says which AI app is still running, with Terminal sessions or a background app named (W8-FEEDBACK-S1B, S1, 11 §5).
+- The passkey button on the confirm step uses the platform word (Touch ID, Windows Hello, passkey); the backup-code hint now says what the code is instead of a terminal command (W8-FEEDBACK-S1B, S1).
+- `agentlink_status` names the AgentLink ID by its own label in the summary (W8-FEEDBACK-S1B, S1, 06 §2.1).
+
+### Fixed
+
+- The install lines in the README, the quick guide and the user guide are now one command per code block with a label above, so the copy button copies a line that runs. Before, a Windows user who copied the inline line pasted only the web address and PowerShell failed. The README also names the current version, 0.4.10.
+- A release or deploy no longer stays undone when the heavy CI on `main` is slow or flaky (OPS-CIGREEN-WAIT, S2, CI): the deploys now wait up to 90 minutes for this commit's CI, as the release does, and a new `ci-green pick-up` workflow re-runs the failed jobs of the release and deploy runs of a commit whose `ci-green` gave up, as soon as that commit's CI and Security turn green and it is still the head of `main`. The re-run is the original run, so every check, approval and freeze applies unchanged; anything it cannot pick up shows as a red run.
+- R2-REASONS (S1): a failed step in the local app now says why (storage or network unreachable, keychain locked, busy, AI app settings not writable) instead of one generic line; a failed check whether Claude Desktop is open no longer shows "Quit Claude Desktop first" but "Couldn't check whether it is open".
+- New ID offers Touch ID again (W8-F13-TOUCHID, S2): if Touch ID isn't set up for AgentLink on this computer yet, New ID now offers "Switch to Touch ID": enter your backup code once, then confirm with Touch ID. The backup code form now says what the code is and why Touch ID isn't offered, and Get started shows one Back button instead of two.
+- The app no longer quits silently while you use it (W8-F25, owner test of 0.4.10): `agentlink ui` now closes after 30 minutes without use (any open page or request counts as use) instead of 30 minutes after it started. Every exit (idle, Ctrl+C, closing the terminal, a stop signal) prints one line: "AgentLink closed. Run `agentlink` to open it again." The open page says the same instead of "Try again in a minute".
+- On Windows, AgentLink now opens your browser reliably, and no longer says it opened when it didn't (W8-F40). If the page hasn't loaded after 15 seconds, the terminal says "Your browser didn't open AgentLink. Press Enter here to try again." The first line now says "Opening AgentLink in your browser…" and names Touch ID or Windows Hello instead of a "setup page" (W8-F41).
+- The app now shows the AgentLink mark in the browser tab (W8-FEEDBACK-S1, S0).
+- Running `agentlink` no longer prints raw JSON log lines in your terminal; set `AGENTLINK_LOG=debug` (or `info`, `warn`, `error`) to see them (W8-FEEDBACK-S1, S1).
+- The AI app picker calls the first card "Claude Code CLI" and adds "Open now" to an app that is open at the moment (W8-FEEDBACK-S1, S1).
+- `agentlink doctor` on a computer with an owner but no IDs now says "You have no IDs yet" and points to `agentlink`, and the first-run page no longer tells you to run a command you may not have (W8-FEEDBACK-S1, S1).
+- "Contacts still see" and "Update contacts" no longer show on an ID with no contacts (W8-FEEDBACK-S1B, S1).
+- New ID shows which AI apps are already in use (W8-S5, S2): each AI app on the pick now says "Uses {name}", "Uses a removed ID" or "Set up by hand", instead of "Found on this Mac". If you pick an app another ID uses, the confirm screen says so before Touch ID: "{app} will use {new} instead of {old}" (or "instead of an ID that was removed").
+- Finish removing from Home (W8-S4): an ID whose removal stopped part-way is no longer shown as a normal ID on Home or in the ID switcher. Both now say "{name} wasn't fully removed" with Finish removing, which finishes it with Touch ID without typing the name again.
+- An ID that no AI app uses says "Not used by any AI app" once, and the ID switcher shortens several AI apps to "Claude Code and 1 more" (W8-S4).
+
 ## [0.4.10] - 2026-11-02
 
 ### Changed
@@ -908,7 +942,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.10...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.11...HEAD
+[0.4.11]: https://github.com/4thtech/agentlink/compare/v0.4.10...v0.4.11
 [0.4.10]: https://github.com/4thtech/agentlink/compare/v0.4.9...v0.4.10
 [0.4.9]: https://github.com/4thtech/agentlink/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/4thtech/agentlink/compare/v0.4.7...v0.4.8
