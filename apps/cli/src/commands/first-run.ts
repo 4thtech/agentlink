@@ -23,7 +23,8 @@
 // is the M1-11s-c route (`setupGate`), which re-checks that no owner exists on every begin and
 // finish; this step adds no route and no authority, only the opener call.
 import process from 'node:process';
-import { createLogger, type Logger } from '@4thtech-io/log';
+import type { Logger } from '@4thtech-io/log';
+import { cliLogger } from '../runtime/log-level.js';
 import {
   startApprovalServer,
   type ApprovalServer,
@@ -147,7 +148,7 @@ export interface FirstRunSeams {
 /** The production step: the OS user's home, the OS keychain, the OS browser opener. */
 export function nodeFirstRunDeps(seams: Partial<FirstRunSeams> = {}): FirstRunDeps {
   const owner = seams.owner ?? nodeOwnerDeps();
-  const logger: Logger = seams.logger ?? createLogger({ name: 'init' });
+  const logger: Logger = seams.logger ?? cliLogger('init', process.env);
   const uiOptions = seams.localUi ?? ((agent: OwnerAgent) => localUiOptions(agent));
   const startServer = seams.startServer ?? startApprovalServer;
   return Object.freeze<FirstRunDeps>({

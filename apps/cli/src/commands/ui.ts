@@ -28,7 +28,8 @@
 // owner signature, and first-run setup is the `setupGate` route that re-checks that no owner exists.
 import { homedir } from 'node:os';
 import process from 'node:process';
-import { createLogger, type Logger } from '@4thtech-io/log';
+import type { Logger } from '@4thtech-io/log';
+import { cliLogger } from '../runtime/log-level.js';
 import { probeOsKeychain, selectKeyStoreBackend, startApprovalServer } from '@4thtech-io/node';
 import { createAiAppsDesk } from '../harness/app-desk.js';
 import { embeddedLocalUiAssets } from '../mcp/local-ui-assets.js';
@@ -206,7 +207,7 @@ export async function serveUi(
 /** The production step: the OS user's home, the OS keychain, the OS browser opener. */
 export function nodeUiDeps(): UiDeps {
   const owner = nodeOwnerDeps();
-  const logger: Logger = createLogger({ name: 'ui' });
+  const logger: Logger = cliLogger('ui', process.env);
   return Object.freeze<UiDeps>({
     // U3-b: no agent that is being removed; the rest through the AgentDirectory seam.
     agents: async () =>

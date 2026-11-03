@@ -28,8 +28,8 @@ import {
   type TransportFactory,
 } from '@4thtech-io/core';
 import type { KeyStore } from '@4thtech-io/crypto';
-import { createLogger, type Logger } from '@4thtech-io/log';
-import { cliLogLevel } from './log-level.js';
+import type { Logger } from '@4thtech-io/log';
+import { cliLogger } from './log-level.js';
 import {
   nodeHostResolver,
   nodeNip11Fetcher,
@@ -159,7 +159,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
   if (!isAgentName(name)) throw new RuntimeError('agent_name_invalid');
   const deps = options.deps ?? nodeRuntimeDeps;
   const clock = options.clock ?? systemClock;
-  const logger = options.logger ?? createLogger({ name: 'cli', level: cliLogLevel(process.env) });
+  const logger = options.logger ?? cliLogger('cli', process.env);
 
   const found = await readAgentConfig(options.home ?? homedir(), name);
   if (found === undefined) {
