@@ -353,6 +353,62 @@ describe('Remove', () => {
     expect(code()).toBeTruthy();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
   });
+  it('F22: Claude Code names the Terminal sessions still using the ID', async () => {
+    const running = list([
+      ...FOUR.slice(0, 1),
+      agent('work', 'Work', {
+        contacts: 1,
+        running: true,
+        state: 'ready',
+        apps: [{ app: 'claude-code', state: 'ready' }],
+      }),
+      ...FOUR.slice(2),
+    ]);
+    answers['GET /api/ui/agents'] = { status: 200, body: running };
+    const sheet = await open('work');
+    await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
+    await click(button(sheet, 'Remove with Touch ID'));
+    expect(plain(host)).toContain('Claude Code sessions in Terminal are still using this ID. Close them, then check again.');
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
+    // Still running: Check again stays on the sentence, still without a gesture.
+    await click(button(host, 'Check again'));
+    expect(plain(host)).toContain('Claude Code sessions in Terminal are still using this ID. Close them, then check again.');
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    // Quit: Check again goes on to the Touch ID step, and the server still decides.
+    answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
+    await click(button(host, 'Check again'));
+    expect(code()).toBeTruthy();
+    expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
+  });
+  it('F22: OpenCode says it keeps running in the background', async () => {
+    const running = list([
+      ...FOUR.slice(0, 1),
+      agent('work', 'Work', {
+        contacts: 1,
+        running: true,
+        state: 'ready',
+        apps: [{ app: 'opencode', state: 'ready' }],
+      }),
+      ...FOUR.slice(2),
+    ]);
+    answers['GET /api/ui/agents'] = { status: 200, body: running };
+    const sheet = await open('work');
+    await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
+    await click(button(sheet, 'Remove with Touch ID'));
+    expect(plain(host)).toContain('OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.');
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
+    // Still running: Check again stays on the sentence, still without a gesture.
+    await click(button(host, 'Check again'));
+    expect(plain(host)).toContain('OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.');
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    // Quit: Check again goes on to the Touch ID step, and the server still decides.
+    answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
+    await click(button(host, 'Check again'));
+    expect(code()).toBeTruthy();
+    expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
+  });
   it('W6-FLOW-FIXES: a failed read goes on to the Touch ID step (presence is never skipped)', async () => {
     const sheet = await open('work');
     answers['GET /api/ui/agents'] = { status: 500, body: {} };
