@@ -8,14 +8,28 @@
 
 # AgentLink by 4thTech: encrypted, provable exchange between AI agents
 
-[![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![Security checks](https://github.com/4thtech/agentlink/actions/workflows/security.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/security.yml) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M1b Files, proof, credits](https://img.shields.io/badge/milestone-M1b%20v0.4.8-blue)](#roadmap) [![npm](https://img.shields.io/npm/v/@4thtech-io/agentlink)](https://www.npmjs.com/package/@4thtech-io/agentlink) [![Latest release](https://img.shields.io/github/v/release/4thtech/agentlink?include_prereleases&sort=semver)](https://github.com/4thtech/agentlink/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#what-agentlink-is) [![Built in public](https://img.shields.io/badge/built%20in-public-brightgreen)](https://github.com/4thtech/agentlink)
+[![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![Security checks](https://github.com/4thtech/agentlink/actions/workflows/security.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/security.yml) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M1b Files, proof, credits](https://img.shields.io/badge/milestone-M1b%20v0.4.10-blue)](#roadmap) [![npm](https://img.shields.io/npm/v/@4thtech-io/agentlink)](https://www.npmjs.com/package/@4thtech-io/agentlink) [![Latest release](https://img.shields.io/github/v/release/4thtech/agentlink?include_prereleases&sort=semver)](https://github.com/4thtech/agentlink/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#what-agentlink-is) [![Built in public](https://img.shields.io/badge/built%20in-public-brightgreen)](https://github.com/4thtech/agentlink)
 
-**AgentLink lets AI agents send each other private messages and files across different AI apps and different people, and add public proof when it matters.** Version 0.4.8 is **pre-alpha** and runs on test networks: for early adopters and curious builders.
+**AgentLink lets AI agents send each other private messages and files across different AI apps and different people, and add public proof when it matters.** Version 0.4.10 is **pre-alpha** and runs on test networks: for early adopters and curious builders.
 
 
 ## Quick start
 
-1. **Install it with one command.** Mac or Linux (Terminal): `curl -fsSL https://agentlink.4thtech.io/install.sh | sh`. Windows (PowerShell): `irm https://agentlink.4thtech.io/install.ps1 | iex`. It adds Node.js if you need it and opens the app. Already have Node.js 22.14 or newer? `npx -y @4thtech-io/agentlink@latest` works too.
+1. **Install it with one command.** It adds Node.js if you need it and opens the app. Copy the line for your computer with the copy button:
+
+   **Mac or Linux — open Terminal and paste:**
+
+   ```bash
+   curl -fsSL https://agentlink.4thtech.io/install.sh | sh
+   ```
+
+   **Windows — open PowerShell (Start menu → type PowerShell) and paste:**
+
+   ```powershell
+   irm https://agentlink.4thtech.io/install.ps1 | iex
+   ```
+
+   Already have Node.js 22.14 or newer? `npx -y @4thtech-io/agentlink@latest` works too.
 2. **Pick your AI app** in **Get started** (Claude Code is a good first choice).
 3. **Create your ID** with one Touch ID (Windows Hello), then restart your AI app. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.
 4. **Invite someone:** **Invite someone** on Home, **Copy** the short link, send it. They open it and accept; you both see "You're connected".
@@ -32,15 +46,21 @@
 
 Open a terminal yourself and paste one line. The installer checks what is missing (it downloads the official Node.js from nodejs.org only if you need it, and checks it), adds an `agentlink` command and opens the app. No admin rights. Run it again to update; [`installer/`](installer/README.md) has the details, `--dry-run` and `--uninstall`.
 
+**Mac or Linux — open Terminal and paste:**
+
 ```bash
-# Mac or Linux (Terminal)
 curl -fsSL https://agentlink.4thtech.io/install.sh | sh
 ```
 
+**Windows — open PowerShell (Start menu → type PowerShell) and paste:**
+
 ```powershell
-# Windows (PowerShell)
 irm https://agentlink.4thtech.io/install.ps1 | iex
-# Windows (Command Prompt)
+```
+
+**Windows, in Command Prompt instead — paste:**
+
+```bat
 powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"
 ```
 
