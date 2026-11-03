@@ -2,9 +2,9 @@
 // OPS-UNSTICK-A (report C8): a visible, expiring quarantine for evidence-backed flaky tests.
 //
 // The list is tools/ci/quarantine.json. Each entry names ONE test (`<repo path> > <describe> > ...
-// > <test title>`), the CI job scope it applies to (`checks` or `node-os`), the reason, the evidence
-// (CI run and job), an owner (GitHub login), the date it was added and its expiry: at most
-// MAX_DAYS later, at most MAX_ENTRIES entries. The limits live here, not in the JSON.
+// > <test title>`), the CI job scope it applies to (`checks`, `node-os` or `e2e-browser`), the
+// reason, the evidence (CI run and job), an owner (GitHub login), the date it was added and its
+// expiry: at most MAX_DAYS later, at most MAX_ENTRIES entries. The limits live here, not in the JSON.
 //
 // A quarantined test still runs and is reported. While its entry is live, a failure of that test
 // alone does not fail the job: it shows as a warning and in the run summary. Any other failure
@@ -30,7 +30,7 @@ import { pathToFileURL } from 'node:url';
 
 export const MAX_ENTRIES = 5;
 export const MAX_DAYS = 14;
-export const SCOPES = new Set(['checks', 'node-os']);
+export const SCOPES = new Set(['checks', 'node-os', 'e2e-browser']);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LOGIN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const TEST_FILE_RE = /^[\w.@-]+(?:\/[\w.@-]+)*\.test\.(?:ts|tsx|mjs|js)$/;
@@ -239,7 +239,8 @@ function parse(argv) {
     else throw new Error(`unknown argument ${flag}`);
   }
   if (command === 'evaluate') {
-    if (!SCOPES.has(args.scope)) throw new Error('--scope must be checks or node-os');
+    if (!SCOPES.has(args.scope))
+      throw new Error(`--scope must be one of ${[...SCOPES].join(', ')}`);
     if (!/^\d+$/.test(args.exitCode ?? '')) throw new Error('--exit-code is required');
   }
   return args;

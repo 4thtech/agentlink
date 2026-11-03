@@ -34,8 +34,9 @@
 //      macOS-specific (MACOS_PATHS); output `run_macos`. The heavy lane on `main` always runs them.
 //
 // Usage: node tools/ci/select-affected.mjs <changed-files.txt>
-// Writes test_scope, turbo_filters, needs_playwright and one run_<job> per package job and per
-// heavy-lane job to $GITHUB_OUTPUT when it is set. ci.yml reads a missing run_<job> as `true`.
+// Writes test_scope, turbo_filters, needs_playwright, checks_test_filters, e2e_browser_filters and
+// one run_<job> per package job and per heavy-lane job to $GITHUB_OUTPUT when it is set. ci.yml
+// reads a missing run_<job> as `true`.
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -133,7 +134,33 @@ export const PACKAGE_JOBS = Object.freeze({
   'relays-docker': ['@4thtech-io/node', '@4thtech-io/transport-nostr'],
   'storage-minio': ['@4thtech-io/storage'],
   'bundle-check': ['@4thtech-io/agentlink'],
+  // CI-E2E-BROWSER: the real-browser suites, moved out of `checks` (BROWSER_JOB_PACKAGES below).
+  'e2e-browser': ['@4thtech-io/e2e', '@4thtech-io/local-ui', '@4thtech-io/node'],
 });
+
+// CI-E2E-BROWSER (owner-approved CI reliability fix, 2026-11-03): the Playwright suites run in their
+// own job `e2e-browser` instead of `checks`, so their UI waits no longer share a 4-vCPU runner with
+// every other package's tests. That job runs the whole e2e package (the journeys) and the
+// `*browser.test.*` files of BROWSER_TEST_PACKAGES (their vitest configs read
+// AGENTLINK_CI_BROWSER_TESTS: `only` there, `skip` in `checks`); `checks` runs everything else and
+// leaves the e2e package out of its test step. Each test file runs in exactly one of the two jobs
+// (tools/ci/e2e-browser-split.test.mjs).
+export const E2E_PACKAGE = '@4thtech-io/e2e';
+export const BROWSER_TEST_PACKAGES = Object.freeze(['@4thtech-io/local-ui', '@4thtech-io/node']);
+export const BROWSER_JOB_PACKAGES = Object.freeze([E2E_PACKAGE, ...BROWSER_TEST_PACKAGES]);
+
+/**
+ * CI-E2E-BROWSER: the turbo filters of the two test steps for a filtered (fast-lane) selection:
+ * `checks` tests every selected package but the e2e package; `e2e-browser` the selected
+ * BROWSER_JOB_PACKAGES. A full run uses the constants in ci.yml instead.
+ * @param {string[]} packages
+ */
+export function browserSplitFilters(packages) {
+  return {
+    checks: turboFilters(packages.filter((p) => p !== E2E_PACKAGE)),
+    browser: turboFilters(packages.filter((p) => BROWSER_JOB_PACKAGES.includes(p))),
+  };
+}
 
 // Root files that change what gets installed: a new dependency can break one OS or the packed CLI.
 export const INSTALL_FILES = Object.freeze([
@@ -492,6 +519,11 @@ function main(argv) {
     test_scope: result.scope,
     turbo_filters: result.scope === 'filtered' ? turboFilters(result.packages) : '',
     needs_playwright: result.scope === 'full' ? 'true' : String(result.playwright),
+    // CI-E2E-BROWSER: empty on a full run (ci.yml then uses its full-run filters).
+    checks_test_filters:
+      result.scope === 'filtered' ? browserSplitFilters(result.packages).checks : '',
+    e2e_browser_filters:
+      result.scope === 'filtered' ? browserSplitFilters(result.packages).browser : '',
   };
   if (result.scope === 'full') console.log(`Full suite: ${result.reason}`);
   else console.log(`Affected packages (${result.packages.length}): ${result.packages.join(' ')}`);
