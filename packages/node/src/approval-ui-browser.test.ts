@@ -178,7 +178,7 @@ const pick = (page: Page, n: number) =>
     name: `Select Send a message to Contact ${String(n)}`,
     exact: true,
   });
-const CODE_LABEL = 'Backup code or owner passphrase';
+const CODE_LABEL = 'Backup code';
 /** The wrong-code backoff's free attempts (approval-server.ts), pinned. */
 const FREE_ATTEMPTS = 3;
 const XSS = '<img src=x onerror="window.__xss=1"><script>window.__xss=2</script>';
