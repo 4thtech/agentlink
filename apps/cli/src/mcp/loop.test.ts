@@ -356,6 +356,7 @@ type Processed = (r: { readonly stored: number; readonly reports: readonly unkno
 /** A live subscription double: records close calls; `onProcessed` is the core's callback. */
 class StubSubscription implements LoopSubscription {
   closed = false;
+  keyEpoch: number | undefined;
   closes = 0;
   constructor(
     readonly onProcessed: Processed | undefined,
@@ -413,6 +414,53 @@ describe('background loop with live subscriptions (M1-9s)', () => {
     expect(s.sync).toHaveBeenCalledTimes(1);
     expect(s.deliver).toHaveBeenCalledTimes(2);
     expect(s.subscribe).toHaveBeenCalledTimes(1);
+    await loop.stop();
+  });
+
+  it('NEW-INVITE-STUCK: a key epoch change while live closes the subscription, catches up and reopens with the new keys', async () => {
+    const s = liveStubClient();
+    const epoch = { value: 0 };
+    const subscribe = vi.fn((options?: { onProcessed?: Processed }) => {
+      const sub = new StubSubscription(options?.onProcessed, s.order);
+      sub.keyEpoch = epoch.value;
+      s.subs.push(sub);
+      s.order.push('subscribe');
+      return Promise.resolve(sub);
+    });
+    const client = {
+      ...s.client,
+      subscribeInbox: subscribe,
+      currentKeyEpoch: () => Promise.resolve(epoch.value),
+    };
+    const timers = new ManualTimers();
+    const loop = new BackgroundLoop({ client, logger, timers });
+    loop.start();
+    timers.fire(0);
+    await flush();
+    timers.fire(0);
+    await flush();
+    expect(loop.live).toBe(true);
+    expect(s.sync).toHaveBeenCalledTimes(1);
+    // Nothing changed: the next pass keeps the subscription and skips the fetch.
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(s.sync).toHaveBeenCalledTimes(1);
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    // The ID was renamed: keys rotated. The very next pass swaps the subscription.
+    epoch.value = 1;
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(s.subs[0]?.closed).toBe(true);
+    expect(s.sync).toHaveBeenCalledTimes(2);
+    expect(subscribe).toHaveBeenCalledTimes(2);
+    expect(s.subs[1]?.keyEpoch).toBe(1);
+    expect(s.order.indexOf('close')).toBeLessThan(s.order.lastIndexOf('subscribe'));
+    expect(loop.live).toBe(true);
+    // And it stays quiet afterwards.
+    timers.fire(SYNC_INTERVAL_MS);
+    await flush();
+    expect(s.sync).toHaveBeenCalledTimes(2);
+    expect(subscribe).toHaveBeenCalledTimes(2);
     await loop.stop();
   });
 

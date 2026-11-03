@@ -23,7 +23,7 @@ import {
   passphrase,
   seed,
 } from './testing/fixtures.js';
-import { pairWith, textPayload, type TestAgent, type TestOwner } from './testing/envelopes.js';
+import { pairWith, rotate, textPayload, type TestAgent, type TestOwner } from './testing/envelopes.js';
 import { nostrTransport, type Transport, type TransportFactory } from './transport.js';
 
 const RELAYS_A = Object.freeze(['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net']);
@@ -263,6 +263,22 @@ describe('subscribeInbox (M1-9s; 07 §4.1, §4.2; 06 §6)', () => {
     await sub.close();
     b.client.close();
     a.client.close();
+  });
+
+  it('reports the key epoch it subscribed with; a rename (key rotation) shows as a newer epoch', async () => {
+    const net = new LiveRelayNetwork();
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    const first = await b.client.subscribeInbox();
+    expect(first.keyEpoch).toBe((await b.keyStore.getPublicBundle()).keyEpoch);
+    await rotate(b);
+    const now = (await b.keyStore.getPublicBundle()).keyEpoch;
+    expect(now).toBe(first.keyEpoch + 1);
+    expect(await b.client.currentKeyEpoch()).toBe(now);
+    const second = await b.client.subscribeInbox();
+    expect(second.keyEpoch).toBe(now);
+    await first.close();
+    await second.close();
+    b.client.close();
   });
 
   it('no duplicate effects when the subscription and a catch-up see the same wrap', async () => {
