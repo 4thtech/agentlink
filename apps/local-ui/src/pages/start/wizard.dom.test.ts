@@ -767,6 +767,22 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     );
   });
 
+  it('W8-F11: "Confirm it\'s you" shows one Back, also on the backup-code form', async () => {
+    await mount(asAdd({ createAgentApi: made() }));
+    await typeName('Side project');
+    await click('Continue');
+    await click(/^CursorFound/);
+    await click(PICK_STEP.next('Cursor'));
+    const backs = (): number =>
+      [...host.querySelectorAll('button')].filter(
+        (b) => b.textContent?.trim() === CONNECT_STEP.back,
+      ).length;
+    expect(backs()).toBe(1);
+    await click('Use a backup code instead');
+    expect(host.querySelector('input[type="password"]')).not.toBeNull();
+    expect(backs()).toBe(1);
+  });
+
   it('a new Add agent starts with no name from an earlier run', async () => {
     rememberWizard({ name: 'Old name', choice: 'cursor', outcome: { label: 'Old name' } });
     await mount(asAdd());

@@ -374,10 +374,14 @@
 
 /* Sheets and the inline editor (Rename, Add, Remove, Pause). */
 .ag-rename,
-.ag-sheet-body {
+.ag-sheet-body,
+.ag-code-form {
   display: flex;
   flex-direction: column;
   gap: var(--al-space-4);
+}
+.ag-code-form p {
+  margin: 0;
 }
 .ag-goes {
   margin: 0;
