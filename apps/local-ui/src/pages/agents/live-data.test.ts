@@ -108,7 +108,9 @@ describe('the words (08 §1)', () => {
         NOW,
       ),
     ).toBe('Connected to Cursor and 2 more');
-    expect(agentLine(row({ state: 'idle', appStates: [app('Codex', 'idle')] }), NOW)).toBe('Connected to Codex');
+    expect(agentLine(row({ state: 'idle', appStates: [app('Codex', 'idle')] }), NOW)).toBe(
+      'Connected to Codex',
+    );
     expect(
       agentLine(
         row({
