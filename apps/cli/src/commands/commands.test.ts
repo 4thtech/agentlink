@@ -586,6 +586,32 @@ describe('doctor (07 §9.4)', () => {
     expect(no.text).not.toContain(TEXT.doctorOwnerCodeUnfinished);
   });
 
+  it('F8: an owner with no IDs says "no IDs yet" and points to `agentlink`; no owner keeps the set-up line', async () => {
+    const needs = { status: 'needs_setup', reason: 'no_agent', message: 'Not set up here.' } as const;
+    const doctorWith = async (ownerOnMachine: (() => Promise<boolean>) | undefined) => {
+      const out: string[] = [];
+      const deps = createDeps({ open: () => Promise.resolve(needs), home: '/nonexistent-home' });
+      const handler = createDoctorHandler({
+        ...deps,
+        ...(ownerOnMachine === undefined ? {} : { ownerOnMachine }),
+      });
+      const code = await createDispatcher({ doctor: handler })(['doctor'], {
+        output: { print: (t) => out.push(t), printError: (t) => out.push(t) },
+        terminal: TTY,
+        version: '0.0.0',
+      });
+      return { code, text: out.join('\n') };
+    };
+    const owner = await doctorWith(() => Promise.resolve(true));
+    expect(owner.code).toBe(EXIT_FAILED);
+    expect(owner.text).toContain('You have no IDs yet. Open AgentLink to create one: run `');
+    expect(owner.text).not.toContain('not set up');
+    const none = await doctorWith(() => Promise.resolve(false));
+    expect(none.text).toContain('Not set up here.');
+    expect(none.text).not.toContain('You have no IDs yet');
+    expect((await doctorWith(undefined)).text).toContain('Not set up here.');
+  });
+
   const noCard = (): Fake => fakeAgent({ identity: { get: () => Promise.resolve(undefined) } });
 
   it('names the missing owner card, never suggests init, and stops (M1-9u)', async () => {
