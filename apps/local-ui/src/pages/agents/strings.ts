@@ -21,7 +21,7 @@ export const AGENTS_STRINGS = {
   manageAgentsApps: 'Manage IDs & apps',
   notConnectedYet: 'Not connected yet',
   connectFreeApp: (app: string): string => `Connect ${app}`,
-  switch: 'Switch',
+  switch: 'Open',
   rename: 'Rename',
   connect: 'Connect',
   remove: 'Remove',

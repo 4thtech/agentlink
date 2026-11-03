@@ -152,8 +152,8 @@ describe('the Agents page', () => {
     expect(personal.textContent).toContain('Used by Claude Code, Claude Desktop');
     expect(rowOf('second').textContent).toContain('Not used by any AI app');
     expect(personal.textContent).toContain('4 contacts');
-    expect(button(personal, 'Switch')).toBeUndefined();
-    expect(button(rowOf('work'), 'Switch')).toBeDefined();
+    expect(button(personal, 'Open')).toBeUndefined();
+    expect(button(rowOf('work'), 'Open')).toBeDefined();
     expect(rowOf('work').textContent).toContain('1 contact');
   });
   it('an agent with no AI app reads Not used by any AI app with its AI apps panel; Removal not finished with Try again', async () => {
@@ -166,7 +166,7 @@ describe('the Agents page', () => {
     expect(old.textContent).toContain('Removal not finished');
     expect(old.textContent).toContain('Removing it stopped part-way. Nothing else was affected.');
     expect(button(old, 'Try again')).toBeDefined();
-    expect(button(old, 'Switch')).toBeUndefined();
+    expect(button(old, 'Open')).toBeUndefined();
   });
   it('has no List and Map control in the simple layer (it lives Under the hood)', async () => {
     await mountPage();
@@ -212,7 +212,7 @@ describe('the Agents page', () => {
       body: { status: 'done', generation: 8, current: 'work' },
     };
     const reload = await mountPage();
-    await click(button(rowOf('work'), 'Switch'));
+    await click(button(rowOf('work'), 'Open'));
     const post = calls.find((c) => c.url === '/api/ui/agents/switch')!;
     expect(JSON.parse(post.body)).toEqual({ name: 'work', generation: 7 });
     expect(reload).toHaveBeenCalledTimes(1);
@@ -223,7 +223,7 @@ describe('the Agents page', () => {
     const reads = (): number =>
       calls.filter((c) => c.url === '/api/ui/agents' && c.method === 'GET').length;
     const before = reads();
-    await click(button(rowOf('work'), 'Switch'));
+    await click(button(rowOf('work'), 'Open'));
     expect(plain(host)).toContain('You switched IDs. Nothing was changed.');
     // The page's read and the shared live store's read.
     expect(reads()).toBeGreaterThan(before);
