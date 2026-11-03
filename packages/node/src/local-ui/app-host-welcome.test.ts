@@ -827,6 +827,16 @@ describe('U3-g-b: first run creates the first agent and opens it in the host', (
     expect(JSON.parse((await h.get('/api/ui/first-run', s)).body)).toEqual({ owner: 'set_up' });
   });
 
+  // F2: an app host started WITH an agent (no `host.firstRun`) that has none open any more (a failed
+  // switch) must not tell the page "no owner": first run cannot set one up there, and an owner exists.
+  it('F2: with no agent open and no host.firstRun, GET /api/ui/first-run is set_up when an agent folder exists', async () => {
+    const w = world();
+    w.entries.set('old', { name: 'old', label: 'Old', available: true, removing: false });
+    const h = await harness({ w, firstRun: false });
+    const s = await h.session();
+    expect(JSON.parse((await h.get('/api/ui/first-run', s)).body)).toEqual({ owner: 'set_up' });
+  });
+
   it('without host.firstRun no agent is created from the page (503 unavailable)', async () => {
     const h = await harness({ firstRun: false });
     const s = await h.session();

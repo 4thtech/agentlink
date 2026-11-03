@@ -1437,7 +1437,9 @@ export async function startApprovalServerWith(
       // U3-invite-b: the join screen's lease-gated pass, captured with this context's agent.
       ...(follower === undefined ? {} : { followPairing: follower.follow }),
       // U3-g-b (IR-U3-g-b-1 L): with no agent yet, the first-run page's owner state is the real one.
-      ...(agentUi === undefined && options.host?.firstRun !== undefined
+      // F2: also when the host has no first-run port (started with an agent, then none open after a
+      // failed switch): setupBlockedNoAgent is then true, so the page never offers a second owner.
+      ...(agentUi === undefined && options.host !== undefined
         ? { setupBlocked: () => setupBlockedNoAgent() }
         : {}),
       // U3-f: the CLI's harness desk (the one AI app config writer), when the caller wired it.
