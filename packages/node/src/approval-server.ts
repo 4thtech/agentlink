@@ -877,11 +877,13 @@ export interface ApprovalServer {
   /**
    * F25: whether the app is in use, for the `ui` command's idle limit. `lastAt` is the time (ms) of
    * the last request to the page API (`/api/ui/`), `openStreams` the open live streams (open tabs).
-   * Counts and a time only.
+   * Counts and a time only. F40: `linksUsed` counts the one-shot session links used so far (each
+   * one opened a session), so the CLI can tell when a browser it asked for never loaded the page.
    */
   readonly activity: {
     lastAt(): number;
     openStreams(): number;
+    linksUsed(): number;
   };
   close(): Promise<void>;
 }
@@ -1556,6 +1558,9 @@ export async function startApprovalServerWith(
     return found;
   };
 
+  /** F40: how many one-shot links were used (a count only, for the CLI's "didn't open" check). */
+  let linksUsed = 0;
+
   /** Mints a one-shot session link token (M1-11a). */
   const mintLink = (): string => {
     const token = encodeBase64url(randomBytes(32));
@@ -1572,7 +1577,9 @@ export async function startApprovalServerWith(
     );
     if (at < 0) return false;
     const [link] = links.splice(at, 1);
-    return link !== undefined && now() < link.expiresAt;
+    const live = link !== undefined && now() < link.expiresAt;
+    if (live) linksUsed += 1;
+    return live;
   };
 
   /** A new session secret for the cookie. */
@@ -5571,6 +5578,7 @@ export async function startApprovalServerWith(
     activity: Object.freeze({
       lastAt: () => lastActivityAt,
       openStreams: () => liveEvents.size,
+      linksUsed: () => linksUsed,
     }),
     open: async (approvalId?: string) => {
       // A malformed ID rejects the returned promise (never a synchronous throw).

@@ -40,6 +40,13 @@ import {
   ownerSetupDone,
 } from '../mcp/local-ui-wiring.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
+import {
+  OPEN_CHECK_MS,
+  openAndWatch,
+  setupOpenedLine,
+  stdinEnter,
+  type OpenWatch,
+} from '../runtime/open-watch.js';
 import { nodeOwnerDeps, type OwnerAgent, type OwnerCommandDeps } from './owner/deps.js';
 
 /** How long `init` keeps the setup page served at most (proposed: 30 minutes). */
@@ -47,10 +54,10 @@ export const FIRST_RUN_WAIT_MS = 30 * 60_000;
 
 /** Fixed text (11 §5 plain words). Nothing from a file, the page or the user is inserted. */
 export const FIRST_RUN_TEXT = Object.freeze({
-  opened:
-    "Your browser opened the AgentLink setup page. Protect approvals there with a passkey. Keep this window open while you use the page; press Ctrl+C when you're done.",
+  /** F40, F41: "Opening" (the opener cannot prove a page loaded); the platform's gesture word. */
+  opened: setupOpenedLine(process.platform),
   done: "OK       Approvals on this computer are now protected. The settings page works while this window stays open; press Ctrl+C when you're done.",
-  noBrowser: "AgentLink couldn't open your browser for the setup page.",
+  noBrowser: "AgentLink couldn't open your browser.",
   notFinished: "The setup page is closed, and setup wasn't finished.",
   /** `prefix`: the command as this run was started (M1-36a), never a typed value. */
   agentRun: (prefix: string): string =>
@@ -61,6 +68,8 @@ export const FIRST_RUN_TEXT = Object.freeze({
 export interface FirstRunServer {
   /** Opens the browser at a one-shot /first-run link; false when no browser could be started. */
   openFirstRun(): Promise<boolean>;
+  /** F40: how many one-shot links were used (absent: no "didn't open" follow-up). */
+  linksUsed?(): number;
   /** Stops the server and closes the agent. */
   close(): Promise<void>;
 }
@@ -77,6 +86,10 @@ export interface FirstRunDeps {
   readonly waitMs: number;
   /** Calls `stop` on Ctrl+C; returns the unsubscribe. */
   interrupt(stop: () => void): () => void;
+  /** F40: Enter in this terminal (absent: no "press Enter to try again"). Returns the unsubscribe. */
+  onEnter?(press: () => void): () => void;
+  /** F40: how long the page has to use its link before the follow-up (default OPEN_CHECK_MS). */
+  readonly openCheckMs?: number;
 }
 
 type Wait = 'setup' | 'stop' | 'time';
@@ -107,13 +120,23 @@ export async function firstRunStep(
   if (server === undefined) return false;
   let unsubscribe: (() => void) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let watch: OpenWatch | undefined;
   try {
-    const opened = await server.openFirstRun().catch(() => false);
-    if (!opened) {
+    // F40: "Opening…", then, if no one-shot link is used in time, "press Enter to try again".
+    watch = await openAndWatch(
+      {
+        open: () => server.openFirstRun(),
+        linksUsed: server.linksUsed?.bind(server),
+        print: (line) => output.print(line),
+        onEnter: deps.onEnter?.bind(deps),
+        checkMs: deps.openCheckMs ?? OPEN_CHECK_MS,
+      },
+      { opened: FIRST_RUN_TEXT.opened },
+    );
+    if (!watch.opened) {
       output.print(FIRST_RUN_TEXT.noBrowser);
       return false;
     }
-    output.print(FIRST_RUN_TEXT.opened);
     const stopped = new Promise<Wait>((resolve) => {
       unsubscribe = deps.interrupt(() => resolve('stop'));
     });
@@ -122,6 +145,8 @@ export async function firstRunStep(
     });
     // Setup first; after it the page stays served (the settings pages) until Ctrl+C or the limit.
     const first = await Promise.race([setUp, stopped, timedOut]);
+    // Setup finished: the page is loaded, so no follow-up and no Enter reading from here on.
+    watch.stop();
     if (first !== 'setup') {
       output.print(FIRST_RUN_TEXT.notFinished);
       return false;
@@ -130,10 +155,17 @@ export async function firstRunStep(
     await Promise.race([stopped, timedOut]);
     return true;
   } finally {
+    watch?.stop();
     if (timer !== undefined) clearTimeout(timer);
     unsubscribe?.();
     await server.close().catch(() => undefined);
   }
+}
+
+/** F40: the production Enter, only while standard input is a terminal. */
+function optionalEnter(): Pick<FirstRunDeps, 'onEnter'> {
+  const enter = stdinEnter();
+  return enter === undefined ? {} : { onEnter: enter };
 }
 
 /** The outside world of the production step (IR-M1-11b-6-1 L-2: tests pass doubles). */
@@ -189,6 +221,7 @@ export function nodeFirstRunDeps(seams: Partial<FirstRunSeams> = {}): FirstRunDe
         });
         return Object.freeze<FirstRunServer>({
           openFirstRun: () => server.openFirstRun(),
+          linksUsed: () => server.activity.linksUsed(),
           close: async () => {
             await server.close().catch(() => undefined);
             await agent.close();
@@ -200,6 +233,8 @@ export function nodeFirstRunDeps(seams: Partial<FirstRunSeams> = {}): FirstRunDe
       }
     },
     waitMs: FIRST_RUN_WAIT_MS,
+    // F40: Enter in the owner's terminal tries the browser again with a fresh one-shot link.
+    ...optionalEnter(),
     interrupt: (stop) => {
       process.once('SIGINT', stop);
       return () => {

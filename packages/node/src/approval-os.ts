@@ -33,6 +33,8 @@ export const OS_PROGRAMS = Object.freeze({
   linuxNotify: '/usr/bin/notify-send',
   /** The default; `%SystemRoot%\explorer.exe` when SystemRoot is a plain `X:\Windows`. */
   winExplorer: 'C:\\Windows\\explorer.exe',
+  /** F40: the default; `%SystemRoot%\System32\rundll32.exe` under the same SystemRoot rule. */
+  winRundll32: 'C:\\Windows\\System32\\rundll32.exe',
 });
 
 /** The execFile options of every run: never a shell. */
@@ -76,11 +78,19 @@ const nodeSeams = (): OsSeams => ({
 
 const WINDOWS_ROOT = /^[A-Za-z]:\\Windows$/i;
 
-function windowsExplorer(env: OsSeams['env']): string {
+function windowsRoot(env: OsSeams['env']): string | undefined {
   const root = env['SystemRoot'] ?? env['SYSTEMROOT'];
-  return typeof root === 'string' && WINDOWS_ROOT.test(root)
-    ? `${root}\\explorer.exe`
-    : OS_PROGRAMS.winExplorer;
+  return typeof root === 'string' && WINDOWS_ROOT.test(root) ? root : undefined;
+}
+
+function windowsExplorer(env: OsSeams['env']): string {
+  const root = windowsRoot(env);
+  return root === undefined ? OS_PROGRAMS.winExplorer : `${root}\\explorer.exe`;
+}
+
+function windowsRundll32(env: OsSeams['env']): string {
+  const root = windowsRoot(env);
+  return root === undefined ? OS_PROGRAMS.winRundll32 : `${root}\\System32\\rundll32.exe`;
 }
 
 /**
@@ -118,11 +128,27 @@ export function browserOpenerWith(seams: OsSeams): BrowserOpener {
       case 'darwin':
         return run(seams, OS_PROGRAMS.darwinOpen, [url]);
       case 'win32':
-        return run(seams, windowsExplorer(seams.env), [url], true);
+        return windowsOpen(seams, url);
       default:
         return run(seams, OS_PROGRAMS.linuxOpen, [url]);
     }
   };
+}
+
+/**
+ * F40 (Windows 11, 0.4.10): `explorer.exe <url>` exits 1 whether or not a browser opened, so a
+ * silent failure read as success. `rundll32.exe url.dll,FileProtocolHandler <url>` hands the url to
+ * the default browser and reports a failure to start; explorer.exe stays the fallback. Both by
+ * absolute path under SystemRoot, shell false, the url as its own argument (Node quotes it for the
+ * Windows command line; the url is ours: origin, fixed path, base64url token). Never cmd.exe or
+ * `start`, whose command line would parse the url. Neither result proves a page loaded: the CLI
+ * also watches whether the one-shot link was used (ApprovalServer `activity.linksUsed`).
+ */
+async function windowsOpen(seams: OsSeams, url: string): Promise<boolean> {
+  if (await run(seams, windowsRundll32(seams.env), ['url.dll,FileProtocolHandler', url])) {
+    return true;
+  }
+  return run(seams, windowsExplorer(seams.env), [url], true);
 }
 
 /** AppleScript string literal for a fixed text (only `\` and `"` need escaping). */
@@ -194,7 +220,7 @@ export function fileRevealerWith(seams: OsSeams): FileRevealer {
 export const osFileRevealer: FileRevealer = (file, folder) =>
   fileRevealerWith(nodeSeams())(file, folder);
 
-/** The platform's URL opener: `/usr/bin/open`, `/usr/bin/xdg-open` or `explorer.exe`. */
+/** The platform's URL opener: `/usr/bin/open`, `/usr/bin/xdg-open`, or rundll32 then explorer.exe. */
 export const osBrowserOpener: BrowserOpener = (url) => browserOpenerWith(nodeSeams())(url);
 
 /** The platform's notification. */

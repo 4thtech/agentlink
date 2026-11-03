@@ -135,7 +135,7 @@ export interface UiWelcomeDeps {
 export interface UiWelcomeServer {
   readonly page: 'first-run';
   /** F25: page use, for the idle limit (see UiServer.activity). */
-  readonly activity: { lastAt(): number; openStreams(): number };
+  readonly activity: { lastAt(): number; openStreams(): number; linksUsed?(): number };
   open(): Promise<boolean>;
   close(): Promise<void>;
 }

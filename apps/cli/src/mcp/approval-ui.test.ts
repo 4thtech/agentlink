@@ -73,6 +73,7 @@ function fakeServer(origin = 'http://localhost:47321'): FakeServer {
     notified,
     closed,
     address: () => ({ host: 'localhost', port, addresses: ['127.0.0.1'] }),
+    activity: { lastAt: () => 0, openStreams: () => 0, linksUsed: () => 0 },
     approvalUrl: (id) => `${origin}/approve/${id}`,
     open: (id) => {
       opened.push(id);
