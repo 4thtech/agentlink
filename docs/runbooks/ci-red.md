@@ -72,6 +72,8 @@ The orchestrator, or the builder that owns the change (Sonnet or above). The fix
 
 6. **Trap: the same e2e test fails on several unrelated PRs at the same time.** Suspect a live-service dependency before suspecting the PRs: for example the production drop (`drop.agentlink.4thtech.io`) or another production service being down, slow or changed. Tests must never reach production services (the e2e suite uses the fake drop, `e2e/src/fake-drop.mjs`). Find the call in the failing log (`grep -n 'agentlink.4thtech.io' <log>`); if a test reached a real host, that is a bug in the test or its configuration: fix it there (a CI card), do not rerun until it passes and do not change the production service.
 
+7. **Trap: a release stopped at `ci-green` because the main commit's CI was red or flaky.** Never open a new Version packages PR to "retry" the release. The next green `main` commit publishes any version npm lacks (`select-mode`), and the owner's `npm latest` click stays. Re-run the red job (a flake: **Re-run failed jobs**), or wait for the next green `main` commit.
+
 ## Verify
 `gh pr checks <n>` shows all four required checks as `pass` on a non-draft PR (on a draft they are green with the suite skipped: mark it ready and look again). A skipped job is not evidence for an acceptance criterion (`development-process.md` §6.3).
 

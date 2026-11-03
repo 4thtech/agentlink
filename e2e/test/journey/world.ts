@@ -11,6 +11,8 @@
 //     documents (main-frame `load`) after it. A reload or a full navigation loses the marker and
 //     counts a document; an in-app navigation (history API) does neither.
 // Nothing here prints a key, a link or a path. Every file is written under a temp folder.
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import type { Browser, BrowserContext, Page } from 'playwright';
 import { expect } from 'vitest';
@@ -107,6 +109,73 @@ export interface NoReload {
   readonly documents: number;
 }
 
+/** What a page saw, for the failure output (bounded; paths only, never a query or fragment). */
+interface PageTrail {
+  readonly lines: string[];
+}
+const trails = new WeakMap<Page, PageTrail>();
+const TRAIL_MAX = 40;
+const EXCERPT_MAX = 1500;
+
+/** Links and long token-like runs never reach the output (one-shot link tokens included). */
+export function redactForOutput(value: string): string {
+  return value
+    .replace(/https?:\/\/[^\s"')]+/g, (url) => {
+      try {
+        const u = new URL(url);
+        return `${u.origin}${u.pathname.length > 40 ? '/[redacted]' : u.pathname}`;
+      } catch {
+        return '[link]';
+      }
+    })
+    .replace(/[A-Za-z0-9_-]{24,}/g, '[redacted]');
+}
+
+function remember(page: Page, line: string): void {
+  const trail = trails.get(page);
+  if (trail === undefined) return;
+  trail.lines.push(redactForOutput(line).slice(0, 300));
+  if (trail.lines.length > TRAIL_MAX) trail.lines.shift();
+}
+
+/**
+ * Runs one browser step. On a failure the error carries the page's visible text, a screenshot path
+ * and the last console errors and failed requests of the page (bounded, redacted), so a CI timeout
+ * says what the app showed.
+ */
+export async function withDiagnostics<T>(
+  page: Page,
+  what: string,
+  step: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await step();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    const body = await page
+      .locator('body')
+      .innerText({ timeout: 2_000 })
+      .catch(() => '(page text unavailable)');
+    const shot = join(tmpdir(), `agentlink-e2e-${process.pid}-${Date.now()}.png`);
+    const saved = await page
+      .screenshot({ path: shot, timeout: 5_000 })
+      .then(() => shot)
+      .catch(() => '(no screenshot)');
+    const trail = trails.get(page)?.lines.slice(-15).join('\n') ?? '';
+    throw new Error(
+      [
+        `${what}: ${redactForOutput(reason)}`,
+        `--- page text (${redactForOutput(page.url())}) ---`,
+        redactForOutput(body).slice(0, EXCERPT_MAX),
+        `--- screenshot: ${saved}`,
+        `--- console errors and failed requests (last 15) ---`,
+        trail,
+      ].join('\n'),
+      { cause: error },
+    );
+  }
+}
+
 export interface JourneyPage {
   readonly page: Page;
   readonly context: BrowserContext;
@@ -131,6 +200,18 @@ const COUNTER_SCRIPT = `(() => {
 /** Chromium page with the virtual authenticator, the gesture counter and the no-reload probe. */
 export async function journeyPage(browser: Browser): Promise<JourneyPage> {
   const { page, context } = await pageWithTouchId(browser);
+  trails.set(page, { lines: [] });
+  page.on('console', (m) => {
+    if (m.type() === 'error') remember(page, `console: ${m.text()}`);
+  });
+  page.on('pageerror', (e) => remember(page, `pageerror: ${e.message}`));
+  page.on('requestfailed', (r) =>
+    remember(page, `failed: ${r.method()} ${r.url().split(/[?#]/)[0] ?? ''}`),
+  );
+  page.on('response', (r) => {
+    if (r.status() >= 400)
+      remember(page, `${r.status()} ${r.request().method()} ${r.url().split(/[?#]/)[0] ?? ''}`);
+  });
   const counts = { create: 0, get: 0 };
   await context.exposeBinding('__journeyGesture', (_source, name: unknown) => {
     if (name === 'create') counts.create += 1;
