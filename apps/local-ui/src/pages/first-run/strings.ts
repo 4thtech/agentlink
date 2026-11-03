@@ -250,6 +250,8 @@ export const NAME = {
   notNow: 'Not now',
   /** W4-ONE-TOUCH: New ID with the backup code. */
   confirmCode: 'Confirm with my backup code',
+  /** W8-F12 (11 §5.5 "backup code"; copy proposed, owner confirms at merge): what the code is. */
+  codeWhat: 'Your backup code is the code you saved when you first set up AgentLink.',
 } as const;
 
 /** W4-ONE-TOUCH (D-140; 11 §5.8 "Create and connect"): after the one gesture. */

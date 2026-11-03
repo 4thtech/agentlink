@@ -726,8 +726,9 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     await click(/^CursorFound/);
     await click(PICK_STEP.next('Cursor'));
     const backs = (): number =>
-      [...host.querySelectorAll('button')].filter((b) => b.textContent?.trim() === CONNECT_STEP.back)
-        .length;
+      [...host.querySelectorAll('button')].filter(
+        (b) => b.textContent?.trim() === CONNECT_STEP.back,
+      ).length;
     expect(backs()).toBe(1);
     await click('Use a backup code instead');
     expect(host.querySelector('input[type="password"]')).not.toBeNull();

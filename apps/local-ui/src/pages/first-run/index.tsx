@@ -1326,9 +1326,10 @@ export function FirstRunPage({
           summary=""
           app={chosenApp ?? null}
           goLabel={sensorWords}
+          platform={platform}
           {...(createAgentApi === undefined ? {} : { api: createAgentApi })}
           appsApi={appsApi}
-          onCancel={() => toStep('app')}
+          // W8-F11: the screen's own Back (above) is the one Back; the gate shows none.
           onDone={(created) =>
             finishStep({
               label: created.label,
