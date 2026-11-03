@@ -259,6 +259,11 @@ export function CreateAgentGate({
   };
 
   const switchTo = status?.kind === 'unavailable' && !switched ? status.switchTo : undefined;
+  // The server says this computer has no passkey for this owner: the Touch ID button could only
+  // fall back to the code, so the code form (with why) is shown at once. Without the switch values
+  // (no ID open) the switch can't be offered here (`POST /api/owner/passkey` needs an open ID).
+  const noneHere =
+    status?.kind === 'unavailable' && status.reason === 'not_set_up_here' && !switched;
 
   /** W8-F13: the backup code once and one touch register the passkey; nothing is created yet. */
   const submitSwitch = (event: FormEvent<HTMLFormElement>): void => {
@@ -394,7 +399,7 @@ export function CreateAgentGate({
             </p>
           )}
         </form>
-      ) : useCode || !canPasskey ? (
+      ) : useCode || !canPasskey || (switchTo === undefined && noneHere) ? (
         <form className="ag-code-form" autoComplete="on" onSubmit={(e) => void withCode(e)}>
           {why === undefined ? null : (
             <p className="al-text-body-sm al-muted" role="status">

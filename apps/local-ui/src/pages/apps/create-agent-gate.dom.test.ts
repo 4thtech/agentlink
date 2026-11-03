@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import agentsCss from '../agents/agents.css?raw';
 import type { PasskeyStatus } from '../contacts/owner.js';
 import type { PasskeySwitchOutcome } from '../contacts/passkey-switch.js';
+import { PASSKEY_WHY } from '../contacts/strings.js';
 import type { AppsApi } from '../first-run/apps-api.js';
 import { NAME, UPGRADE } from '../first-run/strings.js';
 import type { CreateAgentApi, CreateFinish } from './create-agent-api.js';
@@ -195,6 +196,17 @@ describe('W8-F13: the New ID gate offers Touch ID to an owner without one here',
     expect(api.withPasskey).toHaveLength(1);
     expect(api.withCode).toEqual([]);
     expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ label: 'Side' }));
+  });
+
+  it('no passkey here and no switch values (no ID open): the code form at once, with why', async () => {
+    const { api } = await mount({ kind: 'unavailable', reason: 'not_set_up_here' });
+    expect(labels()).not.toContain('Connect with Touch ID');
+    expect(labels()).not.toContain(UPGRADE.bannerAction('mac'));
+    expect(labels()).toContain(NAME.confirmCode);
+    const form = host.querySelector('form')?.textContent ?? '';
+    expect(form).toContain(PASSKEY_WHY.not_set_up_here('Touch ID'));
+    expect(form).toContain(NAME.codeWhat);
+    expect(api.begun).toBe(0);
   });
 
   it('a switch that does not happen changes nothing and keeps the backup code way', async () => {
