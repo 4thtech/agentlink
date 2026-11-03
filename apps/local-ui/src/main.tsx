@@ -9,6 +9,7 @@ import '@4thtech-io/ui/chrome.css';
 import './app.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { HostClosedGate } from './layout/host-closed-gate.js';
 import { installGenerationGuard } from './api/generation.js';
 import { applyOs } from './layout/os.js';
 import { prefetchPages } from './lazy/pages.js';
@@ -27,9 +28,11 @@ if (container !== null) {
   createRoot(container).render(
     <StrictMode>
       {/* W4-WIZARD: an entry on Home waits for the open-on-launch check (no Home flash). */}
-      <StartGate>
-        <AppRoutes />
-      </StartGate>
+      <HostClosedGate>
+        <StartGate>
+          <AppRoutes />
+        </StartGate>
+      </HostClosedGate>
     </StrictMode>,
   );
   // The other pages arrive while the browser is idle (the first load carries none of them).

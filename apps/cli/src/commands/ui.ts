@@ -46,8 +46,15 @@ import { openUiHostAgent, startUiWelcome, withoutAssets, type UiHostDeps } from 
 import { uiRemovalPort } from './ui-remove.js';
 import { removeAppHostRecord, writeAppHostRecord } from '../runtime/app-host-record.js';
 
-/** How long `ui` serves the pages at most (proposed: 30 minutes, as for the first-run step). */
+/**
+ * How long `ui` keeps serving with nobody using it (06 §5 sets "a time limit (30 minutes)"; F25: it
+ * counts from the last use, not from the start, so a page in use is never cut off). Use is any page
+ * request or an open page (live stream).
+ */
 export const UI_WAIT_MS = 30 * 60_000;
+
+/** While a page is open, `ui` looks again this often, so a closed tab starts the idle time soon. */
+const OPEN_PAGE_CHECK_MS = 15_000;
 
 /** Fixed text (11 §5 plain words). Nothing from a file, the page or the user is inserted. */
 export const UI_TEXT = Object.freeze({
@@ -56,6 +63,11 @@ export const UI_TEXT = Object.freeze({
   openedSetup:
     "Your browser opened the AgentLink setup page. Protect approvals there with a passkey. Keep this window open while you use the page; press Ctrl+C when you're done.",
   noBrowser: "AgentLink couldn't open your browser.",
+  /** F25: Ctrl+C, closing the terminal or a stop signal: one plain line, no link. */
+  closed: (prefix: string): string => `AgentLink closed. Run \`${prefix}\` to open it again.`,
+  /** F25: the idle limit (UI_WAIT_MS) ended the run. */
+  closedIdle: (prefix: string): string =>
+    `AgentLink closed after 30 minutes without use. Run \`${prefix}\` to open it again.`,
   /** `prefix`: the command as this run was started (M1-36a), never a typed value. */
   notReady: (prefix: string): string =>
     `AgentLink isn't set up here yet. Run \`${prefix} init\` in your own terminal first.`,
@@ -82,6 +94,11 @@ export interface UiServer {
   readonly page: UiPage;
   /** Opens the browser at a one-shot link to `page`; false when no browser could be started. */
   open(): Promise<boolean>;
+  /**
+   * F25: whether the app is in use (absent: only the time since start counts). `lastAt` is a time in
+   * ms of the last page request; `openStreams` the open pages.
+   */
+  readonly activity?: { lastAt(): number; openStreams(): number };
   /** Stops the server and closes the agent. */
   close(): Promise<void>;
 }
@@ -115,9 +132,9 @@ export interface UiDeps {
    * undefined when it cannot (an agent folder exists, no usable keychain, no app in this build).
    */
   startWelcome?(options?: { readonly invite?: string }): Promise<UiServer | undefined>;
-  /** The longest serve time, in milliseconds. */
+  /** The longest time with no use, in milliseconds (F25: idle, not wall-clock). */
   readonly waitMs: number;
-  /** Calls `stop` on Ctrl+C; returns the unsubscribe. */
+  /** Calls `stop` on Ctrl+C, SIGTERM or SIGHUP; returns the unsubscribe. */
   interrupt(stop: () => void): () => void;
 }
 
@@ -192,16 +209,44 @@ export async function serveUi(
     const stopped = new Promise<void>((resolve) => {
       unsubscribe = deps.interrupt(resolve);
     });
-    const timedOut = new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, deps.waitMs);
+    const idle = new Promise<'idle'>((resolve) => {
+      const started = Date.now();
+      let seenOpen = started;
+      const check = (): void => {
+        const used = server.activity;
+        const open = used?.openStreams() ?? 0;
+        // An open page is use; the idle time counts from the last time one was seen (or any request).
+        if (open > 0) seenOpen = Date.now();
+        const last = Math.max(started, seenOpen, used?.lastAt() ?? started);
+        const remaining = deps.waitMs - (Date.now() - last);
+        if (remaining <= 0) {
+          resolve('idle');
+          return;
+        }
+        timer = setTimeout(check, open > 0 ? Math.min(remaining, OPEN_PAGE_CHECK_MS) : remaining);
+      };
+      timer = setTimeout(check, deps.waitMs);
     });
-    await Promise.race([stopped, timedOut]);
+    const reason = await Promise.race([stopped.then(() => 'stop' as const), idle]);
+    output.print(reason === 'idle' ? UI_TEXT.closedIdle(prefix) : UI_TEXT.closed(prefix));
     return EXIT_OK;
   } finally {
     if (timer !== undefined) clearTimeout(timer);
     unsubscribe?.();
     await server.close().catch(() => undefined);
   }
+}
+
+/**
+ * F25: Ctrl+C, a closing terminal (SIGHUP) and a plain stop (SIGTERM) all end the run the same way:
+ * the caller closes the server (which removes the pid-matched app-host.json) and prints one line.
+ */
+export function onStopSignals(stop: () => void, proc: NodeJS.Process = process): () => void {
+  const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+  for (const signal of signals) proc.once(signal, stop);
+  return () => {
+    for (const signal of signals) proc.off(signal, stop);
+  };
 }
 
 /** The production step: the OS user's home, the OS keychain, the OS browser opener. */
@@ -317,6 +362,7 @@ export function nodeUiDeps(): UiDeps {
         });
         return Object.freeze<UiServer>({
           page,
+          activity: server.activity,
           // U3-invite: first run (no owner yet) or the join screen; never a link with the invite.
           open: () => (invite === undefined ? openUiPage(page, server) : server.openJoin()),
           close: async () => {
@@ -330,12 +376,7 @@ export function nodeUiDeps(): UiDeps {
       }
     },
     waitMs: UI_WAIT_MS,
-    interrupt: (stop) => {
-      process.once('SIGINT', stop);
-      return () => {
-        process.off('SIGINT', stop);
-      };
-    },
+    interrupt: (stop) => onStopSignals(stop),
   });
 }
 

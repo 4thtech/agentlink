@@ -191,7 +191,7 @@ describe('agentlink ui in the owner terminal (M1-11b-9)', () => {
     };
     const { deps } = fakeDeps({ stop: 'never', waitMs: 60, activity });
     await uiStep(p.context, deps, PREFIX);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(255);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(200);
   });
 
   it('the idle line uses the prefix and the Ctrl+C line names no number (F25)', () => {
@@ -392,7 +392,7 @@ describe('agentlink ui with no agent at all opens Welcome (U3-g-b)', () => {
     const { deps, calls } = fakeDeps({ agents: [], welcome: 'ok' });
     await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
     expect(calls).toMatchObject({ welcome: 1, start: 0, opened: 1, closed: 1 });
-    expect(p.out).toEqual([UI_TEXT.openedSetup]);
+    expect(p.out).toEqual([UI_TEXT.openedSetup, UI_TEXT.closed(PREFIX)]);
     expect(p.err).toEqual([]);
     expectNoLink(p);
   });

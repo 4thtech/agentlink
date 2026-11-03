@@ -22,6 +22,7 @@ import { parseAgents, type AgentRow, type AgentsList } from '../pages/agents/dat
 import { AGENTS_STRINGS } from '../pages/agents/strings.js';
 import { announceAgentsChanged, noteSwitched } from '../pages/agents/use-agents.js';
 import { createApiClient } from './client.js';
+import { markHostClosed, noteHostReached, noteHostUnreachable } from './host-closed.js';
 
 /** 08 §1 (K1, ui-contract/live.ts). */
 const EVENTS_PATH = '/api/ui/events';
@@ -484,6 +485,11 @@ function onStreamEvent(e: SseEvent): void {
   if (e.id !== '') lastEventId = e.id;
   if (!isObject(e.data)) return;
   const data = e.data;
+  // F25: the host says it is closing (the command ended); no more reads or reconnects will work.
+  if (e.event === 'closing') {
+    markHostClosed();
+    return;
+  }
   // W5-INVITE-FEEDBACK: the open agent's contacts or invites changed. Only `at`; the views that
   // show them read again. Not an agents change.
   if (e.event === 'contacts') {
@@ -581,11 +587,16 @@ async function openStream(): Promise<void> {
       signal: controller.signal,
     });
   } catch {
-    if (stream === controller) failed();
+    // F25: a stream that cannot connect counts like any request that cannot (host gone).
+    if (stream === controller) {
+      noteHostUnreachable();
+      failed();
+    }
     return;
   } finally {
     clearTimeout(answer);
   }
+  noteHostReached();
   if (stream !== controller) return;
   // No stream here (an older app, an approval page) or too many open: poll instead.
   if (res.status === 404 || res.status === 429 || res.status === 501) {
