@@ -201,9 +201,9 @@ export const en = {
   'cli.owner.done': 'OK Approvals are protected.',
   'cli.doctor.keysFound': 'OK       ID keys found',
   'cli.doctor.noOwnerCard':
-    'Problem  This ID has no card from your owner yet\n         Run `{prefix} owner add-agent --agent {agent}` in your own terminal.',
+    "Problem  This ID isn't finished setting up\n         Open AgentLink to finish setting up this ID: run `{prefix}`.",
   'cli.doctor.noOwnerCardNoOthers':
-    'Problem  No ID on this computer has a card from an owner\n         If you have never set up an owner, `{prefix} owner add-agent` tells you what to run first.\n         If an owner already exists here, `{prefix} owner add-agent --agent <name>` adds this ID to it with your owner code.',
+    "Problem  AgentLink isn't set up on this computer yet\n         Open AgentLink to set it up: run `{prefix}`.",
   'cli.doctor.networkOk': 'OK       Message network reachable',
   'cli.doctor.networkDown':
     "Problem  Can't reach the message network\n         Check your connection and run `{prefix} doctor` again.",

@@ -37,7 +37,7 @@ export const DOCTOR_LOCAL_TEXT = Object.freeze({
   halfRemoved: (count: number): string =>
     `Problem  ${String(count)} ${count === 1 ? 'ID was' : 'IDs were'} only half removed. Run \`${commandPrefix()}\` to open AgentLink and finish removing ${count === 1 ? 'it' : 'them'}.`,
   appMissingId: (app: string, id: string): string =>
-    `Problem  ${app} starts an ID that isn't here any more (${id}). In AgentLink, connect ${app} to another ID.`,
+    `Problem  ${app} starts the ID "${id}", which isn't on this computer any more. Open AgentLink (run \`${commandPrefix()}\`), go to AI apps and connect ${app} to another ID.`,
 });
 
 /** The reasons that mean something went wrong, not that the person closed AgentLink. */
@@ -48,16 +48,32 @@ export interface LocalChecksOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly platform?: NodeJS.Platform;
   /** The ID folders (name and whether half removed); default: the agent directory under `home`. */
-  readonly ids?: () => Promise<readonly { readonly name: string; readonly removing: boolean }[]>;
+  readonly ids?: () => Promise<
+    readonly {
+      readonly name: string;
+      readonly removing: boolean;
+      /** The display name; absent: the folder name. */
+      readonly label?: string;
+    }[]
+  >;
   /** The AI apps' entries, read-only (default: the harness desk, never asking the OS about apps). */
   readonly apps?: Pick<LocalUiAiApps, 'list'>;
   /** Whether a process is alive (default: signal 0). */
   readonly alive?: (pid: number) => boolean;
 }
 
+/** One ID that can be checked: its folder name, its display name and the AI apps that start it. */
+export interface LocalDoctorId {
+  readonly name: string;
+  readonly label: string;
+  readonly apps: readonly string[];
+}
+
 export interface LocalChecks {
   readonly lines: readonly string[];
   readonly problems: number;
+  /** Every ID on this computer that is not half removed, by display name (empty: none/unreadable). */
+  readonly ids?: readonly LocalDoctorId[];
 }
 
 /** The checks; never throws. A check that cannot be read says nothing. */
@@ -65,6 +81,7 @@ export async function localDoctorChecks(options: LocalChecksOptions = {}): Promi
   const home = options.home ?? homedir();
   const lines: string[] = [];
   let problems = 0;
+  let checkable: LocalDoctorId[] | undefined;
 
   const last = await readLastExit(home);
   if (last !== undefined) {
@@ -82,7 +99,11 @@ export async function localDoctorChecks(options: LocalChecksOptions = {}): Promi
   const ids = await (
     options.ids ??
     (async () =>
-      (await agentDirectory(home).list()).map((e) => ({ name: e.name, removing: e.removing })))
+      (await agentDirectory(home).list()).map((e) => ({
+        name: e.name,
+        removing: e.removing,
+        label: e.label,
+      })))
   )().catch(() => undefined);
   if (ids !== undefined) {
     const half = ids.filter((id) => id.removing).length;
@@ -101,13 +122,29 @@ export async function localDoctorChecks(options: LocalChecksOptions = {}): Promi
       });
     const usable = new Set(ids.filter((id) => !id.removing).map((id) => id.name));
     const listed = await apps.list().catch(() => undefined);
+    const appsOf = new Map<string, string[]>();
     for (const app of listed?.apps ?? []) {
       if (app.state.kind !== 'agent') continue;
       const id = app.state.agent;
-      if (!isAgentName(id) || usable.has(id)) continue;
+      if (!isAgentName(id)) continue;
+      if (usable.has(id)) {
+        appsOf.set(id, [...(appsOf.get(id) ?? []), app.name]);
+        continue;
+      }
       lines.push(DOCTOR_LOCAL_TEXT.appMissingId(app.name, id));
       problems += 1;
     }
+    checkable = ids
+      .filter((id) => !id.removing && isAgentName(id.name))
+      .map((id) => ({
+        name: id.name,
+        label: id.label !== undefined && id.label.length > 0 ? id.label : id.name,
+        apps: Object.freeze(appsOf.get(id.name) ?? []),
+      }));
   }
-  return Object.freeze({ lines: Object.freeze(lines), problems });
+  return Object.freeze({
+    lines: Object.freeze(lines),
+    problems,
+    ...(checkable === undefined ? {} : { ids: Object.freeze(checkable) }),
+  });
 }

@@ -63,7 +63,7 @@ Restart your AI tool, then ask it: **"What's my AgentLink status?"**
 
 A good answer says AgentLink is set up, and how many contacts and new messages you have (none, at first).
 
-If it says **"This ID has no card from your owner yet"**, the ID exists but you have not vouched for it yet. In your own terminal, run `npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>` (or `owner init --agent <name>` if this is your first ID), then ask again.
+If it says **"This ID isn't finished setting up"**, open AgentLink (run `npx -y @4thtech-io/agentlink@latest`) and finish setting up the ID there, then ask again.
 
 ## 5. Pair two of your own tools
 
@@ -81,7 +81,7 @@ Pairing with another person works the same way: [Pair with someone](pair-with-so
 
 1. **The AgentLink tools do not show up.** Restart the AI tool completely. Then run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal. It shows what is set up and prints the fix. If `init` could not find your tool, name it with `--harness`.
 2. **`npx` fails, or "Node too old".** Run `node --version`. You need 22.14 or newer. Install the current LTS, then open a new terminal.
-3. **"This ID has no card from your owner yet".** Run `owner add-agent --agent <name>` in your own terminal (step 4).
+3. **"This ID isn't finished setting up".** Open AgentLink and finish setting up the ID there (step 4).
 4. **`owner` says it looks like a terminal your AI controls.** That is on purpose. Open a new terminal window yourself and run it there.
 5. **The invite expired or was already used.** Invites work once and expire after 7 days. Ask for a new one. If a message has not arrived, wait up to a minute and ask your AI to check again.
 

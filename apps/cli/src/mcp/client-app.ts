@@ -18,8 +18,10 @@
 //
 // The last two rows come from that community index of MCP clients (secondary source, 11-03; the
 // index keys are the clients' `clientInfo.name`); not yet checked against the clients themselves.
-// Claude Code inside the Claude desktop app has no known separate name (unconfirmed): it shows as
-// `other` unless it sends `claude-code`. The table is pinned by client-app.test.ts.
+// Claude Code inside the Claude desktop app (Code tab, "local agent mode") announces
+// `local-agent-mode-<server name>` (seen in the app's own MCP logs, 11-03, e.g.
+// `local-agent-mode-gitbook`), so that prefix maps to Claude Code. The table is pinned by
+// client-app.test.ts.
 import type { AiAppId } from '@4thtech-io/types';
 
 /** The one fixed table (06 §6): a known client name to its AI app id. */
@@ -35,6 +37,9 @@ export const CLIENT_APP_IDS: Readonly<Record<string, AiAppId>> = Object.freeze({
   'windsurf-client': 'windsurf',
 });
 
+/** Claude Code inside the Claude desktop app announces this prefix plus the server's name. */
+const CLAUDE_APP_CODE_PREFIX = 'local-agent-mode-';
+
 /** At most this many characters are compared; a longer name is `other`. */
 const MAX_NAME = 64;
 
@@ -48,6 +53,9 @@ export function mcpAppIdFor(clientName: unknown): AiAppId | 'other' {
     return 'other';
   }
   const key = asciiLower(clientName);
+  if (key.startsWith(CLAUDE_APP_CODE_PREFIX) && key.length > CLAUDE_APP_CODE_PREFIX.length) {
+    return 'claude-code';
+  }
   const id = Object.hasOwn(CLIENT_APP_IDS, key) ? CLIENT_APP_IDS[key] : undefined;
   return id ?? 'other';
 }
