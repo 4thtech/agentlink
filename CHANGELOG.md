@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.13] - 2026-11-03
+
+### Added
+
+- DOCS-CLASSROOM-HANDOUT: one-page classroom handout for students and teacher (install, backup code, invite, troubleshooting).
+
+### Changed
+
+- CI runs the real-browser tests (the app journeys and the browser tests of the node package and the local app) in their own `e2e-browser` job instead of inside `checks`, so their UI waits no longer compete for CPU with every other package's tests. `ci-gate` requires the new job wherever `checks` used to run those tests, and a macOS leg that got no runner is rerun once after a 5-minute wait (CI-E2E-BROWSER, S1).
+- Each ID on the IDs page has an Invite someone button that starts the invite for that ID (F27). Approval pages say which ID they are for (F29), keep one orange button per step and drop the "owner passphrase" wording (F30, F31), and after you approve something marked Free they explain that your messages travel at no cost and only proofs cost a small fee (F32). The name field on New ID has a regression test that a typed name is never replaced by the prefill (F44). (CLASSROOM-UX, S1)
+- DOCS-0412: Status, README, knowledge base and the user guide are current to 0.4.12 (the AI app picker, the Open button, removing an ID, the app closing after 30 minutes without use, Windows).
+- A release no longer waits 20–60 min for the Version packages commit's own CI (RELEASE-VERSION-ONLY-REUSE, S2, release-and-deployment.md §4.1): when the git trees show the commit only bumps versions, changelogs and consumed changesets, and its parent's CI and Security gates are green, `ci-green` reuses that verdict. Anything else waits for the commit's own CI as before; the owner's publish approval is unchanged.
+
+### Fixed
+
+- Claude Code run in the Claude desktop app's Code tab now shows as "Claude Code" in live status instead of "Another AI app" (F46, S1; the app announces itself as `local-agent-mode-<server>`).
+- `agentlink doctor` copy (D1/D3, S1): it never tells you to run an `owner add-agent` command, it points to the AgentLink app in plain words; without `--id` it checks every ID on the computer by its display name, lists the AI apps that start it and ends each block with an OK or Problem line; an AI app that starts a removed ID names the app and the ID and says how to fix it in the app.
+- `agentlink doctor` (S1): no longer tells you to run the long `npx` form in its own lines; it says "run `agentlink`". The footer now reads "File storage isn't checked yet." instead of claiming AI apps are not checked. The "AI apps" line of each ID now also names an AI app that is connected to it right now, so it agrees with the IDs page ("Used by").
+- Owner approvals without a passkey (F49, S1, 08 §1, 11 §5): removing or renaming an ID, contacts, invites and other owner approvals offer "Confirm with your backup code" as the one primary button, with "Switch to Touch ID/Windows Hello" as a link; a switch that fails because the passkey can't protect approvals sends you back to the backup code, stops suggesting the switch in that browser (a hint stored in the browser only; the server still checks every approval) and never says "open Chrome or Edge" inside Chrome or Edge.
+- Backup code (F49, S1, 11 §5): every backup code field has Show/Hide and accepts pasted codes with line breaks, no-break spaces or long dashes; the once-shown code copies reliably (fallback when the clipboard refuses, a visible Copied, a message if both fail), selects as one piece, and can be saved as a small local .txt file.
+- An AI app that is connected but has made no call for 10 minutes now keeps its green dot (it reads "Connected"); before, the dot turned into the grey ring that "Not connected" uses, in the ID switcher, the ID cards, the app chips and the letter icon (L1, S0).
+- Approvals set up with Windows Hello now use the passkey (M1-11s-c-c, S2, 04 §2.5, 08 §1, F48): where the passkey gives its approval key only when used, first run asks for one more passkey touch at once, checks it (same passkey, this page, verified, signed by that passkey) and protects approvals with it. Without a usable passkey the last screen now says "Save your backup code — you need it to approve."
+- Setup on Windows (W1, S2, 04 §4): creating a new ID no longer stops at "Confirm it's you" with "couldn't use the folder AgentLink/Send" when the home folder already holds a folder named `agentlink` in another case. Where the file system ignores case (Windows; macOS by default), a folder whose real path differs only in case is the same folder: it is pinned and used under its real name. Links, non-folders and a folder that changes during the check are still refused.
+
 ## [0.4.12] - 2026-11-03
 
 ### Fixed
@@ -949,7 +973,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.12...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.13...HEAD
+[0.4.13]: https://github.com/4thtech/agentlink/compare/v0.4.12...v0.4.13
 [0.4.12]: https://github.com/4thtech/agentlink/compare/v0.4.11...v0.4.12
 [0.4.11]: https://github.com/4thtech/agentlink/compare/v0.4.10...v0.4.11
 [0.4.10]: https://github.com/4thtech/agentlink/compare/v0.4.9...v0.4.10

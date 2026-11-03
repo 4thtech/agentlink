@@ -1,5 +1,14 @@
 # @4thtech-io/node
 
+## 0.4.13
+
+### Patch Changes
+
+- 7a0258f: Creating a new ID no longer fails at "Confirm it's you" when your home folder already has a folder named `agentlink` in another case (Windows, and macOS by default, ignore case in folder names). AgentLink now uses that folder under its real name for Send, Inbox and Proofs; links and anything that is not a plain folder are still refused.
+- @4thtech-io/core@0.4.13
+  - @4thtech-io/crypto@0.4.13
+  - @4thtech-io/transport-nostr@0.4.13
+
 ## 0.4.12
 
 ### Patch Changes

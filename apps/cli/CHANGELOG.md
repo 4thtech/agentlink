@@ -1,5 +1,15 @@
 # @4thtech-io/agentlink
 
+## 0.4.13
+
+### Patch Changes
+
+- 7a0258f: Claude Code run inside the Claude desktop app is shown as Claude Code (not "Another AI app"). `agentlink doctor` without an ID lists every ID by name with its AI apps and one OK or Problem line, and no longer tells you to type `owner add-agent`; it points to the AgentLink app instead.
+- f835b48: Each ID card has an Invite someone button. Approvals say which ID they are for, use one orange button per step, no longer mention an owner passphrase, and explain what Free means after you approve.
+- f835b48: Without Touch ID or Windows Hello set up for approvals, every approval sheet now has one button: Confirm with your backup code. Switching to Touch ID or Windows Hello is a small link, and after a switch fails because this computer can't protect approvals, AgentLink stops suggesting it in that browser and no longer tells you to open Chrome or Edge when you already use them. Backup code fields have Show and Hide, take pasted codes with line breaks or odd spaces, and the backup code screen has a working Copy (with a Copied note or a clear message), a selectable code and Save as file.
+- f835b48: Setting up approvals with Windows Hello (and passkeys that answer only when used) now asks for your passkey a second time right away, so your passkey protects approvals instead of the backup code. When a passkey still can't protect approvals, the last screen says clearly to save your backup code because you need it to approve.
+- 7a0258f: Creating a new ID no longer fails at "Confirm it's you" when your home folder already has a folder named `agentlink` in another case (Windows, and macOS by default, ignore case in folder names). AgentLink now uses that folder under its real name for Send, Inbox and Proofs; links and anything that is not a plain folder are still refused.
+
 ## 0.4.12
 
 ### Patch Changes
