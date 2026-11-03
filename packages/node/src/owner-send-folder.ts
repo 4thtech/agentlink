@@ -204,7 +204,10 @@ export async function setUpSendFolder(
   } catch {
     return notAllowed('folder_unavailable');
   }
-  const candidate = path.join(realHome, ...SEND_FOLDER_SEGMENTS);
+  const named = path.join(realHome, ...SEND_FOLDER_SEGMENTS);
+  // W1: where the file system ignores case, an existing `agentlink` folder is the one meant; the
+  // rules name it by its real path (pinFolder), so that is the path compared.
+  const candidate = (await pinFolder(named))?.path ?? named;
   // The same test sending uses (allowed-path): the entry names this folder where it really is.
   const allowed = existing.some(
     (entry) => typeof entry === 'string' && pinnedLocation(entry, realHome) === candidate,
