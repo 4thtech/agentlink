@@ -295,7 +295,8 @@
   color: var(--al-color-fg-subtle);
 }
 .al-am-app-word.is-working,
-.al-am-app-word.is-ready {
+.al-am-app-word.is-ready,
+.al-am-app-word.is-idle {
   color: var(--al-color-status-success-fg);
 }
 .al-am-app-word.is-paused {
@@ -313,8 +314,8 @@
   color: var(--al-color-fg-link);
 }
 
-/* A live dot: filled for Working and Ready, a ring otherwise, dashed for Not set up. Words always
-   stand next to it (never colour alone). */
+/* A live dot: filled for Working, Ready and Idle (all connected), a ring otherwise, dashed for Not set up.
+   Words always stand next to it (never colour alone). */
 .al-ldot {
   display: inline-block;
   flex: none;
@@ -325,7 +326,8 @@
   border: 1.5px solid var(--al-color-border-strong);
 }
 .al-ldot.is-working,
-.al-ldot.is-ready {
+.al-ldot.is-ready,
+.al-ldot.is-idle {
   border-color: var(--al-color-status-success-icon);
   background: var(--al-color-status-success-icon);
 }

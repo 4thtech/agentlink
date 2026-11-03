@@ -40,6 +40,12 @@ import {
  */
 export const DOCTOR_TEXT = Object.freeze({
   rulesOk: 'OK       Your rules are in use',
+  /** Plain `doctor`: one block per ID on this computer. */
+  idHeader: 'ID: {label}',
+  apps: 'AI apps: {apps}',
+  noApps: 'AI apps: none connected',
+  idOk: 'OK       {label} is working',
+  idProblem: 'Problem  {label} has a problem (see above)',
   /** W8-FEEDBACK-S1 (F8): there is an owner on this computer but no ID yet. */
   get noIdsYet(): string {
     return `Problem  You have no IDs yet. Open AgentLink to create one: run \`${commandPrefix()}\`.`;
@@ -161,157 +167,185 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
       problems += local.problems;
     }
 
-    let opened;
-    try {
-      opened = await deps.open(context.parsed.agent);
-    } catch (error) {
-      const text = fixedErrorText(error);
-      emit(
-        text === undefined ? TEXT.doctorOpenFailed : fill(TEXT.doctorNoAgent, { message: text }),
-        true,
-      );
-      return EXIT_FAILED;
-    }
-    if (opened.status === 'needs_setup') {
-      // F8: an owner and no ID at all is not "not set up": the next step is to open AgentLink.
-      if (
-        opened.reason === 'no_agent' &&
-        deps.ownerOnMachine !== undefined &&
-        (await deps.ownerOnMachine().catch(() => false)) &&
-        (await listAgentNames(deps.home).catch(() => ['?'] as string[])).length === 0
-      ) {
-        emit(DOCTOR_TEXT.noIdsYet, true);
-        return EXIT_FAILED;
-      }
-      emit(
-        fill(opened.reason === 'no_agent' ? TEXT.doctorNoAgent : TEXT.doctorNoKeychain, {
-          message: terminalOneLine(opened.message),
-        }),
-        true,
-      );
-      if (opened.fix !== undefined)
-        emit(fill(TEXT.doctorFix, { fix: terminalOneLine(opened.fix) }));
-      return EXIT_FAILED;
-    }
-
-    const { agent } = opened;
-    try {
-      emit(copy('cli.doctor.keysFound'));
-
-      // M1-9z (IR-M1-9z-1 F2): a leftover owner code change; `owner change-code` finishes it.
-      if (deps.unfinishedOwnerCodeChange !== undefined) {
-        if (await deps.unfinishedOwnerCodeChange().catch(() => false)) {
-          emit(TEXT.doctorOwnerCodeUnfinished, true);
-        }
-      }
-
-      // M1-9u: the agent exists but no owner card is stored for it. Read from the agent's own store
-      // (no KeyStore secret); the later checks would only fail in confusing ways.
-      const view = await agent.client.identity.get().catch(() => undefined);
-      if (view === undefined) {
+    /** One ID's checks (`name` undefined: the default ID). True when it stopped early on a problem. */
+    const checkOne = async (
+      name: string | undefined,
+      withProofNetwork: boolean,
+    ): Promise<boolean> => {
+      let opened;
+      try {
+        opened = await deps.open(name);
+      } catch (error) {
+        const text = fixedErrorText(error);
         emit(
-          copy('cli.doctor.noOwnerCard', {
-            agent: isAgentName(agent.name) ? agent.name : '<name>',
-            prefix: cliPrefix(),
+          text === undefined ? TEXT.doctorOpenFailed : fill(TEXT.doctorNoAgent, { message: text }),
+          true,
+        );
+        return true;
+      }
+      if (opened.status === 'needs_setup') {
+        // F8: an owner and no ID at all is not "not set up": the next step is to open AgentLink.
+        if (
+          opened.reason === 'no_agent' &&
+          deps.ownerOnMachine !== undefined &&
+          (await deps.ownerOnMachine().catch(() => false)) &&
+          (await listAgentNames(deps.home).catch(() => ['?'] as string[])).length === 0
+        ) {
+          emit(DOCTOR_TEXT.noIdsYet, true);
+          return true;
+        }
+        emit(
+          fill(opened.reason === 'no_agent' ? TEXT.doctorNoAgent : TEXT.doctorNoKeychain, {
+            message: terminalOneLine(opened.message),
           }),
           true,
         );
-        await agent.close();
-        if (!(await otherAgentHasCard(deps, agent.name))) {
-          emit(copy('cli.doctor.noOwnerCardNoOthers', { prefix: cliPrefix() }));
-        }
-        return EXIT_FAILED;
+        if (opened.fix !== undefined)
+          emit(fill(TEXT.doctorFix, { fix: terminalOneLine(opened.fix) }));
+        return true;
       }
 
-      const config = await readAgentConfig(deps.home, agent.name).catch(() => undefined);
-      if (config !== undefined) {
-        emit(config.config.keyStore === 'keychain' ? TEXT.doctorKeychain : TEXT.doctorFile);
-      }
-
-      const { client } = agent;
+      const { agent } = opened;
       try {
-        const relays = (await client.identity.signedCard()).relays.length;
-        emit(
-          relays === 0 ? TEXT.doctorNoRelays : renderCopy(TEXT.doctorRelays, { count: relays }),
-          relays === 0,
-        );
-      } catch {
-        emit(TEXT.doctorNoRelays, true);
-      }
+        emit(copy('cli.doctor.keysFound'));
 
-      if (await agentPausedNow(client)) {
-        // W4-PAUSE (06 §6): a paused agent fetches nothing, so the network is not checked.
-        emit(TEXT.statusPaused);
-      } else {
-        try {
-          const caught = await client.catchUp({ budgetMs: 3_000 });
-          emit(caught.partial ? TEXT.doctorPartial : copy('cli.doctor.networkOk'));
-        } catch {
-          emit(copy('cli.doctor.networkDown', { prefix: cliPrefix() }), true);
-        }
-      }
-
-      try {
-        const state = await client.identity.sendState();
-        emit(state === 'ready' ? TEXT.doctorSend : TEXT.doctorSendBlocked, state !== 'ready');
-      } catch {
-        emit(TEXT.doctorSendBlocked, true);
-      }
-
-      // D-100 (06 §8): rules that fail closed (G-6) name the deliberate way back. Fixed text only:
-      // never the kind's code or anything from the stored rules. A runtime without the loader
-      // shows nothing here.
-      const rules = await Promise.resolve()
-        .then(() => client.ownerActions.loadPolicy())
-        .catch(() => undefined);
-      if (rules !== undefined) {
-        emit(
-          rules.mode === 'fail_closed' ? DOCTOR_TEXT.rulesFailClosed : DOCTOR_TEXT.rulesOk,
-          rules.mode === 'fail_closed',
-        );
-        // M1-33a (06 §3 "Existing policies", D-109): a notice, not a problem. A runtime that can't
-        // tell shows nothing.
-        if (rules.mode === 'signed') {
-          const older = await Promise.resolve()
-            .then(() => client.ownerActions.receiptsOnFromOlderDefault())
-            .catch(() => false);
-          if (older) emit(DOCTOR_RECEIPTS_OLDER_DEFAULT);
-        }
-      }
-
-      // M1-9h: the proof network (06 §8 "RPC"). Counts only (I-7).
-      if (deps.proofNetwork !== undefined) {
-        const reach = await deps.proofNetwork().catch(() => ({ answered: 0, total: 1 }));
-        if (reach.total === 0) emit(DOCTOR_PROOF_TEXT.none, true);
-        else if (reach.answered === reach.total) emit(DOCTOR_PROOF_TEXT.ok);
-        else if (reach.answered > 0) emit(DOCTOR_PROOF_TEXT.partial);
-        else emit(DOCTOR_PROOF_TEXT.down, true);
-      }
-
-      // Keychain hygiene (IR-M1-8a-1 L-10): offered only when the runtime can list the items.
-      if (deps.strayItems !== undefined) {
-        const count = await deps.strayItems.count(agent.agentId).catch(() => 0);
-        if (count > 0) {
-          emit(renderCopy(TEXT.doctorStray, { count }));
-          const prompter = deps.prompter();
-          try {
-            emit(TEXT.doctorStrayAsk);
-            const answer = await prompter.ask();
-            if (answer?.trim().toLowerCase() === 'y') {
-              const removed = await deps.strayItems.remove(agent.agentId).catch(() => 0);
-              emit(fill(TEXT.doctorStrayRemoved, { count: removed }));
-            }
-          } finally {
-            prompter.close();
+        // M1-9z (IR-M1-9z-1 F2): a leftover owner code change; `owner change-code` finishes it.
+        if (deps.unfinishedOwnerCodeChange !== undefined) {
+          if (await deps.unfinishedOwnerCodeChange().catch(() => false)) {
+            emit(TEXT.doctorOwnerCodeUnfinished, true);
           }
         }
+
+        // M1-9u: the agent exists but no owner card is stored for it. Read from the agent's own store
+        // (no KeyStore secret); the later checks would only fail in confusing ways.
+        const view = await agent.client.identity.get().catch(() => undefined);
+        if (view === undefined) {
+          emit(copy('cli.doctor.noOwnerCard', { prefix: cliPrefix() }), true);
+          await agent.close();
+          if (!(await otherAgentHasCard(deps, agent.name))) {
+            emit(copy('cli.doctor.noOwnerCardNoOthers', { prefix: cliPrefix() }));
+          }
+          return true;
+        }
+
+        const config = await readAgentConfig(deps.home, agent.name).catch(() => undefined);
+        if (config !== undefined) {
+          emit(config.config.keyStore === 'keychain' ? TEXT.doctorKeychain : TEXT.doctorFile);
+        }
+
+        const { client } = agent;
+        try {
+          const relays = (await client.identity.signedCard()).relays.length;
+          emit(
+            relays === 0 ? TEXT.doctorNoRelays : renderCopy(TEXT.doctorRelays, { count: relays }),
+            relays === 0,
+          );
+        } catch {
+          emit(TEXT.doctorNoRelays, true);
+        }
+
+        if (await agentPausedNow(client)) {
+          // W4-PAUSE (06 §6): a paused agent fetches nothing, so the network is not checked.
+          emit(TEXT.statusPaused);
+        } else {
+          try {
+            const caught = await client.catchUp({ budgetMs: 3_000 });
+            emit(caught.partial ? TEXT.doctorPartial : copy('cli.doctor.networkOk'));
+          } catch {
+            emit(copy('cli.doctor.networkDown', { prefix: cliPrefix() }), true);
+          }
+        }
+
+        try {
+          const state = await client.identity.sendState();
+          emit(state === 'ready' ? TEXT.doctorSend : TEXT.doctorSendBlocked, state !== 'ready');
+        } catch {
+          emit(TEXT.doctorSendBlocked, true);
+        }
+
+        // D-100 (06 §8): rules that fail closed (G-6) name the deliberate way back. Fixed text only:
+        // never the kind's code or anything from the stored rules. A runtime without the loader
+        // shows nothing here.
+        const rules = await Promise.resolve()
+          .then(() => client.ownerActions.loadPolicy())
+          .catch(() => undefined);
+        if (rules !== undefined) {
+          emit(
+            rules.mode === 'fail_closed' ? DOCTOR_TEXT.rulesFailClosed : DOCTOR_TEXT.rulesOk,
+            rules.mode === 'fail_closed',
+          );
+          // M1-33a (06 §3 "Existing policies", D-109): a notice, not a problem. A runtime that can't
+          // tell shows nothing.
+          if (rules.mode === 'signed') {
+            const older = await Promise.resolve()
+              .then(() => client.ownerActions.receiptsOnFromOlderDefault())
+              .catch(() => false);
+            if (older) emit(DOCTOR_RECEIPTS_OLDER_DEFAULT);
+          }
+        }
+
+        // M1-9h: the proof network (06 §8 "RPC"). Counts only (I-7).
+        if (deps.proofNetwork !== undefined && withProofNetwork) {
+          const reach = await deps.proofNetwork().catch(() => ({ answered: 0, total: 1 }));
+          if (reach.total === 0) emit(DOCTOR_PROOF_TEXT.none, true);
+          else if (reach.answered === reach.total) emit(DOCTOR_PROOF_TEXT.ok);
+          else if (reach.answered > 0) emit(DOCTOR_PROOF_TEXT.partial);
+          else emit(DOCTOR_PROOF_TEXT.down, true);
+        }
+
+        // Keychain hygiene (IR-M1-8a-1 L-10): offered only when the runtime can list the items.
+        if (deps.strayItems !== undefined) {
+          const count = await deps.strayItems.count(agent.agentId).catch(() => 0);
+          if (count > 0) {
+            emit(renderCopy(TEXT.doctorStray, { count }));
+            const prompter = deps.prompter();
+            try {
+              emit(TEXT.doctorStrayAsk);
+              const answer = await prompter.ask();
+              if (answer?.trim().toLowerCase() === 'y') {
+                const removed = await deps.strayItems.remove(agent.agentId).catch(() => 0);
+                emit(fill(TEXT.doctorStrayRemoved, { count: removed }));
+              }
+            } finally {
+              prompter.close();
+            }
+          }
+        }
+      } finally {
+        await agent.close();
       }
-      context.output.print('');
-      context.output.print(DOCTOR_PROOF_TEXT.notChecked);
-    } finally {
-      await agent.close();
+      return false;
+    };
+
+    // Plain `doctor` (no --agent): every ID on this computer, by display name, with its AI apps and
+    // one OK/Problem line; the checks of one ID are the same as with --agent.
+    const all = context.parsed.agent === undefined ? local?.ids : undefined;
+    let failed = false;
+    if (all !== undefined && all.length > 0) {
+      let first = true;
+      for (const id of all) {
+        const before = problems;
+        const label = terminalOneLine(id.label);
+        context.output.print('');
+        context.output.print(fill(DOCTOR_TEXT.idHeader, { label }));
+        context.output.print(
+          id.apps.length === 0
+            ? DOCTOR_TEXT.noApps
+            : fill(DOCTOR_TEXT.apps, { apps: id.apps.map((a) => terminalOneLine(a)).join(', ') }),
+        );
+        const stopped = await checkOne(id.name, first);
+        first = false;
+        failed = failed || stopped;
+        const bad = stopped || problems > before;
+        emit(fill(bad ? DOCTOR_TEXT.idProblem : DOCTOR_TEXT.idOk, { label }), false);
+      }
+    } else {
+      failed = await checkOne(context.parsed.agent, true);
+      if (failed) return EXIT_FAILED;
     }
-    return problems === 0 ? EXIT_OK : EXIT_FAILED;
+    context.output.print('');
+    context.output.print(DOCTOR_PROOF_TEXT.notChecked);
+    return problems === 0 && !failed ? EXIT_OK : EXIT_FAILED;
   };
 }
 

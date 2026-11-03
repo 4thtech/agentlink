@@ -4,6 +4,7 @@
 // same symlink-escape tests run on Linux, macOS and Windows (CI `node-os`).
 import { execFileSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -26,6 +27,7 @@ import {
   openAllowedFileWith,
   pinFolder,
   resolveAllowedFile,
+  sameRealLocation,
   stillPinned,
 } from './allowed-path.js';
 
@@ -398,6 +400,82 @@ describe('pinFolder and stillPinned (M1-36b-2-d: check, sign and use see one fol
     const pin = await pinFolder(folder);
     rmSync(folder, { recursive: true });
     expect(await stillPinned(pin!)).toBe(false);
+  });
+
+  // W1 (Windows 0.4.12): on a case-insensitive file system (NTFS; APFS by default) a folder that
+  // already exists as `casepin` answers to `CasePin` too, and realpath names it as it is on disk.
+  // That is the same real folder, not a link: it is pinned under its real name.
+  it('a folder named in another case is pinned under its real name (case-insensitive file systems)', async () => {
+    const realHome = realpathSync.native(home);
+    const onDisk = join(realHome, 'casepin');
+    mkdirSync(onDisk);
+    const caseInsensitive = existsSync(join(realHome, 'CASEPIN'));
+    const pin = await pinFolder(join(realHome, 'CasePin'));
+    if (caseInsensitive) {
+      expect(pin?.path).toBe(onDisk);
+      expect(await stillPinned(pin!)).toBe(true);
+    } else {
+      expect(pin).toBeUndefined();
+    }
+  });
+
+  it('a link named in another case is still never pinned', async () => {
+    const realHome = realpathSync.native(home);
+    link(join(realHome, 'Work'), join(realHome, 'caselink'));
+    expect(await pinFolder(join(realHome, 'CaseLink'))).toBeUndefined();
+    expect(await pinFolder(join(realHome, 'caselink'))).toBeUndefined();
+  });
+});
+
+describe('sameRealLocation (W1: realpath may differ from the path only in case on win32)', () => {
+  it('win32: the same drive and segments in another case are the same location', () => {
+    expect(
+      sameRealLocation(
+        'C:\\Users\\talir\\agentlink\\Send',
+        'c:\\Users\\talir\\AgentLink\\Send',
+        'win32',
+        true,
+      ),
+    ).toBe(true);
+  });
+
+  it('win32: another folder, a deeper or shallower path, or another drive is not', () => {
+    const expected = 'C:\\Users\\talir\\AgentLink\\Send';
+    expect(sameRealLocation('C:\\Users\\talir\\Other\\Send', expected, 'win32', true)).toBe(false);
+    expect(sameRealLocation('C:\\Users\\talir\\AgentLink', expected, 'win32', true)).toBe(false);
+    expect(sameRealLocation('C:\\Users\\talir\\AgentLink\\Send\\x', expected, 'win32', true)).toBe(
+      false,
+    );
+    expect(sameRealLocation('D:\\Users\\talir\\AgentLink\\Send', expected, 'win32', true)).toBe(
+      false,
+    );
+    expect(sameRealLocation('relative\\Send', expected, 'win32', true)).toBe(false);
+  });
+
+  it('posix: case-insensitive only where the platform is; exact otherwise', () => {
+    expect(
+      sameRealLocation('/Users/a/agentlink/Send', '/Users/a/AgentLink/Send', 'posix', true),
+    ).toBe(true);
+    expect(
+      sameRealLocation('/Users/a/agentlink/Send', '/Users/a/AgentLink/Send', 'posix', false),
+    ).toBe(false);
+    expect(
+      sameRealLocation('/Users/a/AgentLink/Send', '/Users/a/AgentLink/Send', 'posix', false),
+    ).toBe(true);
+    expect(sameRealLocation('/Users/a/Other/Send', '/Users/a/AgentLink/Send', 'posix', true)).toBe(
+      false,
+    );
+  });
+
+  it('without ignoring case, win32 needs the exact same path', () => {
+    expect(
+      sameRealLocation(
+        'C:\\Users\\talir\\agentlink',
+        'C:\\Users\\talir\\AgentLink',
+        'win32',
+        false,
+      ),
+    ).toBe(false);
   });
 });
 

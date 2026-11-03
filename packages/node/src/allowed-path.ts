@@ -156,9 +156,39 @@ export interface FolderPin {
 }
 
 /**
- * Pins `folder` when it is a real folder (not a link) whose realpath is exactly `folder`; undefined
- * otherwise. The identity is read before and after the realpath and must match, so a swap during
- * the pin is not pinned.
+ * W1: Windows (NTFS) and macOS (APFS, by default) find a folder whatever the case of its name, and
+ * realpath names it as it is on disk. There, a realpath that differs from the path only in the case
+ * of its root and segments is the same location (pinFolder still requires the same identity).
+ */
+const CASE_INSENSITIVE_PLATFORM = process.platform === 'win32' || process.platform === 'darwin';
+
+/**
+ * True when `real` (a realpath) names the location `expected`: exactly, or, with `ignoreCase`, with
+ * the same root and the same segments up to case (win32 paths parsed as core's path guard does).
+ * Never true for a relative or malformed path, another folder, or a deeper or shallower path.
+ */
+export function sameRealLocation(
+  real: string,
+  expected: string,
+  flavor: PathFlavor,
+  ignoreCase: boolean,
+): boolean {
+  if (real === expected) return parseAbsolutePath(real, flavor) !== undefined;
+  if (!ignoreCase) return false;
+  const a = parseAbsolutePath(real, flavor);
+  const b = parseAbsolutePath(expected, flavor);
+  if (a === undefined || b === undefined) return false;
+  if (a.root !== b.root || a.segments.length !== b.segments.length) return false;
+  return a.segments.every(
+    (segment, i) => segment.toLowerCase() === (b.segments[i] as string).toLowerCase(),
+  );
+}
+
+/**
+ * Pins `folder` when it is a real folder (not a link) whose realpath is `folder` (on Windows and
+ * macOS: up to case, W1); undefined otherwise. The pin's `path` is the realpath, so callers use the
+ * folder under its real name from then on. The identity is read before and after the realpath, and
+ * of the realpath itself, and must match, so a swap during the pin is not pinned.
  */
 export async function pinFolder(folder: string): Promise<FolderPin | undefined> {
   if (typeof folder !== 'string' || parseAbsolutePath(folder, FLAVOR) === undefined) {
@@ -167,11 +197,17 @@ export async function pinFolder(folder: string): Promise<FolderPin | undefined> 
   try {
     const first = await lstat(folder, { bigint: true });
     if (first.isSymbolicLink() || !first.isDirectory()) return undefined;
-    if ((await realpath(folder)) !== folder) return undefined;
+    const real = await realpath(folder);
+    if (!sameRealLocation(real, folder, FLAVOR, CASE_INSENSITIVE_PLATFORM)) return undefined;
     const second = await lstat(folder, { bigint: true });
     if (second.isSymbolicLink() || !second.isDirectory()) return undefined;
     if (second.dev !== first.dev || second.ino !== first.ino) return undefined;
-    return Object.freeze({ path: folder, dev: first.dev, ino: first.ino });
+    if (real !== folder) {
+      const atReal = await lstat(real, { bigint: true });
+      if (atReal.isSymbolicLink() || !atReal.isDirectory()) return undefined;
+      if (atReal.dev !== first.dev || atReal.ino !== first.ino) return undefined;
+    }
+    return Object.freeze({ path: real, dev: first.dev, ino: first.ino });
   } catch {
     return undefined;
   }

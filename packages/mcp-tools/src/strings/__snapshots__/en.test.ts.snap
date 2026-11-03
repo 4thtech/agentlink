@@ -154,14 +154,13 @@ exports[`copy catalogue (M1-9g) > cli.doctor.networkDown > renders as designed 1
 exports[`copy catalogue (M1-9g) > cli.doctor.networkOk > renders as designed 1`] = `"OK       Message network reachable"`;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.noOwnerCard > renders as designed 1`] = `
-"Problem  This ID has no card from your owner yet
-         Run \`npx -y @4thtech-io/agentlink owner add-agent --agent writer\` in your own terminal."
+"Problem  This ID isn't finished setting up
+         Open AgentLink to finish setting up this ID: run \`npx -y @4thtech-io/agentlink\`."
 `;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.noOwnerCardNoOthers > renders as designed 1`] = `
-"Problem  No ID on this computer has a card from an owner
-         If you have never set up an owner, \`npx -y @4thtech-io/agentlink owner add-agent\` tells you what to run first.
-         If an owner already exists here, \`npx -y @4thtech-io/agentlink owner add-agent --agent <name>\` adds this ID to it with your owner code."
+"Problem  AgentLink isn't set up on this computer yet
+         Open AgentLink to set it up: run \`npx -y @4thtech-io/agentlink\`."
 `;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.restart > renders as designed 1`] = `

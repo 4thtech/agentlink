@@ -61,6 +61,15 @@ describe('AgentIcon (W4-SHELL, Decision 44 B1)', () => {
     expect(out).toContain('&lt;');
   });
 
+  it('draws idle with the same filled dot as ready (connected = green, L1)', () => {
+    expect(html(h(AgentIcon, { label: 'A', dot: 'idle' }))).toContain('al-agent-icon-dot is-idle');
+    const rule = /\.al-agent-icon-dot\.is-ready,\s*\.al-agent-icon-dot\.is-idle\s*\{([^}]*)\}/.exec(
+      css,
+    );
+    expect(rule).not.toBeNull();
+    expect(rule?.[1]).toMatch(/background:\s*var\(--al-color-status-success-icon\)/);
+  });
+
   it('has one style per tone, drawn from design tokens only, in two sizes', () => {
     for (const tone of AGENT_ICON_TONES) {
       const rule = new RegExp(`\\.al-agent-icon\\.is-${tone}\\s*\\{([^}]*)\\}`).exec(css);

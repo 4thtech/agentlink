@@ -616,18 +616,56 @@ describe('doctor (07 §9.4)', () => {
     expect((await doctorWith(undefined)).text).toContain('Not set up here.');
   });
 
+  it('plain doctor lists every ID by display name with its AI apps and an OK/Problem line', async () => {
+    const opened: (string | undefined)[] = [];
+    const f = fakeAgent();
+    const handler = createDoctorHandler({
+      ...createDeps({
+        open: (name) => {
+          opened.push(name);
+          return Promise.resolve({ status: 'ok', agent: f.agent });
+        },
+        home: '/nonexistent-home',
+      }),
+      local: () =>
+        Promise.resolve({
+          lines: [],
+          problems: 0,
+          ids: [
+            { name: 'work', label: 'My work ID', apps: ['Cursor'] },
+            { name: 'spare', label: 'Spare', apps: [] },
+          ],
+        }),
+    });
+    const out: string[] = [];
+    const code = await createDispatcher({ doctor: handler })(['doctor'], {
+      output: { print: (t) => out.push(t), printError: (t) => out.push(t) },
+      terminal: TTY,
+      version: '0.0.0',
+    });
+    const text = out.join('\n');
+    expect(code).toBe(EXIT_OK);
+    expect(opened).toEqual(['work', 'spare']);
+    expect(text).toContain('ID: My work ID');
+    expect(text).toContain('AI apps: Cursor');
+    expect(text).toContain('AI apps: none connected');
+    expect(text).toContain('OK       My work ID is working');
+    expect(text).toContain('OK       Spare is working');
+  });
+
   const noCard = (): Fake => fakeAgent({ identity: { get: () => Promise.resolve(undefined) } });
 
   it('names the missing owner card, never suggests init, and stops (M1-9u)', async () => {
     const result = await harness(noCard()).run(['doctor']);
     expect(result.code).toBe(EXIT_FAILED);
     const text = result.out.join('\n');
-    expect(text).toContain('Problem  This ID has no card from your owner yet');
-    expect(text).toContain('`npx -y @4thtech-io/agentlink owner add-agent --agent default`');
+    expect(text).toContain("Problem  This ID isn't finished setting up");
+    expect(text).toContain('Open AgentLink to finish setting up this ID: run `');
+    expect(text).not.toContain('add-agent');
     expect(text).not.toContain('agentlink init');
     expect(text).not.toContain('OK       Message network');
     // No other agent on this machine has a card either: the state is named.
-    expect(text).toContain('No ID on this computer has a card from an owner');
+    expect(text).toContain("AgentLink isn't set up on this computer yet");
   });
 
   it('does not add the machine-wide line when another agent has a card (M1-9u)', async () => {
@@ -646,8 +684,8 @@ describe('doctor (07 §9.4)', () => {
       }).run(['doctor']);
       expect(result.code).toBe(EXIT_FAILED);
       const text = result.out.join('\n');
-      expect(text).toContain('add-agent --agent default');
-      expect(text).not.toContain('No ID on this computer');
+      expect(text).toContain("This ID isn't finished setting up");
+      expect(text).not.toContain("AgentLink isn't set up on this computer yet");
     } finally {
       await rm(home, { recursive: true, force: true });
     }

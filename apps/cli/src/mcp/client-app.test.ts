@@ -31,6 +31,12 @@ describe('mcpAppIdFor (06 §6)', () => {
     expect(mcpAppIdFor('windsurf-client')).toBe('windsurf');
   });
 
+  it('maps Claude Code inside the Claude desktop app (local-agent-mode prefix)', () => {
+    expect(mcpAppIdFor('local-agent-mode-agentlink')).toBe('claude-code');
+    expect(mcpAppIdFor('Local-Agent-Mode-gitbook')).toBe('claude-code');
+    expect(mcpAppIdFor('local-agent-mode-')).toBe('other');
+  });
+
   it.each([
     ['an unknown name', 'my-own-client'],
     ['a near miss', 'claude-code '],
