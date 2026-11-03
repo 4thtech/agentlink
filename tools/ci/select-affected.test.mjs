@@ -253,7 +253,14 @@ describe('package jobs: which ones a pull request runs', () => {
   const ALL = Object.keys(PKG).sort();
 
   it('maps each package job of ci.yml to the packages it tests', () => {
-    expect(ALL).toEqual(['bundle-check', 'keychain', 'relays-docker', 'storage-minio', 'vectors']);
+    expect(ALL).toEqual([
+      'bundle-check',
+      'e2e-browser',
+      'keychain',
+      'relays-docker',
+      'storage-minio',
+      'vectors',
+    ]);
   });
 
   it('names only packages that exist in the workspace (a renamed package must not silence a job)', () => {
@@ -285,13 +292,18 @@ describe('package jobs: which ones a pull request runs', () => {
     expect(running(['docs/process/ci-cd.md', 'changelog.d/x.md', 'README.md'])).toEqual([]);
   });
 
-  it('a CLI-only change runs keychain and bundle-check', () => {
-    expect(running(['apps/cli/src/server.ts'])).toEqual(['bundle-check', 'keychain']);
+  it('a CLI-only change runs keychain, bundle-check and the browser suites (e2e is above the CLI)', () => {
+    expect(running(['apps/cli/src/server.ts'])).toEqual([
+      'bundle-check',
+      'e2e-browser',
+      'keychain',
+    ]);
   });
 
-  it('a node change runs keychain, relays-docker and bundle-check (node is under the CLI)', () => {
+  it('a node change runs keychain, relays-docker, bundle-check and the browser suites', () => {
     expect(running(['packages/node/src/keystore.ts'])).toEqual([
       'bundle-check',
+      'e2e-browser',
       'keychain',
       'relays-docker',
     ]);
@@ -313,8 +325,12 @@ describe('package jobs: which ones a pull request runs', () => {
     expect(running(['packages/chain/src/index.ts'])).toContain('vectors');
   });
 
-  it('an e2e change runs no package job', () => {
-    expect(running(['e2e/test/world.ts'])).toEqual([]);
+  it('an e2e change runs only the browser suites', () => {
+    expect(running(['e2e/test/world.ts'])).toEqual(['e2e-browser']);
+  });
+
+  it('a local app change runs the browser suites (its own browser test, node and e2e above it)', () => {
+    expect(running(['apps/local-ui/src/pages/home/page.ts'])).toContain('e2e-browser');
   });
 
   it('a change to an app no package job tests (console, verify) runs none', () => {
@@ -322,7 +338,7 @@ describe('package jobs: which ones a pull request runs', () => {
   });
 
   it('a ui change runs the jobs of the CLI, which serves the approval pages', () => {
-    expect(running(['packages/ui/src/x.ts'])).toEqual(['bundle-check', 'keychain']);
+    expect(running(['packages/ui/src/x.ts'])).toEqual(['bundle-check', 'e2e-browser', 'keychain']);
   });
 });
 
