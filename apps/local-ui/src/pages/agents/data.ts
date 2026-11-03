@@ -271,6 +271,7 @@ export function agentLine(row: AgentRow, now: number): string {
   if (state === 'ready' && first !== undefined) {
     return live.length > 1 ? W.readyInMore(first.name, live.length - 1) : W.readyIn(first.name);
   }
+  if (state === 'idle' && first !== undefined) return W.readyIn(first.name);
   if (state === 'idle') return W.idle;
   if (state === 'ready' || state === 'working') return W.ready;
   // W7-ID-RENAME: no AI app uses this ID: one name everywhere, never "Offline".
@@ -365,7 +366,9 @@ export function fleetRows(rows: readonly AgentRow[], query: FleetQuery): AgentRo
       (q === '' ||
         r.label.toLowerCase().includes(q) ||
         runsApp(r, (a) => a.name.toLowerCase().includes(q))) &&
-      (query.status === 'all' || stateOf(r) === query.status) &&
+      (query.status === 'all' ||
+        stateOf(r) === query.status ||
+        (query.status === 'ready' && stateOf(r) === 'idle')) &&
       (query.app === 'all' || runsApp(r, (a) => a.id === query.app)),
   );
   const tail = (r: AgentRow): number => (r.removing ? 1 : 0);

@@ -58,6 +58,8 @@ export interface AiAppsDeskOptions {
   readonly now?: () => number;
   /** Claude Desktop runs now (best effort; default: the OS process list, claudeDesktopRunning). */
   readonly desktopRunning?: () => Promise<boolean>;
+  /** R2: the three-way check (running, not running, could not check); wins over `desktopRunning`. */
+  readonly desktopState?: () => Promise<DesktopState>;
   /** The agentId an agent folder records (07 §9.1; default: its config.json). */
   readonly agentIdOf?: (name: string) => Promise<string | undefined>;
   /** Fixed-text events only (never a path, a name or file content). */
@@ -67,37 +69,63 @@ export interface AiAppsDeskOptions {
 const DESKTOP: HarnessDef['id'] = 'claude-desktop';
 const DESKTOP_CHECK_MS = 3_000;
 
+/** R2: what the process check found. `unknown`: the check itself failed (it says nothing). */
+export type DesktopState = 'running' | 'not_running' | 'unknown';
+
+type DesktopCheckRun = (
+  file: string,
+  args: readonly string[],
+) => Promise<{ readonly code: number; readonly out: string }>;
+
+const runCheck: DesktopCheckRun = (file, args) =>
+  new Promise((resolve) => {
+    execFile(
+      file,
+      [...args],
+      { timeout: DESKTOP_CHECK_MS, windowsHide: true, encoding: 'utf8' },
+      (error, stdout) => {
+        const code = error === null ? 0 : typeof error.code === 'number' ? error.code : Number.NaN;
+        resolve({ code, out: typeof stdout === 'string' ? stdout : '' });
+      },
+    );
+  });
+
 /**
- * Best effort: is the Claude desktop app running (06 §7)? macOS: `pgrep -x Claude`; Windows:
- * `tasklist` for `Claude.exe`. Fixed programs and arguments, no shell; the output is only matched,
- * never logged. A check that fails says "running" (fail closed: nothing is written).
+ * Best effort: is the Claude desktop app running (06 §7)? macOS: `pgrep -x Claude` (exit 0 running,
+ * exit 1 not running, anything else: the check failed); Windows: `tasklist` for `Claude.exe`. Fixed
+ * programs and arguments, no shell; the output is only matched, never logged.
  */
-export function claudeDesktopRunning(
+export async function claudeDesktopState(
   platform: NodeJS.Platform = process.platform,
-): Promise<boolean> {
-  const run = (file: string, args: readonly string[]) =>
-    new Promise<{ code: number; out: string }>((resolve) => {
-      execFile(
-        file,
-        [...args],
-        { timeout: DESKTOP_CHECK_MS, windowsHide: true, encoding: 'utf8' },
-        (error, stdout) => {
-          const code =
-            error === null ? 0 : typeof error.code === 'number' ? error.code : Number.NaN;
-          resolve({ code, out: typeof stdout === 'string' ? stdout : '' });
-        },
-      );
-    });
+  run: DesktopCheckRun = runCheck,
+): Promise<DesktopState> {
   if (platform === 'darwin') {
-    return run('/usr/bin/pgrep', ['-x', 'Claude']).then(({ code }) => code !== 1);
+    const { code } = await run('/usr/bin/pgrep', ['-x', 'Claude']);
+    return code === 0 ? 'running' : code === 1 ? 'not_running' : 'unknown';
   }
   if (platform === 'win32') {
-    return run('tasklist', ['/FI', 'IMAGENAME eq Claude.exe', '/NH', '/FO', 'CSV']).then(
-      ({ code, out }) => code !== 0 || out.toLowerCase().includes('"claude.exe"'),
-    );
+    const { code, out } = await run('tasklist', [
+      '/FI',
+      'IMAGENAME eq Claude.exe',
+      '/NH',
+      '/FO',
+      'CSV',
+    ]);
+    if (code !== 0) return 'unknown';
+    return out.toLowerCase().includes('"claude.exe"') ? 'running' : 'not_running';
   }
   // No Claude Desktop on this system (harnesses.ts): nothing to wait for.
-  return Promise.resolve(false);
+  return 'not_running';
+}
+
+/**
+ * The same check as a yes or no for callers that must fail closed (the `init` prompt): a check that
+ * could not run says "running".
+ */
+export async function claudeDesktopRunning(
+  platform: NodeJS.Platform = process.platform,
+): Promise<boolean> {
+  return (await claudeDesktopState(platform)) !== 'not_running';
 }
 
 function viewState(state: EntryState): LocalUiAiAppEntryState {
@@ -110,7 +138,13 @@ const UNREADABLE: LocalUiAiAppEntryState = Object.freeze({ kind: 'unreadable' })
 export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
   const platform = options.platform ?? process.platform;
   const now = options.now ?? (() => Math.floor(Date.now() / 1000));
-  const desktopRunning = options.desktopRunning ?? (() => claudeDesktopRunning(platform));
+  const legacyCheck = options.desktopRunning;
+  const desktopCheck: () => Promise<DesktopState> =
+    options.desktopState ??
+    (legacyCheck === undefined
+      ? () => claudeDesktopState(platform)
+      : () => legacyCheck().then((r): DesktopState => (r ? 'running' : 'not_running')));
+  const desktopNow = (): Promise<DesktopState> => desktopCheck().catch(() => 'unknown');
   const agentIdOf =
     options.agentIdOf ??
     (async (name: string) => (await readAgentConfig(options.home, name))?.config.agentId);
@@ -124,7 +158,7 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
   };
   const fileOptions = options.uid === undefined ? {} : { uid: options.uid };
   const running = (def: HarnessDef): Promise<boolean> =>
-    def.id === DESKTOP ? desktopRunning().catch(() => true) : Promise.resolve(false);
+    def.id === DESKTOP ? desktopNow().then((state) => state === 'running') : Promise.resolve(false);
 
   /** The config as read now, entry-only, or `unreadable`. Never throws with file content. */
   async function read(def: HarnessDef): Promise<
@@ -153,9 +187,10 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
   return Object.freeze<LocalUiAiApps>({
     async list() {
       const defs = await detectHarnesses(context);
-      const desktop = defs.some((def) => def.id === DESKTOP)
-        ? await desktopRunning().catch(() => true)
-        : false;
+      const state: DesktopState = defs.some((def) => def.id === DESKTOP)
+        ? await desktopNow()
+        : 'not_running';
+      const desktop = state === 'running';
       const apps: LocalUiAiAppView[] = [];
       for (const def of defs) {
         const found = await read(def);
@@ -172,6 +207,8 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
             path,
             state: found === 'unreadable' ? UNREADABLE : viewState(found.state),
             quitFirst: def.id === DESKTOP && desktop,
+            // R2: the check itself failed: not "Quit first", but "couldn't check".
+            ...(def.id === DESKTOP && state === 'unknown' ? { checkFailed: true } : {}),
           }),
         );
       }

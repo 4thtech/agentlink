@@ -25,7 +25,17 @@ export interface CreateStatement {
   readonly agentFingerprint: string;
   readonly ownerFingerprint: string;
   readonly folder: string;
-  readonly app?: { readonly id: string; readonly name: string; readonly kind: 'connect' | 'move' };
+  readonly app?: {
+    readonly id: string;
+    readonly name: string;
+    readonly kind: 'connect' | 'move';
+    /**
+     * W8-S5 (F7): for a move, the ID the app leaves as the server names it (null when it is gone),
+     * and whether it was removed. Shown as text only.
+     */
+    readonly oldLabel?: string | null;
+    readonly oldGone?: boolean;
+  };
 }
 
 export interface CreatePublicKey {
@@ -121,6 +131,18 @@ function fields(list: readonly Uint8Array[]): Uint8Array {
   return out;
 }
 
+/**
+ * W8-S5 (IR L3): the replaced ID's label as the server names it. A label longer than an ID label
+ * (32 characters) is shortened for display, never refused; anything past this bound is refused.
+ */
+const OLD_LABEL_MAX = 256;
+const SHOWN_LABEL_MAX = 32;
+const shortLabel = (label: string | null): string | null => {
+  if (label === null) return null;
+  const chars = [...label];
+  return chars.length <= SHOWN_LABEL_MAX ? label : `${chars.slice(0, SHOWN_LABEL_MAX).join('')}…`;
+};
+
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -144,17 +166,29 @@ export function parseStatement(value: unknown): CreateStatement | undefined {
   let shown: CreateStatement['app'];
   if (app !== undefined) {
     if (!isObject(app)) return undefined;
-    const { app: id, name, kind } = app;
+    const { app: id, name, kind, oldLabel, oldGone } = app;
     if (
       typeof id !== 'string' ||
       !APP_ID.test(id) ||
       typeof name !== 'string' ||
       !APP_NAME.test(name) ||
-      (kind !== 'connect' && kind !== 'move')
+      (kind !== 'connect' && kind !== 'move') ||
+      !(
+        oldLabel === undefined ||
+        oldLabel === null ||
+        (typeof oldLabel === 'string' && oldLabel.length > 0 && oldLabel.length <= OLD_LABEL_MAX)
+      ) ||
+      !(oldGone === undefined || typeof oldGone === 'boolean')
     ) {
       return undefined;
     }
-    shown = { id, name, kind };
+    shown = {
+      id,
+      name,
+      kind,
+      ...(oldLabel === undefined ? {} : { oldLabel: shortLabel(oldLabel) }),
+      ...(oldGone === undefined ? {} : { oldGone }),
+    };
   }
   return { label, agentFingerprint, ownerFingerprint, folder, ...(shown ? { app: shown } : {}) };
 }

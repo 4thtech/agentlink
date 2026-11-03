@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { CREDITS_TEXT } from './commands/credits.js';
 import { DOCTOR_PROOF_TEXT, DOCTOR_TEXT } from './commands/doctor.js';
+import { DOCTOR_LOCAL_TEXT } from './commands/doctor-local.js';
 import { FIRST_RUN_TEXT } from './commands/first-run.js';
 import { UI_TEXT } from './commands/ui.js';
 import { HOOK_TEXT, INIT_TEXT } from './commands/init.js';
@@ -39,7 +40,13 @@ import { en } from '@4thtech-io/mcp-tools/strings/en.js';
 import { TERMS_TEXT } from '@4thtech-io/mcp-tools/terms-common.js';
 import { TOOL_TEXT } from '@4thtech-io/mcp-tools/text.js';
 import { VERIFY_TEXT } from '@4thtech-io/mcp-tools/verify-proof-pack.js';
-import { NEVER_SAY, lintVocabulary, proseOf } from './vocabulary.js';
+import {
+  HOOD_HARNESS_PHRASES,
+  NEVER_SAY,
+  lintHoodVocabulary,
+  lintVocabulary,
+  proseOf,
+} from './vocabulary.js';
 
 /** Sample arguments for the text functions: plain words, so they add no banned term. */
 const SAMPLE_ARGS: readonly unknown[] = ['Sample', 'Sample', 'Sample', 'Sample'];
@@ -70,6 +77,7 @@ function stringsOf(table: string, value: unknown): [string, string][] {
 /** The user-facing text tables of the CLI. */
 const TABLES: Readonly<Record<string, unknown>> = {
   CREDITS_TEXT,
+  DOCTOR_LOCAL_TEXT,
   DOCTOR_PROOF_TEXT,
   DOCTOR_TEXT,
   FIRST_RUN_TEXT,
@@ -231,5 +239,13 @@ describe('the lint itself (self-test)', () => {
     for (const term of ['wallet', 'gas', 'seed phrase', 'transaction', 'chain', 'address']) {
       expect(names).toContain(term);
     }
+  });
+
+  it('Under the hood may say "harness" only in the AI-app heading and its hint', () => {
+    for (const phrase of HOOD_HARNESS_PHRASES) {
+      expect(lintVocabulary(phrase)).toContain('harness/envelope');
+      expect(lintHoodVocabulary(phrase)).toEqual([]);
+    }
+    expect(lintHoodVocabulary('Open your harness settings.')).toEqual(['harness/envelope']);
   });
 });

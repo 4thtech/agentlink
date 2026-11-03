@@ -19,7 +19,9 @@
 // I-1/I-4: the runtime holds only the agent's KeyStore interface; it never holds an owner key and
 // takes no owner presence. Owner commands (M1-9b) take presence themselves, through @4thtech-io/node.
 // I-7: errors carry fixed text only (RuntimeError, or @4thtech-io/node's own fixed messages).
+import { readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import process from 'node:process';
 import {
   AgentLinkClient,
@@ -28,8 +30,8 @@ import {
   type TransportFactory,
 } from '@4thtech-io/core';
 import type { KeyStore } from '@4thtech-io/crypto';
-import { createLogger, type Logger } from '@4thtech-io/log';
-import { cliLogLevel } from './log-level.js';
+import type { Logger } from '@4thtech-io/log';
+import { cliLogger } from './log-level.js';
 import {
   nodeHostResolver,
   nodeNip11Fetcher,
@@ -139,6 +141,23 @@ export type OpenAgentResult =
 export const NO_AGENT_MESSAGE = `AgentLink is not set up for this ID on this machine yet. Run \`${NPX_PREFIX} init\` yourself, in your own terminal.`;
 
 /**
+ * W8-S3 (F16): `needs_setup` `no_agent` when the folder is gone and the owner has removed an ID on
+ * this computer: an AI app entry left behind names a removed ID, so "run init" is the wrong advice.
+ * Fixed text; never names the ID (the MCP server does not know which AI app runs it).
+ */
+export const AGENT_GONE_MESSAGE =
+  "This ID isn't on this computer any more. Open the AgentLink app to connect this AI app to another ID.";
+
+/** True when the owner's revoked list (`~/.agentlink/revoked/`) has any entry. Never throws. */
+async function anyRemovedId(home: string): Promise<boolean> {
+  try {
+    return (await readdir(join(home, '.agentlink', 'revoked'))).some((n) => n.endsWith('.json'));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * `needs_setup` `agent_removing` (U3-e): the agent was removed or its removal did not finish. Fixed
  * text; never names the agent.
  */
@@ -159,11 +178,14 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
   if (!isAgentName(name)) throw new RuntimeError('agent_name_invalid');
   const deps = options.deps ?? nodeRuntimeDeps;
   const clock = options.clock ?? systemClock;
-  const logger = options.logger ?? createLogger({ name: 'cli', level: cliLogLevel(process.env) });
+  const logger = options.logger ?? cliLogger('cli', process.env);
 
   const found = await readAgentConfig(options.home ?? homedir(), name);
   if (found === undefined) {
-    return { status: 'needs_setup', reason: 'no_agent', message: NO_AGENT_MESSAGE };
+    const message = (await anyRemovedId(options.home ?? homedir()))
+      ? AGENT_GONE_MESSAGE
+      : NO_AGENT_MESSAGE;
+    return { status: 'needs_setup', reason: 'no_agent', message };
   }
   const { config, paths } = found;
   const home = options.home ?? homedir();

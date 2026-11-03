@@ -21,8 +21,8 @@
 // carriers, signed by the owner key with the same session, go out through the outbox with a bounded
 // wait; if they are not delivered the answer is `undeliverable` and nothing more happens ("Remove
 // anyway?" with "Remove anyway" / "Not now"); `anyway: true` (a new gesture) goes on. (5) The AI
-// app entries that run the agent are removed (card U3-f's seam; without it there are none to
-// remove). (6) The keys are erased through the KeyStore erase API (never an owner item). (7) The
+// app entries that run the agent are removed (W8-S3: exactly AgentLink's entry for this folder,
+// listed in the statement before the gesture, through the CLI's harness desk). (6) The keys are erased through the KeyStore erase API (never an owner item). (7) The
 // store, config and folder are deleted (agent-dir.ts removeAgentFolder, its realpath rules). Then
 // the app opens another agent, or none ("Add an agent"); the owner stays.
 //
@@ -103,16 +103,36 @@ export interface AgentRemovalPort {
   /** Records `text` as the entry for `agentId` (0600, never replacing one that exists). */
   recordRevoked(agentId: string, text: string): Promise<void>;
   /**
-   * Card U3-f: removes the AI app entries that run this agent (entry-only, 04 §2.5 "Writing AI app
-   * configs"). Absent until U3-f lands: no entry is written by the app before it.
+   * W8-S3 (04 §2.5 step 5): the AI apps whose `agentlink` entry is exactly AgentLink's entry for
+   * this agent folder (06 §7, entry-only), read before the gesture so the statement lists each one.
+   * Throws on an invalid name.
    */
-  removeAppEntries?(name: string): Promise<void>;
+  appEntries(name: string): Promise<readonly RemovalAppEntry[]>;
+  /**
+   * W8-S3 (04 §2.5 step 5, "Writing AI app configs"): removes exactly the entries `shown` (the ones
+   * the statement listed), each only while it is still exactly AgentLink's entry for `name`, at the
+   * fixed per-harness path, with a backup, never while Claude Desktop runs, and only when the folder
+   * records `agentId`. An entry that now runs another agent, or that is gone, is left alone. Throws
+   * (a fixed error) when an entry cannot be written, or when an entry for `name` that was not shown
+   * exists now, so nothing is removed that the owner did not see; the keys stay (Try again).
+   */
+  removeAppEntries(name: string, agentId: string, shown: readonly RemovalAppEntry[]): Promise<void>;
+}
+
+/** One AI app whose entry runs the agent being removed: its fixed-table id and display name. */
+export interface RemovalAppEntry {
+  readonly app: string;
+  readonly name: string;
 }
 
 /** The strict input of the remove route (`X-AgentLink-Input`). */
 export interface RemoveInput {
   readonly name: string;
-  readonly typedLabel: string;
+  /**
+   * The typed label (b11 §29). W8-FINISH-REMOVE (proposed, owner confirms at merge): left out only
+   * to finish removing an agent that is already retired for good (the gate checks that).
+   */
+  readonly typedLabel: string | undefined;
   /** "Remove anyway" after `undeliverable` (b11 §29). */
   readonly anyway: boolean;
 }
@@ -120,17 +140,24 @@ export interface RemoveInput {
 const NAME = /^[a-z][a-z0-9-]{0,31}$/;
 const MAX_LABEL_CHARS = 40;
 
-/** Parses the input: exactly `{name, typedLabel}` plus an optional `anyway: true`; else undefined. */
+/**
+ * Parses the input: `{name}` plus an optional `typedLabel` and an optional `anyway: true`; else
+ * undefined. Whether `typedLabel` may be left out is the gate's decision (a retired agent only).
+ */
 export function parseRemoveInput(input: JsonValue | undefined): RemoveInput | undefined {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
   const record = input as Record<string, JsonValue>;
   const keys = Object.keys(record).sort();
   const allowed = ['anyway', 'name', 'typedLabel'];
   if (!keys.every((k) => allowed.includes(k)) || !keys.includes('name')) return undefined;
-  if (!keys.includes('typedLabel')) return undefined;
   const { name, typedLabel, anyway } = record;
   if (typeof name !== 'string' || !NAME.test(name)) return undefined;
-  if (typeof typedLabel !== 'string' || typedLabel.length > MAX_LABEL_CHARS * 2) return undefined;
+  if (
+    typedLabel !== undefined &&
+    (typeof typedLabel !== 'string' || typedLabel.length > MAX_LABEL_CHARS * 2)
+  ) {
+    return undefined;
+  }
   if (anyway !== undefined && anyway !== true) return undefined;
   return Object.freeze({ name, typedLabel, anyway: anyway === true });
 }
@@ -145,6 +172,7 @@ export function removeStatement(
   folder: string,
   contacts: number,
   anyway = false,
+  apps: readonly RemovalAppEntry[] = [],
 ): string[] {
   return [
     `Remove the ID ${label} from this computer for good.`,
@@ -155,6 +183,9 @@ export function removeStatement(
       : anyway
         ? "Its contacts can't be told now. It is removed anyway."
         : 'Its contacts are told that it was removed.',
+    // W8-S3 (04 §2.5 step 5): each AI app entry change, shown before the gesture, which covers it.
+    // The app name comes from the fixed harness table only.
+    ...apps.map((app) => `${app.name} will stop using ${label}.`),
   ];
 }
 
@@ -255,6 +286,9 @@ export async function runRemovalSteps(steps: RemovalSteps): Promise<'removed' | 
   if (facts.agentId !== steps.agentId) throw new RemovalStepFailed('sign');
   // (2) Always signed, with or without contacts; bound to the agent's own ID (never the label).
   const body = await step('sign', () => client.removal.prepareRevoke());
+  // (5, shown) The AI app entries that run this folder, read before the gesture: the statement
+  // lists each one. Nothing is done yet, so a failure here is a failure before signing.
+  const apps = await step('sign', () => port.appEntries(name));
   // A refused or cancelled gesture propagates as it is (the gate answers it).
   const signatures = await owner.sign(
     {
@@ -263,6 +297,7 @@ export async function runRemovalSteps(steps: RemovalSteps): Promise<'removed' | 
         name,
         facts.contacts,
         steps.anyway,
+        apps,
       ),
     },
     [{ kind: 'owner-action', action: body }],
@@ -304,9 +339,9 @@ export async function runRemovalSteps(steps: RemovalSteps): Promise<'removed' | 
     const delivered = await step('tell', () => client.removal.deliver(ids, steps.delivery));
     if (delivered !== 'delivered' && !steps.anyway) return 'undeliverable';
   }
-  // (5) The AI app entries that run this agent (before the keys: a failure stops here).
-  const removeEntries = port.removeAppEntries;
-  if (removeEntries !== undefined) await step('apps', () => removeEntries.call(port, name));
+  // (5) The AI app entries that run this agent, exactly those shown (before the keys: a failure
+  // stops here, so Try again can still show and remove them).
+  await step('apps', () => port.removeAppEntries(name, facts.agentId, apps));
   // (6) The keys: the storage ids were read first (facts); the store is closed, then erased.
   await agent.close().catch(() => undefined);
   await step('keys', () =>
@@ -322,7 +357,7 @@ export async function runRemovalSteps(steps: RemovalSteps): Promise<'removed' | 
   return 'removed';
 }
 
-/** What finishing a removal whose keys are already gone needs (04 §2.5 steps 6 and 7 only). */
+/** What finishing a removal whose keys are already gone needs (04 §2.5 steps 5 to 7). */
 export interface FinishSteps {
   readonly name: string;
   readonly label: string;
@@ -332,6 +367,8 @@ export interface FinishSteps {
   readonly recorded: string;
   /** The owner key the entry is signed by (64 lowercase hex), the owner of this gesture. */
   readonly ownerNostr: string;
+  /** W8-S3: the AI app entries (step 5) go through the same port as a full removal. */
+  readonly port: AgentRemovalPort;
   readonly removeFolder: (name: string) => Promise<void>;
   readonly erase: KeyEraseControl;
   readonly owner: LocalUiOwnerOperation;
@@ -342,11 +379,13 @@ export interface FinishSteps {
  * Try again after a stop between step 6 and step 7 (IR-U3-e-SEC-1 GAP B): the agent's keys are gone,
  * so its store no longer opens, but it is retired (a verifying entry in the revoked list) and marked.
  * The gesture signs a fresh `agent.revoke` for the same agent (D-68: every presence route signs; it
- * is idempotent and not stored, the recorded entry stays), then the erase runs again (idempotent)
- * and the folder goes. Nothing is sent: the contacts were told, or the owner chose Remove anyway,
- * before the keys went.
+ * is idempotent and not stored, the recorded entry stays), then (W8-S3) the AI app entries that
+ * still run the folder are removed (step 5, before the keys), the erase runs again (idempotent; the
+ * backend adds the `s3:<id>` its `storage-mark` names) and the folder goes. Nothing is sent: the
+ * contacts were told, or the owner chose Remove anyway, before the keys went.
  */
 export async function runFinishSteps(steps: FinishSteps): Promise<'removed'> {
+  const apps = await step('sign', () => steps.port.appEntries(steps.name));
   const { body } = buildAgentRevokeBody({
     agent: steps.agentId,
     owner: steps.ownerNostr,
@@ -354,7 +393,7 @@ export async function runFinishSteps(steps: FinishSteps): Promise<'removed'> {
   });
   const signatures = await steps.owner.sign(
     // The store no longer opens, so no verified label can be read: the folder name only.
-    { lines: removeStatement(steps.name, steps.name, 0) },
+    { lines: removeStatement(steps.name, steps.name, 0, false, apps) },
     [{ kind: 'owner-action', action: body as unknown as JsonObject }],
   );
   const first = signatures[0];
@@ -365,6 +404,9 @@ export async function runFinishSteps(steps: FinishSteps): Promise<'removed'> {
   if (!verifyRevokedEntry(signedText, steps.agentId, `0x${steps.ownerNostr}`).ok) {
     throw new RemovalStepFailed('sign');
   }
+  await step('apps', () => steps.port.removeAppEntries(steps.name, steps.agentId, apps));
+  // The store no longer opens, so its `own_storage` ids cannot be read; the backend adds the id its
+  // `storage-mark` names (eraseKeychainAgent). No KeyStore backend lists items today.
   await step('keys', () =>
     steps.erase.eraseAgentKeys({ agentId: steps.agentId, storageIds: [], revoke: steps.recorded }),
   );

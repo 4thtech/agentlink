@@ -145,15 +145,15 @@ describe('the Agents page', () => {
     expect(host.querySelectorAll('[data-agent]')).toHaveLength(4);
     const personal = rowOf('default');
     expect(personal.textContent).toContain('Open');
-    expect(personal.textContent).toContain('Ready in Claude Code and 1 more');
+    expect(personal.textContent).toContain('Connected to Claude Code and 1 more');
     expect(personal.textContent).toContain('Claude Code');
     expect(personal.textContent).toContain('Claude Desktop');
     // D-144 (c): which AI apps use the ID, or none.
     expect(personal.textContent).toContain('Used by Claude Code, Claude Desktop');
     expect(rowOf('second').textContent).toContain('Not used by any AI app');
     expect(personal.textContent).toContain('4 contacts');
-    expect(button(personal, 'Switch')).toBeUndefined();
-    expect(button(rowOf('work'), 'Switch')).toBeDefined();
+    expect(button(personal, 'Open')).toBeUndefined();
+    expect(button(rowOf('work'), 'Open')).toBeDefined();
     expect(rowOf('work').textContent).toContain('1 contact');
   });
   it('an agent with no AI app reads Not used by any AI app with its AI apps panel; Removal not finished with Try again', async () => {
@@ -166,7 +166,7 @@ describe('the Agents page', () => {
     expect(old.textContent).toContain('Removal not finished');
     expect(old.textContent).toContain('Removing it stopped part-way. Nothing else was affected.');
     expect(button(old, 'Try again')).toBeDefined();
-    expect(button(old, 'Switch')).toBeUndefined();
+    expect(button(old, 'Open')).toBeUndefined();
   });
   it('has no List and Map control in the simple layer (it lives Under the hood)', async () => {
     await mountPage();
@@ -212,7 +212,7 @@ describe('the Agents page', () => {
       body: { status: 'done', generation: 8, current: 'work' },
     };
     const reload = await mountPage();
-    await click(button(rowOf('work'), 'Switch'));
+    await click(button(rowOf('work'), 'Open'));
     const post = calls.find((c) => c.url === '/api/ui/agents/switch')!;
     expect(JSON.parse(post.body)).toEqual({ name: 'work', generation: 7 });
     expect(reload).toHaveBeenCalledTimes(1);
@@ -223,7 +223,7 @@ describe('the Agents page', () => {
     const reads = (): number =>
       calls.filter((c) => c.url === '/api/ui/agents' && c.method === 'GET').length;
     const before = reads();
-    await click(button(rowOf('work'), 'Switch'));
+    await click(button(rowOf('work'), 'Open'));
     expect(plain(host)).toContain('You switched IDs. Nothing was changed.');
     // The page's read and the shared live store's read.
     expect(reads()).toBeGreaterThan(before);
@@ -346,6 +346,70 @@ describe('Remove', () => {
     // Still running: Check again stays on the sentence, still without a gesture.
     await click(button(host, 'Check again'));
     expect(plain(host)).toContain('Quit Codex first.');
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    // Quit: Check again goes on to the Touch ID step, and the server still decides.
+    answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
+    await click(button(host, 'Check again'));
+    expect(code()).toBeTruthy();
+    expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
+  });
+  it('F22: Claude Code names the Terminal sessions still using the ID', async () => {
+    const running = list([
+      ...FOUR.slice(0, 1),
+      agent('work', 'Work', {
+        contacts: 1,
+        running: true,
+        state: 'ready',
+        apps: [{ app: 'claude-code', state: 'ready' }],
+      }),
+      ...FOUR.slice(2),
+    ]);
+    answers['GET /api/ui/agents'] = { status: 200, body: running };
+    const sheet = await open('work');
+    await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
+    await click(button(sheet, 'Remove with Touch ID'));
+    expect(plain(host)).toContain(
+      'Claude Code sessions in Terminal are still using this ID. Close them, then check again.',
+    );
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
+    // Still running: Check again stays on the sentence, still without a gesture.
+    await click(button(host, 'Check again'));
+    expect(plain(host)).toContain(
+      'Claude Code sessions in Terminal are still using this ID. Close them, then check again.',
+    );
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    // Quit: Check again goes on to the Touch ID step, and the server still decides.
+    answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
+    await click(button(host, 'Check again'));
+    expect(code()).toBeTruthy();
+    expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
+  });
+  it('F22: OpenCode says it keeps running in the background', async () => {
+    const running = list([
+      ...FOUR.slice(0, 1),
+      agent('work', 'Work', {
+        contacts: 1,
+        running: true,
+        state: 'ready',
+        apps: [{ app: 'opencode', state: 'ready' }],
+      }),
+      ...FOUR.slice(2),
+    ]);
+    answers['GET /api/ui/agents'] = { status: 200, body: running };
+    const sheet = await open('work');
+    await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
+    await click(button(sheet, 'Remove with Touch ID'));
+    expect(plain(host)).toContain(
+      'OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.',
+    );
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
+    // Still running: Check again stays on the sentence, still without a gesture.
+    await click(button(host, 'Check again'));
+    expect(plain(host)).toContain(
+      'OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.',
+    );
     expect(host.querySelector('input[name="owner-code"]')).toBeNull();
     // Quit: Check again goes on to the Touch ID step, and the server still decides.
     answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
@@ -488,3 +552,34 @@ describe('Add', () => {
 
 // W4-SHELL-V2: the top-bar agent chip and its live dropdown are tested with the shell
 // (layout/w4-shell-v2.dom.test.ts).
+
+// W8-S4 (F16, F20, F21; 04 §2.5 "Finishing a removal"; 11 §5.8 "Unfinished removal"): an ID whose
+// removal stopped part-way is finished without typing its name again (it is already retired for
+// good), with export offered first and presence still asked. An ID no AI app uses says so once.
+describe('W8-S4: finish removing, and one "Not used" line', () => {
+  const unisolated = (el: Element): string => (el.textContent ?? '').replace(/[⁨⁩]/g, '');
+
+  it('F20: an ID with no AI app says "Not used by any AI app" once', async () => {
+    await mountPage();
+    const text = rowOf('second').textContent ?? '';
+    expect(text.split('Not used by any AI app').length - 1).toBe(1);
+  });
+
+  it('Try again opens the finish sheet: no typed name, export first, then presence; sends no typedLabel', async () => {
+    answers['POST /api/ui/agents/remove'] = { status: 200, body: { status: 'done' } };
+    await mountPage();
+    await click(button(rowOf('old'), 'Try again'));
+    const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(unisolated(sheet)).toContain('Finish removing Old test');
+    expect(sheet.querySelector('input[type="text"]')).toBeNull();
+    expect(button(sheet, 'Export history first')).toBeDefined();
+    await click(button(sheet, 'Finish with Touch ID'));
+    await type(host.querySelector<HTMLInputElement>('input[name="owner-code"]')!, '123456');
+    await click(button(host, 'Confirm'));
+    const post = calls.find((c) => c.url === '/api/ui/agents/remove')!;
+    const sent = JSON.parse(
+      atob(post.headers.get('X-AgentLink-Input')!.replace(/-/g, '+').replace(/_/g, '/')),
+    ) as unknown;
+    expect(sent).toEqual({ name: 'old' });
+  });
+});

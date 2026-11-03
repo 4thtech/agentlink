@@ -283,7 +283,7 @@ describe('agentlink join: a computer with no agent folder at all (IR-U3-invite-2
     // Not the "not set up here yet, run init" dead end, and the agent start is not tried.
     expect(h.calls.starts).toEqual([]);
     expect(err).toEqual([]);
-    expect(out).toEqual([JOIN_TEXT.opened]);
+    expect(out).toEqual([JOIN_TEXT.opened, expect.stringContaining('AgentLink closed. Run')]);
   });
 
   it('the production no-agent host gets the waiting invite and the handoff record', async () => {
@@ -305,7 +305,7 @@ describe('agentlink join: no host running', () => {
       expect(await h.run([LINK])).toBe(EXIT_OK);
       expect(h.calls.starts).toEqual([{ name: undefined, invite: LINK }]);
       expect(h.calls.opened).toBe(1);
-      expect(h.out).toEqual([JOIN_TEXT.opened]);
+      expect(h.out).toEqual([JOIN_TEXT.opened, expect.stringContaining('AgentLink closed. Run')]);
       expect(h.err).toEqual([]);
       // No network request of its own (the only request `join` ever makes is the handoff).
       expect(fetchSpy).not.toHaveBeenCalled();

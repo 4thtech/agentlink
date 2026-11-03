@@ -15,6 +15,8 @@ export interface AppRow {
   readonly state: StateWord;
   readonly agent?: string;
   readonly quitFirst: boolean;
+  /** R2: the server could not check whether the app is open (not the same as "quit first"). */
+  readonly checkFailed?: boolean;
 }
 export interface AppsList {
   readonly desktopRunning: boolean;
@@ -76,6 +78,7 @@ function parseRow(v: unknown): AppRow | undefined {
     state: v['state'] as StateWord,
     ...(typeof agent === 'string' && v['state'] === 'connected' ? { agent } : {}),
     quitFirst: v['quitFirst'] === true,
+    ...(v['checkFailed'] === true ? { checkFailed: true } : {}),
   };
 }
 

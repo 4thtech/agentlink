@@ -84,6 +84,7 @@ function contact(
 
 interface FakeOptions {
   self?: boolean;
+  label?: string;
   counts?: Counts;
   catchUpFails?: boolean;
   contacts?: ContactView[];
@@ -104,7 +105,12 @@ function fakeClient(options: FakeOptions = {}): ToolClient & { calls: string[] }
       return Promise.resolve(
         options.self === false
           ? undefined
-          : { agentId: A, agentFingerprint: '1111\u00b72222', ownerFingerprint: '3333\u00b74444' },
+          : {
+              agentId: A,
+              agentFingerprint: '1111\u00b72222',
+              ownerFingerprint: '3333\u00b74444',
+              ...(options.label === undefined ? {} : { label: options.label }),
+            },
       );
     },
     catchUp: () => {
@@ -299,6 +305,23 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     expect(result.structured.summary).toBe(
       '1 new message from \u201cMarko Novak\u201d (self-declared). To read it, call agentlink_inbox. 1 open offer from \u201cMarko Novak\u201d (self-declared) is waiting for an answer. To see them, call agentlink_inbox with openOffers true.',
     );
+  });
+
+  it('F17: status names the ID by its own label, before the news', async () => {
+    const client = fakeClient({ label: 'Work' });
+    const quiet = await callTool('agentlink_status', {}, context(client));
+    expect(quiet.structured.summary).toBe(
+      'This AgentLink ID is \u201cWork\u201d. Nothing new on AgentLink.',
+    );
+    const news = await callTool(
+      'agentlink_status',
+      {},
+      context(fakeClient({ label: 'Work', counts: { inbox: [], requests: 2 } })),
+    );
+    expect(news.structured.summary.startsWith('This AgentLink ID is \u201cWork\u201d. ')).toBe(
+      true,
+    );
+    expect(news.structured.summary.length).toBeLessThanOrEqual(500);
   });
 
   it('M1-22: an open offer from a contact that is not active is never counted or named', async () => {
@@ -516,7 +539,9 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
       expect(touched).not.toContain(write);
     }
     expect(touched).not.toContain('identity.init');
+    // F17: the verified ID label is a read (loadLabel), never prepare or apply.
     expect(touched.filter((t) => t.startsWith('ownerActions.'))).toEqual([
+      'ownerActions.loadLabel',
       'ownerActions.loadPolicy',
     ]);
   });

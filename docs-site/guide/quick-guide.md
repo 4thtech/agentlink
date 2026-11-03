@@ -38,7 +38,7 @@ Keep that window open while you use AgentLink. Press **Ctrl+C** in it to close t
 
 ## 2. Select your AI app
 
-On a new computer the app opens on **Get started**. Under **Which AI app do you use?** pick yours (for example Claude Code). Apps AgentLink found on your computer are listed under **Found on this Mac** (on Windows, **Found on this computer**). Press **Continue with** and the app's name.
+On a new computer the app opens on **Get started**. Under **Which AI app do you use?** pick yours (for example Claude Code CLI). Apps AgentLink found on your computer are listed under **Found on this Mac** (on Windows, **Found on this computer**); an app that is open right now says **Open now**. Press **Continue with** and the app's name.
 
 ## 3. Create your ID in that AI app
 

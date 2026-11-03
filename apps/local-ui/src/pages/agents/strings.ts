@@ -21,7 +21,7 @@ export const AGENTS_STRINGS = {
   manageAgentsApps: 'Manage IDs & apps',
   notConnectedYet: 'Not connected yet',
   connectFreeApp: (app: string): string => `Connect ${app}`,
-  switch: 'Switch',
+  switch: 'Open',
   rename: 'Rename',
   connect: 'Connect',
   remove: 'Remove',
@@ -34,6 +34,12 @@ export const AGENTS_STRINGS = {
   notRunning: 'Not running',
   removalNotFinished: 'Removal not finished',
   removalReason: 'Removing it stopped part-way. Nothing else was affected.',
+  // W8-S4 (F16, F21; 04 §2.5 "Finishing a removal"; 11 §5.8 "Unfinished removal").
+  notFullyRemoved: (label: string): string => `${iso(label)} wasn't fully removed`,
+  finishRemoving: 'Finish removing',
+  finishTitle: (label: string): string => `Finish removing ${iso(label)}`,
+  finishTouchId: 'Finish with Touch ID',
+  finishStatement: (label: string): string => `Finish removing ${iso(label)}`,
   empty: 'No IDs left. Add one to keep using AgentLink.',
   loadError: "Couldn't load your IDs.",
   loading: 'Loading your IDs',
@@ -68,6 +74,12 @@ export const AGENTS_STRINGS = {
   typeNameDisabled: 'Type the name to enable this',
   removeTouchId: 'Remove with Touch ID',
   quitAny: (label: string): string => `Quit any AI app that uses ${iso(label)} first.`,
+  /** F22: a CLI app (Terminal sessions); no count is read, so no number is claimed. */
+  quitTerminal: (app: string): string =>
+    `${app} sessions in Terminal are still using this ID. Close them, then check again.`,
+  /** F22: a desktop app that keeps running after its window closes. */
+  quitBackground: (app: string): string =>
+    `${app} keeps running in the background after you close its window. Quit it from its menu, then check again.`,
   quitApp: (app: string): string => `Quit ${app} first.`,
   agentFolder: (folder: string): string => `ID folder: ${folder}`,
   checkAgain: 'Check again',
@@ -100,6 +112,16 @@ export const AGENTS_STRINGS = {
   /** The local-only "Tali · Claude Code" (D-144 improvement (a)); the app is never sent to contacts. */
   withApp: (label: string, apps: readonly string[]): string =>
     apps.length === 0 ? label : `${label} · ${apps.join(', ')}`,
+  /**
+   * W8-S4 (F20): the same, short enough for one line (the switcher): "Tali · Claude Code and 1
+   * more", as the card's "Ready in Claude Code and 1 more".
+   */
+  withAppShort: (label: string, apps: readonly string[]): string =>
+    apps.length === 0
+      ? label
+      : apps.length === 1
+        ? `${label} · ${apps[0] ?? ''}`
+        : `${label} · ${apps[0] ?? ''} and ${apps.length - 1} more`,
   backUp: 'Back up',
   disconnect: 'Disconnect',
   noAppsYet: 'No AI app is set up for this ID yet.',
@@ -146,14 +168,17 @@ export const AGENTS_STRINGS = {
   searchPlaceholder: 'ID or AI app',
   show: 'Show',
   allStatuses: 'All statuses',
-  aiApp: 'AI app',
+  // W7-HARNESS-TERM: "harness" is allowed in Under the hood only (11 §5.1 exception); the rest of the app says "AI app".
+  aiApp: 'AI app (harness)',
   allApps: 'All AI apps',
   sortBy: 'Sort by',
   sortActivity: 'Most recent activity',
   sortName: 'Name',
   sortStatus: 'Status',
   colAgent: 'ID',
-  colApps: 'Used by',
+  colApps: 'AI app (harness)',
+  harnessHint:
+    'AI apps: developers call them harnesses, the program that runs your AI and connects it to AgentLink.',
   colStatus: 'Status',
   colPeople: 'People',
   colLast: 'Last active',

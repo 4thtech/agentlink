@@ -166,8 +166,8 @@ describe('the agent dropdown follows the events stream (the owner’s bug)', () 
     await act(async () => chip()?.click());
     await settle();
     // Only the AI apps set up for an agent are listed under it (Codex is not set up for Tali's).
-    expect(appLines(0)).toEqual(['Claude CodeReady']);
-    expect(appLines(1)).toEqual(['CodexNot running']);
+    expect(appLines(0)).toEqual(['Claude CodeConnected']);
+    expect(appLines(1)).toEqual(['CodexNot connected']);
 
     await send(
       'agents',
@@ -191,7 +191,7 @@ describe('the agent dropdown follows the events stream (the owner’s bug)', () 
       'B.1',
     );
     expect(q('[role="menu"]'), 'the dropdown stays open').not.toBeNull();
-    expect(appLines(0)).toEqual(['Claude CodeNot running · last seen 3 min ago']);
+    expect(appLines(0)).toEqual(['Claude CodeNot connected · last seen 3 min ago']);
     expect(qa('.al-am-row')[0]?.textContent).toContain('Offline · last seen 3 min ago');
     expect(chip()?.textContent).toContain('Offline · last seen 3 min ago');
 
@@ -200,8 +200,8 @@ describe('the agent dropdown follows the events stream (the owner’s bug)', () 
       { agents: [tali({ apps: [{ app: 'claude-code', state: 'ready', since: NOW }] })], at: NOW },
       'B.2',
     );
-    expect(appLines(0)).toEqual(['Claude CodeReady']);
-    expect(chip()?.textContent).toContain('Ready in Claude Code');
+    expect(appLines(0)).toEqual(['Claude CodeConnected']);
+    expect(chip()?.textContent).toContain('Connected to Claude Code');
 
     await send(
       'agents',
@@ -235,7 +235,7 @@ describe('the agent dropdown follows the events stream (the owner’s bug)', () 
     );
     await act(async () => chip()?.click());
     await settle();
-    expect(appLines(1)).toEqual(['Another AI appIdle']);
+    expect(appLines(1)).toEqual(['Another AI appConnected']);
   });
 });
 
@@ -244,7 +244,7 @@ describe('the live status strip (Under the hood)', () => {
     serve({ underTheHood: true });
     await mount();
     const strip = (): string => q('[aria-label="Live status"]')?.textContent ?? '';
-    expect(strip()).toContain("Claude CodeTali's agent ready");
+    expect(strip()).toContain("Claude CodeTali's agent connected");
     await send(
       'agents',
       {

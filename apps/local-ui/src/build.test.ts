@@ -54,6 +54,14 @@ describe('production build', () => {
     expect(html).not.toMatch(/\son[a-z]+=/i);
   });
 
+  it('links the AgentLink mark as the tab icon, a hashed file that adapts to light and dark', () => {
+    const html = outputs.find((o) => o.fileName === 'index.html')?.text ?? '';
+    const href = /<link[^>]+rel="icon"[^>]+href="(\/assets\/favicon-[^"]+\.svg)"/.exec(html)?.[1];
+    expect(href).toBeDefined();
+    const icon = outputs.find((o) => `/${o.fileName}` === href);
+    expect(icon?.text).toContain('prefers-color-scheme: dark');
+  });
+
   it('links its styles as a file', () => {
     const html = outputs.find((o) => o.fileName === 'index.html')?.text ?? '';
     expect(html).toMatch(/<link[^>]+rel="stylesheet"[^>]+href="\/assets\/[^"]+\.css"/);

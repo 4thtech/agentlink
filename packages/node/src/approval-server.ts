@@ -194,6 +194,7 @@ import {
   type FileRevealer,
   type OsNotifier,
 } from './approval-os.js';
+import { failedBody } from './local-ui/failure-reasons.js';
 import { revealSavedFile } from './local-ui/reveal-file.js';
 import { EXPIRED_HTML, NO_APP_HTML } from './approval-pages.js';
 import { NodeKeyStoreError } from './errors.js';
@@ -874,6 +875,17 @@ export interface ApprovalServer {
   openJoin(): Promise<boolean>;
   /** Raises the fixed OS notification for a new request and returns its approvalUrl. */
   notifyNewApproval(approvalId: string): Promise<string>;
+  /**
+   * F25: whether the app is in use, for the `ui` command's idle limit. `lastAt` is the time (ms) of
+   * the last request to the page API (`/api/ui/`), `openStreams` the open live streams (open tabs).
+   * Counts and a time only. F40: `linksUsed` counts the one-shot session links used so far (each
+   * one opened a session), so the CLI can tell when a browser it asked for never loaded the page.
+   */
+  readonly activity: {
+    lastAt(): number;
+    openStreams(): number;
+    linksUsed(): number;
+  };
   close(): Promise<void>;
 }
 
@@ -1437,7 +1449,9 @@ export async function startApprovalServerWith(
       // U3-invite-b: the join screen's lease-gated pass, captured with this context's agent.
       ...(follower === undefined ? {} : { followPairing: follower.follow }),
       // U3-g-b (IR-U3-g-b-1 L): with no agent yet, the first-run page's owner state is the real one.
-      ...(agentUi === undefined && options.host?.firstRun !== undefined
+      // F2: also when the host has no first-run port (started with an agent, then none open after a
+      // failed switch): setupBlockedNoAgent is then true, so the page never offers a second owner.
+      ...(agentUi === undefined && options.host !== undefined
         ? { setupBlocked: () => setupBlockedNoAgent() }
         : {}),
       // U3-f: the CLI's harness desk (the one AI app config writer), when the caller wired it.
@@ -1545,6 +1559,9 @@ export async function startApprovalServerWith(
     return found;
   };
 
+  /** F40: how many one-shot links were used (a count only, for the CLI's "didn't open" check). */
+  let linksUsed = 0;
+
   /** Mints a one-shot session link token (M1-11a). */
   const mintLink = (): string => {
     const token = encodeBase64url(randomBytes(32));
@@ -1561,7 +1578,9 @@ export async function startApprovalServerWith(
     );
     if (at < 0) return false;
     const [link] = links.splice(at, 1);
-    return link !== undefined && now() < link.expiresAt;
+    const live = link !== undefined && now() < link.expiresAt;
+    if (live) linksUsed += 1;
+    return live;
   };
 
   /** A new session secret for the cookie. */
@@ -2039,7 +2058,7 @@ export async function startApprovalServerWith(
       result.status >= 200 &&
       result.status <= 599;
     if (!ok) {
-      sendJson(res, 500, { status: 'failed' });
+      sendJson(res, 500, failedBody());
       return;
     }
     sendJson(res, result.status, result.body);
@@ -3098,6 +3117,7 @@ export async function startApprovalServerWith(
     if (planned.kind === 'disconnect') return 'app_unavailable';
     const change = changeOf(planned, app, folder, agentId);
     if (change === undefined) return 'app_unavailable';
+    const old = await oldIdOf(change.kind === 'move' ? planned.oldAgent : null);
     return {
       planned: { app, name, folder, ...change, desk },
       shown: {
@@ -3108,8 +3128,29 @@ export async function startApprovalServerWith(
         oldEntry: copy(planned.oldEntry),
         newEntry: copy(planned.newEntry),
         oldAgent: planned.oldAgent,
+        oldLabel: old.oldLabel,
+        oldGone: old.oldGone,
       },
     };
+  };
+
+  /**
+   * W8-S5 (F7; 04 §2.8 Begin): the agent a move takes the AI app from, as the statement names it.
+   * Server-side from the directory only: the open agent's verified label, another agent's
+   * config.json label, else its folder name; `oldGone` when its folder is absent or its removal did
+   * not finish. Without the directory (outside the app host, or a failed read) the folder name.
+   */
+  const oldIdOf = async (
+    oldAgent: string | null,
+  ): Promise<{ readonly oldLabel: string | null; readonly oldGone: boolean }> => {
+    if (oldAgent === null) return { oldLabel: null, oldGone: false };
+    const slot = host;
+    const entries = await slot?.directory.list().catch(() => undefined);
+    if (slot === undefined || entries === undefined) return { oldLabel: oldAgent, oldGone: false };
+    const entry = entries.find((e) => e.name === oldAgent);
+    if (entry === undefined) return { oldLabel: null, oldGone: true };
+    const label = entry.name === slot.current ? (agentLabel ?? entry.name) : entry.label;
+    return { oldLabel: label === '' ? entry.name : label, oldGone: entry.removing };
   };
 
   /**
@@ -4289,8 +4330,8 @@ export async function startApprovalServerWith(
     let result: LocalUiResult;
     try {
       result = await route.handler(uiContext, id, revealFile);
-    } catch {
-      sendJson(res, 500, { status: 'failed' });
+    } catch (error) {
+      sendJson(res, 500, failedBody(error));
       return;
     }
     sendResult(res, result);
@@ -4363,8 +4404,8 @@ export async function startApprovalServerWith(
       let result: LocalUiResult;
       try {
         result = await route.handler(uiContext, parsed as JsonObject, invitesDesk);
-      } catch {
-        sendJson(res, 500, { status: 'failed' });
+      } catch (error) {
+        sendJson(res, 500, failedBody(error));
         return;
       }
       sendResult(res, result);
@@ -4650,8 +4691,8 @@ export async function startApprovalServerWith(
           query: url.searchParams,
           ...(input === undefined ? {} : { input }),
         });
-      } catch {
-        refusal = { status: 500, body: { status: 'failed' } };
+      } catch (error) {
+        refusal = { status: 500, body: failedBody(error) };
       }
       if (refusal !== undefined) {
         req.resume();
@@ -4668,6 +4709,7 @@ export async function startApprovalServerWith(
     );
   }
 
+  let lastActivityAt = Date.now();
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     setCommonHeaders(res);
     // U3-d: the open agent's verified label is known before anything is stamped with it.
@@ -4695,6 +4737,8 @@ export async function startApprovalServerWith(
     const url = new URL(raw, origin);
     const path = url.pathname;
     const method = req.method ?? 'GET';
+    // F25: page API activity (a poll, a read, a write) keeps `ui` open; static files do not.
+    if (path.startsWith('/api/ui/')) lastActivityAt = Date.now();
     if (!path.startsWith(SETUP_PATH_PREFIX)) sweepSetup();
 
     if (path.startsWith(ASSETS_PREFIX)) {
@@ -5326,8 +5370,8 @@ export async function startApprovalServerWith(
     let result: LocalUiResult;
     try {
       result = await route.handler(uiContext, change);
-    } catch {
-      sendJson(res, 500, { status: 'failed' });
+    } catch (error) {
+      sendJson(res, 500, failedBody(error));
       return;
     }
     stamp(res);
@@ -5341,7 +5385,9 @@ export async function startApprovalServerWith(
    * U3-e: `POST /api/ui/agents/remove` `{name, typedLabel, anyway?}` (08 §1; 04 §2.5 "Removing an
    * agent"), the remove kind. The caller checked the session, CSRF, Origin, fetch metadata, the
    * octet-stream type and the generation (the request's hold). No query. In order: the strict input;
-   * the name must be a listed agent and the typed label its label exactly (`label_mismatch`); the app
+   * the name must be a listed agent and the typed label its label exactly (`label_mismatch`), or,
+   * with no typed label, the agent must already be retired by this owner (W8-FINISH-REMOVE, else
+   * `invalid`); the app
    * closes the agent if it has it open (same generation: a refused removal opens it again); the
    * folder lock is taken EXCLUSIVE, or `in_use` before any presence is used; the agent is opened for
    * its removal under that lock; then ownerGate checks presence against the owner its own card names
@@ -5387,7 +5433,7 @@ export async function startApprovalServerWith(
         return;
       }
       // The typed label is the confirmation (b11 §29): exactly the label shown, never normalised.
-      if (input.typedLabel !== entry.label) {
+      if (input.typedLabel !== undefined && input.typedLabel !== entry.label) {
         finishRemove('label_mismatch');
         return;
       }
@@ -5395,6 +5441,23 @@ export async function startApprovalServerWith(
       if (keys === undefined) {
         finishRemove('unknown_agent');
         return;
+      }
+      // W8-FINISH-REMOVE (proposed, owner confirms at merge): without the typed label only an agent
+      // already retired for good is finished: listed `removing`, with a revoked-list entry that
+      // verifies for its own ID. Its owner is checked below against the owner of the gesture (the
+      // agent's own card, or the stored owner unlocked for the entry's signer). Presence is the same.
+      let retiredOwner: string | undefined;
+      if (input.typedLabel === undefined) {
+        const recorded = entry.removing
+          ? await removal.readRevoked(keys.agentId).catch(() => undefined)
+          : undefined;
+        const checked =
+          recorded?.kind === 'entry' ? verifyRevokedEntry(recorded.text, keys.agentId) : undefined;
+        if (checked?.ok !== true) {
+          finishRemove('invalid');
+          return;
+        }
+        retiredOwner = checked.owner;
       }
       const erase = createKeyEraseControl(
         keys.backend === 'keychain'
@@ -5408,7 +5471,7 @@ export async function startApprovalServerWith(
       await removal.exclusive(input.name, async () => {
         const agent = await removal.open(input.name);
         if (agent === undefined) {
-          // GAP B: a retired agent whose keys are gone no longer opens; steps 6 and 7 finish it.
+          // GAP B: a retired agent whose keys are gone no longer opens; steps 5 to 7 finish it.
           const recorded = entry.removing
             ? await removal.readRevoked(keys.agentId).catch(() => undefined)
             : undefined;
@@ -5437,6 +5500,7 @@ export async function startApprovalServerWith(
                   agentId: keys.agentId,
                   recorded: text,
                   ownerNostr,
+                  port: removal,
                   removeFolder: (name) => slot.directory.removeFolder(name),
                   erase,
                   owner,
@@ -5458,6 +5522,14 @@ export async function startApprovalServerWith(
           return;
         }
         try {
+          if (retiredOwner !== undefined) {
+            // Without the typed label: the entry must be signed by the owner the agent's card names.
+            const context = await agent.context().catch(() => undefined);
+            if (context === undefined || encodeHex(context.owner.ownerNostr) !== retiredOwner) {
+              finishRemove('invalid');
+              return;
+            }
+          }
           await ownerGate(
             req,
             res,
@@ -5535,8 +5607,8 @@ export async function startApprovalServerWith(
   }
 
   dispatch = (req, res) => {
-    handle(req, res).catch(() => {
-      if (!res.headersSent) sendJson(res, 500, { status: 'failed' });
+    handle(req, res).catch((error: unknown) => {
+      if (!res.headersSent) sendJson(res, 500, failedBody(error));
       else res.destroy();
     });
   };
@@ -5554,6 +5626,11 @@ export async function startApprovalServerWith(
     port,
     address: () => ({ host: APPROVAL_SERVER_HOST, port, addresses }),
     approvalUrl,
+    activity: Object.freeze({
+      lastAt: () => lastActivityAt,
+      openStreams: () => liveEvents.size,
+      linksUsed: () => linksUsed,
+    }),
     open: async (approvalId?: string) => {
       // A malformed ID rejects the returned promise (never a synchronous throw).
       const path = approvalId === undefined ? '/' : new URL(approvalUrl(approvalId)).pathname;
@@ -5575,7 +5652,8 @@ export async function startApprovalServerWith(
       // U3-invite: the handoff record goes first, so no `join` hands over to a closing host.
       if (handoffWritten) await options.host?.handoff?.remove().catch(() => undefined);
       joinDesk?.dismiss();
-      // W4-LIVE-STATUS: every event stream ends when the host stops.
+      // F25: open pages hear "closing" first; W4-LIVE-STATUS: every event stream ends when the host stops.
+      liveEvents.closing();
       liveEvents.close();
       await Promise.all(listeners.map(closeServer));
       // U3-c: the app host closes the agent it has open (whichever the owner switched to).

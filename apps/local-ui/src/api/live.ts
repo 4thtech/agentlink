@@ -22,6 +22,7 @@ import { parseAgents, type AgentRow, type AgentsList } from '../pages/agents/dat
 import { AGENTS_STRINGS } from '../pages/agents/strings.js';
 import { announceAgentsChanged, noteSwitched } from '../pages/agents/use-agents.js';
 import { createApiClient } from './client.js';
+import { markHostClosed, noteHostReached, noteHostUnreachable } from './host-closed.js';
 
 /** 08 §1 (K1, ui-contract/live.ts). */
 const EVENTS_PATH = '/api/ui/events';
@@ -83,17 +84,18 @@ export type LiveMode = 'stream' | 'poll' | 'idle';
 
 export const LIVE_WORDS = {
   working: 'Working',
-  ready: 'Ready',
-  idle: 'Idle',
-  off: 'Not running',
+  // 06 §5.8 (F19): any live session reads Connected, whatever its age; no live session, Not connected.
+  ready: 'Connected',
+  idle: 'Connected',
+  off: 'Not connected',
   none: 'Not set up',
   /** W7-ID-RENAME: an ID no AI app uses (never "Offline" or "Not set up"). */
   noApp: AGENTS_STRINGS.notUsed,
   paused: 'Paused',
   offline: 'Offline',
   removing: AGENTS_STRINGS.removalNotFinished,
-  readyIn: (app: string): string => `Ready in ${app}`,
-  readyInMore: (app: string, n: number): string => `Ready in ${app} and ${n} more`,
+  readyIn: (app: string): string => `Connected to ${app}`,
+  readyInMore: (app: string, n: number): string => `Connected to ${app} and ${n} more`,
   workingIn: (app: string): string => `Working in ${app}`,
   lastSeen: (word: string, ago: string): string => `${word} · last seen ${ago}`,
   /**
@@ -263,7 +265,7 @@ function toLive(r: AgentRecord, name: (id: string) => string, now: number): Live
         : LIVE_WORDS.readyIn(name(first.app));
   } else if (r.state === 'idle' && first !== undefined) {
     state = 'idle';
-    statusText = LIVE_WORDS.idle;
+    statusText = LIVE_WORDS.readyIn(name(first.app));
   } else if (shown.length === 0) {
     state = 'none';
     statusText = LIVE_WORDS.noApp;
@@ -484,6 +486,11 @@ function onStreamEvent(e: SseEvent): void {
   if (e.id !== '') lastEventId = e.id;
   if (!isObject(e.data)) return;
   const data = e.data;
+  // F25: the host says it is closing (the command ended); no more reads or reconnects will work.
+  if (e.event === 'closing') {
+    markHostClosed();
+    return;
+  }
   // W5-INVITE-FEEDBACK: the open agent's contacts or invites changed. Only `at`; the views that
   // show them read again. Not an agents change.
   if (e.event === 'contacts') {
@@ -581,11 +588,16 @@ async function openStream(): Promise<void> {
       signal: controller.signal,
     });
   } catch {
-    if (stream === controller) failed();
+    // F25: a stream that cannot connect counts like any request that cannot (host gone).
+    if (stream === controller) {
+      noteHostUnreachable();
+      failed();
+    }
     return;
   } finally {
     clearTimeout(answer);
   }
+  noteHostReached();
   if (stream !== controller) return;
   // No stream here (an older app, an approval page) or too many open: poll instead.
   if (res.status === 404 || res.status === 429 || res.status === 501) {

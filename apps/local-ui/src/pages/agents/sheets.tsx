@@ -178,11 +178,32 @@ export function RenameEditor({
 // ------------------------------------------------------------------------------------------ Remove
 
 /** The AI apps that run the agent now (a live session); the row's apps when the read names none. */
-function runningApps(row: AgentRow): { readonly apps: readonly string[]; readonly named: boolean } {
-  const live = (row.appStates ?? [])
-    .filter((a) => a.state === 'working' || a.state === 'ready' || a.state === 'idle')
-    .map((a) => a.name);
-  return live.length > 0 ? { apps: live, named: true } : { apps: row.apps, named: false };
+function runningApps(row: AgentRow): QuitApps {
+  const liveStates = (row.appStates ?? []).filter(
+    (a) => a.state === 'working' || a.state === 'ready' || a.state === 'idle',
+  );
+  const live = liveStates.map((a) => a.name);
+  return live.length > 0
+    ? { apps: live, ids: liveStates.map((a) => a.id), named: true }
+    : { apps: row.apps, ids: [], named: false };
+}
+
+interface QuitApps {
+  readonly apps: readonly string[];
+  /** App ids of the live apps (never shown); empty when the read named none. */
+  readonly ids: readonly string[];
+  readonly named: boolean;
+}
+
+/** F22: what is still running, in words: Terminal sessions (CLI) or a background desktop app. */
+function quitSentence(quit: QuitApps, label: string): string {
+  if (quit.named && quit.apps.length === 1) {
+    const app = quit.apps[0] as string;
+    if (quit.ids[0] === 'claude-code') return S.quitTerminal(app);
+    if (quit.ids[0] === 'opencode') return S.quitBackground(app);
+    return S.quitApp(app);
+  }
+  return S.quitAny(label);
 }
 
 type RemovePhase =
@@ -213,7 +234,10 @@ export function RemoveSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const nameId = useId();
-  const matches = typed === row.label;
+  // W8-S4 (04 §2.5 "Finishing a removal"): an ID whose removal stopped part-way is already retired
+  // for good, so finishing asks for presence only, never the typed name again.
+  const finishing = row.removing;
+  const matches = finishing || typed === row.label;
   const contacts = row.contacts ?? 0;
   // W5-SHEET-CLOSE: a removal in flight keeps the sheet for a moment, never for good: after 10 s
   // without an answer the owner can close it again.
@@ -229,8 +253,9 @@ export function RemoveSheet({
 
   // W6-FLOW-FIXES: the AI apps the person must quit first (fresh read, else the row's apps).
   // `named`: the read names the running apps; the server's `in_use` alone does not.
-  const [quit, setQuit] = useState<{ readonly apps: readonly string[]; readonly named: boolean }>({
+  const [quit, setQuit] = useState<QuitApps>({
     apps: row.apps,
+    ids: [],
     named: false,
   });
   const [checking, setChecking] = useState(false);
@@ -265,7 +290,14 @@ export function RemoveSheet({
       setBusy(true);
       setError(undefined);
       void api
-        .remove({ name: row.name, typedLabel: typed, ...(anyway ? { anyway: true } : {}) }, proof)
+        .remove(
+          {
+            name: row.name,
+            ...(finishing ? {} : { typedLabel: typed }),
+            ...(anyway ? { anyway: true } : {}),
+          },
+          proof,
+        )
         .then((outcome) => {
           setBusy(false);
           if (outcome.kind === 'done') {
@@ -280,7 +312,7 @@ export function RemoveSheet({
           const said = gateMessage(outcome);
           if (said !== undefined) return setError(said);
           if (outcome.kind === 'in_use') {
-            setQuit({ apps: row.apps, named: false });
+            setQuit({ apps: row.apps, ids: [], named: false });
             return setPhase({ kind: 'in_use' });
           }
           if (outcome.kind === 'contacts_unreachable') return setPhase({ kind: 'anyway' });
@@ -297,7 +329,11 @@ export function RemoveSheet({
     };
 
   const inProgress = busy && phase.kind === 'presence';
-  const title = inProgress ? S.removingTitle(row.label) : S.removeTitle(row.label);
+  const title = inProgress
+    ? S.removingTitle(row.label)
+    : finishing
+      ? S.finishTitle(row.label)
+      : S.removeTitle(row.label);
   return (
     <Sheet
       open
@@ -311,6 +347,7 @@ export function RemoveSheet({
       <div className="ag-sheet-body">
         {phase.kind === 'form' || phase.kind === 'presence' ? (
           <>
+            {finishing ? <p className="al-text-body">{S.removalReason}</p> : null}
             <p className="al-text-body">{S.removeIntro}</p>
             <ul className="ag-goes">
               <li>{S.keysAndSettings(row.label)}</li>
@@ -319,7 +356,7 @@ export function RemoveSheet({
                 <li key={app}>{S.itsEntry(app)}</li>
               ))}
             </ul>
-            {contacts > 0 ? (
+            {contacts > 0 && !finishing ? (
               <p className="al-text-body">{S.contactsTold(row.label, contacts)}</p>
             ) : null}
             <p className="al-text-body">
@@ -343,17 +380,19 @@ export function RemoveSheet({
                 {S.exportFirst}
               </Button>
             </div>
-            <TextField
-              id={nameId}
-              label={S.typeName}
-              aria-label={S.typeNameLabel(row.label)}
-              name="confirm-label"
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              value={typed}
-              onChange={(e) => setTyped(e.currentTarget.value)}
-            />
+            {finishing ? null : (
+              <TextField
+                id={nameId}
+                label={S.typeName}
+                aria-label={S.typeNameLabel(row.label)}
+                name="confirm-label"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                value={typed}
+                onChange={(e) => setTyped(e.currentTarget.value)}
+              />
+            )}
             <div className="ag-actions">
               <Button
                 variant="danger"
@@ -362,7 +401,7 @@ export function RemoveSheet({
                 aria-describedby={matches ? undefined : `${nameId}-why`}
                 onClick={checkThenAsk}
               >
-                {S.removeTouchId}
+                {finishing ? S.finishTouchId : S.removeTouchId}
               </Button>
               <Button variant="ghost" onClick={onClose}>
                 {S.cancel}
@@ -378,7 +417,7 @@ export function RemoveSheet({
 
         {phase.kind === 'presence' ? (
           <OwnerGate
-            summary={S.removeStatement(row.label)}
+            summary={finishing ? S.finishStatement(row.label) : S.removeStatement(row.label)}
             passkey={passkey}
             busy={busy}
             error={error}
@@ -390,11 +429,7 @@ export function RemoveSheet({
         {phase.kind === 'in_use' ? (
           <>
             <p className="al-text-body" role="alert">
-              <strong>
-                {quit.named && quit.apps.length === 1
-                  ? S.quitApp(quit.apps[0] as string)
-                  : S.quitAny(row.label)}
-              </strong>
+              <strong>{quitSentence(quit, row.label)}</strong>
             </p>
             {quit.apps.length > 0 && !(quit.named && quit.apps.length === 1) ? (
               <ul className="ag-goes">

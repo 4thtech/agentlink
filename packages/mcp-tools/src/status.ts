@@ -99,7 +99,7 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
     openOffers,
     incomplete,
   });
-  return ok(statusSummary(inbox, counts.requests, offers), {
+  return ok(statusSummary(inbox, counts.requests, offers, self.label), {
     // M1-5g: a relay returned a second at its cap. Fixed text only (I-5, I-7). W4-PAUSE: the
     // paused line instead (no catch-up ran, so nothing can be incomplete).
     ...(paused
@@ -175,7 +175,10 @@ export function statusSummary(
   inbox: readonly { readonly contact: ContactRef; readonly unread: number }[],
   requests: number,
   offers: readonly { readonly contact: ContactRef; readonly open: number }[] = [],
+  idLabel?: string,
 ): string {
+  // F17: the ID's own name leads, so the AI app can say which ID it is. Counted in the length.
+  const lead = idLabel === undefined ? [] : [fill(TOOL_TEXT.statusIdLead, { label: idLabel })];
   const requestsTail =
     requests > 0 ? [copy('chat.inbox.requestsWaiting', { count: requests })] : [];
   const offersTail = offers.length > 0 ? [TOOL_TEXT.openOffersHowTo] : [];
@@ -187,6 +190,7 @@ export function statusSummary(
     TOOL_TEXT.moreContactsWithNews,
     ...(offers.length > 0 ? [TOOL_TEXT.moreContactsWithOffers, ...offersTail] : []),
     ...requestsTail,
+    ...lead,
   ];
   for (const { contact, unread } of inbox.slice(0, SUMMARY_CONTACTS)) {
     const line = copy('chat.session.start', { count: unread, contactName: renderRef(contact) });
@@ -198,10 +202,11 @@ export function statusSummary(
   for (const { contact, open } of offers.slice(0, SUMMARY_CONTACTS)) {
     const line = offersLine(contact, open);
     const rest = [TOOL_TEXT.moreContactsWithOffers, ...offersTail, ...requestsTail];
-    if (!fits([...named, ...unreadMore, ...offered, line, ...rest])) break;
+    if (!fits([...lead, ...named, ...unreadMore, ...offered, line, ...rest])) break;
     offered.push(line);
   }
   const parts = [
+    ...lead,
     ...named,
     ...unreadMore,
     ...offered,
@@ -209,5 +214,7 @@ export function statusSummary(
     ...offersTail,
     ...requestsTail,
   ];
-  return parts.length === 0 ? copy('chat.session.nothingNew') : parts.join(' ');
+  return parts.length === lead.length
+    ? [...lead, copy('chat.session.nothingNew')].join(' ')
+    : parts.join(' ');
 }

@@ -314,6 +314,7 @@ export function uiDepsOf(
             close: () => agent.close(),
           },
           open: (other) => openUiHostAgent(hostDeps, other),
+          aiAppsList: { list: () => wiring.aiApps().list() },
           removal: uiRemovalPort({ home: pc.home, runtime: pc.runtime }),
           ...(invite === undefined ? {} : { waitingInvite: invite }),
         },

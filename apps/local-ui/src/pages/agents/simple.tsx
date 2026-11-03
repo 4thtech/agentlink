@@ -67,6 +67,7 @@ export function AgentCard({
     a.setPanel(open === panel ? undefined : { name: row.name, panel });
   const running = appsOf(row).filter((x) => x.state !== 'not_set_up');
   const usedBy = usedByNames(row);
+  const line = agentLine(row, a.now);
 
   if (row.removing) {
     return (
@@ -104,7 +105,7 @@ export function AgentCard({
             </span>
             {row.current ? <span className="ag-open al-text-label">{S.open}</span> : null}
           </span>
-          <span className={`ag-line al-text-body-sm is-${state}`}>{agentLine(row, a.now)}</span>
+          <span className={`ag-line al-text-body-sm is-${state}`}>{line}</span>
         </div>
         {row.current ? null : (
           <Button variant="ghost" size="sm" onClick={() => a.onSwitch(row)}>
@@ -112,15 +113,18 @@ export function AgentCard({
           </Button>
         )}
       </div>
-      <p className="ag-used-by al-text-body-sm al-muted">
-        {usedBy.length > 0 ? S.usedBy(usedBy) : S.notUsed}
-      </p>
+      {/* W8-S4 (F20): never twice; the live line may already say "Not used by any AI app". */}
+      {usedBy.length > 0 || line !== S.notUsed ? (
+        <p className="ag-used-by al-text-body-sm al-muted">
+          {usedBy.length > 0 ? S.usedBy(usedBy) : S.notUsed}
+        </p>
+      ) : null}
       {running.length > 0 ? <AppChips apps={running} now={a.now} /> : null}
       <p className="al-text-body-sm al-muted">
         {S.contactsCount(row.contacts)}
         {tidy ? ` · ${S.noAppNoContacts}` : ''}
       </p>
-      {row.current && a.cardName !== undefined ? (
+      {row.current && a.cardName !== undefined && row.contacts !== 0 ? (
         <CardNameNote
           row={row}
           cardName={a.cardName}

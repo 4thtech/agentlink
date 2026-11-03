@@ -8,10 +8,20 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../dispatch.js';
 import type { TerminalContext } from '../runtime/guards.js';
-import { UI_TEXT, UI_WAIT_MS, openUiPage, uiStep, type UiDeps, type UiPage } from './ui.js';
+import { OPEN_TEXT, setupOpenedLine } from '../runtime/open-watch.js';
+import {
+  UI_TEXT,
+  UI_WAIT_MS,
+  onStopSignals,
+  openUiPage,
+  uiStep,
+  type UiDeps,
+  type UiPage,
+} from './ui.js';
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 const AGENT: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } };
@@ -36,6 +46,8 @@ interface Script {
   readonly opens?: boolean | 'throws';
   readonly stop?: 'soon' | 'never';
   readonly waitMs?: number;
+  /** F25: the host's page activity (absent: none reported). */
+  readonly activity?: { lastAt(): number; openStreams(): number };
   /** The local agent names on this computer. */
   readonly agents?: readonly string[];
   /** U3-b: the last used agent (app.json). */
@@ -90,6 +102,7 @@ function fakeDeps(script: Script) {
       if (script.start === 'throws') return Promise.reject(new Error('keychain locked'));
       if (script.start === 'none') return Promise.resolve(undefined);
       return Promise.resolve({
+        ...(script.activity === undefined ? {} : { activity: script.activity }),
         page: script.page ?? 'home',
         open: () => {
           calls.opened += 1;
@@ -132,7 +145,10 @@ describe('agentlink ui in the owner terminal (M1-11b-9)', () => {
       await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
       expect(calls).toMatchObject({ start: 1, opened: 1, closed: 1 });
       expect(calls.unsubscribed).toBeGreaterThan(0);
-      expect(p.out).toEqual([page === 'home' ? UI_TEXT.opened : UI_TEXT.openedSetup]);
+      expect(p.out).toEqual([
+        page === 'home' ? UI_TEXT.opened : UI_TEXT.openedSetup,
+        UI_TEXT.closed(PREFIX),
+      ]);
       expect(p.err).toEqual([]);
       expectNoLink(p);
     },
@@ -145,33 +161,165 @@ describe('agentlink ui in the owner terminal (M1-11b-9)', () => {
     expect(calls.closed).toBe(1);
   });
 
+  it('stops after the idle limit and says so in one plain line (F25)', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ stop: 'never', waitMs: 30 });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls.closed).toBe(1);
+    expect(p.out).toEqual([UI_TEXT.opened, UI_TEXT.closedIdle(PREFIX)]);
+    expect(p.err).toEqual([]);
+  });
+
+  it('page activity resets the idle limit (F25)', async () => {
+    const p = probe(TTY);
+    let lastAt = Date.now();
+    const started = Date.now();
+    setTimeout(() => {
+      lastAt = Date.now();
+    }, 70);
+    const activity = { lastAt: () => lastAt, openStreams: () => 0 };
+    const { deps } = fakeDeps({ stop: 'never', waitMs: 100, activity });
+    await uiStep(p.context, deps, PREFIX);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(165);
+  });
+
+  it('an open page (live stream) keeps it open (F25)', async () => {
+    const p = probe(TTY);
+    const started = Date.now();
+    const activity = {
+      lastAt: () => started,
+      openStreams: () => (Date.now() - started < 200 ? 1 : 0),
+    };
+    const { deps } = fakeDeps({ stop: 'never', waitMs: 60, activity });
+    await uiStep(p.context, deps, PREFIX);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(200);
+  });
+
+  it('the idle line uses the prefix and the Ctrl+C line names no number (F25)', () => {
+    expect(UI_TEXT.closedIdle(PREFIX)).toBe(
+      `AgentLink closed after 30 minutes without use. Run \`${PREFIX}\` to open it again.`,
+    );
+    expect(UI_TEXT.closed(PREFIX)).toBe(`AgentLink closed. Run \`${PREFIX}\` to open it again.`);
+  });
+
+  it.each(['SIGINT', 'SIGTERM', 'SIGHUP'] as const)(
+    '%s stops the host cleanly and unsubscribes (F25)',
+    (signal) => {
+      const proc = new EventEmitter();
+      let stopped = 0;
+      const off = onStopSignals(() => (stopped += 1), proc as unknown as NodeJS.Process);
+      proc.emit(signal);
+      expect(stopped).toBe(1);
+      off();
+      expect(proc.listenerCount('SIGINT') + proc.listenerCount('SIGTERM')).toBe(0);
+      expect(proc.listenerCount('SIGHUP')).toBe(0);
+    },
+  );
+
   it('the limit is 30 minutes', () => {
     expect(UI_WAIT_MS).toBe(30 * 60_000);
   });
 
-  it.each(['none', 'throws'] as const)(
-    'an agent that is not set up or a server that cannot start (%s): the fixed init line, exit 1',
-    async (start) => {
-      const p = probe(TTY);
-      const { deps, calls } = fakeDeps({ start });
-      await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
-      expect(calls).toMatchObject({ opened: 0 });
-      expect(p.err).toEqual([UI_TEXT.notReady(PREFIX)]);
-      expectNoLink(p);
-    },
-  );
+  it('an agent that is not set up (no diagnosis): the fixed init line, exit 1', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ start: 'none' });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+    expect(calls).toMatchObject({ opened: 0 });
+    expect(p.err).toEqual([UI_TEXT.notReady(PREFIX)]);
+    expectNoLink(p);
+  });
+
+  it('a server that cannot start says so without asking for init (R1)', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ start: 'throws' });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+    expect(calls).toMatchObject({ opened: 0 });
+    expect(p.err).toEqual([UI_TEXT.startFailure.failed(PREFIX)]);
+    expectNoLink(p);
+  });
 
   it.each([false, 'throws'] as const)(
-    'no browser (%s): closes at once, says so, never shows the link',
+    'no browser (%s): keeps serving, prints no link (R1)',
     async (opens) => {
       const p = probe(TTY);
-      const { deps, calls } = fakeDeps({ opens });
-      await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+      const { deps, calls } = fakeDeps({ opens, stop: 'never', waitMs: 30 });
+      await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
       expect(calls).toMatchObject({ opened: 1, closed: 1 });
-      expect(p.err).toEqual([UI_TEXT.noBrowser]);
+      expect(p.err).toEqual([]);
+      expect(p.out[0]).toBe(UI_TEXT.noBrowser);
       expectNoLink(p);
     },
   );
+});
+
+// F40: the opened line says "Opening…"; when no one-shot link is used within the check time, one
+// follow-up asks for Enter, which opens a fresh link. Nothing printed holds the link.
+describe('agentlink ui when the browser does not show the page (F40)', () => {
+  function withWatch(used: () => number) {
+    const p = probe(TTY);
+    let press: (() => void) | undefined;
+    let stop: (() => void) | undefined;
+    let opened = 0;
+    const deps: UiDeps = {
+      start: () =>
+        Promise.resolve({
+          page: 'home' as const,
+          activity: { lastAt: () => Date.now(), openStreams: () => 0, linksUsed: used },
+          open: () => {
+            opened += 1;
+            return Promise.resolve(true);
+          },
+          close: () => Promise.resolve(),
+        }),
+      waitMs: 5_000,
+      openCheckMs: 10,
+      onEnter: (handler) => {
+        press = handler;
+        return () => {
+          press = undefined;
+        };
+      },
+      interrupt: (handler) => {
+        stop = handler;
+        return () => undefined;
+      },
+    };
+    return { p, deps, enter: () => press?.(), stop: () => stop?.(), opened: () => opened };
+  }
+
+  it('no link used: the follow-up, Enter opens again, Ctrl+C closes', async () => {
+    const h = withWatch(() => 0);
+    const run = uiStep(h.p.context, h.deps, PREFIX);
+    await new Promise((r) => setTimeout(r, 40));
+    expect(h.p.out).toEqual([UI_TEXT.opened, OPEN_TEXT.notOpened]);
+    h.enter();
+    await new Promise((r) => setTimeout(r, 1));
+    expect(h.opened()).toBe(2);
+    expect(h.p.out.at(-1)).toBe(OPEN_TEXT.retrying);
+    h.stop();
+    await expect(run).resolves.toBe(EXIT_OK);
+    expectNoLink(h.p);
+  });
+
+  it('a link used: no follow-up', async () => {
+    let used = 0;
+    const h = withWatch(() => used);
+    const run = uiStep(h.p.context, h.deps, PREFIX);
+    await new Promise((r) => setTimeout(r, 1));
+    used = 1;
+    await new Promise((r) => setTimeout(r, 40));
+    h.stop();
+    await expect(run).resolves.toBe(EXIT_OK);
+    expect(h.p.out).toEqual([UI_TEXT.opened, UI_TEXT.closed(PREFIX)]);
+  });
+
+  it('the opened lines say "Opening", never that the browser opened (F40, F41)', () => {
+    expect(UI_TEXT.opened.startsWith('Opening AgentLink')).toBe(true);
+    expect(UI_TEXT.openedSetup).toBe(setupOpenedLine(process.platform));
+    for (const line of [UI_TEXT.opened, UI_TEXT.openedSetup]) {
+      expect(line).not.toMatch(/browser opened|setup page/i);
+    }
+  });
 });
 
 describe('agentlink ui run by an agent (M1-11b-9)', () => {
@@ -322,7 +470,7 @@ describe('agentlink ui with no agent at all opens Welcome (U3-g-b)', () => {
     const { deps, calls } = fakeDeps({ agents: [], welcome: 'ok' });
     await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
     expect(calls).toMatchObject({ welcome: 1, start: 0, opened: 1, closed: 1 });
-    expect(p.out).toEqual([UI_TEXT.openedSetup]);
+    expect(p.out).toEqual([UI_TEXT.openedSetup, UI_TEXT.closed(PREFIX)]);
     expect(p.err).toEqual([]);
     expectNoLink(p);
   });

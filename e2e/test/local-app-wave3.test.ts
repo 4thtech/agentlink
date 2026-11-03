@@ -71,7 +71,7 @@ function need(ctx: {
 
 const sha = (file: string): string => encodeHex(sha256(new Uint8Array(readFileSync(file))));
 
-/** Agents page: the Switch button on the card of the agent named `label`. */
+/** Agents page: the Open button on the card of the agent named `label`. */
 async function switchTo(
   page: Page,
   origin: string,
@@ -82,8 +82,8 @@ async function switchTo(
   const card = page
     .getByText(label, { exact: true })
     .first()
-    .locator('xpath=ancestor::*[.//button[normalize-space()="Switch"]][1]');
-  await card.getByRole('button', { name: 'Switch', exact: true }).click();
+    .locator('xpath=ancestor::*[.//button[normalize-space()="Open"]][1]');
+  await card.getByRole('button', { name: 'Open', exact: true }).click();
   // The header names the agent that is now open (W4-SHELL-V2: the agent chip, top left).
   await page.locator('button.al-chip').filter({ hasText: openLabel }).waitFor();
 }
@@ -481,7 +481,7 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
     // The open agent shows the name its owner signed (read from its store); the others, their folder names.
     for (const shown of ['Home base', 'second-agent', 'work']) expect(listed).toContain(shown);
     expect((await pc.directory.list()).map((e) => e.name)).toEqual(names);
-    expect(await page.getByRole('button', { name: 'Switch', exact: true }).count()).toBe(2);
+    expect(await page.getByRole('button', { name: 'Open', exact: true }).count()).toBe(2);
 
     // Switching shows each agent's history.
     await switchTo(page, link, 'second-agent', 'Second agent');
@@ -505,7 +505,9 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
     run.deps.stop();
     const ended = await run.done;
     expect(ended.errors).toEqual([]);
-    expect(ended.printed).toHaveLength(1);
+    // The "opened" line and F25's closing line: no terminal picker.
+    expect(ended.printed).toHaveLength(2);
+    expect(ended.printed[1]).toMatch(/^AgentLink closed\. Run `.+` to open it again\.$/);
     expect(ended.code).toBe(0);
   }, 240_000);
 });

@@ -179,8 +179,8 @@ describe('Agents, simple (A8)', () => {
     expect(personal.querySelector('.al-agent-icon-dot.is-working')).not.toBeNull();
     expect(personal.querySelector('bdi')?.textContent).toBe('Personal');
     expect(personal.textContent).toContain('Working in Claude Code');
-    expect(personal.textContent).toContain('Not running · last seen 10 min ago');
-    expect(card('work').textContent).toContain('Ready in Cursor');
+    expect(personal.textContent).toContain('Not connected · last seen 10 min ago');
+    expect(card('work').textContent).toContain('Connected to Cursor');
     expect(card('research').textContent).toContain('Not used by any AI app');
     expect(card('invoices').textContent).toContain('Paused');
     const add = [...host.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'New ID');
@@ -383,6 +383,20 @@ describe('Agents, simple (A8)', () => {
     expect(post).toBeDefined();
   });
 
+  it('F23: no "Contacts still see" note while the ID has no contacts to tell', async () => {
+    answers['GET /api/ui/agents/card-name'] = {
+      status: 200,
+      body: { status: 'differs', cardName: 'My agent' },
+    };
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list([agent('default', 'Personal', { current: true, contacts: 0, state: 'ready' })]),
+    };
+    await mount();
+    expect(card('default').textContent).not.toContain('Contacts still see');
+    expect(button(card('default'), 'Update contacts')).toBeUndefined();
+  });
+
   it('AI apps: each app with its word, Connect or Disconnect, and the quit-first guidance', async () => {
     await mount();
     await click(button(card('default'), 'AI apps'));
@@ -419,6 +433,19 @@ describe('Agents, Under the hood: the fleet (A11)', () => {
     expect(host.querySelector('table')).not.toBeNull();
     expect(rowNames()).toEqual(['default', 'work', 'research', 'invoices']);
     expect(plain(host)).toContain('1 working · 1 ready · 2 not running or paused');
+  });
+
+  it('labels the AI-app column "AI app (harness)" with the hint', async () => {
+    await mount(true);
+    expect(host.querySelectorAll('thead th')[2]?.textContent).toBe('AI app (harness)');
+    expect(host.querySelector('[data-harness-hint]')?.textContent).toBe(
+      'AI apps: developers call them harnesses, the program that runs your AI and connects it to AgentLink.',
+    );
+  });
+
+  it('keeps "harness" out of the simple list (Under the hood only)', async () => {
+    await mount(false);
+    expect(plain(host)).not.toMatch(/harness/i);
   });
 
   it('searches, filters by status and by AI app, and sorts by name', async () => {
@@ -468,7 +495,7 @@ describe("one agent's page (/agents/<name>)", () => {
     for (const h of ['AI apps', 'People', 'Rules', 'Activity', 'Backup']) {
       expect([...host.querySelectorAll('h2')].map((x) => x.textContent)).toContain(h);
     }
-    expect(plain(host)).toContain('Ready in Cursor');
+    expect(plain(host)).toContain('Connected to Cursor');
     expect(host.querySelector('[data-sparkline]')).toBeNull();
     const back = [...host.querySelectorAll('a')].find(
       (a) => a.textContent?.trim() === 'Back up recovery kit',

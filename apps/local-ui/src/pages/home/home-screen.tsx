@@ -9,6 +9,9 @@
 // and the agent filter (2+ agents), message details and contact facts, approval ID/kind/expiry and
 // the bulk review.
 //
+// W8-S4 (F21): an ID whose removal stopped part-way is not a chip; Home says "{label} wasn't fully
+// removed" with Finish removing (the Remove sheet in finish mode, here on Home).
+//
 // Loading: nothing under ~300 ms, then a skeleton shaped like Home (U0 SkeletonGate). Home looks
 // again every few seconds while visible. Reading sends GETs only (I-4); whatever another party wrote
 // is shown only inside the untrusted container (I-5); Save and Show in Finder send only an item ID.
@@ -41,6 +44,10 @@ import { getLive, subscribeLive, switchAgent, type LiveAgent } from '../../api/l
 import { INVITE_PATH } from '../../nav.js';
 import { CONTACTS_CHANGED } from '../../api/contact-changes.js';
 import { PasteEntryLink } from '../invite/paste-entry.js';
+import { createAgentsApi, type AgentsApi } from '../agents/api.js';
+import type { AgentRow } from '../agents/data.js';
+import { FinishRemoveSheet, UnfinishedRemoval } from '../agents/finish-remove.js';
+import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import { usePrefs } from '../../prefs/index.js';
 import type { OwnerState, SheetOptions } from '../approvals/card.js';
@@ -121,6 +128,9 @@ interface Clients {
   readonly save: SaveApi;
   readonly reveal: Reveal;
   readonly invites: InviteApi;
+  /** W8-S4: Finish removing (the Remove sheet's own calls). */
+  readonly agents: AgentsApi;
+  readonly owner: OwnerClient;
 }
 
 function useClients(props: HomeScreenProps): Clients {
@@ -140,6 +150,8 @@ function useClients(props: HomeScreenProps): Clients {
       save: createSaveApi(withKeys),
       reveal: (id: string) => files.reveal(id),
       invites: createInviteApi(opts),
+      agents: createAgentsApi(opts),
+      owner: createOwnerClient(opts),
     };
   }, [givenFetch, token, credentials, approvalsClient]);
 }
@@ -150,9 +162,12 @@ type View =
   | { readonly state: 'ready'; readonly data: HomeData };
 
 const LIVE_EMPTY = { list: undefined, agents: [], error: false };
-function useLiveAgents(): readonly LiveAgent[] {
+function useLiveAgents(): {
+  readonly agents: readonly LiveAgent[];
+  readonly rows: readonly AgentRow[];
+} {
   const snap = useSyncExternalStore(subscribeLive, getLive, () => LIVE_EMPTY);
-  return snap.agents;
+  return { agents: snap.agents, rows: snap.list?.agents ?? [] };
 }
 
 /** The skeleton in the shape of Home (U0): the card, Invite, the People label and three rows. */
@@ -453,7 +468,12 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   const clients = useClients(props);
   const { hood: pro } = usePrefs();
   const vt = useViewTransition();
-  const agents = useLiveAgents();
+  // W8-S4 (F21; 04 §2.5 "Finishing a removal"): an ID whose removal stopped part-way is never a
+  // usable ID here (no chip); Home names it with Finish removing instead.
+  const liveIds = useLiveAgents();
+  const agents = useMemo(() => liveIds.agents.filter((a) => !a.removing), [liveIds.agents]);
+  const unfinished = liveIds.rows.filter((r) => r.removing);
+  const [finishing, setFinishing] = useState<AgentRow | undefined>(undefined);
   const current = agents.find((a) => a.current);
   const appName = current?.apps[0]?.app;
   const agentLabel = idWithApp(current?.label ?? '', appName);
@@ -677,6 +697,9 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
         <div className="hm-stack hm-c">
           {props.getStarted ?? null}
           {props.ownerNotice ?? null}
+          {unfinished.map((row) => (
+            <UnfinishedRemoval key={row.name} row={row} onFinish={setFinishing} />
+          ))}
           <HomeApprovals
             items={approvals}
             owner={owner}
@@ -931,6 +954,14 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
           </section>
         </div>
       </SkeletonGate>
+      {finishing === undefined ? null : (
+        <FinishRemoveSheet
+          row={finishing}
+          api={clients.agents}
+          owner={clients.owner}
+          onClose={() => setFinishing(undefined)}
+        />
+      )}
     </div>
   );
 }

@@ -156,3 +156,4 @@ Each milestone is a gate; M3 needs the external audit passed. Durations are indi
 - Pricing: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/pricing.md
 - Releases: https://github.com/4thtech/agentlink/releases and changelog https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md
 - Security policy: https://github.com/4thtech/agentlink/blob/main/SECURITY.md
+- Wording: "AI app" (the app and the user docs, see the [glossary](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/help/glossary.md)) and "harness" (Under the hood and the [technical docs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md)) mean the same: the program that runs your AI and connects it to AgentLink. Use "AI app" with users.

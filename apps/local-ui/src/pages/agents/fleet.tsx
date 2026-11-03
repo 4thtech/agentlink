@@ -28,7 +28,6 @@ const STATUSES: readonly { value: FleetStatus; label: string }[] = [
   { value: 'all', label: S.allStatuses },
   { value: 'working', label: W.working },
   { value: 'ready', label: W.ready },
-  { value: 'idle', label: W.idle },
   { value: 'offline', label: W.offline },
   { value: 'paused', label: W.paused },
 ];
@@ -91,6 +90,9 @@ export function Fleet({
 
   return (
     <div className="ag-fleet">
+      <p className="al-text-body-sm al-muted" data-harness-hint>
+        {S.harnessHint}
+      </p>
       <div className="ag-filters">
         <span className="ag-field ag-field-grow">
           <label htmlFor={`${id}-q`} className="al-text-label al-muted">

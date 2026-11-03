@@ -100,8 +100,30 @@ export interface AppTile {
   readonly id: string;
   readonly name: string;
   readonly found: boolean;
+  /** The card's label (F5: the Claude Code card reads "Claude Code CLI"); `name` stays the app's name. */
+  readonly label: string;
+  /** F6: the app is open right now (the detector knows it for Claude Desktop only). */
+  readonly open: boolean;
   /** Already runs the open agent (Connect another AI app): shown, not picked again. */
   readonly connected: boolean;
+  /**
+   * W8-S5 (F7): the ID the found app's entry runs now, when it is another one: its label, an ID that
+   * was removed (no folder, or its removal did not finish), or another ID when the IDs were not read.
+   * Picking it moves the app to the new ID (begin's statement says so).
+   */
+  readonly uses?:
+    | { readonly kind: 'id'; readonly label: string }
+    | { readonly kind: 'removed' }
+    | { readonly kind: 'other' };
+  /** W8-S5 (F7): an `agentlink` entry AgentLink did not write: "Set up by hand", never picked. */
+  readonly byHand: boolean;
+}
+
+/** W8-S5 (F7): what the pick knows of the owner's IDs (folder name, label, half-removed). */
+export interface KnownId {
+  readonly name: string;
+  readonly label: string;
+  readonly removing?: boolean;
 }
 
 /** The apps the tiles always offer, in order, when the look did not find them (A1). */
@@ -112,24 +134,75 @@ export const KNOWN_APPS: readonly { readonly id: string; readonly name: string }
   { id: 'codex', name: 'Codex' },
 ];
 
+/** F5 (owner decision): the card label where it differs from the app's name. */
+const CARD_LABELS: Readonly<Record<string, string>> = { 'claude-code': 'Claude Code CLI' };
+
 /** The tiles: every found app first (in the look's order), then the known apps not found yet. */
-export function appTiles(found: readonly DetectedApp[] | undefined, agent?: string): AppTile[] {
-  const tiles: AppTile[] = (found ?? []).map((a) => ({
-    id: a.id,
-    name: a.name,
-    found: true,
-    connected: agent !== undefined && a.state === 'connected' && a.agent === agent,
-  }));
+
+export function appTiles(
+  found: readonly DetectedApp[] | undefined,
+  agent?: string,
+  ids?: readonly KnownId[],
+): AppTile[] {
+  const usesOf = (a: DetectedApp): AppTile['uses'] => {
+    if (a.state !== 'connected' || a.agent === undefined || a.agent === agent) return undefined;
+    if (ids === undefined) return { kind: 'other' };
+    const id = ids.find((i) => i.name === a.agent);
+    return id === undefined || id.removing === true
+      ? { kind: 'removed' }
+      : { kind: 'id', label: id.label };
+  };
+  const tiles: AppTile[] = (found ?? []).map((a) => {
+    const uses = usesOf(a);
+    return {
+      id: a.id,
+      name: a.name,
+      label: CARD_LABELS[a.id] ?? a.name,
+      found: true,
+      open: a.quitFirst,
+      connected: agent !== undefined && a.state === 'connected' && a.agent === agent,
+      byHand: a.state === 'not_ours',
+      ...(uses === undefined ? {} : { uses }),
+    };
+  });
   for (const known of KNOWN_APPS) {
     if (!tiles.some((t) => t.id === known.id))
-      tiles.push({ ...known, found: false, connected: false });
+      tiles.push({
+        ...known,
+        label: CARD_LABELS[known.id] ?? known.name,
+        found: false,
+        open: false,
+        connected: false,
+        byHand: false,
+      });
   }
   return tiles;
 }
 
-/** The app picked by default: the first found one not connected yet, else the first one. */
+/**
+ * The app picked by default: the first found one no ID uses yet and that is not open now (it would
+ * need quitting); else the first free one that is open; else (W8-S5) the first found one
+ * whose ID was removed; else the first one free to pick. Never one another ID uses.
+ */
 export function defaultChoice(tiles: readonly AppTile[]): string {
-  return (tiles.find((t) => t.found && !t.connected) ?? tiles.find((t) => !t.connected))?.id ?? '';
+  const free = (t: AppTile): boolean => !t.connected && !t.byHand && t.uses === undefined;
+  return (
+    (
+      tiles.find((t) => t.found && free(t) && !t.open) ??
+      tiles.find((t) => t.found && free(t)) ??
+      tiles.find((t) => t.found && t.uses?.kind === 'removed') ??
+      tiles.find(free)
+    )?.id ?? ''
+  );
+}
+
+/** W8-S5 (F7): a found app's line: what it uses now, else found here (open now). */
+function foundLine(t: AppTile, mac: boolean): string {
+  if (t.byHand) return P.byHand;
+  if (t.uses?.kind === 'id') return P.uses(t.uses.label);
+  if (t.uses?.kind === 'removed') return P.usesRemoved;
+  if (t.uses?.kind === 'other') return P.usesAnother;
+  return `${mac ? P.found : P.foundElsewhere}${t.open ? P.openNow : ''}`;
 }
 
 function TerminalGlyph(): ReactElement {
@@ -185,7 +258,7 @@ export function PickStep({
               <span className="st-tile-top">
                 <TerminalGlyph />
               </span>
-              <span className="st-tile-name">{t.name}</span>
+              <span className="st-tile-name">{CARD_LABELS[t.id] ?? t.name}</span>
               <Skeleton loading label={P.loading} lines={1} />
             </div>
           ))}
@@ -200,7 +273,7 @@ export function PickStep({
                 type="button"
                 className="st-tile al-press"
                 aria-pressed={selected}
-                disabled={t.connected}
+                disabled={t.connected || t.byHand}
                 data-selected={selected ? 'true' : undefined}
                 onClick={() => onChoose(t.id)}
               >
@@ -212,13 +285,15 @@ export function PickStep({
                     </span>
                   ) : null}
                 </span>
-                <span className="st-tile-name">{t.name}</span>
+                <span className="st-tile-name">{t.label}</span>
                 {t.connected ? (
                   <span className="st-tile-state is-found">{P.connected}</span>
+                ) : t.found && (t.byHand || t.uses !== undefined) ? (
+                  <span className="st-tile-state">{foundLine(t, mac)}</span>
                 ) : t.found ? (
                   <span className="st-tile-state is-found">
                     <span className="st-dot" aria-hidden="true" />
-                    {mac ? P.found : P.foundElsewhere}
+                    {foundLine(t, mac)}
                   </span>
                 ) : (
                   <span className="st-tile-state">{P.notFound}</span>

@@ -196,6 +196,7 @@ function appView(view: LocalUiAiAppView): JsonObject | undefined {
     state: word,
     ...(agent === undefined ? {} : { agent }),
     quitFirst: view.quitFirst === true,
+    ...(view.checkFailed === true ? { checkFailed: true } : {}),
   };
 }
 

@@ -229,6 +229,14 @@ export class LiveEvents {
     }
   }
 
+  /**
+   * F25: tells every open stream the host is closing (`event: closing`, empty data, no ID so it is
+   * never replayed), so the page can say "AgentLink closed" instead of "try again". Then `close()`.
+   */
+  closing(): void {
+    for (const stream of [...this.#streams]) this.#write(stream, 'event: closing\ndata: {}\n\n');
+  }
+
   /** Ends every stream; no stream opens after this (the host stops). */
   close(): void {
     this.#closed = true;

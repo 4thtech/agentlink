@@ -8,6 +8,7 @@
 // Reachability uses the same fetch-only `catchUp` as `status`: it stores raw envelopes and processes
 // nothing. Every line is fixed text or a count; no path, agent name, account name or error text is
 // printed (I-5, I-7), only the fixed sentences of the runtime and of node (07 §9.4).
+import process from 'node:process';
 import {
   EXIT_FAILED,
   EXIT_OK,
@@ -16,8 +17,9 @@ import {
   type CommandHandler,
 } from '../dispatch.js';
 import * as chain from '@4thtech-io/chain';
-import { hasUnfinishedOwnerCodeChange, nodeRpcFetch } from '@4thtech-io/node';
+import { hasOwnerOnMachine, hasUnfinishedOwnerCodeChange, nodeRpcFetch } from '@4thtech-io/node';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
+import { localDoctorChecks, type LocalChecks } from './doctor-local.js';
 import { isAgentName } from '../runtime/agent-name.js';
 import { cliPrefix, commandPrefix } from '../runtime/cli-prefix.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
@@ -38,6 +40,10 @@ import {
  */
 export const DOCTOR_TEXT = Object.freeze({
   rulesOk: 'OK       Your rules are in use',
+  /** W8-FEEDBACK-S1 (F8): there is an owner on this computer but no ID yet. */
+  get noIdsYet(): string {
+    return `Problem  You have no IDs yet. Open AgentLink to create one: run \`${commandPrefix()}\`.`;
+  },
   get rulesFailClosed(): string {
     return `Problem  Your rules can't be used, so AgentLink uses its strictest settings\n         In a terminal you opened yourself, run \`${commandPrefix()} policy recover\` to review and confirm them again.`;
   },
@@ -59,6 +65,13 @@ export type ProofNetworkCheck = () => Promise<{
 export interface DoctorDeps extends CommandDeps {
   /** Absent: the line is not printed (tests of other subsystems). */
   readonly proofNetwork?: ProofNetworkCheck;
+  /**
+   * F8: true when an owner is set up on this computer (store-only: reads no secret). Absent: the
+   * "no IDs yet" line is never chosen and doctor keeps its set-up line.
+   */
+  readonly ownerOnMachine?: () => Promise<boolean>;
+  /** R1: the local checks (last exit, leftover host note, half-removed IDs, AI apps). Absent: none. */
+  readonly local?: () => Promise<LocalChecks>;
 }
 
 /** M1-9h doctor lines (11 §5: "public record", never chain, RPC or a network name). */
@@ -141,6 +154,13 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
       printAll(context, text.split('\n'));
     };
 
+    // R1: these read only local files, so they come first and also help when no ID can be opened.
+    const local = await deps.local?.().catch(() => undefined);
+    if (local !== undefined) {
+      for (const line of local.lines) emit(line);
+      problems += local.problems;
+    }
+
     let opened;
     try {
       opened = await deps.open(context.parsed.agent);
@@ -153,6 +173,16 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
       return EXIT_FAILED;
     }
     if (opened.status === 'needs_setup') {
+      // F8: an owner and no ID at all is not "not set up": the next step is to open AgentLink.
+      if (
+        opened.reason === 'no_agent' &&
+        deps.ownerOnMachine !== undefined &&
+        (await deps.ownerOnMachine().catch(() => false)) &&
+        (await listAgentNames(deps.home).catch(() => ['?'] as string[])).length === 0
+      ) {
+        emit(DOCTOR_TEXT.noIdsYet, true);
+        return EXIT_FAILED;
+      }
       emit(
         fill(opened.reason === 'no_agent' ? TEXT.doctorNoAgent : TEXT.doctorNoKeychain, {
           message: terminalOneLine(opened.message),
@@ -288,4 +318,6 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
 export const doctorHandler: CommandHandler = createDoctorHandler({
   ...createDeps({ unfinishedOwnerCodeChange: hasUnfinishedOwnerCodeChange }),
   proofNetwork: nodeProofNetworkCheck(),
+  ownerOnMachine: hasOwnerOnMachine,
+  local: () => localDoctorChecks({ env: process.env }),
 });

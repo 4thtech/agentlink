@@ -28,8 +28,14 @@
 // owner signature, and first-run setup is the `setupGate` route that re-checks that no owner exists.
 import { homedir } from 'node:os';
 import process from 'node:process';
-import { createLogger, type Logger } from '@4thtech-io/log';
-import { probeOsKeychain, selectKeyStoreBackend, startApprovalServer } from '@4thtech-io/node';
+import type { Logger } from '@4thtech-io/log';
+import { cliLogger } from '../runtime/log-level.js';
+import {
+  hasOwnerOnMachine,
+  probeOsKeychain,
+  selectKeyStoreBackend,
+  startApprovalServer,
+} from '@4thtech-io/node';
 import { createAiAppsDesk } from '../harness/app-desk.js';
 import { embeddedLocalUiAssets } from '../mcp/local-ui-assets.js';
 import { createUiApprovalSource } from '../approval/ui-source.js';
@@ -44,20 +50,90 @@ import { nodeOwnerDeps } from './owner/deps.js';
 import { openUiHostAgent, startUiWelcome, withoutAssets, type UiHostDeps } from './ui-host.js';
 import { uiRemovalPort } from './ui-remove.js';
 import { removeAppHostRecord, writeAppHostRecord } from '../runtime/app-host-record.js';
+import { writeLastExit, type LastExitReason } from '../runtime/last-exit.js';
+import { guardProcess, type FatalReason } from '../runtime/ui-lifecycle.js';
+import { cliVersion } from '../runtime/cli-version.js';
+import {
+  OPEN_CHECK_MS,
+  openAndWatch,
+  setupOpenedLine,
+  stdinEnter,
+  type OpenWatch,
+} from '../runtime/open-watch.js';
 
-/** How long `ui` serves the pages at most (proposed: 30 minutes, as for the first-run step). */
+/**
+ * How long `ui` keeps serving with nobody using it (06 §5 sets "a time limit (30 minutes)"; F25: it
+ * counts from the last use, not from the start, so a page in use is never cut off). Use is any page
+ * request or an open page (live stream).
+ */
 export const UI_WAIT_MS = 30 * 60_000;
+
+/** While a page is open, `ui` looks again this often, so a closed tab starts the idle time soon. */
+const OPEN_PAGE_CHECK_MS = 15_000;
+
+/** R1: why `ui` could not start. */
+export type StartFailure =
+  'no_owner' | 'no_ids' | 'only_removing' | 'port' | 'keychain' | 'open' | 'failed';
+
+const START_EXIT: Readonly<Record<StartFailure, LastExitReason>> = Object.freeze({
+  no_owner: 'start_no_owner',
+  no_ids: 'start_no_ids',
+  only_removing: 'start_removing',
+  port: 'start_port',
+  keychain: 'start_keychain',
+  open: 'start_open',
+  failed: 'start_failed',
+});
+
+/** Bind failures: the local page cannot be served (a fixed set of codes, never the text). */
+const PORT_CODES = new Set(['EADDRINUSE', 'EADDRNOTAVAIL', 'EACCES']);
+
+function isPortError(error: unknown): boolean {
+  const code =
+    typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : '';
+  return typeof code === 'string' && PORT_CODES.has(code);
+}
 
 /** Fixed text (11 §5 plain words). Nothing from a file, the page or the user is inserted. */
 export const UI_TEXT = Object.freeze({
+  /** F40: "Opening", never "opened": the OS opener cannot prove a page loaded (open-watch.ts). */
   opened:
-    "Your browser opened AgentLink on Home. Keep this window open while you use it; press Ctrl+C when you're done.",
-  openedSetup:
-    "Your browser opened the AgentLink setup page. Protect approvals there with a passkey. Keep this window open while you use the page; press Ctrl+C when you're done.",
-  noBrowser: "AgentLink couldn't open your browser.",
+    "Opening AgentLink Home in your browser… Keep this window open while you use it; press Ctrl+C when you're done.",
+  /** F41: the platform's word for the gesture (Touch ID, Windows Hello, a passkey); no "setup page". */
+  openedSetup: setupOpenedLine(process.platform),
+  /** R1: no browser could be started, but the app is healthy: it keeps serving. */
+  noBrowser:
+    "AgentLink couldn't open your browser, but it's still running. Keep this window open; press Ctrl+C when you're done.",
+  noBrowserServing: (origin: string): string =>
+    `AgentLink couldn't open your browser, but it's still running at ${origin}. Keep this window open; press Ctrl+C when you're done.`,
+  /** R1: a problem AgentLink could not carry on through (the run ended, cleanly). */
+  closedProblem: (prefix: string): string =>
+    `AgentLink closed because of an unexpected problem. Run \`${prefix}\` to open it again, or \`${prefix} doctor\` if it keeps happening.`,
+  /** F25: Ctrl+C, closing the terminal or a stop signal: one plain line, no link. */
+  closed: (prefix: string): string => `AgentLink closed. Run \`${prefix}\` to open it again.`,
+  /** F25: the idle limit (UI_WAIT_MS) ended the run. */
+  closedIdle: (prefix: string): string =>
+    `AgentLink closed after 30 minutes without use. Run \`${prefix}\` to open it again.`,
   /** `prefix`: the command as this run was started (M1-36a), never a typed value. */
   notReady: (prefix: string): string =>
     `AgentLink isn't set up here yet. Run \`${prefix} init\` in your own terminal first.`,
+  /** R1: why it could not start, one line each; only `no_owner` asks for init. */
+  startFailure: Object.freeze<Record<StartFailure, (prefix: string) => string>>({
+    no_owner: (prefix) =>
+      `AgentLink isn't set up here yet. Run \`${prefix} init\` in your own terminal first.`,
+    no_ids: (prefix) =>
+      `AgentLink couldn't open the app to make your first ID. Run \`${prefix} doctor\` to see why.`,
+    only_removing: (prefix) =>
+      `Some of your IDs were only half removed, so AgentLink couldn't start. Run \`${prefix} doctor\` to see what is left.`,
+    port: (prefix) =>
+      `AgentLink couldn't start its page on this computer. Close any other open AgentLink, then run \`${prefix}\` again.`,
+    keychain: (prefix) =>
+      `AgentLink can't reach your computer's keychain. Unlock it, then run \`${prefix}\` again.`,
+    open: (prefix) =>
+      `AgentLink couldn't open your ID. Your IDs are still here. Run \`${prefix} doctor\` to see why.`,
+    failed: (prefix) =>
+      `AgentLink couldn't start. Your IDs are still here. Run \`${prefix} doctor\` to see why.`,
+  }),
   agentRun: (prefix: string): string =>
     `You must do this yourself: run \`${prefix} ui\` in your own terminal. It opens your AgentLink pages in your browser. Don't let your AI open them or run this for you.`,
 });
@@ -81,6 +157,13 @@ export interface UiServer {
   readonly page: UiPage;
   /** Opens the browser at a one-shot link to `page`; false when no browser could be started. */
   open(): Promise<boolean>;
+  /** R1: the local address (`http://localhost:<port>`, never a session link), for when no browser opens. */
+  readonly origin?: string;
+  /**
+   * F25: whether the app is in use (absent: only the time since start counts). `lastAt` is a time in
+   * ms of the last page request; `openStreams` the open pages.
+   */
+  readonly activity?: { lastAt(): number; openStreams(): number; linksUsed?(): number };
   /** Stops the server and closes the agent. */
   close(): Promise<void>;
 }
@@ -114,10 +197,23 @@ export interface UiDeps {
    * undefined when it cannot (an agent folder exists, no usable keychain, no app in this build).
    */
   startWelcome?(options?: { readonly invite?: string }): Promise<UiServer | undefined>;
-  /** The longest serve time, in milliseconds. */
+  /** The longest time with no use, in milliseconds (F25: idle, not wall-clock). */
   readonly waitMs: number;
-  /** Calls `stop` on Ctrl+C; returns the unsubscribe. */
-  interrupt(stop: () => void): () => void;
+  /** Calls `stop` on Ctrl+C, SIGTERM or SIGHUP (with the signal's name); returns the unsubscribe. */
+  interrupt(stop: (signal?: string) => void): () => void;
+  /**
+   * R1: why `start` found nothing to start (no owner, no IDs, only half-removed IDs, no keychain …).
+   * Absent: the line for "not set up here yet".
+   */
+  diagnose?(): Promise<StartFailure>;
+  /** R1: stray background errors keep the host up; `onFatal` ends it. Returns the unsubscribe. */
+  guard?(onFatal: (reason: FatalReason) => void): () => void;
+  /** R1: writes why this run closed (~/.agentlink/last-exit.json). Must not throw. */
+  recordExit?(reason: LastExitReason): Promise<void>;
+  /** F40: Enter in this terminal (absent: no "press Enter to try again"). Returns the unsubscribe. */
+  onEnter?(press: () => void): () => void;
+  /** F40: how long the page has to use its link before the follow-up (default OPEN_CHECK_MS). */
+  readonly openCheckMs?: number;
 }
 
 /** The command. Returns the process exit code. */
@@ -168,45 +264,157 @@ export async function serveUi(
     none && deps.startWelcome !== undefined
       ? await deps.startWelcome(startOptions).catch(() => undefined)
       : undefined;
-  server ??= await deps.start(agent, startOptions).catch(() => undefined);
+  let thrown: unknown;
+  server ??= await deps.start(agent, startOptions).catch((error: unknown) => {
+    thrown = error;
+    return undefined;
+  });
   if (server === undefined) {
-    output.printError(UI_TEXT.notReady(prefix));
+    // R1: say what went wrong; "run init" only when nothing is set up. Nothing from the error is shown.
+    const failure: StartFailure = isPortError(thrown)
+      ? 'port'
+      : thrown === undefined
+        ? await (deps.diagnose?.() ?? Promise.resolve('no_owner' as const)).catch(
+            () => 'failed' as const,
+          )
+        : await (deps.diagnose?.() ?? Promise.resolve('failed' as const)).catch(
+            () => 'failed' as const,
+          );
+    output.printError(UI_TEXT.startFailure[failure](prefix));
+    await deps.recordExit?.(START_EXIT[failure]);
     return EXIT_FAILED;
   }
   let unsubscribe: (() => void) | undefined;
+  let unguard: (() => void) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let watch: OpenWatch | undefined;
   try {
-    const opened = await server.open().catch(() => false);
-    if (!opened) {
-      output.printError(UI_TEXT.noBrowser);
-      return EXIT_FAILED;
-    }
-    output.print(
-      join !== undefined
-        ? join.opened
-        : server.page === 'first-run'
-          ? UI_TEXT.openedSetup
-          : UI_TEXT.opened,
+    const fatal = new Promise<FatalReason>((resolve) => {
+      unguard = deps.guard?.(resolve);
+    });
+    // F40: "Opening…", then, if no one-shot link is used in time, "press Enter to try again".
+    // R1: a browser that will not open does not stop a healthy host.
+    const linksUsed = server.activity?.linksUsed?.bind(server.activity);
+    watch = await openAndWatch(
+      {
+        open: () => server.open(),
+        linksUsed,
+        print: (line) => output.print(line),
+        onEnter: deps.onEnter?.bind(deps),
+        checkMs: deps.openCheckMs ?? OPEN_CHECK_MS,
+      },
+      {
+        opened:
+          join !== undefined
+            ? join.opened
+            : server.page === 'first-run'
+              ? UI_TEXT.openedSetup
+              : UI_TEXT.opened,
+        failed:
+          server.origin === undefined ? UI_TEXT.noBrowser : UI_TEXT.noBrowserServing(server.origin),
+      },
     );
-    const stopped = new Promise<void>((resolve) => {
+    const stopped = new Promise<string | undefined>((resolve) => {
       unsubscribe = deps.interrupt(resolve);
     });
-    const timedOut = new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, deps.waitMs);
+    const idle = new Promise<'idle'>((resolve) => {
+      const started = Date.now();
+      let seenOpen = started;
+      const check = (): void => {
+        const used = server.activity;
+        const open = used?.openStreams() ?? 0;
+        // An open page is use; the idle time counts from the last time one was seen (or any request).
+        if (open > 0) seenOpen = Date.now();
+        const last = Math.max(started, seenOpen, used?.lastAt() ?? started);
+        const remaining = deps.waitMs - (Date.now() - last);
+        if (remaining <= 0) {
+          resolve('idle');
+          return;
+        }
+        timer = setTimeout(check, open > 0 ? Math.min(remaining, OPEN_PAGE_CHECK_MS) : remaining);
+      };
+      timer = setTimeout(check, deps.waitMs);
     });
-    await Promise.race([stopped, timedOut]);
+    const reason = await Promise.race([
+      stopped.then((signal) => ({ kind: 'stop' as const, signal })),
+      idle.then(() => ({ kind: 'idle' as const })),
+      fatal.then((why) => ({ kind: 'fatal' as const, why })),
+    ]);
+    if (reason.kind === 'fatal') {
+      output.print(UI_TEXT.closedProblem(prefix));
+      await deps.recordExit?.(reason.why);
+      return EXIT_FAILED;
+    }
+    output.print(reason.kind === 'idle' ? UI_TEXT.closedIdle(prefix) : UI_TEXT.closed(prefix));
+    await deps.recordExit?.(
+      reason.kind === 'idle'
+        ? 'idle'
+        : reason.signal === 'SIGTERM'
+          ? 'sigterm'
+          : reason.signal === 'SIGHUP'
+            ? 'sighup'
+            : 'ctrl_c',
+    );
     return EXIT_OK;
   } finally {
+    watch?.stop();
     if (timer !== undefined) clearTimeout(timer);
     unsubscribe?.();
+    unguard?.();
     await server.close().catch(() => undefined);
+  }
+}
+
+/** F40: the production Enter, only while standard input is a terminal. */
+function optionalEnter(): Pick<UiDeps, 'onEnter'> {
+  const enter = stdinEnter();
+  return enter === undefined ? {} : { onEnter: enter };
+}
+
+/**
+ * F25: Ctrl+C, a closing terminal (SIGHUP) and a plain stop (SIGTERM) all end the run the same way:
+ * the caller closes the server (which removes the pid-matched app-host.json) and prints one line.
+ */
+export function onStopSignals(stop: () => void, proc: NodeJS.Process = process): () => void {
+  const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+  for (const signal of signals) proc.once(signal, stop);
+  return () => {
+    for (const signal of signals) proc.off(signal, stop);
+  };
+}
+
+/**
+ * R1: why nothing could be started, from what is on this computer now (names, counts and a keychain
+ * probe only; no secret is read). Never throws.
+ */
+export async function diagnoseStart(
+  home: string,
+  probes: {
+    readonly keychainUsable?: () => Promise<boolean>;
+    readonly ownerOnMachine?: () => Promise<boolean>;
+  } = {},
+): Promise<StartFailure> {
+  try {
+    const keychainUsable =
+      probes.keychainUsable ??
+      (async () => selectKeyStoreBackend(await probeOsKeychain(), { fileOptIn: false }).ok);
+    const entries = await agentDirectory(home).list();
+    if (entries.length > 0) {
+      if (entries.every((e) => e.removing)) return 'only_removing';
+      return (await keychainUsable().catch(() => false)) ? 'open' : 'keychain';
+    }
+    if (!(await keychainUsable().catch(() => false))) return 'keychain';
+    const owner = await (probes.ownerOnMachine ?? hasOwnerOnMachine)().catch(() => false);
+    return owner ? 'no_ids' : 'no_owner';
+  } catch {
+    return 'failed';
   }
 }
 
 /** The production step: the OS user's home, the OS keychain, the OS browser opener. */
 export function nodeUiDeps(): UiDeps {
   const owner = nodeOwnerDeps();
-  const logger: Logger = createLogger({ name: 'ui' });
+  const logger: Logger = cliLogger('ui', process.env);
   return Object.freeze<UiDeps>({
     // U3-b: no agent that is being removed; the rest through the AgentDirectory seam.
     agents: async () =>
@@ -294,6 +502,10 @@ export function nodeUiDeps(): UiDeps {
               close: () => agent.close(),
             },
             open: (other) => openUiHostAgent(hostDeps, other),
+            // F2: Welcome's "Which AI app" list also works when a switch left no agent open.
+            aiAppsList: Object.freeze({
+              list: () => createAiAppsDesk({ home: homedir(), env: process.env }).list(),
+            }),
             // U3-e: removing an agent (the folder lock, its own open, the revoked list).
             removal: uiRemovalPort(),
             // U3-invite (08 §4): the invite `join` checked, held in memory by the host only.
@@ -312,6 +524,8 @@ export function nodeUiDeps(): UiDeps {
         });
         return Object.freeze<UiServer>({
           page,
+          activity: server.activity,
+          origin: server.origin,
           // U3-invite: first run (no owner yet) or the join screen; never a link with the invite.
           open: () => (invite === undefined ? openUiPage(page, server) : server.openJoin()),
           close: async () => {
@@ -325,12 +539,13 @@ export function nodeUiDeps(): UiDeps {
       }
     },
     waitMs: UI_WAIT_MS,
-    interrupt: (stop) => {
-      process.once('SIGINT', stop);
-      return () => {
-        process.off('SIGINT', stop);
-      };
-    },
+    interrupt: (stop) => onStopSignals(stop),
+    // F40: Enter in the owner's terminal tries the browser again with a fresh one-shot link.
+    ...optionalEnter(),
+    // R1: stray background errors are logged with a fixed code and the host keeps serving.
+    guard: (onFatal) => guardProcess({ log: logger, onFatal }),
+    recordExit: (reason) => writeLastExit(homedir(), { reason, version: cliVersion() }),
+    diagnose: () => diagnoseStart(homedir()),
   });
 }
 

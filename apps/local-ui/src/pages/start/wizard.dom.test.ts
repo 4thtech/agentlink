@@ -15,6 +15,7 @@ import type { AppsApi, AppsListResult, ApplyResult, DetectedApp } from '../first
 import { FirstRunPage, type FirstRunPageProps } from '../first-run/index.js';
 import { encodeRegistration } from '../first-run/passkey.js';
 import type { FinishResult, SetupApi, StatusResult } from '../first-run/setup-api.js';
+import { appTiles, defaultChoice } from './wizard.js';
 import { rememberWizard, resetAutoShown, resetWizard, wasAutoShown } from './store.js';
 import { RECOVERY_KIT_LATER_KEY } from '../../states/index.js';
 import {
@@ -310,7 +311,7 @@ describe('W4-WIZARD step 1: pick your AI app (A1)', () => {
     expect(text()).toContain(PICK_STEP.eyebrow);
     const tiles = [...host.querySelectorAll<HTMLButtonElement>('.st-tile')];
     expect(tiles.map((t) => t.querySelector('.st-tile-name')?.textContent)).toEqual([
-      'Claude Code',
+      'Claude Code CLI',
       'Cursor',
       'Claude Desktop',
       'Codex',
@@ -319,6 +320,31 @@ describe('W4-WIZARD step 1: pick your AI app (A1)', () => {
     expect(tiles[2]?.textContent).toContain(PICK_STEP.notFound);
     expect(tiles[0]?.getAttribute('aria-pressed')).toBe('true');
     expect(button(PICK_STEP.next('Claude Code'))).toBeDefined();
+  });
+
+  it('F5/F6: the Claude Code card reads "Claude Code CLI"; a found app that is open says so', () => {
+    const desk = app('claude-desktop', 'Claude Desktop', { quitFirst: true });
+    const tiles = appTiles([CLAUDE_CODE, desk, CURSOR]);
+    expect(tiles.map((t) => [t.label, t.name, t.open])).toEqual([
+      ['Claude Code CLI', 'Claude Code', false],
+      ['Claude Desktop', 'Claude Desktop', true],
+      ['Cursor', 'Cursor', false],
+      ['Codex', 'Codex', false],
+    ]);
+    expect(appTiles(undefined)[0]?.label).toBe('Claude Code CLI');
+  });
+
+  it('F6: the found line of an open app adds "Open now"', async () => {
+    const list: AppsListResult = {
+      kind: 'ok',
+      desktopRunning: true,
+      apps: [CLAUDE_CODE, app('claude-desktop', 'Claude Desktop', { quitFirst: true })],
+    };
+    await mount({ appsApi: fakeApps({ list }) });
+    const tiles = [...host.querySelectorAll<HTMLButtonElement>('.st-tile')];
+    expect(tiles[0]?.textContent).toContain('Claude Code CLI');
+    expect(tiles[0]?.textContent).not.toContain('Open now');
+    expect(tiles[1]?.textContent).toContain(`${PICK_STEP.found} · Open now`);
   });
 
   it('picking another tile changes the one primary button; nothing is sent', async () => {
@@ -592,6 +618,28 @@ describe('W4-WIZARD: the same steps for an owner who has one already', () => {
     expect(went.at(-1)).toBe('/start/connected');
     expect(h1()).toBe(CONNECTED_STEP.title('Cursor'));
   });
+
+  it('F4: an owner with no ID left whose begin is refused no_agent gets the real reason, not "Setup didn\'t finish"', async () => {
+    const create = fakeCreate({ kind: 'done', name: 'x', label: 'x' });
+    const refusing: CreateAgentApi = {
+      ...create,
+      begin: () => Promise.resolve({ kind: 'refused', status: 'no_agent' } as const),
+    };
+    await mount({
+      api: fakeSetup({ status: OWNER }),
+      upgradeApi: registered,
+      appsApi: fakeApps({ agent: null }),
+      createAgentApi: refusing,
+      passkeysAvailable: () => true,
+    });
+    await typeName('Cursor agent');
+    await click('Continue');
+    await click(/^CursorFound/);
+    await click(PICK_STEP.next('Cursor'));
+    await click(CONNECT_STEP.connect('Touch ID'));
+    expect(text()).not.toContain("Setup didn't finish");
+    expect(text()).toContain('agentlink owner add-agent');
+  });
 });
 
 /** The agents the name step and "Open {name}" read: "Work" is taken; switches are recorded. */
@@ -719,6 +767,22 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     );
   });
 
+  it('W8-F11: "Confirm it\'s you" shows one Back, also on the backup-code form', async () => {
+    await mount(asAdd({ createAgentApi: made() }));
+    await typeName('Side project');
+    await click('Continue');
+    await click(/^CursorFound/);
+    await click(PICK_STEP.next('Cursor'));
+    const backs = (): number =>
+      [...host.querySelectorAll('button')].filter(
+        (b) => b.textContent?.trim() === CONNECT_STEP.back,
+      ).length;
+    expect(backs()).toBe(1);
+    await click('Use a backup code instead');
+    expect(host.querySelector('input[type="password"]')).not.toBeNull();
+    expect(backs()).toBe(1);
+  });
+
   it('a new Add agent starts with no name from an earlier run', async () => {
     rememberWizard({ name: 'Old name', choice: 'cursor', outcome: { label: 'Old name' } });
     await mount(asAdd());
@@ -839,5 +903,129 @@ describe('W4-WIZARD: accessibility, motion and words', () => {
       INVITE_STEP.body,
     ];
     for (const w of words) expect(lintVocabulary(w)).toEqual([]);
+  });
+});
+
+// W8-S5 (F7; 04 §2.8; 11 §5.8 "AI app states"): New ID's pick says what each found AI app uses now.
+// An app that runs another ID says "Uses {label}", one whose entry names an ID that is gone (its
+// folder is missing or its removal did not finish) says "Uses a removed ID"; an entry AgentLink did
+// not write is "Set up by hand" and can't be picked. Picking a used app is a move: the Confirm
+// screen shows the replacement line from begin's own statement before the one gesture.
+describe('W8-S5 (F7): New ID offers an AI app that another or a removed ID uses', () => {
+  const OWNER: StatusResult = { kind: 'ok', owner: 'set_up' };
+  const registered = {
+    info: () => Promise.resolve({ kind: 'ok', registered: true } as const),
+    register: () => Promise.resolve({ kind: 'registered' } as const),
+  } as unknown as NonNullable<FirstRunPageProps['upgradeApi']>;
+  const USED: AppsListResult = {
+    kind: 'ok',
+    desktopRunning: false,
+    apps: [
+      app('claude-code', 'Claude Code', { state: 'connected', agent: 'work' }),
+      app('cursor', 'Cursor', { state: 'connected', agent: 'ag-test' }),
+      app('codex', 'Codex', { state: 'not_ours' }),
+    ],
+  };
+  const IDS = [
+    { name: 'work', label: 'Work', removing: false },
+    { name: 'side', label: 'Side', removing: false },
+  ];
+
+  it('appTiles: "Uses {label}" for another ID, "Uses a removed ID" for a gone or half-removed one, "Set up by hand" for a foreign entry', () => {
+    const list = USED.kind === 'ok' ? USED.apps : [];
+    const tiles = appTiles(list, undefined, [
+      ...IDS,
+      { name: 'old', label: 'Old', removing: true },
+    ]);
+    expect(tiles.slice(0, 3).map((t) => [t.id, t.uses, t.byHand])).toEqual([
+      ['claude-code', { kind: 'id', label: 'Work' }, false],
+      ['cursor', { kind: 'removed' }, false],
+      ['codex', undefined, true],
+    ]);
+    const half = appTiles(
+      [app('cursor', 'Cursor', { state: 'connected', agent: 'old' })],
+      undefined,
+      [{ name: 'old', label: 'Old', removing: true }],
+    );
+    expect(half[0]?.uses).toEqual({ kind: 'removed' });
+    // Without the IDs read, the app still says it is used, never "Found".
+    expect(appTiles(list)[0]?.uses).toEqual({ kind: 'other' });
+  });
+
+  it('the default pick is a free app, else one whose ID was removed; never one another ID uses', () => {
+    const list = USED.kind === 'ok' ? USED.apps : [];
+    expect(defaultChoice(appTiles(list, undefined, IDS))).toBe('cursor');
+    expect(
+      defaultChoice(appTiles([...list, app('claude-desktop', 'Claude Desktop')], undefined, IDS)),
+    ).toBe('claude-desktop');
+  });
+
+  it('the default pick skips a free app that is open now while a free one is not', () => {
+    const open = app('claude-desktop', 'Claude Desktop', { quitFirst: true });
+    const closed = app('codex', 'Codex');
+    expect(defaultChoice(appTiles([open, closed], undefined, IDS))).toBe('codex');
+    expect(defaultChoice(appTiles([open], undefined, IDS))).toBe('claude-desktop');
+  });
+
+  it("the tiles say it, the by-hand one is off, and picking a used app shows begin's replacement line", async () => {
+    history.replaceState(null, '', '/start/app?add=agent');
+    const create = fakeCreate({
+      kind: 'done',
+      name: 'side-project',
+      label: 'Side project',
+      app: 'claude-code',
+    });
+    const moving: CreateAgentApi & { begun: (string | undefined)[] } = Object.assign(create, {
+      begin: (label: string, appId?: string) => {
+        create.begun.push(appId);
+        return Promise.resolve({
+          kind: 'ready',
+          nonce: 'M'.repeat(43),
+          statement: {
+            label,
+            agentFingerprint: '1111·2222',
+            ownerFingerprint: '3333·4444',
+            folder: 'side-project',
+            app: {
+              id: 'claude-code',
+              name: 'Claude Code',
+              kind: 'move',
+              oldLabel: 'Work',
+              oldGone: false,
+            },
+          },
+          publicKey: {
+            rpId: 'localhost',
+            challenge: 'AQID',
+            allowCredentials: ['AQID'],
+            prfSalt: 'BwgJ',
+            timeoutMs: 120_000,
+          },
+        } as const);
+      },
+    });
+    const agentsApi = fakeAgents();
+    await mount({
+      api: fakeSetup({ status: OWNER }),
+      upgradeApi: registered,
+      appsApi: fakeApps({ list: USED, agent: 'work' }),
+      createAgentApi: moving,
+      agentsApi,
+      passkeysAvailable: () => true,
+    });
+    await typeName('Side project');
+    await click('Continue');
+    const tiles = [...host.querySelectorAll<HTMLButtonElement>('.st-tile')];
+    expect(tiles[0]?.textContent).toContain('Uses Work');
+    expect(tiles[0]?.textContent).not.toContain(PICK_STEP.found);
+    expect(tiles[1]?.textContent).toContain('Uses a removed ID');
+    expect(tiles[2]?.textContent).toContain('Set up by hand');
+    expect(tiles[2]?.disabled).toBe(true);
+    await click(/^Claude Code CLIUses Work/);
+    await click(PICK_STEP.next('Claude Code'));
+    expect(text()).toContain('Claude Code will use Side project instead of Work');
+    await click(CONNECT_STEP.connect('Touch ID'));
+    // One begin: the plan shown is the plan the gesture approves.
+    expect(create.begun).toEqual(['claude-code']);
   });
 });

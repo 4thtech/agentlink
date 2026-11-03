@@ -9,6 +9,8 @@
 // server. The proof goes only to this same-origin server; it is never logged or kept, and the passkey
 // PRF output is wiped once encoded.
 
+import { knownFailureReason, type FailureReasonCode } from '../../api/failure-reasons.js';
+
 export type PresenceProof =
   | { readonly kind: 'code'; readonly code: string }
   | { readonly kind: 'passkey'; readonly body: Uint8Array };
@@ -22,7 +24,7 @@ export type OwnerResult =
   | { readonly kind: 'not_applied' }
   | { readonly kind: 'busy' }
   | { readonly kind: 'session' }
-  | { readonly kind: 'failed' };
+  | { readonly kind: 'failed'; readonly reason?: FailureReasonCode };
 
 /** The stored localhost passkey, when there is one this browser can use. */
 export interface PasskeyInfo {
@@ -67,15 +69,16 @@ function checkPath(path: string): void {
   }
 }
 
-async function statusOf(res: Response): Promise<unknown> {
+async function answerOf(
+  res: Response,
+): Promise<{ readonly status: unknown; readonly reason: FailureReasonCode | undefined }> {
   try {
     const body: unknown = await res.json();
-    return typeof body === 'object' && body !== null
-      ? ((body as { status?: unknown; error?: unknown }).status ??
-          (body as { error?: unknown }).error)
-      : undefined;
+    if (typeof body !== 'object' || body === null) return { status: undefined, reason: undefined };
+    const b = body as { status?: unknown; error?: unknown; reason?: unknown };
+    return { status: b.status ?? b.error, reason: knownFailureReason(b.reason) };
   } catch {
-    return undefined;
+    return { status: undefined, reason: undefined };
   }
 }
 
@@ -150,7 +153,7 @@ export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient
       } finally {
         body.fill(0);
       }
-      const status = await statusOf(res);
+      const { status, reason } = await answerOf(res);
       if (res.status === 200 && status === 'done') return { kind: 'done' };
       if (res.status === 401) return { kind: 'session' };
       if (res.status === 403 && status === 'presence_rejected') return { kind: 'rejected' };
@@ -163,7 +166,10 @@ export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient
       if (res.status === 409 && status === 'busy') return { kind: 'busy' };
       if (res.status === 409 && status === 'not_applied') return { kind: 'not_applied' };
       if (res.status === 409) return { kind: 'refused' };
-      return { kind: 'failed' };
+      // R2: a failed answer's fixed reason (never its text) gives the page specific words.
+      return reason !== undefined && status === 'failed'
+        ? { kind: 'failed', reason }
+        : { kind: 'failed' };
     },
   };
 }
