@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.12] - 2026-11-03
+
+### Fixed
+
+- After a rename, invites and messages to the ID's new keys are picked up within 30 seconds instead of up to 5 minutes (NEW-INVITE-STUCK, S1): the AI app's live inbox notices the key change and reopens on the new keys.
+- "Couldn't rename it" now says why when AgentLink knows, and a rename that collided with another change of the same ID asks the person to try again (F23, S1).
+
 ## [0.4.11] - 2026-11-03
 
 ### Added
@@ -942,7 +949,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.11...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.12...HEAD
+[0.4.12]: https://github.com/4thtech/agentlink/compare/v0.4.11...v0.4.12
 [0.4.11]: https://github.com/4thtech/agentlink/compare/v0.4.10...v0.4.11
 [0.4.10]: https://github.com/4thtech/agentlink/compare/v0.4.9...v0.4.10
 [0.4.9]: https://github.com/4thtech/agentlink/compare/v0.4.8...v0.4.9
