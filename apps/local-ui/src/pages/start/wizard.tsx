@@ -100,6 +100,10 @@ export interface AppTile {
   readonly id: string;
   readonly name: string;
   readonly found: boolean;
+  /** The card's label (F5: the Claude Code card reads "Claude Code CLI"); `name` stays the app's name. */
+  readonly label: string;
+  /** F6: the app is open right now (the detector knows it for Claude Desktop only). */
+  readonly open: boolean;
   /** Already runs the open agent (Connect another AI app): shown, not picked again. */
   readonly connected: boolean;
 }
@@ -112,17 +116,29 @@ export const KNOWN_APPS: readonly { readonly id: string; readonly name: string }
   { id: 'codex', name: 'Codex' },
 ];
 
+/** F5 (owner decision): the card label where it differs from the app's name. */
+const CARD_LABELS: Readonly<Record<string, string>> = { 'claude-code': 'Claude Code CLI' };
+
 /** The tiles: every found app first (in the look's order), then the known apps not found yet. */
+
 export function appTiles(found: readonly DetectedApp[] | undefined, agent?: string): AppTile[] {
   const tiles: AppTile[] = (found ?? []).map((a) => ({
     id: a.id,
     name: a.name,
+    label: CARD_LABELS[a.id] ?? a.name,
     found: true,
+    open: a.quitFirst,
     connected: agent !== undefined && a.state === 'connected' && a.agent === agent,
   }));
   for (const known of KNOWN_APPS) {
     if (!tiles.some((t) => t.id === known.id))
-      tiles.push({ ...known, found: false, connected: false });
+      tiles.push({
+        ...known,
+        label: CARD_LABELS[known.id] ?? known.name,
+        found: false,
+        open: false,
+        connected: false,
+      });
   }
   return tiles;
 }
@@ -185,7 +201,7 @@ export function PickStep({
               <span className="st-tile-top">
                 <TerminalGlyph />
               </span>
-              <span className="st-tile-name">{t.name}</span>
+              <span className="st-tile-name">{CARD_LABELS[t.id] ?? t.name}</span>
               <Skeleton loading label={P.loading} lines={1} />
             </div>
           ))}
@@ -212,13 +228,14 @@ export function PickStep({
                     </span>
                   ) : null}
                 </span>
-                <span className="st-tile-name">{t.name}</span>
+                <span className="st-tile-name">{t.label}</span>
                 {t.connected ? (
                   <span className="st-tile-state is-found">{P.connected}</span>
                 ) : t.found ? (
                   <span className="st-tile-state is-found">
                     <span className="st-dot" aria-hidden="true" />
                     {mac ? P.found : P.foundElsewhere}
+                    {t.open ? P.openNow : ''}
                   </span>
                 ) : (
                   <span className="st-tile-state">{P.notFound}</span>

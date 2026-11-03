@@ -91,6 +91,9 @@ export function Fleet({
 
   return (
     <div className="ag-fleet">
+      <p className="al-text-body-sm al-muted" data-harness-hint>
+        {S.harnessHint}
+      </p>
       <div className="ag-filters">
         <span className="ag-field ag-field-grow">
           <label htmlFor={`${id}-q`} className="al-text-label al-muted">

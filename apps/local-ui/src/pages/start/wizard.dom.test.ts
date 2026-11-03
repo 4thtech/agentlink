@@ -15,6 +15,7 @@ import type { AppsApi, AppsListResult, ApplyResult, DetectedApp } from '../first
 import { FirstRunPage, type FirstRunPageProps } from '../first-run/index.js';
 import { encodeRegistration } from '../first-run/passkey.js';
 import type { FinishResult, SetupApi, StatusResult } from '../first-run/setup-api.js';
+import { appTiles } from './wizard.js';
 import { rememberWizard, resetAutoShown, resetWizard, wasAutoShown } from './store.js';
 import { RECOVERY_KIT_LATER_KEY } from '../../states/index.js';
 import {
@@ -310,7 +311,7 @@ describe('W4-WIZARD step 1: pick your AI app (A1)', () => {
     expect(text()).toContain(PICK_STEP.eyebrow);
     const tiles = [...host.querySelectorAll<HTMLButtonElement>('.st-tile')];
     expect(tiles.map((t) => t.querySelector('.st-tile-name')?.textContent)).toEqual([
-      'Claude Code',
+      'Claude Code CLI',
       'Cursor',
       'Claude Desktop',
       'Codex',
@@ -319,6 +320,31 @@ describe('W4-WIZARD step 1: pick your AI app (A1)', () => {
     expect(tiles[2]?.textContent).toContain(PICK_STEP.notFound);
     expect(tiles[0]?.getAttribute('aria-pressed')).toBe('true');
     expect(button(PICK_STEP.next('Claude Code'))).toBeDefined();
+  });
+
+  it('F5/F6: the Claude Code card reads "Claude Code CLI"; a found app that is open says so', () => {
+    const desk = app('claude-desktop', 'Claude Desktop', { quitFirst: true });
+    const tiles = appTiles([CLAUDE_CODE, desk, CURSOR]);
+    expect(tiles.map((t) => [t.label, t.name, t.open])).toEqual([
+      ['Claude Code CLI', 'Claude Code', false],
+      ['Claude Desktop', 'Claude Desktop', true],
+      ['Cursor', 'Cursor', false],
+      ['Codex', 'Codex', false],
+    ]);
+    expect(appTiles(undefined)[0]?.label).toBe('Claude Code CLI');
+  });
+
+  it('F6: the found line of an open app adds "Open now"', async () => {
+    const list: AppsListResult = {
+      kind: 'ok',
+      desktopRunning: true,
+      apps: [CLAUDE_CODE, app('claude-desktop', 'Claude Desktop', { quitFirst: true })],
+    };
+    await mount({ appsApi: fakeApps({ list }) });
+    const tiles = [...host.querySelectorAll<HTMLButtonElement>('.st-tile')];
+    expect(tiles[0]?.textContent).toContain('Claude Code CLI');
+    expect(tiles[0]?.textContent).not.toContain('Open now');
+    expect(tiles[1]?.textContent).toContain(`${PICK_STEP.found} · Open now`);
   });
 
   it('picking another tile changes the one primary button; nothing is sent', async () => {

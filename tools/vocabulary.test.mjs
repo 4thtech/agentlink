@@ -64,9 +64,9 @@ const ALLOWED = [
   },
   {
     page: 'help/glossary.md',
-    terms: ['MCP', 'nostr/relay'],
+    terms: ['MCP', 'nostr/relay', 'harness/envelope'],
     reason:
-      'the glossary defines "MCP" (how AI apps plug in tools) and "Relay" (an open message server) in plain words, so it has to name them',
+      'the glossary defines "MCP" (how AI apps plug in tools) and "Relay" (an open message server) in plain words, so it has to name them; the "AI app" row says developers call them harnesses (owner decision 2 Nov 2026, 11 §5.1 exception)',
   },
   {
     page: 'get-started/gemini-cli.md',

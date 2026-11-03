@@ -290,7 +290,7 @@ describe('W4-WIZARD (was U3-g Welcome and pick): step 1', () => {
     await mount(fakeSetup(), fakeApps());
     await settle();
     const names = [...host.querySelectorAll('.st-tile-name')].map((n) => n.textContent);
-    expect(names).toEqual(['Claude Code', 'Claude Desktop', 'Codex', 'Cursor']);
+    expect(names).toEqual(['Claude Code CLI', 'Claude Desktop', 'Codex', 'Cursor']);
     expect(text().match(/Found on this Mac/g)).toHaveLength(3);
     expect(button(PICK_STEP.next('Claude Code')).className).toContain('al-btn-primary');
   });

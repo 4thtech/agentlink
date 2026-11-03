@@ -123,8 +123,7 @@ export const SETUP_MESSAGES = {
   presence_required: "Your browser didn't send the passkey. Nothing changed. Try again.",
   presence_rejected: "That passkey couldn't be used here. Nothing changed. Try again.",
   invalid: 'Something went wrong on this page. Reload it and try again.',
-  unavailable:
-    "Setup can't run from this page right now. Ask your AI to open AgentLink again, or run `agentlink owner init` in your own terminal.",
+  unavailable: "Setup can't run from this page right now. Close this tab and run AgentLink again.",
   rolled_back: "Setup didn't finish, so nothing was kept. Start again.",
   // M1-UX-FIRSTRUN-V2: the Send folder was refused before the gesture (nothing began).
   folder_not_empty:

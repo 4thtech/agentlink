@@ -49,6 +49,8 @@ export const PICK_STEP = {
   body: 'Pick one. We set it up for you, nothing to copy or paste.',
   found: 'Found on this Mac',
   foundElsewhere: 'Found on this computer',
+  /** F6: appended to the found line when the app is open right now. */
+  openNow: ' · Open now',
   notFound: 'Not found yet',
   connected: 'Connected',
   next: (app: string): string => `Continue with ${app}`,

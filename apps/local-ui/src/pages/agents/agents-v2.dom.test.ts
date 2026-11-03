@@ -421,6 +421,19 @@ describe('Agents, Under the hood: the fleet (A11)', () => {
     expect(plain(host)).toContain('1 working · 1 ready · 2 not running or paused');
   });
 
+  it('labels the AI-app column "AI app (harness)" with the hint', async () => {
+    await mount(true);
+    expect(host.querySelectorAll('thead th')[2]?.textContent).toBe('AI app (harness)');
+    expect(host.querySelector('[data-harness-hint]')?.textContent).toBe(
+      'AI apps: developers call them harnesses, the program that runs your AI and connects it to AgentLink.',
+    );
+  });
+
+  it('keeps "harness" out of the simple list (Under the hood only)', async () => {
+    await mount(false);
+    expect(plain(host)).not.toMatch(/harness/i);
+  });
+
   it('searches, filters by status and by AI app, and sorts by name', async () => {
     await mount(true);
     await type(host.querySelector<HTMLInputElement>('input[type="search"]')!, 'cur');
