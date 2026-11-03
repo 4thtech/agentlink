@@ -87,9 +87,7 @@ describe('the browser opener (L-2, L-4)', () => {
     const failing = seams('win32', {
       execFile: (file, args, options, callback) => {
         calls.push({ file, args: [...args], options: { ...options } });
-        callback(
-          file.endsWith('rundll32.exe') ? Object.assign(new Error('x'), { code: 1 }) : null,
-        );
+        callback(file.endsWith('rundll32.exe') ? Object.assign(new Error('x'), { code: 1 }) : null);
       },
     });
     expect(await browserOpenerWith(failing.seams)(URL_)).toBe(true);

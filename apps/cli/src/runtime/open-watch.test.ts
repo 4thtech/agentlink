@@ -101,12 +101,7 @@ describe('openAndWatch (F40)', () => {
     await tick(40);
     r.enter();
     await tick(40);
-    expect(r.out).toEqual([
-      'OPENED',
-      OPEN_TEXT.notOpened,
-      OPEN_TEXT.retrying,
-      OPEN_TEXT.notOpened,
-    ]);
+    expect(r.out).toEqual(['OPENED', OPEN_TEXT.notOpened, OPEN_TEXT.retrying, OPEN_TEXT.notOpened]);
     r.enter();
     await tick(1);
     expect(r.opened).toBe(3);
