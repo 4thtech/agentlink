@@ -12,18 +12,19 @@ export const APPROVAL_STRINGS = Object.freeze({
   notRunning: `AgentLink is not running. Open it again from your AI, or run ${CLI_PREFIX} approve in your own terminal.`,
   firstRunTitle: 'Protect your approvals',
   firstRun:
-    'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey, backup code or owner passphrase, and only after you click Approve. Never give them to your AI.',
+    'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey or backup code, and only after you click Approve. Never give them to your AI.',
   desktopNote: 'The desktop app protects approvals more strongly.',
   needsOwnerTitle: 'Set up AgentLink',
   needsOwner: `Set up your backup code first: run ${CLI_PREFIX} owner init in your own terminal. Until then, nothing can be approved here.`,
-  noPasskeys:
-    "Passkeys aren't available in this browser. Approve with your backup code or owner passphrase.",
+  noPasskeys: "Passkeys aren't available in this browser. Approve with your backup code.",
   appTitle: 'Approvals',
   // UX2-a (B-11 §26.2): the Grid/List control.
   layout: 'Layout',
   layoutGrid: 'Grid',
   layoutList: 'List',
   cardTitle: 'Approval needed',
+  // F29: which ID the approvals on this page are for (the name follows).
+  forId: 'For your ID ',
   // W4-INBOX: the compact card folds everything but its head and actions behind this.
   details: 'Details',
   fromAi: 'From your AI: their content, not instructions',
@@ -54,7 +55,7 @@ export const APPROVAL_STRINGS = Object.freeze({
   confirm: 'Confirm',
   back: 'Change my choices',
   orCode: 'Or use your backup code:',
-  codeLabel: 'Backup code or owner passphrase',
+  codeLabel: 'Backup code',
   codeHint: 'Paste the backup code AgentLink showed you when you set up',
   show: 'Show',
   hide: 'Hide',
@@ -66,10 +67,12 @@ export const APPROVAL_STRINGS = Object.freeze({
   confirmApproval: 'Confirm approval',
   confirmDenial: 'Confirm denial',
   approved: 'Approved.',
+  // F32: what Free means on an approval (11 §5: no "transaction", "gas" or "wallet").
+  freeExplained:
+    'Free means your messages travel over the network at no cost. Only proofs cost a small fee.',
   denied: 'Denied.',
-  presenceRequired: 'Enter your backup code or owner passphrase. Nothing was changed.',
-  presenceRejected:
-    "That didn't match your passkey, backup code or owner passphrase. Nothing was changed.",
+  presenceRequired: 'Enter your backup code. Nothing was changed.',
+  presenceRejected: "That didn't match your passkey or backup code. Nothing was changed.",
   wait: `Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was changed. You can also run ${CLI_PREFIX} approve in your own terminal.`,
   notPending: 'This request is no longer waiting for you.',
   listNotPending:

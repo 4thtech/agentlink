@@ -823,6 +823,41 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     expect(text()).not.toContain('You already have an ID with this name.');
   });
 
+  it('F44: the name prefill never overwrites a name already typed (a slow read of the IDs)', async () => {
+    const base = fakeAgents();
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const agentsApi = { ...base, list: () => gate.then(() => base.list()) };
+    await mount(asAdd({ agentsApi }));
+    await typeName('Maths class');
+    await act(async () => {
+      release();
+      await gate;
+    });
+    expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe(
+      'Maths class',
+    );
+  });
+
+  it('F44: a name cleared on purpose is not refilled when the IDs are read late', async () => {
+    const base = fakeAgents();
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const agentsApi = { ...base, list: () => gate.then(() => base.list()) };
+    await mount(asAdd({ agentsApi }));
+    await typeName('x');
+    await typeName('');
+    await act(async () => {
+      release();
+      await gate;
+    });
+    expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe('');
+  });
+
   it('IR-W4-WIRE-2X-SEC-1: bidi and invisible format characters never reach the server', async () => {
     const labelCheck = vi.fn(() => Promise.resolve({ kind: 'ok' } as const));
     await mount(asAdd({ api: Object.assign(fakeSetup({ status: OWNER }), { labelCheck }) }));

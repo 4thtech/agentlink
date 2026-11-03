@@ -230,6 +230,37 @@ describe('the Agents page', () => {
   });
 });
 
+describe('F27: Invite someone on each ID card', () => {
+  it('the open ID goes straight to the Invite screen', async () => {
+    await mountPage();
+    await click(button(rowOf('default'), 'Invite someone'));
+    expect(location.pathname + location.search).toBe('/contacts?invite');
+    expect(calls.some((c) => c.url === '/api/ui/agents/switch')).toBe(false);
+  });
+  it('another ID opens first, then goes to the Invite screen', async () => {
+    answers['POST /api/ui/agents/switch'] = {
+      status: 200,
+      body: { status: 'done', generation: 8, current: 'work' },
+    };
+    await mountPage();
+    await click(button(rowOf('work'), 'Invite someone'));
+    const post = calls.find((c) => c.url === '/api/ui/agents/switch')!;
+    expect(JSON.parse(post.body)).toEqual({ name: 'work', generation: 7 });
+    expect(location.pathname + location.search).toBe('/contacts?invite');
+  });
+  it('a refused switch stays on the IDs page', async () => {
+    answers['POST /api/ui/agents/switch'] = { status: 409, body: { status: 'agent_changed' } };
+    await mountPage();
+    await click(button(rowOf('work'), 'Invite someone'));
+    expect(location.pathname).toBe('/agents');
+    expect(plain(host)).toContain('You switched IDs. Nothing was changed.');
+  });
+  it('a removing ID has no Invite someone', async () => {
+    await mountPage();
+    expect(button(rowOf('old'), 'Invite someone')).toBeUndefined();
+  });
+});
+
 describe('Rename', () => {
   it('uses the Touch ID wording, the code, and posts to the label route', async () => {
     answers['POST /api/ui/agents/label'] = { status: 200, body: { status: 'done' } };
