@@ -31,6 +31,8 @@ export const TOOL_TEXT = Object.freeze({
   // W4-PAUSE (D-143 (5); 06 §6 "Paused agents"): fixed text, no slot.
   pausedSummary: 'This AgentLink ID is paused, so nothing was sent or fetched.',
   pausedNextStep: 'This AgentLink ID is paused. The owner can resume it in the AgentLink app.',
+  // F17: which ID this is. Slot: the owner's own verified ID name (never an inbound name).
+  statusIdLead: 'This AgentLink ID is “{label}”.',
   moreContactsWithNews: 'Other contacts have new messages too.',
   // M1-22: open offers (06 §2.1, §6.1). Slots: a count and a name under the 06 §2.1 rule.
   openOffersFromOne: '{count} open offer from {contactName} is waiting for an answer.',

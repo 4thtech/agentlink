@@ -254,7 +254,7 @@ describe('chapter 4: agents', () => {
     await page.getByText('Work is paused').first().waitFor();
 
     // Back to Ana; Resume on Work's card opens Work and asks for Touch ID once.
-    await agentCard(page, 'Ana').getByRole('button', { name: 'Switch', exact: true }).click();
+    await agentCard(page, 'Ana').getByRole('button', { name: 'Open', exact: true }).click();
     await page
       .getByRole('button', { name: /^ID: Ana/ })
       .first()

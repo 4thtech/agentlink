@@ -58,6 +58,11 @@ export interface SelfView {
   readonly agentFingerprint: string;
   /** Short owner fingerprint. */
   readonly ownerFingerprint: string;
+  /**
+   * F17: the ID's display name, only the owner-signed `agent.label` once verified (never a
+   * self-declared or inbound name, I-5). Absent when there is none or it can't be read.
+   */
+  readonly label?: string;
 }
 
 /** Counts by contact (never content) and the requests count (06 §2.1). */
@@ -547,7 +552,15 @@ export function coreToolClient(
       const identity = await client.identity.get();
       if (identity === undefined) return undefined;
       const { card } = identity;
+      let label: string | undefined;
+      try {
+        const reading = await client.ownerActions.loadLabel();
+        if (reading.status === 'verified') label = reading.label;
+      } catch {
+        // No label: status then names the ID by its fingerprint fields only.
+      }
       return {
+        ...(label === undefined ? {} : { label }),
         agentId: identity.agentId,
         agentFingerprint: short(agentFingerprint(decodeHex0x(identity.agentId, { length: 20 }))),
         ownerFingerprint: short(

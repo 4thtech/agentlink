@@ -52,6 +52,8 @@ export const CONTACTS_STRINGS = {
   cancel: 'Cancel',
   presenceIntro: 'Confirm it’s you. Never give your backup code to your AI.',
   usePasskey: 'Confirm with your passkey',
+  /** F24: the same button with the platform's own word (SENSOR: Touch ID, Windows Hello, your passkey). */
+  usePasskeyOn: (sensor: string): string => `Confirm with ${sensor}`,
   useCode: 'Use your backup code instead',
   ownerCode: 'Backup code',
   confirm: 'Confirm',

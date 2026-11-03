@@ -120,7 +120,7 @@ export function AgentCard({
         {S.contactsCount(row.contacts)}
         {tidy ? ` · ${S.noAppNoContacts}` : ''}
       </p>
-      {row.current && a.cardName !== undefined ? (
+      {row.current && a.cardName !== undefined && row.contacts !== 0 ? (
         <CardNameNote
           row={row}
           cardName={a.cardName}

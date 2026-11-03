@@ -259,7 +259,7 @@ export function PresencePrompt({
       ) : (
         <div className="ct-actions">
           <Button variant="primary" icon="approval" onClick={usePasskey} disabled={busy}>
-            {S.usePasskey}
+            {S.usePasskeyOn(sensor)}
           </Button>
           <Button variant="ghost" onClick={() => setUseCode(true)} disabled={busy}>
             {S.useCode}

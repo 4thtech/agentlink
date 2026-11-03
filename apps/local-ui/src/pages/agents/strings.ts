@@ -21,7 +21,7 @@ export const AGENTS_STRINGS = {
   manageAgentsApps: 'Manage IDs & apps',
   notConnectedYet: 'Not connected yet',
   connectFreeApp: (app: string): string => `Connect ${app}`,
-  switch: 'Switch',
+  switch: 'Open',
   rename: 'Rename',
   connect: 'Connect',
   remove: 'Remove',
@@ -68,6 +68,12 @@ export const AGENTS_STRINGS = {
   typeNameDisabled: 'Type the name to enable this',
   removeTouchId: 'Remove with Touch ID',
   quitAny: (label: string): string => `Quit any AI app that uses ${iso(label)} first.`,
+  /** F22: a CLI app (Terminal sessions); no count is read, so no number is claimed. */
+  quitTerminal: (app: string): string =>
+    `${app} sessions in Terminal are still using this ID. Close them, then check again.`,
+  /** F22: a desktop app that keeps running after its window closes. */
+  quitBackground: (app: string): string =>
+    `${app} keeps running in the background after you close its window. Quit it from its menu, then check again.`,
   quitApp: (app: string): string => `Quit ${app} first.`,
   agentFolder: (folder: string): string => `ID folder: ${folder}`,
   checkAgain: 'Check again',

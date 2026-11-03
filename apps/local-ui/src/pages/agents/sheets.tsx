@@ -178,11 +178,32 @@ export function RenameEditor({
 // ------------------------------------------------------------------------------------------ Remove
 
 /** The AI apps that run the agent now (a live session); the row's apps when the read names none. */
-function runningApps(row: AgentRow): { readonly apps: readonly string[]; readonly named: boolean } {
-  const live = (row.appStates ?? [])
-    .filter((a) => a.state === 'working' || a.state === 'ready' || a.state === 'idle')
-    .map((a) => a.name);
-  return live.length > 0 ? { apps: live, named: true } : { apps: row.apps, named: false };
+function runningApps(row: AgentRow): QuitApps {
+  const liveStates = (row.appStates ?? []).filter(
+    (a) => a.state === 'working' || a.state === 'ready' || a.state === 'idle',
+  );
+  const live = liveStates.map((a) => a.name);
+  return live.length > 0
+    ? { apps: live, ids: liveStates.map((a) => a.id), named: true }
+    : { apps: row.apps, ids: [], named: false };
+}
+
+interface QuitApps {
+  readonly apps: readonly string[];
+  /** App ids of the live apps (never shown); empty when the read named none. */
+  readonly ids: readonly string[];
+  readonly named: boolean;
+}
+
+/** F22: what is still running, in words: Terminal sessions (CLI) or a background desktop app. */
+function quitSentence(quit: QuitApps, label: string): string {
+  if (quit.named && quit.apps.length === 1) {
+    const app = quit.apps[0] as string;
+    if (quit.ids[0] === 'claude-code') return S.quitTerminal(app);
+    if (quit.ids[0] === 'opencode') return S.quitBackground(app);
+    return S.quitApp(app);
+  }
+  return S.quitAny(label);
 }
 
 type RemovePhase =
@@ -229,8 +250,9 @@ export function RemoveSheet({
 
   // W6-FLOW-FIXES: the AI apps the person must quit first (fresh read, else the row's apps).
   // `named`: the read names the running apps; the server's `in_use` alone does not.
-  const [quit, setQuit] = useState<{ readonly apps: readonly string[]; readonly named: boolean }>({
+  const [quit, setQuit] = useState<QuitApps>({
     apps: row.apps,
+    ids: [],
     named: false,
   });
   const [checking, setChecking] = useState(false);
@@ -280,7 +302,7 @@ export function RemoveSheet({
           const said = gateMessage(outcome);
           if (said !== undefined) return setError(said);
           if (outcome.kind === 'in_use') {
-            setQuit({ apps: row.apps, named: false });
+            setQuit({ apps: row.apps, ids: [], named: false });
             return setPhase({ kind: 'in_use' });
           }
           if (outcome.kind === 'contacts_unreachable') return setPhase({ kind: 'anyway' });
@@ -390,11 +412,7 @@ export function RemoveSheet({
         {phase.kind === 'in_use' ? (
           <>
             <p className="al-text-body" role="alert">
-              <strong>
-                {quit.named && quit.apps.length === 1
-                  ? S.quitApp(quit.apps[0] as string)
-                  : S.quitAny(row.label)}
-              </strong>
+              <strong>{quitSentence(quit, row.label)}</strong>
             </p>
             {quit.apps.length > 0 && !(quit.named && quit.apps.length === 1) ? (
               <ul className="ag-goes">
