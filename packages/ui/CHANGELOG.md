@@ -1,5 +1,11 @@
 # @4thtech-io/ui
 
+## 0.4.13
+
+### Patch Changes
+
+- 7a0258f: A connected AI app with no recent call keeps the green live dot instead of the grey ring.
+
 ## 0.4.12
 
 No changes in this release.

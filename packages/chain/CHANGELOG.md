@@ -1,5 +1,12 @@
 # @4thtech-io/chain
 
+## 0.4.13
+
+### Patch Changes
+
+- @4thtech-io/crypto@0.4.13
+  - @4thtech-io/types@0.4.13
+
 ## 0.4.12
 
 ### Patch Changes

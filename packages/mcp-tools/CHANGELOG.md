@@ -1,5 +1,16 @@
 # @4thtech-io/mcp-tools
 
+## 0.4.13
+
+### Patch Changes
+
+- 7a0258f: Claude Code run inside the Claude desktop app is shown as Claude Code (not "Another AI app"). `agentlink doctor` without an ID lists every ID by name with its AI apps and one OK or Problem line, and no longer tells you to type `owner add-agent`; it points to the AgentLink app instead.
+- @4thtech-io/chain@0.4.13
+  - @4thtech-io/core@0.4.13
+  - @4thtech-io/crypto@0.4.13
+  - @4thtech-io/log@0.4.13
+  - @4thtech-io/types@0.4.13
+
 ## 0.4.12
 
 ### Patch Changes
