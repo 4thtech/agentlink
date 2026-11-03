@@ -8,7 +8,27 @@ A Mac, a Windows 10 or 11 computer or a Linux computer, and an AI app (Claude Co
 
 ## How do I install and open it?
 
-Open a terminal yourself and paste one line. Mac or Linux (Terminal): `curl -fsSL https://agentlink.4thtech.io/install.sh | sh`. Windows (PowerShell): `irm https://agentlink.4thtech.io/install.ps1 | iex` (Command Prompt: `powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"`). It downloads the official Node.js from nodejs.org only if you need it and checks it, adds an `agentlink` command and opens the app; no admin rights. Run it again to update; add `--uninstall` (Mac, Linux) to remove it. Next time, type `agentlink`.
+Open a terminal yourself and paste one line.
+
+**Mac or Linux (Terminal):**
+
+```bash
+curl -fsSL https://agentlink.4thtech.io/install.sh | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://agentlink.4thtech.io/install.ps1 | iex
+```
+
+**Windows (Command Prompt):**
+
+```bat
+powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"
+```
+
+It downloads the official Node.js from nodejs.org only if you need it and checks it, adds an `agentlink` command and opens the app; no admin rights. Run it again to update; add `--uninstall` (Mac, Linux) to remove it. Next time, type `agentlink`.
 
 If you already have Node.js 22.14 or newer, you can instead run `npx -y @4thtech-io/agentlink@latest`. `@latest` makes sure you run the newest version. Your browser opens the app. Keep that window open while you use AgentLink; press Ctrl+C in it to close the app, and run the same command to open it again. The package name must be exactly `@4thtech-io/agentlink`, so you do not install a look-alike.
 

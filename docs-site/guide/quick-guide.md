@@ -22,7 +22,11 @@ Paste one line into a terminal you opened yourself and press Return (Enter on Wi
   irm https://agentlink.4thtech.io/install.ps1 | iex
   ```
 
-  In Command Prompt instead: `powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"`
+  **In Command Prompt instead, paste:**
+
+  ```bat
+  powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"
+  ```
 
 - **Linux:** in a terminal, the same line as on a Mac.
 
