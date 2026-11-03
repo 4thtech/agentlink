@@ -17,7 +17,9 @@ describe('idle live dot (L1)', () => {
     const dot =
       /\.al-ldot\.is-working,\s*\.al-ldot\.is-ready,\s*\.al-ldot\.is-idle\s*\{([^}]*)\}/.exec(css);
     expect(dot?.[1]).toMatch(/background:\s*var\(--al-color-status-success-icon\)/);
-    expect(css).toMatch(/\.al-am-app-word\.is-ready,\s*\.al-am-app-word\.is-idle\s*\{/);
+    expect(css).toMatch(
+      /\.al-am-app-word\.is-working,\s*\.al-am-app-word\.is-ready,\s*\.al-am-app-word\.is-idle\s*\{/,
+    );
   });
 
   it('keeps the ring for off', () => {
