@@ -225,8 +225,17 @@ describe('startUiWelcome (U3-g-b)', () => {
   it.each([
     ['an agent exists', { entries: [{ name: 'a', label: 'a', available: true, removing: false }] }],
     [
-      'an agent is being removed',
-      { entries: [{ name: 'a', label: 'a', available: true, removing: true }] },
+      'an agent is usable next to one being removed',
+      {
+        entries: [
+          { name: 'a', label: 'a', available: true, removing: true },
+          { name: 'b', label: 'b', available: true, removing: false },
+        ],
+      },
+    ],
+    [
+      'an agent folder cannot be read',
+      { entries: [{ name: 'a', label: 'a', available: false, removing: false }] },
     ],
     ['no usable keychain', { keychain: false }],
     ['no app in this build', { assets: { files: new Map() } }],
@@ -234,6 +243,19 @@ describe('startUiWelcome (U3-g-b)', () => {
     const w = welcome(over);
     expect(await startUiWelcome(w.deps)).toBeUndefined();
     expect(w.started).toEqual([]);
+  });
+
+  // R1: only half-removed IDs left: the host must still start (it could not before).
+  it('R1: starts when every folder is only half removed', async () => {
+    const w = welcome({
+      entries: [
+        { name: 'a', label: 'a', available: true, removing: true },
+        { name: 'b', label: 'b', available: false, removing: true },
+      ],
+    });
+    const server = await startUiWelcome(w.deps);
+    expect(server).toBeDefined();
+    expect(w.started).toHaveLength(1);
   });
 
   // U3-g-c: Welcome's "Pick your AI app" lists the apps before the first agent exists.

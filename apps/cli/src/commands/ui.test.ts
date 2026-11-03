@@ -219,26 +219,33 @@ describe('agentlink ui in the owner terminal (M1-11b-9)', () => {
     expect(UI_WAIT_MS).toBe(30 * 60_000);
   });
 
-  it.each(['none', 'throws'] as const)(
-    'an agent that is not set up or a server that cannot start (%s): the fixed init line, exit 1',
-    async (start) => {
-      const p = probe(TTY);
-      const { deps, calls } = fakeDeps({ start });
-      await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
-      expect(calls).toMatchObject({ opened: 0 });
-      expect(p.err).toEqual([UI_TEXT.notReady(PREFIX)]);
-      expectNoLink(p);
-    },
-  );
+  it('an agent that is not set up (no diagnosis): the fixed init line, exit 1', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ start: 'none' });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+    expect(calls).toMatchObject({ opened: 0 });
+    expect(p.err).toEqual([UI_TEXT.notReady(PREFIX)]);
+    expectNoLink(p);
+  });
+
+  it('a server that cannot start says so without asking for init (R1)', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ start: 'throws' });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+    expect(calls).toMatchObject({ opened: 0 });
+    expect(p.err).toEqual([UI_TEXT.startFailure.failed(PREFIX)]);
+    expectNoLink(p);
+  });
 
   it.each([false, 'throws'] as const)(
-    'no browser (%s): closes at once, says so, never shows the link',
+    'no browser (%s): keeps serving, prints no link (R1)',
     async (opens) => {
       const p = probe(TTY);
-      const { deps, calls } = fakeDeps({ opens });
-      await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
+      const { deps, calls } = fakeDeps({ opens, stop: 'never', waitMs: 30 });
+      await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
       expect(calls).toMatchObject({ opened: 1, closed: 1 });
-      expect(p.err).toEqual([UI_TEXT.noBrowser]);
+      expect(p.err).toEqual([]);
+      expect(p.out[0]).toBe(UI_TEXT.noBrowser);
       expectNoLink(p);
     },
   );
