@@ -587,7 +587,11 @@ describe('doctor (07 §9.4)', () => {
   });
 
   it('F8: an owner with no IDs says "no IDs yet" and points to `agentlink`; no owner keeps the set-up line', async () => {
-    const needs = { status: 'needs_setup', reason: 'no_agent', message: 'Not set up here.' } as const;
+    const needs = {
+      status: 'needs_setup',
+      reason: 'no_agent',
+      message: 'Not set up here.',
+    } as const;
     const doctorWith = async (ownerOnMachine: (() => Promise<boolean>) | undefined) => {
       const out: string[] = [];
       const deps = createDeps({ open: () => Promise.resolve(needs), home: '/nonexistent-home' });
