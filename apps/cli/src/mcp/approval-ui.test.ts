@@ -73,7 +73,7 @@ function fakeServer(origin = 'http://localhost:47321'): FakeServer {
     notified,
     closed,
     address: () => ({ host: 'localhost', port, addresses: ['127.0.0.1'] }),
-    activity: { lastAt: () => 0, openStreams: () => 0, linksUsed: () => 0 },
+    activity: { lastAt: () => Date.now(), openStreams: () => 0, linksUsed: () => 0 },
     approvalUrl: (id) => `${origin}/approve/${id}`,
     open: (id) => {
       opened.push(id);
@@ -83,7 +83,6 @@ function fakeServer(origin = 'http://localhost:47321'): FakeServer {
     openFirstRun: () => Promise.resolve(true),
     openHome: () => Promise.resolve(true),
     openJoin: () => Promise.resolve(true),
-    activity: { lastAt: () => Date.now(), openStreams: () => 0 },
     notifyNewApproval: (id) => {
       notified.push(id);
       return Promise.resolve(`${origin}/approve/${id}`);
