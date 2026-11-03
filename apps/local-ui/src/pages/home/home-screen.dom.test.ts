@@ -752,3 +752,60 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
     expect(q('[data-thread-id]')?.textContent).toContain('Tali · Claude Code');
   });
 });
+
+// W8-S4 (F16, F21; 04 §2.5 "Finishing a removal"; 11 §5.8): an ID whose removal stopped part-way is
+// never a chip on Home; Home says "{label} wasn't fully removed" with Finish removing, which opens
+// the finish sheet right here (no typed name, presence still asked).
+describe('W8-S4 (F21): a half-removed ID on Home', () => {
+  const idRow = (name: string, label: string, over: Record<string, unknown> = {}) => ({
+    name,
+    label,
+    current: false,
+    available: true,
+    removing: false,
+    contacts: 0,
+    running: false,
+    state: 'offline',
+    apps: [] as unknown[],
+    ...over,
+  });
+  const agents = (rows: unknown[]): Answers => ({
+    '/api/ui/agents': ok({
+      switchable: true,
+      generation: 1,
+      current: 'tali',
+      label: 'Tali',
+      agents: rows,
+    }),
+    '/api/ui/apps': ok({ desktopRunning: false, apps: [] }),
+  });
+  const TALI = idRow('tali', 'Tali', { current: true });
+  const WORK = idRow('tali-work', 'Tali work');
+  const OLD = idRow('old', 'Old test', { removing: true });
+  const unisolated = (el: Element | null): string => (el?.textContent ?? '').replace(/[⁨⁩]/g, '');
+
+  it('is not a chip; Home names it with Finish removing', async () => {
+    await render(base(agents([TALI, WORK, OLD])));
+    const chips = all('[data-id-chips] button').map((c) => c.textContent);
+    expect(chips.some((c) => c?.includes('Old test'))).toBe(false);
+    expect(chips).toHaveLength(3);
+    const note = q('[data-unfinished="old"]');
+    expect(unisolated(note)).toContain("Old test wasn't fully removed");
+    expect(byText('button', 'Finish removing')).toBeTruthy();
+  });
+
+  it('with one usable ID left there are no chips, and the note still shows', async () => {
+    await render(base(agents([TALI, OLD])));
+    expect(q('[data-id-chips]')).toBeNull();
+    expect(unisolated(q('[data-unfinished="old"]'))).toContain("Old test wasn't fully removed");
+  });
+
+  it('Finish removing opens the finish sheet on Home, with no name to type', async () => {
+    await render(base(agents([TALI, OLD])));
+    await click(byText('button', 'Finish removing'));
+    const sheet = q('[role="dialog"]');
+    expect(unisolated(sheet)).toContain('Finish removing Old test');
+    expect(sheet?.querySelector('input[type="text"]')).toBeNull();
+    expect(byText('button', 'Finish with Touch ID')).toBeTruthy();
+  });
+});

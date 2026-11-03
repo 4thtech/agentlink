@@ -15,7 +15,7 @@ import type { AppsApi, AppsListResult, ApplyResult, DetectedApp } from '../first
 import { FirstRunPage, type FirstRunPageProps } from '../first-run/index.js';
 import { encodeRegistration } from '../first-run/passkey.js';
 import type { FinishResult, SetupApi, StatusResult } from '../first-run/setup-api.js';
-import { appTiles } from './wizard.js';
+import { appTiles, defaultChoice } from './wizard.js';
 import { rememberWizard, resetAutoShown, resetWizard, wasAutoShown } from './store.js';
 import { RECOVERY_KIT_LATER_KEY } from '../../states/index.js';
 import {
@@ -903,5 +903,122 @@ describe('W4-WIZARD: accessibility, motion and words', () => {
       INVITE_STEP.body,
     ];
     for (const w of words) expect(lintVocabulary(w)).toEqual([]);
+  });
+});
+
+// W8-S5 (F7; 04 §2.8; 11 §5.8 "AI app states"): New ID's pick says what each found AI app uses now.
+// An app that runs another ID says "Uses {label}", one whose entry names an ID that is gone (its
+// folder is missing or its removal did not finish) says "Uses a removed ID"; an entry AgentLink did
+// not write is "Set up by hand" and can't be picked. Picking a used app is a move: the Confirm
+// screen shows the replacement line from begin's own statement before the one gesture.
+describe('W8-S5 (F7): New ID offers an AI app that another or a removed ID uses', () => {
+  const OWNER: StatusResult = { kind: 'ok', owner: 'set_up' };
+  const registered = {
+    info: () => Promise.resolve({ kind: 'ok', registered: true } as const),
+    register: () => Promise.resolve({ kind: 'registered' } as const),
+  } as unknown as NonNullable<FirstRunPageProps['upgradeApi']>;
+  const USED: AppsListResult = {
+    kind: 'ok',
+    desktopRunning: false,
+    apps: [
+      app('claude-code', 'Claude Code', { state: 'connected', agent: 'work' }),
+      app('cursor', 'Cursor', { state: 'connected', agent: 'ag-test' }),
+      app('codex', 'Codex', { state: 'not_ours' }),
+    ],
+  };
+  const IDS = [
+    { name: 'work', label: 'Work', removing: false },
+    { name: 'side', label: 'Side', removing: false },
+  ];
+
+  it('appTiles: "Uses {label}" for another ID, "Uses a removed ID" for a gone or half-removed one, "Set up by hand" for a foreign entry', () => {
+    const list = USED.kind === 'ok' ? USED.apps : [];
+    const tiles = appTiles(list, undefined, [
+      ...IDS,
+      { name: 'old', label: 'Old', removing: true },
+    ]);
+    expect(tiles.slice(0, 3).map((t) => [t.id, t.uses, t.byHand])).toEqual([
+      ['claude-code', { kind: 'id', label: 'Work' }, false],
+      ['cursor', { kind: 'removed' }, false],
+      ['codex', undefined, true],
+    ]);
+    const half = appTiles(
+      [app('cursor', 'Cursor', { state: 'connected', agent: 'old' })],
+      undefined,
+      [{ name: 'old', label: 'Old', removing: true }],
+    );
+    expect(half[0]?.uses).toEqual({ kind: 'removed' });
+    // Without the IDs read, the app still says it is used, never "Found".
+    expect(appTiles(list)[0]?.uses).toEqual({ kind: 'other' });
+  });
+
+  it('the default pick is a free app, else one whose ID was removed; never one another ID uses', () => {
+    const list = USED.kind === 'ok' ? USED.apps : [];
+    expect(defaultChoice(appTiles(list, undefined, IDS))).toBe('cursor');
+    expect(
+      defaultChoice(appTiles([...list, app('claude-desktop', 'Claude Desktop')], undefined, IDS)),
+    ).toBe('claude-desktop');
+  });
+
+  it("the tiles say it, the by-hand one is off, and picking a used app shows begin's replacement line", async () => {
+    history.replaceState(null, '', '/start/app?add=agent');
+    const create = fakeCreate({
+      kind: 'done',
+      name: 'side-project',
+      label: 'Side project',
+      app: 'claude-code',
+    });
+    const moving: CreateAgentApi & { begun: (string | undefined)[] } = Object.assign(create, {
+      begin: (label: string, appId?: string) => {
+        create.begun.push(appId);
+        return Promise.resolve({
+          kind: 'ready',
+          nonce: 'M'.repeat(43),
+          statement: {
+            label,
+            agentFingerprint: '1111·2222',
+            ownerFingerprint: '3333·4444',
+            folder: 'side-project',
+            app: {
+              id: 'claude-code',
+              name: 'Claude Code',
+              kind: 'move',
+              oldLabel: 'Work',
+              oldGone: false,
+            },
+          },
+          publicKey: {
+            rpId: 'localhost',
+            challenge: 'AQID',
+            allowCredentials: ['AQID'],
+            prfSalt: 'BwgJ',
+            timeoutMs: 120_000,
+          },
+        } as const);
+      },
+    });
+    const agentsApi = fakeAgents();
+    await mount({
+      api: fakeSetup({ status: OWNER }),
+      upgradeApi: registered,
+      appsApi: fakeApps({ list: USED, agent: 'work' }),
+      createAgentApi: moving,
+      agentsApi,
+      passkeysAvailable: () => true,
+    });
+    await typeName('Side project');
+    await click('Continue');
+    const tiles = [...host.querySelectorAll<HTMLButtonElement>('.st-tile')];
+    expect(tiles[0]?.textContent).toContain('Uses Work');
+    expect(tiles[0]?.textContent).not.toContain(PICK_STEP.found);
+    expect(tiles[1]?.textContent).toContain('Uses a removed ID');
+    expect(tiles[2]?.textContent).toContain('Set up by hand');
+    expect(tiles[2]?.disabled).toBe(true);
+    await click(/^Claude Code CLIUses Work/);
+    await click(PICK_STEP.next('Claude Code'));
+    expect(text()).toContain('Claude Code will use Side project instead of Work');
+    await click(CONNECT_STEP.connect('Touch ID'));
+    // One begin: the plan shown is the plan the gesture approves.
+    expect(create.begun).toEqual(['claude-code']);
   });
 });

@@ -488,3 +488,34 @@ describe('Add', () => {
 
 // W4-SHELL-V2: the top-bar agent chip and its live dropdown are tested with the shell
 // (layout/w4-shell-v2.dom.test.ts).
+
+// W8-S4 (F16, F20, F21; 04 §2.5 "Finishing a removal"; 11 §5.8 "Unfinished removal"): an ID whose
+// removal stopped part-way is finished without typing its name again (it is already retired for
+// good), with export offered first and presence still asked. An ID no AI app uses says so once.
+describe('W8-S4: finish removing, and one "Not used" line', () => {
+  const unisolated = (el: Element): string => (el.textContent ?? '').replace(/[⁨⁩]/g, '');
+
+  it('F20: an ID with no AI app says "Not used by any AI app" once', async () => {
+    await mountPage();
+    const text = rowOf('second').textContent ?? '';
+    expect(text.split('Not used by any AI app').length - 1).toBe(1);
+  });
+
+  it('Try again opens the finish sheet: no typed name, export first, then presence; sends no typedLabel', async () => {
+    answers['POST /api/ui/agents/remove'] = { status: 200, body: { status: 'done' } };
+    await mountPage();
+    await click(button(rowOf('old'), 'Try again'));
+    const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(unisolated(sheet)).toContain('Finish removing Old test');
+    expect(sheet.querySelector('input[type="text"]')).toBeNull();
+    expect(button(sheet, 'Export history first')).toBeDefined();
+    await click(button(sheet, 'Finish with Touch ID'));
+    await type(host.querySelector<HTMLInputElement>('input[name="owner-code"]')!, '123456');
+    await click(button(host, 'Confirm'));
+    const post = calls.find((c) => c.url === '/api/ui/agents/remove')!;
+    const sent = JSON.parse(
+      atob(post.headers.get('X-AgentLink-Input')!.replace(/-/g, '+').replace(/_/g, '/')),
+    ) as unknown;
+    expect(sent).toEqual({ name: 'old' });
+  });
+});

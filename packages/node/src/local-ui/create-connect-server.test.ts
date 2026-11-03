@@ -874,6 +874,40 @@ describe('W4-ONE-TOUCH New agent: one gesture creates the agent and connects its
     expect(h.w.ownKeys).toEqual([]);
   });
 
+  // W8-S5 (F7; 04 §2.8 Begin; 11 §5.8): a move names the ID the AI app leaves, resolved here from
+  // the directory (never from the page): its label, or `oldGone` when its folder is missing or its
+  // removal did not finish. They are in the statement, so the challenge binds them.
+  it('W8-S5: a move statement carries oldLabel and oldGone, resolved from the directory', async () => {
+    const { h, s } = await owned();
+    const open = [...h.w.entries.keys()][0] as string;
+    h.w.desk.entry = { agent: open };
+    const first = json(
+      await agentBegin(h, s, { label: 'Work', app: 'claude-code' }),
+    ) as unknown as Begun;
+    expect(first.statement['app']).toMatchObject({
+      kind: 'move',
+      oldAgent: open,
+      oldLabel: 'Home base',
+      oldGone: false,
+    });
+    h.w.desk.entry = { agent: 'ag-test' };
+    const gone = json(
+      await agentBegin(h, s, { label: 'Work', app: 'claude-code' }),
+    ) as unknown as Begun;
+    expect(gone.statement['app']).toMatchObject({
+      kind: 'move',
+      oldAgent: 'ag-test',
+      oldLabel: null,
+      oldGone: true,
+    });
+    h.w.entries.set('half', { name: 'half', label: 'Half', available: true, removing: true });
+    h.w.desk.entry = { agent: 'half' };
+    const half = json(
+      await agentBegin(h, s, { label: 'Work', app: 'claude-code' }),
+    ) as unknown as Begun;
+    expect(half.statement['app']).toMatchObject({ oldLabel: 'Half', oldGone: true });
+  });
+
   it('contract: the real answers have exactly the shape of the shared samples (ui-contract/agents)', async () => {
     const { h, s, auth } = await owned();
     const sample = AGENTS_OWNER.add;
