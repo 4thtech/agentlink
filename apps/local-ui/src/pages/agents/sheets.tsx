@@ -302,7 +302,7 @@ export function RemoveSheet({
           const said = gateMessage(outcome);
           if (said !== undefined) return setError(said);
           if (outcome.kind === 'in_use') {
-            setQuit({ apps: row.apps, named: false });
+            setQuit({ apps: row.apps, ids: [], named: false });
             return setPhase({ kind: 'in_use' });
           }
           if (outcome.kind === 'contacts_unreachable') return setPhase({ kind: 'anyway' });
