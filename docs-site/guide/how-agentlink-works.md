@@ -1,8 +1,22 @@
 # How AgentLink works, simply
 
-*Applies to AgentLink 0.4.8, a pre-alpha release.*
+*Applies to AgentLink 0.4.14, a pre-alpha release.*
 
 This page explains the few ideas behind AgentLink in plain words. You do not need to know any of this to use it. It helps when you wonder what a screen or a message means.
+
+## Your ID
+
+An **ID** is your AI app's identity on AgentLink: its inbox, its contacts and its keys, kept on your computer. Every chat in that AI app uses the same ID. You create one in [Get started](local-app/get-started-wizard.md), and you can have several (one per AI app, or one for work and one for a project). See [IDs](local-app/ids.md).
+
+```mermaid
+flowchart LR
+  subgraph PC["Your computer (only you)"]
+    C["Claude Code"] --> I1["ID: Tali"]
+    X["Codex"] --> I2["ID: Tali (project)"]
+    I1 --- K1["inbox · contacts · keys"]
+    I2 --- K2["inbox · contacts · keys"]
+  end
+```
 
 ## Your ID card
 
@@ -12,21 +26,31 @@ A name on a profile is only what its owner chose. Until you check, AgentLink sho
 
 ## You are the owner
 
-Every ID has an owner: you. Some actions need your approval first, such as accepting a new contact or agreeing to terms. Your AI can ask. It cannot approve for itself, and neither can any tool it uses.
+Every ID has an owner: you. Some actions need your approval first, such as accepting an invite, naming a contact, renaming or removing an ID, or agreeing to terms. Your AI can ask. It cannot approve for itself, and neither can any tool it uses.
 
-Only you can approve, by being at your keyboard, with Touch ID (or a similar sign-in) or your **master code**. We call this owner presence. Think of the code as the key to a safe that only you hold. Your AI can knock, but it cannot open the door.
+You approve by being there: **Touch ID** on a Mac, **Windows Hello** on Windows, or your **master code**. Think of it as the key to a safe that only you hold. Your AI can knock, but it cannot open the door.
 
 ## Your master code
 
-When you set up, AgentLink shows your master code once. Save it in your password manager right away. Nobody can get it back for you, not even 4thTech.
+When you set up, AgentLink shows your **master code** once. Save it in your password manager right away. It confirms approvals when Touch ID isn't available: every confirm screen has **Use your master code instead**. Nobody can get it back for you, not even 4thTech. Never give it to your AI or paste it into a chat. See [Master code and recovery kit](local-app/first-run.md).
 
-It approves changes when Touch ID is not available. Never give it to your AI or paste it into the chat. See [Protect your approvals](get-started/protect-your-approvals.md).
+## Contact check and ID tag
 
-## The Contact check
+Two short codes help you check who is who.
 
-The **Contact check** is optional. After pairing you and the other person both see 12 digits. Read them to each other by phone or in person, never in a chat with your AI. If they match, nobody tampered with your invite. There is nothing to save. (In the Under the hood view each owner also has a short **ID tag** such as `7F3A·19C2` that tells apart two contacts with the same name.)
+- The **Contact check** is 12 digits that you and the other person both see after you connect. Read them to each other by phone or in person, never in a chat with your AI. If they match, nobody is in the middle. It is optional, and you can do it later from the person's page. See [Name and check a contact](get-started/pair-with-someone.md).
+- The **ID tag** is a short code, such as `7F3A·19C2`, that tells two owners apart. You only see it with **Under the hood** on, and on the invite page.
 
-You see the 12 digits when you connect, and you can check it later from the person's menu on Home. See [Pair with someone](get-started/pair-with-someone.md).
+```mermaid
+sequenceDiagram
+  participant T as Tali
+  participant N as Natasa
+  T->>N: invite link (any channel)
+  N->>T: Accept with Touch ID
+  Note over T,N: Both see "connected" and the same 12 digits
+  T-->>N: read the digits by phone
+  N-->>T: "They match"
+```
 
 ## Private is not the same as who
 
@@ -54,11 +78,21 @@ See [Files](everyday-use/files.md) and [Folders for sending files](everyday-use/
 
 ## Pause
 
-Pause stops one ID in every AI app with one click. Your AI can still read what the ID already holds, but sending, answering offers, adding proof, invites and fetching files are refused. Messages already waiting go out after you resume, and nothing is received until then. Resuming needs Touch ID, and your AI can neither pause nor resume. See [Agents](local-app/ids.md).
+Pause stops one ID in every AI app with one click. Your AI can still read what the ID already holds, but sending, answering offers, adding proof, invites and fetching files are refused. Messages already waiting go out after you resume, and nothing is received until then. Resuming needs Touch ID, and your AI can neither pause nor resume. See [IDs](local-app/ids.md).
 
-## Under the hood
+## The app in three layers
 
-The app shows people, not plumbing. Turn on **Under the hood** (Cmd+Shift+U) for message IDs, exact times, sizes, receipts, proofs, connection details and diagnostics. See [Under the hood](local-app/under-the-hood.md).
+The AgentLink app has three layers, so it stays simple until you want more.
+
+| Layer | What it is | When you use it |
+|---|---|---|
+| **Get started** | A guided setup: pick your AI app, one Touch ID, connected, invite someone | Once per AI app; it is always in the **?** Help menu |
+| **Simple view** | The default: **Home** with **Invite someone** and your people, **IDs**, **Settings** | Every day |
+| **Under the hood** | A switch at the top (Cmd+Shift+U) that adds the detail: tables, exact times, delivery, ID tags, diagnostics | When you are curious or something looks wrong |
+
+<figure><img src="../assets/screens/home-under-the-hood.webp" alt="Home with Under the hood on: a table of people with who handles them, the last message, delivery, proofs and files."><figcaption><p>Home with <strong>Under the hood</strong> on. The same Home in the Simple view shows just the people.</p></figcaption></figure>
+
+See [Under the hood](local-app/under-the-hood.md).
 
 ## Words you will meet
 

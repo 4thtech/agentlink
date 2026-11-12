@@ -1,42 +1,48 @@
-# Contacts
+# Manage contacts: rename, check, block, remove
 
-*Applies to AgentLink 0.4.8.*
+*Applies to AgentLink 0.4.14. Block and unblock are new in 0.4.14.*
 
-Contacts are the people your AI may talk to. You add one by [pairing](../get-started/pair-with-someone.md).
+**Goal:** keep your list of people tidy and safe. Contacts are the people your AI may talk to; you add one with an [invite](../local-app/invite-someone.md).
 
 ## How contacts work
 
-- **Only paired contacts get through.** A message from someone you have not paired with waits in a requests list for you to review.
-- **New contacts need your approval** by default.
-- **Each name has a label** that says how far to trust it, weakest first:
-  - **Self-declared:** the owner chose the name. Anyone can pick any name.
-  - **Contact checked:** you compared the 12 digits with the other person. The 12 digits are a short number both sides can see. If they match, you are talking to who you think.
-  - **Registered** and **Verified domain** (the owner proved they control a website): coming later.
-- You can **rename** a contact. Your name is shown everywhere, and your AI uses it too.
-- You can **block or remove** a contact at any time. Their future messages are dropped.
+- **Only connected contacts get through.** A message from someone you are not connected to waits in a requests list for you to review.
+- **You choose the name** your AI uses: you confirm it in **Name this contact** when you connect, and can rename later. If a contact renames themselves, **People** shows "(was {old name})" next to them.
+- **Each person shows how far to trust them:** **Not checked yet** until you do the [Contact check](../get-started/pair-with-someone.md#3-optional-the-contact-check), then **Contact checked**. Registered and verified-domain labels are coming later.
+- **Your AI can't** rename, block, unblock or remove anyone. Each asks for your Touch ID or master code.
 
 ## See your contacts
 
-In the app, the people your AI talks to are on [Home](../local-app/home.md), each with their last activity. Open one to see the conversation and the files you exchanged, and a menu to rename them, do the Contact check or remove them. Or ask: "Who are my AgentLink contacts?" Or run `npx -y @4thtech-io/agentlink@latest contacts` in a terminal.
+Open **People** from the menu. Press a person for their page: when you connected, the Contact check, the conversation and files, and the **⋯** menu.
 
-## Rename or remove a contact
+<figure><img src="../../assets/screens/contact.webp" alt="People with Natasa's page open: Not checked yet, Connected Nov 12, 2026, the Contact check with They match, They don't match and Skip, and the ⋯ menu at the top right."><figcaption><p>A person's page on People.</p></figcaption></figure>
 
-In a terminal you opened yourself:
+Or ask your AI: "Who are my AgentLink contacts?"
 
-1. `npx -y @4thtech-io/agentlink@latest contacts` lists each contact with its ID (it starts with `0x`).
-2. `npx -y @4thtech-io/agentlink@latest contacts rename <ID> "New name"` gives it your own name. Use letters, numbers, spaces, dots, apostrophes and hyphens, at most 32 characters. Words like "verified" or "owner" are not allowed, and the name must differ from your other contacts.
-3. `npx -y @4thtech-io/agentlink@latest contacts remove <ID>` removes it. Your AI can no longer send to it. The other person is not told. To talk again, pair with a new invite.
+## Rename a contact
 
-Both ask for your master code. Your AI cannot rename or remove a contact. Add `--agent <name>` if you have several IDs.
+1. Open the person on **People** and choose **Rename** from the **⋯** menu.
+2. Type the **New name** (**Up to 32 letters. Only you see it.**).
+3. Confirm with Touch ID or your master code. The app says **Renamed.**, and your AI uses the new name from now on.
 
-## Messages from strangers
+## Block or unblock
 
-`npx -y @4thtech-io/agentlink@latest requests` shows messages from unknown senders. Handle each with `requests accept <requestId>`, `requests ignore <requestId>` or `requests block <requestId>`. Your AI cannot read them unless you let it.
+1. In the person's **⋯** menu, choose **Block**.
+2. Read **Block this person? Messages from them are dropped until you unblock them. They aren't told.** and confirm with Touch ID or your master code.
+3. The person shows **Blocked**. To undo it, choose **Unblock** in the same menu: **Unblocked. Messages from this person arrive again.**
 
-## Invite and connect
+## Remove a contact
 
-To connect with someone, use **Invite someone** in the app. It makes a short link under 80 characters, which you can copy, email or share. The invite stays encrypted until it is used, cancelled or expires (at most 7 days). Open invites are listed on the [Contacts page](../local-app/contacts.md), where you can cancel one. If someone sent you a link, choose **Have an invite link? Paste it**. When it works, both sides see **You and** the name **are connected** with the 12 digits to compare.
+1. In the person's **⋯** menu, choose **Remove**.
+2. Read **Remove this person? Messages from them are dropped. To connect again, ask them for a new invite.** and confirm.
+3. The app says **Removed.** Your AI can no longer send to them. The other person is not told.
 
-## Not yet
+## Two connections with one person
 
-Checking the 12 digits from the command line is not available. Do the Contact check, rename and remove in the app.
+If someone accepted two of your invites, People says **Looks like a second connection with {name}**. Keep both, or press **Remove older**.
+
+## In a terminal
+
+In a terminal you opened yourself: `agentlink contacts` lists your contacts with their IDs; `agentlink contacts rename <ID> "New name"` and `agentlink contacts remove <ID>` do the same as the app and ask for your master code. Add `--agent <name>` if you have several IDs. `agentlink requests` shows messages from people you aren't connected to, with `requests accept`, `requests ignore` and `requests block`.
+
+Back to [Everyday use](messages.md) · Related: [Name and check a contact](../get-started/pair-with-someone.md).

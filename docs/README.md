@@ -130,6 +130,7 @@ When code, process or any other document disagrees with a spec, the spec wins. S
 | [`onboarding.md`](process/onboarding.md) | Onboarding for collaborators and the agents working for them |
 | [`backlog.md`](process/backlog.md) | Task cards (the IDs you see in branches and PR titles) |
 | [`repo-reference.md`](process/repo-reference.md) | Stack, repository layout, commands and testing |
+| [`docs-architecture.md`](process/docs-architecture.md) | What goes where in the public docs: README, guide, technical docs, knowledge base, llms.txt; single sources; the screenshot pipeline (`pnpm docs:screens`); how `docs-site/` reaches GitBook |
 | [`docs-model.md`](process/docs-model.md) | How every public docs page is written: readers and layers, page types, components, screenshots, the UI ↔ tech bridge, the single GitBook space and its release-time sync, definition of done |
 | [`test-reports/`](process/test-reports/README.md) | Reports of end-to-end and acceptance test runs (setup, how to rerun, measured results) |
 
