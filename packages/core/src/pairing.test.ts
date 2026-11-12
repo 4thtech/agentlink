@@ -885,6 +885,68 @@ describe('re-pair and crossed invites (04 §2.9)', () => {
   }
 });
 
+// UX1113-QA-RECONNECT: after "Remove person", a fresh invite from either side brings the contact
+// back (07 §3 `removed`: "kept until a fresh completed pairing re-activates it", 04 §2.9 re-pair
+// rules; 04 §2.5.1 `contact.remove`: "Only a fresh completed pairing brings it back").
+describe('reconnect after a remove (07 §3 removed, 04 §2.9)', () => {
+  it('the remover invites again: both sides complete, the contact is active, history kept', async () => {
+    await pairFully(a, b);
+    const before = await count(a, 'envelopes');
+    await a.client.contacts.remove(b.id);
+    expect((await contactRow(a, b.id))?.status).toBe('removed');
+    clock.t += 10;
+    const { atA } = await pairFully(a, b);
+    expect(atA.map((r) => r.outcome)).not.toContain('dropped');
+    expect((await contactRow(a, b.id))?.status).toBe('active');
+    expect((await contactRow(a, b.id))?.pairing).toBe('complete');
+    expect((await contactRow(b, a.id))?.pairing).toBe('complete');
+    const code = await codeOf(a, b.id);
+    expect(code.status).toBe('ok');
+    expect(await codeOf(b, a.id)).toEqual(code);
+    expect(await count(a, 'envelopes')).toBeGreaterThan(before);
+    expect((await a.client.contacts.list()).map((c) => c.id)).toContain(b.id);
+  });
+
+  it('the removed side invites: the remover accepts and both sides complete', async () => {
+    await pairFully(a, b);
+    await a.client.contacts.remove(b.id);
+    clock.t += 10;
+    // B (who was removed, and still has A) invites; A (the remover) accepts.
+    await pairFully(b, a);
+    expect((await contactRow(a, b.id))?.status).toBe('active');
+    expect((await contactRow(a, b.id))?.pairing).toBe('complete');
+    const code = await codeOf(a, b.id);
+    expect(code.status).toBe('ok');
+    expect(await codeOf(b, a.id)).toEqual(code);
+  });
+
+  it('a removed contact still cannot reach the store without a live invite or pairing', async () => {
+    await pairFully(a, b);
+    const invite = await a.client.pairing.createInvite();
+    const accepted = await b.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('test');
+    await a.client.contacts.remove(b.id);
+    await a.client.pairing.cancelInvite(invite.inviteId);
+    const reports = await deliver(a, accepted.handshake.envelope);
+    expect(reports.map((r) => r.outcome)).toEqual(['dropped']);
+    expect((await contactRow(a, b.id))?.status).toBe('removed');
+  });
+
+  it('a blocked contact stays blocked out of pairing: the owner unblocks first (04 §2.9 D-72)', async () => {
+    await pairFully(a, b);
+    await a.store.transaction((tx) =>
+      tx.update('contacts', { contact_id: b.id }, { status: 'blocked' }),
+    );
+    clock.t += 10;
+    const invite = await a.client.pairing.createInvite();
+    const accepted = await b.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('test');
+    const reports = await deliver(a, accepted.handshake.envelope);
+    expect(reports.map((r) => r.outcome)).toEqual(['dropped']);
+    expect((await contactRow(a, b.id))?.status).toBe('blocked');
+  });
+});
+
 describe('the code comes from the signed messages only (04 §3.6.1)', () => {
   it('editing stored pairing columns or a payload copy never changes the code; editing a signed message shows none', async () => {
     await pairFully(a, b);
