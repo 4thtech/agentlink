@@ -215,6 +215,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/backup/export',
       // WP-P2: People across all IDs (local-ui/api/people-all.test.ts).
       '/api/ui/people',
+      // REL051-RET1: Settings > Storage, sizes only (local-ui/api/storage.test.ts).
+      '/api/ui/storage',
       // UX1113 WP-S2: Touch ID & master code (local-ui/owner-presence-server.test.ts).
       '/api/ui/owner-code/check',
       '/api/ui/owner-presence/test',

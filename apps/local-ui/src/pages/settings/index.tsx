@@ -103,6 +103,8 @@ export function lineFor(
       const received = s.inbox === undefined ? '' : ` Received files go to ${s.inbox}.`;
       return { line: `${S.files.line(s.folders)}${received}` };
     }
+    case '/settings/storage':
+      return { line: S.storage.line };
     case '/settings/appearance':
       return { line: S.appearance.line, state: themeWord(theme), tone: 'plain' };
     case '/settings/proofs':

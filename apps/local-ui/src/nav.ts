@@ -94,6 +94,8 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   { label: PAGE_TITLES.touchId, path: '/settings/touch-id' },
   { label: PAGE_TITLES.apps, path: '/settings/apps' },
   { label: PAGE_TITLES.filesFolder, path: '/settings/files' },
+  // REL051-RET1: sizes only (retention plan RET-1).
+  { label: PAGE_TITLES.storage, path: '/settings/storage' },
   { label: PAGE_TITLES.appearance, path: '/settings/appearance' },
   { label: PAGE_TITLES.rules, path: '/settings/rules' },
   { label: PAGE_TITLES.proofs, path: '/settings/proofs' },
@@ -152,7 +154,6 @@ export const REDIRECTS: Readonly<Record<string, string>> = {
   // real now, so `/settings/touch-id` is no longer redirected.
   '/settings/advanced': ADVANCED_HOME,
   '/settings/about': '/advanced/diagnostics',
-  '/settings/storage': '/settings/files',
   '/settings/notifications': SETTINGS_HOME,
   '/settings/passkeys': '/settings/backup',
   '/advanced': ADVANCED_HOME,

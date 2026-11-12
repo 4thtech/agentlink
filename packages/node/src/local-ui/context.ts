@@ -10,6 +10,7 @@
 import type { LocalUiBackupDesk } from '../kit-record.js';
 import type { LiveAgentState, LiveAppRecord } from './live-status.js';
 import type { LocalUiPeopleAllDesk } from './api/people-all.js';
+import type { LocalUiStorageDesk } from './api/storage.js';
 import {
   CoreError,
   acceptInviteAction,
@@ -699,6 +700,8 @@ export interface LocalUiContext {
   readonly agents?: LocalUiAgentsDesk;
   /** WP-P2: every ID's people for `GET /api/ui/people` (api/people-all.ts); app host only. Reads only. */
   readonly peopleAll?: LocalUiPeopleAllDesk;
+  /** REL051-RET1: the sizes behind `GET /api/ui/storage` (api/storage.ts); app host only. Reads only. */
+  readonly storage?: LocalUiStorageDesk;
   /**
    * U3-d (D-138, 08 §1): the open agent and saving a verified label, for the owner routes of
    * api/agents-manage.ts and api/apps.ts only; absent outside the app host. It signs nothing: a

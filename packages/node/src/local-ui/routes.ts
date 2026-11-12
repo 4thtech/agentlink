@@ -57,6 +57,7 @@ import { messagesRoutes } from './api/messages.js';
 import { pulseRoute } from './api/messages-pulse.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
 import { peopleAllRoutes } from './api/people-all.js';
+import { storageRoutes } from './api/storage.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
 // UX1113 WP-S2: Settings › Touch ID & master code (check, test, replace; the owner-code kind).
@@ -443,6 +444,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     uiSettingsRoutes,
     // WP-P2: People across all IDs (read only).
     peopleAllRoutes,
+    // REL051-RET1: Settings > Storage, sizes only (read only).
+    storageRoutes,
     // UX1113 WP-S2: Touch ID & master code.
     ownerPresenceRoutes,
     // UX1113-R1 (D-147): restore from a recovery kit, in the app.
