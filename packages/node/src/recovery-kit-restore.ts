@@ -227,6 +227,8 @@ export interface RestoreEngineOptions {
    * owner write may be in progress). Default: this process, or a live process with that ID.
    */
   readonly runAlive?: (pid: number) => boolean;
+  /** REL051-CF3 test seam: how the `shown` marker is written (default writeUnsavedMarker). */
+  readonly writeMarker?: typeof writeUnsavedMarker;
 }
 
 /** REL051-CF3: what the page says about a master code that was made here and not saved. */
@@ -1602,15 +1604,14 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         passkey === undefined
           ? false
           : await importOwnerPasskey(current.kit, options.keychain(), passkey);
-      // REL051-CF3: the code is in this answer now; the marker stays until "I saved it".
-      await writeUnsavedMarker(home, {
-        kind: 'restore',
-        stage: 'shown',
-        ownerNostr,
-        ...(item === undefined ? {} : { item }),
-        pid: process.pid,
-        at: now(),
-      }).catch(() => undefined);
+      // REL051-CF3: the code is in this answer now; the marker stays until "I saved it". A `writing`
+      // marker must never outlive a code that was shown (a later start would roll that owner back):
+      // one retry, then the marker goes; if neither works, the code is not shown (the owner is then
+      // rolled back to "Finish restoring" at the next start, or replaced with Touch ID).
+      if (!(await markShown(ownerNostr, item))) {
+        await restored(outcomes);
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
       await unlink(pendingPath).catch(() => undefined);
       await restored(outcomes);
       return ok({
@@ -1693,6 +1694,32 @@ function build(options: RestoreEngineOptions): TerminalRestore {
 
   const runAlive = options.runAlive ?? ((pid: number) => pid === process.pid || processAlive(pid));
 
+  /** REL051-CF3: the restore's marker moves to `shown` (or goes); false when neither worked. */
+  async function markShown(ownerNostr: Uint8Array, item: Uint8Array | undefined): Promise<boolean> {
+    const write = options.writeMarker ?? writeUnsavedMarker;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await write(home, {
+          kind: 'restore',
+          stage: 'shown',
+          ownerNostr,
+          ...(item === undefined ? {} : { item }),
+          pid: process.pid,
+          at: now(),
+        });
+        return true;
+      } catch {
+        // Tried again once.
+      }
+    }
+    try {
+      await removeUnsavedMarker(home);
+      return (await readUnsavedMarker(home)) === undefined;
+    } catch {
+      return false;
+    }
+  }
+
   async function settle(): Promise<void> {
     try {
       const marker = await readUnsavedMarker(home);
@@ -1747,6 +1774,12 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     const owner = await readOwnerItem(keychain, keychainTimeoutMs);
     if (owner === null) return { status: 'none' };
     wipe(owner);
+    // A marker of another owner than the one here now is stale: it goes, and nothing is said.
+    const present = await knownOwner().catch(() => undefined);
+    if (present !== undefined && !equalBytes(present, marker.ownerNostr)) {
+      await removeUnsavedMarker(home);
+      return { status: 'none' };
+    }
     const passkey = await readOwnerPasskeyItem(keychain, keychainTimeoutMs);
     wipe(passkey ?? undefined);
     return { status: 'lost', kind: marker.kind, touchId: passkey !== null };

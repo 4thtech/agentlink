@@ -245,7 +245,11 @@ import {
 import { createRestoreEngine, type RestoreEngine } from './recovery-kit-restore.js';
 import { removeStaleRestoreFiles } from './restore-quarantine.js';
 import { MasterCodeHold } from './local-ui/master-code-hold.js';
-import { removeUnsavedMarker, writeUnsavedMarker } from './master-code-unsaved.js';
+import {
+  readUnsavedMarker,
+  removeUnsavedMarker,
+  writeUnsavedMarker,
+} from './master-code-unsaved.js';
 
 /** REL051-CF3: how long a /api/ui/ request waits for the start-up settle at most. */
 const SETTLE_WAIT_MS = 5_000;
@@ -4355,14 +4359,19 @@ export async function startApprovalServerWith(
       let result: Awaited<ReturnType<typeof completeOwnerSetup>>;
       // REL051-CF3 (R1-CLASS-03): a new master code is about to be made; until the owner says "I
       // saved it", a later start tells the page it was never saved (never asks for it).
-      if (markerHome !== undefined) {
-        await writeUnsavedMarker(markerHome, {
+      // An earlier marker (another run's) is never overwritten here, and only this run's is removed.
+      let markerOurs = false;
+      if (markerHome !== undefined && (await readUnsavedMarker(markerHome)) === undefined) {
+        markerOurs = await writeUnsavedMarker(markerHome, {
           kind: 'first_run',
           stage: 'writing',
           ownerNostr: held.keys.ownerNostr,
           pid: process.pid,
           at: now(),
-        }).catch(() => undefined);
+        }).then(
+          () => true,
+          () => false,
+        );
       }
       try {
         result = await completeOwnerSetup(
@@ -4383,7 +4392,7 @@ export async function startApprovalServerWith(
         );
       } catch (error) {
         // REL051-CF3: rolled back (or another owner's): no code of this run exists.
-        if (markerHome !== undefined) await removeUnsavedMarker(markerHome);
+        if (markerHome !== undefined && markerOurs) await removeUnsavedMarker(markerHome);
         const code = error instanceof NodeKeyStoreError ? error.code : undefined;
         if (code === 'owner_exists') await answer(res, 409, 'owner_exists');
         else if (code === 'owner_card_failed') {

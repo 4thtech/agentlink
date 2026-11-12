@@ -139,6 +139,24 @@ describe('Get started: a reload on "Your master code"', () => {
     expect(code.saves).toBe(1);
   });
 
+  it('IR-REL051-CF3-1 (5): Back from the code step is not "I saved it" (the server keeps it)', async () => {
+    const code = fakeCode({
+      kind: 'shown',
+      which: 'first_run',
+      code: FIRST_CODE,
+      view: { outcome: 'done', passkey: true, fingerprint: '7F3A·19C2' },
+    });
+    await mountFirstRun(code);
+    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
+    await act(async () => {
+      history.replaceState(null, '', '/start/app');
+      window.dispatchEvent(new Event('agentlink:navigate'));
+    });
+    await settle();
+    expect(host.querySelector('[data-backup-code]')).toBeNull();
+    expect(code.saves).toBe(0);
+  });
+
   it('a reload that landed on step 1 goes back to the code step', async () => {
     const code = fakeCode({
       kind: 'shown',

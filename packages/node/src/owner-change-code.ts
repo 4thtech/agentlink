@@ -15,6 +15,8 @@
 //   leaves the current code working.
 // - A recovery kit (`ALKR`, 04 §2.3.2) is never read or changed: it has its own recovery code.
 // - Every secret buffer (current secret, seed, new code) is wiped before returning.
+import { homedir } from 'node:os';
+import { removeUnsavedMarker } from './master-code-unsaved.js';
 import {
   KeyStoreError,
   equalBytes,
@@ -343,7 +345,11 @@ export function changeOwnerCode(options: ChangeOwnerCodeOptions): Promise<Change
       );
     }
     assertNoHarnessMarker(options.env ?? process.env);
-    return changeOwnerCodeWith(osKeychain(), ttyOwnerTerminal(), options);
+    return changeOwnerCodeWith(osKeychain(), ttyOwnerTerminal(), options).then(async (result) => {
+      // REL051-CF3: a new master code replaced any that was never saved.
+      await removeUnsavedMarker(homedir());
+      return result;
+    });
   });
 }
 

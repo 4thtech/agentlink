@@ -17,7 +17,7 @@
 // owner item only while it is still exactly the bytes whose hash is here, no passkey item exists and
 // the run that wrote it is gone; a process that can read that item can delete it directly anyway.
 import { constants } from 'node:fs';
-import { link, lstat, mkdir, open, readFile, unlink } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { decodeHex, encodeHex, randomBytes } from '@4thtech-io/crypto';
 
@@ -45,7 +45,7 @@ export interface UnsavedMarker {
 
 const markerPath = (home: string): string => join(home, '.agentlink', UNSAVED_FILE);
 
-/** Writes the marker (replacing an earlier one), 0600, through a new temporary file and a link. */
+/** Writes the marker (replacing an earlier one), 0600, through a new temporary file and a rename. */
 export async function writeUnsavedMarker(home: string, marker: UnsavedMarker): Promise<void> {
   const dir = join(home, '.agentlink');
   await mkdir(dir, { recursive: true, mode: DIR_MODE });
@@ -66,12 +66,12 @@ export async function writeUnsavedMarker(home: string, marker: UnsavedMarker): P
   } finally {
     await fh.close();
   }
-  const path = markerPath(home);
-  await unlink(path).catch(() => undefined);
   try {
-    await link(temp, path);
-  } finally {
+    // One atomic replace: the marker is always either the old one or the new one, never missing.
+    await rename(temp, markerPath(home));
+  } catch (error) {
     await unlink(temp).catch(() => undefined);
+    throw error;
   }
 }
 

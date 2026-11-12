@@ -11,12 +11,16 @@
 //   says "Finish restoring" (owner-only completion with the same kit gives a new master code).
 // - Anything else is kept: an owner with Touch ID (the page then offers a new master code), an owner
 //   item that is not the restore's, a live run's marker.
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { encodeUtf8, type JsonValue } from '@4thtech-io/crypto';
+import { encodeUtf8, randomBytes, type JsonValue } from '@4thtech-io/crypto';
 import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readUnsavedMarker, removeUnsavedMarker } from './master-code-unsaved.js';
+import {
+  readUnsavedMarker,
+  removeUnsavedMarker,
+  writeUnsavedMarker,
+} from './master-code-unsaved.js';
 import { OWNER_ACCOUNT, OWNER_PASSKEY_ACCOUNT } from './owner-keystore.js';
 import { VirtualPrfAuthenticator } from './passkey-authenticator.fixture.js';
 import {
@@ -213,5 +217,54 @@ describe('R1-CLASS-04: the app closed right after "Restore 1 ID"', () => {
     const next = engineOf({ runAlive: () => false });
     await next.settle();
     expect(keychain.items.has(OWNER_ACCOUNT)).toBe(true);
+  });
+});
+
+// IR-REL051-CF3-1 Lows (1)-(3).
+describe('IR-REL051-CF3-1: the marker never outlives a shown code as `writing`', () => {
+  it('a `shown` write that fails twice removes the marker: a later start never rolls that owner back', async () => {
+    const { a1, kit } = await oneIdKit();
+    let tries = 0;
+    const first = engineOf({
+      writeMarker: () => {
+        tries += 1;
+        return Promise.reject(new Error('disk full'));
+      },
+    });
+    const done = await restoreClick(first, kit.code, [a1.agentId]);
+    expect(body(done)['status']).toBe('done');
+    expect(typeof body(done)['masterCode']).toBe('string');
+    expect(tries).toBe(2);
+    expect(await readUnsavedMarker(t.home)).toBeUndefined();
+    // Even with the Touch ID item gone, the owner whose code was shown is kept.
+    keychain.items.delete(OWNER_PASSKEY_ACCOUNT);
+    const next = engineOf({ runAlive: () => false });
+    await next.settle();
+    expect(keychain.items.has(OWNER_ACCOUNT)).toBe(true);
+  });
+
+  it('the marker is replaced atomically (no temporary file left, the new content in place)', async () => {
+    const base = { kind: 'first_run' as const, pid: 1, at: 1, ownerNostr: randomBytes(32) };
+    await writeUnsavedMarker(t.home, { ...base, stage: 'writing' });
+    await writeUnsavedMarker(t.home, { ...base, stage: 'shown' });
+    expect((await readUnsavedMarker(t.home))?.stage).toBe('shown');
+    expect((await readdir(join(t.home, '.agentlink'))).filter((n) => n.endsWith('.tmp'))).toEqual(
+      [],
+    );
+  });
+
+  it('a marker of another owner than the one here is stale: it goes and nothing is said', async () => {
+    const { a1, kit } = await oneIdKit();
+    const first = engineOf();
+    expect(body(await restoreClick(first, kit.code, [a1.agentId]))['status']).toBe('done');
+    await writeUnsavedMarker(t.home, {
+      kind: 'restore',
+      stage: 'shown',
+      ownerNostr: randomBytes(32),
+      pid: 1,
+      at: 1,
+    });
+    expect(await first.masterCodeState()).toEqual({ status: 'none' });
+    expect(await readUnsavedMarker(t.home)).toBeUndefined();
   });
 });

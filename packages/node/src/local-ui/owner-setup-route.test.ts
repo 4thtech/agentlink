@@ -82,6 +82,7 @@ import {
   type SetupFolders,
 } from '../owner-setup.js';
 import { LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
+import { readUnsavedMarker, writeUnsavedMarker } from '../master-code-unsaved.js';
 import { TEST_APP } from '../local-ui-app.fixture.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
@@ -2067,6 +2068,33 @@ describe('REL051-CF3: a reload on "Your master code" shows the same code again',
     const next = await harness(agent, { setup: false, internals: withHome() });
     const lost = await show(next, await next.session());
     expect(lost.json).toEqual({ status: 'lost', kind: 'first_run', touchId: false });
+  }, 60_000);
+
+  it('IR-REL051-CF3-1 (4): a failed setup never overwrites or removes an earlier marker', async () => {
+    const agent = await initAgent();
+    const earlier = {
+      kind: 'restore' as const,
+      stage: 'writing' as const,
+      ownerNostr: randomBytes(32),
+      item: randomBytes(32),
+      pid: 1,
+      at: 1,
+    };
+    await writeUnsavedMarker(home(), earlier);
+    agent.keychain.failSet.add(OWNER_ACCOUNT);
+    const h = await harness(agent, { internals: withHome() });
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const res = await post(
+      h,
+      FINISH,
+      s,
+      new Authenticator().create(begun.publicKey, { origin: h.origin }),
+    );
+    expect(res.status).not.toBe(200);
+    const kept = await readUnsavedMarker(home());
+    expect(kept?.kind).toBe('restore');
+    expect(kept?.item).toEqual(earlier.item);
   }, 60_000);
 
   it('the show and saved routes need the session, CSRF, Origin and fetch metadata', async () => {

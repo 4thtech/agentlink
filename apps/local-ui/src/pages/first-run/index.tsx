@@ -1178,8 +1178,8 @@ export function FirstRunPage({
     // address) is "I saved it" without the click: the code leaves the state and the page, never
     // hidden to come back; the kit is put off as with the click.
     if (view.k === 'done' && step !== 'connect') {
+      // REL051-CF3: the code leaves the page, but the server keeps it (Back is not "I saved it").
       rememberRecoveryKitLater();
-      void masterCode.saved();
       rememberWizard({
         outcome: { label, ...(view.done.app === undefined ? {} : { app: view.done.app }) },
       });
