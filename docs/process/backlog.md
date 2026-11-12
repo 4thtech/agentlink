@@ -10811,7 +10811,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Repo/path:** agentlink · new `packages/core/src/storage-usage.ts`; `packages/node/src` UI route `GET /api/ui/storage`; `apps/local-ui/src/pages/settings/storage*`
 - **Depends on:** RET-0 copy (11 §5.7); may start before RET-0 merges, since it reads only
 - **Spec:** 04 §4.2 "Storage view"; 08 §1 "Storage, archive and delete"; 11 §5.7
-- **Done when:** sizes match fixtures (store and WAL, messages per person, indexed saved files, unassigned Inbox files, drop usage); works with 2+ IDs; no name, path or link in logs or the answer beyond 11 §5.2 names (I-7); vocabulary lint; one e2e-browser journey; screenshots.
+- **Done when:** sizes match fixtures (store and WAL, messages per person, indexed saved files, unassigned Inbox files, drop usage); no Show in Finder (deferred to RET-4); works with 2+ IDs; no name, path or link in logs or the answer beyond 11 §5.2 names (I-7); vocabulary lint; one e2e-browser journey; screenshots.
 
 #### RET-2 · Store schema: tombstones, `saved_files`, migration (0.5.2)
 - **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -10832,6 +10832,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/messages/*`, `pages/settings/storage*`; node UI server routes `POST /api/ui/history/delete/begin` and `/finish`
 - **Depends on:** RET-1, RET-3
 - **Spec:** 08 §1 "Storage, archive and delete"; 04 §4.2 "Presence and undo"; 11 §5.7
+- **Also:** Show in Finder for the Inbox folder on Settings › Storage (moved from RET-1): a new reveal route kind with no presence that opens only the configured Inbox folder (04 §4 realpath rules), takes no path from the page and signs nothing; S2 review of the new route kind.
 - **Done when:** `RED (expected):` commit first for the routes; presence required once per sheet; the list is bound at begin; Undo within 10 s cancels the commit; copy per 11 §5.7 with the OS sensor word; integrated walkthrough screenshots.
 
 #### RET-5 · Archive conversations as a store flag (0.5.2)
