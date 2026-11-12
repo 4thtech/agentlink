@@ -165,6 +165,8 @@ export function wiringOf(pc: Computer, assets: Map<string, Uint8Array>): LocalUi
         env: {},
         desktopRunning: () => Promise.resolve(false),
       }),
+    // REL051-B3b: this computer's data folder, so Under the hood shows it (as `~/.agentlink`).
+    dataFolder: () => ({ path: join(pc.home, '.agentlink'), home: pc.home }),
   };
 }
 

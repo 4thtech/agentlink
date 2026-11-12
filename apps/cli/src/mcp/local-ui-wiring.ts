@@ -21,6 +21,7 @@
 //   public fingerprint (IR-M1-11s-c-1 L-2), through the redacting logger. Nothing else of an event
 //   is logged at info, and no event ever holds a token, link, code or seed (I-7).
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import process from 'node:process';
 import type { AgentLinkClient } from '@4thtech-io/core';
 import type { Logger } from '@4thtech-io/log';
@@ -31,6 +32,7 @@ import {
   type KeyStoreBackendKind,
   type LocalUiAiApps,
   type LocalUiAssets,
+  type LocalUiDataFolder,
   type LocalUiOptions,
 } from '@4thtech-io/node';
 // The card relay list `owner init` uses (commands/owner/card-relays.ts re-exports this same list;
@@ -38,6 +40,7 @@ import {
 import { DEFAULT_RELAYS } from '@4thtech-io/transport-nostr';
 import { createAiAppsDesk } from '../harness/app-desk.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
+import { cliVersion } from '../runtime/cli-version.js';
 import { readAgentConfig } from '../runtime/index.js';
 import { embeddedLocalUiAssets } from './local-ui-assets.js';
 
@@ -56,6 +59,11 @@ export interface LocalUiWiringDeps {
    * of AI app configs. A new desk per opened agent, so a switch drops the open previews.
    */
   aiApps(): LocalUiAiApps;
+  /**
+   * REL051-B3b: the data folder (`<home>/.agentlink`) and its home, for the health read's Under the
+   * hood fact (answered home-relative only). Optional for older doubles.
+   */
+  dataFolder?(): LocalUiDataFolder;
 }
 
 export function nodeLocalUiWiring(home: string = homedir()): LocalUiWiringDeps {
@@ -67,6 +75,7 @@ export function nodeLocalUiWiring(home: string = homedir()): LocalUiWiringDeps {
     // The real home and this process's environment, as `init` uses (harnesses.ts: only Windsurf's
     // own folder variables are followed, and CLAUDE_CONFIG_DIR is refused).
     aiApps: () => createAiAppsDesk({ home, env: process.env }),
+    dataFolder: () => ({ path: join(home, '.agentlink'), home }),
   });
 }
 
@@ -124,6 +133,9 @@ export async function localUiOptions(
     assets: deps.assets(),
     client: agent.client,
     aiApps: deps.aiApps(),
+    // REL051-B3b: Under the hood's Version and Data folder (the health read checks and trims both).
+    version: cliVersion(),
+    ...(deps.dataFolder === undefined ? {} : { dataFolder: deps.dataFolder() }),
     ...(wired
       ? {
           ownerSetup: {

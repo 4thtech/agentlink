@@ -26,8 +26,9 @@ export interface StripItem {
 
 /**
  * N19 (spec §2.3): the server's own facts from the health read it already answers: version, the port
- * the page is served on, the relays connected and the last sync. Counts and words only; never an
- * address, path or key. The data folder and uptime have no read yet, so they are not shown.
+ * the page is served on, the relays connected, the last sync, and (REL051-B3b) the data folder with
+ * the home folder as `~` and the server's uptime. Counts and words only; never an address or key,
+ * and no path but a home-relative data folder (an absolute one is not shown).
  */
 export function serverFacts(
   result: ApiResult<unknown> | undefined,
@@ -57,7 +58,38 @@ export function serverFacts(
       }),
     });
   }
+  const data = result.kind === 'ok' ? (result.data as Record<string, unknown>) : {};
+  const folder = dataFolderOf(data['dataFolder']);
+  if (folder !== undefined) items.push({ label: S.hoodServerDataFolder, value: folder });
+  const uptime = uptimeOf(data['uptimeSeconds']);
+  if (uptime !== undefined) items.push({ label: S.hoodServerUptime, value: uptime });
   return items;
+}
+
+// Control, format and bidi characters: a folder holding one is not shown.
+const UNSHOWABLE =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/u;
+
+/**
+ * REL051-B3b: the data folder only as the server trims it (home as `~`, as on the AI apps page);
+ * anything else, an absolute path above all, is not shown.
+ */
+function dataFolderOf(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.length > 200 || UNSHOWABLE.test(value)) return undefined;
+  return value === '~' || value.startsWith('~/') || value.startsWith('~\\') ? value : undefined;
+}
+
+/** REL051-B3b: whole seconds as a short duration ("1 h 2 min"); else nothing. */
+export function uptimeOf(value: unknown): string | undefined {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return undefined;
+  if (value < 60) return S.hoodUptimeUnderMinute;
+  const days = Math.floor(value / 86_400);
+  const hours = Math.floor((value % 86_400) / 3_600);
+  const minutes = Math.floor((value % 3_600) / 60);
+  if (days > 0) return `${String(days)} d ${String(hours)} h`;
+  if (hours > 0) return `${String(hours)} h ${String(minutes)} min`;
+  return `${String(minutes)} min`;
 }
 
 function useServerFacts(): StripItem[] {

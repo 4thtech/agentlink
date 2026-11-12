@@ -55,7 +55,7 @@ import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
 import type { AgentEpochKeys } from '../key-epoch.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
-import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
+import type { LocalUiDataFolder, LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
 import type { LocalUiInviteDesk } from './route-types.js';
 import type { JoinDesk } from './join-desk.js';
 import type { LocalUiSettingsDesk } from './api/ui-settings.js';
@@ -90,6 +90,11 @@ export interface LocalUiOptions {
   readonly health?: LocalUiHealthSource;
   /** M1-11s-a-d: the app version the health read answers (a plain version, else nothing). */
   readonly version?: string;
+  /**
+   * REL051-B3b: the data folder (`~/.agentlink`) and the home folder it is under; the health read
+   * answers it home-relative only, never the absolute path (api/health.ts healthDataFolder).
+   */
+  readonly dataFolder?: LocalUiDataFolder;
   /**
    * U3-f (08 §1 "AI apps"; 06 §7 "The app as a second path"): the CLI's harness desk, the one writer
    * of AI app configs (apps/cli/src/harness/app-desk.ts). Absent: the AI apps routes answer
