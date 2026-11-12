@@ -111,7 +111,7 @@ export function ConnectedMoment({
         </span>
         <span className="inv-meet inv-from-right">
           <span className="inv-meet al-slide-in">
-            <span className="inv-avatar inv-avatar--them inv-unflip">{letterOf(shown ?? '')}</span>
+            <span className="inv-avatar inv-avatar--them inv-unflip">{letterOf(name)}</span>
           </span>
         </span>
         <span className="inv-pair-check al-pop">

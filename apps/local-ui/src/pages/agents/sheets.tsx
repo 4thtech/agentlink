@@ -6,7 +6,7 @@
 import { Button, Sheet, TextField } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type FormEvent, type ReactElement } from 'react';
 import { FAILURE_COPY } from '../../api/failure-reasons.js';
-import { navigate } from '../../router.js';
+import { ExportKit } from '../backup/export-kit.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import { AppMark } from './app-mark.js';
 import type { AgentsApi, OwnerOutcome } from './api.js';
@@ -204,14 +204,18 @@ export function RemoveSheet({
   onChanged,
   onRemoved,
   onAgentChanged,
+  onSwitch,
 }: Shared & {
   row: AgentRow;
   onClose: () => void;
   onChanged: () => void;
   onRemoved: (label: string) => void;
   onAgentChanged: () => void;
+  /** Opens another ID, since a recovery kit is saved for the open ID (WP-11). */
+  onSwitch?: (row: AgentRow) => void;
 }): ReactElement {
   const passkey = usePasskey(owner);
+  const [exporting, setExporting] = useState(false);
   const [phase, setPhase] = useState<RemovePhase>({ kind: 'form' });
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
@@ -352,16 +356,25 @@ export function RemoveSheet({
         {phase.kind === 'form' ? (
           <>
             <div className="ag-actions">
-              <Button
-                variant="secondary"
-                icon="download"
-                onClick={() => {
-                  onClose();
-                  navigate('/settings/backup');
-                }}
-              >
-                {S.exportFirst}
-              </Button>
+              {exporting && row.current ? (
+                <ExportKit label={row.label} />
+              ) : (
+                <>
+                  <Button
+                    variant="secondary"
+                    icon="download"
+                    onClick={() => {
+                      setExporting(true);
+                      if (!row.current) onSwitch?.(row);
+                    }}
+                  >
+                    {S.exportFirst}
+                  </Button>
+                  {exporting && !row.current ? (
+                    <p className="al-text-body-sm">{S.backupOpenFirst(row.label)}</p>
+                  ) : null}
+                </>
+              )}
             </div>
             {finishing ? null : (
               <TextField

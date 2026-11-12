@@ -337,7 +337,7 @@ describe('Remove', () => {
     expect(plain(sheet)).toContain('Your 1 contact will be told Work is retired.');
     expect(plain(sheet)).toContain("This can't be undone.");
     expect(plain(sheet)).toContain('ID folder: work');
-    expect(button(sheet, 'Export history first')).toBeDefined();
+    expect(button(sheet, 'Save recovery kit first')).toBeDefined();
     expect(button(sheet, 'Remove with Touch ID')!.disabled).toBe(true);
     const field = sheet.querySelector<HTMLInputElement>('input[type="text"]')!;
     await type(field, 'work');
@@ -604,7 +604,7 @@ describe('W8-S4: finish removing, and one "Not used" line', () => {
     const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
     expect(unisolated(sheet)).toContain('Finish removing Old test');
     expect(sheet.querySelector('input[type="text"]')).toBeNull();
-    expect(button(sheet, 'Export history first')).toBeDefined();
+    expect(button(sheet, 'Save recovery kit first')).toBeDefined();
     await click(button(sheet, 'Finish with Touch ID'));
     await type(host.querySelector<HTMLInputElement>('input[name="owner-code"]')!, '123456');
     await click(button(host, 'Confirm with your backup code'));

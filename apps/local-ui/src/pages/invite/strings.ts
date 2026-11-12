@@ -182,7 +182,8 @@ export function letterOf(text: string): string {
  * the list shows (the owner's alias or the name rule's output), rendered as React text.
  */
 export const FEEDBACK_STRINGS = {
-  accepted: (name: string): string => `${name} accepted your invite`,
+  // 11 §5.2: the name here is self-declared until the owner names the contact, so the toast is generic.
+  accepted: (): string => 'Your new contact accepted your invite',
   connected: (name: string): string => `You're connected with ${name}`,
   again: (name: string): string => `Connected again with ${name}. Check the safety code again.`,
   connecting: (name: string): string => `Connecting to ${name}…`,
@@ -209,7 +210,7 @@ export function changeText(change: {
   readonly name: string;
   readonly ref?: string;
 }): string {
-  if (change.kind === 'accepted') return FEEDBACK_STRINGS.accepted(change.name);
+  if (change.kind === 'accepted') return FEEDBACK_STRINGS.accepted();
   if (change.kind === 'again') return FEEDBACK_STRINGS.again(change.name);
   return FEEDBACK_STRINGS.connected(change.name);
 }

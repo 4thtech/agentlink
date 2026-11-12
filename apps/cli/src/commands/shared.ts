@@ -159,7 +159,8 @@ export const TEXT = Object.freeze({
   get doctorPartial(): string {
     return `Warning  Part of the message network did not answer\n         Check your connection and run \`${commandPrefix()} doctor\` again.`;
   },
-  doctorOpenFailed: "Problem  Couldn't open this ID\n         Open AgentLink to see what is wrong with it.",
+  doctorOpenFailed:
+    "Problem  Couldn't open this ID\n         Open AgentLink to see what is wrong with it.",
   doctorNoAgent: 'Problem  {message}',
   doctorNoKeychain: 'Problem  {message}',
   doctorFix: '         {fix}',

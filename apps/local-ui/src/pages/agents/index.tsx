@@ -511,6 +511,7 @@ export function AgentsPage({
           row={removing}
           api={api}
           owner={owner}
+          onSwitch={doSwitch}
           onClose={() => {
             setRemoveQueue([]);
             reread();

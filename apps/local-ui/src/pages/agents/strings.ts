@@ -69,7 +69,7 @@ export const AGENTS_STRINGS = {
   contactsTold: (label: string, n: number): string =>
     `Your ${n} ${n === 1 ? 'contact' : 'contacts'} will be told ${iso(label)} is retired.`,
   cantUndo: "This can't be undone.",
-  exportFirst: 'Export history first',
+  exportFirst: 'Save recovery kit first',
   typeName: "Type the ID's name to confirm",
   typeNameLabel: (label: string): string => `Type ${iso(label)} to confirm`,
   typeNameDisabled: 'Type the name to enable this',

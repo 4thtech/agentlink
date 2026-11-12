@@ -226,7 +226,7 @@ describe('diffContacts: what changed between two reads', () => {
 describe('the words (11 §5)', () => {
   it('says each change in plain words, with no banned term', () => {
     expect(changeText({ kind: 'accepted', ref: REF_A, name: 'Marko' })).toBe(
-      'Marko accepted your invite',
+      'Your new contact accepted your invite',
     );
     expect(changeText({ kind: 'connected', ref: REF_A, name: 'Marko' })).toBe(
       "You're connected with Marko",
@@ -264,7 +264,8 @@ describe('the toast host', () => {
     await act(async () => {
       emit?.({ kind: 'accepted', ref: REF_A, name: hostile });
     });
-    expect(text()).toContain(`${hostile} accepted your invite`);
+    expect(text()).toContain('Your new contact accepted your invite');
+    expect(text()).not.toContain(hostile);
     expect(host.querySelector('img')).toBeNull();
     expect(host.querySelector('[role="status"]')).not.toBeNull();
     await click('');

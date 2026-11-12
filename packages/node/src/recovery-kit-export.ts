@@ -17,7 +17,7 @@
 // Zero access: nothing here talks to any network. Nothing is logged; failures are fixed outcomes
 // that never carry a path, a code or an error's text (I-7). The code leaves as display text only.
 import { constants } from 'node:fs';
-import { chmod, mkdtemp, open, rm, stat } from 'node:fs/promises';
+import { chmod, lstat, mkdtemp, open, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -101,7 +101,7 @@ function dateOf(ms: number): string {
 
 async function exists(path: string): Promise<boolean> {
   try {
-    await stat(path);
+    await lstat(path);
     return true;
   } catch {
     return false;
@@ -152,7 +152,7 @@ async function snapshotOf(storePath: string, into: string): Promise<RecoveryKitS
     db.close();
   }
   await chmod(into, 0o600);
-  const { size } = await stat(into);
+  const { size } = await lstat(into);
   return { length: size, chunks: fileChunks(into) };
 }
 
