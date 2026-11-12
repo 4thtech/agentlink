@@ -48,11 +48,13 @@ const currentSection = (): string | null | undefined =>
 /** Path, the page's own heading (today's page), and the section marked current. */
 const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/', 'Home', 'Home'],
-  ['/agents', 'IDs', 'IDs'],
+  ['/agents', 'IDs', 'My IDs'],
   // W7-ID-B3 (D-144): the same page under its new name.
-  ['/ids', 'IDs', 'IDs'],
+  ['/ids', 'IDs', 'My IDs'],
   ['/activity', 'Activity', 'Activity'],
   ['/activity/live', 'Live activity stream', null],
+  // WP-N1 (design-1112 §2.2): `/people` is the page's path; `/contacts` stays as an alias.
+  ['/people', 'People', 'People'],
   ['/contacts', 'People', 'People'],
   ['/settings', 'Settings', 'Settings'],
   ['/settings/backup', 'Backup & Touch ID', 'Settings'],
@@ -103,7 +105,7 @@ describe('routes', () => {
     expect(location.pathname).toBe('/agents/work');
     // The Agents page draws the agent's page (its heading is the agent's label once read).
     expect(host.querySelector('main.ag-page')).not.toBeNull();
-    expect(currentSection()).toBe('IDs');
+    expect(currentSection()).toBe('My IDs');
   });
 
   it('shows the not-found state for an unknown path, still in the layout', () => {
@@ -139,10 +141,11 @@ describe('routes', () => {
     ['/settings/agents', '/agents'],
     ['/settings/activity', '/activity'],
     ['/settings/advanced', '/advanced/network'],
+    ['/settings/touch-id', '/settings/backup'],
     ['/settings/about', '/advanced/diagnostics'],
     ['/settings/messages', '/'],
     ['/inbox', '/'],
-    ['/settings/contacts', '/contacts'],
+    ['/settings/contacts', '/people'],
     ['/settings/storage', '/settings/files'],
     ['/settings/passkeys', '/settings/backup'],
     ['/settings/notifications', '/settings'],
@@ -155,18 +158,16 @@ describe('routes', () => {
 });
 
 describe('the sections (nav.ts)', () => {
-  it('Home, IDs, People, Activity, Settings; Advanced holds six pages', () => {
+  it('Home, People, My IDs, Activity, Settings; Advanced holds four pages', () => {
     expect(SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Home', '/'],
-      ['IDs', '/agents'],
-      ['People', '/contacts'],
+      ['People', '/people'],
+      ['My IDs', '/ids'],
       ['Activity', '/activity'],
       ['Settings', '/settings'],
     ]);
     expect(ADVANCED_SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Live activity', '/activity/live'],
-      ['Rules', '/advanced/rules'],
-      ['Proofs & credits', '/advanced/proofs'],
       ['Relays & network', '/advanced/network'],
       ['Diagnostics', '/advanced/diagnostics'],
       ['Connections map', '/advanced/map'],
@@ -176,6 +177,7 @@ describe('the sections (nav.ts)', () => {
   it('Settings (A9) in order, ending with Advanced', () => {
     expect(SETTINGS_PAGES.map((p) => p.label)).toEqual([
       'Backup & Touch ID',
+      'Touch ID & master code',
       'AI apps',
       'Files folder',
       'Appearance',
@@ -203,8 +205,11 @@ describe('the sections (nav.ts)', () => {
     expect(sectionOf('/advanced/network')).toBe('network');
     expect(titleOf('/settings/rules')).toBe('Rules');
     expect(titleOf('/start/connect')).toBe('Get started');
-    expect(titleOf('/agents/work')).toBe('IDs');
-    expect(titleOf('/ids/work')).toBe('IDs');
+    expect(titleOf('/agents/work')).toBe('My IDs');
+    expect(titleOf('/ids/work')).toBe('My IDs');
+    expect(sectionOf('/people')).toBe('people');
+    expect(sectionOf('/contacts')).toBe('people');
+    expect(titleOf('/people')).toBe('People');
     expect(sectionOf('/ids/work')).toBe('agents');
   });
 

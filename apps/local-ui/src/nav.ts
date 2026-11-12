@@ -26,6 +26,8 @@ export const START_STEPS = ['/start/app', '/start/connect', '/start/connected', 
  */
 export const LEGACY_INBOX_PATH = '/inbox';
 export const INTERIM_PEOPLE_PATH = '/contacts';
+/** WP-N1 (design-1112 §2.2): People's own path; `/contacts` stays as an alias that shows the same page. */
+export const PEOPLE_PATH = '/people';
 /**
  * W4-WIRE: the Invite screen (U4), where every "Invite someone" and "Add contact" leads: Home, the
  * Get started card, Go to, the empty states and the compact window. A fixed marker with no data.
@@ -40,6 +42,7 @@ export const ADVANCED_HOME = '/advanced/network';
 export type SectionIcon =
   | 'home'
   | 'agents'
+  | 'idcard'
   | 'people'
   | 'activity'
   | 'settings'
@@ -60,8 +63,8 @@ export interface Section {
 /** The section menu, in order (A4/A8/A9). */
 export const SECTIONS: readonly Section[] = [
   { id: 'home', label: PAGE_TITLES.home, icon: 'home', path: HOME_PATH },
-  { id: 'agents', label: PAGE_TITLES.agents, icon: 'agents', path: AGENTS_PATH },
-  { id: 'people', label: PAGE_TITLES.people, icon: 'people', path: INTERIM_PEOPLE_PATH },
+  { id: 'people', label: PAGE_TITLES.people, icon: 'people', path: PEOPLE_PATH },
+  { id: 'agents', label: PAGE_TITLES.agents, icon: 'idcard', path: IDS_PATH },
   { id: 'activity', label: PAGE_TITLES.activity, icon: 'activity', path: ACTIVITY_PATH },
   { id: 'settings', label: PAGE_TITLES.settings, icon: 'settings', path: SETTINGS_HOME },
 ];
@@ -69,8 +72,6 @@ export const SECTIONS: readonly Section[] = [
 /** The Advanced group: only while Under the hood is on (A10/A11). */
 export const ADVANCED_SECTIONS: readonly Section[] = [
   { id: 'live', label: PAGE_TITLES.liveActivity, icon: 'stream', path: LIVE_ACTIVITY_PATH },
-  { id: 'rules', label: PAGE_TITLES.rules, icon: 'rules', path: '/advanced/rules' },
-  { id: 'proofs', label: PAGE_TITLES.proofs, icon: 'proofs', path: '/advanced/proofs' },
   { id: 'network', label: PAGE_TITLES.network, icon: 'relays', path: ADVANCED_HOME },
   {
     id: 'diagnostics',
@@ -89,12 +90,14 @@ export interface SettingsPage {
 /** Settings (A9), in order; "Advanced" leads to the Advanced pages. */
 export const SETTINGS_PAGES: readonly SettingsPage[] = [
   { label: PAGE_TITLES.backupTouchId, path: '/settings/backup' },
+  // WP-N1: until WP-S2 and WP-C1 build the new pages, these point at the pages that exist today.
+  { label: PAGE_TITLES.touchId, path: '/settings/touch-id' },
   { label: PAGE_TITLES.apps, path: '/settings/apps' },
   { label: PAGE_TITLES.filesFolder, path: '/settings/files' },
   { label: PAGE_TITLES.appearance, path: '/settings/appearance' },
   { label: PAGE_TITLES.rules, path: '/settings/rules' },
   { label: PAGE_TITLES.proofs, path: '/settings/proofs' },
-  { label: PAGE_TITLES.advanced, path: ADVANCED_HOME },
+  { label: PAGE_TITLES.advanced, path: '/settings/advanced' },
 ];
 
 /** The agent name segment of `/agents/<name>` (the folder name rule: lower case, digits, dashes). */
@@ -107,7 +110,7 @@ export function agentNameOf(path: string): string | undefined {
 
 /** The section a path belongs to (marked current in the menu), or undefined. */
 export function sectionOf(path: string): string | undefined {
-  if (path === INTERIM_PEOPLE_PATH) return 'people';
+  if (path === INTERIM_PEOPLE_PATH || path === PEOPLE_PATH) return 'people';
   if (path === HOME_PATH || path.startsWith('/approve/')) return 'home';
   if (path === AGENTS_PATH || path === IDS_PATH || agentNameOf(path) !== undefined) return 'agents';
   if (path === LIVE_ACTIVITY_PATH) return 'live';
@@ -121,7 +124,7 @@ export function sectionOf(path: string): string | undefined {
 /** The title of a path (the phone menu button and the document title). */
 export function titleOf(path: string): string {
   if (path.startsWith('/start/')) return PAGE_TITLES.getStarted;
-  if (path === INTERIM_PEOPLE_PATH) return PAGE_TITLES.people;
+  if (path === INTERIM_PEOPLE_PATH || path === PEOPLE_PATH) return PAGE_TITLES.people;
   if (agentNameOf(path) !== undefined) return PAGE_TITLES.agents;
   const settings = SETTINGS_PAGES.find((p) => p.path === path);
   if (settings !== undefined && path.startsWith('/settings/')) return settings.label;
@@ -142,9 +145,11 @@ export const REDIRECTS: Readonly<Record<string, string>> = {
   '/settings/home': HOME_PATH,
   [LEGACY_INBOX_PATH]: HOME_PATH,
   '/settings/messages': HOME_PATH,
-  '/settings/contacts': INTERIM_PEOPLE_PATH,
+  '/settings/contacts': PEOPLE_PATH,
   '/settings/agents': AGENTS_PATH,
   '/settings/activity': ACTIVITY_PATH,
+  // WP-N1: interim, until WP-S2 (Touch ID & master code) and WP-C1 (Advanced) build their pages.
+  '/settings/touch-id': '/settings/backup',
   '/settings/advanced': ADVANCED_HOME,
   '/settings/about': '/advanced/diagnostics',
   '/settings/storage': '/settings/files',
@@ -166,11 +171,22 @@ export interface GoToEntry {
   readonly keywords?: string;
 }
 
+/** Extra words a section is found by in Cmd+K ("IDs" stays a name for My IDs; "Contacts" for People). */
+const SECTION_KEYWORDS: Readonly<Record<string, string>> = {
+  people: 'contacts',
+  agents: 'ids id agents',
+};
+
 /** Everything Cmd+K reaches, in the order it lists them (the prototype's palette). */
 export function goToEntries(hood: boolean): readonly GoToEntry[] {
   const go = 'Go to';
   const list: GoToEntry[] = [
-    ...SECTIONS.map((s) => ({ label: s.label, hint: go, path: s.path })),
+    ...SECTIONS.map((s) => ({
+      label: s.label,
+      hint: go,
+      path: s.path,
+      ...(SECTION_KEYWORDS[s.id] === undefined ? {} : { keywords: SECTION_KEYWORDS[s.id] }),
+    })),
     {
       label: 'Invite someone',
       hint: 'Action',
