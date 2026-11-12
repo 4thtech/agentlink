@@ -198,6 +198,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // W4-INVITES-LIST: the open invites (a read) and Cancel (api/invites-short.test.ts).
       '/api/ui/invites',
       '/api/ui/invites/cancel',
+      // REL051-B2: copy an open invite's link again (api/invites-short.test.ts, invites-server.test.ts).
+      '/api/ui/invites/link',
       // W4-LIVE-STATUS: the live event stream (local-ui/events-server.test.ts).
       '/api/ui/events',
       // W4-PAUSE: Pause (its own kind) and Resume (local-ui/agents-pause-server.test.ts).
@@ -378,6 +380,8 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
       `POST ${INVITE_CHECK_PATH}`,
       // W4-INVITES-LIST: Cancel an open invite (no presence, signs nothing).
       'POST /api/ui/invites/cancel',
+      // REL051-B2: the kept link of an open invite (no presence, signs nothing, never logged).
+      'POST /api/ui/invites/link',
       'POST /api/ui/join/dismiss',
     ]);
     expect(routes.find((r) => r.path === INVITE_ACCEPT_PATH)).toMatchObject({
