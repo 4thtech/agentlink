@@ -307,6 +307,13 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     );
   });
 
+  it('R-4: agent.name is the ID label, the folder name only as fallback', async () => {
+    const labelled = await callTool('agentlink_status', {}, context(fakeClient({ label: 'Work' })));
+    expect((labelled.structured['agent'] as { name: string }).name).toBe('Work');
+    const bare = await callTool('agentlink_status', {}, context(fakeClient({})));
+    expect((bare.structured['agent'] as { name: string }).name).toBe('default');
+  });
+
   it('F17: status names the ID by its own label, before the news', async () => {
     const client = fakeClient({ label: 'Work' });
     const quiet = await callTool('agentlink_status', {}, context(client));
@@ -981,6 +988,26 @@ describe('resolveContact (06 §2: ID, name; AMBIGUOUS_CONTACT with candidates)',
         shortId: '0xcccccccc',
       },
     ]);
+  });
+
+  it('C-3: candidates carry the full id, which resolves; the query is never echoed', () => {
+    const out = resolveContact('marko CANARY-QUERY', [
+      contact(B, display('Marko CANARY-QUERY')),
+      contact(C, display('Marko CANARY-QUERY')),
+    ]);
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    const result = finalizeResult(out.output, []);
+    const ids = (result.structured['candidates'] as { id: string }[]).map((c) => c.id);
+    expect(ids).toEqual([B, C]);
+    for (const id of ids) {
+      expect(
+        resolveContact(id, [contact(B, display('Marko')), contact(C, display('Marko'))]).ok,
+      ).toBe(true);
+    }
+    expect(
+      JSON.stringify(result.structured['summary']) + String(result.structured['nextStep']),
+    ).not.toContain('CANARY');
   });
 
   it('WAVE-030: two contacts that both declare the same name are told apart by owner fingerprint, and the self-declared name is never echoed', () => {

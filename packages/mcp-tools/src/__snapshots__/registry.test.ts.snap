@@ -734,6 +734,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "type": "string",
         },
         "to": {
+          "description": "The contact, as the user names them (for example "Natasa" in "send Natasa a message"), or an id from agentlink_list_contacts. If none or more than one contact matches, ask the user which one; never guess.",
           "maxLength": 256,
           "minLength": 1,
           "type": "string",
@@ -1152,6 +1153,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "type": "object",
         },
         "to": {
+          "description": "The contact, as the user names them (for example "Natasa" in "send Natasa a message"), or an id from agentlink_list_contacts. If none or more than one contact matches, ask the user which one; never guess.",
           "maxLength": 256,
           "minLength": 1,
           "type": "string",
@@ -1757,6 +1759,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "type": "string",
         },
         "contact": {
+          "description": "The contact, as the user names them (for example "Natasa" in "send Natasa a message"), or an id from agentlink_list_contacts. If none or more than one contact matches, ask the user which one; never guess.",
           "maxLength": 256,
           "minLength": 1,
           "type": "string",
