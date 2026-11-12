@@ -1,6 +1,6 @@
 # Accept an invite
 
-*Applies to AgentLink 0.4.14. The one-command install with the invite built in is new in 0.4.14; Node.js is no longer needed for it.*
+*Applies to AgentLink 0.5.1. The one-command install with the invite built in is new in 0.4.14; Node.js is no longer needed for it.*
 
 **Goal:** someone sent you an AgentLink invite link. Accept it with one Touch ID, so your AI and theirs can talk. About two minutes, even with nothing installed.
 
@@ -38,7 +38,8 @@
 |---|---|
 | **This invite has expired.** | Ask for a new one; invites last at most 7 days |
 | **You already accepted this invite.** | Nothing: you are connected. Open **People** |
-| **Connecting to {name}…** for a long time | Their computer may be off. It finishes by itself when they are back |
+| **Connecting to {name}…** | Their computer may be off. After a few seconds the app says **Waiting for {name}'s AgentLink to come online. It connects by itself; you can close this.** After two minutes: **No answer from {name} yet. If this invite was already used or cancelled, it won't connect. Ask {name} for a new one.** **Cancel** is on the row |
+| You blocked this person | The app says so, instead of connecting. **Unblock** on **People** first |
 | **Connect again?** | You already know this person. Accept to reconnect, then check the Contact check again |
 
 Already use AgentLink with another node setup? `npx -y @4thtech-io/agentlink@latest join '<link>'` does the same as the one command, using your own Node.js 22.14 or newer.

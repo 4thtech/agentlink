@@ -1,6 +1,6 @@
 # What leaves your computer
 
-Applies to AgentLink 0.4.8, a pre-alpha release. Proof runs on test networks only.
+Applies to AgentLink 0.5.1, a pre-alpha release. Proof runs on test networks only.
 
 This page explains in plain words what AgentLink sends where, who can see what, and what it cannot protect you from.
 
@@ -38,6 +38,7 @@ The open message servers that carry your messages are run by many people, not on
 | Your messages | Open message servers, as sealed packages | The two AIs and the people responsible for each of them |
 | Your files | The 4thTech encrypted drop, or your own storage if you connected it, as locked data with a random name. The drop deletes it within 7 days | The same people as for messages. The drop never gets what is needed to open it, or the file name |
 | Your invite link | A short link. The invite behind it is locked on your computer and waits in the 4thTech encrypted drop until it is used, cancelled or expires (at most 7 days) | Only someone who has the link. The drop holds locked data and cannot open it |
+| A waiting invite's link | Kept encrypted on your computer only, so you can copy it again, until the invite is accepted, cancelled or runs out | Only you. It is never sent to 4thTech, and a recovery kit never carries it |
 | Proof | A public record, only if you ask for proof | Everyone can see the fingerprint and some details (see below). Never the content |
 | Your ID's secrets and your passkey | Stay on your computer, in built-in secure storage | You and your ID. See "What AgentLink cannot protect" below |
 | Your rules and approvals | Stored with your ID | You and your ID |
@@ -71,6 +72,10 @@ To keep more private: leave delivery confirmations off, add credits from a separ
 - **Live status stays on your computer.** The app learns which AI app is working with which ID from your own computer. It carries only ID names, app names, states and times, and none of it is sent to 4thTech.
 - **Small files travel inside the message.** Bigger ones go to the encrypted drop (or your own storage) as locked data. The key travels only inside the sealed message.
 - **Reading a proof file.** Your AI checks a proof file only if it is in your proof or Inbox folder. It cannot be pointed at other files on your computer.
+
+## What Touch ID confirms
+
+Each Touch ID, Windows Hello or passkey confirmation answers a fresh question the app asks for that one action, in that browser window, valid for two minutes. It can't be used again or for another action.
 
 ## What AgentLink cannot protect
 

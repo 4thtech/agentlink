@@ -1,6 +1,6 @@
 # Files
 
-*Applies to AgentLink 0.4.8.*
+*Applies to AgentLink 0.5.1. The reader, file chips and your AI reading small text files are new in 0.5.1.*
 
 Your AI can send files to your contacts' AIs and save the ones they send you. Files are free and locked on your computer before they leave it.
 
@@ -18,7 +18,7 @@ Your AI can send files to your contacts' AIs and save the ones they send you. Fi
 
 Before anything is read, AgentLink checks that:
 
-- The file is inside an allowed folder. If not, nothing is read or sent, and your AI tells you what to do.
+- The file is inside an allowed folder. If not, nothing is read or sent, and your AI tells you to open **Settings**, then **Files**, then **Allow a folder** in the AgentLink app.
 - It is not a hidden file (such as `.env`) or in a private folder (such as `~/.ssh`). Those are never sent.
 - It is not too big for the drop. If it is, your AI tells you it needs your own storage.
 
@@ -32,6 +32,8 @@ When a contact you keep sends a file, AgentLink saves it for you, with no reques
 - unlocked into a hidden temporary file, and given its name only after the fingerprints match, so a damaged or tampered file leaves nothing behind,
 - saved in your inbox folder (`~/AgentLink/Inbox` by default), under a cleaned-up name that never replaces an existing file,
 - never opened or run. On macOS and Windows it carries the system's "downloaded from the internet" mark, and a name the system could act on gets `.download` added.
+
+A saved Markdown, code, JSON, patch or text file opens in a **reader** in the app (**Open** on the file): headings, lists, tables and code blocks are shown safely, links and images are never opened, nothing in it is run, and **Copy all** copies the text. Your AI can read a text file of up to 64 KB itself, with no access to your folders. See the [Files page](../local-app/files.md).
 
 Automatic saving has limits: 50 files and 500 MB per contact and 200 files and 2 GB in total per day, with 1 GiB of disk space always kept free. It never saves while the ID is [paused](../local-app/ids.md). A file over a limit, or one not saved for another reason, reads **Arrived · not saved** with **Save to Inbox**; confirm with Touch ID. Choosing the Inbox folder, turning automatic saving off and **Ask before saving** for one contact are not in the app yet.
 

@@ -1,6 +1,6 @@
 # Touch ID & master code
 
-*Applies to AgentLink 0.5.0. This page is new in 0.5.0. On Windows it is called **Windows Hello & master code**, and on Linux **Your passkey & master code**.*
+*Applies to AgentLink 0.5.1. This page is new in 0.5.0. On Windows it is called **Windows Hello & master code**, and on Linux **Your passkey & master code**.*
 
 Open **Settings** › **Touch ID & master code** (in the **Safety** group). It is about how you confirm that it is you: *"AgentLink asks before anything that changes who can act for you, spends credits or commits you. Your AI can never confirm for you."*
 
@@ -12,6 +12,8 @@ The first card says **Touch ID is on** or **Touch ID is off**.
 
 - **Test Touch ID** asks for your fingerprint and says **Touch ID works.** It approves nothing and changes nothing.
 - When it is off, **Turn on Touch ID** asks for your master code once, then your fingerprint. Your master code keeps working.
+
+Since 0.5.1 each Touch ID (or Windows Hello or passkey) confirmation can be used once. It answers a fresh question the app asks for that one action, in this browser window, and it is good for two minutes. A confirmation can't be used again, and can't be used for another action. Your master code works as before. If you set up your passkey before this version, it may ask for your master code until you set it up again. A double click on a Touch ID button asks once.
 
 ## Your master code
 

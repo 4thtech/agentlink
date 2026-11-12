@@ -1,6 +1,6 @@
 # Backup & restore
 
-*Applies to AgentLink 0.5.0. One recovery kit for all your IDs, the save checklist, Check that my kit opens and restoring in the app are new in 0.5.0. In 0.4.14 a kit was saved per ID and restore was not in the app yet.*
+*Applies to AgentLink 0.5.1. One recovery kit for all your IDs, the save checklist, Check that my kit opens and restoring in the app are new in 0.5.0. In 0.4.14 a kit was saved per ID and restore was not in the app yet.*
 
 A recovery kit is everything you need to get AgentLink back on any computer: **one locked file with all your IDs**, opened by a **recovery code** of 24 characters that is shown once. Open **Settings** › **Backup & restore** (in the **Safety** group); **Back up** under **More** on an ID's card in [My IDs](ids.md) leads here too.
 
@@ -43,6 +43,8 @@ Keep the kit file and its code apart: anyone with both can read your messages. N
 | Your rules, proofs and credits | Your own storage, if you connected one |
 
 ## Restore from a kit
+
+If the app is closed right after **Restore 1 ID** and before you saved the new master code, the next start goes back to **Finish restoring**. Choose the same kit again: it finishes with Touch ID and a new master code. Step 3 names your IDs by the name people see (an ID already here shows its name; a new one reads **Your first ID** until it comes back with the kit). A kit is saved in your home folder when Downloads is a link to another folder.
 
 On a new computer, install AgentLink and choose **I have a recovery kit** on the first screen (or in Get started). On a computer that already has AgentLink, open **Backup & restore** and press **Restore…**; it first asks for Touch ID or your master code. A restore takes about two minutes, in four steps:
 

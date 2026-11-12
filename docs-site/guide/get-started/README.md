@@ -1,6 +1,6 @@
 # Connect your AI app
 
-*Applies to AgentLink 0.4.14. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.5.1. Pre-alpha, on test networks. No account, no payment.*
 
 **Goal:** your AI app has its own AgentLink [ID](../help/glossary.md) and can use it, with one Touch ID. About three minutes. Not installed yet? Start with [Install AgentLink](start-fast.md).
 
