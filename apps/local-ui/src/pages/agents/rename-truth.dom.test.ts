@@ -239,6 +239,38 @@ describe('WP-1: the note shows wherever the owner looks', () => {
   });
 });
 
+// The owner's 0.4.13 run: "Update contacts" -> Touch ID -> "Couldn't rename it. Try again." Every
+// answer that is not done got that one sentence. Now each says what happened.
+describe('WP-1: Update contacts says what went wrong, never one generic sentence', () => {
+  const cases: [string, { status: number; body: unknown }, RegExp][] = [
+    [
+      'the app cannot rename this ID until restarted (501)',
+      { status: 501, body: { error: 'not_available' } },
+      /Quit the AgentLink app and open it again/,
+    ],
+    [
+      'an earlier rename is still finishing',
+      { status: 409, body: { error: 'rotation_pending' } },
+      /still reaching your contacts/,
+    ],
+    [
+      'the keychain was locked',
+      { status: 500, body: { status: 'failed', reason: 'keychain_unavailable' } },
+      /keychain isn't available/,
+    ],
+  ];
+  for (const [what, answer, said] of cases) {
+    it(what, async () => {
+      answers['POST /api/ui/agents/label'] = answer;
+      await mountAgents();
+      await click(button(host, 'Update contacts'));
+      await confirmWithCode();
+      expect(plain(host)).toMatch(said);
+      expect(plain(host)).not.toContain("Couldn't rename it. Try again.");
+    });
+  }
+});
+
 describe('WP-1 R-5: Rename takes the same name when only the card differs', () => {
   it('Save is enabled for the unchanged label and posts it', async () => {
     await mountAgents();
