@@ -1,8 +1,8 @@
-# Students: start here
+# New to AgentLink? Start here
 
-*Applies to AgentLink 0.5.x. Pre-alpha, on test networks. No account, no payment. Written for the classroom: about five minutes to install, then you talk to a classmate's AI.*
+*Applies to AgentLink 0.5.x. Pre-alpha, on test networks. No account, no payment. Written for anyone new, for example in a class or a team: about five minutes to install, then you talk to another person's AI.*
 
-AgentLink gives your AI app its own [ID](../help/glossary.md), so it can send private messages and files to the AI of a classmate you invite. Only you and your classmate can read them; 4thTech never sees what you send.
+AgentLink gives your AI app its own [ID](../help/glossary.md), so it can send private messages and files to the AI of a person you invite. Only you and that person can read them; 4thTech never sees what you send.
 
 ## 1. Install AgentLink (about 5 minutes)
 
@@ -51,7 +51,7 @@ If the page did not open, the window prints a link; open it yourself. Full detai
 The app opens on **Get started**: four short steps, each with **Skip to Home**. More detail: [Connect your AI app](README.md).
 
 1. **Pick your AI app** (Claude Desktop, Claude Code, Codex or another one marked **Found on this computer**) and press **Continue with** its name.
-2. **Create your ID.** Type the name your classmates will see, then press **Connect with Touch ID**. On Windows the button says **Connect with Windows Hello**, on Linux **Connect with your passkey**. This one touch creates your ID and adds AgentLink to your AI app.
+2. **Create your ID.** Type the name other people will see, then press **Connect with Touch ID**. On Windows the button says **Connect with Windows Hello**, on Linux **Connect with your passkey**. This one touch creates your ID and adds AgentLink to your AI app.
 3. **Save your master code.** It is shown once and cannot be shown again. Press **Save in my password manager**, **Copy** or **Save as file**, then **I saved it**. You need it when Touch ID is not available. See [Master code and recovery kit](../local-app/first-run.md).
 
    <figure><img src="../../assets/screens/master-code.webp" alt="The master code screen with Save in my password manager, Copy, Save as file and I saved it."><figcaption><p>Save your master code before you go on.</p></figcaption></figure>
@@ -62,16 +62,16 @@ The app opens on **Get started**: four short steps, each with **Skip to Home**. 
 
 Check: ask your AI **"What's my AgentLink status?"** A good answer names your ID.
 
-## 3. Connect with a classmate
+## 3. Connect with another person
 
 One of you sends an invite, the other accepts it.
 
 **If you send the invite**
 
 1. In AgentLink press **Invite someone** (on Home).
-2. Type your classmate's name, then press **Copy** and paste the link into a message to that one person. Each link works once, for 7 days.
+2. Type their name, then press **Copy** and paste the link into a message to that one person. Each link works once, for 7 days.
 
-   <figure><img src="../../assets/screens/invite-someone.webp" alt="Invite someone with an invite link and the buttons Copy, Email and Copy invite message."><figcaption><p>Copy the link and send it to one classmate.</p></figcaption></figure>
+   <figure><img src="../../assets/screens/invite-someone.webp" alt="Invite someone with an invite link and the buttons Copy, Email and Copy invite message."><figcaption><p>Copy the link and send it to one person.</p></figcaption></figure>
 
 3. When they accept, you see **{name} accepted your invite**.
 
@@ -100,9 +100,9 @@ Your AI can send a file from a folder you allow. Setup made one for you: `AgentL
 
 - "Send AgentLink/Send/plan.md to Ana with a short note."
 
-Your classmate's AI saves it in their `AgentLink/Inbox` folder and tells them. Files are free and locked on your computer before they leave it. See [Files](../everyday-use/files.md).
+Their AI saves it in their `AgentLink/Inbox` folder and tells them. Files are free and locked on your computer before they leave it. See [Files](../everyday-use/files.md).
 
-> **Coming in 0.5.1:** sharing a Markdown plan so your classmate's AI can read it straight from the message, without opening a saved file. This is not in 0.5.0; until it is released, send the file as above.
+> **Coming in 0.5.1:** sharing a Markdown plan so their AI can read it straight from the message, without opening a saved file. This is not in 0.5.0; until it is released, send the file as above.
 
 ## Questions and answers
 
@@ -112,7 +112,7 @@ Your classmate's AI saves it in their `AgentLink/Inbox` folder and tells them. F
 
 **The page says "AgentLink closed".** AgentLink closes after 30 minutes without use. Type `agentlink` in Terminal or PowerShell to open it again.
 
-**Two classmates have the same name.** Your AI asks which one you mean. Rename one on **People** so you can tell them apart; each row also shows its ID tag. See [People](../local-app/contacts.md).
+**Two contacts have the same name.** Your AI asks which one you mean. Rename one on **People** so you can tell them apart; each row also shows its ID tag. See [People](../local-app/contacts.md).
 
 **My invite expired or does not work.** An invite works once, for 7 days. Ask for a new one: the sender uses **Cancel invite**, then **Invite someone** again.
 
