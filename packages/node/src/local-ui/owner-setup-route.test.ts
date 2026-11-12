@@ -689,7 +689,12 @@ describe('setup is refused when any owner exists, including a partial one (D-78;
       const s = await h.session();
       const res = await post(h, BEGIN, s, new Uint8Array(0));
       expect(res.status).toBe(409);
-      expect(JSON.parse(res.body)).toEqual({ status: 'owner_exists' });
+      // REL051-SF3 (R1-SEC-04): a lone `owner-passkey` item (no `owner` item) holds first run as
+      // "Finish restoring" (the page opens Restore, which replaces a leftover of the same owner);
+      // still refused, nothing made or written.
+      expect(JSON.parse(res.body)).toEqual({
+        status: what === 'only an owner-passkey item' ? 'finish_restore' : 'owner_exists',
+      });
       expect(h.seeds).toHaveLength(0);
       expect(agent.keychain.items).toEqual(before);
     });
@@ -724,7 +729,8 @@ describe('setup is refused when any owner exists, including a partial one (D-78;
       new Authenticator().create(begun.publicKey, { origin: h.origin }),
     );
     expect(res.status).toBe(409);
-    expect(JSON.parse(res.body)).toEqual({ status: 'owner_exists' });
+    // REL051-SF3 (R1-SEC-04): the lone `owner-passkey` item now holds first run as "Finish restoring".
+    expect(JSON.parse(res.body)).toEqual({ status: 'finish_restore' });
     expect(agent.keychain.items.get(OWNER_PASSKEY_ACCOUNT)).toEqual(planted);
     expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
     expect(allZero(h.seeds[0] as Uint8Array)).toBe(true);

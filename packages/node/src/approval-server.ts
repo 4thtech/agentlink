@@ -243,6 +243,7 @@ import {
   type SetupRegistration,
 } from './owner-setup.js';
 import { createRestoreEngine, type RestoreEngine } from './recovery-kit-restore.js';
+import { removeStaleRestoreFiles } from './restore-quarantine.js';
 import {
   keepsFolder,
   prepareSendFolder,
@@ -871,6 +872,11 @@ export interface ApprovalServerInternals {
     /** The restore engine's keychain read limit (tests). */
     readonly keychainTimeoutMs?: number;
   };
+  /**
+   * REL051-SF3 (T-7): remove the restore folder's stale uploads and quarantined stores when the
+   * server starts. startApprovalServer sets it; a test server sweeps only its own `restore.home`.
+   */
+  readonly sweepRestoreAtStart?: boolean;
   /**
    * WP-R2b (IR M-1): the recovery-kit export walk's per-ID limit and the settle time of a late open
    * (tests: shorter). Default VISIT_STEP_MS and VISIT_SETTLE_MS (app-host.ts).
@@ -1737,7 +1743,23 @@ export async function startApprovalServerWith(
           await host.adoptFirst(first).catch(() => false);
         }
       },
+      // REL051-SF3 (04 §2.5): wrong proofs on restore presence count on the shared backoff.
+      presenceBackoff: {
+        waitSeconds: () => waitSeconds(),
+        failed: () => {
+          presenceFailed();
+        },
+        succeeded: () => {
+          presenceSucceeded();
+        },
+      },
     }));
+  // REL051-SF3 (T-7): stale uploads and quarantined stores of a crashed run go at start-up, not on
+  // a first restore request. Files a live engine (this or another process) still uses are kept.
+  if (internals.sweepRestoreAtStart === true || internals.restore?.home !== undefined) {
+    const restoreHome = internals.restore?.home ?? homedir();
+    void removeStaleRestoreFiles(join(restoreHome, '.agentlink', 'restore')).catch(() => undefined);
+  }
 
   /**
    * WP-R2b (04 §2.3.3 "In the local app"; §2.5 "KeyStore isolation"): the recovery-kit export's walk
@@ -3915,6 +3937,11 @@ export async function startApprovalServerWith(
       .firstRunHold()
       .catch(() => 'keychain_unavailable' as const);
     if (hold !== undefined) {
+      // REL051-SF3: a finish refused here ends this session's hold (its seed is wiped now).
+      const held = pendingSetup;
+      if (step === 'finish' && !busy && held !== undefined && matches(cookie, held.session)) {
+        dropSetup(held);
+      }
       req.resume();
       sendJson(res, 409, { status: hold });
       return;
@@ -6464,5 +6491,5 @@ export async function startApprovalServerWith(
  * `owner` item for owner presence and the platform's browser opener and notifier.
  */
 export function startApprovalServer(options: ApprovalServerOptions): Promise<ApprovalServer> {
-  return startApprovalServerWith(options);
+  return startApprovalServerWith(options, { sweepRestoreAtStart: true });
 }

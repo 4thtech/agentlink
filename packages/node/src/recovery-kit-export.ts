@@ -31,7 +31,7 @@
 // Zero access: nothing here talks to any network. Nothing is logged; failures are fixed outcomes
 // that never carry a path, a code or an error's text (I-7). The code leaves as display text only.
 import { constants } from 'node:fs';
-import { chmod, lstat, mkdtemp, open, rm, stat } from 'node:fs/promises';
+import { chmod, lstat, mkdtemp, open, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -216,10 +216,17 @@ async function exists(path: string): Promise<boolean> {
 }
 
 /** The Downloads folder when it is a folder, else the home folder. */
-async function kitFolder(home: string): Promise<{ path: string; shown: 'Downloads' | 'Home' }> {
+/**
+ * Where the kit is saved: the user's Downloads folder, else the home folder (04 §2.3.3). REL051-SF3
+ * (04 §4, no link following): a Downloads that is a link (to a synced or shared folder, say) is not
+ * followed; the kit then goes to the home folder, where Restore finds it too.
+ */
+export async function kitFolder(
+  home: string,
+): Promise<{ path: string; shown: 'Downloads' | 'Home' }> {
   const downloads = join(home, 'Downloads');
   try {
-    if ((await stat(downloads)).isDirectory()) return { path: downloads, shown: 'Downloads' };
+    if ((await lstat(downloads)).isDirectory()) return { path: downloads, shown: 'Downloads' };
   } catch {
     // No Downloads folder: the home folder.
   }
