@@ -18,6 +18,7 @@
     { "path": "apps/invite" },
     { "path": "apps/cloud-agent" },
     { "path": "apps/submitter" },
-    { "path": "apps/drop" }
+    { "path": "apps/drop" },
+    { "path": "apps/desktop" }
   ]
 }

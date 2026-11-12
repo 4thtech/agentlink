@@ -302,6 +302,12 @@ importers:
 
   apps/console: {}
 
+  apps/desktop:
+    devDependencies:
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
+
   apps/desktop/build:
     devDependencies:
       '@electron/asar':

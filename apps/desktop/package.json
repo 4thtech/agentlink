@@ -1,0 +1,23 @@
+{
+  "name": "@4thtech-io/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AgentLink desktop app shell: the Electron main process (window, tray, deep links) around the bundled core.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/4thtech/agentlink.git",
+    "directory": "apps/desktop"
+  },
+  "main": "./dist/main/entry.js",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5"
+  }
+}

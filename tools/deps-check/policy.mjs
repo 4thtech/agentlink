@@ -15,7 +15,7 @@
 import { builtinModules } from 'node:module';
 
 /** Node built-ins (bare and `node:`) are allowed only here (repo-reference.md, 11 §6). */
-export const NODE_ZONES = ['packages/node', 'apps/cli'];
+export const NODE_ZONES = ['packages/node', 'apps/cli', 'apps/desktop'];
 
 /**
  * Test-only directories outside packages/* and apps/* that deps-check and ESLint scan in full
@@ -512,6 +512,11 @@ export const ZONES = {
   'apps/cloud-agent': entry('@4thtech-io/cloud-agent', WORKER_APP),
   'apps/submitter': entry('@4thtech-io/submitter', WORKER_APP),
   'apps/drop': entry('@4thtech-io/drop', WORKER_APP),
+  // WP-D2 (desktop plan 2026-11-12, Decisions 1-2): the desktop shell, the Electron main process. It
+  // runs on Node (it spawns the core and talks to it over fd 3), so it is a NODE_ZONES entry. It
+  // imports no workspace package and has no runtime dependency: Electron is fetched by committed
+  // hash (WP-D4), never as an npm package, and the shell holds no key and does no crypto (phases 1-2).
+  'apps/desktop': entry('@4thtech-io/desktop', []),
 };
 
 /** Every workspace package name known to the policy. */
