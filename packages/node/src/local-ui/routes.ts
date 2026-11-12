@@ -50,6 +50,7 @@ import { messagesRoutes } from './api/messages.js';
 // UX2-f1: the per-contact activity pulse (read-only).
 import { pulseRoute } from './api/messages-pulse.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
+import { peopleAllRoutes } from './api/people-all.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
 import {
@@ -381,6 +382,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     // W4-PAUSE (D-143 (5)): Pause and Resume.
     agentsPauseRoutes,
     uiSettingsRoutes,
+    // WP-P2: People across all IDs (read only).
+    peopleAllRoutes,
   ]) {
     for (const route of routes) registry.register(route);
   }

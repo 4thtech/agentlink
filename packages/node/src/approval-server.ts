@@ -316,6 +316,7 @@ import {
   type UiSettings,
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
+import { createPeopleAllDesk } from './local-ui/api/people-all.js';
 import {
   AppHostSlot,
   FIRST_AGENT_LABEL,
@@ -1431,6 +1432,32 @@ export async function startApprovalServerWith(
           write: (settings) =>
             (uiSettingsDirectory.writeUiSettings as (s: UiSettings) => Promise<void>)(settings),
         });
+  // WP-P2: every ID's people for the People page. Read only: the open ID through its own client
+  // (captured with its name and the generation in one step), every other ID as a count from the
+  // read-only store peek (directory.stats); no other KeyStore, client or store is opened (04 §2.5).
+  const peopleAllDesk =
+    options.host === undefined
+      ? undefined
+      : createPeopleAllDesk({
+          entries: async () => (host === undefined ? [] : await host.directory.list()),
+          open: () => {
+            const slot = host;
+            const name = slot?.current;
+            const client = agentUi?.client;
+            if (slot === undefined || name === undefined) return undefined;
+            return {
+              name,
+              label: agentLabel ?? name,
+              generation: slot.generation,
+              contacts: () =>
+                client === undefined
+                  ? Promise.reject(new Error('no client'))
+                  : client.contacts.list(),
+            };
+          },
+          generation: () => host?.generation ?? 0,
+          count: async (name) => (await host?.directory.stats(name))?.contacts,
+        });
   const buildUiContext = (bound: ApprovalServerSource = source): LocalUiContext =>
     Object.freeze<LocalUiContext>({
       // IR-M1-11s-b-1 H-1: handlers read through a read-only view, never the client itself.
@@ -1457,6 +1484,7 @@ export async function startApprovalServerWith(
       }),
       // U3-c: the Agents list, in the app host only.
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
+      ...(peopleAllDesk === undefined ? {} : { peopleAll: peopleAllDesk }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
       ...(uiSettingsDesk === undefined ? {} : { uiSettings: uiSettingsDesk }),
       // U3-d: create an agent and save a verified label, in the app host only.

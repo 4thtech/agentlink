@@ -158,6 +158,26 @@ function olderSameOwner(views: readonly ContactView[]): ReadonlyMap<number, stri
   return links;
 }
 
+/**
+ * The list's rows from core's views: only the allowlisted fields (`row`), with the same-owner links.
+ * WP-P2: api/people-all.ts builds every ID's rows with this same allowlist.
+ */
+export function contactRows(list: readonly ContactView[]): JsonObject[] {
+  const views: ContactView[] = [];
+  const rows: JsonObject[] = [];
+  for (const view of list) {
+    const out = row(view);
+    if (out === undefined) continue;
+    views.push(view);
+    rows.push(out);
+  }
+  const links = olderSameOwner(views);
+  return rows.map((out, i) => {
+    const older = links.get(i);
+    return older === undefined ? out : { ...out, olderSameOwner: older };
+  });
+}
+
 async function listContacts(
   context: LocalUiContext,
   request: LocalUiRequest,
@@ -166,19 +186,7 @@ async function listContacts(
   if (client === undefined) return UI_NOT_SET_UP;
   if ([...request.query.keys()].length > 0) return UI_INVALID_QUERY;
   try {
-    const views: ContactView[] = [];
-    const rows: JsonObject[] = [];
-    for (const view of await client.contacts.list()) {
-      const out = row(view);
-      if (out === undefined) continue;
-      views.push(view);
-      rows.push(out);
-    }
-    const links = olderSameOwner(views);
-    const contacts = rows.map((out, i) => {
-      const older = links.get(i);
-      return older === undefined ? out : { ...out, olderSameOwner: older };
-    });
+    const contacts = contactRows(await client.contacts.list());
     return { status: 200, body: { status: 'ok', contacts } };
   } catch {
     // Never the error's text: it could name a path.
