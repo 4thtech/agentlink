@@ -4,7 +4,7 @@
 //   takes it), sent once to this same-origin server, never logged or kept here.
 // Confirming with it is the presence kind `native` (`X-AgentLink-Presence: native`, empty body) on
 // the screen's existing route; the page never runs the helper and never sees a secret.
-import { NATIVE_STATES, type NativeState } from './strings.js';
+import { NATIVE_STATES, type NativeOutcomeKind, type NativeState } from './strings.js';
 
 export interface NativeStatus {
   readonly available: boolean;
@@ -13,12 +13,14 @@ export interface NativeStatus {
   readonly reason?: 'reregister' | 'damaged' | 'other_owner';
 }
 
-export type NativeRegistration =
-  | { readonly kind: 'registered' }
-  | { readonly kind: 'off' }
-  | { readonly kind: 'rejected' }
-  | { readonly kind: 'native'; readonly state: NativeState }
-  | { readonly kind: 'failed' };
+/** Every outcome has one fixed message (strings.ts nativeOutcomeText); none is silent. */
+export type NativeRegistration = NativeOutcomeKind;
+
+/**
+ * DESK-NATIVE-DEBUG: the longest the page waits for a turn on / off / on again: the OS prompt
+ * (120 s in the helper) and the keychain calls; then it says so instead of waiting silently.
+ */
+export const NATIVE_PAGE_TIMEOUT_MS = 200_000;
 
 type Fetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -65,8 +67,9 @@ export function registerNative(
   backupCode: string,
   fetcher: Fetch = defaultFetch,
   token: string = pageToken(),
+  timeoutMs?: number,
 ): Promise<NativeRegistration> {
-  return nativeOp('/api/owner/native', backupCode, fetcher, token);
+  return nativeOp('/api/owner/native', backupCode, fetcher, token, timeoutMs);
 }
 
 /** Fable review M1: turn it off (the master code; never Touch ID itself). */
@@ -74,8 +77,9 @@ export function turnOffNative(
   backupCode: string,
   fetcher: Fetch = defaultFetch,
   token: string = pageToken(),
+  timeoutMs?: number,
 ): Promise<NativeRegistration> {
-  return nativeOp('/api/owner/native/off', backupCode, fetcher, token);
+  return nativeOp('/api/owner/native/off', backupCode, fetcher, token, timeoutMs);
 }
 
 /** Fable review M1: turn it on again after a fingerprint or sign-in change (one gesture). */
@@ -83,8 +87,9 @@ export function replaceNative(
   backupCode: string,
   fetcher: Fetch = defaultFetch,
   token: string = pageToken(),
+  timeoutMs?: number,
 ): Promise<NativeRegistration> {
-  return nativeOp('/api/owner/native/replace', backupCode, fetcher, token);
+  return nativeOp('/api/owner/native/replace', backupCode, fetcher, token, timeoutMs);
 }
 
 async function nativeOp(
@@ -92,14 +97,22 @@ async function nativeOp(
   backupCode: string,
   fetcher: Fetch,
   token: string,
+  timeoutMs: number = NATIVE_PAGE_TIMEOUT_MS,
 ): Promise<NativeRegistration> {
   const body = new TextEncoder().encode(backupCode);
+  const stop = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    stop.abort();
+  }, timeoutMs);
   try {
     const res = await fetcher(path, {
       method: 'POST',
       headers: { 'X-AgentLink-CSRF': token, 'Content-Type': 'application/octet-stream' },
       credentials: 'same-origin',
       body,
+      signal: stop.signal,
     });
     let answer: Record<string, unknown> = {};
     try {
@@ -117,10 +130,14 @@ async function nativeOp(
     if (status === 'native_unavailable') return { kind: 'native', state: 'unavailable' };
     if (isState(answer['native'])) return { kind: 'native', state: answer['native'] };
     if (status === 'presence_rejected') return { kind: 'rejected' };
+    if (status === 'busy') return { kind: 'busy' };
+    if (status === 'wait' || res.status === 429) return { kind: 'wait' };
+    if (status === 'needs_setup') return { kind: 'needs_setup' };
     return { kind: 'failed' };
   } catch {
-    return { kind: 'failed' };
+    return timedOut ? { kind: 'timeout' } : { kind: 'failed' };
   } finally {
+    clearTimeout(timer);
     body.fill(0);
   }
 }

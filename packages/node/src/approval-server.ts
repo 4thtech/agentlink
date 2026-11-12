@@ -245,6 +245,7 @@ import {
   registerOwnerNative,
   replaceOwnerNative,
   turnOffOwnerNative,
+  type NativeStep,
 } from './owner-native.js';
 import {
   MAX_SETUP_REGISTRATION_BYTES,
@@ -418,6 +419,8 @@ const NATIVE_HTTP: Readonly<Record<NativeAnswerState, number>> = Object.freeze({
   reregister: 409,
   unavailable: 409,
   retry_later: 503,
+  // DESK-NATIVE-DEBUG: the OS prompt got no answer in time (never a wrong code).
+  timeout: 403,
   error: 500,
 });
 const NOTIFICATION = ['AgentLink', 'An approval is waiting for you.'] as const;
@@ -850,6 +853,34 @@ export interface ApprovalServerOptions {
    * is then refused and nothing changes for the browser.
    */
   readonly nativePresence?: NativeHelper;
+  /**
+   * DESK-NATIVE-DEBUG: receives ONE fixed diagnostic line per native presence operation outcome
+   * (nativeDiagnostic: fixed words, step names and error codes only; never a secret, a path, a
+   * handle, a record or a system message). The desktop host writes it to stderr, which the shell's
+   * redacting core log keeps. Exceptions in it are ignored.
+   */
+  readonly diagnose?: (line: string) => void;
+}
+
+/**
+ * DESK-NATIVE-DEBUG: the fixed reason of a native presence failure for the diagnostic line: the
+ * helper's state, how its run ended and its own fixed diagnostic; or a keystore error's code (and
+ * `timeout` / `refused` for the keychain); `unexpected` for anything else. Only fixed tokens.
+ */
+export function nativeFailureReason(error: unknown): string {
+  if (error instanceof NativeHelperError) {
+    return [
+      `helper_${error.state}`,
+      ...(error.detail === undefined ? [] : [error.detail]),
+      ...(error.diag === undefined ? [] : [`[${error.diag}]`]),
+    ].join(' ');
+  }
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === 'string' && /^[a-z_]{1,40}$/.test(code)) {
+    const detail = (error as { detail?: unknown }).detail;
+    return detail === 'timeout' || detail === 'refused' ? `${code} ${detail}` : code;
+  }
+  return 'unexpected';
 }
 
 /** One listen call: a loopback host, a port (0 = the OS picks), IPv6-only for ::1. */
@@ -2014,6 +2045,14 @@ export async function startApprovalServerWith(
 
   // --- DESK-D12c: native presence (04 §2.3.4, §2.5 phase 2) ------------------------------------
   const nativeHelper: NativeHelper | undefined = options.nativePresence;
+  /** DESK-NATIVE-DEBUG: one fixed line (see ApprovalServerOptions.diagnose). */
+  const nativeDiagnostic = (line: string): void => {
+    try {
+      options.diagnose?.(`native presence: ${line}`);
+    } catch {
+      // Diagnostics never change the outcome.
+    }
+  };
   /** The answer when the page asks for native presence where there is no helper (not the app). */
   const NO_NATIVE = Object.freeze({ native: 'unavailable' });
 
@@ -2053,6 +2092,7 @@ export async function startApprovalServerWith(
           : error instanceof KeyStoreError && error.code === 'presence_rejected'
             ? 'not_registered'
             : 'keychain';
+      nativeDiagnostic(`${reason} failed (${nativeFailureReason(error)})`);
       return { http: NATIVE_HTTP[state], state };
     } finally {
       req.off('close', abandon);
@@ -2161,13 +2201,24 @@ export async function startApprovalServerWith(
         } else {
           presence = { kind: 'passphrase', secret: body };
         }
+        // DESK-NATIVE-DEBUG: the step reached, for the one diagnostic line of this operation.
+        const name = op === 'off' ? 'turn_off' : op;
+        let step: NativeStep | 'presence' = 'presence';
+        const steps = {
+          onStep: (next: NativeStep): void => {
+            step = next;
+          },
+        };
+        nativeDiagnostic(`${name} started`);
         try {
           // Each wipes the presented bytes, whether or not it succeeds. None takes native presence.
-          if (op === 'off') await turnOffOwnerNative(keychainOf(), helper, context.owner, presence);
-          else if (op === 'replace') {
-            await replaceOwnerNative(keychainOf(), helper, context.owner, presence);
-          } else await registerOwnerNative(keychainOf(), helper, context.owner, presence);
+          if (op === 'off') {
+            await turnOffOwnerNative(keychainOf(), helper, context.owner, presence, steps);
+          } else if (op === 'replace') {
+            await replaceOwnerNative(keychainOf(), helper, context.owner, presence, steps);
+          } else await registerOwnerNative(keychainOf(), helper, context.owner, presence, steps);
         } catch (error) {
+          nativeDiagnostic(`${name} failed at ${step} (${nativeFailureReason(error)})`);
           if (error instanceof NativeHelperError) {
             reply(NATIVE_HTTP[error.state], 'presence_rejected', { native: error.state });
             return;
@@ -2180,9 +2231,13 @@ export async function startApprovalServerWith(
             reply(403, 'presence_rejected');
           } else if (code === 'presence_required') reply(403, 'presence_required');
           else if (code === 'owner_missing') reply(503, 'needs_setup');
-          else reply(500, 'failed');
+          // DESK-NATIVE-DEBUG: the keychain did not answer or refused: its own message, not "error".
+          else if (code === 'keychain_failed') {
+            reply(NATIVE_HTTP.keychain, 'failed', { native: 'keychain' });
+          } else reply(500, 'failed');
           return;
         }
+        nativeDiagnostic(`${name} done`);
         presenceSucceeded();
         reply(200, op === 'off' ? 'off' : 'registered');
       } finally {

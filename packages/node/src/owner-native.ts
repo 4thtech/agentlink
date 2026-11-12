@@ -100,10 +100,48 @@ const keychainFailed = (): NodeKeyStoreError =>
     'keychain_failed',
     `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
+/** DESK-NATIVE-DEBUG: the item read back is missing or not the bytes just written. */
+const readBackDiffers = (): NodeKeyStoreError =>
+  new NodeKeyStoreError(
+    'keychain_failed',
+    `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
+    'refused',
+  );
+
+/**
+ * DESK-NATIVE-DEBUG: the fixed name of each step of turning native presence on, off or on again, in
+ * order, for the one diagnostic line a failure writes (approval-server.ts). Never carries data.
+ */
+export type NativeStep =
+  | 'already_on_check'
+  | 'master_code'
+  | 'remove_old'
+  | 'helper_create'
+  | 'create_output'
+  | 'helper_check'
+  | 'helper_ecdh'
+  | 'seal'
+  | 'keychain_write'
+  | 'keychain_read_back'
+  | 'open_once';
 
 export interface OwnerNativeOptions {
   readonly timeoutMs?: number;
+  /** DESK-NATIVE-DEBUG: called with each step's fixed name as it begins (diagnostics only). */
+  readonly onStep?: (step: NativeStep) => void;
 }
+
+/** Calls `onStep` with `step`; an exception in it changes nothing. */
+function stepTo(options: OwnerNativeOptions, step: NativeStep): void {
+  try {
+    options.onStep?.(step);
+  } catch {
+    // Diagnostics never change the outcome.
+  }
+}
+
+/** A helper output core cannot use: the helper's fault, never a wrong master code. */
+const helperOutputBad = (): NativeHelperError => new NativeHelperError('error', 'bad_output');
 
 /** The `owner-native` item's bytes, or null. Ciphertext and public header only; the caller wipes. */
 function readItem(keychain: KeychainBackend, timeoutMs: number): Promise<Uint8Array | null> {
@@ -243,36 +281,46 @@ export async function storeOwnerNativeSeed(
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   const expected = ownerKeysCopy(owner);
   if (!(seed instanceof Uint8Array) || !sameOwnerKeys(seed, expected)) throw presenceRejected();
+  stepTo(options, 'already_on_check');
   const existing = await readItem(keychain, timeoutMs);
   if (existing !== null) {
     wipe(existing);
     throw nativeExists();
   }
   const kind: NativePresenceKind = helper.kind;
+  stepTo(options, 'helper_create');
   const printed = await helper.create();
   let secret: Uint8Array | undefined;
   let back: Uint8Array | null = null;
   let check: Uint8Array | undefined;
   let created: Uint8Array | undefined;
+  /** DESK-NATIVE-DEBUG: the blob once written; removed again when a later step fails. */
+  let written: Uint8Array | undefined;
   try {
     // The record is read into the header fields here and rebuilt from them; it must be canonical.
+    // DESK-NATIVE-DEBUG: an output core cannot use is the helper's fault (`error`), never a wrong
+    // master code: it must not show "that master code did not work" or count as a wrong code.
+    stepTo(options, 'create_output');
     let parsed: ReturnType<typeof readNativeCreateOutput>;
     try {
       parsed = readNativeCreateOutput(kind, printed);
     } catch {
-      throw presenceRejected();
+      throw helperOutputBad();
     }
     created = parsed.record;
     const record = encodeNativeHelperRecord(kind, parsed.credential);
-    if (!equalBytes(record, parsed.record)) throw presenceRejected();
+    if (!equalBytes(record, parsed.record)) throw helperOutputBad();
     if (kind === NATIVE_PRESENCE_MACOS) {
       // The key must refuse without a gesture before the one gesture of registration.
+      stepTo(options, 'helper_check');
       await helper.check(record);
+      stepTo(options, 'helper_ecdh');
       secret = await helper.release(record, 'setup');
     } else {
       secret = parsed.firstSecret;
     }
-    if (secret === undefined) throw presenceRejected();
+    if (secret === undefined) throw helperOutputBad();
+    stepTo(options, 'seal');
     const blob = await sealNativeSeed({
       kind,
       nativeSecret: secret,
@@ -282,17 +330,28 @@ export async function storeOwnerNativeSeed(
       challenge: parsed.credential.challenge,
     });
     options.sealed?.(blob);
+    stepTo(options, 'keychain_write');
+    written = blob;
     await guarded(() => keychain.set(OWNER_NATIVE_ACCOUNT, blob), timeoutMs);
+    stepTo(options, 'keychain_read_back');
     back = await readItem(keychain, timeoutMs);
-    if (back === null || !equalBytes(back, blob)) throw keychainFailed();
+    if (back === null || !equalBytes(back, blob)) throw readBackDiffers();
+    stepTo(options, 'open_once');
     check = await openNativeSeed(back, secret, {
       expectedOwnerNostr: expected.ownerNostr,
       expectedKind: kind,
     });
     if (!equalBytes(check, seed)) throw keychainFailed();
     created = undefined;
+    written = undefined;
     return blob;
   } catch (error) {
+    // DESK-NATIVE-DEBUG: a write whose read-back or open failed (or that timed out but may still
+    // land) must not leave an item behind: the next try would answer "already on" while the status
+    // says off. Removed only while it is still exactly our bytes (best effort).
+    if (written !== undefined) {
+      await removeOwnerNativeItemIfOurs(keychain, written, timeoutMs).catch(() => undefined);
+    }
     if (created !== undefined && kind !== NATIVE_PRESENCE_MACOS) {
       await helper.remove(created).catch(() => undefined);
     }
@@ -376,6 +435,7 @@ export async function registerOwnerNative(
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   const owner = ownerKeysCopy(expected);
+  stepTo(options, 'already_on_check');
   const existing = await readItem(keychain, timeoutMs).catch((error: unknown) => {
     wipePresence(presence);
     throw error;
@@ -385,6 +445,7 @@ export async function registerOwnerNative(
     wipePresence(presence);
     throw nativeExists();
   }
+  stepTo(options, 'master_code');
   const seed = await openSeedForNativeOp(keychain, owner, presence, timeoutMs);
   try {
     await storeOwnerNativeSeed(keychain, helper, seed, owner, options);
@@ -444,8 +505,10 @@ export async function turnOffOwnerNative(
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   const owner = ownerKeysCopy(expected);
+  stepTo(options, 'master_code');
   const seed = await openSeedForNativeOp(keychain, owner, presence, timeoutMs);
   wipe(seed);
+  stepTo(options, 'remove_old');
   const blob = await readItem(keychain, timeoutMs);
   if (blob === null) throw nativeMissing();
   try {
@@ -475,8 +538,10 @@ export async function replaceOwnerNative(
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   const owner = ownerKeysCopy(expected);
+  stepTo(options, 'master_code');
   const seed = await openSeedForNativeOp(keychain, owner, presence, timeoutMs);
   try {
+    stepTo(options, 'remove_old');
     const old = await readItem(keychain, timeoutMs);
     if (old !== null) {
       try {

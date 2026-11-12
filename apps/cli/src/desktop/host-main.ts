@@ -52,6 +52,16 @@ export async function desktopHostMain(deps: DesktopHostMainDeps): Promise<number
   return deps.run(deps.hostDeps(pipe));
 }
 
+/** One fixed diagnostic line on stderr (DESK-NATIVE-DEBUG). */
+export function writeDiagnosticLine(line: string): void {
+  try {
+    // The CLI's user-output channel (output.ts): one line on stderr.
+    createOutput().printError(line);
+  } catch {
+    // Nothing to do: diagnostics never change the outcome.
+  }
+}
+
 /** The production host deps: the OS user's home and keychain, links only to `pipe`. */
 export function nodeDesktopHostDeps(pipe: DesktopPipe): DesktopHostDeps {
   const logger = cliLogger('desktop', process.env);
@@ -66,10 +76,14 @@ export function nodeDesktopHostDeps(pipe: DesktopPipe): DesktopHostDeps {
     uiDeps: (startServer) => nodeUiDeps({ startServer }),
     // DESK-D12c: Touch ID / Windows Hello for approvals, when the app's presence helper is in place
     // next to the bundled Node (a fixed path, never from the environment or the pipe).
+    // DESK-NATIVE-DEBUG: its one fixed diagnostic line per outcome goes to stderr, which the shell's
+    // redacting core log keeps (apps/desktop/src/main/core-log.ts). Fixed tokens only.
     startServer: (options, sink) => {
       const nativePresence = desktopNativeHelper();
       return startApprovalServerWithLinkSink(
-        nativePresence === undefined ? options : { ...options, nativePresence },
+        nativePresence === undefined
+          ? options
+          : { ...options, nativePresence, diagnose: writeDiagnosticLine },
         sink,
       );
     },

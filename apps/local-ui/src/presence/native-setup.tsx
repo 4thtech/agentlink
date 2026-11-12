@@ -11,7 +11,7 @@ import {
   type NativeRegistration,
   type NativeStatus,
 } from './native-api.js';
-import { NATIVE_STRINGS } from './strings.js';
+import { NATIVE_STRINGS, nativeOutcomeText } from './strings.js';
 
 export function NativeSetupOffer({
   backupCode,
@@ -70,10 +70,9 @@ export function NativeSetupOffer({
       if (outcome.kind === 'registered') {
         setDone(true);
         onDone?.();
-      } else if (outcome.kind === 'native') {
-        setNote(NATIVE_STRINGS.state[outcome.state]);
       } else {
-        setNote(NATIVE_STRINGS.state.error);
+        // DESK-NATIVE-DEBUG: every other outcome has its own fixed message.
+        setNote(nativeOutcomeText(outcome, platform));
       }
     });
   };
@@ -92,6 +91,11 @@ export function NativeSetupOffer({
           {nativeSetupLabel(platform)}
         </Button>
       </div>
+      {working ? (
+        <p className="al-text-body-sm" role="status" data-native-waiting="">
+          {NATIVE_STRINGS.waiting(platform)}
+        </p>
+      ) : null}
       {note === undefined ? null : (
         <p className="al-text-body-sm ct-error" role="alert">
           {note}

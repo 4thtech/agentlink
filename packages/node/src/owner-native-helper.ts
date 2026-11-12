@@ -5,8 +5,12 @@
 // with <reason> one of the fixed ids setup | approve | pay (display-only: the helper shows its own
 // fixed text and releases the same secret for every reason). The record goes on stdin as lowercase
 // hex and one newline; stdout is lowercase hex and one newline on success, nothing else is accepted;
-// stderr is ignored. Every exit code maps to one fixed UI state (nativeUiState); no output, exit code
-// or message of the helper ever reaches an error text, a log or the page.
+// stderr carries at most one fixed diagnostic line of the macOS helper (DESK-NATIVE-DEBUG,
+// "<stage> <domain> <code>", parsed strictly by readHelperDiagnostic; anything else is dropped). Every exit code maps to one fixed UI state (nativeUiState); no output or message
+// of the helper ever reaches an error text, a log or the page. DESK-NATIVE-DEBUG: the fixed name of
+// how a run ended (NativeHelperDetail: an exit code's name from the fixed table, a timeout, a kill,
+// a spawn failure, a malformed or wrong-length output) rides on NativeHelperError.detail for the
+// core's one diagnostic line (approval-server.ts nativeDiagnostic); it is never shown on the page.
 //
 // The helper is spawned without a shell, with an empty environment (nothing of ours, no PATH, no
 // HOME), stdin/stdout pipes only, a bounded stdout and a timeout. Its path is fixed by the app layout
@@ -55,10 +59,18 @@ export const NATIVE_HELPER_EXIT = Object.freeze({
  * `failed` (not recognised), `lockout` (too many tries: use the master code), `reregister` (the key is
  * no longer valid, e.g. fingers changed: turn it on again), `unavailable` (no Touch ID or Windows
  * Hello, or a key that is not hardware-backed: the master code is the way), `retry_later` (Windows
- * could not check the key yet), `error` (anything else).
+ * could not check the key yet), `timeout` (the prompt got no answer in NATIVE_HELPER_TIMEOUT_MS;
+ * DESK-NATIVE-DEBUG), `error` (anything else).
  */
 export type NativeUiState =
-  'cancelled' | 'failed' | 'lockout' | 'reregister' | 'unavailable' | 'retry_later' | 'error';
+  | 'cancelled'
+  | 'failed'
+  | 'lockout'
+  | 'reregister'
+  | 'unavailable'
+  | 'retry_later'
+  | 'timeout'
+  | 'error';
 
 export const NATIVE_UI_STATES: readonly NativeUiState[] = Object.freeze([
   'cancelled',
@@ -67,6 +79,7 @@ export const NATIVE_UI_STATES: readonly NativeUiState[] = Object.freeze([
   'reregister',
   'unavailable',
   'retry_later',
+  'timeout',
   'error',
 ]);
 
@@ -93,10 +106,42 @@ export function nativeUiState(code: number | null): NativeUiState {
   }
 }
 
+/**
+ * DESK-NATIVE-DEBUG: how a helper run ended, as a fixed name (for the diagnostic line only): the
+ * exit code's name (`exit_<name>`, `exit_other` for a code outside the table), `timeout`, `aborted`
+ * (the page went away), `no_start` (spawn failed), `killed` (ended by a signal from outside),
+ * `too_much_output`, `bad_output` (not lowercase
+ * hex and one newline) or `wrong_length` (a secret of the wrong size).
+ */
+export type NativeHelperDetail =
+  | `exit_${keyof typeof NATIVE_HELPER_EXIT}`
+  | 'exit_other'
+  | 'timeout'
+  | 'aborted'
+  | 'no_start'
+  | 'killed'
+  | 'too_much_output'
+  | 'bad_output'
+  | 'wrong_length';
+
+/** The fixed name of an exit code (never the number of an unknown one). */
+export function nativeExitName(code: number): NativeHelperDetail {
+  for (const [name, value] of Object.entries(NATIVE_HELPER_EXIT)) {
+    if (value === code) return `exit_${name}` as NativeHelperDetail;
+  }
+  return 'exit_other';
+}
+
 /** A helper refusal: one fixed state, no output, no exit code text (I-7). */
 export class NativeHelperError extends Error {
   readonly code = 'native_presence';
-  constructor(readonly state: NativeUiState) {
+  constructor(
+    readonly state: NativeUiState,
+    /** DESK-NATIVE-DEBUG: how the run ended (fixed name), for the diagnostic line only. */
+    readonly detail?: NativeHelperDetail,
+    /** DESK-NATIVE-DEBUG: the helper's own fixed diagnostic (readHelperDiagnostic), if any. */
+    readonly diag?: string,
+  ) {
     super(`native presence: ${state}`);
     this.name = 'NativeHelperError';
   }
@@ -106,6 +151,41 @@ export interface NativeHelperRunResult {
   /** The exit code, or null when the helper did not start, was killed or timed out. */
   readonly code: number | null;
   readonly stdout: Uint8Array;
+  /** DESK-NATIVE-DEBUG: why `code` is null (fixed name); absent when the helper exited. */
+  readonly ended?: 'timeout' | 'aborted' | 'no_start' | 'killed' | 'too_much_output';
+  /** DESK-NATIVE-DEBUG: the helper's diagnostic line, already checked by readHelperDiagnostic. */
+  readonly diag?: string;
+}
+
+/** The fixed shape of the macOS helper's one stderr line (agentlink-presence.swift header). */
+const HELPER_DIAG =
+  /^(args|input|create|verify|gate|sensor|sheet|output) (none|la|os|ck) (-?[0-9]{1,7})\n?$/;
+const MAX_STDERR = 128;
+
+/**
+ * DESK-NATIVE-DEBUG: the helper's stderr as `<stage> <domain> <code>` when it is exactly that fixed
+ * shape (fixed words and one integer, nothing from the system), else undefined. Nothing else of
+ * stderr is ever kept.
+ */
+export function readHelperDiagnostic(stderr: Uint8Array): string | undefined {
+  if (stderr.length === 0 || stderr.length > MAX_STDERR) return undefined;
+  for (const b of stderr) if (b < 0x0a || b > 0x7a) return undefined;
+  const m = HELPER_DIAG.exec(new TextDecoder().decode(stderr));
+  return m === null ? undefined : `${m[1] ?? ''} ${m[2] ?? ''} ${m[3] ?? ''}`;
+}
+
+/** The error of a run that did not exit 0: its UI state and how it ended. */
+function refusal(result: NativeHelperRunResult): NativeHelperError {
+  if (result.code === null) {
+    const ended = result.ended ?? 'no_start';
+    // The OS prompt waited the whole NATIVE_HELPER_TIMEOUT_MS with no answer: its own message.
+    return new NativeHelperError(ended === 'timeout' ? 'timeout' : 'error', ended, result.diag);
+  }
+  return new NativeHelperError(
+    nativeUiState(result.code),
+    nativeExitName(result.code),
+    result.diag,
+  );
 }
 
 /** Runs the helper once with `args` and `stdin` (tests: a stand-in; production: spawnNativeHelper). */
@@ -146,16 +226,16 @@ const hexValue = (b: number): number =>
 function printed(result: NativeHelperRunResult): Uint8Array {
   const raw = result.stdout;
   try {
-    if (result.code !== 0) throw new NativeHelperError(nativeUiState(result.code));
+    if (result.code !== 0) throw refusal(result);
     const n = raw.length > 0 && raw[raw.length - 1] === 0x0a ? raw.length - 1 : raw.length;
-    if (n === 0 || n % 2 !== 0) throw new NativeHelperError('error');
+    if (n === 0 || n % 2 !== 0) throw new NativeHelperError('error', 'bad_output');
     const out = new Uint8Array(n / 2);
     for (let i = 0; i < out.length; i += 1) {
       const hi = hexValue(raw[2 * i] as number);
       const lo = hexValue(raw[2 * i + 1] as number);
       if (hi < 0 || lo < 0) {
         out.fill(0);
-        throw new NativeHelperError('error');
+        throw new NativeHelperError('error', 'bad_output');
       }
       out[i] = (hi << 4) | lo;
     }
@@ -189,7 +269,7 @@ export function createNativeHelper(options: {
     },
     async check(record) {
       const result = await run(['check'], stdinOf(record));
-      if (result.code !== 0) throw new NativeHelperError(nativeUiState(result.code));
+      if (result.code !== 0) throw refusal(result);
     },
     async release(record, reason, signal) {
       if (!(NATIVE_REASONS as readonly string[]).includes(reason)) {
@@ -200,13 +280,13 @@ export function createNativeHelper(options: {
       if (isAborted(signal)) {
         // Fable review L1: abandoned; whatever the helper printed is dropped.
         result.stdout.fill(0);
-        throw new NativeHelperError('cancelled');
+        throw new NativeHelperError('cancelled', 'aborted');
       }
       const out = printed(result);
       const fits = mac ? out.length === 32 : [256, 384, 512].includes(out.length);
       if (!fits) {
         out.fill(0);
-        throw new NativeHelperError('error');
+        throw new NativeHelperError('error', 'wrong_length');
       }
       return out;
     },
@@ -221,7 +301,8 @@ export function createNativeHelper(options: {
 export const NATIVE_HELPER_TIMEOUT_MS = 120_000;
 
 /**
- * Spawns the helper at `path` (no shell, empty environment, stdin/stdout pipes, stderr ignored,
+ * Spawns the helper at `path` (no shell, empty environment, stdin/stdout/stderr pipes, stderr only
+ * read for its fixed diagnostic line,
  * stdout capped, killed after `timeoutMs`). A helper that cannot start, is killed or prints too much
  * resolves with code null (the `error` state). Never rejects.
  */
@@ -233,9 +314,14 @@ export function spawnNativeHelper(
   return (args, stdin, signal) =>
     new Promise((resolve) => {
       const chunks: Buffer[] = [];
+      const errChunks: Buffer[] = [];
+      let errSize = 0;
       let size = 0;
       let settled = false;
-      const finish = (code: number | null): void => {
+      const finish = (
+        code: number | null,
+        ended?: 'timeout' | 'aborted' | 'no_start' | 'killed' | 'too_much_output',
+      ): void => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
@@ -249,44 +335,56 @@ export function spawnNativeHelper(
         }
         for (const chunk of chunks) chunk.fill(0);
         chunks.length = 0;
-        resolve({ code, stdout });
+        const diag =
+          errSize <= MAX_STDERR ? readHelperDiagnostic(Buffer.concat(errChunks)) : undefined;
+        errChunks.length = 0;
+        const base =
+          code === null ? { code, stdout, ended: ended ?? 'no_start' } : { code, stdout };
+        resolve(diag === undefined ? base : { ...base, diag });
       };
       let child: ReturnType<typeof spawn>;
       try {
         child = spawn(path, [...args], {
           shell: false,
           env: {},
-          stdio: ['pipe', 'pipe', 'ignore'],
+          stdio: ['pipe', 'pipe', 'pipe'],
           windowsHide: true,
         });
       } catch {
-        resolve({ code: null, stdout: new Uint8Array(0) });
+        resolve({ code: null, stdout: new Uint8Array(0), ended: 'no_start' });
         return;
       }
       const timer = setTimeout(() => {
         child.kill();
-        finish(null);
+        finish(null, 'timeout');
       }, timeoutMs);
       // Fable review L1: the page went away (client disconnected, prompt abandoned): kill the helper,
       // so its OS prompt closes and no late touch is waited for.
       function onAbort(): void {
         child.kill();
-        finish(null);
+        finish(null, 'aborted');
       }
       if (signal?.aborted === true) onAbort();
       else signal?.addEventListener('abort', onAbort, { once: true });
-      child.on('error', () => finish(null));
+      child.on('error', () => finish(null, 'no_start'));
+      // DESK-NATIVE-DEBUG: at most MAX_STDERR bytes are kept, and only a fixed-shape line is used.
+      child.stderr?.on('data', (chunk: Buffer) => {
+        errSize += chunk.length;
+        if (errSize <= MAX_STDERR) errChunks.push(chunk);
+      });
+      child.stderr?.on('error', () => undefined);
       child.stdout?.on('data', (chunk: Buffer) => {
         size += chunk.length;
         if (size > MAX_STDOUT) {
           chunk.fill(0);
           child.kill();
-          finish(null);
+          finish(null, 'too_much_output');
           return;
         }
         chunks.push(chunk);
       });
-      child.on('close', (code) => finish(typeof code === 'number' ? code : null));
+      // Ended by a signal from outside (our own kills settle first): no exit code.
+      child.on('close', (code) => finish(typeof code === 'number' ? code : null, 'killed'));
       child.stdin?.on('error', () => undefined);
       child.stdin?.end(stdin === undefined ? undefined : Buffer.from(stdin));
     });

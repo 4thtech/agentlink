@@ -3,6 +3,12 @@
 // Turning it on, off, or on again after a fingerprint or sign-in change is each its own owner
 // operation, confirmed with the master code (never with Touch ID itself, so a captured Touch ID
 // secret can neither keep itself on nor turn itself back on). Nothing is shown in a browser.
+//
+// DESK-NATIVE-DEBUG (stopgap until the Settings redesign, WP-S2): one settings card under the list,
+// the switch aligned on the right of its row (the shared `al-switch` look), the master code prompt
+// inline beneath it, and every outcome a fixed message: while the OS prompt is up the card says it
+// is waiting (never a silent, emptied form), errors are announced (role="alert"), and the status is
+// read again after every answer so the switch shows what is really stored.
 import { Button } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { BackupCodeField } from '../pages/first-run/backup-code.js';
@@ -15,9 +21,15 @@ import {
   type NativeRegistration,
   type NativeStatus,
 } from './native-api.js';
-import { NATIVE_STRINGS as N } from './strings.js';
+import { NATIVE_STRINGS as N, nativeOutcomeText } from './strings.js';
+import './native-settings.css';
 
 type Op = 'on' | 'off' | 'again';
+
+interface Note {
+  readonly text: string;
+  readonly tone: 'ok' | 'error';
+}
 
 export function NativeSettings({
   userAgent,
@@ -34,7 +46,7 @@ export function NativeSettings({
   const [asking, setAsking] = useState<Op | undefined>(undefined);
   const [code, setCode] = useState('');
   const [working, setWorking] = useState(false);
-  const [note, setNote] = useState<string | undefined>(undefined);
+  const [note, setNote] = useState<Note | undefined>(undefined);
   const mounted = useRef(true);
 
   const refresh = async (): Promise<void> => {
@@ -57,6 +69,7 @@ export function NativeSettings({
   if (platform === undefined || status === undefined || !status.available) return null;
   const broken = status.reason === 'reregister' || status.reason === 'damaged';
   const on = status.registered && !broken;
+  const title = N.settingsTitle(platform);
 
   const submit = (event: FormEvent): void => {
     event.preventDefault();
@@ -66,48 +79,64 @@ export function NativeSettings({
     setCode('');
     setWorking(true);
     setNote(undefined);
-    void ops[op](typed).then(async (outcome) => {
-      if (!mounted.current) return;
-      setWorking(false);
-      if (outcome.kind === 'registered' || outcome.kind === 'off') {
-        setAsking(undefined);
-        setNote(outcome.kind === 'off' ? N.turnedOff(platform) : N.turnedOn(platform));
+    void ops[op](typed)
+      .catch((): NativeRegistration => ({ kind: 'failed' }))
+      .then(async (outcome) => {
+        if (!mounted.current) return;
+        setWorking(false);
+        const done = outcome.kind === 'registered' || outcome.kind === 'off';
+        // A wrong master code keeps the prompt open to try again; every other answer closes it.
+        if (outcome.kind !== 'rejected') setAsking(undefined);
+        setNote({ text: nativeOutcomeText(outcome, platform), tone: done ? 'ok' : 'error' });
         await refresh();
-      } else if (outcome.kind === 'native') setNote(N.state[outcome.state]);
-      else if (outcome.kind === 'rejected') setNote(N.wrongCode);
-      else setNote(N.state.error);
-    });
+      });
+  };
+
+  const ask = (op: Op): void => {
+    if (working) return;
+    setNote(undefined);
+    setCode('');
+    setAsking(op);
   };
 
   return (
-    <section className="st-row" aria-label={N.settingsTitle(platform)} data-native-settings="">
-      <label className="st-row-text">
-        <span className="st-row-title">{N.settingsTitle(platform)}</span>
-        <span className="st-row-line">{on ? N.settingsOn(platform) : N.settingsOff}</span>
-        <input
-          type="checkbox"
+    <section className="st-native" aria-label={title} data-native-settings="">
+      <div className="st-native-row">
+        <span className="st-row-text">
+          <span className="st-row-title" id="st-native-title">
+            {title}
+          </span>
+          <span className="st-row-line">{on ? N.settingsOn(platform) : N.settingsOff}</span>
+        </span>
+        <button
+          type="button"
           role="switch"
           aria-checked={on}
-          checked={on}
+          aria-labelledby="st-native-title"
+          className={`al-switch${on ? ' is-on' : ''}`}
           disabled={working || broken}
-          onChange={() => {
-            setNote(undefined);
-            setAsking(on ? 'off' : 'on');
-          }}
-        />
-      </label>
+          onClick={() => ask(on ? 'off' : 'on')}
+        >
+          <span className="al-switch-knob" aria-hidden="true" />
+          <span className="al-switch-state al-text-caption" aria-hidden="true">
+            {on ? 'On' : 'Off'}
+          </span>
+        </button>
+      </div>
       {broken ? (
-        <>
+        <div className="st-native-body">
           <p className="al-text-body-sm" role="status">
             {N.state.reregister}
           </p>
-          <Button variant="primary" onClick={() => setAsking('again')} disabled={working}>
-            {N.turnOnAgain}
-          </Button>
-        </>
+          <div className="st-native-actions">
+            <Button variant="primary" onClick={() => ask('again')} disabled={working}>
+              {N.turnOnAgain}
+            </Button>
+          </div>
+        </div>
       ) : null}
       {asking === undefined ? null : (
-        <form onSubmit={submit} autoComplete="off">
+        <form className="st-native-body" onSubmit={submit} autoComplete="off">
           <BackupCodeField
             label={N.codeLabel}
             name="owner-code"
@@ -115,24 +144,34 @@ export function NativeSettings({
             disabled={working}
             onValue={setCode}
           />
-          <Button type="submit" variant="primary" disabled={working}>
-            {N.confirmCode}
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setAsking(undefined);
-              setCode('');
-            }}
-            disabled={working}
-          >
-            {N.cancel}
-          </Button>
+          <div className="st-native-actions">
+            <Button type="submit" variant="primary" disabled={working}>
+              {N.confirmCode}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setAsking(undefined);
+                setCode('');
+              }}
+              disabled={working}
+            >
+              {N.cancel}
+            </Button>
+          </div>
         </form>
       )}
-      {note === undefined ? null : (
-        <p className="al-text-body-sm" role="status">
-          {note}
+      {working ? (
+        <p className="al-text-body-sm st-native-note" role="status" data-native-waiting="">
+          {N.waiting(platform)}
+        </p>
+      ) : null}
+      {note === undefined || working ? null : (
+        <p
+          className={`al-text-body-sm st-native-note${note.tone === 'error' ? ' is-error' : ''}`}
+          role={note.tone === 'error' ? 'alert' : 'status'}
+        >
+          {note.text}
         </p>
       )}
     </section>
