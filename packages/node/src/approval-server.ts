@@ -326,6 +326,7 @@ import {
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
 import { createPeopleAllDesk } from './local-ui/api/people-all.js';
+import { createStorageDesk, inboxUsageOf } from './local-ui/api/storage.js';
 import {
   AppHostSlot,
   FIRST_AGENT_LABEL,
@@ -1507,6 +1508,41 @@ export async function startApprovalServerWith(
           generation: () => host?.generation ?? 0,
           count: async (name) => (await host?.directory.stats(name))?.contacts,
         });
+  // REL051-RET1: the read-only Storage view. The open ID through its own client; every other ID as
+  // totals from the read-only store peek (directory.storage); no other store or KeyStore is opened.
+  const storageDesk =
+    options.host === undefined
+      ? undefined
+      : createStorageDesk({
+          entries: async () => (host === undefined ? [] : await host.directory.list()),
+          open: () => {
+            const slot = host;
+            const name = slot?.current;
+            const client = agentUi?.client;
+            if (slot === undefined || name === undefined) return undefined;
+            return {
+              name,
+              label: agentLabel ?? name,
+              generation: slot.generation,
+              contacts: () =>
+                client === undefined
+                  ? Promise.reject(new Error('no client'))
+                  : client.contacts.list(),
+              dropUsage: async () => {
+                const usage = await client?.files.dropUsage();
+                return usage === undefined || !usage.available
+                  ? undefined
+                  : { usedBytes: usage.usedBytes, quotaBytes: usage.quotaBytes };
+              },
+            };
+          },
+          generation: () => host?.generation ?? 0,
+          usage: async (name) => await host?.directory.storage?.(name),
+          inbox: async () =>
+            agentUi?.client === undefined
+              ? undefined
+              : await inboxUsageOf(readOnlyClient(agentUi.client)),
+        });
   /**
    * WP-R2b (04 §2.3.3 "Kit record"): what `GET /api/ui/backup` and Show in Finder read. Reads only;
    * it signs nothing, opens no other ID's core and reads no keychain item. Built where an ID can
@@ -1605,6 +1641,7 @@ export async function startApprovalServerWith(
       // U3-c: the Agents list, in the app host only.
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
       ...(peopleAllDesk === undefined ? {} : { peopleAll: peopleAllDesk }),
+      ...(storageDesk === undefined ? {} : { storage: storageDesk }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
       ...(uiSettingsDesk === undefined ? {} : { uiSettings: uiSettingsDesk }),
       // U3-d: create an agent and save a verified label, in the app host only.

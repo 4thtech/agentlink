@@ -170,6 +170,14 @@ export {
   type AgentLiveSession,
   type AgentStorePeek,
 } from './agent-peek.js';
+// REL051-RET1: the read-only sizes of an ID's store and of the Inbox folder (Settings, Storage).
+export {
+  peekStorageUsage,
+  scanInbox,
+  type InboxScan,
+  type StoragePerContact,
+  type StorageUsage,
+} from './storage-usage.js';
 // W4-LIVE-STATUS (04 §2.5): the signal-0 check of an MCP session row's pid.
 export { pidAlive } from './pid-alive.js';
 // M1-11s-a-d: the caller's health source for the status bar's health read.

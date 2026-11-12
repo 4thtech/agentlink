@@ -35,6 +35,7 @@ export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   '/settings/touch-id': part(async () => (await import('../pages/touch-id/index.js')).TouchIdPage),
   '/settings/apps': part(async () => (await import('../pages/apps/index.js')).AppsPage),
   '/settings/files': part(async () => (await import('../pages/files/index.js')).FilesPage),
+  '/settings/storage': part(async () => (await import('../pages/storage/index.js')).StoragePage),
   '/settings/appearance': part(
     async () => (await import('../pages/appearance/index.js')).AppearancePage,
   ),

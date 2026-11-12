@@ -42,6 +42,7 @@
 // with `adoptFirst`: the generation increases first, the requests in flight drain, then the agent is
 // opened through the same `open` path as a switch. Nothing is signed here.
 import type { AgentStorePeek } from '../agent-peek.js';
+import type { StorageUsage } from '../storage-usage.js';
 import type { UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { ApprovalServerSource } from '../approval-server.js';
 import type { LocalUiAiApps, LocalUiOptions } from './context.js';
@@ -91,6 +92,11 @@ export interface AgentDirectory {
   read(name: string): Promise<AgentDirectoryEntry | undefined>;
   /** The contact count and Running of one agent; undefined when its store cannot be read now. */
   stats(name: string): Promise<AgentDirectoryStats | undefined>;
+  /**
+   * REL051-RET1: the sizes of one agent's store, read-only (node storage-usage.ts); undefined when
+   * it cannot be read now. Optional: a directory without it shows no sizes.
+   */
+  storage?(name: string): Promise<StorageUsage | undefined>;
   /** Card U3-d: writes the verified label into config.json (07 §9.1). */
   writeLabel(name: string, label: string): Promise<void>;
   /**
