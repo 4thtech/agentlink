@@ -657,6 +657,19 @@ describe('round 2: busy, finish restoring, per-ID failure', () => {
     expect(r).toEqual({ kind: 'error', problem: 'finish_restore' });
   });
 
+  it('first-run owner setup maps 409 keychain_unavailable to a retryable message', async () => {
+    const fetch = (() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ status: 'keychain_unavailable' }), { status: 409 }),
+      )) as typeof globalThis.fetch;
+    const r = await createSetupApi({ fetch, token: 't' }).begin('Ana');
+    expect(r).toEqual({ kind: 'error', problem: 'keychain_unavailable' });
+    const { SETUP_MESSAGES } = await import('../first-run/strings.js');
+    expect(SETUP_MESSAGES.keychain_unavailable).toBe(
+      "AgentLink couldn't check this computer's keychain. Try again.",
+    );
+  });
+
   it('a per-ID failed answer keeps the outcomes and step 4 says that ID was not restored', async () => {
     const fetch = (() =>
       Promise.resolve(

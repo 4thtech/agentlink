@@ -152,7 +152,7 @@ export const SETUP_MESSAGES = {
   relay_unreachable: FAILURE_COPY.relay_unreachable,
   ai_app_running: FAILURE_COPY.ai_app_running,
   ai_app_config_unwritable: FAILURE_COPY.ai_app_config_unwritable,
-  keychain_unavailable: FAILURE_COPY.keychain_unavailable,
+  keychain_unavailable: "AgentLink couldn't check this computer's keychain. Try again.",
   concurrent_change: FAILURE_COPY.concurrent_change,
   internal: FAILURE_COPY.internal,
   offline: "AgentLink isn't answering. Ask your AI to open AgentLink again.",

@@ -34,6 +34,8 @@ export type SetupProblem =
   | 'no_agent'
   /** UX1113-R1: restored IDs wait for their owner; the restore wizard finishes it. */
   | 'finish_restore'
+  /** UX1113-R1: the keychain did not answer, so no owner could be ruled in or out. */
+  | 'keychain_unavailable'
   | 'expired'
   | 'not_pending'
   | 'busy'
@@ -213,6 +215,7 @@ function problemOf(answer: Answer): SetupError {
   if (str(answer.json?.['error']) === 'no_agent') return { kind: 'error', problem: 'no_agent' };
   const status = str(answer.json?.['status']);
   if (status === 'finish_restore') return { kind: 'error', problem: 'finish_restore' };
+  if (status === 'keychain_unavailable') return { kind: 'error', problem: 'keychain_unavailable' };
   if (status === 'folder_refused') {
     const reason = str(answer.json?.['reason']);
     return {
