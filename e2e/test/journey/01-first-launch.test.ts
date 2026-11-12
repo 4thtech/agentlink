@@ -98,15 +98,22 @@ describe('chapter 1: onboarding', () => {
 
     // W4-HOME (un-gated): once set up, the app opens on Home with no one in People yet, and Get
     // started does not come back.
-    // UX1113: the link was not copied, so leaving says so once (it would stop working).
+    // REL051-B2 (owner test, 13 Nov): Done without Copy keeps the invite. It waits on Home, where
+    // Show link (and Copy link) get the same link back for the student.
+    const made = (await page.locator('.inv-link[data-state="ready"]').textContent())?.trim() ?? '';
+    expect(made).toMatch(/^https:\/\/agentlink\.4thtech\.io\/i#/);
     await page.getByRole('button', { name: 'Done, go to Home' }).click();
-    await page.getByRole('alert').filter({ hasText: "haven't copied" }).waitFor();
-    await page.getByRole('button', { name: 'Leave without copying' }).first().click();
     await page.waitForURL((url) => url.pathname === '/');
     expect(await text(page)).not.toContain('Which AI app do you use?');
+    expect(await text(page)).not.toContain("haven't copied");
     await page.getByRole('heading', { name: 'People' }).first().waitFor();
     // W4-WIRE: Home shows once its Get started read has answered too (its skeleton until then).
-    await page.getByText('No one here yet.').first().waitFor();
+    await page.getByText('Waiting for them to accept').first().waitFor();
+    expect(await text(page)).not.toContain(made);
+    await page.getByRole('button', { name: 'Show link' }).first().click();
+    await page.locator('.inv-link-kept').first().waitFor();
+    expect((await page.locator('.inv-link-kept').first().textContent())?.trim()).toBe(made);
+    await page.getByRole('button', { name: 'Hide link' }).first().click();
     // W4-WIRE: Home carries the Get started card (one of the three ways back), counted from real
     // state: the AI app is connected; inviting someone is next, on the Invite screen.
     await page.getByRole('heading', { name: 'Get started · 1 of 2 done' }).waitFor();

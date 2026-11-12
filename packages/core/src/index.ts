@@ -71,6 +71,7 @@ export {
   // W4-SHORT-INVITE / W4-INVITES-LIST (D-139): the drop fetcher of a short link, and an open invite.
   shortInviteFetcher,
   type OpenInvite,
+  type InviteLinkResult,
   type CheckedInviteLink,
   type CreateInviteInput,
   type CreatedInvite,

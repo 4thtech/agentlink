@@ -550,6 +550,8 @@ export function inviteDesk(client: AgentLinkClient): LocalUiInviteDesk {
     },
     cancel: (inviteId) => client.pairing.cancelInvite(inviteId),
     cancelConnecting: (ref) => client.contacts.cancelConnecting(ref),
+    // REL051-B2: the kept link of one open invite (Copy link, Show link); never logged.
+    link: (inviteId) => client.pairing.inviteLink(inviteId),
   });
 }
 

@@ -85,6 +85,7 @@ import { BACKUP_REVEAL_PATH, REVEAL_PATH } from './reveal-path.js';
 import {
   INVITE_ACCEPT_PATH,
   INVITE_CANCEL_PATH,
+  INVITE_LINK_PATH,
   INVITE_CHECK_PATH,
   INVITE_CONNECTING_CANCEL_PATH,
   INVITE_CREATE_PATH,
@@ -119,6 +120,7 @@ const INVITE_STEP_PATHS: Readonly<Record<string, string>> = Object.freeze({
   dismiss: JOIN_DISMISS_PATH,
   cancel: INVITE_CANCEL_PATH,
   'cancel-connecting': INVITE_CONNECTING_CANCEL_PATH,
+  link: INVITE_LINK_PATH,
 });
 export const LOCAL_UI_API_PREFIX = '/api/ui/';
 /** M1-11s-c: setup routes live only under the first-run page's API. */
@@ -338,7 +340,8 @@ export class LocalUiRouteRegistry {
         step !== 'check' &&
         step !== 'dismiss' &&
         step !== 'cancel' &&
-        step !== 'cancel-connecting'
+        step !== 'cancel-connecting' &&
+        step !== 'link'
       ) {
         throw invalid('unknown invite step');
       }

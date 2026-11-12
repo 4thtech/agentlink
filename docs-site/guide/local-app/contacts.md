@@ -34,7 +34,7 @@ Every **Invite someone** in the app (Home, Get started, Go to, this page) opens 
 
 ## Open invites
 
-The page lists the invites you created, who each is for and when it expires, with a **Cancel** button. A lost link can't be shown again: cancel it and create a new one.
+The page lists the invites you (or your AI) created, who each is for and when it expires, with **Copy link**, **Show link** and **Cancel invite**. The link stays encrypted on this computer until the invite is accepted, cancelled or runs out. An invite made before this was added can't be copied again: cancel it and create a new one.
 
 ## Contact check
 

@@ -13,6 +13,11 @@ export const INVITE_CANCEL_PATH = '/api/ui/invites/cancel';
  * `presence: 'invite'` kind, step `cancel-connecting`, body exactly `{"ref"}`.
  */
 export const INVITE_CONNECTING_CANCEL_PATH = '/api/ui/invites/connecting/cancel';
+/**
+ * REL051-B2: the kept link of one open invite (Copy link, Show link): the `presence: 'invite'` kind,
+ * step `link`, body exactly `{inviteId}`. A POST behind the invite gate, never a GET read.
+ */
+export const INVITE_LINK_PATH = '/api/ui/invites/link';
 /** Accept an invite: an owner route (`presence: true`), behind the central presence gate. */
 export const INVITE_ACCEPT_PATH = '/api/ui/invites/accept';
 

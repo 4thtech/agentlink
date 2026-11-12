@@ -16,6 +16,8 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetPrefsForTests, setPref } from '../../prefs/index.js';
+import type { CreateOutcome, InviteApi } from '../contacts/invite-api.js';
+import { InviteScreen } from '../invite/invite-screen.js';
 import { HomeScreen, type HomeScreenProps } from './home-screen.js';
 import { HOME_STRINGS as S } from './people-strings.js';
 
@@ -526,6 +528,92 @@ describe('Home simple (A4)', () => {
     const post = s.calls.find((c) => c.url === '/api/ui/invites/connecting/cancel');
     expect(post?.method).toBe('POST');
     expect(JSON.parse(new TextDecoder().decode(post?.body))).toEqual({ ref: bo });
+  });
+
+  // REL051-B2 (owner test, 13 Nov): a waiting invite's link can be copied or shown again.
+  const KEPT_ID = 'AQEBAQEBAQEBAQEBAQEBAQ';
+  const KEPT_LINK = `https://agentlink.4thtech.io/i#2.${'K'.repeat(43)}`;
+  const waitingFor = (name: string | null) => ({
+    invites: [
+      {
+        inviteId: KEPT_ID,
+        name,
+        expiresAt: new Date(Date.now() + 6.5 * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z'),
+      },
+    ],
+  });
+  const linkAnswer = ok({
+    status: 'ok',
+    inviteUrl: KEPT_LINK,
+    shareText: `Connect with me on AgentLink: ${KEPT_LINK}`,
+    format: 'short',
+    expiresAt: '2999-01-01T00:00:00Z',
+  });
+
+  it('a waiting invite: Copy link and Show link get the kept link from this app only', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    const s = await render(
+      base({ '/api/ui/invites': ok(waitingFor('Marko')), '/api/ui/invites/link': linkAnswer }),
+    );
+    expect(host.textContent).toContain('Waiting for Marko');
+    // The list read carries no link, and the page shows none until asked.
+    expect(host.textContent).not.toContain(KEPT_LINK);
+    await click(byText('button', 'Copy link'));
+    const post = s.calls.find((c) => c.url === '/api/ui/invites/link');
+    expect(post?.method).toBe('POST');
+    expect(post?.headers.get('X-AgentLink-CSRF')).toBe('t');
+    expect(writeText).toHaveBeenCalledWith(KEPT_LINK);
+    expect(host.textContent).not.toContain(KEPT_LINK);
+    await click(byText('button', 'Show link'));
+    expect(host.textContent).toContain(KEPT_LINK);
+    await click(byText('button', 'Hide link'));
+    expect(host.textContent).not.toContain(KEPT_LINK);
+    expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
+  });
+
+  it('Done without Copy, then Copy link from Home: the student still gets the link', async () => {
+    const cancelled: string[] = [];
+    const invites: InviteApi = {
+      create: () =>
+        Promise.resolve<CreateOutcome>({
+          kind: 'ok',
+          invite: {
+            inviteUrl: KEPT_LINK,
+            shareText: `Connect with me on AgentLink: ${KEPT_LINK}`,
+            expiresAt: Date.UTC(2999, 0, 1),
+            format: 'short',
+            inviteId: KEPT_ID,
+          },
+        }),
+      cancel: (id) => {
+        cancelled.push(id);
+        return Promise.resolve({ kind: 'cancelled' });
+      },
+      check: () => Promise.resolve({ kind: 'failed' }),
+      accept: () => Promise.resolve({ kind: 'failed' }),
+    };
+    let done = false;
+    await act(async () => {
+      root.render(h(InviteScreen, { invites, sender: 'Tali', onDone: () => (done = true) }));
+    });
+    await settle();
+    expect(host.textContent).toContain(KEPT_LINK);
+    // Done, never Copy: the panel goes away.
+    await click(byText('button', 'Done'));
+    expect(done).toBe(true);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await settle();
+    expect(cancelled).toEqual([]);
+    // Home lists the invite (from the server) and Copy link gets the same link back.
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    await render(
+      base({ '/api/ui/invites': ok(waitingFor(null)), '/api/ui/invites/link': linkAnswer }),
+    );
+    await click(byText('button', 'Copy link'));
+    expect(writeText).toHaveBeenCalledWith(KEPT_LINK);
   });
 
   it('shows only the stretch both boxes cover: a reply older than the other side’s oldest loaded message waits for Load earlier (IR-W4-HOME-1)', async () => {

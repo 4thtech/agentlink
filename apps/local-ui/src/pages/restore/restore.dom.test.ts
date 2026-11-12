@@ -7,7 +7,7 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppsApi } from '../first-run/apps-api.js';
-import type { OwnerClient } from '../contacts/owner.js';
+import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import type { RestoreApi, Summary } from './api.js';
 import { clean, toGroups } from './code-field.js';
 import { createSetupApi } from '../first-run/setup-api.js';
@@ -347,6 +347,32 @@ describe('step 2: your recovery code', () => {
     expect(text()).toContain(S.CODE.assurance);
   });
 
+  it('REL051-UF3 (R1-UI-06): a double click on Confirm with Touch ID asks once and confirms once', async () => {
+    const presence = vi.fn(() => ok({}));
+    const api = fakeApi({
+      header: () => ok({ header: 'ok' as const, ownerPresent: true }),
+      presence,
+    });
+    let answer: ((p: PresenceProof) => void) | undefined;
+    const passkeyProof = vi.fn(
+      (): Promise<PresenceProof | undefined> =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    await mount(api, { owner: owner(true), passkeyProof });
+    await click(S.KIT.next);
+    const confirm = button(S.PRESENCE.usePasskey('Touch ID'));
+    await act(async () => confirm?.click());
+    await act(async () => confirm?.click());
+    expect(passkeyProof).toHaveBeenCalledTimes(1);
+    expect(confirm?.disabled).toBe(true);
+    await act(async () => answer?.({ kind: 'passkey', body: new Uint8Array([1]) }));
+    await settle();
+    expect(presence).toHaveBeenCalledTimes(1);
+    expect(text()).toContain(S.CODE.title);
+  });
+
   it('asks for presence first on a computer that already has an owner', async () => {
     const presence = vi.fn(() => ok({}));
     const api = fakeApi({
@@ -474,6 +500,31 @@ describe('step 3: what comes back', () => {
     expect(call[1]).toEqual(['0x' + '1'.repeat(40), '0x' + '2'.repeat(40)]);
     // The folder only (the server's suggestion); the ID keeps its name.
     expect(call[2]).toEqual({ ['0x' + '2'.repeat(40)]: 'work-2' });
+  });
+
+  it('REL051-UF3 (R1-UI-08): rows use the name people see; the folder only Under the hood', async () => {
+    const named: Summary = {
+      ...SUMMARY,
+      ids: [
+        // Restore on the same computer: the server knows the label of an ID already here.
+        { ...SUMMARY.ids[2]!, label: 'Ana Novak' },
+        // A new ID from the first-run folder: its label is inside the kit, read once restored.
+        { ...SUMMARY.ids[0]!, name: 'default' },
+      ],
+    };
+    await toReview(fakeApi({ open: () => ok({ kit: 'kit-handle', summary: named }) }));
+    const rowNames = [...host.querySelectorAll('.rs-row-name')].map((n) => n.textContent);
+    expect(rowNames).toEqual(['Ana Novak', S.REVIEW.firstId]);
+    const boxes = [...host.querySelectorAll<HTMLInputElement>('.rs-row input[type="checkbox"]')];
+    expect(boxes.map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Restore Ana Novak',
+      `Restore ${S.REVIEW.firstId}`,
+    ]);
+    expect(text()).not.toContain('macbook');
+    expect(text()).not.toContain('default');
+    // R1-UI-26: no Under the hood block in Simple.
+    expect(host.querySelector('.rs-hood')).toBeNull();
+    expect(text()).not.toContain(S.REVIEW.hood);
   });
 
   it('keeps Restore off when nothing is ticked', async () => {

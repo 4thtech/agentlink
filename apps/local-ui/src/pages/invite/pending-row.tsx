@@ -1,12 +1,20 @@
 // W4-PEOPLE-INVITE: one open invite in the People list (prototype v23 A4, A10; W4-INVITES-LIST).
 // Exported for Home (U3). A dashed letter, the name (or "Someone"), "Waiting for … · link works N
 // more days" and Cancel invite; once cancelled, "Invite cancelled. The link no longer works." stays
-// in place. Under the hood: the invite's ID and its exact expiry. Never a link: a lost link is
-// cancelled and a new one made. The name is the owner's own label, rendered as text.
+// in place. Under the hood: the invite's ID and its exact expiry. The name is the owner's own label,
+// rendered as text. REL051-B2 (owner test, 13 Nov): Copy link and Show link get the invite's kept
+// link from this app on a click (invite-link-actions.tsx); the list itself never carries a link.
 import { Button, useHood } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
-import type { ConnectingRow, OpenInvite } from '../contacts/invite-api.js';
-import { FEEDBACK_STRINGS as F, INVITE_STRINGS as S, letterOf, waitingLine } from './strings.js';
+import type { ConnectingRow, LinkOutcome, OpenInvite } from '../contacts/invite-api.js';
+import { InviteLinkButtons, InviteLinkReveal, useInviteLink } from './invite-link-actions.js';
+import {
+  FEEDBACK_STRINGS as F,
+  INVITE_STRINGS as S,
+  letterOf,
+  linkLabel,
+  waitingLine,
+} from './strings.js';
 import './invite.css';
 
 const DAY_MS = 86_400_000;
@@ -19,6 +27,8 @@ export interface PendingInviteRowProps {
   /** Unix milliseconds. */
   readonly now: number;
   readonly onCancel: (inviteId: string) => Promise<CancelResult>;
+  /** REL051-B2: reads the invite's kept link (Copy link, Show link); absent: no link actions. */
+  readonly onLink?: (inviteId: string) => Promise<LinkOutcome>;
   /** Already cancelled in this visit (the page keeps the row after the server dropped it). */
   readonly cancelled?: boolean;
   /** Briefly marks a row that just arrived (colour only). */
@@ -32,10 +42,12 @@ export function PendingInviteRow({
   invite,
   now,
   onCancel,
+  onLink,
   cancelled: givenCancelled = false,
   highlight = false,
 }: PendingInviteRowProps): ReactElement {
   const hood = useHood();
+  const link = useInviteLink(invite.inviteId, onLink);
   const [state, setState] = useState<'open' | 'busy' | 'cancelled' | 'failed'>(
     givenCancelled ? 'cancelled' : 'open',
   );
@@ -72,11 +84,23 @@ export function PendingInviteRow({
             {S.cantCancel}
           </span>
         ) : null}
+        {done || onLink === undefined ? null : (
+          <InviteLinkReveal link={link} label={linkLabel(invite.name ?? '')} />
+        )}
       </span>
       {done ? null : (
-        <Button size="sm" className="al-press" disabled={state === 'busy'} onClick={cancel}>
-          {state === 'busy' ? S.cancelling : S.cancelInvite}
-        </Button>
+        <span className="inv-pending-actions">
+          {onLink === undefined ? null : <InviteLinkButtons link={link} />}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="al-press"
+            disabled={state === 'busy'}
+            onClick={cancel}
+          >
+            {state === 'busy' ? S.cancelling : S.cancelInvite}
+          </Button>
+        </span>
       )}
     </li>
   );

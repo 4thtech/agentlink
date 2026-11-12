@@ -8,10 +8,11 @@
 // - apps/local-ui (src/pages/contacts/*.test.ts) asserts its client builds exactly each request and
 //   reads each answer as the outcome word next to it.
 //
-// All three routes are the invite kind (no presence): an octet-stream body holding one JSON object,
+// Every POST route is the invite kind (no presence): an octet-stream body holding one JSON object,
 // the page's CSRF token, no query, no X-AgentLink-Input. The list never carries a link, a secret or
-// a lookup ID: a lost link cannot be shown again (04 §3.6.2); the owner cancels and creates a new one.
-// The world's values are filler.
+// a lookup ID. REL051-B2 (owner test, 13 Nov; 04 §3.6, 08 §1): `POST /api/ui/invites/link` answers
+// one open invite's kept link again, only on the owner's click (Copy link, Show link); an invite
+// stored before links were kept answers `no_link`. The world's values are filler.
 
 /** `POST /api/ui/invites`: `{}`, `{label}`, and `long: true` only from Advanced (D-139 (7)). */
 export interface InviteCreateBody {
@@ -52,6 +53,20 @@ export interface InviteCancelBody {
   readonly inviteId: string;
 }
 
+/** REL051-B2: `POST /api/ui/invites/link` body: exactly `{inviteId}`. */
+export interface InviteLinkBody {
+  readonly inviteId: string;
+}
+
+/** REL051-B2: the kept link of one open invite, its share text, format and expiry. */
+export interface InviteLinkAnswerBody {
+  readonly status: 'ok';
+  readonly inviteUrl: string;
+  readonly shareText: string;
+  readonly format: 'short' | 'long';
+  readonly expiresAt: string;
+}
+
 export interface InvitesAnswer<B = unknown> {
   readonly status: number;
   readonly body: B;
@@ -59,6 +74,8 @@ export interface InvitesAnswer<B = unknown> {
 
 export const INVITES_PATH = '/api/ui/invites';
 export const INVITE_CANCEL_PATH = '/api/ui/invites/cancel';
+/** REL051-B2: copy an open invite's link again (the invite kind, step `link`). */
+export const INVITE_LINK_PATH = '/api/ui/invites/link';
 /** The short link form (04 §3.6.2): the canonical host, `2.` and 43 base64url characters. */
 export const SHORT_INVITE_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#2\.[A-Za-z0-9_-]{43}$/;
 
@@ -125,6 +142,36 @@ export const INVITE_CANCEL = {
     body: { inviteId: INVITES_WORLD.otherInviteId } satisfies InviteCancelBody,
     answer: { status: 404, body: { error: 'not_found' } } satisfies InvitesAnswer,
     outcome: 'not_found',
+  },
+} as const;
+
+/** REL051-B2: `POST /api/ui/invites/link` answers. */
+export const INVITE_LINK = {
+  ok: {
+    body: { inviteId: INVITES_WORLD.inviteId } satisfies InviteLinkBody,
+    answer: {
+      status: 200,
+      body: {
+        status: 'ok',
+        inviteUrl: INVITES_WORLD.shortLink,
+        shareText: `Add my AI agent on AgentLink: ${INVITES_WORLD.shortLink}`,
+        format: 'short',
+        expiresAt: INVITES_WORLD.expiresAt,
+      },
+    } satisfies InvitesAnswer<InviteLinkAnswerBody>,
+    outcome: 'ok',
+  },
+  /** Used, cancelled, expired or unknown. */
+  gone: {
+    body: { inviteId: INVITES_WORLD.otherInviteId } satisfies InviteLinkBody,
+    answer: { status: 404, body: { error: 'not_found' } } satisfies InvitesAnswer,
+    outcome: 'not_found',
+  },
+  /** An open invite stored before links were kept: cancel it and make a new one. */
+  old: {
+    body: { inviteId: 'AgICAgICAgICAgICAgICAg' } satisfies InviteLinkBody,
+    answer: { status: 404, body: { error: 'no_link' } } satisfies InvitesAnswer,
+    outcome: 'no_link',
   },
 } as const;
 

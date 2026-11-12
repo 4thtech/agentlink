@@ -49,6 +49,12 @@
 // `POST /api/ui/invites/connecting/cancel`, the invite kind, step `cancel-connecting`, body exactly
 // `{"ref"}`, drops this agent's accepts that wait for that contact (core `cancelConnecting`; nothing
 // is signed or sent), as Cancel on an open invite does for the other side.
+// REL051-B2 (owner test, 13 Nov; 04 §3.6; 08 §1): `POST /api/ui/invites/link`, the invite kind, step
+// `link`, body exactly `{"inviteId"}`: core `inviteLink`, the link an open invite was handed out as
+// (kept sealed on this computer), with its share text, format and expiry, for Copy link and Show
+// link on Home and People. 404 `not_found` for a used, cancelled, expired or unknown invite; 404
+// `no_link` for one stored before links were kept. A POST behind the invite gate (session, CSRF,
+// Origin, fetch metadata), answered `no-store`; no event, no log line (I-7). No MCP tool reads it.
 //
 // Only the canonical link `https://agentlink.4thtech.io/i#<payload>` or the bare payload ever reaches
 // core: any other host, scheme, path, percent-escape, whitespace or size is refused here first, and
@@ -79,6 +85,7 @@ import {
   INVITE_CHECK_PATH,
   INVITE_CONNECTING_CANCEL_PATH,
   INVITE_CREATE_PATH,
+  INVITE_LINK_PATH,
   INVITES_LIST_PATH,
 } from '../invite-paths.js';
 import {
@@ -466,6 +473,63 @@ async function cancelConnecting(
   return Object.freeze({ status: 200, body: Object.freeze({ status: 'cancelled' }) });
 }
 
+// --- copy the link again (REL051-B2) -----------------------------------------------------------
+
+/** 404: an open invite stored before links were kept; the owner cancels it and makes a new one. */
+const NO_LINK = fixed(404, 'no_link');
+/** A short link as core makes it (04 §3.6.2). */
+const SHORT_LINK = /^2\.[A-Za-z0-9_-]{43}$/;
+
+async function inviteLink(
+  _context: LocalUiContext,
+  body: JsonObject,
+  invites: LocalUiInviteDesk | undefined,
+): Promise<LocalUiResult> {
+  if (invites === undefined) return UI_NOT_SET_UP;
+  const keys = Object.keys(body);
+  const inviteId = body['inviteId'];
+  if (keys.length !== 1 || typeof inviteId !== 'string' || !INVITE_ID.test(inviteId)) {
+    return INVALID;
+  }
+  if (invites.link === undefined) return NO_LINK;
+  let found: Awaited<ReturnType<NonNullable<LocalUiInviteDesk['link']>>>;
+  try {
+    found = await invites.link(inviteId);
+  } catch (error) {
+    if (error instanceof CoreError && error.code === 'identity_missing') return UI_NOT_SET_UP;
+    return UNAVAILABLE;
+  }
+  if (found.status === 'not_found') return NOT_FOUND;
+  if (found.status !== 'ok') return NO_LINK;
+  const { inviteUrl, format, expiresAt } = found;
+  const when = rfc3339(expiresAt);
+  // Only the canonical link, in the form its format names, ever reaches the page (fail closed).
+  if (
+    typeof inviteUrl !== 'string' ||
+    !inviteUrl.startsWith(INVITE_LINK_PREFIX) ||
+    when === undefined ||
+    (format !== 'short' && format !== 'long')
+  ) {
+    return UNAVAILABLE;
+  }
+  const code = inviteUrl.slice(INVITE_LINK_PREFIX.length);
+  const shaped =
+    format === 'short'
+      ? SHORT_LINK.test(code)
+      : code.length > 0 && code.length <= INVITE_MAX_PAYLOAD_CHARS && PAYLOAD.test(code);
+  if (!shaped) return UNAVAILABLE;
+  return Object.freeze({
+    status: 200,
+    body: Object.freeze({
+      status: 'ok',
+      inviteUrl,
+      shareText: inviteShareText(inviteUrl, expiresAt),
+      format,
+      expiresAt: when,
+    }),
+  });
+}
+
 // --- check ------------------------------------------------------------------------------------
 
 async function checkInvite(
@@ -648,6 +712,14 @@ export const inviteConnectingCancelRoute: LocalUiInviteRoute = Object.freeze<Loc
   handler: cancelConnecting,
 });
 
+export const inviteLinkRoute: LocalUiInviteRoute = Object.freeze<LocalUiInviteRoute>({
+  method: 'POST',
+  path: INVITE_LINK_PATH,
+  presence: 'invite',
+  step: 'link',
+  handler: inviteLink,
+});
+
 export const invitesRoutes: readonly LocalUiRoute[] = Object.freeze([
   inviteCreateRoute,
   inviteCheckRoute,
@@ -655,4 +727,5 @@ export const invitesRoutes: readonly LocalUiRoute[] = Object.freeze([
   invitesListRoute,
   inviteCancelRoute,
   inviteConnectingCancelRoute,
+  inviteLinkRoute,
 ]);

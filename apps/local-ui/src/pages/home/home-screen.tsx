@@ -66,7 +66,12 @@ import {
   type InviteApi,
   type OpenInvite,
 } from '../contacts/invite-api.js';
-import { FEEDBACK_STRINGS as F } from '../invite/strings.js';
+import { FEEDBACK_STRINGS as F, linkLabel } from '../invite/strings.js';
+import {
+  InviteLinkButtons,
+  InviteLinkReveal,
+  useInviteLink,
+} from '../invite/invite-link-actions.js';
 import { createFilesApi } from '../files/files-api.js';
 import type { Conversation as Person, MessagesApi, Problem } from '../messages/api.js';
 import { createSaveApi, type SaveApi } from '../inbox/save-api.js';
@@ -384,7 +389,11 @@ function ArchiveButton({
 
 const DAY_MS = 86_400_000;
 
-/** An invite that waits to be accepted: who, how long the link works, and Cancel. Never the link. */
+/**
+ * An invite that waits to be accepted: who, how long the link works, Copy link, Show link and
+ * Cancel. The list carries no link; Copy link and Show link read the kept one on a click
+ * (REL051-B2, owner test 13 Nov: Done without Copy no longer loses it).
+ */
 function PendingInviteRow({
   invite,
   pro,
@@ -400,6 +409,10 @@ function PendingInviteRow({
 }): ReactElement {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const link = useInviteLink(
+    invite.inviteId,
+    api.link === undefined ? undefined : (id) => api.link!(id),
+  );
   const left = Math.max(0, Math.ceil((invite.expiresAt - Date.now()) / DAY_MS));
   const name = invite.name ?? undefined;
   return (
@@ -429,9 +442,14 @@ function PendingInviteRow({
             {S.cantCancel}
           </span>
         ) : null}
+        {api.link === undefined ? null : (
+          <InviteLinkReveal link={link} label={linkLabel(name ?? '')} />
+        )}
       </span>
+      {api.link === undefined ? null : <InviteLinkButtons link={link} />}
       <Button
         size="sm"
+        variant="ghost"
         disabled={busy}
         onClick={() => {
           setBusy(true);

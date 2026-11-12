@@ -34,6 +34,7 @@ import {
   type PresenceProof,
 } from '../contacts/owner.js';
 import { switchToPasskey, type SwitchToPasskey } from '../contacts/passkey-switch.js';
+import { usePresenceFlight } from '../contacts/presence-flight.js';
 import { PASSKEY_WHY } from '../contacts/strings.js';
 import { BackupCodeField, UseCodeInstead } from '../first-run/backup-code.js';
 import { detectPlatform } from '../first-run/passkey.js';
@@ -550,6 +551,8 @@ function ReplaceCode({
   const [note, setNote] = useState<Note>(undefined);
   const [newCode, setNewCode] = useState<string | undefined>(undefined);
   const [copied, setCopied] = useState(false);
+  // REL051-UF3 (R1-UI-06): a double click on the sensor button asks once.
+  const flight = usePresenceFlight(busy);
   // IR WP-S2 M-1: the keychain may have taken the new code without confirming it. The new code stays
   // on screen (never cleared on this path) and no Finish or Cancel is offered.
   const [unconfirmed, setUnconfirmed] = useState(false);
@@ -597,14 +600,14 @@ function ReplaceCode({
   };
 
   const usePasskey = (): void => {
-    if (passkey === undefined || busy) return;
-    void passkeyProof(passkey).then(
-      (proof) =>
-        proof === undefined
-          ? setNote({ tone: 'plain', text: S.testCancelled(sensor) })
-          : begin(proof),
-      () => setNote({ tone: 'plain', text: S.testCancelled(sensor) }),
-    );
+    if (passkey === undefined || busy || !flight.start()) return;
+    void passkeyProof(passkey)
+      .catch(() => undefined)
+      .then((proof) => {
+        flight.done();
+        if (proof === undefined) setNote({ tone: 'plain', text: S.testCancelled(sensor) });
+        else begin(proof);
+      });
   };
 
   const submitFinish = (event: FormEvent): void => {
@@ -741,11 +744,16 @@ function ReplaceCode({
         </form>
       ) : (
         <div className="ti-row">
-          <Button variant="primary" icon="approval" onClick={usePasskey} disabled={busy}>
+          <Button
+            variant="primary"
+            icon="approval"
+            onClick={usePasskey}
+            disabled={busy || flight.asking}
+          >
             {S.confirmWith(sensor)}
           </Button>
-          <UseCodeInstead onClick={() => setUseCode(true)} disabled={busy} />
-          <Button variant="ghost" onClick={cancel} disabled={busy}>
+          <UseCodeInstead onClick={() => setUseCode(true)} disabled={busy || flight.asking} />
+          <Button variant="ghost" onClick={cancel} disabled={busy || flight.asking}>
             {S.cancel}
           </Button>
         </div>

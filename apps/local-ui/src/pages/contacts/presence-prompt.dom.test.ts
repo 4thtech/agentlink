@@ -93,6 +93,39 @@ async function render(
   return { submitted, switches };
 }
 
+describe('REL051-UF3 (R1-UI-06): one sensor question per press', () => {
+  it('a double click on "Confirm with …" asks once and holds the buttons until it settles', async () => {
+    let asked = 0;
+    let finish: ((value: null) => void) | undefined;
+    Object.defineProperty(navigator, 'credentials', {
+      configurable: true,
+      value: {
+        get: () => {
+          asked += 1;
+          return new Promise((resolve) => {
+            finish = resolve;
+          });
+        },
+      },
+    });
+    try {
+      await render(() => Promise.resolve(READY));
+      const confirm = button(S.usePasskeyOn(SENSOR[detectPlatform()]));
+      await act(async () => confirm.click());
+      await act(async () => confirm.click());
+      expect(asked).toBe(1);
+      expect(confirm.disabled).toBe(true);
+      // Cancelled at the sensor: the button opens again for a new try.
+      await act(async () => finish?.(null));
+      await flush();
+      expect(confirm.disabled).toBe(false);
+      expect(host.textContent).toContain(S.passkeyNotUsed);
+    } finally {
+      Reflect.deleteProperty(navigator, 'credentials');
+    }
+  });
+});
+
 describe('HOTFIX-045-TOUCHID: the presence sheet says why and offers the switch', () => {
   it('a passkey the caller missed is still offered (owner store answered after all)', async () => {
     await render(() => Promise.resolve(READY));

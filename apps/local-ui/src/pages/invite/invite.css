@@ -552,3 +552,17 @@ a.al-btn.inv-email {
   margin: 0;
   color: var(--al-color-status-success-fg);
 }
+
+/* REL051-B2: Copy link, Show link and Cancel invite on a waiting invite; the link shown below. */
+.inv-pending-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+.inv-link.inv-link-kept {
+  flex: 1 1 100%;
+  min-block-size: 40px;
+  margin-block-start: var(--al-space-2);
+  font-size: 13px;
+}

@@ -257,6 +257,26 @@ async function* fileChunks(path: string): AsyncIterable<Uint8Array> {
   }
 }
 
+/**
+ * REL051-B2 (IR-REL051-B2-1; 04 §3.6): the kept links of open invites never leave this computer, so
+ * the snapshot drops them before it is sealed into a kit. With `secure_delete` and a VACUUM, the
+ * sealed values are not left on free pages either. A store from before schema 14 has no column.
+ */
+export function stripInviteLinks(snapshotPath: string): void {
+  const db = new Database(snapshotPath, { fileMustExist: true });
+  try {
+    const columns = db.prepare("SELECT name FROM pragma_table_info('invites')").all() as {
+      name?: unknown;
+    }[];
+    if (!columns.some((c) => c.name === 'invite_link')) return;
+    db.pragma('secure_delete = ON');
+    db.prepare('UPDATE "invites" SET "invite_link" = NULL WHERE "invite_link" IS NOT NULL').run();
+    db.exec('VACUUM');
+  } finally {
+    db.close();
+  }
+}
+
 /** 04 §2.3.3 "Snapshot": `VACUUM INTO` a private file (run under the agent's lock by the control). */
 async function snapshotOf(storePath: string, into: string): Promise<RecoveryKitStoreSource> {
   const db = new Database(storePath, { readonly: true, fileMustExist: true });
@@ -265,6 +285,7 @@ async function snapshotOf(storePath: string, into: string): Promise<RecoveryKitS
   } finally {
     db.close();
   }
+  stripInviteLinks(into);
   await chmod(into, 0o600);
   const { size } = await lstat(into);
   return { length: size, chunks: fileChunks(into) };

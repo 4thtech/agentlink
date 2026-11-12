@@ -21,6 +21,7 @@ import type {
   InviteRefusal,
 } from '../contacts/invite-api.js';
 import { passkeyProof, type PasskeyInfo, type PresenceProof } from '../contacts/owner.js';
+import { usePresenceFlight } from '../contacts/presence-flight.js';
 import { PresencePrompt } from '../contacts/presence-prompt.js';
 import { CONTACTS_STRINGS as C, waitSeconds } from '../contacts/strings.js';
 import { UseCodeInstead } from '../first-run/backup-code.js';
@@ -108,6 +109,9 @@ export function PasteInvite({
   const [link, setLink] = useState('');
   const [message, setMessage] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  // REL051-UF3 (R1-UI-06): a double click on Accept asks for the sensor once.
+  const flight = usePresenceFlight(busy);
+  const held = busy || flight.asking;
   const open = phase.k !== 'closed';
 
   const restart = (): void => {
@@ -200,11 +204,15 @@ export function PasteInvite({
       setPhase({ k: 'who', invite, code: true });
       return;
     }
-    void gesture(passkey).then((proof) => {
-      // Touch ID cancelled: the card stays and nothing is sent.
-      if (proof === undefined) setMessage(J.notAccepted);
-      else send(invite, proof);
-    });
+    if (!flight.start()) return;
+    void gesture(passkey)
+      .catch(() => undefined)
+      .then((proof) => {
+        flight.done();
+        // Touch ID cancelled: the card stays and nothing is sent.
+        if (proof === undefined) setMessage(J.notAccepted);
+        else send(invite, proof);
+      });
   };
 
   let body: ReactElement | null = null;
@@ -298,7 +306,7 @@ export function PasteInvite({
               size="lg"
               block
               className="al-press"
-              disabled={busy}
+              disabled={held}
               onClick={() => accept(invite)}
             >
               <span className="inv-btn-in">
@@ -309,7 +317,7 @@ export function PasteInvite({
             {/* FB-8: the master code is always a way to confirm, also with a passkey here. */}
             {passkey === undefined ? null : (
               <UseCodeInstead
-                disabled={busy}
+                disabled={held}
                 onClick={() => {
                   setMessage(undefined);
                   setPhase({ k: 'who', invite, code: true });
@@ -318,7 +326,7 @@ export function PasteInvite({
             )}
             {busy ? <ProgressBar label={P.connecting(shown)} indeterminate /> : null}
             {message === undefined ? null : <InlineError>{message}</InlineError>}
-            <Button variant="ghost" disabled={busy} onClick={restart}>
+            <Button variant="ghost" disabled={held} onClick={restart}>
               {S.notNow}
             </Button>
           </>

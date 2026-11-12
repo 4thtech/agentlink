@@ -79,6 +79,7 @@ import {
   encodeInviteLink,
   encodeInvitePayload,
   encodeShortInviteLink,
+  INVITE_LINK_PREFIX,
   resolveInviteLink,
   type ShortInviteFetch,
 } from './invite-link.js';
@@ -257,6 +258,20 @@ export interface OpenInvite {
   readonly label: string | null;
   readonly expiresAt: number;
 }
+
+/** A short link's code after the prefix (04 §3.6.2): `2.` and 43 base64url characters. */
+const SHORT_LINK = /^2\.[A-Za-z0-9_-]{43}$/;
+
+/** REL051-B2: what `inviteLink` answers. The link carries the invite secret: never log it. */
+export type InviteLinkResult =
+  | {
+      readonly status: 'ok';
+      readonly inviteUrl: string;
+      readonly format: 'short' | 'long';
+      readonly expiresAt: number;
+    }
+  | { readonly status: 'not_found' }
+  | { readonly status: 'no_link' };
 
 /** Retry delays for a failed drop object delete (04 §3.6.2: retried with backoff). */
 /**
@@ -522,6 +537,8 @@ export class PairingService implements PairingHandler {
             ? null
             : await seal(ctx, 'invites', 'drop_key_epoch', key, String(sealed.epoch)),
         cancelled_at: null,
+        // REL051-B2: set below, once it is known which link is handed out.
+        invite_link: null,
       };
       await ctx.store.transaction((tx) => {
         tx.insert('invites', row);
@@ -553,6 +570,22 @@ export class PairingService implements PairingHandler {
             ctx.log.info('invite drop sweep failed');
           });
         }
+      }
+      // REL051-B2 (04 §3.6): keep the link handed out, sealed like proof_key, so the owner can copy
+      // it again while the invite is open (inviteLink). Whoever reads the store can already answer
+      // this invite with proof_key, so this adds no reach; the link never leaves this computer
+      // except to the owner's own page. A failed write only means it cannot be copied again.
+      try {
+        const kept = await seal(ctx, 'invites', 'invite_link', key, inviteUrl);
+        await ctx.store.transaction((tx) => {
+          tx.update(
+            'invites',
+            { invite_id: id, used_at: null, cancelled_at: null },
+            { invite_link: kept },
+          );
+        });
+      } catch {
+        ctx.log.info('invite link not kept');
       }
       ctx.log.info('invite created', { expiresAt, format });
       return {
@@ -601,6 +634,34 @@ export class PairingService implements PairingHandler {
   }
 
   /**
+   * REL051-B2 (owner test, 13 Nov; 04 §3.6; 08 §1): the link an open invite (not used, not
+   * cancelled, not expired) was handed out as, for the owner's Copy link and Show link on the
+   * local page only (no MCP tool reads it). `not_found` for any other ID; `no_link` for an open
+   * invite stored before links were kept. The link carries the invite secret: never log it (I-7).
+   */
+  async inviteLink(inviteId: string): Promise<InviteLinkResult> {
+    const ctx = this.#ctx;
+    if (typeof inviteId !== 'string' || !/^[A-Za-z0-9_-]{22}$/.test(inviteId)) {
+      return { status: 'not_found' };
+    }
+    const now = nowOf(ctx);
+    const row = await ctx.store.transaction((tx) => tx.get('invites', { invite_id: inviteId }));
+    if (
+      row === undefined ||
+      row.used_at != null ||
+      row.cancelled_at != null ||
+      row.expires_at <= now
+    ) {
+      return { status: 'not_found' };
+    }
+    if (row.invite_link == null) return { status: 'no_link' };
+    const inviteUrl = await open(ctx, 'invites', 'invite_link', [inviteId], row.invite_link);
+    if (!inviteUrl.startsWith(INVITE_LINK_PREFIX)) return { status: 'no_link' };
+    const format = SHORT_LINK.test(inviteUrl.slice(INVITE_LINK_PREFIX.length)) ? 'short' : 'long';
+    return { status: 'ok', inviteUrl, format, expiresAt: row.expires_at };
+  }
+
+  /**
    * Cancels an open invite (04 §3.6.2: an owner action on the local page or the CLI; no MCP tool
    * cancels). A later answer is refused, and a short link's drop object is deleted (retried with
    * backoff; never blocking). `not_found` for an unknown, used, cancelled or expired invite.
@@ -619,7 +680,12 @@ export class PairingService implements PairingHandler {
       ) {
         return false;
       }
-      tx.update('invites', { invite_id: inviteId, cancelled_at: null }, { cancelled_at: now });
+      // REL051-B2: a cancelled invite's link is no longer kept.
+      tx.update(
+        'invites',
+        { invite_id: inviteId, cancelled_at: null },
+        { cancelled_at: now, invite_link: null },
+      );
       return true;
     });
     if (!done) return 'not_found';
@@ -644,9 +710,22 @@ export class PairingService implements PairingHandler {
 
   async #sweep(): Promise<void> {
     const ctx = this.#ctx;
+    const now = nowOf(ctx);
+    // REL051-B2 (IR-REL051-B2-1): an expired invite's kept link is cleared too (used and cancelled
+    // ones are cleared when that happens), with or without a drop.
+    try {
+      await ctx.store.transaction((tx) => {
+        for (const r of tx.select('invites')) {
+          if (r.invite_link != null && r.expires_at <= now) {
+            tx.update('invites', { invite_id: r.invite_id }, { invite_link: null });
+          }
+        }
+      });
+    } catch {
+      ctx.log.info('invite link clear failed');
+    }
     const adapter = this.#dropAdapter();
     if (adapter === undefined) return;
-    const now = nowOf(ctx);
     const nowMs = now * 1000;
     let rows: Row<'invites'>[];
     try {
@@ -1122,7 +1201,8 @@ export class PairingService implements PairingHandler {
           tx.update(
             'invites',
             { invite_id: context.invite, used_at: null },
-            { used_at: context.now },
+            // REL051-B2: a used invite's link is no longer kept.
+            { used_at: context.now, invite_link: null },
           );
         }
         inbound.write(tx, inboundRow);
