@@ -32,8 +32,14 @@ function RailLink({
       href={section.path}
       className={current ? 'al-rail-item is-current' : 'al-rail-item'}
       aria-current={current ? 'page' : undefined}
+      // Expanded, the name is the visible label plus the badge's hidden words (WCAG 2.5.3: it starts
+      // with what is shown). Collapsed, the icon has no text, so the name is set here.
       aria-label={
-        count > 0 ? `${section.label}, ${String(count)} ${S.approvalsWaiting}` : section.label
+        expanded
+          ? undefined
+          : count > 0
+            ? `${section.label}, ${String(count)} ${S.approvalsWaiting}`
+            : section.label
       }
       title={expanded ? undefined : section.label}
     >
@@ -66,7 +72,7 @@ export function SectionRail({
   onToggle,
   waiting = 0,
 }: SectionRailProps): ReactElement {
-  const current = sectionOf(path);
+  const current = !hood && path === '/advanced/network' ? 'settings' : sectionOf(path);
   return (
     <nav
       aria-label={S.sections}
@@ -115,7 +121,7 @@ export function SectionSheet({ path, hood }: MenuProps): ReactElement {
   const [open, setOpen] = useState(false);
   const bar = useRef<HTMLButtonElement>(null);
   const sheet = useRef<HTMLElement>(null);
-  const current = sectionOf(path);
+  const current = !hood && path === '/advanced/network' ? 'settings' : sectionOf(path);
   const close = useCallback((restore: boolean): void => {
     setOpen(false);
     if (restore) bar.current?.focus();

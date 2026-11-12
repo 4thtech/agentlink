@@ -40,3 +40,18 @@ export const EXPIRED_HTML = fixedPage(PAGE_STRINGS.title, PAGE_STRINGS.expired);
 
 /** `/` and `/approve/<id>` without the app bundle. Fixed text; nothing from the request. */
 export const NO_APP_HTML = fixedPage(PAGE_STRINGS.noAppTitle, PAGE_STRINGS.noApp);
+
+/**
+ * UX1113-QA-HOST: any other path outside the API (no session, or no app bundle). Fixed text and one
+ * plain link to Home; no script, no token and nothing from the request.
+ */
+export const NOT_FOUND_HTML = [
+  '<!doctype html>',
+  '<html lang="en"><head><meta charset="utf-8">',
+  '<meta name="viewport" content="width=device-width, initial-scale=1">',
+  `<title>${PAGE_STRINGS.title}</title></head>`,
+  '<body><main><h1>Page not found</h1>',
+  `<p>This page isn't here. <a href="/">Go to Home</a></p>`,
+  '</main></body></html>',
+  '',
+].join('\n');

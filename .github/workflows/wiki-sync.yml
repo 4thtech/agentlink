@@ -1,0 +1,148 @@
+# Wiki sync (DOCS-UNIFY): keeps the AgentLink part of 4thTech Docs (wiki.4thtech.io) generated from
+# docs-site/ at the newest release tag. docs-site/ here is the only source; the wiki repo
+# 4thtech/wiki.4thtech.io holds a generated copy in agentlink/ (plus its SUMMARY.md entries, the
+# AgentLink redirects and data/agentlink-sync.yaml). GitBook publishes the wiki's main by Git Sync.
+#
+# Once a day, and on demand: when the wiki's recorded tag is older than the newest release tag (or a
+# tag is given), it checks out the wiki, runs tools/docs/wiki-sync.mjs for that tag (release tags
+# only, never main, and the tag must be on main), runs the wiki's own checks and opens or updates ONE
+# pull request in the wiki repo (branch agentlink-sync/<tag>). A person merges it; there is no
+# auto-merge (the wiki is a private repo on GitHub Free: no rulesets, no auto-merge).
+#
+# Credentials: the secret WIKI_SYNC_TOKEN, a fine-grained token (or GitHub App token) limited to
+# 4thtech/wiki.4thtech.io with Contents and Pull requests read/write; nothing else. The token could
+# technically write the wiki's main (nothing protects it there), so this workflow only ever pushes the
+# agentlink-sync/<tag> branch: the last step refuses any other branch name. The wiki's own code
+# (scripts/check-docs.mjs) runs in a step without the token, and every later git call disables hooks
+# and fsmonitor, so nothing it leaves in .git can run with the token. Only the generated paths are
+# committed. This repo's own token stays read-only. DEPLOY_FREEZE stops the job.
+# Runbook: docs-site/MAINTAINING.md §2.
+name: Wiki sync
+
+on:
+  schedule:
+    - cron: "41 6 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (for example v0.4.15). Empty: the newest release tag."
+        required: false
+        default: ""
+      force:
+        description: "Sync even when the wiki already records this tag (re-generate)."
+        type: boolean
+        required: false
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: sync
+    if: github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository (for the sync script)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: agentlink
+
+      - name: Check out the wiki
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: 4thtech/wiki.4thtech.io
+          token: ${{ secrets.WIKI_SYNC_TOKEN }}
+          persist-credentials: false
+          path: wiki
+
+      - name: Decide whether the wiki is behind
+        id: plan
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          tag="${INPUT_TAG:-}"
+          if [ -z "$tag" ]; then tag="$(node agentlink/tools/docs/wiki-sync.mjs --latest-tag)"; fi
+          if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Not a release tag: refusing." >&2
+            exit 1
+          fi
+          recorded="$(node agentlink/tools/docs/wiki-sync.mjs --wiki wiki --recorded-tag)"
+          echo "Newest release: $tag. The wiki has: $recorded."
+          if [ "$recorded" = "$tag" ] && [ "${FORCE:-false}" != "true" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # No token in this step's environment, and the wiki checkout keeps no credentials.
+      - name: Generate the AgentLink pages and run the wiki's checks
+        if: steps.plan.outputs.run == 'true'
+        shell: bash
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          set -euo pipefail
+          node agentlink/tools/docs/wiki-sync.mjs --wiki wiki --tag "$TAG"
+          node agentlink/tools/docs/wiki-sync.mjs --wiki wiki --check
+          cd wiki
+          # The wiki's own code runs next; its git config must come out unchanged (no remote, URL
+          # rewrite or credential helper planted before the step that holds the token).
+          before="$(sha256sum .git/config)"
+          node scripts/check-docs.mjs
+          if [ "$(sha256sum .git/config)" != "$before" ]; then
+            echo "The wiki's checks changed .git/config; refusing to continue." >&2
+            exit 1
+          fi
+
+      - name: Open or update the wiki pull request
+        if: steps.plan.outputs.run == 'true'
+        shell: bash
+        working-directory: wiki
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+          GH_TOKEN: ${{ secrets.WIKI_SYNC_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Hooks and fsmonitor off for every git call: the wiki's own code ran in this checkout.
+          g() { git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
+          allowed=(agentlink SUMMARY.md .gitbook.yaml data/agentlink-sync.yaml)
+          if [ -z "$(g status --porcelain)" ]; then
+            echo "The wiki already matches $TAG."
+            exit 0
+          fi
+          # Anything changed outside the generated paths means something else wrote here: stop.
+          other="$(g status --porcelain -- . ':!agentlink' ':!SUMMARY.md' ':!.gitbook.yaml' ':!data/agentlink-sync.yaml')"
+          if [ -n "$other" ]; then
+            echo "Unexpected changes outside the generated paths; refusing to commit:" >&2
+            echo "$other" >&2
+            exit 1
+          fi
+          branch="agentlink-sync/$TAG"
+          case "$branch" in
+            agentlink-sync/v*) ;;
+            *) echo "Refusing to push to $branch" >&2; exit 1 ;;
+          esac
+          if [ "$branch" = "main" ]; then echo "Refusing to push to main" >&2; exit 1; fi
+          g switch -q -c "$branch"
+          g add -- "${allowed[@]}"
+          g -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Sync AgentLink docs from $TAG"
+          gh auth setup-git
+          g push --force origin "HEAD:refs/heads/$branch"
+          body="Generated by 4thtech/agentlink tools/docs/wiki-sync.mjs from docs-site at $TAG (workflow Wiki sync). Edit docs-site in 4thtech/agentlink, not this folder."
+          if [ -z "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            gh pr create --base main --head "$branch" --title "Sync AgentLink docs from $TAG" --body "$body"
+          fi
+          echo "Opened or updated the wiki pull request for $TAG; a person merges it."

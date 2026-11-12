@@ -228,7 +228,9 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     // Clicking Approve alone decides nothing: presence comes after the click.
     await box.getByRole('button', { name: 'Approve', exact: true }).click();
     expect(source.applied).toEqual([]);
-    await page.getByRole('button', { name: 'Approve with your passkey' }).click();
+    await page
+      .getByRole('button', { name: /^Approve with (Touch ID|Windows Hello|your passkey)$/ })
+      .click();
     await page.getByText('Approved.').waitFor();
     expect(source.applied).toHaveLength(1);
     const signed = source.applied[0];
@@ -270,7 +272,9 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
       .getByText('This covers exactly these 2. Anything new waits for your next review.')
       .waitFor();
     expect(source.applied).toEqual([]);
-    await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
+    await page
+      .getByRole('button', { name: /^Confirm with (Touch ID|Windows Hello|your passkey)$/ })
+      .click();
     await page.getByText('Approved 2.').waitFor();
 
     // One gesture (sign count + 1), one signed object, exactly the picked items.
@@ -375,7 +379,11 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     await pick(page, 3).check();
     await page.getByRole('button', { name: 'Approve 2 selected' }).click();
     await page.getByLabel(CODE_LABEL).waitFor();
-    expect(await page.getByRole('button', { name: 'Confirm with your passkey' }).count()).toBe(0);
+    expect(
+      await page
+        .getByRole('button', { name: /^Confirm with (Touch ID|Windows Hello|your passkey)$/ })
+        .count(),
+    ).toBe(0);
     await page.getByLabel(CODE_LABEL).fill(world.code);
     await page.getByRole('button', { name: 'Confirm', exact: true }).click();
     await page.getByText('Approved 2.').waitFor();

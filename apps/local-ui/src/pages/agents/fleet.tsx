@@ -216,6 +216,9 @@ export function Fleet({
               <th scope="col" className="ag-col-opt">
                 {S.colApps}
               </th>
+              <th scope="col" className="ag-col-opt">
+                {S.colFolder}
+              </th>
               <th scope="col">{S.colStatus}</th>
               <th scope="col" className="ag-col-opt">
                 {S.colPeople}
@@ -266,6 +269,9 @@ export function Fleet({
                         </span>
                       ))}
                   </span>
+                </td>
+                <td className="ag-col-opt al-text-body-sm al-text-code" data-hood-fact="folder">
+                  {r.name}
                 </td>
                 <td className={`ag-line al-text-body-sm is-${stateOf(r)}`}>{agentLine(r, now)}</td>
                 <td className="ag-col-opt al-text-body-sm">{r.contacts ?? '—'}</td>

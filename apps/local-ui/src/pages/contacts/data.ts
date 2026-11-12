@@ -32,6 +32,8 @@ export interface ContactRow {
   readonly pairedAs?: 'inviter' | 'invitee';
   /** D-141 (08 §1 C2): the name before a rename, while the note is due; plain text only. */
   readonly formerName?: string;
+  /** Under the owner's own name for them: what they now call themselves; plain text only. */
+  readonly newName?: string;
 }
 
 export type ListAnswer =
@@ -70,6 +72,7 @@ function row(v: unknown): ContactRow | undefined {
   const pairedAt = v['pairedAt'];
   const pairedAs = v['pairedAs'];
   const former = v['formerName'];
+  const own = v['newName'];
   if (typeof ref !== 'string' || !REF.test(ref)) return undefined;
   if (typeof name !== 'string' || name.length > MAX_NAME) return undefined;
   if (!oneOf(nameSource, ['owner', 'counterparty'] as const)) return undefined;
@@ -99,6 +102,7 @@ function row(v: unknown): ContactRow | undefined {
     ...(typeof former === 'string' && former !== '' && former.length <= MAX_NAME
       ? { formerName: former }
       : {}),
+    ...(typeof own === 'string' && own !== '' && own.length <= MAX_NAME ? { newName: own } : {}),
   };
 }
 
@@ -137,6 +141,61 @@ export function parseRenameCheck(data: unknown): RenameCheck {
 export function contactPath(ref: string, what: string): string {
   if (!REF.test(ref)) throw new Error('contact ref is malformed');
   return `${LIST_PATH}/${ref}/${what}`;
+}
+
+// WP-P2 (design-1112 spec §5): `GET /api/ui/people` (packages/node/src/local-ui/api/people-all.ts),
+// every ID. The open ID carries its people (checked by the same `row` as above); another ID carries
+// only how many people it has (its names stay sealed in its own store until it is opened, 04 §2.5).
+// An ID's `name` is the folder name the switch route takes (never shown); its `label` is the owner's
+// own label (plain text).
+
+export const PEOPLE_ALL_PATH = '/api/ui/people';
+const ID_NAME = /^[a-z][a-z0-9-]{0,31}$/;
+const MAX_LABEL = 128;
+
+export interface IdPeople {
+  readonly name: string;
+  readonly label: string;
+  readonly current: boolean;
+  /** The open ID's people; undefined for another ID or when they could not be read. */
+  readonly contacts?: readonly ContactRow[];
+  /** Another ID's number of people; undefined for the open ID or when it could not be read. */
+  readonly count?: number;
+}
+
+/** True when this ID's part could not be read just now. */
+export const idMissing = (id: IdPeople): boolean =>
+  id.current ? id.contacts === undefined : id.count === undefined;
+
+/** The IDs of the read; undefined when the answer is not usable (the page keeps one ID's list). */
+export function parsePeopleAll(data: unknown): readonly IdPeople[] | undefined {
+  if (!isObject(data) || data.status !== 'ok' || !Array.isArray(data.ids)) return undefined;
+  const ids: IdPeople[] = [];
+  for (const item of data.ids as unknown[]) {
+    if (!isObject(item)) continue;
+    const { name, label, current, status, contacts, count } = item;
+    if (typeof name !== 'string' || !ID_NAME.test(name)) continue;
+    if (ids.some((id) => id.name === name)) continue;
+    const shown =
+      typeof label === 'string' && label.length > 0 && label.length <= MAX_LABEL ? label : name;
+    const open = current === true;
+    const base = { name, label: shown, current: open };
+    if (status !== 'ok') {
+      ids.push(base);
+    } else if (open && Array.isArray(contacts)) {
+      const rows: ContactRow[] = [];
+      for (const c of contacts as unknown[]) {
+        const r = row(c);
+        if (r !== undefined) rows.push(r);
+      }
+      ids.push({ ...base, contacts: rows });
+    } else if (!open && typeof count === 'number' && Number.isSafeInteger(count) && count >= 0) {
+      ids.push({ ...base, count });
+    } else {
+      ids.push(base);
+    }
+  }
+  return ids;
 }
 
 export function renameCheckPath(ref: string, alias: string): string {

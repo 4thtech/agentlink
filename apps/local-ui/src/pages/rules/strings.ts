@@ -1,10 +1,21 @@
 // The Rules page's copy (11 §5, §5.6, §6.2.1; DESIGN-ADJ-1 RU-2…RU-6, LS-1; UX audit 6a–6c). Plain
 // words only: no 11 §5.1 term (rules.test.tsx checks the rendered page). The warning sentences of the
 // confirm screen are in warnings.ts (D-119).
+import { sensorWord } from '../../presence-word.js';
 
 export const RULES_STRINGS = {
-  eyebrow: 'What your AI may do with this ID without asking',
-  savingNote: 'Saving asks for your passkey',
+  lead: 'What your AI may do without asking you. Everything else waits for your approval on Home.',
+  pickerLabel: 'Rules for',
+  masterCode: 'your master code',
+  changedTag: 'Changed',
+  moreHelp: 'File sizes, who can message this ID, limits for accepting terms, exports',
+  moreState: (n: number, changed: number): string =>
+    changed === 0
+      ? `${String(n)} rules · all at their defaults`
+      : `${String(n)} rules · ${String(changed)} changed`,
+  barWider: (sensor: string): string =>
+    `lets your AI do more without asking. Saving asks for ${sensor}.`,
+  barPlain: (sensor: string): string => `Saving asks for ${sensor}.`,
   loading: 'Loading your rules…',
   summaryTitle: 'Rules in force',
   summaryNote: 'This is what your AI follows right now.',
@@ -17,24 +28,26 @@ export const RULES_STRINGS = {
   // M1-PAY-CONFIRM-b: a spending change continues to the confirmation sheet (b11 §19.1).
   continueToConfirm: 'Continue',
   never: 'Never',
-  allow: 'Allow',
-  askEveryTime: 'Ask me every time',
+  allow: 'Allowed',
+  askEveryTime: 'Ask me',
   recommended: 'recommended',
-  hold: 'Hold for my review',
+  hold: 'Hold for me',
   drop: 'Drop',
 
-  proofTitle: 'Add proof',
-  proofHelp: 'Each proof uses credits and is public.',
+  proofTitle: 'Add a public proof',
+  proofHelpBefore: 'Each proof costs credits and is public. Allowed up to',
+  proofHelpAfter: 'in any 24 hours, then it asks.',
   proofOff: 'Your AI never adds proof.',
   budget: 'Proof budget in any 24 hours',
   askOver: 'Ask me over',
-  invitesTitle: 'New contacts',
-  invitesHelp: 'Ask me before connecting with a new contact.',
+  invitesTitle: 'Connect with someone new',
+  summaryInvites: 'New people',
+  invitesHelp: 'Your AI asks before it accepts or sends an invite.',
   termsTitle: 'Accepting terms',
-  termsHelp: 'Accepting commits you. Never approved from a notification.',
+  termsHelp: 'Accepting commits you. This is never approved from a notification.',
 
-  unknownTitle: 'Requests from unknown senders',
-  unknownHelp: 'Only an invite adds a contact.',
+  unknownTitle: 'Messages from someone you have not connected with',
+  unknownHelp: "Only an invite adds a person. Strangers can't reach your AI.",
   whoTitle: 'Who can message this ID',
   whoPaired: 'Paired contacts',
   whoListed: (n: number): string =>
@@ -78,7 +91,9 @@ export const RULES_STRINGS = {
     'Delivery receipts are on from an older default. Each one shows publicly that a proof reached you, never the content.',
   codeLabel: 'Master code',
   codeHint: 'Never give it to your AI.',
-  save: 'Save with passkey',
+  get save(): string {
+    return `Save with ${sensorWord()}`;
+  },
   saveCode: 'Save',
   back: 'Back to editing',
   preparing: 'Checking your changes…',
@@ -91,13 +106,13 @@ export const RULES_STRINGS = {
   stale: 'Your rules changed somewhere else. Reload the page and make your changes again.',
   busy: 'Another approval is in progress. Try again in a moment.',
   failed: "Couldn't save. Try again.",
-  sessionExpired:
-    'This link has expired. Open AgentLink again from your AI, or run `agentlink ui`.',
-  passkeyCancelled: 'The passkey was not used. Try again.',
+  sessionExpired: 'This page has expired. Open AgentLink again from your AI app.',
+  passkeyCancelled: (sensor: string): string =>
+    `${sensor[0]?.toUpperCase() ?? ''}${sensor.slice(1)} was not used. Try again.`,
   invalidEdit: "These changes can't be saved. Check the values and try again.",
 
   unavailable: "Your rules couldn't be loaded. Try again in a minute.",
   notSetUp: 'Set up AgentLink first. Your rules appear here after that.',
   notValid:
-    "Your rules couldn't be checked, so everything that costs money or commits you asks first. Run `agentlink policy recover` in your own terminal.",
+    "Your rules couldn't be checked, so everything that costs money or commits you asks first. Open Advanced to repair them.",
 } as const;

@@ -10780,3 +10780,51 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** owner setup (release GitHub App, environments `release-bot` and `desktop-sign`, variables `RELEASE_APP_CLIENT_ID` and `RELEASE_BOT_LOGIN`)
 - **Spec:** OPS-UNSTICK report changes C2 and C4; D-25, D-52; `audit-rules.md` §3
 - **Done when:** the `version` job opens the PR with the App token and turns on auto-merge; `review-gate` classes an App-authored, version-shaped diff as S0 with no review requirement and anything else as an ordinary automated PR (tests on the real gate script, RED commit first); `desktop-extension-release` uses `desktop-sign`; the npm-publish click is the only owner click; the retrigger workaround and the hand-filled body are gone from docs and tools.
+
+#### UX1113-S2-REWRAP · a dedicated `unlockForRewrap` scope for Replace master code (follow-up from the WP-S2 Fable audit)
+- **Status:** new · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner keys)
+- **Repo/path:** agentlink · `packages/node/src/owner-keystore.ts`, `packages/node/src/approval-server.ts` (`ownerCodeRun`), tests
+- **Depends on:** UX1113 WP-S2
+- **Scope:** Replace master code reuses `unlockForExport` and `exportSeedOf` to copy the seed for its re-wrap. Give it its own unlock (a session scope that only `stageOwnerCodeChange` can read), so the export capability is the recovery-kit export alone again.
+- **Acceptance:** the export route and Replace each read the seed only through their own scope; a session of one is refused by the other (tests); 04 §2.3.3 and §2.5 name both.
+#### UX1113-R0 · Restore spec and decision D-147 (design-1112 WP-R0)
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Fable security design review · **Security:** S2 (spec: keys, owner presence)
+- **Repo/path:** agentlink · `docs/foundation/{00-README,04-security-and-crypto,06-mcp-server,08-clients-console-cloud}.md`; `docs/process/backlog.md`; `changelog.d/`
+- **Depends on:** D-147 (Tali, 2026-11-12)
+- **Spec:** D-147; 04 §2.3.3 "Restore in the app", "Kit record", "Check that my kit opens", §2.5 "Restore-only owner session"; 06 §8; 08 §1, §8
+- **Done when:** the Fable reviewer signs off each row T-1 to T-12 as covered or as a named residual; Tali says "merge". Nothing in UX1113-R1 to -R4 or UX1113-D1 starts before.
+
+#### UX1113-R1 · Restore engine routes and CLI (design-1112 WP-R1)
+- **Status:** new · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Repo/path:** agentlink · new `packages/node/src/local-ui/api/restore.ts`, new `packages/node/src/recovery-kit-restore.ts`; `packages/node/src/local-ui/{routes,route-types,context}.ts`; `packages/node/src/approval-server.ts` (gate wiring only); `packages/node/src/key-controls.ts` (rename map, seedless `unlockForRestore` session, `importOwner` with the passkey wrap); new `apps/cli/src/commands/{backup,backup-strings}.ts`; `apps/cli/src/dispatch.ts`; `test-vectors/harness` wiring; changeset
+- **Depends on:** UX1113-R0
+- **Spec:** 04 §2.3.3 "Restore" and "Restore in the app" (routes `found`, `upload`, `open`, `check`, `apply/begin`, `apply/finish`; handles; rate limit; threats T-1 to T-12), §2.5 "Restore-only owner session"; 06 §8 (`agentlink backup restore [file] [--check]`, alias `agentlink restore`)
+- **Done when:** `RED (expected):` commit first; the `recovery-kit` vectors pass through the routes; every row of the "never overwrites" table; revoked ID refused; different owner refused before the code; wrong code ×3 then wait; apply without the gesture or the owner session writes nothing (filesystem and keychain asserted empty); a crash between IDs leaves whole IDs only; the import fence covers the routes and the control; a log and error scan finds no code, path or seed; the CLI refuses under a harness marker and with piped stdin; the restore session holds no seed and is bound to the kit's header hash; `cancel` wipes the opened kit; one opened kit and one pending apply per server; files read only through an `O_NOFOLLOW` descriptor; upload limits; owner-only completion after a crash between agents and owner, and first run refuses to mint another owner over restored IDs; the PRF `get()` path; the PR carries the Fable security design section (each T row with its test); Fable audit with only the spec and the diff; Tali's "merge".
+
+#### UX1113-R2 · Kit for all IDs, kit record, Check that my kit opens (design-1112 WP-R2)
+- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Repo/path:** agentlink · `packages/node/src/recovery-kit-export.ts`; `packages/node/src/local-ui/api/backup.ts`; new `packages/node/src/kit-record.ts`; the `packages/core` owner-action listing for `backup.export` (one file, named in the PR); tests; changeset
+- **Depends on:** UX1113-R0; the `check` route registration lands through UX1113-R1 or after it
+- **Spec:** 04 §2.3.3 "In the local app" (one `backup.export` per ID, one `kitId`, one gesture), "Kit record", "Check that my kit opens"
+- **Done when:** `RED (expected):` commit first; a two-ID owner gets one file that restores both (round trip with UX1113-R1 in an integration test); snapshot consistency per ID (policy loads at its mark after restore); `GET /api/ui/backup` returns `lastKit` and `missing` and never a path; the record survives a restart; a record with no matching `backup.export` reads as no kit; Show in Finder opens only the recorded regular file; nothing new is logged. Fable audit; Tali's "merge".
+
+#### UX1113-R3 · Restore wizard UI (design-1112 WP-R3)
+- **Status:** new · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · new `apps/local-ui/src/pages/restore/*`; `pages/welcome/index.tsx`; `pages/first-run/strings.ts` (`WELCOME` block only); `lazy/pages.ts`; `main.tsx` (route)
+- **Depends on:** UX1113-R1 API frozen
+- **Spec:** 08 §1 "Backup & restore and the restore journey"; design-1112 spec §6.5, §6.6 and mockups 07 to 10
+- **Done when:** DOM tests per step and per error; the code never appears in `localStorage`, `sessionStorage`, the URL or a rendered attribute (test scans); vocabulary lint; axe; reduced motion; one Playwright journey against a temp HOME (save kit, wipe profile, restore, Home shows the person and the message); screenshots of all four steps.
+
+#### UX1113-R4 · Backup & restore page (design-1112 WP-R4)
+- **Status:** new · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/backup/{index.tsx,export-kit.tsx,strings.ts,backup.css}`; `apps/local-ui/src/states/recovery-kit.ts`; tests
+- **Depends on:** UX1113-R2 API frozen; the Settings structure package (WP-S1)
+- **Spec:** 08 §1 "Backup & restore and the restore journey"; design-1112 spec §6.2 to §6.4 and mockup 04
+- **Done when:** DOM tests for the three status states from a mocked `GET /api/ui/backup`; Done stays disabled until the three ticks; the printed sheet is never written to disk (no download call); the localStorage flag is only a fallback; screenshots.
+
+#### UX1113-D1 · Desktop: native picker and presence for restore (design-1112 WP-D1)
+- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Repo/path:** agentlink · `apps/desktop/src/main/*` (new `restore-picker.ts`, a `pipe.ts` message); `apps/local-ui/src/desktop.ts`; branch from `desktop/integration`
+- **Depends on:** UX1113-R1
+- **Spec:** 08 §8 "Restore from a recovery kit"; 04 §2.3.3 "Restore in the app" (T-1, T-6)
+- **Done when:** the picked path never reaches the renderer (test); native presence satisfies the restore gesture and the presence step; first run on a clean profile shows "I have a recovery kit". Fable audit; Tali's "merge".

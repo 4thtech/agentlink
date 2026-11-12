@@ -80,11 +80,10 @@ async function switchTo(
   openLabel: string = label,
 ): Promise<void> {
   await page.goto(new URL('/settings/agents', origin).href);
-  const card = page
-    .getByText(label, { exact: true })
-    .first()
-    .locator('xpath=ancestor::*[.//button[normalize-space()="Open"]][1]');
-  await card.getByRole('button', { name: 'Open', exact: true }).click();
+  // design-1112: an ID with no AI app has no Open on its card (Connect an AI app instead), so the
+  // ID menu in the header is how any ID is opened.
+  await page.locator('button.al-chip').first().click();
+  await page.getByRole('menuitemradio').filter({ hasText: label }).first().click();
   // The header names the agent that is now open (W4-SHELL-V2: the agent chip, top left).
   await page.locator('button.al-chip').filter({ hasText: openLabel }).waitFor();
 }
@@ -498,7 +497,10 @@ describe('the upgrade run: a 0.4.3 home after the update (U3-k)', () => {
     // The open agent shows the name its owner signed (read from its store); the others, their folder names.
     for (const shown of ['Home base', 'second-agent', 'work']) expect(listed).toContain(shown);
     expect((await pc.directory.list()).map((e) => e.name)).toEqual(names);
-    expect(await page.getByRole('button', { name: 'Open', exact: true }).count()).toBe(2);
+    // Every other agent can be opened: the ID menu lists all three (cards with no AI app have no Open).
+    await page.locator('button.al-chip').first().click();
+    expect(await page.getByRole('menuitemradio').count()).toBe(3);
+    await page.keyboard.press('Escape');
 
     // Switching shows each agent's history.
     await switchTo(page, link, 'second-agent', 'Second agent');

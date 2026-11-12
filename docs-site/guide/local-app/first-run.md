@@ -1,33 +1,45 @@
-# First run and your master code
+# Your master code and recovery kit
 
-*Applies to AgentLink 0.4.8. The Welcome page and the separate first-run steps from 0.4.4 are replaced by [Get started](get-started-wizard.md).*
+*Applies to AgentLink 0.4.14. Saving a recovery kit in the app is new in 0.4.14. The words "backup code" and "owner code" became **master code** in 0.4.14; it is the same code.*
 
-First run is the short path that sets you up as the owner of your ID. It takes one touch, and it is now the first part of [Get started](get-started-wizard.md).
+Two things keep you in charge of your IDs when your fingerprint reader or your computer is not there: your **master code** and your **recovery kit**.
 
-## Steps
+| | Master code | Recovery kit |
+|---|---|---|
+| What it is | A code that confirms approvals instead of Touch ID | An encrypted file with one ID, its contacts and messages |
+| When you get it | Once, during [Get started](get-started-wizard.md) | When you press **Save recovery kit** |
+| Where to keep it | Your password manager | Somewhere safe, apart from its recovery code |
+| Use it for | **Use your master code instead**, on any confirm | Getting an ID back on a new computer (restore is coming) |
+| Never | Give it to your AI or paste it into a chat | Share it with anyone |
 
-1. Open a terminal yourself (not one inside your AI app) and run `npx -y @4thtech-io/agentlink@latest`. On a new computer nothing else needs to be set up first: your browser opens on Get started. Keep the terminal window open while you use the app; it stops by itself after 30 minutes.
-2. Pick your AI app, or **I'll choose later**.
-3. Confirm it is you with one Touch ID. It creates your ID, makes you its owner, protects your approvals and adds AgentLink to the AI app you picked. Restart that app to finish. If anything goes wrong, nothing is kept and you can start again.
-4. Invite someone, or **Skip to Home**.
+## Your master code
 
-Coming from an invite link? The same steps run, and the page ends on **Accept** the inviter's **invite?** See [Join from an invite](../get-started/join-from-an-invite.md).
+The master code is shown once, right after the Touch ID that creates your first ID.
 
-## What the master code is for
+<figure><img src="../../assets/screens/master-code.webp" alt="The master code screen: Approvals on this computer are protected. The code in groups of four, Shown once, Hide, Save in my password manager, Copy, Save as file and I saved it."><figcaption><p>Shown once. Save it before you press I saved it.</p></figcaption></figure>
 
-The master code approves things when Touch ID is not available, for example in another browser. Nobody can get it back for you, not even 4thTech. Never give it to your AI or paste it into a chat.
+1. Press **Save in my password manager**, **Copy** (it says **Copied**) or **Save as file**. **Hide** covers it if someone is looking.
+2. Press **I saved it**.
 
-When the app shows your code once, you can **Copy** it (the button then says **Copied**; if copying is blocked you are told), select it in one piece, or **Save as file** to keep it as a small text file on your computer. Every master code field has **Show** and **Hide**, and accepts a pasted code even with line breaks or long dashes. If you set up without a passkey, the last screen says "Save your master code — you need it to approve."
+Every place that asks for Touch ID also offers **Use your master code instead**. Fields accept a pasted code even with line breaks, spaces or long dashes. Nobody can get your master code back for you, not even 4thTech.
+
+## Your recovery kit
+
+A recovery kit holds your IDs, their contacts and their messages, locked under a new **recovery code** that is shown once. It is everything you need to get AgentLink back on any computer; keep the file and the code safe, and apart.
+
+1. Open **Settings** › **Backup & restore** (an ID's **Back up** leads there too).
+2. Press **Save a recovery kit** and confirm with Touch ID or your master code. One kit covers all your IDs.
+3. The kit is saved to your Downloads folder (or your home folder when there is none). Move the file off this computer, write down the recovery code shown once, press **Check now**, then **Done**.
+
+<figure><img src="../../assets/screens/recovery-kit.webp" alt="Settings, Backup and Touch ID: the Recovery kit section explains that the kit holds your IDs, people and messages, and the Touch ID section explains that Touch ID confirms anything that changes who can act for you."><figcaption><p>Settings › Backup &amp; Touch ID.</p></figcaption></figure>
+
+<figure><img src="../../assets/screens/recovery-kit-saved.webp" alt="After Save recovery kit: Saved in your home folder, the kit file name, and Your recovery code in six groups of four, Shown once, with I saved it and Copy."><figcaption><p>The kit is saved and its recovery code is shown once.</p></figcaption></figure>
+
+Nothing is sent anywhere. To restore, choose **I have a recovery kit** when you set up AgentLink on the new computer, or **Restore…** in **Settings** › **Backup & restore**.
 
 ## If you set up before 0.3.0
 
-If you set up AgentLink in the terminal before the local app, your approvals use a code. The app offers **Switch to Touch ID** (**Switch to Windows Hello** or **Switch to a passkey** on other computers), and the note goes away as soon as Touch ID is set up.
-
-1. Press **Switch to Touch ID**.
-2. Type your master code once. The page may call it the code `owner init` printed.
-3. Touch the sensor. The page says **Touch ID is on**.
-
-From then on you approve with a touch. Your master code keeps working when the sensor isn't available, so keep it saved. Never give the code to your AI.
+If you set up AgentLink in the terminal before the app existed, your approvals use a code. The app offers **Switch to Touch ID** (**Switch to Windows Hello** or **Switch to a passkey** elsewhere): press it, type your master code once (the code `owner init` printed), touch the sensor, and the page says **Touch ID is on**. Your master code keeps working when the sensor isn't available.
 
 ## If your browser has no passkey
 

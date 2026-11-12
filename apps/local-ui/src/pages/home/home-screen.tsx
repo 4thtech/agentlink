@@ -41,7 +41,9 @@ import {
 } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { getLive, subscribeLive, switchAgent, type LiveAgent } from '../../api/live.js';
-import { INVITE_PATH } from '../../nav.js';
+import { INVITE_PATH, PEOPLE_PATH } from '../../nav.js';
+import { notify, setArchived, useArchived } from '../../notices/index.js';
+import { checkHref } from '../contacts/safety.js';
 import { CONTACTS_CHANGED } from '../../api/contact-changes.js';
 import { PasteEntryLink } from '../invite/paste-entry.js';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
@@ -241,6 +243,7 @@ function PersonOpen({
   folderNote,
   props,
   onChanged,
+  archived,
 }: {
   readonly person: Person;
   readonly contact: ContactRow | undefined;
@@ -258,6 +261,8 @@ function PersonOpen({
   readonly folderNote?: ReactNode;
   readonly props: HomeScreenProps;
   readonly onChanged: (what: 'check' | 'rename' | 'remove') => void;
+  /** A removed connection: whether it is archived, and the switch. */
+  readonly archived?: { readonly is: boolean; readonly toggle: () => void } | undefined;
 }): ReactElement {
   const messages: MessagesApi = clients.people.messages;
   const { thread, loadEarlier } = useThread(messages, person.contactId, tick);
@@ -265,8 +270,24 @@ function PersonOpen({
   const removed = contact?.status === 'revoked';
   return (
     <div className="hm-open hm-c al-expand" data-person-open={person.contactId}>
+      {/* UX 2026-11-12: one calm line here; the full explanation is on the contact's own page. */}
       {removed ? (
-        <Banner tone="warning">{fmt(S.connectionRemovedBody, { name: person.name })}</Banner>
+        <Banner
+          tone="neutral"
+          icon="minus"
+          compact
+          className="hm-gone"
+          action={
+            archived === undefined ? undefined : (
+              <ArchiveButton name={person.name} archived={archived.is} onToggle={archived.toggle} />
+            )
+          }
+        >
+          {fmt(S.connectionRemoved, { name: person.name })}.{' '}
+          <a href={checkHref(person.contactId)} className="hm-gone-link">
+            {S.details}
+          </a>
+        </Banner>
       ) : null}
       <div className="hm-open-head hm-f">
         <span className="hm-kicker al-text-label">{S.conversationTitle}</span>
@@ -332,6 +353,29 @@ function PersonOpen({
         {...(folderNote === undefined ? {} : { folderNote })}
       />
     </div>
+  );
+}
+
+/** Archive (or Restore) a removed connection: out of People, conversation and files kept. */
+function ArchiveButton({
+  name,
+  archived,
+  onToggle,
+}: {
+  readonly name: string;
+  readonly archived: boolean;
+  readonly onToggle: () => void;
+}): ReactElement {
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="hm-archive"
+      aria-label={fmt(archived ? S.restoreLabel : S.archiveLabel, { name })}
+      onClick={onToggle}
+    >
+      {archived ? S.restore : S.archive}
+    </Button>
   );
 }
 
@@ -407,17 +451,34 @@ function PendingInviteRow({
  * {name}…", or "Waiting for {name} to come online. This finishes on its own." Text only (I-5).
  */
 function ConnectingRowView({ row }: { readonly row: ConnectingRow }): ReactElement {
+  // A blocked person's accept never finishes: say so; Unblock lives on People.
+  const [hidden, setHidden] = useState(false);
+  if (hidden) return <></>;
   return (
-    <div className="hm-invite-row hm-f">
+    <div className="hm-invite-row hm-f" data-blocked={row.blocked === true ? 'true' : undefined}>
       <span className="al-avatar hm-avatar is-pending" aria-hidden="true">
         {[...row.name][0]?.toUpperCase() ?? '?'}
       </span>
       <span className="hm-row-main hm-c">
         <PersonName name={row.name} />
         <span className="hm-sub al-text-body-sm">
-          {row.sent ? F.connecting(row.name) : F.waitingOnline(row.name)}
+          {row.blocked === true
+            ? F.youBlocked(row.name)
+            : row.sent
+              ? F.connecting(row.name)
+              : F.waitingOnline(row.name)}
         </span>
       </span>
+      {row.blocked === true ? (
+        <>
+          <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH}>
+            {F.unblockAction}
+          </a>
+          <Button size="sm" variant="ghost" onClick={() => setHidden(true)}>
+            {F.cancelConnecting}
+          </Button>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -486,7 +547,6 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   const [tick, setTick] = useState(0);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  const [notice, setNotice] = useState<string | undefined>(undefined);
   const live = useRef(true);
   const summariesRef = useRef(summaries);
   summariesRef.current = summaries;
@@ -600,15 +660,61 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
       ? agents.find((a) => a.name === filter)
       : undefined;
   const q = query.trim().toLowerCase();
-  const people = (data?.people ?? []).filter(
+  const archivedRefs = useArchived(current?.name);
+  const isGone = (contactId: string): boolean =>
+    data?.contacts.get(contactId)?.status === 'revoked';
+  // UX 2026-11-12: a removed connection the owner archived leaves People for "Archived" (kept).
+  const isArchived = (contactId: string): boolean =>
+    isGone(contactId) && archivedRefs.has(contactId.toLowerCase());
+  const matching = (data?.people ?? []).filter(
     (p) => otherAgent === undefined && (!pro || q === '' || p.name.toLowerCase().includes(q)),
   );
+  const people = matching.filter((p) => !isArchived(p.contactId));
+  const archivedPeople = matching.filter((p) => isArchived(p.contactId));
+  // Two people with the same name look alike: their rows add the ID tag that tells them apart.
+  const nameCount = new Map<string, number>();
+  for (const p of [...people, ...archivedPeople]) {
+    const key = p.name.trim().toLowerCase();
+    nameCount.set(key, (nameCount.get(key) ?? 0) + 1);
+  }
+  const sameNameNote = (p: Person): string => {
+    if ((nameCount.get(p.name.trim().toLowerCase()) ?? 0) < 2) return '';
+    const tag = data?.contacts.get(p.contactId)?.fingerprint;
+    return tag === undefined ? '' : ` · ${S.idTag} ${tag}`;
+  };
+  const archiveToggle = (contactId: string) =>
+    current === undefined || !isGone(contactId)
+      ? undefined
+      : {
+          is: isArchived(contactId),
+          toggle: () => {
+            if (open === contactId) setOpen(undefined);
+            setArchived(current.name, contactId, !isArchived(contactId));
+          },
+        };
   const pending = props.pendingRows === undefined ? (data?.invites ?? []) : [];
   const connectingRows = props.pendingRows === undefined ? (data?.connecting ?? []) : [];
   const now = Date.now();
 
   // W7-ID-X1: with more than one ID, chips filter by ID ("All IDs · Tali · Tali work"). Only the open
   // ID's people are on this computer's page, so its chip carries their count; another ID's chip opens it.
+  // Counts are what Home was told: the open ID's own list, the other IDs' from the all-IDs read.
+  const countOf = (a: { readonly name: string; readonly current: boolean }): number | undefined =>
+    a.current ? data?.people.length : data?.idCounts?.get(a.name);
+  const allCount = ((): number | undefined => {
+    const counts = agents.map(countOf);
+    return data === undefined || counts.some((c) => c === undefined)
+      ? undefined
+      : counts.reduce<number>((n, c) => n + (c ?? 0), 0);
+  })();
+  const otherLine = (a: { readonly name: string; readonly label: string }): string => {
+    const n = data?.idCounts?.get(a.name);
+    if (n === undefined) return fmt(S.otherIdUnknown, { name: a.label });
+    if (n === 0) return fmt(S.otherIdNone, { name: a.label });
+    return n === 1
+      ? fmt(S.otherIdOne, { name: a.label })
+      : fmt(S.otherIdPeople, { name: a.label, count: String(n) });
+  };
   const idChips = many ? (
     <div className="hm-id-chips hm-f" role="group" aria-label={S.idChips} data-id-chips="">
       <button
@@ -618,8 +724,8 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
         onClick={() => setFilter('all')}
       >
         {S.allAgents}
-        {data === undefined ? null : (
-          <span className="hm-id-count al-text-code">{data.people.length}</span>
+        {allCount === undefined ? null : (
+          <span className="hm-id-count al-text-code">{allCount}</span>
         )}
       </button>
       {agents.map((a) => (
@@ -633,13 +739,155 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
         >
           <AgentIcon label={a.label} seed={a.name} />
           <span>{idWithApp(a.label, a.apps[0]?.app)}</span>
-          {a.current && data !== undefined ? (
-            <span className="hm-id-count al-text-code">{data.people.length}</span>
-          ) : null}
+          {countOf(a) === undefined ? null : (
+            <span className="hm-id-count al-text-code">{countOf(a)}</span>
+          )}
         </button>
       ))}
     </div>
   ) : null;
+
+  const personRow = (person: Person): ReactElement => {
+    const summary = summaries.get(person.contactId);
+    const isOpen = open === person.contactId;
+    // W6-FLOW-FIXES: the other side removed this connection (its agent was
+    // retired: contact status `revoked`). Say so on the row; nothing can be sent.
+    const gone = data?.contacts.get(person.contactId)?.status === 'revoked';
+    const problem = !gone && summary?.delivery === 'not_delivered';
+    const delivery = summary?.delivery === undefined ? '' : (DELIVERY_WORD[summary.delivery] ?? '');
+    const archive = archiveToggle(person.contactId);
+    const archiveButton =
+      archive === undefined ? null : (
+        <ArchiveButton name={person.name} archived={archive.is} onToggle={archive.toggle} />
+      );
+    const simpleRow = (
+      <button
+        type="button"
+        className="hm-row"
+        aria-expanded={isOpen}
+        onClick={(e) => toggle(person.contactId, e.currentTarget.closest('.hm-person'))}
+      >
+        <Avatar name={person.name} />
+        <span className="hm-row-main hm-c">
+          <PersonName name={person.name} />
+          <span className="hm-sub hm-f al-text-body-sm">
+            {many && current !== undefined ? (
+              <AgentIcon label={current.label} seed={current.name} />
+            ) : null}
+            {gone
+              ? fmt(S.connectionRemoved, { name: person.name })
+              : person.lastAt > 0
+                ? fmt(S.lastMessage, { when: ago(person.lastAt, now) })
+                : S.noMessagesYet}
+            {summary === undefined ? '' : ` · ${filesText(summary.files)}`}
+            {many && agentLabel !== '' ? ` · ${agentLabel}` : ''}
+            {sameNameNote(person)}
+          </span>
+        </span>
+        {problem ? (
+          <span className="hm-problem hm-f">
+            <Icon name="triangle-alert" size={14} />
+            <span>{S.notDelivered}</span>
+          </span>
+        ) : null}
+        <Icon name="chevron-right" size={18} className={isOpen ? 'hm-chev is-open' : 'hm-chev'} />
+      </button>
+    );
+    return (
+      <div
+        key={person.contactId}
+        className="hm-person"
+        role={pro ? 'rowgroup' : undefined}
+        data-person={person.contactId}
+        data-open={isOpen ? 'true' : undefined}
+        data-removed={gone ? 'true' : undefined}
+      >
+        {pro ? (
+          <div className="hm-prow hm-row" role="row">
+            <span role="cell" className="hm-cellbox hm-f">
+              <button
+                type="button"
+                className="hm-row-toggle hm-f"
+                aria-expanded={isOpen}
+                onClick={(e) => toggle(person.contactId, e.currentTarget.closest('.hm-person'))}
+              >
+                <Avatar name={person.name} small />
+                <PersonName name={person.name} />
+              </button>
+            </span>
+            <span role="cell" className="hm-opt hm-cell hm-f">
+              {many && current !== undefined ? (
+                <AgentIcon label={current.label} seed={current.name} />
+              ) : null}
+              <span className="hm-ellipsis">{agentLabel}</span>
+            </span>
+            <span role="cell" className="hm-cellbox hm-f">
+              {gone ? (
+                <span className="hm-sub al-text-body-sm">
+                  {fmt(S.connectionRemoved, { name: person.name })}
+                </span>
+              ) : (
+                <LastText person={person} summary={summary} />
+              )}
+            </span>
+            <span
+              role="cell"
+              className="hm-opt hm-cell hm-f"
+              data-delivery={summary?.delivery ?? 'none'}
+            >
+              {delivery}
+            </span>
+            <span role="cell" className="hm-opt al-text-code">
+              {summary === undefined ? '' : String(summary.proofs)}
+            </span>
+            <span role="cell" className="hm-opt al-text-code">
+              {summary === undefined ? '' : String(summary.files)}
+            </span>
+            <span role="cell" className="hm-cellbox hm-f">
+              {archiveButton}
+              <Icon
+                name="chevron-right"
+                size={16}
+                className={isOpen ? 'hm-chev is-open' : 'hm-chev'}
+              />
+            </span>
+          </div>
+        ) : archiveButton === null ? (
+          simpleRow
+        ) : (
+          <div className="hm-gone-row">
+            {simpleRow}
+            {archiveButton}
+          </div>
+        )}
+        {isOpen && data !== undefined ? (
+          <OpenRow pro={pro}>
+            <PersonOpen
+              person={person}
+              contact={data.contacts.get(person.contactId)}
+              data={data}
+              clients={clients}
+              agent={agentLabel}
+              app={appName}
+              idSeed={many ? current?.name : undefined}
+              pro={pro}
+              tick={tick}
+              passkey={passkey}
+              refresh={refresh}
+              props={props}
+              {...(props.folderNote === undefined ? {} : { folderNote: props.folderNote })}
+              archived={archive}
+              onChanged={(what) => {
+                if (what === 'remove') setOpen(undefined);
+                if (what === 'remove') notify({ text: fmt(S.removed, { name: person.name }) });
+                refresh();
+              }}
+            />
+          </OpenRow>
+        ) : null}
+      </div>
+    );
+  };
 
   const peopleHead = (
     <div className="hm-people-head hm-f">
@@ -724,11 +972,6 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
             askerLabel={many ? agentLabel : undefined}
             onChanged={() => void loadApprovals()}
           />
-          {notice === undefined ? null : (
-            <p role="status" className="hm-notice al-text-body-sm">
-              {notice}
-            </p>
-          )}
           {pro ? null : (
             <a
               className="al-btn al-btn-primary al-btn-lg al-btn-block hm-invite al-press"
@@ -749,11 +992,18 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                 <span>{agentLabel}</span>
               </h3>
             ) : null}
-            {data !== undefined &&
-            data.people.length === 0 &&
-            pending.length === 0 &&
-            connectingRows.length === 0 &&
-            props.pendingRows === undefined ? (
+            {otherAgent !== undefined ? (
+              <div className="hm-nomatch hm-f" data-other-id="">
+                <p className="al-text-body-sm al-muted">{otherLine(otherAgent)}</p>
+                <Button size="sm" onClick={() => void switchAgent(otherAgent.name)}>
+                  {fmt(S.openAgent, { name: otherAgent.label })}
+                </Button>
+              </div>
+            ) : data !== undefined &&
+              data.people.length === 0 &&
+              pending.length === 0 &&
+              connectingRows.length === 0 &&
+              props.pendingRows === undefined ? (
               <EmptyState
                 title={S.noPeople}
                 icon="users"
@@ -792,154 +1042,14 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                       </span>
                     </div>
                   ) : null}
-                  {people.map((person) => {
-                    const summary = summaries.get(person.contactId);
-                    const isOpen = open === person.contactId;
-                    // W6-FLOW-FIXES: the other side removed this connection (its agent was
-                    // retired: contact status `revoked`). Say so on the row; nothing can be sent.
-                    const gone = data?.contacts.get(person.contactId)?.status === 'revoked';
-                    const problem = !gone && summary?.delivery === 'not_delivered';
-                    const delivery =
-                      summary?.delivery === undefined
-                        ? ''
-                        : (DELIVERY_WORD[summary.delivery] ?? '');
-                    return (
-                      <div
-                        key={person.contactId}
-                        className="hm-person"
-                        role={pro ? 'rowgroup' : undefined}
-                        data-person={person.contactId}
-                        data-open={isOpen ? 'true' : undefined}
-                        data-removed={gone ? 'true' : undefined}
-                      >
-                        {pro ? (
-                          <div className="hm-prow hm-row" role="row">
-                            <span role="cell" className="hm-cellbox hm-f">
-                              <button
-                                type="button"
-                                className="hm-row-toggle hm-f"
-                                aria-expanded={isOpen}
-                                onClick={(e) =>
-                                  toggle(person.contactId, e.currentTarget.closest('.hm-person'))
-                                }
-                              >
-                                <Avatar name={person.name} small />
-                                <PersonName name={person.name} />
-                              </button>
-                            </span>
-                            <span role="cell" className="hm-opt hm-cell hm-f">
-                              {many && current !== undefined ? (
-                                <AgentIcon label={current.label} seed={current.name} />
-                              ) : null}
-                              <span className="hm-ellipsis">{agentLabel}</span>
-                            </span>
-                            <span role="cell" className="hm-cellbox hm-f">
-                              {gone ? (
-                                <span className="hm-sub al-text-body-sm">
-                                  {fmt(S.connectionRemoved, { name: person.name })}
-                                </span>
-                              ) : (
-                                <LastText person={person} summary={summary} />
-                              )}
-                            </span>
-                            <span
-                              role="cell"
-                              className="hm-opt hm-cell hm-f"
-                              data-delivery={summary?.delivery ?? 'none'}
-                            >
-                              {delivery}
-                            </span>
-                            <span role="cell" className="hm-opt al-text-code">
-                              {summary === undefined ? '' : String(summary.proofs)}
-                            </span>
-                            <span role="cell" className="hm-opt al-text-code">
-                              {summary === undefined ? '' : String(summary.files)}
-                            </span>
-                            <span role="cell" className="hm-cellbox hm-f">
-                              <Icon
-                                name="chevron-right"
-                                size={16}
-                                className={isOpen ? 'hm-chev is-open' : 'hm-chev'}
-                              />
-                            </span>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            className="hm-row"
-                            aria-expanded={isOpen}
-                            onClick={(e) =>
-                              toggle(person.contactId, e.currentTarget.closest('.hm-person'))
-                            }
-                          >
-                            <Avatar name={person.name} />
-                            <span className="hm-row-main hm-c">
-                              <PersonName name={person.name} />
-                              <span className="hm-sub hm-f al-text-body-sm">
-                                {many && current !== undefined ? (
-                                  <AgentIcon label={current.label} seed={current.name} />
-                                ) : null}
-                                {gone
-                                  ? fmt(S.connectionRemoved, { name: person.name })
-                                  : person.lastAt > 0
-                                    ? fmt(S.lastMessage, { when: ago(person.lastAt, now) })
-                                    : S.noMessagesYet}
-                                {summary === undefined ? '' : ` · ${filesText(summary.files)}`}
-                                {many && agentLabel !== '' ? ` · ${agentLabel}` : ''}
-                              </span>
-                            </span>
-                            {problem ? (
-                              <span className="hm-problem hm-f">
-                                <Icon name="triangle-alert" size={14} />
-                                <span>{S.notDelivered}</span>
-                              </span>
-                            ) : null}
-                            <Icon
-                              name="chevron-right"
-                              size={18}
-                              className={isOpen ? 'hm-chev is-open' : 'hm-chev'}
-                            />
-                          </button>
-                        )}
-                        {isOpen && data !== undefined ? (
-                          <OpenRow pro={pro}>
-                            <PersonOpen
-                              person={person}
-                              contact={data.contacts.get(person.contactId)}
-                              data={data}
-                              clients={clients}
-                              agent={agentLabel}
-                              app={appName}
-                              idSeed={many ? current?.name : undefined}
-                              pro={pro}
-                              tick={tick}
-                              passkey={passkey}
-                              refresh={refresh}
-                              props={props}
-                              {...(props.folderNote === undefined
-                                ? {}
-                                : { folderNote: props.folderNote })}
-                              onChanged={(what) => {
-                                if (what === 'remove') setOpen(undefined);
-                                if (what === 'remove')
-                                  setNotice(fmt(S.removed, { name: person.name }));
-                                refresh();
-                              }}
-                            />
-                          </OpenRow>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                  {people.map(personRow)}
                 </div>
-                {data !== undefined && people.length === 0 && data.people.length > 0 ? (
+                {data !== undefined &&
+                people.length === 0 &&
+                archivedPeople.length === 0 &&
+                data.people.length > 0 ? (
                   <div className="hm-nomatch hm-f">
                     <p className="al-text-body-sm al-muted">{S.noMatch}</p>
-                    {otherAgent === undefined ? null : (
-                      <Button size="sm" onClick={() => void switchAgent(otherAgent.name)}>
-                        {fmt(S.openAgent, { name: otherAgent.label })}
-                      </Button>
-                    )}
                   </div>
                 ) : null}
                 {connectingRows.map((row) => (
@@ -957,6 +1067,23 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                     />
                   ))}
               </div>
+            )}
+            {archivedPeople.length === 0 ? null : (
+              <details className="hm-archived" data-archived="">
+                <summary className="hm-kicker al-text-label">
+                  {fmt(S.archivedCount, { count: archivedPeople.length })}
+                </summary>
+                <p className="al-text-body-sm al-muted">{S.archivedHint}</p>
+                <div className="hm-list">
+                  <div
+                    role={pro ? 'table' : undefined}
+                    aria-label={pro ? S.archived : undefined}
+                    className="hm-table"
+                  >
+                    {archivedPeople.map(personRow)}
+                  </div>
+                </div>
+              </details>
             )}
           </section>
         </div>

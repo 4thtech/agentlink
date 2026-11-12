@@ -1,5 +1,38 @@
 # @4thtech-io/core
 
+## 0.5.0
+
+### Patch Changes
+
+- @4thtech-io/chain@0.5.0
+  - @4thtech-io/crypto@0.5.0
+  - @4thtech-io/log@0.5.0
+  - @4thtech-io/storage@0.5.0
+  - @4thtech-io/transport-nostr@0.5.0
+  - @4thtech-io/types@0.5.0
+
+## 0.4.15
+
+### Patch Changes
+
+- @4thtech-io/chain@0.4.15
+  - @4thtech-io/crypto@0.4.15
+  - @4thtech-io/log@0.4.15
+  - @4thtech-io/storage@0.4.15
+  - @4thtech-io/transport-nostr@0.4.15
+  - @4thtech-io/types@0.4.15
+
+## 0.4.14
+
+### Patch Changes
+
+- @4thtech-io/chain@0.4.14
+  - @4thtech-io/crypto@0.4.14
+  - @4thtech-io/log@0.4.14
+  - @4thtech-io/storage@0.4.14
+  - @4thtech-io/transport-nostr@0.4.14
+  - @4thtech-io/types@0.4.14
+
 ## 0.4.13
 
 ### Patch Changes

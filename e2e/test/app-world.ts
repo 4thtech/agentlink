@@ -203,6 +203,8 @@ export function startServerOf(
         },
         notifier: () => Promise.resolve(true),
         ownerKdf: KDF,
+        // UX1113-R3: restore reads this computer's Downloads, never the real home.
+        restore: { home: pc.home, kdf: KDF },
       },
     );
   };
@@ -241,6 +243,9 @@ export function uiDepsOf(
       let opened: Awaited<ReturnType<typeof openAgentStoreWith>> | undefined;
       // W4-RENAME-REACHES-CONTACTS: the host's agent gets its key-items token (as openWithStore).
       let epochKeys: AgentEpochKeys | undefined;
+      // WP-11: the recovery-kit source, as openWithStore gives it (keychain-backed agents only; here
+      // the keychain is this computer's stand-in file, which the server's owner gate also uses).
+      let kit: { backend: string; agentId: string; storePath: string } | undefined;
       const deps: RuntimeDeps = {
         ...pc.runtime,
         openKeyStore: async (backend, agentId) => {
@@ -249,6 +254,7 @@ export function uiDepsOf(
           return keyStore;
         },
         openStore: async (backend, agentId, path) => {
+          kit = { backend, agentId, storePath: path };
           opened = await pc.runtime.openStore(backend, agentId, path);
           return opened;
         },
@@ -270,6 +276,18 @@ export function uiDepsOf(
           store: opened.store,
           cipher: opened.cipher,
           ...(epochKeys === undefined ? {} : { epochKeys }),
+          ...(kit === undefined ||
+          kit.backend !== 'keychain' ||
+          kit.agentId !== result.agent.client.agentId
+            ? {}
+            : {
+                recoveryKit: Object.freeze({
+                  agentId: kit.agentId,
+                  name: result.agent.name,
+                  storePath: kit.storePath,
+                  home: pc.home,
+                }),
+              }),
           close: () => result.agent.close(),
         }),
       };
@@ -495,12 +513,19 @@ export async function launchBrowser(): Promise<{ browser?: Browser; error?: unkn
   }
 }
 
+const MAC_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
 export async function pageWithTouchId(
   browser: Browser,
   viewport = { width: 1280, height: 900 },
 ): Promise<{ page: Page; context: BrowserContext }> {
+  // The virtual authenticator stands in for Touch ID, and the app names the sensor from the browser's
+  // platform (11 §5: Touch ID / Windows Hello / "your passkey"); the journeys assert the Mac words, so
+  // the harness reports a Mac on every runner. AGENTLINK_TEST_UA overrides it (to prove the other words).
   const context = await browser.newContext({
     viewport,
+    userAgent: process.env['AGENTLINK_TEST_UA'] ?? MAC_USER_AGENT,
     permissions: ['clipboard-read', 'clipboard-write'],
   });
   const page = await context.newPage();

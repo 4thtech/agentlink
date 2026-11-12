@@ -1,5 +1,48 @@
 # @4thtech-io/agentlink
 
+## 0.5.0
+
+### Minor Changes
+
+- 849fab6: Restore from a recovery kit in the app and in the terminal (UX1113-R1, D-147): the app's restore routes (found, upload, header, presence, open, check, cancel, apply), the seedless restore-only owner session, and `agentlink restore` (alias of `agentlink backup restore [file] [--check]`).
+- 849fab6: The local app's redesign (UX1113): the sections Home, People, My IDs, Activity and Settings in a new order with an ID-card icon; People across all your IDs with Archived connections; My IDs with plain status lines; Settings grouped as Safety, Your AI and This app, with the running version at the bottom; Rules with a change bar; Activity as plain sentences with counts, filters and search; Backup & restore with one recovery kit for all IDs, a checklist and Check that my kit opens; the restore wizard in the app (I have a recovery kit); reload works on every page and an unknown page says Page not found; page styles load with their page (WP-N1, P1, I1, S1, S3, A2, R3, R4, QA).
+
+### Patch Changes
+
+- 849fab6: Notices are calm and consistent: one toast stack, inline banners and page notices with one look and a close where it makes sense. A removed connection is one quiet line on Home with Archive; "Protect your approvals" is a card you can hide, worded for the desktop app.
+- 849fab6: Reload on any app page shows the page, unknown addresses show Page not found, and your app choices are kept across launches (UX1113-QA-HOST).
+- 849fab6: People: after you remove a person, a fresh invite from either side connects you again, as the remove dialog says. Before, both sides waited forever because the removed person's invite answer was dropped.
+- 849fab6: Activity says what each approval was about and with whom; accepting an invite reads as your own act; first run reads as creating the ID; unblocks and Contact checks are listed.
+- 849fab6: Rename on another ID switches to it first; a damaged kit with the right code says damaged; a kit counts as backed up once it opened with its code; restored IDs keep their label; labels instead of folder names in the kit toast, Check and Settings (UX1113-QA2-CORE).
+- 849fab6: Home counts and filters by ID are truthful; a blocked person's invite says so; Skip to Home warns about an uncopied invite; Get started no longer reopens on every reload; Rules fits a phone; same-name people show their ID tag.
+- 849fab6: Restore names each restored ID by its verified label instead of its folder name (UX1113-R1-LABEL).
+- 849fab6: Saving a recovery kit in the app now leaves a small record of the save (when, which IDs, how many people), the groundwork for one kit that holds all your IDs and for a Backup & restore page that says whether your kit is current (UX1113-R2, D-147).
+- 849fab6: Back up in the app saves every ID on this computer into one recovery kit with one master code entry, opening the other IDs one at a time; the Backup page reads your last kit's record, Show in Finder finds the kit, and Check that my kit opens works right after a save (UX1113-R2b, D-147).
+- 849fab6: Activity data: each decision now says what it was about (sending a file, adding a proof, accepting an invite or terms) and with whom, and the feed also lists new connections, removed people, ID changes, AI app changes and saved recovery kits. The Activity page shows them in a later update.
+- 849fab6: People: with two or more IDs, each row says "with {ID}", your other IDs show how many people they have with an Open button, and an "All my IDs" filter and a "Find a person" search sit above the list.
+- 849fab6: Settings › Touch ID & master code: test Touch ID, check your master code, and replace it (Touch ID or your current code, then a new code shown once; the old code works until you type the new one back) (WP-S2).
+
+## 0.4.15
+
+### Patch Changes
+
+- 2f71b08: Honest recovery kit copy: the app and docs no longer claim a kit restores anything until restore ships (WP-0).
+
+## 0.4.14
+
+### Patch Changes
+
+- ce79b9f: Every screen that asks for Touch ID, Windows Hello or a passkey now also offers "Use your backup code instead": saving rules, connecting an AI app after setup, accepting an invite (from the invite page or a pasted link) and moving credits. Moving credits can now also be confirmed with Touch ID or Windows Hello. A passphrase you type key by key is sent exactly as typed; only pasted backup codes have stray spaces and dashes removed.
+- ce79b9f: People: block or unblock a person from the ⋯ menu. Block explains what it does, then asks for your passkey or backup code; messages from a blocked person are dropped until you unblock them.
+- ce79b9f: After an update, the app says "Restart {app} to use the new version" for an AI app that still runs the older AgentLink. Each AI app session now records the version it runs (store schema 13).
+- ce79b9f: The backup code screen shows the code once, with Show/Hide, one Copied message, more space between the buttons, and no fingerprint.
+- ce79b9f: One name for each code: master code (was backup code and owner code), Contact check (was safety code) and ID tag (was owner fingerprint), in the app, the terminal, the AI tool texts, the invite page and the guides (D-146).
+- ce79b9f: WP-1 Rename truth: the ID open when the app starts can be renamed (and "Update contacts" works); the name note shows on the IDs page in both views, on the ID's own page and on Home; an invite asks for the name update first while the card still has an older name; `owner init` and `owner add-agent` take `--label` and sign card and label alike.
+- ce79b9f: Save your recovery kit from the app: Settings › Backup & Touch ID and each ID's Back up button ask for Touch ID or your backup code, save the kit to your Downloads folder and show its new recovery code once (WP-11).
+- ce79b9f: Doctor speaks in plain words: no folder names, no npx commands, each ID by its own name with its connected AI apps (WP-14).
+- ce79b9f: Your AI reports the ID's own name and can address a contact by the name you say (WP-6).
+- ce79b9f: Started from the one-line installer's `agentlink` command, AgentLink now names `agentlink` (not `npx -y @4thtech-io/agentlink`) in the lines it prints, such as "AgentLink closed. Run `agentlink` to open it again." (WP-2, D4)
+
 ## 0.4.13
 
 ### Patch Changes

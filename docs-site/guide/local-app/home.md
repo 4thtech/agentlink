@@ -1,8 +1,14 @@
 # Home
 
-*Applies to AgentLink 0.4.8. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
+*Applies to AgentLink 0.4.14. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
 
 Home is the first screen. It shows what needs you, then the people your AI talks to.
+
+<figure><img src="../../assets/screens/home.webp" alt="Home in the Simple view: the Invite someone button, Someone invited you? Paste link, and under People one row, Natasa, Last message just now, 0 files."><figcaption><p>Home in the Simple view.</p></figcaption></figure>
+
+Right after setup, before you have contacts, Home also shows the **Get started** card:
+
+<figure><img src="../../assets/screens/home-first.webp" alt="Home right after setup: Get started 1 of 2 done, Connect your AI app checked and Invite someone next, the Invite someone button and No one here yet under People."><figcaption><p>Home before your first contact.</p></figcaption></figure>
 
 ## What you see
 

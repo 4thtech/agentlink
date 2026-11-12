@@ -493,6 +493,17 @@ const SETUP_TIME = new Set([
   'GET /api/ui/join',
   'POST /api/ui/join/dismiss',
   'POST /api/ui/join/handoff',
+  // UX1113-R1 (D-147): restore from a recovery kit is first run's other way in; its own gate
+  // (local-ui/restore-server.test.ts, recovery-kit-restore.test.ts).
+  'GET /api/ui/restore/found',
+  'POST /api/ui/restore/upload',
+  'POST /api/ui/restore/header',
+  'POST /api/ui/restore/presence',
+  'POST /api/ui/restore/open',
+  'POST /api/ui/restore/check',
+  'POST /api/ui/restore/cancel',
+  'POST /api/ui/restore/apply/begin',
+  'POST /api/ui/restore/apply/finish',
   // W4-SHELL-V2: the app's UI settings are the app's, not an agent's (ui-settings-server.test.ts).
   'GET /api/ui/ui-settings',
   'PUT /api/ui/ui-settings',

@@ -85,6 +85,11 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'probeOsKeychain',
       'quarantineMark',
       'resolveAllowedFile',
+      // UX1113-R1 (D-147; 06 §8 `agentlink restore`): the terminal restore on this user's keychain,
+      // home and own TTY prompt; no backend, path or prompt seam (the engine stays inside).
+      // UX1113-R1: `doctor` names why first run is held (store-only, no seam).
+      'restoreHoldHere',
+      'restoreInTerminal',
       'selectKeyStoreBackend',
       // M1-36b-2-c: the Send folder for an existing agent; the owner signs through the given
       // owner operation (performOwnerOperation in the CLI), nothing is unlocked here.
@@ -103,6 +108,12 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
   it('exports no raw backend, account builder, store-key access or KeyStore class', () => {
     const names = Object.keys(entry);
     for (const name of [
+      // UX1113-R1: the restore engine, its seams and the restore-only owner session stay inside.
+      'createRestoreEngine',
+      'createTerminalRestore',
+      'runRestoreInTerminal',
+      'unlockForRestore',
+      'createKeyImportControl',
       'osKeychain',
       'keychainAccount',
       'probeKeychain',

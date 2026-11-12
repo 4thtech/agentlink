@@ -15,7 +15,8 @@ import {
   type ReactNode,
 } from 'react';
 import { getLive } from '../api/live.js';
-import { SETTINGS_PAGES, sectionOf } from '../nav.js';
+import { sectionOf } from '../nav.js';
+import { isSettingsSubpage, SettingsFrame } from '../pages/settings/side-nav.js';
 import {
   PrefsHood,
   getPrefs,
@@ -146,7 +147,12 @@ export async function needsPasskeySwitch(): Promise<boolean> {
 
 /** Get started and the join screen: a focused column with no chrome (b11 §28, §33.2). */
 export function isFocusedPath(path: string): boolean {
-  return path.startsWith('/start/') || path === '/first-run' || path === '/settings/join';
+  return (
+    path.startsWith('/start/') ||
+    path.startsWith('/restore/') ||
+    path === '/first-run' ||
+    path === '/settings/join'
+  );
 }
 
 /** UI-REFRESH-t: the first Tab stop. Focus goes to the page content (it is made focusable here). */
@@ -284,7 +290,7 @@ export function Layout({
     );
   }
   const [statusClass, statusWord] = STATUS[connection];
-  const settings = sectionOf(path) === 'settings';
+  const settings = sectionOf(path) === 'settings' || path === '/advanced/network';
   return (
     <PrefsHood>
       <a href="#al-main" className="al-skip al-text-body-sm" onClick={skipToContent}>
@@ -303,26 +309,16 @@ export function Layout({
             waiting={waiting}
           />
           <main className={`al-shell-content al-app-main ${VT_CLASS.main}`} id="al-main">
-            <div className="al-route">
+            <div className="al-route" {...(settings ? { 'data-settings': '' } : {})}>
               {switchNeeded ? <SwitchToPasskeyBanner platform={platform} /> : null}
-              {settings ? (
-                <nav aria-label={SHELL_STRINGS.settingsNav} className="al-subnav">
-                  {SETTINGS_PAGES.map((p) => (
-                    <a
-                      key={p.path}
-                      href={p.path}
-                      className={p.path === path ? 'is-active' : undefined}
-                      aria-current={p.path === path ? 'page' : undefined}
-                    >
-                      {p.label}
-                    </a>
-                  ))}
-                </nav>
-              ) : null}
               <StartHereContext.Provider value={start}>
                 {/* The one-time Tidy up note (b11 §29.7), on Home. */}
                 {path === '/' ? <TidyNote /> : null}
-                {children}
+                {settings && isSettingsSubpage(path) ? (
+                  <SettingsFrame path={path}>{children}</SettingsFrame>
+                ) : (
+                  children
+                )}
               </StartHereContext.Provider>
             </div>
           </main>

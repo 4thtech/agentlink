@@ -27,6 +27,7 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import {
   CryptoInputError,
+  KEY_LABELS,
   KeyStoreError,
   credentialDigestOfItem,
   equalBytes,
@@ -42,6 +43,8 @@ import {
   type KeyImportControl,
   type KeystoreEntry,
   type OpenRecoveryKitOptions,
+  type OwnerPresence,
+  type OwnerPublicKeys,
   type OwnerSession,
   type RecoveryCodeSecret,
   type RecoveryKitExportRequest,
@@ -51,6 +54,7 @@ import {
   type StorageCredentialControl,
 } from '@4thtech-io/crypto';
 import {
+  derivePublicKey,
   encodeStorageCredentialItem,
   generateSecretCode,
   newKeystoreKek,
@@ -86,13 +90,14 @@ import {
   type KeychainItem,
 } from './keychain.js';
 import {
+  KeychainOwnerKeyStore,
   OWNER_ACCOUNT,
   OWNER_NEXT_ACCOUNT,
   exportSeedOf,
   issuedBy,
   storeRestoredOwnerSeed,
-  type KeychainOwnerKeyStore,
 } from './owner-keystore.js';
+import { storeOwnerPasskeyKey, storeOwnerPasskeySeed } from './owner-passkey.js';
 import {
   checkQuarantinedSnapshot,
   discardQuarantineSync,
@@ -605,10 +610,16 @@ export function createKeyImportControl(options: KeyImportControlOptions): KeyImp
         throw argument('restore: the agent name is not valid');
       }
       // 04 §2.3.3 restore table: an existing owner is kept only after its own code opened it to the
-      // kit's owner. A card naming that owner is never enough.
+      // kit's owner. A card naming that owner is never enough. UX1113-R1 (D-147 (4)): or the
+      // seedless restore-only session that presence on this store minted (unlockForRestore).
       if (await ownerPresent()) {
         const session = importOptions.owner;
-        if (ownerStore === undefined || !issuedBy(session, ownerStore)) throw presenceRequired();
+        if (
+          ownerStore === undefined ||
+          !(issuedBy(session, ownerStore) || restoreSessionOf(session, ownerStore))
+        ) {
+          throw presenceRequired();
+        }
         if (!(session as OwnerSession).isActive()) throw ownerLocked();
         const keys = await ownerStore.getPublicKeys();
         if (!equalBytes(keys.ownerNostr, opened.ownerNostr)) throw ownerRejected();
@@ -668,6 +679,204 @@ export function createKeyImportControl(options: KeyImportControlOptions): KeyImp
         wipe(ownerCode);
         throw error;
       }
+    },
+  });
+}
+
+// --- Restore in the app (UX1113-R1, D-147) --------------------------------------------------------
+
+/**
+ * UX1113-R1 (D-147 (5); 04 §2.3.3 step 6 "In the app"): after importOwner wrote the owner under its
+ * new master code, also writes the `ALKP` passkey wrap of the kit's owner seed under the PRF output
+ * of the restore's fresh user-verified WebAuthn create, as first run does (04 §2.3.1), and keeps its
+ * credential public key. The seed never leaves this package; the PRF output is wiped. False when the
+ * wrap could not be written (the owner then approves with the master code, as without PRF).
+ */
+export async function importOwnerPasskey(
+  kit: RecoveryKitImport,
+  keychain: KeychainBackend,
+  passkey: {
+    readonly prfOutput: Uint8Array;
+    readonly credentialId: Uint8Array;
+    readonly authenticatorData: Uint8Array;
+  },
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<boolean> {
+  const opened = stateOf(kit);
+  try {
+    const owner = ownerKeysOfSeed(opened.ownerSeed);
+    if (!equalBytes(owner.ownerNostr, opened.ownerNostr)) return false;
+    await storeOwnerPasskeySeed(
+      keychain,
+      opened.ownerSeed,
+      owner,
+      passkey.prfOutput,
+      passkey.credentialId,
+      { timeoutMs },
+    );
+    await storeOwnerPasskeyKey(
+      keychain,
+      passkey.credentialId,
+      passkey.authenticatorData,
+      timeoutMs,
+    ).catch(() => false);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    wipe(passkey.prfOutput);
+  }
+}
+
+/** The owner public keys a seed derives (04 §2.1, epoch 0). */
+function ownerKeysOfSeed(seed: Uint8Array): OwnerPublicKeys {
+  const evm = derivePublicKey(seed, KEY_LABELS.evm, 0);
+  const nostr = derivePublicKey(seed, KEY_LABELS.nostr, 0);
+  const enc = derivePublicKey(seed, KEY_LABELS.enc, 0);
+  if (
+    evm.label !== KEY_LABELS.evm ||
+    nostr.label !== KEY_LABELS.nostr ||
+    enc.label !== KEY_LABELS.enc
+  ) {
+    throw argument('restore: the owner keys cannot be derived');
+  }
+  return Object.freeze({
+    ownerEvm: evm.address,
+    ownerNostr: nostr.publicKey,
+    ownerEnc: enc.publicKey,
+  });
+}
+
+/**
+ * UX1113-R1 (04 §2.3.3 "never overwrites"; T-7): removes the keychain items of `agentId` that
+ * importAgent just wrote, when the rest of that ID (its folder, store or config) could not be
+ * written, so a failed ID leaves none of its items. Only the restore engine calls it, only for an ID
+ * whose importAgent succeeded in the same apply (it checked every item was absent before writing).
+ * Never an owner account or an `s3:*` item.
+ */
+export async function discardImportedAgent(
+  keychain: KeychainBackend,
+  agentId: string,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<void> {
+  assertAgentId(agentId);
+  for (const name of KIT_ITEMS) {
+    await guarded(() => keychain.delete(keychainAccount(agentId, name)), timeoutMs).catch(
+      () => false,
+    );
+  }
+}
+
+/** The binding and state of one restore-only owner session (module-private, by identity). */
+interface RestoreSessionState {
+  readonly store: KeychainOwnerKeyStore;
+  readonly headerHash: Uint8Array;
+  readonly expiresAt: number;
+  active: boolean;
+}
+
+const RESTORE_SESSIONS = new WeakMap<object, RestoreSessionState>();
+
+/** True when `session` is a live restore-only session of `store` (by identity, never by shape). */
+function restoreSessionOf(session: unknown, store: KeychainOwnerKeyStore): boolean {
+  if (typeof session !== 'object' || session === null) return false;
+  const state = RESTORE_SESSIONS.get(session);
+  if (state === undefined || state.store !== store || !state.active) return false;
+  if (Date.now() >= state.expiresAt) {
+    state.active = false;
+    return false;
+  }
+  return true;
+}
+
+/** UX1113-R1: the restore-only owner session (04 §2.5 "Restore-only owner session"). */
+export interface RestoreOwnerSessionHold {
+  /** The seedless session: `isActive` and `getPublicKeys` only; every sign refuses. */
+  readonly session: OwnerSession;
+  /** The store it pairs with, for KeyImportControl's `ownerStore` (public keys only). */
+  readonly store: KeychainOwnerKeyStore;
+  /** True when this session is bound to exactly this 32-byte header hash. */
+  boundTo(headerHash: Uint8Array): boolean;
+  /** Ends it (idempotent): importAgent refuses it from then on. */
+  end(): void;
+}
+
+const restoreRefused = (): KeyStoreError =>
+  new KeyStoreError('operation_not_allowed', 'restore session: it signs nothing');
+
+/**
+ * UX1113-R1 (D-147 (4); 04 §2.5 "Restore-only owner session"): verifies owner presence (the master
+ * code on `owner`, or the passkey PRF output on `owner-passkey`; the caller checked the assertion)
+ * by opening this computer's owner item to exactly `ownerNostr` (the kit header's owner), **wipes
+ * the owner seed at once** (the unlock session is ended before this returns) and answers a seedless
+ * session bound to `headerHash` (SHA-256 of the kit's 74-byte header). It answers only `isActive()`
+ * and `getPublicKeys()`; every sign, encrypt and decrypt refuses; only KeyImportControl.importAgent
+ * accepts it (by identity), to check that the owner on this computer is the kit's. A wrong secret,
+ * another owner and a damaged item are one answer, `presence_rejected`. It holds no secret, so it is
+ * not an unlock session in the sense of D-68 (1). Lives at most `ttlMs` (default 10 minutes).
+ */
+export async function unlockForRestore(
+  keychain: KeychainBackend,
+  ownerNostr: Uint8Array,
+  options: {
+    readonly presence: OwnerPresence;
+    readonly headerHash: Uint8Array;
+    readonly ttlMs?: number;
+    readonly timeoutMs?: number;
+  },
+): Promise<RestoreOwnerSessionHold> {
+  if (!(options.headerHash instanceof Uint8Array) || options.headerHash.length !== 32) {
+    throw argument('restore session: the header hash must be 32 bytes');
+  }
+  const ttlMs = options.ttlMs ?? 600_000;
+  // unlockForOwnerNostr wipes the presented bytes, whether or not they unlock.
+  const unlocked = await KeychainOwnerKeyStore.unlockForOwnerNostr(
+    keychain,
+    ownerNostr,
+    options.presence,
+    { ttlMs: 60_000, ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }) },
+  );
+  // The seed-derived keys are wiped now: the restore session never holds them.
+  await unlocked.session.close();
+  const state: RestoreSessionState = {
+    store: unlocked.store,
+    headerHash: options.headerHash.slice(),
+    expiresAt: Date.now() + ttlMs,
+    active: true,
+  };
+  const keys = unlocked.owner;
+  const refuse = (): Promise<never> => Promise.reject(restoreRefused());
+  const session = Object.freeze({
+    expiresAt: state.expiresAt,
+    isActive: (): boolean => restoreSessionOf(session, state.store),
+    getPublicKeys: () =>
+      Promise.resolve(
+        Object.freeze({
+          ownerEvm: keys.ownerEvm.slice(),
+          ownerNostr: keys.ownerNostr.slice(),
+          ownerEnc: keys.ownerEnc.slice(),
+        }),
+      ),
+    signOwnerAction: refuse,
+    sign712: refuse,
+    signEnvelopeHash: refuse,
+    signNostr: refuse,
+    nip44Encrypt: refuse,
+    nip44Decrypt: refuse,
+    unwrapCek: refuse,
+    close: (): Promise<void> => {
+      state.active = false;
+      return Promise.resolve();
+    },
+  }) as unknown as OwnerSession;
+  RESTORE_SESSIONS.set(session, state);
+  return Object.freeze({
+    session,
+    store: state.store,
+    boundTo: (headerHash: Uint8Array): boolean =>
+      state.active && headerHash instanceof Uint8Array && equalBytes(headerHash, state.headerHash),
+    end: (): void => {
+      state.active = false;
     },
   });
 }

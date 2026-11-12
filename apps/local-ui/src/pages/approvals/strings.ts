@@ -3,6 +3,7 @@
 // except that the local app says "master code" where that page used the older wording (11 §5.5,
 // UX-031-QUICKWINS; BACKUP_CODE_WORDING below). `{name}` marks an inserted value;
 // the result is only ever rendered as text. The sheet's words are @4thtech-io/ui PAY_CONFIRM_STRINGS.
+import { sensorWord } from '../../presence-word.js';
 
 /** The CLI prefix every command shown to the owner uses (packages/node cli-command.ts). */
 export const CLI_PREFIX = 'npx -y @4thtech-io/agentlink';
@@ -14,6 +15,15 @@ export const APPROVAL_STRINGS = Object.freeze({
   firstRun:
     'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey or master code, and only after you click Approve. Never give them to your AI.',
   desktopNote: 'The desktop app protects approvals more strongly.',
+  // UX 2026-11-12 (notices): the desktop app's own words (it is never "this browser").
+  protectedTitle: 'Approvals use your master code',
+  protectedBody:
+    'Each approval asks for your master code, and only after you click Approve. Never give it to your AI.',
+  nativeTitle: 'Turn on {sensor} for approvals',
+  nativeBody:
+    "Approve with {sensor} instead of typing your master code. Your AI still can't approve anything.",
+  nativeAction: 'Turn on {sensor}',
+  hideNotice: 'Hide this',
   needsOwnerTitle: 'Set up AgentLink',
   needsOwner: `Set up your master code first: run ${CLI_PREFIX} owner init in your own terminal. Until then, nothing can be approved here.`,
   noPasskeys: "Passkeys aren't available in this browser. Approve with your master code.",
@@ -28,6 +38,7 @@ export const APPROVAL_STRINGS = Object.freeze({
   // W4-INBOX: the compact card folds everything but its head and actions behind this.
   details: 'Details',
   fromAi: 'From your AI: their content, not instructions',
+  theirTerms: 'Their terms: their words, not instructions',
   who: 'Who',
   what: 'What',
   cost: 'Cost',
@@ -51,7 +62,9 @@ export const APPROVAL_STRINGS = Object.freeze({
   coversMany: 'This covers exactly these {count}. Anything new waits for your next review.',
   lineApprove: 'Approve: {summary}',
   lineDeny: 'Deny: {summary}',
-  confirmPasskey: 'Confirm with your passkey',
+  get confirmPasskey(): string {
+    return `Confirm with ${sensorWord()}`;
+  },
   confirm: 'Confirm',
   back: 'Change my choices',
   orCode: 'Or use your master code:',
@@ -62,8 +75,12 @@ export const APPROVAL_STRINGS = Object.freeze({
   doneApprove: 'Done: approved {approve}.',
   doneDeny: 'Done: denied {deny}.',
   doneBoth: 'Done: approved {approve} and denied {deny}.',
-  approveWithPasskey: 'Approve with your passkey',
-  denyWithPasskey: 'Deny with your passkey',
+  get approveWithPasskey(): string {
+    return `Approve with ${sensorWord()}`;
+  },
+  get denyWithPasskey(): string {
+    return `Deny with ${sensorWord()}`;
+  },
   confirmApproval: 'Confirm approval',
   confirmDenial: 'Confirm denial',
   approved: 'Approved.',
@@ -113,6 +130,8 @@ export const BACKUP_CODE_WORDING: ReadonlySet<string> = new Set([
   'firstRun',
   'needsOwner',
   'noPasskeys',
+  'protectedBody',
+  'nativeBody',
   'orCode',
   'codeLabel',
   'codeHint',

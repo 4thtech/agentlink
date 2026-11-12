@@ -51,7 +51,7 @@ import {
 import { isCommitmentAction } from './commitments.js';
 import { isPaidPendingAction } from './pay-confirm.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
-import type { ContactBook } from './contacts.js';
+import { removeContactTx, type ContactBook } from './contacts.js';
 import type { IdentityService } from './identity.js';
 import { isRestrictedAlias } from './names.js';
 import { credentialDigestsEqual, readStorageMark, type OwnStorageKeys } from './own-storage.js';
@@ -493,11 +493,8 @@ export class OwnerActions {
         return refused(op, 'contact_revoked');
       }
       tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
-      tx.update(
-        'contacts',
-        { contact_id: contactId, status: { in: ['active', 'blocked'] } },
-        { status: 'removed', updated_at: now },
-      );
+      // The one remove (07 §3): staged pairings go, a block survives as key blocks (audit M1, L2).
+      removeContactTx(tx, row, now);
       return { status: 'applied', op };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
@@ -1575,6 +1572,44 @@ export class OwnerActions {
     const signer = await this.#signer();
     if ('refusal' in signer) return refuse(signer.refusal);
     return this.#build(signer, 'backup.export', params.data);
+  }
+
+  /**
+   * WP-R2 (D-147 (6); 04 §2.3.3 "Kit record"): true when this agent's store holds the nonce row of
+   * an applied `backup.export` that is exactly `signed` and names `kitId`, so the app can tell a kit
+   * record that names a real save from one that does not. WP-R2b (IR L-3): the row's action hash is
+   * the hash of the whole signed action, so a record cannot pair a real nonce with another kitId.
+   * Reads one row; writes nothing. Anything malformed is false.
+   */
+  async backupExportRecorded(signed: unknown, kitId: string): Promise<boolean> {
+    const nonceText = /^[A-Za-z0-9_-]{22}$/;
+    if (typeof kitId !== 'string' || !nonceText.test(kitId)) return false;
+    if (typeof signed !== 'object' || signed === null || Array.isArray(signed)) return false;
+    const keys = Object.keys(signed);
+    if (keys.length !== 2 || !keys.includes('body') || !keys.includes('sig')) return false;
+    const { body, sig } = signed as { body?: unknown; sig?: unknown };
+    if (typeof sig !== 'string' || typeof body !== 'object' || body === null) return false;
+    const b = body as Record<string, unknown>;
+    const params = b['params'] as Record<string, unknown> | null | undefined;
+    if (
+      b['op'] !== 'backup.export' ||
+      typeof b['nonce'] !== 'string' ||
+      !nonceText.test(b['nonce']) ||
+      typeof params !== 'object' ||
+      params === null ||
+      params['kitId'] !== kitId
+    ) {
+      return false;
+    }
+    let hash: string;
+    try {
+      hash = ownerActionHash({ body, sig });
+    } catch {
+      return false;
+    }
+    const nonce = b['nonce'];
+    const row = await this.#ctx.store.transaction((tx) => tx.get('owner_action_nonces', { nonce }));
+    return row !== undefined && row.op === 'backup.export' && row.action_hash === hash;
   }
 
   /**

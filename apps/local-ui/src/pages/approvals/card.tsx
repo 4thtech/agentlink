@@ -32,6 +32,7 @@ import {
   RingMeter,
   SuccessMoment,
   Surface,
+  useHood,
   useRowPresence,
   useVisibilityPause,
 } from '@4thtech-io/ui';
@@ -50,6 +51,7 @@ import { APPROVAL_ID } from './client.js';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 import { normaliseBackupCode } from '../first-run/backup-code.js';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
+import { isPlumbing, TermsDetails, TermsSummary } from './terms-view.js';
 
 /** The owner as the page knows it: set up or not, and the decision passkey when registered. */
 export interface OwnerState {
@@ -197,6 +199,15 @@ export function Statuses({ lines }: { lines: readonly string[] }): ReactElement 
 /** The card's content: headline, facts, terms, then what the AI chose (marked as theirs). */
 export function ApprovalFacts({ item }: { item: ApprovalItem }): ReactElement {
   const d = item.details;
+  const hood = useHood();
+  const fromAi =
+    d === undefined
+      ? []
+      : hood
+        ? d.fromAi
+        : d.terms === undefined
+          ? d.fromAi
+          : d.fromAi.filter((f) => !isPlumbing(f));
   return (
     <>
       <div className="al-approval-top">
@@ -225,17 +236,14 @@ export function ApprovalFacts({ item }: { item: ApprovalItem }): ReactElement {
             ))}
           </dl>
           {d.terms !== undefined && d.terms.length > 0 ? (
-            <div className="al-terms">
-              {d.terms.map((line, i) => (
-                <p key={i}>{line}</p>
-              ))}
-            </div>
+            <TermsDetails lines={d.terms} showAdvanced={hood} />
           ) : null}
-          {d.fromAi.length > 0 ? (
+          {/* Ids, hashes and flags are plumbing: Under the hood only (11 §5). */}
+          {fromAi.length > 0 ? (
             <figure className="al-untrusted" role="group" aria-label={S.fromAi}>
               <figcaption className="al-untrusted-label">{S.fromAi}</figcaption>
               <dl className="al-untrusted-body">
-                {d.fromAi.map((f, i) => (
+                {fromAi.map((f, i) => (
                   <div key={i}>
                     <dt>{f.name}</dt>
                     <dd>
@@ -269,6 +277,7 @@ export function CompactHead({ item }: { item: ApprovalItem }): ReactElement {
       {d === undefined ? null : (
         <p className="al-approval-line al-text-body-sm">{[d.who, d.what, d.cost].join(' · ')}</p>
       )}
+      {d?.terms !== undefined && d.terms.length > 0 ? <TermsSummary lines={d.terms} /> : null}
     </>
   );
 }

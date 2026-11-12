@@ -50,13 +50,15 @@ Every screen guide ends with a table inside **For the technically curious**: *On
 
 ## 5. Screenshots
 
-- **Real app, test data only.** Capture the real local app, run in a throwaway home folder (user `demo`), on a test network. Names come from the 11 §5 samples (Marko, Ana). Never a real key, owner or backup code, safety code, Agent ID, address, path with a real user name, or a real person.
-- **Fixed frame.** Browser viewport 1280 × 800, device scale 2, PNG, cropped to the app, at most 400 KB. Dark theme only (decided 2026-10-26).
-- **Names.** `<surface>-<page>--<state>.png`, lowercase with hyphens, for example `local-files--confirm-add.png`.
-- **Stored** in the folder's `.gitbook/assets/`; embedded as `<figure><img src="../.gitbook/assets/<name>" alt="<what it shows and why>"><figcaption><p><caption></p></figcaption></figure>`.
+**Updated 2026-11-12 (docs overhaul, owner request):** light theme, generated, one shared folder. The full pipeline is in [docs-architecture.md](docs-architecture.md) §3.
+
+- **Real app, generated.** `pnpm docs:screens` renders the real app on the journey harness (temp homes, keychain stand-in, in-memory relay, virtual passkey): never a real home, keychain, key, code or person. The two people are **Tali** and **Natasa**.
+- **Fixed frame.** 1280 × 800 at device scale 2, light theme, WebP, about 40 to 70 KB each.
+- **Names.** `<page-or-moment>.webp`, lowercase with hyphens, for example `accept-invite.webp`. Add a shot by adding one `shot(page, '<name>')` step to the generator.
+- **Stored** in `docs-site/assets/screens/`, shared by the README, the guide and the technical docs; embedded as `<figure><img src="../assets/screens/NAME.webp" alt="<what it shows and why>"><figcaption><p><caption></p></figcaption></figure>` (one more `../` per folder level).
 - **Alt text** says what the reader should notice, not "screenshot".
-- **Placeholder** until captured: `<!-- screenshot: <name> | shows: <state> -->` (invisible on both sites, greppable).
-- **Refresh** when any string on the shot changes.
+- **Placeholder** until captured: `<!-- screenshot: <name> | shows: <state> -->`.
+- **Refresh** with `pnpm docs:screens` when any string on a shot changes. The older dark, fixture-based shots in `docs-site/guide/.gitbook/assets/` stay only until the generator covers their pages (files, proofs, rules).
 
 ## 6. Wording
 
@@ -87,7 +89,7 @@ Every screen guide ends with a table inside **For the technically curious**: *On
 - **Brand.** 4thTech is the master brand and AgentLink a sub-brand: "AgentLink by 4thTech". The site header uses the 4thTech logo from 4thTech's original file (never redrawn). AgentLink landing pages show its horizontal lockup; the footer uses the endorsed lockup ([brand rules](../../brand/README.md)). The two marks are never merged; the AgentLink mark is never put inside a hexagon.
 - **Cross-links.** The AgentLink landing page says in one line that it builds on earlier 4thTech work and links it; earlier pages carry one line pointing to AgentLink as the current product.
 - **Intro GIF** (on the repo README, today a relative path): pinning its URL to the release tag is planned for the 4thTech Docs copy, so a copied page never shows a newer or missing file.
-- **Screenshots: dark theme only.** One set, no light variants.
+- **Screenshots:** light theme, one set, from `docs-site/assets/screens/` (§5); the wiki sync copies that folder too.
 - **OCC v1** (EUPL-1.2 with a non-commercial rider): reference only; link, never copy code.
 
 ## 9. Definition of done (every page)

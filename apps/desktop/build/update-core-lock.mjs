@@ -23,6 +23,7 @@ writeFileSync(
       name: 'agentlink-core-deps',
       version: '0.0.0',
       private: true,
+      license: 'MIT',
       dependencies: cli.dependencies,
     },
     null,

@@ -58,6 +58,11 @@ export interface AgentDirectoryEntry {
   readonly labelled?: boolean;
   /** False when the folder's config cannot be read (the agent is listed, never opened). */
   readonly available: boolean;
+  /**
+   * WP-R2b: the KeyStore backend config.json records (07 §9.1); absent when unknown. A `file` ID
+   * is never opened by the recovery-kit export (it needs its passphrase) and is named instead.
+   */
+  readonly keyStore?: 'keychain' | 'file';
   /** `removing: true` in config.json, or the agent's ID is in the owner's revoked list. */
   readonly removing: boolean;
 }
@@ -247,6 +252,39 @@ export type AppHostSwitchOutcome =
 /** How long a switch waits for the requests in flight before it closes the agent anyway. */
 export const SWITCH_DRAIN_MS = 10_000;
 
+/**
+ * WP-R2b (IR M-1): the most one open or one step of the recovery-kit export's walk may take
+ * (milliseconds); the export's own budget can only shorten it.
+ */
+export const VISIT_STEP_MS = 15_000;
+/** WP-R2b: how long a late open may take to settle before the open agent is opened again. */
+export const VISIT_SETTLE_MS = 5_000;
+/**
+ * WP-R2b (IR round 2): the most the walk waits to open the first ID again; past it the host stays
+ * unbound (`restarting`) and keeps trying in the background.
+ */
+export const VISIT_REOPEN_MS = 15_000;
+/** WP-R2b: background tries to open the first ID again after a reopen timed out or failed. */
+const REOPEN_RETRIES = 3;
+const REOPEN_RETRY_DELAY_MS = 1_000;
+
+/** Resolves `{done: true, value}` when `p` settles within `ms`, else `{done: false}`. */
+async function within<T>(
+  p: Promise<T>,
+  ms: number,
+): Promise<{ readonly done: true; readonly value: T } | { readonly done: false }> {
+  if (!(ms > 0)) return { done: false };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<{ readonly done: false }>((resolve) => {
+    timer = setTimeout(() => resolve({ done: false }), ms);
+  });
+  try {
+    return await Promise.race([p.then((value) => ({ done: true as const, value })), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** The 06 §6 agent-name rule, checked again here before the directory sees the name. */
 export const HOST_AGENT_NAME = /^[a-z][a-z0-9-]{0,31}$/;
 
@@ -267,6 +305,8 @@ export class AppHostSlot {
   #idle: (() => void)[] = [];
   #switching: Promise<void> | undefined;
   #closed = false;
+  /** WP-R2b: the ID being opened again in the background after the walk (none open meanwhile). */
+  #restarting: string | undefined;
 
   constructor(
     options: AppHostOptions,
@@ -285,6 +325,14 @@ export class AppHostSlot {
   }
 
   /** The open agent's name, or undefined when none is open. */
+  /**
+   * WP-R2b: true while the ID that was open before a recovery-kit walk is being opened again in the
+   * background (none is open; requests answer "AgentLink is restarting this ID, try again").
+   */
+  get restarting(): boolean {
+    return this.#restarting !== undefined && this.#agent === undefined;
+  }
+
   get current(): string | undefined {
     return this.#agent?.name;
   }
@@ -538,6 +586,186 @@ export class AppHostSlot {
       await this.#options.directory.writeCurrent(entry.name).catch(() => undefined);
       return;
     }
+  }
+
+  /**
+   * WP-R2b (04 §2.5 "KeyStore isolation"; §2.3.3 "In the local app"): for the recovery-kit export's
+   * one owner operation only, called by the export request itself (its own hold stays). Takes the
+   * slot as a switch does (refused while a switch is in progress; new requests wait or are refused;
+   * the other requests in flight drain first, at most the drain time), closes the open agent, then
+   * opens each of `names` in turn through the same `open` path and hands it to `visit`, closing it
+   * before the next one: at most one agent's KeyStore and store are open here at any time, and the
+   * open agent is never opened a second time. `visit` gets undefined for a name that could not be
+   * opened (or is no longer listed, or is `removing`, or is the open agent); its false stops the
+   * walk.
+   *
+   * Bounded (IR M-1): each open and each `visit` may take at most `bounds.stepMs()` (read before
+   * each; 0 or less stops the walk). An open that does not finish in time stops the walk and the
+   * agent it later yields is closed as soon as it arrives; a `visit` that does not finish in time
+   * stops the walk and its agent is closed at once (the export then signs and applies nothing more
+   * and seals nothing). Before the agent that was open is opened again, a late open is given up to
+   * `bounds.settleMs` to settle, so that two agents are not open together (a native open that hangs
+   * beyond that is closed the moment it returns: the residual of the security section).
+   *
+   * Finally the agent that was open is opened again; the generation does not change (the page still
+   * shows it). If it cannot be opened again the host stays with none open (never half-open), the
+   * generation is raised (every page reloads and shows that state) and `restored` is false. `ok` is
+   * false when the walk did not finish (stopped, timed out, refused, or `visit` threw: every agent
+   * it opened is closed all the same).
+   */
+  async visitOthers(
+    names: readonly string[],
+    visit: (name: string, agent: AppHostAgent | undefined) => Promise<boolean>,
+    bounds: {
+      readonly stepMs: () => number;
+      readonly settleMs?: number;
+      readonly reopenMs?: number;
+      readonly retryDelayMs?: number;
+    } = {
+      stepMs: () => VISIT_STEP_MS,
+    },
+  ): Promise<{ readonly ok: boolean; readonly restored: boolean }> {
+    if (this.#closed || this.#switching !== undefined || this.#agent === undefined) {
+      return { ok: false, restored: this.#agent !== undefined };
+    }
+    let finish: () => void = () => undefined;
+    this.#switching = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const previous = this.#agent;
+    let ok = true;
+    let restored = false;
+    /** An open that did not finish in time: settles once its agent (if any) is closed. */
+    let late: Promise<void> | undefined;
+    try {
+      // The export request's own hold stays; every other request in flight drains first.
+      await this.#drainedBut(1);
+      this.#agent = undefined;
+      this.#bind(undefined);
+      // KeyStore isolation (04 §2.5): the open agent is closed before any other is opened.
+      await previous.close().catch(() => undefined);
+      for (const name of names) {
+        // No time left (the export's budget spent) or the host closing: nothing more is opened.
+        if (this.#closed || !(bounds.stepMs() > 0)) {
+          ok = false;
+          break;
+        }
+        let agent: AppHostAgent | undefined;
+        if (HOST_AGENT_NAME.test(name) && name !== previous.name) {
+          const entry = await this.#options.directory.read(name).catch(() => undefined);
+          if (entry !== undefined && entry.name === name && entry.available && !entry.removing) {
+            const limit = bounds.stepMs();
+            if (!(limit > 0)) {
+              ok = false;
+              break;
+            }
+            const opening = this.#options.open(name).catch(() => undefined);
+            const opened = await within(opening, limit);
+            if (!opened.done) {
+              late = opening.then(async (a) => {
+                await a?.close().catch(() => undefined);
+              });
+              ok = false;
+              break;
+            }
+            agent = opened.value;
+            if (agent !== undefined && agent.name !== name) {
+              await agent.close().catch(() => undefined);
+              agent = undefined;
+            }
+          }
+        }
+        let next = false;
+        try {
+          const visited = await within(
+            visit(name, agent).catch(() => false),
+            bounds.stepMs(),
+          );
+          next = visited.done && visited.value;
+        } finally {
+          await agent?.close().catch(() => undefined);
+        }
+        if (!next) {
+          ok = false;
+          break;
+        }
+      }
+    } finally {
+      if (late !== undefined) await within(late, bounds.settleMs ?? VISIT_SETTLE_MS);
+      // The agent that was open, opened again (never while another is open), bounded (IR round 2).
+      const reopening = this.#closed
+        ? Promise.resolve(undefined)
+        : this.#options.open(previous.name).catch(() => undefined);
+      const reopened = await within(reopening, bounds.reopenMs ?? VISIT_REOPEN_MS);
+      const back = reopened.done ? reopened.value : undefined;
+      if (back !== undefined && back.name === previous.name && !this.#closed) {
+        this.#agent = back;
+        this.#bind(back);
+        restored = true;
+      } else {
+        await back?.close().catch(() => undefined);
+        // Nothing open now (never half-open): every page reloads and shows it. Unless the host is
+        // closing, the ID is opened again in the background; requests fail closed meanwhile.
+        this.#generation += 1;
+        if (!this.#closed) {
+          this.#restarting = previous.name;
+          void this.#reopenLater(
+            previous.name,
+            reopened.done ? Promise.resolve(undefined) : reopening,
+            bounds.retryDelayMs ?? REOPEN_RETRY_DELAY_MS,
+          );
+        }
+      }
+      this.#switching = undefined;
+      finish();
+    }
+    return { ok, restored };
+  }
+
+  /**
+   * WP-R2b (IR round 2): after a walk could not open `name` again in time, waits for that open (it
+   * may still finish) and otherwise tries again a few times. The agent is bound only while the host
+   * is still empty, open and not switching; any other agent it yields is closed at once. Never
+   * rejects.
+   */
+  async #reopenLater(
+    name: string,
+    pending: Promise<AppHostAgent | undefined>,
+    delayMs: number,
+  ): Promise<void> {
+    try {
+      let attempt: Promise<AppHostAgent | undefined> = pending;
+      for (let tries = 0; tries <= REOPEN_RETRIES; tries += 1) {
+        const agent = await attempt.catch(() => undefined);
+        if (this.#restarting !== name) {
+          await agent?.close().catch(() => undefined);
+          return;
+        }
+        if (agent !== undefined) {
+          if (
+            agent.name === name &&
+            !this.#closed &&
+            this.#agent === undefined &&
+            this.#switching === undefined
+          ) {
+            this.#agent = agent;
+            this.#bind(agent);
+            this.#generation += 1;
+          } else {
+            await agent.close().catch(() => undefined);
+          }
+          this.#restarting = undefined;
+          return;
+        }
+        if (this.#closed || this.#agent !== undefined || tries === REOPEN_RETRIES) break;
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+        if (this.#closed || this.#agent !== undefined || this.#switching !== undefined) break;
+        attempt = this.#options.open(name).catch(() => undefined);
+      }
+    } catch {
+      // Never rejects; the host stays empty and the page shows it.
+    }
+    this.#restarting = undefined;
   }
 
   /** Resolves when at most `keep` requests are in flight (the caller's own), or after the drain. */

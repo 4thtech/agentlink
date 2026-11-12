@@ -484,41 +484,14 @@ export async function replaceOwnerWrap(
   options: StoreOwnerSeedOptions = {},
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
-  const want = ownerKeysCopy(owner);
-  const kek = await newKeystoreKek(
-    'ALKO',
-    { secret, secretKind: 1, source: 'prompt' },
-    options.kdf,
-  );
-  let blob: Uint8Array;
-  try {
-    blob = await sealOwnerSeed(kek, seed, { destination: 'local', fileKeystoreMachine: false });
-  } finally {
-    wipe(kek.kek);
-  }
   const dropStaging = async (): Promise<void> => {
     await guarded(() => keychain.delete(OWNER_NEXT_ACCOUNT), timeoutMs).catch(() => false);
   };
+  // Steps 1 and 2 (stageOwnerWrap); on failure the staging item is already removed.
+  const blob = await stageOwnerWrap(keychain, seed, owner, secret, options);
 
-  // Steps 1 to 3: nothing below touches the `owner` item.
+  // Step 3: nothing above or here touches the `owner` item.
   try {
-    await guarded(() => keychain.set(OWNER_NEXT_ACCOUNT, blob), timeoutMs);
-    const staged = await guarded(() => keychain.get(OWNER_NEXT_ACCOUNT), timeoutMs);
-    const sameBytes = staged !== null && equalBytes(staged, blob);
-    let check: Uint8Array | undefined;
-    try {
-      if (!sameBytes || staged === null) throw changeFailedUnchanged();
-      check = await openOwnerSeedWithoutCard(
-        staged,
-        { secret, source: 'prompt' },
-        { fileKeystoreMachine: false },
-      ).catch(() => {
-        throw changeFailedUnchanged();
-      });
-      if (!sameOwner(publicKeysOf(check), want)) throw changeFailedUnchanged();
-    } finally {
-      wipe(staged, check);
-    }
     const current = await readOwnerItem(keychain, timeoutMs);
     const unchanged = current !== null && equalBytes(current, oldBlob);
     if (current !== null) wipe(current);
@@ -557,6 +530,61 @@ export async function replaceOwnerWrap(
     'keychain_failed',
     `The system keychain didn't confirm the change. Keep both your current and your new master code, and run \`${CLI_COMMAND} owner change-code\` again in your own terminal: it finishes or cleans up this change.`,
   );
+}
+
+/**
+ * M1-9z steps 1 and 2 of replaceOwnerWrap, on their own (UX1113 WP-S2: the app's Replace master code
+ * stages first and replaces only after the owner typed the new code back): seals a fresh `ALKO` v1
+ * blob of `seed` under `secret` (a generated master code, kind 1), writes it to `owner-next`, reads it
+ * back, requires the same bytes and opens the read-back bytes with `secret`: they must derive exactly
+ * `owner`. Returns the staged blob (ciphertext; the caller wipes it). Never touches the `owner` item.
+ * Any failure removes the staging item and throws; `seed` and `secret` are not modified.
+ */
+export async function stageOwnerWrap(
+  keychain: KeychainBackend,
+  seed: Uint8Array,
+  owner: OwnerPublicKeys,
+  secret: Uint8Array,
+  options: StoreOwnerSeedOptions = {},
+): Promise<Uint8Array> {
+  const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  const want = ownerKeysCopy(owner);
+  const kek = await newKeystoreKek(
+    'ALKO',
+    { secret, secretKind: 1, source: 'prompt' },
+    options.kdf,
+  );
+  let blob: Uint8Array;
+  try {
+    blob = await sealOwnerSeed(kek, seed, { destination: 'local', fileKeystoreMachine: false });
+  } finally {
+    wipe(kek.kek);
+  }
+  try {
+    await guarded(() => keychain.set(OWNER_NEXT_ACCOUNT, blob), timeoutMs);
+    const staged = await guarded(() => keychain.get(OWNER_NEXT_ACCOUNT), timeoutMs);
+    const sameBytes = staged !== null && equalBytes(staged, blob);
+    let check: Uint8Array | undefined;
+    try {
+      if (!sameBytes || staged === null) throw changeFailedUnchanged();
+      check = await openOwnerSeedWithoutCard(
+        staged,
+        { secret, source: 'prompt' },
+        { fileKeystoreMachine: false },
+      ).catch(() => {
+        throw changeFailedUnchanged();
+      });
+      if (!sameOwner(publicKeysOf(check), want)) throw changeFailedUnchanged();
+    } finally {
+      wipe(staged, check);
+    }
+    return blob;
+  } catch (error) {
+    wipe(blob);
+    await guarded(() => keychain.delete(OWNER_NEXT_ACCOUNT), timeoutMs).catch(() => false);
+    if (error instanceof NodeKeyStoreError) throw error;
+    throw changeFailedUnchanged();
+  }
 }
 
 const restoreOwnerFailed = (): NodeKeyStoreError =>
@@ -1080,9 +1108,12 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
   }
 
   /**
-   * M1-9i-c: unlock() for `agentlink backup export` † only. The same presence proof and checks; the
-   * session also lets this store's KeyExportControl read a copy of the owner seed (04 §2.3.3 "Export:
-   * who sees the seeds"), which is wiped when the session ends. Never offered to the agent path.
+   * M1-9i-c: unlock() for `agentlink backup export` † and the app's recovery-kit export, and (UX1113
+   * WP-S2) the app's Replace master code, only. The same presence proof and checks; the session also
+   * lets code in this package read a copy of the owner seed through exportSeedOf: the
+   * KeyExportControl to seal a kit (04 §2.3.3 "Export: who sees the seeds"), and the approval
+   * server's Replace step to re-wrap it under a new master code (04 §2.5, wiped at once). The copy is
+   * wiped when the session ends. Never offered to the agent path.
    */
   unlockForExport(presence: OwnerPresence, options: UnlockOptions = {}): Promise<OwnerSession> {
     return this.#unlock(presence, options, true);

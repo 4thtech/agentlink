@@ -56,13 +56,13 @@ To see whether it is on, open **Windows Security**, then **App & browser control
 
 ## What is different from the browser version
 
-- Touch ID in the app window is not available in the first builds on Mac. Approvals use your browser or your backup code (to be confirmed).
+- Touch ID in the app window is not available in the first builds on Mac. Approvals use your browser or your master code (to be confirmed).
 - Windows Hello approvals in the app window are to be confirmed.
 - Nothing about your IDs, contacts or messages changes. Your data stays in your AgentLink folder on your computer.
 
 ## Where your data lives
 
-Your IDs, contacts and messages stay on your computer, exactly as with the browser version. The preview does not send your backup code or your messages to 4thtech. See [What leaves your computer](../privacy-and-security.md).
+Your IDs, contacts and messages stay on your computer, exactly as with the browser version. The preview does not send your master code or your messages to 4thtech. See [What leaves your computer](../privacy-and-security.md).
 
 ## Removing it
 
@@ -70,4 +70,4 @@ Mac: drag AgentLink from Applications to the Bin. Windows: Settings, then Apps, 
 
 ## Report a problem
 
-The preview is early. If a step here does not match what you see, tell the person who invited you, or open an issue at `https://github.com/4thtech/agentlink/issues`. Do not include your backup code or any invite link.
+The preview is early. If a step here does not match what you see, tell the person who invited you, or open an issue at `https://github.com/4thtech/agentlink/issues`. Do not include your master code or any invite link.

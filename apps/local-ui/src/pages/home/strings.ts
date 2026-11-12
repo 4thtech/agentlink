@@ -95,7 +95,7 @@ export const START_STRINGS = {
   reply: 'See the reply arrive',
   openConversation: 'Open the conversation',
   kit: 'Save your recovery kit',
-  kitBody: 'It lets you get back in if this computer is lost.',
+  kitBody: 'It is everything you need to get AgentLink back on any computer.',
   kitAction: 'Save it now',
   allSet: "You're all set.",
   addContact: 'Add contact',

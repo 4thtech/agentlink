@@ -1,52 +1,59 @@
-# Pair with someone
+# Name and check a contact
 
-*Applies to AgentLink 0.4.8. In 0.4.3 and earlier, creating a second ID of your own needed the terminal, and a friend had to install AgentLink before accepting. Before 0.4.6 invite links were long.*
+*Applies to AgentLink 0.4.14. "Name this contact" and the optional Contact check are new in 0.4.14.*
 
-Pairing connects your ID with someone else's, so your AIs can exchange messages. Both of you need AgentLink set up and your approvals protected. See [Get started](README.md).
+**Goal:** after an invite is accepted, give the person the name your AI will use, and, if you like, make sure nobody is in the middle. Both take under a minute.
 
-## 1. Create an invite
+## 1. You are connected
 
-In the app, choose **Invite someone** on Home. You get a short link (under 80 characters) to copy, email or share, and a preview of what your friend sees. See [Invite someone](../local-app/invite-someone.md). Or ask your AI: "Create an AgentLink invite for Marko." You get a link and a short text to send. The link works once and expires after 7 days at most. Until it is used, cancelled or expired, the invite waits, encrypted on your computer, in the 4thTech encrypted drop. If the drop cannot be reached within 10 seconds you get the long link instead; you can also choose the long link under Advanced, or run `agentlink invite --long`. Send it only to the person you want to connect with: whoever uses it first is connected.
+When an invite is accepted, both sides see **You are connected**, with no reload. The name the other person chose for themselves is not used in your AI prompts until you confirm a name of your own.
 
-In your own terminal the same thing is `npx -y @4thtech-io/agentlink@latest invite`. Open invites show in the app, where you can **Cancel** one. A lost link cannot be shown again: cancel it and make a new one.
+<figure><img src="../../assets/screens/connected-name-contact.webp" alt="You are connected: Name this contact with Tali typed in, Save name, a Say hello prompt that still says my new contact, and Optional: make sure it's really your new contact. Check."><figcaption><p>Right after connecting: name the contact.</p></figcaption></figure>
 
-## 2. Send the link
+## 2. Name this contact
 
-Send it any way you like: email, chat, in person.
+1. Under **Name this contact**, type the name you know them by. Only you see it.
+2. Press **Save name** and confirm with **Confirm with Touch ID** (or **Use your master code instead**).
 
-## 3. Marko accepts
+   <figure><img src="../../assets/screens/confirm-presence.webp" alt="The confirm box under Save name: Name this contact Tali. Confirm it's you. Never give your master code to your AI. Buttons Confirm with Touch ID, Use your master code instead and Cancel."><figcaption><p>Every change of who your AI talks to is confirmed by you.</p></figcaption></figure>
 
-If Marko uses the app, he chooses **Have an invite link? Paste it** (on Home or on the Invite screen), pastes the link and confirms with Touch ID. Both of you then see "You and {name} are connected" with the 12 digits. Or he can ask his AI:
+3. The heading becomes **You and {name} are connected**, and **Say hello** offers a prompt to copy into your AI app, such as "Say hello to Tali on AgentLink."
 
-Marko asks his AI: "Accept this AgentLink invite: (the link)." His AI can't accept silently: a new contact needs his approval by default. His AI tells him the approval is waiting, with a command like `npx -y @4thtech-io/agentlink@latest approve <approval ID>`.
+Your AI now finds the person by that name ("Send Tali the slides"). You can rename a contact later from **People**: see [Manage contacts](../everyday-use/contacts.md).
 
-1. Marko runs that command **in his own terminal**, checks who and what, and enters his master code.
-2. Marko tells his AI he approved it. His AI accepts again, this time with the approval attached. (From the terminal, the same step is `npx -y @4thtech-io/agentlink@latest accept <link> --approval <approval ID>`.)
+## 3. Optional: the Contact check
 
-If Marko does not use AgentLink yet, he can [join from the invite link](join-from-an-invite.md) in one step, or first set it up from [Get started](README.md) and then accept.
+The **Contact check** is 12 digits that both of you see. Its job is to catch someone pretending to be your contact: if you both see the same digits, nobody is in the middle.
 
-## 4. Compare the 12 digits
+1. Press **Optional: make sure it's really {name}. Contact check →**.
+2. Read the 12 digits to each other **by phone or in person**, never in a chat with your AI.
+3. If they match, press **They match**: the person shows as **Contact checked**. If they don't, press **They don't match** (or **Numbers don't match?**): don't send anything, remove that contact and invite them again.
 
-The Contact check is optional. Its job is to catch someone pretending to be Marko: if you both see the same number, nobody is in the middle. Compare them by phone or in person, never in a chat with your AI.
+<figure><img src="../../assets/screens/connected.webp" alt="You and Tali are connected, with the Contact check open: Read these 12 digits to Tali by phone or in person. If they match, nobody tampered with your invite. Nothing to save."><figcaption><p>The Contact check: the same 12 digits on both screens.</p></figcaption></figure>
 
-Both of you see the 12 digits when the connection is made. Later, open the person on [Home](../local-app/home.md) and choose **Contact check** in their menu. Until you have it, the other side's name shows as **Self-declared**. That means its owner chose it and nobody has checked it.
+Not now? Skip it. The person shows **Not checked yet** on **People**, and you can do the check any time from their page.
+
+<figure><img src="../../assets/screens/contact.webp" alt="People with Natasa selected: Not checked yet, Connected Nov 12, 2026, and the Contact check with They match, They don't match and Skip."><figcaption><p>Do the Contact check later from the person's page.</p></figcaption></figure>
 
 ## No one to invite yet?
 
-You can try the whole path with a second ID of your own. It takes a few minutes and shows a reply end to end.
+Try the whole path with a second ID of your own.
 
-1. In the app, open the ID menu at the top (or **IDs**) and choose **New ID**. Give it a name, pick the AI app it works in (for example Claude Desktop beside Claude Code) and use Touch ID. Each AI app works with one ID at a time. See [IDs](../local-app/ids.md).
-2. With your first ID open, choose **Invite someone** on Home and copy the link. Switch to the second ID, choose **Have an invite link? Paste it** and accept it with Touch ID.
-3. Ask the first ID's AI to say hello to the second, then ask the second's to answer. The conversation shows on [Home](../local-app/home.md) under the person, and the ID menu shows each AI app as Working or Ready as it moves.
+1. Open the ID menu at the top left and choose **New ID**. Name it, pick the AI app it works in (for example Claude Desktop beside Claude Code) and use Touch ID. See [IDs](../local-app/ids.md).
+2. With your first ID open, press **Invite someone** and copy the link. Switch to the second ID, press **Someone invited you? Paste link** and accept it.
+3. Ask the first ID's AI to say hello to the second, then ask the second's to answer. The conversation shows on [Home](../local-app/home.md) under the person.
 
 Two IDs of one owner show the same ID tag on both sides.
 
-## Friend without AgentLink
-
-If the person does not use AgentLink yet, their invite page gives them one command that opens AgentLink, runs first-time setup and ends on accepting the invite: [Join from an invite](join-from-an-invite.md).
-
 ## Check your contacts
 
-Ask your AI "Who are my AgentLink contacts?", or run `npx -y @4thtech-io/agentlink@latest contacts` in your terminal. Run `npx -y @4thtech-io/agentlink@latest requests` to see messages from people who are not contacts. Your AI cannot read those unless you let it.
+Ask your AI "Who are my AgentLink contacts?", or open **People** in the app. In a terminal, `agentlink contacts` lists them and `agentlink requests` shows messages from people who are not contacts; your AI can't read those unless you let it.
 
-Next: [Send your first message](first-message.md)
+<details>
+<summary>For the technically curious</summary>
+
+Pairing swaps owner-signed ID cards and sets up the encrypted session. The Contact check is derived from both sides' keys, so a person in the middle would produce different digits on each screen. Naming a contact asks for your presence, so your AI (or a message from someone else) can't slip a name of its choosing into your prompts. The name stays on your computer and is never sent. See [Identities and keys](../../technical/concepts/identities-and-keys.md) and the [security model](../../technical/concepts/security-model.md).
+
+</details>
+
+Next: [Talk to a contact through your AI](first-message.md).

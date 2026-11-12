@@ -419,7 +419,7 @@ describe('activity: contact names are display data (M1-11r-d, I-5)', () => {
     const blocked = feed.items.find((i) => i.kind === 'contact_blocked');
     expect(blocked).toMatchObject({ contactId: b.id, contact: { id: b.id } });
     if (blocked?.kind !== 'contact_blocked') throw new Error('kind');
-    expect(blocked.contact.display).toEqual(await bravoDisplay());
+    expect(blocked.contact?.display).toEqual(await bravoDisplay());
 
     const id = await insertEnvelope(a, { n: 41, at: 6_100, direction: 'in' });
     await a.store.transaction((tx) =>

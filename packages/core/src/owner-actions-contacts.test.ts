@@ -12,6 +12,7 @@
 import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
+import type { Sealed } from './store/schema.js';
 import { FakeClock, passphrase, seed } from './testing/fixtures.js';
 import {
   cardUpdatePayload,
@@ -225,6 +226,38 @@ describe('contact.remove (M1-9za; 04 §2.5.1; 07 §3; 02 F-14)', () => {
     expect(outcome).toMatchObject({ status: 'refused', reason: 'contact_revoked' });
     expect((await contactRow(a, b.id))?.status).toBe('revoked');
     expect(await nonceRows(a)).toEqual([]);
+  });
+
+  it('drops staged pairings for the contact, and a blocked contact stays blocked by key (audit M1, L2)', async () => {
+    const { a, b, c } = await twoSameNamed();
+    const stagedFor = (id: string) =>
+      a.store.transaction((tx) => tx.count('pairings', { contact_id: id }));
+    await a.store.transaction((tx) =>
+      tx.insert('pairings', {
+        pairing_id: encodeBase64url(randomBytes(16)),
+        contact_id: b.id,
+        role: 'invitee',
+        agent_nostr: 'ab'.repeat(32),
+        key_epoch: 0,
+        owner_fingerprint: 'cd'.repeat(32),
+        agent_card_json: 'x' as unknown as Sealed,
+        name: 'x' as unknown as Sealed,
+        relays: 'x' as unknown as Sealed,
+        created_at: clock.t,
+        expires_at: clock.t + 3600,
+      }),
+    );
+    await a.client.ownerActions.apply(await signed(a, 'contact.remove', { contact: b.id }));
+    expect(await stagedFor(b.id)).toBe(0);
+    await a.store.transaction((tx) =>
+      tx.update('contacts', { contact_id: c.id }, { status: 'blocked' }),
+    );
+    await a.client.ownerActions.apply(await signed(a, 'contact.remove', { contact: c.id }));
+    const key = (await contactRow(a, c.id))?.agent_nostr;
+    expect((await a.client.requests.listBlocked()).map((e) => e.fromKey)).toContain(key);
+    expect((await a.client.requests.listBlocked()).map((e) => e.fromKey)).not.toContain(
+      (await contactRow(a, b.id))?.agent_nostr,
+    );
   });
 
   it('refuses an already removed or unknown contact', async () => {

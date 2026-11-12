@@ -1,5 +1,6 @@
 // Shell copy (11 §5: no "wallet", "gas", "seed phrase" or "transaction"). Page copy lives with each
 // page; only the shell and the shared stub state are here.
+import { sensorWord } from './presence-word.js';
 export const SHELL_STRINGS = {
   appName: 'AgentLink',
   navLabel: 'Main',
@@ -75,7 +76,10 @@ export const PAGE_TITLES = {
   activity: 'Activity',
   messages: 'Messages',
   contacts: 'People',
-  agents: 'IDs',
+  agents: 'My IDs',
+  get touchId(): string {
+    return `${sensorWord()} & master code`;
+  },
   apps: 'AI apps',
   files: 'Files',
   storage: 'Storage',
@@ -86,7 +90,8 @@ export const PAGE_TITLES = {
   advanced: 'Advanced',
   about: 'About',
   // W4-SHELL: the Settings and Advanced entries (b11 §34.6); the pages keep their own headings.
-  backupTouchId: 'Backup & Touch ID',
+  // WP-R4: Touch ID has its own page (WP-S2), so this entry is Backup & restore.
+  backupTouchId: 'Backup & restore',
   defaultRules: 'Default rules',
   notifications: 'Notifications',
   activityLog: 'Activity log',

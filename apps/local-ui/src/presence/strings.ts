@@ -63,7 +63,7 @@ export const NATIVE_STRINGS = Object.freeze({
   /** DESK-NATIVE-DEBUG: the page's own answers when the server did not finish. */
   busy: 'Another approval is in progress. Finish it, then try again.',
   wait: 'Too many tries with a wrong master code. Wait a moment, then try again.',
-  needsSetup: 'Open your agent first, then try again.',
+  needsSetup: 'Open your ID first, then try again.',
   pageTimeout: 'That took too long to answer. Check the switch above, then try again.',
   /**
    * DESK-TOUCHID-FIX review (Fable L-2): turning it on again removes the old one first; when the new

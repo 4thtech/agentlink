@@ -1,10 +1,12 @@
 # Contacts page
 
-*Applies to AgentLink 0.4.8. In 0.4.6 the people your AI talks to are on [Home](home.md), with their conversations and files. This People page is still there (open it with Go to, Cmd+K, or its old link) and shows each contact with its label.*
+*Applies to AgentLink 0.4.14. In 0.4.6 the people your AI talks to are on [Home](home.md), with their conversations and files. This People page is still there (open it with Go to, Cmd+K, or its old link) and shows each contact with its label.*
 
 The page lists your contacts by name, each with its label (Self-declared or Contact checked). For how contacts work, see [Contacts](../everyday-use/contacts.md).
 
-<figure><img src="../.gitbook/assets/local-contacts--list.png" alt="Three contacts on the left; the selected one on the right shows its name, a Contact checked badge, and Rename and Remove buttons."><figcaption><p>Contacts, with made-up people. One contact is still waiting for their AI.</p></figcaption></figure>
+<figure><img src="../../assets/screens/people.webp" alt="People with one person, Natasa, Not checked yet, Active now, and the buttons Invite someone and Someone invited you? Paste link."><figcaption><p>People, with sorting by Recent or Most active.</p></figcaption></figure>
+
+<figure><img src="../../assets/screens/contact.webp" alt="Natasa's page: Not checked yet, Connected Nov 12, 2026, and the Contact check with They match, They don't match and Skip."><figcaption><p>A person's page.</p></figcaption></figure>
 
 ## Add a contact
 

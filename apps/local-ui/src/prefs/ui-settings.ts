@@ -14,11 +14,17 @@ import {
   readUiSettings,
   type UiSettings,
 } from '@4thtech-io/types/ui-contract/ui-settings';
-import { getPrefs, setPref, subscribePrefs } from './store.js';
+import { resetKeptForTests, startKept } from './app-kept.js';
+import { getPrefs, reloadPrefs, setPref, subscribePrefs } from './store.js';
 
 export type UiSettingsFetch = typeof fetch;
 
-let menuExpanded = false;
+/** The owner's saved choice; undefined until he makes one (then the width decides, see below). */
+let menuChoice: boolean | undefined;
+/** WP-N1 (design-1112 §2.2): the menu opens expanded on windows this wide and wider. */
+const WIDE_WINDOW = 1100;
+const menuExpandedNow = (): boolean =>
+  menuChoice ?? (typeof window !== 'undefined' && window.innerWidth >= WIDE_WINDOW);
 const menuListeners = new Set<() => void>();
 let started = false;
 let fetchImpl: UiSettingsFetch | undefined;
@@ -89,7 +95,11 @@ export async function saveUiSettings(change: UiSettings): Promise<boolean> {
   }
 }
 
+/** UX1113-QA-HOST: the app's copy is being read into the store (nothing to save back). */
+let reloading = false;
+
 function onPrefs(): void {
+  if (reloading) return;
   const hood = getPrefs().hood;
   if (hood === synced) return;
   synced = hood;
@@ -107,6 +117,17 @@ export async function startUiSettings(seam?: { fetch?: UiSettingsFetch }): Promi
   synced = getPrefs().hood;
   unsubscribe = subscribePrefs(onPrefs);
   const stored = await read();
+  // UX1113-QA-HOST: the page choices the app keeps fill storage first (a new launch is a new
+  // origin with empty storage); the display choices are read again from there, without saving.
+  if (startKept(stored, saveUiSettings)) {
+    reloading = true;
+    try {
+      reloadPrefs();
+    } finally {
+      reloading = false;
+    }
+    synced = getPrefs().hood;
+  }
   if (stored?.underTheHood !== undefined) {
     synced = stored.underTheHood;
     if (getPrefs().hood !== stored.underTheHood) setPref('hood', stored.underTheHood);
@@ -115,8 +136,8 @@ export async function startUiSettings(seam?: { fetch?: UiSettingsFetch }): Promi
     synced = true;
     void saveUiSettings({ underTheHood: true });
   }
-  if (stored?.menuExpanded !== undefined && stored.menuExpanded !== menuExpanded) {
-    menuExpanded = stored.menuExpanded;
+  if (stored?.menuExpanded !== undefined && stored.menuExpanded !== menuChoice) {
+    menuChoice = stored.menuExpanded;
     for (const l of menuListeners) l();
   }
   settleUiSettings();
@@ -128,12 +149,12 @@ export function setUnderTheHood(on: boolean): void {
 }
 
 export function getMenuExpanded(): boolean {
-  return menuExpanded;
+  return menuExpandedNow();
 }
 
 export function setMenuExpanded(on: boolean): void {
-  if (on === menuExpanded) return;
-  menuExpanded = on;
+  if (on === menuChoice) return;
+  menuChoice = on;
   for (const l of menuListeners) l();
   void saveUiSettings({ menuExpanded: on });
 }
@@ -147,10 +168,11 @@ export function subscribeMenuExpanded(listener: () => void): () => void {
 export function resetUiSettingsForTests(): void {
   unsubscribe?.();
   unsubscribe = undefined;
+  resetKeptForTests();
   started = false;
   fetchImpl = undefined;
   synced = undefined;
-  menuExpanded = false;
+  menuChoice = undefined;
   settled = false;
   for (const l of menuListeners) l();
   for (const l of settledListeners) l();

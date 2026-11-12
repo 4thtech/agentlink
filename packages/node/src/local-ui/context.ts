@@ -7,7 +7,9 @@
 // `LocalUiOwnerOperation` that the central presence gate hands to a `presence: true` route
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
+import type { LocalUiBackupDesk } from '../kit-record.js';
 import type { LiveAgentState, LiveAppRecord } from './live-status.js';
+import type { LocalUiPeopleAllDesk } from './api/people-all.js';
 import {
   CoreError,
   acceptInviteAction,
@@ -709,6 +711,12 @@ export interface LocalUiContext {
    * source itself stays with the server.
    */
   readonly recoveryKitAvailable?: boolean;
+  /**
+   * WP-R2b (04 §2.3.3 "Kit record"): the kit record and Show in Finder for it, built by the server
+   * where an ID can save a kit here or in the app host (approval-server.ts backupDeskOf). Reads only;
+   * it signs nothing and never answers a path. Absent: the record reads as `unreadable`.
+   */
+  readonly backup?: LocalUiBackupDesk;
   /** W4-FILES-SAVE: saving a received file, for the save owner route; undefined when not set up. */
   readonly fileSave?: LocalUiFileSavePort;
   /**
@@ -736,6 +744,8 @@ export interface LocalUiContext {
    * only: it lists, it never opens, switches or writes.
    */
   readonly agents?: LocalUiAgentsDesk;
+  /** WP-P2: every ID's people for `GET /api/ui/people` (api/people-all.ts); app host only. Reads only. */
+  readonly peopleAll?: LocalUiPeopleAllDesk;
   /**
    * U3-d (D-138, 08 §1): the open agent and saving a verified label, for the owner routes of
    * api/agents-manage.ts and api/apps.ts only; absent outside the app host. It signs nothing: a

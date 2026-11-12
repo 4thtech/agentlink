@@ -25,6 +25,7 @@ import { JoinPage } from './pages/join/index.js';
 import { ConfirmMove, type Move } from './pages/proofs/top-up.js';
 import { RulesPage, type RulesPageProps } from './pages/rules/index.js';
 import type { OwnerClient as RulesOwner, Presence } from './pages/rules/owner.js';
+import { TouchIdPage } from './pages/touch-id/index.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -229,7 +230,17 @@ const SURFACES: readonly Surface[] = [
       return render(createElement<RulesPageProps>(RulesPage, { api: rulesApi(), owner }));
     },
     reach: async () => {
-      const group = host.querySelector('[role="radiogroup"][aria-label="New contacts"]');
+      // WP-S3: the contact rules sit under "More rules"; open it first.
+      const more = [...host.querySelectorAll('button')].find((b) =>
+        (b.textContent ?? '').startsWith('More rules'),
+      );
+      await act(async () => {
+        more?.click();
+      });
+      await settle();
+      const group = host.querySelector(
+        '[role="radiogroup"][aria-label="Connect with someone new"]',
+      );
       const allow = [...(group?.querySelectorAll<HTMLButtonElement>('[role="radio"]') ?? [])].find(
         (b) => b.textContent?.startsWith('Allow'),
       );
@@ -362,6 +373,31 @@ const SURFACES: readonly Surface[] = [
       );
     },
   },
+  {
+    file: 'pages/touch-id/index.tsx',
+    name: 'WP-S2 Replace master code',
+    submit: 'Confirm with your master code',
+    mount: (sent, gestures) => {
+      const api: ApiClient = {
+        get: () => Promise.resolve({ kind: 'error', status: 500 }),
+        post: () => Promise.resolve({ kind: 'error', status: 500 }),
+        owner: (_path, _input, presence): Promise<OwnerApiResult> => {
+          if (typeof presence === 'string') sent.push(presence);
+          else gestures.n += 1;
+          return Promise.resolve({ kind: 'presence_rejected' });
+        },
+      };
+      return render(
+        createElement(TouchIdPage, {
+          api,
+          platform: 'mac',
+          passkeyStatus: () => Promise.resolve({ kind: 'ready' as const, info: PASSKEY }),
+          passkeyProof: gesture(gestures),
+        }),
+      );
+    },
+    reach: () => click('Replace master code'),
+  },
 ];
 
 describe('FB-8: with a passkey present, every presence screen offers the master code', () => {
@@ -425,6 +461,10 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/apps/panel.tsx': { offers: /<OwnerGate\b/ },
   // WP-11: Save recovery kit (Settings › Backup and the ID card's Back up panel).
   'pages/backup/export-kit.tsx': { offers: /<OwnerGate\b/ },
+  // UX1113 WP-S2: Replace master code on Settings › Touch ID & master code.
+  'pages/touch-id/index.tsx': { offers: /<UseCodeInstead\b/ },
+  // UX1113-R3: Restore here asks first on a computer that has an owner (PresenceStep offers the code).
+  'pages/restore/index.tsx': { offers: /<PresenceStep\b/ },
   'pages/contacts/index.tsx': { offers: /<PresencePrompt\b/ },
   'pages/invite/name-contact.tsx': { offers: /<PresencePrompt\b/ },
   'pages/home/person-menu.tsx': { offers: /<PresencePrompt\b/ },

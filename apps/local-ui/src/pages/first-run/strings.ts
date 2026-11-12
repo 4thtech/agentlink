@@ -64,7 +64,7 @@ export const FIRST_RUN = {
   backupBody: (sensor: string): string =>
     `Your master code approves changes when ${sensor} isn't available and unlocks your AgentLink key. Save it once. We can't recover it for you. Never give it to your AI.`,
   backupLost:
-    "Lost it? You can't get this code back. Your recovery kit restores everything instead.",
+    "Lost it? You can't get this code back. Save a recovery kit too: it gets AgentLink back on any computer.",
   saveToManager: 'Save in my password manager',
   saveAsked: 'If your browser or password manager offered to save it, accept there.',
   savedAs: 'Saved as',
@@ -112,6 +112,10 @@ export const FIRST_RUN = {
   /** W4-WIZARD: step 2 without an app found on this computer. */
   yourAiApp: 'your AI app',
   noAppYet: 'Connect an AI app later',
+  noAppCreateBody:
+    "We create your ID. No AI app is connected yet: install one, then connect it in Settings > AI apps. Your confirmation proves it's you.",
+  notFoundCreateBody: (app: string): string =>
+    `${app} isn't on this computer yet, so nothing is added to it now. We create the ID; install ${app}, then connect it in Settings > AI apps.`,
   notFoundTitle: (app: string): string => `${app} isn't on this computer yet`,
   notFoundBody: (app: string): string =>
     `Install ${app}, then come back to Get started. Nothing changed. You can pick another AI app.`,
@@ -125,6 +129,7 @@ export const SETUP_MESSAGES = {
   // b11 §28.3.
   cancelled: 'Not protected yet. Try again.',
   no_agent: 'Set up your ID first.',
+  finish_restore: 'A restore was not finished. Choose your kit again to finish it.',
   label_invalid:
     "That name can't be used. Use letters, numbers, single spaces and . ' - up to 32 characters.",
   expired: 'This step took too long. Nothing changed. Try again.',
@@ -151,7 +156,7 @@ export const SETUP_MESSAGES = {
   relay_unreachable: FAILURE_COPY.relay_unreachable,
   ai_app_running: FAILURE_COPY.ai_app_running,
   ai_app_config_unwritable: FAILURE_COPY.ai_app_config_unwritable,
-  keychain_unavailable: FAILURE_COPY.keychain_unavailable,
+  keychain_unavailable: "AgentLink couldn't check this computer's keychain. Try again.",
   concurrent_change: FAILURE_COPY.concurrent_change,
   internal: FAILURE_COPY.internal,
   offline: "AgentLink isn't answering. Ask your AI to open AgentLink again.",
@@ -240,6 +245,8 @@ export const WELCOME = {
   title: 'Private messages between AI agents. Only you and your contact can read them.',
   start: 'Get started',
   what: "What's AgentLink?",
+  /** D-147 (spec §6.5): under Get started, for a person who has a recovery kit. */
+  restore: 'I have a recovery kit',
   /** The public docs; opens in a new tab and sends no data. */
   whatHref: 'https://wiki.4thtech.io/products/agentlink',
   /** The owner read failed. */

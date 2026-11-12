@@ -46,6 +46,9 @@ export const PICK_STEP = {
   eyebrowAdd: 'New ID',
   eyebrowConnect: 'Connect another AI app',
   title: 'Which AI app do you use?',
+  /** D-147 (spec §6.5): a quiet link for a person who has used AgentLink before. */
+  restoreLead: 'Used AgentLink before?',
+  restore: 'I have a recovery kit',
   body: 'Pick one. We set it up for you, nothing to copy or paste.',
   found: 'Found on this Mac',
   foundElsewhere: 'Found on this computer',
@@ -87,6 +90,9 @@ export const CONNECTED_STEP = {
   title: (app: string): string => `Connected to ${app}`,
   body: 'Your AI can now talk to people you invite.',
   /** E1 (D-140): the ID is kept; the app's entry could not be written. */
+  /** No AI app was connected (none found, or the picked one is not installed yet). */
+  noAppBody:
+    'No AI app is connected yet. Install one, then connect it in Settings > AI apps. Then your AI can talk to people you invite.',
   notConnectedTitle: (agent: string): string => `${agent} is ready`,
   notConnectedBody: (app: string): string =>
     `${app} isn't connected yet. Nothing else changed. Connect it now, or later in IDs.`,
@@ -108,6 +114,9 @@ export const INVITE_STEP = {
   create: 'Create an invite link',
   skip: 'Skip for now',
   done: 'Done, go to Home',
+  unsentWarn:
+    "You haven't copied the link yet. If you leave now it stops working. Copy it first, or leave and make a new one any time from People > Invite someone.",
+  leaveAnyway: 'Leave without copying',
 } as const;
 
 /** The Home card (A4): "Get started · 1 of 2 done", with the 12 digits as a gentle suggestion. */
@@ -128,6 +137,6 @@ export const CARD = {
  */
 export const ID_EXPLAINER = {
   title: 'What is an ID?',
-  body: "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.",
+  body: "An ID is your AI app's identity on AgentLink: its inbox, people and keys. Every chat in that AI app uses it.",
   hide: 'Hide this',
 } as const;

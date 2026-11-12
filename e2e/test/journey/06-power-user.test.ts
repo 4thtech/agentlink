@@ -63,7 +63,7 @@ describe('chapter 6: power user', () => {
       await page.getByRole('heading', { name: section, level: 2 }).waitFor();
     }
     await emulateReducedMotion(page);
-    await page.getByRole('link', { name: 'IDs', exact: true }).first().click();
+    await page.getByRole('link', { name: 'My IDs', exact: true }).first().click();
     await table.waitFor();
     await expectFadesOnly(page);
     expect((await layoutShiftScore(page)) - shifted).toBeLessThanOrEqual(CLS_BUDGET);

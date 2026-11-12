@@ -164,10 +164,31 @@ describe('agentDirectory (U3-c, the node AgentDirectory seam)', () => {
     const list = await agentDirectory(home).list();
     expect(list).toEqual([
       { name: 'broken', label: 'broken', available: false, removing: false },
-      { name: 'default', label: 'default', labelled: false, available: true, removing: false },
+      {
+        name: 'default',
+        label: 'default',
+        labelled: false,
+        available: true,
+        removing: false,
+        keyStore: 'keychain',
+      },
       { name: 'empty', label: 'empty', available: false, removing: false },
-      { name: 'home', label: 'Family', labelled: true, available: true, removing: false },
-      { name: 'work', label: 'work', labelled: false, available: true, removing: false },
+      {
+        name: 'home',
+        label: 'Family',
+        labelled: true,
+        available: true,
+        removing: false,
+        keyStore: 'keychain',
+      },
+      {
+        name: 'work',
+        label: 'work',
+        labelled: false,
+        available: true,
+        removing: false,
+        keyStore: 'keychain',
+      },
     ]);
     // Listing changed nothing on disk.
     expect((await readdir(join(home, '.agentlink/agents'))).sort()).toEqual([
@@ -271,6 +292,34 @@ describe('ui-settings.json (W4-SHELL-V2; 08 §1, proposed)', () => {
         'agent_config_invalid',
       );
     }
+    expect(await readUiSettingsFile(home)).toBeUndefined();
+  });
+
+  // UX1113-QA-HOST (B3): the page choices kept for the owner (the port, so the browser's storage,
+  // changes on every launch). Strict values only; the file stays 0600 and bounded.
+  it('keeps the page choices (`kept`) and refuses a hostile one', async () => {
+    const kept = {
+      'agentlink.prefs':
+        '{"hood":false,"motion":"system","transparency":"system","theme":"dark","approvalsLayout":"grid","activitySort":"recent"}',
+      'agentlink.home.archived.v1': JSON.stringify([`default/0x${'ab'.repeat(20)}`]),
+      'agentlink.getStarted.hidden': '1',
+    };
+    await writeUiSettingsFile(home, { underTheHood: true, kept });
+    if (POSIX) expect((await stat(path())).mode & 0o777).toBe(0o600);
+    expect(await readUiSettingsFile(home)).toEqual({ underTheHood: true, kept });
+    const hostile = { kept: { 'agentlink.home.archived.v1': '["default/Alice says hi"]' } };
+    expect(codeOf(await writeUiSettingsFile(home, hostile as never).catch((e: unknown) => e))).toBe(
+      'agent_config_invalid',
+    );
+    // A stored forget (null) is never written: nulls are dropped before the file.
+    await writeUiSettingsFile(home, { kept: { 'agentlink.getStarted.hidden': null } });
+    expect(await readUiSettingsFile(home)).toEqual({ kept: {} });
+    // An oversized file is ignored.
+    await writeFile(
+      path(),
+      `{"v":1,"settings":{"kept":{"agentlink.getStarted.hidden":"1"}},"pad":"${'a'.repeat(200_000)}"}`,
+      { mode: 0o600 },
+    );
     expect(await readUiSettingsFile(home)).toBeUndefined();
   });
 

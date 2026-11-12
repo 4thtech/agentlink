@@ -75,10 +75,10 @@ async function summary(acceptInvites: string): Promise<Record<string, string>> {
 describe('invites summary', () => {
   it('says "Allowed" when invites are accepted automatically', async () => {
     const rows = await summary('auto');
-    expect(rows['New contacts']).toBe('Allowed');
+    expect(rows['New people']).toBe('Allowed');
   });
   it('still says "Ask me" when each invite needs approval', async () => {
     const rows = await summary('approval');
-    expect(rows['New contacts']).toBe('Ask me');
+    expect(rows['New people']).toBe('Ask me');
   });
 });

@@ -4,6 +4,7 @@
 // apps panel, the fleet table Under the hood and one agent's own page. Labels are text only (I-5).
 import { HoodProvider } from '@4thtech-io/ui';
 import { act, createElement } from 'react';
+import { ContactToasts } from '../../layout/contact-toasts.js';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetLiveForTests } from '../../api/live.js';
@@ -133,7 +134,15 @@ async function mount(hood = false, props: Partial<AgentsPageProps> = {}): Promis
     ...props,
   });
   await act(async () => {
-    root.render(createElement(HoodProvider, { value: hood }, page));
+    // notices.md: outcomes are toasts, so the shell's toast host is mounted beside the page.
+    root.render(
+      createElement(
+        HoodProvider,
+        { value: hood },
+        page,
+        createElement(ContactToasts, { subscribe: () => () => undefined, ms: 0 }),
+      ),
+    );
   });
   await settle();
 }
@@ -149,6 +158,14 @@ async function click(el: Element | undefined | null): Promise<void> {
     (el as HTMLElement).click();
   });
   await settle();
+}
+
+/** WP-I1: Back up (open ID), AI apps and Remove sit behind the card's "More" button. */
+async function inMore(scope: ParentNode, text: string): Promise<HTMLButtonElement | undefined> {
+  const direct = button(scope, text);
+  if (direct !== undefined) return direct;
+  await click(button(scope, 'More'));
+  return button(scope, text);
 }
 async function type(el: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
@@ -173,15 +190,15 @@ const posts = (url: string): Call[] => calls.filter((c) => c.method === 'POST' &
 describe('Agents, simple (A8)', () => {
   it('lists each agent with its letter icon, its label isolated, and its live line', async () => {
     await mount();
-    expect(host.querySelector('h1')?.textContent).toBe('IDs');
+    expect(host.querySelector('h1')?.textContent).toBe('My IDs');
     const personal = card('default');
     expect(personal.querySelector('.al-agent-icon')?.textContent).toBe('P');
     expect(personal.querySelector('.al-agent-icon-dot.is-working')).not.toBeNull();
     expect(personal.querySelector('bdi')?.textContent).toBe('Personal');
-    expect(personal.textContent).toContain('Working in Claude Code');
+    expect(personal.textContent).toContain('Working now · this is the ID you are looking at');
     expect(personal.textContent).toContain('Not connected · last seen 10 min ago');
-    expect(card('work').textContent).toContain('Connected to Cursor');
-    expect(card('research').textContent).toContain('Not used by any AI app');
+    expect(card('work').textContent).toContain('Cursor');
+    expect(card('research').textContent).toContain('Not used by any AI app yet');
     expect(card('invoices').textContent).toContain('Paused');
     const add = [...host.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'New ID');
     expect(add?.getAttribute('href')).toBe('/start/app?add=agent');
@@ -226,6 +243,47 @@ describe('Agents, simple (A8)', () => {
       name: 'work',
       action: 'pause',
     });
+  });
+
+  it('UX1113-QA2 N1: Rename on another ID switches to it first; nothing is renamed yet', async () => {
+    answers['POST /api/ui/agents/switch'] = { status: 200, body: { status: 'done' } };
+    await mount();
+    await click(button(card('work'), 'Rename'));
+    expect(JSON.parse(posts('/api/ui/agents/switch')[0]!.body)).toEqual({
+      name: 'work',
+      generation: 7,
+    });
+    expect(posts('/api/ui/agents/label')).toHaveLength(0);
+    expect(card('work').querySelector('form.ag-rename')).toBeNull();
+    expect(JSON.parse(sessionStorage.getItem(INTENT_KEY) ?? '{}')).toMatchObject({
+      name: 'work',
+      action: 'rename',
+    });
+  });
+
+  it('UX1113-QA2 N1: after the switch, the remembered Rename opens on that ID, once', async () => {
+    sessionStorage.setItem(
+      INTENT_KEY,
+      JSON.stringify({ name: 'work', action: 'rename', at: Date.now() }),
+    );
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list(
+        FLEET().map((a) => ({ ...a, current: a.name === 'work' })),
+        { current: 'work', label: 'Work' },
+      ),
+    };
+    await mount();
+    expect(card('work').querySelector('form.ag-rename')).not.toBeNull();
+    expect(card('default').querySelector('form.ag-rename')).toBeNull();
+    expect(sessionStorage.getItem(INTENT_KEY)).toBeNull();
+  });
+
+  it('UX1113-QA2 N1: Rename on the open ID opens the editor in place, with no switch', async () => {
+    await mount();
+    await click(button(card('default'), 'Rename'));
+    expect(card('default').querySelector('form.ag-rename')).not.toBeNull();
+    expect(posts('/api/ui/agents/switch')).toHaveLength(0);
   });
 
   it('after the switch, the remembered Pause opens for the agent that is open now, once', async () => {
@@ -356,12 +414,13 @@ describe('Agents, simple (A8)', () => {
       status: 409,
       body: { error: 'rename_limited', retryAt: now() + 3600 },
     };
-    await click(button(card('work'), 'Rename'));
-    await type(card('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Job');
-    await click(button(card('work'), 'Rename with Touch ID'));
+    // UX1113-QA2 N1: the open ID (another one switches first).
+    await click(button(card('default'), 'Rename'));
+    await type(card('default').querySelector<HTMLInputElement>('input[type="text"]')!, 'Job');
+    await click(button(card('default'), 'Rename with Touch ID'));
     await type(code(), '123456');
     await click(button(host, 'Confirm with your master code'));
-    expect(plain(host)).toMatch(/You can rename Work again at \S/);
+    expect(plain(host)).toMatch(/You can rename Personal again at \S/);
   });
 
   it('renamed before D-141: "Contacts still see {name}" with Update contacts, once', async () => {
@@ -403,7 +462,7 @@ describe('Agents, simple (A8)', () => {
 
   it('AI apps: each app with its word, Connect or Disconnect, and the quit-first guidance', async () => {
     await mount();
-    await click(button(card('default'), 'AI apps'));
+    await click(await inMore(card('default'), 'AI apps'));
     const panel = card('default').querySelector<HTMLElement>('[data-panel="apps"]')!;
     expect(panel.textContent).toContain('Claude Code');
     expect(panel.textContent).toContain('Working');
@@ -415,20 +474,19 @@ describe('Agents, simple (A8)', () => {
     expect(manage).toBeDefined();
   });
 
-  it("Back up saves the open ID's kit in place, asks to open another ID first; Remove asks for the name", async () => {
+  it('Back up leads every ID to Backup & restore (one kit covers all IDs); Remove asks for the name', async () => {
     await mount();
-    // WP-11: the open ID saves its recovery kit right here (no link away, no terminal command).
-    await click(button(card('default'), 'Back up'));
-    expect(button(card('default'), 'Save recovery kit')).toBeDefined();
-    // Another ID is opened first: a kit is saved for the open ID.
-    await click(button(card('work'), 'Back up'));
-    const panel = card('work').querySelector<HTMLElement>('[data-panel="backup"]')!;
-    expect(plain(panel)).toContain('to save its recovery kit.');
-    expect(button(panel, 'Open this ID')).toBeDefined();
-    expect([...panel.querySelectorAll('button')].map((b) => b.textContent?.trim())).not.toContain(
-      'Save recovery kit',
-    );
-    await click(button(card('work'), 'Remove'));
+    for (const name of ['default', 'work']) {
+      await click(await inMore(card(name), 'Back up'));
+      const panel = card(name).querySelector<HTMLElement>('[data-panel="backup"]')!;
+      expect(plain(panel)).toContain('One recovery kit covers all your IDs.');
+      expect(plain(panel)).not.toContain('Open this ID');
+      expect(panel.querySelector('a[href="/settings/backup"]')?.textContent).toBe(
+        'Open Backup & restore',
+      );
+      expect(panel.querySelectorAll('button')).toHaveLength(0);
+    }
+    await click(await inMore(card('work'), 'Remove'));
     expect(plain(host)).toContain('Remove Work?');
     expect(host.querySelector('[role="dialog"] input[type="text"]')).not.toBeNull();
   });
@@ -486,7 +544,7 @@ describe('Agents, Under the hood: the fleet (A11)', () => {
     expect(plain(host)).toContain('2 IDs selected');
     // Pause applies to the open agent (08 §1): several at once is not offered.
     expect(button(host.querySelector('[data-bulk]')!, 'Pause')).toBeUndefined();
-    await click(button(host.querySelector('[data-bulk]')!, 'Remove'));
+    await click(await inMore(host.querySelector('[data-bulk]')!, 'Remove'));
     expect(plain(host)).toContain('Remove Research?');
   });
 
@@ -507,9 +565,10 @@ describe("one agent's page (/agents/<name>)", () => {
     }
     expect(plain(host)).toContain('Connected to Cursor');
     expect(host.querySelector('[data-sparkline]')).toBeNull();
-    // WP-11: Work is not the open ID, so its Backup section asks to open it first.
+    // One kit covers every ID: the Backup section leads to Backup & restore, no ID is opened first.
     const backup = host.querySelector<HTMLElement>('[data-panel="backup"]')!;
-    expect(plain(backup)).toContain('to save its recovery kit.');
+    expect(plain(backup)).toContain('One recovery kit covers all your IDs.');
+    expect(backup.querySelector('a[href="/settings/backup"]')).not.toBeNull();
   });
 
   it('draws the heartbeat bars only from reads seen in this session', async () => {

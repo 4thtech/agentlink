@@ -82,6 +82,8 @@ export interface ConnectingRow {
   readonly sent: boolean;
   /** The agent is already a contact: a re-pair. */
   readonly again: boolean;
+  /** The server says this person is blocked here: the accept can't finish until they are unblocked. */
+  readonly blocked?: boolean;
 }
 
 export type CreateOutcome =
@@ -212,7 +214,14 @@ export function parseConnecting(data: unknown): readonly ConnectingRow[] {
     if (typeof ref !== 'string' || !REF.test(ref) || expiresAt === undefined) continue;
     if (typeof name !== 'string' || name.length === 0 || name.length > MAX_NAME_CHARS) continue;
     if (typeof sent !== 'boolean' || typeof again !== 'boolean') continue;
-    out.push({ ref, name, expiresAt, sent, again });
+    out.push({
+      ref,
+      name,
+      expiresAt,
+      sent,
+      again,
+      ...(item['blocked'] === true ? { blocked: true } : {}),
+    });
   }
   return out;
 }

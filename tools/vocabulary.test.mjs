@@ -27,6 +27,18 @@ const GUIDE = join(root, 'docs-site/guide');
  */
 const ALLOWED = [
   {
+    page: 'help/glossary.md',
+    terms: ['old code names'],
+    reason:
+      'says once which words 0.4.14 renamed (backup code, owner code, safety code, owner fingerprint) so readers of older pages and screenshots find the new ones (D-146)',
+  },
+  {
+    page: 'local-app/first-run.md',
+    terms: ['old code names'],
+    reason:
+      'the version note says the backup code and owner code became the master code in 0.4.14, so a person who saved a "backup code" knows it is the same code (D-146)',
+  },
+  {
     page: 'local-app/ids.md',
     terms: ['agent (the ID)'],
     reason:
@@ -85,11 +97,6 @@ const ALLOWED = [
       "names the user's own saved passwords in ~/Library/Keychains, not one of our codes (§5.5)",
   },
   {
-    page: 'apps/desktop-app.md',
-    terms: ['password'],
-    reason: "the operating system's device password, not one of our codes (§5.5)",
-  },
-  {
     page: 'get-started/protect-your-approvals.md',
     terms: ['owner key'],
     reason:
@@ -99,12 +106,6 @@ const ALLOWED = [
     page: 'privacy-and-security.md',
     terms: ['address'],
     reason: 'an IP (connection) address, not an agent address',
-  },
-  {
-    page: 'quick-guide.md',
-    terms: ['network name'],
-    reason:
-      'the proof step names the two test networks proof runs on (Base Sepolia and Gnosis Chiado) so a student can recognise them in the proof file (11 §5.1 D-111)',
   },
   {
     page: 'pricing.md',

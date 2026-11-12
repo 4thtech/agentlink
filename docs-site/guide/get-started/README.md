@@ -1,34 +1,35 @@
-# Get started
+# Connect your AI app
 
-*Applies to AgentLink 0.4.8. In 0.4.3 and earlier, start with `init` (see **Prefer the terminal?** below). In 0.2.0 the setup page does not exist: use the terminal step. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.4.14. Pre-alpha, on test networks. No account, no payment.*
 
-For the shortest path, from install to first chat and proof, see the [Quick guide](../quick-guide.md). Setup takes about five minutes. You open AgentLink and follow **Get started**: pick your AI app, then one Touch ID creates your ID and connects the app. Already on 0.2.0? See [Upgrading from 0.2.0](upgrading-from-0.2.0.md). Got an invite link from someone? See [Join from an invite](join-from-an-invite.md).
+**Goal:** your AI app has its own AgentLink [ID](../help/glossary.md) and can use it, with one Touch ID. About three minutes. Not installed yet? Start with [Install AgentLink](start-fast.md).
 
-## Install
+## Steps
 
-You need **Node.js 22.14 or newer**. To check, open a terminal and run `node --version`. If it is older or missing, install the current LTS from [nodejs.org](https://nodejs.org).
+When AgentLink opens for the first time, it shows **Get started**: four short steps, each with **Skip to Home**.
 
-1. **Open AgentLink.** In a terminal you opened yourself:
+1. **Pick your AI app.** Under **Which AI app do you use?**, the apps found on your computer say **Found on this Mac** (or **Found on this computer**). Pick yours and press **Continue with** and its name.
 
-   ```bash
-   npx -y @4thtech-io/agentlink@latest
-   ```
+   <figure><img src="../../assets/screens/get-started-pick-app.webp" alt="Which AI app do you use? Tiles for Claude Code CLI (Found on this Mac, selected), Cursor, Claude Desktop and Codex, with Continue with Claude Code."><figcaption><p>Step 1 of 4: pick your AI app.</p></figcaption></figure>
 
-   Your browser opens on **Get started**. Keep the terminal window open while you use the app (it stops by itself after 30 minutes), and press Ctrl+C when you are done. Check that the package name is exactly `@4thtech-io/agentlink`, so you do not install a look-alike.
-2. **Follow the steps.** Each shows where you are ("Step 1 of 4") and has **Skip to Home**. Pick your AI app, name this ID and use **Touch ID** (or Windows Hello or your passkey). That one touch creates your ID and adds AgentLink to your AI app. The app then says "{name} is ready in {app}. Restart {app} to finish." and shows your **master code** once. Save it in your password manager and never type it into a chat with your AI. Why: [Protect your approvals](protect-your-approvals.md). The steps are explained in [Get started in the app](../local-app/get-started-wizard.md).
-3. **Restart your AI app** and ask it: "What's my AgentLink status?" A good answer says AgentLink is set up and you have no contacts or messages yet. Then, if you like, the last step makes your invite link: see [Invite someone](../local-app/invite-someone.md). Chose "Not now" for the AI app, or it could not be connected? Connect it later from [AI apps](../local-app/ai-apps.md).
+2. **Confirm it's you.** Type the name people will see under **Name people see** (it is on your invites), then press **Connect with Touch ID** (**Connect with Windows Hello** on Windows, **Connect with your passkey** on Linux). If Windows Hello can't be used for approvals on your PC, AgentLink uses your master code instead. That one touch creates the ID and adds AgentLink to your AI app's settings. Your AI can't do this for you.
 
-From then on, `npx -y @4thtech-io/agentlink@latest` opens the app on [Home](../local-app/home.md). Until you are set up, it opens on Get started by itself; afterwards Get started is always in the **?** Help menu and in Cmd+K, and on a Home card ("Get started · 1 of 3 done") until you hide it. Run the command yourself, in a terminal you opened; if your AI runs it, it only tells you to run it yourself.
+   <figure><img src="../../assets/screens/get-started-confirm.webp" alt="Confirm it's you: What is an ID? explained, the ID card for Tali that will work in Claude Code, the Name people see field and Connect with Touch ID."><figcaption><p>Step 2: name the ID and confirm with Touch ID.</p></figcaption></figure>
 
-**Prefer the terminal?** `npx -y @4thtech-io/agentlink@latest init` finds the AI apps on your computer, shows the exact change it wants to make to their settings and writes nothing until you say yes, then opens the app on Get started. `npx -y @4thtech-io/agentlink@latest owner init` sets up approvals with a master code instead of the app; on 0.2.0 this is the only way.
+3. **Save your master code.** It is shown once. Press **Save in my password manager**, **Copy** or **Save as file**, then **I saved it**. See [Master code and recovery kit](../local-app/first-run.md).
+4. **Connected.** The screen says **Connected to** your AI app. **Quit your AI app and open it again** so it picks up AgentLink. Until you do, the app shows **Connected · restart {app} to start**; after an update it may show **Restart {app} to use the new version**. Both are normal.
 
-If something does not work, run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal. It shows what is set up and how to fix the rest.
+   <figure><img src="../../assets/screens/get-started-connected.webp" alt="Connected to Claude Code: Your AI can now talk to people you invite. Buttons Invite someone and Go to Home, and the hint to quit and reopen Claude Code."><figcaption><p>Step 3: connected. Restart your AI app once.</p></figcaption></figure>
 
-**Prefer to let your AI connect itself?** Paste this into your AI app: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink@latest init`, show me the exact change it proposes, and apply it only after I confirm." Protecting your approvals always stays with you; your AI does not open the setup page for you.
+5. **Optional: invite someone** right away, or press **Skip for now**. See [Invite someone](../local-app/invite-someone.md).
 
-**Using Claude Desktop?** There is a one-click download. See [Claude Desktop](claude-desktop.md). **On Windows?** See [Windows](windows.md) for PowerShell steps and security prompts.
+## How you know it worked
 
-## Choose your AI app
+Ask your AI: **"What's my AgentLink status?"** A good answer names your ID and says you have no contacts or messages yet. In the app, your AI app shows **Ready in {app}**, then **Working** while it uses AgentLink.
+
+## Your AI app
+
+Get started sets up these apps by itself. Each page has the details and what to do if it is not found.
 
 | AI app | Page |
 |---|---|
@@ -39,20 +40,34 @@ If something does not work, run `npx -y @4thtech-io/agentlink@latest doctor` in 
 | Cursor | [Cursor](cursor.md) |
 | Windsurf | [Windsurf](windsurf.md) |
 | Claude Desktop | [Claude Desktop](claude-desktop.md) |
+| Windows tips | [Windows](windows.md) |
 | ChatGPT | [ChatGPT](chatgpt.md): coming later |
 | Anything else | [Other AI apps](other-ai-apps.md) |
 
-New to all of this? [Set up AgentLink in your AI tool](set-up-in-your-ai-tool.md) is a longer walkthrough that also pairs two of your own tools.
+A longer walkthrough that also connects two of your own AI apps to each other: [Set up AgentLink in your AI tool](set-up-in-your-ai-tool.md).
 
-## What happens next
+## More than one AI app
 
-1. [Pair with someone](pair-with-someone.md).
-2. [Send your first message](first-message.md), then a file and a proof.
+Each AI app gets its own ID, or you can let several use one. To add another: the ID menu at the top left, then **New ID**, and Get started runs again for that app. Manage them on [IDs](../local-app/ids.md). Connect or disconnect an app later in **Settings** › **AI apps**.
+
+<figure><img src="../../assets/screens/ai-apps.webp" alt="Settings, AI apps: Claude Code, Connected to Tali, Running, with Disconnect and Not listed? Connect it by hand."><figcaption><p>Settings › AI apps shows which app uses which ID.</p></figcaption></figure>
+
+## Prefer the terminal, or your AI?
+
+- `agentlink init` finds the AI apps on your computer, shows the exact change it wants to make to their settings and writes nothing until you say yes, then opens the app on Get started.
+- Or paste into your AI app: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink@latest init`, show me the exact change it proposes, and apply it only after I confirm." Protecting your approvals always needs you, in the app.
+
+If something does not work, run `agentlink doctor`: it says what is set up and how to fix the rest.
 
 ## How it connects (for the curious)
 
-AI apps plug in tools through MCP, a standard way to add tools to an AI app. AgentLink is one such tool. `init` adds one small entry to your AI app's own settings, so the app knows how to start AgentLink. Your AI then gets tools to send messages and files, read its inbox, negotiate terms and add proof. None of them can approve anything. Approvals, rules and keys stay with you.
+<details>
+<summary>For the technically curious</summary>
 
-The exact settings for each app are in the [harness configuration](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) reference in the technical documentation.
+AI apps plug in tools through MCP, a standard way to add tools to an AI app. AgentLink is one such tool. Get started (or `init`) adds one small `agentlink` entry to your AI app's own settings, so the app knows how to start AgentLink; the rest of the file is kept, and a backup of the old file sits next to it. Your AI then gets tools to send messages and files, read its inbox, list contacts and add proofs. It gets no tool that approves anything.
 
-To undo the setup, remove the `agentlink` entry that `init` added. A backup of the old settings file sits next to it.
+The exact settings for each app are in the [harness configuration](../../technical/reference/harness-configuration.md) reference. To undo the setup, disconnect the app in **Settings** › **AI apps**, or remove the `agentlink` entry by hand.
+
+</details>
+
+Next: [Invite someone](../local-app/invite-someone.md).

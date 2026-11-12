@@ -1,5 +1,34 @@
 # @4thtech-io/node
 
+## 0.5.0
+
+### Minor Changes
+
+- 849fab6: Restore from a recovery kit in the app and in the terminal (UX1113-R1, D-147): the app's restore routes (found, upload, header, presence, open, check, cancel, apply), the seedless restore-only owner session, and `agentlink restore` (alias of `agentlink backup restore [file] [--check]`).
+
+### Patch Changes
+
+- @4thtech-io/core@0.5.0
+  - @4thtech-io/crypto@0.5.0
+  - @4thtech-io/transport-nostr@0.5.0
+
+## 0.4.15
+
+### Patch Changes
+
+- @4thtech-io/core@0.4.15
+  - @4thtech-io/crypto@0.4.15
+  - @4thtech-io/transport-nostr@0.4.15
+
+## 0.4.14
+
+### Patch Changes
+
+- ce79b9f: WP-1 Rename truth: the ID open when the app starts can be renamed (and "Update contacts" works); the name note shows on the IDs page in both views, on the ID's own page and on Home; an invite asks for the name update first while the card still has an older name; `owner init` and `owner add-agent` take `--label` and sign card and label alike.
+- @4thtech-io/core@0.4.14
+  - @4thtech-io/crypto@0.4.14
+  - @4thtech-io/transport-nostr@0.4.14
+
 ## 0.4.13
 
 ### Patch Changes

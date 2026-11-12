@@ -47,11 +47,6 @@
 .ag-label {
   overflow-wrap: anywhere;
 }
-.ag-open {
-  padding: 0 var(--al-space-2);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  border-radius: var(--al-radius-sm);
-}
 .ag-line {
   color: var(--al-color-fg-muted);
 }
@@ -91,12 +86,6 @@
   flex-direction: column;
   gap: var(--al-space-1);
   min-width: 0;
-}
-.ag-title-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-2);
-  align-items: center;
 }
 .ag-chips,
 .ag-apps,
@@ -158,7 +147,7 @@
   min-width: 0;
 }
 .ag-note,
-.ag-banner {
+.ag-nudge {
   display: flex;
   flex-wrap: wrap;
   gap: var(--al-space-3);
@@ -188,10 +177,6 @@
 .ag-note > .ct-presence {
   align-self: stretch;
   margin-block-start: var(--al-space-2);
-}
-.ag-banner {
-  border-color: var(--al-color-status-warning-border);
-  background: var(--al-color-status-warning-bg);
 }
 .ag-warn {
   display: inline-flex;
@@ -439,7 +424,152 @@
   color: var(--al-color-fg-muted);
 }
 
+/* My IDs (WP-I1, spec §4): the fit strip, the card side column, the name nudge, the foot. */
+.ag-page:not([data-layer='pro']) {
+  max-width: 980px;
+}
+.ag-fit {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+  align-items: center;
+  padding: var(--al-space-4) var(--al-space-8) var(--al-space-4) var(--al-space-4);
+  border: var(--al-border-width-thin) dashed var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-sunken);
+}
+.ag-fit-box {
+  display: flex;
+  flex: 1 1 180px;
+  gap: var(--al-space-3);
+  align-items: center;
+  padding: var(--al-space-3) var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-surface);
+}
+.ag-fit-box.is-id {
+  border-color: var(--al-color-accent-default);
+}
+.ag-fit-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ag-fit-arrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.ag-fit-hide {
+  position: absolute;
+  top: var(--al-space-2);
+  right: var(--al-space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--al-color-fg-muted);
+  cursor: pointer;
+}
+.ag-card .ag-line,
+.ag-card .ag-line.is-working,
+.ag-card .ag-line.is-ready,
+.ag-card .ag-line.is-idle,
+.ag-card .ag-line.is-paused {
+  color: var(--al-color-fg-muted);
+}
+.ag-card .al-agent-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--al-radius-lg);
+  font-size: 22px;
+}
+.ag-card .al-agent-icon-dot {
+  right: -4px;
+  bottom: -4px;
+}
+.ag-card-head {
+  align-items: flex-start;
+}
+.ag-chip-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-fg-default);
+  color: var(--al-color-bg-surface);
+  font-size: 11px;
+  font-weight: var(--al-font-weight-semibold);
+}
+.ag-glyph {
+  flex: none;
+}
+a.al-btn .ag-glyph {
+  margin-right: var(--al-space-2);
+}
+.ag-foot .al-btn > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+.ag-foot .al-btn .ag-glyph {
+  margin: 0;
+}
+.ag-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+  align-items: flex-end;
+  text-align: right;
+}
+.ag-people {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ag-kit {
+  min-height: 28px;
+  padding: 0 var(--al-space-3);
+  cursor: pointer;
+}
+.ag-nudge {
+  color: var(--al-color-status-info-fg);
+}
+.ag-nudge p {
+  flex: 1 1 240px;
+}
+.ag-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--al-space-3);
+  border-top: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.ag-actions-end {
+  margin-left: auto;
+}
+
 @media (max-width: 600px) {
+  .ag-fit-arrow {
+    display: none;
+  }
+  .ag-card-head {
+    flex-wrap: wrap;
+  }
+  .ag-side {
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+  }
   .ag-card {
     padding: var(--al-space-4);
   }
