@@ -610,7 +610,11 @@ function Detail({
       </p>
       {duplicate}
       {contact.status === 'blocked' ? <p className="al-text-body">{S.blockedDetail}</p> : null}
-      {contact.status === 'revoked' ? <p className="al-text-body">{S.revokedDetail}</p> : null}
+      {contact.status === 'revoked' ? (
+        <Banner tone="neutral" icon="minus" title={S.revokedTitle}>
+          {S.revokedDetail} {S.revokedMore}
+        </Banner>
+      ) : null}
       {notice === undefined ? null : (
         <p className="al-text-body" role="status">
           {notice}

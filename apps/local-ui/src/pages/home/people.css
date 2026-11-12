@@ -439,3 +439,26 @@
   align-items: center;
   gap: var(--al-space-2);
 }
+
+/* UX 2026-11-12 (notices): a removed connection is one calm line; Archive moves it to Archived. */
+.hm-gone-row {
+  display: flex;
+  align-items: center;
+  padding-inline-end: var(--al-space-3);
+}
+.hm-gone-row > .hm-row {
+  flex: 1;
+  min-width: 0;
+}
+.hm-person[data-removed] .hm-avatar {
+  opacity: 0.6;
+}
+.hm-archived > summary {
+  cursor: pointer;
+  padding: var(--al-space-2) 0;
+}
+.hm-archived {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}

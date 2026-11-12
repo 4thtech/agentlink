@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // U3-h (b11 §29.2 to §29.8): the Agents page, the Rename, Add and Remove sheets, and the switcher.
 // W4-AGENTS: the cards of the simple layer (agents-v2.dom.test.ts has Pause, the fleet and the page).
-import { act, createElement } from 'react';
+import { Fragment, act, createElement } from 'react';
+import { ContactToasts } from '../../layout/contact-toasts.js';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { resetLiveForTests } from '../../api/live.js';
@@ -109,7 +110,15 @@ const api = () => createAgentsApi({ fetch: fetchFn, token: 't' });
 const owner = () => createOwnerClient({ fetch: fetchFn, token: 't' });
 async function mountPage(reload = vi.fn<() => void>()): Promise<Mock<() => void>> {
   await act(async () => {
-    root.render(createElement<AgentsPageProps>(AgentsPage, { api: api(), owner: owner(), reload }));
+    // notices.md: outcomes are toasts, so the shell's toast host is mounted beside the page.
+    root.render(
+      createElement(
+        Fragment,
+        null,
+        createElement<AgentsPageProps>(AgentsPage, { api: api(), owner: owner(), reload }),
+        createElement(ContactToasts, { subscribe: () => () => undefined, ms: 0 }),
+      ),
+    );
   });
   await settle();
   return reload;

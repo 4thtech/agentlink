@@ -16,6 +16,10 @@ export const CONTACTS_STRINGS = {
   blockedDetail: 'Blocked. Messages from this person are dropped.',
   revoked: 'No longer active',
   revokedDetail: 'This person turned this ID off. Messages from it are dropped.',
+  // UX 2026-11-12 (notices): the full explanation lives here, not on Home.
+  revokedTitle: 'They removed this connection.',
+  revokedMore:
+    "Your AI can't send to them any more. Your conversation and saved files stay here. On Home you can archive them.",
   waiting: 'Waiting for them',
   waitingDetail: 'Waiting for them to answer the invite. The 12 digits show here once it does.',
   mismatchChip: '12 digits did not match',

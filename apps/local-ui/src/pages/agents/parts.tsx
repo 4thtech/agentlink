@@ -2,7 +2,7 @@
 // app's dot and word, the Pause sheet (one click, no Touch ID), the paused banner with Resume (Touch
 // ID, signs `agent.resume`), and the "Contacts still see {name}" note (D-141). Labels and former names
 // are text only, each in its own bidi-isolated run (I-5).
-import { Button, Pulse, Sheet } from '@4thtech-io/ui';
+import { Button, PageNotice, Pulse, Sheet } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import type { AgentsApi } from './api.js';
@@ -145,18 +145,26 @@ export function PausedBanner({
   children?: ReactElement | null;
 }): ReactElement {
   return (
-    <div className="ag-banner al-reveal" data-paused-banner role="status">
-      <p className="al-text-body">
-        <bdi>{row.label}</bdi>
-        {S.isPaused}
-      </p>
-      {resuming ? (
-        children
-      ) : (
-        <Button variant="primary" icon="play" onClick={onResume}>
-          {S.resumeTouchId}
-        </Button>
-      )}
+    <div className="al-reveal" data-paused-banner>
+      <PageNotice
+        tone="warning"
+        icon="pause"
+        title={
+          <>
+            <bdi>{row.label}</bdi>
+            {S.isPaused}
+          </>
+        }
+        actions={
+          resuming ? undefined : (
+            <Button size="sm" variant="primary" icon="play" onClick={onResume}>
+              {S.resumeTouchId}
+            </Button>
+          )
+        }
+      >
+        {resuming ? children : undefined}
+      </PageNotice>
     </div>
   );
 }
@@ -196,31 +204,39 @@ export function CardNameNote({
     });
   };
   return (
-    <div className="ag-note" role="status" data-card-name-note>
-      <p className="al-text-body-sm">
-        <strong>
-          {noContacts ? S.newInvitesStillShow : S.contactsStillSee}
-          <bdi>{cardName}</bdi>
-        </strong>
-      </p>
-      <p className="al-text-body-sm al-muted">
-        {S.noteHint}
-        <bdi>{row.label}</bdi>.
-      </p>
-      {asking ? (
-        <OwnerGate
-          summary={S.renameStatement(cardName, row.label)}
-          passkey={passkey}
-          busy={busy}
-          error={error}
-          onProof={send}
-          onCancel={() => setAsking(false)}
-        />
-      ) : (
-        <Button variant="primary" size="sm" onClick={() => setAsking(true)}>
-          {noContacts ? S.updateName : S.updateContacts}
-        </Button>
-      )}
+    <div data-card-name-note>
+      <PageNotice
+        tone="info"
+        icon="users"
+        title={
+          <>
+            {noContacts ? S.newInvitesStillShow : S.contactsStillSee}
+            <bdi>{cardName}</bdi>
+          </>
+        }
+        actions={
+          asking ? undefined : (
+            <Button variant="primary" size="sm" onClick={() => setAsking(true)}>
+              {noContacts ? S.updateName : S.updateContacts}
+            </Button>
+          )
+        }
+      >
+        <p>
+          {S.noteHint}
+          <bdi>{row.label}</bdi>.
+        </p>
+        {asking ? (
+          <OwnerGate
+            summary={S.renameStatement(cardName, row.label)}
+            passkey={passkey}
+            busy={busy}
+            error={error}
+            onProof={send}
+            onCancel={() => setAsking(false)}
+          />
+        ) : null}
+      </PageNotice>
     </div>
   );
 }

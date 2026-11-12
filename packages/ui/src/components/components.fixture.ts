@@ -161,6 +161,20 @@ export const fixtures: Record<string, () => ReactElement> = {
     h(ui.SecretDisplay, { label: 'Recovery code', value: 'ABCD EFGH JKLM' }),
   'Banner/warning': () => h(ui.Banner, { tone: 'warning', title: 'Heads up' }, 'Low credits'),
   'Toast/success': () => h(ui.Toast, { tone: 'success', action: 'Undo' }, 'Saved'),
+  'Banner/dismiss': () => h(ui.Banner, { tone: 'info', onDismiss: () => undefined }, 'Renamed'),
+  'PageNotice/default': () =>
+    h(
+      ui.PageNotice,
+      {
+        tone: 'info',
+        title: 'Protect your approvals',
+        actions: 'Set up',
+        onDismiss: () => undefined,
+      },
+      'Each approval asks for your master code.',
+    ),
+  'ToastStack/default': () =>
+    h(ui.ToastStack, { items: [{ id: 1, text: 'Saved' }], onDismiss: () => undefined, ms: 0 }),
   'EmptyState/default': () =>
     h(ui.EmptyState, { title: 'No files yet', prompt: 'Send the contract to Marko' }),
   'AppShell/default': () =>

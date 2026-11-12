@@ -33,7 +33,11 @@ import {
   type Progress,
   type SetupState,
 } from '../start/setup-state.js';
-import { Surface, type PayPlatform } from '@4thtech-io/ui';
+import { Button, PageNotice, type PayPlatform } from '@4thtech-io/ui';
+import { inDesktopApp } from '../../desktop.js';
+import { noticeKey, useDismissed } from '../../notices/index.js';
+import { detectPlatform } from '../first-run/passkey.js';
+import { SENSOR } from '../first-run/strings.js';
 import {
   useEffect,
   useMemo,
@@ -47,7 +51,7 @@ import { getLive, subscribeLive } from '../../api/live.js';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import type { OwnerState } from './card.js';
 import { createApprovalsClient, type ApprovalsClient } from './client.js';
-import { APPROVAL_STRINGS as S } from './strings.js';
+import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 import './approvals.css';
 
 export { APPROVAL_TTL } from './card.js';
@@ -61,6 +65,8 @@ export interface ApprovalsPageProps {
   readonly reducedMotion?: boolean;
   /** W4-WIRE: the real setup state for the Get started card on Home. Default: the app's reads. */
   readonly readSetup?: () => Promise<SetupState>;
+  /** The desktop app's native presence, when it offers one (a slot; see OwnerPanel). */
+  readonly nativePresence?: NativePresenceSlot;
 }
 
 export function browserPasskeys(): boolean {
@@ -100,34 +106,100 @@ export function useOwner(client: ApprovalsClient, canPasskey: boolean): OwnerVie
   return owner;
 }
 
-/** Owner set up? If not, the reason; where passkeys can't work, the master code is the way. */
+/**
+ * UX 2026-11-12 (notices): the desktop app's native owner presence (Touch ID, Windows Hello), when
+ * the desktop build offers it. A slot only: this page never registers or uses it itself.
+ */
+export interface NativePresenceSlot {
+  /** The sensor's name for the copy ("Touch ID"); the platform's when absent. */
+  readonly sensor?: string;
+  /** Starts the desktop app's own "turn on" flow (owner presence stays with the desktop app). */
+  readonly turnOn: () => void;
+}
+
+/** The open ID's name (not its label), for remembering a dismissal per ID. */
+function useOpenIdName(): string | undefined {
+  const snap = useSyncExternalStore(subscribeLive, getLive, () => LIVE_EMPTY);
+  return snap.agents.find((a) => a.current)?.name;
+}
+
+/**
+ * Owner set up? If not, the reason (a page notice that stays until it is done). Set up but with no
+ * passkey here: one calm page notice, closable (remembered per ID), in words that fit where it
+ * runs. The desktop app is never "this browser": it offers its own sensor when it has one, else it
+ * says the master code is how approvals are confirmed.
+ */
 export function OwnerPanel({
   owner,
   canPasskey,
   needsOwnerOnly = false,
+  desktop = inDesktopApp(),
+  nativePresence,
 }: {
   owner: OwnerView;
   canPasskey: boolean;
   needsOwnerOnly?: boolean;
+  /** Test seam: running in the desktop app. Default: its user-agent marker. */
+  desktop?: boolean;
+  nativePresence?: NativePresenceSlot | undefined;
 }): ReactElement | null {
+  const id = useOpenIdName();
+  const [dismissed, dismiss] = useDismissed(noticeKey('protect-approvals', id));
   if (!owner.ready) {
     return (
-      <Surface as="section" level={1} className="al-panel">
-        <h2>{S.needsOwnerTitle}</h2>
+      <PageNotice tone="warning" icon="key-round" title={S.needsOwnerTitle}>
         <p>{S.needsOwner}</p>
-      </Surface>
+      </PageNotice>
     );
   }
-  if (needsOwnerOnly || owner.passkey !== undefined) return null;
-  // A passkey can be set up here: the layout's "Switch to …" banner is the one place to start.
+  if (needsOwnerOnly || owner.passkey !== undefined || dismissed) return null;
+  if (desktop) {
+    if (nativePresence !== undefined) {
+      const sensor = nativePresence.sensor ?? SENSOR[detectPlatform()];
+      return (
+        <PageNotice
+          tone="info"
+          icon="approval"
+          title={fmt(S.nativeTitle, { sensor })}
+          actions={
+            <Button size="sm" variant="primary" onClick={nativePresence.turnOn}>
+              {fmt(S.nativeAction, { sensor })}
+            </Button>
+          }
+          onDismiss={dismiss}
+          dismissLabel={S.hideNotice}
+        >
+          <p>{fmt(S.nativeBody, { sensor })}</p>
+        </PageNotice>
+      );
+    }
+    return (
+      <PageNotice
+        tone="neutral"
+        icon="key-round"
+        title={S.protectedTitle}
+        onDismiss={dismiss}
+        dismissLabel={S.hideNotice}
+      >
+        <p>{S.protectedBody}</p>
+      </PageNotice>
+    );
+  }
+  // A passkey can be set up here: the layout's "Switch to …" notice is the one place to start.
   if (canPasskey && owner.offered) return null;
   return (
-    <Surface as="section" level={1} className="al-panel">
-      <h2>{S.firstRunTitle}</h2>
+    <PageNotice
+      tone="info"
+      icon="key-round"
+      title={S.firstRunTitle}
+      onDismiss={dismiss}
+      dismissLabel={S.hideNotice}
+    >
       <p>{S.firstRun}</p>
-      <p>{S.noPasskeys}</p>
-      <p className="al-note">{S.desktopNote}</p>
-    </Surface>
+      <p>
+        {S.noPasskeys} {S.desktopNote}
+      </p>
+    </PageNotice>
   );
 }
 
@@ -232,6 +304,7 @@ export function ApprovalsPage({
   platform,
   reducedMotion,
   readSetup = readSetupState,
+  nativePresence,
 }: ApprovalsPageProps): ReactElement {
   // The owner's state, as the list showed it: not set up yet (nothing can be approved, with the
   // reason) or no passkeys in this browser (the master code is the way).
@@ -248,7 +321,11 @@ export function ApprovalsPage({
         : { getStarted: <GetStartedCard progress={started} /> })}
       {...(owner === undefined
         ? {}
-        : { ownerNotice: <OwnerPanel owner={owner} canPasskey={passkeys} /> })}
+        : {
+            ownerNotice: (
+              <OwnerPanel owner={owner} canPasskey={passkeys} nativePresence={nativePresence} />
+            ),
+          })}
       {...(payConfirm === undefined ? {} : { payConfirm })}
       {...(canPasskey === undefined ? {} : { canPasskey })}
       {...(platform === undefined ? {} : { platform })}

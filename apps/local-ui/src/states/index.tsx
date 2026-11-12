@@ -1,7 +1,7 @@
 // Shared states for pages (d1 Local-states, `shared-states--all`; D-116). Every page uses these for
 // its empty, loading, error, offline and setup states, so the copy is the same everywhere.
 // Classes and components come from packages/ui only (CSP: no inline styles).
-import { Banner, Button, CopyPrompt, EmptyState } from '@4thtech-io/ui';
+import { Banner, Button, CopyPrompt, EmptyState, PageNotice } from '@4thtech-io/ui';
 import type { ReactElement } from 'react';
 import { UPGRADE, type Platform } from '../pages/first-run/strings.js';
 import { STATE_STRINGS as S } from './strings.js';
@@ -57,17 +57,17 @@ export function NotRunningState(): ReactElement {
 /** Shown on every page until approvals are protected; one action back to first run. */
 export function SetupUnfinishedBanner(): ReactElement {
   return (
-    <Banner
+    <PageNotice
       tone="warning"
       title={S.setupUnfinishedTitle}
-      action={
+      actions={
         <a className="al-btn al-btn-primary al-btn-sm" href="/first-run">
           {S.continueSetup}
         </a>
       }
     >
-      {S.setupUnfinishedBody}
-    </Banner>
+      <p>{S.setupUnfinishedBody}</p>
+    </PageNotice>
   );
 }
 
@@ -78,18 +78,18 @@ export function SetupUnfinishedBanner(): ReactElement {
  */
 export function SwitchToPasskeyBanner({ platform }: { platform: Platform }): ReactElement {
   return (
-    <Banner
+    <PageNotice
       tone="info"
       icon="key-round"
       title={UPGRADE.bannerTitle(platform)}
-      action={
+      actions={
         <a className="al-btn al-btn-primary al-btn-sm" href="/first-run">
           {UPGRADE.bannerAction(platform)}
         </a>
       }
     >
-      {UPGRADE.bannerBody}
-    </Banner>
+      <p>{UPGRADE.bannerBody}</p>
+    </PageNotice>
   );
 }
 
@@ -103,18 +103,18 @@ export function RecoveryKitBanner({
   afterFirstContact?: boolean;
 }): ReactElement {
   return (
-    <Banner
+    <PageNotice
       tone={afterFirstContact ? 'warning' : 'info'}
       icon="life-buoy"
-      {...(afterFirstContact ? {} : { title: S.kitPendingTitle })}
-      action={
+      title={S.kitPendingTitle}
+      actions={
         <a className="al-btn al-btn-secondary al-btn-sm" href="/settings/backup">
           {S.saveKit}
         </a>
       }
     >
-      {afterFirstContact ? S.kitPendingAfterContact : S.kitPendingBody}
-    </Banner>
+      <p>{afterFirstContact ? S.kitPendingAfterContact : S.kitPendingBody}</p>
+    </PageNotice>
   );
 }
 

@@ -10,6 +10,7 @@ import type { AgentRow } from '../agents/data.js';
 import { CardNameNote } from '../agents/parts.js';
 import { AGENTS_STRINGS as S } from '../agents/strings.js';
 import type { OwnerClient } from '../contacts/owner.js';
+import { notify } from '../../notices/index.js';
 
 export interface RenameBannerProps {
   readonly api: AgentsApi;
@@ -20,7 +21,6 @@ export interface RenameBannerProps {
 
 export function RenameBanner({ api, owner, row }: RenameBannerProps): ReactElement | null {
   const [cardName, setCardName] = useState<string | undefined>(undefined);
-  const [told, setTold] = useState<string | undefined>(undefined);
   const name = row?.name;
   const label = row?.label;
   useEffect(() => {
@@ -38,13 +38,7 @@ export function RenameBanner({ api, owner, row }: RenameBannerProps): ReactEleme
   }, [api, name, label]);
 
   if (row === undefined || row.removing) return null;
-  if (cardName === undefined) {
-    return told === undefined ? null : (
-      <p className="al-text-body-sm" role="status">
-        {told}
-      </p>
-    );
-  }
+  if (cardName === undefined) return null;
   return (
     <section className="hm-rename-banner" aria-label={S.updateName} data-rename-banner>
       <CardNameNote
@@ -54,7 +48,8 @@ export function RenameBanner({ api, owner, row }: RenameBannerProps): ReactEleme
         owner={owner}
         onUpdated={(contactsTold) => {
           setCardName(undefined);
-          setTold(contactsTold ? S.renamedTold(row.label) : undefined);
+          // notices.md: an outcome is a toast.
+          if (contactsTold) notify({ text: S.renamedTold(row.label) });
         }}
       />
     </section>

@@ -4,6 +4,7 @@
 // apps panel, the fleet table Under the hood and one agent's own page. Labels are text only (I-5).
 import { HoodProvider } from '@4thtech-io/ui';
 import { act, createElement } from 'react';
+import { ContactToasts } from '../../layout/contact-toasts.js';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetLiveForTests } from '../../api/live.js';
@@ -133,7 +134,15 @@ async function mount(hood = false, props: Partial<AgentsPageProps> = {}): Promis
     ...props,
   });
   await act(async () => {
-    root.render(createElement(HoodProvider, { value: hood }, page));
+    // notices.md: outcomes are toasts, so the shell's toast host is mounted beside the page.
+    root.render(
+      createElement(
+        HoodProvider,
+        { value: hood },
+        page,
+        createElement(ContactToasts, { subscribe: () => () => undefined, ms: 0 }),
+      ),
+    );
   });
   await settle();
 }

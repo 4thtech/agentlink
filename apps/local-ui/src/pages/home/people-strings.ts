@@ -122,6 +122,15 @@ export const HOME_STRINGS = {
   connectionRemoved: '{name} removed this connection',
   connectionRemovedBody:
     "{name} removed this connection. Your AI can't send to them any more. Your conversation and saved files stay here.",
+  // UX 2026-11-12 (notices): removed connections are calm on Home; Archive moves them out of People.
+  details: 'Details',
+  archive: 'Archive',
+  restore: 'Restore',
+  archiveLabel: 'Archive {name}',
+  restoreLabel: 'Move {name} back to People',
+  archived: 'Archived',
+  archivedCount: 'Archived ({count})',
+  archivedHint: 'Connections that were removed. Their conversation and saved files stay here.',
   checked: 'Contact checked.',
   codeLead: 'Compare this code with {name}, on a call or in person.',
   codeLoading: 'Getting the 12 digits…',
