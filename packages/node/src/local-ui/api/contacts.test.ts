@@ -671,7 +671,12 @@ for (const [what, op, prepareKey, lines] of [
     'prepareBlock',
     ['Block this contact. Messages from them are dropped until you unblock them.'],
   ],
-  ['unblock', 'contact.unblock', 'prepareUnblock', ['Unblock this contact. Their messages arrive again.']],
+  [
+    'unblock',
+    'contact.unblock',
+    'prepareUnblock',
+    ['Unblock this contact. Their messages arrive again.'],
+  ],
 ] as const) {
   describe(`POST /api/ui/contacts/:ref/${what}`, () => {
     const route = ownerRoute(`/api/ui/contacts/:ref/${what}`);
@@ -712,7 +717,9 @@ for (const [what, op, prepareKey, lines] of [
       const s4 = signer();
       await route.handler(ctx(fakeClient()), req({ ref: MARKO }, '', { contact: ANA }), s4);
       expect(s4.calls).toHaveLength(0);
-      const throwing = fakeContacts({ [prepareKey]: () => Promise.reject(new Error('/secret/path')) });
+      const throwing = fakeContacts({
+        [prepareKey]: () => Promise.reject(new Error('/secret/path')),
+      });
       const s5 = signer();
       const r5 = await route.handler(ctx(fakeClient(throwing)), req({ ref: MARKO }), s5);
       expect(s5.calls).toHaveLength(0);

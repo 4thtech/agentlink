@@ -232,8 +232,8 @@ export interface LocalUiReadClient {
   };
   /**
    * M1-11c-a2 (Contacts): the contact list, the safety code recomputed for the owner surface (04
-   * §3.6.1) and core's prepare helpers for `contact.check`, `contact.rename` and `contact.remove`
-   * (#415). Each prepare builds an unsigned body and writes nothing (I-4); only a signature from the
+   * §3.6.1) and core's prepare helpers for `contact.check`, `contact.rename`, `contact.remove`,
+   * and (UX1112 WP-12, F-2) `contact.block` and `contact.unblock` (#415). Each prepare builds an unsigned body and writes nothing (I-4); only a signature from the
    * gate's one-use `sign`, applied by core, changes anything. No direct block, remove or apply.
    */
   readonly contacts: {
@@ -242,6 +242,8 @@ export interface LocalUiReadClient {
     prepareCheck(contactId: string): Promise<PreparedOwnerAction>;
     prepareRename(contactId: string, alias: string): Promise<PreparedOwnerAction>;
     prepareRemove(contactId: string): Promise<PreparedOwnerAction>;
+    prepareBlock(contactId: string): Promise<PreparedOwnerAction>;
+    prepareUnblock(contactId: string): Promise<PreparedOwnerAction>;
   };
   /**
    * M1-11c-a4 (Proofs and credits): the proof list and the credits read, both store or chain reads
@@ -374,6 +376,8 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       prepareRename: (contactId: string, alias: string) =>
         client.ownerActions.prepareContactRename(contactId, alias),
       prepareRemove: (contactId: string) => client.ownerActions.prepareContactRemove(contactId),
+      prepareBlock: (contactId: string) => client.ownerActions.prepareContactBlock(contactId),
+      prepareUnblock: (contactId: string) => client.ownerActions.prepareContactUnblock(contactId),
     }),
     proofs: Object.freeze({
       list: (query: PageQuery) => client.proofs.list(query),

@@ -465,7 +465,14 @@ describe('ContactsPage: block and unblock (WP-12)', () => {
   });
 
   it('the copy follows 11 §5: plain words, no wallet, key or address', () => {
-    for (const line of [S.block, S.unblock, S.blockContact, S.blockExplain, S.blockedNow, S.unblocked]) {
+    for (const line of [
+      S.block,
+      S.unblock,
+      S.blockContact,
+      S.blockExplain,
+      S.blockedNow,
+      S.unblocked,
+    ]) {
       expect(line).not.toMatch(/wallet|gas|seed|transaction|key|address|0x/i);
     }
   });

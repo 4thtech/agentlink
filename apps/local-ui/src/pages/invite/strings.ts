@@ -54,6 +54,9 @@ export const INVITE_STRINGS = {
   // The person menu.
   rename: 'Rename',
   checkCode: 'Check safety code',
+  // UX1112 WP-12 (F-2): Block, or Unblock on a blocked person.
+  block: 'Block',
+  unblock: 'Unblock',
   remove: 'Remove',
   // The friend's side and the Connected moment.
   nameBySender: 'Name set by the sender',

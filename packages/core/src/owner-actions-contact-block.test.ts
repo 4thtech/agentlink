@@ -64,8 +64,11 @@ async function signedText(
 
 const status = async (agent: TestAgent, id: string) =>
   (await agent.store.transaction((tx) => tx.get('contacts', { contact_id: id })))?.status;
-const setStatus = (agent: TestAgent, id: string, value: 'active' | 'blocked' | 'revoked' | 'removed') =>
-  agent.store.transaction((tx) => tx.update('contacts', { contact_id: id }, { status: value }));
+const setStatus = (
+  agent: TestAgent,
+  id: string,
+  value: 'active' | 'blocked' | 'revoked' | 'removed',
+) => agent.store.transaction((tx) => tx.update('contacts', { contact_id: id }, { status: value }));
 const nonceRows = (agent: TestAgent) =>
   agent.store.transaction((tx) => tx.select('owner_action_nonces'));
 
@@ -268,8 +271,16 @@ describe('prepareContactBlock and prepareContactUnblock (WP-12)', () => {
     const { a, b } = await paired();
     const block = await a.client.ownerActions.prepareContactBlock(b.id);
     if (block.status !== 'prepared') throw new Error('not prepared');
-    expect(await a.client.ownerActions.apply(await sign(stranger, block.body))).toMatchObject({
+    // The stranger's store refuses to sign a body naming another owner; a forged owner field is
+    // refused by core as owner_mismatch.
+    await expect(sign(stranger, block.body)).rejects.toThrow();
+    const forged = {
+      ...block.body,
+      owner: encodeHex((await stranger.getPublicKeys()).ownerNostr),
+    };
+    expect(await a.client.ownerActions.apply(await sign(stranger, forged))).toMatchObject({
       status: 'refused',
+      reason: 'owner_mismatch',
     });
     expect(await status(a, b.id)).toBe('active');
   });

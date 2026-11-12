@@ -18,10 +18,14 @@
 //   never signs a code they did not compare (a re-pair in between changes it).
 // - `POST …/rename`: input `{alias}`; core checks the restricted form and uniqueness.
 // - `POST …/remove`: no input.
-// A handler that returns without signing performed nothing; the gate answers 409 `refused`.
+// - `POST …/block`, `POST …/unblock` (UX1112 WP-12, F-2; 02 F-14; D-72): no input. Core prepares
+//   `contact.block` for an active contact or `contact.unblock` for a blocked one and refuses
+//   anything else before the gesture; a blocked contact's later messages are dropped (04 §3.1.1).
+// A handler that returns without signing performed nothing; the gate answers 409 `refused`. No MCP
+// tool or CLI command reaches these routes (I-4).
 //
 // "They don't match" has no route: it signs nothing (04 §3.6.1), and the shell has no unsigned owner
-// write yet, so the page offers Remove (signed). Blocking from the page is a follow-up.
+// write yet, so the page offers Remove (signed).
 //
 // What leaves (UX north star; 11 §5.2): a contact's `ref` (its ID, used only in these paths and never
 // shown), the name core shows (the owner's alias, or the contact's own name after restrictName), the
@@ -281,6 +285,10 @@ const RENAME_LINES = Object.freeze(['Rename this contact on this computer.']);
 const REMOVE_LINES = Object.freeze([
   'Remove this contact. Messages from them are dropped from now on.',
 ]);
+const BLOCK_LINES = Object.freeze([
+  'Block this contact. Messages from them are dropped until you unblock them.',
+]);
+const UNBLOCK_LINES = Object.freeze(['Unblock this contact. Their messages arrive again.']);
 
 async function checkContact(
   context: LocalUiContext,
@@ -361,6 +369,34 @@ async function removeContact(
   return signAndApply(context, owner, prepared, REMOVE_LINES);
 }
 
+/**
+ * WP-12: Block or Unblock, no input. Core prepares the body for this contact (refusing an unknown,
+ * removed, revoked, already blocked or not blocked one); it is signed only when it is exactly that
+ * op, with fixed review lines (never the contact's name, I-5), and applied by core (I-4).
+ */
+function blockRoute(op: 'contact.block' | 'contact.unblock'): LocalUiOwnerRoute['handler'] {
+  const lines = op === 'contact.block' ? BLOCK_LINES : UNBLOCK_LINES;
+  return async (context, request, owner) => {
+    const client = context.client;
+    if (client === undefined) return UI_NOT_SET_UP;
+    const ref = refOf(request);
+    if (ref === undefined || request.input !== undefined) return NOT_SIGNED;
+    let prepared: PreparedOwnerAction;
+    try {
+      prepared =
+        op === 'contact.block'
+          ? await client.contacts.prepareBlock(ref)
+          : await client.contacts.prepareUnblock(ref);
+    } catch {
+      return NOT_SIGNED;
+    }
+    if (prepared.status !== 'prepared' || prepared.body.op !== op) return NOT_SIGNED;
+    const params = prepared.body.params as { contact?: unknown };
+    if (params.contact !== ref) return NOT_SIGNED;
+    return signAndApply(context, owner, prepared, lines);
+  };
+}
+
 const read = (path: string, handler: LocalUiReadRoute['handler']): LocalUiReadRoute =>
   Object.freeze<LocalUiReadRoute>({ method: 'GET', path, presence: false, handler });
 
@@ -374,4 +410,6 @@ export const contactsRoutes: readonly LocalUiRoute[] = Object.freeze([
   ownerOp('/api/ui/contacts/:ref/check', checkContact),
   ownerOp('/api/ui/contacts/:ref/rename', renameContact),
   ownerOp('/api/ui/contacts/:ref/remove', removeContact),
+  ownerOp('/api/ui/contacts/:ref/block', blockRoute('contact.block')),
+  ownerOp('/api/ui/contacts/:ref/unblock', blockRoute('contact.unblock')),
 ]);

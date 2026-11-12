@@ -121,6 +121,14 @@ export const contactRemoveParamsSchema = z.strictObject({
   contact: evmAddress,
 });
 
+/**
+ * `contact.block` and `contact.unblock` params (04 §2.5.1; 02 F-14; D-72; UX1112 WP-12, F-2;
+ * proposed, owner confirms at merge): exactly the contact's agent ID in its one encoding.
+ */
+export const contactBlockParamsSchema = z.strictObject({
+  contact: evmAddress,
+});
+
 // --- local owner actions: agent labels and AI app connections (U3-d, D-138) ----------------------
 
 /** At most 32 code points, as the restricted name (06 §2.1, §6 labels). */
@@ -386,6 +394,26 @@ export const contactRemoveActionSchema = z
   })
   .refine(expiring, EXPIRING_MSG);
 
+/** Blocks one active contact (status `blocked`, 02 F-14) (WP-12). Own machine only: no envelope. */
+export const contactBlockActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('contact.block'),
+    params: contactBlockParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
+/** Unblocks one blocked contact (status back to `active`) (WP-12). Own machine only: no envelope. */
+export const contactUnblockActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('contact.unblock'),
+    params: contactBlockParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
 /** Connects the agent's own S3-compatible storage (M1-9i-a, D-115). Own machine only: no envelope. */
 export const storageSetActionSchema = z
   .strictObject({
@@ -516,6 +544,8 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   contactCheckActionSchema,
   contactRenameActionSchema,
   contactRemoveActionSchema,
+  contactBlockActionSchema,
+  contactUnblockActionSchema,
   storageSetActionSchema,
   storageRemoveActionSchema,
   backupExportActionSchema,
@@ -565,6 +595,7 @@ export type AgentRevokeParams = z.infer<typeof agentRevokeParamsSchema>;
 export type ContactCheckParams = z.infer<typeof contactCheckParamsSchema>;
 export type ContactRenameParams = z.infer<typeof contactRenameParamsSchema>;
 export type ContactRemoveParams = z.infer<typeof contactRemoveParamsSchema>;
+export type ContactBlockParams = z.infer<typeof contactBlockParamsSchema>;
 export type StorageSetParams = z.infer<typeof storageSetParamsSchema>;
 export type StorageRemoveParams = z.infer<typeof storageRemoveParamsSchema>;
 export type BackupExportParams = z.infer<typeof backupExportParamsSchema>;

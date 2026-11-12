@@ -50,6 +50,14 @@ export const CONTACTS_STRINGS = {
   removeExplain:
     'Remove this person? Messages from them are dropped. To connect again, ask them for a new invite.',
   removed: 'Removed.',
+  // UX1112 WP-12 (F-2; D-72; 11 §6.2 "Rename and Block"): block or unblock one person.
+  block: 'Block',
+  unblock: 'Unblock',
+  blockContact: 'Block person',
+  blockExplain:
+    "Block this person? Messages from them are dropped until you unblock them. They aren't told.",
+  blockedNow: 'Blocked.',
+  unblocked: 'Unblocked. Messages from this person arrive again.',
   cancel: 'Cancel',
   presenceIntro: 'Confirm it’s you. Never give your backup code to your AI.',
   usePasskey: 'Confirm with your passkey',
@@ -152,4 +160,6 @@ export const SUMMARY = {
   check: (name: string): string => `Mark ${name} as Safety code checked.`,
   rename: (name: string, alias: string): string => `Rename ${name} to ${alias}.`,
   remove: (name: string): string => `Remove ${name}.`,
+  block: (name: string): string => `Block ${name}.`,
+  unblock: (name: string): string => `Unblock ${name}.`,
 } as const;
