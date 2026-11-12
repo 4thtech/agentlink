@@ -11,6 +11,7 @@
 // Everything goes to this same-origin server only (never a 4thTech service, never a shortener). An
 // answer is read through an allowlist: only the named fields, each checked for type and size. The
 // link and the share text are never logged, and no error here carries them (I-7, b11 §21.5).
+import { sendWithProof } from '../../api/presence-ceremony.js';
 import type { PresenceProof } from './owner.js';
 
 export const INVITE_CREATE_PATH = '/api/ui/invites';
@@ -313,20 +314,24 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
 
   async function call(
     path: string,
-    init: { headers: Headers; body: Uint8Array; keepalive?: boolean },
+    init: { headers: Headers; body: Uint8Array; keepalive?: boolean; proof?: PresenceProof },
   ): Promise<
     { kind: 'answer'; status: number; json: Record<string, unknown> } | { kind: 'offline' }
   > {
     let res: Response;
     try {
-      res = await doFetch(path, {
-        method: 'POST',
-        headers: init.headers,
-        body: init.body as BodyInit,
-        credentials: 'same-origin',
-        cache: 'no-store',
-        ...(init.keepalive === true ? { keepalive: true } : {}),
-      });
+      // REL051-SF1: an owner proof goes through its ceremony (api/presence-ceremony.ts).
+      res =
+        init.proof !== undefined
+          ? await sendWithProof(doFetch, path, init.headers, init.proof)
+          : await doFetch(path, {
+              method: 'POST',
+              headers: init.headers,
+              body: init.body as BodyInit,
+              credentials: 'same-origin',
+              cache: 'no-store',
+              ...(init.keepalive === true ? { keepalive: true } : {}),
+            });
     } catch {
       return { kind: 'offline' };
     } finally {
@@ -464,9 +469,7 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
         'content-type': 'application/octet-stream',
         'X-AgentLink-Input': toBase64url(encode({ invite })),
       });
-      if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-      const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
-      const answer = await call(INVITE_ACCEPT_PATH, { headers, body });
+      const answer = await call(INVITE_ACCEPT_PATH, { headers, body: new Uint8Array(0), proof });
       if (answer.kind === 'offline') return { kind: 'offline' };
       const { status, json } = answer;
       if (status === 200 && json['status'] === 'pending') {

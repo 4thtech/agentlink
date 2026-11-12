@@ -34,6 +34,7 @@ import {
   encodeBase64url,
   encodeHex,
   encodeUtf8,
+  equalBytes,
   ownerPrfSalt,
   randomBytes,
   readPasskeyBlobHeader,
@@ -49,6 +50,7 @@ import {
   generateRecoveryCode,
 } from '@4thtech-io/crypto/keystore';
 import type { OwnerActionOutcome } from '@4thtech-io/core';
+import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   MAX_PRESENCE_BACKOFF_S,
@@ -75,6 +77,7 @@ import {
 } from './owner-passkey.js';
 import type { OwnerTerminal } from './owner-terminal.js';
 import { VirtualPrfAuthenticator } from './passkey-authenticator.fixture.js';
+import { encodePayConfirmAssertion } from './pay-confirm.js';
 import { TEST_APP } from './local-ui-app.fixture.js';
 
 // Every owner seed opened, copied before it is wiped, so the scan knows what to look for.
@@ -760,6 +763,19 @@ function registerVia(
   });
 }
 
+/** REL051-SF1: authenticators with a signing key (kept at registration), by credential ID. */
+const signers: VirtualPrfAuthenticator[] = [];
+function newAuth(options: { prf?: boolean } = {}): VirtualPrfAuthenticator {
+  const auth = new VirtualPrfAuthenticator({ ...options, credential: newWebauthnTestCredential() });
+  signers.push(auth);
+  return auth;
+}
+
+/**
+ * A passkey decision as the page sends it (REL051-SF1): the ceremony for this decision first, then
+ * `assertion` answering its challenge, signed by the authenticator whose credential ID it names (the
+ * first one made when none does). A refused ceremony ask is the answer.
+ */
 async function decideVia(
   h: Harness,
   approvalId: string,
@@ -768,15 +784,40 @@ async function decideVia(
   headers: Record<string, string> = {},
 ): Promise<Response> {
   const row = await h.source.get(approvalId);
-  return send(h.port, `/api/approvals/${approvalId}/${decision}`, {
+  const path = `/api/approvals/${approvalId}/${decision}`;
+  const base = {
+    ...h.page,
+    'X-AgentLink-Digest': row?.actionDigest ?? '0'.repeat(64),
+    ...headers,
+  };
+  const ask = await send(h.port, path, {
+    method: 'POST',
+    headers: { ...base, 'X-AgentLink-Presence': 'challenge' },
+  });
+  if (ask.status !== 200) return ask;
+  const ready = JSON.parse(ask.body) as { ceremony: string; publicKey: { challenge: string } };
+  const clientDataJSON = encodeUtf8(
+    JSON.stringify({
+      type: 'webauthn.get',
+      challenge: ready.publicKey.challenge,
+      origin: h.origin,
+      crossOrigin: false,
+    }),
+  );
+  const signer =
+    signers.find((s) => equalBytes(s.credentialId, assertion.credentialId)) ?? signers[0];
+  const signature =
+    signer === undefined
+      ? new Uint8Array(0)
+      : signer.sign(assertion.authenticatorData, clientDataJSON);
+  return send(h.port, path, {
     method: 'POST',
     headers: {
-      ...h.page,
-      'X-AgentLink-Digest': row?.actionDigest ?? '0'.repeat(64),
+      ...base,
       'X-AgentLink-Presence': 'passkey',
-      ...headers,
+      'X-AgentLink-Ceremony': ready.ceremony,
     },
-    body: encodePasskeyAssertion(assertion),
+    body: encodePayConfirmAssertion({ ...assertion, clientDataJSON, signature }),
   });
 }
 
@@ -802,7 +843,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
 
   it('HOTFIX-045-TOUCHID: says other_owner when the stored passkey is not the open agent owner', async () => {
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     expect((await registerVia(h, code, auth.create(owner.ownerNostr, salt))).status).toBe(200);
     const otherNostr = new Uint8Array(32).fill(7);
     (h.source as { context: ApprovalServerSource['context'] }).context = () =>
@@ -815,7 +856,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
 
   it('registers a PRF passkey and approves with it on that origin', async () => {
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     const reg = await registerVia(h, code, auth.create(owner.ownerNostr, salt));
     expect(reg.status).toBe(200);
     expect(JSON.parse(reg.body)).toEqual({ status: 'registered' });
@@ -848,7 +889,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
 
   it('rejects registration and decisions with any other Host value', async () => {
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     for (const host of [
       `127.0.0.1:${String(h.port)}`,
       `[::1]:${String(h.port)}`,
@@ -870,7 +911,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
 
   it('refuses an assertion made for another RP ID, or without UP or UV', async () => {
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     expect((await registerVia(h, code, auth.create(owner.ownerNostr, salt))).status).toBe(200);
     h.source.add(1);
     const good = auth.get(salt);
@@ -886,20 +927,27 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
         good.authenticatorData.slice(32),
       ),
     };
-    for (const bad of [otherRp, flags(0x04), flags(0x01), flags(0x00)]) {
+    // REL051-SF1: a signed gesture with UP but no UV is `verification_required` (never presence
+    // alone, as for a paid action); every other one is presence_rejected.
+    for (const [bad, word] of [
+      [otherRp, 'presence_rejected'],
+      [flags(0x04), 'presence_rejected'],
+      [flags(0x01), 'verification_required'],
+      [flags(0x00), 'presence_rejected'],
+    ] as const) {
       pastBackoff(h);
       const res = await decideVia(h, id(1), 'approve', bad);
       expect(res.status).toBe(403);
-      expect(JSON.parse(res.body)).toMatchObject({ status: 'presence_rejected' });
+      expect(JSON.parse(res.body)).toMatchObject({ status: word });
     }
     expect(h.source.applied).toEqual([]);
   });
 
   it('refuses a wrong credential: another passkey, another credential ID, another user', async () => {
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     expect((await registerVia(h, code, auth.create(owner.ownerNostr, salt))).status).toBe(200);
-    const other = new VirtualPrfAuthenticator();
+    const other = newAuth();
     other.create(owner.ownerNostr, salt);
     h.source.add(1);
     const cases: PasskeyAssertion[] = [
@@ -923,7 +971,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
 
   it('a PRF-less authenticator registers nothing and the master code still decides', async () => {
     const h = await harness();
-    const plain = new VirtualPrfAuthenticator({ prf: false });
+    const plain = newAuth({ prf: false });
     const reg = await registerVia(h, code, plain.create(owner.ownerNostr, salt));
     expect(reg.status).toBe(422);
     expect(JSON.parse(reg.body)).toEqual({ status: 'passkey_unsupported' });
@@ -944,17 +992,19 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
 
   it('refuses a passkey decision before any passkey is registered', async () => {
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     auth.create(owner.ownerNostr, salt);
     h.source.add(1);
+    // REL051-SF1: no passkey, no ceremony: the passkey path is refused before any gesture.
     const res = await decideVia(h, id(1), 'approve', auth.get(salt));
     expect(res.status).toBe(403);
-    expect(JSON.parse(res.body)).toMatchObject({ status: 'presence_rejected' });
+    expect(JSON.parse(res.body)).toMatchObject({ status: 'presence_required' });
+    expect(h.source.applied).toEqual([]);
   });
 
   it('registration needs the master code, and a second passkey is refused', async () => {
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     const wrong = await registerVia(
       h,
       'AAAA BBBB CCCC DDDD EEEE FFFF',
@@ -967,18 +1017,14 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
     expect(JSON.parse(none.body)).toEqual({ status: 'presence_required' });
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).toBeNull();
     expect((await registerVia(h, code, auth.create(owner.ownerNostr, salt))).status).toBe(200);
-    const second = await registerVia(
-      h,
-      code,
-      new VirtualPrfAuthenticator().create(owner.ownerNostr, salt),
-    );
+    const second = await registerVia(h, code, newAuth().create(owner.ownerNostr, salt));
     expect(second.status).toBe(409);
     expect(JSON.parse(second.body)).toEqual({ status: 'passkey_exists' });
   });
 
   it('refuses a registration without the page Origin, CSRF token or content type', async () => {
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     const make = (): PasskeyAssertion => auth.create(owner.ownerNostr, salt);
     expect((await registerVia(h, code, make(), { Origin: 'http://evil.example' })).status).toBe(
       403,
@@ -990,7 +1036,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
 
   it('emits fixed passkey events only', async () => {
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     await registerVia(h, code, auth.create(owner.ownerNostr, salt));
     expect(h.events).toContainEqual({ kind: 'passkey', outcome: 'registered' });
     const text = JSON.stringify(h.events);
@@ -1026,7 +1072,7 @@ describe('no owner-seed or PRF bytes on disk (04 §2.2, §8 rule 3)', () => {
     seen.seeds.length = 0;
     seen.prfs.length = 0;
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     const created = auth.create(owner.ownerNostr, salt);
     const prfCopy = created.prfOutput.slice();
     expect((await registerVia(h, code, created)).status).toBe(200);
@@ -1055,11 +1101,15 @@ describe('no owner-seed or PRF bytes on disk (04 §2.2, §8 rule 3)', () => {
 describe('the M1-8c same-user script with the passkey path enabled (10 M1-8, D-67)', () => {
   it('cannot approve or deny without the PRF output, even holding the session', async () => {
     const h = await harness();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = newAuth();
     expect((await registerVia(h, code, auth.create(owner.ownerNostr, salt))).status).toBe(200);
     const jobFile = join(root, 'passkey-job.json');
     const outFile = join(root, 'passkey-script-result.json');
-    const job = async (target: Harness, leakedPrf?: Uint8Array): Promise<void> => {
+    const job = async (
+      target: Harness,
+      leakedPrf?: Uint8Array,
+      leaked?: { path: string; digest: string; ceremony: string; body: string },
+    ): Promise<void> => {
       for (const n of [1, 2]) target.source.add(n);
       const rows = await Promise.all([1, 2].map((n) => target.source.get(id(n))));
       writeFileSync(
@@ -1077,6 +1127,7 @@ describe('the M1-8c same-user script with the passkey path enabled (10 M1-8, D-6
           approvals: rows.map((r) => ({ approvalId: r?.approvalId, digest: r?.actionDigest })),
           outFile,
           ...(leakedPrf === undefined ? {} : { leakedPrf: encodeBase64url(leakedPrf) }),
+          ...(leaked === undefined ? {} : { leaked }),
         }),
       );
     };
@@ -1105,15 +1156,49 @@ describe('the M1-8c same-user script with the passkey path enabled (10 M1-8, D-6
       auth.credentialId,
     );
 
-    // Harness control (not vacuous): the same script holding the PRF output does approve. It runs
-    // against a fresh server (same keychain and passkey), since the guesses above left this one in
-    // the M1-11a backoff; its clock steps past any backoff on every read, because the script tries
-    // its wrong guesses before the leaked PRF output.
-    const fresh = await harness(MAX_PRESENCE_BACKOFF_S * 1000 + 1);
-    await job(fresh, auth.get(salt).prfOutput);
+    // Harness control (not vacuous): the same script holding one real gesture's body, captured
+    // before it was used, does approve once; REL051-SF1: the same body sent again does not, and the
+    // leaked PRF output alone (without the passkey's signature) approves nothing. It runs against a
+    // fresh server (same keychain and passkey), since the guesses above left this one in the M1-11a
+    // backoff; the script sends the captured body before its own wrong guesses.
+    const fresh = await harness();
+    fresh.source.add(1);
+    const row = await fresh.source.get(id(1));
+    const path = `/api/approvals/${id(1)}/approve`;
+    const ask = await send(fresh.port, path, {
+      method: 'POST',
+      headers: {
+        ...fresh.page,
+        'X-AgentLink-Digest': row?.actionDigest ?? '',
+        'X-AgentLink-Presence': 'challenge',
+      },
+    });
+    const ready = JSON.parse(ask.body) as { ceremony: string; publicKey: { challenge: string } };
+    const got = auth.get(salt);
+    const clientDataJSON = encodeUtf8(
+      JSON.stringify({
+        type: 'webauthn.get',
+        challenge: ready.publicKey.challenge,
+        origin: fresh.origin,
+        crossOrigin: false,
+      }),
+    );
+    const live = encodePayConfirmAssertion({
+      ...got,
+      clientDataJSON,
+      signature: auth.sign(got.authenticatorData, clientDataJSON),
+    });
+    await job(fresh, auth.get(salt).prfOutput, {
+      path,
+      digest: row?.actionDigest ?? '',
+      ceremony: ready.ceremony,
+      body: encodeBase64url(live),
+    });
     const leaked = await run();
-    expect(leaked.attempts.some((a) => a.status === 200)).toBe(true);
-    expect(fresh.source.applied.length).toBeGreaterThan(0);
+    expect(leaked.attempts.filter((a) => a.status === 200).map((a) => a.name)).toEqual([
+      'leaked live gesture',
+    ]);
+    expect(fresh.source.applied).toHaveLength(1);
     for (const s of fresh.source.applied) expect(ownerSigValid(s.body, s.sig)).toBe(true);
   }, 120_000);
 });

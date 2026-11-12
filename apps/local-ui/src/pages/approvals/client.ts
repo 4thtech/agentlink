@@ -5,12 +5,13 @@
 // - GET /api/approvals, GET /api/approvals/<id>, GET /api/owner/passkey;
 // - POST /api/approvals/<id>/(approve|deny) with `X-AgentLink-Digest`, and POST /api/approvals/review
 //   with `X-AgentLink-Items` (`<id>:<digest>:a|d,…`). The body is the master code (octet-stream), or,
-//   with `X-AgentLink-Presence: passkey`, the assertion: credential ID, authenticator data, user
-//   handle and PRF output, each with a 16-bit length first.
+//   with `X-AgentLink-Presence: passkey` (REL051-SF1), the answer to the ceremony the server issued
+//   for exactly that request (api/presence-ceremony.ts): six fields, each with a 16-bit length first.
 //
 // The session token travels as `X-AgentLink-CSRF`. The browser never signs (D-118); the passkey is
 // asked only after the owner clicks (11 §6.2.1). The code and the assertion bytes are wiped after the
 // request and never logged. Paid approvals go through the confirmation sheet (pay-confirm), never here.
+import { browserCeremonyGesture, sendWithProof } from '../../api/presence-ceremony.js';
 
 /** What the card shows, built by the agent's runtime (approval-server.ts ApprovalDetails). */
 export interface ApprovalDetailsView {
@@ -103,27 +104,6 @@ function pageToken(): string {
   return document.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content') ?? '';
 }
 
-const fromB64 = (text: string): Uint8Array<ArrayBuffer> => {
-  const s = text.replace(/-/g, '+').replace(/_/g, '/');
-  const bin = atob(s + '='.repeat((4 - (s.length % 4)) % 4));
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
-};
-
-const bytesOf = (buffer: ArrayBuffer | null | undefined): Uint8Array =>
-  buffer ? new Uint8Array(buffer) : new Uint8Array(0);
-
-function fields(list: readonly Uint8Array[]): Uint8Array<ArrayBuffer> {
-  const out = new Uint8Array(list.reduce((n, f) => n + 2 + f.length, 0));
-  let at = 0;
-  for (const f of list) {
-    out[at] = f.length >> 8;
-    out[at + 1] = f.length & 255;
-    out.set(f, at + 2);
-    at += 2 + f.length;
-  }
-  return out;
-}
-
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 const str = (v: unknown): v is string => typeof v === 'string';
@@ -168,42 +148,38 @@ function itemOf(v: unknown): ApprovalItem | undefined {
 }
 
 /**
- * One gesture with this page's own challenge: the four-field decision assertion (M1-8e). Shared with
- * the Inbox's Save (W4-FILES-SAVE), whose owner route takes the same body. Undefined when there is
- * no credentials container or the prompt was dismissed.
+ * One owner request with the master code, or the passkey through its ceremony (REL051-SF1,
+ * api/presence-ceremony.ts): the server's challenge for exactly this request, one gesture, then the
+ * six fields. Shared with the Inbox's Save (W4-FILES-SAVE). `dismissed` when the prompt was closed
+ * (nothing was sent); otherwise the answer, or undefined when the server could not be reached.
  */
-export async function passkeyAssertion(
+export async function sendWithPresence(
+  doFetch: typeof fetch,
   container: CredentialsContainer | undefined,
-  passkey: DecisionPasskey,
-): Promise<Uint8Array<ArrayBuffer> | undefined> {
-  if (container === undefined) return undefined;
-  const challenge = new Uint8Array(32);
-  globalThis.crypto.getRandomValues(challenge);
-  let credential: Credential | null;
+  path: string,
+  headers: Headers,
+  presence: { readonly kind: 'code'; readonly code: string } | { readonly kind: 'passkey' },
+): Promise<Response | 'dismissed' | undefined> {
+  let dismissed = false;
   try {
-    credential = await container.get({
-      publicKey: {
-        challenge,
-        rpId: 'localhost',
-        allowCredentials: [{ type: 'public-key', id: fromB64(passkey.credentialId) }],
-        userVerification: 'required',
-        timeout: 120000,
-        extensions: {
-          prf: { eval: { first: fromB64(passkey.prfSalt) } },
-        } as AuthenticationExtensionsClientInputs,
-      },
-    });
+    return await sendWithProof(
+      doFetch,
+      path,
+      headers,
+      presence.kind === 'code'
+        ? presence
+        : {
+            kind: 'passkey',
+            gesture: async (publicKey) => {
+              const body = await browserCeremonyGesture(publicKey, container);
+              if (body === undefined) dismissed = true;
+              return body;
+            },
+          },
+    ).then((res) => (dismissed ? 'dismissed' : res));
   } catch {
     return undefined;
   }
-  if (credential === null) return undefined;
-  const c = credential as PublicKeyCredential;
-  const r = c.response as AuthenticatorAssertionResponse;
-  const ext = c.getClientExtensionResults() as { prf?: { results?: { first?: ArrayBuffer } } };
-  const prf = bytesOf(ext.prf?.results?.first);
-  const body = fields([bytesOf(c.rawId), bytesOf(r.authenticatorData), bytesOf(r.userHandle), prf]);
-  prf.fill(0);
-  return body;
 }
 
 export function createApprovalsClient(options: ApprovalsClientOptions = {}): ApprovalsClient {
@@ -235,20 +211,23 @@ export function createApprovalsClient(options: ApprovalsClientOptions = {}): App
   async function post(
     path: string,
     headers: Record<string, string>,
-    body: Uint8Array<ArrayBuffer>,
+    presence: Presence,
   ): Promise<DecideAnswer> {
+    const sent = await sendWithPresence(
+      doFetch,
+      credentials(),
+      path,
+      new Headers({
+        [CSRF_HEADER]: token(),
+        'Content-Type': 'application/octet-stream',
+        ...headers,
+      }),
+      presence,
+    );
+    if (sent === 'dismissed') return { kind: 'dismissed' };
+    if (sent === undefined) return { kind: 'offline' };
     try {
-      const res = await doFetch(path, {
-        method: 'POST',
-        headers: {
-          [CSRF_HEADER]: token(),
-          'Content-Type': 'application/octet-stream',
-          ...headers,
-        },
-        body,
-        credentials: 'same-origin',
-        cache: 'no-store',
-      });
+      const res = sent;
       const json = (await res.json()) as unknown;
       if (!isObject(json) || !str(json['status'])) return { kind: 'status', status: 'refused' };
       return {
@@ -259,25 +238,7 @@ export function createApprovalsClient(options: ApprovalsClientOptions = {}): App
       };
     } catch {
       return { kind: 'offline' };
-    } finally {
-      body.fill(0);
     }
-  }
-
-  const assertion = (passkey: DecisionPasskey): Promise<Uint8Array<ArrayBuffer> | undefined> =>
-    passkeyAssertion(credentials(), passkey);
-
-  /** The body and headers for the owner's presence; undefined when the prompt was dismissed. */
-  async function presenceBody(
-    presence: Presence,
-  ): Promise<{ body: Uint8Array<ArrayBuffer>; headers: Record<string, string> } | undefined> {
-    if (presence.kind === 'code') {
-      return { body: Uint8Array.from(new TextEncoder().encode(presence.code)), headers: {} };
-    }
-    const body = await assertion(presence.passkey);
-    return body === undefined
-      ? undefined
-      : { body, headers: { 'X-AgentLink-Presence': 'passkey' } };
   }
 
   return {
@@ -321,12 +282,10 @@ export function createApprovalsClient(options: ApprovalsClientOptions = {}): App
 
     async decide(item, decision, presence) {
       if (!APPROVAL_ID.test(item.approvalId)) return { kind: 'status', status: 'refused' };
-      const p = await presenceBody(presence);
-      if (p === undefined) return { kind: 'dismissed' };
       return post(
         `/api/approvals/${item.approvalId}/${decision}`,
-        { 'X-AgentLink-Digest': item.actionDigest, ...p.headers },
-        p.body,
+        { 'X-AgentLink-Digest': item.actionDigest },
+        presence,
       );
     },
 
@@ -337,9 +296,7 @@ export function createApprovalsClient(options: ApprovalsClientOptions = {}): App
             `${p.item.approvalId}:${p.item.actionDigest}:${p.decision === 'approve' ? 'a' : 'd'}`,
         )
         .join(',');
-      const p = await presenceBody(presence);
-      if (p === undefined) return { kind: 'dismissed' };
-      return post('/api/approvals/review', { 'X-AgentLink-Items': items, ...p.headers }, p.body);
+      return post('/api/approvals/review', { 'X-AgentLink-Items': items }, presence);
     },
   };
 }

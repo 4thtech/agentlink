@@ -4,12 +4,17 @@
 //
 // The browser never signs and never sees what is signed. A confirm sends the review token and the
 // acknowledged warning codes (base64url JSON in `X-AgentLink-Input`) and the owner's presence in the
-// body: the passkey assertion (credential ID, authenticator data, user handle and PRF output, each
-// after a 16-bit big-endian length, `X-AgentLink-Presence: passkey`), or the master code as UTF-8.
+// body: the passkey answering the ceremony the server issued for exactly that request (REL051-SF1,
+// api/presence-ceremony.ts; `X-AgentLink-Presence: passkey`), or the master code as UTF-8.
 // The server checks presence, then signs. Bodies, the token and the master code are never logged.
 //
 // MSG-FILES-IO-h: `reveal` (Show in Finder, D-134) needs no presence: an octet-stream POST whose
 // body is only `{"id":"<item ID>"}`. Never a file name or a path; the server finds the file itself.
+import {
+  browserCeremonyGesture,
+  sendWithProof,
+  type CeremonyGesture,
+} from '../../api/presence-ceremony.js';
 import { REVEAL_PATH } from './io-api.js';
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
@@ -31,7 +36,7 @@ export interface PasskeyInfo {
 }
 
 export type Presence =
-  | { readonly kind: 'passkey'; readonly body: Uint8Array }
+  | { readonly kind: 'passkey'; readonly gesture: CeremonyGesture }
   | { readonly kind: 'code'; readonly code: string };
 
 /** MSG-FILES-IO-h: what Show in Finder came to, as the page explains it (io-strings.ts). */
@@ -75,14 +80,6 @@ function toBase64url(bytes: Uint8Array): string {
   let bin = '';
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function fromBase64url(text: string): Uint8Array<ArrayBuffer> {
-  const b64 = text.replace(/-/g, '+').replace(/_/g, '/');
-  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
-  return out;
 }
 
 /** Each field after its 16-bit big-endian length (the server's passkey body). */
@@ -166,10 +163,21 @@ export function createFilesApi(options: FilesApiOptions = {}): FilesApi {
         'content-type': 'application/octet-stream',
         'X-AgentLink-Input': toBase64url(new TextEncoder().encode(JSON.stringify(input))),
       });
-      if (presence.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-      const body =
-        presence.kind === 'passkey' ? presence.body : new TextEncoder().encode(presence.code);
-      const answer = await call(path, { method: 'POST', headers, body: body as BodyInit });
+      if (!path.startsWith('/api/') || path.startsWith('//')) throw new Error('api path');
+      let answer: Answer;
+      try {
+        // REL051-SF1: the passkey answers a ceremony for exactly this request.
+        const res = await sendWithProof(doFetch, path, headers, presence);
+        let json: unknown;
+        try {
+          json = await res.json();
+        } catch {
+          json = undefined;
+        }
+        answer = { kind: 'answer', status: res.status, json };
+      } catch {
+        answer = { kind: 'offline' };
+      }
       if (answer.kind === 'offline') return { kind: 'offline' };
       const json = isObject(answer.json) ? answer.json : {};
       if (answer.status === 200 && json['status'] === 'applied') {
@@ -223,61 +231,21 @@ export function passkeysAvailable(): boolean {
   );
 }
 
-interface PrfResults {
-  readonly prf?: { readonly results?: { readonly first?: ArrayBuffer | ArrayBufferView } };
-}
-
-function bytesOf(value: ArrayBuffer | ArrayBufferView | null | undefined): Uint8Array {
-  if (value === undefined || value === null) return new Uint8Array(0);
-  if (value instanceof ArrayBuffer) return new Uint8Array(value.slice(0));
-  return new Uint8Array(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength));
-}
-
 /**
- * One passkey gesture for the stored localhost passkey, after the owner's click: the assertion body
- * for the server, or why there is none. The challenge is random: the server checks the PRF output
- * against the owner key, not the challenge (M1-8e).
+ * The passkey for one confirm, after the owner's click. REL051-SF1: the gesture runs when the
+ * request is sent, for the challenge the server issued for exactly that request
+ * (api/presence-ceremony.ts); `not_used` when this browser can't use a passkey at all.
  */
-export async function passkeyPresence(
+export function passkeyPresence(
   info: PasskeyInfo,
-): Promise<{ readonly kind: 'ok'; readonly body: Uint8Array } | { readonly kind: 'not_used' }> {
+): { readonly kind: 'ok'; readonly gesture: CeremonyGesture } | { readonly kind: 'not_used' } {
   if (!passkeysAvailable()) return { kind: 'not_used' };
-  const challenge = new Uint8Array(32);
-  crypto.getRandomValues(challenge);
-  let credential: Credential | null;
-  try {
-    credential = await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        rpId: 'localhost',
-        allowCredentials: [{ type: 'public-key', id: fromBase64url(info.credentialId) }],
-        userVerification: 'required',
-        timeout: 120_000,
-        extensions: {
-          prf: { eval: { first: fromBase64url(info.prfSalt) } },
-        } as AuthenticationExtensionsClientInputs,
-      },
-    });
-  } catch {
-    return { kind: 'not_used' };
-  }
-  if (credential === null || !(credential instanceof PublicKeyCredential)) {
-    return { kind: 'not_used' };
-  }
-  const response = credential.response as AuthenticatorAssertionResponse;
-  const prf = bytesOf((credential.getClientExtensionResults() as PrfResults).prf?.results?.first);
-  try {
-    if (prf.length === 0) return { kind: 'not_used' };
-    return {
-      kind: 'ok',
-      body: encodeFields([
-        new Uint8Array(credential.rawId),
-        new Uint8Array(response.authenticatorData),
-        bytesOf(response.userHandle),
-        prf,
-      ]),
-    };
-  } finally {
-    prf.fill(0);
-  }
+  // Only for the passkey the page offered: a ceremony naming another one is not answered.
+  return {
+    kind: 'ok',
+    gesture: (publicKey) =>
+      publicKey.allowCredentials.includes(info.credentialId)
+        ? browserCeremonyGesture(publicKey)
+        : Promise.resolve(undefined),
+  };
 }

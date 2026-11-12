@@ -57,7 +57,8 @@ function server(routes: Record<string, Handler>): { calls: Call[]; fetch: typeof
       url,
       method: init?.method ?? 'GET',
       headers: new Headers(init?.headers),
-      body: init?.body,
+      // A copy, as the server reads it: the page wipes the presence bytes once sent.
+      body: init?.body instanceof Uint8Array ? init.body.slice() : init?.body,
     };
     calls.push(call);
     let found = routes[`${call.method} ${url}`] ?? routes[url];

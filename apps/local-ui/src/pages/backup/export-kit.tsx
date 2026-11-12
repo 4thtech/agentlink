@@ -232,7 +232,7 @@ export function ExportKit({
   const submit = (proof: PresenceProof): void => {
     setPhase({ kind: 'working' });
     setNote(undefined);
-    const presence = proof.kind === 'code' ? proof.code : { passkey: proof.body };
+    const presence = proof.kind === 'code' ? proof.code : { passkey: proof.gesture };
     void api.owner(BACKUP_EXPORT_PATH, {}, presence).then(
       (result) => {
         const outcome = exportOutcomeOf(result);

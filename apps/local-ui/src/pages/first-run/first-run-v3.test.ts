@@ -208,7 +208,11 @@ async function mount(
       passkeysAvailable: () => true,
       platform: 'mac',
       prfSupport: () => Promise.resolve('yes'),
-      passkeyProof: () => Promise.resolve({ kind: 'passkey', body: new Uint8Array([1, 2, 3]) }),
+      passkeyProof: () =>
+        Promise.resolve({
+          kind: 'passkey',
+          gesture: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+        }),
       goHome: home,
       readJoin: () => Promise.resolve({ kind: 'failed' }),
       ...extra,
@@ -805,14 +809,36 @@ describe('U3-g: the clients speak what the server parses', () => {
     const apps = createAppsApi({
       token: 't',
       fetch: (_path, init) => {
-        seen.push(new Headers(init?.headers));
+        const headers = new Headers(init?.headers);
+        seen.push(headers);
+        // REL051-SF1: the ceremony ask is answered with a challenge.
+        if (headers.get('X-AgentLink-Presence') === 'challenge') {
+          return Promise.resolve(
+            json(200, {
+              status: 'ready',
+              ceremony: 'C'.repeat(22),
+              publicKey: {
+                rpId: 'localhost',
+                challenge: 'AAEC',
+                allowCredentials: ['AQID'],
+                timeoutMs: 120000,
+                prfSalt: 'BAUG',
+              },
+            }),
+          );
+        }
         return Promise.resolve(json(status, body));
       },
     });
-    const proof: PresenceProof = { kind: 'passkey', body: new Uint8Array([1, 2, 3]) };
+    const proof: PresenceProof = {
+      kind: 'passkey',
+      gesture: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+    };
     expect(await apps.apply('b'.repeat(64), proof)).toEqual({ kind: 'done' });
-    const sent = seen[0];
+    expect(seen[0]?.get('X-AgentLink-Presence')).toBe('challenge');
+    const sent = seen[1];
     expect(sent?.get('X-AgentLink-Presence')).toBe('passkey');
+    expect(sent?.get('X-AgentLink-Ceremony')).toBe('C'.repeat(22));
     expect(sent?.get('content-type')).toBe('application/octet-stream');
     expect(atob((sent?.get('X-AgentLink-Input') ?? '').replace(/-/g, '+').replace(/_/g, '/'))).toBe(
       JSON.stringify({ changeId: 'b'.repeat(64) }),
