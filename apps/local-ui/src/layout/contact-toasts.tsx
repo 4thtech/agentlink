@@ -6,7 +6,7 @@
 // (I-5). A toast closes itself after a few seconds (longer with an action), or with its close; at
 // most three show, newest last.
 import { ToastStack, type ToastItem } from '@4thtech-io/ui';
-import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { subscribeContactChanges, type ContactChange } from '../api/contact-changes.js';
 import { INTERIM_PEOPLE_PATH } from '../nav.js';
 import { subscribeToasts } from '../notices/index.js';
@@ -30,6 +30,13 @@ export interface ContactToastsProps {
 
 let seq = 0;
 
+/**
+ * Another ID opening mounts the whole shell again (router.tsx, W4-SHELL), toast stack included: the
+ * toasts on screen at that moment are handed to the next mount, in the same commit, so an outcome
+ * ("{label} was removed.") is still read. Cleared right after, so nothing lingers.
+ */
+let handOver: readonly ToastItem[] = [];
+
 function contactToast(change: ContactChange): ToastItem {
   seq += 1;
   return {
@@ -50,12 +57,21 @@ export function ContactToasts({
     [],
   );
 
+  const live = useRef<readonly ToastItem[]>(shown);
+  live.current = shown;
+
   useEffect(() => {
+    for (const item of handOver) add(item);
+    handOver = [];
     const offContacts = subscribe((change) => add(contactToast(change)));
     const offNotices = subscribeNotices(add);
     return () => {
       offContacts();
       offNotices();
+      handOver = live.current;
+      setTimeout(() => {
+        handOver = [];
+      }, 0);
     };
     // One subscription per mount.
   }, []);
