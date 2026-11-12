@@ -381,7 +381,12 @@ async function readSavedFile(
   }
   if (name.startsWith('.') || !Number.isSafeInteger(maxBytes) || maxBytes < 0) return undefined;
   if (!(await dir.stillSame())) return undefined;
-  const handle = await open(target, constants.O_RDONLY | noFollow).catch(() => undefined);
+  // IR-REL051-A12-1 L1: only a regular file is opened, and never blocking, so a FIFO or a device
+  // planted under the saved name can neither hang the read nor be read.
+  const before = await lstat(target).catch(() => undefined);
+  if (before === undefined || !before.isFile()) return undefined;
+  const noBlock = (constants as { O_NONBLOCK?: number }).O_NONBLOCK ?? 0;
+  const handle = await open(target, constants.O_RDONLY | noFollow | noBlock).catch(() => undefined);
   if (handle === undefined) return undefined;
   try {
     const opened = await handle.stat();

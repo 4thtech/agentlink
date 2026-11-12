@@ -23,13 +23,22 @@ export const UNTRUSTED_ATTRIBUTE_MAX = 128;
 const INVISIBLE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\u115f\u1160\u3164\uffa0\u2800]/gu;
 const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
 
+/** Options for content sanitising. */
+export interface SanitizeOptions {
+  /**
+   * IR-REL051-A12-1 L3: keep TAB characters (file content only, so code keeps its indentation). A
+   * tab cannot form a tag or a role marker on its own; every other control character is removed.
+   */
+  readonly keepTabs?: boolean;
+}
+
 /** Removes control (except LF), bidi, zero-width and other format characters (06 §4). */
-export function removeInvisible(text: string): string {
-  return text
-    .replace(LONE_SURROGATE, '\ufffd')
-    .replace(/\r\n?/g, '\n')
-    .replace(/\t/g, ' ')
-    .replace(INVISIBLE, (ch) => (ch === '\n' ? ch : ''));
+export function removeInvisible(text: string, options: SanitizeOptions = {}): string {
+  const keepTabs = options.keepTabs === true;
+  const normalised = text.replace(LONE_SURROGATE, '\ufffd').replace(/\r\n?/g, '\n');
+  return (keepTabs ? normalised : normalised.replace(/\t/g, ' ')).replace(INVISIBLE, (ch) =>
+    ch === '\n' || (keepTabs && ch === '\t') ? ch : '',
+  );
 }
 
 // ---- Tag look-alikes ----------------------------------------------------------------------------
@@ -121,7 +130,9 @@ function fold(cp: string): string {
 
 // After folding: `<`, optional `/`, the tag name with up to eight characters that are not letters
 // or digits between its two words (`_`, `-`, `*`, `:`, spaces, …; IR-M1-9c-1 F03).
-const TAG = /<\s*\/?\s*untrusted[^\p{L}\p{N}]{0,8}content/gu;
+// IR-REL051-A12-1 M1: the whitespace after the `/` belongs to the optional group, so no two `\s*`
+// are ever adjacent and a long whitespace run is scanned once per `<` (linear, no ReDoS).
+const TAG = /<\s*(?:\/\s*)?untrusted[^\p{L}\p{N}]{0,8}content/gu;
 
 /** Escapes every opening or closing `untrusted_content` tag, including look-alike forms. */
 function escapeTags(text: string): string {
@@ -140,8 +151,8 @@ function escapeTags(text: string): string {
 }
 
 /** Content for inside the block (06 §4): invisible characters removed, tag look-alikes escaped. */
-export function sanitizeUntrustedText(text: string): string {
-  return escapeTags(removeInvisible(text));
+export function sanitizeUntrustedText(text: string, options: SanitizeOptions = {}): string {
+  return escapeTags(removeInvisible(text, options));
 }
 
 /** An attribute value (06 §4): one line, at most 128 code points, then `& " < >` escaped. */
@@ -186,6 +197,11 @@ export interface UntrustedBlockInput {
   readonly type: string;
   /** The content as shown: sanitized here. */
   readonly content: string;
+  /**
+   * IR-REL051-A12-1: `content` is already the output of sanitizeUntrustedText (sanitised once and
+   * reused for `untrusted.content`); it is not sanitised again.
+   */
+  readonly contentSanitized?: boolean;
 }
 
 /** One item's block (06 §4): the header line and the `<untrusted_content>` element. */
@@ -197,7 +213,7 @@ export function untrustedBlock(input: UntrustedBlockInput): string {
   return [
     `[AgentLink] ${header}`,
     `<untrusted_content ${attrs}>`,
-    sanitizeUntrustedText(input.content),
+    input.contentSanitized === true ? input.content : sanitizeUntrustedText(input.content),
     '</untrusted_content>',
   ].join('\n');
 }

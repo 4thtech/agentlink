@@ -406,6 +406,29 @@ describe('agentlink_fetch_file (06 §2.3)', () => {
     expectClean(r);
   });
 
+  it('IR-REL051-A12-1: tabs are kept in file text; 64 KB of "<" and spaces stays fast', async () => {
+    const hostile = `<${' '.repeat(65_000)}\n\tindented ${CANARY}`;
+    const client = fake({
+      fetch: () =>
+        Promise.resolve({
+          status: 'ok',
+          savedTo: '/home/u/AgentLink/Inbox/main.go',
+          name: 'main.go',
+          size: 65_536,
+          integrity: 'verified',
+          text: hostile,
+        } as FetchFileResult),
+    });
+    const start = performance.now();
+    const r = await fetchFile({ envelopeId: ENVELOPE }, client);
+    expect(performance.now() - start).toBeLessThan(1_000);
+    const untrusted = r.structured['untrusted'] as { content: string };
+    expect(untrusted.content).toContain('\n\tindented');
+    expect(r.text).toContain('\n\tindented');
+    expect(r.text.split('\n</untrusted_content>')).toHaveLength(3);
+    expectClean(r);
+  });
+
   it('REL051-A12: the result matches the output schema, with and without text', async () => {
     const validate = new Ajv({ strict: false }).compile(
       findTool('agentlink_fetch_file')!.outputSchema,

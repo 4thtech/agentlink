@@ -13,6 +13,7 @@ import {
   symlink,
   writeFile,
 } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { encodeHex, sha256 } from '@4thtech-io/crypto';
@@ -174,6 +175,19 @@ describe('nodeFilesPlatform', () => {
     }
     await inbox.close?.();
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'IR-REL051-A12-1 L1 readSaved: a FIFO under the saved name never hangs and is never read',
+    async () => {
+      const platform = nodeFilesPlatform({ home, drop: false });
+      const inbox = await platform.inbox('~/AgentLink/Inbox');
+      execFileSync('mkfifo', [path.join(inbox.realpath, 'pipe.md')]);
+      const start = Date.now();
+      expect(await inbox.readSaved?.('pipe.md', 64)).toBeUndefined();
+      expect(Date.now() - start).toBeLessThan(2_000);
+      await inbox.close?.();
+    },
+  );
 
   it('with drop: false there is no drop; by default the drop is configured', () => {
     expect(nodeFilesPlatform({ home, drop: false }).drop).toBeUndefined();

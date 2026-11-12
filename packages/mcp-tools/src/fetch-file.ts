@@ -119,7 +119,11 @@ export async function fetchFileHandler(
   switch (result.status) {
     case 'ok': {
       // The text only when the core returned it (it checked kind, size and both hashes).
-      const content = typeof result.text === 'string' ? result.text : undefined;
+      // Sanitised once (IR-REL051-A12-1 M1), tabs kept for code (L3), reused for both outputs.
+      const content =
+        typeof result.text === 'string'
+          ? sanitizeUntrustedText(result.text, { keepTabs: true })
+          : undefined;
       logger.info('file fetched', { size: result.size, text: content !== undefined });
       const summary = content === undefined ? FETCH_FILE_TEXT.saved : FETCH_FILE_TEXT.savedWithText;
       const output = ok(summary, {
@@ -128,9 +132,7 @@ export async function fetchFileHandler(
         size: result.size,
         integrity: result.integrity,
         kind: fileKindOf(result.name),
-        ...(content === undefined
-          ? {}
-          : { untrusted: { content: sanitizeUntrustedText(content) } }),
+        ...(content === undefined ? {} : { untrusted: { content } }),
       });
       const blocks = [
         untrustedBlock({
@@ -149,6 +151,7 @@ export async function fetchFileHandler(
                 envelope: envelopeId,
                 type: 'file',
                 content,
+                contentSanitized: true,
               }),
             ]),
       ];
