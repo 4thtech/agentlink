@@ -24,6 +24,7 @@ import {
   type Summary,
 } from './api.js';
 import { emptyGroups, codeOf } from './code-field.js';
+import { setOutcome, useOutcome } from './outcome.js';
 import { canRestoreHere, createRestorePasskey, getRestorePrf } from './passkey.js';
 import {
   CheckedStep,
@@ -48,7 +49,6 @@ type View =
   | { readonly k: 'code' }
   | { readonly k: 'checked'; readonly summary: Summary }
   | { readonly k: 'review' }
-  | { readonly k: 'protect' }
   | { readonly k: 'terminal' };
 
 export interface RestoreWizardProps {
@@ -77,7 +77,7 @@ const stepOf = (view: View): StepId =>
         ? 'code'
         : view.k === 'review'
           ? 'review'
-          : 'protect';
+          : 'review';
 
 function problemText(f: Failure): string {
   if (f.problem === 'wait' && f.retryAfter !== undefined) return CODE.wait(f.retryAfter);
@@ -100,6 +100,7 @@ export function RestoreWizard({
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const sensor = SENSOR[platform];
 
+  const outcome = useOutcome();
   const [view, setView] = useState<View>({ k: 'kit' });
   const [kits, setKits] = useState<readonly FoundKit[] | undefined>(undefined);
   const [choice, setChoice] = useState<string | undefined>(undefined);
@@ -114,10 +115,6 @@ export function RestoreWizard({
   const [kitHandle, setKitHandle] = useState<string | undefined>(undefined);
   const [summary, setSummary] = useState<Summary | undefined>(undefined);
   const [review, setReview] = useState<ReviewState>({ selected: new Set(), names: {} });
-  const [restored, setRestored] = useState<string[]>([]);
-  const [failed, setFailed] = useState<string[]>([]);
-  const [masterCode, setMasterCode] = useState<string | undefined>(undefined);
-  const [touchId, setTouchId] = useState(false);
   const [saved, setSaved] = useState(false);
   const [apps, setApps] = useState<readonly DetectedApp[] | undefined>(undefined);
   const [connecting, setConnecting] = useState<string | undefined>(undefined);
@@ -157,9 +154,6 @@ export function RestoreWizard({
     }
   }, [waiting, waitUntil]);
 
-  // The master code never outlives this page.
-  useEffect(() => () => setMasterCode(undefined), []);
-
   const savedAt = picked?.savedAt ?? kits?.find((k) => k.handle === choice)?.modifiedAt;
 
   const fail = (f: Failure, hint?: string): void => {
@@ -173,7 +167,7 @@ export function RestoreWizard({
 
   const leave = useCallback(
     (to: string): void => {
-      setMasterCode(undefined);
+      setOutcome(undefined);
       onLeave(to);
     },
     [onLeave],
@@ -284,13 +278,15 @@ export function RestoreWizard({
     code: string | undefined,
     withTouchId: boolean,
   ): void => {
-    setRestored(ids.filter((i) => i.outcome === 'restored').map((i) => i.name));
-    setFailed(ids.filter((i) => i.outcome === 'failed').map((i) => i.name));
-    setMasterCode(code);
-    setTouchId(withTouchId);
+    setOutcome({
+      restored: ids.filter((i) => i.outcome === 'restored').map((i) => i.name),
+      failed: ids.filter((i) => i.outcome === 'failed').map((i) => i.name),
+      masterCode: code,
+      touchId: withTouchId,
+      kitDate: summary?.createdAt,
+    });
     setSaved(false);
     setKitHandle(undefined);
-    setView({ k: 'protect' });
   };
 
   const restore = async (): Promise<void> => {
@@ -338,19 +334,60 @@ export function RestoreWizard({
     void appsApi.list().then((r) => setApps(r.kind === 'ok' ? r.apps : []));
   }, [appsApi]);
   useEffect(() => {
-    if (view.k === 'protect') lookForApps();
-  }, [view.k, lookForApps]);
+    if (outcome !== undefined) lookForApps();
+  }, [outcome, lookForApps]);
 
   // --- render ---------------------------------------------------------------------------------
 
   const eyebrow = check ? WIZARD.eyebrowCheck : WIZARD.eyebrow;
-  const frame = (children: ReactElement): ReactElement => (
-    <Frame step={stepOf(view)} check={check} onCancel={cancel}>
+  const frame = (children: ReactElement, step: StepId = stepOf(view)): ReactElement => (
+    <Frame step={step} check={check} onCancel={cancel}>
       {children}
     </Frame>
   );
   const shownError = waiting > 0 ? CODE.wait(waiting) : error;
 
+  if (outcome !== undefined) {
+    // The restore is done; this survives the page being mounted again for the ID that opened.
+    const first = outcome.restored[0] ?? '';
+    return frame(
+      <ProtectStep
+        restored={outcome.restored}
+        failed={outcome.failed}
+        masterCode={outcome.masterCode}
+        sensor={sensor}
+        touchId={outcome.touchId}
+        savedDate={outcome.kitDate === undefined ? '' : formatDate(outcome.kitDate)}
+        apps={apps}
+        idName={first}
+        connecting={connecting}
+        onConnect={setConnecting}
+        connectView={
+          connecting === undefined || apps === undefined ? null : (
+            <ConnectApp
+              appsApi={appsApi}
+              appId={connecting}
+              appName={apps.find((a) => a.id === connecting)?.name ?? ''}
+              folder={first}
+              agentLabel={first}
+              sensor={sensor}
+              passkeyProof={passkeyProof}
+              onDone={() => {
+                setConnecting(undefined);
+                lookForApps();
+              }}
+              onConnected={() => lookForApps()}
+            />
+          )
+        }
+        saved={saved}
+        onSaved={setSaved}
+        onHome={() => leave('/')}
+        storage={false}
+      />,
+      'protect',
+    );
+  }
   switch (view.k) {
     case 'kit':
       return frame(
@@ -445,45 +482,6 @@ export function RestoreWizard({
           }}
         />,
       );
-    case 'protect': {
-      const first = restored[0] ?? '';
-      return frame(
-        <ProtectStep
-          restored={restored}
-          failed={failed}
-          masterCode={masterCode}
-          sensor={sensor}
-          touchId={touchId}
-          savedDate={summary === undefined ? '' : formatDate(summary.createdAt)}
-          apps={apps}
-          idName={first}
-          connecting={connecting}
-          onConnect={setConnecting}
-          connectView={
-            connecting === undefined || apps === undefined ? null : (
-              <ConnectApp
-                appsApi={appsApi}
-                appId={connecting}
-                appName={apps.find((a) => a.id === connecting)?.name ?? ''}
-                folder={first}
-                agentLabel={first}
-                sensor={sensor}
-                passkeyProof={passkeyProof}
-                onDone={() => {
-                  setConnecting(undefined);
-                  lookForApps();
-                }}
-                onConnected={() => lookForApps()}
-              />
-            )
-          }
-          saved={saved}
-          onSaved={setSaved}
-          onHome={() => leave('/')}
-          storage={false}
-        />,
-      );
-    }
   }
 }
 

@@ -11,6 +11,7 @@ import type { OwnerClient } from '../contacts/owner.js';
 import type { RestoreApi, Summary } from './api.js';
 import { clean, toGroups } from './code-field.js';
 import { RestoreWizard } from './index.js';
+import { setOutcome } from './outcome.js';
 import * as S from './strings.js';
 
 const cssFiles = import.meta.glob<string>('./restore.css', {
@@ -71,6 +72,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   act(() => root.unmount());
+  setOutcome(undefined);
   host.remove();
   vi.useRealTimers();
 });
@@ -551,6 +553,15 @@ describe('step 4: protect and reconnect', () => {
       box.click();
     });
     expect(button(S.PROTECT.home)?.disabled).toBe(false);
+  });
+
+  it('survives the page being mounted again for the ID that opened (step 4 keeps its result)', async () => {
+    await newComputer();
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount(fakeApi());
+    expect(text()).toContain(S.PROTECT.codeTitle);
+    expect(host.querySelector('[data-master-code]')?.textContent).toBe(MASTER);
   });
 
   it('prints from memory: only a print-sheet node, no download', async () => {

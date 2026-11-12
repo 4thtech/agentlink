@@ -792,9 +792,11 @@ export interface ProtectStepProps {
 
 function Code({
   code,
+  body,
   onPrint,
 }: {
   readonly code: string;
+  readonly body: string;
   readonly onPrint: () => void;
 }): ReactElement {
   const [copied, setCopied] = useState<'no' | 'yes' | 'failed'>('no');
@@ -809,6 +811,7 @@ function Code({
       <p className="rs-secret-val" data-master-code="">
         {code}
       </p>
+      <p>{body}</p>
       <div className="rs-actions">
         <Button
           icon={copied === 'yes' ? 'check' : 'copy'}
@@ -850,8 +853,11 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
         <Banner tone="success">{PROTECT.unchanged(p.sensor)}</Banner>
       ) : (
         <div className="rs-secret">
-          <Code code={code} onPrint={() => window.print()} />
-          <p>{p.touchId ? PROTECT.codeBody(p.sensor) : PROTECT.codeBodyNoSensor}</p>
+          <Code
+            code={code}
+            body={p.touchId ? PROTECT.codeBody(p.sensor) : PROTECT.codeBodyNoSensor}
+            onPrint={() => window.print()}
+          />
           <label className="rs-saved">
             <input
               type="checkbox"
