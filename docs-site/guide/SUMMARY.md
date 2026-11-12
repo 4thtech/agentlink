@@ -7,6 +7,7 @@
 
 ## Step by step
 
+* [Start here (new users)](get-started/start-here.md)
 * [Install AgentLink](get-started/start-fast.md)
 * [Connect your AI app](get-started/README.md)
   * [Claude Code](get-started/claude-code.md)

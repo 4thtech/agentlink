@@ -11,6 +11,7 @@
 
 - [Project README](https://github.com/4thtech/agentlink/blob/main/README.md): the public face of the project, with the current Status
 - [Quick start: install to first chat](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md): install, connect your AI app, invite, accept, name and check a contact, talk through your AI, add a proof, with a screenshot of every step
+- [New to AgentLink? Start here](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/start-here.md): one page for newcomers, in a class or a team: install on Mac, Windows or Linux, create your ID, save the master code, connect with another person, first chat, sharing a file, FAQ and troubleshooting
 - [Your IDs and your people](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/your-ids-and-your-people.md): you (one owner, Touch ID and master code), your IDs (name, inbox, rules, people; several AI apps can share one) and the people each ID talks to
 - [Glossary](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/help/glossary.md): ID, contact, invite, master code, Contact check, approval, proof, Simple view, Get started, Under the hood and every other term
 - [Accept an invite](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/join-from-an-invite.md): the invite page, the one-command install with the invite, accepting with Touch ID

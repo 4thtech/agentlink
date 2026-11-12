@@ -5,13 +5,16 @@
 import './interpreted-parsers.js'; // first: it must run before the schemas load
 import { inviteFetcher } from './drop-fetch.js';
 import { evaluateFragment } from './invite-state.js';
-import { osFor, render } from './view.js';
+import { isPhone, osFor, render } from './view.js';
 
 const hash = window.location.hash;
 const fetchObject = inviteFetcher((input, init) => window.fetch(input, init));
 const copy = (text: string): Promise<void> => navigator.clipboard.writeText(text);
-// WP-2: the command shown first, from the browser's own user agent (nothing leaves the page).
-const os = osFor(navigator.userAgent);
+// WP-2, REL051-INV: the computer shown first, and whether this is a phone, from the browser's own
+// user agent (nothing leaves the page).
+// A phone or tablet (iPadOS reports a Mac, so touch points count too) gets no computer chosen first.
+const phone = isPhone(navigator.userAgent, navigator.maxTouchPoints);
+const options = { os: phone ? null : osFor(navigator.userAgent), phone };
 
 async function show(): Promise<void> {
   const view = await evaluateFragment(hash, Math.floor(Date.now() / 1000), fetchObject);
@@ -22,7 +25,7 @@ async function show(): Promise<void> {
     () => {
       void show();
     },
-    os,
+    options,
   );
 }
 
