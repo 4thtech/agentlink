@@ -79,29 +79,31 @@ const ALL_KINDS: Record<string, unknown>[] = [
     kind: 'approval_decided',
     at: AT + 200,
     decision: 'approved',
-    action: {
-      type: 'send_file',
-      contactId: NATASA,
-      files: [{ name: 'Q3-plan.pdf', size: 2_100_000 }],
-    },
+    action: 'send_file',
+    contactId: NATASA,
+    files: [{ name: 'Q3-plan.pdf', size: 2_100_000 }],
   },
   {
     kind: 'approval_decided',
     at: AT + 190,
     decision: 'approved_by_rules',
-    action: { type: 'add_proof', contactId: MARKO, files: [], costUsd: '0.05' },
+    action: 'add_proof',
+    contactId: MARKO,
+    costUsd: '0.05',
   },
   {
     kind: 'approval_decided',
     at: AT + 180,
     decision: 'denied',
-    action: { type: 'accept_terms', contactId: MARKO, files: [] },
+    action: 'accept_terms',
+    contactId: MARKO,
   },
   {
     kind: 'approval_decided',
     at: AT + 170,
     decision: 'cancelled',
-    action: { type: 'send_message', contactId: NATASA, files: [] },
+    action: 'send_message',
+    contactId: NATASA,
   },
   { kind: 'approval_decided', at: AT + 160, decision: 'approved' },
   {
@@ -170,7 +172,8 @@ describe('Activity page (WP-A2)', () => {
       'Natasa removed the connection',
       'oc-test is now called Natasa K',
       'Marko Novak accepted your invite',
-      'You accepted the invite from Natasa',
+      // QA2: accepting their invite is its own (approval) row; the connection does not repeat it.
+      'You and Natasa are now connected',
       'You changed your rules',
       'You created a new ID',
       'You removed an ID',
@@ -213,11 +216,9 @@ describe('Activity page (WP-A2)', () => {
                 kind: 'approval_decided',
                 at: AT,
                 decision: 'approved',
-                action: {
-                  type: 'send_file',
-                  contactId: NATASA,
-                  files: [{ name: '<b>x</b>.txt', size: 10 }],
-                },
+                action: 'send_file',
+                contactId: NATASA,
+                files: [{ name: '<b>x</b>.txt', size: 10 }],
               },
             ],
           }),
@@ -240,7 +241,8 @@ describe('Activity page (WP-A2)', () => {
         kind: 'approval_decided',
         at: AT + 2,
         decision: 'denied',
-        action: { type: 'send_file', contactId: GONE, files: [] },
+        action: 'send_file',
+        contactId: GONE,
       },
       { kind: 'proof', at: AT + 1, direction: 'received', state: 'received', contactId: GONE },
     ];
@@ -365,10 +367,10 @@ describe('counts, filters and search', () => {
     };
     expect(shown(1)).toBe(5);
     expect(shown(2)).toBe(3);
-    // contact_removed/revoked/renamed/connected x2, 6 id and app, backup.
-    expect(shown(3)).toBe(14);
-    // denied approval, unknown sender, blocked contact, rules.
-    expect(shown(4)).toBe(4);
+    // contact_removed/revoked/renamed/connected x2, id and app (QA2: the saved kit moved to Safety).
+    expect(shown(3)).toBe(13);
+    // denied approval, unknown sender, blocked contact, rules, saved kit (QA2).
+    expect(shown(4)).toBe(5);
     expect(shown(0)).toBe(ALL_KINDS.length);
   });
 
@@ -457,7 +459,8 @@ describe('states', () => {
               kind: 'approval_decided',
               at: AT,
               decision: 'approved',
-              action: { type: 'wire_money', contactId: NATASA, files: [] },
+              action: 'wire_money',
+              contactId: NATASA,
             },
             {
               kind: 'proof',

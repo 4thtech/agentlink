@@ -59,7 +59,13 @@ describe('Activity page: the recorded feed (QA2 N7)', () => {
 
   it('a denied invite reads as declining it', () => {
     const [item] = parsed([
-      { kind: 'approval_decided', at: 1, decision: 'denied', action: 'accept_invite', contactId: ANA },
+      {
+        kind: 'approval_decided',
+        at: 1,
+        decision: 'denied',
+        action: 'accept_invite',
+        contactId: ANA,
+      },
     ]);
     expect(sentence(item!)).toBe("You declined Ana's invite");
     expect(grey(item!)).not.toContain('Asked by your AI');
@@ -69,7 +75,13 @@ describe('Activity page: the recorded feed (QA2 N7)', () => {
 describe('Activity page: names and lines that were not true (QA2 N7)', () => {
   it('never "{name} is now called {name}"', () => {
     expect(
-      parseItem({ kind: 'contact_renamed', at: 1, contactId: BO, formerName: 'Work', newName: 'Work' }),
+      parseItem({
+        kind: 'contact_renamed',
+        at: 1,
+        contactId: BO,
+        formerName: 'Work',
+        newName: 'Work',
+      }),
     ).toBeUndefined();
   });
 

@@ -499,7 +499,8 @@ describe('ActivityService.list (M1-11r-a)', () => {
     const a = await openAgent(clock, 58);
     const id = `id_created:${a.client.agentId}`;
     expect(await a.client.activity.list({ limit: 20 })).toEqual({
-      items: [{ kind: 'id_created', id, at: clock.t }],
+      // QA2: with no first-run label stored, the creation names no ID.
+      items: [{ kind: 'id_created', id, at: clock.t, name: null }],
     });
   });
 
@@ -525,7 +526,9 @@ describe('ActivityService.list (M1-11r-a)', () => {
     );
     clock.t = 1_800_000_060;
     await a.client.contacts.block(b.id);
-    clock.t = 1_800_000_070;
+    // QA2: rules at version 1 within 10 minutes of the ID's creation are its first rules, part of
+    // creating it (activity-recorded.test.ts); these come later, so they are a rules change.
+    clock.t = 1_800_000_700;
     await applyPolicy(a, clock, () => {});
 
     const all = await a.client.activity.list({ limit: 100 });
@@ -584,7 +587,7 @@ describe('ActivityService.list (M1-11r-a)', () => {
           expect(item.version).toBe(1);
           break;
         case 'id_created':
-          expect(keysOf(item)).toEqual(['at', 'id', 'kind']);
+          expect(keysOf(item)).toEqual(['at', 'id', 'kind', 'name']);
           break;
         case 'contact_connected':
           expect(keysOf(item)).toEqual(['at', 'contactId', 'id', 'kind', 'via']);
