@@ -1,0 +1,48 @@
+/* DESK-NATIVE-DEBUG (stopgap until WP-S2): "Use Touch ID for approvals" as its own settings card,
+   the same border, radius and row metrics as the Settings list (settings.css), the switch on the
+   right of its row and the master code prompt inline beneath it. Tokens only; no motion. */
+.st-native {
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  overflow: hidden;
+}
+.st-native-row {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-block-size: 64px;
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  padding: var(--al-space-3) var(--al-space-4);
+}
+.st-native-row .al-switch:disabled {
+  cursor: default;
+  opacity: var(--al-opacity-disabled);
+}
+.st-native-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-3) var(--al-space-4) var(--al-space-4);
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  max-inline-size: 520px;
+}
+.st-native-body p {
+  margin: 0;
+}
+.st-native-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-2);
+}
+.st-native-note {
+  margin: 0;
+  padding: 0 var(--al-space-4) var(--al-space-4);
+}
+.st-native-row + .st-native-note {
+  padding-block-start: 0;
+}
+.st-native-note.is-error {
+  color: var(--al-color-status-danger-fg);
+}

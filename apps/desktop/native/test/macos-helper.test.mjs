@@ -8,7 +8,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
@@ -35,8 +35,12 @@ function refused(args, input, code) {
   const r = runHelper(args, input);
   assert.equal(r.code, code, `${JSON.stringify(args)} -> ${r.code}`);
   assert.equal(r.out, '', 'stdout stays empty on refusal');
-  assert.equal(r.err, '', 'stderr stays empty');
+  // DESK-NATIVE-DEBUG: one fixed diagnostic line, nothing else.
+  assert.match(r.err, DIAG, 'stderr is one fixed diagnostic line');
+  return r.err;
 }
+
+const DIAG = /^(args|input|create|verify|gate|sensor|sheet|output) (none|la|os|ck) -?\d{1,7}\n$/;
 
 // Needs a Secure Enclave, enrolled Touch ID and an unlocked Mac (a locked Mac makes create exit 12).
 const seAvailable = () =>
@@ -75,7 +79,8 @@ test('available exits 0 or 69 and prints nothing', { skip: !onMac }, () => {
   const r = runHelper(['available']);
   assert.ok([EXIT.ok, EXIT.unavailable].includes(r.code));
   assert.equal(r.out, '');
-  assert.equal(r.err, '');
+  if (r.code === EXIT.ok) assert.equal(r.err, '');
+  else assert.match(r.err, /^sensor (none|la) -?\d{1,7}\n$/);
 });
 
 test('malformed stdin is refused before any key is used', { skip: !onMac }, () => {
@@ -144,8 +149,8 @@ test(
     const peerHex = a.slice(-130);
     const seB = b.slice(-260, -130);
     const swapped = a.slice(0, -260) + seB + peerHex + '\n';
-    refused(['check'], swapped, EXIT.keyUnusable);
-    refused(['ecdh', 'approve'], swapped, EXIT.keyUnusable);
+    assert.match(refused(['check'], swapped, EXIT.keyUnusable), /^verify /);
+    assert.match(refused(['ecdh', 'approve'], swapped, EXIT.keyUnusable), /^verify /);
   },
 );
 
@@ -174,9 +179,9 @@ test(
     const rec = spawnSync(tool, [], { encoding: 'utf8' }).stdout;
     assert.match(rec, /^01[0-9a-f]+\n$/);
     parseMacRecord(rec);
-    refused(['check'], rec, EXIT.keyUnusable);
+    assert.equal(refused(['check'], rec, EXIT.keyUnusable), 'gate none 0\n');
     for (const reason of ['setup', 'approve', 'pay'])
-      refused(['ecdh', reason], rec, EXIT.keyUnusable);
+      assert.equal(refused(['ecdh', reason], rec, EXIT.keyUnusable), 'gate none 0\n');
   },
 );
 
@@ -189,3 +194,24 @@ test(
     assert.match(r.stderr, /flags=0x10002\(adhoc,runtime\)/);
   },
 );
+
+// DESK-NATIVE-DEBUG: with no reachable sensor (lid closed, a keyboard without Touch ID) a
+// `.biometryCurrentSet` sheet could only be cancelled. `ecdh` checks Touch ID can be used right now
+// after the no-gesture proof and before the interactive context: exit 69 (14 on lockout), no sheet.
+// A sensor that disappears is `unavailable`, never `key unusable` (which would say "fingers changed").
+test('ecdh checks the sensor before any sheet; a missing sensor is unavailable', () => {
+  const src = readFileSync(
+    fileURLToPath(new URL('../macos/agentlink-presence.swift', import.meta.url)),
+    'utf8',
+  );
+  const ecdh = src.slice(src.indexOf('func cmdEcdh('));
+  const gated = ecdh.indexOf('requireGated(verifiedKey(rec), rec.peer)');
+  const sensor = ecdh.indexOf('requireSensorNow()');
+  const sheet = ecdh.indexOf('let ctx = LAContext()');
+  assert.ok(gated > 0 && sensor > gated && sheet > sensor, 'gate proof, then sensor, then sheet');
+  const fn = src.slice(src.indexOf('func requireSensorNow()'), src.indexOf('func cmdEcdh('));
+  assert.match(fn, /canEvaluatePolicy\(\.deviceOwnerAuthenticationWithBiometrics/);
+  assert.match(fn, /finish\(\.lockout\)/);
+  assert.match(fn, /finish\(\.unavailable\)/);
+  assert.match(src, /case -11, -12, -13:\s*\n\s*return \.unavailable/);
+});

@@ -16,14 +16,22 @@
 //                        Secure Enclave refuses with LAError.notInteractive (the key is valid and
 //                        needs a gesture); a key that works without a gesture exits 13
 //     ecdh <reason-id>   stdin: record; first the same no-gesture proof as `check` (anything but
-//                        notInteractive exits without a sheet), then one Touch ID sheet; prints
-//                        the 32-byte secret
+//                        notInteractive exits without a sheet), then whether Touch ID can be used
+//                        right now (DESK-NATIVE-DEBUG: a closed lid, a keyboard without Touch ID or
+//                        no enrolled finger exits 69, lockout 14, without a sheet), then one Touch ID
+//                        sheet; prints the 32-byte secret
 //   reason-id is one of: setup | approve | pay. The sheet text is fixed here (reasonText below);
 //   the caller cannot supply text. macOS shows it as "<app> is trying to <text>".
 //
 //   stdin: lowercase hex of the record, optionally followed by exactly one "\n"; at most 8192 bytes.
 //   stdout: on success only, lowercase hex followed by "\n". Nothing else, ever.
-//   stderr: never written. Errors are reported only by the exit code.
+//   stderr: DESK-NATIVE-DEBUG: on failure only, ONE fixed diagnostic line
+//           "<stage> <domain> <code>\n": stage one of args input create verify gate sensor sheet
+//           output; domain one of none la os ck (LocalAuthentication, OSStatus, CryptoKit); code a
+//           signed integer (the LAError / OSStatus code, 0 when none). Never a key, a handle, a
+//           secret or any text from the system. Core parses it strictly and keeps only these tokens
+//           for its own diagnostic line (owner-native-helper.ts readHelperDiagnostic).
+//           Errors are still decided only by the exit code.
 //
 //   Record v1 (what `create` prints and `check`/`ecdh` read back; not secret, and useless on any
 //   other Mac). The core does not store it: it reads it into the ALKH header fields and rebuilds it
@@ -86,7 +94,34 @@ enum Exit: Int32 {
   case internalError = 70
 }
 
-func finish(_ code: Exit) -> Never { exit(code.rawValue) }
+// DESK-NATIVE-DEBUG: where a failure happened, as fixed tokens (see the header). `sheet` is set just
+// before the Touch ID sheet can appear, so a failure at `sheet` means the sheet was shown and the
+// gesture (or its absence) decided; success after it means the touch was accepted.
+var diagStage = "args"
+var diagDomain = "none"
+var diagCode = 0
+
+func noteError(_ error: Error) {
+  let ns = error as NSError
+  if ns.domain == LAErrorDomain {
+    diagDomain = "la"
+  } else if ns.domain == NSOSStatusErrorDomain {
+    diagDomain = "os"
+  } else if error is CryptoKitError {
+    diagDomain = "ck"
+  } else {
+    diagDomain = "none"
+  }
+  diagCode = diagDomain == "none" ? 0 : max(-9_999_999, min(9_999_999, ns.code))
+}
+
+func finish(_ code: Exit) -> Never {
+  if code != .ok {
+    let line = Array("\(diagStage) \(diagDomain) \(diagCode)\n".utf8)
+    _ = line.withUnsafeBufferPointer { write(2, $0.baseAddress, $0.count) }
+  }
+  exit(code.rawValue)
+}
 
 // Phase 3 (signed builds): check the parent's code signature (team ID + identifier, via its audit
 // token) and refuse anyone else with Exit.callerRefused. Phase 2: unsigned callers have no identity
@@ -111,9 +146,10 @@ let maxHandle = 1024
 let maxInput = 8192
 let pointLen = 65
 
-// MARK: I/O (stdout: hex + "\n" only; stderr: never)
+// MARK: I/O (stdout: hex + "\n" only; stderr: the one fixed diagnostic line of finish(), on failure)
 
 func writeOut(_ bytes: [UInt8]) -> Never {
+  diagStage = "output"
   let digits: [UInt8] = Array("0123456789abcdef".utf8)
   var buf = [UInt8]()
   buf.reserveCapacity(bytes.count * 2 + 1)
@@ -136,6 +172,7 @@ func writeOut(_ bytes: [UInt8]) -> Never {
 }
 
 func readInput() -> [UInt8] {
+  diagStage = "input"
   var data = [UInt8]()
   var chunk = [UInt8](repeating: 0, count: 4096)
   while true {
@@ -195,6 +232,7 @@ func parseRecord(_ b: [UInt8]) -> Record {
 // MARK: error mapping
 
 func code(for error: Error, keyStage: Bool) -> Exit {
+  noteError(error)
   let ns = error as NSError
   if ns.domain == LAErrorDomain {
     switch ns.code {
@@ -206,6 +244,11 @@ func code(for error: Error, keyStage: Bool) -> Exit {
     case LAError.biometryLockout.rawValue: return .lockout
     case LAError.biometryNotAvailable.rawValue, LAError.biometryNotEnrolled.rawValue,
       LAError.passcodeNotSet.rawValue:
+      return .unavailable
+    // DESK-NATIVE-DEBUG: no usable sensor right now (raw values, older SDK names differ):
+    // -11 companion/watch not available, -12 biometry not paired, -13 biometry disconnected
+    // (e.g. a Magic Keyboard with Touch ID unplugged, or the lid closed).
+    case -11, -12, -13:
       return .unavailable
     case LAError.invalidContext.rawValue: return .internalError
     default: return .keyUnusable
@@ -221,6 +264,7 @@ func code(for error: Error, keyStage: Bool) -> Exit {
 
 /// Opens the handle with interaction NOT allowed and checks it matches the stored public key.
 func verifiedKey(_ rec: Record) -> SecureEnclave.P256.KeyAgreement.PrivateKey {
+  diagStage = "verify"
   let quiet = LAContext()
   quiet.interactionNotAllowed = true
   let key: SecureEnclave.P256.KeyAgreement.PrivateKey
@@ -239,15 +283,18 @@ func rawSecret(_ s: SharedSecret) -> [UInt8] { s.withUnsafeBytes { Array($0) } }
 // MARK: commands
 
 func cmdAvailable() -> Never {
+  diagStage = "sensor"
   guard SecureEnclave.isAvailable else { finish(.unavailable) }
   var err: NSError?
   guard LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err) else {
+    if let e = err { noteError(e) }
     finish(.unavailable)
   }
   finish(.ok)
 }
 
 func cmdCreate() -> Never {
+  diagStage = "create"
   guard SecureEnclave.isAvailable else { finish(.unavailable) }
   var err: NSError?
   guard LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err) else {
@@ -287,6 +334,7 @@ func cmdCreate() -> Never {
 /// with LAError.notInteractive. A key that works without a gesture (not made by `create`) or fails
 /// any other way is never used for the real exchange.
 func requireGated(_ key: SecureEnclave.P256.KeyAgreement.PrivateKey, _ peer: P256.KeyAgreement.PublicKey) {
+  diagStage = "gate"
   do {
     var s = rawSecret(try key.sharedSecretFromKeyAgreement(with: peer))
     for i in s.indices { s[i] = 0 }
@@ -295,6 +343,7 @@ func requireGated(_ key: SecureEnclave.P256.KeyAgreement.PrivateKey, _ peer: P25
     // Only the LocalAuthentication refusal proves the gate (a locked Mac's OSStatus does not).
     let ns = error as NSError
     if ns.domain == LAErrorDomain && ns.code == LAError.notInteractive.rawValue { return }
+    noteError(error)
     finish(code(for: error, keyStage: true))
   }
 }
@@ -305,18 +354,35 @@ func cmdCheck() -> Never {
   finish(.ok)
 }
 
+/// DESK-NATIVE-DEBUG: Touch ID usable at this moment, checked before any sheet. The key is
+/// `.biometryCurrentSet` with no password fallback, so a sheet with no reachable sensor (lid
+/// closed, external keyboard without Touch ID) could only be cancelled: exit instead, no sheet.
+func requireSensorNow() {
+  diagStage = "sensor"
+  var err: NSError?
+  if LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err) { return }
+  if let e = err { noteError(e) }
+  if let e = err, e.domain == LAErrorDomain, e.code == LAError.biometryLockout.rawValue {
+    finish(.lockout)
+  }
+  finish(.unavailable)
+}
+
 func cmdEcdh(_ reason: String) -> Never {
   let rec = parseRecord(readInput())
   requireGated(verifiedKey(rec), rec.peer)
+  requireSensorNow()
   let ctx = LAContext()
   ctx.localizedReason = reason
   ctx.touchIDAuthenticationAllowableReuseDuration = 0
+  diagStage = "sheet"
   do {
     let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
       dataRepresentation: rec.handle, authenticationContext: ctx)
     guard key.publicKey.x963Representation == rec.sePub else { finish(.keyUnusable) }
     let s = rawSecret(try key.sharedSecretFromKeyAgreement(with: rec.peer))
     ctx.invalidate()
+    diagStage = "output"
     guard s.count == 32 else { finish(.internalError) }
     writeOut(s)
   } catch {

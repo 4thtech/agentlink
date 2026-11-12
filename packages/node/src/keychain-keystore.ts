@@ -76,10 +76,11 @@ import {
 } from './keychain.js';
 import { CLI_COMMAND } from './cli-command.js';
 
-const keychainFailed = (): NodeKeyStoreError =>
+const keychainFailed = (detail?: 'timeout' | 'refused'): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keychain_failed',
     `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
+    detail,
   );
 
 const identityMissing = (): NodeKeyStoreError =>
@@ -123,7 +124,7 @@ export async function guarded<T>(call: () => Promise<T>, timeoutMs: number): Pro
     // The file backend (M1-8f) throws only fixed-sentence NodeKeyStoreErrors, which pass through;
     // anything else (a native keychain error, a timeout) becomes the fixed `keychain_failed`.
     if (error instanceof NodeKeyStoreError) throw error;
-    throw keychainFailed();
+    throw keychainFailed(timedOut ? 'timeout' : 'refused');
   } finally {
     clearTimeout(timer);
   }

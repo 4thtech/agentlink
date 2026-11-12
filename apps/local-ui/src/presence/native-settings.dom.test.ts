@@ -32,7 +32,10 @@ async function flush(): Promise<void> {
     for (let i = 0; i < 8; i += 1) await Promise.resolve();
   });
 }
-const toggle = (): HTMLInputElement | null => host.querySelector('input[role="switch"]');
+const toggle = (): HTMLButtonElement | null => host.querySelector('[role="switch"]');
+/** The switch's state, as assistive technology reads it. */
+const checked = (): boolean | undefined =>
+  toggle() === null ? undefined : toggle()?.getAttribute('aria-checked') === 'true';
 async function clickButton(text: string): Promise<void> {
   const b = [...host.querySelectorAll('button')].find((x) => x.textContent === text);
   if (b === undefined) throw new Error(`no button ${text}`);
@@ -83,14 +86,14 @@ describe('Settings: Use Touch ID for approvals', () => {
       { available: true, registered: false },
     ]);
     expect(host.textContent).toContain('Use Touch ID for approvals');
-    expect(toggle()?.checked).toBe(true);
+    expect(checked()).toBe(true);
     await act(async () => toggle()?.click());
     await flush();
     await typeCode('ABCD EFGH');
     await clickButton(NATIVE_STRINGS.confirmCode);
     expect(calls).toEqual(['off:ABCD EFGH']);
     expect(host.textContent).toContain(NATIVE_STRINGS.turnedOff('mac'));
-    expect(toggle()?.checked).toBe(false);
+    expect(checked()).toBe(false);
   });
 
   it('a fingerprint change shows the reregister state; Turn on again works with the master code', async () => {
@@ -103,7 +106,7 @@ describe('Settings: Use Touch ID for approvals', () => {
     await typeCode('ABCD EFGH');
     await clickButton(NATIVE_STRINGS.confirmCode);
     expect(calls).toEqual(['again:ABCD EFGH']);
-    expect(toggle()?.checked).toBe(true);
+    expect(checked()).toBe(true);
   });
 
   it('nothing in a browser, and nothing where Touch ID is not available', async () => {
@@ -111,5 +114,92 @@ describe('Settings: Use Touch ID for approvals', () => {
     expect(toggle()).toBeNull();
     await render(MAC_APP, [{ available: false, registered: false }]);
     expect(toggle()).toBeNull();
+  });
+});
+
+// DESK-NATIVE-DEBUG: no outcome ends silently. While the OS prompt is up the card says it is
+// waiting; every answer (each helper state, the keychain, busy, wait, a dropped or too-slow
+// request) shows its own fixed message, errors are announced, and the status is read again.
+describe('Settings: every outcome is visible (DESK-NATIVE-DEBUG)', () => {
+  async function renderWith(
+    outcome: () => Promise<NativeRegistration>,
+    statuses: NativeStatus[] = [{ available: true, registered: false }],
+  ): Promise<{ reads: () => number }> {
+    let at = 0;
+    await act(async () => {
+      root.render(
+        createElement(NativeSettings, {
+          userAgent: MAC_APP,
+          nativeStatus: () =>
+            Promise.resolve(statuses[Math.min(at++, statuses.length - 1)] as NativeStatus),
+          ops: { on: outcome, off: outcome, again: outcome },
+        }),
+      );
+    });
+    await flush();
+    return { reads: () => at };
+  }
+  async function confirm(): Promise<void> {
+    await act(async () => toggle()?.click());
+    await flush();
+    await typeCode('ABCD EFGH');
+    await clickButton(NATIVE_STRINGS.confirmCode);
+  }
+
+  it('says it is waiting for Touch ID while the prompt is up', async () => {
+    let answer: (r: NativeRegistration) => void = () => undefined;
+    await renderWith(() => new Promise<NativeRegistration>((resolve) => (answer = resolve)));
+    await confirm();
+    expect(host.querySelector('[data-native-waiting]')?.textContent).toBe(
+      NATIVE_STRINGS.waiting('mac'),
+    );
+    await act(async () => answer({ kind: 'native', state: 'cancelled' }));
+    await flush();
+    expect(host.querySelector('[data-native-waiting]')).toBeNull();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(NATIVE_STRINGS.state.cancelled);
+  });
+
+  const cases: [NativeRegistration, string][] = [
+    [{ kind: 'native', state: 'cancelled' }, NATIVE_STRINGS.state.cancelled],
+    [{ kind: 'native', state: 'failed' }, NATIVE_STRINGS.state.failed],
+    [{ kind: 'native', state: 'lockout' }, NATIVE_STRINGS.state.lockout],
+    [{ kind: 'native', state: 'unavailable' }, NATIVE_STRINGS.unavailableNow('mac')],
+    [{ kind: 'native', state: 'timeout' }, NATIVE_STRINGS.state.timeout],
+    [{ kind: 'native', state: 'keychain' }, NATIVE_STRINGS.state.keychain],
+    [{ kind: 'native', state: 'error' }, NATIVE_STRINGS.state.error],
+    [{ kind: 'rejected' }, NATIVE_STRINGS.wrongCode],
+    [{ kind: 'busy' }, NATIVE_STRINGS.busy],
+    [{ kind: 'wait' }, NATIVE_STRINGS.wait],
+    [{ kind: 'needs_setup' }, NATIVE_STRINGS.needsSetup],
+    [{ kind: 'timeout' }, NATIVE_STRINGS.pageTimeout],
+    [{ kind: 'failed' }, NATIVE_STRINGS.state.error],
+  ];
+  for (const [outcome, text] of cases) {
+    it(`${outcome.kind}${'state' in outcome ? `/${outcome.state}` : ''}: its own message, announced`, async () => {
+      const r = await renderWith(() => Promise.resolve(outcome));
+      await confirm();
+      expect(host.querySelector('[role="alert"]')?.textContent).toBe(text);
+      // Read again after the answer, so the switch shows what is stored.
+      expect(r.reads()).toBe(2);
+      expect(checked()).toBe(false);
+    });
+  }
+
+  it('a thrown operation is a message too, never silence', async () => {
+    await renderWith(() => Promise.reject(new Error('boom')));
+    await confirm();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(NATIVE_STRINGS.state.error);
+  });
+
+  it('the switch sits in its own settings row, with the prompt beneath it', async () => {
+    await renderWith(() => Promise.resolve({ kind: 'registered' }));
+    const card = host.querySelector('section.st-native');
+    expect(card).not.toBeNull();
+    expect(card?.querySelector('.st-native-row [role="switch"]')).not.toBeNull();
+    expect(card?.querySelector('input[type="checkbox"]')).toBeNull();
+    await act(async () => toggle()?.click());
+    await flush();
+    const form = card?.querySelector('form.st-native-body');
+    expect(form?.previousElementSibling?.classList.contains('st-native-row')).toBe(true);
   });
 });

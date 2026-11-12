@@ -60,6 +60,8 @@ interface Harness {
   readonly port: number;
   readonly helper: StandInHelper;
   readonly routeCalls: number[];
+  /** DESK-NATIVE-DEBUG: the diagnostic lines the server wrote. */
+  readonly lines: string[];
   page(): Promise<Record<string, string>>;
 }
 
@@ -68,6 +70,7 @@ async function harness(options: { helper?: StandInHelper | null } = {}): Promise
   const helper = options.helper ?? new StandInHelper(1);
   const opened: string[] = [];
   const routeCalls: number[] = [];
+  const lines: string[] = [];
   const routes = createLocalUiRoutes();
   routes.register({
     method: 'POST',
@@ -94,6 +97,7 @@ async function harness(options: { helper?: StandInHelper | null } = {}): Promise
       source,
       localUi: { assets: TEST_APP },
       ...(options.helper === null ? {} : { nativePresence: helper }),
+      diagnose: (line: string) => lines.push(line),
     },
     {
       keychain: world.keychain,
@@ -114,6 +118,7 @@ async function harness(options: { helper?: StandInHelper | null } = {}): Promise
     port,
     helper,
     routeCalls,
+    lines,
     async page() {
       const at = opened.length;
       await server.open();
@@ -491,5 +496,76 @@ describe('Fable review fixes on the server (M1, L1, L4)', () => {
     }
     const code = await decide(h, page, 9, {}, encodeUtf8(world.code));
     expect(code.status).toBe(200);
+  });
+});
+
+// DESK-NATIVE-DEBUG: every outcome of turning it on writes ONE fixed diagnostic line (step name and
+// fixed reason only, never the master code, a secret or a system message), and a keychain failure
+// answers its own state (`keychain`), never the catch-all.
+describe('one fixed diagnostic line per outcome (DESK-NATIVE-DEBUG)', () => {
+  it('a registration that works: started, then done', async () => {
+    const h = await harness();
+    const reg = await register(h, await h.page());
+    expect(reg.status).toBe(200);
+    expect(h.lines).toEqual([
+      'native presence: register started',
+      'native presence: register done',
+    ]);
+  });
+
+  it('a cancelled sheet: failed at helper_ecdh with the fixed state', async () => {
+    const helper = new StandInHelper(1);
+    helper.gesture = 'cancelled';
+    const h = await harness({ helper });
+    await register(h, await h.page());
+    expect(h.lines).toEqual([
+      'native presence: register started',
+      'native presence: register failed at helper_ecdh (helper_cancelled)',
+    ]);
+  });
+
+  it('a prompt that timed out answers `timeout`', async () => {
+    const helper = new StandInHelper(1);
+    helper.gesture = 'timeout';
+    const h = await harness({ helper });
+    const reg = await register(h, await h.page());
+    expect(reg.status).toBe(403);
+    expect(json(reg)).toEqual({ status: 'presence_rejected', native: 'timeout' });
+  });
+
+  it('a keychain write that fails answers `keychain` and names the step; nothing secret logged', async () => {
+    const h = await harness();
+    const real = world.keychain.set.bind(world.keychain);
+    world.keychain.set = (account: string, value: Uint8Array) =>
+      account === OWNER_NATIVE_ACCOUNT
+        ? Promise.reject(new Error('the native keychain message'))
+        : real(account, value);
+    try {
+      const reg = await register(h, await h.page());
+      expect(reg.status).toBe(503);
+      expect(json(reg)).toEqual({ status: 'failed', native: 'keychain' });
+    } finally {
+      world.keychain.set = real;
+    }
+    expect(h.lines).toEqual([
+      'native presence: register started',
+      'native presence: register failed at keychain_write (keychain_failed refused)',
+    ]);
+    const all = h.lines.join('\n');
+    expect(all).not.toContain(world.code);
+    expect(all).not.toContain('native keychain message');
+  });
+
+  it('a wrong master code: failed at master_code (presence_rejected)', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await send(h.port, '/api/owner/native', {
+      method: 'POST',
+      headers: page,
+      body: encodeUtf8('AAAA BBBB CCCC DDDD EEEE FFFF'),
+    });
+    expect(h.lines.at(-1)).toBe(
+      'native presence: register failed at master_code (presence_rejected)',
+    );
   });
 });

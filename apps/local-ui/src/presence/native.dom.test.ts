@@ -276,3 +276,41 @@ describe('first-time setup offers "Turn on Touch ID for approvals"', () => {
     expect(NATIVE_STRINGS.state.unavailable).toMatch(/master code/i);
   });
 });
+
+// DESK-NATIVE-DEBUG: the answers the page used to fold into "failed" have their own kinds, and a
+// request that never answers ends with `timeout` after the page's own limit.
+describe('native operation answers (DESK-NATIVE-DEBUG)', () => {
+  const reply = (status: number, body: unknown) => () =>
+    Promise.resolve(new Response(JSON.stringify(body), { status }));
+  it('maps busy, wait, needs setup, the keychain and timeout states', async () => {
+    expect(await registerNative('x', reply(409, { status: 'busy' }), 't')).toEqual({
+      kind: 'busy',
+    });
+    expect(await registerNative('x', reply(429, { status: 'wait', retryAfter: 5 }), 't')).toEqual({
+      kind: 'wait',
+    });
+    expect(await registerNative('x', reply(503, { status: 'needs_setup' }), 't')).toEqual({
+      kind: 'needs_setup',
+    });
+    expect(
+      await registerNative('x', reply(503, { status: 'failed', native: 'keychain' }), 't'),
+    ).toEqual({ kind: 'native', state: 'keychain' });
+    expect(
+      await registerNative(
+        'x',
+        reply(403, { status: 'presence_rejected', native: 'timeout' }),
+        't',
+      ),
+    ).toEqual({ kind: 'native', state: 'timeout' });
+  });
+  it('a request that never answers ends as `timeout`, and the body is wiped', async () => {
+    let sent: Uint8Array | undefined;
+    const never = (_url: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        sent = init?.body as Uint8Array;
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      });
+    expect(await registerNative('ABCD', never, 't', 30)).toEqual({ kind: 'timeout' });
+    expect(sent?.every((b) => b === 0)).toBe(true);
+  });
+});

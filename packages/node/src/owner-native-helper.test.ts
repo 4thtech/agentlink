@@ -12,7 +12,9 @@ import {
   NativeHelperError,
   createNativeHelper,
   desktopHelperPath,
+  nativeExitName,
   nativeUiState,
+  readHelperDiagnostic,
   spawnNativeHelper,
   type NativeHelperRunner,
 } from './owner-native-helper.js';
@@ -244,5 +246,90 @@ describe('Fable review L1: an abandoned release', () => {
     const pending = spawnNativeHelper(script)(['ecdh', 'approve'], undefined, abandoned.signal);
     setTimeout(() => abandoned.abort(), 100);
     expect((await pending).code).toBeNull();
+  });
+});
+
+// DESK-NATIVE-DEBUG: every way a run ends has a fixed name for the core's one diagnostic line, the
+// helper's own fixed stderr line is parsed strictly (anything else is dropped), and a prompt that
+// got no answer in time is its own state (`timeout`), not the catch-all `error`.
+describe('fixed diagnostics of a helper run (DESK-NATIVE-DEBUG)', () => {
+  const stub = (name: string, body: string): string => {
+    const script = join(root, name);
+    writeFileSync(script, `#!${process.execPath}\n${body}\n`);
+    chmodSync(script, 0o700);
+    return script;
+  };
+  const failure = (p: Promise<unknown>): Promise<NativeHelperError> =>
+    p.then(
+      () => {
+        throw new Error('expected a refusal');
+      },
+      (e: unknown) => e as NativeHelperError,
+    );
+
+  it('a refusal carries the exit code name and the helper diagnostic line', async () => {
+    const script = stub(
+      'refuses',
+      `process.stderr.write('sheet la -2\\n'); process.exitCode = 10;`,
+    );
+    const helper = createNativeHelper({ kind: 1, run: spawnNativeHelper(script) });
+    const error = await failure(helper.release(RECORD, 'setup'));
+    expect(error).toBeInstanceOf(NativeHelperError);
+    expect([error.state, error.detail, error.diag]).toEqual([
+      'cancelled',
+      'exit_cancelled',
+      'sheet la -2',
+    ]);
+  });
+
+  it('stderr that is not exactly the fixed shape is dropped, never kept', async () => {
+    for (const text of [
+      'sheet la -2 /Users/someone/secret\n',
+      'Error: The operation could not be completed\n',
+      `sheet la ${'1'.repeat(9)}\n`,
+      'bogus la -2\n',
+      'x'.repeat(400),
+    ]) {
+      const script = stub(
+        'noisy',
+        `process.stderr.write(${JSON.stringify(text)}); process.exitCode = 11;`,
+      );
+      const result = await spawnNativeHelper(script)(['ecdh', 'setup'], undefined);
+      expect(result.code).toBe(11);
+      expect(result.diag).toBeUndefined();
+    }
+    expect(readHelperDiagnostic(new TextEncoder().encode('sensor la -6\n'))).toBe('sensor la -6');
+    expect(readHelperDiagnostic(new TextEncoder().encode('gate none 0'))).toBe('gate none 0');
+  });
+
+  it('a prompt with no answer in time is `timeout`; a helper that cannot start is `no_start`', async () => {
+    const waits = stub('waits-long', 'setInterval(() => undefined, 1000);');
+    const timed = createNativeHelper({
+      kind: 1,
+      run: spawnNativeHelper(waits, { timeoutMs: 150 }),
+    });
+    const error = await failure(timed.release(RECORD, 'setup'));
+    expect([error.state, error.detail]).toEqual(['timeout', 'timeout']);
+    const missing = createNativeHelper({
+      kind: 1,
+      run: spawnNativeHelper(join(root, 'not-there')),
+    });
+    const none = await failure(missing.release(RECORD, 'setup'));
+    expect([none.state, none.detail]).toEqual(['error', 'no_start']);
+  });
+
+  it('a malformed or wrong-length output and an unknown exit code are named', async () => {
+    const answering = (code: number, stdout: string) =>
+      createNativeHelper({ kind: 1, run: fakeRunner(() => ({ code, stdout })).run });
+    expect((await failure(answering(0, 'zz\n').release(RECORD, 'setup'))).detail).toBe(
+      'bad_output',
+    );
+    expect(
+      (await failure(answering(0, `${'11'.repeat(16)}\n`).release(RECORD, 'setup'))).detail,
+    ).toBe('wrong_length');
+    const e3 = await failure(answering(3, '').check(RECORD));
+    expect([e3.state, e3.detail]).toEqual(['error', 'exit_other']);
+    expect(nativeExitName(13)).toBe('exit_keyUnusable');
+    expect(nativeUiState(69)).toBe('unavailable');
   });
 });
