@@ -488,6 +488,31 @@ describe('Remove', () => {
     expect(host.querySelector('[role="dialog"]')).toBeNull();
     expect(plain(host)).toContain('Work was removed.');
   });
+  it('the carried removal note is shown once: a second mount within 5 s does not show it again', async () => {
+    answers['POST /api/ui/agents/remove'] = { status: 200, body: { status: 'done' } };
+    const sheet = await open('work');
+    await confirmTyped(sheet);
+    expect(plain(host)).toContain('Work was removed.');
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await mountPage();
+    expect(plain(host)).toContain('Work was removed.');
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await mountPage();
+    expect(plain(host)).not.toContain('Work was removed.');
+  });
+  it('Save recovery kit first on an ID that is not open asks before switching; Cancel keeps the sheet', async () => {
+    const sheet = await open('work');
+    await click(button(sheet, 'Save recovery kit first'));
+    expect(plain(sheet)).toContain('Open Work to save its recovery kit?');
+    expect(button(sheet, 'Open')).toBeDefined();
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    await click(button(sheet, 'Cancel'));
+    expect(plain(sheet)).not.toContain('Open Work to save its recovery kit?');
+    expect(host.querySelector('[role="dialog"]')).toBe(sheet);
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+  });
 });
 
 const backupCode = (): HTMLInputElement =>

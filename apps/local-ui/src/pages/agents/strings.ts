@@ -221,6 +221,7 @@ export const AGENTS_STRINGS = {
   peopleOther: (label: string): string => `Open ${iso(label)} to see its people.`,
   rulesOther: (label: string): string => `Open ${iso(label)} to see its rules.`,
   openAgent: 'Open this ID',
+  openForKit: (label: string): string => `Open ${iso(label)} to save its recovery kit?`,
   seeAllActivity: 'See all activity',
   seeRules: 'Change rules',
   noActivity: 'Nothing yet while this page is open.',

@@ -216,6 +216,7 @@ export function RemoveSheet({
 }): ReactElement {
   const passkey = usePasskey(owner);
   const [exporting, setExporting] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   const [phase, setPhase] = useState<RemovePhase>({ kind: 'form' });
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
@@ -364,14 +365,32 @@ export function RemoveSheet({
                     variant="secondary"
                     icon="download"
                     onClick={() => {
-                      setExporting(true);
-                      if (!row.current) onSwitch?.(row);
+                      if (row.current) setExporting(true);
+                      else setAskOpen(true);
                     }}
                   >
                     {S.exportFirst}
                   </Button>
-                  {exporting && !row.current ? (
-                    <p className="al-text-body-sm">{S.backupOpenFirst(row.label)}</p>
+                  {askOpen && !row.current ? (
+                    <div role="group" aria-label={S.openForKit(row.label)}>
+                      <p className="al-text-body-sm">{S.openForKit(row.label)}</p>
+                      <div className="ag-actions">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            setAskOpen(false);
+                            setExporting(true);
+                            onSwitch?.(row);
+                          }}
+                        >
+                          {S.open}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setAskOpen(false)}>
+                          {S.cancel}
+                        </Button>
+                      </div>
+                    </div>
                   ) : null}
                 </>
               )}
