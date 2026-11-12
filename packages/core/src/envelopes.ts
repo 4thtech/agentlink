@@ -1251,6 +1251,11 @@ export class EnvelopeService {
     }
     const screen = await this.#ctx.store.transaction((tx) => screenInboundTx(tx, from));
     if (screen.action === 'drop') {
+      // A removed contact comes back only through a fresh completed pairing (07 §3 `removed`, 04
+      // §2.9, §2.5.1 `contact.remove`). Its pairing messages go to the pairing screen as an unknown
+      // key's would: kept only for an invite this agent holds or a pairing it staged from that key,
+      // otherwise dropped. Blocked and revoked agents stay out (D-72; 04 §3.4.1).
+      if (screen.reason === 'removed' && PAIRING_TYPES.has(type)) return this.#screenPairing(o);
       return { kind: 'drop', reason: screen.reason === 'malformed' ? 'invalid' : screen.reason };
     }
     const sender = screen.sender;
