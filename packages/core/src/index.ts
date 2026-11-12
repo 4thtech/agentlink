@@ -432,6 +432,10 @@ export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from '.
 export { PROOF_PRICE_USD_MICROS } from './proofs/price.js';
 export {
   ActivityService,
+  // UX1113 WP-A1: what a decided approval was about, and how a connection was made.
+  type ActivityActionType,
+  type ActivityApprovalAction,
+  type ActivityConnectedVia,
   type ActivityContact,
   type ActivityCost,
   type ActivityEntry,

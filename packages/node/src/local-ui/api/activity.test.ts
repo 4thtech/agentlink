@@ -5,8 +5,9 @@
 //   client view, with `limit` (1 to 100, default 20) and the opaque `cursor` of the previous page.
 //   A malformed query is 400 before core is asked; core's own refusal is 400 too.
 // - What leaves the server is an allowlist per kind: the time, the kind and the display fields the
-//   page needs (decision, direction, proof state, sender code). Row IDs, record IDs, contact IDs,
-//   rule versions and the proof network never do (UX north star: no IDs, hashes or chains in the
+//   page needs (decision, direction, proof state, sender code; WP-A1: the approval's action, a
+//   contact reference). Row IDs, record IDs, approval IDs, rule versions and the proof network
+//   never do (UX north star: no IDs, hashes or chains in the
 //   default view). An entry of an unknown kind, or with a value outside its allowlist, is left out.
 // - Not set up (no client): 409 `not_set_up`. Any other failure: 500 `failed`, with no error text.
 import { CoreError, type ActivityEntry, type Page, type PageQuery } from '@4thtech-io/core';
@@ -37,7 +38,7 @@ const call = (context: LocalUiContext, query = ''): Promise<LocalUiResult> =>
   route.handler(context, { params: {}, query: new URLSearchParams(query) });
 
 const RECORD_ID = 'ab'.repeat(32);
-const CONTACT_ID = 'contact-7f3e9a01';
+const CONTACT_ID = `0x${'7f'.repeat(20)}`;
 const APPROVAL_ID = 'apr_5c1d8e2f';
 
 const ENTRIES: ActivityEntry[] = [
@@ -126,13 +127,20 @@ describe('GET /api/ui/activity (M1-11c-a1)', () => {
         { kind: 'approval_decided', at: 1_760_000_500, decision: 'approved_by_rules' },
         { kind: 'proof', at: 1_760_000_400, direction: 'sent', state: 'recorded' },
         { kind: 'sender_blocked', at: 1_760_000_300, senderCode: '2B9E·04D1' },
-        { kind: 'contact_blocked', at: 1_760_000_200 },
+        // WP-A1 (spec §7): a contact reference, which the page resolves with its people read.
+        { kind: 'contact_blocked', at: 1_760_000_200, contactId: CONTACT_ID },
         { kind: 'rules_changed', at: 1_760_000_100 },
-        { kind: 'contact_renamed', at: 1_760_000_050, formerName: 'Marko', newName: 'Mark' },
+        {
+          kind: 'contact_renamed',
+          at: 1_760_000_050,
+          contactId: CONTACT_ID,
+          formerName: 'Marko',
+          newName: 'Mark',
+        },
       ],
     });
     const text = JSON.stringify(result.body);
-    for (const hidden of [RECORD_ID, CONTACT_ID, APPROVAL_ID, '10200', 'chainId', 'version']) {
+    for (const hidden of [RECORD_ID, APPROVAL_ID, '10200', 'chainId', 'version']) {
       expect(text).not.toContain(hidden);
     }
   });
