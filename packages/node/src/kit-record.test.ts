@@ -24,7 +24,6 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   KIT_RECORD_FILE,
-  createKitExportHandles,
   kitStatus,
   readKitRecord,
   revealKitFile,
@@ -48,6 +47,21 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
+/** A signed `backup.export` as the record keeps it (the signature is not checked here; core does). */
+const proof = (agent: string, nonce: string, kitId = KIT) => ({
+  body: {
+    v: 1,
+    agent,
+    owner: 'aa'.repeat(32),
+    op: 'backup.export',
+    params: { kitId, contents: 'full' },
+    nonce,
+    issuedAt: 1_800_000_000,
+    expiresAt: 1_800_000_600,
+  },
+  sig: 'cd'.repeat(64),
+});
+
 function record(over: Partial<KitRecord> = {}): KitRecord {
   return {
     v: 1,
@@ -56,7 +70,10 @@ function record(over: Partial<KitRecord> = {}): KitRecord {
     covers: [A, B],
     names: { [A]: 'default', [B]: 'work' },
     peopleAtSave: { [A]: 3, [B]: 1 },
-    exports: { [A]: 'n'.repeat(22), [B]: 'm'.repeat(22) },
+    exports: {
+      [A]: proof(A, 'n'.repeat(22), over.kitId ?? KIT),
+      [B]: proof(B, 'm'.repeat(22), over.kitId ?? KIT),
+    },
     contents: 'full',
     file: join(root, 'Downloads', 'agentlink-recovery-kit-2027-01-15.alkk'),
     ...over,
@@ -101,7 +118,28 @@ describe('kit record file (04 §2.3.3 "Kit record")', () => {
       { ...record(), names: { [A]: 'default' } },
       { ...record(), names: { [A]: 'Default', [B]: 'work' } },
       { ...record(), peopleAtSave: { [A]: -1, [B]: 1 } },
-      { ...record(), exports: { [A]: 'x', [B]: 'm'.repeat(22) } },
+      { ...record(), exports: { [A]: 'x', [B]: proof(B, 'm'.repeat(22)) } },
+      // WP-R2b (IR L-3): each proof is a signed backup.export of that ID naming this kitId.
+      { ...record(), exports: { [A]: proof(A, 'x'), [B]: proof(B, 'm'.repeat(22)) } },
+      { ...record(), exports: { [A]: proof(B, 'n'.repeat(22)), [B]: proof(B, 'm'.repeat(22)) } },
+      {
+        ...record(),
+        exports: { [A]: proof(A, 'n'.repeat(22), 'Z'.repeat(22)), [B]: proof(B, 'm'.repeat(22)) },
+      },
+      {
+        ...record(),
+        exports: {
+          [A]: { ...proof(A, 'n'.repeat(22)), sig: 'not hex' },
+          [B]: proof(B, 'm'.repeat(22)),
+        },
+      },
+      {
+        ...record(),
+        exports: {
+          [A]: { ...proof(A, 'n'.repeat(22)), extra: 1 },
+          [B]: proof(B, 'm'.repeat(22)),
+        },
+      },
       { ...record(), contents: 'everything' },
       { ...record(), file: 'relative/path.alkk' },
       { ...record(), at: 1.5 },
@@ -295,35 +333,5 @@ describe('revealKitFile (Show in Finder by the recorded path only)', () => {
         Promise.resolve(false),
       ),
     ).toBe('not_opened');
-  });
-});
-
-describe('export handles (Check right after a save)', () => {
-  const kit = { kitId: KIT, path: '/x/agentlink-recovery-kit-2027-01-15.alkk', dev: 1, ino: 2 };
-
-  it('is 128 random bits, single use', () => {
-    const handles = createKitExportHandles();
-    const handle = handles.issue(kit);
-    expect(handle).toMatch(/^[A-Za-z0-9_-]{22}$/);
-    expect(handles.issue(kit)).not.toBe(handle);
-    expect(handles.take(handle)).toEqual(kit);
-    expect(handles.take(handle)).toBeUndefined();
-  });
-
-  it('lasts 10 minutes; unknown handles are undefined', () => {
-    let t = 1_000_000;
-    const handles = createKitExportHandles({ now: () => t });
-    const handle = handles.issue(kit);
-    t += 10 * 60 * 1000 + 1;
-    expect(handles.take(handle)).toBeUndefined();
-    expect(handles.take('Z'.repeat(22))).toBeUndefined();
-    expect(handles.take(42 as unknown as string)).toBeUndefined();
-  });
-
-  it('keeps only a few live handles (the oldest goes first)', () => {
-    const handles = createKitExportHandles();
-    const first = handles.issue(kit);
-    for (let i = 0; i < 8; i += 1) handles.issue(kit);
-    expect(handles.take(first)).toBeUndefined();
   });
 });

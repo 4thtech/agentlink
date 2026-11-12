@@ -325,6 +325,7 @@ import {
   FIRST_AGENT_LABEL,
   FIRST_AGENT_NAME,
   HOST_AGENT_NAME,
+  VISIT_STEP_MS,
   type AgentDirectoryEntry,
   type AppHostAgent,
   type AppHostFirstRun,
@@ -346,6 +347,7 @@ import { createKeyEraseControl } from './key-controls.js';
 import {
   exportRecoveryKit,
   type RecoveryKitClient,
+  type RecoveryKitNotIncluded,
   type RecoveryKitOthers,
 } from './recovery-kit-export.js';
 import { MAX_KIT_IDS, type KitTodayId, type LocalUiBackupDesk } from './kit-record.js';
@@ -853,6 +855,11 @@ export interface ApprovalServerInternals {
    * (tests use a temporary HOME and the floor). Default: the OS user's home and the kit defaults.
    */
   readonly restore?: { readonly home?: string; readonly kdf?: Argon2idParams };
+  /**
+   * WP-R2b (IR M-1): the recovery-kit export walk's per-ID limit and the settle time of a late open
+   * (tests: shorter). Default VISIT_STEP_MS and VISIT_SETTLE_MS (app-host.ts).
+   */
+  readonly backupWalk?: { readonly stepMs?: number; readonly settleMs?: number };
 }
 
 export interface ApprovalServer {
@@ -1496,18 +1503,20 @@ export async function startApprovalServerWith(
         }
         return today;
       },
-      exportRecorded: async (agentId, nonce) => {
+      exportRecorded: async (agentId, signed, kitId) => {
         // Core's word, from the open ID's own core only (another ID's core is never opened here).
         const client = agentUi?.client as
           | {
               agentId?: string;
-              ownerActions?: { backupExportRecorded?: (n: string) => Promise<boolean> };
+              ownerActions?: {
+                backupExportRecorded?: (signed: unknown, kitId: string) => Promise<boolean>;
+              };
             }
           | undefined;
         if (client?.agentId !== agentId) return undefined;
         const actions = client.ownerActions;
         if (typeof actions?.backupExportRecorded !== 'function') return undefined;
-        return actions.backupExportRecorded(nonce);
+        return actions.backupExportRecorded(signed, kitId);
       },
     });
   };
@@ -1675,7 +1684,7 @@ export async function startApprovalServerWith(
    */
   const otherIdsOf = (open: LocalUiRecoveryKitSource): RecoveryKitOthers =>
     Object.freeze<RecoveryKitOthers>({
-      each: async (step) => {
+      each: async (step, bounds) => {
         const slot = host;
         if (slot === undefined) return { ok: true, notIncluded: [] };
         let entries: readonly AgentDirectoryEntry[];
@@ -1684,37 +1693,60 @@ export async function startApprovalServerWith(
         } catch {
           return { ok: false, notIncluded: [] };
         }
-        const notIncluded: string[] = [];
+        // IR L-1: each ID left out carries its reason; only a file-KeyStore ID can be backed up in
+        // the terminal. A file-KeyStore ID is never opened here (it would need its passphrase).
+        const notIncluded: RecoveryKitNotIncluded[] = [];
         const names: string[] = [];
         for (const entry of entries) {
           if (entry.name === open.name || entry.name === slot.current || entry.removing) continue;
-          if (!entry.available || names.length >= MAX_KIT_IDS - 1) notIncluded.push(entry.name);
-          else names.push(entry.name);
+          if (entry.keyStore === 'file') {
+            notIncluded.push({ name: entry.name, reason: 'file_keystore' });
+          } else if (!entry.available) {
+            notIncluded.push({ name: entry.name, reason: 'could_not_open' });
+          } else if (names.length >= MAX_KIT_IDS - 1) {
+            notIncluded.push({ name: entry.name, reason: 'over_limit' });
+          } else {
+            names.push(entry.name);
+          }
         }
         if (names.length === 0) return { ok: true, notIncluded };
-        const ok = await slot.visitOthers(names, async (name, agent) => {
-          const kit = agent === undefined ? undefined : recoveryKitOf(agent.localUi);
-          const client = agent?.localUi.client as unknown as RecoveryKitClient | undefined;
-          if (
-            agent === undefined ||
-            kit === undefined ||
-            client === undefined ||
-            kit.home !== open.home ||
-            kit.name !== name
-          ) {
-            notIncluded.push(name);
-            return true;
-          }
-          const apply = (signed: { readonly body: JsonObject; readonly sig: string }) =>
-            agent.source.apply(signed);
-          return step({
-            source: { agentId: kit.agentId, name: kit.name, storePath: kit.storePath },
-            prepareBackupExport: (kitId, contents) =>
-              client.ownerActions.prepareBackupExport(kitId, contents),
-            apply,
-          });
-        });
-        return { ok, notIncluded };
+        // IR M-1: each open and each step bounded by the per-ID limit and the export's budget.
+        const stepMs = (): number =>
+          Math.min(internals.backupWalk?.stepMs ?? VISIT_STEP_MS, bounds.deadlineAt - now());
+        const walked = await slot.visitOthers(
+          names,
+          async (name, agent) => {
+            const kit = agent === undefined ? undefined : recoveryKitOf(agent.localUi);
+            const client = agent?.localUi.client as unknown as RecoveryKitClient | undefined;
+            if (
+              agent === undefined ||
+              kit === undefined ||
+              client === undefined ||
+              kit.home !== open.home ||
+              kit.name !== name
+            ) {
+              // Opened, but no recovery-kit source: the CLI gives one to keychain IDs only.
+              const fileKeyStore = agent !== undefined && kit === undefined && client !== undefined;
+              notIncluded.push({ name, reason: fileKeyStore ? 'file_keystore' : 'could_not_open' });
+              return true;
+            }
+            const apply = (signed: { readonly body: JsonObject; readonly sig: string }) =>
+              agent.source.apply(signed);
+            return step({
+              source: { agentId: kit.agentId, name: kit.name, storePath: kit.storePath },
+              prepareBackupExport: (kitId, contents) =>
+                client.ownerActions.prepareBackupExport(kitId, contents),
+              apply,
+            });
+          },
+          {
+            stepMs,
+            ...(internals.backupWalk?.settleMs === undefined
+              ? {}
+              : { settleMs: internals.backupWalk.settleMs }),
+          },
+        );
+        return { ok: walked.ok, notIncluded };
       },
     });
 

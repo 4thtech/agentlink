@@ -154,7 +154,12 @@ async function idsWorld(home: string, over: { refuseWork?: boolean } = {}) {
   const applied: Record<Name, JsonObject[]> = { default: [], work: [], files: [] };
   const entries = new Map<string, AgentDirectoryEntry>([
     ['default', { name: 'default', label: 'Personal', available: true, removing: false }],
-    ['files', { name: 'files', label: 'Files', available: true, removing: false }],
+    ['broken', { name: 'broken', label: 'broken', available: false, removing: false }],
+    // A file-KeyStore ID (config.json records `file`): named, never opened (no passphrase here).
+    [
+      'files',
+      { name: 'files', label: 'Files', available: true, removing: false, keyStore: 'file' },
+    ],
     ['old', { name: 'old', label: 'Old', available: true, removing: true }],
     ['work', { name: 'work', label: 'Work', labelled: true, available: true, removing: false }],
   ]);
@@ -220,8 +225,15 @@ async function idsWorld(home: string, over: { refuseWork?: boolean } = {}) {
           } as never);
           return Promise.resolve({ status: 'prepared', op: 'backup.export', body, jcs });
         },
-        backupExportRecorded: (nonce: string) =>
-          Promise.resolve(applied[name].some((b) => b['nonce'] === nonce)),
+        // As core: the exact signed save (its body) and its kitId (IR L-3).
+        backupExportRecorded: (signed: { body: JsonObject }, kitId: string) =>
+          Promise.resolve(
+            applied[name].some(
+              (b) =>
+                JSON.stringify(b) === JSON.stringify(signed.body) &&
+                (b['params'] as JsonObject)['kitId'] === kitId,
+            ),
+          ),
       },
     };
     return {
@@ -244,12 +256,32 @@ async function idsWorld(home: string, over: { refuseWork?: boolean } = {}) {
       },
     };
   };
+  /**
+   * IR L-4: the keychain the server and the export control read. Each read of an ID's seed (the
+   * seal) is logged with the agents open at that moment: only the open ID may be open then.
+   */
+  const keychain = {
+    get: async (account: string) => {
+      for (const id of [world.agentId, second]) {
+        if (account === keychainAccount(id, 'seed')) {
+          log.push(`seal-read ${id === world.agentId ? 'default' : 'work'}`);
+          if (open.size > 1 || [...open].some((n) => n !== 'default')) {
+            violations.push(`seal read with [${[...open]}]`);
+          }
+        }
+      }
+      return world.keychain.get(account);
+    },
+    set: (account: string, value: Uint8Array) => world.keychain.set(account, value),
+    delete: (account: string) => world.keychain.delete(account),
+  };
   return {
     log,
     open,
     applied,
     violations,
     directory,
+    keychain,
     agent,
     get most() {
       return most;
@@ -260,7 +292,17 @@ async function idsWorld(home: string, over: { refuseWork?: boolean } = {}) {
 type IdsWorld = Awaited<ReturnType<typeof idsWorld>>;
 
 let homes = 0;
-async function harness(over: { refuseWork?: boolean; home?: string; ids?: IdsWorld } = {}) {
+async function harness(
+  over: {
+    refuseWork?: boolean;
+    home?: string;
+    ids?: IdsWorld;
+    /** IR M-1: the open of `work` hangs until this resolves (a keychain prompt, owner away). */
+    hangWork?: Promise<void>;
+    /** The open ID cannot be opened again after the walk. */
+    noReopen?: boolean;
+  } = {},
+) {
   homes += 1;
   const home = over.home ?? join(world.root, `home-${String(homes)}`);
   mkdirSync(join(home, 'Downloads'), { recursive: true });
@@ -277,17 +319,17 @@ async function harness(over: { refuseWork?: boolean; home?: string; ids?: IdsWor
       host: {
         directory: ids.directory,
         initial,
-        open: (name) => {
-          if (name !== 'default' && name !== 'work' && name !== 'files') {
-            return Promise.resolve(undefined);
-          }
-          return Promise.resolve(ids.agent(name));
+        open: async (name) => {
+          if (name !== 'default' && name !== 'work' && name !== 'files') return undefined;
+          if (name === 'work' && over.hangWork !== undefined) await over.hangWork;
+          if (name === 'default' && over.noReopen === true) return undefined;
+          return ids.agent(name);
         },
       },
     },
     {
-      keychain: world.keychain,
-      openOwnerStore: (expected) => KeychainOwnerKeyStore.open(world.keychain, expected),
+      keychain: ids.keychain,
+      openOwnerStore: (expected) => KeychainOwnerKeyStore.open(ids.keychain, expected),
       opener: (url) => {
         opened.push(url);
         return Promise.resolve(true);
@@ -298,6 +340,7 @@ async function harness(over: { refuseWork?: boolean; home?: string; ids?: IdsWor
         return Promise.resolve(true);
       },
       restore: { home, kdf: KDF },
+      backupWalk: { stepMs: 300, settleMs: 100 },
     },
   );
   servers.push(server);
@@ -348,7 +391,7 @@ interface Saved {
   folder: string;
   code: string;
   covers: { name: string; label: string }[];
-  notIncluded?: { name: string; label: string }[];
+  notIncluded?: { name: string; label: string; reason: string }[];
   check: string;
 }
 
@@ -373,8 +416,11 @@ describe('Back up covers every ID of this owner, one core open at a time (WP-R2b
         { name: 'default', label: 'default' },
         { name: 'work', label: 'Work' },
       ]);
-      // The file-KeyStore ID is named, never sealed; the one being removed is skipped.
-      expect(body.notIncluded).toEqual([{ name: 'files', label: 'Files' }]);
+      // IR L-1: each ID left out with its reason; the one being removed is skipped.
+      expect(body.notIncluded).toEqual([
+        { name: 'broken', label: 'broken', reason: 'could_not_open' },
+        { name: 'files', label: 'Files', reason: 'file_keystore' },
+      ]);
 
       // The KeyStore spy: never two open, the open ID never opened twice, in this exact order.
       expect(h.ids.violations).toEqual([]);
@@ -384,13 +430,14 @@ describe('Back up covers every ID of this owner, one core open at a time (WP-R2b
         'prepare default',
         'apply default',
         'close default',
-        'open files',
-        'close files',
         'open work',
         'prepare work',
         'apply work',
         'close work',
         'open default',
+        // IR L-4: the seal reads each ID's items with only the open ID open.
+        'seal-read default',
+        'seal-read work',
       ]);
       expect([...h.ids.open]).toEqual(['default']);
       expect(h.ids.applied.default).toHaveLength(1);
@@ -502,7 +549,13 @@ describe('Back up covers every ID of this owner, one core open at a time (WP-R2b
         ],
         peopleAtSave: 7,
       },
-      missing: { ids: [{ name: 'files', label: 'Files' }], people: 0 },
+      missing: {
+        ids: [
+          { name: 'broken', label: 'broken' },
+          { name: 'files', label: 'Files' },
+        ],
+        people: 0,
+      },
     };
     expect(after).toEqual(expected);
     expect(JSON.stringify(after)).not.toContain(h.home);
@@ -531,6 +584,50 @@ describe('Back up covers every ID of this owner, one core open at a time (WP-R2b
     expect(first.body).not.toContain(saved.code);
     // Single use.
     expect((await check()).status).not.toBe(200);
+  });
+});
+
+describe('Back up is bounded when another ID does not open (WP-R2b, IR M-1)', () => {
+  it('a peer open that hangs: answered within the limit, nothing sealed, the open ID restored, the peer closed when it arrives', async () => {
+    let answer: () => void = () => undefined;
+    const prompt = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    const h = await harness({ hangWork: prompt });
+    const started = Date.now();
+    const res = await h.exportKit(world.code);
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ error: 'not_applied' });
+    expect(readdirSync(join(h.home, 'Downloads'))).toEqual([]);
+    expect(await readKitRecord(join(h.home, '.agentlink'))).toEqual({ status: 'none' });
+    expect([...h.ids.open]).toEqual(['default']);
+    expect(h.ids.applied.work).toEqual([]);
+    // Reads work again at once.
+    expect((await h.read()).status).toBe(200);
+    // The owner answers the prompt later: that ID is opened and closed, never kept or used.
+    answer();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(h.ids.log.slice(-2)).toEqual(['open work', 'close work']);
+    expect([...h.ids.open]).toEqual(['default']);
+    expect(h.ids.log).not.toContain('prepare work');
+  });
+
+  it('the open ID cannot be opened again: the kit is saved, the host has none open and a new generation', async () => {
+    const h = await harness({ noReopen: true });
+    const res = await h.exportKit(world.code);
+    expect(res.status).toBe(200);
+    expect([...h.ids.open]).toEqual([]);
+    expect(h.ids.violations).toEqual([]);
+    const agents = await send(h.server.port, '/api/ui/agents', {
+      headers: {
+        Cookie: h.headers().Cookie,
+        'X-AgentLink-CSRF': h.headers()['X-AgentLink-CSRF'],
+        'Sec-Fetch-Site': 'same-origin',
+      },
+    });
+    expect(agents.headers['x-agentlink-generation']).toBe('2');
+    expect((JSON.parse(agents.body) as { current: string | null }).current).toBeNull();
   });
 });
 

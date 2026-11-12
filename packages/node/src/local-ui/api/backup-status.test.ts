@@ -31,6 +31,21 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
+/** A signed `backup.export` as the record keeps it (core checks it, here a stand-in). */
+const proof = (agent: string, nonce: string) => ({
+  body: {
+    v: 1,
+    agent,
+    owner: 'aa'.repeat(32),
+    op: 'backup.export',
+    params: { kitId: 'K'.repeat(22), contents: 'full' },
+    nonce,
+    issuedAt: 1_800_000_000,
+    expiresAt: 1_800_000_600,
+  },
+  sig: 'cd'.repeat(64),
+});
+
 async function saveRecord(): Promise<void> {
   await writeKitRecord(dir, {
     v: 1,
@@ -39,7 +54,7 @@ async function saveRecord(): Promise<void> {
     covers: [A, B],
     names: { [A]: 'default', [B]: 'work' },
     peopleAtSave: { [A]: 2, [B]: 1 },
-    exports: { [A]: 'n'.repeat(22), [B]: 'm'.repeat(22) },
+    exports: { [A]: proof(A, 'n'.repeat(22)), [B]: proof(B, 'm'.repeat(22)) },
     contents: 'full',
     file,
   });
@@ -131,17 +146,18 @@ describe('GET /api/ui/backup (WP-R2 kit record)', () => {
 
   it('a record whose backup.export core does not hold reads as no kit', async () => {
     await saveRecord();
-    const asked: [string, string][] = [];
+    const asked: [string, unknown, string][] = [];
     const res = await read(
       contextWith({
-        exportRecorded: (agentId, nonce) => {
-          asked.push([agentId, nonce]);
+        exportRecorded: (agentId, signed, kitId) => {
+          asked.push([agentId, signed.body['nonce'], kitId]);
           return Promise.resolve(agentId === A ? false : undefined);
         },
       }),
     );
     expect(res.body).toMatchObject({ record: 'none', state: 'none', lastKit: null });
-    expect(asked).toContainEqual([A, 'n'.repeat(22)]);
+    // WP-R2b (IR L-3): core is asked about the signed save and its kitId, not a bare nonce.
+    expect(asked).toContainEqual([A, 'n'.repeat(22), 'K'.repeat(22)]);
   });
 
   it('a check that cannot run (no covered ID open) keeps the record', async () => {

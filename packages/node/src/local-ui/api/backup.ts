@@ -28,6 +28,7 @@ import {
   kitStatus,
   readKitRecord,
   revealKitFile,
+  type KitRecord,
   type KitStatus,
   type KitTodayId,
   type LocalUiBackupDesk,
@@ -91,16 +92,13 @@ const available = (context: LocalUiContext): boolean =>
  * Core's word on the record: false when a covered ID's store holds no such `backup.export`, true when
  * at least one covered ID confirms it, undefined when none could be checked here (G-1: a display aid).
  */
-async function verified(
-  desk: LocalUiBackupDesk,
-  covers: readonly string[],
-  exports: Readonly<Record<string, string>>,
-): Promise<boolean | undefined> {
+async function verified(desk: LocalUiBackupDesk, record: KitRecord): Promise<boolean | undefined> {
   let answer: boolean | undefined;
-  for (const agentId of covers) {
-    const nonce = exports[agentId];
-    if (nonce === undefined) return false;
-    const one = await desk.exportRecorded(agentId, nonce);
+  for (const agentId of record.covers) {
+    const signed = record.exports[agentId];
+    if (signed === undefined) return false;
+    // WP-R2b (IR L-3): the exact signed save and its kitId, never a bare nonce.
+    const one = await desk.exportRecorded(agentId, signed, record.kitId);
     if (one === false) return false;
     if (one === true) answer = true;
   }
@@ -114,7 +112,7 @@ async function statusOf(desk: LocalUiBackupDesk | undefined): Promise<KitStatus>
     const read = await readKitRecord(desk.agentlinkDir);
     if (read.status !== 'saved') return kitStatus(read, [], undefined);
     const today: readonly KitTodayId[] = await desk.ids();
-    const ok = await verified(desk, read.record.covers, read.record.exports);
+    const ok = await verified(desk, read.record);
     return kitStatus(read, today, ok);
   } catch {
     // Never the error's text (it may name a path).
@@ -193,7 +191,7 @@ function exportPrecheck(
 function savedExtras(outcome: object): {
   covers: readonly { readonly name: string }[];
   check: string | undefined;
-  notIncluded: readonly { readonly name: string }[];
+  notIncluded: readonly { readonly name: string; readonly reason: string }[];
 } {
   const extra = outcome as Partial<Pick<RecoveryKitSaved, 'covers' | 'check' | 'notIncluded'>>;
   const covers = Array.isArray(extra.covers)
@@ -206,16 +204,22 @@ function savedExtras(outcome: object): {
     typeof extra.check === 'string' && /^[A-Za-z0-9_-]{22}$/.test(extra.check)
       ? extra.check
       : undefined;
-  // WP-R2b: this owner's IDs the kit does not include (a file-KeyStore ID), named on the page.
+  // WP-R2b (IR L-1): this owner's IDs the kit does not include, each with its fixed reason.
   const notIncluded = Array.isArray(extra.notIncluded)
     ? extra.notIncluded
-        .filter((name): name is string => typeof name === 'string')
-        .map((name) => ({
-          name,
-        }))
+        .filter(
+          (one) =>
+            typeof one === 'object' &&
+            one !== null &&
+            typeof one.name === 'string' &&
+            NOT_INCLUDED_REASONS.includes(one.reason),
+        )
+        .map((one) => ({ name: one.name, reason: one.reason }))
     : [];
   return { covers, check, notIncluded };
 }
+
+const NOT_INCLUDED_REASONS: readonly string[] = ['file_keystore', 'could_not_open', 'over_limit'];
 
 /** The covered IDs by name and label (labels from the desk; else the folder name). */
 async function coversShown(
@@ -267,7 +271,16 @@ async function exportKit(
       folder: outcome.folder,
       code: outcome.code,
       covers: await coversShown(context, covers),
-      ...(notIncluded.length === 0 ? {} : { notIncluded: await coversShown(context, notIncluded) }),
+      // WP-R2b (IR L-1): `[{name, label, reason}]`, reason `file_keystore` (the page says "back it
+      // up in the terminal"), `could_not_open` or `over_limit`; absent when every ID is in the kit.
+      ...(notIncluded.length === 0
+        ? {}
+        : {
+            notIncluded: (await coversShown(context, notIncluded)).map((shown, i) => ({
+              ...shown,
+              reason: notIncluded[i]?.reason as string,
+            })),
+          }),
       ...(check === undefined ? {} : { check }),
     },
   };

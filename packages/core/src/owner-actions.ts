@@ -1579,14 +1579,40 @@ export class OwnerActions {
 
   /**
    * WP-R2 (D-147 (6); 04 §2.3.3 "Kit record"): true when this agent's store holds the nonce row of
-   * an applied `backup.export` with `nonce` (the audit record of a kit save), so the app can tell a
-   * kit record that names a real save from one that does not. Reads one row; writes nothing. Any
-   * input that is not a 16-byte base64url nonce is false.
+   * an applied `backup.export` that is exactly `signed` and names `kitId`, so the app can tell a kit
+   * record that names a real save from one that does not. WP-R2b (IR L-3): the row's action hash is
+   * the hash of the whole signed action, so a record cannot pair a real nonce with another kitId.
+   * Reads one row; writes nothing. Anything malformed is false.
    */
-  async backupExportRecorded(nonce: string): Promise<boolean> {
-    if (typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{22}$/.test(nonce)) return false;
+  async backupExportRecorded(signed: unknown, kitId: string): Promise<boolean> {
+    const nonceText = /^[A-Za-z0-9_-]{22}$/;
+    if (typeof kitId !== 'string' || !nonceText.test(kitId)) return false;
+    if (typeof signed !== 'object' || signed === null || Array.isArray(signed)) return false;
+    const keys = Object.keys(signed);
+    if (keys.length !== 2 || !keys.includes('body') || !keys.includes('sig')) return false;
+    const { body, sig } = signed as { body?: unknown; sig?: unknown };
+    if (typeof sig !== 'string' || typeof body !== 'object' || body === null) return false;
+    const b = body as Record<string, unknown>;
+    const params = b['params'] as Record<string, unknown> | null | undefined;
+    if (
+      b['op'] !== 'backup.export' ||
+      typeof b['nonce'] !== 'string' ||
+      !nonceText.test(b['nonce']) ||
+      typeof params !== 'object' ||
+      params === null ||
+      params['kitId'] !== kitId
+    ) {
+      return false;
+    }
+    let hash: string;
+    try {
+      hash = ownerActionHash({ body, sig });
+    } catch {
+      return false;
+    }
+    const nonce = b['nonce'];
     const row = await this.#ctx.store.transaction((tx) => tx.get('owner_action_nonces', { nonce }));
-    return row !== undefined && row.op === 'backup.export';
+    return row !== undefined && row.op === 'backup.export' && row.action_hash === hash;
   }
 
   /**

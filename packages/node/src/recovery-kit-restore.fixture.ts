@@ -120,7 +120,7 @@ export async function makeAgent(
       name,
       relays: ['wss://relay.agentlink.dev', 'wss://nos.lol'],
     });
-    const contacts = [];
+    const contacts: Record<string, unknown>[] = [];
     for (let i = 0; i < (extra.people ?? 0); i += 1) {
       contacts.push({
         ...(await sampleRow('contacts', i, opened.cipher as never)),

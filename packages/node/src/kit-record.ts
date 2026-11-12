@@ -1,15 +1,16 @@
 // WP-R2 (D-147 (6), (7); 04 §2.3.3 "Kit record", "Check that my kit opens"; design-1112 §6.2 to
 // §6.4): the record of the last recovery kit saved on this computer, the status the Backup & restore
-// page shows from it, Show in Finder by the recorded path, and the in-memory export handle that lets
-// Check open the kit just saved without the page ever naming a file.
+// page shows from it and Show in Finder by the recorded path. (WP-R2b: Check's export handle is the
+// restore engine's, recovery-kit-restore.ts registerExportedKit.)
 //
 // The record is `~/.agentlink/kit-record.json` (mode 0600, written through a temporary file and a
 // rename):
 //   {"v":1,"kitId","at","covers":[agentId…],"names":{agentId:name},"peopleAtSave":{agentId:n},
-//    "exports":{agentId:nonce},"contents","file"}
+//    "exports":{agentId:{body,sig}},"contents","file"}
 // `names` (each covered ID's folder name, the kit manifest's) lets the page match today's IDs, and
-// `exports` (each covered ID's `backup.export` nonce, public) lets core say the save was applied
-// (core `backupExportRecorded`); both are additions to the 04 §2.3.3 format, proposed, owner confirms
+// `exports` (each covered ID's signed `backup.export`, public: no secret in it) lets core say this
+// very save was applied (core `backupExportRecorded` matches the nonce row's action hash, so the
+// kitId is bound too, WP-R2b IR L-3); both are additions to the 04 §2.3.3 format, proposed, owner confirms
 // at merge. `file` is the kit's absolute path, kept for Show in Finder only: it never leaves the
 // server, and Check never opens a kit by it.
 //
@@ -37,8 +38,38 @@ const O_NONBLOCK = (constants as { O_NONBLOCK?: number }).O_NONBLOCK ?? 0;
 const AGENT_ID = /^0x[0-9a-f]{40}$/;
 const AGENT_NAME = /^[a-z][a-z0-9-]{0,31}$/;
 const B64_16 = /^[A-Za-z0-9_-]{22}$/;
+/** A BIP-340 signature, 64 bytes as lowercase hex. */
+const SIG = /^[0-9a-f]{128}$/;
 /** The kit file names the export writes (recovery-kit-export.ts). */
 const KIT_FILE_NAME = /^agentlink-recovery-kit-\d{4}-\d{2}-\d{2}(?:-\d{1,2})?\.alkk$/;
+
+/** One covered ID's signed `backup.export` as core applied it (public; no secret). */
+export interface KitExportProof {
+  readonly body: Readonly<Record<string, unknown>>;
+  readonly sig: string;
+}
+
+/** The proof exactly as written for `agentId` and `kitId`, deep-copied, or undefined. */
+function parseProof(value: unknown, agentId: string, kitId: string): KitExportProof | undefined {
+  if (!isObject(value) || !sameKeys(value, ['body', 'sig'])) return undefined;
+  const { body, sig } = value;
+  if (typeof sig !== 'string' || !SIG.test(sig) || !isObject(body)) return undefined;
+  const params = body['params'];
+  if (
+    body['op'] !== 'backup.export' ||
+    body['agent'] !== agentId ||
+    typeof body['nonce'] !== 'string' ||
+    !B64_16.test(body['nonce']) ||
+    !isObject(params) ||
+    params['kitId'] !== kitId
+  ) {
+    return undefined;
+  }
+  return Object.freeze({
+    body: Object.freeze(JSON.parse(JSON.stringify(body)) as Record<string, unknown>),
+    sig,
+  });
+}
 
 export interface KitRecord {
   readonly v: 1;
@@ -52,8 +83,8 @@ export interface KitRecord {
   readonly names: Readonly<Record<string, string>>;
   /** Each covered ID's active contacts in its snapshot. */
   readonly peopleAtSave: Readonly<Record<string, number>>;
-  /** Each covered ID's `backup.export` nonce (its audit row in that ID's store). */
-  readonly exports: Readonly<Record<string, string>>;
+  /** Each covered ID's signed `backup.export` (its audit row in that ID's store is its hash). */
+  readonly exports: Readonly<Record<string, KitExportProof>>;
   readonly contents: 'full' | 'identity';
   /** The kit's absolute path: for Show in Finder only, never answered to the page. */
   readonly file: string;
@@ -102,6 +133,7 @@ function parseRecord(value: unknown): KitRecord | undefined {
   if (!isObject(names) || !sameKeys(names, ids)) return undefined;
   if (!isObject(peopleAtSave) || !sameKeys(peopleAtSave, ids)) return undefined;
   if (!isObject(exports) || !sameKeys(exports, ids)) return undefined;
+  const proofs: Record<string, KitExportProof> = {};
   const seenNames = new Set<string>();
   for (const id of ids) {
     const name = names[id];
@@ -116,8 +148,9 @@ function parseRecord(value: unknown): KitRecord | undefined {
     ) {
       return undefined;
     }
-    const nonce = exports[id];
-    if (typeof nonce !== 'string' || !B64_16.test(nonce)) return undefined;
+    const proof = parseProof(exports[id], id, kitId);
+    if (proof === undefined) return undefined;
+    proofs[id] = proof;
   }
   if (contents !== 'full' && contents !== 'identity') return undefined;
   if (
@@ -138,7 +171,7 @@ function parseRecord(value: unknown): KitRecord | undefined {
     covers: Object.freeze(ids),
     names: pick<string>(names),
     peopleAtSave: pick<number>(peopleAtSave),
-    exports: pick<string>(exports),
+    exports: pick<KitExportProof>(proofs),
     contents,
     file,
   });
@@ -364,63 +397,9 @@ export async function revealKitFile(
   }
 }
 
-/** The kit file a save just created, as Check may open it (04 §2.3.3 "Check that my kit opens"). */
-export interface KitExportHandleValue {
-  readonly kitId: string;
-  /** Server-held only; never answered to the page. */
-  readonly path: string;
-  /** The device and inode of the file the export created: Check refuses any other file. */
-  readonly dev: number;
-  readonly ino: number;
-}
-
 /**
- * The in-memory export handles: 128 random bits each, 10 minutes, single use (`take` removes it), at
- * most a few live (the oldest goes first). Nothing is stored on disk. One registry per server
- * process: the app host has one page session, so the handle is bound to it by living in that
- * process only (the restore routes of WP-R1 `take` from the same registry).
- */
-export interface KitExportHandles {
-  issue(kit: KitExportHandleValue): string;
-  take(handle: string): KitExportHandleValue | undefined;
-}
-
-const HANDLE_TTL_MS = 10 * 60 * 1000;
-const MAX_LIVE_HANDLES = 4;
-
-export function createKitExportHandles(
-  options: { readonly now?: () => number; readonly ttlMs?: number } = {},
-): KitExportHandles {
-  const now = options.now ?? Date.now;
-  const ttl = options.ttlMs ?? HANDLE_TTL_MS;
-  const live = new Map<string, { kit: KitExportHandleValue; until: number }>();
-  return Object.freeze({
-    issue(kit: KitExportHandleValue): string {
-      const handle = encodeBase64url(randomBytes(16));
-      live.set(handle, { kit: Object.freeze({ ...kit }), until: now() + ttl });
-      while (live.size > MAX_LIVE_HANDLES) {
-        const oldest = live.keys().next().value;
-        if (oldest === undefined) break;
-        live.delete(oldest);
-      }
-      return handle;
-    },
-    take(handle: string): KitExportHandleValue | undefined {
-      if (typeof handle !== 'string' || !B64_16.test(handle)) return undefined;
-      const held = live.get(handle);
-      live.delete(handle);
-      if (held === undefined || now() > held.until) return undefined;
-      return held.kit;
-    },
-  });
-}
-
-/** The server process's registry (the export route issues, Check takes). */
-export const kitExportHandles: KitExportHandles = createKitExportHandles();
-
-/**
- * WP-R2: what `GET /api/ui/backup` and Show in Finder need from the app host (built by the server;
- * the context field `backup` is wired by the server, see the PR). Reads only; it signs nothing.
+ * WP-R2: what `GET /api/ui/backup` and Show in Finder need from the app host (built by the server,
+ * approval-server.ts backupDeskOf, as the context's `backup`). Reads only; it signs nothing.
  */
 export interface LocalUiBackupDesk {
   /** `~/.agentlink`, where the record lives. */
@@ -428,10 +407,14 @@ export interface LocalUiBackupDesk {
   /** Today's IDs of this owner (the Agents list): names, labels, active contacts. */
   ids(): Promise<readonly KitTodayId[]>;
   /**
-   * Core's `backupExportRecorded(nonce)` for `agentId` when that ID's core is open here; undefined
-   * when it cannot be checked now (another ID).
+   * Core's `backupExportRecorded(signed, kitId)` for `agentId` when that ID's core is open here;
+   * undefined when it cannot be checked now (another ID's core is never opened for a read).
    */
-  exportRecorded(agentId: string, nonce: string): Promise<boolean | undefined>;
+  exportRecorded(
+    agentId: string,
+    signed: KitExportProof,
+    kitId: string,
+  ): Promise<boolean | undefined>;
   /** The OS revealer (approval-os.ts osFileRevealer). */
   readonly revealer: FileRevealer;
 }

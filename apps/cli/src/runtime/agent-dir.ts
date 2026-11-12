@@ -834,6 +834,8 @@ async function directoryEntry(
       labelled: config.label !== undefined,
       available: true,
       removing,
+      // WP-R2b: the recorded backend, so Back up names a file-KeyStore ID without opening it.
+      keyStore: config.keyStore,
     });
   } catch {
     // A folder that breaks the rules is still listed (never lost), and never opened.

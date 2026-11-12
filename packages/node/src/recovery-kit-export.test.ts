@@ -38,7 +38,10 @@ import { readKitRecord } from './kit-record.js';
 import { checkGesture, signGesture } from './owner-operation.js';
 import { initOwnerWith } from './owner-init.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
+import { OWNER_SESSION_DEFAULT_TTL_MS } from '@4thtech-io/crypto';
 import {
+  EXPORT_BUDGET_MS,
+  EXPORT_SEAL_MARGIN_MS,
   exportRecoveryKit,
   type RecoveryKitClient,
   type RecoveryKitOthers,
@@ -195,6 +198,7 @@ async function harness(
     secondCore,
     signCalls,
     registered,
+    session,
     run,
     close: async () => {
       await session.close();
@@ -259,10 +263,16 @@ describe('exportRecoveryKit: one kit for every ID (WP-R2)', () => {
       expect(read.record.covers).toEqual([world.agentId, second]);
       expect(read.record.names).toEqual({ [world.agentId]: 'default', [second]: 'work' });
       expect(read.record.peopleAtSave).toEqual({ [world.agentId]: 2, [second]: 5 });
-      expect(read.record.exports).toEqual({
-        [world.agentId]: h.firstCore.applied[0]?.['nonce'],
-        [second]: h.secondCore.applied[0]?.['nonce'],
-      });
+      // WP-R2b (IR L-3): each ID's signed backup.export as its core applied it (body and sig).
+      expect(read.record.exports[world.agentId]?.body).toEqual(h.firstCore.applied[0]);
+      expect(read.record.exports[second]?.body).toEqual(h.secondCore.applied[0]);
+      for (const id of [world.agentId, second]) {
+        const proof = read.record.exports[id];
+        expect(proof?.sig).toMatch(/^[0-9a-f]{128}$/);
+        expect(ownerSigValid(world.owner, proof?.body as JsonObject, proof?.sig as string)).toBe(
+          true,
+        );
+      }
       expect(read.record.file).toBe(path);
       expect(read.record.contents).toBe('full');
 
@@ -407,7 +417,14 @@ describe('exportRecoveryKit: one kit for every ID (WP-R2)', () => {
       walk: (peers) => ({
         each: async (step) => {
           for (const peer of peers) if (!(await step(peer))) return { ok: false, notIncluded: [] };
-          return { ok: true, notIncluded: ['files'] };
+          return {
+            ok: true,
+            notIncluded: [
+              { name: 'files', reason: 'file_keystore' as const },
+              { name: 'Bad Name', reason: 'file_keystore' as const },
+              { name: 'odd', reason: 'because' as never },
+            ],
+          };
         },
       }),
     });
@@ -415,7 +432,8 @@ describe('exportRecoveryKit: one kit for every ID (WP-R2)', () => {
       const outcome = await h.run();
       expect(outcome.status).toBe('saved');
       if (outcome.status !== 'saved') return;
-      expect(outcome.notIncluded).toEqual(['files']);
+      // IR L-1: each with its fixed reason; anything else the host might pass is dropped.
+      expect(outcome.notIncluded).toEqual([{ name: 'files', reason: 'file_keystore' }]);
       const read = await readKitRecord(join(h.home, '.agentlink'));
       expect(read.status === 'saved' && read.record.covers).toEqual([world.agentId, second]);
     } finally {
@@ -426,12 +444,92 @@ describe('exportRecoveryKit: one kit for every ID (WP-R2)', () => {
   it('past its time budget the operation signs no further ID and seals nothing', async () => {
     let t = Date.now();
     const h = await harness({
-      // Each read of the clock moves it on by 61 s: the second ID's turn is past the 120 s budget.
-      now: () => (t += 61_000),
+      // Each read of the clock moves it on by 15 s: the second ID's turn is past the 40 s budget.
+      now: () => (t += 15_000),
     });
     try {
       expect(await h.run()).toEqual({ status: 'not_applied' });
       expect(h.signCalls.length).toBeLessThan(2);
+      expect(h.secondCore.applied).toEqual([]);
+      expect(readdirSync(join(h.home, 'Downloads'))).toEqual([]);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('the walk budget plus the seal margin fits inside the export session (IR M-1)', async () => {
+    expect(EXPORT_BUDGET_MS + EXPORT_SEAL_MARGIN_MS).toBeLessThanOrEqual(
+      OWNER_SESSION_DEFAULT_TTL_MS,
+    );
+    // The host is told the deadline: the budget from the gesture on.
+    let seen: number | undefined;
+    const t = 1_000_000;
+    const h = await harness({
+      now: () => t,
+      walk: (peers) => ({
+        each: async (step, bounds) => {
+          seen = bounds.deadlineAt;
+          for (const peer of peers) if (!(await step(peer))) return { ok: false, notIncluded: [] };
+          return { ok: true, notIncluded: [] };
+        },
+      }),
+    });
+    try {
+      expect((await h.run()).status).toBe('saved');
+      expect(seen).toBe(t + EXPORT_BUDGET_MS);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('the export session ending mid-walk signs nothing more and seals nothing (IR M-1)', async () => {
+    const h = await harness({
+      walk: (peers) => ({
+        each: async (step) => {
+          // The session expires while the host opens the next ID.
+          await h.session.close();
+          for (const peer of peers) if (!(await step(peer))) return { ok: false, notIncluded: [] };
+          return { ok: true, notIncluded: [] };
+        },
+      }),
+    });
+    try {
+      expect(await h.run()).toEqual({ status: 'not_applied' });
+      expect(h.secondCore.applied).toEqual([]);
+      expect(readdirSync(join(h.home, 'Downloads'))).toEqual([]);
+      expect(await readKitRecord(join(h.home, '.agentlink'))).toEqual({ status: 'none' });
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('a step still running when the host gave up (timeout) signs and applies no more', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let late: Promise<boolean> | undefined;
+    const h = await harness({
+      walk: (peers) => ({
+        each: (step) => {
+          const peer = peers[0] as RecoveryKitPeer;
+          // The host's per-step timeout fires while the peer's prepare is still running.
+          late = step({
+            ...peer,
+            prepareBackupExport: async (k, c) => {
+              await held;
+              return peer.prepareBackupExport(k, c);
+            },
+          });
+          return Promise.resolve({ ok: false, notIncluded: [] });
+        },
+      }),
+    });
+    try {
+      expect(await h.run()).toEqual({ status: 'not_applied' });
+      release();
+      expect(await late).toBe(false);
+      expect(h.signCalls).toHaveLength(1);
       expect(h.secondCore.applied).toEqual([]);
       expect(readdirSync(join(h.home, 'Downloads'))).toEqual([]);
     } finally {
@@ -663,9 +761,17 @@ describe.runIf(process.platform !== 'win32')('round trip with WP-R1 (real cores)
         try {
           expect(
             await core.client.ownerActions.backupExportRecorded(
-              read.record.exports[id.agentId] as string,
+              read.record.exports[id.agentId],
+              read.record.kitId,
             ),
           ).toBe(true);
+          // IR L-3: the same signed save under another kitId is not this save.
+          expect(
+            await core.client.ownerActions.backupExportRecorded(
+              read.record.exports[id.agentId],
+              'Z'.repeat(22),
+            ),
+          ).toBe(false);
         } finally {
           await core.close();
         }
