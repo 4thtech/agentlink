@@ -89,6 +89,16 @@ export const FORBIDDEN_ENV = [
 ] as const;
 /** Any variable with this prefix → exit (ELECTRON_RUN_AS_NODE, ELECTRON_ENABLE_LOGGING, …). */
 export const FORBIDDEN_ENV_PREFIX = 'ELECTRON_';
+/**
+ * Any variable with this prefix → exit (NODE_OPTIONS, NODE_PATH, NODE_TLS_REJECT_UNAUTHORIZED, …):
+ * the whole NODE_ family, not only the names in FORBIDDEN_ENV.
+ *
+ * Residual (unsigned phase): the dynamic loader reads DYLD_* (macOS) and LD_PRELOAD /
+ * LD_LIBRARY_PATH (Linux) before any of this code runs, so checking them here cannot stop an
+ * injection. They are closed by the hardened runtime and library validation once the app is signed
+ * (WP-D18), not by this check; the threat model already assumes a same-user shell (04 §2.5).
+ */
+export const FORBIDDEN_ENV_NODE_PREFIX = 'NODE_';
 
 export interface LaunchInput {
   /** process.argv. */
@@ -130,6 +140,7 @@ export function forbiddenEnvironment(env: Readonly<Record<string, string | undef
     if (value === undefined) continue;
     const upper = name.toUpperCase();
     if (upper.startsWith(FORBIDDEN_ENV_PREFIX)) return true;
+    if (upper.startsWith(FORBIDDEN_ENV_NODE_PREFIX)) return true;
     if ((FORBIDDEN_ENV as readonly string[]).includes(upper)) return true;
   }
   return false;

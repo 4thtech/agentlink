@@ -101,6 +101,24 @@ export const STOP_REASONS = [
 ] as const;
 export type StopReason = (typeof STOP_REASONS)[number];
 
+/**
+ * The stop reasons that mean the core could not start and a restart cannot fix it: the supervisor
+ * stops restarting (terminal "failed"); only the person retries (tray). `port` and `failed` may be
+ * passing, so they keep the normal backoff.
+ */
+export const START_FAILURE_REASONS = [
+  'no_owner',
+  'no_ids',
+  'only_removing',
+  'keychain',
+  'open',
+] as const satisfies readonly StopReason[];
+export type StartFailureReason = (typeof START_FAILURE_REASONS)[number];
+
+export function isStartFailure(reason: StopReason): reason is StartFailureReason {
+  return (START_FAILURE_REASONS as readonly StopReason[]).includes(reason);
+}
+
 /** The pages the shell may ask the core to open; the core maps each to a fixed path. */
 export const SHOW_ROUTES = ['home', 'approvals', 'join'] as const;
 export type ShowRoute = (typeof SHOW_ROUTES)[number];

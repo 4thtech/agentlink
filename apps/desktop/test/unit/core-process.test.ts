@@ -16,7 +16,8 @@ import type { CoreMessage } from '../../src/shared/protocol.js';
 import { FakeTimers, fakeSpawn, readyLine } from './fakes.js';
 
 const NODE = '/Applications/AgentLink.app/Contents/Resources/node/bin/node';
-const HOST = '/Applications/AgentLink.app/Contents/Resources/core/desktop/host.js';
+const HOST =
+  '/Applications/AgentLink.app/Contents/Resources/core/node_modules/@4thtech-io/agentlink/dist/desktop-host.js';
 
 function setup(env: Record<string, string> = { HOME: '/Users/x', PATH: '/usr/bin' }) {
   const timers = new FakeTimers();
@@ -63,6 +64,12 @@ describe('cleanCoreEnv', () => {
       'darwin',
     );
     expect(env).toEqual({ HOME: '/Users/x', PATH: '/usr/bin', LANG: 'en_US.UTF-8' });
+  });
+
+  it('passes the AI app markers through, so the core still refuses an AI-started app (G-1)', () => {
+    expect(
+      cleanCoreEnv({ HOME: '/Users/x', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli' }, 'darwin'),
+    ).toEqual({ HOME: '/Users/x', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli' });
   });
 
   it('matches Windows names case-insensitively, keeping their spelling', () => {
@@ -181,6 +188,48 @@ describe('CoreSupervisor', () => {
     expect(children).toHaveLength(MAX_FAST_FAILURES);
     supervisor.retry();
     expect(children).toHaveLength(MAX_FAST_FAILURES + 1);
+  });
+
+  it.each(['no_owner', 'no_ids', 'only_removing', 'keychain', 'open'] as const)(
+    'stops restarting when the core could not start (%s); retry starts it again',
+    (reason) => {
+      const { supervisor, children, timers, states, messages } = setup();
+      supervisor.start();
+      const child = children[0];
+      child?.stream.push(`${JSON.stringify({ v: 1, type: 'stopped', reason })}\n`);
+      expect(messages).toEqual([{ v: 1, type: 'stopped', reason }]);
+      child?.exit(1);
+      expect(supervisor.state).toBe('failed');
+      expect(supervisor.failureReason).toBe(reason);
+      expect(states.at(-1)).toBe('failed');
+      timers.advance(10 * BACKOFF_MAX_MS);
+      expect(children).toHaveLength(1);
+      supervisor.retry();
+      expect(children).toHaveLength(2);
+      expect(supervisor.state).toBe('running');
+      expect(supervisor.failureReason).toBeNull();
+    },
+  );
+
+  it.each(['port', 'failed', 'fatal', 'signal'] as const)(
+    'keeps the normal backoff after stopped "%s"',
+    (reason) => {
+      const { supervisor, children, timers } = setup();
+      supervisor.start();
+      children[0]?.stream.push(`${JSON.stringify({ v: 1, type: 'stopped', reason })}\n`);
+      children[0]?.exit(1);
+      expect(supervisor.state).toBe('waiting');
+      expect(supervisor.failureReason).toBeNull();
+      timers.advance(BACKOFF_BASE_MS);
+      expect(children).toHaveLength(2);
+    },
+  );
+
+  it('kills a core whose pipe closed', () => {
+    const { supervisor, children } = setup();
+    supervisor.start();
+    children[0]?.stream.destroy();
+    expect(children[0]?.kills).toEqual(['SIGKILL']);
   });
 
   it('resets the backoff after a stable run', () => {

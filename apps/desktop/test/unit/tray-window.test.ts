@@ -21,13 +21,17 @@ describe('tray', () => {
     expect(trayTooltip('closing', Number.NaN)).toBe('AgentLink: Closing');
   });
 
-  it('has Open and Quit only', () => {
+  it('has Open, Try again and Quit only', () => {
     const electron = fakeElectron();
     let opened = 0;
     let quit = 0;
+    let retried = 0;
     const tray = new AppTray(electron, '/icon.png', {
       open: () => {
         opened += 1;
+      },
+      retry: () => {
+        retried += 1;
       },
       quit: () => {
         quit += 1;
@@ -37,13 +41,15 @@ describe('tray', () => {
     const menu = fake?.menu as FakeMenu;
     expect(menu.template.map((i) => i.label ?? i.type)).toEqual([
       TRAY_COPY.open,
+      TRAY_COPY.retry,
       'separator',
       TRAY_COPY.quit,
     ]);
     menu.template[0]?.click?.();
-    menu.template[2]?.click?.();
+    menu.template[1]?.click?.();
+    menu.template[3]?.click?.();
     fake?.emit('click');
-    expect([opened, quit]).toEqual([2, 1]);
+    expect([opened, retried, quit]).toEqual([2, 1, 1]);
     tray.update('running', 2);
     expect(fake?.tooltip).toBe('AgentLink: Running · 2 waiting');
   });

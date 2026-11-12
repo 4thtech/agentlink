@@ -9,7 +9,15 @@
 //   ELECTRON_*, AGENTLINK_* secrets (passphrases, owner codes) and everything else are dropped.
 // - A protocol violation closes the pipe and stops that core; the supervisor starts a new one with
 //   backoff. After MAX_FAST_FAILURES quick deaths in a row it gives up (state "failed").
-import type { CoreMessage, ShellMessage } from '../shared/protocol.js';
+// - A core that says `stopped` with a start-failure reason (no owner, keychain, port, …) is not
+//   restarted: a restart cannot fix it. The state goes to "failed" with that reason
+//   (`failureReason`), and the shell shows a fixed message for it (D2 open question 4).
+import {
+  isStartFailure,
+  type CoreMessage,
+  type ShellMessage,
+  type StartFailureReason,
+} from '../shared/protocol.js';
 import { PipeClient, type PipeStream, type PipeViolation } from './pipe.js';
 
 /** Environment variables passed to the core (exact names; case-insensitive match on Windows). */
@@ -48,6 +56,13 @@ export const CORE_ENV_ALLOWLIST: readonly string[] = [
   'DBUS_SESSION_BUS_ADDRESS',
   'DISPLAY',
   'WAYLAND_DISPLAY',
+  // AI app markers (apps/cli/src/runtime/guards.ts HARNESS_MARKERS). Passed through so the core's
+  // guard against an AI starting the owner pages (G-1) still sees an app launched from an AI app.
+  'CLAUDECODE',
+  'CLAUDE_CODE_ENTRYPOINT',
+  'CODEX_SANDBOX',
+  'CODEX_SANDBOX_NETWORK_DISABLED',
+  'GEMINI_CLI',
 ];
 
 /** Backoff between restarts: 1 s, 2 s, 4 s … capped at 30 s. */
@@ -144,6 +159,7 @@ export class CoreSupervisor {
   #startedAt = 0;
   #failures = 0;
   #restartTimer: unknown = null;
+  #startFailure: StartFailureReason | null = null;
   #stopWaiters: Array<() => void> = [];
 
   constructor(options: CoreSupervisorOptions) {
@@ -157,6 +173,11 @@ export class CoreSupervisor {
     return this.#state;
   }
 
+  /** Why the core could not start, when the state is "failed" for that reason; else null. */
+  get failureReason(): StartFailureReason | null {
+    return this.#state === 'failed' ? this.#startFailure : null;
+  }
+
   #setState(state: SupervisorState): void {
     this.#state = state;
     this.#options.onStateChange?.(state);
@@ -165,6 +186,7 @@ export class CoreSupervisor {
   start(): void {
     if (this.#state !== 'idle' && this.#state !== 'waiting') return;
     this.#restartTimer = null;
+    this.#startFailure = null;
     const o = this.#options;
     this.#startedAt = o.timers.now();
     let child: CoreChild;
@@ -190,16 +212,30 @@ export class CoreSupervisor {
       child.kill('SIGKILL');
       return;
     }
+    let killed = false;
+    const killOnce = (): void => {
+      if (killed) return;
+      killed = true;
+      child.kill('SIGKILL');
+    };
     this.#pipe = new PipeClient(stream, {
       onMessage: (message) => {
-        if (this.#child === child && this.#state === 'running') o.onMessage(message);
+        if (this.#child !== child || this.#state !== 'running') return;
+        if (message.type === 'stopped' && isStartFailure(message.reason)) {
+          this.#startFailure = message.reason;
+        }
+        o.onMessage(message);
       },
       onViolation: (violation) => {
         o.onViolation?.(violation);
         // A core that breaks the protocol is stopped; the exit handler restarts it.
-        child.kill('SIGKILL');
+        killOnce();
       },
-      onClose: () => undefined,
+      onClose: () => {
+        // A core without its pipe can never reach the window: stop it (the exit handler decides on
+        // a restart). While stopping, the shutdown grace timers handle it.
+        if (this.#child === child && this.#state !== 'stopping') killOnce();
+      },
     });
     o.onStart?.();
   }
@@ -220,6 +256,10 @@ export class CoreSupervisor {
       return;
     }
     const o = this.#options;
+    if (this.#startFailure !== null) {
+      this.#setState('failed');
+      return;
+    }
     const ranFor = o.timers.now() - this.#startedAt;
     this.#failures = ranFor >= STABLE_RUN_MS ? 1 : this.#failures + 1;
     if (this.#failures >= MAX_FAST_FAILURES) {

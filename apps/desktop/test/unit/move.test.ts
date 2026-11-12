@@ -44,6 +44,16 @@ describe('locationProblem', () => {
     ).toBeNull();
   });
 
+  it('accepts an Applications folder this user cannot write (standard user)', () => {
+    expect(locationProblem(mac(IN_APPS, false))).toBeNull();
+    expect(
+      locationProblem(mac('/Users/x/Applications/AgentLink.app/Contents/MacOS/AgentLink', false)),
+    ).toBeNull();
+    expect(
+      locationProblem(mac('/Applications/Sub/AgentLink.app/Contents/MacOS/AgentLink', false)),
+    ).toBe('read_only');
+  });
+
   it('refuses a translocated app', () => {
     expect(locationProblem(mac(TRANSLOCATED))).toBe('translocated');
   });
@@ -52,7 +62,9 @@ describe('locationProblem', () => {
     expect(
       locationProblem(mac('/Volumes/AgentLink/AgentLink.app/Contents/MacOS/AgentLink', false)),
     ).toBe('read_only');
-    expect(locationProblem(mac(IN_APPS, false))).toBe('read_only');
+    expect(
+      locationProblem(mac('/Users/x/Downloads/AgentLink.app/Contents/MacOS/AgentLink', false)),
+    ).toBe('read_only');
     expect(locationProblem(win('C:\\Program Files\\AgentLink\\AgentLink.exe', false))).toBe(
       'read_only',
     );

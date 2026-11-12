@@ -10,6 +10,7 @@ import {
   type ShellProcess,
 } from '../../src/main/main.js';
 import { WINDOW_PARTITION } from '../../src/main/security.js';
+import { START_FAILURE_TEXT, START_FAILURE_TITLE } from '../../src/main/start-failure.js';
 import {
   FakeBrowserWindow,
   FakeEvent,
@@ -163,6 +164,22 @@ describe('runShell startup', () => {
     expect(contents.windowOpenHandler?.({ url: 'https://evil.example/' })).toEqual({
       action: 'deny',
     });
+  });
+
+  it('a core that could not start → one fixed message, no restart, Try again in the tray', async () => {
+    const { electron, children, proc } = setup();
+    await runShell(electron, proc);
+    children[0]?.stream.push('{"v":1,"type":"stopped","reason":"keychain"}\n');
+    children[0]?.exit(1);
+    expect(electron.dialog.shown).toHaveLength(1);
+    expect(electron.dialog.shown[0]?.title).toBe(START_FAILURE_TITLE);
+    expect(electron.dialog.shown[0]?.message).toBe(START_FAILURE_TEXT.keychain);
+    (proc.timers as FakeTimers).advance(120_000);
+    expect(children).toHaveLength(1);
+    expect(FakeBrowserWindow.created).toHaveLength(0);
+    const menu = FakeTray.created[0]?.menu as { template: { click?: () => void }[] };
+    menu.template[1]?.click?.();
+    expect(children).toHaveLength(2);
   });
 
   it('a protocol violation stops the core; nothing is loaded', async () => {

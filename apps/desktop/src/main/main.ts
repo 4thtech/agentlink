@@ -25,6 +25,8 @@ import { join } from 'node:path';
 import { CoreSupervisor, type SpawnFn, type Timers } from './core-process.js';
 import type { ElectronModule } from './electron-api.js';
 import { ensureGoodLocation } from './move.js';
+import { showStartFailure } from './start-failure.js';
+import RESOURCE_LAYOUT from '../shared/resource-layout.json' with { type: 'json' };
 import { OriginLock, WINDOW_PARTITION, hardenSession, lockWebContents } from './security.js';
 import {
   DEEP_LINK_SCHEME,
@@ -78,19 +80,19 @@ export interface ResourcePaths {
 
 /**
  * The fixed layout under `process.resourcesPath` (macOS `AgentLink.app/Contents/Resources`, Windows
- * `…\AgentLink\resources`). To be kept in step with WP-D3 (host entry) and WP-D4 (packaging).
+ * `…\AgentLink\resources`), from src/shared/resource-layout.json, which WP-D4's packaging reads too.
  */
 export function resourcePaths(resourcesPath: string, platform: string): ResourcePaths {
-  const node =
-    platform === 'win32'
-      ? join(resourcesPath, 'node', 'node.exe')
-      : join(resourcesPath, 'node', 'bin', 'node');
+  const node = join(
+    resourcesPath,
+    ...(platform === 'win32' ? RESOURCE_LAYOUT.node.win32 : RESOURCE_LAYOUT.node.posix),
+  );
   return {
     node,
-    hostScript: join(resourcesPath, 'core', 'desktop', 'host.js'),
+    hostScript: join(resourcesPath, ...RESOURCE_LAYOUT.hostScript),
     trayIcon: join(
       resourcesPath,
-      'assets',
+      ...RESOURCE_LAYOUT.assetsDir,
       platform === 'darwin' ? 'trayTemplate.png' : platform === 'win32' ? 'tray.ico' : 'tray.png',
     ),
   };
@@ -256,6 +258,7 @@ export async function runShell(
   if (proc.exists(paths.trayIcon)) {
     tray = new AppTray(electron, paths.trayIcon, {
       open: showWindow,
+      retry: () => supervisor?.retry(),
       quit: () => app.quit(),
     });
   }
@@ -299,7 +302,11 @@ export async function runShell(
       }
     },
     onStateChange: (state) => {
-      if (state === 'failed') tray?.update('failed', approvals);
+      if (state !== 'failed') return;
+      tray?.update('failed', approvals);
+      const reason = supervisor?.failureReason ?? null;
+      if (reason === null || quitting) return;
+      void showStartFailure(electron.dialog, reason);
     },
   });
   supervisor.start();

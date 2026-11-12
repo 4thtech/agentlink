@@ -43,6 +43,11 @@ export function appRoot(execPath: string, platform: string): string {
   return sep > 0 ? execPath.slice(0, sep) : execPath;
 }
 
+/** /Applications/X.app or ~/Applications/X.app (directly inside the folder). */
+function inApplications(bundle: string): boolean {
+  return /^(?:\/Users\/[^/]+)?\/Applications\/[^/]+\.app$/.test(bundle);
+}
+
 /** What is wrong with where the app runs from, or null when the location is fine. */
 export function locationProblem(input: LocationInput): LocationProblem | null {
   const root = appRoot(input.execPath, input.platform);
@@ -56,6 +61,9 @@ export function locationProblem(input: LocationInput): LocationProblem | null {
   const privateTmp =
     input.platform === 'darwin' && !tmp.startsWith('/private/') ? `/private${tmp}` : null;
   if (privateTmp !== null && path.startsWith(`${privateTmp}/`)) return 'temporary';
+  // An app already in an Applications folder is where it belongs: a standard (non-admin) user often
+  // cannot write there, and that is fine (the app writes only to ~/.agentlink).
+  if (input.platform === 'darwin' && inApplications(path)) return null;
   if (!input.writable(root)) return 'read_only';
   return null;
 }

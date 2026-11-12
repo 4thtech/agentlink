@@ -117,6 +117,9 @@ describe('checkLaunch', () => {
     'electron_run_as_node',
     'NODE_OPTIONS',
     'NODE_EXTRA_CA_CERTS',
+    'NODE_PATH',
+    'NODE_TLS_REJECT_UNAUTHORIZED',
+    'node_anything',
     'SSLKEYLOGFILE',
   ])('refuses the environment variable %s', (name) => {
     expect(checkLaunch(input([], { env: { HOME: '/x', [name]: '1' } }))).toEqual({

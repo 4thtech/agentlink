@@ -6,7 +6,9 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
     // The Electron main process runs on Node. Electron's own API is typed locally in
     // src/main/electron-api.ts (no `electron` package: plan 2026-11-12 Decision 1, M4).
-    "types": ["node"]
+    "types": ["node"],
+    // src/shared/resource-layout.json (the packaged layout, shared with build/).
+    "resolveJsonModule": true
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts"]

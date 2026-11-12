@@ -1,4 +1,4 @@
-// The minimal tray / menu-bar icon (WP-D2). Two items: open the window, quit. The tooltip shows a
+// The minimal tray / menu-bar icon (WP-D2). Three items: open the window, try again (after the core could not start), quit. The tooltip shows a
 // fixed word for the core's state and numbers only (never a name or message text). WP-D8 replaces
 // this with the shape-coded icons, the popover and notifications.
 import type { HostState } from '../shared/protocol.js';
@@ -6,6 +6,7 @@ import type { ElectronModule, Tray } from './electron-api.js';
 
 export const TRAY_COPY = {
   open: 'Open AgentLink',
+  retry: 'Try again',
   quit: 'Quit AgentLink',
   base: 'AgentLink',
 } as const;
@@ -25,6 +26,8 @@ export function trayTooltip(state: HostState | 'failed', approvals: number): str
 
 export interface TrayActions {
   readonly open: () => void;
+  /** Starts the core again after it could not start (only does something when it failed). */
+  readonly retry: () => void;
   readonly quit: () => void;
 }
 
@@ -41,6 +44,7 @@ export class AppTray {
     this.#tray.setContextMenu(
       electron.Menu.buildFromTemplate([
         { label: TRAY_COPY.open, click: actions.open },
+        { label: TRAY_COPY.retry, click: actions.retry },
         { type: 'separator' },
         { label: TRAY_COPY.quit, click: actions.quit },
       ]),
