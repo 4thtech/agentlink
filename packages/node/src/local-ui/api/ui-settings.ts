@@ -8,13 +8,20 @@
 //   (I-4: no policy, key or approval is reachable from here). The server's ui-settings gate runs it
 //   after the same session, CSRF, Origin, Host, fetch-metadata and octet-stream checks as every write,
 //   refuses a query, an operation input or a presence header, and parses the body itself (strict
-//   JSON, allowlisted keys, boolean values, at most UI_SETTINGS_MAX_BODY_BYTES). The handler gets only
+//   JSON, allowlisted keys, boolean switches and the strict `kept` page choices of UX1113-QA-HOST,
+//   at most UI_SETTINGS_MAX_BODY_BYTES). The handler gets only
 //   that checked change. The file write is the app host's (`~/.agentlink/ui-settings.json`, 0600, a
 //   fresh exclusive temp file renamed into place, never following a link;
 //   apps/cli/src/runtime/agent-dir.ts).
 // - Fixed answers only; nothing here logs a value or a path.
 import type { JsonObject } from '@4thtech-io/crypto';
-import { UI_SETTINGS_PATH, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
+import {
+  UI_KEPT_KEYS,
+  UI_SETTINGS_PATH,
+  mergeUiSettings,
+  readKeptValue,
+  type UiSettings,
+} from '@4thtech-io/types/ui-contract/ui-settings';
 import type { LocalUiContext } from '../context.js';
 import {
   NOT_AVAILABLE,
@@ -35,11 +42,22 @@ export interface LocalUiSettingsDesk {
   update(change: UiSettings): Promise<UiSettings>;
 }
 
-/** A body of allowlisted booleans, built key by key (nothing of the source object is passed on). */
+/**
+ * A body of the allowlisted settings, built key by key (nothing of the source object is passed on).
+ * UX1113-QA-HOST: `kept` carries only allowlisted keys whose value passes its own check again.
+ */
 function body(settings: UiSettings): JsonObject {
-  const out: Record<string, boolean> = {};
+  const out: Record<string, boolean | Record<string, string>> = {};
   if (typeof settings.underTheHood === 'boolean') out['underTheHood'] = settings.underTheHood;
   if (typeof settings.menuExpanded === 'boolean') out['menuExpanded'] = settings.menuExpanded;
+  if (settings.kept !== undefined) {
+    const kept: Record<string, string> = {};
+    for (const key of UI_KEPT_KEYS) {
+      const value = readKeptValue(key, settings.kept[key]);
+      if (value !== undefined) kept[key] = value;
+    }
+    out['kept'] = kept;
+  }
   return out;
 }
 
@@ -96,7 +114,8 @@ export function createUiSettingsDesk(store: {
     read,
     update: (change) => {
       const run = queue.then(async () => {
-        const next: UiSettings = { ...(await read()), ...change };
+        // UX1113-QA-HOST: `kept` merges key by key; a null forgets that key (never stored).
+        const next: UiSettings = mergeUiSettings(await read(), change);
         await store.write(next);
         return next;
       });

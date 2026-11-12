@@ -196,7 +196,8 @@ import {
 } from './approval-os.js';
 import { failedBody } from './local-ui/failure-reasons.js';
 import { revealSavedFile } from './local-ui/reveal-file.js';
-import { EXPIRED_HTML, NO_APP_HTML } from './approval-pages.js';
+import { EXPIRED_HTML, NOT_FOUND_HTML, NO_APP_HTML } from './approval-pages.js';
+import { isAppPagePath } from '@4thtech-io/types/ui-contract/app-pages';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
 import {
@@ -414,13 +415,14 @@ const REVIEW_ITEM = /^(apr_[A-Za-z0-9_-]{22}):([0-9a-f]{64}):([ad])$/;
 
 /**
  * M1-11s-b: the local UI app's pages (D-118); everything else keeps its own route or is 404.
- * W4-SHELL (Decision 40): the wave-4 destinations `/inbox` and `/contacts`, exactly; nothing below
- * or beside them. W4-SHELL-V2 (Decisions 49–51): the sections `/agents` (and one agent,
- * `/agents/<name>`), `/activity` (and `/activity/live`), `/advanced/<page>`, and the Get started
- * steps `/start/<step>`; one lower-case segment each, nothing deeper.
+ * UX1113-QA-HOST: the page paths are one strict list shared with the router
+ * (@4thtech-io/types ui-contract/app-pages.ts; the router's drift test), so a reload on any page
+ * (People, My IDs, Restore, every Settings page, the old aliases) shows the page. An unknown GET
+ * path that is not the API or an asset shows "Page not found" (the app's own with a session, else a
+ * fixed page), never raw JSON; the API keeps its JSON answers.
  */
-const APP_PAGE =
-  /^\/(?:first-run|inbox|contacts|start(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|agents(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|activity(?:\/live)?|advanced(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|settings(?:\/[a-z0-9]+(?:-[a-z0-9]+)*){0,4})$/;
+const APP_PAGE = { test: (path: string): boolean => path !== '/' && isAppPagePath(path) };
+const API_PREFIX = '/api/';
 const ASSETS_PREFIX = '/assets/';
 /** One file name: no separator, no leading dot, no escape. */
 const ASSET_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -1640,6 +1642,26 @@ export async function startApprovalServerWith(
     } else {
       sendJson(res, status, { status: 'refused' });
     }
+  };
+
+  /** UX1113-QA-HOST: the fixed "Page not found · Go to Home" page (404; nothing from the request). */
+  const notFoundPage = (res: ServerResponse): void => {
+    emit({ kind: 'rejected', reason: 'not_found' });
+    sendText(res, 404, 'text/html; charset=utf-8', NOT_FOUND_HTML);
+  };
+
+  /** The app's index.html with this server's CSRF token (and generation) filled in. */
+  const sendShell = (res: ServerResponse, status: 200 | 404): void => {
+    const shell = localUi.shell;
+    if (shell === undefined) return notFoundPage(res);
+    // The token is base64url, so it needs no escaping.
+    const meta =
+      `<meta name="agentlink-csrf" content="${csrf}">` +
+      // U3-c: the generation the page is built against (a decimal number, no escaping needed).
+      (host === undefined
+        ? ''
+        : `<meta name="agentlink-generation" content="${String(host.generation)}">`);
+    sendText(res, status, 'text/html; charset=utf-8', `${shell.before}${meta}${shell.after}`);
   };
 
   const fetchSiteOk = (req: IncomingMessage): boolean => {
@@ -4900,22 +4922,27 @@ export async function startApprovalServerWith(
       // M1-11b-2: Approvals (`/`) and one request (`/approve/<id>`) render inside the app. Where
       // the UI renders only: the session gate above, and the CSRF, Origin, fetch-metadata and
       // presence gates of the approval API below, are unchanged.
-      const shell = localUi.shell;
-      if (shell === undefined) {
-        if (appPage) return reject(res, 404, 'not_found');
+      if (localUi.shell === undefined) {
+        if (appPage) return notFoundPage(res);
         // M1-11b-2c: no app bundle, no approval page: fixed text that points to the terminal, with
         // no script and no CSRF token (approval-pages.ts).
         sendText(res, 503, 'text/html; charset=utf-8', NO_APP_HTML);
         return;
       }
-      // The token is base64url, so it needs no escaping.
-      const meta =
-        `<meta name="agentlink-csrf" content="${csrf}">` +
-        // U3-c: the generation the page is built against (a decimal number, no escaping needed).
-        (host === undefined
-          ? ''
-          : `<meta name="agentlink-generation" content="${String(host.generation)}">`);
-      sendText(res, 200, 'text/html; charset=utf-8', `${shell.before}${meta}${shell.after}`);
+      sendShell(res, 200);
+      return;
+    }
+
+    // UX1113-QA-HOST: any other GET outside the API is "Page not found": with a session and the
+    // app, the app itself (its router shows Page not found · Go to Home); otherwise a fixed page
+    // with no script, no token and nothing from the request. The API keeps its JSON answers.
+    if (!path.startsWith(API_PREFIX) && (method === 'GET' || method === 'HEAD')) {
+      if (localUi.shell !== undefined && matchIndex(cookieToken(req), sessions) >= 0) {
+        emit({ kind: 'rejected', reason: 'not_found' });
+        sendShell(res, 404);
+        return;
+      }
+      notFoundPage(res);
       return;
     }
 

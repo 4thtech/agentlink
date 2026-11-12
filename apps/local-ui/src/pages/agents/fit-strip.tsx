@@ -2,6 +2,7 @@
 // owner hides it, and always while there is exactly one ID with no people yet. The hiding is a
 // preference in this browser (try/catch; no storage means it shows again), not setup state.
 import { Icon } from '@4thtech-io/ui';
+import { keepInApp } from '../../prefs/app-kept.js';
 import { useState, type ReactElement } from 'react';
 import type { AgentRow } from './data.js';
 import { BotIcon, IdCardIcon } from './icons.js';
@@ -29,6 +30,7 @@ export function FitStrip({ rows }: { rows: readonly AgentRow[] }): ReactElement 
   const hide = (): void => {
     try {
       localStorage.setItem(FIT_STRIP_HIDDEN_KEY, '1');
+      keepInApp(FIT_STRIP_HIDDEN_KEY);
     } catch {
       // Not remembered: hidden until the page loads again.
     }

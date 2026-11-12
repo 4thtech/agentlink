@@ -3,6 +3,7 @@
 // Styled from the Get started card (`st-card`); hiding is a preference in this browser, not setup
 // state (the same way the Get started card is hidden).
 import { Icon } from '@4thtech-io/ui';
+import { keepInApp } from '../../prefs/app-kept.js';
 import { useState, type ReactElement } from 'react';
 import { ID_EXPLAINER as T } from './strings.js';
 import './start.css';
@@ -20,6 +21,7 @@ function hiddenHere(): boolean {
 function hideHere(): void {
   try {
     localStorage.setItem(ID_EXPLAINER_HIDDEN_KEY, '1');
+    keepInApp(ID_EXPLAINER_HIDDEN_KEY);
   } catch {
     // Not remembered: hidden until the page loads again.
   }

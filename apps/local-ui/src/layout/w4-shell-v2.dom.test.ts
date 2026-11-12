@@ -190,6 +190,12 @@ async function mountAt(path: string): Promise<void> {
   await settle();
 }
 
+/**
+ * The switch saves (Under the hood, the menu). UX1113-QA-HOST: the page choices the app keeps go in
+ * their own `kept` requests (prefs/app-kept.test.ts covers them), so they are left out here.
+ */
+const switchPuts = (w: World): Record<string, unknown>[] => w.puts.filter((p) => !('kept' in p));
+
 const q = <T extends Element = HTMLElement>(sel: string): T | null => host.querySelector<T>(sel);
 const qa = <T extends Element = HTMLElement>(sel: string): T[] => [
   ...host.querySelectorAll<T>(sel),
@@ -655,7 +661,7 @@ describe('Under the hood (kept by the app)', () => {
     expect(getPrefs().hood).toBe(true);
     await key({ key: 'u', ctrlKey: true, shiftKey: true });
     expect(getPrefs().hood).toBe(false);
-    expect(w.puts).toEqual([{ underTheHood: true }, { underTheHood: false }]);
+    expect(switchPuts(w)).toEqual([{ underTheHood: true }, { underTheHood: false }]);
   });
 
   it("the app's stored value wins over this browser's", async () => {
@@ -665,7 +671,7 @@ describe('Under the hood (kept by the app)', () => {
     serve(w);
     await mountAt('/');
     expect(hood()?.getAttribute('aria-checked')).toBe('true');
-    expect(w.puts).toEqual([]);
+    expect(switchPuts(w)).toEqual([]);
   });
 
   it('imports this browser’s old switch once when the app has none yet', async () => {
@@ -674,7 +680,7 @@ describe('Under the hood (kept by the app)', () => {
     const w = world();
     serve(w);
     await mountAt('/');
-    expect(w.puts).toEqual([{ underTheHood: true }]);
+    expect(switchPuts(w)).toEqual([{ underTheHood: true }]);
     expect(hood()?.getAttribute('aria-checked')).toBe('true');
   });
 
@@ -685,7 +691,7 @@ describe('Under the hood (kept by the app)', () => {
     await mountAt('/settings/appearance');
     act(() => setPref('hood', true));
     await settle();
-    expect(w.puts).toEqual([{ underTheHood: true }]);
+    expect(switchPuts(w)).toEqual([{ underTheHood: true }]);
     expect(hood()?.getAttribute('aria-checked')).toBe('true');
   });
 });
@@ -723,7 +729,7 @@ describe('Cmd+K (kept from #715), in both modes', () => {
       qa('[role="option"]').find((o) => o.textContent?.includes('Turn on Under the hood')),
     );
     expect(getPrefs().hood).toBe(true);
-    expect(w.puts).toEqual([{ underTheHood: true }]);
+    expect(switchPuts(w)).toEqual([{ underTheHood: true }]);
   });
 });
 
@@ -935,6 +941,6 @@ describe('motion through the U0 kit (IR-6, 7, 8)', () => {
     await click(q('main [role="switch"]'));
     expect(vt.calls).toBe(1);
     expect(getPrefs().hood).toBe(true);
-    expect(w.puts).toEqual([{ underTheHood: true }]);
+    expect(switchPuts(w)).toEqual([{ underTheHood: true }]);
   });
 });

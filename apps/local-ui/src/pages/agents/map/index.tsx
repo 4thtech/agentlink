@@ -4,6 +4,7 @@
 // Two fixed columns (agents left, contacts right), sorted by activity, no physics. One SVG layer for
 // the lines; the boxes are buttons in list order. A click opens that conversation in Messages.
 import { Button, EmptyState, LiveDot, Switch, useReducedMotion } from '@4thtech-io/ui';
+import { keepInApp } from '../../../prefs/app-kept.js';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../../api/client.js';
 import { navigate } from '../../../router.js';
@@ -47,6 +48,7 @@ function readQuiet(): boolean {
 function writeQuiet(on: boolean): void {
   try {
     localStorage.setItem(QUIET_KEY, on ? '1' : '0');
+    keepInApp(QUIET_KEY);
   } catch {
     /* storage failed: the choice is kept for this visit only */
   }

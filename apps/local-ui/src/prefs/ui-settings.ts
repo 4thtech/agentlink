@@ -14,7 +14,8 @@ import {
   readUiSettings,
   type UiSettings,
 } from '@4thtech-io/types/ui-contract/ui-settings';
-import { getPrefs, setPref, subscribePrefs } from './store.js';
+import { resetKeptForTests, startKept } from './app-kept.js';
+import { getPrefs, reloadPrefs, setPref, subscribePrefs } from './store.js';
 
 export type UiSettingsFetch = typeof fetch;
 
@@ -94,7 +95,11 @@ export async function saveUiSettings(change: UiSettings): Promise<boolean> {
   }
 }
 
+/** UX1113-QA-HOST: the app's copy is being read into the store (nothing to save back). */
+let reloading = false;
+
 function onPrefs(): void {
+  if (reloading) return;
   const hood = getPrefs().hood;
   if (hood === synced) return;
   synced = hood;
@@ -112,6 +117,17 @@ export async function startUiSettings(seam?: { fetch?: UiSettingsFetch }): Promi
   synced = getPrefs().hood;
   unsubscribe = subscribePrefs(onPrefs);
   const stored = await read();
+  // UX1113-QA-HOST: the page choices the app keeps fill storage first (a new launch is a new
+  // origin with empty storage); the display choices are read again from there, without saving.
+  if (startKept(stored, saveUiSettings)) {
+    reloading = true;
+    try {
+      reloadPrefs();
+    } finally {
+      reloading = false;
+    }
+    synced = getPrefs().hood;
+  }
   if (stored?.underTheHood !== undefined) {
     synced = stored.underTheHood;
     if (getPrefs().hood !== stored.underTheHood) setPref('hood', stored.underTheHood);
@@ -152,6 +168,7 @@ export function subscribeMenuExpanded(listener: () => void): () => void {
 export function resetUiSettingsForTests(): void {
   unsubscribe?.();
   unsubscribe = undefined;
+  resetKeptForTests();
   started = false;
   fetchImpl = undefined;
   synced = undefined;

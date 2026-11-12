@@ -2,6 +2,8 @@
 // browser so the reminder banner stays on every page until the kit is saved (M1-11b-3 clears it).
 // It holds only a flag and a time, never a code or anything secret. Storage can be missing or refuse
 // (private windows): then nothing is remembered and the banner simply isn't shown.
+// UX1113-QA-HOST: the app keeps the flag too, so a relaunch (a new port) keeps it (prefs/app-kept.ts).
+import { keepInApp } from '../prefs/app-kept.js';
 
 export const RECOVERY_KIT_LATER_KEY = 'agentlink.recoveryKit.later';
 
@@ -20,6 +22,7 @@ export function rememberRecoveryKitLater(at: number = Date.now()): void {
   } catch {
     // Not remembered; nothing else changes.
   }
+  keepInApp(RECOVERY_KIT_LATER_KEY);
 }
 
 /** Forgets "Later" (the kit was saved). */
@@ -29,6 +32,7 @@ export function forgetRecoveryKitLater(): void {
   } catch {
     // Nothing to do.
   }
+  keepInApp(RECOVERY_KIT_LATER_KEY);
 }
 
 /** True while the owner put the kit off and hasn't saved it yet. */
