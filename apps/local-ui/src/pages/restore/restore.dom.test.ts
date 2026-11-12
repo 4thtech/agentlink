@@ -10,8 +10,10 @@ import type { AppsApi } from '../first-run/apps-api.js';
 import type { OwnerClient } from '../contacts/owner.js';
 import type { RestoreApi, Summary } from './api.js';
 import { clean, toGroups } from './code-field.js';
+import { createSetupApi } from '../first-run/setup-api.js';
+import { createRestoreApi } from './api.js';
 import { RestoreWizard } from './index.js';
-import { setOutcome } from './outcome.js';
+import { setFinishRestore, setOutcome } from './outcome.js';
 import * as S from './strings.js';
 
 const cssFiles = import.meta.glob<string>('./restore.css', {
@@ -619,5 +621,64 @@ describe('copy and accessibility', () => {
   it('adds no animation of its own (reduced motion needs nothing)', () => {
     const css = Object.values(cssFiles)[0] as string;
     expect(css).not.toMatch(/transition|animation|@keyframes/);
+  });
+});
+
+describe('round 2: busy, finish restoring, per-ID failure', () => {
+  it('busy shows a calm sentence and Continue is off while a request is in flight', async () => {
+    let release: (v: unknown) => void = () => undefined;
+    const api = fakeApi({
+      header: () => new Promise((r) => (release = r)) as ReturnType<RestoreApi['header']>,
+    });
+    await mount(api);
+    await click(S.KIT.next);
+    expect(button(S.KIT.working)?.disabled).toBe(true);
+    await act(async () => {
+      button(S.KIT.working)?.click();
+    });
+    expect(api.calls.filter((c) => c === 'header')).toHaveLength(1);
+    await act(async () => release({ kind: 'error', problem: 'busy' }));
+    await settle();
+    expect(text()).toContain('Still working on the last step…');
+  });
+
+  it('shows "Finish restoring" when first run left a restore unfinished', async () => {
+    setFinishRestore(true);
+    await mount(fakeApi());
+    expect(text()).toContain('Finish restoring: choose your kit again');
+  });
+
+  it('first-run owner setup maps 409 finish_restore to its own problem', async () => {
+    const fetch = (() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ status: 'finish_restore' }), { status: 409 }),
+      )) as typeof globalThis.fetch;
+    const r = await createSetupApi({ fetch, token: 't' }).begin('Ana');
+    expect(r).toEqual({ kind: 'error', problem: 'finish_restore' });
+  });
+
+  it('a per-ID failed answer keeps the outcomes and step 4 says that ID was not restored', async () => {
+    const fetch = (() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            error: 'failed',
+            ids: [
+              { agentId: 'a', name: 'tali', outcome: 'restored' },
+              { agentId: 'b', name: 'work', outcome: 'failed' },
+            ],
+          }),
+          { status: 500 },
+        ),
+      )) as typeof globalThis.fetch;
+    const real = createRestoreApi({ fetch, token: 't' });
+    await toReview(
+      fakeApi({
+        applyBegin: (k, s, n) => real.applyBegin(k, s, n),
+      }),
+    );
+    await click('Restore 2 IDs');
+    expect(text()).toContain("You're back. 1 ID restored.");
+    expect(text()).toContain(S.REVIEW.notRestored('work'));
   });
 });

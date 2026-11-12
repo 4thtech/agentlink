@@ -125,6 +125,7 @@ export const SETUP_MESSAGES = {
   // b11 §28.3.
   cancelled: 'Not protected yet. Try again.',
   no_agent: 'Set up your ID first.',
+  finish_restore: 'A restore was not finished. Choose your kit again to finish it.',
   label_invalid:
     "That name can't be used. Use letters, numbers, single spaces and . ' - up to 32 characters.",
   expired: 'This step took too long. Nothing changed. Try again.',

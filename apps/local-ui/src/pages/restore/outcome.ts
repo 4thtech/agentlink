@@ -35,3 +35,15 @@ export function useOutcome(): RestoreOutcome | undefined {
     getOutcome,
   );
 }
+
+// First run answered "finish_restore": restored IDs wait for their owner, so the wizard says
+// "Finish restoring" and asks for the kit again (spec §6.6). A flag in memory, never stored.
+let finishing = false;
+export const setFinishRestore = (value: boolean): void => {
+  finishing = value;
+};
+export const takeFinishRestore = (): boolean => {
+  const was = finishing;
+  finishing = false;
+  return was;
+};

@@ -143,6 +143,8 @@ export interface KitStepProps {
   readonly onContinue: () => void;
   readonly onStartFresh: () => void;
   readonly eyebrow: string;
+  /** First run said a restore was left unfinished. */
+  readonly finishing?: boolean;
 }
 
 export function KitStep(p: KitStepProps): ReactElement {
@@ -160,10 +162,16 @@ export function KitStep(p: KitStepProps): ReactElement {
     <section className="rs-screen" aria-labelledby="rs-h">
       <div className="rs-intro">
         <p className="rs-kicker">{p.eyebrow}</p>
-        <Title id="rs-h">{KIT.title}</Title>
+        <Title id="rs-h">{p.finishing === true ? KIT.finishTitle : KIT.title}</Title>
         <p className="rs-lead">
-          {KIT.lead}
-          <strong>{KIT.leadName}</strong>.
+          {p.finishing === true ? (
+            KIT.finishLead
+          ) : (
+            <>
+              {KIT.lead}
+              <strong>{KIT.leadName}</strong>.
+            </>
+          )}
         </p>
       </div>
       {p.kits === undefined ? (
@@ -847,7 +855,7 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
         )}
       </div>
       {p.failed.length === 0 ? null : (
-        <Banner tone="warning">{PROTECT.partial(nameList(p.failed))}</Banner>
+        <Banner tone="warning">{p.failed.map((n) => REVIEW.notRestored(n)).join(' ')}</Banner>
       )}
       {code === undefined ? (
         <Banner tone="success">{PROTECT.unchanged(p.sensor)}</Banner>

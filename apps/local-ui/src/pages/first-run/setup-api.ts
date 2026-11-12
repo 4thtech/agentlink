@@ -32,6 +32,8 @@ export type SetupProblem =
   | 'tries_exhausted'
   /** 409 `no_agent`: the app has no agent yet; setup comes first. */
   | 'no_agent'
+  /** UX1113-R1: restored IDs wait for their owner; the restore wizard finishes it. */
+  | 'finish_restore'
   | 'expired'
   | 'not_pending'
   | 'busy'
@@ -210,6 +212,7 @@ const str = (value: unknown): string | undefined => (typeof value === 'string' ?
 function problemOf(answer: Answer): SetupError {
   if (str(answer.json?.['error']) === 'no_agent') return { kind: 'error', problem: 'no_agent' };
   const status = str(answer.json?.['status']);
+  if (status === 'finish_restore') return { kind: 'error', problem: 'finish_restore' };
   if (status === 'folder_refused') {
     const reason = str(answer.json?.['reason']);
     return {

@@ -101,6 +101,14 @@ export interface PrfRequest {
   readonly prfSalt: string;
 }
 
+/** After the read-back: some IDs were refused (`failed` with per-ID outcomes). */
+export interface PartialAnswer {
+  readonly status: 'done';
+  readonly ids: readonly Outcome[];
+  readonly masterCode?: undefined;
+  readonly touchId?: undefined;
+}
+
 export type BeginAnswer =
   | { readonly status: 'done'; readonly ids: readonly Outcome[] }
   | { readonly status: 'gesture'; readonly nonce: string; readonly publicKey: Creation };
@@ -109,8 +117,8 @@ export type FinishAnswer =
   | {
       readonly status: 'done';
       readonly ids: readonly Outcome[];
-      readonly masterCode: string;
-      readonly touchId: boolean;
+      readonly masterCode?: string | undefined;
+      readonly touchId?: boolean | undefined;
     }
   | { readonly status: 'prf_needed'; readonly nonce: string; readonly publicKey: PrfRequest };
 
@@ -281,6 +289,12 @@ export function createRestoreApi(options: RestoreApiOptions = {}): RestoreApi {
     return { kind: 'error', problem: 'failed' };
   };
 
+  const partial = (a: Answer | 'offline'): PartialAnswer | undefined => {
+    if (a === 'offline' || a.json?.['error'] !== 'failed') return undefined;
+    const ids = outcomesOf(a.json?.['ids']);
+    return ids === undefined ? undefined : { status: 'done', ids };
+  };
+
   const bad: Failure = { kind: 'error', problem: 'failed' };
   const okOnly = (a: Answer | 'offline'): a is Answer => a !== 'offline' && a.status === 200;
 
@@ -366,6 +380,8 @@ export function createRestoreApi(options: RestoreApiOptions = {}): RestoreApi {
         selection,
         names,
       });
+      const partialBegin = partial(a);
+      if (partialBegin !== undefined) return { kind: 'ok', answer: partialBegin };
       if (!okOnly(a)) return failure(a);
       const status = a.json?.['status'];
       if (status === 'done') {
@@ -382,6 +398,8 @@ export function createRestoreApi(options: RestoreApiOptions = {}): RestoreApi {
     },
     async applyFinish(nonce, body) {
       const a = await call('POST', `${RESTORE_BASE}/apply/finish`, body, { nonce });
+      const partialFinish = partial(a);
+      if (partialFinish !== undefined) return { kind: 'ok', answer: partialFinish };
       if (!okOnly(a)) return failure(a);
       const status = a.json?.['status'];
       if (status === 'done') {

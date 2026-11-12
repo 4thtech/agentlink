@@ -52,6 +52,7 @@ import { lazyPart } from '../../lazy/index.js';
 import { INVITE_PATH } from '../../nav.js';
 import { createInviteApi, type InviteApi } from '../contacts/invite-api.js';
 import { navigate } from '../../router.js';
+import { setFinishRestore } from '../restore/outcome.js';
 import { announceAgentsChanged } from '../agents/use-agents.js';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import {
@@ -905,6 +906,10 @@ export function FirstRunPage({
         });
       const problem = (error: SetupError): void => {
         if (error.problem === 'session_expired') return setView({ k: 'expired' });
+        if (error.problem === 'finish_restore') {
+          setFinishRestore(true);
+          return navigate('/restore/kit');
+        }
         if (error.problem === 'label_invalid')
           return again(undefined, SETUP_MESSAGES.label_invalid);
         again(setupMessage(error));

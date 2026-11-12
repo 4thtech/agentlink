@@ -24,7 +24,7 @@ import {
   type Summary,
 } from './api.js';
 import { emptyGroups, codeOf } from './code-field.js';
-import { setOutcome, useOutcome } from './outcome.js';
+import { setOutcome, takeFinishRestore, useOutcome } from './outcome.js';
 import { canRestoreHere, createRestorePasskey, getRestorePrf } from './passkey.js';
 import {
   CheckedStep,
@@ -119,6 +119,9 @@ export function RestoreWizard({
   const [apps, setApps] = useState<readonly DetectedApp[] | undefined>(undefined);
   const [connecting, setConnecting] = useState<string | undefined>(undefined);
   const gestureBusy = useRef(false);
+  /** One request at a time: Continue and Open stay off while one is in flight (no double submit). */
+  const inflight = useRef(false);
+  const [finishing] = useState(() => takeFinishRestore());
 
   // Found kit files (name pattern and header only; nothing is opened).
   useEffect(() => {
@@ -192,6 +195,15 @@ export function RestoreWizard({
   };
 
   const continueKit = async (): Promise<void> => {
+    if (inflight.current) return;
+    inflight.current = true;
+    try {
+      await continueKitNow();
+    } finally {
+      inflight.current = false;
+    }
+  };
+  const continueKitNow = async (): Promise<void> => {
     setError(undefined);
     setErrorHint(undefined);
     if (choice === undefined) return setError(KIT.needsFile);
@@ -235,6 +247,15 @@ export function RestoreWizard({
   // --- step 2 ---------------------------------------------------------------------------------
 
   const openKit = async (): Promise<void> => {
+    if (inflight.current) return;
+    inflight.current = true;
+    try {
+      await openKitNow();
+    } finally {
+      inflight.current = false;
+    }
+  };
+  const openKitNow = async (): Promise<void> => {
     if (choice === undefined || waiting > 0) return;
     setError(undefined);
     setWorking(true);
@@ -321,7 +342,11 @@ export function RestoreWizard({
       }
       if (finished.kind === 'error') return fail(finished);
       if (finished.answer.status !== 'done') return setError(PROBLEMS.failed);
-      finishRestore(finished.answer.ids, finished.answer.masterCode, finished.answer.touchId);
+      finishRestore(
+        finished.answer.ids,
+        finished.answer.masterCode,
+        finished.answer.touchId === true,
+      );
     } finally {
       gestureBusy.current = false;
       setWorking(false);
@@ -403,6 +428,7 @@ export function RestoreWizard({
           onFile={(f) => void chooseFile(f)}
           working={working}
           error={error}
+          finishing={finishing}
           {...(errorHint === undefined ? {} : { errorHint })}
           onContinue={() => void continueKit()}
           onStartFresh={() => leave('/')}

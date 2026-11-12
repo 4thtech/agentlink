@@ -25,6 +25,9 @@ export const WIZARD = {
 
 export const KIT = {
   title: 'Choose your kit file',
+  finishTitle: 'Finish restoring: choose your kit again',
+  finishLead:
+    'A restore on this computer did not finish. Choose your kit again and AgentLink will complete it. Nothing already restored is overwritten.',
   lead: 'It is the file AgentLink saved when you backed up. Its name starts with ',
   leadName: 'agentlink-recovery-kit',
   found: 'Found on this computer',
@@ -140,6 +143,9 @@ export const REVIEW = {
   done: 'Done',
   progress: (name: string, i: number, n: number): string => `Restoring ${name}… ${i} of ${n}`,
   restoring: 'Restoring…',
+  /** An ID the read-back refused: not restored, nothing of it kept. */
+  notRestored: (name: string): string =>
+    `${name} was not restored. Nothing of it was kept. Your other IDs are fine.`,
   failedOne: (name: string): string =>
     `Couldn't finish restoring ${name}. Nothing of it was kept. Your other IDs are fine.`,
   tryAgain: 'Try again',
@@ -215,7 +221,7 @@ export const PROBLEMS: Readonly<Record<RestoreProblem, string>> = {
   wrong_code: CODE.wrong,
   damaged: CODE.damaged,
   wait: 'Too many tries. Wait a moment, then try again.',
-  busy: 'AgentLink is busy with another step. Try again in a moment.',
+  busy: 'Still working on the last step…',
   presence_required: "Confirm it's you first.",
   presence_rejected: PRESENCE.rejected,
   needs_terminal: NEEDS_TERMINAL.title,
