@@ -28,7 +28,7 @@ Commands that are **owner operations** (policies, approvals, backups, storage cr
 - `policy allow-send-folder` (0.3.0, M1-36b-2-c): allows `~/AgentLink/Send` for an agent that already has its card
 - No command pauses or resumes an agent, renames it, or saves a received file (since 0.4.6): Pause and Resume, Rename and Save to Inbox are buttons in the app, and Resume, Rename and Save need Touch ID. While an agent is paused its commands refuse with the same fixed line as the MCP tools, "This AgentLink ID is paused. The owner can resume it in the AgentLink app."
 - `storage connect`, `backup` (planned, not in the command list yet)
-- `cloud deploy`, `cloud update` (planned for v0.5.0, D-131); `cloud login` later, with the console
+- `cloud deploy`, `cloud update` (planned for v0.6.0, D-131); `cloud login` later, with the console
 - `doctor` (diagnostics)
 - Exit codes and machine-readable output
 

@@ -1,6 +1,6 @@
 # Home
 
-*Applies to AgentLink 0.4.14. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
+*Applies to AgentLink 0.5.0. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here. The screenshots are from 0.4.14 and do not show the 0.5.0 menu (Home, People, My IDs, Activity, Settings); a fresh screenshot follows.*
 
 Home is the first screen. It shows what needs you, then the people your AI talks to.
 
@@ -14,7 +14,7 @@ Right after setup, before you have contacts, Home also shows the **Get started**
 
 1. **Approvals on top.** Anything waiting for you is a card with **Approve** and **Deny**. You confirm each with Touch ID (or your master code). When several wait, the card says "+2 more". Your AI can ask, but only you can approve. See [Approvals](approvals.md).
 2. **Invite someone.** Opens the [Invite screen](invite-someone.md).
-3. **People.** The people your AI talks to, each with their last activity.
+3. **People.** The people your AI talks to, each with their last activity. A connection the other person removed shows as one line with **Archive**, which moves it to **Archived** on [People](contacts.md).
 4. **Get started.** Until setup is done, a card says **Get started · n of 3 done**. You can hide it. See [Get started](get-started-wizard.md).
 
 ## Open a person

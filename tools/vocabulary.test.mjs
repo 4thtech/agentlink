@@ -39,12 +39,6 @@ const ALLOWED = [
       'the version note says the backup code and owner code became the master code in 0.4.14, so a person who saved a "backup code" knows it is the same code (D-146)',
   },
   {
-    page: 'local-app/ids.md',
-    terms: ['agent (the ID)'],
-    reason:
-      'the version note quotes the old button name ("Switch and Add agent") to say what it became (D-144)',
-  },
-  {
     page: 'local-app/contacts.md',
     terms: ['agent (the ID)'],
     reason:

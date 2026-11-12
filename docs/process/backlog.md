@@ -8552,6 +8552,17 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Acceptance:**
   - A search for cloud-agent mentions of 0.4.0 finds none that is not history; links and docs-status checks pass; edits marked "proposed, owner confirms at merge".
 
+#### DOCS-050 · docs: the 0.5.0 docs pass (redesign, one recovery kit, restore) (new)
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S0 (docs) · **Phase:** M1b
+- **Repo/path:** agentlink · `README.md`, `docs/status.yaml`, `docs-site/`, `knowledge/`, `llms.txt`, `docs/runbooks/owner-feedback-loop.md`
+- **Depends on:** UX1113 (#802), the 0.5.0 version PR (#803)
+- **Spec:** D-147, 11 §5
+- **Scope:**
+  - README Status and Roadmap, the guide (Your IDs and your people, My IDs, People, Settings, Backup & restore, Touch ID & master code, Rules, Activity, help), knowledge and llms.txt for 0.5.0, each fact checked against the released strings; the cloud agent becomes 0.6.0 in the public docs.
+  - RB-21: owner test builds on the e2e harness (keychain stand-in file, in-memory relay), not a bare temp HOME; MAINTAINING.md: the wiki PR verifier and merge.
+- **Acceptance:**
+  - `pnpm lint` (docs preflight, docs-status check) and the docs tests green; no page claims an unreleased feature.
+
 #### M1-UX-MULTI-AGENT-b · cli agent choice: stale comment and a loose assertion (new, low, IR-M1-UX-MULTI-AGENT-1, #562)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (comment and test only)
 - **Repo/path:** agentlink · `apps/cli/src/runtime/agent-name.ts` and the `toContain('codex')` assertion in `apps/cli/src/commands/init.test.ts`
