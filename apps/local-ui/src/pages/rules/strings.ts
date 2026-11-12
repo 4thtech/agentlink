@@ -38,16 +38,25 @@ export const RULES_STRINGS = {
   proofHelpBefore: 'Each proof costs credits and is public. Allowed up to',
   proofHelpAfter: 'in any 24 hours, then it asks.',
   proofOff: 'Your AI never adds proof.',
+  // REL051-SF5: on "Ask me" every proof asks (06 §3), so the budget sentence does not apply.
+  proofAsk: 'Each proof costs credits and is public. Your AI asks before each proof.',
+  proofAskBudget: 'Budget in any 24 hours when proofs are allowed:',
   budget: 'Proof budget in any 24 hours',
   askOver: 'Ask me over',
   invitesTitle: 'Connect with someone new',
   summaryInvites: 'New people',
-  invitesHelp: 'Your AI asks before it accepts or sends an invite.',
+  // REL051-SF5: `contacts.acceptInvites` gates accepting only (04 §3.6, 06 §2.1); making an invite
+  // never asks, on any surface (06 §7, 08 §1).
+  invitesHelp:
+    'Your AI asks before it accepts an invite. An invite you or your AI send connects when the other person accepts it.',
   termsTitle: 'Accepting terms',
   termsHelp: 'Accepting commits you. This is never approved from a notification.',
 
   unknownTitle: 'Messages from someone you have not connected with',
   unknownHelp: "Only an invite adds a person. Strangers can't reach your AI.",
+  // REL051-SF5: on "Hold for me" a request you accept reaches your AI's inbox (D-72).
+  unknownHelpHold:
+    "Only an invite adds a person. Strangers can't reach your AI unless you accept their request.",
   whoTitle: 'Who can message this ID',
   whoPaired: 'Paired contacts',
   whoListed: (n: number): string =>

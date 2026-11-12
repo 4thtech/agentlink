@@ -9,6 +9,7 @@ Rules decide what your AI may do without asking you: *"What your AI may do witho
 Each rule is one row with its choices (**Allowed**, **Ask me**, **Never**; the safe choice is marked *recommended*):
 
 - **Everyday:** **Add a public proof** (with its budget in any 24 hours), **Connect with someone new** and **Accepting terms**.
+- **Connect with someone new** covers accepting an invite. Making an invite never asks: an invite you or your AI send connects when the other person accepts it.
 - **More rules:** file sizes, who can message this ID, limits for accepting terms and exports. Its row says how many rules there are and how many you changed.
 
 ## Change a rule
