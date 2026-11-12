@@ -1,5 +1,6 @@
 // U3-i: AI apps copy (b11 §30, new strings list; 11 §5). No "wallet", "gas", "seed phrase" or
 // "transaction". An app's name is always next to its mark.
+import { sensorWord } from '../../presence-word.js';
 export const APPS_STRINGS = {
   title: 'AI apps',
   forAgent: (label: string): string => `for ${label}`,
@@ -45,7 +46,9 @@ export const APPS_STRINGS = {
   willUse: (app: string, label: string, other: string): string =>
     `${app} will use ${label} instead of ${other}.`,
   willStop: (app: string, label: string): string => `${app} will stop using ${label}.`,
-  apply: 'Apply with Touch ID',
+  get apply(): string {
+    return `Apply with ${sensorWord()}`;
+  },
   connecting: 'Connecting…',
   changed: 'The file changed. Review it again.',
   notChangedYet: 'Not connected yet. Try again.',
@@ -64,7 +67,7 @@ export const APPS_STRINGS = {
   manualTitle: (app: string): string => `Connect ${app} by hand`,
   manualTitleGeneric: 'Connect an AI app by hand',
   manualIntro: 'Nothing here is run by AgentLink. Add the entry yourself.',
-  manualOpen: 'Open this file',
+  manualOpen: (file: string | undefined): string => `Open ${file ?? "your AI app's settings file"}`,
   manualAdd: 'Add the entry above',
   manualRestart: (app: string): string => `Restart ${app}`,
   genericApp: 'your AI app',

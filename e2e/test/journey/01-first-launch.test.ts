@@ -98,7 +98,10 @@ describe('chapter 1: onboarding', () => {
 
     // W4-HOME (un-gated): once set up, the app opens on Home with no one in People yet, and Get
     // started does not come back.
+    // UX1113: the link was not copied, so leaving says so once (it would stop working).
     await page.getByRole('button', { name: 'Done, go to Home' }).click();
+    await page.getByRole('alert').filter({ hasText: "haven't copied" }).waitFor();
+    await page.getByRole('button', { name: 'Leave without copying' }).first().click();
     await page.waitForURL((url) => url.pathname === '/');
     expect(await text(page)).not.toContain('Which AI app do you use?');
     await page.getByRole('heading', { name: 'People' }).first().waitFor();

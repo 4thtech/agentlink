@@ -34,14 +34,24 @@ describe('Backup & Touch ID', () => {
       S.touchTitle,
     ]);
   });
-  it('reminds you when you put the recovery kit off, and not otherwise', async () => {
-    await act(async () => root.render(h(BackupPage)));
+  const record = (lastKit: unknown) => () =>
+    Promise.resolve({ kind: 'ok', status: 200, data: { lastKit } } as never);
+  it('reminds you only while the put-off flag is set and no kit is on record', async () => {
+    await act(async () => root.render(h(BackupPage, { read: record(null) })));
     expect(host.textContent).not.toContain(S.kitPending);
     act(() => root.unmount());
     root = createRoot(host);
     rememberRecoveryKitLater();
-    await act(async () => root.render(h(BackupPage)));
+    await act(async () => root.render(h(BackupPage, { read: record(null) })));
     expect(host.textContent).toContain(S.kitPending);
+  });
+  it('a kit on record ends the reminder, clears the flag and says when it was saved', async () => {
+    rememberRecoveryKitLater();
+    const saved = record({ at: 1_760_000_000, covers: ['Work'] });
+    await act(async () => root.render(h(BackupPage, { read: saved })));
+    expect(host.textContent).not.toContain(S.kitPending);
+    expect(host.textContent).toContain('Last recovery kit saved on');
+    expect(localStorage.length).toBe(0);
   });
   it('has no button that does nothing', async () => {
     const api: ApiClient = {

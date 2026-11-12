@@ -32,6 +32,8 @@ export interface ContactRow {
   readonly pairedAs?: 'inviter' | 'invitee';
   /** D-141 (08 §1 C2): the name before a rename, while the note is due; plain text only. */
   readonly formerName?: string;
+  /** Under the owner's own name for them: what they now call themselves; plain text only. */
+  readonly newName?: string;
 }
 
 export type ListAnswer =
@@ -70,6 +72,7 @@ function row(v: unknown): ContactRow | undefined {
   const pairedAt = v['pairedAt'];
   const pairedAs = v['pairedAs'];
   const former = v['formerName'];
+  const own = v['newName'];
   if (typeof ref !== 'string' || !REF.test(ref)) return undefined;
   if (typeof name !== 'string' || name.length > MAX_NAME) return undefined;
   if (!oneOf(nameSource, ['owner', 'counterparty'] as const)) return undefined;
@@ -99,6 +102,7 @@ function row(v: unknown): ContactRow | undefined {
     ...(typeof former === 'string' && former !== '' && former.length <= MAX_NAME
       ? { formerName: former }
       : {}),
+    ...(typeof own === 'string' && own !== '' && own.length <= MAX_NAME ? { newName: own } : {}),
   };
 }
 

@@ -1,13 +1,16 @@
 // Files page copy (11 §5: plain words; the owner's settings are "rules", never "policy"; no
 // "wallet", "gas", "seed phrase" or "transaction"; DESIGN-ADJ-1 FI-3; D-99, D-119). Commands in
 // backticks are typed by the owner in their own terminal and are shown exactly.
+import { sensorWord } from '../../presence-word.js';
 export { FILES_IO_STRINGS, asOf } from './io-strings.js';
 
 export const FILES_STRINGS = {
   foldersLabel: 'Folders your AI can send files from',
   folderMissing: "Not found on this computer. Your AI can't send from it.",
   allowFolder: 'Allow a folder',
-  everyChange: 'Every change here needs your passkey or master code.',
+  get everyChange(): string {
+    return `Every change here needs ${sensorWord()} or your master code.`;
+  },
   emptyTitle: "Your AI can't send files yet. Allow a folder it may send from.",
   emptyPrompt: 'Send proposal.pdf to Marko.',
   loading: 'Loading…',
@@ -27,7 +30,9 @@ export const FILES_STRINGS = {
   understood: 'I understand',
   confirmAdd: 'Allow folder',
   confirmRemove: 'Stop sending',
-  withPasskey: 'You confirm with your passkey.',
+  get withPasskey(): string {
+    return `You confirm with ${sensorWord()}.`;
+  },
   useCode: 'Use your master code instead',
   ownerCode: 'Master code',
   ownerCodeHint: 'Type it here only. Never give it to your AI.',

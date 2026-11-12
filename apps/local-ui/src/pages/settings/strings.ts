@@ -1,6 +1,7 @@
 // Settings copy (design-1112 §3.1; 11 §5: plain words, no "wallet", "gas", "seed phrase" or
 // "transaction"). Each row has one line and, when it is known, a state on the right. A line that
 // would need a value the app could not read falls back to plain words (nothing is made up).
+import { sensorWord } from '../../presence-word.js';
 export const SETTINGS_STRINGS = {
   title: 'Settings',
   back: 'Settings',
@@ -19,7 +20,9 @@ export const SETTINGS_STRINGS = {
     notBackedUp: 'Not backed up',
   },
   touchId: {
-    title: 'Touch ID & master code',
+    get title(): string {
+      return `${sensorWord()} & master code`;
+    },
     line: 'How you confirm that it is you. Your AI can never do this for you.',
     on: (sensor: string): string => `${sensor} on`,
     masterOnly: 'Master code only',

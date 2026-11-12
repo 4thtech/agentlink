@@ -1,10 +1,13 @@
 // The Rules page's copy (11 §5, §5.6, §6.2.1; DESIGN-ADJ-1 RU-2…RU-6, LS-1; UX audit 6a–6c). Plain
 // words only: no 11 §5.1 term (rules.test.tsx checks the rendered page). The warning sentences of the
 // confirm screen are in warnings.ts (D-119).
+import { sensorWord } from '../../presence-word.js';
 
 export const RULES_STRINGS = {
   eyebrow: 'What your AI may do with this ID without asking',
-  savingNote: 'Saving asks for your passkey',
+  get savingNote(): string {
+    return `Saving asks for ${sensorWord()}`;
+  },
   loading: 'Loading your rules…',
   summaryTitle: 'Rules in force',
   summaryNote: 'This is what your AI follows right now.',
@@ -78,7 +81,9 @@ export const RULES_STRINGS = {
     'Delivery receipts are on from an older default. Each one shows publicly that a proof reached you, never the content.',
   codeLabel: 'Master code',
   codeHint: 'Never give it to your AI.',
-  save: 'Save with passkey',
+  get save(): string {
+    return `Save with ${sensorWord()}`;
+  },
   saveCode: 'Save',
   back: 'Back to editing',
   preparing: 'Checking your changes…',

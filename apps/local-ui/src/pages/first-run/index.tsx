@@ -482,7 +482,7 @@ function ConnectFirstStep({
         <h1 id="fr-h" ref={title} tabIndex={-1} className="st-title">
           {S.title}
         </h1>
-        <p className="st-lead">{S.body(appName ?? T.yourAiApp)}</p>
+        <p className="st-lead">{appName === undefined ? T.noAppCreateBody : S.body(appName)}</p>
       </div>
       <IdExplainerCard />
       <AgentCard name={shown} line={appName === undefined ? T.noAppYet : S.worksIn(appName)} />
@@ -659,6 +659,7 @@ export function FirstRunPage({
   // most 1.5 s), then Home opens.
   const stepInvites = useMemo(() => trackCancels(createInviteApi()), []);
   const [inviteGone, setInviteGone] = useState(false);
+  const [linkUnsent, setLinkUnsent] = useState(false);
   const leaveInvite = (): void => {
     setInviteGone(true);
     window.setTimeout(() => void stepInvites.settled().then(goHome), 0);
@@ -1171,9 +1172,15 @@ export function FirstRunPage({
     return frame(
       <InviteStep
         inviteHref={INVITE_PATH}
+        unsent={linkUnsent && invitePanel === undefined}
         onHome={invitePanel === undefined ? leaveInvite : goHome}
         panel={
-          invitePanel ?? (inviteGone ? <></> : <INVITE_PANEL.Part invites={stepInvites.api} />)
+          invitePanel ??
+          (inviteGone ? (
+            <></>
+          ) : (
+            <INVITE_PANEL.Part invites={stepInvites.api} onUnsent={setLinkUnsent} />
+          ))
         }
       />,
     );
@@ -1397,9 +1404,11 @@ export function FirstRunPage({
           <h1 id="fr-h" className="st-title">
             {S.title}
           </h1>
-          <p className="st-lead">{S.body(appName)}</p>
+          <p className="st-lead">
+            {chosenApp === undefined ? T.notFoundCreateBody(appName) : S.body(appName)}
+          </p>
         </div>
-        <AgentCard name={label} line={S.worksIn(appName)} />
+        <AgentCard name={label} line={chosenApp === undefined ? T.noAppYet : S.worksIn(appName)} />
         <CreateAgentGate
           label={label}
           summary=""
@@ -1417,7 +1426,7 @@ export function FirstRunPage({
             })
           }
         />
-        <p className="st-note">{S.restartNote(appName)}</p>
+        {chosenApp === undefined ? null : <p className="st-note">{S.restartNote(appName)}</p>}
       </section>,
     );
   }

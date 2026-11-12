@@ -9,8 +9,12 @@ import { PageIcon, titleFor } from './page-meta.js';
 import { SETTINGS_STRINGS as S } from './strings.js';
 import './settings.css';
 
+const ADVANCED_NETWORK = '/advanced/network';
+
 /** A page that sits under Settings home and is listed in `SETTINGS_PAGES` with a `/settings/` path. */
 export function isSettingsSubpage(path: string): boolean {
+  // Advanced › Relays & network (/advanced/network) is the page behind Settings' "Advanced" row.
+  if (path === ADVANCED_NETWORK) return true;
   return path.startsWith('/settings/') && SETTINGS_PAGES.some((p) => p.path === path);
 }
 
@@ -38,7 +42,11 @@ export function SettingsFrame({
                 key={p.path}
                 href={p.path}
                 className="set-side-link"
-                aria-current={p.path === path ? 'page' : undefined}
+                aria-current={
+                  p.path === (path === ADVANCED_NETWORK ? '/settings/advanced' : path)
+                    ? 'page'
+                    : undefined
+                }
               >
                 <PageIcon path={p.path} />
                 {titleFor(p.path, p.label)}

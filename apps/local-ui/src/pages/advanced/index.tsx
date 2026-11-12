@@ -5,7 +5,7 @@
 import { Skeleton } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement } from 'react';
 import type { ApiResult } from '../../api/client.js';
-import { readHealth } from '../../layout/health.js';
+import { parseHealth, readHealth } from '../../layout/health.js';
 import { parseRelays, type Relays } from './relays.js';
 import { ADVANCED_STRINGS as S } from './strings.js';
 import './advanced.css';
@@ -18,7 +18,9 @@ export interface AdvancedPageProps {
   readonly read?: () => Promise<ApiResult<unknown>>;
 }
 
-type State = { readonly loading: true } | { readonly loading: false; readonly relays?: Relays };
+type State =
+  | { readonly loading: true }
+  | { readonly loading: false; readonly relays?: Relays; readonly working?: boolean };
 
 const WHEN = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' });
 
@@ -30,7 +32,9 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
       (r) => {
         if (!live) return;
         const relays = parseRelays(r);
-        setState(relays === undefined ? { loading: false } : { loading: false, relays });
+        // The same read as Settings home's "All working": a running answer is never contradicted.
+        const working = parseHealth(r)?.state === 'connected';
+        setState(relays === undefined ? { loading: false } : { loading: false, relays, working });
       },
       () => {
         if (live) setState({ loading: false });
@@ -43,6 +47,7 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
 
   const relays = state.loading ? undefined : state.relays;
   const sync = relays?.lastSyncAt;
+  const working = !state.loading && state.working === true;
   const answered = !state.loading && relays !== undefined;
   return (
     <div className="ad-page">
@@ -58,7 +63,9 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
               <dt>{S.relays}</dt>
               <dd>
                 {relays.connected === undefined || relays.total === undefined
-                  ? S.noRelays
+                  ? working
+                    ? S.relaysWorking
+                    : S.noRelays
                   : S.relayCount(relays.connected, relays.total)}
               </dd>
             </div>
@@ -66,18 +73,20 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
               <dt>{S.network}</dt>
               <dd>{S.networkAuto}</dd>
             </div>
-            <div className="ad-row">
-              <dt>{S.lastSync}</dt>
-              <dd>
-                {sync === undefined ? (
-                  S.never
-                ) : (
-                  <time dateTime={new Date(sync * 1000).toISOString()}>
-                    {WHEN.format(new Date(sync * 1000))}
-                  </time>
-                )}
-              </dd>
-            </div>
+            {sync === undefined && working ? null : (
+              <div className="ad-row">
+                <dt>{S.lastSync}</dt>
+                <dd>
+                  {sync === undefined ? (
+                    S.never
+                  ) : (
+                    <time dateTime={new Date(sync * 1000).toISOString()}>
+                      {WHEN.format(new Date(sync * 1000))}
+                    </time>
+                  )}
+                </dd>
+              </div>
+            )}
           </dl>
         ) : (
           <p className="al-text-body al-muted">{S.unknown}</p>

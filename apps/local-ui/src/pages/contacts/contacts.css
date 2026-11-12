@@ -190,7 +190,7 @@
 }
 .ct-check,
 .ct-open {
-  color: var(--al-color-accent-default);
+  color: var(--al-color-fg-link);
   text-decoration: underline;
 }
 .ct-archived {

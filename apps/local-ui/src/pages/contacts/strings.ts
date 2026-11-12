@@ -2,6 +2,7 @@
 // address or a hash in the default view; 11 §5.2 names and labels; 04 §3.6.1 Contact check; UX audit
 // 3b, 10a). A contact's name is never part of a fixed string: the helpers below take the name as
 // formatted by the ui name rule and the page renders the result as text.
+import { sensorWord } from '../../presence-word.js';
 export const CONTACTS_STRINGS = {
   listLabel: 'Your people',
   lead: 'The people your AI can message. You connect by invite, and only you and they can read what is sent.',
@@ -39,6 +40,7 @@ export const CONTACTS_STRINGS = {
   safetyExplain:
     'Compare these 12 digits with the other person by call or in person; if they match, it’s really them.',
   wasName: (former: string): string => `(was ${former})`,
+  nowCalls: (name: string): string => `Now calls itself ${name}`,
   keepBoth: 'Keep both',
   removeOlder: 'Remove older',
   codeLoading: 'Loading the 12 digits…',
@@ -75,7 +77,9 @@ export const CONTACTS_STRINGS = {
   unblocked: 'Unblocked. Messages from this person arrive again.',
   cancel: 'Cancel',
   presenceIntro: 'Confirm it’s you. Never give your master code to your AI.',
-  usePasskey: 'Confirm with your passkey',
+  get usePasskey(): string {
+    return `Confirm with ${sensorWord()}`;
+  },
   /** F24: the same button with the platform's own word (SENSOR: Touch ID, Windows Hello, your passkey). */
   usePasskeyOn: (sensor: string): string => `Confirm with ${sensor}`,
   useCode: 'Use your master code instead',

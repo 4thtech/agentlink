@@ -1,5 +1,6 @@
 // U3-h: Agents copy (b11 §29; 11 §5). "keys" appears only in the Remove sheet, because it is what is
 // deleted. No "wallet", "gas", "seed phrase" or "transaction".
+import { sensorWord } from '../../presence-word.js';
 /**
  * W4-AGENTS (I-5; IR-W4-AGENTS-SEC-1 L1): an agent label inside a title, a statement or an aria
  * name is its own bidi-isolated run (U+2068 … U+2069), so no character in it can reorder the words
@@ -39,7 +40,9 @@ export const AGENTS_STRINGS = {
   notFullyRemoved: (label: string): string => `${iso(label)} wasn't fully removed`,
   finishRemoving: 'Finish removing',
   finishTitle: (label: string): string => `Finish removing ${iso(label)}`,
-  finishTouchId: 'Finish with Touch ID',
+  get finishTouchId(): string {
+    return `Finish with ${sensorWord()}`;
+  },
   finishStatement: (label: string): string => `Finish removing ${iso(label)}`,
   empty: 'No IDs yet. An ID is created when you connect your first AI app.',
   loadError: "Couldn't load your IDs.",
@@ -53,7 +56,9 @@ export const AGENTS_STRINGS = {
   mapSoon: 'The map arrives in an update. The list has everything you need.',
   switcherLabel: 'IDs',
   renameField: 'Name',
-  saveTouchId: 'Save with Touch ID',
+  get saveTouchId(): string {
+    return `Save with ${sensorWord()}`;
+  },
   labelInvalid: "That name can't be used. Change it and try again.",
   notRenamed: 'Not renamed yet. Try again.',
   renameFailed: "Couldn't rename it. Try again.",
@@ -73,7 +78,9 @@ export const AGENTS_STRINGS = {
   typeName: "Type the ID's name to confirm",
   typeNameLabel: (label: string): string => `Type ${iso(label)} to confirm`,
   typeNameDisabled: 'Type the name to enable this',
-  removeTouchId: 'Remove with Touch ID',
+  get removeTouchId(): string {
+    return `Remove with ${sensorWord()}`;
+  },
   quitAny: (label: string): string => `Quit any AI app that uses ${iso(label)} first.`,
   /** F22: a CLI app (Terminal sessions); no count is read, so no number is claimed. */
   quitTerminal: (app: string): string =>
@@ -173,7 +180,9 @@ export const AGENTS_STRINGS = {
     `Your AI apps can't send or receive messages as ${iso(label)} until you resume it. Nothing is deleted.`,
   /** After the label (in its own bdi run): "{label} is paused". */
   isPaused: ' is paused',
-  resumeTouchId: 'Resume with Touch ID',
+  get resumeTouchId(): string {
+    return `Resume with ${sensorWord()}`;
+  },
   resumeStatement: (label: string): string => `Resume ${iso(label)}`,
   pauseFailed: "Couldn't pause it. Try again.",
   resumeFailed: "Couldn't resume it. Try again.",
@@ -181,7 +190,9 @@ export const AGENTS_STRINGS = {
 
   // Rename (D-141, 11 §5.8).
   renameHint: 'People see this name.',
-  renameTouchId: 'Rename with Touch ID',
+  get renameTouchId(): string {
+    return `Rename with ${sensorWord()}`;
+  },
   renamedTold: (label: string): string =>
     `Renamed. Your contacts will see ${label} next time they're online.`,
   renameLimited: (label: string, time: string): string =>
@@ -198,7 +209,9 @@ export const AGENTS_STRINGS = {
   newInvitesStillShow: 'New invites still show ',
   updateName: 'Update name',
   /** After the label (in its own bdi run): "… so everyone sees {label}." */
-  noteHint: 'One Touch ID, so everyone sees ',
+  get noteHint(): string {
+    return `One ${sensorWord()}, so everyone sees `;
+  },
   // WP-1 (R-2): the invite asks for the update first.
   /** Before the card name: "Your invites still show {cardName}". */
   invitesStillShow: 'Your invites still show ',
