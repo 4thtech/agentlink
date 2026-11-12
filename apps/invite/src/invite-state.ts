@@ -31,7 +31,13 @@ import {
   ownerFingerprint,
 } from '@4thtech-io/crypto';
 import type { Invite } from '@4thtech-io/types';
-import { CANONICAL_PREFIX, buildAskAi, buildJoinCommand, isCanonicalLink } from './prompt.js';
+import {
+  CANONICAL_PREFIX,
+  buildAskAi,
+  buildCommands,
+  isCanonicalLink,
+  type InviteCommands,
+} from './prompt.js';
 
 /** The inviter's details. Every value is shown with `textContent` only. */
 export interface Inviter {
@@ -60,8 +66,8 @@ export type InviteView =
   | {
       readonly kind: 'ready';
       readonly inviteUrl: string;
-      /** The command, or undefined when it would be too long for cmd.exe (08 §4). */
-      readonly command: string | undefined;
+      /** WP-2: the command per computer, or undefined when one would be too long for cmd.exe (08 §4). */
+      readonly commands: InviteCommands | undefined;
       readonly sentence: string;
       readonly inviter: Inviter;
     };
@@ -120,7 +126,7 @@ export async function evaluateFragment(
     return {
       kind: 'ready',
       inviteUrl,
-      command: buildJoinCommand(inviteUrl),
+      commands: buildCommands(inviteUrl),
       sentence: buildAskAi(inviteUrl),
       inviter: { name, fallback, label: 'self-declared', fingerprint, expiresAt: invite.expiresAt },
     };

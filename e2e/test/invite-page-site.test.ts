@@ -199,7 +199,9 @@ describe('the pages', () => {
   it('F33: the favicon is a plain SVG image: no script, no link out, no outside reference', () => {
     const svg = read('favicon.svg');
     expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"')).toBe(true);
-    expect(svg).not.toMatch(/<script\b|\son[a-z]+\s*=|javascript:|<foreignObject\b|href=|@import|url\(/i);
+    expect(svg).not.toMatch(
+      /<script\b|\son[a-z]+\s*=|javascript:|<foreignObject\b|href=|@import|url\(/i,
+    );
     expect([...svg.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([
       'http://www.w3.org/2000/svg',
     ]);

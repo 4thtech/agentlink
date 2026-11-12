@@ -228,9 +228,9 @@ describe('a good invite (U3-invite)', () => {
     await expect(page.locator('#os-unix').getAttribute('aria-pressed')).resolves.toBe('true');
     await expect(page.locator('#os-windows').getAttribute('aria-pressed')).resolves.toBe('false');
     await expect(page.locator('#os-node').getAttribute('aria-pressed')).resolves.toBe('false');
-    await expect(page.locator('#way-command [role="group"] button').allTextContents()).resolves.toEqual(
-      ['Mac or Linux', 'Windows', 'Node.js'],
-    );
+    await expect(
+      page.locator('#way-command [role="group"] button').allTextContents(),
+    ).resolves.toEqual(['Mac or Linux', 'Windows', 'Node.js']);
     await expect(page.locator('#link-text').textContent()).resolves.toMatch(
       /^agentlink\.4thtech\.io\/i#.{4}….{5}$/,
     );

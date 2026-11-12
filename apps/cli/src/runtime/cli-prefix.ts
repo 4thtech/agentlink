@@ -7,8 +7,13 @@ import process from 'node:process';
 
 /** The documented zero-install form. */
 export const NPX_PREFIX = 'npx -y @4thtech-io/agentlink';
-/** The form after a global install. */
+/** The form after a global install, or after the one-line installer (installer/). */
 export const GLOBAL_PREFIX = 'agentlink';
+/**
+ * WP-2 (D4): the variable the installers' launcher (`~/.agentlink/bin/agentlink`, `agentlink.cmd`)
+ * sets to `installer`. It only changes which command the text names; it grants nothing.
+ */
+export const LAUNCHER_MARKER = 'AGENTLINK_LAUNCHER';
 
 export interface LaunchInfo {
   /** `process.argv[1]`: the script that started this program. */
@@ -45,6 +50,8 @@ function defaultOnPath(script: string): boolean {
  * path) gets the `npx` form, which works after the documented install.
  */
 export function cliPrefix(info?: LaunchInfo): string {
+  // WP-2 (D4): the installers' launcher runs npx, but it put `agentlink` on the user's PATH.
+  if (process.env[LAUNCHER_MARKER] === 'installer') return GLOBAL_PREFIX;
   const script = info === undefined ? process.argv[1] : info.script;
   if (script === undefined || script === '') return NPX_PREFIX;
   // npx and `npm exec` put the cached package's `.bin` on PATH, so the PATH check below would find

@@ -134,10 +134,10 @@ describe('deploy-invite.yml structure', () => {
     const build = job('build');
     expect(build).not.toMatch(/environment:|secrets\.|CLOUDFLARE/);
     expect(build).toMatch(
-      /exactly _headers, i\/index\.html, index\.html, install\.ps1, install\.sh, invite\.css and invite\.js/,
+      /exactly _headers, favicon\.svg, i\/index\.html, index\.html, install\.ps1, install\.sh, invite\.css and invite\.js/,
     );
     expect(build).toContain(
-      'if [ "$found" != "./_headers ./i/index.html ./index.html ./install.ps1 ./install.sh ./invite.css ./invite.js " ]; then',
+      'if [ "$found" != "./_headers ./favicon.svg ./i/index.html ./index.html ./install.ps1 ./install.sh ./invite.css ./invite.js " ]; then',
     );
     expect(job('deploy-staging')).toMatch(/--assets "\$RUNNER_TEMP\/invite-site"/);
     expect(job('deploy-staging')).toMatch(/name: invite-site/);
@@ -386,6 +386,7 @@ describe('site check (what is served equals the build)', () => {
     '/i': ['i/index.html', '<!doctype html><title>Invite</title>'],
     '/invite.js': ['invite.js', 'export const x = 1;'],
     '/invite.css': ['invite.css', 'body { margin: 0; }'],
+    '/favicon.svg': ['favicon.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>'],
     '/install.sh': ['install.sh', '#!/bin/sh\nmain "$@"\n'],
     '/install.ps1': ['install.ps1', "Write-Host 'AgentLink'\n"],
   };

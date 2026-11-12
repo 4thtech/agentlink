@@ -65,5 +65,4 @@ describe('page copy', () => {
       'This invite is damaged or not supported. Ask the person who sent it for a new one.',
     );
   });
-
 });

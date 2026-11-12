@@ -88,11 +88,15 @@ describe('install.ps1 source', () => {
   });
 
   it('WP-2: takes the invite as -Invite, checks it before anything else, and hands it to join', () => {
-    expect(source).toContain('param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite)');
-    // The same patterns as `agentlink join` (08 §4), case-sensitive and anchored at the very end.
     expect(source).toContain(
-      "[regex]::IsMatch($Link, '\\Ahttps://agentlink\\.4thtech\\.io/i#(?:[A-Za-z0-9_-]{1,21846}|2\\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048])\\z')",
+      'param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite)',
     );
+    // The same patterns as `agentlink join` (08 §4), case-sensitive and anchored at the very end.
+    expect(source).toContain("$prefix = [regex]::Escape('https://agentlink.4thtech.io/i#')");
+    expect(source).toContain(
+      "[regex]::IsMatch($Link, '\\A' + $prefix + '(?:[A-Za-z0-9_-]{1,21846}|2\\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048])\\z')",
+    );
+    expect(source).not.toMatch(/IgnoreCase|-match \$Link|\$Link -match/);
     // An -Invite that is given but empty or not a string is refused, not ignored.
     expect(source).toMatch(/if \(\$null -ne \$Invite\) \{/);
     expect(source).toContain("Invoke-Launcher $launcher @('join', $Invite)");

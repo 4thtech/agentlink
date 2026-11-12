@@ -43,7 +43,9 @@ function expectSafe(view: InviteView, payload: string): void {
   expect(view.commands?.node).toBe(JOIN_COMMAND_TEMPLATE.replace('{inviteUrl}', view.inviteUrl));
   expect(view.commands?.node).toBe(buildJoinCommand(view.inviteUrl));
   expect(view.commands?.node).toBe(`npx -y @4thtech-io/agentlink join '${view.inviteUrl}'`);
-  expect(view.commands?.unix).toBe(`curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite '${view.inviteUrl}'`);
+  expect(view.commands?.unix).toBe(
+    `curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite '${view.inviteUrl}'`,
+  );
   expect(view.commands?.windows).toBe(
     `& ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Invite '${view.inviteUrl}'`,
   );
@@ -200,7 +202,15 @@ describe('evaluateFragment: hostile inviter names (06 §2.1, I-5)', () => {
       expect(view.inviter.name).toMatch(/^[\p{L}\p{N} .'·-]{1,45}$/u);
       expect(view.inviter.label).toBe('self-declared');
       // Nothing the inviter chose reaches the command or the sentence.
-      for (const text of [...Object.values(view.commands ?? {}), view.sentence]) {
+      // The commands are fixed templates (the Mac or Linux one has its own `curl`), so only the
+      // link in them may vary, and it is checked like the sentence.
+      expect(view.commands?.unix.replaceAll(view.inviteUrl, '{inviteUrl}')).toBe(
+        INSTALL_SH_TEMPLATE,
+      );
+      expect(view.commands?.windows.replaceAll(view.inviteUrl, '{inviteUrl}')).toBe(
+        INSTALL_PS1_TEMPLATE,
+      );
+      for (const text of [view.inviteUrl, view.commands?.node ?? '', view.sentence]) {
         for (const word of ['SYSTEM', 'curl', 'ignore', 'onerror', 'approve', 'Copy this']) {
           expect(text).not.toContain(word);
         }

@@ -6,9 +6,12 @@ export { INSTALL_AND_ACCEPT_TEMPLATE, buildPrompt } from './prompt.js';
 // U3-invite: the page's one step (08 §4), for the browser tests.
 export {
   ASK_AI_TEMPLATE,
+  INSTALL_PS1_TEMPLATE,
+  INSTALL_SH_TEMPLATE,
   JOIN_COMMAND_TEMPLATE,
   MAX_COMMAND_CHARS,
   buildAskAi,
+  buildCommands,
   buildJoinCommand,
+  type InviteCommands,
 } from './prompt.js';
-export { NODE_DOWNLOAD_URL } from './strings.js';
