@@ -1152,6 +1152,18 @@ describe.runIf(POSIX)(
       expect(await engine.restorePending()).toBe(false);
     });
 
+    it('the marker is read only as a regular file, never through a link (CodeQL js/file-system-race)', async () => {
+      const dir = join(t.home, '.agentlink');
+      await mkdir(dir, { recursive: true });
+      const marker = `${JSON.stringify({ v: 1, ownerNostr: encodeHex(new Uint8Array(32).fill(7)) })}\n`;
+      const elsewhere = join(t.root, 'marker-elsewhere.json');
+      await writeFile(elsewhere, marker);
+      await symlink(elsewhere, join(dir, 'restore-pending.json'));
+      expect(await engine.restorePending()).toBe(false);
+      await rename(elsewhere, join(dir, 'restore-pending.json'));
+      expect(await engine.restorePending()).toBe(true);
+    });
+
     it('other_owner before the code when the owner key is known only from a verified card here', async () => {
       // An ID of owner A restored here, then no passkey, no ID open and no hint.
       const a = await kitOnDisk();
