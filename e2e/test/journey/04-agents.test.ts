@@ -375,7 +375,8 @@ describe('chapter 4: agents', () => {
       expect(await a.page.getByRole('menuitemradio').filter({ hasText: 'Ana' }).count()).toBe(0);
       await eventually(
         'Bo sees Ana retired',
-        async () => (await text(b.page)).includes('No longer active'),
+        // The badge is drawn in capitals (text-transform), so innerText reads it upper-case.
+        async () => (await text(b.page)).toLowerCase().includes('no longer active'),
         30_000,
       );
       await bProbe.check();

@@ -39,8 +39,7 @@ const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
 afterAll(() => ch.stop());
 
-const contactList = (page: JourneyPage['page']) =>
-  page.getByRole('list', { name: 'Your contacts' });
+const contactList = (page: JourneyPage['page']) => page.getByRole('list', { name: 'Your people' });
 
 /** The contact row appears in the list by itself; its detail shows the safety code. */
 async function seesSafetyCode(jp: JourneyPage, name: string): Promise<void> {
