@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { macSignPlan, signingMode } from '../lib/sign-plan.mjs';
+import {
+  HELPER_BUNDLE_PATH,
+  HELPER_PATH,
+  HELPER_SIGN_OPTIONS,
+  macSignPlan,
+  signingMode,
+} from '../lib/sign-plan.mjs';
 
 const app = '/out/AgentLink.app';
 const files = [
@@ -45,4 +51,25 @@ test('a bundled node outside the expected path is still refused', () => {
     () => macSignPlan({ app, files, bundles: [...bundles, `${app}/Contents/Resources/node`] }),
     /node/,
   );
+});
+
+// DESK051-C3: the presence helper is an app bundle in Contents/Helpers. Both its executable and the
+// bundle keep the fixed identifier and the hardened runtime; other nested apps do not get them.
+test('the presence helper app and its executable are signed with the helper identity', () => {
+  const helperApp = `${app}${HELPER_BUNDLE_PATH}`;
+  const helperExe = `${app}${HELPER_PATH}`;
+  const plan = macSignPlan({
+    app,
+    files: [...files, helperExe],
+    bundles: [...bundles, helperApp],
+  });
+  for (const target of [helperApp, helperExe]) {
+    const step = plan.find((s) => s.target === target);
+    assert.deepEqual(step.options, [...HELPER_SIGN_OPTIONS], target);
+  }
+  const targets = plan.map((s) => s.target);
+  assert.ok(targets.indexOf(helperExe) < targets.indexOf(helperApp));
+  assert.ok(targets.indexOf(helperApp) < targets.indexOf(app));
+  const electronHelper = plan.find((s) => s.target.endsWith('/AgentLink Helper.app'));
+  assert.deepEqual(electronHelper.options, []);
 });
