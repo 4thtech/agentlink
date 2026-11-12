@@ -13,7 +13,7 @@ import type { ApprovalsClient } from '../approvals/client.js';
 import { SETTINGS_PAGES } from '../../nav.js';
 import { resetPrefsForTests, setPref } from '../../prefs/index.js';
 import { settingsGroups } from './groups.js';
-import { SettingsPage } from './index.js';
+import { lineFor, SettingsPage } from './index.js';
 import { isSettingsSubpage, SettingsFrame } from './side-nav.js';
 import { parseBackup } from './state.js';
 import { SETTINGS_STRINGS as S } from './strings.js';
@@ -181,33 +181,37 @@ describe('Settings home', () => {
     expect(text).toContain(S.backup.fallback);
     expect(text).toContain(S.proofs.fallback);
     expect(text).toContain(S.apps.fallback);
-    expect(text).not.toMatch(/\$\d|connected|saved \d|\d+ folders|up to date/);
+    expect(text).not.toMatch(/\$\d|connected|saved \d|\d+ folders/);
     expect(host.querySelector('.set-state')?.textContent).toBe(S.appearance.system);
     expect(host.querySelector('.set-footer')).toBeNull();
   });
 
   it('the footer carries the version the health read reports, never a fixed one', async () => {
     await mount();
-    expect(host.querySelector('.set-footer')?.textContent).toBe(S.footer.upToDate('9.8.7'));
+    expect(host.querySelector('.set-footer')?.textContent).toBe(S.footer.version('9.8.7'));
     await mount(
       answerFrom({ ...ANSWERS, '/api/ui/health': { agent: 'running', version: '1.2.3' } }),
     );
-    expect(host.querySelector('.set-footer')?.textContent).toBe(S.footer.upToDate('1.2.3'));
+    expect(host.querySelector('.set-footer')?.textContent).toBe(S.footer.version('1.2.3'));
     await mount(answerFrom({ ...ANSWERS, '/api/ui/health': { agent: 'running', version: null } }));
     expect(host.querySelector('.set-footer')).toBeNull();
   });
 
   it('puts one notice on top by priority: no kit, then out of date, then Touch ID', async () => {
     await mount(answerFrom({ ...ANSWERS, '/api/ui/backup': { lastKit: null, missing: {} } }));
-    expect(host.querySelectorAll('section.al-notice')).toHaveLength(1);
+    expect(host.querySelectorAll('section.al-notice, section.set-notice')).toHaveLength(1);
     expect(host.textContent).toContain(S.notice.noKitTitle);
-    expect(host.querySelector('section.al-notice a')?.textContent).toBe(S.notice.noKitAction);
+    expect(host.querySelector('section.set-notice a.al-btn-primary')?.textContent).toBe(
+      S.notice.noKitAction,
+    );
     expect(rowFor('/settings/backup')?.textContent).toContain(S.backup.notBackedUp);
 
     await mount();
-    expect(host.querySelectorAll('section.al-notice')).toHaveLength(1);
+    expect(host.querySelectorAll('section.al-notice, section.set-notice')).toHaveLength(1);
     expect(host.textContent).toContain('Your recovery kit is missing 1 ID and 2 people.');
-    expect(host.querySelector('section.al-notice a')?.textContent).toBe(S.notice.staleAction);
+    expect(host.querySelector('section.set-notice a.al-btn-primary')?.textContent).toBe(
+      S.notice.staleAction,
+    );
 
     await mount(
       answerFrom({
@@ -216,7 +220,9 @@ describe('Settings home', () => {
       }),
       false,
     );
-    expect(host.querySelectorAll('section.al-notice').length).toBeLessThanOrEqual(1);
+    expect(
+      host.querySelectorAll('section.al-notice, section.set-notice').length,
+    ).toBeLessThanOrEqual(1);
     expect(host.textContent).not.toContain('recovery kit is missing');
     expect(rowFor('/settings/backup')?.textContent).toContain(S.backup.upToDate);
   });
@@ -274,5 +280,90 @@ describe('the kit record read', () => {
     expect(parseBackup({ export: 'available' })).toBeUndefined();
     expect(parseBackup({ lastKit: 'x' })).toBeUndefined();
     expect(parseBackup({ lastKit: null })).toEqual({ kind: 'none' });
+  });
+});
+
+describe('round 2', () => {
+  it('never claims "up to date": no update check is read, so the footer is the version alone', async () => {
+    await mount();
+    expect(host.querySelector('.set-footer')?.textContent).toBe('AgentLink 9.8.7');
+    expect(host.textContent).not.toMatch(/up to date/i);
+  });
+
+  it('tints the states: amber out of date, green working, plain values', async () => {
+    await mount();
+    const pill = (path: string): Element | null | undefined =>
+      rowFor(path)?.querySelector('.set-state');
+    expect(pill('/settings/backup')?.className).toContain('is-warn');
+    expect(rowFor('/settings/backup')?.querySelector('.set-row-ic')?.className).toContain(
+      'is-warn',
+    );
+    expect(pill('/settings/apps')?.className).toContain('is-plain');
+    expect(pill('/settings/proofs')?.className).toContain('is-plain');
+    expect(pill('/settings/appearance')?.className).toContain('is-plain');
+    const adv = pill('/settings/advanced') ?? pill('/advanced/network');
+    expect(adv?.className).toContain('is-good');
+  });
+
+  it('a Touch ID entry injected into the pages renders with its meta and state', async () => {
+    const pages = [
+      ...SETTINGS_PAGES.filter((p) => p.path !== '/settings/touch-id'),
+      { label: 'Touch ID', path: '/settings/touch-id' },
+    ];
+    const render = async (answers: Record<string, unknown>, registered: boolean): Promise<void> => {
+      await act(async () => {
+        root.render(
+          h(
+            HoodProvider,
+            { value: false },
+            h(SettingsPage, { get: answerFrom(answers), approvals: approvals(registered), pages }),
+          ),
+        );
+      });
+    };
+    await render(ANSWERS, true);
+    const row = rowFor('/settings/touch-id');
+    expect(row?.querySelector('.set-row-title')?.textContent).toBe(S.touchId.title);
+    expect(row?.querySelector('.set-row-line')?.textContent).toBe(S.touchId.line);
+    expect(row?.querySelector('.set-state')?.className).toContain('is-good');
+    expect(row?.querySelector('.set-state')?.textContent).toMatch(/ on$/);
+    expect(row?.querySelector('.set-row-ic svg')).not.toBeNull();
+    await render(
+      { ...ANSWERS, '/api/owner/passkey': { passkey: { rpId: 'localhost', registered: false } } },
+      false,
+    );
+    expect(rowFor('/settings/touch-id')?.querySelector('.set-state')?.textContent).toBe(
+      S.touchId.masterOnly,
+    );
+  });
+
+  it('finds a setting by title or line, Esc clears, and says so when nothing matches', async () => {
+    await mount();
+    const input = host.querySelector<HTMLInputElement>('.set-search input');
+    const type = (value: string): void => {
+      act(() => {
+        const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        set?.call(input, value);
+        input?.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    };
+    type('proofs');
+    expect(rows().map((r) => r.getAttribute('href'))).toEqual(['/settings/proofs']);
+    type('zzzz');
+    expect(rows()).toHaveLength(0);
+    expect(host.textContent).toContain(S.search.empty);
+    act(() => {
+      input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(input?.value).toBe('');
+    expect(rows().length).toBe(SETTINGS_PAGES.length);
+  });
+
+  it('Rules shows the ID name on the right only when it is given', () => {
+    const rules = { asks: 3, total: 4 };
+    const withName = lineFor('/settings/rules', { rules }, 'system', 'Touch ID', 'Tali');
+    expect(withName.state).toBe('Tali');
+    expect(withName.line).toContain('Asks you first for 3 of 4 things.');
+    expect(lineFor('/settings/rules', { rules }, 'system', 'Touch ID').state).toBeUndefined();
   });
 });

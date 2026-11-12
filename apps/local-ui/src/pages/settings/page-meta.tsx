@@ -12,7 +12,7 @@ const ICONS: Readonly<Record<string, Icon>> = {
   '/settings/rules': { shell: 'rules' },
   '/settings/apps': { own: 'plug' },
   '/settings/files': { own: 'folder' },
-  '/settings/appearance': { own: 'appearance' },
+  '/settings/appearance': { own: 'sun' },
   '/settings/proofs': { shell: 'proofs' },
   '/settings/advanced': { shell: 'diag' },
   '/advanced/network': { shell: 'diag' },

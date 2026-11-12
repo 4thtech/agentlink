@@ -4,17 +4,18 @@
 // Every line comes from a real read; a read that fails falls back to plain words, never a made-up
 // value, and nothing private (key, address, path of this computer) shows. The footer's version is
 // the running package's, from the health read.
-import { PageNotice } from '@4thtech-io/ui';
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactElement } from 'react';
+import { getLive, subscribeLive } from '../../api/live.js';
 import { createApiClient, type ApiResult } from '../../api/client.js';
 import { ShellIcon } from '../../layout/shell-icons.js';
-import { SETTINGS_PAGES } from '../../nav.js';
+import { SETTINGS_PAGES, type SettingsPage as SettingsPageEntry } from '../../nav.js';
 import { usePrefs } from '../../prefs/index.js';
 import { createApprovalsClient, type ApprovalsClient } from '../approvals/client.js';
 import { browserPasskeys, OwnerPanel, useOwner } from '../approvals/index.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import { SENSOR } from '../first-run/strings.js';
-import { groupOf, settingsGroups } from './groups.js';
+import { settingsGroups } from './groups.js';
+import { SettingsIcon } from './icons.js';
 import { PageIcon, titleFor } from './page-meta.js';
 import { readSettingsState, type SettingsState } from './state.js';
 import { SETTINGS_STRINGS as S } from './strings.js';
@@ -25,6 +26,8 @@ export interface SettingsPageProps {
   readonly get?: (path: string) => Promise<ApiResult<unknown>>;
   /** The approvals client for the Touch ID notice (default: the production one). */
   readonly approvals?: ApprovalsClient;
+  /** The pages (default: SETTINGS_PAGES); a test injects entries other work packages add. */
+  readonly pages?: readonly SettingsPageEntry[];
 }
 
 const productionGet = (path: string): Promise<ApiResult<unknown>> => createApiClient().get(path);
@@ -52,6 +55,7 @@ export function lineFor(
   s: SettingsState | undefined,
   theme: 'system' | 'light' | 'dark',
   sensor: string,
+  idName?: string,
 ): Line {
   switch (path) {
     case '/settings/backup': {
@@ -76,7 +80,10 @@ export function lineFor(
     case '/settings/rules':
       return s?.rules === undefined
         ? { line: S.rules.fallback }
-        : { line: S.rules.line(s.rules.asks, s.rules.total) };
+        : {
+            line: S.rules.line(s.rules.asks, s.rules.total),
+            ...(idName === undefined ? {} : { state: idName, tone: 'plain' as const }),
+          };
     case '/settings/apps': {
       const names = s?.apps?.apps.filter((a) => a.state === 'connected').map((a) => a.name);
       if (names === undefined) return { line: S.apps.fallback };
@@ -115,10 +122,12 @@ function Row(props: {
   readonly path: string;
   readonly title: string;
   readonly line: Line;
+  readonly tile?: Tone;
 }): ReactElement {
+  const { tile } = props;
   return (
     <a className="set-row" href={props.path}>
-      <span className="set-row-ic" aria-hidden="true">
+      <span className={`set-row-ic${tile === undefined ? '' : ` is-${tile}`}`} aria-hidden="true">
         <PageIcon path={props.path} />
       </span>
       <span className="set-row-text">
@@ -133,91 +142,156 @@ function Row(props: {
   );
 }
 
-/** The one notice by priority, or undefined when the kit says nothing needs the owner. */
+/** The kit notice: a tinted card, icon, bold title, a line, and the primary action on the right. */
+function KitCard(props: {
+  readonly title: string;
+  readonly line: string;
+  readonly action: string;
+}): ReactElement {
+  return (
+    <section className="set-notice" aria-labelledby="set-notice-t">
+      <span className="set-notice-ic" aria-hidden="true">
+        <SettingsIcon name="shield" />
+      </span>
+      <div className="set-notice-text">
+        <p id="set-notice-t" className="set-notice-title">
+          {props.title}
+        </p>
+        <p className="set-notice-line">{props.line}</p>
+      </div>
+      <a className="al-btn al-btn-primary set-notice-act" href="/settings/backup">
+        {props.action}
+      </a>
+    </section>
+  );
+}
+
 function KitNotice({ state }: { readonly state: SettingsState | undefined }): ReactElement | null {
   const b = state?.backup;
   if (b === undefined) return null;
   if (b.kind === 'none') {
     return (
-      <PageNotice
-        tone="warning"
-        title={S.notice.noKitTitle}
-        actions={
-          <a className="al-btn al-btn-primary al-btn-sm" href="/settings/backup">
-            {S.notice.noKitAction}
-          </a>
-        }
-      >
-        <p>{S.notice.noKit}</p>
-      </PageNotice>
+      <KitCard title={S.notice.noKitTitle} line={S.notice.noKit} action={S.notice.noKitAction} />
     );
   }
   if (b.missingIds === 0 && b.missingPeople === 0) return null;
   return (
-    <PageNotice
-      tone="warning"
+    <KitCard
       title={S.notice.staleTitle(b.missingIds, b.missingPeople)}
-      actions={
-        <a className="al-btn al-btn-primary al-btn-sm" href="/settings/backup">
-          {S.notice.staleAction}
-        </a>
-      }
-    >
-      <p>{S.notice.stale(DAY.format(b.at))}</p>
-    </PageNotice>
+      line={S.notice.stale(DAY.format(b.at))}
+      action={S.notice.staleAction}
+    />
   );
 }
 
-export function SettingsPage({ get = productionGet, approvals }: SettingsPageProps): ReactElement {
+export function SettingsPage({
+  get = productionGet,
+  approvals,
+  pages = SETTINGS_PAGES,
+}: SettingsPageProps): ReactElement {
   const prefs = usePrefs();
   const [state, setState] = useState<SettingsState | undefined>(undefined);
+  const [query, setQuery] = useState('');
   const client = useMemo(() => approvals ?? createApprovalsClient(), [approvals]);
   const passkeys = browserPasskeys();
   const owner = useOwner(client, passkeys);
+  const live = useSyncExternalStore(subscribeLive, getLive, () => LIVE_EMPTY);
+  // The ID's name beside Rules, only when the owner has two or more IDs.
+  const idName = live.agents.length >= 2 ? live.agents.find((a) => a.current)?.name : undefined;
 
   useEffect(() => {
-    let live = true;
+    let current = true;
     void readSettingsState(get).then((s) => {
-      if (live) setState(s);
+      if (current) setState(s);
     });
     return () => {
-      live = false;
+      current = false;
     };
   }, [get]);
 
-  const groups = settingsGroups(SETTINGS_PAGES);
   const sensor = SENSOR[detectPlatform()];
+  const items = settingsGroups(pages).map((g) => ({
+    id: g.id,
+    rows: g.pages.map((p) => ({
+      path: p.path,
+      title: titleFor(p.path, p.label),
+      line: lineFor(p.path, state, prefs.theme, sensor, idName),
+    })),
+  }));
+  const needle = query.trim().toLowerCase();
+  const shown = items
+    .map((g) => ({
+      ...g,
+      rows: g.rows.filter(
+        (r) =>
+          needle === '' ||
+          r.title.toLowerCase().includes(needle) ||
+          r.line.line.toLowerCase().includes(needle),
+      ),
+    }))
+    .filter((g) => g.rows.length > 0);
   const kit = state?.backup;
   const kitNeedsOwner =
     kit !== undefined && (kit.kind === 'none' || kit.missingIds + kit.missingPeople > 0);
   return (
     <div className="set-page">
-      <h1 className="al-text-title-1">{S.title}</h1>
+      <div className="set-head">
+        <h1 className="al-text-title-1">{S.title}</h1>
+        <label className="set-search">
+          <ShellIcon name="search" size={16} />
+          <input
+            type="search"
+            value={query}
+            placeholder={S.search.label}
+            aria-label={S.search.label}
+            autoComplete="off"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && query !== '') {
+                e.preventDefault();
+                setQuery('');
+              }
+            }}
+          />
+        </label>
+      </div>
       {kitNeedsOwner ? (
         <KitNotice state={state} />
       ) : owner === undefined ? null : (
         <OwnerPanel owner={owner} canPasskey={passkeys} />
       )}
-      {groups.map((g) => (
+      {shown.map((g) => (
         <section key={g.id} className="set-group" aria-labelledby={`set-g-${g.id}`}>
           <h2 id={`set-g-${g.id}`} className="set-group-title al-text-label">
-            {S.groups[groupOf(g.pages[0]?.path ?? '')]}
+            {S.groups[g.id]}
           </h2>
           <div className="set-list">
-            {g.pages.map((p) => (
+            {g.rows.map((r) => (
               <Row
-                key={p.path}
-                path={p.path}
-                title={titleFor(p.path, p.label)}
-                line={lineFor(p.path, state, prefs.theme, sensor)}
+                key={r.path}
+                path={r.path}
+                title={r.title}
+                line={r.line}
+                {...(r.path === '/settings/backup' || r.path === '/settings/touch-id'
+                  ? r.line.tone === undefined
+                    ? {}
+                    : { tile: r.line.tone }
+                  : {})}
               />
             ))}
           </div>
         </section>
       ))}
+      {shown.length === 0 ? (
+        <p className="set-empty" role="status">
+          {S.search.empty}
+        </p>
+      ) : null}
       {state?.version === undefined ? null : (
-        <p className="set-footer al-text-caption al-muted">{S.footer.upToDate(state.version)}</p>
+        <p className="set-footer al-text-caption al-muted">{S.footer.version(state.version)}</p>
       )}
     </div>
   );
 }
+
+const LIVE_EMPTY = { list: undefined, agents: [], error: false } as const;

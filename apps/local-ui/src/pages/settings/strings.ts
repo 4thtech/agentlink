@@ -83,6 +83,10 @@ export const SETTINGS_STRINGS = {
     staleAction: 'Save a new kit',
   },
   footer: {
-    upToDate: (version: string): string => `AgentLink ${version} · up to date`,
+    version: (version: string): string => `AgentLink ${version}`,
+  },
+  search: {
+    label: 'Find a setting',
+    empty: 'No setting matches that.',
   },
 } as const;
