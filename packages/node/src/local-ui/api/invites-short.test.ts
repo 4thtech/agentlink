@@ -15,6 +15,8 @@ import {
   INVITES_LIST,
   INVITE_CANCEL,
   INVITE_CANCEL_PATH,
+  INVITE_LINK,
+  INVITE_LINK_PATH,
   INVITES_PATH,
   INVITES_WORLD,
   SHORT_INVITE_REFUSALS,
@@ -33,6 +35,7 @@ import {
   inviteCancelRoute,
   inviteCheckRoute,
   inviteCreateRoute,
+  inviteLinkRoute,
   invitesListRoute,
 } from './invites.js';
 
@@ -67,6 +70,7 @@ function desk(over: Partial<LocalUiInviteDesk> = {}) {
   const created: unknown[] = [];
   const checked: string[] = [];
   const cancelled: string[] = [];
+  const linked: string[] = [];
   const d: LocalUiInviteDesk = {
     create: (input) => {
       created.push(input);
@@ -86,9 +90,25 @@ function desk(over: Partial<LocalUiInviteDesk> = {}) {
       cancelled.push(id);
       return Promise.resolve(id === INVITES_WORLD.inviteId ? 'cancelled' : 'not_found');
     },
+    link: (id) => {
+      linked.push(id);
+      if (id === INVITES_WORLD.inviteId) {
+        return Promise.resolve({
+          status: 'ok' as const,
+          inviteUrl: SHORT,
+          format: 'short' as const,
+          expiresAt: EXPIRES,
+        });
+      }
+      return Promise.resolve(
+        id === INVITE_LINK.old.body.inviteId
+          ? { status: 'no_link' as const }
+          : { status: 'not_found' as const },
+      );
+    },
     ...over,
   };
-  return { desk: d, created, checked, cancelled };
+  return { desk: d, created, checked, cancelled, linked };
 }
 
 const request = (): LocalUiRequest =>
@@ -172,6 +192,65 @@ describe('cancel (04 §3.6.2: an owner action on the local page)', () => {
       });
     }
     expect(d.cancelled).toEqual([INVITES_WORLD.inviteId, INVITES_WORLD.otherInviteId]);
+  });
+});
+
+describe('copy an open invite link again (REL051-B2)', () => {
+  it('is the invite kind at /api/ui/invites/link with exactly {inviteId}', async () => {
+    expect(inviteLinkRoute).toMatchObject({
+      method: 'POST',
+      path: INVITE_LINK_PATH,
+      presence: 'invite',
+      step: 'link',
+    });
+    const d = desk();
+    const ok = await inviteLinkRoute.handler(context(), INVITE_LINK.ok.body, d.desk);
+    const { shareText, ...rest } = INVITE_LINK.ok.answer.body;
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject(rest);
+    expect(String((ok.body as { shareText?: unknown }).shareText).endsWith(SHORT)).toBe(true);
+    expect(Object.keys(ok.body as object).sort()).toEqual(
+      Object.keys(INVITE_LINK.ok.answer.body).sort(),
+    );
+    void shareText;
+    expect(await inviteLinkRoute.handler(context(), INVITE_LINK.gone.body, d.desk)).toEqual(
+      INVITE_LINK.gone.answer,
+    );
+    expect(await inviteLinkRoute.handler(context(), INVITE_LINK.old.body, d.desk)).toEqual(
+      INVITE_LINK.old.answer,
+    );
+    for (const body of [
+      {},
+      { inviteId: 'short' },
+      { inviteId: 7 },
+      { inviteId: INVITES_WORLD.inviteId, x: 1 },
+    ] as unknown as JsonObject[]) {
+      expect(await inviteLinkRoute.handler(context(), body, d.desk)).toEqual({
+        status: 400,
+        body: { error: 'invalid' },
+      });
+    }
+    expect(d.linked).toEqual([
+      INVITES_WORLD.inviteId,
+      INVITES_WORLD.otherInviteId,
+      INVITE_LINK.old.body.inviteId,
+    ]);
+  });
+
+  it('a link core answers in another form is never passed on', async () => {
+    const d = desk({
+      link: () =>
+        Promise.resolve({
+          status: 'ok' as const,
+          inviteUrl: 'https://evil.example/i#x',
+          format: 'short' as const,
+          expiresAt: EXPIRES,
+        }),
+    });
+    expect(await inviteLinkRoute.handler(context(), INVITE_LINK.ok.body, d.desk)).toEqual({
+      status: 503,
+      body: { error: 'unavailable' },
+    });
   });
 });
 

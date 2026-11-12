@@ -449,8 +449,10 @@ describe(
       // add a migration with the next version instead (07 §3.7: forward migrations only).
       const digestOf = (i: number) =>
         encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-      expect(STORE_SCHEMA_VERSION).toBe(13);
-      expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+      expect(STORE_SCHEMA_VERSION).toBe(14);
+      expect(MIGRATIONS.map((m) => m.version)).toEqual([
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+      ]);
       // Version 1 (G-9) is unchanged by D-72.
       expect(digestOf(0)).toMatchInlineSnapshot(
         `"6a2a36755c97cca746bdfe0b166c409cf1a067b1fd526011470446c0bb7dfd1b"`,
@@ -590,6 +592,37 @@ describe(
         `ALTER TABLE "mcp_sessions" ADD COLUMN "version" TEXT CHECK ("version" IS NULL OR (typeof("version") = 'text'))`,
       ]);
       expect(digestOf(12)).toBe('b1f4cd696cbfd40f22df66a704b91150139e187eae84d972cc479e40069cbb53');
+      // Version 14 (REL051-B2; 07 §3): `invites.invite_link`, one nullable sealed column appended.
+      // Versions 1 to 13 keep their digests above (version 1 is frozen without the column).
+      const v14 = MIGRATIONS[13]?.statements ?? [];
+      expect(v14).toHaveLength(1);
+      expect(v14[0]).toMatch(/^ALTER TABLE "invites" ADD COLUMN "invite_link" /);
+    });
+
+    it('migrates a version 13 file to version 14 (REL051-B2): invites kept, invite_link null', async () => {
+      const raw = new Database(path());
+      for (const m of MIGRATIONS.slice(0, 13)) {
+        for (const statement of m.statements) raw.prepare(statement).run();
+      }
+      raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+      raw.pragma('user_version = 13');
+      raw
+        .prepare(
+          'INSERT INTO "invites" ("invite_id", "proof_key", "expires_at", "created_at") ' +
+            'VALUES (?, ?, 2, 1)',
+        )
+        .run('AAAAAAAAAAAAAAAAAAAAAA', 'x');
+      raw.close();
+      const v14 = await SqliteStore.open(path());
+      expect(v14.schemaVersion).toBe(14);
+      const [row] = await v14.transaction((tx) => tx.select('invites'));
+      expect(row?.invite_id).toBe('AAAAAAAAAAAAAAAAAAAAAA');
+      expect(row?.invite_link).toBeNull();
+      await v14.close();
+      const again = await SqliteStore.open(path());
+      expect(again.schemaVersion).toBe(14);
+      expect(await again.transaction((tx) => tx.select('invites'))).toHaveLength(1);
+      await again.close();
     });
 
     it('migrates a version 12 file to version 13 (WP-13, F45): rows kept, version null', async () => {

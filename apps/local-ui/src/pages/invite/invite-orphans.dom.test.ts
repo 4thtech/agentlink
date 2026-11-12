@@ -1,21 +1,18 @@
 // @vitest-environment jsdom
-// W5-INVITE-FEEDBACK "stop the double-create" (owner test of 0.4.6, 1 Nov: two invites 10 s apart,
-// the first never used and never cancelled). A link the panel made that never left the screen is
-// cancelled when the panel goes away; when the page is reloaded or closed instead, there is no
-// unmount, so the panel remembers in this tab (sessionStorage: public invite IDs only, never a link)
-// the invites that did not leave the screen, cancels them with a keepalive request when the page
-// hides, and cancels any that are left over when it opens next.
+// REL051-B2 (owner test, 13 Nov; replaces W5-INVITE-FEEDBACK "stop the double-create"): the app
+// now keeps every open invite's link (sealed, on this computer), so an invite is never orphaned:
+// it waits under Home and People with Copy link, Show link and Cancel invite. The panel therefore
+// cancels nothing when the page hides or reloads and keeps nothing in the tab's storage. Only an
+// explicit "Skip for now" in Get started (`discard`) ends a link that never left the screen.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CreateOutcome, InviteApi } from '../contacts/invite-api.js';
 import { InvitePanel } from './invite-panel.js';
-import { UNSENT_INVITES_KEY } from './unsent-invites.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const ID_1 = 'AQEBAQEBAQEBAQEBAQEBAQ';
-const ID_2 = 'BwcHBwcHBwcHBwcHBwcHBw';
 const LINK = `https://agentlink.4thtech.io/i#2.${'A'.repeat(43)}`;
 
 let host: HTMLElement;
@@ -65,40 +62,58 @@ function fake(ids: string[]) {
   return { api, cancelled };
 }
 
-describe('the double-create', () => {
-  it('remembers a link that did not leave the screen, and cancels it with keepalive on pagehide', async () => {
+/** The tab key an older build used for unsent invite IDs (W5-INVITE-FEEDBACK). */
+const OLD_KEY = 'agentlink.unsentInvites';
+
+describe('an invite is kept when the page goes (REL051-B2)', () => {
+  it('a page that hides cancels nothing and keeps nothing in the tab', async () => {
     const { api, cancelled } = fake([ID_1]);
     await act(async () => {
       root.render(createElement(InvitePanel, { invites: api }));
     });
     await settle();
-    expect(JSON.parse(sessionStorage.getItem(UNSENT_INVITES_KEY) ?? '[]')).toEqual([ID_1]);
-    expect(sessionStorage.getItem(UNSENT_INVITES_KEY)).not.toContain('agentlink.4thtech.io');
+    expect(sessionStorage.length).toBe(0);
     await act(async () => {
       window.dispatchEvent(new Event('pagehide'));
     });
-    expect(cancelled).toEqual([{ id: ID_1, keepalive: true }]);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await settle();
+    expect(cancelled).toEqual([]);
   });
 
-  it('cancels a link left over from the last load before it makes a new one', async () => {
-    sessionStorage.setItem(UNSENT_INVITES_KEY, JSON.stringify([ID_1]));
-    const { api, cancelled } = fake([ID_2]);
+  it('an ID an older build left in the tab is never cancelled, and the key is cleared', async () => {
+    sessionStorage.setItem(OLD_KEY, JSON.stringify([ID_1]));
+    const { api, cancelled } = fake(['BwcHBwcHBwcHBwcHBwcHBw']);
     await act(async () => {
       root.render(createElement(InvitePanel, { invites: api }));
     });
     await settle();
-    expect(cancelled.map((c) => c.id)).toEqual([ID_1]);
-    expect(JSON.parse(sessionStorage.getItem(UNSENT_INVITES_KEY) ?? '[]')).toEqual([ID_2]);
+    expect(cancelled).toEqual([]);
+    expect(sessionStorage.getItem(OLD_KEY)).toBeNull();
   });
 
-  it('a copied link is never cancelled and is forgotten', async () => {
+  it('Skip for now (discard) ends a link that never left the screen; a copied one stays', async () => {
+    const discard = { current: false };
+    const first = fake([ID_1]);
+    await act(async () => {
+      root.render(createElement(InvitePanel, { invites: first.api, discard }));
+    });
+    await settle();
+    discard.current = true;
+    act(() => root.unmount());
+    root = createRoot(host);
+    await settle();
+    expect(first.cancelled.map((c) => c.id)).toEqual([ID_1]);
+
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: () => Promise.resolve() },
     });
-    const { api, cancelled } = fake([ID_1]);
+    const kept = { current: false };
+    const second = fake([ID_1]);
     await act(async () => {
-      root.render(createElement(InvitePanel, { invites: api }));
+      root.render(createElement(InvitePanel, { invites: second.api, discard: kept }));
     });
     await settle();
     await act(async () => {
@@ -108,20 +123,10 @@ describe('the double-create', () => {
       copy?.click();
     });
     await settle();
-    expect(JSON.parse(sessionStorage.getItem(UNSENT_INVITES_KEY) ?? '[]')).toEqual([]);
-    await act(async () => {
-      window.dispatchEvent(new Event('pagehide'));
-    });
-    expect(cancelled).toEqual([]);
-  });
-
-  it('ignores a stored value of another shape', async () => {
-    sessionStorage.setItem(UNSENT_INVITES_KEY, '{"x":1}');
-    const { api, cancelled } = fake([ID_1]);
-    await act(async () => {
-      root.render(createElement(InvitePanel, { invites: api }));
-    });
+    kept.current = true;
+    act(() => root.unmount());
+    root = createRoot(host);
     await settle();
-    expect(cancelled).toEqual([]);
+    expect(second.cancelled).toEqual([]);
   });
 });

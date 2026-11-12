@@ -96,25 +96,28 @@ describe('a contact renamed itself', () => {
   });
 });
 
-describe('leaving the invite step with a link nobody has', () => {
+describe('leaving the invite step (REL051-B2: the link is kept and waits on Home)', () => {
   const press = (re: RegExp): void => {
     const b = [...host.querySelectorAll('button')].find((x) => re.test(x.textContent ?? ''));
     act(() => b?.click());
   };
-  it('warns once, then lets you leave', () => {
+  it('Done leaves at once, with no warning, even before the link was copied', () => {
     const onHome = vi.fn();
-    act(() => root.render(h(InviteStep, { inviteHref: '/invite', onHome, unsent: true })));
+    const onSkip = vi.fn();
+    act(() => root.render(h(InviteStep, { inviteHref: '/invite', onHome, onSkip })));
     press(/Done/);
-    expect(onHome).not.toHaveBeenCalled();
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain("haven't copied");
-    press(/Leave without copying/);
     expect(onHome).toHaveBeenCalledTimes(1);
+    expect(onSkip).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.textContent).not.toContain("haven't copied");
   });
-  it('leaves at once when the link went somewhere', () => {
+  it('Skip for now is its own way out (the page ends a link nobody has)', () => {
     const onHome = vi.fn();
-    act(() => root.render(h(InviteStep, { inviteHref: '/invite', onHome, unsent: false })));
-    press(/Done/);
-    expect(onHome).toHaveBeenCalledTimes(1);
+    const onSkip = vi.fn();
+    act(() => root.render(h(InviteStep, { inviteHref: '/invite', onHome, onSkip })));
+    press(/Skip for now/);
+    expect(onSkip).toHaveBeenCalledTimes(1);
+    expect(onHome).not.toHaveBeenCalled();
   });
 });
 
@@ -137,31 +140,13 @@ describe('Get started reads', () => {
   });
 });
 
-describe('N8 and B11: one leave button, and the header Skip raises the same warning', () => {
-  const buttons = (): string[] =>
-    [...host.querySelectorAll('button')].map((b) => b.textContent ?? '');
-  it('shows a single "Leave without copying" once warned', () => {
-    act(() =>
-      root.render(
-        h(InviteStep, { inviteHref: '/invite', onHome: vi.fn(), unsent: true, warned: true }),
-      ),
-    );
-    expect(buttons().filter((t) => /Leave without copying/.test(t))).toHaveLength(1);
-    expect(buttons().some((t) => /Skip for now/.test(t))).toBe(false);
-  });
-  it('lets the page hold the warning (so the header Skip to Home can raise it)', () => {
-    const onWarn = vi.fn();
-    const onHome = vi.fn();
-    act(() =>
-      root.render(
-        h(InviteStep, { inviteHref: '/invite', onHome, unsent: true, warned: false, onWarn }),
-      ),
-    );
-    act(() =>
-      [...host.querySelectorAll('button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(),
-    );
-    expect(onWarn).toHaveBeenCalledTimes(1);
-    expect(onHome).not.toHaveBeenCalled();
+describe('N8 and B11: one Done and one Skip, never a "Leave without copying"', () => {
+  it('shows Done and Skip for now only', () => {
+    act(() => root.render(h(InviteStep, { inviteHref: '/invite', onHome: vi.fn() })));
+    const buttons = [...host.querySelectorAll('button')].map((b) => b.textContent ?? '');
+    expect(buttons.filter((t) => /Done/.test(t))).toHaveLength(1);
+    expect(buttons.filter((t) => /Skip for now/.test(t))).toHaveLength(1);
+    expect(buttons.some((t) => /Leave without copying/.test(t))).toBe(false);
   });
 });
 

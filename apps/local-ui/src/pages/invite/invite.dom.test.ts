@@ -7,7 +7,8 @@
 // - Copy puts the link on the clipboard and shows the ✓ "Copied" moment; Email opens the mail app
 //   with the share text; Share appears only where the browser has a share sheet for text.
 // - A name typed before the link went anywhere makes a fresh link with that name (the old one is
-//   cancelled), and a link that never left the screen is cancelled when you leave it.
+//   cancelled). REL051-B2 (owner test, 13 Nov): leaving keeps the link, copied or not; it waits
+//   under Home and People, where Copy link gets it again and Cancel invite ends it.
 // - Under the hood: the invite's facts, a long link and the QR code. The long-link fallback (the
 //   drop is down) says so in plain words.
 import { HoodProvider } from '@4thtech-io/ui';
@@ -292,13 +293,13 @@ describe('the invite panel (A3/A5)', () => {
     expect(nameField().readOnly).toBe(true);
   });
 
-  it('a link that never left the screen is cancelled when you leave; a copied one stays', async () => {
+  it('leaving keeps the link, copied or not (REL051-B2: Copy link on Home gets it again)', async () => {
     const w = world();
     await show(panel(w));
     act(() => root?.unmount());
     root = undefined;
     await settle();
-    expect(w.cancelled).toEqual(['invite-0000000000000001']);
+    expect(w.cancelled).toEqual([]);
 
     const kept = world();
     stubClipboard();
@@ -319,7 +320,8 @@ describe('the invite panel (A3/A5)', () => {
     act(() => root?.unmount());
     root = undefined;
     await settle();
-    expect(w.cancelled).toEqual(['invite-0000000000000001', 'invite-0000000000000002']);
+    // The unnamed link it replaced goes; the named one stays when you leave (REL051-B2).
+    expect(w.cancelled).toEqual(['invite-0000000000000001']);
     expect(w.cancelled.some((id) => id.startsWith('other'))).toBe(false);
   });
 
@@ -331,7 +333,7 @@ describe('the invite panel (A3/A5)', () => {
     act(() => root?.unmount());
     root = undefined;
     await settle();
-    expect(w.cancelled).toEqual(['invite-0000000000000001', 'invite-0000000000000002']);
+    expect(w.cancelled).toEqual(['invite-0000000000000001']);
   });
 
   it('copying the link by selecting it anywhere counts as sent: it stays when you leave', async () => {
@@ -353,7 +355,7 @@ describe('the invite panel (A3/A5)', () => {
     expect(w.cancelled).toEqual([]);
   });
 
-  it('a copy of something else does not count as sent', async () => {
+  it('a copy of something else does not count as sent: the name still makes a fresh link', async () => {
     const w = world();
     await show(panel(w));
     const other = document.createElement('p');
@@ -368,9 +370,9 @@ describe('the invite panel (A3/A5)', () => {
     });
     document.getSelection()?.removeAllRanges();
     other.remove();
-    act(() => root?.unmount());
-    root = undefined;
-    await settle();
+    expect(nameField().readOnly).toBe(false);
+    await typeName('Denis');
+    await blurName();
     expect(w.cancelled).toEqual(['invite-0000000000000001']);
   });
 
@@ -421,5 +423,25 @@ describe('the Invite screen (A5)', () => {
     expect(text()).toContain(S.nameBySender);
     await click(S.done);
     expect(done).toHaveBeenCalledTimes(1);
+  });
+
+  // REL051-B2 (owner test, 13 Nov): Done without Copy used to cancel the link, so it was lost.
+  it('Done without Copy keeps the invite (it waits under Home and People)', async () => {
+    const w = world();
+    await show(
+      createElement(InviteScreen, {
+        invites: w.invites,
+        now: () => NOW,
+        sender: 'Tali',
+        onDone: () => {
+          act(() => root?.unmount());
+          root = undefined;
+        },
+      }),
+    );
+    await click(S.done);
+    await settle();
+    expect(w.created).toHaveLength(1);
+    expect(w.cancelled).toEqual([]);
   });
 });
