@@ -81,8 +81,22 @@ export interface Summary {
 
 export interface Outcome {
   readonly agentId: string;
+  /** The folder name. */
   readonly name: string;
+  /** UX1113-R1-LABEL: the verified label from the read-back (display text), else the folder name. */
+  readonly label?: string;
   readonly outcome: 'restored' | 'failed';
+}
+
+const LABEL = /^[\p{L}\p{M}\p{N}](?:[\p{L}\p{M}\p{N} ._'-]*[\p{L}\p{M}\p{N}._'-])?$/u;
+
+/**
+ * UX1113-R1-LABEL: an ID's label as the page shows it (plain text in a <bdi>): 1 to 32 code points of
+ * letters, numbers, spaces and `._'-`, no double space; anything else shows the folder name.
+ */
+export function shownLabel(label: unknown, folder: string): string {
+  if (typeof label !== 'string' || [...label].length > 32 || label.includes('  ')) return folder;
+  return LABEL.test(label) ? label : folder;
 }
 
 /** The public WebAuthn creation values of `apply/begin` (no owner here). */
@@ -200,10 +214,10 @@ function outcomesOf(value: unknown): Outcome[] | undefined {
   const out: Outcome[] = [];
   for (const o of value) {
     if (!isRecord(o)) return undefined;
-    const { agentId, name, outcome } = o;
+    const { agentId, name, outcome, label } = o;
     if (typeof agentId !== 'string' || typeof name !== 'string') return undefined;
     if (outcome !== 'restored' && outcome !== 'failed') return undefined;
-    out.push({ agentId, name, outcome });
+    out.push({ agentId, name, label: shownLabel(label, name), outcome });
   }
   return out;
 }

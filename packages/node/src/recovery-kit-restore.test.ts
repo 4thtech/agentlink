@@ -367,7 +367,7 @@ describe.runIf(POSIX)('a computer without an owner (T-1, T-10, T-12)', () => {
     const kit = body(await openKit('S1', handle, c))['kit'] as string;
     const done = await gestureAndFinish('S1', kit, [agents[0]?.agentId as string]);
     expect(done['ids']).toEqual([
-      { agentId: agents[0]?.agentId, name: 'helper', outcome: 'restored' },
+      { agentId: agents[0]?.agentId, name: 'helper', label: 'helper', outcome: 'restored' },
     ]);
     expect(done['touchId']).toBe(true);
     const master = done['masterCode'] as string;
@@ -490,7 +490,9 @@ describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
     }
     expect([...keychain.items.keys()]).toEqual([]);
     const done = await gestureAndFinish('S1', kit, [b.agentId], { [b.agentId]: 'work-2' });
-    expect(done['ids']).toEqual([{ agentId: b.agentId, name: 'work-2', outcome: 'restored' }]);
+    expect(done['ids']).toEqual([
+      { agentId: b.agentId, name: 'work-2', label: 'work-2', outcome: 'restored' },
+    ]);
     expect(keychain.items.has(keychainAccount(gone.agentId, 'seed'))).toBe(false);
     expect(keychain.items.has(keychainAccount(a.agentId, 'seed'))).toBe(false);
   });
@@ -1084,7 +1086,9 @@ describe.runIf(POSIX)('UX1113-R1-LABEL: the done answer names IDs by their verif
 
   it('a label is display text only: anything not a plain restricted label shows the folder name', () => {
     expect(restoredLabel({ status: 'verified', label: 'Ana' }, 'default')).toBe('Ana');
-    expect(restoredLabel({ status: 'verified', label: 'Work agent' }, 'default')).toBe('Work agent');
+    expect(restoredLabel({ status: 'verified', label: 'Work agent' }, 'default')).toBe(
+      'Work agent',
+    );
     for (const hostile of [
       '\u202eevil\u202c',
       'a\u200bb',

@@ -32,7 +32,7 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { AgentLinkClient, type ApprovalChannel } from '@4thtech-io/core';
+import { AgentLinkClient, isRestrictedAlias, type ApprovalChannel } from '@4thtech-io/core';
 import {
   CryptoInputError,
   KeyStoreError,
@@ -407,9 +407,33 @@ async function readBack(
   agentId: string,
   ownerNostr: Uint8Array,
   path: string,
-): Promise<boolean> {
+): Promise<{ readonly label: LabelReadingLike | undefined } | undefined> {
   const seen = await inspectId(keychain, agentId, path);
-  return seen !== undefined && seen.policyLoads && equalBytes(seen.ownerNostr, ownerNostr);
+  if (seen === undefined || !seen.policyLoads || !equalBytes(seen.ownerNostr, ownerNostr)) {
+    return undefined;
+  }
+  return { label: seen.label };
+}
+
+/** Core `loadLabel`'s answer, as the read-back keeps it. */
+type LabelReadingLike =
+  | { readonly status: 'verified'; readonly label: string }
+  | { readonly status: 'none' | 'unverified' };
+
+const LABEL_CHARS = /^[\p{L}\p{M}\p{N}](?:[\p{L}\p{M}\p{N} ._'-]*[\p{L}\p{M}\p{N}._'-])?$/u;
+
+/**
+ * UX1113-R1-LABEL: what the done answer names a restored ID by. Display text only (never decides
+ * anything): the label core verified at the read-back (owner-signed `agent.label` in the restored
+ * store), only when it is still its own restricted form, at most 32 code points and plain letters,
+ * numbers, spaces and `._'-`; anything else (unverified, none, hostile) is the folder name.
+ */
+export function restoredLabel(reading: LabelReadingLike | undefined, folder: string): string {
+  if (reading?.status !== 'verified') return folder;
+  const label = reading.label;
+  if (typeof label !== 'string' || [...label].length > 32) return folder;
+  if (!LABEL_CHARS.test(label) || label.includes('  ') || !isRestrictedAlias(label)) return folder;
+  return label;
 }
 
 /**
@@ -421,7 +445,14 @@ async function inspectId(
   keychain: KeychainBackend,
   agentId: string,
   path: string,
-): Promise<{ readonly ownerNostr: Uint8Array; readonly policyLoads: boolean } | undefined> {
+): Promise<
+  | {
+      readonly ownerNostr: Uint8Array;
+      readonly policyLoads: boolean;
+      readonly label: LabelReadingLike | undefined;
+    }
+  | undefined
+> {
   let opened: AgentStore | undefined;
   let keyStore: KeyStore | undefined;
   try {
@@ -443,7 +474,9 @@ async function inspectId(
     if (typeof named !== 'string') return undefined;
     const owner = decodeHex0x(named, { length: 32 });
     const policy = await client.ownerActions.loadPolicy();
-    return { ownerNostr: owner, policyLoads: policy.mode !== 'fail_closed' };
+    // UX1113-R1-LABEL: the verified label (core re-verifies the stored `agent.label`); display only.
+    const label = await client.ownerActions.loadLabel().catch(() => undefined);
+    return { ownerNostr: owner, policyLoads: policy.mode !== 'fail_closed', label };
   } catch {
     return undefined;
   } finally {
@@ -1109,6 +1142,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   interface Outcome {
     readonly agentId: string;
     readonly name: string;
+    /** UX1113-R1-LABEL: the verified label from the read-back, else the folder name. */
+    readonly label: string;
     readonly outcome: 'restored' | 'failed';
   }
 
@@ -1143,14 +1178,14 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         // Restore step 7 (IR-UX1113-R1 M2): the ID opens with its KeyStore and store, its card names
         // the kit's owner, and its policy loads at the restored mark; else this ID is rolled back.
         const storePath = join(agentsDir, name, 'store.sqlite');
-        if (!(await readBack(keychain, agent.agentId, current.kit.ownerNostr, storePath))) {
-          throw new Error('read-back');
-        }
-        out.push({ agentId: agent.agentId, name, outcome: 'restored' });
+        const back = await readBack(keychain, agent.agentId, current.kit.ownerNostr, storePath);
+        if (back === undefined) throw new Error('read-back');
+        const label = restoredLabel(back.label, name);
+        out.push({ agentId: agent.agentId, name, label, outcome: 'restored' });
       } catch {
         if (installed) await removeInstalledFolder(name);
         if (written) await discardImportedAgent(keychain, agent.agentId);
-        out.push({ agentId: agent.agentId, name, outcome: 'failed' });
+        out.push({ agentId: agent.agentId, name, label: name, outcome: 'failed' });
       }
     }
     return out;

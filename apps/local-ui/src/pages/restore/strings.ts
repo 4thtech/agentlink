@@ -129,6 +129,8 @@ export const REVIEW = {
   nameInvalid: 'Use 1 to 32 letters, numbers or dashes, starting with a letter.',
   nameClash: 'Another ID here or in this kit has that name.',
   comesBack: 'Comes back',
+  /** UX1113-R1-LABEL: the kit names an ID by its folder; the label is inside, read after restore. */
+  nameHint: 'Its name comes back with it',
   comes: ['People and messages', 'Rules, proofs and credits'] as const,
   comesSince: (date: string): string =>
     `Messages sent to you since ${date} arrive in a minute or two`,
@@ -156,8 +158,9 @@ export const REVIEW = {
 
 export const PROTECT = {
   title: (n: number): string => `You're back. ${n} ${n === 1 ? 'ID' : 'IDs'} restored.`,
-  lead: (names: string): string =>
-    `${names} ${names.includes(' and ') || names.includes(',') ? 'are' : 'is'} on this computer with their people and messages. Two short things left.`,
+  /** After the names (each in its own <bdi>). */
+  leadRest: (n: number): string =>
+    ` ${n === 1 ? 'is' : 'are'} on this computer with their people and messages. Two short things left.`,
   codeTitle: 'Your new master code for this computer',
   shownOnce: 'Shown once',
   codeBody: (sensor: string): string =>

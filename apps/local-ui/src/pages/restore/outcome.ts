@@ -6,7 +6,11 @@
 import { useSyncExternalStore } from 'react';
 
 export interface RestoreOutcome {
+  /** The restored IDs by their label (UX1113-R1-LABEL; the folder name when there is none). */
   readonly restored: readonly string[];
+  /** The restored IDs' folder names, in the same order. */
+  readonly restoredFolders: readonly string[];
+  /** The IDs that were not restored, by their label. */
   readonly failed: readonly string[];
   /** Shown once, only when a new owner was made. */
   readonly masterCode: string | undefined;

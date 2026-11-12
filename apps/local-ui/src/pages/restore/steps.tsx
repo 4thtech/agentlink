@@ -55,6 +55,20 @@ export function nameList(names: readonly string[]): string {
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] as string}`;
 }
 
+/** nameList as markup: each name (a label: untrusted display text) in its own <bdi>. */
+function NameList({ names }: { readonly names: readonly string[] }): ReactElement {
+  return (
+    <>
+      {names.map((n, i) => (
+        <span key={i}>
+          {i === 0 ? '' : i === names.length - 1 ? ' and ' : ', '}
+          <bdi>{n}</bdi>
+        </span>
+      ))}
+    </>
+  );
+}
+
 // --- frame --------------------------------------------------------------------------------------
 
 export interface FrameProps {
@@ -591,6 +605,7 @@ function Row({
       </span>
       <span className="rs-row-text">
         <bdi className="rs-row-name">{row.name}</bdi>
+        <span className="rs-row-line">{REVIEW.nameHint}</span>
         <span className="rs-row-line">
           {row.state === 'new' ? (
             summary.contents === 'identity' ? (
@@ -788,6 +803,8 @@ export interface ProtectStepProps {
   readonly savedDate: string;
   readonly apps: readonly DetectedApp[] | undefined;
   readonly idName: string;
+  /** The first restored ID's label (display text). */
+  readonly idLabel?: string;
   readonly connecting: string | undefined;
   readonly onConnect: (appId: string) => void;
   /** The inline connect flow for the app being connected. */
@@ -851,7 +868,10 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
       <div className="rs-intro">
         <Title id="rs-h">{PROTECT.title(p.restored.length)}</Title>
         {p.restored.length === 0 ? null : (
-          <p className="rs-lead">{PROTECT.lead(nameList(p.restored))}</p>
+          <p className="rs-lead">
+            <NameList names={p.restored} />
+            {PROTECT.leadRest(p.restored.length)}
+          </p>
         )}
       </div>
       {p.failed.length === 0 ? null : (
@@ -908,7 +928,7 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
                     <span className="rs-row-name">{app.name}</span>
                     <span className="rs-row-line">
                       {app.state === 'connected' && app.agent === p.idName
-                        ? PROTECT.appUses(p.idName)
+                        ? PROTECT.appUses(p.idLabel ?? p.idName)
                         : PROTECT.appFound}
                     </span>
                   </span>
@@ -922,7 +942,7 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
                       disabled={app.state === 'not_ours' || app.state === 'unreadable'}
                       onClick={() => p.onConnect(app.id)}
                     >
-                      {PROTECT.connect(p.idName)}
+                      {PROTECT.connect(p.idLabel ?? p.idName)}
                     </Button>
                   )}
                 </div>
