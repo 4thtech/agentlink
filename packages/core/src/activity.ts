@@ -30,6 +30,17 @@
 //   (`app_connected` / `app_disconnected`) and `backup.export` (`backup_saved`). A rename names the
 //   label, and an app change the app, only while that nonce's signed action is still the one
 //   `local_owner_actions` keeps (the latest per record); otherwise null.
+// - UX1113-QA2-ACTIVITY (QA finding N7): first run is part of creating the ID, so the ID's first
+//   `agent.label` applied within FIRST_RUN_SECONDS of its creation is not a rename (`id_created` carries
+//   that label while it is still the stored one), and the rules at version 1 applied in that window (the
+//   first rules signed with the first card, owner-first-policy.ts) are not a rules change. Blocks,
+//   unblocks and Contact checks are listed from their applied owner actions too (`contact.block`,
+//   `contact.unblock`, `contact.check`), so a block stays listed after an unblock or a remove; a block
+//   whose contact is still blocked from that second is left to the contact row (one entry, with the
+//   contact). The nonce row names no contact: an unblock names the one contact the unblock made
+//   active at that second, a Contact check the contact whose stored check carries that nonce, and a
+//   block listed this way none. A contact rename with no net change (A, then B, then A again before
+//   the owner saw the note) is left out after the names are opened, so such a page can be short.
 //
 // A decided approval also says what it was about (WP-A1, `action`): the type from its stored action's
 // tool (and decision or receipt), the other agent's ID as a contact reference, the files of a send
@@ -195,7 +206,15 @@ export type ActivityEntry =
     })
   | (EntryBase & {
       /** WP-A1: this ID's own events. `id_paused` only while it is paused. */
-      readonly kind: 'id_created' | 'id_removed' | 'id_paused' | 'id_resumed' | 'backup_saved';
+      readonly kind: 'id_removed' | 'id_paused' | 'id_resumed' | 'backup_saved';
+    })
+  | (EntryBase & {
+      readonly kind: 'id_created';
+      /**
+       * QA2: the label first run gave it (the owner's own), while that label is still the stored one;
+       * else null.
+       */
+      readonly name: string | null;
     })
   | (EntryBase & {
       /** WP-A1: the owner renamed this ID (`agent.label`): the owner's own label, or null. */
@@ -244,8 +263,18 @@ export type ActivityEntry =
     })
   | (EntryBase & {
       readonly kind: 'contact_blocked';
-      readonly contactId: string;
-      readonly contact: ActivityContact;
+      /**
+       * From the contact row while it is blocked; null for a block listed from its owner action after
+       * the contact was unblocked or removed (QA2).
+       */
+      readonly contactId: string | null;
+      readonly contact: ActivityContact | null;
+    })
+  | (EntryBase & {
+      /** QA2: the owner unblocked a contact, or did the Contact check (`contact.check`). */
+      readonly kind: 'contact_unblocked' | 'contact_checked';
+      /** A contact reference only; null when the store no longer ties the action to one contact. */
+      readonly contactId: string | null;
     })
   | (EntryBase & {
       /** D-141: "{formerName} is now called {newName}"; both restricted (06 §2.1). */
@@ -277,7 +306,8 @@ interface Pending {
   };
   /** WP-A1: an owner action entry's nonce and the local rows that may hold its signed action. */
   readonly local?: { readonly nonce: string; readonly rows: readonly Row<'local_owner_actions'>[] };
-  readonly build: (resolved: Resolved) => ActivityEntry;
+  /** Null leaves the entry out (QA2: a rename with no net change). */
+  readonly build: (resolved: Resolved) => ActivityEntry | null;
 }
 
 interface Resolved {
@@ -307,7 +337,18 @@ const OWNER_ACTION_KINDS = Object.freeze({
   'app.connect': 'app_connected',
   'app.disconnect': 'app_disconnected',
   'backup.export': 'backup_saved',
+  // QA2.
+  'contact.block': 'contact_blocked',
+  'contact.unblock': 'contact_unblocked',
+  'contact.check': 'contact_checked',
 } as const);
+/**
+ * QA2: how long after an ID's creation its first label and first rules still belong to creating it
+ * (first run and New ID sign them right after the card, in the same owner session).
+ */
+const FIRST_RUN_SECONDS = 600;
+const inFirstRun = (createdAt: number | undefined, at: number): boolean =>
+  createdAt !== undefined && at >= createdAt && at - createdAt <= FIRST_RUN_SECONDS;
 type ListedOwnerOp = keyof typeof OWNER_ACTION_KINDS;
 const LISTED_OWNER_OPS = Object.keys(OWNER_ACTION_KINDS) as ListedOwnerOp[];
 const isListedOwnerOp = (op: string): op is ListedOwnerOp => Object.hasOwn(OWNER_ACTION_KINDS, op);
@@ -434,6 +475,35 @@ function approvalActionOf(value: unknown): ActivityApprovalAction | null {
     default:
       return null;
   }
+}
+
+/**
+ * QA2: the contact an unblock at `at` made active: the one contact whose row changed to active at that
+ * second (the unblock writes `updated_at` with its nonce row). Null when none or more than one does,
+ * or the row has changed since.
+ */
+function unblockedContactTx(tx: StoreTx, at: number): string | null {
+  const rows = tx.select('contacts', { status: 'active', updated_at: at }, { limit: 2 });
+  return rows.length === 1 ? (rows[0]?.contact_id ?? null) : null;
+}
+
+/**
+ * QA2: the contact whose stored `contact.check` (the latest one, contacts.ts) carries `nonce`; null
+ * when no stored check does. Only the row's own key is taken, never a value from the signed object.
+ */
+function checkedContactTx(tx: StoreTx, nonce: string): string | null {
+  for (const row of tx.select('contacts', { safety_code_checked: 1 })) {
+    if (row.safety_check === null) continue;
+    let value: unknown;
+    try {
+      value = parseJson(row.safety_check);
+    } catch {
+      continue;
+    }
+    const body = isRecord(value) ? value.body : undefined;
+    if (isRecord(body) && body.nonce === nonce) return row.contact_id;
+  }
+  return null;
 }
 
 function deepFreeze<T>(value: T): T {
@@ -653,15 +723,19 @@ export class ActivityService {
           contactId: r.contact_id,
           files: [],
           renamed: { row: r, short },
-          build: ({ contact, renamed: names }) => ({
-            kind: 'contact_renamed',
-            id,
-            at,
-            contactId: r.contact_id,
-            contact: contact ?? { id: r.contact_id, display: null },
-            formerName: names?.formerName ?? '',
-            newName: names?.newName ?? '',
-          }),
+          build: ({ contact, renamed: names }) =>
+            // QA2: no net change since the owner last saw the name ("Work is now called Work").
+            names !== undefined && names.formerName === names.newName
+              ? null
+              : {
+                  kind: 'contact_renamed',
+                  id,
+                  at,
+                  contactId: r.contact_id,
+                  contact: contact ?? { id: r.contact_id, display: null },
+                  formerName: names?.formerName ?? '',
+                  newName: names?.newName ?? '',
+                },
         }));
       }
 
@@ -728,14 +802,43 @@ export class ActivityService {
 
       // WP-A1: this ID's own rows (one each).
       const identity = tx.select('identity', {}, { limit: 1 })[0];
+      // QA2: the ID's first label, when first run signed it right after creating the ID.
+      const firstLabel = tx.select(
+        'owner_action_nonces',
+        { op: 'agent.label' },
+        {
+          orderBy: [
+            ['applied_at', 'asc'],
+            ['nonce', 'asc'],
+          ],
+          limit: 1,
+        },
+      )[0];
+      const foldedLabel =
+        firstLabel !== undefined && inFirstRun(identity?.created_at, firstLabel.applied_at)
+          ? firstLabel.nonce
+          : undefined;
       if (identity !== undefined) {
         const created = `id_created:${identity.agent_id}`;
         const createdAt = identity.created_at;
-        add(
-          createdAt,
-          created,
-          plain(() => ({ kind: 'id_created', id: created, at: createdAt })),
-        );
+        add(createdAt, created, (t) => ({
+          contactId: null,
+          files: [],
+          ...(foldedLabel === undefined
+            ? {}
+            : {
+                local: {
+                  nonce: foldedLabel,
+                  rows: t.select('local_owner_actions', { op: 'agent.label' }),
+                },
+              }),
+          build: ({ params }) => ({
+            kind: 'id_created',
+            id: created,
+            at: createdAt,
+            name: plainLabel(params?.label),
+          }),
+        }));
         const revokedAt = identity.revoked_at;
         if (revokedAt !== null) {
           const removed = `id_removed:${identity.agent_id}`;
@@ -771,8 +874,41 @@ export class ActivityService {
       for (const r of owned) {
         const op = r.op;
         if (!isListedOwnerOp(op)) continue;
-        const id = `${OWNER_ACTION}${r.nonce}`;
+        // QA2: first run's label is part of creating the ID (id_created carries it).
+        if (r.nonce === foldedLabel) continue;
         const at = r.applied_at;
+        // QA2: a block whose contact is still blocked from that second is the contact row's entry.
+        if (
+          op === 'contact.block' &&
+          tx.select('contacts', { status: 'blocked', updated_at: at }, { limit: 1 }).length > 0
+        ) {
+          continue;
+        }
+        const id = `${OWNER_ACTION}${r.nonce}`;
+        if (op === 'contact.block' || op === 'contact.unblock' || op === 'contact.check') {
+          add(at, id, (t) => {
+            const contactId =
+              op === 'contact.block'
+                ? null
+                : op === 'contact.unblock'
+                  ? unblockedContactTx(t, at)
+                  : checkedContactTx(t, r.nonce);
+            return {
+              contactId: null,
+              files: [],
+              build: (): ActivityEntry =>
+                op === 'contact.block'
+                  ? { kind: 'contact_blocked', id, at, contactId: null, contact: null }
+                  : {
+                      kind: op === 'contact.unblock' ? 'contact_unblocked' : 'contact_checked',
+                      id,
+                      at,
+                      contactId,
+                    },
+            };
+          });
+          continue;
+        }
         add(at, id, (t) => {
           const kind = OWNER_ACTION_KINDS[op];
           const local =
@@ -783,7 +919,7 @@ export class ActivityService {
             contactId: null,
             files: [],
             ...(local === undefined ? {} : { local }),
-            build: ({ params }): ActivityEntry => {
+            build: ({ params }): ActivityEntry | null => {
               if (kind === 'id_renamed') {
                 return { kind, id, at, name: plainLabel(params?.label) };
               }
@@ -791,14 +927,20 @@ export class ActivityService {
                 const app = params?.app;
                 return { kind, id, at, app: isAiAppId(app) ? app : null };
               }
-              return { kind, id, at };
+              if (kind === 'id_resumed' || kind === 'backup_saved') return { kind, id, at };
+              return null;
             },
           };
         });
       }
 
       const policy = tx.get('policies', { slot: SINGLETON_SLOT });
-      if (policy !== undefined) {
+      // QA2: the first rules, signed with the first card, are part of creating the ID.
+      const firstRules =
+        policy !== undefined &&
+        policy.version === 1 &&
+        inFirstRun(identity?.created_at, policy.applied_at);
+      if (policy !== undefined && !firstRules) {
         const id = `rules_changed:${String(policy.version)}`;
         add(
           policy.applied_at,
@@ -830,17 +972,14 @@ export class ActivityService {
       const renamed = p.renamed === undefined ? undefined : await this.#renamedNames(p.renamed);
       const action = p.approval === undefined ? undefined : await this.#actionOf(p.approval);
       const params = p.local === undefined ? undefined : await this.#paramsOf(p.local);
-      items.push(
-        deepFreeze(
-          p.build({
-            contact,
-            files,
-            ...(renamed === undefined ? {} : { renamed }),
-            ...(action === undefined ? {} : { action }),
-            ...(params === undefined ? {} : { params }),
-          }),
-        ),
-      );
+      const entry = p.build({
+        contact,
+        files,
+        ...(renamed === undefined ? {} : { renamed }),
+        ...(action === undefined ? {} : { action }),
+        ...(params === undefined ? {} : { params }),
+      });
+      if (entry !== null) items.push(deepFreeze(entry));
     }
     return Object.freeze({
       items: Object.freeze(items),

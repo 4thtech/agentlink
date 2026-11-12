@@ -21,18 +21,26 @@
 // An optional field outside its allowlist is left out; a people entry without a valid reference is
 // left out whole.
 //
+// UX1113-QA2-ACTIVITY (QA finding N7): contact_blocked may come with no reference (a block core lists
+// from its owner action after the contact was unblocked or removed): sent without `contactId`; a
+// reference that is present but not one still drops it. New kinds contact_unblocked and
+// contact_checked (`contactId` when it is a reference). id_created may name the ID (`name`, the
+// owner's own label, as for id_renamed).
+//
 // Frozen response shape for the page (WP-A2): `{items: Item[], nextCursor?: string}`, each Item
 // `{kind, at}` plus, by kind:
 //   approval_decided   decision; action?, contactId?, files?, costUsd?
 //   proof              direction, state; contactId?, costUsd?
 //   sender_blocked     senderCode
-//   contact_blocked    contactId
+//   contact_blocked    contactId?   (QA2: none for a block listed from its owner action)
+//   contact_unblocked, contact_checked   contactId?
 //   contact_renamed    contactId, formerName, newName
 //   contact_connected  contactId; via? ('your_invite' | 'their_invite')
 //   contact_removed    contactId
 //   contact_revoked    contactId
 //   rules_changed      (nothing more)
-//   id_created, id_removed, id_paused, id_resumed, backup_saved   (nothing more)
+//   id_created         name?
+//   id_removed, id_paused, id_resumed, backup_saved   (nothing more)
 //   id_renamed         name?
 //   app_connected, app_disconnected   app?
 import {
@@ -203,6 +211,18 @@ function view(entry: ActivityEntry): JsonObject | undefined {
         ? { kind: entry.kind, at, senderCode: entry.senderCode }
         : undefined;
     case 'contact_blocked':
+      // QA2: no reference (null) is a block listed from its owner action; anything else must be one.
+      if (entry.contactId === null) return { kind: entry.kind, at };
+      return isContactRef(entry.contactId)
+        ? { kind: entry.kind, at, contactId: entry.contactId }
+        : undefined;
+    case 'contact_unblocked':
+    case 'contact_checked':
+      return {
+        kind: entry.kind,
+        at,
+        ...(isContactRef(entry.contactId) ? { contactId: entry.contactId } : {}),
+      };
     case 'contact_removed':
     case 'contact_revoked':
       return isContactRef(entry.contactId)
@@ -218,8 +238,11 @@ function view(entry: ActivityEntry): JsonObject | undefined {
         ...(typeof via === 'string' && CONNECTED_VIA.has(via) ? { via } : {}),
       };
     }
+    case 'id_created': {
+      const name = idName(entry.name);
+      return { kind: entry.kind, at, ...(name === undefined ? {} : { name }) };
+    }
     case 'rules_changed':
-    case 'id_created':
     case 'id_removed':
     case 'id_paused':
     case 'id_resumed':

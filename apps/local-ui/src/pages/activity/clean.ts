@@ -61,6 +61,8 @@ export type ActivityItem =
     }
   | { readonly kind: 'sender_blocked'; readonly at: number; readonly senderCode: string }
   | { readonly kind: 'contact_blocked'; readonly at: number; readonly contactId?: string }
+  | { readonly kind: 'contact_unblocked'; readonly at: number; readonly contactId?: string }
+  | { readonly kind: 'contact_checked'; readonly at: number; readonly contactId?: string }
   | { readonly kind: 'contact_removed'; readonly at: number; readonly contactId?: string }
   | { readonly kind: 'contact_revoked'; readonly at: number; readonly contactId?: string }
   | {
@@ -77,11 +79,11 @@ export type ActivityItem =
       readonly via?: 'your_invite' | 'their_invite';
     }
   | { readonly kind: 'id_renamed'; readonly at: number; readonly name?: string }
+  | { readonly kind: 'id_created'; readonly at: number; readonly name?: string }
   | { readonly kind: 'app_connected'; readonly at: number; readonly app?: string }
   | { readonly kind: 'app_disconnected'; readonly at: number; readonly app?: string }
   | {
-      readonly kind:
-        'rules_changed' | 'id_created' | 'id_removed' | 'id_paused' | 'id_resumed' | 'backup_saved';
+      readonly kind: 'rules_changed' | 'id_removed' | 'id_paused' | 'id_resumed' | 'backup_saved';
       readonly at: number;
     };
 
@@ -101,7 +103,6 @@ const PROOF_VIEWS: ReadonlySet<string> = new Set([
 const ACTIONS: ReadonlySet<string> = new Set(ACTION_TYPES);
 const PLAIN_KINDS: ReadonlySet<string> = new Set([
   'rules_changed',
-  'id_created',
   'id_removed',
   'id_paused',
   'id_resumed',
@@ -125,10 +126,22 @@ const plain = (v: unknown): string | undefined => {
   const t = cleanLine(v).trim();
   return t.length > 0 && t.length <= MAX_NAME ? t : undefined;
 };
+/**
+ * QA2: an ID's name is the owner's own label (at most 32 code points, plain text, as the API checks
+ * it): one with a control or direction character is dropped, not cleaned into another name.
+ */
+const ownLabel = (v: unknown): string | undefined => {
+  if (typeof v !== 'string' || cleanLine(v) !== v) return undefined;
+  const t = v.trim();
+  return t.length > 0 && Array.from(t).length <= 32 ? t : undefined;
+};
 
-function parseAction(raw: unknown): ActionView | undefined {
-  if (!isRecord(raw)) return undefined;
-  const type = raw['type'];
+/**
+ * QA2 (N7): an approval's action in the shape the API froze (api/activity.ts): `action` is the type,
+ * and `contactId`, `files` and `costUsd` sit on the entry itself. Undefined for an unknown type.
+ */
+function parseAction(raw: Record<string, unknown>): ActionView | undefined {
+  const type = raw['action'];
   if (typeof type !== 'string' || !ACTIONS.has(type)) return undefined;
   const files: { name: string; size: number }[] = [];
   const rawFiles = raw['files'];
@@ -161,21 +174,12 @@ export function parseItem(raw: unknown): ActivityItem | undefined {
     case 'approval_decided': {
       const decision = raw['decision'];
       if (typeof decision !== 'string' || !DECISIONS.has(decision)) return undefined;
-      const action = parseAction(raw['action']);
-      // The action's person and cost may also sit on the entry itself (the frozen shape lists them there).
-      const withTop: ActionView | undefined =
-        action === undefined
-          ? undefined
-          : {
-              ...action,
-              ...(action.contactId === undefined ? ref(raw['contactId']) : {}),
-              ...(action.costUsd === undefined ? usd(raw['costUsd']) : {}),
-            };
+      const action = parseAction(raw);
       return {
         kind,
         at,
         decision: decision as Decision,
-        ...(withTop === undefined ? {} : { action: withTop }),
+        ...(action === undefined ? {} : { action }),
       };
     }
     case 'proof': {
@@ -198,13 +202,16 @@ export function parseItem(raw: unknown): ActivityItem | undefined {
         : undefined;
     }
     case 'contact_blocked':
+    case 'contact_unblocked':
+    case 'contact_checked':
     case 'contact_removed':
     case 'contact_revoked':
       return { kind, at, ...ref(raw['contactId']) };
     case 'contact_renamed': {
       const formerName = plain(raw['formerName']);
       const newName = plain(raw['newName']);
-      return formerName === undefined || newName === undefined
+      // QA2: never "{name} is now called {name}".
+      return formerName === undefined || newName === undefined || formerName === newName
         ? undefined
         : { kind, at, ...ref(raw['contactId']), formerName, newName };
     }
@@ -217,8 +224,9 @@ export function parseItem(raw: unknown): ActivityItem | undefined {
         ...(via === 'your_invite' || via === 'their_invite' ? { via } : {}),
       };
     }
-    case 'id_renamed': {
-      const name = plain(raw['name']);
+    case 'id_renamed':
+    case 'id_created': {
+      const name = ownLabel(raw['name']);
       return name === undefined ? { kind, at } : { kind, at, name };
     }
     case 'app_connected':
@@ -421,6 +429,9 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
       const a = item.action;
       const n = who(a?.contactId);
       const t = actionOf(a, n);
+      // QA2: accepting an invite is the owner's own act, also when done in the app; the store cannot
+      // tell who asked, so it never says "Asked by your AI".
+      const invite = a?.type === 'accept_invite' && item.decision !== 'approved_by_rules';
       const template =
         item.decision === 'approved'
           ? S.approved
@@ -429,13 +440,25 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
             : item.decision === 'denied'
               ? S.denied
               : S.cancelled;
-      const sentence = fill(template, {}).flatMap((p) =>
-        typeof p === 'string' && p.includes('{action}') ? [...splitAction(p, t.act)] : [p],
-      );
+      const sentence = invite
+        ? fill(
+            pick(
+              item.decision === 'approved'
+                ? S.inviteAccepted
+                : item.decision === 'denied'
+                  ? S.inviteDeclined
+                  : S.inviteCancelled,
+              n !== undefined,
+            ),
+            n === undefined ? {} : { who: { name: n } },
+          )
+        : fill(template, {}).flatMap((p) =>
+            typeof p === 'string' && p.includes('{action}') ? [...splitAction(p, t.act)] : [p],
+          );
       const cost = a?.costUsd === undefined ? undefined : formatUsd(a.costUsd);
       const outcome = t.inbound ? S.nothingAccepted : S.nothingSent;
       const grey = [
-        S.askedByAi,
+        invite ? S.inviteByYou : S.askedByAi,
         ...(item.decision === 'approved_by_rules' ? [S.decidedByRulesLine] : []),
         ...(item.decision === 'denied' || item.decision === 'cancelled' ? [outcome] : []),
         ...(cost === undefined ? [] : [cost]),
@@ -545,6 +568,26 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
         pill: S.pillBlocked,
         link: link(S.linkPeople, '/contacts'),
       });
+    case 'contact_unblocked':
+      return build({
+        icon: 'ban',
+        tone: 'neutral',
+        sentence: names(S.contactUnblocked, item.contactId),
+        grey: S.contactUnblockedLine,
+        pill: S.pillUnblocked,
+        link: link(S.linkPeople, '/contacts'),
+        words: 'unblocked',
+      });
+    case 'contact_checked':
+      return build({
+        icon: 'check',
+        tone: 'success',
+        sentence: names(S.contactChecked, item.contactId),
+        grey: S.contactCheckedLine,
+        pill: S.pillChecked,
+        link: link(S.linkPeople, '/contacts'),
+        words: 'contact check safety code',
+      });
     case 'contact_removed':
       return build({
         icon: 'minus',
@@ -580,11 +623,9 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
         icon: 'user-plus',
         tone: 'success',
         sentence: names(
-          item.via === 'your_invite'
-            ? S.contactConnectedYours
-            : item.via === 'their_invite'
-              ? S.contactConnectedTheirs
-              : S.contactConnected,
+          // QA2: accepting their invite is its own row (the owner's decision); this one says the
+          // connection is made, without repeating "You accepted".
+          item.via === 'your_invite' ? S.contactConnectedYours : S.contactConnected,
           item.contactId,
         ),
         grey: S.contactConnectedLine,
@@ -621,14 +662,16 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
                     S.idRenamedLine,
                     'agent',
                   ] as const);
+      const named =
+        (item.kind === 'id_renamed' || item.kind === 'id_created') && item.name !== undefined
+          ? item.name
+          : undefined;
       return build({
         icon,
         tone: 'neutral',
         sentence: fill(
-          text,
-          item.kind === 'id_renamed' && item.name !== undefined
-            ? { name: { name: item.name } }
-            : {},
+          item.kind === 'id_created' && named !== undefined ? S.idCreatedNamed : text,
+          named === undefined ? {} : { name: { name: named } },
         ),
         grey: line,
         pill: S.pillId,
@@ -701,6 +744,16 @@ export function inCount(item: ActivityItem, key: CountKey): boolean {
 
 export const WEEK_SECONDS = 7 * 24 * 3600;
 
+/** QA2: the kinds the Safety filter shows (with denied approvals). */
+const SAFETY_KINDS: ReadonlySet<string> = new Set([
+  'rules_changed',
+  'sender_blocked',
+  'contact_blocked',
+  'contact_unblocked',
+  'contact_checked',
+  'backup_saved',
+]);
+
 export function inFilter(item: ActivityItem, filter: Filter): boolean {
   switch (filter) {
     case 'all':
@@ -711,18 +764,16 @@ export function inFilter(item: ActivityItem, filter: Filter): boolean {
       return item.kind === 'proof';
     case 'safety':
       return (
-        item.kind === 'rules_changed' ||
-        item.kind === 'sender_blocked' ||
-        item.kind === 'contact_blocked' ||
+        SAFETY_KINDS.has(item.kind) ||
         (item.kind === 'approval_decided' && item.decision === 'denied')
       );
     case 'people':
+      // QA2: a saved kit, a block, an unblock and a Contact check are Safety, not People & IDs.
       return (
-        item.kind !== 'contact_blocked' &&
+        !SAFETY_KINDS.has(item.kind) &&
         (item.kind.startsWith('contact_') ||
           item.kind.startsWith('id_') ||
-          item.kind.startsWith('app_') ||
-          item.kind === 'backup_saved')
+          item.kind.startsWith('app_'))
       );
   }
 }

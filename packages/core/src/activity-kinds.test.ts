@@ -419,12 +419,20 @@ describe('activity: ID, AI app and backup events (WP-A1)', () => {
     await insertOwnerAction(a, { nonce: 'n-kit', op: 'backup.export', at: 6_500 });
     // Ops the feed already shows from another row, or does not show, are not listed again.
     await insertOwnerAction(a, { nonce: 'n-policy', op: 'policy.set', at: 6_600 });
-    await insertOwnerAction(a, { nonce: 'n-block', op: 'contact.block', at: 6_700 });
     await insertOwnerAction(a, { nonce: 'n-credits', op: 'credits.deposit', at: 6_800 });
+    // QA2: a block whose contact is no longer blocked is listed from its owner action, no contact.
+    await insertOwnerAction(a, { nonce: 'n-block', op: 'contact.block', at: 6_700 });
 
     const items = await all(a);
     const owner = items.filter((i) => i.id.startsWith('owner_action:'));
     expect(owner).toEqual([
+      {
+        kind: 'contact_blocked',
+        id: 'owner_action:n-block',
+        at: 6_700,
+        contactId: null,
+        contact: null,
+      },
       { kind: 'backup_saved', id: 'owner_action:n-kit', at: 6_500 },
       { kind: 'app_disconnected', id: 'owner_action:n-app-off', at: 6_400, app: 'codex' },
       { kind: 'app_connected', id: 'owner_action:n-app', at: 6_300, app: 'claude-code' },
