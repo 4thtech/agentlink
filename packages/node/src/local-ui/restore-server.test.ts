@@ -1,7 +1,7 @@
 // UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app"; 08 §1): the restore routes are their own route
 // kind, behind the session, CSRF, Host, Origin and fetch-metadata gate of every /api/ui/ route, run
 // by the server's restore gate (never a page handler), with fixed answers only.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { encodeBase64url, encodeUtf8 } from '@4thtech-io/crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -29,10 +29,17 @@ afterEach(async () => {
 });
 
 let homes = 0;
-async function harness(over: { keychain?: KeychainBackend; keychainTimeoutMs?: number } = {}) {
+async function harness(
+  over: {
+    keychain?: KeychainBackend;
+    keychainTimeoutMs?: number;
+    before?: (home: string) => void;
+  } = {},
+) {
   homes += 1;
   const home = join(world.root, `home-${String(homes)}`);
   mkdirSync(join(home, 'Downloads'), { recursive: true });
+  over.before?.(home);
   const opened: string[] = [];
   const server = await startApprovalServerWith(
     {
@@ -227,5 +234,24 @@ describe('first run fails closed on a keychain that does not answer (T-1)', () =
     const retried = await begin();
     expect(JSON.parse(retried.body)).not.toEqual({ status: 'keychain_unavailable' });
     expect(JSON.parse(retried.body)).not.toEqual({ status: 'finish_restore' });
+  });
+});
+
+describe('stale restore files go when the server starts (T-7; R1-SEC-08)', () => {
+  it('an upload and a quarantined store a crashed run left are removed at start-up', async () => {
+    const h = await harness({
+      before: (home) => {
+        const dir = join(home, '.agentlink', 'restore');
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, '.upload-0123456789abcdef.alkk'), 'x');
+        writeFileSync(join(dir, '.restore-0123456789abcdef.sqlite'), 'x');
+      },
+    });
+    const dir = join(h.home, '.agentlink', 'restore');
+    // No restore request was made: only start-up can have removed them.
+    for (let i = 0; i < 50 && readdirSync(dir).length > 0; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(readdirSync(dir)).toEqual([]);
   });
 });
