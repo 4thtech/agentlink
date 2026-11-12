@@ -2393,6 +2393,7 @@ export async function startApprovalServerWith(
       input: header(req, 'x-agentlink-input'),
       items: header(req, 'x-agentlink-items'),
       digest: header(req, 'x-agentlink-digest'),
+      generation: header(req, 'x-agentlink-generation'),
     });
 
   /** True when the request asks for a ceremony (`X-AgentLink-Presence: challenge`). */
@@ -5949,7 +5950,6 @@ export async function startApprovalServerWith(
     decided.clear();
     dropSetup();
     payHolds.clear();
-    ceremonies.clear();
     // W4-ONE-TOUCH: a held New agent plan names the old agent's owner and Send folder home.
     dropCreate();
     boundHome = agent?.firstCard?.firstPolicy?.home;

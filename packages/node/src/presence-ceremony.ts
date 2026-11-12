@@ -4,7 +4,7 @@
 //
 // What it is: the server's store of open presence ceremonies, and the binding of a ceremony to one
 // request. Before a passkey gesture the page asks the very route it will call for a ceremony: the
-// same method, path, query and action headers (`X-AgentLink-Input`, `X-AgentLink-Items`,
+// same method, path, query and action headers (`X-AgentLink-Input`, `X-AgentLink-Items`, the generation,
 // `X-AgentLink-Digest`), with `X-AgentLink-Presence: challenge` and an empty body. The server answers
 // a ceremony ID and a WebAuthn challenge derived from a fresh nonce and the binding of that request.
 // The page then calls the route with `X-AgentLink-Presence: passkey`, `X-AgentLink-Ceremony: <id>`
@@ -56,6 +56,8 @@ export interface PresenceBindingInput {
   readonly input: string | undefined;
   readonly items: string | undefined;
   readonly digest: string | undefined;
+  /** The app host's generation (`X-AgentLink-Generation`): a ceremony never outlives a switch. */
+  readonly generation?: string | undefined;
 }
 
 /** SHA-256 over the canonical JSON of the bound request parts. */
@@ -67,6 +69,7 @@ export function presenceBinding(parts: PresenceBindingInput): Uint8Array {
     parts.input ?? null,
     parts.items ?? null,
     parts.digest ?? null,
+    parts.generation ?? null,
   ]);
   return sha256(encodeUtf8(value));
 }

@@ -20,7 +20,7 @@ const clock = (): { now: () => number; advance: (ms: number) => void } => {
 };
 
 describe('presenceBinding', () => {
-  it('differs for another method, path, input, items or digest', () => {
+  it('differs for another method, path, input, items, digest or generation', () => {
     const base = { method: 'POST', target: '/a', input: 'x', items: 'i', digest: 'd' };
     const all = [
       base,
@@ -31,6 +31,7 @@ describe('presenceBinding', () => {
       { ...base, input: undefined },
       { ...base, items: undefined },
       { ...base, digest: 'e' },
+      { ...base, generation: '2' },
     ].map((p) => presenceBinding(p));
     for (let i = 0; i < all.length; i += 1) {
       for (let j = i + 1; j < all.length; j += 1) {
