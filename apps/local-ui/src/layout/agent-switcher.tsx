@@ -52,7 +52,7 @@ export const CHIP_STRINGS = {
   manageAgents: 'Manage IDs',
   connectAnotherApp: 'Connect another AI app to this ID',
   connectAnotherHelp: 'The AI app shares this ID.',
-  newIdHelp: 'A new identity with its own inbox and contacts.',
+  newIdHelp: 'A new ID with its own inbox and people.',
   chipPrefix: 'ID: ',
   openApp: 'Open the AgentLink app to see your IDs.',
 } as const;

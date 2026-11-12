@@ -207,7 +207,7 @@ describe('the Agents page', () => {
     );
     // D-144 (b): the owner's explainer sentence on the empty page.
     expect(plain(host)).toContain(
-      "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.",
+      "An ID is your AI app's identity on AgentLink: its inbox, people and keys. Every chat in that AI app uses it.",
     );
     const links = [...host.querySelectorAll('a')].filter((a) => a.textContent === 'New ID');
     expect(links.map((a) => a.getAttribute('href'))).toContain('/start/app?add=agent');

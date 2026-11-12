@@ -771,6 +771,14 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
         { app: 'cursor', name: 'Cursor', state: 'connected', agent: 'tali-work' },
       ],
     }),
+    // N3: the other ID's number of people comes from the all-IDs read.
+    '/api/ui/people': ok({
+      status: 'ok',
+      ids: [
+        { name: 'tali', label: 'Tali', current: true, status: 'ok', contacts: [] },
+        { name: 'tali-work', label: 'Tali work', current: false, status: 'ok', count: 1 },
+      ],
+    }),
   });
   const tone = (el: Element | null | undefined): string | undefined =>
     [...(el?.classList ?? [])].find((c) => c.startsWith('is-') && c !== 'is-lg');
@@ -787,9 +795,9 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
     await render(base(agentsAnswer(2)));
     const chips = all('[data-id-chips] button');
     expect(chips.map((c) => c.textContent)).toEqual([
-      `${S.allAgents}2`,
+      `${S.allAgents}3`,
       'TTali · Claude Code2',
-      'TTali work · Cursor',
+      'TTali work · Cursor1',
     ]);
     expect(chips[0]?.getAttribute('aria-pressed')).toBe('true');
     expect(q('[data-id-group]')?.textContent).toContain('Tali · Claude Code');
@@ -798,6 +806,15 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
     expect(tone(q('[data-id-chip="tali"] .al-agent-icon'))).toBe(
       tone(row('Denis')?.querySelector('.al-agent-icon')),
     );
+  });
+
+  it('N3: choosing another ID says how many people it has, not "No one matches"', async () => {
+    await render(base(agentsAnswer(2)));
+    await click(q('[data-id-chip="tali-work"]'));
+    const note = q('[data-other-id]');
+    expect(note?.textContent).toContain('Tali work has 1 person. Open it to see them.');
+    expect(q('.hm-nomatch')?.textContent).not.toContain(S.noMatch);
+    expect(row('Denis')).toBeFalsy();
   });
 
   it('names the asking ID with its app and draws its colour on the approval card', async () => {

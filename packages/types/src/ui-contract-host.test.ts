@@ -91,6 +91,7 @@ describe('ui-settings kept: the page choices the app keeps', () => {
         'agentlink.home.archived.v1',
         'agentlink.recoveryKit.later',
         'agentlink.getStarted.hidden',
+        'agentlink.getStarted.left',
         'agentlink.idsFit.hidden',
         'agentlink.idExplainer.hidden',
         'agentlink:tidy-dismissed',

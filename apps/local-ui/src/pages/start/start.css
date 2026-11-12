@@ -498,3 +498,13 @@
   font-size: 14px;
   line-height: 20px;
 }
+
+/* The uncopied-link warning: a clear callout, not small grey print. */
+.st-unsent {
+  margin: 0;
+  padding: var(--al-space-3) var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-surface);
+  color: var(--al-color-fg-default);
+}

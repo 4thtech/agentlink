@@ -88,18 +88,48 @@ export function PendingInviteRow({
  * yet, "Waiting for {name} to come online. This finishes on its own." No Cancel: it finishes or
  * expires on its own. The name is text only (I-5).
  */
-export function ConnectingInviteRow({ row }: { readonly row: ConnectingRow }): ReactElement {
+export function ConnectingInviteRow({
+  row,
+  blocked = row.blocked === true,
+  onUnblock,
+}: {
+  readonly row: ConnectingRow;
+  /** The person is blocked here (the server says so, or the page found them blocked). */
+  readonly blocked?: boolean;
+  /** Opens the person where Unblock lives; absent when that is not possible from here. */
+  readonly onUnblock?: () => void;
+}): ReactElement {
+  // A blocked person's accept never finishes: say so, with Unblock and a Cancel that clears the row
+  // from this page (the accept itself is only ever answered or expires).
+  const [hidden, setHidden] = useState(false);
+  if (hidden) return <></>;
   return (
-    <li className="inv-pending inv-connecting">
+    <li className="inv-pending inv-connecting" data-blocked={blocked ? 'true' : undefined}>
       <span className="inv-pending-letter" aria-hidden="true">
         {letterOf(row.name)}
       </span>
       <span className="inv-pending-main">
         <span className="inv-pending-name">{row.name}</span>
         <span className="al-text-body-sm al-muted">
-          {row.sent ? F.connecting(row.name) : F.waitingOnline(row.name)}
+          {blocked
+            ? F.youBlocked(row.name)
+            : row.sent
+              ? F.connecting(row.name)
+              : F.waitingOnline(row.name)}
         </span>
       </span>
+      {blocked ? (
+        <span className="inv-pending-actions">
+          {onUnblock === undefined ? null : (
+            <Button size="sm" onClick={onUnblock}>
+              {F.unblockAction}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => setHidden(true)}>
+            {F.cancelConnecting}
+          </Button>
+        </span>
+      ) : null}
     </li>
   );
 }

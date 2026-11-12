@@ -103,6 +103,8 @@ const KEPT: Readonly<Record<string, (raw: string) => string | undefined>> = Obje
   /** The recovery kit was put off ("Later"): a time in ms only. */
   'agentlink.recoveryKit.later': (raw) => (/^[0-9]{1,16}$/.test(raw) ? raw : undefined),
   'agentlink.getStarted.hidden': fixed('1'),
+  /** Get started was left (Skip to Home or Done): it does not open by itself again. */
+  'agentlink.getStarted.left': fixed('1'),
   'agentlink.idsFit.hidden': fixed('1'),
   'agentlink.idExplainer.hidden': fixed('1'),
   'agentlink:tidy-dismissed': fixed('1'),

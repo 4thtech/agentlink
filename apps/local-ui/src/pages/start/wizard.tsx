@@ -326,6 +326,7 @@ export function PickStep({
       </div>
       {eyebrow === P.eyebrow ? (
         <p className="st-note">
+          {P.restoreLead}{' '}
           <a href="/restore/kit" data-restore-link="">
             {P.restore}
           </a>
@@ -584,6 +585,9 @@ export interface InviteStepProps {
   readonly onHome: () => void;
   /** A link is on screen that has not been copied or sent: leaving cancels it, so warn first. */
   readonly unsent?: boolean;
+  /** The warning is showing (the page holds this, so "Skip to Home" in the header can raise it too). */
+  readonly warned?: boolean;
+  readonly onWarn?: () => void;
 }
 
 /** A3, step 4 (optional): invite someone; "Skip for now" and "Done, go to Home". */
@@ -592,13 +596,17 @@ export function InviteStep({
   inviteHref,
   onHome,
   unsent = false,
+  warned: givenWarned,
+  onWarn,
 }: InviteStepProps): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
-  const [warned, setWarned] = useState(false);
+  const [ownWarned, setOwnWarned] = useState(false);
+  const warned = givenWarned ?? ownWarned;
   // Leaving with a link nobody has: say so once, then let the person go.
   const leave = (): void => {
     if (unsent && !warned) {
-      setWarned(true);
+      if (onWarn === undefined) setOwnWarned(true);
+      else onWarn();
       return;
     }
     onHome();
@@ -620,14 +628,16 @@ export function InviteStep({
         </div>
       )}
       {unsent && warned ? (
-        <p className="st-note st-unsent" role="alert">
+        <p className="st-unsent al-text-body-sm" role="alert">
           {I.unsentWarn}
         </p>
       ) : null}
       <div className="st-row st-end">
-        <Button variant="ghost" size="lg" onClick={leave}>
-          {unsent && warned ? I.leaveAnyway : I.skip}
-        </Button>
+        {unsent && warned ? null : (
+          <Button variant="ghost" size="lg" onClick={leave}>
+            {I.skip}
+          </Button>
+        )}
         <Button variant="secondary" size="lg" onClick={leave}>
           {unsent && warned ? I.leaveAnyway : I.done}
         </Button>

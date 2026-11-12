@@ -41,7 +41,7 @@ import {
 } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { getLive, subscribeLive, switchAgent, type LiveAgent } from '../../api/live.js';
-import { INVITE_PATH } from '../../nav.js';
+import { INVITE_PATH, PEOPLE_PATH } from '../../nav.js';
 import { notify, setArchived, useArchived } from '../../notices/index.js';
 import { checkHref } from '../contacts/safety.js';
 import { CONTACTS_CHANGED } from '../../api/contact-changes.js';
@@ -451,17 +451,34 @@ function PendingInviteRow({
  * {name}…", or "Waiting for {name} to come online. This finishes on its own." Text only (I-5).
  */
 function ConnectingRowView({ row }: { readonly row: ConnectingRow }): ReactElement {
+  // A blocked person's accept never finishes: say so; Unblock lives on People.
+  const [hidden, setHidden] = useState(false);
+  if (hidden) return <></>;
   return (
-    <div className="hm-invite-row hm-f">
+    <div className="hm-invite-row hm-f" data-blocked={row.blocked === true ? 'true' : undefined}>
       <span className="al-avatar hm-avatar is-pending" aria-hidden="true">
         {[...row.name][0]?.toUpperCase() ?? '?'}
       </span>
       <span className="hm-row-main hm-c">
         <PersonName name={row.name} />
         <span className="hm-sub al-text-body-sm">
-          {row.sent ? F.connecting(row.name) : F.waitingOnline(row.name)}
+          {row.blocked === true
+            ? F.youBlocked(row.name)
+            : row.sent
+              ? F.connecting(row.name)
+              : F.waitingOnline(row.name)}
         </span>
       </span>
+      {row.blocked === true ? (
+        <>
+          <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH}>
+            {F.unblockAction}
+          </a>
+          <Button size="sm" variant="ghost" onClick={() => setHidden(true)}>
+            {F.cancelConnecting}
+          </Button>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -654,6 +671,17 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   );
   const people = matching.filter((p) => !isArchived(p.contactId));
   const archivedPeople = matching.filter((p) => isArchived(p.contactId));
+  // Two people with the same name look alike: their rows add the ID tag that tells them apart.
+  const nameCount = new Map<string, number>();
+  for (const p of [...people, ...archivedPeople]) {
+    const key = p.name.trim().toLowerCase();
+    nameCount.set(key, (nameCount.get(key) ?? 0) + 1);
+  }
+  const sameNameNote = (p: Person): string => {
+    if ((nameCount.get(p.name.trim().toLowerCase()) ?? 0) < 2) return '';
+    const tag = data?.contacts.get(p.contactId)?.fingerprint;
+    return tag === undefined ? '' : ` · ${S.idTag} ${tag}`;
+  };
   const archiveToggle = (contactId: string) =>
     current === undefined || !isGone(contactId)
       ? undefined
@@ -670,6 +698,23 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
 
   // W7-ID-X1: with more than one ID, chips filter by ID ("All IDs · Tali · Tali work"). Only the open
   // ID's people are on this computer's page, so its chip carries their count; another ID's chip opens it.
+  // Counts are what Home was told: the open ID's own list, the other IDs' from the all-IDs read.
+  const countOf = (a: { readonly name: string; readonly current: boolean }): number | undefined =>
+    a.current ? data?.people.length : data?.idCounts?.get(a.name);
+  const allCount = ((): number | undefined => {
+    const counts = agents.map(countOf);
+    return data === undefined || counts.some((c) => c === undefined)
+      ? undefined
+      : counts.reduce<number>((n, c) => n + (c ?? 0), 0);
+  })();
+  const otherLine = (a: { readonly name: string; readonly label: string }): string => {
+    const n = data?.idCounts?.get(a.name);
+    if (n === undefined) return fmt(S.otherIdUnknown, { name: a.label });
+    if (n === 0) return fmt(S.otherIdNone, { name: a.label });
+    return n === 1
+      ? fmt(S.otherIdOne, { name: a.label })
+      : fmt(S.otherIdPeople, { name: a.label, count: String(n) });
+  };
   const idChips = many ? (
     <div className="hm-id-chips hm-f" role="group" aria-label={S.idChips} data-id-chips="">
       <button
@@ -679,8 +724,8 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
         onClick={() => setFilter('all')}
       >
         {S.allAgents}
-        {data === undefined ? null : (
-          <span className="hm-id-count al-text-code">{data.people.length}</span>
+        {allCount === undefined ? null : (
+          <span className="hm-id-count al-text-code">{allCount}</span>
         )}
       </button>
       {agents.map((a) => (
@@ -694,9 +739,9 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
         >
           <AgentIcon label={a.label} seed={a.name} />
           <span>{idWithApp(a.label, a.apps[0]?.app)}</span>
-          {a.current && data !== undefined ? (
-            <span className="hm-id-count al-text-code">{data.people.length}</span>
-          ) : null}
+          {countOf(a) === undefined ? null : (
+            <span className="hm-id-count al-text-code">{countOf(a)}</span>
+          )}
         </button>
       ))}
     </div>
@@ -736,6 +781,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                 : S.noMessagesYet}
             {summary === undefined ? '' : ` · ${filesText(summary.files)}`}
             {many && agentLabel !== '' ? ` · ${agentLabel}` : ''}
+            {sameNameNote(person)}
           </span>
         </span>
         {problem ? (
@@ -946,11 +992,18 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                 <span>{agentLabel}</span>
               </h3>
             ) : null}
-            {data !== undefined &&
-            data.people.length === 0 &&
-            pending.length === 0 &&
-            connectingRows.length === 0 &&
-            props.pendingRows === undefined ? (
+            {otherAgent !== undefined ? (
+              <div className="hm-nomatch hm-f" data-other-id="">
+                <p className="al-text-body-sm al-muted">{otherLine(otherAgent)}</p>
+                <Button size="sm" onClick={() => void switchAgent(otherAgent.name)}>
+                  {fmt(S.openAgent, { name: otherAgent.label })}
+                </Button>
+              </div>
+            ) : data !== undefined &&
+              data.people.length === 0 &&
+              pending.length === 0 &&
+              connectingRows.length === 0 &&
+              props.pendingRows === undefined ? (
               <EmptyState
                 title={S.noPeople}
                 icon="users"
@@ -997,11 +1050,6 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                 data.people.length > 0 ? (
                   <div className="hm-nomatch hm-f">
                     <p className="al-text-body-sm al-muted">{S.noMatch}</p>
-                    {otherAgent === undefined ? null : (
-                      <Button size="sm" onClick={() => void switchAgent(otherAgent.name)}>
-                        {fmt(S.openAgent, { name: otherAgent.label })}
-                      </Button>
-                    )}
                   </div>
                 ) : null}
                 {connectingRows.map((row) => (

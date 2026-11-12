@@ -108,6 +108,7 @@ import {
   mismatchBody,
   nudge,
   personLine,
+  sameNameTag,
   secondConnection,
   since,
   waitSeconds,
@@ -146,6 +147,21 @@ const DATE = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   year: 'numeric',
 });
+
+/** Time of day, for telling two same-named people apart when no ID tag is known. */
+const TIME = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
+/** The names (as the rows show them, lower case) that more than one person in `rows` has. */
+export function repeatedNames(rows: readonly ContactRow[]): ReadonlySet<string> {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const c of rows) {
+    const key = shownName(c).trim().toLowerCase();
+    if (seen.has(key)) repeated.add(key);
+    seen.add(key);
+  }
+  return repeated;
+}
 
 /** The pairing day in the second-connection notice ("paired 25 Oct"). */
 const DAY = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
@@ -244,6 +260,7 @@ function PersonRow({
   onSelect,
   archived,
   again,
+  sameName = false,
 }: {
   c: Person;
   selected: string | undefined;
@@ -254,6 +271,8 @@ function PersonRow({
   archived?: boolean;
   /** An active person with the same owner: the day you connected again. */
   again?: string | undefined;
+  /** Another person in this list has the same name: the row says what tells them apart. */
+  sameName?: boolean;
 }): ReactElement {
   // WP-P2: the activity pulse is the open ID's; another ID's people show no last message here.
   const other = c.id !== undefined && !c.id.current;
@@ -294,7 +313,10 @@ function PersonRow({
                     ? undefined
                     : ago(last, pulse.now),
                   connected,
-                )}
+                ) +
+                (sameName
+                  ? ` · ${sameNameTag(c.fingerprint, TIME.format(new Date((c.pairedAt ?? c.since) * 1000)))}`
+                  : '')}
           </span>
         </span>
         <span className="al-contact-side">
@@ -339,12 +361,14 @@ function ContactList({
   /** W5-INVITE-FEEDBACK: the contact that just connected (a short pulse). */
   fresh?: string | undefined;
 }): ReactElement {
+  const repeated = repeatedNames(contacts);
   return (
     <Surface as="ul" level={1} className="ct-list" aria-label={S.listLabel}>
       {contacts.map((c) => (
         <PersonRow
           key={personKey(c)}
           c={c}
+          sameName={repeated.has(shownName(c).trim().toLowerCase())}
           selected={selected}
           fresh={fresh}
           pulse={pulse}
@@ -912,6 +936,8 @@ function PendingInvites({
   now,
   onCancel,
   connecting = [],
+  blockedRefs,
+  onUnblock,
 }: {
   rows: readonly OpenInvite[];
   cancelled: readonly OpenInvite[];
@@ -920,6 +946,9 @@ function PendingInvites({
   onCancel: (inviteId: string) => Promise<CancelResult>;
   /** W5-INVITE-FEEDBACK: this agent's accepts that wait for the inviter's answer. */
   connecting?: readonly ConnectingRow[];
+  /** Contacts the page knows are blocked (matched to a waiting accept by ref). */
+  blockedRefs?: ReadonlySet<string>;
+  onUnblock?: (ref: string) => void;
 }): ReactElement | null {
   const gone = cancelled.filter((c) => !rows.some((r) => r.inviteId === c.inviteId));
   if (rows.length === 0 && gone.length === 0 && connecting.length === 0) return null;
@@ -927,7 +956,14 @@ function PendingInvites({
   return (
     <Surface as="ul" level={1} className="ct-list ct-invites" aria-label={I.pendingLabel}>
       {connecting.map((c) => (
-        <ConnectingInviteRow key={`c-${c.ref}`} row={c} />
+        <ConnectingInviteRow
+          key={`c-${c.ref}`}
+          row={c}
+          blocked={c.blocked === true || blockedRefs?.has(c.ref) === true}
+          {...(onUnblock === undefined || blockedRefs?.has(c.ref) !== true
+            ? {}
+            : { onUnblock: () => onUnblock(c.ref) })}
+        />
       ))}
       {[...gone, ...rows].map((r) => (
         <PendingInviteRow
@@ -1338,6 +1374,18 @@ export function ContactsPage({
         now={Date.now()}
         onCancel={cancelInvite}
         connecting={connectingRows}
+        blockedRefs={
+          new Set(
+            (list.phase === 'ok' ? list.contacts : [])
+              .filter((c) => c.status === 'blocked')
+              .map((c) => c.ref),
+          )
+        }
+        onUnblock={(ref) => {
+          setRemoved(false);
+          setSelected(ref);
+          setSheetOpen(true);
+        }}
       />
     </>
   );

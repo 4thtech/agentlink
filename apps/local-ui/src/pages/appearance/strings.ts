@@ -1,7 +1,7 @@
 // Settings › Appearance copy (11 §5). Plain words; no technical terms.
 export const APPEARANCE_STRINGS = {
   title: 'Appearance',
-  intro: 'These choices are kept in this browser only.',
+  intro: 'These choices are kept for you on this computer.',
   theme: 'Theme',
   motion: 'Reduce motion',
   transparency: 'Transparency',

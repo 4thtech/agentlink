@@ -32,7 +32,7 @@ describe('ID explainer card', () => {
   it("says what an ID is, in the owner's words", async () => {
     await mount();
     expect(ID_EXPLAINER.body).toBe(
-      "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.",
+      "An ID is your AI app's identity on AgentLink: its inbox, people and keys. Every chat in that AI app uses it.",
     );
     expect(host.textContent).toContain(ID_EXPLAINER.body);
     expect(host.querySelector('h2')?.textContent).toBe('What is an ID?');
