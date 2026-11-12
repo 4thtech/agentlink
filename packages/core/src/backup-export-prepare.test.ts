@@ -53,7 +53,13 @@ describe('prepareBackupExport (WP-11, 04 §2.5.1 backup.export)', () => {
 
   it('refuses a kitId that is not 16 bytes of base64url, and contents other than full/identity', async () => {
     const a = await agentOf(2);
-    for (const bad of ['', 'short', 'A'.repeat(23), `${'A'.repeat(21)}=`, 42 as unknown as string]) {
+    for (const bad of [
+      '',
+      'short',
+      'A'.repeat(23),
+      `${'A'.repeat(21)}=`,
+      42 as unknown as string,
+    ]) {
       expect(await a.client.ownerActions.prepareBackupExport(bad, 'full')).toMatchObject({
         status: 'refused',
         op: 'backup.export',

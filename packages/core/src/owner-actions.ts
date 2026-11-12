@@ -35,6 +35,7 @@ import {
   agentLabelParamsSchema,
   appChangeParamsSchema,
   approvalIdSchema,
+  backupExportParamsSchema,
   contactRenameParamsSchema,
   evmAddress,
   fileSaveParamsSchema,
@@ -1477,6 +1478,25 @@ export class OwnerActions {
     });
     if (!params.success) return refuse('item_invalid');
     return this.#build(signer, 'file.save', params.data);
+  }
+
+  /**
+   * The unsigned `backup.export` for this agent (WP-11, D-117 A; 04 §2.3.3, §2.5.1): `kitId` is the
+   * 16 CSPRNG bytes the local app server drew for this kit (base64url without padding) and
+   * `contents` is `full` or `identity`; anything else is `params_invalid`. apply() records its nonce
+   * row, the audit record of the export, and only then may the kit be sealed. Writes nothing.
+   */
+  async prepareBackupExport(
+    kitId: string,
+    contents: 'full' | 'identity',
+  ): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'backup.export', reason }) as const;
+    const params = backupExportParamsSchema.safeParse({ kitId, contents });
+    if (!params.success) return refuse('params_invalid');
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    return this.#build(signer, 'backup.export', params.data);
   }
 
   /**

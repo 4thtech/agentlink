@@ -100,6 +100,38 @@ export interface LocalUiOptions {
    * handler or LocalUiContext. Absent: a rename that would rotate answers `not_available`.
    */
   readonly epochKeys?: AgentEpochKeys;
+  /**
+   * WP-11 (F-1, D-117 A; 04 §2.3.3): where the open agent's recovery kit comes from, for the app
+   * host's export gesture only (the gate's `exportRecoveryKit`). Held by the server, never by a
+   * handler or LocalUiContext. Only for an agent whose KeyStore items live in the OS keychain the
+   * server's owner gate uses. Absent: `GET /api/ui/backup` answers `not_available` and the export
+   * route is refused before the gesture.
+   */
+  readonly recoveryKit?: LocalUiRecoveryKitSource;
+}
+
+/**
+ * WP-11: the open agent's part of a recovery kit (04 §2.3.3). Public facts and paths only: the seeds
+ * and items are read inside the export control, never here.
+ */
+export interface LocalUiRecoveryKitSource {
+  /** `0x` + 40 lowercase hex: must be the open client's `agentId`. */
+  readonly agentId: string;
+  /** The agent folder name (06 §6 `[a-z][a-z0-9-]{0,31}`), the kit manifest's `name`. */
+  readonly name: string;
+  /** The agent's `store.sqlite`; its inter-process lock is `<path>.lock` (06 §6). */
+  readonly storePath: string;
+  /**
+   * The OS user's home folder: `~/.agentlink` is under it (a kit is never written there) and the kit
+   * goes to its `Downloads` folder, else to the home folder itself.
+   */
+  readonly home: string;
+  /** Argon2id parameters of the kit; default the kit defaults (tests use the floor). */
+  readonly kdf?: {
+    readonly memoryKiB: number;
+    readonly iterations: number;
+    readonly parallelism: number;
+  };
 }
 
 /**
@@ -615,6 +647,11 @@ export interface LocalUiContext {
   readonly client: LocalUiReadClient | undefined;
   /** M1-11c-a4c: the credits moves for the owner routes; undefined when not set up. */
   readonly credits?: LocalUiCreditsPort;
+  /**
+   * WP-11: true when the open agent can save a recovery kit here (LocalUiOptions `recoveryKit`); the
+   * source itself stays with the server.
+   */
+  readonly recoveryKitAvailable?: boolean;
   /** W4-FILES-SAVE: saving a received file, for the save owner route; undefined when not set up. */
   readonly fileSave?: LocalUiFileSavePort;
   /**

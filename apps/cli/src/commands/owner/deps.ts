@@ -25,6 +25,7 @@ import {
   type ChangeOwnerCodeResult,
   type ApprovalContext,
   type KeyStoreBackendKind,
+  type LocalUiRecoveryKitSource,
   type OwnerInitResult,
   type OwnerSetupOptions,
   type OwnerOperationItem,
@@ -56,6 +57,12 @@ export interface OwnerAgent {
    * KeyStore the node package did not open.
    */
   readonly epochKeys?: AgentEpochKeys;
+  /**
+   * WP-11 (D-117 A; 04 §2.3.3): what the app host's Back up page saves a recovery kit from: the
+   * agent's ID, folder name and store path, and the OS user's home. Only for an agent whose items
+   * live in the OS keychain; absent otherwise (the page then says the kit can't be saved here).
+   */
+  readonly recoveryKit?: LocalUiRecoveryKitSource;
   close(): Promise<void>;
 }
 
@@ -118,6 +125,7 @@ async function openWithStore(
 ): Promise<OpenOwnerAgentResult> {
   let opened: AgentStore | undefined;
   let keys: AgentEpochKeys | undefined;
+  let kit: { backend: KeyStoreBackendKind; agentId: string; storePath: string } | undefined;
   const deps: RuntimeDeps = {
     ...nodeRuntimeDeps,
     openKeyStore: async (backend, agentId) => {
@@ -126,6 +134,7 @@ async function openWithStore(
       return keyStore;
     },
     openStore: async (backend, agentId, path) => {
+      kit = { backend, agentId, storePath: path };
       opened = await nodeRuntimeDeps.openStore(backend, agentId, path);
       return opened;
     },
@@ -151,6 +160,18 @@ async function openWithStore(
       store: store.store,
       cipher: store.cipher,
       ...(keys === undefined ? {} : { epochKeys: keys }),
+      ...(kit === undefined ||
+      kit.backend !== 'keychain' ||
+      kit.agentId !== result.agent.client.agentId
+        ? {}
+        : {
+            recoveryKit: Object.freeze({
+              agentId: kit.agentId,
+              name: result.agent.name,
+              storePath: kit.storePath,
+              home,
+            }),
+          }),
       close: () => result.agent.close(),
     }),
   };

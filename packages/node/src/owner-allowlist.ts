@@ -53,6 +53,10 @@ export const OWNER_ACTION_OPS: readonly string[] = Object.freeze([
   'file.save',
   // W4-PAUSE (D-143 (5)): the owner resumes a paused agent from the local app (Resume).
   'agent.resume',
+  // WP-11 (D-117 A; 04 §2.3.3): the owner saves a recovery kit from the local app. The app host's
+  // ordinary `sign` refuses it; only the export gesture (approval-server.ts `exportRecoveryKit`)
+  // signs it, right before the kit is sealed.
+  'backup.export',
 ]);
 
 export const ownerOperationRefused = (): NodeKeyStoreError =>

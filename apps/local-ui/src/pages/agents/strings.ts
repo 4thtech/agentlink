@@ -133,7 +133,8 @@ export const AGENTS_STRINGS = {
   restartToFinish: (app: string): string => `Restart ${app} to finish.`,
   backupTitle: 'Recovery kit',
   backupHint: 'Save a recovery kit. Keep it somewhere safe, away from this computer.',
-  backupLink: 'Back up recovery kit',
+  // WP-11: a recovery kit is saved for the open ID.
+  backupOpenFirst: (label: string): string => `Open ${iso(label)} to save its recovery kit.`,
   switching: (label: string): string => `Opening ${iso(label)}…`,
 
   // Pause (08 §1 "Pause an ID", D-143 (5)): one click, no Touch ID; Resume with Touch ID.

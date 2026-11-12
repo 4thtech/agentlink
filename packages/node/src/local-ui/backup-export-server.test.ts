@@ -83,7 +83,7 @@ async function harness(
   if (over.downloads !== false) mkdirSync(join(home, 'Downloads'));
   const storePath = join(agentDir, 'store.sqlite');
   const db = new Database(storePath);
-  db.exec('CREATE TABLE t (v TEXT); INSERT INTO t VALUES (\'kept\');');
+  db.exec("CREATE TABLE t (v TEXT); INSERT INTO t VALUES ('kept');");
   db.close();
 
   const state = { applied: [] as JsonObject[] };
@@ -176,11 +176,18 @@ async function harness(
     send(server.port, BACKUP_PATH, {
       headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': 'same-origin' },
     });
-  return { home, state, events, exportKit: (code: string) => post(BACKUP_EXPORT_PATH, code), post, read };
+  return {
+    home,
+    state,
+    events,
+    exportKit: (code: string) => post(BACKUP_EXPORT_PATH, code),
+    post,
+    read,
+  };
 }
 
 const KIT_NAME = /^agentlink-recovery-kit-\d{4}-\d{2}-\d{2}(?:-\d{1,2})?\.alkk$/;
-const CODE = /^[A-Z2-7]{4}(?: [A-Z2-7]{4}){5}$/;
+const CODE = /^[A-Z2-7]{4}(?:-[A-Z2-7]{4}){5}$/;
 
 describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
   it('GET /api/ui/backup says the kit can be saved here', async () => {
@@ -194,7 +201,12 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
     const h = await harness();
     const res = await h.exportKit(world.code);
     expect(res.status).toBe(200);
-    const body = JSON.parse(res.body) as { status: string; file: string; folder: string; code: string };
+    const body = JSON.parse(res.body) as {
+      status: string;
+      file: string;
+      folder: string;
+      code: string;
+    };
     expect(body.status).toBe('saved');
     expect(body.file).toMatch(KIT_NAME);
     expect(body.folder).toBe('Downloads');
@@ -229,14 +241,20 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
     // Nothing under ~/.agentlink but the ID's own folder; no event carries the code.
     expect(readdirSync(join(h.home, '.agentlink'))).toEqual(['agents']);
     expect(JSON.stringify(h.events)).not.toContain(body.code);
-    expect(JSON.stringify(h.events)).not.toContain(body.code.replace(/ /g, ''));
+    expect(JSON.stringify(h.events)).not.toContain(body.code.replace(/-/g, ''));
   });
 
   it('a second kit gets its own file and its own new code; the first is never replaced', async () => {
     const h = await harness();
-    const first = JSON.parse((await h.exportKit(world.code)).body) as { file: string; code: string };
+    const first = JSON.parse((await h.exportKit(world.code)).body) as {
+      file: string;
+      code: string;
+    };
     const before = readFileSync(join(h.home, 'Downloads', first.file));
-    const second = JSON.parse((await h.exportKit(world.code)).body) as { file: string; code: string };
+    const second = JSON.parse((await h.exportKit(world.code)).body) as {
+      file: string;
+      code: string;
+    };
     expect(second.file).toMatch(KIT_NAME);
     expect(second.file).not.toBe(first.file);
     expect(second.code).not.toBe(first.code);
@@ -246,7 +264,10 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
 
   it('no Downloads folder: the kit goes to the home folder', async () => {
     const h = await harness({ downloads: false });
-    const body = JSON.parse((await h.exportKit(world.code)).body) as { file: string; folder: string };
+    const body = JSON.parse((await h.exportKit(world.code)).body) as {
+      file: string;
+      folder: string;
+    };
     expect(body.folder).toBe('Home');
     expect(statSync(join(h.home, body.file)).isFile()).toBe(true);
   });
@@ -274,6 +295,19 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
     expect(res.status).toBe(501);
     expect(h.state.applied).toEqual([]);
     expect(readdirSync(join(h.home, 'Downloads'))).toEqual([]);
+  });
+
+  it('no other route can ask for an export session', () => {
+    const routes = createLocalUiRoutes();
+    expect(() =>
+      routes.register({
+        method: 'POST',
+        path: '/api/ui/other/export',
+        presence: true,
+        recoveryKit: true,
+        handler: () => Promise.resolve({ status: 200, body: {} }),
+      }),
+    ).toThrow(/only the recovery-kit export route/);
   });
 
   it('the one-use sign of any other presence route never signs a backup.export', async () => {
