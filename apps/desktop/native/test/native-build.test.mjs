@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { URL } from 'node:url';
 import {
   EXIT,
   HELPER_ID,
@@ -53,7 +54,15 @@ test('reason ids are a fixed set and the macOS reason texts live in the helper',
 });
 
 test('helpers print nothing but the result: no logging calls in either source', () => {
-  for (const bad of ['print(', 'NSLog', 'os_log', 'Logger(', 'standardError', 'debugPrint', 'dump(']) {
+  for (const bad of [
+    'print(',
+    'NSLog',
+    'os_log',
+    'Logger(',
+    'standardError',
+    'debugPrint',
+    'dump(',
+  ]) {
     assert.ok(!macSrc.includes(bad), `swift uses ${bad}`);
   }
   for (const bad of [
@@ -104,7 +113,13 @@ test('swiftc args: optimised, pinned target, embedded Info.plist, nothing from t
     '-target',
     `arm64-apple-macos${MAC_MIN_OS}`,
   ]);
-  assert.ok(a.join(' ').includes('-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker /s/Info.plist'));
+  assert.ok(
+    a
+      .join(' ')
+      .includes(
+        '-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker /s/Info.plist',
+      ),
+  );
   const x = swiftcArgs({ arch: 'x64', src: '/s/x.swift', out: '/o/x', plist: '/s/Info.plist' });
   assert.ok(x.includes(`x86_64-apple-macos${MAC_MIN_OS}`));
   assert.throws(() => swiftcArgs({ arch: 'ppc', src: 'a', out: 'b', plist: 'c' }), /arch/);
@@ -126,11 +141,29 @@ test('mac build plan: per-arch compiles, lipo for universal, ad-hoc sign with th
 
 test('MSVC args: static CRT, hardening flags, WinRT + bcrypt only, no debug info', () => {
   const a = msvcArgs({ src: 'C:\\s\\a.cpp', out: 'C:\\o\\agentlink-presence.exe' });
-  for (const f of ['/std:c++20', '/EHsc', '/permissive-', '/O2', '/MT', '/GS', '/guard:cf', '/sdl', '/W4']) {
+  for (const f of [
+    '/std:c++20',
+    '/EHsc',
+    '/permissive-',
+    '/O2',
+    '/MT',
+    '/GS',
+    '/guard:cf',
+    '/sdl',
+    '/W4',
+  ]) {
     assert.ok(a.includes(f), f);
   }
   const link = a.slice(a.indexOf('/link'));
-  for (const f of ['/DYNAMICBASE', '/NXCOMPAT', '/CETCOMPAT', '/guard:cf', 'windowsapp.lib', 'bcrypt.lib', '/SUBSYSTEM:CONSOLE']) {
+  for (const f of [
+    '/DYNAMICBASE',
+    '/NXCOMPAT',
+    '/CETCOMPAT',
+    '/guard:cf',
+    'windowsapp.lib',
+    'bcrypt.lib',
+    '/SUBSYSTEM:CONSOLE',
+  ]) {
     assert.ok(link.includes(f), f);
   }
   assert.ok(!a.some((x) => /^\/(DEBUG|Zi|ZI|MD)$/i.test(x)));

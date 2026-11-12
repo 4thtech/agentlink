@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import process from 'node:process';
 import { EXIT, buildMacHelper, parseMacRecord } from '../../build/native.mjs';
 
 const onMac = process.platform === 'darwin';
@@ -98,46 +99,58 @@ test('malformed stdin is refused before any key is used', { skip: !onMac }, () =
   }
 });
 
-test('create: a fresh SE key and a fresh random peer key each time, as one hex record', { skip: !seAvailable() }, () => {
-  const a = runHelper(['create']);
-  const b = runHelper(['create']);
-  for (const r of [a, b]) {
-    assert.equal(r.code, 0);
+test(
+  'create: a fresh SE key and a fresh random peer key each time, as one hex record',
+  { skip: !seAvailable() },
+  () => {
+    const a = runHelper(['create']);
+    const b = runHelper(['create']);
+    for (const r of [a, b]) {
+      assert.equal(r.code, 0);
+      assert.equal(r.err, '');
+      assert.match(r.out, /^01[0-9a-f]+\n$/);
+    }
+    const ra = parseMacRecord(a.out);
+    const rb = parseMacRecord(b.out);
+    assert.equal(ra.sePub[0], 0x04);
+    assert.equal(ra.peerPub[0], 0x04);
+    assert.notDeepEqual(ra.sePub, ra.peerPub);
+    assert.notDeepEqual(ra.sePub, rb.sePub);
+    assert.notDeepEqual(ra.peerPub, rb.peerPub);
+    assert.notDeepEqual(ra.handle, rb.handle);
+  },
+);
+
+test(
+  'check: ECDH without a gesture is refused by the Secure Enclave (LAError.notInteractive)',
+  { skip: !seAvailable() },
+  () => {
+    const rec = runHelper(['create']).out;
+    const r = runHelper(['check'], rec);
+    assert.equal(r.code, EXIT.ok, 'only an LAError.notInteractive refusal exits 0');
+    assert.equal(r.out, '');
     assert.equal(r.err, '');
-    assert.match(r.out, /^01[0-9a-f]+\n$/);
-  }
-  const ra = parseMacRecord(a.out);
-  const rb = parseMacRecord(b.out);
-  assert.equal(ra.sePub[0], 0x04);
-  assert.equal(ra.peerPub[0], 0x04);
-  assert.notDeepEqual(ra.sePub, ra.peerPub);
-  assert.notDeepEqual(ra.sePub, rb.sePub);
-  assert.notDeepEqual(ra.peerPub, rb.peerPub);
-  assert.notDeepEqual(ra.handle, rb.handle);
-});
+  },
+);
 
-test('check: ECDH without a gesture is refused by the Secure Enclave (LAError.notInteractive)', { skip: !seAvailable() }, () => {
-  const rec = runHelper(['create']).out;
-  const r = runHelper(['check'], rec);
-  assert.equal(r.code, EXIT.ok, 'only an LAError.notInteractive refusal exits 0');
-  assert.equal(r.out, '');
-  assert.equal(r.err, '');
-});
-
-test('a record whose public key does not match its key handle is refused', { skip: !seAvailable() }, () => {
-  const a = runHelper(['create']).out.trim();
-  const b = runHelper(['create']).out.trim();
-  // keep a's handle and peer, put b's SE public key in
-  const peerHex = a.slice(-130);
-  const seB = b.slice(-260, -130);
-  const swapped = a.slice(0, -260) + seB + peerHex + '\n';
-  refused(['check'], swapped, EXIT.keyUnusable);
-  refused(['ecdh', 'approve'], swapped, EXIT.keyUnusable);
-});
+test(
+  'a record whose public key does not match its key handle is refused',
+  { skip: !seAvailable() },
+  () => {
+    const a = runHelper(['create']).out.trim();
+    const b = runHelper(['create']).out.trim();
+    // keep a's handle and peer, put b's SE public key in
+    const peerHex = a.slice(-130);
+    const seB = b.slice(-260, -130);
+    const swapped = a.slice(0, -260) + seB + peerHex + '\n';
+    refused(['check'], swapped, EXIT.keyUnusable);
+    refused(['ecdh', 'approve'], swapped, EXIT.keyUnusable);
+  },
+);
 
 test('a corrupted key handle is refused without a sheet', { skip: !seAvailable() }, () => {
   const a = runHelper(['create']).out.trim();
-  const flip = (a[10] === '0' ? '1' : '0');
+  const flip = a[10] === '0' ? '1' : '0';
   const bad = a.slice(0, 10) + flip + a.slice(11) + '\n';
   refused(['check'], bad, EXIT.keyUnusable);
 });
