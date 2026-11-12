@@ -383,7 +383,9 @@ describe('Agents, simple (A8)', () => {
     expect(post).toBeDefined();
   });
 
-  it('F23: no "Contacts still see" note while the ID has no contacts to tell', async () => {
+  // WP-1 (R-1): with no contacts the note still shows (every new invite carries the card's name),
+  // in words that do not speak of contacts (F23).
+  it('F23 / WP-1: no contacts yet: "New invites still show {name}" with Update name', async () => {
     answers['GET /api/ui/agents/card-name'] = {
       status: 200,
       body: { status: 'differs', cardName: 'My agent' },
@@ -395,6 +397,8 @@ describe('Agents, simple (A8)', () => {
     await mount();
     expect(card('default').textContent).not.toContain('Contacts still see');
     expect(button(card('default'), 'Update contacts')).toBeUndefined();
+    expect(card('default').textContent).toContain('New invites still show My agent');
+    expect(button(card('default'), 'Update name')).toBeDefined();
   });
 
   it('AI apps: each app with its word, Connect or Disconnect, and the quit-first guidance', async () => {

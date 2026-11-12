@@ -220,6 +220,15 @@ describe('owner init issues the first agent card (M1-8h; 04 §2.5)', () => {
     expect(alice.err).toEqual([]);
   });
 
+  it('WP-1 (R-3): --label names the card and signs the label; without it, the folder name', async () => {
+    const alice = await initAgent('alice', 1, new RelayNetwork());
+    expect(await alice.run(['owner', 'init', '--label', 'Home Mac'])).toBe(0);
+    expect(alice.setups[0]?.firstCard.firstLabel?.label).toBe('Home Mac');
+    const bob = await initAgent('bob', 2, new RelayNetwork());
+    expect(await bob.run(['owner', 'init'])).toBe(0);
+    expect(bob.setups[0]?.firstCard.firstLabel?.label).toBe('bob');
+  });
+
   it('after owner init the agent has a verified card naming the new owner', async () => {
     const alice = await initAgent('alice', 1, new RelayNetwork());
     expect(await alice.client.identity.get()).toBeUndefined();

@@ -198,6 +198,27 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
     expect(first?.home).toBeUndefined();
   });
 
+  it('WP-1 (R-3): --label names the card and signs the label in the same entry', async () => {
+    const m = await machine(['alice', 'bob']);
+    expect(await m.run(['owner', 'add-agent', '--agent', 'bob', '--label', 'Work Mac'])).toBe(0);
+    const card = m.calls[0]?.card;
+    expect(card?.name).toBe('bob');
+    expect(card?.firstLabel?.label).toBe('Work Mac');
+    expect(typeof card?.firstLabel?.actions.prepareLabel).toBe('function');
+  });
+
+  it('WP-1 (R-3): without --label the folder name is card and label alike', async () => {
+    const m = await machine(['alice', 'bob']);
+    expect(await m.run(['owner', 'add-agent', '--agent', 'bob'])).toBe(0);
+    expect(m.calls[0]?.card.firstLabel?.label).toBe('bob');
+  });
+
+  it('WP-1 (R-3): a --label the label rule refuses runs nothing', async () => {
+    const m = await machine(['alice', 'bob']);
+    expect(await m.run(['owner', 'add-agent', '--agent', 'bob', '--label', ' '])).not.toBe(0);
+    expect(m.calls).toHaveLength(0);
+  });
+
   it('needs --agent: without it nothing runs', async () => {
     const m = await machine(['alice', 'bob']);
     expect(await m.run(['owner', 'add-agent'])).toBe(2);
