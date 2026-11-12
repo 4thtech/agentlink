@@ -3,15 +3,17 @@
 //
 // - The link is made at once (a short link on the encrypted drop; the server falls back to a long
 //   one when the drop is down, and the panel says so in plain words). It exists only as the text of
-//   the link box and, Under the hood, as the QR code's drawing: never in an attribute, the title,
-//   the address, a log or an error. Everything goes to this same-origin server only.
+//   the link box, as the text of Email's `mailto:` address and, Under the hood, as the QR code's
+//   drawing: never the title, the address, a log or an error. Everything goes to this same-origin
+//   server only; a `mailto:` link is opened by the computer's mail app, not by us.
 // - The optional name is only for your list (the invite's local label). A name added before the
 //   link went anywhere makes a fresh link with that name and cancels the unnamed one; once the link
 //   was copied, emailed, shared or shown as a QR code, the name is fixed.
 // - A link that never left the screen is cancelled when the panel goes, so a visit leaves no
 //   pending row behind.
-// - Copy (✓ moment), Email (the mail app, with our share text), Share (only where the browser has a
-//   share sheet for text).
+// - Copy (✓ moment), Email (a real `mailto:` link with our share text; a click does not count as
+//   sent, since nothing tells us a mail app opened), Copy invite message (the whole share text, the
+//   dependable way when there is no mail app), Share (only where the browser has a share sheet).
 // - Under the hood: the invite's facts, a long link instead (D-139 fallback, nothing stored on the
 //   service) and the QR code.
 import { Button, InlineError, SkeletonLine, useHood } from '@4thtech-io/ui';
@@ -30,8 +32,6 @@ const MAX_NAME = 32;
 export interface InvitePanelProps {
   /** For tests; the page's own same-origin clients by default. */
   readonly invites?: InviteApi;
-  /** Opens the mail app with a `mailto:` address. Default: the browser's location. */
-  readonly openMail?: (url: string) => void;
   /** A link was made (the pending list can read again). */
   readonly onCreated?: () => void;
   readonly now?: () => number;
@@ -64,17 +64,12 @@ function isAbort(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as Error).name === 'AbortError';
 }
 
-function defaultMail(url: string): void {
-  window.location.assign(url);
-}
-
 /** RFC 3339 to the minute, UTC: the exact expiry Under the hood. */
 const exact = (ms: number): string =>
   `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
 export function InvitePanel({
   invites: givenInvites,
-  openMail = defaultMail,
   onCreated,
   now = () => Date.now(),
 }: InvitePanelProps): ReactElement {
@@ -89,6 +84,7 @@ export function InvitePanel({
   const [error, setError] = useState<string | undefined>(undefined);
   const [shared, setShared] = useState(false);
   const [copied, setCopied] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [copiedMessage, setCopiedMessage] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [shareFailed, setShareFailed] = useState(false);
   const [qr, setQr] = useState(false);
   const [announce, setAnnounce] = useState('');
@@ -201,6 +197,12 @@ export function InvitePanel({
     return () => clearTimeout(t);
   }, [copied]);
 
+  useEffect(() => {
+    if (copiedMessage !== 'copied') return undefined;
+    const t = setTimeout(() => setCopiedMessage('idle'), COPIED_MS * 2);
+    return () => clearTimeout(t);
+  }, [copiedMessage]);
+
   // A name typed while the first link was still being made: apply it once the link is there, unless
   // the field still has focus (its blur commits it).
   useEffect(() => {
@@ -271,10 +273,22 @@ export function InvitePanel({
       () => setCopied('failed'),
     );
   };
-  const email = (): void => {
+  // The whole invite text (our words around the link), for a mail written by hand or a chat.
+  const copyMessage = (): void => {
     if (invite === undefined) return;
-    markShared();
-    openMail(mailtoOf(invite.shareText));
+    const clip = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+    if (clip === undefined) {
+      setCopiedMessage('failed');
+      return;
+    }
+    void clip.writeText(invite.shareText).then(
+      () => {
+        markShared();
+        setCopiedMessage('copied');
+        setAnnounce(S.copiedMessageAnnounce);
+      },
+      () => setCopiedMessage('failed'),
+    );
   };
   const share = (): void => {
     if (invite === undefined) return;
@@ -348,10 +362,23 @@ export function InvitePanel({
           </Button>
         </div>
         <div className="inv-ways">
-          <Button className="al-press" disabled={!ready} onClick={email}>
+          {/* A real link: the mail app opens when there is one. No click handler: nothing tells us
+              it opened, so this does not count as sent (Copy invite message does). */}
+          <a
+            className="al-btn al-btn-secondary al-press inv-email"
+            {...(ready && invite !== undefined
+              ? { href: mailtoOf(invite.shareText) }
+              : { role: 'link', 'aria-disabled': true })}
+          >
             <span className="inv-btn-in">
               <MailIcon />
               {S.email}
+            </span>
+          </a>
+          <Button className="al-press" disabled={!ready} onClick={copyMessage}>
+            <span className="inv-btn-in">
+              {copiedMessage === 'copied' ? <CheckMark /> : <CopyMark />}
+              {S.copyMessage}
             </span>
           </Button>
           {invite !== undefined && canShareText(invite.shareText) ? (
@@ -365,7 +392,12 @@ export function InvitePanel({
         </div>
         <p className="al-text-body-sm al-muted inv-note">{worksFor(days)}</p>
         {fellBack ? <p className="al-text-body-sm inv-note">{S.fellBack}</p> : null}
-        {copied === 'failed' ? (
+        {copiedMessage === 'copied' ? (
+          <p className="al-text-body-sm" role="status">
+            {S.copiedMessage}
+          </p>
+        ) : null}
+        {copied === 'failed' || copiedMessage === 'failed' ? (
           <p className="al-text-body-sm" role="alert">
             {S.copyFailed}
           </p>

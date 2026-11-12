@@ -95,7 +95,7 @@ export interface StartView {
   readonly complete: boolean;
   /** A step is not done and its read gave no answer. */
   readonly unknown: boolean;
-  /** The say hello step's prompt: "Say hello to {alias} on AgentLink." or our own template. */
+  /** The say hello step's prompt: "Say hello to {name} on AgentLink." (the shown name) or our own template. */
   readonly helloPrompt: string;
 }
 
@@ -106,9 +106,27 @@ function ownerName(row: ContactRow): string | null {
     : null;
 }
 
+/**
+ * The name to say hello to: the owner's alias, else the contact's own name when it passes the name
+ * rule (11 §5.2; restricted set, 32 characters, no reserved words), else null.
+ */
+function helloNameOf(row: ContactRow): { text: string; selfDeclared: boolean } | null {
+  const shown = formatContactName(
+    row.nameSource === 'owner'
+      ? { alias: row.name }
+      : {
+          name: row.name,
+          ...(row.fingerprint === undefined ? {} : { fingerprint: row.fingerprint }),
+        },
+  );
+  return shown.kind === 'fingerprint'
+    ? null
+    : { text: shown.text, selfDeclared: shown.kind === 'restricted' };
+}
+
 /** Answered and owner-named first: the person who can actually receive the hello. */
 function rank(row: ContactRow): number {
-  return (row.pairing === 'complete' ? 0 : 2) + (ownerName(row) === null ? 1 : 0);
+  return (row.pairing === 'complete' ? 0 : 2) + (helloNameOf(row) === null ? 1 : 0);
 }
 
 function pick(rows: readonly ContactRow[]): ContactRow | undefined {
@@ -152,7 +170,7 @@ export function deriveStart(signals: Signals, remembered: ReadonlySet<StepId>): 
   const toCompare = rows === undefined ? undefined : firstToCompare(rows);
   const waitingFor = rows?.find((r) => r.status === 'active' && r.pairing === 'pending');
   const hello = rows === undefined ? undefined : pick(rows);
-  const helloName = hello === undefined ? null : ownerName(hello);
+  const helloName = hello === undefined ? null : helloNameOf(hello);
   const steps: StepView[] = STEP_IDS.map((id): StepView => {
     if (id === 'connect') {
       if (done.connect) {
@@ -185,7 +203,11 @@ export function deriveStart(signals: Signals, remembered: ReadonlySet<StepId>): 
       };
     }
     if (id === 'reply') {
-      return { id, state: id === nextId ? 'next' : 'later', name: helloName ?? undefined };
+      return {
+        id,
+        state: id === nextId ? 'next' : 'later',
+        name: helloName !== null && !helloName.selfDeclared ? helloName.text : undefined,
+      };
     }
     return { id, state: id === nextId ? 'next' : 'later' };
   });
@@ -197,7 +219,7 @@ export function deriveStart(signals: Signals, remembered: ReadonlySet<StepId>): 
     nextId,
     complete: doneCount === COUNTED.length,
     unknown,
-    helloPrompt: startHello(helloName),
+    helloPrompt: startHello(helloName?.text ?? null, helloName?.selfDeclared === true),
   };
 }
 

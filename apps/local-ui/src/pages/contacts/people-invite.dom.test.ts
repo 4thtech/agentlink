@@ -248,6 +248,8 @@ describe("People: the inviter's Connected moment (A7)", () => {
     await settle();
     // The name rule quotes a name the contact gave itself (I-5).
     expect(text()).toContain('You and Marko are connected');
+    expect(text()).not.toContain('4821');
+    await click(I.optionalCheck('Marko'));
     expect(text()).toContain('4821');
     await click(I.done);
     expect(text()).not.toContain('are connected');

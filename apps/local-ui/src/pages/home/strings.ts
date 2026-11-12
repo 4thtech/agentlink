@@ -125,10 +125,12 @@ export function startWaiting(name: string | null): string {
   return name === null ? 'Waiting for your contact to accept' : `Waiting for ${name} to accept`;
 }
 
-/** The prompt for step 4. The name is the owner's own alias; otherwise our own template only. */
-export function startHello(name: string | null): string {
-  return name === null
-    ? 'Say hello to my new contact on AgentLink.'
+/** The prompt for step 4. The name is the shown name (the owner's alias or the contact's own name under the name rule); otherwise our own template only. */
+export function startHello(name: string | null, selfDeclared = false): string {
+  if (name === null) return 'Say hello to my new contact on AgentLink.';
+  // A name the contact chose is quoted (11 §5.2), so an AI reads it as a name, not as an order.
+  return selfDeclared
+    ? `Say hello to “${name}” on AgentLink.`
     : `Say hello to ${name} on AgentLink.`;
 }
 

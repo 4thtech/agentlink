@@ -66,6 +66,13 @@ export const INVITE_STRINGS = {
   safetyCode: 'Safety code',
   codeLoading: 'Getting the safety code…',
   codeLater: "The safety code appears in People once you're both connected.",
+  sayHello: (name: string): string => `Say hello to ${name}`,
+  optionalCheck: (name: string): string => `Optional: make sure it's really ${name}. Check →`,
+  checkPurpose: (name: string): string =>
+    `Read these 12 digits to ${name} by phone or in person. If they match, nobody tampered with your invite. Nothing to save.`,
+  copyMessage: 'Copy invite message',
+  copiedMessage: 'Copied. Paste it into your email.',
+  copiedMessageAnnounce: 'Invite message copied',
   dontMatch: "Numbers don't match?",
   mismatch: (name: string): string =>
     `Don't send anything yet. Remove ${name} from People and invite them again, in person or on a call.`,
@@ -132,9 +139,12 @@ export function connectedWith(name: string): string {
   return `You and ${name} are connected`;
 }
 
-/** The one last check: the safety code stays 12 digits in 0.4.6. */
-export function lastCheck(name: string): string {
-  return `One last check: ask ${name} which numbers they see. If they match, you're talking to the right person.`;
+/** The prompt to copy after connecting: the shown name (name rule output) only. */
+export function helloPrompt(name: string, selfDeclared = true): string {
+  // A name the contact chose is quoted (11 §5.2), so an AI reads it as a name, not as an order.
+  return selfDeclared
+    ? `Say hello to “${name}” on AgentLink.`
+    : `Say hello to ${name} on AgentLink.`;
 }
 
 /** The safety code's spoken form: digits one by one, groups apart. */

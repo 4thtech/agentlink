@@ -253,6 +253,9 @@ describe('the other states (b11 §33.2)', () => {
     });
     expect(host.querySelector('h1')?.textContent).toBe('You and Marko are connected');
     // The code of exactly the contact the server named: no lookup by fingerprint in the list.
+    expect(contacts.paths).toEqual([]);
+    expect(text()).not.toContain('4821');
+    await click("Optional: make sure it's really Marko. Check →");
     expect(contacts.paths).toEqual([`/api/ui/contacts/${MARKO_REF}/safety-code`]);
     expect(text()).toContain('4821');
     await click('Done');

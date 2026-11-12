@@ -18,7 +18,7 @@ import {
   INVITE_STRINGS as S,
   connectedWith,
   invitesYou,
-  lastCheck,
+  helloPrompt,
   linkLabel,
   waitingLine,
   worksFor,
@@ -197,7 +197,7 @@ describe('ConnectedMoment (A7)', () => {
     };
   };
 
-  it("says who is connected and shows the 12-digit safety code; Numbers don't match? explains", async () => {
+  it("says who is connected; the 12 digits stay hidden until the optional check; Numbers don't match? explains", async () => {
     const client = api({ status: 'ok', code: '4821 0937 5512' });
     const done = vi.fn();
     await show(
@@ -210,11 +210,19 @@ describe('ConnectedMoment (A7)', () => {
       }),
     );
     expect(host.querySelector('h1')?.textContent).toBe('You and Denis are connected');
+    // S-1: no digits by default, nothing read, one quiet optional line, and a hello to copy.
+    expect(client.paths).toEqual([]);
+    expect(text()).not.toContain('4821');
+    expect(text()).toContain("Optional: make sure it's really Denis. Check");
+    expect(text()).toContain('Say hello to Denis');
+    expect(text()).toContain('Say hello to “Denis” on AgentLink.');
+    expect(host.querySelector('[role="group"][aria-label="Safety code"]')).toBeNull();
+    await click(byText(S.optionalCheck('Denis')));
     expect(client.paths).toEqual([`/api/ui/contacts/${REF}/safety-code`]);
     expect(text()).toContain('4821');
     expect(text()).toContain('5512');
     expect(host.querySelector('[aria-label^="Safety code: 4 8 2 1"]')).not.toBeNull();
-    expect(text()).toContain('ask Denis which numbers they see');
+    expect(text()).toContain(S.checkPurpose('Denis'));
     await click(byText(S.dontMatch));
     expect(text()).toContain(
       "Don't send anything yet. Remove Denis from People and invite them again, in person or on a call.",
@@ -242,6 +250,8 @@ describe('ConnectedMoment (A7)', () => {
     await show(
       createElement(ConnectedMoment, { name: 'Ana', api: api({ status: 'ok', code: 'x' }) }),
     );
+    expect(text()).not.toContain(S.codeLater);
+    await click(byText(S.optionalCheck('Ana')));
     expect(text()).toContain(S.codeLater);
   });
 });
@@ -256,7 +266,7 @@ describe('the copy (11 §5)', () => {
       waitingLine(null, 1),
       invitesYou('Marko'),
       connectedWith('Marko'),
-      lastCheck('Marko'),
+      helloPrompt('Marko'),
     ];
     for (const line of all) expect([line, lintVocabulary(line)]).toEqual([line, []]);
   });
