@@ -1,0 +1,137 @@
+// WP-D12b: build plan for the presence helpers and static checks on both sources (all platforms).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import {
+  EXIT,
+  HELPER_ID,
+  MAC_MIN_OS,
+  REASONS,
+  macBuildPlan,
+  msvcArgs,
+  swiftcArgs,
+} from '../../build/native.mjs';
+
+const macSrc = readFileSync(new URL('../macos/agentlink-presence.swift', import.meta.url), 'utf8');
+const winSrc = readFileSync(new URL('../windows/agentlink-presence.cpp', import.meta.url), 'utf8');
+
+test('exit code table is fixed and the same in both helpers', () => {
+  assert.deepEqual(EXIT, {
+    ok: 0,
+    cancelled: 10,
+    failed: 11,
+    notInteractive: 12,
+    keyUnusable: 13,
+    lockout: 14,
+    callerRefused: 15,
+    notHardware: 16,
+    attestationRetry: 17,
+    usage: 64,
+    badInput: 65,
+    unavailable: 69,
+    internalError: 70,
+  });
+  const swift = Object.fromEntries(
+    [...macSrc.matchAll(/^\s*case (\w+) = (\d+)$/gm)].map((m) => [m[1], Number(m[2])]),
+  );
+  const cpp = Object.fromEntries(
+    [...winSrc.matchAll(/^constexpr int EXIT_(\w+) = (\d+);/gm)].map((m) => [
+      m[1].toLowerCase().replace(/_(\w)/g, (_, c) => c.toUpperCase()),
+      Number(m[2]),
+    ]),
+  );
+  assert.deepEqual(swift, EXIT);
+  assert.deepEqual(cpp, EXIT);
+});
+
+test('reason ids are a fixed set and the macOS reason texts live in the helper', () => {
+  assert.deepEqual(REASONS, ['setup', 'approve', 'pay']);
+  for (const r of REASONS) {
+    assert.match(macSrc, new RegExp(`case "${r}": return "[^"]+"`));
+    assert.match(winSrc, new RegExp(`L"${r}"`));
+  }
+});
+
+test('helpers print nothing but the result: no logging calls in either source', () => {
+  for (const bad of ['print(', 'NSLog', 'os_log', 'Logger(', 'standardError', 'debugPrint', 'dump(']) {
+    assert.ok(!macSrc.includes(bad), `swift uses ${bad}`);
+  }
+  for (const bad of [
+    'printf',
+    'std::cout',
+    'std::cerr',
+    'std::wcout',
+    'std::wcerr',
+    'OutputDebugString',
+    'STD_ERROR_HANDLE',
+    'fprintf',
+    'puts(',
+  ]) {
+    assert.ok(!winSrc.includes(bad), `cpp uses ${bad}`);
+  }
+});
+
+test('macOS helper: Secure Enclave key gated by .biometryCurrentSet, this-device-only', () => {
+  assert.match(macSrc, /\[\.privateKeyUsage, \.biometryCurrentSet\]/);
+  assert.match(macSrc, /kSecAttrAccessibleWhenUnlockedThisDeviceOnly/);
+  assert.match(macSrc, /SecureEnclave\.P256\.KeyAgreement\.PrivateKey\(accessControl:/);
+  assert.ok(!macSrc.includes('.userPresence'));
+  assert.ok(!macSrc.includes('.devicePasscode'));
+  // no keychain item is ever written or read: the key handle travels with the ALKH record
+  assert.ok(!macSrc.includes('SecItemAdd'));
+  assert.ok(!macSrc.includes('SecItemCopyMatching'));
+});
+
+test('Windows helper: TPM attestation required, PKCS#1 v1.5 SHA-256 verified, fails closed', () => {
+  assert.match(winSrc, /GetAttestationAsync\(\)/);
+  assert.match(winSrc, /KeyCredentialAttestationStatus::Success/);
+  assert.match(winSrc, /RsaSignPkcs1Sha256\(\)/);
+  assert.match(winSrc, /CryptographicEngine::VerifySignature/);
+  assert.match(winSrc, /KeyCredentialCreationOption::FailIfExists/);
+  assert.ok(!winSrc.includes('ReplaceExisting'));
+  assert.ok(!/Pss/i.test(winSrc));
+});
+
+test('caller-signature check is present, off in phase 2, and fails closed when switched on', () => {
+  assert.match(macSrc, /let enforceCallerSignature = false/);
+  assert.match(winSrc, /constexpr bool kEnforceCallerSignature = false;/);
+});
+
+test('swiftc args: optimised, pinned target, embedded Info.plist, nothing from the environment', () => {
+  const a = swiftcArgs({ arch: 'arm64', src: '/s/x.swift', out: '/o/x', plist: '/s/Info.plist' });
+  assert.ok(a.includes('-O'));
+  assert.deepEqual(a.slice(a.indexOf('-target'), a.indexOf('-target') + 2), [
+    '-target',
+    `arm64-apple-macos${MAC_MIN_OS}`,
+  ]);
+  assert.ok(a.join(' ').includes('-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker /s/Info.plist'));
+  const x = swiftcArgs({ arch: 'x64', src: '/s/x.swift', out: '/o/x', plist: '/s/Info.plist' });
+  assert.ok(x.includes(`x86_64-apple-macos${MAC_MIN_OS}`));
+  assert.throws(() => swiftcArgs({ arch: 'ppc', src: 'a', out: 'b', plist: 'c' }), /arch/);
+});
+
+test('mac build plan: per-arch compiles, lipo for universal, ad-hoc sign with the fixed identifier', () => {
+  const one = macBuildPlan({ arch: 'arm64', outDir: '/o', work: '/w' });
+  assert.equal(one.filter((s) => s.cmd === 'swiftc').length, 1);
+  assert.ok(!one.some((s) => s.cmd === 'lipo'));
+  const uni = macBuildPlan({ arch: 'universal', outDir: '/o', work: '/w' });
+  assert.equal(uni.filter((s) => s.cmd === 'swiftc').length, 2);
+  const lipo = uni.find((s) => s.cmd === 'lipo');
+  assert.ok(lipo && lipo.args.includes('-create'));
+  const sign = uni.at(-1);
+  assert.equal(sign.cmd, 'codesign');
+  assert.deepEqual(sign.args.slice(0, 5), ['--force', '--sign', '-', '--identifier', HELPER_ID]);
+  assert.equal(sign.args.at(-1), '/o/agentlink-presence');
+});
+
+test('MSVC args: static CRT, hardening flags, WinRT + bcrypt only, no debug info', () => {
+  const a = msvcArgs({ src: 'C:\\s\\a.cpp', out: 'C:\\o\\agentlink-presence.exe' });
+  for (const f of ['/std:c++20', '/EHsc', '/permissive-', '/O2', '/MT', '/GS', '/guard:cf', '/sdl', '/W4']) {
+    assert.ok(a.includes(f), f);
+  }
+  const link = a.slice(a.indexOf('/link'));
+  for (const f of ['/DYNAMICBASE', '/NXCOMPAT', '/CETCOMPAT', '/guard:cf', 'windowsapp.lib', 'bcrypt.lib', '/SUBSYSTEM:CONSOLE']) {
+    assert.ok(link.includes(f), f);
+  }
+  assert.ok(!a.some((x) => /^\/(DEBUG|Zi|ZI|MD)$/i.test(x)));
+});
