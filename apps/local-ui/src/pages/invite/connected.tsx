@@ -94,6 +94,8 @@ export function ConnectedMoment({
     };
   }, [api, contactRef, checking]);
 
+  // While the name field shows, "Save name" is the one primary button; "Done" steps back.
+  const naming = selfDeclared && named === null && contactRef !== undefined;
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
   const groups = code.kind === 'ok' ? code.code.split(' ') : [];
   return (
@@ -121,7 +123,7 @@ export function ConnectedMoment({
           {shown === null ? S.connectedGeneric : connectedWith(shown)}
         </Heading>
       </div>
-      {selfDeclared && named === null && contactRef !== undefined ? (
+      {naming ? (
         <NameContact
           contactRef={contactRef}
           chosen={name}
@@ -175,7 +177,12 @@ export function ConnectedMoment({
         </div>
       ) : null}
       <div className="inv-connected-actions">
-        <Button variant="primary" size="lg" className="al-press" onClick={onDone}>
+        <Button
+          variant={naming ? 'secondary' : 'primary'}
+          size="lg"
+          className="al-press"
+          onClick={onDone}
+        >
           {S.done}
         </Button>
         {mismatch || !checking ? null : (

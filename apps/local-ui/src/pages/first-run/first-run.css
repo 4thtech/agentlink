@@ -144,3 +144,21 @@
   -webkit-user-select: all;
   cursor: text;
 }
+
+/* The once-shown backup code: the card is as wide as the heading and banners above it, and
+   Show/Hide sits inside the code box, top right (the code starts below that strip). */
+.fr-secret {
+  max-inline-size: none;
+}
+.fr-secret .al-secret-row {
+  position: relative;
+  display: block;
+}
+.fr-secret .al-secret-row > .al-btn {
+  position: absolute;
+  inset-block-start: var(--al-space-1);
+  inset-inline-end: var(--al-space-2);
+}
+.fr-secret .al-secret-val {
+  padding-block-start: var(--al-space-8);
+}

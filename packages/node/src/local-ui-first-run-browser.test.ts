@@ -363,15 +363,13 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
       ]);
     }
 
-    // The fingerprint is the one the card now names; the code is shown once, in a save form.
+    // The owner is set up (the server said done); the page shows the one backup code, once, in a
+    // save form. The fingerprint is no longer on this screen (WP-5): the code is the only display.
     const view = await client.identity.get();
     expect(view).toBeDefined();
-    const fingerprint = events.find((e) => e.kind === 'owner_setup' && e.outcome === 'done');
-    expect(fingerprint).toBeDefined();
-    const shown = (await page.locator('.al-fp').innerText()).replace(/\s/g, '');
-    expect(shown).toContain(
-      ((fingerprint as { fingerprint?: string }).fingerprint ?? 'x').replace(/\s/g, ''),
-    );
+    expect(events.find((e) => e.kind === 'owner_setup' && e.outcome === 'done')).toBeDefined();
+    expect(await page.locator('.al-fp').count()).toBe(0);
+    expect(await page.locator('[data-backup-code]').count()).toBe(1);
     expect(await axeViolations(page)).toEqual([]);
     expect(await page.locator('.al-secret-val').innerText()).toMatch(/[A-Z0-9]{4}/);
     expect(await page.locator('form input[autocomplete="new-password"]').count()).toBe(1);
@@ -381,13 +379,16 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).not.toBeNull();
 
     // F49 (owner, Windows Chrome: "impossible to copy"): Copy puts the code on the clipboard as one
-    // string and says Copied; Show reveals the masked field; a copy of the selected grid is the code
-    // on one line, not broken groups.
+    // string and says Copied; Hide masks the one display and Show brings it back; a copy of the
+    // selected code is the code on one line, not broken groups.
     const codeField = page.locator('form input[autocomplete="new-password"]');
     const theCode = await codeField.inputValue();
-    expect(await codeField.getAttribute('type')).toBe('password');
+    const display = page.locator('[data-backup-code]');
+    expect((await display.innerText()).replace(/\s/g, '')).toBe(theCode.replace(/\s/g, ''));
     await page.locator('[data-reveal-code]').click();
-    expect(await codeField.getAttribute('type')).toBe('text');
+    expect(await display.innerText()).not.toMatch(/[A-Z0-9]{4}/);
+    await page.locator('[data-reveal-code]').click();
+    expect((await display.innerText()).replace(/\s/g, '')).toBe(theCode.replace(/\s/g, ''));
     await page.getByRole('button', { name: 'Copy', exact: true }).click();
     await page.locator('[data-copy-status]').getByText('Copied').waitFor();
     expect(await page.evaluate('navigator.clipboard.readText()')).toBe(theCode);

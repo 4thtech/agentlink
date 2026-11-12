@@ -48,7 +48,7 @@ export const strings = {
       node: 'For a computer with Node.js 22.14 or later. Paste it into Terminal and press Return.',
     },
     link: 'Already have AgentLink? Open it and paste the link',
-    linkHelp: 'In AgentLink, choose Accept an invite and paste this link.',
+    linkHelp: 'In AgentLink, choose “Have an invite link? Paste it” and paste this link.',
     copy: 'Copy',
     copyLink: 'Copy link',
     copied: 'Copied',

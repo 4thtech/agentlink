@@ -83,7 +83,7 @@ export function InviteNameGate({
           <Button variant="primary" size="sm" onClick={() => setAsking(true)}>
             {S.updateName}
           </Button>
-          <Button variant="ghost" size="sm" onClick={onOldName}>
+          <Button variant="secondary" size="sm" onClick={onOldName}>
             {S.inviteAs}
             <bdi>{cardName}</bdi>
           </Button>

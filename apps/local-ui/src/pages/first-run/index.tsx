@@ -325,7 +325,7 @@ function BackupCode({
     setAsked(true);
   };
   return (
-    <section className="al-secret" aria-label={T.backupLabel}>
+    <section className="al-secret fr-secret" aria-label={T.backupLabel}>
       <div className="al-secret-head">
         <span className="al-text-label">{T.backupLabel}</span>
         <span className="al-text-caption al-muted">{T.shownOnce}</span>

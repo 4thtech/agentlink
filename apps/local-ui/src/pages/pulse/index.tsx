@@ -116,7 +116,9 @@ function Marker({ activity, arrival }: { activity: Activity; arrival: number }):
 
 /** The 12 bars, one image named by the count in words (b11 §24.2). */
 export function Spark({ counts }: { counts: readonly number[] }): ReactElement {
-  const heights = barHeights(counts);
+  // No messages at all: the box keeps its width (columns line up) but draws nothing, so a new
+  // contact's row has no stray dashed line at its right edge.
+  const heights = counts.every((n) => n <= 0) ? [] : barHeights(counts);
   return (
     <svg
       className="act-spark"

@@ -169,6 +169,26 @@
   border: var(--al-border-width-thin) solid var(--al-color-status-info-border);
   background: var(--al-color-status-info-bg);
 }
+/* The name note reads top to bottom, left-aligned: the heading, its line, then the buttons; the
+   confirm card (Touch ID) fills the note's width. */
+.ag-note {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--al-space-2);
+}
+.ag-note p {
+  margin: 0;
+}
+.ag-note > .ag-actions,
+.ag-note > .al-btn {
+  margin-block-start: var(--al-space-2);
+}
+.ag-note > .ct-presence {
+  align-self: stretch;
+  margin-block-start: var(--al-space-2);
+}
 .ag-banner {
   border-color: var(--al-color-status-warning-border);
   background: var(--al-color-status-warning-bg);
