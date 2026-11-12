@@ -25,6 +25,8 @@ export type ChangeKind =
   | 'quit_first'
   | 'agent_changed'
   | 'write_failed'
+  /** WP-D7: the AgentLink app sits where an AI app must not point (moved meanwhile). */
+  | 'app_location'
   | 'not_applied'
   | 'rejected'
   | 'required'
@@ -38,9 +40,15 @@ export interface ChangeOutcome {
   readonly kind: ChangeKind;
 }
 
+/** WP-D7: "Use the app for …" (`form: 'app'`), with the `agentlink` command too (`launcher`). */
+export interface PreviewRequest {
+  readonly form?: 'app';
+  readonly launcher?: boolean;
+}
+
 export interface AppsApi {
   list(): Promise<ReadOutcome>;
-  preview(app: string, agent: string): Promise<PreviewOutcome>;
+  preview(app: string, agent: string, request?: PreviewRequest): Promise<PreviewOutcome>;
   apply(changeId: string, proof: PresenceProof): Promise<ChangeOutcome>;
   disconnect(changeId: string, proof: PresenceProof): Promise<ChangeOutcome>;
 }
@@ -58,6 +66,7 @@ const WORDS: ReadonlySet<string> = new Set([
   'write_failed',
   'not_applied',
   'busy',
+  'app_location',
 ]);
 
 function pageToken(): string {
@@ -139,8 +148,12 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
       const list = parseApps(result.data);
       return list === undefined ? { kind: 'error' } : { kind: 'ok', list };
     },
-    async preview(app, agent) {
+    async preview(app, agent, request = {}) {
       const query = new URLSearchParams({ app, agent });
+      if (request.form === 'app') {
+        query.set('form', 'app');
+        if (request.launcher === true) query.set('launcher', '1');
+      }
       const result = await client.get(`${APPS}/preview?${query.toString()}`);
       if (result.kind === 'not_available') return { kind: 'not_available' };
       if (result.kind === 'error' && result.status === 409) return { kind: 'agent_changed' };
