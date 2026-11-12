@@ -15,7 +15,7 @@
 // Every failure answers undefined; nothing here logs, and no path or name is ever part of an error
 // (I-7).
 import Database from 'better-sqlite3';
-import { lstat, readdir, stat } from 'node:fs/promises';
+import { lstat, opendir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 /** The store tables are read for at most this many people. */
@@ -61,8 +61,49 @@ interface Totals {
   fileBytes: number;
 }
 
-/** The sizes of the store at `storePath`; undefined when it cannot be read just now. */
-export async function peekStorageUsage(storePath: string): Promise<StorageUsage | undefined> {
+/** A store's answer is reused while its files are unchanged, for at most this long. */
+export const STORAGE_CACHE_TTL_MS = 60_000;
+const MAX_CACHED_STORES = 64;
+const cache = new Map<
+  string,
+  { readonly key: string; readonly at: number; readonly value: StorageUsage }
+>();
+
+async function fileKey(file: string): Promise<string> {
+  try {
+    const info = await stat(file);
+    return `${String(info.mtimeMs)}:${String(info.size)}`;
+  } catch {
+    return 'none';
+  }
+}
+
+/**
+ * The sizes of the store at `storePath`; undefined when it cannot be read just now. The read is
+ * synchronous SQLite, so an answer is kept per store while the store and its `-wal` file keep the
+ * same modified time and size (and for STORAGE_CACHE_TTL_MS at most): reopening the page does not
+ * scan a large store again.
+ */
+export async function peekStorageUsage(
+  storePath: string,
+  now: () => number = Date.now,
+): Promise<StorageUsage | undefined> {
+  const key = `${await fileKey(storePath)}|${await fileKey(`${storePath}-wal`)}`;
+  const hit = cache.get(storePath);
+  if (hit !== undefined && hit.key === key && now() - hit.at < STORAGE_CACHE_TTL_MS) {
+    return hit.value;
+  }
+  const value = await readStorageUsage(storePath);
+  if (value === undefined) {
+    cache.delete(storePath);
+    return undefined;
+  }
+  if (cache.size >= MAX_CACHED_STORES) cache.clear();
+  cache.set(storePath, { key, at: now(), value });
+  return value;
+}
+
+async function readStorageUsage(storePath: string): Promise<StorageUsage | undefined> {
   const [storeBytes, walBytes] = await Promise.all([sizeOf(storePath), sizeOf(`${storePath}-wal`)]);
   let db: Database.Database;
   try {
@@ -141,23 +182,30 @@ export interface InboxScan {
 /** The size of the regular files directly in `folder` (already a resolved real folder). */
 export async function scanInbox(folder: string): Promise<InboxScan | undefined> {
   try {
-    const names = await readdir(folder);
+    const dir = await opendir(folder);
+    let entries = 0;
     let files = 0;
     let bytes = 0;
     let truncated = false;
-    for (const name of names) {
-      if (files >= MAX_INBOX_ENTRIES) {
-        truncated = true;
-        break;
+    try {
+      for await (const entry of dir) {
+        // The cap is on entries looked at (links and folders included), not only on files.
+        if (entries >= MAX_INBOX_ENTRIES) {
+          truncated = true;
+          break;
+        }
+        entries += 1;
+        try {
+          const info = await lstat(path.join(folder, entry.name));
+          if (!info.isFile()) continue;
+          files += 1;
+          bytes += info.size;
+        } catch {
+          // A file that vanished while counting is not counted.
+        }
       }
-      try {
-        const info = await lstat(path.join(folder, name));
-        if (!info.isFile()) continue;
-        files += 1;
-        bytes += info.size;
-      } catch {
-        // A file that vanished while counting is not counted.
-      }
+    } finally {
+      await dir.close().catch(() => undefined);
     }
     return Object.freeze({ files, bytes, truncated });
   } catch {

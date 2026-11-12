@@ -3,7 +3,7 @@
 // and will not do when it arrives (only on this computer; the other person keeps their copy).
 export const STORAGE_STRINGS = {
   title: 'Storage',
-  lead: 'How much room your messages and saved files take on this computer.',
+  lead: 'What AgentLink keeps on this computer.',
   comingTitle: 'Deleting is coming',
   coming:
     'For now this page only shows sizes. Soon you will be able to delete old messages and files from here. Deleting will only remove them from this computer: the other person keeps their copy and is not told.',
@@ -23,13 +23,14 @@ export const STORAGE_STRINGS = {
   other: 'Removed people and setup messages',
   filesNote:
     'Files are listed for the last 7 days. The Inbox folder below counts every file in it.',
-  exchange: 'Shared this week',
+  exchange: 'Encrypted drop this week',
   exchangeLine: (used: string, quota: string): string => `${used} of ${quota}`,
   inboxTitle: 'Inbox folder',
   inboxLine: (folder: string): string => `Files you receive are saved in ${folder}.`,
-  inboxCount: (n: number, size: string, atLeast: boolean): string =>
-    `${atLeast ? 'At least ' : ''}${String(n)} ${n === 1 ? 'file' : 'files'}, ${size}`,
-  inboxNote:
-    'This counts every file in the folder, including ones you added yourself. AgentLink does not delete them.',
+  unassigned: 'Unassigned files in Inbox',
+  unassignedLine: (n: number, size: string, atLeast: boolean): string =>
+    `${atLeast ? 'At least ' : ''}${String(n)} · ${size}`,
+  unassignedHelp: 'Saved before AgentLink kept track of them. AgentLink never deletes these.',
+  inboxNone: 'No files in the Inbox folder that AgentLink lost track of.',
   inboxUnknown: 'The Inbox folder could not be read just now.',
 } as const;

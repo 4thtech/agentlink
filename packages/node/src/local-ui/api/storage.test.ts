@@ -217,27 +217,55 @@ describe('GET /api/ui/storage (REL051-RET1)', () => {
     expect((result.body as { inbox: unknown }).inbox).toBeNull();
   });
 
-  it('a stuck read gives up after the time limit (503) and the next read runs again', async () => {
+  it('a stuck read gives up after the time limit (503) and no second read starts meanwhile', async () => {
     vi.useFakeTimers();
     try {
       let calls = 0;
+      let release: (() => void) | undefined;
       const desk = createStorageDesk(
         deps({
           timeoutMs: 1000,
           entries: () => {
             calls += 1;
-            return calls === 1 ? new Promise(() => undefined) : Promise.resolve([]);
+            if (calls > 1) return Promise.resolve([]);
+            return new Promise((resolve) => {
+              release = () => resolve([]);
+            });
           },
         }),
       );
       const first = route.handler(ctx(desk), req());
       await vi.advanceTimersByTimeAsync(1001);
       expect(await first).toBe(UI_UNAVAILABLE);
+      const second = route.handler(ctx(desk), req());
+      await vi.advanceTimersByTimeAsync(1001);
+      expect(await second).toBe(UI_UNAVAILABLE);
+      expect(calls).toBe(1);
+      release?.();
+      await vi.advanceTimersByTimeAsync(1);
       expect((await route.handler(ctx(desk), req())).status).toBe(200);
       expect(calls).toBe(2);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('a switch during the read drops the Inbox too', async () => {
+    let gen = 1;
+    const desk = createStorageDesk(
+      deps({
+        generation: () => gen,
+        inbox: () => {
+          gen = 2;
+          return Promise.resolve({
+            folder: '~/AgentLink/Inbox',
+            scan: { files: 1, bytes: 1, truncated: false },
+          });
+        },
+      }),
+    );
+    const result = await route.handler(ctx(desk), req());
+    expect((result.body as { inbox: unknown }).inbox).toBeNull();
   });
 
   it('a hostile name is plain data; a whole-read failure is the fixed answer', async () => {

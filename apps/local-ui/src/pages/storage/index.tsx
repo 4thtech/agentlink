@@ -8,6 +8,7 @@ import { createApiClient, type ApiClient } from '../../api/client.js';
 import { SettingsIcon } from '../settings/icons.js';
 import {
   parseStorage,
+  unassignedIn,
   sizeWords,
   STORAGE_PATH,
   type IdUnavailable,
@@ -171,16 +172,15 @@ export function StoragePage({ api: givenApi }: StoragePageProps): ReactElement {
                 <p className="al-text-body-sm al-muted">{S.inboxLine(load.view.inbox.folder)}</p>
                 <ul className="sto-list">
                   <Row
-                    title={S.savedFiles}
-                    detail={S.inboxCount(
-                      load.view.inbox.files,
-                      sizeWords(load.view.inbox.bytes),
+                    title={S.unassigned}
+                    detail={S.unassignedHelp}
+                    size={S.unassignedLine(
+                      unassignedIn(load.view)?.files ?? 0,
+                      sizeWords(unassignedIn(load.view)?.bytes ?? 0),
                       load.view.inbox.truncated,
                     )}
-                    size={sizeWords(load.view.inbox.bytes)}
                   />
                 </ul>
-                <p className="al-text-body-sm al-muted">{S.inboxNote}</p>
               </>
             )}
           </Surface>

@@ -13,7 +13,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { MAX_INBOX_ENTRIES, peekStorageUsage, scanInbox } from './storage-usage.js';
+import {
+  MAX_INBOX_ENTRIES,
+  STORAGE_CACHE_TTL_MS,
+  peekStorageUsage,
+  scanInbox,
+} from './storage-usage.js';
 
 let dir: string;
 let store: string;
@@ -82,6 +87,38 @@ describe('peekStorageUsage', () => {
     const before = statSync(store).mtimeMs;
     await peekStorageUsage(store);
     expect(statSync(store).mtimeMs).toBe(before);
+  });
+});
+
+describe('peekStorageUsage cache and WAL', () => {
+  it('reuses an answer while the store is unchanged, and reads again after a change', async () => {
+    seed();
+    const first = await peekStorageUsage(store, () => 1000);
+    expect(await peekStorageUsage(store, () => 2000)).toBe(first);
+    const db = new Database(store);
+    db.prepare('INSERT INTO envelopes VALUES (?, ?, ?, ?)').run('e9', 'cb', 'q'.repeat(1000), null);
+    db.close();
+    const after = await peekStorageUsage(store, () => 3000);
+    expect(after).not.toBe(first);
+    expect(after?.messageBytes).toBe(1175);
+  });
+
+  it('reads again after the time limit even when nothing changed', async () => {
+    seed();
+    const first = await peekStorageUsage(store, () => 0);
+    expect(await peekStorageUsage(store, () => STORAGE_CACHE_TTL_MS + 1)).not.toBe(first);
+  });
+
+  it('counts what still sits in the write-ahead file and its size', async () => {
+    seed();
+    const db = new Database(store);
+    db.pragma('journal_mode = WAL');
+    db.pragma('wal_autocheckpoint = 0');
+    db.prepare('INSERT INTO envelopes VALUES (?, ?, ?, ?)').run('w1', 'ca', 'v'.repeat(2000), null);
+    const usage = await peekStorageUsage(store);
+    db.close();
+    expect(usage?.walBytes).toBeGreaterThan(0);
+    expect(usage?.messageBytes).toBe(2175);
   });
 });
 

@@ -96,7 +96,14 @@ describe('Settings > Storage', () => {
     expect(t).toContain('Open this ID to see the sizes for each person.');
     expect(t).toContain('The sizes of this ID could not be read just now.');
     expect(t).toContain('~/AgentLink/Inbox');
-    expect(t).toContain('12 files, 3.5 GB');
+    // 12 files and 3.5 GB in the folder, less the 3 files (45 MB) the ID still indexes.
+    expect(t).toContain('Unassigned files in Inbox');
+    expect(t).toContain('9 · 3.5 GB');
+    expect(t).toContain(
+      'Saved before AgentLink kept track of them. AgentLink never deletes these.',
+    );
+    expect(t).toContain('What AgentLink keeps on this computer.');
+    expect(t).toContain('Encrypted drop this week');
     expect(t).toContain('10 MB of 1.1 GB');
   });
 

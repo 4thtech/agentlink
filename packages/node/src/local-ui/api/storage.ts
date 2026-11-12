@@ -117,6 +117,7 @@ export function createStorageDesk(deps: StorageDeskDeps): LocalUiStorageDesk {
 
   const read = async (): Promise<LocalUiStorageRead> => {
     const open = deps.open();
+    const startGeneration = deps.generation();
     const entries = (await deps.entries()).slice(0, MAX_STORAGE_IDS);
     const out: LocalUiStorageIdPart[] = [];
     for (const entry of entries) {
@@ -148,14 +149,18 @@ export function createStorageDesk(deps: StorageDeskDeps): LocalUiStorageDesk {
         : undefined;
       out.push(Object.freeze({ name: entry.name, label: entry.label, current: false, usage }));
     }
-    const inbox = await deps.inbox().catch(() => undefined);
+    // A switch during the read: the Inbox read may follow another ID's rules; drop it.
+    const found = await deps.inbox().catch(() => undefined);
+    const inbox = deps.generation() === startGeneration ? found : undefined;
     return Object.freeze({ ids: Object.freeze(out), inbox });
   };
 
-  const timed = (): Promise<LocalUiStorageRead> =>
+  // One underlying read at a time: a read that outlives its time limit keeps running, and the next
+  // call waits on it (with its own limit) instead of starting another.
+  const timed = (inner: Promise<LocalUiStorageRead>): Promise<LocalUiStorageRead> =>
     new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('timed out')), timeoutMs);
-      read().then(
+      inner.then(
         (value) => {
           clearTimeout(timer);
           resolve(value);
@@ -169,10 +174,10 @@ export function createStorageDesk(deps: StorageDeskDeps): LocalUiStorageDesk {
 
   return Object.freeze<LocalUiStorageDesk>({
     list: () => {
-      running ??= timed().finally(() => {
+      running ??= read().finally(() => {
         running = undefined;
       });
-      return running;
+      return timed(running);
     },
   });
 }

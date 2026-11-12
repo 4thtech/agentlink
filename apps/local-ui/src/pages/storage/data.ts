@@ -113,6 +113,25 @@ export function parseStorage(data: unknown): StorageView | undefined {
   return { ids, inbox };
 }
 
+/**
+ * The Inbox files AgentLink no longer tracks: what the folder holds beyond the saved files the IDs
+ * still index (never below zero). Undefined when the folder is not known.
+ */
+export function unassignedIn(view: StorageView): { files: number; bytes: number } | undefined {
+  if (view.inbox === undefined) return undefined;
+  let files = 0;
+  let bytes = 0;
+  for (const id of view.ids) {
+    if ('unavailable' in id) continue;
+    files += id.fileCount;
+    bytes += id.fileBytes;
+  }
+  return {
+    files: Math.max(0, view.inbox.files - files),
+    bytes: Math.max(0, view.inbox.bytes - bytes),
+  };
+}
+
 /** Bytes as people read them (the way the computer's own file manager counts: 1 KB = 1000 bytes). */
 export function sizeWords(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return '';
