@@ -1007,6 +1007,29 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
     expect(writeText).toHaveBeenCalledWith('safetxt.md\n');
   });
 
+  it('closes with Escape while a long file is still being drawn', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    const long = '- step\n'.repeat(20_000);
+    await render({
+      ...planFiles('plan.md'),
+      [PREVIEW]: ok({ kind: 'markdown', size: long.length, text: long }),
+    });
+    await click(row('Denis'));
+    const open = byText('.hm-chip button', S.openFile);
+    await act(async () => {
+      (open as HTMLElement).click();
+      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const reader = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(reader?.querySelector('.al-md')?.getAttribute('aria-busy')).toBe('true');
+    await act(async () => {
+      reader?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await settle();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
   it('shows code with line numbers', async () => {
     vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
     await render(planFiles('main.ts'));

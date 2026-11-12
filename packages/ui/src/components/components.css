@@ -2382,6 +2382,17 @@ button.al-md-chip:focus-visible {
   outline: 2px solid var(--al-color-focus-ring);
   outline-offset: 1px;
 }
+/* A later run of a list or table split for drawing continues it without a gap. */
+.al-md .al-md-cont {
+  margin-top: calc(-1 * var(--al-space-3));
+}
+.al-md ul.al-md-cont,
+.al-md ol.al-md-cont {
+  margin-top: calc(var(--al-space-1) - var(--al-space-3));
+}
+.al-md-table.al-md-cont table {
+  margin-top: -1px;
+}
 .al-md-rest,
 .al-code-rest {
   display: block;

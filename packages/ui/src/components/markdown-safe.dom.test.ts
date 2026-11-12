@@ -35,6 +35,24 @@ const md = (text: string): void => {
   act(() => root.render(h(SafeMarkdown, { text })));
 };
 
+/**
+ * Lets the later slices draw (each in its own task) until the document is complete; answers how
+ * long the slowest slice took and how many slices there were.
+ */
+async function drain(): Promise<{ slowest: number; slices: number }> {
+  let slowest = 0;
+  let slices = 0;
+  while (host.querySelector('.al-md[aria-busy="true"]') !== null && slices < 1_000) {
+    const start = performance.now();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    slowest = Math.max(slowest, performance.now() - start);
+    slices += 1;
+  }
+  return { slowest, slices };
+}
+
 const FORBIDDEN_TAGS = [
   'a',
   'img',
@@ -124,6 +142,73 @@ describe('SafeMarkdown: what it renders (REL051-A34)', () => {
       await Promise.resolve();
     });
     expect(writeText).toHaveBeenCalledWith('rm -rf build');
+  });
+});
+
+/** A realistic build plan of about 60 KB: sections with nested lists, tables and code. */
+function realisticPlan(): { text: string; sections: number } {
+  const parts: string[] = [
+    '# Build plan: class project',
+    '',
+    "Written by **Ana**'s AI for the team.",
+    '',
+  ];
+  let sections = 0;
+  while (parts.join('\n').length < 60_000) {
+    sections += 1;
+    const n = String(sections);
+    parts.push(
+      `## Part ${n}: module ${n}`,
+      '',
+      `The *module ${n}* owns its data and talks to the API through \`client${n}.ts\`. See [the guide](https://docs.example.com/part-${n}).`,
+      '',
+      '### Steps',
+      '',
+      `1. Scaffold \`src/module${n}\``,
+      '2. Add the routes',
+      '   - list and detail',
+      '   - create, with **validation**',
+      '     - name is required',
+      '     - email must look like an email',
+      '3. Write the tests',
+      '',
+      '| Task | Owner | Due |',
+      '| --- | :-: | --: |',
+      `| API ${n} | Bo | Mon |`,
+      `| UI ${n} | Ana | Tue |`,
+      `| Tests ${n} | Cy | Wed |`,
+      '',
+      '```ts',
+      `export function route${n}(app: App): void {`,
+      `  app.get('/m${n}', (c) => c.json({ ok: true }));`,
+      '}',
+      '```',
+      '',
+      `> Keep module ${n} small; split it when it grows.`,
+      '',
+    );
+  }
+  return { text: parts.join('\n'), sections };
+}
+
+describe('SafeMarkdown: a real 60 KB plan draws fully formatted (IR-REL051-A34-1)', () => {
+  it('every heading, list, table and code block is drawn; nothing falls to plain text', async () => {
+    const { text, sections } = realisticPlan();
+    expect(text.length).toBeGreaterThan(59_000);
+    const start = performance.now();
+    md(text);
+    expect(performance.now() - start).toBeLessThan(250);
+    const { slowest } = await drain();
+    expect(slowest).toBeLessThan(250);
+    expect(host.querySelector('.al-md-rest')).toBeNull();
+    expect(host.querySelectorAll('h4')).toHaveLength(sections);
+    expect(host.querySelectorAll('h5')).toHaveLength(sections);
+    expect(host.querySelectorAll('table')).toHaveLength(sections);
+    expect(host.querySelectorAll('pre code')).toHaveLength(sections);
+    expect(host.querySelectorAll('blockquote')).toHaveLength(sections);
+    expect(host.querySelectorAll('ol > li > ul > li > ul > li')).toHaveLength(2 * sections);
+    expect(host.textContent).toContain(`Keep module ${String(sections)} small`);
+    assertInert();
   });
 });
 
@@ -260,10 +345,39 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
     assertInert();
   });
 
-  it('says when the rest is shown as plain text, and keeps that text', () => {
+  it('says when the rest is shown as plain text, and keeps that text', async () => {
     md(`${fill('- a\n')}\nLAST LINE`);
+    await drain();
     expect(host.textContent).toContain('The rest of this file is shown as plain text.');
     expect(host.textContent).toContain('LAST LINE');
+  });
+
+  // IR-REL051-A34-1 follow-up: the rest of a document draws in later slices; every slice is
+  // bounded too, and the whole stays under the hard cap.
+  it.each(['list items', 'repeated 2000-row tables', 'links', 'paragraphs', 'emphasis'])(
+    '%s, drawn to the end: each slice under 250 ms, the whole under 50 000 elements',
+    async (name) => {
+      md(BUDGET_CASES[name] as string);
+      // One long paragraph is one piece (capped by itself); the others draw in several slices.
+      const { slowest } = await drain();
+      expect(slowest).toBeLessThan(250);
+      expect(host.querySelectorAll('*').length).toBeLessThan(50_000);
+      expect(host.querySelector('.al-md')?.getAttribute('aria-busy')).toBe('false');
+      assertInert();
+    },
+  );
+
+  it('stops drawing when it goes away (the reader closed mid-document)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    md(fill('- a\n'));
+    expect(host.querySelector('.al-md')?.getAttribute('aria-busy')).toBe('true');
+    act(() => root.render(h('div')));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(host.querySelector('.al-md')).toBeNull();
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
   });
 
   it('fills table rows only to their own cells', () => {
