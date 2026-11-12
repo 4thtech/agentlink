@@ -61,8 +61,7 @@ export const BACKUP_STRINGS = {
   moveBody:
     'Save a new kit here first, restore it there, then remove AgentLink from this computer.',
   moveAction: 'How to move',
-  footnote:
-    `Saving a kit asks for ${sensorWord()} or your master code. Anyone with both the kit file and its code can read your messages, so keep them apart.`,
+  footnote: `Saving a kit asks for ${sensorWord()} or your master code. Anyone with both the kit file and its code can read your messages, so keep them apart.`,
   // --- saving
   get saveHint(): string {
     return `Asks for ${sensorWord()} or your master code first.`;

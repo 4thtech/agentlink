@@ -23,7 +23,6 @@ import { navigate } from '../../router.js';
 
 const RULES_PATH = '/settings/rules';
 const BACKUP_PATH = '/settings/backup';
-import { ExportKit } from '../backup/export-kit.js';
 import { RenameEditor } from './sheets.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
@@ -55,33 +54,27 @@ export interface CardActions {
 }
 
 /**
- * The Back up panel (WP-11, D-117 A): the open ID saves its recovery kit right here, behind Touch ID
- * or the master code (backup/export-kit.tsx). Another ID is opened first, since a kit is saved for
- * the open ID; the page keeps this panel open across the switch.
+ * The Back up panel (WP-11; UX1113 integration C): one recovery kit covers every ID (D-147, WP-R2),
+ * so no ID is opened first and nothing is saved here; the panel leads to Settings › Backup & restore,
+ * where the kit is saved, checked and restored.
  */
-export function BackupPanel({
-  row,
-  onSwitch,
-}: {
-  row: AgentRow;
-  onSwitch: (row: AgentRow) => void;
-}): ReactElement {
+export function BackupPanel(): ReactElement {
   return (
     <div className="ag-expand al-expand" data-panel="backup">
       <p className="al-text-body-sm">
         <strong>{S.backupTitle}</strong>
       </p>
       <p className="al-text-body-sm al-muted">{S.backupHint}</p>
-      {row.current ? (
-        <ExportKit label={row.label} />
-      ) : (
-        <>
-          <p className="al-text-body-sm">{S.backupOpenFirst(row.label)}</p>
-          <Button variant="secondary" size="sm" onClick={() => onSwitch(row)}>
-            {S.openAgent}
-          </Button>
-        </>
-      )}
+      <a
+        className="al-btn al-btn-secondary al-btn-sm"
+        href={BACKUP_PATH}
+        onClick={(event) => {
+          event.preventDefault();
+          navigate(BACKUP_PATH);
+        }}
+      >
+        {S.backupOpen}
+      </a>
     </div>
   );
 }
@@ -316,7 +309,7 @@ export function AgentCard({
           onAgentChanged={a.onAgentChanged}
         />
       ) : null}
-      {open === 'backup' ? <BackupPanel row={row} onSwitch={a.onSwitch} /> : null}
+      {open === 'backup' ? <BackupPanel /> : null}
     </section>
   );
 }

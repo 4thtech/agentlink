@@ -432,19 +432,18 @@ describe('Agents, simple (A8)', () => {
     expect(manage).toBeDefined();
   });
 
-  it("Back up saves the open ID's kit in place, asks to open another ID first; Remove asks for the name", async () => {
+  it('Back up leads every ID to Backup & restore (one kit covers all IDs); Remove asks for the name', async () => {
     await mount();
-    // WP-11: the open ID saves its recovery kit right here (no link away, no terminal command).
-    await click(await inMore(card('default'), 'Back up'));
-    expect(button(card('default'), 'Save a recovery kit')).toBeDefined();
-    // Another ID is opened first: a kit is saved for the open ID.
-    await click(await inMore(card('work'), 'Back up'));
-    const panel = card('work').querySelector<HTMLElement>('[data-panel="backup"]')!;
-    expect(plain(panel)).toContain('to save its recovery kit.');
-    expect(button(panel, 'Open this ID')).toBeDefined();
-    expect([...panel.querySelectorAll('button')].map((b) => b.textContent?.trim())).not.toContain(
-      'Save a recovery kit',
-    );
+    for (const name of ['default', 'work']) {
+      await click(await inMore(card(name), 'Back up'));
+      const panel = card(name).querySelector<HTMLElement>('[data-panel="backup"]')!;
+      expect(plain(panel)).toContain('One recovery kit covers all your IDs.');
+      expect(plain(panel)).not.toContain('Open this ID');
+      expect(panel.querySelector('a[href="/settings/backup"]')?.textContent).toBe(
+        'Open Backup & restore',
+      );
+      expect(panel.querySelectorAll('button')).toHaveLength(0);
+    }
     await click(await inMore(card('work'), 'Remove'));
     expect(plain(host)).toContain('Remove Work?');
     expect(host.querySelector('[role="dialog"] input[type="text"]')).not.toBeNull();
@@ -524,9 +523,10 @@ describe("one agent's page (/agents/<name>)", () => {
     }
     expect(plain(host)).toContain('Connected to Cursor');
     expect(host.querySelector('[data-sparkline]')).toBeNull();
-    // WP-11: Work is not the open ID, so its Backup section asks to open it first.
+    // One kit covers every ID: the Backup section leads to Backup & restore, no ID is opened first.
     const backup = host.querySelector<HTMLElement>('[data-panel="backup"]')!;
-    expect(plain(backup)).toContain('to save its recovery kit.');
+    expect(plain(backup)).toContain('One recovery kit covers all your IDs.');
+    expect(backup.querySelector('a[href="/settings/backup"]')).not.toBeNull();
   });
 
   it('draws the heartbeat bars only from reads seen in this session', async () => {

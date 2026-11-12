@@ -167,9 +167,10 @@ export const AGENTS_STRINGS = {
     'Quit the AI app first, then open it again. AgentLink sets it up; nothing to copy or paste.',
   restartToFinish: (app: string): string => `Restart ${app} to finish.`,
   backupTitle: 'Recovery kit',
-  backupHint: 'Save a recovery kit. Keep it somewhere safe, away from this computer.',
-  // WP-11: a recovery kit is saved for the open ID.
-  backupOpenFirst: (label: string): string => `Open ${iso(label)} to save its recovery kit.`,
+  // UX1113: one recovery kit covers every ID; it is saved in Settings › Backup & restore.
+  backupHint:
+    'One recovery kit covers all your IDs. Save it, check it and restore from it in Backup & restore.',
+  backupOpen: 'Open Backup & restore',
   switching: (label: string): string => `Opening ${iso(label)}…`,
 
   // Pause (08 §1 "Pause an ID", D-143 (5)): one click, no Touch ID; Resume with Touch ID.

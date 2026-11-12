@@ -3,7 +3,6 @@
 // confirm screen are in warnings.ts (D-119).
 import { sensorWord } from '../../presence-word.js';
 
-
 export const RULES_STRINGS = {
   lead: 'What your AI may do without asking you. Everything else waits for your approval on Home.',
   pickerLabel: 'Rules for',
