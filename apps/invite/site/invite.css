@@ -195,7 +195,7 @@ p {
   padding: 0 8px;
   font-size: 14px;
 }
-/* The three ways to accept: one card each, in order. */
+/* The three ways to accept: one card each, in order (REL051-INV: the command first). */
 .way {
   margin-top: 12px;
   padding: 16px 20px;
@@ -286,6 +286,7 @@ a {
   content: '\2713\00a0';
 }
 .preview {
+  display: block;
   margin: 12px 0 0;
   padding: 8px 12px;
   background: var(--sunken);
@@ -296,6 +297,92 @@ a {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* REL051-INV: the command, shown whole (the link inside it is already shortened), wrapping at any
+   character, never scrolling sideways. */
+.how .preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+}
+/* REL051-INV: the command card's three numbered steps. */
+.how {
+  list-style: none;
+  counter-reset: how;
+  margin: 16px 0 0;
+  padding: 0;
+}
+.how > li {
+  counter-increment: how;
+  position: relative;
+  padding: 0 0 0 36px;
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 22px;
+}
+.how > li:last-child {
+  margin-bottom: 0;
+}
+.how > li::before {
+  content: counter(how);
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 24px;
+  text-align: center;
+}
+.how .actions {
+  margin-top: 10px;
+}
+.btn.big {
+  min-width: 160px;
+  min-height: 48px;
+  font-size: 17px;
+}
+.note {
+  margin: 0 0 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.mac-app {
+  margin: 16px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border);
+}
+.mac-app span {
+  display: block;
+}
+.next {
+  margin: 16px 0 0;
+  font-weight: 500;
+}
+.links {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+}
+.links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 500;
+}
+.links a::after {
+  content: '\00a0\2197';
 }
 button:focus-visible,
 a:focus-visible {
@@ -321,6 +408,14 @@ footer {
   }
   .top {
     padding: 8px 24px;
+  }
+}
+@media (max-width: 480px) {
+  .how .btn.big {
+    width: 100%;
+  }
+  .how > li {
+    padding-left: 32px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

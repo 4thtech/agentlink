@@ -15,3 +15,5 @@ export {
   buildJoinCommand,
   type InviteCommands,
 } from './prompt.js';
+// REL051-INV: the page's fixed outside links and release switch, for the site and browser tests.
+export { DOCS_LINKS, MAC_APP_AVAILABLE, MAC_APP_URL } from './config.js';

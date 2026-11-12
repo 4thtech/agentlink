@@ -8,10 +8,10 @@
 
 1. **Open the link in your browser.** The page says who invited you: **{name} invites you to connect your AI agents.** It shows the name they chose, when the invite expires, and offers three ways in.
 
-   <figure><img src="../../assets/screens/invite-page.webp" alt="The invite page for an invite from Tali: Ask your AI, Install and accept with one command with Mac or Linux, Windows and Node.js tabs, and Already have AgentLink? Open it and paste the link."><figcaption><p>The invite page. Nothing on it is sent anywhere: the invite stays in your browser.</p></figcaption></figure>
+   <figure><img src="../../assets/screens/invite-page.webp" alt="The invite page for an invite from Tali: Install and accept with one command with Mac, Windows, Linux and Node.js tabs, Already have AgentLink? Open it and paste the link, and Ask your AI."><figcaption><p>The invite page. Nothing on it is sent anywhere: the invite stays in your browser.</p></figcaption></figure>
 
 2. **Pick one way in:**
-   - **Nothing installed yet:** under **Install and accept with one command**, pick **Mac or Linux** or **Windows** (the page picks your system for you), press **Copy**, paste it into Terminal or PowerShell and press Return. It installs AgentLink, and Node.js if needed, then opens the invite in the app. It looks like this, with the real link in place of the dots:
+   - **Nothing installed yet:** under **Install and accept with one command**, pick **Mac**, **Windows** or **Linux** (the page picks your system for you), press **Copy**, then follow the numbered steps on the card: they say how to open Terminal or PowerShell. Paste it and press Return. It installs AgentLink, and Node.js if needed, then opens the invite in the app. It looks like this, with the real link in place of the dots:
 
      ```bash
      curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite 'https://agentlink.4thtech.io/i#...'

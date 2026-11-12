@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { INSTALL_AND_ACCEPT_TEMPLATE } from '@4thtech-io/invite';
+import { DOCS_LINKS, INSTALL_AND_ACCEPT_TEMPLATE } from '@4thtech-io/invite';
 import { CSP, headersFor } from './invite/headers.js';
 
 const site = (path: string): string =>
@@ -83,10 +83,20 @@ describe('the pages', () => {
         expect(html).not.toMatch(/\sstyle\s*=/i);
         expect(html).not.toMatch(/\son[a-z]+\s*=/i);
         expect(html).not.toMatch(/javascript:/i);
-        // WP-2: no outside URL and no link at all (the installer brings Node.js, so the Node.js
-        // download link is gone).
-        expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([]);
-        expect([...html.matchAll(/<a\b[^>]*>/gi)]).toHaveLength(0);
+        // WP-2, REL051-INV: the only outside URLs are the two help links to 4thTech Docs (the
+        // build constants of config.ts), each a plain link in a new tab with no referrer. The Mac
+        // app's link has no href in the HTML (its release switch is off).
+        expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([
+          DOCS_LINKS.guide,
+          DOCS_LINKS.windows,
+        ]);
+        const anchors = [...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0]);
+        expect(anchors).toHaveLength(3);
+        for (const a of anchors) {
+          expect(a).toMatch(/\btarget="_blank"/);
+          expect(a).toMatch(/\brel="noopener noreferrer"/);
+        }
+        expect(anchors.filter((a) => /\bhref=/.test(a))).toHaveLength(2);
         // One first-party style file (CSP style-src 'self') and the site's own favicon (F33).
         const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((m) => m[0]);
         expect(links).toEqual([
@@ -121,9 +131,15 @@ describe('the pages', () => {
           'way-link',
           'step-text',
           'step-help',
-          'os-unix',
+          'os-mac',
           'os-windows',
+          'os-linux',
           'os-node',
+          'open-help',
+          'phone-note',
+          'mac-app',
+          'mac-app-link',
+          'help-again',
           'link-text',
           'copy-ai',
           'copy',
