@@ -4,6 +4,18 @@
 // formatted by the ui name rule and the page renders the result as text.
 export const CONTACTS_STRINGS = {
   listLabel: 'Your people',
+  lead: 'The people your AI can message. You connect by invite, and only you and they can read what is sent.',
+  archivedLabel: 'Archived',
+  archivedFoot:
+    "Connections that ended. Your AI can't send to them. Their conversation and saved files stay until you delete them.",
+  theyRemoved: 'They removed this connection.',
+  connectedAgain: (date: string): string =>
+    `You connected again on ${date}, so nothing is missing.`,
+  oldConversation: 'The old conversation stays here.',
+  olderConnection: 'older connection',
+  open: 'Open',
+  checkContact: 'Check contact',
+  invitesWaiting: 'Invites waiting',
   detailTitle: 'Person',
   closeSheet: 'Close',
   loading: 'Loading…',
@@ -26,7 +38,6 @@ export const CONTACTS_STRINGS = {
   safetyCode: 'Contact check',
   safetyExplain:
     'Compare these 12 digits with the other person by call or in person; if they match, it’s really them.',
-  sameName: 'Another person has the same name.',
   wasName: (former: string): string => `(was ${former})`,
   keepBoth: 'Keep both',
   removeOlder: 'Remove older',
@@ -79,7 +90,7 @@ export const CONTACTS_STRINGS = {
   refused:
     'Nothing was changed. If you were comparing the 12 digits, they may have changed: compare them again.',
   notApplied: 'Nothing was changed. Try again.',
-  sessionExpired: 'This page has expired. Ask your AI to open AgentLink again.',
+  sessionExpired: 'This page has timed out. Open AgentLink again from your AI app.',
   failed: "That didn't work. Nothing was changed. Try again in a minute.",
 } as const;
 
@@ -126,8 +137,15 @@ export const HOOD = {
   selfDeclared: 'Not checked yet',
 } as const;
 
-export function countLine(n: number): string {
-  return n === 1 ? '1 person' : `${String(n)} people`;
+export function countLine(n: number, waiting = 0): string {
+  const people = n === 1 ? '1 person' : `${String(n)} people`;
+  if (waiting === 0) return people;
+  return `${people} · ${String(waiting)} invite${waiting === 1 ? '' : 's'} waiting`;
+}
+
+/** "Last message 2 h ago · connected 3 Nov" (dates and ages are plain text). */
+export function personLine(last: string | undefined, connected: string): string {
+  return `${last === undefined ? 'No messages yet' : `Last message ${last}`} · connected ${connected}`;
 }
 
 /** The safety-code nudge (UX audit 3b). `name` is the name-rule output. */

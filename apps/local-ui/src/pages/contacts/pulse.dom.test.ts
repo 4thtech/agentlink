@@ -106,32 +106,26 @@ async function mount(pulse: () => Response = okPulse): Promise<void> {
   await settle();
 }
 const rows = (): HTMLElement[] => [...host.querySelectorAll<HTMLElement>('.ct-row')];
-const rowText = (i: number, sel: string): string =>
-  rows()[i]?.querySelector(sel)?.textContent ?? '';
 
 describe('Contacts rows', () => {
-  it('shows the word and a shaped marker on each row, the pulse beside them', async () => {
+  it('says when the last message was on each row line (UX 2026-11-12 §5)', async () => {
     await mount();
     expect(rows().length).toBe(3);
-    expect(rowText(0, '.act-word')).toBe('Quiet');
-    expect(rows()[0]?.querySelector('.act-marker')?.getAttribute('data-shape')).toBe('none');
-    expect(rowText(1, '.act-word')).toBe('Today');
-    expect(rowText(2, '.act-word')).toBe('Active now');
-    expect(rows()[2]?.querySelector('.act-marker')?.getAttribute('data-shape')).toBe('dot');
-    expect(rows()[1]?.querySelector('.act-marker')?.getAttribute('data-shape')).toBe('ring');
-    expect(rows()[2]?.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe(
-      '5 messages in the last 24 hours',
+    expect(rows()[2]?.querySelector('.ct-line')?.textContent).toMatch(
+      /^Last message just now · connected /,
     );
-    expect(rows()[2]?.querySelectorAll('.act-bar').length).toBe(12);
-    // A row with no messages draws no bars (no stray dashed line), the image keeps its label.
-    expect(rows()[0]?.querySelectorAll('.act-bar').length).toBe(0);
-    expect(rows()[0]?.querySelector('.act-spark')?.getAttribute('aria-label')).toBeTruthy();
+    expect(rows()[1]?.querySelector('.ct-line')?.textContent).toMatch(
+      /^Last message 1 h ago · connected /,
+    );
+    expect(rows()[0]?.querySelector('.ct-line')?.textContent).toMatch(
+      /^No messages yet · connected /,
+    );
   });
 
   it('keeps the list when the read fails: no word, a flat pulse, no alert', async () => {
     await mount(() => new Response('{}', { status: 503 }));
     expect(rows().length).toBe(3);
-    expect(host.querySelector('.act-word')).toBeNull();
+    expect(rows()[0]?.querySelector('.ct-line')?.textContent).toMatch(/^No messages yet/);
     expect(host.querySelector('[role="alert"]')).toBeNull();
   });
 

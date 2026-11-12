@@ -488,10 +488,10 @@ describe('the page markup', () => {
   });
 });
 
-describe('ContactsPage: duplicate names (UX-031-QUICKWINS)', () => {
+describe('ContactsPage: same names (UX 2026-11-12 §5)', () => {
   const SAME = 'Another person has the same name.';
 
-  it('hints on both rows when two contacts show the same name', async () => {
+  it('lists two active people with the same name and no warning, told apart by the date', async () => {
     await mount({
       [LIST]: {
         status: 'ok',
@@ -502,11 +502,39 @@ describe('ContactsPage: duplicate names (UX-031-QUICKWINS)', () => {
       },
     });
     expect(host.querySelectorAll('.ct-row').length).toBe(2);
-    expect(host.querySelector('.ct-list')?.textContent?.split(SAME).length).toBe(3);
+    expect(text()).not.toContain(SAME);
+    const lines = [...host.querySelectorAll('.ct-line')].map((l) => l.textContent);
+    expect(new Set(lines).size).toBe(2);
+    expect(host.querySelector('.ct-row bdi')?.textContent).toBe('oc-test');
   });
 
-  it('shows no hint when names differ', async () => {
+  it('moves a removed person to Archived with the removed copy; no same-name text anywhere', async () => {
+    await mount({
+      [LIST]: {
+        status: 'ok',
+        contacts: [
+          { ...ana, name: 'oc-test', status: 'revoked', since: 1_759_536_000 },
+          { ...ana, ref: MARKO, name: 'oc-test', since: 1_762_000_000 },
+        ],
+      },
+    });
+    expect(host.querySelectorAll('.ct-list:not(.ct-list-archived) .ct-row').length).toBe(1);
+    const archived = host.querySelector('details.ct-archived');
+    expect(archived?.hasAttribute('open')).toBe(false);
+    expect(archived?.querySelector('summary')?.textContent).toBe('Archived (1)');
+    expect(archived?.querySelectorAll('.ct-row').length).toBe(1);
+    const line = archived?.querySelector('.ct-line')?.textContent ?? '';
+    expect(line).toContain('They removed this connection.');
+    expect(line).toContain('You connected again on');
+    expect(line).toContain('The old conversation stays here.');
+    expect(text()).not.toContain(SAME);
+    expect(text()).not.toContain('No longer active');
+    expect(text()).toContain('1 person');
+  });
+
+  it('shows no Archived group when nobody was removed', async () => {
     await mount({ [LIST]: { status: 'ok', contacts: [marko, ana] } });
+    expect(host.querySelector('.ct-archived')).toBeNull();
     expect(text()).not.toContain(SAME);
   });
 });
@@ -634,12 +662,12 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     }
   });
 
-  it('same name but a different owner: only the name hint, no removal suggestion', async () => {
+  it('same name but a different owner: no removal suggestion', async () => {
     await mount({
       [LIST]: { status: 'ok', contacts: [OLD, { ...OLD, ref: MARKO, since: NEW.since }] },
     });
     await selectNewer();
-    expect(text()).toContain(S.sameName);
+    expect(text()).not.toContain('Another person has the same name.');
     expect(text()).not.toContain(NOTICE_START);
     expect(host.querySelector('.ct-dup')).toBeNull();
   });
