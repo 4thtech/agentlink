@@ -3,13 +3,13 @@ import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { assetFor, constants } from './constants.mjs';
 import { fetchVerified, sha256File } from './fetch-verified.mjs';
 import { checkTgzDeps, lockRegistryProblems, treeHash } from './core-lock.mjs';
 import { capture, run, walk } from './run.mjs';
 
-export const DESKTOP_DIR = resolve(new URL('../..', import.meta.url).pathname);
+export const DESKTOP_DIR = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 export const CACHE_DIR = join(DESKTOP_DIR, '.cache');
 export const OUT_DIR = join(DESKTOP_DIR, 'out');
 
@@ -90,7 +90,7 @@ export async function packAsar(payloadDir, asarPath) {
 }
 
 export const REGISTRY = 'https://registry.npmjs.org/';
-const CORE_LOCK_DIR = new URL('../core-lock/', import.meta.url).pathname;
+const CORE_LOCK_DIR = fileURLToPath(new URL('../core-lock/', import.meta.url));
 
 /**
  * Installs the core with NOTHING resolved at build time:
