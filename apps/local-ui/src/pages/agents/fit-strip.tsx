@@ -4,6 +4,7 @@
 import { Icon } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { AgentRow } from './data.js';
+import { BotIcon, IdCardIcon } from './icons.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
 export const FIT_STRIP_HIDDEN_KEY = 'agentlink.idsFit.hidden';
@@ -36,7 +37,7 @@ export function FitStrip({ rows }: { rows: readonly AgentRow[] }): ReactElement 
   return (
     <aside className="ag-fit" aria-label={S.fitLabel}>
       <div className="ag-fit-box">
-        <Icon name="ai-app" size={20} />
+        <BotIcon size={20} />
         <span className="ag-fit-text">
           <strong className="al-text-body-sm">{S.fitApp}</strong>
           <span className="al-text-body-sm al-muted">{S.fitAppBody}</span>
@@ -46,7 +47,7 @@ export function FitStrip({ rows }: { rows: readonly AgentRow[] }): ReactElement 
         {S.fitUses}
       </span>
       <div className="ag-fit-box is-id">
-        <Icon name="agent" size={20} />
+        <IdCardIcon size={20} />
         <span className="ag-fit-text">
           <strong className="al-text-body-sm">{S.fitId}</strong>
           <span className="al-text-body-sm al-muted">{S.fitIdBody}</span>

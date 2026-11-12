@@ -126,7 +126,7 @@ describe('My IDs (WP-I1)', () => {
     await mount();
     const c = card('default');
     expect(c.textContent).toContain('Working now · this is the ID you are looking at');
-    expect(labels(c, '.ag-chip')).toEqual(['Claude CodeWorking', 'Claude DesktopConnected']);
+    expect(labels(c, '.ag-chip')).toEqual(['CClaude CodeWorking', 'DClaude DesktopReady']);
     expect(c.querySelector('.ag-people')?.textContent).toBe('3people');
     expect(foot(c)).toEqual(['Invite someone', 'Rename', 'Pause', 'Rules', 'Activity', 'More']);
     expect(c.querySelector('[data-nudge]')).toBeNull();

@@ -76,15 +76,41 @@ export function KitPill({
   );
 }
 
-/** "Claude Code · Working" for each app that runs the agent (never colour alone). */
-export function AppChips({ apps, now }: { apps: readonly AppLive[]; now: number }): ReactElement {
+/** The tile letters of the mockup: C, D and X; any other app uses the first letter of its name. */
+const APP_LETTER: Readonly<Record<string, string>> = {
+  'claude-code': 'C',
+  'claude-desktop': 'D',
+  codex: 'X',
+};
+
+/**
+ * "Claude Code · Working" for each app that runs the agent (never colour alone). On a My IDs card
+ * (`card`): a letter tile, the name, the dot and the word, and a ready app reads "Ready".
+ */
+export function AppChips({
+  apps,
+  now,
+  card = false,
+}: {
+  apps: readonly AppLive[];
+  now: number;
+  card?: boolean;
+}): ReactElement {
   return (
     <ul className="ag-chips">
       {apps.map((a) => (
         <li key={a.id} className="ag-chip al-text-body-sm">
-          <AppDot app={a} />
+          {card ? (
+            <span className="ag-chip-tile" aria-hidden="true">
+              {APP_LETTER[a.id] ?? [...a.name][0]?.toUpperCase()}
+            </span>
+          ) : null}
+          {card ? null : <AppDot app={a} />}
           <span className="ag-chip-name">{a.name}</span>
-          <span className="al-muted">{appWord(a, now)}</span>
+          {card ? <AppDot app={a} /> : null}
+          <span className="al-muted">
+            {card && a.state === 'ready' && a.outdated !== true ? S.readyWord : appWord(a, now)}
+          </span>
         </li>
       ))}
     </ul>

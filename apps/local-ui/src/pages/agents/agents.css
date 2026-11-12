@@ -490,6 +490,52 @@
   color: var(--al-color-fg-muted);
   cursor: pointer;
 }
+.ag-card .ag-line,
+.ag-card .ag-line.is-working,
+.ag-card .ag-line.is-ready,
+.ag-card .ag-line.is-idle,
+.ag-card .ag-line.is-paused {
+  color: var(--al-color-fg-muted);
+}
+.ag-card .al-agent-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--al-radius-lg);
+  font-size: 22px;
+}
+.ag-card .al-agent-icon-dot {
+  right: -4px;
+  bottom: -4px;
+}
+.ag-card-head {
+  align-items: flex-start;
+}
+.ag-chip-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-fg-default);
+  color: var(--al-color-bg-surface);
+  font-size: 11px;
+  font-weight: var(--al-font-weight-semibold);
+}
+.ag-glyph {
+  flex: none;
+}
+a.al-btn .ag-glyph {
+  margin-right: var(--al-space-2);
+}
+.ag-foot .al-btn > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+.ag-foot .al-btn .ag-glyph {
+  margin: 0;
+}
 .ag-side {
   display: flex;
   flex-direction: column;

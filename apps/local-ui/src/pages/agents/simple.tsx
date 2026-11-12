@@ -17,6 +17,7 @@ import {
   NameNudge,
   type KitState,
 } from './parts.js';
+import { PencilIcon, ShieldCheckIcon } from './icons.js';
 import { ACTIVITY_PATH } from '../../nav.js';
 import { navigate } from '../../router.js';
 
@@ -87,11 +88,10 @@ export function BackupPanel({
 
 export function AgentCard({
   row,
-  tidy,
   actions: a,
 }: {
   row: AgentRow;
-  tidy: boolean;
+  tidy?: boolean;
   actions: CardActions;
 }): ReactElement {
   const [renaming, setRenaming] = useState(false);
@@ -152,7 +152,7 @@ export function AgentCard({
             <bdi>{row.label}</bdi>
           </span>
           <span className={`ag-line al-text-body-sm is-${lineState}`}>{lineText}</span>
-          {running.length > 0 ? <AppChips apps={running} now={a.now} /> : null}
+          {running.length > 0 ? <AppChips apps={running} now={a.now} card /> : null}
           {noApp ? <p className="al-text-body-sm al-muted">{S.noAppConnected}</p> : null}
         </div>
         <div className="ag-side">
@@ -167,7 +167,6 @@ export function AgentCard({
           <KitPill kit={a.kitOf?.(row)} onOpen={() => navigate(BACKUP_PATH)} />
         </div>
       </div>
-      {tidy ? <p className="al-text-body-sm al-muted">{S.noAppNoContacts}</p> : null}
       {/* WP-1 (R-1): also with no contacts yet (every new invite carries the card's name). */}
       {row.current && a.cardName !== undefined ? (
         <CardNameNote
@@ -211,12 +210,18 @@ export function AgentCard({
                     {S.switch}
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" icon="user-plus" onClick={() => a.onInvite(row)}>
+                <Button
+                  variant={row.current ? 'secondary' : 'ghost'}
+                  size="sm"
+                  icon="user-plus"
+                  onClick={() => a.onInvite(row)}
+                >
                   {S.inviteSomeone}
                 </Button>
               </>
             )}
             <Button variant="ghost" size="sm" onClick={() => setRenaming(true)}>
+              <PencilIcon />
               {S.rename}
             </Button>
             {noApp ? null : (
@@ -250,10 +255,10 @@ export function AgentCard({
                   <Button
                     variant="ghost"
                     size="sm"
-                    icon="key-round"
                     aria-expanded={open === 'backup'}
                     onClick={() => toggle('backup')}
                   >
+                    <ShieldCheckIcon />
                     {S.backUp}
                   </Button>
                 )}
@@ -278,10 +283,10 @@ export function AgentCard({
             <Button
               variant="ghost"
               size="sm"
-              icon="key-round"
               aria-expanded={open === 'backup'}
               onClick={() => toggle('backup')}
             >
+              <ShieldCheckIcon />
               {S.backUp}
             </Button>
           ) : null}

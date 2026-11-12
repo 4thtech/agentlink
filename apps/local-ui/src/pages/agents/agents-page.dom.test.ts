@@ -218,10 +218,9 @@ describe('the Agents page', () => {
     expect(plain(host)).toContain("Couldn't load your IDs.");
     expect(button(host, 'Try again')).toBeDefined();
   });
-  it('marks the Tidy up agents "No AI app, no contacts"', async () => {
+  it('an unused ID has no extra "no contacts" line (WP-I1)', async () => {
     await mountPage();
-    expect(rowOf('second').textContent).toContain('No AI app, no contacts');
-    expect(rowOf('work').textContent).not.toContain('No AI app, no contacts');
+    expect(rowOf('second').textContent).not.toContain('No AI app, no contacts');
   });
   it('Switch posts the name and generation, then reloads every page', async () => {
     answers['POST /api/ui/agents/switch'] = {
