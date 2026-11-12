@@ -7,7 +7,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { CreateOutcome, InviteApi } from '../contacts/invite-api.js';
+import type { CreateOutcome, InviteApi, LinkOutcome } from '../contacts/invite-api.js';
 import { InvitePanel } from './invite-panel.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -36,11 +36,18 @@ async function settle(): Promise<void> {
   }
 }
 
-function fake(ids: string[]) {
+function fake(ids: string[], linkOf: (id: string) => LinkOutcome = () => ({ kind: 'not_found' })) {
   const cancelled: { id: string; keepalive: boolean }[] = [];
+  const created: string[] = [];
+  const linked: string[] = [];
   const api: InviteApi = {
+    link: (id) => {
+      linked.push(id);
+      return Promise.resolve(linkOf(id));
+    },
     create: () => {
       const id = ids.shift() ?? ID_1;
+      created.push(id);
       return Promise.resolve<CreateOutcome>({
         kind: 'ok',
         invite: {
@@ -59,20 +66,25 @@ function fake(ids: string[]) {
     check: () => Promise.resolve({ kind: 'failed' }),
     accept: () => Promise.resolve({ kind: 'failed' }),
   };
-  return { api, cancelled };
+  return { api, cancelled, created, linked };
 }
+
+/** IR-REL051-B2-1 (4): the invite this screen made, by its public ID, for a reload. */
+const SCREEN_KEY = 'agentlink.screenInvite';
 
 /** The tab key an older build used for unsent invite IDs (W5-INVITE-FEEDBACK). */
 const OLD_KEY = 'agentlink.unsentInvites';
 
 describe('an invite is kept when the page goes (REL051-B2)', () => {
-  it('a page that hides cancels nothing and keeps nothing in the tab', async () => {
+  it('a page that hides cancels nothing; the tab keeps only the public ID of the invite on screen', async () => {
     const { api, cancelled } = fake([ID_1]);
     await act(async () => {
       root.render(createElement(InvitePanel, { invites: api }));
     });
     await settle();
-    expect(sessionStorage.length).toBe(0);
+    expect(Object.keys(sessionStorage)).toEqual([SCREEN_KEY]);
+    expect(sessionStorage.getItem(SCREEN_KEY)).toContain(ID_1);
+    expect(sessionStorage.getItem(SCREEN_KEY)).not.toContain('agentlink.4thtech.io');
     await act(async () => {
       window.dispatchEvent(new Event('pagehide'));
     });
@@ -128,5 +140,57 @@ describe('an invite is kept when the page goes (REL051-B2)', () => {
     root = createRoot(host);
     await settle();
     expect(second.cancelled).toEqual([]);
+  });
+
+  // IR-REL051-B2-1 (4): the double-create guard, now that leaving keeps the invite.
+  it('a reload shows the invite this screen made again instead of making another', async () => {
+    const { api, created, linked } = fake(['BwcHBwcHBwcHBwcHBwcHBw'], (id) =>
+      id === ID_1
+        ? {
+            kind: 'ok',
+            inviteUrl: LINK,
+            shareText: `Add my AI agent on AgentLink: ${LINK}`,
+            format: 'short',
+            expiresAt: Date.UTC(2999, 0, 1),
+          }
+        : { kind: 'not_found' },
+    );
+    // What the first load of this tab left (the page was reloaded: nothing unmounted).
+    sessionStorage.setItem(SCREEN_KEY, JSON.stringify({ id: ID_1, label: '' }));
+    await act(async () => {
+      root.render(createElement(InvitePanel, { invites: api }));
+    });
+    await settle();
+    expect(linked).toEqual([ID_1]);
+    expect(created).toEqual([]);
+    expect(host.textContent).toContain(LINK);
+  });
+
+  it('an invite gone meanwhile (accepted, cancelled, expired) is not reused: one new invite', async () => {
+    const { api, created } = fake([ID_1]);
+    sessionStorage.setItem(SCREEN_KEY, JSON.stringify({ id: 'BwcHBwcHBwcHBwcHBwcHBw', label: '' }));
+    await act(async () => {
+      root.render(createElement(InvitePanel, { invites: api }));
+    });
+    await settle();
+    expect(created).toEqual([ID_1]);
+    expect(sessionStorage.getItem(SCREEN_KEY)).toContain(ID_1);
+  });
+
+  it('leaving in the app (Done) forgets it: the next Invite someone makes a new invite', async () => {
+    const { api, created, cancelled } = fake([ID_1, 'BwcHBwcHBwcHBwcHBwcHBw']);
+    await act(async () => {
+      root.render(createElement(InvitePanel, { invites: api }));
+    });
+    await settle();
+    act(() => root.unmount());
+    root = createRoot(host);
+    expect(sessionStorage.getItem(SCREEN_KEY)).toBeNull();
+    await act(async () => {
+      root.render(createElement(InvitePanel, { invites: api }));
+    });
+    await settle();
+    expect(created).toEqual([ID_1, 'BwcHBwcHBwcHBwcHBwcHBw']);
+    expect(cancelled).toEqual([]);
   });
 });

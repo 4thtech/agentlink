@@ -179,6 +179,25 @@ describe('copy an open invite link again (REL051-B2)', () => {
     }
   });
 
+  it("the sweep clears an expired invite's kept link, with or without a drop (IR-REL051-B2-1)", async () => {
+    for (const [n, drop] of [
+      [70, undefined],
+      [71, fakeDrop()],
+    ] as const) {
+      const a = await agent(n, 'Ana', drop);
+      const old = await a.client.pairing.createInvite({ expiresInDays: 1 });
+      const open = await a.client.pairing.createInvite();
+      clock.t += 2 * 86_400;
+      try {
+        await a.client.pairing.sweepInviteObjects();
+      } finally {
+        clock.t -= 2 * 86_400;
+      }
+      expect((await rowOf(a, old.inviteId))?.invite_link).toBeNull();
+      expect((await rowOf(a, open.inviteId))?.invite_link).not.toBeNull();
+    }
+  });
+
   it('an invite stored before links were kept answers no_link; unknown or malformed ids not_found', async () => {
     const a = await agent(68, 'Ana', undefined);
     const created = await a.client.pairing.createInvite();
