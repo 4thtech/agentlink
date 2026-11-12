@@ -83,10 +83,23 @@ describe('the pages', () => {
         expect(html).not.toMatch(/\sstyle\s*=/i);
         expect(html).not.toMatch(/\son[a-z]+\s*=/i);
         expect(html).not.toMatch(/javascript:/i);
-        // WP-2: no outside URL and no link at all (the installer brings Node.js, so the Node.js
-        // download link is gone).
+        // WP-2: no outside URL and no link address (the installer brings Node.js, so the Node.js
+        // download link is gone). WP-D9: the two app links of the command card are in the file only
+        // as empty, hidden placeholders with no address and no text; only a build with the
+        // desktop app links flag on (src/flags.ts) fills and shows them.
         expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([]);
-        expect([...html.matchAll(/<a\b[^>]*>/gi)]).toHaveLength(0);
+        expect([...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0])).toEqual([
+          '<a id="open-app" class="btn secondary">',
+          '<a id="get-app" class="btn secondary" rel="noopener noreferrer">',
+        ]);
+        expect(html).toMatch(
+          /<p id="app-links" class="actions" hidden>\s*<a id="open-app" class="btn secondary"><\/a>\s*<a id="get-app" class="btn secondary" rel="noopener noreferrer"><\/a>\s*<\/p>/,
+        );
+        const command = /<article id="way-command"[\s\S]*?<\/article>/.exec(html)?.[0] ?? '';
+        expect(command).toContain('id="app-links"');
+        expect(html).not.toMatch(
+          /agentlink:\/\/|href="(?!\/)|Open in the AgentLink app|Get the app/,
+        );
         // One first-party style file (CSP style-src 'self') and the site's own favicon (F33).
         const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((m) => m[0]);
         expect(links).toEqual([
@@ -128,6 +141,9 @@ describe('the pages', () => {
           'copy-ai',
           'copy',
           'copy-link',
+          'app-links',
+          'open-app',
+          'get-app',
           'next',
         ]) {
           expect(html, id).toMatch(new RegExp(`id="${id}"`));

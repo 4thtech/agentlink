@@ -23,6 +23,7 @@ import { spawn as nodeSpawn } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CoreSupervisor, type SpawnFn, type Timers } from './core-process.js';
+import { INVITE_RESULT_TITLE, inviteResultCopy, toInviteLink } from './deep-link.js';
 import type { ElectronModule } from './electron-api.js';
 import { ensureGoodLocation } from './move.js';
 import { showStartFailure } from './start-failure.js';
@@ -37,6 +38,7 @@ import {
 } from './switches.js';
 import { AppTray } from './tray.js';
 import { MainWindow } from './window.js';
+import type { InviteOutcome } from '../shared/protocol.js';
 
 declare const __AGENTLINK_DESKTOP_PREVIEW__: boolean | undefined;
 
@@ -115,8 +117,8 @@ export interface ShellProcess {
   /** Preview settings (readPreview); always null in a release build. */
   readonly preview: PreviewSettings | null;
   /**
-   * WP-D9's deep-link handler: an `agentlink://` argument → the canonical invite link, or null to
-   * ignore it. Until WP-D9 lands, nothing is accepted.
+   * WP-D9's deep-link handler (deep-link.ts toInviteLink, wired by realProcess): an `agentlink://`
+   * argument → the canonical invite link, or null to ignore it. Absent → nothing is accepted.
    */
   readonly toInviteLink?: (deepLink: string) => string | null;
 }
@@ -175,6 +177,28 @@ export async function runShell(
   const handleDeepLink = (deepLink: string): void => {
     const link = toInviteLink(deepLink);
     if (link !== null) sendInvite(link);
+  };
+  // WP-D9: the fixed copy for an invite the core did not open (one dialog at a time, so a website
+  // that triggers the scheme repeatedly cannot stack them). Nothing from the invite is shown.
+  let inviteDialogOpen = false;
+  const showInviteResult = (outcome: InviteOutcome): void => {
+    const message = inviteResultCopy(outcome);
+    if (message === null || inviteDialogOpen) return;
+    inviteDialogOpen = true;
+    void electron.dialog
+      .showMessageBox({
+        type: 'info',
+        title: INVITE_RESULT_TITLE,
+        message,
+        buttons: ['OK'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        inviteDialogOpen = false;
+      });
   };
   const showWindow = (): void => {
     if (window?.loaded === true && window.show()) return;
@@ -294,7 +318,7 @@ export async function runShell(
           approvals = message.count;
           return;
         case 'invite-result':
-          // WP-D9 shows the fixed copy for the outcome; nothing to do in the shell core.
+          showInviteResult(message.outcome);
           return;
         case 'stopped':
           // The exit follows; the supervisor's exit handler decides on a restart.
@@ -343,5 +367,6 @@ export function realProcess(): ShellProcess {
       now: () => Date.now(),
     },
     preview: readPreview(proc.env),
+    toInviteLink,
   };
 }

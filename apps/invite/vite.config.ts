@@ -30,6 +30,9 @@ function installers(): Plugin {
 
 export default defineConfig({
   publicDir: 'site',
+  // WP-D9 (src/flags.ts): the desktop app links stay off until the desktop app is released; the
+  // desktop release turns this on. Off, the page renders neither link and the branch is dropped.
+  define: { __AGENTLINK_DESKTOP_APP_LINKS__: 'false' },
   plugins: [installers()],
   build: {
     outDir: 'dist/site',

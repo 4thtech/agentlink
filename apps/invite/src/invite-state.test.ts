@@ -38,6 +38,8 @@ function expectSafe(view: InviteView, payload: string): void {
   }
   expect(view.inviteUrl).toBe(`${PREFIX}${payload}`);
   expect(view.inviteUrl).toMatch(CANONICAL);
+  // WP-D9: "Open in the AgentLink app" carries the same checked payload, and nothing else.
+  expect(view.appLink).toBe(`agentlink://join#${payload}`);
   // WP-2: one command per computer, each a fixed template plus the link (08 §4).
   expect(view.commands).toEqual(buildCommands(view.inviteUrl));
   expect(view.commands?.node).toBe(JOIN_COMMAND_TEMPLATE.replace('{inviteUrl}', view.inviteUrl));

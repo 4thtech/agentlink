@@ -56,6 +56,9 @@ describe('page copy', () => {
         'Paste it into PowerShell and press Enter. It installs AgentLink, and Node.js if needed, then opens the invite.',
       node: 'For a computer with Node.js 22.14 or later. Paste it into Terminal and press Return.',
     });
+    // WP-D9: the app link and the download page, next to the command.
+    expect(strings.step.openApp).toBe('Open in the AgentLink app');
+    expect(strings.step.getApp).toBe('Get the app (coming soon)');
     expect(strings.step.copyFailed).toBe("Copy didn't work. Select the text and copy it.");
     expect(expiredFor('Marko')).toBe('This invite has expired. Ask Marko for a new one.');
     expect(nextFor('Marko')).toBe(
