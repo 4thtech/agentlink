@@ -76,7 +76,9 @@ it('a double click on Apply with Touch ID asks once and applies once', async () 
   await act(async () => go?.click());
   expect(passkeyProof).toHaveBeenCalledTimes(1);
   expect(go?.disabled).toBe(true);
-  await act(async () => answer?.({ kind: 'passkey', body: new Uint8Array([1]) }));
+  await act(async () =>
+    answer?.({ kind: 'passkey', gesture: () => Promise.resolve(new Uint8Array([1])) }),
+  );
   await act(async () => {
     for (let i = 0; i < 5; i += 1) await Promise.resolve();
   });

@@ -326,7 +326,9 @@ describe('Touch ID & master code (WP-S2, §3.3)', () => {
     await act(async () => confirm?.click());
     expect(proof).toHaveBeenCalledTimes(1);
     expect(confirm?.disabled).toBe(true);
-    await act(async () => answer?.({ kind: 'passkey', body: new Uint8Array([1]) }));
+    await act(async () =>
+      answer?.({ kind: 'passkey', gesture: () => Promise.resolve(new Uint8Array([1])) }),
+    );
     await settle();
     expect(calls.filter((c) => c.path === '/api/ui/owner-code/replace')).toHaveLength(1);
   });

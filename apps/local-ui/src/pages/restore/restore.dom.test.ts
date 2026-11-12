@@ -367,7 +367,9 @@ describe('step 2: your recovery code', () => {
     await act(async () => confirm?.click());
     expect(passkeyProof).toHaveBeenCalledTimes(1);
     expect(confirm?.disabled).toBe(true);
-    await act(async () => answer?.({ kind: 'passkey', body: new Uint8Array([1]) }));
+    await act(async () =>
+      answer?.({ kind: 'passkey', gesture: () => Promise.resolve(new Uint8Array([1])) }),
+    );
     await settle();
     expect(presence).toHaveBeenCalledTimes(1);
     expect(text()).toContain(S.CODE.title);

@@ -29,7 +29,7 @@ function fake(...answers: { status: number; body: unknown }[]) {
   const fetchFn = ((_path: string, init: RequestInit) => {
     sent.push({
       headers: new Headers(init.headers),
-      body: init.body instanceof Uint8Array ? init.body.slice() : new Uint8Array(0),
+      body: init.body instanceof Uint8Array ? Uint8Array.from(init.body) : new Uint8Array(0),
     });
     const a = answers.shift() ?? { status: 500, body: {} };
     return Promise.resolve(

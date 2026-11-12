@@ -179,7 +179,10 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
 
   it('REL051-UF3 (R1-UI-06): a double click on Accept asks for Touch ID once and accepts once', async () => {
     const { api, calls } = fakeApi(['waiting', 'waiting_for_them']);
-    const proof: PresenceProof = { kind: 'passkey', body: new Uint8Array([9]) };
+    const proof: PresenceProof = {
+      kind: 'passkey',
+      gesture: () => Promise.resolve(new Uint8Array([9])),
+    };
     let asked = 0;
     let answer: ((p: PresenceProof) => void) | undefined;
     const gesture = (): Promise<PresenceProof | undefined> => {
