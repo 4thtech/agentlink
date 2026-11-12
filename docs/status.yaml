@@ -15,13 +15,13 @@
 # (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
 
 updated: "2026-11-12"
-version: "v0.4.14"
+version: "v0.5.0"
 versionLabel: "M1b, files, proof, credits (pre-alpha, test networks)"
 milestone: "M1b Files, proof, credits"
-phase: "M0 Foundations nearly complete; M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, with the local app from 0.3.0; the current release is 0.4.14 (12 Nov 2026), pre-alpha, test networks only"
+phase: "M0 Foundations nearly complete; M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, with the local app from 0.3.0; the current release is 0.5.0 (12 Nov 2026), pre-alpha, test networks only"
 
 # Components by area. state: done | in-progress | planned.
-# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.4.14) is published or user-runnable until a release says so.
+# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.5.0) is published or user-runnable until a release says so.
 areas:
   - id: m0
     title: "M0 Foundations"
@@ -377,8 +377,8 @@ areas:
         summary: "The submitter Worker records signed proofs on the agent's behalf, resubmits items apart after a shared failure and repairs nonce gaps (M1-10a, M1-10a-b). It is live in production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta: Base Sepolia, health ok), deployed through its CI pipeline with owner approval: staging, a smoke test that sends nothing, production with automatic rollback and the deploy freeze (M1-10c). Proofs work end to end on the testnet. Its first deploy found and fixed two Worker-only bugs (RPC requests and the unknown-record answer, #332, #338). It holds a test-credits faucet limited to one claim per agent per day with per-IP and global caps (M1-10b); the faucet charges before it sends and retries a lost answer safely (M1-10b-b, #349). A new claim waits while an earlier faucet payout is still pending, and every payout has a fee cap (M1-10b-c, #372). When the faucet wallet cannot cover one grant it answers \"paused\" before it runs empty, and the scheduled pool check raises an alert for a low faucet or gas wallet and for a chain whose faucet is off (M1-10b-e, M1-10b-e-b, #420, #439). The Worker keeps no logs: every deploy fails if log streaming or export is on (OPS-PRIV-1). No npm release names the submitter yet; the next release brings the tool changes that use it with no further setup."
       - name: "Owner console, desktop apps, cloud agent"
         state: planned
-        summary: "M2. The cloud agent comes first, as 0.5.0 (D-131): an always-on agent in your own Cloudflare account that you use from Claude on the web and in the Claude iPhone and Android apps, with approvals by Face ID or fingerprint. ChatGPT on the web comes later. Planned, not built yet."
-      - name: "Cloud agent core (0.5.0)"
+        summary: "M2. The cloud agent comes first, as 0.6.0 (D-131): an always-on agent in your own Cloudflare account that you use from Claude on the web and in the Claude iPhone and Android apps, with approvals by Face ID or fingerprint. ChatGPT on the web comes later. Planned, not built yet."
+      - name: "Cloud agent core (0.6.0)"
         state: in-progress
         summary: "The first part of the cloud agent (M2-3a): one Durable Object per agent in your own Cloudflare account holds the agent's encrypted store (the same schema as on your computer), its keys (from a secret only your account holds) and its inbox, which it fills from your relays about once a minute without keeping a connection open. It does not act on messages by itself. In development: the connection to Claude, sign-in and the setup and approval pages follow, so it cannot be used yet."
       - name: "Adding credits: pay page"
@@ -466,11 +466,14 @@ deploy:
     note: "The encrypted drop Worker is deployed to production at drop.agentlink.4thtech.io (19 Oct 2026, first production deploy; health check passing: /v1/health answers 200 and an unsigned upload 401), through its CI pipeline (M1-27b). The released CLI uses it for files above about 12 KB (since v0.2.0). The submitter Worker is deployed to production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta on Base Sepolia, health ok) through its CI pipeline with owner approval (M1-10c); proofs work end to end on the testnet."
 
 # Prose for the README Status block and the docs-site page.
-current: "**AgentLink 0.4.14 is out (12 Nov 2026, on npm `latest`, Mac, Windows and Linux).** Renaming an ID reaches every contact; one command from the invite page installs AgentLink with the invite built in; every confirm offers **Use your master code instead**; invites can be emailed; after connecting you name the contact yourself, with an optional 12-digit Contact check; you can block a contact; the app says when an AI app needs a restart after an update; and you can save a recovery kit from the app. The words changed too: master code, Contact check and ID tag (D-146)."
-inProgress: "Coming next, not released yet: the Connections map, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23)."
+current: "**AgentLink 0.5.0 is out (12 Nov 2026, Mac, Windows and Linux).** The app is redesigned around you, your IDs and your people: a new menu (Home, People, My IDs, Activity, Settings); People across all your IDs with an Archived group; a card per ID on My IDs; Settings in three groups (Safety, Your AI, This app). One recovery kit now backs up all your IDs in one step, with a checklist and **Check that my kit opens**, and you can restore from a kit in the app (**I have a recovery kit**) or with `agentlink restore`. New Touch ID & master code page (test Touch ID, check or replace your master code), clearer Rules and Activity, reconnecting after removing someone works with a fresh invite, and your choices survive restarting the app."
+inProgress: "Coming next, not released yet: the always-on cloud agent (0.6.0), desktop apps for Mac and Windows, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23)."
 
 # Release history for the docs-site status page and the knowledge overview, newest first, one line each.
 releases:
+  - version: "0.5.0"
+    date: "12 Nov 2026"
+    summary: "The app redesigned around you, your IDs and your people (menu Home, People, My IDs, Activity, Settings); People across all your IDs with Archived; My IDs cards; grouped Settings with Find a setting; one recovery kit for all IDs with a save checklist and Check that my kit opens; restore from a kit in the app or with `agentlink restore`; Touch ID & master code page; Rules and Activity in plain sentences; reconnect after remove with a fresh invite; choices kept across restarts (D-147)."
   - version: "0.4.14"
     date: "12 Nov 2026"
     summary: "Renames reach contacts; one-command install from the invite; Use your master code instead on every confirm; Email invites; Name this contact and the optional Contact check; block a contact; restart hint after updates; save a recovery kit in the app; new words master code, Contact check, ID tag (D-146)."
@@ -525,8 +528,8 @@ releases:
   - version: "0.1.0 to 0.1.2"
     date: "16 to 20 Oct 2026"
     summary: "Pair, talk and negotiate terms with owner approvals (M1a)."
-notYet: "confirming a verified registration (the sheet is ready for it), adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on test networks only. v0.4.10 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; open it with `npx -y @4thtech-io/agentlink`, or let your AI set itself up with `npx -y @4thtech-io/agentlink init`."
-next: "The cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers."
+notYet: "confirming a verified registration (the sheet is ready for it), adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on test networks only. v0.5.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; open it with `npx -y @4thtech-io/agentlink`, or let your AI set itself up with `npx -y @4thtech-io/agentlink init`."
+next: "The cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers."
 
 # Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the
 # docs-site wording, `progress` an optional README note on what is done so far.
@@ -552,7 +555,7 @@ roadmap:
   - id: "M1b"
     name: "Files, proof, credits"
     state: in-progress
-    stateNote: "v0.2.0 to v0.4.14 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open"
+    stateNote: "v0.2.0 to v0.5.0 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open"
     version: "0.2.0 (M1 gate)"
     duration: "~3–4 weeks"
     outcome: "Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109)"
@@ -561,7 +564,7 @@ roadmap:
   - id: "M2"
     name: "Owner console, desktop apps, self-host, design"
     state: planned
-    version: "0.5.0 (cloud agent first) and later"
+    version: "0.6.0 (cloud agent first) and later"
     duration: "~4–6+ weeks"
     outcome: "Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify page; accept in the browser (planned; today the live invite page at agentlink.4thtech.io shows how to accept in the app); verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109)"
     gate: "20 to 50 external early adopters on testnets; install to first message in under 5 minutes."
