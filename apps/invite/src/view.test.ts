@@ -4,7 +4,14 @@
 // e2e/test/invite-page-*.test.ts cover the built page itself.
 import { describe, expect, it } from 'vitest';
 import pageHtml from '../site/i/index.html?raw';
-import { DOCS_BASE, DOCS_LINKS, MAC_APP_AVAILABLE, MAC_APP_URL } from './config.js';
+import {
+  DOCS_BASE,
+  DOCS_LINKS,
+  MAC_APP_AVAILABLE,
+  MAC_APP_URL,
+  MAC_APP_VERSION,
+  macAppAsset,
+} from './config.js';
 import type { InviteView } from './invite-state.js';
 import { buildAskAi, buildCommands } from './prompt.js';
 import { strings } from './strings.js';
@@ -64,6 +71,18 @@ describe('config (REL051-INV)', () => {
     for (const url of Object.values(DOCS_LINKS)) expect(url.startsWith(`${DOCS_BASE}/`)).toBe(true);
     expect(DOCS_BASE).toBe('https://wiki.4thtech.io/products/agentlink');
     expect(MAC_APP_URL).toMatch(/^https:\/\/github\.com\/4thtech\/agentlink\/releases\//);
+  });
+
+  it('pins the Mac app link to the exact release asset of the desktop build, never latest', () => {
+    expect(MAC_APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(macAppAsset('0.5.1')).toBe('AgentLink-0.5.1-mac-arm64.dmg');
+    expect(MAC_APP_URL).toMatch(
+      /^https:\/\/github\.com\/4thtech\/agentlink\/releases\/download\/v(\d+\.\d+\.\d+)\/AgentLink-\1-mac-arm64\.dmg$/,
+    );
+    expect(MAC_APP_URL).toBe(
+      `https://github.com/4thtech/agentlink/releases/download/v${MAC_APP_VERSION}/AgentLink-${MAC_APP_VERSION}-mac-arm64.dmg`,
+    );
+    expect(MAC_APP_URL).not.toContain('latest');
   });
 
   it('the page links are exactly the docs links, each in a new tab with no referrer', () => {

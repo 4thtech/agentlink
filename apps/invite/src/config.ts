@@ -24,6 +24,15 @@ export const DOCS_LINKS = {
  */
 export const MAC_APP_AVAILABLE = false;
 
-/** The Mac app's download: the asset of the newest GitHub Release (confirm the file name at 0.5.1). */
-export const MAC_APP_URL =
-  'https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac.dmg';
+/** The release the Mac app link names (its GitHub Release tag is `v` plus this). */
+export const MAC_APP_VERSION = '0.5.1';
+
+/**
+ * The Mac app's file name, as the desktop build writes it (apps/desktop/build/build-mac.mjs on
+ * desktop/integration-051: `AgentLink-<version>-mac-<arch>.dmg`, arch arm64 or x64). The page links
+ * the Apple silicon (arm64) build.
+ */
+export const macAppAsset = (version: string): string => `AgentLink-${version}-mac-arm64.dmg`;
+
+/** The Mac app's download: that exact asset of that exact GitHub Release (never `latest`). */
+export const MAC_APP_URL = `https://github.com/4thtech/agentlink/releases/download/v${MAC_APP_VERSION}/${macAppAsset(MAC_APP_VERSION)}`;
