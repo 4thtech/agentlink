@@ -13,6 +13,11 @@ import {
   pinnedRoot,
 } from '../../src/main/updater/manifest.js';
 import { macQuarantineValue } from '../../src/main/updater/quarantine.js';
+import {
+  CHECK_INTERVAL_MS,
+  FIRST_CHECK_DELAY_MS,
+  scheduleUpdateChecks,
+} from '../../src/main/updater/schedule.js';
 
 const enc = (s: string): Uint8Array => new TextEncoder().encode(s);
 const code = (fn: () => unknown): string => {
@@ -151,5 +156,29 @@ describe('phase-1 words and marks', () => {
     expect(macQuarantineValue(Date.parse('2026-11-12T10:00:00Z'))).toMatch(
       /^0081;[0-9a-f]+;AgentLink;$/,
     );
+  });
+});
+
+describe('schedule', () => {
+  it('checks shortly after launch, then daily, one pass at a time', async () => {
+    const timers: { cb: () => void; ms: number }[] = [];
+    let runs = 0;
+    let release: () => void = () => undefined;
+    scheduleUpdateChecks({} as never, { setTimeout: (cb, ms) => timers.push({ cb, ms }) }, () => {
+      runs += 1;
+      return new Promise((resolve) => {
+        release = () => resolve({ kind: 'up_to_date' });
+      });
+    });
+    expect(timers.map((t) => t.ms)).toEqual([FIRST_CHECK_DELAY_MS]);
+    timers[0]?.cb();
+    expect(runs).toBe(1);
+    expect(timers[1]?.ms).toBe(CHECK_INTERVAL_MS);
+    timers[1]?.cb(); // still running: skipped
+    expect(runs).toBe(1);
+    release();
+    await new Promise((r) => setTimeout(r, 0));
+    timers[2]?.cb();
+    expect(runs).toBe(2);
   });
 });

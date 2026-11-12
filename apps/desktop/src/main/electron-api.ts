@@ -20,6 +20,9 @@ export interface App {
   enableSandbox(): void;
   requestSingleInstanceLock(additionalData?: Record<string, unknown>): boolean;
   whenReady(): Promise<void>;
+  /** WP-D10 updater: the installed version and the app's own data folder. */
+  getVersion?(): string;
+  getPath?(name: 'userData'): string;
   quit(): void;
   exit(code?: number): void;
   isInApplicationsFolder?(): boolean;
@@ -199,6 +202,8 @@ export interface Dialog {
 
 export interface Shell {
   openExternal(url: string): Promise<void>;
+  /** WP-D10: opens the verified installer the person chose to open (resolves '' on success). */
+  openPath?(path: string): Promise<string>;
 }
 
 /** The Electron module as main.ts uses it. */

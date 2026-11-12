@@ -37,6 +37,7 @@ import {
   forwardedDeepLink,
 } from './switches.js';
 import { AppTray } from './tray.js';
+import { scheduleUpdateChecks } from './updater/schedule.js';
 import { MainWindow } from './window.js';
 import type { InviteOutcome } from '../shared/protocol.js';
 
@@ -121,6 +122,8 @@ export interface ShellProcess {
    * argument → the canonical invite link, or null to ignore it. Absent → nothing is accepted.
    */
   readonly toInviteLink?: (deepLink: string) => string | null;
+  /** WP-D10: starts the phase-1 update checks (packaged release builds only). Absent: none. */
+  readonly startUpdates?: (electron: ElectronModule) => void;
 }
 
 export type ShellOutcome = 'refused' | 'second-instance' | 'location' | 'running';
@@ -335,6 +338,7 @@ export async function runShell(
   });
   supervisor.start();
   if (launch.deepLink !== null) handleDeepLink(launch.deepLink);
+  if (app.isPackaged && preview === null) proc.startUpdates?.(electron);
   return 'running';
 }
 
@@ -368,5 +372,28 @@ export function realProcess(): ShellProcess {
     },
     preview: readPreview(proc.env),
     toInviteLink,
+    startUpdates: (electron) => startUpdates(electron, proc.platform, proc.arch),
   };
+}
+
+/** WP-D10: the phase-1 updater on the real Electron app (index.ts does nothing without a pinned root). */
+function startUpdates(electron: ElectronModule, platform: string, arch: string): void {
+  const { app, dialog, shell } = electron;
+  if (app.getVersion === undefined || app.getPath === undefined || shell.openPath === undefined) {
+    return;
+  }
+  const openPath = shell.openPath.bind(shell);
+  scheduleUpdateChecks(
+    {
+      currentVersion: app.getVersion(),
+      channel: 'stable',
+      platform,
+      arch,
+      stateDir: app.getPath('userData'),
+      openPath,
+      showMessageBox: (options) =>
+        dialog.showMessageBox({ ...options, buttons: [...options.buttons] }),
+    },
+    { setTimeout: (callback, ms) => setTimeout(callback, ms).unref() },
+  );
 }

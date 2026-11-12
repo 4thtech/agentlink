@@ -46,6 +46,12 @@ test('malformed keys and floors are refused', () => {
     JSON.stringify({ rootPublicKey: 'AB'.repeat(32), minimumStatementSequence: 0 }),
     JSON.stringify({ rootPublicKey: 'ab'.repeat(32), minimumStatementSequence: -1 }),
     JSON.stringify({ rootPublicKey: 'ab'.repeat(32) }),
+    // Not a point on the curve (x >= p).
+    JSON.stringify({ rootPublicKey: 'ff'.repeat(32), minimumStatementSequence: 0 }),
+    JSON.stringify({
+      rootPublicKey: '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      minimumStatementSequence: 2 ** 31,
+    }),
   ]) {
     assert.notDeepEqual(rootKeyProblems(json), [], json);
   }

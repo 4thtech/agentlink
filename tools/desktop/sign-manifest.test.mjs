@@ -25,6 +25,7 @@ import {
 } from '../../apps/desktop/src/main/updater/manifest.ts';
 import { loadKeyState, saveKeyState } from '../../apps/desktop/src/main/updater/state.ts';
 import { DOCUMENT_URLS, runUpdateCheck } from '../../apps/desktop/src/main/updater/index.ts';
+import * as appVerifier from '../../apps/desktop/src/main/updater/manifest.ts';
 import {
   ToolError,
   generateKeyFile,
@@ -487,6 +488,43 @@ describe('phase 1 flow: verified download, then "Open the installer"', () => {
     }
   });
 
+  it('an up-to-date app still adopts a rotation and a revocation (Fable M1)', async () => {
+    // Up to date (0.5.0) and the manifest for 0.5.0 carries rotation #2 to K2.
+    const s2 = statement(2, 'rotate', k2.publicKey);
+    const t = setup({ document: manifest('0.5.0', k2, s2) });
+    const deps = { ...t.deps, currentVersion: '0.5.0' };
+    expect(await runUpdateCheck(deps)).toEqual({ kind: 'up_to_date' });
+    let state = await loadKeyState(t.stateDir, ROOT, NOW);
+    expect([state.sequence, state.updateKey]).toEqual([2, k2.publicKey]);
+    // An expired manifest still delivers its statement.
+    const s3 = statement(3, 'rotate', k3.publicKey);
+    const u = setup({ document: manifest('0.6.0', k3, s3, { now: NOW - 40 * DAY, days: 31 }) });
+    expect(await runUpdateCheck({ ...u.deps, stateDir: t.stateDir })).toEqual({
+      kind: 'refused',
+      code: 'expired',
+    });
+    state = await loadKeyState(t.stateDir, ROOT, NOW);
+    expect(state.updateKey).toBe(k3.publicKey);
+    // A manifest that embeds a revocation: refused, and the revocation is kept.
+    const s4 = statement(4, 'revoke', k3.publicKey);
+    const revoking = resign({ ...manifest('0.5.0', k3, s3), statement: s4 }, k3);
+    const v = setup({ document: revoking });
+    expect(
+      await runUpdateCheck({ ...v.deps, stateDir: t.stateDir, currentVersion: '0.5.0' }),
+    ).toEqual({
+      kind: 'refused',
+      code: 'revoked',
+    });
+    state = await loadKeyState(t.stateDir, ROOT, NOW);
+    expect([state.sequence, state.updateKey]).toEqual([4, null]);
+    // Later, the old K3 manifest is refused: the app does not go back.
+    const w = setup({ document: manifest('0.6.0', k3, s3) });
+    expect(await runUpdateCheck({ ...w.deps, stateDir: t.stateDir })).toEqual({
+      kind: 'refused',
+      code: 'unrotated_key',
+    });
+  });
+
   it('an older release is "up to date"; a refused document offers nothing', async () => {
     const t = setup({ document: manifest('0.4.0', k1, s1) });
     expect(await runUpdateCheck(t.deps)).toEqual({ kind: 'up_to_date' });
@@ -507,9 +545,11 @@ describe('the command line, end to end (real offline KDF)', () => {
   it('generate → public-key → check → statement → sign, then the app accepts it', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'agentlink-keys-'));
     try {
-      const io = { readHidden: async () => PASS.slice() };
+      let answer = 'yes';
+      const io = { readHidden: async () => PASS.slice(), readLine: async () => encodeUtf8(answer) };
       const lines = [];
-      const run = (args) => main(args, { env: {}, io, out: (l) => lines.push(l) });
+      const run = (args) =>
+        main(args, { env: {}, io, out: (l) => lines.push(l), verifier: appVerifier });
       const p = (name) => join(dir, name);
       await run(['generate', '--role', 'root', '--out', p('root.key')]);
       await run(['generate', '--role', 'update', '--out', p('update.key')]);
@@ -548,8 +588,25 @@ describe('the command line, end to end (real offline KDF)', () => {
         p('unsigned.json'),
         '--out',
         out,
+        '--root-public',
+        rootFile.publicKey,
       ];
+      // Without a pinned root (root-key.json is the placeholder) and no --root-public: refused.
+      await expect(run(signArgs(p('update.key'), p('a.json')).slice(0, -2))).rejects.toThrow(
+        /placeholder/,
+      );
+      // The owner sees what is signed and must type yes.
+      answer = 'no';
+      await expect(run(signArgs(p('update.key'), p('b.json')))).rejects.toThrow(/Not signed/);
+      expect(existsSync(p('b.json'))).toBe(false);
+      answer = 'yes';
       await run(signArgs(p('update.key'), p('signed.json')));
+      expect(lines.some((l) => l.includes('darwin/arm64') && l.includes('sha256'))).toBe(true);
+      // A statement from another root is refused before the passphrase is asked.
+      const otherRoot = key('root');
+      await expect(
+        run([...signArgs(p('update.key'), p('c.json')).slice(0, -1), otherRoot.publicKey]),
+      ).rejects.toThrow(/statement refused/);
       const appRoot = pinnedRoot({
         rootPublicKey: rootFile.publicKey,
         minimumStatementSequence: 0,

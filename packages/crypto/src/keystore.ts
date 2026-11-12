@@ -91,3 +91,11 @@ export {
 // M1-9i-b2 (04 §2.2): the s3:<id> item holds the storage secret, so only KeyStore backends (the
 // StorageCredentialControl and the credentials provider) write or read it.
 export { encodeStorageCredentialItem, parseStorageCredentialItem } from './credential-digest.js';
+// WP-D10 (D-145 (5), 08 §8): the desktop update key file `ALKU` v1. It takes and returns an offline
+// root or update secret key, so only the owner's offline signing tool (tools/desktop) reaches it.
+export {
+  openUpdateKeyFile,
+  readUpdateKeyFileRole,
+  sealUpdateKeyFile,
+  type UpdateKeyRole,
+} from './update-key-file.js';

@@ -5,10 +5,13 @@
 // (AGENTLINK_DESKTOP_OWNER_LOCAL_BUILD=1), which is refused whenever CI or GITHUB_ACTIONS is set.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { decodeHex, isBip340PublicKey } from '@4thtech-io/crypto';
 
 export const ROOT_KEY_PLACEHOLDER_MARK = 'PLACEHOLDER-AGENTLINK-DESKTOP-ROOT-KEY';
 export const OWNER_LOCAL_VAR = 'AGENTLINK_DESKTOP_OWNER_LOCAL_BUILD';
 const HEX32 = /^[0-9a-f]{64}$/;
+/** The same limits as the app's pinnedRoot (src/main/updater/manifest.ts). */
+const MAX_SEQUENCE = 2 ** 31 - 1;
 
 export const rootKeyJsonPath = (desktopDir) =>
   join(desktopDir, 'src', 'main', 'updater', 'root-key.json');
@@ -22,14 +25,15 @@ export function rootKeyProblems(text) {
     return ['root-key.json is not JSON'];
   }
   const problems = [];
-  if (typeof value?.rootPublicKey !== 'string' || !HEX32.test(value.rootPublicKey)) {
+  const key = value?.rootPublicKey;
+  if (typeof key !== 'string' || !HEX32.test(key) || !isBip340PublicKey(decodeHex(key))) {
     problems.push(
-      'root-key.json has no real root public key (still the placeholder?): run the offline key ceremony first',
+      'root-key.json has no valid root public key (still the placeholder?): run the offline key ceremony first',
     );
   }
   const floor = value?.minimumStatementSequence;
-  if (!Number.isSafeInteger(floor) || floor < 0) {
-    problems.push('root-key.json minimumStatementSequence must be a whole number >= 0');
+  if (!Number.isSafeInteger(floor) || floor < 0 || floor > MAX_SEQUENCE) {
+    problems.push('root-key.json minimumStatementSequence must be a whole number from 0 to 2^31-1');
   }
   return problems;
 }

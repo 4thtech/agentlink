@@ -313,6 +313,9 @@ importers:
 
   apps/desktop/build:
     devDependencies:
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../../../packages/crypto
       '@electron/asar':
         specifier: 4.3.1
         version: 4.3.1

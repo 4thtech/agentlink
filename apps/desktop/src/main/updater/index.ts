@@ -109,21 +109,23 @@ export async function checkForUpdate(
     deps.fetch ?? defaultFetch,
   );
   const document = parseUpdateDocument(bytes);
-  if (document.kind === 'statement') {
-    const next = applyStatement(state, document.statement, root, now);
-    if (next !== state) await saveKeyState(deps.stateDir, next);
-    return { root, accepted: undefined };
-  }
+  // The root statement (alone, or embedded in a manifest) is verified under the pinned root and kept
+  // BEFORE any manifest-level check, so an app that is up to date, or sees an expired manifest or one
+  // for another channel or computer, still adopts a rotation or a revocation (Fable WP-D10 M1).
+  const statement =
+    document.kind === 'statement' ? document.statement : document.manifest.statement;
+  const next = applyStatement(state, statement, root, now);
+  if (next !== state) await saveKeyState(deps.stateDir, next);
+  if (document.kind === 'statement') return { root, accepted: undefined };
   const accepted = acceptManifest(document.manifest, {
     root,
-    state,
+    state: next,
     currentVersion: deps.currentVersion,
     channel: deps.channel,
     platform: deps.platform,
     arch: deps.arch,
     now,
   });
-  if (accepted.state !== state) await saveKeyState(deps.stateDir, accepted.state);
   return { root, accepted };
 }
 

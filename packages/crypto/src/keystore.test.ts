@@ -47,6 +47,9 @@ const SEED_OR_SECRET = [
   'openKeystoreFile',
   'openKeystoreFileWithKek',
   'sealOwnerSeed',
+  'sealUpdateKeyFile',
+  'openUpdateKeyFile',
+  'readUpdateKeyFileRole',
   'openOwnerSeed',
   // M1-9x (04 §2.8): the owner wrap opened when no local card names the owner.
   'openOwnerSeedWithoutCard',

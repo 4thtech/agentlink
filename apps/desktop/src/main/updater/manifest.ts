@@ -19,11 +19,12 @@ import {
   decodeUtf8,
   isBip340PublicKey,
   parseReceivedJson,
+  TAGS,
   taggedHash,
 } from '@4thtech-io/crypto';
 
-export const STATEMENT_DOMAIN = 'agentlink-desktop-root/v1';
-export const MANIFEST_DOMAIN = 'agentlink-desktop-update/v1';
+export const STATEMENT_DOMAIN = TAGS.desktopKeyStatement;
+export const MANIFEST_DOMAIN = TAGS.desktopUpdateManifest;
 /** Size cap of an update document, checked before parsing. */
 export const MAX_DOCUMENT_BYTES = 65536;
 /** Largest installer we accept (1 GiB); the real ones are about 120 MB. */
