@@ -47,14 +47,20 @@ function setup(
     filesIo: {
       previewSource: (id: string) => {
         seen.sources.push(id);
-        return source === 'throws' ? Promise.reject(new Error(`/secret/${id}`)) : Promise.resolve(source);
+        return source === 'throws'
+          ? Promise.reject(new Error(`/secret/${id}`))
+          : Promise.resolve(source);
       },
     },
     policy: {
       load:
         options.policy ??
         (() =>
-          Promise.resolve({ mode: 'signed', version: 3, policy: { files: { inboxFolder: INBOX } } })),
+          Promise.resolve({
+            mode: 'signed',
+            version: 3,
+            policy: { files: { inboxFolder: INBOX } },
+          })),
     },
   } as unknown as LocalUiReadClient;
   const context: LocalUiContext = {
@@ -145,7 +151,12 @@ describe('file preview route (REL051-A34)', () => {
 
   it('a stated size over the cap is too_large before the disk is touched', async () => {
     const { run, seen } = setup({
-      source: { name: 'plan.md', size: 256 * 1024 + 1, plaintextSha256: HASH, savedName: 'plan.md' },
+      source: {
+        name: 'plan.md',
+        size: 256 * 1024 + 1,
+        plaintextSha256: HASH,
+        savedName: 'plan.md',
+      },
     });
     expect(await run(`id=${ID}`)).toEqual({ status: 413, body: { error: 'too_large' } });
     expect(seen.reads).toEqual([]);

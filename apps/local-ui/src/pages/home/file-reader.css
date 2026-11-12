@@ -1,0 +1,130 @@
+/* REL051-A34 (D-149): a file in the message it came with, and the reader sheet. Tokens only;
+   classes only, no inline styles (08 §4 CSP). The reader is a wide sheet on a desktop and the
+   whole screen on a phone; long lines scroll inside the document, never the page. */
+
+.hm-chips {
+  gap: var(--al-space-2);
+  margin: var(--al-space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.hm-chip {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: var(--al-space-3);
+  padding: var(--al-space-3);
+  border: 1px solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-surface);
+  color: var(--al-color-fg-muted);
+}
+.hm-msg.is-in .hm-chip {
+  background: var(--al-color-bg-raised);
+}
+.hm-chip-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-default);
+}
+.hm-chip[data-kind='markdown'] .hm-chip-icon,
+.hm-reader-file .hm-chip-icon {
+  background: var(--al-color-accent-subtle);
+  color: var(--al-color-accent-default);
+}
+.hm-chip-main {
+  flex: 1 1 auto;
+  gap: 2px;
+}
+.hm-chip-name {
+  align-self: flex-start;
+}
+.hm-chip-own {
+  overflow-wrap: anywhere;
+  color: var(--al-color-fg-default);
+}
+.hm-chip-meta {
+  margin: 0;
+  color: var(--al-color-fg-subtle);
+}
+.hm-chip-actions {
+  flex: none;
+  justify-content: flex-end;
+}
+
+/* The reader. */
+.al-sheet.hm-reader {
+  width: min(880px, 100%);
+}
+.hm-reader-body {
+  gap: var(--al-space-3);
+}
+.hm-reader-file {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: var(--al-space-3);
+}
+.hm-reader-from,
+.hm-reader-safe {
+  margin: 0;
+  color: var(--al-color-fg-subtle);
+}
+.hm-reader-tools {
+  gap: var(--al-space-1);
+  padding-bottom: var(--al-space-2);
+  border-bottom: 1px solid var(--al-color-border-subtle);
+}
+.hm-reader-view {
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+}
+.hm-reader-view [aria-pressed='true'] {
+  background: var(--al-color-bg-raised);
+  color: var(--al-color-fg-default);
+  box-shadow: var(--al-shadow-1);
+}
+.hm-reader-spacer {
+  flex: 1 1 auto;
+}
+.hm-reader-frame {
+  min-width: 0;
+}
+.hm-reader-doc {
+  padding: var(--al-space-4) var(--al-space-5);
+  min-width: 0;
+}
+.hm-reader-doc .al-code-view {
+  margin: calc(-1 * var(--al-space-2)) calc(-1 * var(--al-space-3));
+}
+.hm-reader-loading {
+  gap: var(--al-space-2);
+}
+
+@media (max-width: 600px) {
+  .al-sheet.hm-reader {
+    inset: 0;
+    width: 100%;
+    border-radius: 0;
+  }
+  .hm-chip {
+    flex-wrap: wrap;
+  }
+  .hm-chip-main {
+    flex: 1 1 0;
+  }
+  .hm-chip-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding-left: calc(36px + var(--al-space-3));
+  }
+  .hm-reader-doc {
+    padding: var(--al-space-3);
+  }
+}

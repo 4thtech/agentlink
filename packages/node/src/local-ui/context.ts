@@ -46,12 +46,14 @@ import type {
   SaveReceivedFileResult,
   PreparedPolicyEdit,
   ProofListItem,
+  PreviewSource,
   ReceivedFileItem,
   ResolvedFolders,
   SentFileItem,
   TopUpView,
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
+import type { PreviewReadLimits, PreviewReadOutcome } from './read-preview.js';
 import type { ApprovalContext } from '../owner-approval.js';
 import type { AgentEpochKeys } from '../key-epoch.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
@@ -332,6 +334,12 @@ export interface LocalUiReadClient {
      * `FilesIoView.isReceived`, store only), checked before presence is asked. Optional for fakes.
      */
     isReceived?(itemId: string): Promise<boolean>;
+    /**
+     * REL051-A34 (D-149): one received item's name, stated size, plaintext hash and saved name, by
+     * its ID only (core `FilesIoView.previewSource`), for the in-app preview. Store only; never log
+     * it (I-7). Optional so page fakes without it stay valid; the server always sets it.
+     */
+    previewSource?(itemId: string): Promise<PreviewSource | null>;
   };
   /**
    * U3-d (D-138; 04 §2.5.1 `agent.label`): the agent's verified label (core `loadLabel`: the stored
@@ -437,6 +445,8 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       prepareSave: (itemId: string) => client.ownerActions.prepareFileSave(itemId),
       // W4-FILES-SAVE SEC-L1: the item is a received file (store read).
       isReceived: (itemId: string) => client.filesIo.isReceived(itemId),
+      // REL051-A34: the in-app preview's store read (no file is touched here).
+      previewSource: (itemId: string) => client.filesIo.previewSource(itemId),
     }),
     // U3-d: the verified label and the unsigned `agent.label` (reads and prepare only).
     agent: Object.freeze({
@@ -664,6 +674,15 @@ export interface LocalUiContext {
    * it signs nothing and never answers a path. Absent: the record reads as `unreadable`.
    */
   readonly backup?: LocalUiBackupDesk;
+  /**
+   * REL051-A34: the in-app preview's checked read (local-ui/read-preview.ts with the server's home
+   * folder). Absent: the route uses readSavedText with the OS user's home.
+   */
+  readonly previewRead?: (
+    inboxFolder: string,
+    savedName: string,
+    limits: PreviewReadLimits,
+  ) => Promise<PreviewReadOutcome>;
   /** W4-FILES-SAVE: saving a received file, for the save owner route; undefined when not set up. */
   readonly fileSave?: LocalUiFileSavePort;
   /**

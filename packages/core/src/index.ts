@@ -458,6 +458,7 @@ export {
   type ExchangeTime,
   type ExchangeTimes,
   type FilesIoViewOptions,
+  type PreviewSource,
   type InboxMessage,
   type MessageBox,
   type MessageFile,

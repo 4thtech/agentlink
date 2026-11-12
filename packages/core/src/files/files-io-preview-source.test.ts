@@ -73,7 +73,15 @@ describe('client.filesIo.previewSource(id) (REL051-A34)', () => {
     const { a, b } = await agents();
     const id = await send(a, b, 'plan.md', 900);
     await b.client.fetchFile({ envelopeId: id });
-    for (const bad of ['', id, `${id}.01`, `${id}.0`, `../${id}.00`, `${id}.00/x`, 'x'.repeat(70)]) {
+    for (const bad of [
+      '',
+      id,
+      `${id}.01`,
+      `${id}.0`,
+      `../${id}.00`,
+      `${id}.00/x`,
+      'x'.repeat(70),
+    ]) {
       expect(await b.client.filesIo.previewSource(bad), bad).toBeNull();
     }
     // The sender's own copy is not a received file.

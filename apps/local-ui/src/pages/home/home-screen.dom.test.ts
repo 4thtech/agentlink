@@ -962,7 +962,7 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
     const s = await render(planFiles('plan.md'));
     await click(row('Denis'));
     await click(byText('.hm-chip button', S.openFile));
-    const reader = q('[role="dialog"]');
+    const reader = document.querySelector<HTMLElement>('[role="dialog"]');
     expect(reader).toBeTruthy();
     const call = s.calls.find((c) => c.url.startsWith('/api/ui/files/received/preview'));
     expect(call?.url).toBe(PREVIEW);
@@ -976,7 +976,11 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
     expect(reader?.querySelector('strong')?.textContent).toBe('pnpm');
     expect(reader?.querySelectorAll('a, img, iframe, script')).toHaveLength(0);
     expect(reader?.textContent).toContain('<img src=x onerror=alert(1)>');
-    expect(byText('[role="dialog"] button', S.copyAll)).toBeTruthy();
+    expect(
+      [...document.querySelectorAll('[role="dialog"] button')].find(
+        (b) => b.textContent?.trim() === S.copyAll,
+      ),
+    ).toBeTruthy();
     expect(s.calls.every((c) => c.method === 'GET')).toBe(true);
     expect(lintVocabulary(reader?.textContent ?? '')).toEqual([]);
     // Escape closes the reader.
@@ -984,7 +988,7 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
       reader?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     });
     await settle();
-    expect(q('[role="dialog"]')).toBeNull();
+    expect(document.querySelector<HTMLElement>('[role="dialog"]')).toBeNull();
   });
 
   it('shows code with line numbers', async () => {
@@ -992,7 +996,9 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
     await render(planFiles('main.ts'));
     await click(row('Denis'));
     await click(byText('.hm-chip button', S.openFile));
-    expect(all('[role="dialog"] [data-line]').length).toBe(PLAN.split('\n').length - 1);
+    expect([...document.querySelectorAll('[role="dialog"] [data-line]')].length).toBe(
+      PLAN.split('\n').length - 1,
+    );
   });
 
   it('offers no Open for a file that is not text or not saved', async () => {
@@ -1015,7 +1021,7 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
     });
     await click(row('Denis'));
     await click(byText('.hm-chip button', S.openFile));
-    const reader = q('[role="dialog"]');
+    const reader = document.querySelector<HTMLElement>('[role="dialog"]');
     expect(reader?.textContent).toContain(S.previewChanged);
     expect(reader?.textContent).not.toContain('Build plan');
   });

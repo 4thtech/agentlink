@@ -13,6 +13,7 @@ import { AgentIcon, Banner, Button, Icon, SkeletonLine, UntrustedContent } from 
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { sizeText } from '../files/io.js';
 import type { MessageItem, MessagePage, MessagesApi } from '../messages/api.js';
+import { MessageFiles, type FilesContext } from './file-reader.js';
 import { mergeThread } from './people-api.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
 
@@ -285,6 +286,7 @@ export function Conversation({
   loadEarlier,
   removed = false,
   idSeed,
+  files,
 }: {
   /** The person's name, as the name rule shows it (text only). */
   readonly name: string;
@@ -299,6 +301,8 @@ export function Conversation({
   readonly removed?: boolean;
   /** W7-ID-X1: with more than one ID, the open ID's colour seed: a header names it. */
   readonly idSeed?: string | undefined;
+  /** REL051-A34: each message's files as chips, and the reader (absent: no chips). */
+  readonly files?: FilesContext | undefined;
 }): ReactElement {
   const [loading, setLoading] = useState(false);
   if (thread.state === 'loading') {
@@ -319,7 +323,9 @@ export function Conversation({
   // stretch would be missing). Load earlier moves the line back.
   const cutoff = coveredFrom([thread.inbox, thread.sent]);
   const items = mergeThread(thread.inbox.items, thread.sent.items).filter(
-    ({ item }) => item.text !== '' && item.at >= cutoff,
+    // REL051-A34: a message with only a file shows too, as its file chip.
+    ({ item }) =>
+      (item.text !== '' || (files !== undefined && item.files.length > 0)) && item.at >= cutoff,
   );
   const more = thread.inbox.next !== undefined || thread.sent.next !== undefined;
   const ours = app === undefined || app === '' ? S.yourAgent : fmt(S.yourAi, { name: app });
@@ -361,26 +367,33 @@ export function Conversation({
                   <span className="hm-msg-who">
                     {ours} · {shortTime(item.at)}
                   </span>
-                  <div
-                    className="hm-bubble al-optimistic"
-                    data-state={item.status === 'queued' ? 'pending' : 'confirmed'}
-                  >
-                    {item.text}
-                  </div>
+                  {item.text === '' ? null : (
+                    <div
+                      className="hm-bubble al-optimistic"
+                      data-state={item.status === 'queued' ? 'pending' : 'confirmed'}
+                    >
+                      {item.text}
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
                   <span className="hm-msg-who">
                     {fmt(S.theirAi, { name })} · {shortTime(item.at)}
                   </span>
-                  <UntrustedContent from={name} kind="message">
-                    {item.text}
-                  </UntrustedContent>
+                  {item.text === '' ? null : (
+                    <UntrustedContent from={name} kind="message">
+                      {item.text}
+                    </UntrustedContent>
+                  )}
                 </>
+              )}
+              {files === undefined ? null : (
+                <MessageFiles item={item} out={out} person={name} agent={agent} files={files} />
               )}
               <div className="hm-msg-actions hm-f">
                 {out ? <Delivery status={item.status} removed={removed} /> : null}
-                <CopyText text={item.text} />
+                {item.text === '' ? null : <CopyText text={item.text} />}
               </div>
               {pro ? <Details item={item} out={out} agent={agent} name={name} /> : null}
             </li>

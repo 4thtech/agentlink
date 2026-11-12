@@ -197,6 +197,7 @@ import {
 } from './approval-os.js';
 import { failedBody } from './local-ui/failure-reasons.js';
 import { revealSavedFile } from './local-ui/reveal-file.js';
+import { readSavedText, type PreviewReadLimits } from './local-ui/read-preview.js';
 import { EXPIRED_HTML, NOT_FOUND_HTML, NO_APP_HTML } from './approval-pages.js';
 import { isAppPagePath } from '@4thtech-io/types/ui-contract/app-pages';
 import { NodeKeyStoreError } from './errors.js';
@@ -845,6 +846,11 @@ export interface ApprovalServerInternals {
   readonly notifier?: OsNotifier;
   /** MSG-FILES-IO-h: the OS file revealer behind Show in Finder. Default: osFileRevealer. */
   readonly fileRevealer?: FileRevealer;
+  /**
+   * REL051-A34: the home folder a `~/` Inbox folder resolves against for the in-app preview (tests
+   * use a temporary HOME, as the agent's own runtime does). Default: the OS user's home.
+   */
+  readonly filesHome?: string;
   /** The clock in milliseconds (link lifetime, backoff). Default: Date.now. */
   readonly now?: () => number;
   /** M1-11s-b: the /api/ui/ routes. Default: createLocalUiRoutes() (the page files). */
@@ -1365,6 +1371,15 @@ export async function startApprovalServerWith(
   const fileRevealer = internals.fileRevealer ?? osFileRevealer;
   const revealFile = (inboxFolder: string, savedName: string) =>
     revealSavedFile(inboxFolder, savedName, { opener: fileRevealer });
+  // REL051-A34: the in-app preview's checked read (local-ui/read-preview.ts).
+  const filesHome = internals.filesHome;
+  const previewRead = (inboxFolder: string, savedName: string, limits: PreviewReadLimits) =>
+    readSavedText(
+      inboxFolder,
+      savedName,
+      limits,
+      filesHome === undefined ? {} : { home: filesHome },
+    );
   const notifier = internals.notifier ?? osNotifier;
   const listen = internals.listen ?? listenOnce;
   const emit = (event: ApprovalServerEvent): void => {
@@ -1589,6 +1604,8 @@ export async function startApprovalServerWith(
       // W4-FILES-SAVE: for the save owner route only; core takes only a `file.save` and re-verifies
       // the owner signature before it saves (I-4).
       ...(agentUi?.client === undefined ? {} : { fileSave: fileSavePort(agentUi.client) }),
+      // REL051-A34: the in-app preview's checked read (the route passes only store values).
+      previewRead,
       // UX2-d1: accepting an invite, for the accept owner route; it pairs only after core used an
       // owner-signed, applied approval (I-4).
       ...(agentUi?.client === undefined ? {} : { invites: inviteAcceptPort(agentUi.client) }),

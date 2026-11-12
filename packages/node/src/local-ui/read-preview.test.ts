@@ -162,7 +162,7 @@ describe('in-app preview: the checked read (REL051-A34)', () => {
     const cases: Record<string, Uint8Array> = {
       'bin.md': new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
       'bad.md': new Uint8Array([0x61, 0xc3, 0x28, 0x62]),
-      'nul.md': new TextEncoder().encode('a\u0000b'),
+      'zero.md': new TextEncoder().encode('a\u0000b'),
     };
     for (const [name, bytes] of Object.entries(cases)) {
       writeFileSync(join(folder, name), bytes);

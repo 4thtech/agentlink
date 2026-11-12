@@ -46,6 +46,7 @@ import { contactsRoutes } from './api/contacts.js';
 import { filesRoutes } from './api/files.js';
 // MSG-FILES-IO-d: Files, Received and Sent (read-only); MSG-FILES-IO-h: Show in Finder.
 import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
+import { filesPreviewRoute } from './api/files-preview.js';
 import { filesSaveRoute } from './api/files-save.js';
 import { firstRunRoutes } from './api/first-run.js';
 // M1-11s-a-d: the status bar's health read (read-only).
@@ -411,6 +412,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     filesIoRoutes,
     // MSG-FILES-IO-h: Show in Finder (the one reveal route, D-134).
     [filesRevealRoute],
+    // REL051-A34 (D-149): the in-app preview of a received text file (read, by item ID only).
+    [filesPreviewRoute],
     proofsRoutes,
     rulesRoutes,
     payConfirmRoutes,
