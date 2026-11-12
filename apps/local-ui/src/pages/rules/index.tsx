@@ -514,6 +514,18 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
             help={
               draft.notarize === 'deny' ? (
                 S.proofOff
+              ) : draft.notarize === 'approval' ? (
+                // REL051-SF5: every proof asks; the budget stays editable for when proofs are
+                // allowed again.
+                <>
+                  {S.proofAsk} {S.proofAskBudget}{' '}
+                  <InlineAmount
+                    label={S.budget}
+                    value={draft.dailyBudgetUSD}
+                    invalid={checked.invalid.has('dailyBudgetUSD')}
+                    onChange={(v) => edit({ dailyBudgetUSD: v })}
+                  />
+                </>
               ) : (
                 <>
                   {S.proofHelpBefore}{' '}
@@ -624,7 +636,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
             <Row
               title={S.unknownTitle}
               changed={differs('unknownSenders')}
-              help={S.unknownHelp}
+              help={draft.unknownSenders === 'drop' ? S.unknownHelp : S.unknownHelpHold}
               control={
                 <Segmented
                   label={S.unknownTitle}
