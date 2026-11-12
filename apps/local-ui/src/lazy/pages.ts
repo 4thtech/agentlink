@@ -31,6 +31,8 @@ export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   // Settings (A9).
   '/settings': part(async () => (await import('../pages/settings/index.js')).SettingsPage),
   '/settings/backup': part(async () => (await import('../pages/backup/index.js')).BackupPage),
+  // UX1113 WP-S2: Touch ID & master code.
+  '/settings/touch-id': part(async () => (await import('../pages/touch-id/index.js')).TouchIdPage),
   '/settings/apps': part(async () => (await import('../pages/apps/index.js')).AppsPage),
   '/settings/files': part(async () => (await import('../pages/files/index.js')).FilesPage),
   '/settings/appearance': part(

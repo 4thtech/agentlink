@@ -20,6 +20,7 @@ import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
 import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
 import { UI_SETTINGS_PATH, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { LocalUiContext } from './context.js';
+import type { LocalUiOwnerCodeStep } from './owner-code-paths.js';
 import type { RenameSignOutcome } from '../owner-rename.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
@@ -91,7 +92,27 @@ export interface LocalUiOwnerOperation {
    * the folder's display name and the new recovery code, which it answers to the page once.
    */
   exportRecoveryKit?(review: OwnerReview): Promise<LocalUiRecoveryKitOutcome>;
+  /**
+   * UX1113 WP-S2 (04 §2.5 "Touch ID & master code page"), the `check` and `test` steps only: the
+   * presence this request carried was verified (and its session already closed); this records the
+   * one owner operation and signs nothing.
+   */
+  presenceChecked?(): void;
+  /**
+   * WP-S2, the `replace` step only, instead of `sign` (once): stages a new generated master code in
+   * `owner-next` for this page session (owner-change-code.ts stageOwnerCodeChange). The `owner` item
+   * is untouched. The handler gets the code, which it answers to the page once.
+   */
+  replaceOwnerCode?(): Promise<LocalUiOwnerCodeOutcome>;
+  /** WP-S2, the `finish` step only (once): the staged item, opened by the code typed back, replaces the `owner` item. */
+  finishOwnerCode?(): Promise<'done' | 'unconfirmed'>;
 }
+
+/** WP-S2: how staging a new master code ended. */
+export type LocalUiOwnerCodeOutcome =
+  | { readonly status: 'staged'; readonly code: string }
+  /** A leftover `owner-next` item: nothing was written (the terminal step finishes it). */
+  | { readonly status: 'unfinished' };
 
 /** WP-11: how saving a recovery kit ended (route-types.ts `exportRecoveryKit`). */
 export type LocalUiRecoveryKitOutcome =
@@ -145,6 +166,8 @@ export interface LocalUiOwnerRoute {
    * (unlockForExport) and offers `exportRecoveryKit` instead of `sign`; no other route does.
    */
   readonly recoveryKit?: true;
+  /** UX1113 WP-S2: one owner-code step, only at its fixed path (owner-code-paths.ts). */
+  readonly ownerCode?: LocalUiOwnerCodeStep;
   /**
    * U3-invite: a read-only check run after the generation check and before the presence gate. A
    * result refuses the request with it (the owner store is never opened, nothing is signed); the

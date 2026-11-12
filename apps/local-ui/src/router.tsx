@@ -59,6 +59,7 @@ export const ROUTES: readonly RouteDef[] = [
   // Settings (A9).
   { path: '/settings', page: lazyPage('/settings') },
   { path: '/settings/backup', page: lazyPage('/settings/backup') },
+  { path: '/settings/touch-id', page: lazyPage('/settings/touch-id') },
   { path: '/settings/apps', page: lazyPage('/settings/apps') },
   { path: '/settings/files', page: lazyPage('/settings/files') },
   { path: '/settings/appearance', page: lazyPage('/settings/appearance') },

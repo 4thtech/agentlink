@@ -53,6 +53,9 @@ import { payConfirmRoutes } from './api/pay-confirm.js';
 import { peopleAllRoutes } from './api/people-all.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
+// UX1113 WP-S2: Settings › Touch ID & master code (check, test, replace; the owner-code kind).
+import { ownerPresenceRoutes } from './api/owner-presence.js';
+import { OWNER_CODE_PATHS, isOwnerCodeStep } from './owner-code-paths.js';
 import {
   AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
@@ -182,6 +185,21 @@ export class LocalUiRouteRegistry {
         route.path !== BACKUP_EXPORT_PATH)
     ) {
       throw invalid('only the recovery-kit export route can export');
+    }
+    // UX1113 WP-S2: an owner-code step is a POST owner route at its own fixed path, once each.
+    const ownerCode = (route as { ownerCode?: unknown }).ownerCode;
+    if (ownerCode !== undefined) {
+      if (
+        !isOwnerCodeStep(ownerCode) ||
+        presence !== true ||
+        method !== 'POST' ||
+        route.path !== OWNER_CODE_PATHS[ownerCode] ||
+        recoveryKit !== undefined ||
+        stub !== undefined ||
+        this.#entries.some((e) => (e.route as { ownerCode?: unknown }).ownerCode === ownerCode)
+      ) {
+        throw invalid('an owner-code step is only its one POST route at its fixed path');
+      }
     }
     // U3-c: only an owner route (POST, presence) can be a stub; the flag is `true` or absent.
     if (stub !== undefined && (stub !== true || presence !== true || method !== 'POST')) {
@@ -384,6 +402,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     uiSettingsRoutes,
     // WP-P2: People across all IDs (read only).
     peopleAllRoutes,
+    // UX1113 WP-S2: Touch ID & master code.
+    ownerPresenceRoutes,
   ]) {
     for (const route of routes) registry.register(route);
   }
