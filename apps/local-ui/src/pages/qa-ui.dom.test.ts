@@ -190,15 +190,23 @@ describe('N2: an accept from a blocked person says so and can be cancelled', () 
       })[0]?.blocked,
     ).toBe(true);
   });
-  it('shows "You blocked Bo. Unblock to connect.", Unblock and Cancel; Cancel clears the row', () => {
+  it('shows "You blocked Bo. Unblock to connect.", Unblock and Cancel; Cancel (the server route) clears the row', async () => {
     const onUnblock = vi.fn();
-    act(() => root.render(h(ConnectingInviteRow, { row: waiting, blocked: true, onUnblock })));
+    // REL051-B1: Cancel asks the server (POST /api/ui/invites/connecting/cancel); no client-only hide.
+    const onCancel = vi.fn(() => Promise.resolve('cancelled' as const));
+    act(() =>
+      root.render(h(ConnectingInviteRow, { row: waiting, blocked: true, onUnblock, onCancel })),
+    );
     expect(host.textContent).toContain('You blocked Bo. Unblock to connect.');
     const find = (t: string) =>
       [...host.querySelectorAll('button')].find((b) => b.textContent === t);
     act(() => find('Unblock')?.click());
     expect(onUnblock).toHaveBeenCalledTimes(1);
-    act(() => find('Cancel')?.click());
+    await act(async () => {
+      find('Cancel')?.click();
+      await Promise.resolve();
+    });
+    expect(onCancel).toHaveBeenCalledTimes(1);
     expect(host.querySelector('li')).toBeNull();
   });
   it('a plain waiting accept still reads "Connecting to Bo…"', () => {

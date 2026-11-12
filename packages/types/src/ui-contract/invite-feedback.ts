@@ -13,6 +13,11 @@
 //   over) next to the existing `sent`.
 // - `GET /api/ui/contacts` rows also carry `pairedAt` (unix seconds of the kept pairing), so a
 //   re-pair is visible, and `pairedAs` (`inviter` or `invitee`), which decides the toast; the `contacts` event of `GET /api/ui/events` carries only `at`.
+// - REL051-B1 (N2): a `connecting` row also carries `blocked: true` while the person is blocked here
+//   (the contact is blocked, or it was blocked and then removed): their answer is dropped, so the
+//   accept can't finish until the owner unblocks them (`POST /api/ui/contacts/:ref/unblock`) or
+//   cancels it. `POST /api/ui/invites/connecting/cancel`, the invite kind (no presence, signs
+//   nothing), body exactly `{"ref"}`, drops this agent's waiting accepts for that contact.
 // The world's values are filler.
 
 export interface ConnectingBody {
@@ -21,6 +26,8 @@ export interface ConnectingBody {
   readonly expiresAt: string;
   readonly sent: boolean;
   readonly again: boolean;
+  /** REL051-B1 (N2): present (true) only while the person is blocked here. */
+  readonly blocked?: true;
 }
 
 export interface AlreadyContactBody {
@@ -85,5 +92,38 @@ export const INVITE_ACCEPT_AGAIN_OFFLINE = {
       sent: false,
       again: true,
     },
+  },
+} as const;
+
+/** REL051-B1 (N2): `GET /api/ui/invites` with an accept that waits on a person blocked here. */
+export const INVITES_CONNECTING_BLOCKED = {
+  answer: {
+    status: 200,
+    body: {
+      invites: [],
+      connecting: [
+        {
+          ref: FEEDBACK_WORLD.ref,
+          name: FEEDBACK_WORLD.name,
+          expiresAt: FEEDBACK_WORLD.expiresAt,
+          sent: true,
+          again: false,
+          blocked: true,
+        },
+      ],
+    },
+  },
+} as const;
+
+/** REL051-B1 (N2): `POST /api/ui/invites/connecting/cancel` (the invite kind), body `{ref}`. */
+export const CONNECTING_CANCEL = {
+  path: '/api/ui/invites/connecting/cancel',
+  cancelled: {
+    body: { ref: FEEDBACK_WORLD.ref },
+    answer: { status: 200, body: { status: 'cancelled' } },
+  },
+  gone: {
+    body: { ref: `0x${'4e'.repeat(20)}` },
+    answer: { status: 404, body: { error: 'not_found' } },
   },
 } as const;
