@@ -67,6 +67,7 @@ import {
   type InviteApi,
   type OpenInvite,
 } from '../contacts/invite-api.js';
+import { connectingLine, useConnectingNow } from '../invite/connecting-stage.js';
 import { FEEDBACK_STRINGS as F, linkLabel } from '../invite/strings.js';
 import {
   InviteLinkButtons,
@@ -471,8 +472,11 @@ function PendingInviteRow({
 }
 
 /**
- * W5-INVITE-FEEDBACK: an accept of this agent that waits for the inviter's answer: "Connecting to
- * {name}…", or "Waiting for {name} to come online. This finishes on its own." Text only (I-5).
+ * W5-INVITE-FEEDBACK: an accept of this agent that waits for the inviter's answer. REL051-CF1
+ * (R1-CLASS-01, -06): the line follows how long it has waited (connecting-stage.ts, shared with
+ * People), and every row has Cancel through the server (`POST /api/ui/invites/connecting/cancel`),
+ * so a row that will never finish can be removed. A blocked person also gets Unblock, which lives on
+ * People. Text only (I-5).
  */
 function ConnectingRowView({
   row,
@@ -481,11 +485,10 @@ function ConnectingRowView({
   readonly row: ConnectingRow;
   readonly api: InviteApi;
 }): ReactElement {
-  // A blocked person's accept never finishes: say so; Unblock lives on People. REL051-B1 (N2):
-  // Cancel goes through the server (`POST /api/ui/invites/connecting/cancel`).
   const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const now = useConnectingNow(row);
   if (hidden) return <></>;
   return (
     <div className="hm-invite-row hm-f" data-blocked={row.blocked === true ? 'true' : undefined}>
@@ -494,13 +497,7 @@ function ConnectingRowView({
       </span>
       <span className="hm-row-main hm-c">
         <PersonName name={row.name} />
-        <span className="hm-sub al-text-body-sm">
-          {row.blocked === true
-            ? F.youBlocked(row.name)
-            : row.sent
-              ? F.connecting(row.name)
-              : F.waitingOnline(row.name)}
-        </span>
+        <span className="hm-sub al-text-body-sm">{connectingLine(row, now)}</span>
         {failed ? (
           <span role="alert" className="hm-inline-error al-text-body-sm">
             {F.cancelConnectingFailed}
@@ -508,32 +505,30 @@ function ConnectingRowView({
         ) : null}
       </span>
       {row.blocked === true ? (
-        <>
-          <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH}>
-            {F.unblockAction}
-          </a>
-          {api.cancelConnecting === undefined ? null : (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={busy}
-              onClick={() => {
-                const cancel = api.cancelConnecting;
-                if (cancel === undefined) return;
-                setBusy(true);
-                setFailed(false);
-                void cancel(row.ref).then((outcome) => {
-                  setBusy(false);
-                  if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') setHidden(true);
-                  else setFailed(true);
-                });
-              }}
-            >
-              {F.cancelConnecting}
-            </Button>
-          )}
-        </>
+        <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH}>
+          {F.unblockAction}
+        </a>
       ) : null}
+      {api.cancelConnecting === undefined ? null : (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onClick={() => {
+            const cancel = api.cancelConnecting;
+            if (cancel === undefined) return;
+            setBusy(true);
+            setFailed(false);
+            void cancel(row.ref).then((outcome) => {
+              setBusy(false);
+              if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') setHidden(true);
+              else setFailed(true);
+            });
+          }}
+        >
+          {F.cancelConnecting}
+        </Button>
+      )}
     </div>
   );
 }

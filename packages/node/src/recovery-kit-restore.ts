@@ -32,7 +32,7 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { AgentLinkClient, isRestrictedAlias, type ApprovalChannel } from '@4thtech-io/core';
+import { AgentLinkClient, isOwnIdName, type ApprovalChannel } from '@4thtech-io/core';
 import {
   CryptoInputError,
   KeyStoreError,
@@ -528,7 +528,7 @@ export function restoredLabel(reading: LabelReadingLike | undefined, folder: str
   if (reading?.status !== 'verified') return folder;
   const label = reading.label;
   if (typeof label !== 'string' || [...label].length > 32) return folder;
-  if (!LABEL_CHARS.test(label) || label.includes('  ') || !isRestrictedAlias(label)) return folder;
+  if (!LABEL_CHARS.test(label) || label.includes('  ') || !isOwnIdName(label)) return folder;
   return label;
 }
 

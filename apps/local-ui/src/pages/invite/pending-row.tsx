@@ -7,6 +7,7 @@
 import { Button, useHood } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { ConnectingRow, LinkOutcome, OpenInvite } from '../contacts/invite-api.js';
+import { connectingLine, useConnectingNow } from './connecting-stage.js';
 import { InviteLinkButtons, InviteLinkReveal, useInviteLink } from './invite-link-actions.js';
 import {
   FEEDBACK_STRINGS as F,
@@ -108,9 +109,11 @@ export function PendingInviteRow({
 
 /**
  * W5-INVITE-FEEDBACK: one accept of this agent that waits for the inviter's answer (from the server,
- * so it survives a reload): "Connecting to {name}…", or, while it could not leave this computer
- * yet, "Waiting for {name} to come online. This finishes on its own." No Cancel: it finishes or
- * expires on its own. The name is text only (I-5).
+ * so it survives a reload). REL051-CF1 (R1-CLASS-01, -06): the line follows how long it has waited
+ * (connecting-stage.ts): "Connecting to {name}…", then a "still waiting, you can close this" hint,
+ * then "No answer … ask {name} for a new one". Every row has Cancel (REL051-B1's server route), so a
+ * row that will never finish (a used or cancelled invite) can always be removed; a blocked person
+ * also gets Unblock. The name is text only (I-5).
  */
 export function ConnectingInviteRow({
   row,
@@ -129,10 +132,11 @@ export function ConnectingInviteRow({
    */
   readonly onCancel?: () => Promise<CancelResult>;
 }): ReactElement {
-  // A blocked person's accept never finishes: say so, with Unblock and Cancel.
   const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const shown: ConnectingRow = blocked ? { ...row, blocked: true } : row;
+  const now = useConnectingNow(shown);
   if (hidden) return <></>;
   return (
     <li className="inv-pending inv-connecting" data-blocked={blocked ? 'true' : undefined}>
@@ -141,26 +145,20 @@ export function ConnectingInviteRow({
       </span>
       <span className="inv-pending-main">
         <span className="inv-pending-name">{row.name}</span>
-        <span className="al-text-body-sm al-muted">
-          {blocked
-            ? F.youBlocked(row.name)
-            : row.sent
-              ? F.connecting(row.name)
-              : F.waitingOnline(row.name)}
-        </span>
+        <span className="al-text-body-sm al-muted">{connectingLine(shown, now)}</span>
         {failed ? (
           <span role="alert" className="al-text-body-sm">
             {F.cancelConnectingFailed}
           </span>
         ) : null}
       </span>
-      {blocked ? (
+      {blocked || onCancel !== undefined ? (
         <span className="inv-pending-actions">
-          {onUnblock === undefined ? null : (
+          {blocked && onUnblock !== undefined ? (
             <Button size="sm" onClick={onUnblock}>
               {F.unblockAction}
             </Button>
-          )}
+          ) : null}
           {onCancel === undefined ? null : (
             <Button
               size="sm"

@@ -38,6 +38,7 @@
 //   contact_connected  contactId; via? ('your_invite' | 'their_invite')
 //   contact_removed    contactId
 //   contact_revoked    contactId
+//   invite_answered_twice   contactId   (R1-SEC-03, 04 §3.6: the contact the invite connected)
 //   rules_changed      (nothing more)
 //   id_created         name?
 //   id_removed, id_paused, id_resumed, backup_saved   (nothing more)
@@ -225,6 +226,7 @@ function view(entry: ActivityEntry): JsonObject | undefined {
       };
     case 'contact_removed':
     case 'contact_revoked':
+    case 'invite_answered_twice':
       return isContactRef(entry.contactId)
         ? { kind: entry.kind, at, contactId: entry.contactId }
         : undefined;

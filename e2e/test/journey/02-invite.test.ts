@@ -4,6 +4,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { until } from '../app-world.js';
 import {
+  ACCEPT_WITH,
   acceptInviteInApp,
   chapter,
   checkInviteInApp,
@@ -216,6 +217,49 @@ describe('chapter 2: contacts and invites', () => {
     await namesContact(b.page, 'Ana K');
     expect(await text(b.page)).not.toContain('Connecting to Ana…');
   }, 180_000);
+
+  // REL051-CF1 (R1-CLASS-01, -06): one invite, two accepters. The second one had the card open
+  // before the first accepted; its accept is refused by the inviter with no message (04 §3.6), so its
+  // row moves from "Connecting" to the waiting hint by itself, and Cancel removes it for good.
+  it('one invite, two accepters: the other one sees the waiting hint and can cancel', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const { a, b, mcpA, mcpB } = await twoOwners(ready.browser, ready.files, world, ch.closers);
+    const late = (await twoOwners(ready.browser, ready.files, world, ch.closers)).b;
+    const link = await createInviteInApp(a);
+    await checkInviteInApp(late, link);
+    await late.page
+      .getByText(/invites you to connect your AIs$/)
+      .first()
+      .waitFor();
+    // Both click Accept, one a moment after the other (the classroom race: once the invite is used
+    // its short link stops working, so a later accept is refused at once instead).
+    await acceptInviteInApp(b, link, 'Ana');
+    await late.page.getByRole('button', { name: ACCEPT_WITH }).click();
+    await until('Bo is paired with Ana', () => pairedWith(mcpB, 'Ana'), 30_000);
+    await navTo(late.page, 'Home');
+    await late.page
+      .getByText(
+        "Waiting for Ana's AgentLink to come online. It connects by itself; you can close this.",
+      )
+      .first()
+      .waitFor({ timeout: 40_000 });
+    // The inviter has exactly one Bo: the second answer connected no one.
+    const listed = await mcpA.call('agentlink_list_contacts');
+    expect((listed.structured['contacts'] as unknown[]).length).toBe(1);
+    await late.page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+    await eventually(
+      'the waiting row is gone',
+      async () => !(await text(late.page)).includes("Waiting for Ana's AgentLink"),
+      15_000,
+    );
+    await late.page.reload();
+    await late.page.waitForLoadState();
+    await new Promise((r) => setTimeout(r, 3_000));
+    expect(await text(late.page)).not.toContain('Connecting to Ana');
+    expect(await text(late.page)).not.toContain("Waiting for Ana's AgentLink");
+  }, 240_000);
 
   // Gate: the same pairing follow as the test above it ("both Contacts pages reach the 12 digits
   // by themselves"): neither page completes the pairing in 30 s while nothing calls the MCP server.

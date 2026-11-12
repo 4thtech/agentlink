@@ -1088,8 +1088,8 @@ describe('resolveContact (06 §2: ID, name; AMBIGUOUS_CONTACT with candidates)',
     expect(dump(result)).not.toContain('CANARY');
   });
 
-  it('not found (and blocked contacts are not offered) without echoing the query', () => {
-    for (const query of [MESSAGE_CANARY, 'Old', '']) {
+  it('not found without echoing the query', () => {
+    for (const query of [MESSAGE_CANARY, '']) {
       const out = resolveContact(query, views);
       expect(out.ok).toBe(false);
       if (out.ok) return;
@@ -1097,6 +1097,18 @@ describe('resolveContact (06 §2: ID, name; AMBIGUOUS_CONTACT with candidates)',
       expect(result.structured.status).toBe('not_found');
       expect(dump(result)).not.toContain('CANARY');
     }
+  });
+
+  // REL051-CF1 (R1-CLASS-11): a blocked contact is still never offered, but it reads as blocked,
+  // with fixed text and no name or candidates.
+  it('a blocked contact is not offered: CONTACT_BLOCKED, never its name', () => {
+    const out = resolveContact('Old', views);
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    const result = finalizeResult(out.output, []);
+    expect(result.structured).toMatchObject({ status: 'error', code: 'CONTACT_BLOCKED' });
+    expect(result.structured['candidates']).toBeUndefined();
+    expect(dump(result)).not.toContain('Old');
   });
 });
 

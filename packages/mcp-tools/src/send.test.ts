@@ -376,3 +376,84 @@ describe('fixed text of the send and inbox tools (11 §5.1; I-5)', () => {
     }
   });
 });
+
+// REL051-CF1 (R1-CLASS-11; 06 §2 contact resolution, 06 §2.1, I-5): after a contact renamed its ID,
+// the name the user still says (its previous name, under the name rule) is answered with its current
+// name and id to ask the user about, never acted on; a blocked contact answers "blocked", not "not found". The query is never echoed.
+describe('agentlink_send: a renamed or blocked contact (R1-CLASS-11)', () => {
+  const renamed = (id: string, now: string, before: string): ContactView =>
+    ({ ...contact(id, now), previousName: before }) as unknown as ContactView;
+
+  // IR-REL051-CF1-1 CF1-B1: a previous name alone never acts (a contact could rename itself to
+  // someone else's name and back to hold a hidden second name): it is a fixed refusal that names the
+  // current name and asks the user, never a send.
+  it('the previous name alone never sends: CONTACT_RENAMED with the current name and its id', async () => {
+    const client = fake({ contacts: [renamed(B, 'Ana Novak', 'Ana'), contact(C, 'Marko')] });
+    const result = await send({ to: 'ana', text: 'hi' }, client);
+    expect(client.sent).toEqual([]);
+    expect(client.calls).not.toContain('send');
+    expect(result.structured).toMatchObject({ status: 'error', code: 'CONTACT_RENAMED' });
+    expect(String(result.structured.summary)).toBe(
+      'No contact has that name now. Did you mean “Ana Novak” (self-declared), which used to have it?',
+    );
+    expect(String(result.structured.nextStep)).toContain('Ask the user');
+    expect(String(result.structured.nextStep)).toContain('id');
+    expect(result.structured['candidates']).toMatchObject([{ id: B, name: 'Ana Novak' }]);
+  });
+
+  it('an owner-aliased contact is never found by its own previous name', async () => {
+    const aliased = {
+      ...renamed(B, 'Natasa (work)', 'Natasa'),
+      display: { name: 'Natasa (work)', label: 'self-declared', nameSource: 'owner' },
+    } as unknown as ContactView;
+    const client = fake({ contacts: [aliased] });
+    const result = await send({ to: 'Natasa', text: 'hi' }, client);
+    expect(client.sent).toEqual([]);
+    expect(result.structured.status).toBe('not_found');
+  });
+
+  it('a current name wins over another contact’s previous name', async () => {
+    const client = fake({ contacts: [renamed(B, 'Ana Novak', 'Ana'), contact(C, 'Ana')] });
+    const result = await send({ to: 'Ana', text: 'hi' }, client);
+    expect(client.sent).toEqual([{ to: C, text: 'hi', type: 'text' }]);
+    expect(String(result.structured.summary)).not.toContain('now called');
+  });
+
+  it('two contacts with that previous name: CONTACT_RENAMED with both, nothing sent', async () => {
+    const client = fake({
+      contacts: [renamed(B, 'Ana Novak', 'Ana'), renamed(C, 'Ana Kos', 'Ana')],
+    });
+    const result = await send({ to: 'Ana', text: 'hi' }, client);
+    expect(result.structured.code).toBe('CONTACT_RENAMED');
+    expect((result.structured['candidates'] as unknown[]).length).toBe(2);
+    expect(client.sent).toEqual([]);
+  });
+
+  it('a blocked contact, by name or ID: CONTACT_BLOCKED, nothing sent, the name not echoed', async () => {
+    for (const to of ['marko', B]) {
+      const client = fake({ contacts: [contact(B, 'Marko', { status: 'blocked' })] });
+      const result = await send({ to, text: 'hi' }, client);
+      expect(result.structured).toMatchObject({ status: 'error', code: 'CONTACT_BLOCKED' });
+      expect(String(result.structured.summary)).toContain('blocked');
+      expect(dump(result)).not.toContain('Marko');
+      expect(dump(result)).not.toContain('marko');
+      expect(client.sent).toEqual([]);
+    }
+  });
+
+  it('a blocked contact found by its previous name is blocked too', async () => {
+    const client = fake({
+      contacts: [{ ...renamed(B, 'Ana Novak', 'Ana'), status: 'blocked' } as ContactView],
+    });
+    const result = await send({ to: 'Ana', text: 'hi' }, client);
+    expect(result.structured.code).toBe('CONTACT_BLOCKED');
+  });
+
+  it('a removed or revoked contact still reads as not found', async () => {
+    for (const status of ['removed', 'revoked']) {
+      const client = fake({ contacts: [contact(B, 'Marko', { status })] });
+      const result = await send({ to: 'Marko', text: 'hi' }, client);
+      expect(result.structured.status).toBe('not_found');
+    }
+  });
+});

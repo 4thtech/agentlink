@@ -152,6 +152,13 @@ export const ACTIVITY_COPY = {
   contactRevokedLine: 'You are no longer connected',
   contactRenamed: '{former} is now called {new}',
   contactRenamedLine: 'Shown under the new name in People',
+  // R1-SEC-03 (04 §3.6, 11 §6): never the second party's name, only the contact the invite connected.
+  inviteAnsweredTwice: [
+    'Someone else also answered your invite. Compare the 12 digits with {who} before you trust this contact.',
+    'Someone else also answered your invite. Do the Contact check before you trust this contact.',
+  ] as Pair,
+  inviteAnsweredTwiceLine: 'Their answer was refused. Nobody else was connected',
+  pillAnsweredTwice: 'Answered twice',
   pillConnected: 'Connected',
   pillRemoved: 'Removed',
   pillRenamed: 'Renamed',

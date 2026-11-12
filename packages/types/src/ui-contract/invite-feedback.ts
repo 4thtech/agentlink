@@ -18,6 +18,8 @@
 //   accept can't finish until the owner unblocks them (`POST /api/ui/contacts/:ref/unblock`) or
 //   cancels it. `POST /api/ui/invites/connecting/cancel`, the invite kind (no presence, signs
 //   nothing), body exactly `{"ref"}`, drops this agent's waiting accepts for that contact.
+// - REL051-CF1 (R1-CLASS-01, -06): a `connecting` row also carries `startedAt` (RFC 3339), when the
+//   accept began, so the app says "still waiting" after a short time and "no answer" after a bound.
 // The world's values are filler.
 
 export interface ConnectingBody {
@@ -28,6 +30,8 @@ export interface ConnectingBody {
   readonly again: boolean;
   /** REL051-B1 (N2): present (true) only while the person is blocked here. */
   readonly blocked?: true;
+  /** REL051-CF1 (R1-CLASS-01, -06): when the accept began (RFC 3339), when core knows it. */
+  readonly startedAt?: string;
 }
 
 export interface AlreadyContactBody {

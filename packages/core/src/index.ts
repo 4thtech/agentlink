@@ -127,7 +127,7 @@ export {
   type ContactCheckVerdict,
   type PairingDigestLookup,
 } from './contact-check.js';
-export { isRestrictedAlias, renderContactName, restrictName } from './names.js';
+export { isOwnIdName, isRestrictedAlias, renderContactName, restrictName } from './names.js';
 export {
   computeActionDigest,
   ownerActionHash,

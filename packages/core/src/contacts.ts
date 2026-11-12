@@ -123,6 +123,12 @@ export interface ContactView {
     readonly newName: string;
     readonly at: number;
   };
+  /**
+   * REL051-CF1 (R1-CLASS-11): the contact's own name before its last rename, restricted like
+   * `display` (06 §2.1), kept after the owner saw the note. Lets the tools find the contact by the
+   * name the user still says. Display and lookup only; never shown as the contact's name.
+   */
+  readonly previousName?: string;
   readonly createdAt: number;
   readonly updatedAt: number;
   /**
@@ -159,6 +165,11 @@ export interface ConnectingContact {
    * the accept can't finish until the owner unblocks them (`contact.unblock`) or cancels it.
    */
   readonly blocked: boolean;
+  /**
+   * REL051-CF1 (R1-CLASS-01, -06): when this accept began (the staged row's `created_at`, unix
+   * seconds), so the app can say "still waiting" and later "no answer", also after a restart.
+   */
+  readonly startedAt: number;
 }
 
 /** W5-INVITE-FEEDBACK: the kept `handshake` row's plain time and direction. */
@@ -515,6 +526,7 @@ export class ContactBook {
       pairing: row.pairing,
       safetyCodeChecked,
       ...(await this.#nameChange(row, short)),
+      ...(await this.#previousName(row, short)),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       ...pairedFields(
@@ -552,8 +564,10 @@ export class ContactBook {
             row: r,
             contact,
             delivery: tx.get('envelopes', { envelope_id: r.pairing_id })?.delivery ?? null,
+            // REL051-CF1 (R2-7): blocked exactly when completion would be refused (R1-SEC-02, bound to
+            // the contact, so a key it rotated to is caught) or the staged key itself is blocked.
             blocked:
-              contact?.status === 'blocked' ||
+              !pairingAllowedTx(tx, r.contact_id, r.created_at) ||
               tx.get('blocked_keys', { from_key: r.agent_nostr }) !== undefined,
           };
         }),
@@ -581,6 +595,7 @@ export class ContactBook {
         id: row.contact_id,
         display,
         expiresAt: row.expires_at,
+        startedAt: row.created_at,
         sent: delivery === 'sent',
         again,
         blocked,
@@ -601,6 +616,28 @@ export class ContactBook {
       tx.delete('pairings', { contact_id: id, role: 'invitee' }),
     );
     return deleted > 0 ? 'cancelled' : 'not_found';
+  }
+
+  /**
+   * REL051-CF1 (R1-CLASS-11; D-141): the contact's own name before its last rename, under the name
+   * rule (restrictName), whether or not the owner has seen the note, so a tool can still find the
+   * contact by the name the user knows. Absent when none is stored, when the rule leaves only the
+   * fallback, or when it is the name shown now. Never the raw text (I-5).
+   */
+  async #previousName(
+    row: Row<'contacts'>,
+    short: string,
+  ): Promise<{ readonly previousName?: string }> {
+    if (row.former_name === null) return {};
+    let former: string;
+    try {
+      former = await open(this.#ctx, 'contacts', 'former_name', [row.contact_id], row.former_name);
+    } catch {
+      return {};
+    }
+    const restricted = restrictName(former, short);
+    if (restricted === restrictName(undefined, short)) return {};
+    return { previousName: restricted };
   }
 
   /** D-141: the unseen former-name note of a contact shown by its own name, if any. */
@@ -951,12 +988,15 @@ export class ContactBook {
    * received from the card key and processed, ours sent) are checked again, then the revocation,
    * re-pair and key rules, the 04 §2.9 tie-break for concurrent pairings, and the contact is written
    * and the staged row deleted. A completed re-pair replaces the card and the pairing columns and
-   * clears the safety check (a new pairing has a new code). A removed contact becomes active again;
-   * a blocked one stays blocked.
+   * clears the safety check (a new pairing has a new code). A removed contact becomes active again
+   * only under pairingAllowedTx (R1-SEC-02); a blocked one completes nothing. `startedAt`, when
+   * given, is when this agent began the pairing (the inviter's invite `created_at`); otherwise the
+   * staged row's time.
    */
   async prepareCompletion(
     staged: StagedPairing,
     transcript: PairingTranscript,
+    startedAt?: number,
   ): Promise<PreparedCompletion> {
     const ctx = this.#ctx;
     const missing = (): never => {
@@ -1042,6 +1082,13 @@ export class ContactBook {
       const existing = tx.get('contacts', { contact_id: id });
       if (isRevoked(tx, id, existing)) {
         throw new CoreError('contact_revoked', 'That agent has been revoked and cannot be paired.');
+      }
+      // R1-SEC-02: a blocked contact, or a removed one through something begun before the removal
+      // or while its keys stay blocked, completes nothing (whatever key it answers from).
+      if (
+        !pairingAllowedTx(tx, id, Math.min(current.created_at, startedAt ?? current.created_at))
+      ) {
+        throw new CoreError('pairing_not_allowed', 'That pairing is not allowed.');
       }
       assertRepairAllowed(existing, {
         ownerFingerprint: current.owner_fingerprint,
@@ -1421,6 +1468,29 @@ export function removeContactTx(tx: StoreTx, row: Row<'contacts'>, now: number):
     { contact_id: id, status: { in: ['active', 'blocked'] } },
     { status: 'removed', updated_at: now },
   );
+}
+
+/**
+ * R1-SEC-02 (07 §3 `removed`, 04 §2.9; proposed, owner confirms at merge): may a pairing with
+ * `contactId` complete, inside the completing transaction? `startedAt` is when this agent began it:
+ * the invite's `created_at` (inviter) or the staged pairing's (invitee). The rule is bound to the
+ * contact, not to the sender key, so a key the contact rotated to after the remove or block is
+ * caught too:
+ * - a `blocked` contact completes no pairing until the owner unblocks it;
+ * - a `removed` contact completes one only when none of its keys is still in `blocked_keys` (it was
+ *   blocked when removed; `contact.unblock` clears them) and this agent began it after the removal
+ *   (the tombstone's `updated_at`), so an invite made before the remove never brings it back.
+ * Anything else (no row, active) is allowed here; revocation and the re-pair rules are checked apart.
+ */
+export function pairingAllowedTx(tx: StoreTx, contactId: string, startedAt: number): boolean {
+  const row = tx.get('contacts', { contact_id: contactId });
+  if (row === undefined) return true;
+  if (row.status === 'blocked') return false;
+  if (row.status !== 'removed') return true;
+  for (const key of new Set([row.agent_nostr, ...parseKeyList(row.nostr_keys)])) {
+    if (tx.get('blocked_keys', { from_key: key }) !== undefined) return false;
+  }
+  return startedAt > row.updated_at;
 }
 
 /**

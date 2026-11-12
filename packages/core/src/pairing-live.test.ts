@@ -106,6 +106,8 @@ describe('contacts.connecting (W5-INVITE-FEEDBACK)', () => {
       'expiresAt',
       'id',
       'sent',
+      // REL051-CF1: when the accept began (the staged row's time), for the waiting hints.
+      'startedAt',
     ]);
     expect(row?.id).toBe(a.id);
     expect(row?.display.name).toBe('alice');

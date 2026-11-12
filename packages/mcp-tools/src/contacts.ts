@@ -155,19 +155,60 @@ const fold = (text: string): string =>
   removeInvisible(text).normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /**
+ * REL051-CF1: the contact's previous name (restricted by core), when it has one. Never for a contact
+ * the owner named (IR-REL051-CF1-1 CF1-B1): the owner's alias is the only name it answers to.
+ */
+const previousOf = (view: ContactView): string | undefined => {
+  if (view.display.nameSource === 'owner') return undefined;
+  const previous: unknown = (view as { readonly previousName?: unknown }).previousName;
+  return typeof previous === 'string' && previous !== '' ? previous : undefined;
+};
+
+/** REL051-CF1 (R1-CLASS-11): fixed text, no slot (the query and the name are never echoed). */
+const blockedOutput = (): HandlerOutput =>
+  fail('error', TOOL_TEXT.contactBlocked, TOOL_TEXT.contactBlockedNextStep, 'CONTACT_BLOCKED');
+
+/**
  * Resolves a `Contact` argument against the active contacts: an exact contact ID, or the shown name
  * (alias or restricted name), compared after NFKC and case folding. The query is agent-written text:
  * it is never echoed in a summary, `nextStep` or error (IR-M1-9g-1 L1).
+ *
+ * REL051-CF1 (R1-CLASS-11; IR-REL051-CF1-1 CF1-B1): when no shown name matches, the contacts'
+ * previous names (core's restricted `previousName`, after a rename of their ID; never for an
+ * owner-aliased contact) are compared the same way. A match there never acts: a contact could rename
+ * itself to someone else's name and back to keep a hidden second name. It is CONTACT_RENAMED, which
+ * names the current name(s) with their ids as candidates and asks the AI to ask the user. When no
+ * active contact matches, a blocked one that does (ID, shown or previous name) answers
+ * CONTACT_BLOCKED. Removed and revoked contacts stay not found.
  */
 export function resolveContact(query: string, views: readonly ContactView[]): ContactResolution {
   const contacts = activeContacts(views);
-  const byId = contacts.find((view) => view.id === query.trim().toLowerCase());
+  const id = query.trim().toLowerCase();
+  const byId = contacts.find((view) => view.id === id);
   if (byId !== undefined) return { ok: true, contact: byId };
   const wanted = fold(query);
-  const matches =
-    wanted === '' ? [] : contacts.filter((view) => fold(shownName(view.display)) === wanted);
+  const named = (list: readonly ContactView[]): ContactView[] =>
+    wanted === '' ? [] : list.filter((view) => fold(shownName(view.display)) === wanted);
+  const formerly = (list: readonly ContactView[]): ContactView[] =>
+    wanted === ''
+      ? []
+      : list.filter((view) => {
+          const previous = previousOf(view);
+          return previous !== undefined && fold(previous) === wanted;
+        });
+  const matches = named(contacts);
   if (matches.length === 1) return { ok: true, contact: matches[0]! };
+  const renamed = matches.length === 0 ? formerly(contacts) : [];
+  if (renamed.length > 0) return { ok: false, output: renamedOutput(renamed) };
   if (matches.length === 0) {
+    const blocked = views.filter((view) => view.status === 'blocked');
+    if (
+      blocked.some((view) => view.id === id) ||
+      named(blocked).length > 0 ||
+      formerly(blocked).length > 0
+    ) {
+      return { ok: false, output: blockedOutput() };
+    }
     return {
       ok: false,
       output: fail('not_found', TOOL_TEXT.contactNotFound, TOOL_TEXT.contactNotFoundNextStep),
@@ -183,6 +224,22 @@ export function resolveContact(query: string, views: readonly ContactView[]): Co
       { candidates: matches.map(candidateRef) },
     ),
   };
+}
+
+/**
+ * IR-REL051-CF1-1 CF1-B1: contacts found only by a previous name. Never acted on: the summary names
+ * the current name (06 §2.1 rule, renderRef), never the query or the previous name, and
+ * `candidates` carries each one's id so the AI asks the user and calls again with it.
+ */
+function renamedOutput(views: readonly ContactView[]): HandlerOutput {
+  const first = views[0]!;
+  const summary =
+    views.length === 1
+      ? renderCopy(TOOL_TEXT.contactRenamed, { contactName: renderRef(contactRef(first)) })
+      : TOOL_TEXT.contactRenamedMany;
+  return fail('error', summary, TOOL_TEXT.contactRenamedNextStep, 'CONTACT_RENAMED', {
+    candidates: views.map(candidateRef),
+  });
 }
 
 /** At most this many options are spelled out in an ambiguous summary; `candidates` has them all. */
