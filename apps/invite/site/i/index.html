@@ -7,6 +7,7 @@
     <meta name="robots" content="noindex" />
     <meta name="color-scheme" content="light dark" />
     <title>AgentLink invite</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/invite.css" />
   </head>
   <body>
@@ -61,19 +62,15 @@
         </article>
         <article id="way-command" class="card way primary" aria-labelledby="way-command-title">
           <h3 id="way-command-title"></h3>
+          <p id="os-group" class="seg" role="group">
+            <button id="os-unix" type="button" class="seg-option" aria-pressed="false"></button>
+            <button id="os-windows" type="button" class="seg-option" aria-pressed="false"></button>
+            <button id="os-node" type="button" class="seg-option" aria-pressed="false"></button>
+          </p>
           <p id="step-help" class="muted small"></p>
           <p id="step-text" class="preview mono"></p>
           <p class="actions">
             <button id="copy" type="button" class="btn"></button>
-            <span id="node-help" class="small"
-              ><a
-                id="node-link"
-                href="https://nodejs.org/en/download"
-                target="_blank"
-                rel="noopener noreferrer"
-                >Need Node.js? Get it here</a
-              ></span
-            >
           </p>
         </article>
         <article id="way-link" class="card way" aria-labelledby="way-link-title">

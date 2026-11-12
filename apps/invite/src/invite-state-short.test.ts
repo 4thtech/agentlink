@@ -80,9 +80,15 @@ describe('evaluateFragment: a short link', () => {
     if (view.kind !== 'ready') return;
     expect(view.inviteUrl).toBe(short.link);
     expect(view.inviteUrl).toMatch(SHORT);
-    expect(view.command).toBe(JOIN_COMMAND_TEMPLATE.replace('{inviteUrl}', short.link));
+    expect(view.commands?.node).toBe(JOIN_COMMAND_TEMPLATE.replace('{inviteUrl}', short.link));
     expect(view.sentence).toBe(ASK_AI_TEMPLATE.replace('{inviteUrl}', short.link));
-    expect(view.command).toBe(`npx -y @4thtech-io/agentlink join '${short.link}'`);
+    expect(view.commands?.node).toBe(`npx -y @4thtech-io/agentlink join '${short.link}'`);
+    expect(view.commands?.unix).toBe(
+      `curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite '${short.link}'`,
+    );
+    expect(view.commands?.windows).toBe(
+      `& ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Invite '${short.link}'`,
+    );
   });
 
   it('accepts the fragment with or without its leading #', async () => {

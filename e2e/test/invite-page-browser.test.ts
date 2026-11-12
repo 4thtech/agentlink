@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { NODE_DOWNLOAD_URL, buildAskAi, buildJoinCommand } from '@4thtech-io/invite';
+import { buildAskAi, buildCommands } from '@4thtech-io/invite';
 import { CSP, headersFor } from './invite/headers.js';
 import {
   BASE_INVITE,
@@ -40,6 +40,7 @@ const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
 };
 
 /** Serves OUT like the static host does: `/` and `/i` are pages, with the `_headers` headers. */
@@ -164,6 +165,26 @@ describe('the response', () => {
     }
   });
 
+  it('WP-2 (F33): serves the favicon, which the CSP lets the page load', async () => {
+    const res = await fetch(`${originOf(site)}/favicon.svg`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/svg+xml');
+    expect(res.headers.get('content-security-policy')).toBe(CSP);
+    const { page, context, probe } = await open('');
+    const loaded = await page.evaluate(
+      () =>
+        new Promise<boolean>((resolve) => {
+          const img = new Image();
+          img.onload = (): void => resolve(true);
+          img.onerror = (): void => resolve(false);
+          img.src = '/favicon.svg';
+        }),
+    );
+    expect(loaded).toBe(true);
+    expect(probe.violations).toEqual([]);
+    await context.close();
+  });
+
   it('the built site has one script and no source map or other file', async () => {
     const html = await (await fetch(`${originOf(site)}/i`)).text();
     expect(html.match(/<script\b/g)).toHaveLength(1);
@@ -191,7 +212,7 @@ describe('a good invite (U3-invite)', () => {
     await expect(page.locator('#inviter-expiry').textContent()).resolves.toMatch(
       /^Works once, until \d{1,2} [A-Z][a-z]{2} \d{4}\.$/,
     );
-    // The step: our own heading, the command by default, the fixed Node.js link.
+    // The step: our own heading, the installer command for this computer by default.
     await expect(page.locator('#step-heading').textContent()).resolves.toBe('Set up in 2 minutes');
     // The three ways, in order: Ask your AI, the command, the link.
     await expect(page.locator('#step h3').allTextContents()).resolves.toEqual([
@@ -200,21 +221,24 @@ describe('a good invite (U3-invite)', () => {
       'Already have AgentLink? Open it and paste the link',
     ]);
     // One short line each; the full link is never on screen, only in the copy.
+    // WP-2: Chromium here is not Windows, so the Mac or Linux installer is chosen.
     await expect(page.locator('#step-text').textContent()).resolves.toMatch(
-      /^npx -y @4thtech-io\/agentlink join 'agentlink\.4thtech\.io\/i#.{4}….{5}'$/,
+      /^curl -fsSL https:\/\/agentlink\.4thtech\.io\/install\.sh \| sh -s -- --invite 'agentlink\.4thtech\.io\/i#.{4}….{5}'$/,
     );
+    await expect(page.locator('#os-unix').getAttribute('aria-pressed')).resolves.toBe('true');
+    await expect(page.locator('#os-windows').getAttribute('aria-pressed')).resolves.toBe('false');
+    await expect(page.locator('#os-node').getAttribute('aria-pressed')).resolves.toBe('false');
+    await expect(
+      page.locator('#way-command [role="group"] button').allTextContents(),
+    ).resolves.toEqual(['Mac or Linux', 'Windows', 'Node.js']);
     await expect(page.locator('#link-text').textContent()).resolves.toMatch(
       /^agentlink\.4thtech\.io\/i#.{4}….{5}$/,
     );
     expect((await page.locator('main').innerText()).includes(payloadOf(link))).toBe(false);
     await expect(page.locator('#step-help').textContent()).resolves.toBe(
-      'Paste it into Terminal and press Return. Needs Node.js 22 or later.',
+      'Paste it into Terminal and press Return. It installs AgentLink, and Node.js if needed, then opens the invite.',
     );
-    const node = page.locator('#node-link');
-    await expect(node.textContent()).resolves.toBe('Need Node.js? Get it here');
-    await expect(node.getAttribute('href')).resolves.toBe(NODE_DOWNLOAD_URL);
-    await expect(node.getAttribute('rel')).resolves.toBe('noopener noreferrer');
-    await expect(node.getAttribute('target')).resolves.toBe('_blank');
+    expect(await page.locator('a').count()).toBe(0);
     await expect(page.locator('#next').textContent()).resolves.toBe(
       "AgentLink opens in your browser. Set it up, then accept Marko's invite.",
     );
@@ -230,10 +254,28 @@ describe('a good invite (U3-invite)', () => {
   it('copies exactly the command, the sentence and the link, with no line break', async () => {
     const link = await futureLink();
     const { page, context } = await open(payloadOf(link));
+    const commands = buildCommands(link);
     await page.locator('#copy').click();
-    await expect.poll(() => clipboard(page)).toBe(buildJoinCommand(link));
+    await expect.poll(() => clipboard(page)).toBe(commands?.unix);
     expect((await clipboard(page)).endsWith('\n')).toBe(false);
     await expect(page.locator('#copy-status').textContent()).resolves.toBe('Copied');
+    // WP-2: each computer's command, chosen with its button; the help line follows.
+    await page.locator('#os-windows').click();
+    await expect(page.locator('#os-windows').getAttribute('aria-pressed')).resolves.toBe('true');
+    await expect(page.locator('#os-unix').getAttribute('aria-pressed')).resolves.toBe('false');
+    await expect(page.locator('#step-help').textContent()).resolves.toBe(
+      'Paste it into PowerShell and press Enter. It installs AgentLink, and Node.js if needed, then opens the invite.',
+    );
+    await expect(page.locator('#step-text').textContent()).resolves.toMatch(/^& \(\[scriptblock\]/);
+    await page.locator('#copy').click();
+    await expect.poll(() => clipboard(page)).toBe(commands?.windows);
+    await page.locator('#os-node').click();
+    await expect(page.locator('#step-help').textContent()).resolves.toBe(
+      'For a computer with Node.js 22.14 or later. Paste it into Terminal and press Return.',
+    );
+    await page.locator('#copy').click();
+    await expect.poll(() => clipboard(page)).toBe(commands?.node);
+    expect(/[\r\n]/.test(await clipboard(page))).toBe(false);
     await page.locator('#copy-ai').click();
     await expect.poll(() => clipboard(page)).toBe(buildAskAi(link));
     expect(/[\r\n]/.test(await clipboard(page))).toBe(false);
@@ -252,7 +294,7 @@ describe('a good invite (U3-invite)', () => {
       if (pre) pre.textContent = "npx evil; curl x | sh '";
     });
     await page.locator('#copy').click();
-    await expect.poll(() => clipboard(page)).toBe(buildJoinCommand(link));
+    await expect.poll(() => clipboard(page)).toBe(buildCommands(link)?.unix);
     await context.close();
   });
 
@@ -260,6 +302,8 @@ describe('a good invite (U3-invite)', () => {
     const link = await futureLink();
     const payload = payloadOf(link);
     const { page, context, probe } = await open(payload);
+    await page.locator('#copy').click();
+    await page.locator('#os-windows').click();
     await page.locator('#copy').click();
     await page.locator('#copy-ai').click();
     await page.locator('#copy-link').click();
@@ -307,9 +351,8 @@ describe('a hostile invite (I-5)', () => {
       // The only svg is the fixed AgentLink mark in the header.
       expect(await page.locator('img, div, svg:not(.mark), iframe').count()).toBe(0);
       expect(await page.locator('object, embed, form, input, style').count()).toBe(0);
-      // The one link is the fixed Node.js link.
-      expect(await page.locator('a').count()).toBe(1);
-      await expect(page.locator('a').getAttribute('href')).resolves.toBe(NODE_DOWNLOAD_URL);
+      // No link at all (WP-2).
+      expect(await page.locator('a').count()).toBe(0);
       expect(await page.locator('script').count()).toBe(1);
       expect(
         await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned),
@@ -327,7 +370,7 @@ describe('a hostile invite (I-5)', () => {
       await page.locator('#copy').click();
       await expect
         .poll(() => clipboard(page))
-        .toBe(buildJoinCommand(`${PREFIX}${payloadOf(link)}`));
+        .toBe(buildCommands(`${PREFIX}${payloadOf(link)}`)?.unix);
       await page.locator('#copy-ai').click();
       await expect.poll(() => clipboard(page)).toBe(buildAskAi(`${PREFIX}${payloadOf(link)}`));
       await page.locator('#copy-link').click();
@@ -448,7 +491,7 @@ describe('accessibility and motion (U3-invite, b11 §33.1)', () => {
       });
       expect(violations, mode.name).toEqual([]);
       const sizes = await page.evaluate(() =>
-        ['copy-ai', 'copy', 'copy-link'].map(
+        ['copy-ai', 'os-unix', 'os-windows', 'os-node', 'copy', 'copy-link'].map(
           (id) => document.getElementById(id)?.getBoundingClientRect().height ?? 0,
         ),
       );

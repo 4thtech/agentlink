@@ -45,7 +45,7 @@ describe('install.ps1 behaviour (pwsh)', () => {
     const out = `${r.stdout}${r.stderr}`;
     expect(r.status, out).toBe(0);
     expect(out).toContain('all install.ps1 checks passed');
-    expect(out.match(/^ok: /gm)?.length ?? 0, out).toBeGreaterThanOrEqual(18);
+    expect(out.match(/^ok: /gm)?.length ?? 0, out).toBeGreaterThanOrEqual(28);
     // pwsh start-up plus zipping and unzipping the fixture several times: well over the 20 s default.
   }, 150_000);
 
@@ -85,6 +85,25 @@ describe('install.ps1 source', () => {
     const afterParam = body.slice(body.indexOf('\n', body.indexOf('param(')) + 1).trim();
     expect(afterParam.startsWith('& {')).toBe(true);
     expect(afterParam).toMatch(/\} \$MyInvocation$/);
+  });
+
+  it('WP-2: takes the invite as -Invite, checks it before anything else, and hands it to join', () => {
+    expect(source).toContain(
+      'param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite)',
+    );
+    // The same patterns as `agentlink join` (08 §4), case-sensitive and anchored at the very end.
+    expect(source).toContain("$prefix = [regex]::Escape('https://agentlink.4thtech.io/i#')");
+    expect(source).toContain(
+      "[regex]::IsMatch($Link, '\\A' + $prefix + '(?:[A-Za-z0-9_-]{1,21846}|2\\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048])\\z')",
+    );
+    expect(source).not.toMatch(/IgnoreCase|-match \$Link|\$Link -match/);
+    // An -Invite that is given but empty or not a string is refused, not ignored.
+    expect(source).toMatch(/if \(\$null -ne \$Invite\) \{/);
+    expect(source).toContain("Invoke-Launcher $launcher @('join', $Invite)");
+    // F43: the last line comes after the app closes, also on Ctrl+C.
+    expect(source).toMatch(
+      /\} finally \{\s*Write-Host 'Next time, open a new terminal and type: agentlink'/,
+    );
   });
 
   it('asks for TLS 1.2 or 1.3 only, puts the setting back, and refuses redirects', () => {

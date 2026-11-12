@@ -10,11 +10,13 @@ Install AgentLink by pasting one line into a terminal you opened yourself (owner
 
 Already have Node.js 22.14 or newer? `npx -y @4thtech-io/agentlink@latest` works without the installer.
 
+**From an invite (WP-2).** The invite page shows the same line with the invite built in, for your computer: `curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite '<invite link>'` or, in PowerShell, `& ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Invite '<invite link>'`. It installs as below, then opens AgentLink on the invite (`agentlink join` with the link). The link is checked before anything else happens, with the same rules as `agentlink join` (08 §4): `https://agentlink.4thtech.io/i#` and 1 to 21 846 base64url characters, or the short form `i#2.` and 43. Anything else (another host, a space, a quote, a line break, a shell character, a second `#`) stops the installer with one fixed line, "This isn't a complete AgentLink invite. Open the link again and copy the command.", exit code 2, before anything is downloaded or written. The installer never prints or stores the link; your shell history and the process list can hold the command line (08 §4 residuals).
+
 ## What it does
 
 1. **Node.js.** If `node` 22.14 or newer (with `npx` next to it) is on your PATH, it uses that. Otherwise it downloads the official Node.js **22.23.4** (LTS) from `https://nodejs.org/dist/v22.23.4/` into a folder of its own: `~/.agentlink/runtime` (Mac, Linux) or `%LOCALAPPDATA%\AgentLink\runtime` (Windows). Before unpacking, the SHA-256 of the download must equal **both** the line in that release's `SHASUMS256.txt` (fetched over HTTPS from nodejs.org) **and** the hash written in the installer. Any mismatch stops the install and nothing is installed.
 2. **The `agentlink` command.** A small launcher that runs `npx -y @4thtech-io/agentlink@latest` with that Node.js, with the npm registry pinned to `https://registry.npmjs.org/` on the command line (for the `@4thtech-io` scope too), and `--prefix` set to the AgentLink folder, so an `.npmrc` in the folder you start it from is not read (no registry, proxy, TLS or `node-options` from there): `~/.agentlink/bin/agentlink` (one marked line in `~/.profile`, and in `~/.zshrc` or your bash file, adds it to PATH) or `%LOCALAPPDATA%\AgentLink\bin\agentlink.cmd` (added to your user PATH). On Windows it is a `.cmd` file, so the PowerShell execution policy never blocks it.
-3. **Opens the app**, when run from a terminal. Your browser opens on Welcome. Otherwise (for example in a script) it prints the command to run instead.
+3. **Opens the app**, when run from a terminal. Your browser opens on Welcome (with `--invite`, on the invite). It prints "AgentLink is installed." first and "Next time, open a new terminal and type: agentlink" after the app closes, also after Ctrl+C (F43). Otherwise (for example in a script or run by an AI) it prints how to start it instead and never starts the app. The launcher sets `AGENTLINK_LAUNCHER=installer`, so AgentLink names the `agentlink` command in what it prints (D4).
 
 No sudo or admin rights, no system settings, no telemetry. It never asks for or prints a secret. Your IDs, contacts and messages live in `~/.agentlink` (outside `runtime` and `bin`); the installer never touches them.
 
@@ -25,6 +27,7 @@ No sudo or admin rights, no system settings, no telemetry. It never asks for or 
 | `sh -s -- --dry-run` | `-DryRun` | Prints what it would do; changes nothing |
 | `sh -s -- --uninstall` | `-Uninstall` | Removes the runtime, the command and the PATH entry; keeps your IDs |
 | `sh -s -- --no-start` | `-NoStart` | Installs without opening the app |
+| `sh -s -- --invite '<link>'` | `-Invite '<link>'` | Opens AgentLink on that invite after installing (the invite page's command) |
 
 On Mac or Linux: `curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --uninstall`. On Windows, options need the script block form: `& ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Uninstall`.
 
