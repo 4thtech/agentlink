@@ -6,6 +6,7 @@ import {
   WINDOW_PARTITION,
   hardenSession,
   isAllowedExternal,
+  isNativePresenceRequest,
   lockWebContents,
   passkeyPolicy,
   permissionAllowed,
@@ -273,5 +274,49 @@ describe('hardenSession', () => {
     expect(mac.session.userAgent.endsWith(' AgentLinkDesktop/1 (passkey=browser)')).toBe(true);
     const win = await harden('win32');
     expect(win.session.userAgent.endsWith(' AgentLinkDesktop/1 (passkey=window)')).toBe(true);
+  });
+});
+
+// DESK-TOUCHID-FIX: before a request that will start the native presence helper reaches the core,
+// the main process takes focus away from the page (blurWebView), so a focused master-code field can
+// not keep macOS secure input on and the Touch ID sheet can become key. A backstop: the page blurs
+// the field itself first. Headers pass through unchanged.
+describe('native presence requests take focus off the page (DESK-TOUCHID-FIX)', () => {
+  it('recognises exactly the requests that start the helper', () => {
+    const at = (path: string): string => `${ORIGIN}${path}`;
+    expect(
+      isNativePresenceRequest('POST', at('/api/approvals/x'), { 'X-AgentLink-Presence': 'native' }),
+    ).toBe(true);
+    expect(
+      isNativePresenceRequest('POST', at('/api/rules'), { 'x-agentlink-presence': 'native' }),
+    ).toBe(true);
+    expect(isNativePresenceRequest('POST', at('/api/owner/native'), {})).toBe(true);
+    expect(isNativePresenceRequest('POST', at('/api/owner/native/replace'), {})).toBe(true);
+    expect(isNativePresenceRequest('POST', at('/api/owner/native/off'), {})).toBe(false);
+    expect(isNativePresenceRequest('GET', at('/api/owner/native'), {})).toBe(false);
+    expect(
+      isNativePresenceRequest('POST', at('/api/rules'), { 'X-AgentLink-Presence': 'passkey' }),
+    ).toBe(false);
+    expect(isNativePresenceRequest('POST', at('/api/rules'), {})).toBe(false);
+    expect(isNativePresenceRequest('POST', 'not a url', {})).toBe(false);
+  });
+
+  it('calls the blur hook before the request goes on, only on the locked origin', async () => {
+    const session = new FakeSession();
+    const lock = lockedTo();
+    let blurs = 0;
+    await hardenSession(session, lock, 'darwin', () => {
+      blurs += 1;
+    });
+    const headers = { 'X-AgentLink-Presence': 'native', 'X-AgentLink-CSRF': 't' };
+    expect(session.sendHeaders('POST', `${ORIGIN}/api/approvals/a1/approve`, headers)).toEqual(
+      headers,
+    );
+    expect(blurs).toBe(1);
+    session.sendHeaders('POST', `${ORIGIN}/api/owner/native`, {});
+    expect(blurs).toBe(2);
+    session.sendHeaders('POST', `${ORIGIN}/api/rules`, {});
+    session.sendHeaders('POST', 'https://example.com/api/owner/native', headers);
+    expect(blurs).toBe(2);
   });
 });

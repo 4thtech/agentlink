@@ -333,3 +333,113 @@ describe('fixed diagnostics of a helper run (DESK-NATIVE-DEBUG)', () => {
     expect(nativeUiState(69)).toBe('unavailable');
   });
 });
+
+// DESK-TOUCHID-FIX: a cancelled or timed-out helper is stopped with SIGTERM (its handler invalidates
+// the LocalAuthentication context, so no Touch ID sheet is left on screen) and core waits for it to
+// exit before answering; one that ignores SIGTERM is killed after a grace period. The helper's fixed
+// note that secure input was on when it started becomes ONE fixed core diagnostic line.
+describe('stopping the helper and its secure-input note (DESK-TOUCHID-FIX)', () => {
+  const stub = (name: string, body: string): string => {
+    const script = join(root, name);
+    writeFileSync(script, `#!${process.execPath}\n${body}\n`);
+    chmodSync(script, 0o700);
+    return script;
+  };
+  /** A stand-in that, on SIGTERM, records the signal, takes 300 ms to clean up, then exits 10. */
+  const graceful = (name: string, mark: string): string =>
+    stub(
+      name,
+      `const fs = require('node:fs');\n` +
+        `process.on('SIGTERM', () => { fs.writeFileSync(${JSON.stringify(mark)}, 'SIGTERM');\n` +
+        `  setTimeout(() => { fs.appendFileSync(${JSON.stringify(mark)}, ' exited'); process.exit(10); }, 300); });\n` +
+        `setInterval(() => undefined, 1000);`,
+    );
+
+  it('cancel: SIGTERM, then core waits until the helper has exited', async () => {
+    const mark = join(root, 'cancel-mark');
+    const script = graceful('graceful-cancel', mark);
+    const abandoned = new AbortController();
+    const pending = spawnNativeHelper(script)(['ecdh', 'approve'], undefined, abandoned.signal);
+    setTimeout(() => abandoned.abort(), 300);
+    const result = await pending;
+    expect([result.code, result.ended]).toEqual([null, 'aborted']);
+    expect(readFileSync(mark, 'utf8')).toBe('SIGTERM exited');
+  });
+
+  it('timeout: SIGTERM, then core waits until the helper has exited', async () => {
+    const mark = join(root, 'timeout-mark');
+    const script = graceful('graceful-timeout', mark);
+    const result = await spawnNativeHelper(script, { timeoutMs: 300 })(
+      ['ecdh', 'approve'],
+      undefined,
+    );
+    expect([result.code, result.ended]).toEqual([null, 'timeout']);
+    expect(readFileSync(mark, 'utf8')).toBe('SIGTERM exited');
+  });
+
+  it('a helper that ignores SIGTERM is killed after the grace period', async () => {
+    const script = stub(
+      'stubborn',
+      `process.on('SIGTERM', () => undefined); setInterval(() => undefined, 1000);`,
+    );
+    const abandoned = new AbortController();
+    const started = Date.now();
+    const pending = spawnNativeHelper(script, { killGraceMs: 200 })(
+      ['ecdh', 'approve'],
+      undefined,
+      abandoned.signal,
+    );
+    setTimeout(() => abandoned.abort(), 300);
+    const result = await pending;
+    expect([result.code, result.ended]).toEqual([null, 'aborted']);
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it('the stop of a signalled helper is a fixed diagnostic', () => {
+    expect(readHelperDiagnostic(new TextEncoder().encode('signal none 15\n'))).toBe(
+      'signal none 15',
+    );
+  });
+
+  it('secure input on at the start: one fixed core line, on success and on refusal', async () => {
+    const lines: string[] = [];
+    const ok = stub(
+      'secure-ok',
+      `process.stderr.write('note secureinput 1\\n'); process.stdout.write('ab'.repeat(32) + '\\n');`,
+    );
+    const helper = createNativeHelper({
+      kind: 1,
+      run: spawnNativeHelper(ok),
+      diagnose: (line) => lines.push(line),
+    });
+    const secret = await helper.release(RECORD, 'approve');
+    expect(secret.length).toBe(32);
+    expect(lines).toEqual(['native presence: secure input was on when the helper started']);
+
+    const refused = stub(
+      'secure-refused',
+      `process.stderr.write('note secureinput 1\\nsheet la -2\\n'); process.exitCode = 10;`,
+    );
+    const r = await spawnNativeHelper(refused)(['ecdh', 'approve'], undefined);
+    expect([r.code, r.diag, r.secureInput]).toEqual([10, 'sheet la -2', true]);
+
+    const quiet = stub('secure-off', `process.stdout.write('ab'.repeat(32) + '\\n');`);
+    const none: string[] = [];
+    await createNativeHelper({
+      kind: 1,
+      run: spawnNativeHelper(quiet),
+      diagnose: (line) => none.push(line),
+    }).release(RECORD, 'approve');
+    expect(none).toEqual([]);
+  });
+
+  it('a note that is not exactly the fixed line is dropped', async () => {
+    const odd = stub(
+      'secure-odd',
+      `process.stderr.write('note secureinput 1 /Users/x\\nsheet la -2\\n'); process.exitCode = 10;`,
+    );
+    const r = await spawnNativeHelper(odd)(['ecdh', 'approve'], undefined);
+    expect(r.secureInput).toBeUndefined();
+    expect(r.diag).toBeUndefined();
+  });
+});
