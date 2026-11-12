@@ -1,6 +1,6 @@
 # Settings
 
-*Applies to AgentLink 0.5.0. The three groups, the states on each row, Find a setting and the list of pages beside each Settings page are new in 0.5.0.*
+*Applies to AgentLink 0.5.1. The three groups, the states on each row, Find a setting and the list of pages beside each Settings page are new in 0.5.0.*
 
 **Settings** is in the left menu. Its rows are in three groups, and each row says in one line where it stands.
 
@@ -9,7 +9,7 @@
 | Group | Pages |
 |---|---|
 | **Safety** | [Backup & restore](backup-and-restore.md) (*Up to date*, *Out of date*, *Not backed up* or *Not finished*) and [Touch ID & master code](touch-id-and-master-code.md) (*Touch ID on* or *Master code only*; Windows Hello on Windows, *your passkey* elsewhere) |
-| **Your AI** | [Rules](rules.md) (how many things your AI asks you about first), [AI apps](ai-apps.md) (which are connected) and **Files** (the [folders your AI may send from](../everyday-use/allowed-folders.md) and where received files go) |
+| **Your AI** | [Rules](rules.md) (how many things your AI asks you about first), [AI apps](ai-apps.md) (which are connected) **Files** (the [folders your AI may send from](../everyday-use/allowed-folders.md) and where received files go) and [Storage](storage.md) (how much room your messages and saved files take) |
 | **This app** | [Appearance](appearance.md) (theme, motion and Under the hood), [Proofs & credits](proofs-and-credits.md) and **Advanced** (network, diagnostics and the activity log; *All working* when nothing needs you) |
 
 - **One notice at the top** says what needs you first, for example *"You have no recovery kit."* or *"Your recovery kit is missing 2 IDs."*, with the button that fixes it.

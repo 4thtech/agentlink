@@ -1,6 +1,6 @@
 # Install AgentLink
 
-*Applies to AgentLink 0.4.14. Mac, Windows 10 or 11, and Linux. Desktop apps for Mac and Windows are coming soon; until then AgentLink opens in your browser.*
+*Applies to AgentLink 0.5.1. Mac, Windows 10 or 11, and Linux. There is an early [Mac desktop app](../apps/desktop-app.md); otherwise AgentLink opens in your browser.*
 
 **Goal:** AgentLink installed and its app open in your browser, in about two minutes. You need no account and no admin rights.
 

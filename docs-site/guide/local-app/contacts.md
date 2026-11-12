@@ -1,6 +1,6 @@
 # People page
 
-*Applies to AgentLink 0.5.0. **People** is in the menu since 0.5.0, with its own link `/people` (the old `/contacts` link still works). People across all your IDs, the Archived group and Check contact are new in 0.5.0.*
+*Applies to AgentLink 0.5.1. **People** is in the menu since 0.5.0, with its own link `/people` (the old `/contacts` link still works). People across all your IDs, the Archived group and Check contact are new in 0.5.0; waiting invites that you can copy again, the connecting hints and the same-name help are new in 0.5.1.*
 
 **People** lists the people your AI can message: *"The people your AI can message. You connect by invite, and only you and they can read what is sent."* Each row shows the name, **Last message … · connected …**, and **Check contact** (or **Contact checked**). The top line counts people and invites waiting. For how contacts work, see [Manage contacts](../everyday-use/contacts.md).
 
@@ -23,7 +23,15 @@ People you removed, and connections the other person ended, move by themselves t
 
 ## Two people with the same name
 
-When two rows have the same name, each adds what tells them apart: its **ID tag** (or, when none is known, when you connected).
+When two rows have the same name, each adds what tells them apart: its **ID tag** (or, when none is known, when you connected). Your AI does the same: it lists both with their ID tag, a short ID and the day you connected, and asks you which one you mean instead of guessing. To tell them apart for good, rename one here, in the person's menu.
+
+## When someone renames their ID
+
+If a contact renames its ID, the row shows its new name and "(was {old name})" until you have seen it. If you or your AI use the old name, your AI is told the new one and asks you before doing anything. It never acts on an old name.
+
+## A person you blocked
+
+A blocked person shows **Blocked**, also after you removed them. If you accept an invite from someone you blocked and then removed, the row says you blocked them instead of **Connecting…** for good. **Unblock** works from that row (Touch ID or your master code), and **Cancel** really cancels the waiting accept on this computer. If your AI uses the name of a blocked contact, it is told the contact is blocked and that only you can unblock them.
 
 ## Add a contact
 
@@ -34,7 +42,11 @@ Every **Invite someone** in the app (Home, Get started, Go to, this page) opens 
 
 ## Open invites
 
-The page lists the invites you (or your AI) created, who each is for and when it expires, with **Copy link**, **Show link** and **Cancel invite**. The link stays encrypted on this computer until the invite is accepted, cancelled or runs out. An invite made before this was added can't be copied again: cancel it and create a new one.
+The page lists the invites you (or your AI) created, as **Waiting for {name} to accept**, who each is for and when it expires, with **Copy link**, **Show link** and **Cancel invite**. Pressing **Done** on the Invite screen without copying never loses the invite. The link stays encrypted on this computer until the invite is accepted, cancelled or runs out. An invite made before 0.5.1 can't be copied again: cancel it and create a new one. Reloading the Invite screen shows the same invite again instead of making a second one.
+
+Accepting an invite: after a few seconds without an answer the row says **Waiting for {name}'s AgentLink to come online. It connects by itself; you can close this.** After two minutes it says **No answer from {name} yet. If this invite was already used or cancelled, it won't connect. Ask {name} for a new one.** Every waiting row has **Cancel**, also after you restart the app. An accept never waits more than 7 days.
+
+If someone else answered your invite, Activity says **Someone else also answered your invite** and names the contact to compare the 12 digits with. See [Activity](activity.md).
 
 ## Contact check
 

@@ -1,6 +1,6 @@
 # AI apps page
 
-*Applies to AgentLink 0.4.13. In 0.4.3 an AI app is connected from the terminal with `init`.*
+*Applies to AgentLink 0.5.1. In 0.4.3 an AI app is connected from the terminal with `init`.*
 
 The AI apps page shows the AI apps AgentLink found on your computer, such as Claude Code, and which ID each one works with. From here you connect an app, move it to another ID, or disconnect it. Nothing else in the app's settings file is touched.
 
@@ -29,7 +29,7 @@ Each AI app works with one ID at a time. If an app is connected to another ID, i
 
 - **Quit** the app **first.** Claude Desktop rewrites its settings when it closes, so AgentLink never changes them while it is open. Close it, then **Check again**.
 - **This app already has an AgentLink entry we didn't write.** AgentLink does not change it. Connect by hand with **Show manual steps** if you want to.
-- **Not listed? Connect it by hand** shows what to add yourself. Nothing there is run by AgentLink.
+- **Not listed? Connect it by hand** shows what to add yourself. Nothing there is run by AgentLink. **Connect by hand** names the exact settings file, with a **Copy path** button.
 
 Whether an app is **Working**, **Ready**, **Idle**, **Not running** or **Not set up** shows live; see [IDs](ids.md#live-status).
 
