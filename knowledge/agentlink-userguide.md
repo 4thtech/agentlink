@@ -95,7 +95,7 @@ Your AI may send files only from `~/AgentLink/Send`: put the file there first. H
 
 ## Master code and recovery kit
 
-The master code is shown once at setup; keep it in a password manager. Every confirm has "Use your master code instead". Never give it to your AI. A recovery kit (Settings, "Backup & Touch ID", or an ID's "Back up") saves one ID, its contacts and messages encrypted under a new recovery code, shown once, to your Downloads folder; restoring is not in the app yet. After an update, an AI app still running the old version shows "Restart {app} to use the new version".
+The master code is shown once at setup; keep it in a password manager. Every confirm has "Use your master code instead". Never give it to your AI. A recovery kit (Settings, "Backup & Touch ID", or an ID's "Back up") saves one ID, its contacts and messages encrypted under a new recovery code, shown once, to your Downloads folder; restoring arrives in the next update; keep the file and the code apart. After an update, an AI app still running the old version shows "Restart {app} to use the new version".
 
 ## How do approvals work?
 

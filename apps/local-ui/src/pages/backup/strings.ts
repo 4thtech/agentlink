@@ -1,10 +1,10 @@
 // Settings › Backup & Touch ID copy (W4-SETTINGS-ADVANCED; WP-11, F-1, D-117 A; 11 §5; 07 §9.4). The
-// recovery kit is saved here, behind Touch ID or the master code. Restore stays in the terminal.
+// recovery kit is saved here, behind Touch ID or the master code. Restoring from a kit is not built yet.
 export const BACKUP_STRINGS = {
   title: 'Backup & Touch ID',
   kitTitle: 'Recovery kit',
   kitBody:
-    'Your recovery kit gets you back in on a new computer: this ID, its contacts and its messages, locked under a new recovery code.',
+    'A recovery kit holds your IDs, people and messages, locked under a recovery code. Restoring from it arrives in the next update; keep the file and the code safe.',
   kitPending: 'You put this off during setup. Keep your master code safe until you save the kit.',
   saveKit: 'Save recovery kit',
   saveAnother: 'Save a new recovery kit',
@@ -17,7 +17,7 @@ export const BACKUP_STRINGS = {
   codeTitle: 'Your recovery code',
   shownOnce: 'Shown once',
   codeBody:
-    'You need this code and the kit file to restore. Keep them apart, for example the code on paper and the file on a USB stick. Never give the code to your AI.',
+    'You will need this code and the kit file together to restore. Keep them apart, for example the code on paper and the file on a USB stick. Never give the code to your AI.',
   copy: 'Copy',
   copied: 'Copied',
   copyNote: 'Other apps can read your clipboard.',
