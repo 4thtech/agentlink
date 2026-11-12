@@ -5,13 +5,13 @@
 //   owner has not seen yet, carries `formerName`: the former name under the name rule (core's
 //   restricted form), never the raw text. Nothing else changes: the label, the fingerprint and
 //   "Contact checked" stay as core says (no key warning).
-// - `GET /api/ui/contacts/:ref/name-seen`: the page says it showed the note; core sets
+// - `POST /api/ui/contacts/:ref/name-seen` (the mark kind, R1-SEC-16): the page says it showed the note; core sets
 //   `name_change_seen` (display state only, 07 §3: nothing is decided from it). An unknown ref is
 //   not_found; nothing is signed.
 import type { ContactView } from '@4thtech-io/core';
 import { describe, expect, it } from 'vitest';
 import { readOnlyClient, type LocalUiContext, type LocalUiReadClient } from '../context.js';
-import type { LocalUiReadRoute, LocalUiRequest } from '../route-types.js';
+import type { LocalUiMarkRoute, LocalUiReadRoute, LocalUiRequest } from '../route-types.js';
 import { createLocalUiRoutes } from '../routes.js';
 import { contactsRoutes } from './contacts.js';
 import { contactNamesRoutes } from './contacts-renamed.js';
@@ -61,8 +61,8 @@ const list = contactsRoutes.find(
   (r) => r.method === 'GET' && r.path === '/api/ui/contacts',
 ) as LocalUiReadRoute;
 const seenRoute = contactNamesRoutes.find(
-  (r) => r.method === 'GET' && r.path === '/api/ui/contacts/:ref/name-seen',
-) as LocalUiReadRoute;
+  (r) => r.method === 'POST' && r.path === '/api/ui/contacts/:ref/name-seen',
+) as LocalUiMarkRoute;
 
 describe('GET /api/ui/contacts: formerName (D-141)', () => {
   it('carries the restricted former name while the note is unseen; the label stays', async () => {
@@ -115,17 +115,15 @@ describe('GET /api/ui/contacts: formerName (D-141)', () => {
   });
 });
 
-describe('GET /api/ui/contacts/:ref/name-seen', () => {
-  it('is registered once as a read and marks the note seen', async () => {
+describe('POST /api/ui/contacts/:ref/name-seen', () => {
+  it('is registered once as a mark (never a GET) and marks the note seen', async () => {
     const all = createLocalUiRoutes().routes();
-    expect(
-      all.filter((r) => r.method === 'GET' && r.path === '/api/ui/contacts/:ref/name-seen'),
-    ).toHaveLength(1);
-    expect(seenRoute.presence).toBe(false);
+    expect(all.filter((r) => r.path === '/api/ui/contacts/:ref/name-seen')).toHaveLength(1);
+    expect(seenRoute.presence).toBe('mark');
     const seen: string[] = [];
     const r = await seenRoute.handler(
       ctx(client([view({ nameChange: { formerName: 'Marko', newName: 'Mark', at: 1 } })], seen)),
-      req({ ref: MARKO }),
+      { ref: MARKO },
     );
     expect(r).toEqual({ status: 200, body: { status: 'done' } });
     expect(seen).toEqual([MARKO]);
@@ -133,12 +131,9 @@ describe('GET /api/ui/contacts/:ref/name-seen', () => {
 
   it('refuses a ref that is not a contact ID, and an unknown contact', async () => {
     const seen: string[] = [];
-    const bad = await seenRoute.handler(ctx(client([view()], seen)), req({ ref: 'x' }));
+    const bad = await seenRoute.handler(ctx(client([view()], seen)), { ref: 'x' });
     expect(bad.status).toBe(404);
-    const unknown = await seenRoute.handler(
-      ctx(client([], seen)),
-      req({ ref: '0x' + '12'.repeat(20) }),
-    );
+    const unknown = await seenRoute.handler(ctx(client([], seen)), { ref: '0x' + '12'.repeat(20) });
     expect(unknown.status).toBe(404);
   });
 

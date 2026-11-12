@@ -1198,16 +1198,16 @@ describe('the display marks are POSTs with the write gates (R1-SEC-16)', () => {
     const client = {
       agentId: 'agent-1',
       getProof: () => Promise.resolve(undefined),
-      contacts: { list: () => Promise.resolve([{ id: MARKO }]) },
-      contactNames: {
-        markSeen: (id: string) => {
+      contacts: {
+        list: () => Promise.resolve([{ id: MARKO }]),
+        markNameChangeSeen: (id: string) => {
           marks.push(`seen:${id}`);
           return Promise.resolve(true);
         },
       },
-      autoSaveNotice: {
-        due: () => Promise.resolve(true),
-        dismiss: () => {
+      autoSave: {
+        noticeDue: () => Promise.resolve(true),
+        dismissNotice: () => {
           marks.push('dismiss');
           return Promise.resolve();
         },
@@ -1246,8 +1246,10 @@ describe('the display marks are POSTs with the write gates (R1-SEC-16)', () => {
 
   it('refuses no Origin, no CSRF, text/plain, a query, an input header and any body byte', async () => {
     const { h, marks, headers } = await markHarness();
-    const { Origin: _o, ...noOrigin } = headers;
-    const { 'X-AgentLink-CSRF': _c, ...noCsrf } = headers;
+    const without = (name: string): Record<string, string> =>
+      Object.fromEntries(Object.entries(headers).filter(([key]) => key !== name));
+    const noOrigin = without('Origin');
+    const noCsrf = without('X-AgentLink-CSRF');
     const cases: [string, Record<string, string>, Uint8Array | undefined, number][] = [
       [DISMISS, noOrigin, undefined, 403],
       [DISMISS, noCsrf, undefined, 403],

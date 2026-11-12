@@ -25,10 +25,15 @@
 //   link token, in memory only, put in the URL it opens (`/?t=…`). The first request with it
 //   exchanges it for a new random session secret in an HttpOnly, SameSite=Strict cookie scoped to this
 //   port's name and redirects to the same path without the token; the link token is then gone, so a
-//   link left in browser history never opens the page again. An unused link dies after
+//   link left in browser history never opens the page again. R1-SEC-05: the OS opener never puts
+//   the link in a program's argv (approval-os.ts: a private launch file); a link that arrives as a
+//   navigation that is not the OS's own (fetch metadata other than `none`) gets the cookie with a
+//   same-origin continue page instead of the redirect, since browsers drop a SameSite=Strict cookie
+//   on such a redirect. An unused link dies after
 //   SESSION_LINK_LIFETIME_MS. At most MAX_LINKS links and MAX_SESSIONS sessions are held (the oldest
-//   is dropped). No token, cookie or CSRF value is written to disk, logged, put in an event, an
-//   approval URL or an error body.
+//   is dropped). No token, cookie or CSRF value is written to disk (except the one-shot link inside
+//   the OS opener's private 0600 launch file, R1-SEC-05), logged, put in an event, an approval URL
+//   or an error body.
 // - DNS rebinding: the `Host` header must be exactly `localhost:<port>` (so `127.0.0.1:<port>`,
 //   `[::1]:<port>`, `LOCALHOST:<port>` and `localhost.:<port>` are refused); any `Origin` header present
 //   must be exactly `http://localhost:<port>`; a POST must carry that Origin.
@@ -315,6 +320,7 @@ import type {
   LocalUiResult,
   LocalUiRevealRoute,
   LocalUiKitRevealRoute,
+  LocalUiMarkRoute,
   LocalUiUiSettingsRoute,
   LocalUiSetupStep,
 } from './local-ui/route-types.js';
@@ -439,6 +445,23 @@ const REVIEW_ITEM = /^(apr_[A-Za-z0-9_-]{22}):([0-9a-f]{64}):([ad])$/;
  * fixed page), never raw JSON; the API keeps its JSON answers.
  */
 const APP_PAGE = { test: (path: string): boolean => path !== '/' && isAppPagePath(path) };
+
+/**
+ * R1-SEC-05: the same-origin continue page after a session link opened from the launch file. `path`
+ * is a checked page path (`/`, APPROVE_PAGE or APP_PAGE); it is escaped anyway. No script, no token.
+ */
+function continuePage(path: string): string {
+  const safe = path.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? '',
+  );
+  return (
+    '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+    `<meta http-equiv="refresh" content="0;url=${safe}">` +
+    '<title>AgentLink</title></head>' +
+    `<body><p><a href="${safe}">Open AgentLink</a></p></body></html>`
+  );
+}
 const API_PREFIX = '/api/';
 const ASSETS_PREFIX = '/assets/';
 /** One file name: no separator, no leading dot, no escape. */
@@ -1454,6 +1477,8 @@ export async function startApprovalServerWith(
   const handoffBytes = handoffToken === undefined ? undefined : encodeUtf8(handoffToken);
   /** U3-invite: when the last handoff arrived and when the join screen was last opened (ms). */
   let lastHandoffAt = Number.NEGATIVE_INFINITY;
+  /** R1-SEC-15: when the last handoff with a wrong token was refused (ms); throttled on its own. */
+  let lastHandoffRefusedAt = Number.NEGATIVE_INFINITY;
   let lastJoinOpenAt = Number.NEGATIVE_INFINITY;
   // U3-d (D-138; 08 §1; 04 §2.8 "From the local app"): create an agent and save a verified label.
   // Nothing here signs. W4-ONE-TOUCH: creating an agent is the create-agent gate's (createAgentGate).
@@ -4984,6 +5009,48 @@ export async function startApprovalServerWith(
   }
 
   /**
+   * R1-SEC-16: the gate of the mark kind (a display mark). The caller checked the session, CSRF,
+   * Origin, fetch metadata, the octet-stream type and the generation. No query, operation input or
+   * presence header and no body byte; no owner presence, no owner store, nothing signed. The handler
+   * gets the context and the checked route parameters only.
+   */
+  async function markGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiMarkRoute,
+    params: Readonly<Record<string, string>>,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_KIT_REVEAL_BODY_BYTES);
+    if (body === undefined) return;
+    if (body.length !== 0) {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (!stillCurrent(req)) {
+      agentChanged(res);
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext, params);
+    } catch (error) {
+      sendJson(res, 500, failedBody(error));
+      return;
+    }
+    sendResult(res, result);
+  }
+
+  /**
    * UX2-d1 (owner decision 1.1): the gate of the two invite-kind routes (create, check). The caller
    * checked the session, CSRF, Origin, fetch metadata and the octet-stream type. No query, operation
    * input or presence header; create is rate-limited before the body is read; the body must be one
@@ -5195,9 +5262,10 @@ export async function startApprovalServerWith(
    * U3-invite (08 §4 "An app host already running"): `POST /api/ui/join/handoff` from `agentlink
    * join`, the handoff kind. Run before the session gate: the caller is a local process with the
    * handoff token from the 0600 record, never the page. It refuses an Origin, any Sec-Fetch-*
-   * header, a cookie, a CSRF value, an operation input, a presence header and a query; takes at most
-   * one handoff per HANDOFF_INTERVAL_MS (counted before the token is checked, so the token cannot be
-   * guessed quickly); compares the token in constant time; parses exactly `{"invite":"<link>"}`; and
+   * header, a cookie, a CSRF value, an operation input, a presence header and a query; compares the
+   * token in constant time; takes at most one handoff per HANDOFF_INTERVAL_MS, and answers at most
+   * one wrong token per HANDOFF_INTERVAL_MS (R1-SEC-15: counted apart, so a caller without the token
+   * cannot hold the real handoff at 429); parses exactly `{"invite":"<link>"}`; and
    * hands the link to the join desk, which runs Accept step 1 and stores it in memory. Nothing is
    * signed, written or logged; the body is wiped. The token grants nothing else.
    */
@@ -5222,14 +5290,22 @@ export async function startApprovalServerWith(
     if (url.search !== '') return refuse(400, 'invalid');
     const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
     if (type !== 'application/octet-stream') return refuse(415, 'content_type');
+    // R1-SEC-15: the token (32 random bytes, constant-time compare) is checked first, and accepted
+    // and refused handoffs are throttled apart, so a caller without the token cannot hold the real
+    // `join` at 429. Each kind: at most one per HANDOFF_INTERVAL_MS.
     const at = now();
-    if (at - lastHandoffAt < HANDOFF_INTERVAL_MS) {
-      const retryAfter = Math.max(1, Math.ceil((lastHandoffAt + HANDOFF_INTERVAL_MS - at) / 1000));
+    const valid = matches(header(req, HANDOFF_HEADER), handoffBytes);
+    const last = valid ? lastHandoffAt : lastHandoffRefusedAt;
+    if (at - last < HANDOFF_INTERVAL_MS) {
+      const retryAfter = Math.max(1, Math.ceil((last + HANDOFF_INTERVAL_MS - at) / 1000));
       res.setHeader('Retry-After', String(retryAfter));
       return refuse(429, 'wait');
     }
+    if (!valid) {
+      lastHandoffRefusedAt = at;
+      return refuse(401, 'refused');
+    }
     lastHandoffAt = at;
-    if (!matches(header(req, HANDOFF_HEADER), handoffBytes)) return refuse(401, 'refused');
     const body = await boundedBody(req, res, MAX_INVITE_CHECK_BODY_BYTES);
     if (body === undefined) return;
     let link: unknown;
@@ -5411,6 +5487,11 @@ export async function startApprovalServerWith(
       await kitRevealGate(req, res, url, route);
       return;
     }
+    if (route.presence === 'mark') {
+      // R1-SEC-16: a display mark has its own gate; no presence, no input.
+      await markGate(req, res, url, route, params);
+      return;
+    }
     if (route.presence === 'reveal') {
       // MSG-FILES-IO-h: Show in Finder has its own gate; ownerGate never runs it (D-134).
       await revealGate(req, res, url, route);
@@ -5506,7 +5587,10 @@ export async function startApprovalServerWith(
     const path = url.pathname;
     const method = req.method ?? 'GET';
     // F25: page API activity (a poll, a read, a write) keeps `ui` open; static files do not.
-    if (path.startsWith('/api/ui/')) lastActivityAt = Date.now();
+    // R1-SEC-15: only a request with a live session counts, so no other local caller keeps it open.
+    if (path.startsWith('/api/ui/') && matchIndex(cookieToken(req), sessions) >= 0) {
+      lastActivityAt = Date.now();
+    }
     if (!path.startsWith(SETUP_PATH_PREFIX)) sweepSetup();
 
     if (path.startsWith(ASSETS_PREFIX)) {
@@ -5543,6 +5627,14 @@ export async function startApprovalServerWith(
           // set over http://localhost (checked with Playwright WebKit), so the page would not open.
           `${cookieName}=${newSession()}; HttpOnly; SameSite=Strict; Path=/`,
         );
+        const site = header(req, 'sec-fetch-site');
+        if (site !== undefined && site !== 'none') {
+          // R1-SEC-05: opened from the private launch file (approval-os.ts), the navigation is not
+          // same-site, and browsers drop a SameSite=Strict cookie on its redirect. A same-origin
+          // continue page (no script, no token, the checked page path only) goes on with it.
+          sendText(res, 200, 'text/html; charset=utf-8', continuePage(path));
+          return;
+        }
         res.setHeader('Location', path);
         sendText(res, 303, 'text/plain; charset=utf-8', '');
         return;

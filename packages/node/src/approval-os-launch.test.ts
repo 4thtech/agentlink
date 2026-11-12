@@ -2,7 +2,15 @@
 // reaches the opener's argv, which other OS users can read (`ps`, /proc/<pid>/cmdline). The OS
 // opener writes a private launch page (0600, in a 0700 folder in the owner's data folder) that sends
 // the browser on to the link, and hands the OS opener only that file's path.
-import { mkdirSync, mkdtempSync, readdirSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  statSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -64,6 +72,17 @@ describe('the session link is never in the opener argv (R1-SEC-05)', () => {
       expect(page).toContain('<meta name="referrer" content="no-referrer">');
     },
   );
+
+  it('on win32 hands a percent-encoded file URL, so a home folder with spaces stays one argument', async () => {
+    const { seams, calls } = launchSeams('win32', {
+      writeLaunchFile: () => Promise.resolve('C:\\Users\\Ana Novak\\.agentlink\\open\\abc.html'),
+    } as unknown as Partial<OsSeams>);
+    expect(await browserOpenerWith(seams)(LINK)).toBe(true);
+    expect(calls[0]?.args).toEqual([
+      'url.dll,FileProtocolHandler',
+      'file:///C:/Users/Ana%20Novak/.agentlink/open/abc.html',
+    ]);
+  });
 
   it('opens nothing when the launch file cannot be written (never falls back to argv)', async () => {
     const { seams, calls } = launchSeams('darwin', {

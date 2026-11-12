@@ -11,12 +11,24 @@
 // session link. A program that is not at its path is not run: the opener resolves false and
 // `agentlink mcp` falls back to the `agentlink approve` command.
 //
-// The session link holds the view-only session token, so it appears in the opener's argv for a
-// moment. A same-user process can read that; it is the same G-1 residual as 04 §2.5 (the token only
-// grants viewing; every decision still needs owner presence).
+// R1-SEC-05 (04 §2.8 "other OS users"; 08 §1 the link token is in memory only): the session link
+// never reaches the opener's argv, which other OS users can read (`ps`, /proc/<pid>/cmdline). The
+// opener writes a private launch page (writePrivateLaunchFile: mode 0600, a random name, in the
+// owner's own 0700 folder `~/.agentlink/open`) that sends the browser on to the link, and hands the
+// OS opener only that file's path. A link that is not exactly this server's own session link
+// (`http://localhost:<port>/<page>?t=<token>`) is never written or opened; a launch file that cannot
+// be written opens nothing (never a fallback to argv). Launch files are removed after
+// LAUNCH_FILE_LIFETIME_MS (and stale ones swept on the next write); the token in one is one-shot.
+// A same-user process could still read the file: the G-1 residual of 04 §2.5 (viewing only; every
+// decision needs owner presence). The desktop shell gets the link over its private pipe instead
+// (startApprovalServerWithLinkSink), never through this opener.
 import { execFile, type ExecFileOptions } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
+import { chmod, lstat, mkdir, open, readdir, unlink } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import process from 'node:process';
+import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 
 /** Opens `url` in the owner's default browser. Resolves false when nothing could be started. */
 export type BrowserOpener = (url: string) => Promise<boolean>;
@@ -58,11 +70,101 @@ export interface OsSeams {
     options: ExecFileOptions,
     callback: (error: RunError) => void,
   ) => void;
+  /** R1-SEC-05: writes the launch page as a private file; its absolute path, or undefined. */
+  readonly writeLaunchFile: (html: string) => Promise<string | undefined>;
+}
+
+/** R1-SEC-05: how long a launch file is kept (the browser reads it at once; the link is one-shot). */
+export const LAUNCH_FILE_LIFETIME_MS = 2 * 60_000;
+
+/** The owner's launch folder: `~/.agentlink/open`. */
+export function launchFolder(home: string = homedir()): string {
+  return join(home, '.agentlink', 'open');
+}
+
+/**
+ * R1-SEC-05: only this server's own session link is ever written: a fixed origin form, a page path
+ * of plain segments and a base64url token. Nothing in it needs escaping in the launch page.
+ */
+const SESSION_LINK =
+  /^http:\/\/localhost:[1-9][0-9]{0,4}\/(?:[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*)?\?t=[A-Za-z0-9_-]{16,128}$/;
+
+/** R1-SEC-05: the launch page for `link`, or undefined when it is not a session link. */
+export function launchPage(link: string): string | undefined {
+  if (!SESSION_LINK.test(link)) return undefined;
+  return (
+    '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'">` +
+    '<meta name="referrer" content="no-referrer">' +
+    `<meta http-equiv="refresh" content="0;url=${link}">` +
+    '<title>AgentLink</title></head>' +
+    `<body><p><a href="${link}">Open AgentLink</a></p></body></html>`
+  );
+}
+
+/**
+ * R1-SEC-05: writes `html` as a new file with a random name in `dir`, mode 0600, created exclusively
+ * and never through a link. `dir` is created 0700 when missing; one that is a link, not a folder or
+ * (POSIX) not this user's is refused, and its mode is set to 0700. Files older than
+ * LAUNCH_FILE_LIFETIME_MS are removed first. Resolves the path, or undefined on any failure.
+ */
+export async function writePrivateLaunchFile(
+  dir: string,
+  html: string,
+  now: number = Date.now(),
+): Promise<string | undefined> {
+  try {
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    const folder = await lstat(dir);
+    if (folder.isSymbolicLink() || !folder.isDirectory()) return undefined;
+    if (process.platform !== 'win32') {
+      if (typeof process.getuid === 'function' && folder.uid !== process.getuid()) return undefined;
+      await chmod(dir, 0o700);
+    }
+    await sweepLaunchFolder(dir, now);
+    const path = join(dir, `${encodeHex(randomBytes(16))}.html`);
+    const flags =
+      constants.O_WRONLY |
+      constants.O_CREAT |
+      constants.O_EXCL |
+      (typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0);
+    const handle = await open(path, flags, 0o600);
+    try {
+      await handle.writeFile(html, 'utf8');
+    } finally {
+      await handle.close();
+    }
+    return path;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Removes the launch folder's files older than LAUNCH_FILE_LIFETIME_MS (best effort). */
+async function sweepLaunchFolder(dir: string, now: number): Promise<void> {
+  const names = await readdir(dir).catch(() => [] as string[]);
+  for (const name of names) {
+    const path = join(dir, name);
+    const info = await lstat(path).catch(() => undefined);
+    if (info === undefined || info.isDirectory()) continue;
+    if (now - info.mtimeMs > LAUNCH_FILE_LIFETIME_MS) await unlink(path).catch(() => undefined);
+  }
+}
+
+/** Removes one launch file after LAUNCH_FILE_LIFETIME_MS, without keeping the process alive. */
+function removeLater(path: string): void {
+  const timer = setTimeout(() => void unlink(path).catch(() => undefined), LAUNCH_FILE_LIFETIME_MS);
+  timer.unref?.();
 }
 
 const nodeSeams = (): OsSeams => ({
   platform: process.platform,
   env: process.env,
+  writeLaunchFile: async (html) => {
+    const path = await writePrivateLaunchFile(launchFolder(), html);
+    if (path !== undefined) removeLater(path);
+    return path;
+  },
   executable: (path) => {
     try {
       accessSync(path, process.platform === 'win32' ? constants.F_OK : constants.X_OK);
@@ -121,16 +223,34 @@ function run(
   });
 }
 
+/**
+ * R1-SEC-05: the `file:///C:/...` URL of a launch file on a drive (each segment percent-encoded, so
+ * no space or quote reaches the command line); undefined for any other path.
+ */
+function windowsLaunchUrl(file: string): string | undefined {
+  if (!/^[A-Za-z]:\\[^\\]/.test(file)) return undefined;
+  const [drive, ...rest] = file.split('\\');
+  return `file:///${[drive, ...rest.map((part) => encodeURIComponent(part))].join('/')}`;
+}
+
 /** The URL opener over `seams` (internal; the package uses osBrowserOpener). */
 export function browserOpenerWith(seams: OsSeams): BrowserOpener {
-  return (url) => {
+  return async (url) => {
+    // R1-SEC-05: the OS opener gets the launch file's path, never the link.
+    const page = launchPage(url);
+    if (page === undefined) return false;
+    const file = await seams.writeLaunchFile(page).catch(() => undefined);
+    if (file === undefined) return false;
     switch (seams.platform) {
       case 'darwin':
-        return run(seams, OS_PROGRAMS.darwinOpen, [url]);
-      case 'win32':
-        return windowsOpen(seams, url);
+        return run(seams, OS_PROGRAMS.darwinOpen, [file]);
+      case 'win32': {
+        // A file: URL (no spaces, no quoting) of the launch file, for the default .html handler.
+        const launchUrl = windowsLaunchUrl(file);
+        return launchUrl === undefined ? false : windowsOpen(seams, launchUrl);
+      }
       default:
-        return run(seams, OS_PROGRAMS.linuxOpen, [url]);
+        return run(seams, OS_PROGRAMS.linuxOpen, [file]);
     }
   };
 }

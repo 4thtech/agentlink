@@ -29,6 +29,9 @@
 // - WP-R2b (04 §2.3.3 "Kit record"): a `presence: 'kit-reveal'` route (Show in Finder for the
 //   recovery kit) is only a POST at BACKUP_REVEAL_PATH with a handler, registered once; the server's
 //   kit-reveal gate runs it with no input at all. No other path, method or route can use the kind.
+// - R1-SEC-16: a `presence: 'mark'` route (a display mark: the auto-save notice's dismiss, a former
+//   name's seen mark) is only a POST at one of MARK_PATHS with a handler, each registered once; the
+//   server's mark gate runs it with no input at all. A GET is always a read.
 // - The page files in api/ each own their routes; this file only lists them.
 import { activityRoutes } from './api/activity.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
@@ -72,6 +75,7 @@ import {
   BACKUP_EXPORT_PATH,
   BACKUP_PATH,
   CREATE_AGENT_PATHS,
+  MARK_PATHS,
   RESTORE_PATHS,
   UI_SETTINGS_WRITE_PATH,
   type LocalUiRoute,
@@ -237,6 +241,14 @@ export class LocalUiRouteRegistry {
       if (handler !== undefined) throw invalid('a handoff route has no handler');
       if (this.#entries.some((e) => e.route.presence === 'handoff')) {
         throw invalid('the handoff route is already registered');
+      }
+    } else if (presence === 'mark') {
+      // R1-SEC-16: the display marks; the server's mark gate runs them (no input, no presence).
+      if (method !== 'POST') throw invalid('a mark route is a POST');
+      if (!MARK_PATHS.includes(route.path)) throw invalid('a mark route is only at a mark path');
+      if (typeof handler !== 'function') throw invalid('a mark route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'mark' && e.route.path === route.path)) {
+        throw invalid('this mark route is already registered');
       }
     } else if (presence === 'ui-settings') {
       // W4-SHELL-V2: the app's own UI settings; the server's ui-settings gate runs it (no presence).

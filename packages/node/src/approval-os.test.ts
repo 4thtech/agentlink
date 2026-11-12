@@ -10,7 +10,11 @@ import {
   type OsSeams,
 } from './approval-os.js';
 
-const URL_ = 'http://localhost:47321/approve/apr_AAAAAAAAAAAAAAAAAAAAAA?t=abc;rm -rf ~ $(x)';
+const URL_ = `http://localhost:47321/approve/apr_AAAAAAAAAAAAAAAAAAAAAA?t=${'A'.repeat(43)}`;
+// R1-SEC-05: the opener is handed the private launch file, never the link (approval-os-launch.test.ts).
+const LAUNCH_POSIX = '/home/me/.agentlink/open/l.html';
+const LAUNCH_WIN = 'C:\\Users\\me\\.agentlink\\open\\l.html';
+const LAUNCH_WIN_URL = 'file:///C:/Users/me/.agentlink/open/l.html';
 const ALLOWED = new Set<string>([
   ...Object.values(OS_PROGRAMS),
   'D:\\Windows\\explorer.exe',
@@ -38,6 +42,7 @@ function seams(
         calls.push({ file, args: [...args], options: { ...options } });
         callback(null);
       },
+      writeLaunchFile: () => Promise.resolve(platform === 'win32' ? LAUNCH_WIN : LAUNCH_POSIX),
       ...over,
     },
   };
@@ -48,29 +53,32 @@ describe('the browser opener (L-2, L-4)', () => {
     ['darwin', '/usr/bin/open'],
     ['linux', '/usr/bin/xdg-open'],
     ['freebsd', '/usr/bin/xdg-open'],
-  ] as const)('on %s runs %s with shell false and the url as one argument', async (p, program) => {
-    const { seams: s, calls } = seams(p);
-    expect(await browserOpenerWith(s)(URL_)).toBe(true);
-    expect(calls).toHaveLength(1);
-    const call = calls[0] as Call;
-    expect(call.file).toBe(program);
-    expect(ALLOWED.has(call.file)).toBe(true);
-    expect(call.args).toEqual([URL_]);
-    expect(call.options['shell']).toBe(false);
-  });
+  ] as const)(
+    'on %s runs %s with shell false and the launch file as one argument',
+    async (p, program) => {
+      const { seams: s, calls } = seams(p);
+      expect(await browserOpenerWith(s)(URL_)).toBe(true);
+      expect(calls).toHaveLength(1);
+      const call = calls[0] as Call;
+      expect(call.file).toBe(program);
+      expect(ALLOWED.has(call.file)).toBe(true);
+      expect(call.args).toEqual([LAUNCH_POSIX]);
+      expect(call.options['shell']).toBe(false);
+    },
+  );
 
   // F40 (Windows 11, 0.4.10): explorer.exe <url> exits 1 whether or not a browser opened, so a
   // silent failure read as "opened". rundll32 url.dll,FileProtocolHandler hands the url to the
   // default browser and reports a failure to start; explorer.exe stays the fallback. Never cmd.exe
   // or `start` (their command line would parse the url).
-  it('on win32 runs System32\\rundll32.exe url.dll,FileProtocolHandler <url>: shell false, one url argument', async () => {
+  it('on win32 runs System32\\rundll32.exe url.dll,FileProtocolHandler <launch file URL>: shell false, one argument', async () => {
     const { seams: s, calls } = seams('win32');
     expect(await browserOpenerWith(s)(URL_)).toBe(true);
     expect(calls).toHaveLength(1);
     const call = calls[0] as Call;
     expect(call.file).toBe('C:\\Windows\\System32\\rundll32.exe');
     expect(ALLOWED.has(call.file)).toBe(true);
-    expect(call.args).toEqual(['url.dll,FileProtocolHandler', URL_]);
+    expect(call.args).toEqual(['url.dll,FileProtocolHandler', LAUNCH_WIN_URL]);
     expect(call.options['shell']).toBe(false);
     expect(call.options['windowsHide']).toBe(true);
     expect(call.options['windowsVerbatimArguments']).toBeUndefined();
@@ -81,7 +89,7 @@ describe('the browser opener (L-2, L-4)', () => {
     const missing = seams('win32', { executable: (path) => !path.endsWith('rundll32.exe') });
     expect(await browserOpenerWith(missing.seams)(URL_)).toBe(true);
     expect(missing.calls.map((c) => c.file)).toEqual(['C:\\Windows\\explorer.exe']);
-    expect(missing.calls[0]?.args).toEqual([URL_]);
+    expect(missing.calls[0]?.args).toEqual([LAUNCH_WIN_URL]);
 
     const calls: Call[] = [];
     const failing = seams('win32', {
