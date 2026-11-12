@@ -72,7 +72,7 @@ export const waitText = (seconds: number): string =>
  * The confirm screen lists each one the server returned, with its own tick (D-119).
  */
 export const WARNING_TEXT: Readonly<Record<string, string>> = Object.freeze({
-  invites_auto: 'New contacts will be added without asking you.',
+  invites_auto: 'New people will be added without asking you.',
   unknown_senders_queued:
     "Messages from IDs you don't know will wait for you instead of being dropped.",
   contacts_allowed_widened: 'More IDs will be able to reach your AI.',

@@ -661,6 +661,8 @@ export function FirstRunPage({
   const stepInvites = useMemo(() => trackCancels(createInviteApi()), []);
   const [inviteGone, setInviteGone] = useState(false);
   const [linkUnsent, setLinkUnsent] = useState(false);
+  // The warning for a link nobody has copied: raised by Done, Skip for now or the header's "Skip to Home".
+  const [leaveWarned, setLeaveWarned] = useState(false);
   const leaveInvite = (): void => {
     setInviteGone(true);
     window.setTimeout(() => void stepInvites.settled().then(goHome), 0);
@@ -1147,8 +1149,11 @@ export function FirstRunPage({
   }, [step]);
 
   const sensorWords = S.connect(sensor);
+  const unsentLink = step === 'invite' && linkUnsent && invitePanel === undefined;
+  // "Skip to Home" warns like Done does while the link on screen has not been copied (once).
+  const guardedSkip = unsentLink && !leaveWarned ? (): void => setLeaveWarned(true) : onSkip;
   const frame = (body: ReactElement, at: StepId = step): ReactElement => (
-    <WizardFrame step={at} {...(onSkip === undefined ? {} : { onSkip })}>
+    <WizardFrame step={at} {...(guardedSkip === undefined ? {} : { onSkip: guardedSkip })}>
       {body}
     </WizardFrame>
   );
@@ -1178,6 +1183,8 @@ export function FirstRunPage({
       <InviteStep
         inviteHref={INVITE_PATH}
         unsent={linkUnsent && invitePanel === undefined}
+        warned={leaveWarned}
+        onWarn={() => setLeaveWarned(true)}
         onHome={invitePanel === undefined ? leaveInvite : goHome}
         panel={
           invitePanel ??

@@ -9,6 +9,7 @@
 // once-per-life mark) and across the full load that "Go to Home" makes (a one-time mark in this
 // tab's session storage). The next launch decides again from the state.
 import { REDIRECTS } from '../../nav.js';
+import { keepInApp } from '../../prefs/app-kept.js';
 import { navigate } from '../../router.js';
 import { readSetupState, setupIncomplete, type SetupState } from './setup-state.js';
 import { markAutoShown, wasAutoShown } from './store.js';
@@ -21,6 +22,31 @@ export const GUARDED_PATHS: readonly string[] = ['/'];
 /** "Get started just ended on Home with a full load": used once by the next check. */
 export const START_LEAVING_KEY = 'agentlink.start.leaving';
 
+/**
+ * Get started was left on purpose (Skip to Home, or the end of it): kept for the owner (the app's
+ * kept choices), so a reload of Home, or the next launch, does not open it by itself again while an
+ * owner and an ID exist. The Home card and Help → Get started still lead back to it.
+ */
+export const START_LEFT_KEY = 'agentlink.getStarted.left';
+
+function leftStart(): boolean {
+  try {
+    return localStorage.getItem(START_LEFT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Remembers that Get started was left on purpose. */
+export function rememberLeftStart(): void {
+  try {
+    localStorage.setItem(START_LEFT_KEY, '1');
+    keepInApp(START_LEFT_KEY);
+  } catch {
+    // Not remembered: it may open again on the next load.
+  }
+}
+
 /** The path the router shows for `path` (an old path is redirected first). */
 function shown(path: string): string {
   return REDIRECTS[path] ?? path;
@@ -32,11 +58,18 @@ function shown(path: string): string {
  * time-bound and never hidden behind Get started.
  */
 export function shouldOpenStart(path: string, state: SetupState): boolean {
-  return GUARDED_PATHS.includes(shown(path)) && setupIncomplete(state) && state.waiting === 0;
+  if (!GUARDED_PATHS.includes(shown(path)) || !setupIncomplete(state) || state.waiting !== 0) {
+    return false;
+  }
+  // Left on purpose, with an owner and an ID in place: only a missing owner or ID (a first run)
+  // takes the page over again.
+  const firstRun = state.owner === 'missing' || state.agent === false;
+  return firstRun || !leftStart();
 }
 
 /** Get started ends on Home with a full load: the check of that load keeps Home. */
 export function markLeavingStart(): void {
+  rememberLeftStart();
   try {
     sessionStorage.setItem(START_LEAVING_KEY, '1');
   } catch {
@@ -99,5 +132,6 @@ export async function openStartIfIncomplete(options: StartGuardOptions = {}): Pr
 /** "Skip to Home": Get started does not open by itself again in this page's life. */
 export function skipToHome(go: (path: string) => void = (to) => navigate(to)): void {
   markAutoShown();
+  rememberLeftStart();
   go('/');
 }

@@ -337,3 +337,25 @@ section.rl-summary {
 .rl-limits .al-switch-row.is-disabled .al-switch-text > .al-text-body {
   color: var(--al-color-fg-muted);
 }
+
+/* Phones: the segmented choice takes the card's width and its options share it (wrapping their
+   words), so "Never" is no longer cut off; More rules stacks its state under the words. */
+@media (max-width: 700px) {
+  .rl-row-control {
+    flex: 1 1 100%;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
+  .rl-row-control .al-seg {
+    display: grid;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    box-sizing: border-box;
+  }
+  .rl-more-btn {
+    flex-wrap: wrap;
+  }
+  .rl-more-text {
+    flex: 1 1 12rem;
+  }
+}

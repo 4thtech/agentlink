@@ -5,7 +5,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { ContactRow } from '../contacts/data.js';
-import { markLeavingStart, openStartIfIncomplete, shouldOpenStart } from './guard.js';
+import {
+  START_LEFT_KEY,
+  markLeavingStart,
+  openStartIfIncomplete,
+  shouldOpenStart,
+  skipToHome,
+} from './guard.js';
 import {
   parseAgentOpen,
   readSetupState,
@@ -235,11 +241,36 @@ describe('openStartIfIncomplete: the open-on-launch check', () => {
       await openStartIfIncomplete({ path: () => '/settings/home', read: incomplete, go }),
     ).toBe(false);
     expect(go).not.toHaveBeenCalled();
-    // The mark is used once: the next launch decides from the state again.
+    // The mark is used once, but leaving is kept (N9): with an owner and an ID, a missing AI app
+    // no longer takes the page over on the next load; a first run (no owner) still does.
     resetAutoShown();
     expect(
       await openStartIfIncomplete({ path: () => '/settings/home', read: incomplete, go }),
+    ).toBe(false);
+    resetAutoShown();
+    expect(
+      await openStartIfIncomplete({
+        path: () => '/settings/home',
+        read: () => Promise.resolve({ ...SET_UP, owner: 'missing' as const }),
+        go,
+      }),
     ).toBe(true);
+    localStorage.removeItem(START_LEFT_KEY);
+  });
+
+  it('N9: left on purpose, an ID without an AI app does not reopen Get started on reload', async () => {
+    resetAutoShown();
+    localStorage.removeItem(START_LEFT_KEY);
+    const go = vi.fn();
+    // Not left yet: it opens.
+    expect(await openStartIfIncomplete({ path: () => '/', read: incomplete, go })).toBe(true);
+    // Skip to Home remembers it; the next load (a fresh page life) stays on Home.
+    skipToHome(() => undefined);
+    resetAutoShown();
+    go.mockClear();
+    expect(await openStartIfIncomplete({ path: () => '/', read: incomplete, go })).toBe(false);
+    expect(go).not.toHaveBeenCalled();
+    localStorage.removeItem(START_LEFT_KEY);
   });
 
   it('after Skip to Home (or Get started opened), it never opens by itself again', async () => {

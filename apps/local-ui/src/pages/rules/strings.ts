@@ -41,7 +41,7 @@ export const RULES_STRINGS = {
   budget: 'Proof budget in any 24 hours',
   askOver: 'Ask me over',
   invitesTitle: 'Connect with someone new',
-  summaryInvites: 'New contacts',
+  summaryInvites: 'New people',
   invitesHelp: 'Your AI asks before it accepts or sends an invite.',
   termsTitle: 'Accepting terms',
   termsHelp: 'Accepting commits you. This is never approved from a notification.',

@@ -370,7 +370,7 @@ describe('the live agent dropdown', () => {
     await mountAt('/');
     await click(chip());
     const menu = q('[role="menu"]')?.textContent ?? '';
-    expect(menu).toContain('A new identity with its own inbox and contacts.');
+    expect(menu).toContain('A new ID with its own inbox and people.');
     expect(menu).toContain('The AI app shares this ID.');
     await click(
       menuItems().find((m) => m.textContent?.trim() === 'Connect another AI app to this ID'),

@@ -152,6 +152,14 @@ export function personLine(last: string | undefined, connected: string): string 
   return `${last === undefined ? 'No messages yet' : `Last message ${last}`} · connected ${connected}`;
 }
 
+/**
+ * Two people with the same name look alike in a list: the row adds what tells them apart, their
+ * ID tag (or, when none is known, the time they connected). Plain text.
+ */
+export function sameNameTag(tag: string | undefined, connectedAt: string): string {
+  return tag === undefined ? `connected ${connectedAt}` : `ID tag ${tag}`;
+}
+
 /** The safety-code nudge (UX audit 3b). `name` is the name-rule output. */
 export function nudge(name: string): string {
   return `Want to be sure it’s really ${name}? Call them or meet, and compare these 12 digits. It takes about 30 seconds. Both screens should show the same code.`;

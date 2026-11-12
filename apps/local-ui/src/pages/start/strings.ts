@@ -47,7 +47,8 @@ export const PICK_STEP = {
   eyebrowConnect: 'Connect another AI app',
   title: 'Which AI app do you use?',
   /** D-147 (spec §6.5): a quiet link for a person who has used AgentLink before. */
-  restore: 'Used AgentLink before? Restore from a recovery kit',
+  restoreLead: 'Used AgentLink before?',
+  restore: 'I have a recovery kit',
   body: 'Pick one. We set it up for you, nothing to copy or paste.',
   found: 'Found on this Mac',
   foundElsewhere: 'Found on this computer',
@@ -136,6 +137,6 @@ export const CARD = {
  */
 export const ID_EXPLAINER = {
   title: 'What is an ID?',
-  body: "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.",
+  body: "An ID is your AI app's identity on AgentLink: its inbox, people and keys. Every chat in that AI app uses it.",
   hide: 'Hide this',
 } as const;

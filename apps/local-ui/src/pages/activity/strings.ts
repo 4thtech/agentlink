@@ -125,11 +125,11 @@ export const ACTIVITY_COPY = {
   contactBlockedLine: 'Their messages are dropped from now on',
   pillBlocked: 'Blocked',
   // People
-  contactConnectedYours: ['{who} accepted your invite', 'A contact accepted your invite'] as Pair,
+  contactConnectedYours: ['{who} accepted your invite', 'Someone accepted your invite'] as Pair,
   contactConnectedTheirs: ['You accepted the invite from {who}', 'You accepted an invite'] as Pair,
   contactConnected: ['You and {who} are now connected', 'You connected with a contact'] as Pair,
   contactConnectedLine: 'Now in People',
-  contactRemoved: ['You removed {who}', 'You removed a contact'] as Pair,
+  contactRemoved: ['You removed {who}', 'You removed a person'] as Pair,
   contactRemovedLine: 'Moved to Archived in People',
   contactRevoked: ['{who} removed the connection', 'A contact removed the connection'] as Pair,
   contactRevokedLine: 'Moved to Archived in People',

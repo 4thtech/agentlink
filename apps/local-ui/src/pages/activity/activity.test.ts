@@ -166,7 +166,7 @@ describe('Activity page (WP-A2)', () => {
       'Natasa added proof to a message for you',
       'A message from someone you are not connected with was dropped',
       'You blocked Marko Novak',
-      'You removed a contact',
+      'You removed a person',
       'Natasa removed the connection',
       'oc-test is now called Natasa K',
       'Marko Novak accepted your invite',

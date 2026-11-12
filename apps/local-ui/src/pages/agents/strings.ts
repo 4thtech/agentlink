@@ -275,7 +275,7 @@ export const AGENTS_STRINGS = {
     `${app}: ${word}. ${n} checks while this page was open.`,
   historyNote: 'History shows while this page is open; it is not kept.',
   ruleProofs: (word: string): string => `Add a proof: ${word}`,
-  ruleContacts: (word: string): string => `New contacts: ${word}`,
+  ruleContacts: (word: string): string => `New people: ${word}`,
   ruleFiles: (send: number, receive: number): string =>
     `Files: send up to ${send} MB, receive up to ${receive} MB`,
   ruleAllow: 'Allowed',

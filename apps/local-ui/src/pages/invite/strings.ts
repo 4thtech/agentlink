@@ -191,6 +191,9 @@ export const FEEDBACK_STRINGS = {
   connected: (name: string): string => `You're connected with ${name}`,
   again: (name: string): string => `Connected again with ${name}. Do the Contact check again.`,
   connecting: (name: string): string => `Connecting to ${name}…`,
+  youBlocked: (name: string): string => `You blocked ${name}. Unblock to connect.`,
+  unblockAction: 'Unblock',
+  cancelConnecting: 'Cancel',
   waitingOnline: (name: string): string =>
     `Waiting for ${name} to come online. This finishes on its own.`,
   already: (name: string): string => `You're already connected to ${name}. Connect again?`,

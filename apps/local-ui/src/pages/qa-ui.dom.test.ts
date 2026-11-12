@@ -9,6 +9,11 @@ import { TermsDetails, TermsSummary, isPlumbing, parseTermsLines } from './appro
 import { renameNote } from './contacts/index.js';
 import type { ContactRow } from './contacts/data.js';
 import { InviteStep } from './start/wizard.js';
+import { ConnectingInviteRow } from './invite/pending-row.js';
+import { parseConnecting } from './contacts/invite-api.js';
+import { repeatedNames } from './contacts/index.js';
+import { sameNameTag } from './contacts/strings.js';
+import { PICK_STEP } from './start/strings.js';
 import { readSetupState } from './start/setup-state.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -129,5 +134,105 @@ describe('Get started reads', () => {
     await readSetupState({ client });
     expect(asked.length).toBeGreaterThan(0);
     expect(asked.some((p) => p === '/api/approvals')).toBe(false);
+  });
+});
+
+describe('N8 and B11: one leave button, and the header Skip raises the same warning', () => {
+  const buttons = (): string[] =>
+    [...host.querySelectorAll('button')].map((b) => b.textContent ?? '');
+  it('shows a single "Leave without copying" once warned', () => {
+    act(() =>
+      root.render(
+        h(InviteStep, { inviteHref: '/invite', onHome: vi.fn(), unsent: true, warned: true }),
+      ),
+    );
+    expect(buttons().filter((t) => /Leave without copying/.test(t))).toHaveLength(1);
+    expect(buttons().some((t) => /Skip for now/.test(t))).toBe(false);
+  });
+  it('lets the page hold the warning (so the header Skip to Home can raise it)', () => {
+    const onWarn = vi.fn();
+    const onHome = vi.fn();
+    act(() =>
+      root.render(
+        h(InviteStep, { inviteHref: '/invite', onHome, unsent: true, warned: false, onWarn }),
+      ),
+    );
+    act(() =>
+      [...host.querySelectorAll('button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(),
+    );
+    expect(onWarn).toHaveBeenCalledTimes(1);
+    expect(onHome).not.toHaveBeenCalled();
+  });
+});
+
+describe('N6: the restore control is named as the copy says', () => {
+  it('reads "I have a recovery kit"', () => {
+    expect(PICK_STEP.restore).toBe('I have a recovery kit');
+  });
+});
+
+describe('N2: an accept from a blocked person says so and can be cancelled', () => {
+  const ref = '0x' + 'a'.repeat(40);
+  const waiting = { ref, name: 'Bo', expiresAt: 1, sent: true, again: false };
+  it('reads the server flag', () => {
+    expect(
+      parseConnecting({
+        connecting: [
+          {
+            ref,
+            name: 'Bo',
+            expiresAt: '2027-01-15T08:00:00Z',
+            sent: true,
+            again: false,
+            blocked: true,
+          },
+        ],
+      })[0]?.blocked,
+    ).toBe(true);
+  });
+  it('shows "You blocked Bo. Unblock to connect.", Unblock and Cancel; Cancel clears the row', () => {
+    const onUnblock = vi.fn();
+    act(() => root.render(h(ConnectingInviteRow, { row: waiting, blocked: true, onUnblock })));
+    expect(host.textContent).toContain('You blocked Bo. Unblock to connect.');
+    const find = (t: string) =>
+      [...host.querySelectorAll('button')].find((b) => b.textContent === t);
+    act(() => find('Unblock')?.click());
+    expect(onUnblock).toHaveBeenCalledTimes(1);
+    act(() => find('Cancel')?.click());
+    expect(host.querySelector('li')).toBeNull();
+  });
+  it('a plain waiting accept still reads "Connecting to Bo…"', () => {
+    act(() => root.render(h(ConnectingInviteRow, { row: waiting })));
+    expect(host.textContent).toContain('Connecting to Bo…');
+  });
+});
+
+describe('N12: two people with the same name can be told apart', () => {
+  const base = {
+    nameSource: 'owner' as const,
+    label: 'self-declared' as const,
+    status: 'active' as const,
+    pairing: 'complete' as const,
+    since: 1,
+  };
+  const a: ContactRow = {
+    ...base,
+    ref: '0x' + '1'.repeat(40),
+    name: 'Bo',
+    fingerprint: 'AAAA·BBBB',
+  };
+  const b: ContactRow = {
+    ...base,
+    ref: '0x' + '2'.repeat(40),
+    name: 'Bo',
+    fingerprint: 'CCCC·DDDD',
+  };
+  const c: ContactRow = { ...base, ref: '0x' + '3'.repeat(40), name: 'Ana' };
+  it('finds the repeated names', () => {
+    expect([...repeatedNames([a, b, c])]).toEqual(['bo']);
+  });
+  it('the row adds the ID tag, or the time when none is known', () => {
+    expect(sameNameTag('AAAA·BBBB', '10:00')).toBe('ID tag AAAA·BBBB');
+    expect(sameNameTag(undefined, '10:00')).toBe('connected 10:00');
   });
 });
