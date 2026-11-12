@@ -141,6 +141,13 @@ describe('Settings home', () => {
     expect(host.querySelector('.al-subnav')).toBeNull();
   });
 
+  it('shows the Touch ID & master code row and the Advanced entry exactly once (integration)', async () => {
+    await mount();
+    const titles = rows().map((r) => r.querySelector('.set-row-title')?.textContent);
+    expect(titles.filter((t) => t === S.touchId.title)).toHaveLength(1);
+    expect(rows().filter((r) => r.getAttribute('href') === '/settings/advanced')).toHaveLength(1);
+  });
+
   it('groups: Backup in Safety, Rules/AI apps/Files in Your AI, the rest in This app', () => {
     const g = settingsGroups([
       { label: 'x', path: '/settings/appearance' },

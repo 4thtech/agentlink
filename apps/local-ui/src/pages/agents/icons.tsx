@@ -1,7 +1,7 @@
-// WP-I1: five Lucide glyphs the kit's icon set does not have yet (id-card, bot, pencil, shield-check,
-// plus), drawn inline so My IDs matches the mockup. WP-N1 adds `idcard` to layout/shell-icons.tsx; once
-// both are on main this file can use it. Decorative (aria-hidden): the words are always beside them.
+// WP-I1: four Lucide glyphs the kit's icon set does not have yet (bot, pencil, shield-check,
+// plus), drawn inline so My IDs matches the mockup. The id-card comes from layout/shell-icons.tsx (`idcard`, WP-N1). Decorative (aria-hidden): the words are always beside them.
 import type { ReactElement, ReactNode } from 'react';
+import { ShellIcon } from '../../layout/shell-icons.js';
 
 function Glyph({ size, children }: { size: number; children: ReactNode }): ReactElement {
   return (
@@ -24,13 +24,7 @@ function Glyph({ size, children }: { size: number; children: ReactNode }): React
 }
 
 export const IdCardIcon = ({ size = 16 }: { size?: number }): ReactElement => (
-  <Glyph size={size}>
-    <rect x="2" y="5" width="20" height="14" rx="2" />
-    <circle cx="9" cy="11" r="2" />
-    <path d="M6.17 15a3 3 0 0 1 5.66 0" />
-    <path d="M16 10h2" />
-    <path d="M16 14h2" />
-  </Glyph>
+  <ShellIcon name="idcard" size={size} className="ag-glyph" />
 );
 export const BotIcon = ({ size = 16 }: { size?: number }): ReactElement => (
   <Glyph size={size}>
