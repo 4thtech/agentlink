@@ -42,7 +42,10 @@ export const RULES_STRINGS = {
   askOver: 'Ask me over',
   invitesTitle: 'Connect with someone new',
   summaryInvites: 'New people',
-  invitesHelp: 'Your AI asks before it accepts or sends an invite.',
+  // REL051-SF5: `contacts.acceptInvites` gates accepting only (04 §3.6, 06 §2.1); making an invite
+  // never asks, on any surface (06 §7, 08 §1).
+  invitesHelp:
+    'Your AI asks before it accepts an invite. An invite you or your AI send connects when the other person accepts it.',
   termsTitle: 'Accepting terms',
   termsHelp: 'Accepting commits you. This is never approved from a notification.',
 
