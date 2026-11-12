@@ -12,7 +12,8 @@ import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { constants } from './lib/constants.mjs';
 import { BUILD_FUSES } from './lib/fuses.mjs';
-import { asarIntegrity, writeWinIntegrity } from './lib/integrity.mjs';
+import { asarIntegrity, writeWinIcon, writeWinIntegrity } from './lib/integrity.mjs';
+import { winIcoPath } from './lib/icon.mjs';
 import { nsisScript } from './lib/nsis.mjs';
 import { capture, parseArgs, run } from './lib/run.mjs';
 import {
@@ -92,6 +93,8 @@ await fuses.flipFuses(exe, {
   strictlyRequireAllFuses: true,
   ...Object.fromEntries(Object.entries(BUILD_FUSES).map(([k, v]) => [fuses.FuseV1Options[k], v])),
 });
+const ico = winIcoPath(); // throws when the real icon is missing
+await writeWinIcon(exe, ico);
 await writeWinIntegrity(exe, 'resources\\app.asar', integrity);
 
 console.log('[7/7] zip, NSIS, SHA256SUMS');
@@ -103,7 +106,7 @@ const nsi = join(out, `${base}.nsi`);
 rmSync(zip, { force: true });
 rmSync(setup, { force: true });
 run('tar', ['-a', '-c', '-f', zip, '-C', work, 'AgentLink']);
-writeFileSync(nsi, nsisScript({ version, sourceDir: dir, outFile: setup }));
+writeFileSync(nsi, nsisScript({ version, sourceDir: dir, outFile: setup, iconFile: ico }));
 const files = [zip];
 if (!args['nsi-only']) {
   const r = capture('makensis', ['-V2', nsi]);

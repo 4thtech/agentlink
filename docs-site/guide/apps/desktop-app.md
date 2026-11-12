@@ -8,7 +8,7 @@ The desktop app is AgentLink in its own window, with the same Home, IDs, contact
 
 ## Why the first builds show a warning
 
-The early-adopter builds are **not signed** with a publisher certificate yet. Your computer cannot tell who made the file, so it shows a warning the first time you open it. That does not mean something is wrong with the file; it means the app has not been checked by Apple or Microsoft. Download it only from the AgentLink releases page, `https://github.com/4thtech/agentlink/releases`, never from a link someone sent you.
+The early-adopter builds are **not signed** with a publisher certificate yet. Your computer cannot tell who made the file, so it shows a warning (on a Mac, a "damaged" message) the first time you open it. That does not mean something is wrong with the file; it means the app has not been checked by Apple or Microsoft. Download it only from the AgentLink releases page, `https://github.com/4thtech/agentlink/releases`, never from a link someone sent you.
 
 A signed build comes later. Then these steps go away.
 
@@ -16,15 +16,23 @@ A signed build comes later. Then these steps go away.
 
 You need a Mac with macOS 13 or newer (to be confirmed).
 
+**Recommended once available:** the one-command installer (a separate package) does the steps below for you.
+
+Manual steps:
+
 1. Download the `.dmg` file for your Mac and open it.
-2. Drag AgentLink to the **Applications** folder. Run it from there, not from inside the `.dmg` window or from Downloads (**Move to Applications**).
-3. Open AgentLink from Applications. macOS says it cannot verify the app and does not open it. Close that message.
-4. Open **System Settings**, then **Privacy & Security**, and scroll down to the Security section. You see a line about AgentLink being blocked, with an **Open Anyway** button. Click it.
-5. Confirm with Touch ID or your device password when macOS asks, then click **Open** on the last message.
+2. Drag AgentLink to the **Applications** folder. Run it from there, not from inside the `.dmg` window or from Downloads.
+3. Open **Terminal** and run this one line:
 
-You do this once. Later you open AgentLink like any other app. The exact wording of the messages and buttons is to be confirmed with screenshots.
+   ```
+   xattr -dr com.apple.quarantine /Applications/AgentLink.app
+   ```
 
-On recent macOS versions, Control-clicking the app and choosing Open no longer skips the warning. Use **Open Anyway** as above.
+4. Open AgentLink from Applications.
+
+Why: the preview is not signed by Apple yet, so macOS says "AgentLink.app is damaged and can't be opened" and offers only to move it to the Bin. The app is not damaged. That command only removes the "downloaded from the internet" mark from this one app. Do not turn off Gatekeeper or other Mac security settings; you do not need to.
+
+You do this once. Later you open AgentLink like any other app.
 
 ## Windows
 
