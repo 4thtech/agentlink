@@ -39,7 +39,7 @@ export function NativeSetupOffer({
     mounted.current = true;
     if (platform !== undefined) {
       void nativeStatus()
-        .catch(() => ({ available: false, registered: false }))
+        .catch((): NativeStatus => ({ available: false, registered: false }))
         .then((status) => {
           if (mounted.current) setOffer(status.available && !status.registered);
         });

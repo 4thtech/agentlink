@@ -32,6 +32,7 @@ import {
   ownerFingerprint,
   parseJson,
   randomBytes,
+  readNativeBlobHeader,
   sha256,
   taggedHash,
   wipe,
@@ -93,6 +94,39 @@ export const OWNER_PASSKEY_ACCOUNT = 'owner-passkey';
  * secret (`ALKH` v1, 04 §2.3.4; owner-native.ts). One per OS user; the `owner` item stays the fallback.
  */
 export const OWNER_NATIVE_ACCOUNT = 'owner-native';
+
+/**
+ * DESK-D12c (Fable review M1): the native credentials turned off or replaced on this computer, as
+ * 32-byte tags (nativeCredentialTag) one after the other. A blob whose credential is listed is never
+ * opened again, so an old `owner-native` blob written back is refused. Same-user writable like every
+ * owner item (G-1): a defence in depth, not a boundary; a captured secret and its old blob together
+ * still open the seed offline (04 §2.3.4 "Honest strength").
+ */
+export const OWNER_NATIVE_REVOKED_ACCOUNT = 'owner-native-revoked';
+
+/** The tag of an ALKH blob's credential: SHA-256(credId ‖ SHA-256(credPub) ‖ SHA-256(challenge)). */
+export function nativeCredentialTag(header: {
+  readonly credentialId: Uint8Array;
+  readonly credentialPublicKey: Uint8Array;
+  readonly challenge: Uint8Array;
+}): Uint8Array {
+  const a = sha256(header.credentialPublicKey);
+  const b = sha256(header.challenge);
+  const all = new Uint8Array(header.credentialId.length + 64);
+  all.set(header.credentialId, 0);
+  all.set(a, header.credentialId.length);
+  all.set(b, header.credentialId.length + 32);
+  return sha256(all);
+}
+
+/** True when `tag` is in the revoked list `list` (32-byte tags). */
+export function nativeTagRevoked(list: Uint8Array | null, tag: Uint8Array): boolean {
+  if (list === null) return false;
+  for (let at = 0; at + 32 <= list.length; at += 32) {
+    if (equalBytes(list.subarray(at, at + 32), tag)) return true;
+  }
+  return false;
+}
 
 /** `ALKO` v1 is exactly 90 bytes; byte 5 is `secretKind` (04 §2.8). */
 const ALKO_LENGTH = 90;
@@ -1089,6 +1123,7 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
         this.#open();
         blob = await guarded(() => this.#keychain.get(OWNER_NATIVE_ACCOUNT), this.#timeoutMs);
         if (blob === null) throw presenceRejected();
+        await refuseRevoked(this.#keychain, blob, this.#timeoutMs);
         seed = await openNative(blob, proof, this.#expected.ownerNostr);
       } else {
         this.#open();
@@ -1264,6 +1299,7 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
       } else if (proof.kind === 'native') {
         blob = await guarded(() => keychain.get(OWNER_NATIVE_ACCOUNT), timeoutMs);
         if (blob === null) throw presenceRejected();
+        await refuseRevoked(keychain, blob, timeoutMs);
         seed = await openNative(blob, proof, ownerNostr);
       } else {
         blob = await guarded(() => keychain.get(OWNER_PASSKEY_ACCOUNT), timeoutMs);
@@ -1355,6 +1391,22 @@ function presenceProof(presence: unknown): {
  * and the presence's kind. A wrong or wiped secret, another kind or owner, a tampered blob and a blob
  * of another type are one answer, `presence_rejected`. The caller wipes the secret and the seed.
  */
+/** `presence_rejected` when the blob's credential was turned off or replaced (M1). */
+async function refuseRevoked(
+  keychain: KeychainBackend,
+  blob: Uint8Array,
+  timeoutMs: number,
+): Promise<void> {
+  let tag: Uint8Array;
+  try {
+    tag = nativeCredentialTag(readNativeBlobHeader(blob));
+  } catch {
+    throw presenceRejected();
+  }
+  const list = await guarded(() => keychain.get(OWNER_NATIVE_REVOKED_ACCOUNT), timeoutMs);
+  if (nativeTagRevoked(list, tag)) throw presenceRejected();
+}
+
 async function openNative(
   blob: Uint8Array,
   proof: { readonly bytes: Uint8Array; readonly nativeKind?: 1 | 2 },

@@ -35,7 +35,9 @@ import {
 import type { LocalUiOwnerOperation } from './local-ui/route-types.js';
 import { createLocalUiRoutes } from './local-ui/routes.js';
 import { TEST_APP } from './local-ui-app.fixture.js';
+import { request as httpRequest } from 'node:http';
 import { OWNER_NATIVE_ACCOUNT } from './owner-native.js';
+import { OWNER_NATIVE_REVOKED_ACCOUNT } from './owner-keystore.js';
 import { StandInHelper } from './owner-native.fixture.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
 
@@ -49,6 +51,7 @@ const servers: ApprovalServer[] = [];
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => s.close()));
   await world.keychain.delete(OWNER_NATIVE_ACCOUNT);
+  await world.keychain.delete(OWNER_NATIVE_REVOKED_ACCOUNT);
 });
 
 interface Harness {
@@ -344,7 +347,8 @@ describe('pay confirm with native presence (04 §2.5.3): the statement is bound 
     const res = await finish();
     expect(res.status).toBe(200);
     expect(json(res)).toEqual({ status: 'applied' });
-    expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:pay']);
+    expect(h.helper.calls.filter((c) => c.startsWith('release'))).toHaveLength(1);
+    expect(h.helper.calls.find((c) => c.startsWith('release'))?.split('@')[0]).toBe('release:pay');
     expect(h.source.applied).toHaveLength(1);
     expect(h.source.applied[0]?.body['params']).toEqual({
       approvalId: approvalId(6),
@@ -353,7 +357,7 @@ describe('pay confirm with native presence (04 §2.5.3): the statement is bound 
     });
     const again = await finish();
     expect(again.status).toBe(409);
-    expect(h.helper.calls).toHaveLength(1);
+    expect(h.helper.calls.filter((c) => c.startsWith('release'))).toHaveLength(1);
   });
 
   it('a cancelled pay gesture uses the hold up and signs nothing', async () => {
@@ -389,5 +393,103 @@ describe('pay confirm with native presence (04 §2.5.3): the statement is bound 
     expect(res.status).toBe(403);
     expect(json(res)).toEqual({ status: 'presence_rejected', native: 'cancelled' });
     expect(h.source.applied).toHaveLength(0);
+  });
+});
+
+describe('Fable review fixes on the server (M1, L1, L4)', () => {
+  it('M1: off with the backup code, never with native; status then off; on again replaces', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    const viaNative = await send(h.port, '/api/owner/native/off', {
+      method: 'POST',
+      headers: { ...page, ...NATIVE },
+    });
+    expect(viaNative.status).toBe(403);
+    expect(json(viaNative)['status']).toBe('presence_required');
+    const off = await send(h.port, '/api/owner/native/off', {
+      method: 'POST',
+      headers: page,
+      body: encodeUtf8(world.code),
+    });
+    expect(off.status).toBe(200);
+    expect(json(off)).toEqual({ status: 'off' });
+    expect(json(await send(h.port, '/api/owner/native', { headers: page }))).toEqual({
+      native: { available: true, registered: false, platform: 'mac' },
+    });
+    const again = await send(h.port, '/api/owner/native/off', {
+      method: 'POST',
+      headers: page,
+      body: encodeUtf8(world.code),
+    });
+    expect(json(again)).toEqual({ status: 'native_missing' });
+    // A biometry change: status says reregister, and replace turns it on again.
+    await register(h, page);
+    h.helper.checkState = 'reregister';
+    expect(json(await send(h.port, '/api/owner/native', { headers: page }))).toEqual({
+      native: { available: true, registered: true, reason: 'reregister', platform: 'mac' },
+    });
+    h.helper.checkState = 'ok';
+    const replaced = await send(h.port, '/api/owner/native/replace', {
+      method: 'POST',
+      headers: page,
+      body: encodeUtf8(world.code),
+    });
+    expect(replaced.status).toBe(200);
+    expect(json(replaced)).toEqual({ status: 'registered' });
+  });
+
+  it('L1: the page goes away while the prompt is up: busy is released and a late touch approves nothing', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    const row = await (async () => h.source.add(8))();
+    let touch: () => void = () => undefined;
+    h.helper.touch = new Promise((resolve) => (touch = resolve));
+    h.helper.calls.length = 0;
+    const req = httpRequest({
+      host: '127.0.0.1',
+      port: h.port,
+      path: `/api/approvals/${approvalId(8)}/approve`,
+      method: 'POST',
+      headers: {
+        Host: `localhost:${String(h.port)}`,
+        ...page,
+        ...NATIVE,
+        'X-AgentLink-Digest': row.actionDigest,
+      },
+      setHost: false,
+    });
+    req.on('error', () => undefined);
+    req.end();
+    while (!h.helper.calls.some((c) => c.startsWith('release')))
+      await new Promise((r) => setTimeout(r, 2));
+    req.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(h.helper.aborted).toBe(1);
+    touch();
+    h.helper.touch = undefined;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(h.source.applied).toHaveLength(0);
+    // Not busy any more: the backup code decides at once.
+    const code = await decide(h, page, 8, {}, encodeUtf8(world.code));
+    expect(code.status).toBe(200);
+  });
+
+  it('L4: a corrupted blob after a real gesture is "damaged", never the wrong-code wait', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    const blob = (await world.keychain.get(OWNER_NATIVE_ACCOUNT)) ?? new Uint8Array(0);
+    blob[blob.length - 1] = (blob[blob.length - 1] as number) ^ 1;
+    await world.keychain.set(OWNER_NATIVE_ACCOUNT, blob);
+    h.source.add(9);
+    for (let i = 0; i < 5; i += 1) {
+      const res = await decide(h, page, 9);
+      expect(res.status).toBe(409);
+      expect(json(res)).toEqual({ status: 'presence_rejected', native: 'damaged' });
+    }
+    const code = await decide(h, page, 9, {}, encodeUtf8(world.code));
+    expect(code.status).toBe(200);
   });
 });

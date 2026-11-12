@@ -42,10 +42,13 @@ import {
   nativePresenceStatus,
   readOwnerNativeHeader,
   registerOwnerNative,
+  replaceOwnerNative,
   storeOwnerNativeSeed,
+  turnOffOwnerNative,
 } from './owner-native.js';
 import {
   KeychainOwnerKeyStore,
+  OWNER_NATIVE_REVOKED_ACCOUNT,
   OWNER_PASSKEY_ACCOUNT,
   newOwnerSeed,
   storeOwnerSeed,
@@ -391,3 +394,138 @@ describe('cross-type and cross-platform refusal, before the helper runs', () => 
     expect(KeyStoreError).toBeDefined();
   });
 });
+
+describe('Fable review M1: turning it off, and on again after a biometry change', () => {
+  it('off with the backup code: the item goes, and a captured secret with its old blob is refused', async () => {
+    const keychain = await withOwner();
+    const helper = new StandInHelper(NATIVE_PRESENCE_WINDOWS);
+    await registerOwnerNative(keychain, helper, owner, code());
+    const oldBlob = keychain.items.get(OWNER_NATIVE_ACCOUNT)?.slice() ?? new Uint8Array(0);
+    // A same-user process captured one released secret.
+    const captured = (
+      await nativePresence(keychain, helper, owner.ownerNostr, 'approve')
+    ).secret.slice();
+    await turnOffOwnerNative(keychain, helper, owner, code());
+    expect(keychain.items.has(OWNER_NATIVE_ACCOUNT)).toBe(false);
+    expect(keychain.items.get(OWNER_NATIVE_REVOKED_ACCOUNT)?.length).toBe(32);
+    expect(helper.calls).toContain('remove');
+    expect(await nativePresenceStatus(keychain, helper, owner.ownerNostr)).toEqual({
+      available: true,
+      registered: false,
+    });
+    // It writes the old blob back: core never opens it again, with or without the helper.
+    await keychain.set(OWNER_NATIVE_ACCOUNT, oldBlob);
+    helper.calls.length = 0;
+    expect(await codeOf(nativePresence(keychain, helper, owner.ownerNostr, 'approve'))).toBe(
+      'presence_rejected',
+    );
+    expect(helper.calls).toEqual([]);
+    const store = await KeychainOwnerKeyStore.open(keychain, owner);
+    const replay = {
+      kind: 'native' as const,
+      nativeKind: NATIVE_PRESENCE_WINDOWS as 2,
+      secret: captured,
+    };
+    expect(await codeOf(store.unlock(replay))).toBe('presence_rejected');
+    await store.close();
+    expect((await nativePresenceStatus(keychain, helper, owner.ownerNostr)).reason).toBe('damaged');
+  });
+
+  it('off and replace are never approved with native presence itself, nor with a wrong code', async () => {
+    const keychain = await withOwner();
+    const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
+    await registerOwnerNative(keychain, helper, owner, code());
+    const native = await nativePresence(keychain, helper, owner.ownerNostr, 'approve');
+    expect(await codeOf(turnOffOwnerNative(keychain, helper, owner, native))).toBe(
+      'presence_required',
+    );
+    expect(
+      await codeOf(
+        replaceOwnerNative(keychain, helper, owner, { ...native, secret: native.secret.slice() }),
+      ),
+    ).toBe('presence_required');
+    const wrong = {
+      kind: 'passphrase' as const,
+      secret: encodeUtf8('AAAA BBBB CCCC DDDD EEEE FFFF'),
+    };
+    expect(await codeOf(turnOffOwnerNative(keychain, helper, owner, wrong))).toBe(
+      'presence_rejected',
+    );
+    expect(keychain.items.has(OWNER_NATIVE_ACCOUNT)).toBe(true);
+    const empty = await withOwner();
+    expect(await codeOf(turnOffOwnerNative(empty, helper, owner, code()))).toBe(
+      'owner_native_missing',
+    );
+  });
+
+  it('a changed fingerprint shows reregister; turning it on again replaces the credential and works', async () => {
+    const keychain = await withOwner();
+    const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
+    await registerOwnerNative(keychain, helper, owner, code());
+    const before = keychain.items.get(OWNER_NATIVE_ACCOUNT)?.slice() ?? new Uint8Array(0);
+    helper.checkState = 'reregister';
+    expect(await nativePresenceStatus(keychain, helper, owner.ownerNostr)).toEqual({
+      available: true,
+      registered: true,
+      reason: 'reregister',
+    });
+    // The new Secure Enclave key: another record from create.
+    const fresh = new StandInHelper(NATIVE_PRESENCE_MACOS, recordWithOtherHandle());
+    await replaceOwnerNative(keychain, fresh, owner, code());
+    const after = keychain.items.get(OWNER_NATIVE_ACCOUNT) ?? new Uint8Array(0);
+    expect(equalBytes(after, before)).toBe(false);
+    expect(keychain.items.get(OWNER_NATIVE_REVOKED_ACCOUNT)?.length).toBe(32);
+    await nativeOp(keychain, fresh, 'approve');
+    // The replaced blob is revoked.
+    await keychain.set(OWNER_NATIVE_ACCOUNT, before);
+    expect(await codeOf(nativePresence(keychain, helper, owner.ownerNostr, 'approve'))).toBe(
+      'presence_rejected',
+    );
+  });
+});
+
+describe('Fable review L1 and L5', () => {
+  it('an abandoned operation: a late touch approves nothing', async () => {
+    const keychain = await withOwner();
+    const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
+    await registerOwnerNative(keychain, helper, owner, code());
+    helper.calls.length = 0;
+    let touch: () => void = () => undefined;
+    helper.touch = new Promise((resolve) => (touch = resolve));
+    const abandoned = new AbortController();
+    const pending = nativePresence(keychain, helper, owner.ownerNostr, 'approve', {
+      signal: abandoned.signal,
+    });
+    // The prompt is up (the helper is waiting for the touch) when the page goes away.
+    while (!helper.calls.some((c) => c.startsWith('release')))
+      await new Promise((r) => setTimeout(r, 1));
+    abandoned.abort();
+    touch();
+    expect(await codeOf(pending)).toBe('cancelled');
+    expect(helper.aborted).toBe(1);
+  });
+
+  it('a keychain that cannot be read is not "not turned on"', async () => {
+    const keychain = await withOwner();
+    const failing: KeychainBackend = {
+      get: () => Promise.reject(new Error('keychain locked')),
+      set: () => Promise.reject(new Error('keychain locked')),
+      delete: () => Promise.reject(new Error('keychain locked')),
+    };
+    const error = await nativePresence(
+      failing,
+      new StandInHelper(NATIVE_PRESENCE_MACOS),
+      owner.ownerNostr,
+      'approve',
+    ).catch((e: unknown) => e);
+    expect((error as { code?: unknown }).code).not.toBe('presence_rejected');
+    expect(keychain).toBeDefined();
+  });
+});
+
+/** The macOS test record with another (still valid) Secure Enclave handle: a new key after re-register. */
+function recordWithOtherHandle(): Uint8Array {
+  const out = MAC_RECORD.slice();
+  out[3] = (out[3] as number) ^ 0xff;
+  return out;
+}

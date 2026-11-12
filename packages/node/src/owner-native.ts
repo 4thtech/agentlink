@@ -55,10 +55,18 @@ import { CLI_COMMAND } from './cli-command.js';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';
-import type { NativeHelper, NativeReason } from './owner-native-helper.js';
+import {
+  NativeHelperError,
+  isAborted,
+  type NativeHelper,
+  type NativeReason,
+} from './owner-native-helper.js';
 import {
   OWNER_NATIVE_ACCOUNT,
+  OWNER_NATIVE_REVOKED_ACCOUNT,
   OWNER_PASSKEY_ACCOUNT,
+  nativeCredentialTag,
+  nativeTagRevoked,
   ownerKeysCopy,
   ownerMissing,
   readOwnerItem,
@@ -81,6 +89,11 @@ const nativeExists = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'owner_native_exists',
     'Touch ID or Windows Hello is already turned on for approvals on this computer.',
+  );
+const nativeMissing = (): NodeKeyStoreError =>
+  new NodeKeyStoreError(
+    'owner_native_missing',
+    'Touch ID or Windows Hello is not turned on for approvals on this computer.',
   );
 const keychainFailed = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
@@ -118,8 +131,12 @@ export interface NativePresenceStatus {
   readonly available: boolean;
   /** An `owner-native` item for this platform and this owner exists. */
   readonly registered: boolean;
-  /** Why it is not registered for this owner although one exists: another owner's, or the other kind. */
-  readonly reason?: 'other_owner';
+  /**
+   * Why it cannot be used: another owner's or the other platform's item (`other_owner`), an item that
+   * does not read as ALKH or was revoked (`damaged`), or a key the helper says is no longer valid,
+   * e.g. after a fingerprint change (`reregister`). The last two are fixed by turning it on again.
+   */
+  readonly reason?: 'other_owner' | 'damaged' | 'reregister';
 }
 
 /** Whether native presence can be offered here, and whether it is turned on for `ownerNostr`. */
@@ -130,16 +147,39 @@ export async function nativePresenceStatus(
   options: OwnerNativeOptions = {},
 ): Promise<NativePresenceStatus> {
   if (helper === undefined) return { available: false, registered: false };
+  const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   const available = await helper.available().catch(() => false);
-  const header = await readOwnerNativeHeader(keychain, options.timeoutMs).catch(() => null);
-  if (header === null) return { available, registered: false };
+  const blob = await readItem(keychain, timeoutMs).catch(() => null);
+  if (blob === null) return { available, registered: false };
+  let header: NativeBlobHeader;
+  try {
+    header = readNativeBlobHeader(blob);
+  } catch {
+    return { available, registered: false, reason: 'damaged' };
+  } finally {
+    wipe(blob);
+  }
   const ours =
     header.kind === helper.kind &&
     ownerNostr !== undefined &&
     equalBytes(header.ownerNostr, ownerNostr);
-  return ours
+  if (!ours) return { available, registered: false, reason: 'other_owner' };
+  const revoked = await guarded(() => keychain.get(OWNER_NATIVE_REVOKED_ACCOUNT), timeoutMs).catch(
+    () => null,
+  );
+  if (nativeTagRevoked(revoked, nativeCredentialTag(header))) {
+    return { available, registered: false, reason: 'damaged' };
+  }
+  // No prompt: the helper's `check` only asks whether the key is still valid.
+  const valid = await helper
+    .check(encodeNativeHelperRecord(header.kind, header))
+    .then(() => true)
+    .catch(
+      (error: unknown) => !(error instanceof NativeHelperError && error.state === 'reregister'),
+    );
+  return valid
     ? { available, registered: true }
-    : { available, registered: false, reason: 'other_owner' };
+    : { available, registered: true, reason: 'reregister' };
 }
 
 /**
@@ -154,9 +194,10 @@ export async function nativePresence(
   helper: NativeHelper,
   ownerNostr: Uint8Array,
   reason: NativeReason,
-  options: OwnerNativeOptions = {},
+  options: OwnerNativeOptions & { readonly signal?: AbortSignal } = {},
 ): Promise<NativeOwnerPresence> {
-  const blob = await readItem(keychain, options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS);
+  const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  const blob = await readItem(keychain, timeoutMs);
   if (blob === null) throw presenceRejected();
   let record: Uint8Array;
   try {
@@ -164,6 +205,8 @@ export async function nativePresence(
     if (header.kind !== helper.kind || !equalBytes(header.ownerNostr, ownerNostr)) {
       throw presenceRejected();
     }
+    const revoked = await guarded(() => keychain.get(OWNER_NATIVE_REVOKED_ACCOUNT), timeoutMs);
+    if (nativeTagRevoked(revoked, nativeCredentialTag(header))) throw presenceRejected();
     record = encodeNativeHelperRecord(header.kind, header);
   } catch (error) {
     if (error instanceof CryptoInputError) throw presenceRejected();
@@ -171,7 +214,13 @@ export async function nativePresence(
   } finally {
     wipe(blob);
   }
-  const secret = await helper.release(record, reason);
+  if (options.signal?.aborted === true) throw new NativeHelperError('cancelled');
+  const secret = await helper.release(record, reason, options.signal);
+  // Fable review L1: a touch that arrives after the operation was abandoned approves nothing.
+  if (isAborted(options.signal)) {
+    wipe(secret);
+    throw new NativeHelperError('cancelled');
+  }
   return Object.freeze({ kind: 'native', nativeKind: helper.kind, secret });
 }
 
@@ -254,34 +303,25 @@ export async function storeOwnerNativeSeed(
 }
 
 /**
- * Registers native presence for this owner: its own owner operation (04 §2.3.4 "Registration").
- * `presence` is the backup code (`passphrase`, opening the `owner` item) or the passkey's PRF output
- * (`passkey-prf`, opening `owner-passkey`; the caller has checked the assertion against the owner).
- * A native presence never registers (`presence_required`). Refuses before the helper runs when an
- * `owner-native` item exists (`owner_native_exists`), the presence is wrong (`presence_rejected`) or
- * no owner is set up (`owner_missing`). The presented bytes and the seed are wiped.
+ * Opens the owner seed for an owner operation of native presence itself (register, turn off,
+ * replace): `presence` is the backup code (`passphrase`, the `owner` item) or the passkey's PRF output
+ * (`passkey-prf`, `owner-passkey`; the caller has checked the assertion). A native presence is never
+ * accepted for these (`presence_required`): a captured native secret cannot turn itself back on. The
+ * presented bytes are wiped; the caller wipes the seed.
  */
-export async function registerOwnerNative(
+async function openSeedForNativeOp(
   keychain: KeychainBackend,
-  helper: NativeHelper,
-  expected: OwnerPublicKeys,
+  owner: OwnerPublicKeys,
   presence: OwnerPresence,
-  options: OwnerNativeOptions = {},
-): Promise<void> {
-  const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  timeoutMs: number,
+): Promise<Uint8Array> {
   const p = presence as Partial<Record<'kind', unknown> & Record<'secret' | 'prfOutput', unknown>>;
   const presented =
     p.kind === 'passphrase' ? p.secret : p.kind === 'passkey-prf' ? p.prfOutput : undefined;
   let item: Uint8Array | null = null;
-  let seed: Uint8Array | undefined;
   try {
-    const owner = ownerKeysCopy(expected);
     if (!(presented instanceof Uint8Array) || presented.length === 0) throw presenceRequired();
-    const existing = await readItem(keychain, timeoutMs);
-    if (existing !== null) {
-      wipe(existing);
-      throw nativeExists();
-    }
+    let seed: Uint8Array;
     if (p.kind === 'passphrase') {
       item = await readOwnerItem(keychain, timeoutMs);
       if (item === null) throw ownerMissing();
@@ -307,19 +347,156 @@ export async function registerOwnerNative(
         throw error;
       }
     }
-    if (!sameOwnerKeys(seed, owner)) throw presenceRejected();
-    await storeOwnerNativeSeed(keychain, helper, seed, owner, options);
+    if (!sameOwnerKeys(seed, owner)) {
+      wipe(seed);
+      throw presenceRejected();
+    }
+    return seed;
   } finally {
     const secret = (presence as { secret?: unknown }).secret;
     const prf = (presence as { prfOutput?: unknown }).prfOutput;
     for (const value of [secret, prf]) if (value instanceof Uint8Array) wipe(value);
-    wipe(item ?? undefined, seed);
+    wipe(item ?? undefined);
+  }
+}
+
+/**
+ * Registers native presence for this owner: its own owner operation (04 §2.3.4 "Registration").
+ * `presence` is the backup code or the passkey (openSeedForNativeOp); a native presence never
+ * registers (`presence_required`). Refuses before the helper runs when an `owner-native` item exists
+ * (`owner_native_exists`), the presence is wrong (`presence_rejected`) or no owner is set up
+ * (`owner_missing`). The presented bytes and the seed are wiped.
+ */
+export async function registerOwnerNative(
+  keychain: KeychainBackend,
+  helper: NativeHelper,
+  expected: OwnerPublicKeys,
+  presence: OwnerPresence,
+  options: OwnerNativeOptions = {},
+): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  const owner = ownerKeysCopy(expected);
+  const existing = await readItem(keychain, timeoutMs).catch((error: unknown) => {
+    wipePresence(presence);
+    throw error;
+  });
+  if (existing !== null) {
+    wipe(existing);
+    wipePresence(presence);
+    throw nativeExists();
+  }
+  const seed = await openSeedForNativeOp(keychain, owner, presence, timeoutMs);
+  try {
+    await storeOwnerNativeSeed(keychain, helper, seed, owner, options);
+  } finally {
+    wipe(seed);
+  }
+}
+
+function wipePresence(presence: OwnerPresence): void {
+  for (const value of [
+    (presence as { secret?: unknown }).secret,
+    (presence as { prfOutput?: unknown }).prfOutput,
+  ]) {
+    if (value instanceof Uint8Array) wipe(value);
+  }
+}
+
+/** Adds the stored blob's credential to the revoked list (Fable review M1); a damaged blob adds none. */
+async function revokeStored(
+  keychain: KeychainBackend,
+  blob: Uint8Array,
+  timeoutMs: number,
+): Promise<Uint8Array | undefined> {
+  let header: NativeBlobHeader;
+  try {
+    header = readNativeBlobHeader(blob);
+  } catch {
+    return undefined;
+  }
+  const tag = nativeCredentialTag(header);
+  const list = await guarded(() => keychain.get(OWNER_NATIVE_REVOKED_ACCOUNT), timeoutMs);
+  if (!nativeTagRevoked(list, tag)) {
+    const next = new Uint8Array((list?.length ?? 0) + 32);
+    if (list !== null) next.set(list, 0);
+    next.set(tag, list?.length ?? 0);
+    await guarded(() => keychain.set(OWNER_NATIVE_REVOKED_ACCOUNT, next), timeoutMs);
+  }
+  // The record, for the Windows helper to delete its credential (best effort).
+  return header.kind === NATIVE_PRESENCE_MACOS
+    ? undefined
+    : encodeNativeHelperRecord(header.kind, header);
+}
+
+/**
+ * Fable review M1: turns native presence OFF, its own owner operation (the backup code or the
+ * passkey; never native itself). Opens the seed to prove presence, revokes the stored credential
+ * (an old blob written back is never opened again) and deletes the `owner-native` item only while it
+ * is still the one read. Windows also deletes the Hello credential (best effort). `owner_native_missing`
+ * when none is stored. The presented bytes are wiped.
+ */
+export async function turnOffOwnerNative(
+  keychain: KeychainBackend,
+  helper: NativeHelper | undefined,
+  expected: OwnerPublicKeys,
+  presence: OwnerPresence,
+  options: OwnerNativeOptions = {},
+): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  const owner = ownerKeysCopy(expected);
+  const seed = await openSeedForNativeOp(keychain, owner, presence, timeoutMs);
+  wipe(seed);
+  const blob = await readItem(keychain, timeoutMs);
+  if (blob === null) throw nativeMissing();
+  try {
+    const record = await revokeStored(keychain, blob, timeoutMs);
+    const removed = await removeOwnerNativeItemIfOurs(keychain, blob, timeoutMs);
+    if (removed === 'failed' || removed === 'other') throw keychainFailed();
+    if (record !== undefined && helper !== undefined) {
+      await helper.remove(record).catch(() => undefined);
+    }
+  } finally {
+    wipe(blob);
+  }
+}
+
+/**
+ * Fable review M1: turns native presence on AGAIN after a biometry change (or a damaged item), its own
+ * owner operation (the backup code or the passkey; never native itself): the old credential is
+ * revoked and its item removed, then a new one is registered exactly as registerOwnerNative does
+ * (one gesture). Without a stored item it is a plain registration.
+ */
+export async function replaceOwnerNative(
+  keychain: KeychainBackend,
+  helper: NativeHelper,
+  expected: OwnerPublicKeys,
+  presence: OwnerPresence,
+  options: OwnerNativeOptions = {},
+): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  const owner = ownerKeysCopy(expected);
+  const seed = await openSeedForNativeOp(keychain, owner, presence, timeoutMs);
+  try {
+    const old = await readItem(keychain, timeoutMs);
+    if (old !== null) {
+      try {
+        const record = await revokeStored(keychain, old, timeoutMs);
+        const removed = await removeOwnerNativeItemIfOurs(keychain, old, timeoutMs);
+        if (removed === 'failed' || removed === 'other') throw keychainFailed();
+        if (record !== undefined) await helper.remove(record).catch(() => undefined);
+      } finally {
+        wipe(old);
+      }
+    }
+    await storeOwnerNativeSeed(keychain, helper, seed, owner, options);
+  } finally {
+    wipe(seed);
   }
 }
 
 /**
  * Removes the `owner-native` item only while it is still exactly `blob` (as for `owner-passkey`).
- * Used to roll back a setup; turning native presence off is an owner operation of its own (later).
+ * Used to roll back a setup and by turnOffOwnerNative / replaceOwnerNative.
  */
 export async function removeOwnerNativeItemIfOurs(
   keychain: KeychainBackend,

@@ -55,6 +55,8 @@ export type NodeKeyStoreErrorCode =
   | 'owner_passkey_exists'
   /** DESK-D12c: native presence (Touch ID or Windows Hello in the app) is already turned on. */
   | 'owner_native_exists'
+  /** DESK-D12c: native presence is not turned on, so there is nothing to turn off. */
+  | 'owner_native_missing'
   /** M1-8e: the authenticator returned no PRF output; nothing is stored, the owner code stays. */
   | 'passkey_unsupported'
   /**

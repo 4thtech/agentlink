@@ -62,13 +62,22 @@ export class StandInHelper implements NativeHelper {
   available(): Promise<boolean> {
     return Promise.resolve(true);
   }
+  #created = 0;
+  /** Each `create` after the first makes a new credential (as the real helpers do). */
   create(): Promise<Uint8Array> {
     this.calls.push(`create@${String(this.keychain?.writes.length ?? 0)}`);
     if (this.createState !== 'ok') return Promise.reject(new NativeHelperError(this.createState));
-    if (this.kind === NATIVE_PRESENCE_MACOS) return Promise.resolve(this.record.slice());
-    const sig = secretFor(this.kind, this.record);
+    const record = this.record.slice();
+    const n = this.#created++;
+    if (n > 0) {
+      // macOS: another opaque SE handle; Windows: another challenge.
+      const at = this.kind === NATIVE_PRESENCE_MACOS ? 3 : record.length - 1;
+      record[at] = ((record[at] as number) + n) & 0xff;
+    }
+    if (this.kind === NATIVE_PRESENCE_MACOS) return Promise.resolve(record);
+    const sig = secretFor(this.kind, record);
     return Promise.resolve(
-      concatBytes(this.record, new Uint8Array([sig.length >> 8, sig.length & 0xff]), sig),
+      concatBytes(record, new Uint8Array([sig.length >> 8, sig.length & 0xff]), sig),
     );
   }
   check(record: Uint8Array): Promise<void> {
@@ -78,11 +87,23 @@ export class StandInHelper implements NativeHelper {
       ? Promise.resolve()
       : Promise.reject(new NativeHelperError(this.checkState));
   }
-  release(record: Uint8Array, reason: NativeReason): Promise<Uint8Array> {
+  /**
+   * When set, the owner has not touched yet: release waits for it. A real helper is killed on abort
+   * (the OS prompt closes); this stand-in records the abort and, like a late touch, still answers.
+   */
+  touch: Promise<void> | undefined;
+  aborted = 0;
+  async release(
+    record: Uint8Array,
+    reason: NativeReason,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array> {
     this.calls.push(`release:${reason}@${String(this.keychain?.writes.length ?? 0)}`);
     this.records.push(record.slice());
-    if (this.gesture !== 'ok') return Promise.reject(new NativeHelperError(this.gesture));
-    return Promise.resolve(secretFor(this.kind, record));
+    signal?.addEventListener('abort', () => (this.aborted += 1), { once: true });
+    if (this.touch !== undefined) await this.touch;
+    if (this.gesture !== 'ok') throw new NativeHelperError(this.gesture);
+    return secretFor(this.kind, record);
   }
   remove(): Promise<void> {
     this.calls.push('remove');

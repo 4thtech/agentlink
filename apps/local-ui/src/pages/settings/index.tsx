@@ -12,6 +12,7 @@ import { parseRelays, type Relays } from '../advanced/relays.js';
 import { CREDITS_PATH, parseCredits, type CreditsAnswer } from '../proofs/data.js';
 import { SettingsIcon, type SettingsIconName } from './icons.js';
 import { SETTINGS_STRINGS as S } from './strings.js';
+import { NativeSettings } from '../../presence/native-settings.js';
 import './settings.css';
 
 export interface SettingsPageProps {
@@ -155,6 +156,8 @@ export function SettingsPage({ get = productionGet }: SettingsPageProps): ReactE
         </button>
         <div id={panel}>{open ? <AdvancedRows relays={relays} /> : null}</div>
       </div>
+      {/* DESK-D12c: "Use Touch ID for approvals", in the desktop app only. */}
+      <NativeSettings />
     </div>
   );
 }

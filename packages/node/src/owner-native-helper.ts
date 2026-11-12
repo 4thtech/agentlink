@@ -112,6 +112,7 @@ export interface NativeHelperRunResult {
 export type NativeHelperRunner = (
   args: readonly string[],
   stdin: Uint8Array | undefined,
+  signal?: AbortSignal,
 ) => Promise<NativeHelperRunResult>;
 
 /** Core's view of this computer's presence helper. */
@@ -123,29 +124,45 @@ export interface NativeHelper {
   create(): Promise<Uint8Array>;
   /** macOS `check`: resolves only when the key exists and refuses without a gesture. Never prompts. */
   check(record: Uint8Array): Promise<void>;
-  /** `ecdh <reason>` / `sign <reason>`: one OS prompt, the released secret (the caller wipes it). */
-  release(record: Uint8Array, reason: NativeReason): Promise<Uint8Array>;
+  /**
+   * `ecdh <reason>` / `sign <reason>`: one OS prompt, the released secret (the caller wipes it).
+   * `signal` aborts it (the helper is killed and the prompt goes away): `cancelled`, no bytes.
+   */
+  release(record: Uint8Array, reason: NativeReason, signal?: AbortSignal): Promise<Uint8Array>;
   /** Windows `delete` (best effort, no prompt); nothing on macOS (the key lives in its record). */
   remove(record: Uint8Array): Promise<void>;
 }
 
-const HEX_LINE = /^(?:[0-9a-f]{2})+\n?$/;
 const MAX_STDOUT = 16 * 1024;
 
-/** The printed bytes of a successful run, or a fixed error state. */
+const hexValue = (b: number): number =>
+  b >= 0x30 && b <= 0x39 ? b - 0x30 : b >= 0x61 && b <= 0x66 ? b - 0x61 + 10 : -1;
+
+/**
+ * The printed bytes of a successful run (lowercase hex and at most one newline, nothing else), or a
+ * fixed error state. Parsed from the bytes without a string copy (Fable review L2); the run's stdout
+ * buffer is wiped whatever happens.
+ */
 function printed(result: NativeHelperRunResult): Uint8Array {
-  if (result.code !== 0) throw new NativeHelperError(nativeUiState(result.code));
-  let text: string;
+  const raw = result.stdout;
   try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(result.stdout);
-  } catch {
-    throw new NativeHelperError('error');
+    if (result.code !== 0) throw new NativeHelperError(nativeUiState(result.code));
+    const n = raw.length > 0 && raw[raw.length - 1] === 0x0a ? raw.length - 1 : raw.length;
+    if (n === 0 || n % 2 !== 0) throw new NativeHelperError('error');
+    const out = new Uint8Array(n / 2);
+    for (let i = 0; i < out.length; i += 1) {
+      const hi = hexValue(raw[2 * i] as number);
+      const lo = hexValue(raw[2 * i + 1] as number);
+      if (hi < 0 || lo < 0) {
+        out.fill(0);
+        throw new NativeHelperError('error');
+      }
+      out[i] = (hi << 4) | lo;
+    }
+    return out;
+  } finally {
+    raw.fill(0);
   }
-  if (!HEX_LINE.test(text)) throw new NativeHelperError('error');
-  const hex = text.endsWith('\n') ? text.slice(0, -1) : text;
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i += 1) out[i] = Number.parseInt(hex.slice(2 * i, 2 * i + 2), 16);
-  return out;
 }
 
 const stdinOf = (record: Uint8Array): Uint8Array =>
@@ -174,11 +191,18 @@ export function createNativeHelper(options: {
       const result = await run(['check'], stdinOf(record));
       if (result.code !== 0) throw new NativeHelperError(nativeUiState(result.code));
     },
-    async release(record, reason) {
+    async release(record, reason, signal) {
       if (!(NATIVE_REASONS as readonly string[]).includes(reason)) {
         throw new NativeHelperError('error');
       }
-      const out = printed(await run([mac ? 'ecdh' : 'sign', reason], stdinOf(record)));
+      if (signal?.aborted === true) throw new NativeHelperError('cancelled');
+      const result = await run([mac ? 'ecdh' : 'sign', reason], stdinOf(record), signal);
+      if (isAborted(signal)) {
+        // Fable review L1: abandoned; whatever the helper printed is dropped.
+        result.stdout.fill(0);
+        throw new NativeHelperError('cancelled');
+      }
+      const out = printed(result);
       const fits = mac ? out.length === 32 : [256, 384, 512].includes(out.length);
       if (!fits) {
         out.fill(0);
@@ -206,7 +230,7 @@ export function spawnNativeHelper(
   options: { readonly timeoutMs?: number } = {},
 ): NativeHelperRunner {
   const timeoutMs = options.timeoutMs ?? NATIVE_HELPER_TIMEOUT_MS;
-  return (args, stdin) =>
+  return (args, stdin, signal) =>
     new Promise((resolve) => {
       const chunks: Buffer[] = [];
       let size = 0;
@@ -215,7 +239,16 @@ export function spawnNativeHelper(
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        const stdout = code === null ? new Uint8Array(0) : new Uint8Array(Buffer.concat(chunks));
+        signal?.removeEventListener('abort', onAbort);
+        // One copy out, then every chunk and the concatenation are wiped (Fable review L2).
+        let stdout = new Uint8Array(0);
+        if (code !== null) {
+          const joined = Buffer.concat(chunks);
+          stdout = new Uint8Array(joined);
+          joined.fill(0);
+        }
+        for (const chunk of chunks) chunk.fill(0);
+        chunks.length = 0;
         resolve({ code, stdout });
       };
       let child: ReturnType<typeof spawn>;
@@ -234,10 +267,19 @@ export function spawnNativeHelper(
         child.kill();
         finish(null);
       }, timeoutMs);
+      // Fable review L1: the page went away (client disconnected, prompt abandoned): kill the helper,
+      // so its OS prompt closes and no late touch is waited for.
+      function onAbort(): void {
+        child.kill();
+        finish(null);
+      }
+      if (signal?.aborted === true) onAbort();
+      else signal?.addEventListener('abort', onAbort, { once: true });
       child.on('error', () => finish(null));
       child.stdout?.on('data', (chunk: Buffer) => {
         size += chunk.length;
         if (size > MAX_STDOUT) {
+          chunk.fill(0);
           child.kill();
           finish(null);
           return;
@@ -304,4 +346,9 @@ export function desktopNativeHelper(
   if (path === undefined || !exists(path)) return undefined;
   const kind = platform === 'darwin' ? NATIVE_PRESENCE_MACOS : NATIVE_PRESENCE_WINDOWS;
   return createNativeHelper({ kind, run: spawnNativeHelper(path) });
+}
+
+/** True once `signal` was aborted (read fresh after an await). */
+export function isAborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
 }

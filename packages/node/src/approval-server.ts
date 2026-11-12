@@ -238,7 +238,14 @@ import {
   type NativeReason,
   type NativeUiState,
 } from './owner-native-helper.js';
-import { nativePresence, nativePresenceStatus, registerOwnerNative } from './owner-native.js';
+import {
+  nativePresence,
+  nativePresenceStatus,
+  type NativePresenceStatus,
+  registerOwnerNative,
+  replaceOwnerNative,
+  turnOffOwnerNative,
+} from './owner-native.js';
 import {
   MAX_SETUP_REGISTRATION_BYTES,
   SETUP_HOLD_MS,
@@ -390,11 +397,20 @@ const MAX_PASSKEY_BYTES = 6144;
 const PASSKEY_PATH = '/api/owner/passkey';
 /** DESK-D12c: the desktop app's native presence (GET status, POST register). */
 const NATIVE_PATH = '/api/owner/native';
+/** Fable review M1: turn native presence off, or on again (replace), each its own owner operation. */
+const NATIVE_OFF_PATH = '/api/owner/native/off';
+const NATIVE_REPLACE_PATH = '/api/owner/native/replace';
 /** DESK-D12c: the HTTP status of each fixed native presence state (never counted as a wrong code). */
-const NATIVE_HTTP: Readonly<Record<NativeUiState | 'not_registered', number>> = Object.freeze({
+type NativeAnswerState = NativeUiState | 'not_registered' | 'damaged' | 'keychain';
+const NATIVE_HTTP: Readonly<Record<NativeAnswerState, number>> = Object.freeze({
   cancelled: 403,
   failed: 403,
   not_registered: 403,
+  // Fable review L4: a blob that does not open after a real gesture (corrupted, or swapped by a
+  // same-user process) is its own state, never a wrong code: no wrong-code wait.
+  damaged: 409,
+  // Fable review L5: the keychain could not be read; not the same as "not turned on".
+  keychain: 503,
   lockout: 423,
   reregister: 409,
   unavailable: 409,
@@ -1879,7 +1895,7 @@ export async function startApprovalServerWith(
         }
         if (native) {
           // DESK-D12c: one helper gesture for this one decision (or review list), after every check.
-          const got = await nativeFor(context.owner.ownerNostr, 'approve');
+          const got = await nativeFor(context.owner.ownerNostr, 'approve', req, res);
           if (!('presence' in got)) {
             finishDecision(res, got.http, 'presence_rejected', { native: got.state });
             return;
@@ -1935,7 +1951,9 @@ export async function startApprovalServerWith(
             }),
           );
         } catch (error) {
-          if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+          if (error instanceof KeyStoreError && error.code === 'presence_rejected' && native) {
+            finishDecision(res, NATIVE_HTTP.damaged, 'presence_rejected', { native: 'damaged' });
+          } else if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
             presenceFailed();
             finishDecision(res, 403, 'presence_rejected');
           } else if (error instanceof NodeKeyStoreError) {
@@ -1989,16 +2007,39 @@ export async function startApprovalServerWith(
   async function nativeFor(
     ownerNostr: Uint8Array,
     reason: NativeReason,
+    req: IncomingMessage,
+    res: ServerResponse,
   ): Promise<
     | { readonly presence: OwnerPresence }
-    | { readonly http: number; readonly state: NativeUiState | 'not_registered' }
+    | { readonly http: number; readonly state: NativeAnswerState }
   > {
     if (nativeHelper === undefined) return { http: NATIVE_HTTP.unavailable, state: 'unavailable' };
+    // Fable review L1: when the page goes away (the client disconnects, the sheet is abandoned) the
+    // helper is killed, its OS prompt closes, `busy` is released by the gate's own finally, and a
+    // touch that still arrives approves nothing.
+    const abandoned = new AbortController();
+    const abandon = (): void => {
+      if (!res.writableFinished) abandoned.abort();
+    };
+    req.once('close', abandon);
+    res.once('close', abandon);
     try {
-      return { presence: await nativePresence(keychainOf(), nativeHelper, ownerNostr, reason) };
+      return {
+        presence: await nativePresence(keychainOf(), nativeHelper, ownerNostr, reason, {
+          signal: abandoned.signal,
+        }),
+      };
     } catch (error) {
-      const state = error instanceof NativeHelperError ? error.state : 'not_registered';
+      const state: NativeAnswerState =
+        error instanceof NativeHelperError
+          ? error.state
+          : error instanceof KeyStoreError && error.code === 'presence_rejected'
+            ? 'not_registered'
+            : 'keychain';
       return { http: NATIVE_HTTP[state], state };
+    } finally {
+      req.off('close', abandon);
+      res.off('close', abandon);
     }
   }
 
@@ -2018,11 +2059,12 @@ export async function startApprovalServerWith(
       keychainOf(),
       nativeHelper,
       context?.owner.ownerNostr,
-    ).catch(() => ({ available: false, registered: false }) as const);
+    ).catch((): NativePresenceStatus => ({ available: false, registered: false }));
     sendJson(res, 200, {
       native: {
         available: status.available,
         registered: status.registered,
+        ...(status.reason === undefined ? {} : { reason: status.reason }),
         platform: nativeHelper.kind === 1 ? 'mac' : 'windows',
       },
     });
@@ -2033,7 +2075,11 @@ export async function startApprovalServerWith(
    * "Registration"): the backup code as the body, or a passkey assertion with
    * `X-AgentLink-Presence: passkey`; then the helper's one gesture. Signs nothing.
    */
-  async function nativeRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  async function nativeRegister(
+    req: IncomingMessage,
+    res: ServerResponse,
+    op: 'register' | 'off' | 'replace' = 'register',
+  ): Promise<void> {
     const reply = (status: number, outcome: string, extra: Record<string, unknown> = {}): void => {
       emit({ kind: 'owner_operation', outcome: status === 200 ? 'done' : 'failed' });
       sendJson(res, status, { status: outcome, ...extra });
@@ -2046,7 +2092,8 @@ export async function startApprovalServerWith(
       reply(403, 'presence_required');
       return;
     }
-    if (nativeHelper === undefined) {
+    const helper = nativeHelper;
+    if (helper === undefined) {
       req.resume();
       reply(409, 'native_unavailable');
       return;
@@ -2098,8 +2145,11 @@ export async function startApprovalServerWith(
           presence = { kind: 'passphrase', secret: body };
         }
         try {
-          // registerOwnerNative wipes the presented bytes, whether or not it registers.
-          await registerOwnerNative(keychainOf(), nativeHelper, context.owner, presence);
+          // Each wipes the presented bytes, whether or not it succeeds. None takes native presence.
+          if (op === 'off') await turnOffOwnerNative(keychainOf(), helper, context.owner, presence);
+          else if (op === 'replace') {
+            await replaceOwnerNative(keychainOf(), helper, context.owner, presence);
+          } else await registerOwnerNative(keychainOf(), helper, context.owner, presence);
         } catch (error) {
           if (error instanceof NativeHelperError) {
             reply(NATIVE_HTTP[error.state], 'presence_rejected', { native: error.state });
@@ -2107,6 +2157,7 @@ export async function startApprovalServerWith(
           }
           const code = (error as { code?: unknown } | null)?.code;
           if (code === 'owner_native_exists') reply(409, 'native_exists');
+          else if (code === 'owner_native_missing') reply(409, 'native_missing');
           else if (code === 'presence_rejected') {
             presenceFailed();
             reply(403, 'presence_rejected');
@@ -2116,7 +2167,7 @@ export async function startApprovalServerWith(
           return;
         }
         presenceSucceeded();
-        reply(200, 'registered');
+        reply(200, op === 'off' ? 'off' : 'registered');
       } finally {
         busy = false;
       }
@@ -2354,7 +2405,7 @@ export async function startApprovalServerWith(
         let presence: OwnerPresence;
         if (native) {
           // DESK-D12c: one helper gesture for this one owner operation, after every check.
-          const got = await nativeFor(expectedNostr, 'approve');
+          const got = await nativeFor(expectedNostr, 'approve', req, res);
           if (!('presence' in got)) {
             finishOwner(res, got.http, 'presence_rejected', { native: got.state });
             return;
@@ -2390,7 +2441,9 @@ export async function startApprovalServerWith(
             );
             ({ store, session, owner: ownerKeys } = unlocked);
           } catch (error) {
-            if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+            if (error instanceof KeyStoreError && error.code === 'presence_rejected' && native) {
+              finishOwner(res, NATIVE_HTTP.damaged, 'presence_rejected', { native: 'damaged' });
+            } else if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
               presenceFailed();
               finishOwner(res, 403, 'presence_rejected');
             } else if (error instanceof NodeKeyStoreError && error.code === 'owner_missing') {
@@ -2412,7 +2465,9 @@ export async function startApprovalServerWith(
             // unlock wipes the presented bytes, whether or not they unlock.
             session = await opened.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
           } catch (error) {
-            if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+            if (error instanceof KeyStoreError && error.code === 'presence_rejected' && native) {
+              finishOwner(res, NATIVE_HTTP.damaged, 'presence_rejected', { native: 'damaged' });
+            } else if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
               presenceFailed();
               finishOwner(res, 403, 'presence_rejected');
             } else {
@@ -2893,7 +2948,7 @@ export async function startApprovalServerWith(
         return;
       }
       if (step === 'begin') await payBegin(res, input, body, session, passkey);
-      else await payFinish(res, input, body, session, passkey, native);
+      else await payFinish(res, input, body, session, passkey, native, req);
     } finally {
       wipe(body);
     }
@@ -2984,6 +3039,7 @@ export async function startApprovalServerWith(
     session: Uint8Array,
     passkey: boolean,
     native = false,
+    payReq?: IncomingMessage,
   ): Promise<void> {
     if (!onlyKeys(input, ['ceremony']) || typeof input['ceremony'] !== 'string') {
       finishPay(res, 400, 'invalid');
@@ -3035,7 +3091,7 @@ export async function startApprovalServerWith(
         // DESK-D12c (04 §2.5.3, 04 §2.3.4 "The reason is display-only"): the statement of this hold
         // was shown at begin; the one unlock below signs exactly this hold's objects (rule 3) and
         // nothing else. The helper's `pay` text is display-only and binds nothing.
-        const got = await nativeFor(context.owner.ownerNostr, 'pay');
+        const got = await nativeFor(context.owner.ownerNostr, 'pay', payReq ?? res.req, res);
         if (!('presence' in got)) {
           finishPay(res, got.http, 'presence_rejected', { native: got.state });
           return;
@@ -3090,7 +3146,9 @@ export async function startApprovalServerWith(
           // unlock wipes the presented bytes, whether or not they unlock.
           ownerSession = await store.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
         } catch (error) {
-          if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+          if (error instanceof KeyStoreError && error.code === 'presence_rejected' && native) {
+            finishPay(res, NATIVE_HTTP.damaged, 'presence_rejected', { native: 'damaged' });
+          } else if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
             presenceFailed();
             if (!passkey && !native && payHolds.backupFailed(hold)) {
               consumed = true;
@@ -5064,7 +5122,15 @@ export async function startApprovalServerWith(
     const one = API_ONE.exec(path);
     const decideMatch = API_DECIDE.exec(path);
     const passkeyRoute = path === PASSKEY_PATH;
-    const nativeRoute = path === NATIVE_PATH;
+    const nativeOp: 'register' | 'off' | 'replace' | undefined =
+      path === NATIVE_PATH
+        ? 'register'
+        : path === NATIVE_OFF_PATH
+          ? 'off'
+          : path === NATIVE_REPLACE_PATH
+            ? 'replace'
+            : undefined;
+    const nativeRoute = nativeOp !== undefined;
     const reviewRoute = path === REVIEW_PATH;
     if (
       path !== '/api/approvals' &&
@@ -5078,7 +5144,10 @@ export async function startApprovalServerWith(
       return;
     }
     const post =
-      decideMatch !== null || reviewRoute || ((passkeyRoute || nativeRoute) && method === 'POST');
+      decideMatch !== null ||
+      reviewRoute ||
+      ((passkeyRoute || nativeRoute) && method === 'POST') ||
+      (nativeOp !== undefined && nativeOp !== 'register');
     if (method !== (post ? 'POST' : 'GET')) return reject(res, 405, 'method');
     if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token');
     if (!fetchSiteOk(req)) return reject(res, 403, 'fetch_site');
@@ -5098,7 +5167,7 @@ export async function startApprovalServerWith(
           noAgent(res);
           return;
         }
-        await approvalsPost(req, res, reviewRoute, decideMatch, nativeRoute);
+        await approvalsPost(req, res, reviewRoute, decideMatch, nativeOp);
       } finally {
         hold?.leave();
       }
@@ -5126,7 +5195,7 @@ export async function startApprovalServerWith(
     res: ServerResponse,
     reviewRoute: boolean,
     decideMatch: RegExpExecArray | null,
-    nativeRoute = false,
+    nativeOp?: 'register' | 'off' | 'replace',
   ): Promise<void> {
     {
       if (reviewRoute) {
@@ -5140,7 +5209,7 @@ export async function startApprovalServerWith(
         return;
       }
       if (decideMatch === null) {
-        if (nativeRoute) await nativeRegister(req, res);
+        if (nativeOp !== undefined) await nativeRegister(req, res, nativeOp);
         else await passkeyRegister(req, res);
         return;
       }

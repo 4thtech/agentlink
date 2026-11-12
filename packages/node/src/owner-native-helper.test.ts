@@ -198,3 +198,51 @@ describe('where the desktop app keeps the helper (build-mac / build-win layout)'
     expect(desktopHelperPath('C:\\nodejs\\node.exe', 'win32')).toBeUndefined();
   });
 });
+
+describe('Fable review L2: no copy of a released secret is left behind', () => {
+  it('the run output is wiped once parsed, on success and on refusal', async () => {
+    const outputs: Uint8Array[] = [];
+    const run: NativeHelperRunner = () => {
+      const stdout = new TextEncoder().encode(`${'ab'.repeat(32)}\n`);
+      outputs.push(stdout);
+      return Promise.resolve({
+        code: outputs.length === 1 ? 0 : NATIVE_HELPER_EXIT.cancelled,
+        stdout,
+      });
+    };
+    const helper = createNativeHelper({ kind: 1, run });
+    expect((await helper.release(RECORD, 'approve')).length).toBe(32);
+    await expect(helper.release(RECORD, 'approve')).rejects.toBeInstanceOf(NativeHelperError);
+    for (const out of outputs) expect(out.every((b) => b === 0)).toBe(true);
+  });
+});
+
+describe('Fable review L1: an abandoned release', () => {
+  it('passes the signal to the run and drops what it printed after the abort', async () => {
+    const abandoned = new AbortController();
+    const seen: (AbortSignal | undefined)[] = [];
+    const run: NativeHelperRunner = (_args, _stdin, signal) => {
+      seen.push(signal);
+      abandoned.abort();
+      return Promise.resolve({
+        code: 0,
+        stdout: new TextEncoder().encode(`${'ab'.repeat(32)}\n`),
+      });
+    };
+    const error = await createNativeHelper({ kind: 1, run })
+      .release(RECORD, 'approve', abandoned.signal)
+      .catch((e: unknown) => e);
+    expect((error as NativeHelperError).state).toBe('cancelled');
+    expect(seen[0]).toBe(abandoned.signal);
+  });
+
+  it('the spawned helper is killed on abort (a stand-in that would wait forever)', async () => {
+    const script = join(root, 'waits');
+    writeFileSync(script, `#!${process.execPath}\nsetInterval(() => undefined, 1000);\n`);
+    chmodSync(script, 0o700);
+    const abandoned = new AbortController();
+    const pending = spawnNativeHelper(script)(['ecdh', 'approve'], undefined, abandoned.signal);
+    setTimeout(() => abandoned.abort(), 100);
+    expect((await pending).code).toBeNull();
+  });
+});

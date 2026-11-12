@@ -9,10 +9,13 @@ import { NATIVE_STATES, type NativeState } from './strings.js';
 export interface NativeStatus {
   readonly available: boolean;
   readonly registered: boolean;
+  /** Why it cannot be used now: turn it on again (`reregister`, `damaged`), or another owner's. */
+  readonly reason?: 'reregister' | 'damaged' | 'other_owner';
 }
 
 export type NativeRegistration =
   | { readonly kind: 'registered' }
+  | { readonly kind: 'off' }
   | { readonly kind: 'rejected' }
   | { readonly kind: 'native'; readonly state: NativeState }
   | { readonly kind: 'failed' };
@@ -45,7 +48,10 @@ export async function readNativeStatus(
     const n = body.native as Record<string, unknown> | null | undefined;
     if (typeof n !== 'object' || n === null) return NONE;
     if (typeof n['available'] !== 'boolean' || typeof n['registered'] !== 'boolean') return NONE;
-    return { available: n['available'], registered: n['registered'] };
+    const reason = n['reason'];
+    return reason === 'reregister' || reason === 'damaged' || reason === 'other_owner'
+      ? { available: n['available'], registered: n['registered'], reason }
+      : { available: n['available'], registered: n['registered'] };
   } catch {
     return NONE;
   }
@@ -55,14 +61,41 @@ const isState = (value: unknown): value is NativeState =>
   typeof value === 'string' && (NATIVE_STATES as readonly string[]).includes(value);
 
 /** POST /api/owner/native with the backup code; the OS prompt follows on the server's side. */
-export async function registerNative(
+export function registerNative(
   backupCode: string,
   fetcher: Fetch = defaultFetch,
   token: string = pageToken(),
 ): Promise<NativeRegistration> {
+  return nativeOp('/api/owner/native', backupCode, fetcher, token);
+}
+
+/** Fable review M1: turn it off (the backup code; never Touch ID itself). */
+export function turnOffNative(
+  backupCode: string,
+  fetcher: Fetch = defaultFetch,
+  token: string = pageToken(),
+): Promise<NativeRegistration> {
+  return nativeOp('/api/owner/native/off', backupCode, fetcher, token);
+}
+
+/** Fable review M1: turn it on again after a fingerprint or sign-in change (one gesture). */
+export function replaceNative(
+  backupCode: string,
+  fetcher: Fetch = defaultFetch,
+  token: string = pageToken(),
+): Promise<NativeRegistration> {
+  return nativeOp('/api/owner/native/replace', backupCode, fetcher, token);
+}
+
+async function nativeOp(
+  path: string,
+  backupCode: string,
+  fetcher: Fetch,
+  token: string,
+): Promise<NativeRegistration> {
   const body = new TextEncoder().encode(backupCode);
   try {
-    const res = await fetcher('/api/owner/native', {
+    const res = await fetcher(path, {
       method: 'POST',
       headers: { 'X-AgentLink-CSRF': token, 'Content-Type': 'application/octet-stream' },
       credentials: 'same-origin',
@@ -76,6 +109,9 @@ export async function registerNative(
     }
     const status = answer['status'];
     if (res.status === 200 && status === 'registered') return { kind: 'registered' };
+    if (res.status === 200 && status === 'off') return { kind: 'off' };
+    // Already off: nothing to do.
+    if (status === 'native_missing') return { kind: 'off' };
     // Already on (another tab, or an earlier setup): nothing to do.
     if (status === 'native_exists') return { kind: 'registered' };
     if (status === 'native_unavailable') return { kind: 'native', state: 'unavailable' };

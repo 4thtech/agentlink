@@ -94,9 +94,15 @@ export function PresencePrompt({
     mounted.current = true;
     if (desktop !== undefined && !codeFirst) {
       void nativeStatus()
-        .catch(() => ({ available: false, registered: false }))
+        .catch((): NativeStatus => ({ available: false, registered: false }))
         .then((status) => {
-          if (!mounted.current || !status.available || !status.registered) return;
+          if (
+            !mounted.current ||
+            !status.available ||
+            !status.registered ||
+            status.reason !== undefined
+          )
+            return;
           setNative(true);
           setUseCode(false);
         });
