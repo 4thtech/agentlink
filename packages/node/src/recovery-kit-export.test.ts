@@ -195,8 +195,15 @@ describe('exportRecoveryKit: one kit for every ID (WP-R2)', () => {
         },
       );
       try {
-        expect(kit.agents.map((a) => a.agentId)).toEqual([world.agentId, second]);
-        expect(kit.agents.map((a) => a.name)).toEqual(['default', 'work']);
+        // Both IDs, each under its own name (the kit keeps its own canonical order).
+        expect(
+          new Map(kit.agents.map((a) => [a.agentId, Buffer.from(a.name).toString('ascii')])),
+        ).toEqual(
+          new Map([
+            [world.agentId, 'default'],
+            [second, 'work'],
+          ]),
+        );
       } finally {
         kit.wipe();
       }
@@ -260,6 +267,8 @@ describe('exportRecoveryKit: one kit for every ID (WP-R2)', () => {
           expectedOwnerNostr: world.owner.ownerNostr,
         },
       );
+      // One store sink per ID, in the kit's order.
+      const order = kit.agents.map((a) => a.agentId);
       kit.wipe();
       const markers = parts.map((chunks, i) => {
         const file = join(h.home, `snap-${i}.sqlite`);
@@ -271,7 +280,12 @@ describe('exportRecoveryKit: one kit for every ID (WP-R2)', () => {
           db.close();
         }
       });
-      expect(markers).toEqual(['first', 'second']);
+      expect(new Map(order.map((agentId, i) => [agentId, markers[i]]))).toEqual(
+        new Map([
+          [world.agentId, 'first'],
+          [second, 'second'],
+        ]),
+      );
     } finally {
       await h.close();
     }
@@ -317,9 +331,16 @@ describe('exportRecoveryKit: one kit for every ID (WP-R2)', () => {
   // assert both IDs come back whole and each ID's policy loads at its mark (snapshot consistency
   // per ID, 04 §2.3.3 "Snapshot").
   it.skip('round trip with WP-R1: one file restores both IDs (pending WP-R1)', async () => {
-    const engine = './recovery-kit-restore.js';
-    const restore = (await import(/* @vite-ignore */ engine)) as Record<string, unknown>;
-    expect(typeof restore).toBe('object');
+    const h = await harness();
+    try {
+      const outcome = await h.run();
+      expect(outcome.status).toBe('saved');
+      // TODO(WP-R1): check(outcome.check, outcome.code) lists both IDs and writes nothing;
+      // open + apply on a clean HOME restores both; each ID's policy loads at its mark.
+      expect.fail('pending WP-R1 restore engine');
+    } finally {
+      await h.close();
+    }
   });
 
   it('with no other IDs it saves the open ID alone (as before)', async () => {

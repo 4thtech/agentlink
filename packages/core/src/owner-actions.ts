@@ -1578,6 +1578,18 @@ export class OwnerActions {
   }
 
   /**
+   * WP-R2 (D-147 (6); 04 §2.3.3 "Kit record"): true when this agent's store holds the nonce row of
+   * an applied `backup.export` with `nonce` (the audit record of a kit save), so the app can tell a
+   * kit record that names a real save from one that does not. Reads one row; writes nothing. Any
+   * input that is not a 16-byte base64url nonce is false.
+   */
+  async backupExportRecorded(nonce: string): Promise<boolean> {
+    if (typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{22}$/.test(nonce)) return false;
+    const row = await this.#ctx.store.transaction((tx) => tx.get('owner_action_nonces', { nonce }));
+    return row !== undefined && row.op === 'backup.export';
+  }
+
+  /**
    * The unsigned `contact.remove` (04 §2.5.1; 07 §3): refused for an unknown or removed contact and
    * for a revoked one (removing never changes `revoked`), as apply() refuses them.
    */
