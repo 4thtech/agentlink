@@ -28,6 +28,13 @@ export const TAGS = Object.freeze({
   safetyCode: 'agentlink/safety-code/v1',
   /** 04 §2.9 (D-102): `cardPop` is BIP-340 by agentNostr over taggedHash(TAGS.cardPop, sha256(JCS(card))). */
   cardPop: 'agentlink/card-pop/v1',
+  /**
+   * D-145 (5), 08 §8 (WP-D10): a desktop update key statement is BIP-340 by the offline ROOT key over
+   * taggedHash(TAGS.desktopKeyStatement, JCS(statement without sig)). The tag equals its `domain`.
+   */
+  desktopKeyStatement: 'agentlink-desktop-root/v1',
+  /** D-145 (5): a desktop update manifest, BIP-340 by the UPDATE key, over JCS(manifest without sig). */
+  desktopUpdateManifest: 'agentlink-desktop-update/v1',
 } as const);
 
 /** SHA-256 (FIPS 180-4). */

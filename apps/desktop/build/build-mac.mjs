@@ -35,6 +35,7 @@ import {
   OUT_DIR,
   LAYOUT,
   assertNoPreviewString,
+  assertPinnedRootKey,
   buildPayload,
   extract,
   fetchRuntimes,
@@ -90,6 +91,9 @@ const payload = buildPayload({
 const asarPath = join(contents, 'Resources', 'app.asar');
 await packAsar(payload.dir, asarPath);
 await assertNoPreviewString(asarPath);
+if ((await assertPinnedRootKey(asarPath)) === 'owner-local') {
+  console.log('NOTE: owner-local build without a pinned update root key. Never give it to anyone.');
+}
 const integrity = await asarIntegrity(asarPath);
 
 console.log('[4/9] bundled Node (official binary, left untouched)');

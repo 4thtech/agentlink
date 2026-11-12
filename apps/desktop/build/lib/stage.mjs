@@ -8,6 +8,7 @@ import { assetFor, constants } from './constants.mjs';
 import { fetchVerified, sha256File } from './fetch-verified.mjs';
 import { checkTgzDeps, lockRegistryProblems, treeHash } from './core-lock.mjs';
 import { PREVIEW_VAR, findPreviewString } from './preview-check.mjs';
+import { assertRootKeyPinned, readRootKeyJson } from './root-key-check.mjs';
 import { capture, run, walk } from './run.mjs';
 
 export const DESKTOP_DIR = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -99,6 +100,12 @@ export function buildPayload({ workDir, version, distDir = RELEASE_DIST_DIR }) {
  * check-preview-string.mjs, run on the real app.asar during the build so a bad bundle never ships.
  */
 export async function assertNoPreviewString(asarPath) {
+  const hits = findPreviewString(await asarFiles(asarPath));
+  if (hits.length) throw new Error(`${PREVIEW_VAR} is in the release ASAR: ${hits.join(', ')}`);
+}
+
+/** The raw app.asar bytes and every file in it, as [{path, content}]. */
+async function asarFiles(asarPath) {
   const req = createRequire(new URL('../package.json', import.meta.url));
   const asar = await import(pathToFileURL(req.resolve('@electron/asar')).href);
   const files = [{ path: '(raw app.asar bytes)', content: readFileSync(asarPath) }];
@@ -110,8 +117,19 @@ export async function assertNoPreviewString(asarPath) {
       /* directories */
     }
   }
-  const hits = findPreviewString(files);
-  if (hits.length) throw new Error(`${PREVIEW_VAR} is in the release ASAR: ${hits.join(', ')}`);
+  return files;
+}
+
+/**
+ * WP-D10 (Decision 5): the release build carries the owner's real offline root key, never the
+ * placeholder (lib/root-key-check.mjs). Returns 'pinned', or 'owner-local' for an owner-only build.
+ */
+export async function assertPinnedRootKey(asarPath, env = process.env) {
+  return assertRootKeyPinned({
+    rootKeyJson: readRootKeyJson(DESKTOP_DIR),
+    files: await asarFiles(asarPath),
+    env,
+  });
 }
 
 /** Packs the payload dir into app.asar (deterministic file order from @electron/asar). */

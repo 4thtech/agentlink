@@ -304,12 +304,18 @@ importers:
 
   apps/desktop:
     devDependencies:
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
 
   apps/desktop/build:
     devDependencies:
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../../../packages/crypto
       '@electron/asar':
         specifier: 4.3.1
         version: 4.3.1
@@ -625,7 +631,11 @@ importers:
         specifier: workspace:*
         version: link:../packages/types
 
-  tools: {}
+  tools:
+    devDependencies:
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../packages/crypto
 
 packages:
 

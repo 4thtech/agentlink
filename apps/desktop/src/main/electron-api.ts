@@ -20,6 +20,9 @@ export interface App {
   enableSandbox(): void;
   requestSingleInstanceLock(additionalData?: Record<string, unknown>): boolean;
   whenReady(): Promise<void>;
+  /** WP-D10 updater: the installed version and the app's own data folder. */
+  getVersion?(): string;
+  getPath?(name: 'userData'): string;
   quit(): void;
   exit(code?: number): void;
   isInApplicationsFolder?(): boolean;

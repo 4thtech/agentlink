@@ -42,6 +42,7 @@ import {
 } from './switches.js';
 import type { StatusAction } from './status-page.js';
 import { AppTray, trayImage } from './tray.js';
+import { scheduleUpdateChecks } from './updater/schedule.js';
 import { MainWindow } from './window.js';
 import type { InviteOutcome } from '../shared/protocol.js';
 
@@ -128,6 +129,8 @@ export interface ShellProcess {
   readonly toInviteLink?: (deepLink: string) => string | null;
   /** The per-user folder for core.log (core-log.ts logDir). */
   readonly logDir: string;
+  /** WP-D10: starts the phase-1 update checks (packaged release builds only). Absent: none. */
+  readonly startUpdates?: (electron: ElectronModule) => void;
 }
 
 export type ShellOutcome = 'refused' | 'second-instance' | 'location' | 'running';
@@ -394,6 +397,7 @@ export async function runShell(
   };
   startCore();
   if (launch.deepLink !== null) handleDeepLink(launch.deepLink);
+  if (app.isPackaged && preview === null) proc.startUpdates?.(electron);
   return 'running';
 }
 
@@ -428,5 +432,28 @@ export function realProcess(): ShellProcess {
     preview: readPreview(proc.env),
     toInviteLink,
     logDir: logDir(proc.platform, homedir(), proc.env),
+    startUpdates: (electron) => startUpdates(electron, proc.platform, proc.arch),
   };
+}
+
+/** WP-D10: the phase-1 updater on the real Electron app (index.ts does nothing without a pinned root). */
+function startUpdates(electron: ElectronModule, platform: string, arch: string): void {
+  const { app, dialog, shell } = electron;
+  if (app.getVersion === undefined || app.getPath === undefined) {
+    return;
+  }
+  const openPath = shell.openPath.bind(shell);
+  scheduleUpdateChecks(
+    {
+      currentVersion: app.getVersion(),
+      channel: 'stable',
+      platform,
+      arch,
+      stateDir: app.getPath('userData'),
+      openPath,
+      showMessageBox: (options) =>
+        dialog.showMessageBox({ ...options, buttons: [...options.buttons] }),
+    },
+    { setTimeout: (callback, ms) => setTimeout(callback, ms).unref() },
+  );
 }

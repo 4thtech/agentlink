@@ -12,6 +12,7 @@
     "test": "node --test test/*.test.mjs ../native/test/*.test.mjs"
   },
   "devDependencies": {
+    "@4thtech-io/crypto": "workspace:*",
     "@electron/asar": "4.3.1",
     "@electron/fuses": "2.1.3",
     "resedit": "3.1.0",
