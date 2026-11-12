@@ -710,9 +710,22 @@ export class PairingService implements PairingHandler {
 
   async #sweep(): Promise<void> {
     const ctx = this.#ctx;
+    const now = nowOf(ctx);
+    // REL051-B2 (IR-REL051-B2-1): an expired invite's kept link is cleared too (used and cancelled
+    // ones are cleared when that happens), with or without a drop.
+    try {
+      await ctx.store.transaction((tx) => {
+        for (const r of tx.select('invites')) {
+          if (r.invite_link != null && r.expires_at <= now) {
+            tx.update('invites', { invite_id: r.invite_id }, { invite_link: null });
+          }
+        }
+      });
+    } catch {
+      ctx.log.info('invite link clear failed');
+    }
     const adapter = this.#dropAdapter();
     if (adapter === undefined) return;
-    const now = nowOf(ctx);
     const nowMs = now * 1000;
     let rows: Row<'invites'>[];
     try {
