@@ -47,7 +47,7 @@ import { DEFAULT_AGENT_NAME } from '../runtime/agent-name.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
 import { appServes, chooseCurrentAgent } from './current-agent.js';
 import { nodeOwnerDeps } from './owner/deps.js';
-import { openUiHostAgent, startUiWelcome, withoutAssets, type UiHostDeps } from './ui-host.js';
+import { hostUiOf, openUiHostAgent, startUiWelcome, type UiHostDeps } from './ui-host.js';
 import { uiRemovalPort } from './ui-remove.js';
 import { removeAppHostRecord, writeAppHostRecord } from '../runtime/app-host-record.js';
 import { writeLastExit, type LastExitReason } from '../runtime/last-exit.js';
@@ -487,7 +487,8 @@ export function nodeUiDeps(): UiDeps {
           localUi: (opened) => localUiOptions(opened),
           now,
         };
-        const initialUi = withoutAssets(localUi);
+        // WP-1: the ID open at launch carries its key-items token too, so it can be renamed (D-141).
+        const initialUi = hostUiOf(agent, localUi);
         const server = await startApprovalServer({
           source,
           localUi,

@@ -64,6 +64,9 @@ export const OWNER_TEXT = Object.freeze({
   cancelFailed: "Problem  The cancel didn't go through. Nothing was changed.",
 
   // Owner add-agent (M1-9t, D-78; 04 §2.8).
+  // WP-1 (R-3): `--label` outside the label rule (06 §6); nothing ran.
+  labelInvalid:
+    'That name can’t be used. Use 1 to 32 letters, numbers, spaces, dots, dashes or apostrophes. Nothing was changed.',
   addAgentDone: 'OK       This ID can now pair. Restart the app that uses it.',
   get addAgentUnknown(): string {
     return `AgentLink is not set up for this ID on this machine yet. Run \`${prefix()} init --agent <name>\` yourself first, in your own terminal.`;

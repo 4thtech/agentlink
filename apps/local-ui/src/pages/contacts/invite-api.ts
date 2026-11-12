@@ -86,6 +86,11 @@ export interface ConnectingRow {
 
 export type CreateOutcome =
   | { readonly kind: 'ok'; readonly invite: CreatedInvite }
+  /**
+   * WP-1 (D-141): the open ID's card still carries an older name than its label; the page asks for
+   * the name update first (or `oldName` makes the invite anyway). Both names are text only (I-5).
+   */
+  | { readonly kind: 'name_update'; readonly cardName: string; readonly label: string }
   | { readonly kind: 'invalid_name' | 'not_set_up' | 'session_expired' | 'offline' | 'failed' };
 
 export type InviteRefusal = 'expired' | 'own' | 'damaged' | 'cant_use' | 'unavailable';
@@ -120,7 +125,10 @@ export type AcceptOutcome =
     };
 
 export interface InviteApi {
-  create(label: string | undefined, options?: { readonly long?: boolean }): Promise<CreateOutcome>;
+  create(
+    label: string | undefined,
+    options?: { readonly long?: boolean; readonly oldName?: boolean },
+  ): Promise<CreateOutcome>;
   /** `keepalive`: the request outlives the page (W5-INVITE-FEEDBACK, a page that hides). */
   cancel(inviteId: string, options?: { readonly keepalive?: boolean }): Promise<CancelOutcome>;
   check(invite: string): Promise<CheckOutcome>;
@@ -292,6 +300,7 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
       const body = encode({
         ...(label === undefined ? {} : { label }),
         ...(options?.long === true ? { long: true } : {}),
+        ...(options?.oldName === true ? { oldName: true } : {}),
       });
       const answer = await call(INVITE_CREATE_PATH, { headers: inviteHeaders(), body });
       if (answer.kind === 'offline') return { kind: 'offline' };
@@ -303,6 +312,19 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
       if (status === 401) return { kind: 'session_expired' };
       if (json['error'] === 'invalid_label') return { kind: 'invalid_name' };
       if (json['error'] === 'not_set_up') return { kind: 'not_set_up' };
+      if (status === 409 && json['error'] === 'name_update_needed') {
+        const { cardName, label } = json;
+        if (
+          typeof cardName === 'string' &&
+          typeof label === 'string' &&
+          cardName !== '' &&
+          label !== '' &&
+          cardName.length <= MAX_NAME_CHARS &&
+          label.length <= MAX_NAME_CHARS
+        ) {
+          return { kind: 'name_update', cardName, label };
+        }
+      }
       return { kind: 'failed' };
     },
 

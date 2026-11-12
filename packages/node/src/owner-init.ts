@@ -33,7 +33,7 @@ import {
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
 import { generateSecretCode } from '@4thtech-io/crypto/keystore';
-import { restrictName } from '@4thtech-io/core';
+import { isRestrictedAlias, restrictName } from '@4thtech-io/core';
 import { CLI_COMMAND } from './cli-command.js';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS } from './keychain-keystore.js';
@@ -45,6 +45,7 @@ import {
 } from './keychain.js';
 import type { FirstAgentCard } from './owner-first-card.js';
 import {
+  cardNameOf,
   signFirstParts,
   type FirstConnectResult,
   type FirstLabelResult,
@@ -105,6 +106,10 @@ export interface OwnerInitResult {
   readonly card?: AgentCard;
   /** M1-36b-2: the first rules (the Send folder), when `firstCard.firstPolicy` was given. */
   readonly sendFolder?: SendFolderResult;
+  /** WP-1 (R-3): the first label, when `firstCard.firstLabel` was given (`--label`). */
+  readonly label?: FirstLabelResult;
+  /** WP-1: the label now in force (the typed or given one), only when `label` is `saved`. */
+  readonly labelName?: string;
 }
 
 /** Internal options (tests): Argon2id parameters and keychain timeout. */
@@ -228,6 +233,8 @@ export async function initOwnerWith(
 
   // M1-8h-b: the display name the first card commits to, asked before any code is shown.
   const named = first === undefined ? undefined : await withDisplayName(terminal, first);
+  // WP-1 (R-3): a first label core would not sign is refused before any code is shown.
+  if (named !== undefined) cardNameOf(named);
 
   // M1-36b-2: the Send folder for the first rules, checked or created before any code is shown, and
   // removed again (only while empty and only if this run created it) unless the rules took effect.
@@ -296,6 +303,10 @@ async function setUpOwner(
       secretKind: usePassphrase ? 2 : 1,
       ...(issued === undefined ? {} : { card: issued.card }),
       ...(sendFolder === undefined ? {} : { sendFolder }),
+      ...(issued?.label === undefined ? {} : { label: issued.label }),
+      ...(issued?.label === 'saved' && named?.firstLabel !== undefined
+        ? { labelName: named.firstLabel.label }
+        : {}),
     });
   } finally {
     wipe(seed, secret);
@@ -408,7 +419,11 @@ async function issueFirstCard(
   blob: Uint8Array,
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
   plan?: SendFolderPlan,
-): Promise<{ readonly card: AgentCard; readonly sendFolder?: SendFolderResult }> {
+): Promise<{
+  readonly card: AgentCard;
+  readonly sendFolder?: SendFolderResult;
+  readonly label?: FirstLabelResult;
+}> {
   const outcome = await signFirstCardWith(keychain, owner, secret, first, timeoutMs, plan);
   if (outcome.kind === 'signed') return outcome;
   if (outcome.kind === 'unknown')
@@ -438,6 +453,10 @@ function displayNameAllowed(typed: string): boolean {
  * M1-8h-b: asks the owner for the agent's display name (self-declared, 04 §2.4), on terminals that
  * can read a visible line. Enter keeps the name the caller passed (the local agent name); a name
  * outside the rule is asked again, and after three refusals the caller's name is kept.
+ *
+ * WP-1 (R-3): with a first label (`--label`, default the folder name), the question starts from that
+ * label and the answer becomes the label, which also names the card (cardNameOf): card and label are
+ * one name from the start, as in the app. Without one, the typed name names the card only.
  */
 async function withDisplayName(
   terminal: OwnerTerminal,
@@ -445,14 +464,21 @@ async function withDisplayName(
 ): Promise<FirstAgentCard> {
   if (terminal.readText === undefined) return first;
   assertPrintable(first.name, 'The agent name');
+  const firstLabel = first.firstLabel;
+  const current = firstLabel?.label ?? first.name;
+  assertPrintable(current, 'The agent name');
   terminal.write(COPY.nameNote);
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
-    const typed = (await terminal.readText(COPY.nameQuestion(first.name))).normalize('NFC').trim();
+    const typed = (await terminal.readText(COPY.nameQuestion(current))).normalize('NFC').trim();
     if (typed === '') return first;
-    if (displayNameAllowed(typed)) return { ...first, name: typed };
+    if (firstLabel !== undefined) {
+      if (displayNameAllowed(typed) && isRestrictedAlias(typed)) {
+        return { ...first, firstLabel: { ...firstLabel, label: typed } };
+      }
+    } else if (displayNameAllowed(typed)) return { ...first, name: typed };
     terminal.write(COPY.nameRefused);
   }
-  terminal.write(COPY.nameKept(first.name));
+  terminal.write(COPY.nameKept(current));
   return first;
 }
 

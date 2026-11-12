@@ -14,7 +14,15 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createAiAppsDesk } from '../harness/app-desk.js';
 import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
-import { openUiHostAgent, startUiWelcome, type UiHostDeps, type UiWelcomeDeps } from './ui-host.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import {
+  hostUiOf,
+  openUiHostAgent,
+  startUiWelcome,
+  type UiHostDeps,
+  type UiWelcomeDeps,
+} from './ui-host.js';
 
 function deps(
   entries: readonly AgentDirectoryEntry[],
@@ -87,6 +95,45 @@ describe('openUiHostAgent (U3-c)', () => {
     );
     expect(await openUiHostAgent(d, 'work')).toBeUndefined();
     expect(log).toEqual(['open work', 'close work']);
+  });
+});
+
+// WP-1 (root cause of the owner's "Couldn't rename it", 0.4.13): the ID open when `agentlink ui`
+// starts got its page wiring without its key-items token, so the server offered no rename that
+// rotates (approval-server.ts `renameAgent`) and "Update contacts" answered 501 until the owner
+// switched IDs. Every app-host agent, the one open at launch included, goes through hostUiOf.
+describe('hostUiOf (WP-1): the open ID always carries its key-items token', () => {
+  it('adds the agent epochKeys to its page wiring, without the app files', () => {
+    const token = { opaque: true } as never;
+    const agent = { name: 'cc-test', epochKeys: token } as unknown as OwnerAgent;
+    const ui = hostUiOf(agent, { assets: { files: new Map() }, client: {} as never });
+    expect(ui.epochKeys).toBe(token);
+    expect('assets' in ui).toBe(false);
+  });
+
+  it('a switch-opened agent has it (openUiHostAgent)', async () => {
+    const { deps: d } = deps([{ name: 'work', label: 'Work', available: true, removing: false }]);
+    const token = { opaque: true } as never;
+    const opener = d.owner.open;
+    const withKeys: UiHostDeps = {
+      ...d,
+      owner: {
+        open: async (name) => {
+          const r = await opener(name);
+          return r.status === 'ok' ? { ...r, agent: { ...r.agent, epochKeys: token } } : r;
+        },
+      },
+    };
+    const agent = await openUiHostAgent(withKeys, 'work');
+    expect(agent?.localUi.epochKeys).toBe(token);
+    await agent?.close();
+  });
+
+  it('the ID open at launch (ui.ts start) is wired through hostUiOf too', () => {
+    const source = readFileSync(fileURLToPath(new URL('./ui.ts', import.meta.url)), 'utf8');
+    const start = source.slice(source.indexOf('start: async (name'));
+    expect(start).toMatch(/const initialUi = hostUiOf\(agent, localUi\)/);
+    expect(start).toMatch(/localUi: initialUi,/);
   });
 });
 

@@ -16,6 +16,9 @@
 // - M1-36b-2 (D-121 D6): with `card.firstPolicy`, the same entry also signs the agent's first rules
 //   (the 06 §3 defaults plus the empty `~/AgentLink/Send` folder) after the card is stored, shown
 //   before the prompt; node signs only that exact document (owner-first-policy.ts).
+// - WP-1 (R-3): with `card.firstLabel` (`--label`, default the folder name), the card is named by
+//   that label and the same entry signs it as the first `agent.label` after the card and the rules
+//   (signFirstParts, as `owner init` and the app do), so card and label never start out different.
 // - It never shows, generates, changes or re-wraps the owner code and never writes or deletes the
 //   owner item: unlike `owner init` (M1-8h) there is no rollback that removes the owner item.
 //
@@ -49,10 +52,12 @@ import {
   type KeyStoreBackendKind,
   type KeychainBackend,
 } from './keychain.js';
-import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
+import type { FirstAgentCard } from './owner-first-card.js';
 import {
+  cardNameOf,
   signFirstParts,
   type FirstConnectResult,
+  type FirstLabelResult,
   type FirstPartsResult,
 } from './owner-first-label.js';
 import {
@@ -63,7 +68,6 @@ import {
   removeCreated,
   sendFolderOutcome,
   sendFolderReview,
-  signFirstPolicy,
   type SendFolderPlan,
   type SendFolderResult,
 } from './owner-first-policy.js';
@@ -103,6 +107,8 @@ export interface AddAgentResult {
   readonly fingerprint: string;
   /** M1-36b-2: the first rules (the Send folder), when `card.firstPolicy` was given. */
   readonly sendFolder?: SendFolderResult;
+  /** WP-1 (R-3): the first label, when `card.firstLabel` was given (`--label`). */
+  readonly label?: FirstLabelResult;
 }
 
 /** Internal options (tests): keychain timeout. */
@@ -215,6 +221,8 @@ export async function addAgentWith(
   const { card } = options;
   assertAgentId(card.agent);
   assertPrintable(card.name, 'The agent name');
+  // WP-1 (R-3): a first label that is not its own restricted form is refused before anything.
+  cardNameOf(card);
   const owner = options.owner === undefined ? undefined : ownerKeysCopy(options.owner);
   // Never replaces a card (04 §2.8): an agent with a card already has an owner.
   if ((await card.identity.get()) !== undefined) {
@@ -254,10 +262,12 @@ function writeAgentReview(
   plan: SendFolderPlan | undefined,
 ): void {
   const fingerprint = agentFingerprintText(card.agent);
+  // WP-1 (R-3): the name the card will carry (the label when one is signed with it).
+  const shown = cardNameOf(card);
   if (plan?.status === 'ready') {
-    terminal.write(COPY.agentWithRule(card.name, fingerprint));
+    terminal.write(COPY.agentWithRule(shown, fingerprint));
   } else {
-    terminal.write(COPY.agent(card.name, fingerprint));
+    terminal.write(COPY.agent(shown, fingerprint));
   }
   if (plan !== undefined) terminal.write(sendFolderReview(plan));
 }
@@ -281,49 +291,50 @@ async function addAgentWithOwner(
     throw error;
   }
   const fingerprint = ownerFingerprintText(owner);
-  let sendFolder: SendFolderResult | undefined;
+  let signed: SignedAfterCard;
   try {
     terminal.write(COPY.owner(fingerprint));
     writeAgentReview(terminal, card, plan);
     const inner = await unlockOnce(store, terminal);
-    sendFolder = await signFirstCard(inner, card, owner, plan);
+    signed = await signFirstCard(inner, card, owner, plan);
   } finally {
     await store.close();
   }
-  return storedCard(terminal, card, owner, fingerprint, sendFolder, plan);
+  return storedCard(terminal, card, owner, fingerprint, signed, plan);
+}
+
+/** What one code entry signed after the card (fixed values only). */
+interface SignedAfterCard {
+  readonly sendFolder?: SendFolderResult;
+  readonly label?: FirstLabelResult;
 }
 
 /**
  * Signs and stores one first card for `card.agent` naming `owner`, through the restricted
- * FirstCardSession over `inner`, which is closed afterwards. The outcome is decided by storedCard
- * from what core stored, never from an error (whose text is not shown, I-5).
+ * FirstCardSession over `inner` (signFirstParts, as `owner init` does). The outcome is decided by
+ * storedCard from what core stored, never from an error (whose text is not shown, I-5).
+ *
+ * M1-36b-2: the first rules, with the same unlocked owner session (one entry), only after the card
+ * is stored and verified. WP-1 (R-3): with `card.firstLabel` (`--label`), the card is named by that
+ * label (cardNameOf) and the same entry signs it as the first `agent.label`, so what contacts see
+ * and what the app shows are one name.
  */
 async function signFirstCard(
   inner: OwnerSession,
   card: FirstAgentCard,
   owner: OwnerPublicKeys,
   plan: SendFolderPlan | undefined,
-): Promise<SendFolderResult | undefined> {
-  const session = new FirstCardSession(inner, card.agent, owner);
+): Promise<SignedAfterCard> {
   try {
-    await card.identity.init({
-      owner: session,
-      ownerKeys: owner,
-      name: card.name,
-      relays: card.relays,
-    });
-    // M1-36b-2: the first rules, with the same unlocked owner session (one entry), only after the
-    // card is stored and verified (signFirstPolicy checks it again).
-    const { firstPolicy } = card;
-    if (plan?.status === 'ready' && firstPolicy !== undefined) {
-      return await signFirstPolicy(inner, { ...card, firstPolicy }, plan, owner);
-    }
+    const parts = await signFirstParts(inner, owner, card, plan);
+    return {
+      ...(parts.sendFolder === undefined ? {} : { sendFolder: parts.sendFolder }),
+      ...(parts.label === undefined ? {} : { label: parts.label }),
+    };
   } catch {
     // Decided by storedCard from what core stored.
-  } finally {
-    await session.close();
+    return {};
   }
-  return undefined;
 }
 
 /** Success only for a verified stored card naming exactly this agent and this owner. */
@@ -332,7 +343,7 @@ async function storedCard(
   card: FirstAgentCard,
   owner: OwnerPublicKeys,
   fingerprint: string,
-  signed: SendFolderResult | undefined,
+  signed: SignedAfterCard,
   plan: SendFolderPlan | undefined,
 ): Promise<AddAgentResult> {
   let stored: Awaited<ReturnType<FirstAgentCard['identity']['get']>>;
@@ -345,14 +356,15 @@ async function storedCard(
   if (!namesOwner(stored, card.agent, owner)) {
     throw new NodeKeyStoreError('owner_card_failed', COPY.cardFailed);
   }
-  terminal.write(COPY.done(card.name, fingerprint));
-  const sendFolder = signed ?? (plan === undefined ? undefined : notAttempted(plan));
+  terminal.write(COPY.done(cardNameOf(card), fingerprint));
+  const sendFolder = signed.sendFolder ?? (plan === undefined ? undefined : notAttempted(plan));
   const line = sendFolder === undefined ? undefined : sendFolderOutcome(sendFolder);
   if (line !== undefined) terminal.write(line);
   return Object.freeze({
     card: stored.card,
     fingerprint,
     ...(sendFolder === undefined ? {} : { sendFolder }),
+    ...(signed.label === undefined ? {} : { label: signed.label }),
   });
 }
 
@@ -407,14 +419,14 @@ async function addAgentWithoutCard(
     }
     const { store, session, owner } = unlocked;
     const fingerprint = ownerFingerprintText(owner);
-    let sendFolder: SendFolderResult | undefined;
+    let signed: SignedAfterCard;
     try {
-      sendFolder = await signFirstCard(session, card, owner, plan);
+      signed = await signFirstCard(session, card, owner, plan);
     } finally {
       await session.close();
       await store.close();
     }
-    return storedCard(terminal, card, owner, fingerprint, sendFolder, plan);
+    return storedCard(terminal, card, owner, fingerprint, signed, plan);
   }
   throw new NodeKeyStoreError('owner_secret_refused', COPY.refusedWithoutCard);
 }

@@ -104,12 +104,14 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   {
     name: 'owner',
     usage: [
-      'agentlink owner init                     †',
-      'agentlink owner add-agent --id <name>   †',
+      'agentlink owner init [--label <name>]    †',
+      'agentlink owner add-agent --id <name> [--label <name>]   †',
       'agentlink owner change-code              †',
     ],
     guard: 'owner',
-    options: AGENT,
+    // WP-1 (R-3): `--label` is the name the first card and the first label carry (default: the
+    // folder name), so contacts and the app show one name.
+    options: { ...AGENT, label: { type: 'string' } },
   },
   {
     name: 'status',

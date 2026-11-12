@@ -212,6 +212,30 @@ describe('owner add-agent: one owner, many local agents (D-78; 04 §2.8)', () =>
     expect(run.written.join('\n')).not.toContain(code);
   });
 
+  it('WP-1 (R-3): `--label` signs the card and the label alike, in the same code entry', async () => {
+    const alice = await initAgent('alice');
+    const bob = await initAgent('bob');
+    const { owner, code } = await ownerInit(alice);
+    const run = ownerTyping([code]);
+    const actions = bob.client.ownerActions;
+    const result = await addAgentWith(keychain, run.terminal, {
+      backend: 'keychain',
+      env: {},
+      owner,
+      card: { ...firstCard(bob, 'bob'), firstLabel: { label: 'Work Mac', actions } },
+    });
+    // What contacts see (the card) and what the app shows (the label) are the same name.
+    expect(await bob.client.identity.cardName()).toBe('Work Mac');
+    expect(await bob.client.ownerActions.loadLabel()).toMatchObject({
+      status: 'verified',
+      label: 'Work Mac',
+    });
+    expect(result.label).toBe('saved');
+    expect(run.labels).toEqual(['Owner code:']);
+    // The owner read the name the card will carry before the prompt.
+    expect(run.written.join('\n')).toContain('Work Mac');
+  });
+
   it('refuses with an AI-app marker set, before the owner key is read', async () => {
     const alice = await initAgent('alice');
     const bob = await initAgent('bob');

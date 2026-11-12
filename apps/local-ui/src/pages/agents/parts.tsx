@@ -8,6 +8,7 @@ import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import type { AgentsApi } from './api.js';
 import { appDot, appWord, type AgentRow, type AppLive } from './data.js';
 import { gateMessage, OwnerGate, usePasskey } from './owner-gate.js';
+import { renameProblem } from './sheets.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
 /** An AI app's dot: pulsing while Working (still under reduced motion), else the shell's shapes. */
@@ -160,7 +161,12 @@ export function PausedBanner({
   );
 }
 
-/** D-141 (Decision 46): "Contacts still see {cardName}" with "Update contacts" (one gesture). */
+/**
+ * D-141 (Decision 46): "Contacts still see {cardName}" with "Update contacts" (one gesture). WP-1
+ * (R-1): also with no contacts yet ("New invites still show {cardName}" with "Update name"), and
+ * shown on the Simple card, Under the hood, the ID's own page and Home. The gesture is the rename
+ * with the current label, which rotates the card to it (owner-rename.ts).
+ */
 export function CardNameNote({
   row,
   cardName,
@@ -174,6 +180,7 @@ export function CardNameNote({
   owner: OwnerClient;
   onUpdated: (told: boolean) => void;
 }): ReactElement {
+  const noContacts = row.contacts === 0;
   const passkey = usePasskey(owner);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -185,14 +192,20 @@ export function CardNameNote({
     void api.rename({ name: row.name, label: row.label }, proof).then((out) => {
       setBusy(false);
       if (out.kind === 'done') return onUpdated(out.contacts !== undefined && out.contacts > 0);
-      setError(gateMessage(out) ?? S.renameFailed);
+      setError(renameProblem(out, row.label));
     });
   };
   return (
-    <div className="ag-note">
+    <div className="ag-note" role="status" data-card-name-note>
       <p className="al-text-body-sm">
-        {S.contactsStillSee}
-        <bdi>{cardName}</bdi>
+        <strong>
+          {noContacts ? S.newInvitesStillShow : S.contactsStillSee}
+          <bdi>{cardName}</bdi>
+        </strong>
+      </p>
+      <p className="al-text-body-sm al-muted">
+        {S.noteHint}
+        <bdi>{row.label}</bdi>.
       </p>
       {asking ? (
         <OwnerGate
@@ -204,8 +217,8 @@ export function CardNameNote({
           onCancel={() => setAsking(false)}
         />
       ) : (
-        <Button variant="secondary" size="sm" onClick={() => setAsking(true)}>
-          {S.updateContacts}
+        <Button variant="primary" size="sm" onClick={() => setAsking(true)}>
+          {noContacts ? S.updateName : S.updateContacts}
         </Button>
       )}
     </div>

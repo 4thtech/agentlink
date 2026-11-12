@@ -588,8 +588,8 @@ Commands marked † are owner operations: they require owner presence (passkey v
 
 ```
 agentlink init [--agent <name>] [--keystore file] [--harness <id|none>] [--config <path>]   # create identity, configure harnesses (one with --harness; none = identity only, D-78); file KeyStore only without an OS keychain (07 §9)
-agentlink owner init                   † # create the owner key with a generated owner code (run it yourself): file-KeyStore machines; keychain machines until the M1b setup page
-agentlink owner add-agent --agent <name>   † # sign the first card of a further agent with the existing owner key (run it yourself; 04 §2.8, D-78)
+agentlink owner init [--label <name>]  † # WP-1: `--label` (default: the folder name) names the first card and is signed as its first `agent.label` in the same entry; create the owner key with a generated owner code (run it yourself): file-KeyStore machines; keychain machines until the M1b setup page
+agentlink owner add-agent --agent <name> [--label <name>]   † # WP-1: `--label` as for owner init; sign the first card of a further agent with the existing owner key (run it yourself; 04 §2.8, D-78)
 agentlink owner change-code                † # replace an exposed owner code with a new generated one; same owner (run it yourself; 04 §2.8, M1-9z; proposed, owner confirms at merge)
 agentlink keystore passphrase            # file KeyStore only: change its passphrase or unlock code (terminal only)
 agentlink                                # bare, in the owner's own terminal: opens the app, as `ui` (D-138); run by an AI it prints the M1-UX-OPEN-APP line (08 §1)

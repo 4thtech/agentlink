@@ -285,7 +285,8 @@ describe('Rename', () => {
     await click(button(rowOf('work'), 'Rename with Touch ID'));
     await type(code(), '123456');
     await click(button(host, 'Confirm with your backup code'));
-    expect(plain(host)).toContain('Not renamed yet. Try again.');
+    // WP-1: a 501 (the rename that updates the card was not offered) says what to do, not "Try again".
+    expect(plain(host)).toContain('Quit the AgentLink app and open it again');
     expect(rowOf('work')).toBeTruthy();
   });
 });
