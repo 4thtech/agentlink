@@ -21,6 +21,10 @@ node_modules/
 /.claude/worktrees/
 dist/
 build/
+# WP-D4: apps/desktop/build holds the packaging scripts (tracked); its outputs are not
+!apps/desktop/build/
+/apps/desktop/out/
+/apps/desktop/.cache/
 coverage/
 .turbo/
 .wrangler/
