@@ -245,6 +245,12 @@ function ContactList({
             <span className="al-contact-main">
               <span className="al-contact-name">
                 <ContactName {...nameInput(c)} label={labelKind(c)} showLabel />
+                {c.formerName === undefined ? null : (
+                  <span className="al-text-caption al-muted ct-former">
+                    {' '}
+                    <bdi>{S.wasName(c.formerName)}</bdi>
+                  </span>
+                )}
               </span>
               {dupes.has(shownName(c).trim().toLowerCase()) ? (
                 <span className="al-text-caption al-muted ct-same-name">{S.sameName}</span>

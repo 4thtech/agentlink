@@ -188,6 +188,16 @@ describe('ContactsPage: the list', () => {
     expect(empty?.textContent).toContain(`Try: ${S.emptyPrompt}`);
   });
 
+  it('D-141 (08 §1 C2): a renamed contact shows "(was {old})" as plain text in <bdi>', async () => {
+    const renamed = { ...marko, name: 'Marko Studio', formerName: '<b>Marko</b>' };
+    await mount({ [LIST]: { status: 'ok', contacts: [renamed, ana] } });
+    const bdi = host.querySelector('.ct-former bdi');
+    expect(bdi?.textContent).toBe('(was <b>Marko</b>)');
+    expect(host.querySelector('.ct-former b')).toBeNull();
+    expect(text()).toMatch(/Marko Studio.*\(was /);
+    expect(host.querySelectorAll('.ct-former').length).toBe(1);
+  });
+
   it('shows names as text and never an ID or key', async () => {
     const evil = { ...marko, name: '<img src=x onerror=alert(1)>' };
     await mount({ [LIST]: { status: 'ok', contacts: [evil, ana] } });

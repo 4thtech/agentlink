@@ -23,6 +23,7 @@ export const CONTACTS_STRINGS = {
   safetyExplain:
     'Compare these 12 digits with the other person by call or in person; if they match, it’s really them.',
   sameName: 'Another person has the same name.',
+  wasName: (former: string): string => `(was ${former})`,
   keepBoth: 'Keep both',
   removeOlder: 'Remove older',
   codeLoading: 'Loading the safety code…',
