@@ -15,21 +15,24 @@
 // never reaches the opener's argv, which other OS users can read (`ps`, /proc/<pid>/cmdline). The
 // opener writes a private launch page (writePrivateLaunchFile: mode 0600, a random name, in the
 // owner's own 0700 folder: `~/.agentlink/open`, on Linux `~/AgentLink/open` (launchFolder)) that
-// sends the browser on to the link, and hands the
-// OS opener only that file's path. A link that is not exactly this server's own session link
-// (`http://localhost:<port>/<page>?t=<token>`) is never written or opened; a launch file that cannot
-// be written opens nothing (never a fallback to argv). Launch files are removed after
-// LAUNCH_FILE_LIFETIME_MS (and stale ones swept on the next write); the token in one is one-shot.
+// sends the browser on to the link, and starts the owner's DEFAULT WEB BROWSER (default-browser.ts,
+// R2-10) with only that file, never the OS's `.html` handler (often an editor). A link that is not
+// exactly this server's own session link (`http://localhost:<port>/<page>?t=<token>`) is never
+// written or opened; a launch file that cannot be written opens nothing. When the default browser
+// cannot be found safely, the link itself goes to the OS opener as before 0.5.1 (a residual, 04
+// §2.8). Launch files are removed after LAUNCH_FILE_LIFETIME_MS (and stale launch files, by their
+// name pattern only, swept on the next write, R2-11); the token in one is one-shot.
 // A same-user process could still read the file: the G-1 residual of 04 §2.5 (viewing only; every
 // decision needs owner presence). The desktop shell gets the link over its private pipe instead
 // (startApprovalServerWithLinkSink), never through this opener.
 import { execFile, type ExecFileOptions } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
-import { chmod, lstat, mkdir, open, readdir, unlink } from 'node:fs/promises';
+import { access, chmod, lstat, mkdir, open, readdir, readFile, unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
+import { defaultBrowser, type DefaultBrowserSeams } from './default-browser.js';
 
 /** Opens `url` in the owner's default browser. Resolves false when nothing could be started. */
 export type BrowserOpener = (url: string) => Promise<boolean>;
@@ -60,7 +63,7 @@ export const RUN_OPTIONS: Readonly<ExecFileOptions> = Object.freeze({
 type RunError = (Error & { code?: unknown; killed?: boolean }) | null;
 
 /** Internal (tests): the OS seams of the opener and the notifier. */
-export interface OsSeams {
+export interface OsSeams extends DefaultBrowserSeams {
   readonly platform: NodeJS.Platform;
   readonly env: Readonly<Record<string, string | undefined>>;
   /** True when `path` is an executable file. */
@@ -150,10 +153,16 @@ export async function writePrivateLaunchFile(
   }
 }
 
-/** Removes the launch folder's files older than LAUNCH_FILE_LIFETIME_MS (best effort). */
+/** A launch file's name (writePrivateLaunchFile): 32 lowercase hex characters and `.html`. */
+const LAUNCH_FILE_NAME = /^[0-9a-f]{32}\.html$/;
+
+/**
+ * Removes the launch files older than LAUNCH_FILE_LIFETIME_MS (best effort). R2-11: only names
+ * matching LAUNCH_FILE_NAME; anything else in the folder is never touched.
+ */
 async function sweepLaunchFolder(dir: string, now: number): Promise<void> {
   const names = await readdir(dir).catch(() => [] as string[]);
-  for (const name of names) {
+  for (const name of names.filter((n) => LAUNCH_FILE_NAME.test(n))) {
     const path = join(dir, name);
     const info = await lstat(path).catch(() => undefined);
     if (info === undefined || info.isDirectory()) continue;
@@ -167,9 +176,36 @@ function removeLater(path: string): void {
   timer.unref?.();
 }
 
+/** R2-10: the most a read-only command may print (a plist as JSON, a registry value). */
+const MAX_OUTPUT_BYTES = 1 << 20;
+
 const nodeSeams = (): OsSeams => ({
   platform: process.platform,
   env: process.env,
+  home: homedir(),
+  readOutput: (file, args) =>
+    new Promise((resolve) => {
+      try {
+        execFile(
+          file,
+          [...args],
+          { ...RUN_OPTIONS, encoding: 'utf8', maxBuffer: MAX_OUTPUT_BYTES },
+          (error, stdout) => resolve(error === null ? String(stdout) : undefined),
+        );
+      } catch {
+        resolve(undefined);
+      }
+    }),
+  readText: async (path) => {
+    const info = await lstat(path).catch(() => undefined);
+    if (info === undefined || !info.isFile() || info.size > 256 * 1024) return undefined;
+    return readFile(path, 'utf8').catch(() => undefined);
+  },
+  exists: (path) =>
+    access(path).then(
+      () => true,
+      () => false,
+    ),
   writeLaunchFile: async (html) => {
     const path = await writePrivateLaunchFile(launchFolder(homedir(), process.platform), html);
     if (path !== undefined) removeLater(path);
@@ -246,23 +282,35 @@ function windowsLaunchUrl(file: string): string | undefined {
 /** The URL opener over `seams` (internal; the package uses osBrowserOpener). */
 export function browserOpenerWith(seams: OsSeams): BrowserOpener {
   return async (url) => {
-    // R1-SEC-05: the OS opener gets the launch file's path, never the link.
     const page = launchPage(url);
     if (page === undefined) return false;
+    // R2-10: the default web browser, or (unknown) the link itself to the OS opener (pre-0.5.1).
+    const browser = await defaultBrowser(seams).catch(() => undefined);
+    if (browser === undefined) return openLink(seams, url);
+    // R1-SEC-05: the browser gets the launch file, never the link.
     const file = await seams.writeLaunchFile(page).catch(() => undefined);
     if (file === undefined) return false;
-    switch (seams.platform) {
-      case 'darwin':
-        return run(seams, OS_PROGRAMS.darwinOpen, [file]);
-      case 'win32': {
-        // A file: URL (no spaces, no quoting) of the launch file, for the default .html handler.
-        const launchUrl = windowsLaunchUrl(file);
-        return launchUrl === undefined ? false : windowsOpen(seams, launchUrl);
-      }
-      default:
-        return run(seams, OS_PROGRAMS.linuxOpen, [file]);
-    }
+    // Windows: a file: URL (no spaces, no quoting) of the launch file.
+    const target = seams.platform === 'win32' ? windowsLaunchUrl(file) : file;
+    if (target === undefined) return false;
+    return run(seams, browser.program, browser.args(target));
   };
+}
+
+/**
+ * The pre-0.5.1 opener, only when the default web browser is unknown (R2-10): the link to
+ * `/usr/bin/open`, `/usr/bin/xdg-open`, or rundll32 then explorer.exe. Residual (04 §2.8): the link
+ * is in that program's argv for a moment.
+ */
+function openLink(seams: OsSeams, url: string): Promise<boolean> {
+  switch (seams.platform) {
+    case 'darwin':
+      return run(seams, OS_PROGRAMS.darwinOpen, [url]);
+    case 'win32':
+      return windowsOpen(seams, url);
+    default:
+      return run(seams, OS_PROGRAMS.linuxOpen, [url]);
+  }
 }
 
 /**
