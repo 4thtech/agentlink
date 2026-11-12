@@ -27,6 +27,7 @@ const useDefaultBrowser = (): void => {
   set('userAgentData', undefined);
 };
 
+useDefaultBrowser(); // also now: test files read the platform while they load
 await Promise.all([loadAllPages(), loadHood()]);
 beforeEach(() => {
   useDefaultBrowser();
