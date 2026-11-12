@@ -255,6 +255,70 @@ describe('Home simple (A4)', () => {
     expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
   });
 
+  it('B9: terms decided with a person appear inline in their conversation (what, who, state, when)', async () => {
+    const feed = ok({
+      items: [
+        {
+          kind: 'approval_decided',
+          at: AT + 52,
+          decision: 'approved',
+          action: 'offer_terms',
+          contactId: DENIS.contactId,
+        },
+        {
+          kind: 'approval_decided',
+          at: AT + 58,
+          decision: 'approved',
+          action: 'accept_terms',
+          contactId: DENIS.contactId,
+        },
+        {
+          kind: 'approval_decided',
+          at: AT + 57,
+          decision: 'denied',
+          action: 'reject_terms',
+          contactId: DENIS.contactId,
+        },
+        {
+          kind: 'approval_decided',
+          at: AT + 59,
+          decision: 'approved',
+          action: 'accept_terms',
+          contactId: ANA.contactId,
+        },
+        {
+          kind: 'approval_decided',
+          at: AT + 56,
+          decision: 'approved',
+          action: 'send_message',
+          contactId: DENIS.contactId,
+        },
+      ],
+    });
+    const s = await render(base({ '/api/ui/activity?limit=100': feed }));
+    await click(row('Denis'));
+    const lines = all('[data-terms]').map((e) => e.textContent ?? '');
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain('You proposed terms to Denis');
+    expect(lines[0]).toContain('Proposed');
+    expect(lines[1]).toContain('Your answer to the terms from Denis was not sent');
+    expect(lines[1]).toContain('Not sent');
+    expect(lines[2]).toContain('You accepted the terms from Denis');
+    expect(lines[2]).toContain('Accepted');
+    // Placed by time among the messages (AT+52 sits between 45/50 and 55).
+    const order = all('.hm-msgs > li').map((e) => (e.hasAttribute('data-terms') ? 'T' : 'm'));
+    expect(order.indexOf('T')).toBeGreaterThan(0);
+    expect(s.calls.every((c) => c.method === 'GET')).toBe(true);
+    expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
+  });
+
+  it('B9: no terms read (or an unreadable one) leaves the conversation as it was', async () => {
+    await render(base());
+    await click(row('Denis'));
+    expect(all('[data-terms]')).toHaveLength(0);
+    expect(all('.hm-msgs > li').length).toBeGreaterThan(0);
+  });
+
   it('opens a row in place to the conversation, both directions, with delivery words and Copy', async () => {
     const writeText = vi.fn(() => Promise.resolve());
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText }, platform: 'MacIntel' });

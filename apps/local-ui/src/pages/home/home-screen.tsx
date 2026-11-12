@@ -71,6 +71,7 @@ import { createFilesApi } from '../files/files-api.js';
 import type { Conversation as Person, MessagesApi, Problem } from '../messages/api.js';
 import { createSaveApi, type SaveApi } from '../inbox/save-api.js';
 import { Conversation, exactTime, useThread } from './conversation.js';
+import { useTerms } from './terms-trail.js';
 import { HomeApprovals } from './home-approvals.js';
 import { RenameBanner } from './rename-banner.js';
 import {
@@ -266,6 +267,7 @@ function PersonOpen({
 }): ReactElement {
   const messages: MessagesApi = clients.people.messages;
   const { thread, loadEarlier } = useThread(messages, person.contactId, tick);
+  const terms = useTerms(clients.api, person.contactId, tick);
   const files = thread.state === 'ready' ? filesOf(thread.inbox.items, thread.sent.items) : [];
   const removed = contact?.status === 'revoked';
   return (
@@ -338,6 +340,7 @@ function PersonOpen({
         pro={pro}
         thread={thread}
         loadEarlier={loadEarlier}
+        terms={terms}
         removed={removed}
       />
       <PersonFiles

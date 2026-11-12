@@ -23,7 +23,7 @@ import {
   type LocalUiHealthSnapshot,
 } from './health.js';
 
-const KEYS = ['agent', 'relays', 'lastSyncAt', 'version'];
+const KEYS = ['agent', 'relays', 'lastSyncAt', 'version', 'dataFolder', 'uptimeSeconds'];
 
 function contextWith(health: LocalUiContext['health']): LocalUiContext {
   return {
@@ -76,6 +76,8 @@ describe('the health reader (M1-11s-a-d)', () => {
       relays: null,
       lastSyncAt: null,
       version: '0.3.0',
+      dataFolder: null,
+      uptimeSeconds: null,
     });
   });
 
@@ -96,6 +98,8 @@ describe('the health reader (M1-11s-a-d)', () => {
       relays: { connected: 2, total: 3 },
       lastSyncAt: Math.floor(c.now() / 1000) - 30,
       version: '0.3.0-next.2',
+      dataFolder: null,
+      uptimeSeconds: null,
     });
   });
 
@@ -160,6 +164,51 @@ describe('the health reader (M1-11s-a-d)', () => {
       const read = createHealthReader({ hasClient: true, now: Date.now, version });
       expect((await read()).version).toBeNull();
     }
+  });
+
+  it('answers the data folder home-relative (`~`), never an absolute path or any other path', async () => {
+    const cases: [{ path: string; home: string }, string | null][] = [
+      [{ path: '/Users/alice/.agentlink', home: '/Users/alice' }, '~/.agentlink'],
+      [{ path: '/home/alice/.agentlink', home: '/home/alice/' }, '~/.agentlink'],
+      [{ path: 'C:\\Users\\alice\\.agentlink', home: 'C:\\Users\\alice' }, '~\\.agentlink'],
+      [{ path: '/Users/alice', home: '/Users/alice' }, '~'],
+      // Outside the home folder, relative, unshowable or malformed: nothing, never the path.
+      [{ path: '/opt/agentlink', home: '/Users/alice' }, null],
+      [{ path: '/Users/alice2/.agentlink', home: '/Users/alice' }, null],
+      [{ path: '.agentlink', home: '/Users/alice' }, null],
+      [{ path: '/Users/alice/.agent\nlink', home: '/Users/alice' }, null],
+      [{ path: '/Users/alice/' + 'a'.repeat(300), home: '/Users/alice' }, null],
+      [{ path: '/Users/alice/.agentlink', home: '' }, null],
+      [{ path: '/Users/alice/.agentlink', home: '/' }, null],
+    ];
+    for (const [dataFolder, expected] of cases) {
+      const read = createHealthReader({ hasClient: true, now: Date.now, dataFolder });
+      const body = await read();
+      expect(body.dataFolder).toBe(expected);
+      expect(Object.keys(body).sort()).toEqual([...KEYS].sort());
+      expect(JSON.stringify(body)).not.toContain('alice');
+      expect(JSON.stringify(body)).not.toContain('/opt');
+    }
+    // With no agent set up the data folder is still answered (a server fact), trimmed.
+    const setup = createHealthReader({
+      hasClient: false,
+      now: Date.now,
+      dataFolder: { path: '/Users/alice/.agentlink', home: '/Users/alice' },
+    });
+    expect((await setup()).dataFolder).toBe('~/.agentlink');
+  });
+
+  it('answers the server uptime in whole seconds from its start, never negative', async () => {
+    const c = clock();
+    const startedAt = c.now();
+    const read = createHealthReader({ hasClient: true, now: c.now, startedAt });
+    expect((await read()).uptimeSeconds).toBe(0);
+    c.advance(HEALTH_CACHE_MS + 61_500);
+    expect((await read()).uptimeSeconds).toBe(Math.floor((HEALTH_CACHE_MS + 61_500) / 1000));
+    const future = createHealthReader({ hasClient: true, now: c.now, startedAt: c.now() + 10_000 });
+    expect((await future()).uptimeSeconds).toBeNull();
+    const none = createHealthReader({ hasClient: true, now: c.now });
+    expect((await none()).uptimeSeconds).toBeNull();
   });
 
   it('answers not_running, never running, when the source throws, without the error text', async () => {
@@ -230,7 +279,14 @@ describe('GET /api/ui/health (M1-11s-a-d)', () => {
   it('answers 200 with the reader body, and needs_setup without a reader', async () => {
     const route = healthRoutes[0];
     if (route === undefined || route.presence !== false) throw new Error('no read route');
-    const body = { agent: 'paused', relays: null, lastSyncAt: null, version: null } as const;
+    const body = {
+      agent: 'paused',
+      relays: null,
+      lastSyncAt: null,
+      version: null,
+      dataFolder: null,
+      uptimeSeconds: null,
+    } as const;
     expect(
       await route.handler(
         contextWith(() => Promise.resolve(body)),
@@ -246,7 +302,14 @@ describe('GET /api/ui/health (M1-11s-a-d)', () => {
     });
     expect(fallback).toEqual({
       status: 200,
-      body: { agent: 'needs_setup', relays: null, lastSyncAt: null, version: null },
+      body: {
+        agent: 'needs_setup',
+        relays: null,
+        lastSyncAt: null,
+        version: null,
+        dataFolder: null,
+        uptimeSeconds: null,
+      },
     });
   });
 });
@@ -305,6 +368,7 @@ afterEach(async () => {
 async function serve(
   health?: () => LocalUiHealthSnapshot,
   version?: string,
+  dataFolder?: { path: string; home: string },
 ): Promise<{ port: number; cookie: string; csrf: string }> {
   const opened: string[] = [];
   const server = await startApprovalServerWith(
@@ -325,6 +389,7 @@ async function serve(
         client: { agentId: '0x' + '11'.repeat(20) } as never,
         ...(health === undefined ? {} : { health }),
         ...(version === undefined ? {} : { version }),
+        ...(dataFolder === undefined ? {} : { dataFolder }),
       },
     },
     {
@@ -368,6 +433,8 @@ describe('the health route through the server (M1-11s-a-d)', () => {
       relays: null,
       lastSyncAt: null,
       version: '0.3.0',
+      dataFolder: null,
+      uptimeSeconds: expect.any(Number),
     });
     const post = await send(
       port,
@@ -393,10 +460,27 @@ describe('the health route through the server (M1-11s-a-d)', () => {
       relays: { connected: 1, total: 2 },
       lastSyncAt: null,
       version: null,
+      dataFolder: null,
+      uptimeSeconds: expect.any(Number),
     });
     const cookieValue = cookie.split('=')[1] ?? '';
     for (const leak of [cookieValue, csrf, 'wss:', 'auth', 'abandon']) {
       expect(res.body).not.toContain(leak);
     }
+  });
+  it('answers the trimmed data folder and the uptime, and no other new field', async () => {
+    const { port, cookie, csrf } = await serve(() => ({ agent: 'running' }), '0.5.1', {
+      path: '/Users/alice/.agentlink',
+      home: '/Users/alice',
+    });
+    const res = await send(port, '/api/ui/health', { Cookie: cookie, 'X-AgentLink-CSRF': csrf });
+    expect(res.status).toBe(200);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(Object.keys(parsed).sort()).toEqual([...KEYS].sort());
+    expect(parsed['dataFolder']).toBe('~/.agentlink');
+    expect(typeof parsed['uptimeSeconds']).toBe('number');
+    expect(parsed['uptimeSeconds']).toBeGreaterThanOrEqual(0);
+    expect(res.body).not.toContain('alice');
+    expect(res.body).not.toContain('/Users');
   });
 });

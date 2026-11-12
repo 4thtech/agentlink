@@ -15,6 +15,7 @@ import { sizeText } from '../files/io.js';
 import type { MessageItem, MessagePage, MessagesApi } from '../messages/api.js';
 import { mergeThread } from './people-api.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
+import { termsLine, termsStateWord, type TermsEvent } from './terms-trail.js';
 
 const COPIED_MS = 1600;
 const SHORT = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -285,7 +286,10 @@ export function Conversation({
   loadEarlier,
   removed = false,
   idSeed,
+  terms = [],
 }: {
+  /** B9: the terms decided with this person, shown inline by time. */
+  readonly terms?: readonly TermsEvent[];
   /** The person's name, as the name rule shows it (text only). */
   readonly name: string;
   /** The open agent's label (your AI). */
@@ -321,6 +325,12 @@ export function Conversation({
   const items = mergeThread(thread.inbox.items, thread.sent.items).filter(
     ({ item }) => item.text !== '' && item.at >= cutoff,
   );
+  const timeline = [
+    ...items.map((row) => ({ at: row.item.at, row, event: undefined })),
+    ...terms
+      .filter((e) => e.at >= cutoff)
+      .map((event) => ({ at: event.at, row: undefined, event })),
+  ].sort((a, b) => a.at - b.at);
   const more = thread.inbox.next !== undefined || thread.sent.next !== undefined;
   const ours = app === undefined || app === '' ? S.yourAgent : fmt(S.yourAi, { name: app });
   return (
@@ -346,45 +356,74 @@ export function Conversation({
           {S.loadEarlier}
         </Button>
       ) : null}
-      {items.length === 0 ? (
+      {timeline.length === 0 ? (
         <p className="al-text-body-sm al-muted">{fmt(S.noMessages, { name })}</p>
       ) : (
         <ol className="hm-msgs hm-c">
-          {items.map(({ item, out }) => (
-            <li
-              key={`${out ? 'o' : 'i'}-${item.id}`}
-              // UI-REFRESH-k: what another party wrote never moves in; your AI's words may.
-              className={out ? 'hm-msg hm-c is-out al-reveal' : 'hm-msg hm-c is-in'}
-            >
-              {out ? (
-                <>
+          {timeline.map(({ at, row, event }) => {
+            if (event !== undefined) {
+              return (
+                <li
+                  key={`t-${String(at)}-${event.kind}`}
+                  className="hm-msg hm-c hm-terms"
+                  data-terms={event.state}
+                >
                   <span className="hm-msg-who">
-                    {ours} · {shortTime(item.at)}
+                    {S.termsKicker} · {shortTime(at)}
                   </span>
-                  <div
-                    className="hm-bubble al-optimistic"
-                    data-state={item.status === 'queued' ? 'pending' : 'confirmed'}
-                  >
-                    {item.text}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span className="hm-msg-who">
-                    {fmt(S.theirAi, { name })} · {shortTime(item.at)}
-                  </span>
-                  <UntrustedContent from={name} kind="message">
-                    {item.text}
-                  </UntrustedContent>
-                </>
-              )}
-              <div className="hm-msg-actions hm-f">
-                {out ? <Delivery status={item.status} removed={removed} /> : null}
-                <CopyText text={item.text} />
-              </div>
-              {pro ? <Details item={item} out={out} agent={agent} name={name} /> : null}
-            </li>
-          ))}
+                  <p className="hm-terms-line hm-f al-text-body-sm">
+                    <Icon name="file" size={13} />
+                    <span>{termsLine(event, name)}</span>
+                    <span className="hm-terms-state al-text-label">
+                      {termsStateWord(event.state)}
+                    </span>
+                  </p>
+                  {pro ? (
+                    <p className="hm-msg-meta hm-f al-text-code al-reveal">
+                      <span>{exactTime(at)}</span>
+                      <span>{event.kind}</span>
+                    </p>
+                  ) : null}
+                </li>
+              );
+            }
+            const { item, out } = row;
+            return (
+              <li
+                key={`${out ? 'o' : 'i'}-${item.id}`}
+                // UI-REFRESH-k: what another party wrote never moves in; your AI's words may.
+                className={out ? 'hm-msg hm-c is-out al-reveal' : 'hm-msg hm-c is-in'}
+              >
+                {out ? (
+                  <>
+                    <span className="hm-msg-who">
+                      {ours} · {shortTime(item.at)}
+                    </span>
+                    <div
+                      className="hm-bubble al-optimistic"
+                      data-state={item.status === 'queued' ? 'pending' : 'confirmed'}
+                    >
+                      {item.text}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="hm-msg-who">
+                      {fmt(S.theirAi, { name })} · {shortTime(item.at)}
+                    </span>
+                    <UntrustedContent from={name} kind="message">
+                      {item.text}
+                    </UntrustedContent>
+                  </>
+                )}
+                <div className="hm-msg-actions hm-f">
+                  {out ? <Delivery status={item.status} removed={removed} /> : null}
+                  <CopyText text={item.text} />
+                </div>
+                {pro ? <Details item={item} out={out} agent={agent} name={name} /> : null}
+              </li>
+            );
+          })}
         </ol>
       )}
       <p className="hm-note al-text-body-sm">{fmt(S.encrypted, { name })}</p>

@@ -318,15 +318,28 @@ export function ManualPanel({
   app,
   folder,
   entry,
+  known = [],
   onClose,
 }: {
   app: AppRow | undefined;
   folder: string;
+  known?: readonly AppRow[];
   entry: Entry | undefined;
   onClose: () => void;
 }): ReactElement {
   const [copied, setCopied] = useState(false);
+  const [pathCopied, setPathCopied] = useState<string | null>(null);
   const text = entryText(entry ?? genericEntry(folder));
+  const copyPath = (path: string): void => {
+    try {
+      void navigator.clipboard.writeText(path).then(
+        () => setPathCopied(path),
+        () => undefined,
+      );
+    } catch {
+      // No clipboard: the path is selectable.
+    }
+  };
   const name = app?.name;
   const copy = (): void => {
     try {
@@ -348,10 +361,34 @@ export function ManualPanel({
     >
       <div className="ap-sheet-body">
         <p className="al-text-body">{S.manualIntro}</p>
-        {app === undefined ? null : (
+        {app === undefined ? (
+          <section aria-label={S.manualFileHeading} className="ap-manual-files">
+            <p className="al-text-body-sm">
+              {known.length === 0 ? S.manualFileUnknown : S.manualFileKnown}
+            </p>
+            {known.length === 0 ? null : (
+              <ul className="ap-manual-list">
+                {known.map((k) => (
+                  <li key={k.app}>
+                    <span className="al-text-body-sm">{k.name}</span>{' '}
+                    <code className="al-text-code">{k.path}</code>{' '}
+                    <Button variant="ghost" onClick={() => copyPath(k.path)}>
+                      {pathCopied === k.path ? S.pathCopied : S.copyPath}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : (
           <dl className="ap-facts">
             <dt className="al-text-body-sm">{S.file}</dt>
-            <dd className="al-text-body-sm">{app.path}</dd>
+            <dd className="al-text-body-sm">
+              <code className="al-text-code">{app.path}</code>{' '}
+              <Button variant="ghost" onClick={() => copyPath(app.path)}>
+                {pathCopied === app.path ? S.pathCopied : S.copyPath}
+              </Button>
+            </dd>
           </dl>
         )}
         <div role="region" aria-label={S.entryRegion} tabIndex={0}>

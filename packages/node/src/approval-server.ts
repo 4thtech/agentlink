@@ -1376,6 +1376,8 @@ export async function startApprovalServerWith(
   };
 
   const now = internals.now ?? Date.now;
+  // REL051-B3b: the health read's uptime counts from here.
+  const serverStartedAt = now();
   /** One-shot session links (M1-11a): token bytes and the time each dies, oldest first. */
   const links: { readonly bytes: Uint8Array; readonly expiresAt: number }[] = [];
   /** Live session secrets (the cookie values), oldest first. */
@@ -1599,7 +1601,15 @@ export async function startApprovalServerWith(
       health: createHealthReader({
         ...(agentUi?.health === undefined ? {} : { source: agentUi.health }),
         hasClient: agentUi?.client !== undefined,
-        ...(options.localUi?.version === undefined ? {} : { version: options.localUi.version }),
+        // REL051-B3b: the app host's version when the page options carry none (the strip's Version).
+        ...(() => {
+          const version = options.localUi?.version ?? options.host?.version;
+          return version === undefined ? {} : { version };
+        })(),
+        ...(options.localUi?.dataFolder === undefined
+          ? {}
+          : { dataFolder: options.localUi.dataFolder }),
+        startedAt: serverStartedAt,
         now: () => now(),
       }),
       // U3-c: the Agents list, in the app host only.
