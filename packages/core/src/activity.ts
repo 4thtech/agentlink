@@ -59,6 +59,8 @@ import {
   senderCode as senderDigest,
 } from '@4thtech-io/crypto';
 import {
+  AGENT_LABEL_MAX_CODE_POINTS,
+  AI_APP_IDS,
   MAX_FILES_PER_PAYLOAD,
   approvalActionSchema,
   type ContactDisplayName,
@@ -345,6 +347,17 @@ function proofCostTx(tx: StoreTx, recordId: string): ActivityCost {
 
 const isRecord = (v: unknown): v is Readonly<Record<string, unknown>> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Control, format (bidi and invisible) and line or paragraph separator characters. */
+const NOT_PLAIN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+const AI_APPS: ReadonlySet<string> = new Set(AI_APP_IDS);
+const isAiAppId = (v: unknown): v is string => typeof v === 'string' && AI_APPS.has(v);
+
+/** The owner's ID label when it is short plain text (agent.label: at most 32 code points), else null. */
+function plainLabel(label: unknown): string | null {
+  if (typeof label !== 'string' || label.length === 0 || NOT_PLAIN.test(label)) return null;
+  return Array.from(label).length <= AGENT_LABEL_MAX_CODE_POINTS ? label : null;
+}
 
 type ActionFiles = ActivityApprovalAction['files'];
 
@@ -733,6 +746,7 @@ export class ActivityService {
           );
         }
       }
+      // A pause is listed only while it lasts: the row is deleted on resume, so past pauses are gone.
       const pause = tx.get('agent_pause', { slot: SINGLETON_SLOT });
       if (pause !== undefined) {
         const id = `id_paused:${String(pause.paused_at)}`;
@@ -771,12 +785,11 @@ export class ActivityService {
             ...(local === undefined ? {} : { local }),
             build: ({ params }): ActivityEntry => {
               if (kind === 'id_renamed') {
-                const label = params?.label;
-                return { kind, id, at, name: typeof label === 'string' ? label : null };
+                return { kind, id, at, name: plainLabel(params?.label) };
               }
               if (kind === 'app_connected' || kind === 'app_disconnected') {
                 const app = params?.app;
-                return { kind, id, at, app: typeof app === 'string' ? app : null };
+                return { kind, id, at, app: isAiAppId(app) ? app : null };
               }
               return { kind, id, at };
             },
