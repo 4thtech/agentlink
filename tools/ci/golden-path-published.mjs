@@ -60,6 +60,7 @@ function profileEnv(home) {
     HOME: home,
     USERPROFILE: home,
     APPDATA: join(home, 'AppData', 'Roaming'),
+    LOCALAPPDATA: join(home, 'AppData', 'Local'),
   };
   for (const n of [
     'CLAUDECODE',
@@ -116,11 +117,31 @@ const need = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 
-const launcher = join(homes.ana, '.agentlink', 'bin', win ? 'agentlink.cmd' : 'agentlink');
+const launcher = win
+  ? join(homes.ana, 'AppData', 'Local', 'AgentLink', 'bin', 'agentlink.cmd')
+  : join(homes.ana, '.agentlink', 'bin', 'agentlink');
 const cli = (args, home, timeoutMs) =>
   win
     ? run('cmd.exe', ['/d', '/s', '/c', launcher, ...args], profileEnv(home), timeoutMs)
     : run(launcher, args, profileEnv(home), timeoutMs);
+
+// A fresh runner has no usable keychain under a temporary HOME: macOS gets an unlocked one in each
+// profile (the way a student's login keychain is); Linux gets one from the workflow (gnome-keyring in
+// a D-Bus session); Windows has the Credential Manager.
+if (process.platform === 'darwin') {
+  for (const home of Object.values(homes)) {
+    const kc = join(home, 'Library', 'Keychains', 'login.keychain-db');
+    mkdirSync(join(home, 'Library', 'Keychains'), { recursive: true });
+    for (const args of [
+      ['create-keychain', '-p', 'ci', kc],
+      ['default-keychain', '-s', kc],
+      ['unlock-keychain', '-p', 'ci', kc],
+      ['set-keychain-settings', kc],
+    ]) {
+      spawnSync('security', args, { env: profileEnv(home) });
+    }
+  }
+}
 
 await step('S1', 'install (student installer)', async () => {
   const env = profileEnv(homes.ana);

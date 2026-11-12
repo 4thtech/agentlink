@@ -46,6 +46,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # Linux: a Secret Service keyring in a D-Bus session, as a desktop has (the app stores keys there).
+      - name: Install a keyring (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y --no-install-recommends gnome-keyring dbus-x11 libsecret-1-0
+
       - name: Run the golden path
         shell: bash
         env:
@@ -54,4 +59,8 @@ jobs:
           case "$VERSION" in
             *[!A-Za-z0-9.+_-]*) echo "::error::Unexpected version."; exit 1 ;;
           esac
-          node tools/ci/golden-path-published.mjs "$VERSION"
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            dbus-run-session -- bash -c 'printf ci | gnome-keyring-daemon --unlock --components=secrets > /dev/null; node tools/ci/golden-path-published.mjs "$1"' _ "$VERSION"
+          else
+            node tools/ci/golden-path-published.mjs "$VERSION"
+          fi
