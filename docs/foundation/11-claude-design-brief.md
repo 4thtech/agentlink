@@ -363,7 +363,7 @@ Help text (user guide, privacy page) explains the same in full: what is public (
 
 ### 5.7 Messages and Files In/Out (D-133, D-134)
 
-Local app pages that show what the AI sent and received (08 §1). They are read-only, and their copy never suggests that the app can write.
+Local app pages that show what the AI sent and received (08 §1). They are read-only, and their copy never suggests that the app can write, reply or send. The one exception is managing this computer's copy: Storage, Archive and Delete (D-148, rows marked D-148 below; 04 §4.2).
 
 | Where | String |
 |---|---|
@@ -386,12 +386,22 @@ Local app pages that show what the AI sent and received (08 §1). They are read-
 | Inbox (W4-INBOX) | "Inbox", "Needs you", "All caught up" ("Nothing needs you right now. New messages, files and approvals appear here."), "Conversations", "New message", "Conversation with {name}", "To reply, ask your AI." (proposed, owner confirms at merge) |
 | Received file, gone | "Expired" · "Deleted" |
 | Show in Finder | "Show in Finder" (Windows: "Show in Explorer"; Linux and others: "Show in folder"; W4-HOME, W4 UX v2; proposed, owner confirms at merge); no Touch ID |
+| Settings › Storage (D-148, RET-1, 0.5.1; proposed, owner confirms at merge) | "Storage" · helper "What AgentLink keeps on this computer." · per ID, then per person: "Messages {size}" · "Saved files {size}" · "Encrypted drop this week {used} of {quota}" · "Unassigned files in Inbox {count} · {size}" (helper: "Saved before AgentLink kept track of them. AgentLink never deletes these.") · **Show in Finder** |
+| Free up space (D-148, RET-4, 0.5.2) | "Free up space" · filters "Files older than 30 days" · "90 days" · "1 year" · "Larger than {n} MB" · "This removes {count} messages and {files} files ({size})." · **Review** |
+| Conversation menu (D-148, RET-4, RET-5) | "Archive" (no presence; toast "Archived. Your AI still sees it." with **Undo**) · "Unarchive" · "Delete history…" · after selecting messages: "Delete {n} messages" |
+| Delete sheet (D-148, RET-4) | Title "Delete history with {Name}?" (selection: "Delete {n} messages?") · counts "{count} messages, {files} files, {size}" · fixed lines, always shown: "Only on this computer; {Name} keeps their copy and is not told." and "Proofs stay valid. Older backups may still contain it." · switch "Also move saved files to Trash" (on; helper "Only files AgentLink saved that you haven't moved or changed.") · when some items are kept: "{n} kept: still needed for your contact, an approval or an agreement." · button "Delete with {sensor}" ({sensor}: Touch ID, Windows Hello or passkey, per OS; never hard-coded) and the link "Use your master code instead" (§5.5) · "Cancel" |
+| After deleting (D-148, RET-4) | Toast "Deleted {count} messages." with **Undo** for 10 seconds; then "Files are in your Trash." when files moved · when the Trash can't be used: "This file can't go to the Trash. Delete it permanently?" with "Delete permanently" and "Keep it" |
+| Retention settings (D-148, RET-6) | "Keep messages" · "Forever" (default) · "3 months" · "1 year" · "2 years"; "Keep saved files" · "Forever" · "1 month" · "3 months" · "6 months" · "1 year"; helper "Older saved files go to your Trash. Files you moved or changed are never touched." · first turn-on: "This removes {count} messages and {files} files now." |
+| Hint after updating, once (D-148, OD-2) | "Your Inbox folder holds {size}. Free up space in Settings." · **Free up space** · **Not now** |
+| Notarized message deleted (D-148, OD-4) | "Message deleted on this computer. Its proof is still valid." |
+| AI asked to clean up, 0.5.1 (D-148, OD-3) | The AI says: "You can free up space in AgentLink: open Settings › Storage." |
 
 **Rules.**
 - Inbound message text and other people's file names appear only inside the untrusted-content container, as plain text: never in the page title, toasts, notifications, Activity rows, Home tiles or the OS passkey prompt. Those say "New message from {contactName}" only, with the name per §5.2.
 - Reading here doesn't mark a message read for the AI. Don't write "Mark as read" or "Read by you"; the badge counts what is new since the person last looked.
 - No "Reply", "Send", "Compose" or "Forward" control. The only path is "To reply, ask your AI."
 - Errors say what failed, never what a message said.
+- **Archive is not Delete (D-148).** "Archive" only hides and is always undoable; "Delete" always names the place ("on this computer") and always shows the two fixed lines of the delete sheet. Never "Delete for everyone", "Unsend" or "Recall": AgentLink cannot remove the contact's copy, and the copy never suggests it can.
 
 ### 5.8 IDs and AI apps (D-138, D-144)
 
