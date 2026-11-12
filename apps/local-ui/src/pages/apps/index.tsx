@@ -260,7 +260,7 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
   return (
     <main className="ap-page">
       <div className="ap-head">
-        <h1 className="al-text-h1">{S.title}</h1>
+        <h1 className="al-text-title-1">{S.title}</h1>
         {labels.label === '' ? null : (
           <p className="al-text-body al-muted">{S.forAgent(labels.label)}</p>
         )}
