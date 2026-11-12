@@ -76,9 +76,6 @@
 .ct-error {
   color: var(--al-color-status-danger-fg);
 }
-.ct-same-name {
-  display: block;
-}
 /* M1-UX3-DUP-CONTACTS: the second-connection notice is a level-3 banner (b11 §13.1, §16) that
    slides in 8 px over the base duration; with reduced motion it simply appears. */
 .ct-dup .al-banner {
@@ -182,7 +179,6 @@
   margin: 0;
 }
 .ct-group {
-  margin: 0;
   width: 100%;
 }
 .ct-line {
@@ -190,8 +186,10 @@
 }
 .ct-check,
 .ct-open {
-  color: var(--al-color-accent-default);
+  color: var(--al-color-accent-fg);
   text-decoration: underline;
+  text-transform: none;
+  letter-spacing: normal;
 }
 .ct-archived {
   flex: 1 1 100%;
@@ -242,11 +240,6 @@
 .ct-toolbar .ct-count {
   margin-left: auto;
   text-align: right;
-}
-.ct-check,
-.ct-open {
-  text-transform: none;
-  letter-spacing: normal;
 }
 .ct-sum,
 .ct-group {

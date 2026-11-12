@@ -81,10 +81,9 @@ describe('top bar, status bar and sub-navigation', () => {
     expect(rule(chrome, '.al-statusbar.al-chrome')).toContain('border-top-width');
   });
 
-  it('the Settings sub-navigation is sticky below the top bar', () => {
-    const r = rule(all, '.al-subnav');
-    expect(r).toContain('position: sticky');
-    expect(r).toContain('top: var(--al-size-control-lg)');
+  // The Settings sub-navigation bar is retired (two-pane frame, design-1112): no .al-subnav rule.
+  it('has no Settings sub-navigation bar rule', () => {
+    expect(all).not.toContain('.al-subnav');
   });
 });
 

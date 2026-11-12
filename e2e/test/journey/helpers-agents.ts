@@ -91,8 +91,18 @@ export function agentCard(page: Page, label: string) {
 export async function inMore(page: Page, label: string, name: string) {
   const card = agentCard(page, label);
   const direct = card.getByRole('button', { name, exact: true });
-  if ((await direct.count()) === 0) {
-    await card.getByRole('button', { name: 'More about this ID', exact: true }).click();
+  // The card mounts again while the list is read (the button can detach under the click): retry,
+  // and only press More while it is closed (it toggles).
+  const more = card.getByRole('button', { name: 'More about this ID', exact: true });
+  for (let attempt = 0; attempt < 5 && (await direct.count()) === 0; attempt += 1) {
+    try {
+      if ((await more.getAttribute('aria-expanded', { timeout: 5_000 })) !== 'true') {
+        await more.click({ timeout: 5_000 });
+      }
+      await direct.waitFor({ timeout: 3_000 });
+    } catch {
+      // detached or not yet drawn: look again
+    }
   }
   return direct;
 }

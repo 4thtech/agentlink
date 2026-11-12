@@ -32,8 +32,14 @@ function RailLink({
       href={section.path}
       className={current ? 'al-rail-item is-current' : 'al-rail-item'}
       aria-current={current ? 'page' : undefined}
+      // Expanded, the name is the visible label plus the badge's hidden words (WCAG 2.5.3: it starts
+      // with what is shown). Collapsed, the icon has no text, so the name is set here.
       aria-label={
-        count > 0 ? `${section.label}, ${String(count)} ${S.approvalsWaiting}` : section.label
+        expanded
+          ? undefined
+          : count > 0
+            ? `${section.label}, ${String(count)} ${S.approvalsWaiting}`
+            : section.label
       }
       title={expanded ? undefined : section.label}
     >

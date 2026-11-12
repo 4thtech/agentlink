@@ -229,7 +229,17 @@ const SURFACES: readonly Surface[] = [
       return render(createElement<RulesPageProps>(RulesPage, { api: rulesApi(), owner }));
     },
     reach: async () => {
-      const group = host.querySelector('[role="radiogroup"][aria-label="New contacts"]');
+      // WP-S3: the contact rules sit under "More rules"; open it first.
+      const more = [...host.querySelectorAll('button')].find((b) =>
+        (b.textContent ?? '').startsWith('More rules'),
+      );
+      await act(async () => {
+        more?.click();
+      });
+      await settle();
+      const group = host.querySelector(
+        '[role="radiogroup"][aria-label="Connect with someone new"]',
+      );
       const allow = [...(group?.querySelectorAll<HTMLButtonElement>('[role="radio"]') ?? [])].find(
         (b) => b.textContent?.startsWith('Allow'),
       );

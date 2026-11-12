@@ -49,7 +49,7 @@ const BUDGET = { cssGzip: 15 * 1024, jsGzip: 10 * 1024 } as const; // plan §7
 // Advanced and Get started.
 const PAGES = [
   { path: '/', title: 'Home' },
-  { path: '/agents', title: 'IDs' },
+  { path: '/agents', title: 'My IDs' },
   { path: '/activity', title: 'Activity' },
   // Interim: today's People page (U4 folds it into Home). W6-UI-POLISH: /inbox goes to Home.
   { path: '/contacts', title: 'People' },
@@ -498,9 +498,9 @@ async function timedNav(page: Page, label: string, title: string): Promise<numbe
  * Activity, there and back again.
  */
 const NAV_WALK: readonly (readonly [string, string])[] = [
-  ['IDs', 'IDs'],
+  ['My IDs', 'My IDs'],
   ['Activity', 'Activity'],
-  ['IDs', 'IDs'],
+  ['My IDs', 'My IDs'],
 ];
 
 beforeAll(async () => {
@@ -803,7 +803,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     try {
       await observeLayoutShift(page);
       await page.goto(`${origin}/agents`);
-      await settle(page, 'IDs');
+      await settle(page, 'My IDs');
       await page.waitForTimeout(600);
       report['shellCls'] = await expectStableLayout(page);
 
@@ -814,7 +814,11 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       await page.getByRole('button', { name: 'Help' }).first().click();
       await expectFadesOnly(page);
       await page.keyboard.press('Escape');
-      await page.getByRole('button', { name: 'Expand menu' }).first().click();
+      // design-1112: the rail starts open; either toggle is the rail's width change.
+      await page
+        .getByRole('button', { name: /^(Expand|Collapse) menu$/ })
+        .first()
+        .click();
       await expectFadesOnly(page);
       await page
         .getByRole('switch', { name: /Under the hood/ })
@@ -882,7 +886,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
         await page.route('**/api/ui/events', (route) => route.fulfill(json({ error: 'x' }, 404)));
         await observeLayoutShift(page);
         await page.goto(`${origin}/agents`);
-        await settle(page, 'IDs');
+        await settle(page, 'My IDs');
         await page.locator('[aria-label="Live status"] li').first().waitFor();
         await page.waitForFunction(
           () => {

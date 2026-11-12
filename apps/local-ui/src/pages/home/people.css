@@ -55,7 +55,6 @@
   font-size: var(--al-text-body-lg-size);
   font-weight: var(--al-font-weight-semibold);
 }
-.hm-notice,
 .hm-inline-note,
 .hm-ap-done,
 .hm-sub,
@@ -96,7 +95,6 @@
   flex: 1 1 160px;
 }
 .hm-search,
-.hm-agent,
 .hm-rename {
   height: 36px;
 }

@@ -559,10 +559,23 @@ async function soak(
         if (cur === undefined) throw new Error('nothing to act on: no cur');
         await closeMcp();
         await openAgents(a.page);
-        await agentCard(a.page, cur).getByRole('button', { name: 'Pause', exact: true }).click();
+        // design-1112: Pause is only offered on an ID that has an AI app (an ID with none shows
+        // Connect an AI app instead). Chapter 4 covers Pause itself; here an ID with no AI app has
+        // nothing to pause, so the action does nothing for it.
+        const card = agentCard(a.page, cur);
+        await card
+          .getByText(/^(Not used by any AI app|Paused|Working|Ready|Offline|Connected)/)
+          .first()
+          .waitFor();
+        const pauseBtn = card.getByRole('button', { name: 'Pause', exact: true });
+        if ((await pauseBtn.count()) === 0) return;
+        await pauseBtn.click();
         const sheet = a.page.getByRole('dialog', { name: labelled('Pause ', cur, '?') });
         await sheet.getByRole('button', { name: 'Pause', exact: true }).click();
-        await agentCard(a.page, cur).getByText('Paused', { exact: true }).first().waitFor();
+        await agentCard(a.page, cur)
+          .getByText(/^Paused/)
+          .first()
+          .waitFor();
         await verify('pause');
         clock.advance(120);
         await a.page.getByRole('button', { name: 'Resume with Touch ID' }).first().click();

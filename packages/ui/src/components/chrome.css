@@ -56,52 +56,11 @@
   border-top-width: var(--al-border-width-thin);
 }
 
-/* Settings sub-navigation: sticky chrome under the top bar, content scrolls beneath it. */
-.al-subnav {
-  position: sticky;
-  top: var(--al-size-control-lg);
-  z-index: 1;
-  display: flex;
-  gap: var(--al-space-2);
-  margin: calc(-1 * var(--al-space-6)) calc(-1 * var(--al-space-6)) 0;
-  padding: var(--al-space-3) var(--al-space-6);
-  overflow-x: auto;
-  box-sizing: border-box;
-}
-.al-subnav.al-chrome {
-  border-bottom-width: var(--al-border-width-thin);
-}
-.al-subnav a {
-  flex: none;
-  padding: var(--al-space-2) var(--al-space-4);
-  border-radius: var(--al-radius-md);
-  color: var(--al-color-fg-muted);
-  text-decoration: none;
-}
-.al-subnav a:hover {
-  background: var(--al-color-bg-raised);
-  color: var(--al-color-fg-default);
-}
-.al-subnav a.is-active {
-  background: var(--al-color-accent-subtle);
-  color: var(--al-color-accent-fg);
-}
-
-/* The top bar controls. */
-.al-topbar-theme {
-  white-space: nowrap;
-}
-
 @media (max-width: 600px) {
   /* The sidebar is the bottom bar: its hairline moves from the right edge to the top. */
 
-  .al-subnav {
-    margin: calc(-1 * var(--al-space-4)) calc(-1 * var(--al-space-4)) 0;
-    padding: var(--al-space-3) var(--al-space-4);
-  }
-  /* The switch and the theme control keep their names for assistive technology; the words give way. */
-  .al-topbar .al-switch-text,
-  .al-topbar-theme-text {
+  /* The switch keeps its name for assistive technology; the words give way. */
+  .al-topbar .al-switch-text {
     display: none;
   }
 }

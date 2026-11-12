@@ -45,7 +45,8 @@
 .set-row:hover {
   background: var(--al-color-bg-raised);
 }
-.set-row-ic {
+.set-row-ic,
+.rl-more-ic {
   flex: none;
   display: grid;
   place-items: center;
@@ -75,16 +76,6 @@
   color: var(--al-color-fg-muted);
 }
 .set-state.is-good,
-.set-state.is-warn {
-  padding: 2px var(--al-space-3);
-  border-radius: 999px;
-  border: var(--al-border-width-thin) solid;
-}
-.set-state.is-good {
-  background: var(--al-color-status-success-bg);
-  color: var(--al-color-status-success-fg);
-  border-color: var(--al-color-status-success-border);
-}
 .set-state.is-warn {
   background: var(--al-color-status-warning-bg);
   color: var(--al-color-status-warning-fg);
@@ -140,10 +131,7 @@
   align-items: center;
   gap: var(--al-space-4);
   padding: var(--al-space-4);
-  border: var(--al-border-width-thin) solid var(--al-color-status-warning-border);
   border-radius: var(--al-radius-lg);
-  background: var(--al-color-status-warning-bg);
-  color: var(--al-color-status-warning-fg);
 }
 .set-notice-ic {
   flex: none;
