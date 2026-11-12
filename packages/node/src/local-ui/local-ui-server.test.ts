@@ -1184,3 +1184,87 @@ describe('Show in Finder: the server gate (MSG-FILES-IO-h)', () => {
     expect(r.revealed).toHaveLength(0);
   });
 });
+
+// R1-SEC-16 (routes.ts rule: a GET is a read; a change is a POST with Origin and an octet-stream
+// body): the two display marks (the auto-save notice's dismiss, a former name's seen mark) are the
+// `mark` kind: a POST with no input at all, after every write gate; a GET is 405.
+describe('the display marks are POSTs with the write gates (R1-SEC-16)', () => {
+  const MARKO = '0x7f3a19c200000000000000000000000000000001';
+  const DISMISS = '/api/ui/files/auto-save-notice/dismiss';
+  const SEEN = `/api/ui/contacts/${MARKO}/name-seen`;
+
+  async function markHarness() {
+    const marks: string[] = [];
+    const client = {
+      agentId: 'agent-1',
+      getProof: () => Promise.resolve(undefined),
+      contacts: { list: () => Promise.resolve([{ id: MARKO }]) },
+      contactNames: {
+        markSeen: (id: string) => {
+          marks.push(`seen:${id}`);
+          return Promise.resolve(true);
+        },
+      },
+      autoSaveNotice: {
+        due: () => Promise.resolve(true),
+        dismiss: () => {
+          marks.push('dismiss');
+          return Promise.resolve();
+        },
+      },
+    };
+    const h = await harness({ client });
+    const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
+    const headers = {
+      Cookie: cookie,
+      Origin: h.origin,
+      'X-AgentLink-CSRF': csrf,
+      'Content-Type': 'application/octet-stream',
+      'Sec-Fetch-Site': 'same-origin',
+    };
+    return { h, marks, headers, cookie, csrf };
+  }
+
+  it('a POST with every write gate and no body marks; a GET is refused and marks nothing', async () => {
+    const { h, marks, headers, cookie, csrf } = await markHarness();
+    for (const path of [DISMISS, SEEN]) {
+      const get = await send(h.port, path, {
+        headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': 'same-origin' },
+      });
+      expect(get.status, path).toBe(405);
+    }
+    expect(marks).toEqual([]);
+    const dismissed = await send(h.port, DISMISS, { method: 'POST', headers });
+    expect(dismissed.status).toBe(200);
+    expect(JSON.parse(dismissed.body)).toEqual({ status: 'dismissed' });
+    const seen = await send(h.port, SEEN, { method: 'POST', headers });
+    expect(seen.status).toBe(200);
+    expect(JSON.parse(seen.body)).toEqual({ status: 'done' });
+    expect(marks).toEqual(['dismiss', `seen:${MARKO}`]);
+  });
+
+  it('refuses no Origin, no CSRF, text/plain, a query, an input header and any body byte', async () => {
+    const { h, marks, headers } = await markHarness();
+    const { Origin: _o, ...noOrigin } = headers;
+    const { 'X-AgentLink-CSRF': _c, ...noCsrf } = headers;
+    const cases: [string, Record<string, string>, Uint8Array | undefined, number][] = [
+      [DISMISS, noOrigin, undefined, 403],
+      [DISMISS, noCsrf, undefined, 403],
+      [DISMISS, { ...headers, 'Content-Type': 'text/plain' }, undefined, 415],
+      [`${DISMISS}?x=1`, headers, undefined, 400],
+      [SEEN, { ...headers, 'X-AgentLink-Input': 'e30' }, undefined, 400],
+      [SEEN, { ...headers, 'X-AgentLink-Presence': 'passkey' }, undefined, 400],
+      [SEEN, headers, encodeUtf8('{}'), 400],
+    ];
+    for (const [path, hdrs, body, status] of cases) {
+      const res = await send(h.port, path, {
+        method: 'POST',
+        headers: hdrs,
+        ...(body === undefined ? {} : { body }),
+      });
+      expect(res.status, `${path} ${JSON.stringify(Object.keys(hdrs))}`).toBe(status);
+    }
+    expect(marks).toEqual([]);
+  });
+});

@@ -111,3 +111,39 @@ describe('numbered names keep the extension and .download (04 §4.1)', () => {
     expect(numbered.endsWith(' (999).lnk.download')).toBe(true);
   });
 });
+
+// R1-SEC-13 (04 §4.1 "No handling by extension", extended): the other Windows types that run or
+// mount on double-click also get `.download` (the quarantine mark stays the main defence).
+describe('.download for the remaining double-click types (R1-SEC-13)', () => {
+  it.each([
+    'com',
+    'cpl',
+    'vbe',
+    'jse',
+    'wsf',
+    'wsh',
+    'jar',
+    'reg',
+    'msc',
+    'msp',
+    'chm',
+    'xll',
+    'application',
+    'appref-ms',
+    'gadget',
+    'iso',
+    'img',
+    'vhd',
+    'vhdx',
+  ])('.%s', (ext) => {
+    expect(savedFileName(`x.${ext}`)).toBe(`x.${ext}.download`);
+    expect(savedFileName(`X.${ext.toUpperCase()}`)).toBe(`X.${ext.toUpperCase()}.download`);
+    expect(needsDownloadSuffix(`x.${ext}`)).toBe(true);
+  });
+
+  it('leaves ordinary documents alone', () => {
+    for (const name of ['a.pdf', 'b.docx', 'c.png', 'd.txt', 'e.zip', 'f.csv']) {
+      expect(savedFileName(name)).toBe(name);
+    }
+  });
+});

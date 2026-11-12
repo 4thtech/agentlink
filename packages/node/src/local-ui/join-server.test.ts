@@ -564,17 +564,24 @@ describe('the handoff gate (08 §4)', () => {
     expect(parse((await h.read()).body)).toEqual({ state: 'none' });
   });
 
-  it('takes at most one handoff per 5 s (429 wait), counted before the token', async () => {
+  // R1-SEC-15: a caller without the token cannot hold the real handoff at 429. Accepted handoffs are
+  // at most one per 5 s; wrong tokens are throttled on their own (one refusal per 5 s, then 429).
+  it('takes at most one handoff per 5 s (429 wait); wrong tokens never delay the real one', async () => {
     const h = await harness();
-    expect(
-      (await h.handoff({ invite: LINK }, { 'X-AgentLink-Handoff': 'B'.repeat(43) })).status,
-    ).toBe(401);
-    const soon = await h.handoff({ invite: LINK });
+    const wrong = { 'X-AgentLink-Handoff': 'B'.repeat(43) };
+    expect((await h.handoff({ invite: LINK }, wrong)).status).toBe(401);
+    const wrongSoon = await h.handoff({ invite: LINK }, wrong);
+    expect(wrongSoon.status).toBe(429);
+    expect(parse(wrongSoon.body)).toEqual({ error: 'wait' });
+    expect(wrongSoon.headers['retry-after']).toBeDefined();
+    // The real handoff right after the wrong ones is taken.
+    expect((await h.handoff({ invite: LINK })).status).toBe(200);
+    const soon = await h.handoff({ invite: OTHER_LINK });
     expect(soon.status).toBe(429);
     expect(parse(soon.body)).toEqual({ error: 'wait' });
     expect(soon.headers['retry-after']).toBeDefined();
     h.advance(5_000);
-    expect((await h.handoff({ invite: LINK })).status).toBe(200);
+    expect((await h.handoff({ invite: OTHER_LINK })).status).toBe(409);
   });
 
   it('refuses invite_waiting while an invite is shown; replaced after Not now or expiry', async () => {
