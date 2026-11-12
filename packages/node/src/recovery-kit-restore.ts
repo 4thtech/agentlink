@@ -433,7 +433,7 @@ type LabelReadingLike =
 const LABEL_CHARS = /^[\p{L}\p{M}\p{N}](?:[\p{L}\p{M}\p{N} ._'-]*[\p{L}\p{M}\p{N}._'-])?$/u;
 
 /**
- * UX1113-QA2 N4: the agent-folder label rule (apps/cli agent-name.ts `isAgentLabel`, 06 §6, 11 §5.8):
+ * UX1113-QA2 N4: the agent-folder label rule (apps/cli/src/runtime/agent-name.ts `isAgentLabel`, 06 §6, 11 §5.8):
  * 1 to 32 code points of letters, digits, spaces, `.`, `'` and `-`, NFC, no space at either end and
  * no two in a row. Only such a label is written to a restored ID's config.json, so the folder always
  * parses (a label outside it would make the CLI refuse the folder).

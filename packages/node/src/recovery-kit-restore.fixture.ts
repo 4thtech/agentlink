@@ -124,7 +124,7 @@ export async function makeAgent(
       owner: session,
       ownerKeys: owner.keys,
       name,
-      relays: ['wss://relay.agentlink.dev', 'wss://nos.lol'],
+      relays: ['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net'],
     });
     if (extra.label !== undefined) {
       const prepared = await client.ownerActions.prepareLabel(extra.label);
