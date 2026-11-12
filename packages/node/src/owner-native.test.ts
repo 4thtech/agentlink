@@ -529,3 +529,89 @@ function recordWithOtherHandle(): Uint8Array {
   out[3] = (out[3] as number) ^ 0xff;
   return out;
 }
+
+// DESK-NATIVE-DEBUG: each step of turning it on is named as it begins (for the one diagnostic line);
+// a helper output core cannot use is the helper's fault, never "wrong master code"; and a write
+// whose read-back fails leaves no `owner-native` item behind (the next try would say "already on").
+describe('steps and failures of turning it on (DESK-NATIVE-DEBUG)', () => {
+  it('names every step in order, on macOS', async () => {
+    const keychain = await withOwner();
+    const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
+    const steps: string[] = [];
+    await registerOwnerNative(keychain, helper, owner, code(), {
+      onStep: (step) => steps.push(step),
+    });
+    expect(steps).toEqual([
+      'already_on_check',
+      'master_code',
+      'already_on_check',
+      'helper_create',
+      'create_output',
+      'helper_check',
+      'helper_ecdh',
+      'seal',
+      'keychain_write',
+      'keychain_read_back',
+      'open_once',
+    ]);
+  });
+
+  it('a wrong master code stops at master_code; a cancelled sheet at helper_ecdh', async () => {
+    const keychain = await withOwner();
+    const steps: string[] = [];
+    const onStep = (step: string): number => steps.push(step);
+    const wrong = {
+      kind: 'passphrase' as const,
+      secret: encodeUtf8('AAAA BBBB CCCC DDDD EEEE FFFF'),
+    };
+    await registerOwnerNative(keychain, new StandInHelper(1), owner, wrong, { onStep }).catch(
+      () => undefined,
+    );
+    expect(steps.at(-1)).toBe('master_code');
+    steps.length = 0;
+    const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
+    helper.gesture = 'cancelled';
+    await registerOwnerNative(keychain, helper, owner, code(), { onStep }).catch(() => undefined);
+    expect(steps.at(-1)).toBe('helper_ecdh');
+  });
+
+  it('a create output the record reader refuses is a helper error, not a wrong master code', async () => {
+    const keychain = await withOwner();
+    const helper = new StandInHelper(NATIVE_PRESENCE_MACOS, MAC_RECORD.subarray(0, 10));
+    expect(await codeOf(registerOwnerNative(keychain, helper, owner, code()))).toBe('error');
+  });
+
+  it('a read-back that differs from the write removes the item again (no stale "already on")', async () => {
+    const keychain = await withOwner();
+    const real = keychain.get.bind(keychain);
+    let reads = 0;
+    keychain.get = (account: string) => {
+      if (account !== OWNER_NATIVE_ACCOUNT) return real(account);
+      reads += 1;
+      // Two "already on" checks, then the read-back right after the write.
+      return reads === 3 ? Promise.resolve(new Uint8Array([1, 2, 3])) : real(account);
+    };
+    const steps: string[] = [];
+    expect(
+      await codeOf(
+        registerOwnerNative(keychain, new StandInHelper(1), owner, code(), {
+          onStep: (step) => steps.push(step),
+        }),
+      ),
+    ).toBe('keychain_failed');
+    expect(steps.at(-1)).toBe('keychain_read_back');
+    expect(keychain.items.has(OWNER_NATIVE_ACCOUNT)).toBe(false);
+  });
+
+  it('a keychain write that fails is named and leaves nothing behind', async () => {
+    const keychain = await withOwner();
+    keychain.set = () => Promise.reject(new Error('the native keychain message'));
+    const steps: string[] = [];
+    const error = await registerOwnerNative(keychain, new StandInHelper(1), owner, code(), {
+      onStep: (step) => steps.push(step),
+    }).catch((e: unknown) => e as { code?: string; detail?: string; message?: string });
+    expect([error?.code, error?.detail]).toEqual(['keychain_failed', 'refused']);
+    expect(error?.message).not.toContain('native keychain message');
+    expect(steps.at(-1)).toBe('keychain_write');
+  });
+});
