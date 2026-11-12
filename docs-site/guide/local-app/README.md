@@ -32,7 +32,7 @@ Got an invite link from a friend instead? See [Join from an invite](../get-start
 - **Top bar.** Your ID with a live status such as "Ready in Claude Code", and a menu that shows every ID and AI app as it changes. Next to it: **Go to** (Cmd+K, Ctrl+K on Windows and Linux), the **?** Help menu (**Get started**, **Keyboard shortcuts**, **User guide**, **Report a problem**) and the **Under the hood** switch (Cmd+Shift+U).
 - **Left menu.** **Home**, **People**, **My IDs** (the ID-card icon), **Activity** and **Settings**. It opens expanded on windows 1100 px wide or more; the arrow collapses or expands it; on a phone it opens from the top.
 
-Old links from earlier versions still work (`/contacts` and `/agents` open People and My IDs). An address the app doesn't know shows **Page not found** with a way back to Home. Your choices (theme, closed notices and cards, Keep both, Archive) are kept by the app, so they survive quitting and reopening it.
+Old links from earlier versions still work (`/contacts` and `/agents` open People and My IDs). A link the app doesn't know shows **Page not found** with a way back to Home. Your choices (theme, closed notices and cards, Keep both, Archive) are kept by the app, so they survive quitting and reopening it.
 
 ## The pages
 
