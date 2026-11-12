@@ -57,6 +57,8 @@ async function saveRecord(): Promise<void> {
     exports: { [A]: proof(A, 'n'.repeat(22)), [B]: proof(B, 'm'.repeat(22)) },
     contents: 'full',
     file,
+    // UX1113-QA2 N14: a kit that opened with its code (Check); unchecked reads as unfinished.
+    checked: true,
   });
 }
 

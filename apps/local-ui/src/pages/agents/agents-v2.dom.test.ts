@@ -414,12 +414,13 @@ describe('Agents, simple (A8)', () => {
       status: 409,
       body: { error: 'rename_limited', retryAt: now() + 3600 },
     };
-    await click(button(card('work'), 'Rename'));
-    await type(card('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Job');
-    await click(button(card('work'), 'Rename with Touch ID'));
+    // UX1113-QA2 N1: the open ID (another one switches first).
+    await click(button(card('default'), 'Rename'));
+    await type(card('default').querySelector<HTMLInputElement>('input[type="text"]')!, 'Job');
+    await click(button(card('default'), 'Rename with Touch ID'));
     await type(code(), '123456');
     await click(button(host, 'Confirm with your master code'));
-    expect(plain(host)).toMatch(/You can rename Work again at \S/);
+    expect(plain(host)).toMatch(/You can rename Personal again at \S/);
   });
 
   it('renamed before D-141: "Contacts still see {name}" with Update contacts, once', async () => {

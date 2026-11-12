@@ -483,7 +483,8 @@ export function CheckedStep({
   readonly onDone: () => void;
   readonly onAnother: () => void;
 }): ReactElement {
-  const names = summary.ids.map((r) => r.name);
+  // UX1113-QA2 N4: an ID already on this computer by its label; a new one by its folder name.
+  const names = summary.ids.map((r) => r.label ?? r.name);
   const people = summary.ids.reduce((n, r) => n + r.people, 0);
   const last = summary.ids.reduce<number | null>(
     (m, r) => (r.lastMessageAt === null ? m : Math.max(m ?? 0, r.lastMessageAt)),

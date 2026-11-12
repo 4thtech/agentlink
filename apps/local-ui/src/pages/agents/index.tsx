@@ -178,6 +178,7 @@ export function AgentsPage({
   const act = useCallback((action: IntentAction, row: AgentRow): void => {
     if (action === 'pause') setPausing(row);
     else if (action === 'resume') setResuming(true);
+    else if (action === 'rename') setPanel({ name: row.name, panel: 'rename' });
     else setPanel({ name: row.name, panel: 'apps' });
   }, []);
   const fresh = state.kind === 'ready' ? state.list : undefined;
@@ -232,6 +233,7 @@ export function AgentsPage({
   const onPause = (row: AgentRow): void => firstOpen(row, 'pause');
   const onResume = (row: AgentRow): void => firstOpen(row, 'resume');
   const onAppsElsewhere = (row: AgentRow): void => firstOpen(row, 'apps');
+  const onRenameElsewhere = (row: AgentRow): void => firstOpen(row, 'rename');
   /** F27: Invite someone for this ID: the open ID goes straight to the Invite screen; another opens first. */
   const onInvite = (row: AgentRow): void => {
     if (row.current) return navigate(INVITE_PATH);
@@ -454,6 +456,7 @@ export function AgentsPage({
               onSwitch: doSwitch,
               onRemove: (r) => setRemoveQueue([r]),
               onAppsElsewhere,
+              onRenameElsewhere,
               onInvite,
               onRenamed,
               onCardUpdated,

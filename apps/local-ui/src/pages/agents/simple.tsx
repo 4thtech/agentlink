@@ -26,7 +26,8 @@ const BACKUP_PATH = '/settings/backup';
 import { RenameEditor } from './sheets.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
-export type Panel = 'apps' | 'backup';
+// UX1113-QA2 N1: `rename` is the Rename editor, opened by the page after a switch-first press.
+export type Panel = 'apps' | 'backup' | 'rename';
 
 export interface CardActions {
   readonly api: AgentsApi;
@@ -47,6 +48,8 @@ export interface CardActions {
   readonly onAppsElsewhere: (row: AgentRow) => void;
   /** F27: start the Invite flow for this ID. */
   readonly onInvite: (row: AgentRow) => void;
+  /** UX1113-QA2 N1: Rename on another ID switches to it first (the page opens the editor after). */
+  readonly onRenameElsewhere: (row: AgentRow) => void;
   readonly onRenamed: (label: string, told: boolean) => void;
   readonly onCardUpdated: (told: boolean) => void;
   readonly onChanged: () => void;
@@ -87,10 +90,17 @@ export function AgentCard({
   tidy?: boolean;
   actions: CardActions;
 }): ReactElement {
-  const [renaming, setRenaming] = useState(false);
+  const [renamingHere, setRenaming] = useState(false);
   const [more, setMore] = useState(false);
   const state = stateOf(row);
   const open = a.panel?.name === row.name ? a.panel.panel : undefined;
+  // UX1113-QA2 N1: core renames the open ID only; another ID is opened first (08 §1).
+  const renaming = renamingHere || (open === 'rename' && row.current);
+  const startRename = (): void => (row.current ? setRenaming(true) : a.onRenameElsewhere(row));
+  const stopRename = (): void => {
+    setRenaming(false);
+    if (open === 'rename') a.setPanel(undefined);
+  };
   const toggle = (panel: Panel): void =>
     a.setPanel(open === panel ? undefined : { name: row.name, panel });
   const running = appsOf(row).filter((x) => x.state !== 'not_set_up');
@@ -170,17 +180,15 @@ export function AgentCard({
           onUpdated={a.onCardUpdated}
         />
       ) : null}
-      {machineNamed(row) && !renaming ? (
-        <NameNudge row={row} onRename={() => setRenaming(true)} />
-      ) : null}
+      {machineNamed(row) && !renaming ? <NameNudge row={row} onRename={startRename} /> : null}
       {renaming ? (
         <RenameEditor
           row={row}
           api={a.api}
           owner={a.owner}
           {...(row.current && a.cardName !== undefined ? { cardName: a.cardName } : {})}
-          onDone={() => setRenaming(false)}
-          onCancel={() => setRenaming(false)}
+          onDone={stopRename}
+          onCancel={stopRename}
           onChanged={a.onChanged}
           onRenamed={a.onRenamed}
         />
@@ -213,7 +221,7 @@ export function AgentCard({
                 </Button>
               </>
             )}
-            <Button variant="ghost" size="sm" onClick={() => setRenaming(true)}>
+            <Button variant="ghost" size="sm" onClick={startRename}>
               <PencilIcon />
               {S.rename}
             </Button>

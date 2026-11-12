@@ -63,6 +63,9 @@ function notIncludedOf(value: unknown): NotIncluded[] {
   return out;
 }
 
+/** A label shown as is: letters, numbers, spaces and `._'-` only (else the folder name). */
+const SHOWN_LABEL = /^[\p{L}\p{N}][\p{L}\p{N} ._'-]{0,63}$/u;
+
 /** What the export answered, in the page's terms. */
 export type ExportOutcome =
   | { readonly kind: 'saved'; readonly kit: SavedKit }
@@ -84,11 +87,14 @@ export function exportOutcomeOf(result: OwnerApiResult): ExportOutcome {
         typeof d['code'] === 'string' &&
         CODE.test(d['code'])
       ) {
+        // UX1113-QA2 N4: the label people know; the folder name only when there is no plain label.
         const covers = Array.isArray(d['covers'])
           ? d['covers']
-              .map((c) =>
-                typeof c === 'object' && c !== null ? (c as { name?: unknown }).name : c,
-              )
+              .map((c) => {
+                if (typeof c !== 'object' || c === null) return c;
+                const { name, label } = c as { name?: unknown; label?: unknown };
+                return typeof label === 'string' && SHOWN_LABEL.test(label) ? label : name;
+              })
               .filter((n): n is string => typeof n === 'string' && n.length > 0 && n.length < 65)
               .slice(0, 12)
           : [];

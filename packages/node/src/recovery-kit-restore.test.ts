@@ -1375,9 +1375,9 @@ describe.runIf(POSIX)('UX1113-QA2 N14: a kit counts as backed up only once it op
     });
     // A wrong code marks nothing.
     const handle = await foundHandle();
-    expect(body(await engine.check('S1', { handle }, code('AAAA-AAAA-AAAA-AAAA-AAAA-AAAA')))['error']).toBe(
-      'wrong_code',
-    );
+    expect(
+      body(await engine.check('S1', { handle }, code('AAAA-AAAA-AAAA-AAAA-AAAA-AAAA')))['error'],
+    ).toBe('wrong_code');
     let read = await readKitRecord(dir);
     expect(read.status === 'saved' && read.record.checked).toBeFalsy();
     // The export handle right after the save (checklist step 3).

@@ -280,6 +280,14 @@ describe('F27: Invite someone on each ID card', () => {
 describe('Rename', () => {
   it('uses the Touch ID wording, the code, and posts to the label route', async () => {
     answers['POST /api/ui/agents/label'] = { status: 200, body: { status: 'done' } };
+    // UX1113-QA2 N1: core renames the open ID only, so Work is the open one here.
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list(
+        FOUR.map((a) => ({ ...a, current: a.name === 'work' })),
+        { current: 'work', label: 'Work' },
+      ),
+    };
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));
     const field = rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!;
@@ -295,6 +303,14 @@ describe('Rename', () => {
   });
   it('handles a route that is not available yet without breaking', async () => {
     answers['POST /api/ui/agents/label'] = { status: 501, body: {} };
+    // UX1113-QA2 N1: core renames the open ID only, so Work is the open one here.
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list(
+        FOUR.map((a) => ({ ...a, current: a.name === 'work' })),
+        { current: 'work', label: 'Work' },
+      ),
+    };
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
@@ -312,6 +328,14 @@ describe('label check and removal states', () => {
     answers['GET /api/ui/agents/label-check?label=Home'] = {
       status: 200,
       body: { status: 'refused', reason: 'label_invalid' },
+    };
+    // UX1113-QA2 N1: core renames the open ID only, so Work is the open one here.
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list(
+        FOUR.map((a) => ({ ...a, current: a.name === 'work' })),
+        { current: 'work', label: 'Work' },
+      ),
     };
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));

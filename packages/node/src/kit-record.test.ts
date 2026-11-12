@@ -85,8 +85,9 @@ function record(over: Partial<KitRecord> = {}): KitRecord {
 
 /** A record as the save writes it: not checked yet. */
 function unchecked(over: Partial<KitRecord> = {}): KitRecord {
-  const { checked: _checked, ...rest } = record(over);
-  return rest;
+  return Object.fromEntries(
+    Object.entries(record(over)).filter(([key]) => key !== 'checked'),
+  ) as unknown as KitRecord;
 }
 
 describe('kit record file (04 §2.3.3 "Kit record")', () => {

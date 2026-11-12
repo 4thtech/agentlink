@@ -538,6 +538,19 @@ describe('Back up covers every ID of this owner, one core open at a time (WP-R2b
     });
     const saved = JSON.parse((await h.exportKit(world.code)).body) as Saved;
     expect(saved.status).toBe('saved');
+    // UX1113-QA2 N14: saved, but not yet opened with its code: unfinished, never "backed up".
+    const unfinished = JSON.parse((await h.read()).body) as Record<string, unknown>;
+    expect(unfinished['state']).toBe('unfinished');
+    expect(unfinished['record']).toBe('saved');
+    // The checklist's step 3: Check with the export handle and the code still on screen.
+    const checked = await send(h.server.port, RESTORE_PATHS.check, {
+      method: 'POST',
+      headers: h.headers({
+        'X-AgentLink-Input': encodeBase64url(encodeUtf8(JSON.stringify({ handle: saved.check }))),
+      }),
+      body: encodeUtf8(saved.code),
+    });
+    expect(checked.status).toBe(200);
     const after = JSON.parse((await h.read()).body) as Record<string, unknown>;
     const expected = {
       export: 'available',

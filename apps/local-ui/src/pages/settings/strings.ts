@@ -18,6 +18,7 @@ export const SETTINGS_STRINGS = {
     upToDate: 'Up to date',
     outOfDate: 'Out of date',
     notBackedUp: 'Not backed up',
+    notFinished: 'Not finished',
   },
   touchId: {
     get title(): string {

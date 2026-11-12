@@ -71,6 +71,8 @@ export interface SummaryRow {
   readonly lastMessageAt: number | null;
   readonly state: RowState;
   readonly suggestedName?: string;
+  /** UX1113-QA2 N4: an ID already here: the label this computer shows for it. */
+  readonly label?: string;
 }
 export interface Summary {
   readonly kitId: string;
@@ -173,6 +175,8 @@ function inputOf(value: unknown): string {
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+/** A row label shown as text: 1 to 32 letters, numbers, spaces and `.'-` (the folder label rule). */
+const ROW_LABEL = /^[\p{L}\p{N}](?:[\p{L}\p{N} .'-]{0,30}[\p{L}\p{N}.'-])?$/u;
 
 function summaryOf(value: unknown): Summary | undefined {
   if (!isRecord(value) || !Array.isArray(value['ids'])) return undefined;
@@ -184,7 +188,7 @@ function summaryOf(value: unknown): Summary | undefined {
   const ids: SummaryRow[] = [];
   for (const row of value['ids']) {
     if (!isRecord(row)) return undefined;
-    const { agentId, name, people, lastMessageAt, state, suggestedName } = row;
+    const { agentId, name, people, lastMessageAt, state, suggestedName, label } = row;
     if (
       typeof agentId !== 'string' ||
       typeof name !== 'string' ||
@@ -204,6 +208,7 @@ function summaryOf(value: unknown): Summary | undefined {
       lastMessageAt,
       state,
       ...(typeof suggestedName === 'string' ? { suggestedName } : {}),
+      ...(typeof label === 'string' && ROW_LABEL.test(label) ? { label } : {}),
     });
   }
   return { kitId, createdAt, contents, ids };

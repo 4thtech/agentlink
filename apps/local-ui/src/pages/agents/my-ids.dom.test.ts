@@ -159,6 +159,15 @@ describe('My IDs (WP-I1)', () => {
   });
 
   it('the name nudge shows for macbook-agent-1 and not for Tali; Rename opens the editor', async () => {
+    // UX1113-QA2 N1: the editor opens in place on the open ID (another one switches first).
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: {
+        ...list(THREE().map((a) => ({ ...a, current: a.name === 'macbook-agent-1' }))),
+        current: 'macbook-agent-1',
+        label: 'macbook-agent-1',
+      },
+    };
     await mount();
     expect(card('default').querySelector('[data-nudge]')).toBeNull();
     const nudge = card('macbook-agent-1').querySelector<HTMLElement>('[data-nudge]')!;
