@@ -57,6 +57,8 @@ import {
   AGENTS_REMOVE_PATH,
   AGENTS_RESUME_PATH,
   AGENTS_SWITCH_PATH,
+  BACKUP_EXPORT_PATH,
+  BACKUP_PATH,
   CREATE_AGENT_PATHS,
   UI_SETTINGS_WRITE_PATH,
   type LocalUiRoute,
@@ -80,6 +82,8 @@ import {
 import { joinRoutes } from './api/join.js';
 
 export {
+  BACKUP_EXPORT_PATH,
+  BACKUP_PATH,
   AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
   AGENTS_RESUME_PATH,
@@ -160,13 +164,24 @@ export class LocalUiRouteRegistry {
   /** Adds a route, or throws when it breaks a rule above (nothing is added then). */
   register(route: LocalUiRoute): void {
     if (typeof route !== 'object' || route === null) throw invalid('malformed');
-    const { method, presence, handler, step, stub } = route as unknown as {
+    const { method, presence, handler, step, stub, recoveryKit } = route as unknown as {
       method: unknown;
       presence: unknown;
       handler: unknown;
       step: unknown;
       stub: unknown;
+      recoveryKit: unknown;
     };
+    // WP-11: only the one export route unlocks the owner store for a recovery kit.
+    if (
+      recoveryKit !== undefined &&
+      (recoveryKit !== true ||
+        presence !== true ||
+        method !== 'POST' ||
+        route.path !== BACKUP_EXPORT_PATH)
+    ) {
+      throw invalid('only the recovery-kit export route can export');
+    }
     // U3-c: only an owner route (POST, presence) can be a stub; the flag is `true` or absent.
     if (stub !== undefined && (stub !== true || presence !== true || method !== 'POST')) {
       throw invalid('only a POST owner route can be a stub');

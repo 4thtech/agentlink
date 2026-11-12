@@ -415,13 +415,19 @@ describe('Agents, simple (A8)', () => {
     expect(manage).toBeDefined();
   });
 
-  it('Back up links to the recovery kit in Settings; Remove asks for the name', async () => {
+  it("Back up saves the open ID's kit in place, asks to open another ID first; Remove asks for the name", async () => {
     await mount();
+    // WP-11: the open ID saves its recovery kit right here (no link away, no terminal command).
+    await click(button(card('default'), 'Back up'));
+    expect(button(card('default'), 'Save recovery kit')).toBeDefined();
+    // Another ID is opened first: a kit is saved for the open ID.
     await click(button(card('work'), 'Back up'));
-    const link = [...card('work').querySelectorAll('a')].find(
-      (a) => a.textContent?.trim() === 'Back up recovery kit',
+    const panel = card('work').querySelector<HTMLElement>('[data-panel="backup"]')!;
+    expect(plain(panel)).toContain('to save its recovery kit.');
+    expect(button(panel, 'Open this ID')).toBeDefined();
+    expect([...panel.querySelectorAll('button')].map((b) => b.textContent?.trim())).not.toContain(
+      'Save recovery kit',
     );
-    expect(link?.getAttribute('href')).toBe('/settings/backup');
     await click(button(card('work'), 'Remove'));
     expect(plain(host)).toContain('Remove Work?');
     expect(host.querySelector('[role="dialog"] input[type="text"]')).not.toBeNull();
@@ -501,10 +507,9 @@ describe("one agent's page (/agents/<name>)", () => {
     }
     expect(plain(host)).toContain('Connected to Cursor');
     expect(host.querySelector('[data-sparkline]')).toBeNull();
-    const back = [...host.querySelectorAll('a')].find(
-      (a) => a.textContent?.trim() === 'Back up recovery kit',
-    );
-    expect(back?.getAttribute('href')).toBe('/settings/backup');
+    // WP-11: Work is not the open ID, so its Backup section asks to open it first.
+    const backup = host.querySelector<HTMLElement>('[data-panel="backup"]')!;
+    expect(plain(backup)).toContain('to save its recovery kit.');
   });
 
   it('draws the heartbeat bars only from reads seen in this session', async () => {

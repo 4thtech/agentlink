@@ -288,6 +288,7 @@ import {
   type LocalUiAssets,
   type LocalUiContext,
   type LocalUiOptions,
+  type LocalUiRecoveryKitSource,
   type LocalUiOwnerSetup as LocalUiOwnerSetupOption,
 } from './local-ui/context.js';
 import { JoinDesk, type JoinCheck } from './local-ui/join-desk.js';
@@ -337,6 +338,8 @@ import {
 } from './local-ui/api/agents-remove.js';
 import { AgentFolderLockError } from './agent-folder-lock.js';
 import { createKeyEraseControl } from './key-controls.js';
+import { exportRecoveryKit, type RecoveryKitClient } from './recovery-kit-export.js';
+import { ownerOperationRefused } from './owner-allowlist.js';
 import {
   LOCAL_UI_API_PREFIX,
   LocalUiRouteRegistry,
@@ -904,6 +907,18 @@ class ConfirmRequired extends Error {
   }
 }
 
+/**
+ * WP-11: the open agent's recovery-kit source, only when it names the open client's agent (a kit is
+ * never sealed for another agent than the one core prepared the `backup.export` for).
+ */
+function recoveryKitOf(
+  ui: Omit<LocalUiOptions, 'assets'> | undefined,
+): LocalUiRecoveryKitSource | undefined {
+  const source = ui?.recoveryKit;
+  if (source === undefined || ui?.client === undefined) return undefined;
+  return source.agentId === ui.client.agentId ? source : undefined;
+}
+
 /** U3-c: the open agent changed after the request arrived (the re-check before acting). */
 class AgentChanged extends Error {
   constructor() {
@@ -1422,6 +1437,8 @@ export async function startApprovalServerWith(
       client: agentUi?.client === undefined ? undefined : readOnlyClient(agentUi.client),
       // M1-11c-a4c: for the presence routes only; core re-verifies the owner signature (I-4).
       ...(agentUi?.client === undefined ? {} : { credits: creditsPort(agentUi.client) }),
+      // WP-11: whether the open agent can save a recovery kit here (the source stays here).
+      recoveryKitAvailable: recoveryKitOf(agentUi) !== undefined,
       // W4-FILES-SAVE: for the save owner route only; core takes only a `file.save` and re-verifies
       // the owner signature before it saves (I-4).
       ...(agentUi?.client === undefined ? {} : { fileSave: fileSavePort(agentUi.client) }),
@@ -2093,6 +2110,12 @@ export async function startApprovalServerWith(
        * same presence, and its other keys come from the unlocked seed.
        */
       readonly ownerNostr?: Uint8Array;
+      /**
+       * WP-11: the recovery-kit export route (route-types.ts `recoveryKit`). The owner store is
+       * unlocked for an export (unlockForExport), `sign` refuses everything and the operation
+       * offers `exportRecoveryKit` for the open agent's recovery-kit source instead.
+       */
+      readonly recoveryKit?: true;
     } = {},
   ): Promise<void> {
     const wait = waitSeconds();
@@ -2161,6 +2184,10 @@ export async function startApprovalServerWith(
         let store: { lock(): Promise<void>; close(): Promise<void> };
         let session: OwnerSession;
         let ownerKeys: OwnerPublicKeys;
+        if (context === undefined && gate.recoveryKit === true) {
+          finishOwner(res, 409, 'refused');
+          return;
+        }
         if (context === undefined) {
           // HOTFIX-045-REMOVE (GAP B): no card; the stored owner must be the one `byNostr` names.
           try {
@@ -2191,9 +2218,22 @@ export async function startApprovalServerWith(
             finishOwner(res, 503, 'needs_setup');
             return;
           }
+          // WP-11: an export needs the keychain owner store (the one its export control pairs with)
+          // and the open agent's recovery-kit source; anything else is refused before the unlock.
+          if (
+            gate.recoveryKit === true &&
+            (!(opened instanceof KeychainOwnerKeyStore) || recoveryKitOf(agentUi) === undefined)
+          ) {
+            await opened.close().catch(() => undefined);
+            finishOwner(res, 409, 'refused');
+            return;
+          }
           try {
             // unlock wipes the presented bytes, whether or not they unlock.
-            session = await opened.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
+            session =
+              gate.recoveryKit === true && opened instanceof KeychainOwnerKeyStore
+                ? await opened.unlockForExport(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS })
+                : await opened.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
           } catch (error) {
             if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
               presenceFailed();
@@ -2215,6 +2255,15 @@ export async function startApprovalServerWith(
           let carriersOpen = false;
           // D-141: the agent this gesture renames is the one open now (stillCurrent fences a switch).
           const renameUi = agentUi;
+          // WP-11: the open agent's recovery-kit source and client, bound once for this gesture.
+          const exportSource = recoveryKitOf(agentUi);
+          const exportUi =
+            exportSource === undefined || agentUi?.client === undefined
+              ? undefined
+              : {
+                  source: exportSource,
+                  client: agentUi.client as unknown as RecoveryKitClient,
+                };
           let result: LocalUiResult;
           try {
             const owner: LocalUiOwnerOperation = Object.freeze<LocalUiOwnerOperation>({
@@ -2234,8 +2283,19 @@ export async function startApprovalServerWith(
                     'One owner operation signs once.',
                   );
                 }
+                // WP-11: the export gate signs only through exportRecoveryKit.
+                if (gate.recoveryKit === true) throw ownerOperationRefused();
                 used = true;
                 const frozen = checkGesture(review, requests);
+                // WP-11 (04 §2.3.3): a `backup.export` is signed only by the export gesture, right
+                // before its kit is sealed; never by an ordinary owner route.
+                if (
+                  frozen.some(
+                    (r) => r.kind === 'owner-action' && r.action['op'] === 'backup.export',
+                  )
+                ) {
+                  throw ownerOperationRefused();
+                }
                 // M1-PAY-CONFIRM-a (04 §2.5.3): a spending change or a paid approval is signed
                 // only through the confirmation, never by an ordinary owner route.
                 await refuseUnconfirmedPaid(frozen);
@@ -2251,6 +2311,48 @@ export async function startApprovalServerWith(
                 }
                 return signatures;
               },
+              // WP-11 (D-117 A; 04 §2.3.3): saving the open agent's recovery kit, on the export
+              // route only, with the session unlocked for an export. One owner operation: exactly one
+              // `backup.export` for the open agent, applied by core, then the kit sealed.
+              ...(gate.recoveryKit !== true ||
+              !(store instanceof KeychainOwnerKeyStore) ||
+              exportUi === undefined
+                ? {}
+                : {
+                    exportRecoveryKit: async (review: OwnerReview) => {
+                      if (used) {
+                        throw new NodeKeyStoreError(
+                          'owner_operation_invalid',
+                          'One owner operation signs once.',
+                        );
+                      }
+                      used = true;
+                      if (!stillCurrent(req)) throw new AgentChanged();
+                      return exportRecoveryKit({
+                        session,
+                        ownerStore: store as KeychainOwnerKeyStore,
+                        keychain: keychainOf(),
+                        source: exportUi.source,
+                        client: exportUi.client,
+                        review,
+                        sign: async (r, requests) => {
+                          if (!stillCurrent(req)) throw new AgentChanged();
+                          const frozen = checkGesture(r, requests);
+                          const only = frozen[0];
+                          if (
+                            frozen.length !== 1 ||
+                            only?.kind !== 'owner-action' ||
+                            only.action['op'] !== 'backup.export'
+                          ) {
+                            throw ownerOperationRefused();
+                          }
+                          return signGesture(session, frozen);
+                        },
+                        apply: (signed) => source.apply(signed),
+                        now: () => now(),
+                      });
+                    },
+                  }),
               // W4-ONE-TOUCH: Add an agent is no longer an ordinary owner route; its first parts
               // are signed only by the create-agent gate (createAgentGate, 04 §2.8).
               // W4-RENAME-REACHES-CONTACTS (D-141; 04 §2.5.1 `agent.label`, §2.6): a rename that
@@ -4711,12 +4813,16 @@ export async function startApprovalServerWith(
         return;
       }
     }
-    await ownerGate(req, res, (owner) =>
-      route.handler(
-        uiContext,
-        { params, query: url.searchParams, ...(input === undefined ? {} : { input }) },
-        owner,
-      ),
+    await ownerGate(
+      req,
+      res,
+      (owner) =>
+        route.handler(
+          uiContext,
+          { params, query: url.searchParams, ...(input === undefined ? {} : { input }) },
+          owner,
+        ),
+      route.recoveryKit === true ? { recoveryKit: true } : {},
     );
   }
 

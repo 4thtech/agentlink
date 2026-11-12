@@ -80,7 +80,34 @@ export interface LocalUiOwnerOperation {
    * session or the epoch control. Absent outside the app host or without the agent's key items.
    */
   renameAgent?(review: OwnerReview, request: LocalUiRenameRequest): Promise<LocalUiRenameOutcome>;
+  /**
+   * WP-11 (F-1, D-117 A; 04 §2.3.3 "Export: who sees the seeds", §2.5.1 `backup.export`): the one
+   * owner operation of saving a recovery kit, instead of `sign` (one or the other, once). Offered
+   * only on a route that declares `recoveryKit: true`, whose gate unlocked the owner store for an
+   * export, and only for the open agent's LocalUiOptions `recoveryKit`. With the presence this
+   * request carried it signs exactly one `backup.export` for the open agent (core prepared it, the
+   * server drew its kitId), has core apply it (the audit record) and only then seals the kit into a
+   * new file. The handler never sees the owner session, the seeds or the path; it gets the file name,
+   * the folder's display name and the new recovery code, which it answers to the page once.
+   */
+  exportRecoveryKit?(review: OwnerReview): Promise<LocalUiRecoveryKitOutcome>;
 }
+
+/** WP-11: how saving a recovery kit ended (route-types.ts `exportRecoveryKit`). */
+export type LocalUiRecoveryKitOutcome =
+  | {
+      readonly status: 'saved';
+      /** The kit's file name, `agentlink-recovery-kit-YYYY-MM-DD[-n].alkk`. */
+      readonly file: string;
+      /** Where it is, as shown: `Downloads` or `Home`. Never a full path. */
+      readonly folder: 'Downloads' | 'Home';
+      /** The new recovery code, 24 characters in six groups of four (`XXXX-…`), for display once. */
+      readonly code: string;
+    }
+  /** Core did not apply the signed `backup.export`: nothing was sealed. */
+  | { readonly status: 'not_applied' }
+  /** The kit could not be written (no file is left behind). */
+  | { readonly status: 'failed' };
 
 /** D-141: what the rename route hands the gate: the new label and the `agent.label` core prepared. */
 export interface LocalUiRenameRequest {
@@ -113,6 +140,11 @@ export interface LocalUiOwnerRoute {
    * presence gate; the handler never runs.
    */
   readonly stub?: true;
+  /**
+   * WP-11: the recovery-kit export route. Its gate unlocks the owner store for an export
+   * (unlockForExport) and offers `exportRecoveryKit` instead of `sign`; no other route does.
+   */
+  readonly recoveryKit?: true;
   /**
    * U3-invite: a read-only check run after the generation check and before the presence gate. A
    * result refuses the request with it (the owner store is never opened, nothing is signed); the
@@ -311,6 +343,10 @@ export interface LocalUiHandoffRoute {
   readonly path: string;
   readonly presence: 'handoff';
 }
+
+/** WP-11 (08 §1 Backup): the Backup page's read and the recovery-kit export (a presence route). */
+export const BACKUP_PATH = '/api/ui/backup';
+export const BACKUP_EXPORT_PATH = '/api/ui/backup/export';
 
 /** W4-PAUSE: the fixed paths of Pause (its own kind) and Resume (a presence route) (08 §1). */
 export const AGENTS_PAUSE_PATH = '/api/ui/agents/pause';

@@ -112,6 +112,8 @@ export type {
   LocalUiContext,
   LocalUiOptions,
   LocalUiOwnerSetup,
+  // WP-11 (D-117 A): the open agent's recovery-kit source for the app host's Back up page.
+  LocalUiRecoveryKitSource,
 } from './local-ui/context.js';
 // U3-f (06 §7 "The app as a second path"): the AI apps seam the CLI implements over its harness
 // code (the one config writer); the routes, the changeId and the signing stay inside the package.

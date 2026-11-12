@@ -57,12 +57,14 @@ import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
  * this one path: the one open at launch (ui.ts `start`) as much as one opened by a switch.
  */
 export function hostUiOf(
-  agent: Pick<OwnerAgent, 'epochKeys'>,
+  agent: Pick<OwnerAgent, 'epochKeys' | 'recoveryKit'>,
   localUi: LocalUiOptions,
 ): Omit<LocalUiOptions, 'assets'> {
   return {
     ...withoutAssets(localUi),
     ...(agent.epochKeys === undefined ? {} : { epochKeys: agent.epochKeys }),
+    // WP-11 (D-117 A): the Back up page saves this agent's recovery kit (keychain agents only).
+    ...(agent.recoveryKit === undefined ? {} : { recoveryKit: agent.recoveryKit }),
   };
 }
 

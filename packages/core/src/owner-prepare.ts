@@ -23,6 +23,7 @@ import {
   type AgentLabelParams,
   type AgentResumeParams,
   type AppChangeParams,
+  type BackupExportParams,
   type FileSaveParams,
   type ContactCheckParams,
   type ContactRule,
@@ -54,7 +55,8 @@ export type PreparableOp =
   | 'app.connect'
   | 'app.disconnect'
   | 'agent.resume'
-  | 'file.save';
+  | 'file.save'
+  | 'backup.export';
 
 const PREPARABLE: readonly string[] = [
   'policy.set',
@@ -73,6 +75,8 @@ const PREPARABLE: readonly string[] = [
   'agent.resume',
   // W4-FILES-SAVE: the owner saves one received file into the Inbox folder from the local app.
   'file.save',
+  // WP-11 (D-117 A): the owner saves a recovery kit from the local app (04 §2.3.3).
+  'backup.export',
 ];
 
 interface ParamsOf {
@@ -87,6 +91,7 @@ interface ParamsOf {
   readonly 'app.disconnect': AppChangeParams;
   readonly 'agent.resume': AgentResumeParams;
   readonly 'file.save': FileSaveParams;
+  readonly 'backup.export': BackupExportParams;
 }
 
 export interface OwnerActionBodyInput<O extends PreparableOp = PreparableOp> {
@@ -172,7 +177,9 @@ export type PrepareRefusal =
   /** WP-12: Unblock for a contact that is not blocked (refused before the gesture). */
   | 'not_blocked'
   /** W4-FILES-SAVE: not a received item ID `<envelope ID>.<index>` (index 00 to 15). */
-  | 'item_invalid';
+  | 'item_invalid'
+  /** WP-11: `backup.export` params that are not a 16-byte base64url kitId and full/identity. */
+  | 'params_invalid';
 
 export type PreparedOwnerAction =
   | {

@@ -10,6 +10,7 @@ import type { AgentsApi } from './api.js';
 import { AppsPanel } from './apps-panel.js';
 import { agentLine, appsOf, dotOf, stateOf, usedByNames, type AgentRow } from './data.js';
 import { AppChips, CardNameNote } from './parts.js';
+import { ExportKit } from '../backup/export-kit.js';
 import { RenameEditor } from './sheets.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
@@ -38,17 +39,34 @@ export interface CardActions {
   readonly onAgentChanged: () => void;
 }
 
-/** The Back up panel: the recovery kit lives in Settings (Backup & Touch ID). */
-export function BackupPanel(): ReactElement {
+/**
+ * The Back up panel (WP-11, D-117 A): the open ID saves its recovery kit right here, behind Touch ID
+ * or the backup code (backup/export-kit.tsx). Another ID is opened first, since a kit is saved for
+ * the open ID; the page keeps this panel open across the switch.
+ */
+export function BackupPanel({
+  row,
+  onSwitch,
+}: {
+  row: AgentRow;
+  onSwitch: (row: AgentRow) => void;
+}): ReactElement {
   return (
     <div className="ag-expand al-expand" data-panel="backup">
       <p className="al-text-body-sm">
         <strong>{S.backupTitle}</strong>
       </p>
       <p className="al-text-body-sm al-muted">{S.backupHint}</p>
-      <a className="al-btn al-btn-secondary al-btn-sm" href="/settings/backup">
-        {S.backupLink}
-      </a>
+      {row.current ? (
+        <ExportKit label={row.label} />
+      ) : (
+        <>
+          <p className="al-text-body-sm">{S.backupOpenFirst(row.label)}</p>
+          <Button variant="secondary" size="sm" onClick={() => onSwitch(row)}>
+            {S.openAgent}
+          </Button>
+        </>
+      )}
     </div>
   );
 }
@@ -198,7 +216,7 @@ export function AgentCard({
           onAgentChanged={a.onAgentChanged}
         />
       ) : null}
-      {open === 'backup' ? <BackupPanel /> : null}
+      {open === 'backup' ? <BackupPanel row={row} onSwitch={a.onSwitch} /> : null}
     </section>
   );
 }

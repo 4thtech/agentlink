@@ -208,10 +208,13 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // UX1112 WP-12 (F-2): Block and Unblock a contact (local-ui/api/contacts.test.ts).
       '/api/ui/contacts/:ref/block',
       '/api/ui/contacts/:ref/unblock',
+      // WP-11: the Backup page's read and the recovery-kit export (backup-export-server.test.ts).
+      '/api/ui/backup',
+      '/api/ui/backup/export',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
-    const pages = ['activity', 'backup'];
+    const pages = ['activity'];
     // M1-11s-c: the first-run page's two owner setup routes are covered in owner-setup-route.test.ts.
     const stubs = registry.routes().filter(
       // M1-PAY-CONFIRM-a: the two paid-action confirmation routes are covered in pay-confirm.test.ts.

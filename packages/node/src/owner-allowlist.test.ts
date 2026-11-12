@@ -412,6 +412,8 @@ describe('the owner-action op allowlist is exactly the ops owner flows sign', ()
         'app.disconnect',
         'file.save',
         'agent.resume',
+        // WP-11 (D-117 A): signed only by the app's export gesture (backup-export-server.test.ts).
+        'backup.export',
       ].sort(),
     );
     // Pausing signs nothing: there is no pause op.
