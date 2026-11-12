@@ -8,6 +8,8 @@ Install AgentLink by pasting one line into a terminal you opened yourself (owner
 | Windows (PowerShell) | `irm https://agentlink.4thtech.io/install.ps1 \| iex` |
 | Windows (Command Prompt) | `powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 \| iex"` |
 
+A desktop app preview for Mac and Windows is coming soon (not released; unsigned builds). Its install steps are on the [desktop app page](../docs-site/guide/apps/desktop-app.md); this installer stays the way to get AgentLink until then.
+
 Already have Node.js 22.14 or newer? `npx -y @4thtech-io/agentlink@latest` works without the installer.
 
 **From an invite (WP-2).** The invite page shows the same line with the invite built in, for your computer: `curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite '<invite link>'` or, in PowerShell, `& ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Invite '<invite link>'`. It installs as below, then opens AgentLink on the invite (`agentlink join` with the link). The link is checked before anything else happens, with the same rules as `agentlink join` (08 §4): `https://agentlink.4thtech.io/i#` and 1 to 21 846 base64url characters, or the short form `i#2.` and 43. Anything else (another host, a space, a quote, a line break, a shell character, a second `#`) stops the installer with one fixed line, "This isn't a complete AgentLink invite. Open the link again and copy the command.", exit code 2, before anything is downloaded or written. The installer never prints or stores the link; your shell history and the process list can hold the command line (08 §4 residuals).
