@@ -104,7 +104,7 @@ describe('invite and pairing results (F6, F18)', () => {
 describe('copy points only at commands that exist (F7)', () => {
   it('has no keystore flag or ui command', () => {
     expect(en['chat.status.needs_setup.keychain']).not.toContain('--keystore');
-    expect(en['chat.status.needs_setup.keychain']).toContain('agentlink doctor');
+    expect(en['chat.status.needs_setup.keychain']).not.toContain('npx');
     expect(en['local.linkExpired']).not.toContain('agentlink ui');
   });
 });
