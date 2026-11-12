@@ -22,7 +22,6 @@ import {
   lstat,
   mkdir,
   open,
-  readFile,
   readdir,
   realpath,
   rename,
@@ -340,6 +339,29 @@ function objectInput(input: JsonValue | undefined): Record<string, JsonValue> | 
 function handleOf(input: JsonValue | undefined, key = 'handle'): string | undefined {
   const value = objectInput(input)?.[key];
   return typeof value === 'string' && HANDLE.test(value) ? value : undefined;
+}
+
+/**
+ * The text of a small regular file at `path`, or undefined when it is missing, a link, not a regular
+ * file, or unreadable. Opened once with O_NOFOLLOW and checked by fstat on that descriptor; read
+ * from the descriptor only, never by path again (04 §2.3.3, §4: no check-then-use by path).
+ */
+async function readRegularText(path: string): Promise<string | undefined> {
+  let fh: FileHandle;
+  try {
+    fh = await open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
+  } catch {
+    return undefined;
+  }
+  try {
+    const info = await fh.stat();
+    if (!info.isFile()) return undefined;
+    return await fh.readFile('utf8');
+  } catch {
+    return undefined;
+  } finally {
+    await fh.close().catch(() => undefined);
+  }
 }
 
 /** Reads `length` bytes from position 0 of `fh` (fewer at the end of the file). */
@@ -819,9 +841,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   /** The owner key of an unfinished restore (`restore-pending.json`), or undefined. */
   async function readPending(): Promise<Uint8Array | undefined> {
     try {
-      const info = await lstat(pendingPath);
-      if (!info.isFile()) return undefined;
-      const text = await readFile(pendingPath, 'utf8');
+      const text = await readRegularText(pendingPath);
+      if (text === undefined) return undefined;
       const parsed = JSON.parse(text) as { v?: unknown; ownerNostr?: unknown };
       if (parsed.v !== 1 || typeof parsed.ownerNostr !== 'string') return undefined;
       return decodeHex(parsed.ownerNostr, { length: 32 });
@@ -882,10 +903,9 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       if (!AGENT_NAME.test(name)) continue;
       let agentId: string | undefined;
       try {
-        const config = join(agentsDir, name, 'config.json');
-        const info = await lstat(config);
-        if (info.isFile()) {
-          const parsed = JSON.parse(await readFile(config, 'utf8')) as {
+        const text = await readRegularText(join(agentsDir, name, 'config.json'));
+        if (text !== undefined) {
+          const parsed = JSON.parse(text) as {
             agentId?: unknown;
             label?: unknown;
           };
