@@ -19,7 +19,6 @@ export const HARNESS_MARKERS: readonly string[] = Object.freeze([
   'OPENCODE',
   'OPENCODE_CLIENT',
   'CURSOR_AGENT',
-  'CURSOR_TRACE_ID',
   'ANTIGRAVITY_AGENT',
   'AI_AGENT',
 ]);
@@ -28,9 +27,10 @@ export const HARNESS_MARKERS: readonly string[] = Object.freeze([
  * R1-SEC-14 (04 §2.8 "known harness markers", maintained): where each marker comes from, one entry
  * per AI app `init` supports (harness/harnesses.ts HARNESS_IDS; a test fails for an app with no
  * entry). An app with no app-specific marker says so; the TTY guard and owner presence still apply.
- * `CURSOR_TRACE_ID` is set in every Cursor terminal, so the owner step is refused there too: Cursor's
- * AI can read that terminal, and the owner code must never be shown to it. `AI_AGENT` is the shared
- * convention some AI apps set for the commands they run.
+ * `AI_AGENT` is the shared convention some AI apps set for the commands they run. Cursor's own
+ * terminal marker `CURSOR_TRACE_ID` is left out on purpose (orchestrator decision, 0.5.1): it is set
+ * in every Cursor terminal, including the one the owner types in, and refusing `agentlink ui` there
+ * would break the golden path. Residual: Cursor's AI can read that terminal (04 §2.8).
  */
 export const HARNESS_MARKERS_BY_APP: Readonly<
   Record<HarnessId, { readonly markers: readonly string[]; readonly note?: string }>
@@ -43,7 +43,7 @@ export const HARNESS_MARKERS_BY_APP: Readonly<
   codex: { markers: ['CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED', 'CODEX_THREAD_ID'] },
   'gemini-cli': { markers: ['GEMINI_CLI'] },
   opencode: { markers: ['OPENCODE', 'OPENCODE_CLIENT'] },
-  cursor: { markers: ['CURSOR_AGENT', 'CURSOR_TRACE_ID'] },
+  cursor: { markers: ['CURSOR_AGENT', 'AI_AGENT'] },
   antigravity: { markers: ['ANTIGRAVITY_AGENT', 'AI_AGENT'] },
   windsurf: {
     markers: ['AI_AGENT'],

@@ -108,6 +108,24 @@ describe('the session link is never in the opener argv (R1-SEC-05)', () => {
   });
 });
 
+// Snap-packaged browsers (Ubuntu's default Firefox) cannot read hidden folders in the home folder,
+// so on Linux the launch folder is the visible `~/AgentLink/open`.
+describe('the launch folder per platform (R1-SEC-05)', () => {
+  it.each([
+    ['darwin', join('/h', '.agentlink', 'open')],
+    ['win32', join('/h', '.agentlink', 'open')],
+    ['linux', join('/h', 'AgentLink', 'open')],
+    ['freebsd', join('/h', 'AgentLink', 'open')],
+  ] as const)('on %s it is %s', (platform, expected) => {
+    expect(os.launchFolder('/h', platform)).toBe(expected);
+  });
+
+  it('on Linux no segment under home is hidden', () => {
+    const rel = os.launchFolder('/h', 'linux').slice('/h/'.length);
+    for (const part of rel.split('/')) expect(part.startsWith('.')).toBe(false);
+  });
+});
+
 describe.skipIf(process.platform === 'win32')('the private launch file (R1-SEC-05)', () => {
   const write = (
     os as unknown as {

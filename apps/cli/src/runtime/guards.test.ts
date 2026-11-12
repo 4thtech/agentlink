@@ -64,7 +64,7 @@ describe('terminal guards', () => {
     expect(Object.keys(byApp ?? {}).sort()).toEqual([...HARNESS_IDS].sort());
   });
 
-  it.each(['OPENCODE', 'CURSOR_AGENT', 'CURSOR_TRACE_ID', 'CODEX_THREAD_ID', 'AI_AGENT'])(
+  it.each(['OPENCODE', 'CURSOR_AGENT', 'CODEX_THREAD_ID', 'ANTIGRAVITY_AGENT', 'AI_AGENT'])(
     'refuses the owner step while %s is set',
     (marker) => {
       expect(checkOwnerTerminal({ ...tty, env: { [marker]: '1' } })).toEqual({
@@ -73,4 +73,9 @@ describe('terminal guards', () => {
       });
     },
   );
+
+  // Orchestrator decision (0.5.1): the owner may type `agentlink ui` in Cursor's own terminal.
+  it("does not refuse Cursor's own terminal (CURSOR_TRACE_ID alone)", () => {
+    expect(checkOwnerTerminal({ ...tty, env: { CURSOR_TRACE_ID: 'x' } })).toEqual({ ok: true });
+  });
 });

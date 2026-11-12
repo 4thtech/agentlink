@@ -220,7 +220,6 @@ export const HARNESS_MARKERS: readonly string[] = Object.freeze([
   'OPENCODE',
   'OPENCODE_CLIENT',
   'CURSOR_AGENT',
-  'CURSOR_TRACE_ID',
   'ANTIGRAVITY_AGENT',
   'AI_AGENT',
 ]);

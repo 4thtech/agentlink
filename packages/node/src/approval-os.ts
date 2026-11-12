@@ -14,7 +14,8 @@
 // R1-SEC-05 (04 §2.8 "other OS users"; 08 §1 the link token is in memory only): the session link
 // never reaches the opener's argv, which other OS users can read (`ps`, /proc/<pid>/cmdline). The
 // opener writes a private launch page (writePrivateLaunchFile: mode 0600, a random name, in the
-// owner's own 0700 folder `~/.agentlink/open`) that sends the browser on to the link, and hands the
+// owner's own 0700 folder: `~/.agentlink/open`, on Linux `~/AgentLink/open` (launchFolder)) that
+// sends the browser on to the link, and hands the
 // OS opener only that file's path. A link that is not exactly this server's own session link
 // (`http://localhost:<port>/<page>?t=<token>`) is never written or opened; a launch file that cannot
 // be written opens nothing (never a fallback to argv). Launch files are removed after
@@ -77,9 +78,18 @@ export interface OsSeams {
 /** R1-SEC-05: how long a launch file is kept (the browser reads it at once; the link is one-shot). */
 export const LAUNCH_FILE_LIFETIME_MS = 2 * 60_000;
 
-/** The owner's launch folder: `~/.agentlink/open`. */
-export function launchFolder(home: string = homedir()): string {
-  return join(home, '.agentlink', 'open');
+/**
+ * The owner's launch folder: `~/.agentlink/open` on macOS and Windows. On Linux `~/AgentLink/open`
+ * (next to the Inbox folder): a snap-packaged browser (Ubuntu's default Firefox) cannot read hidden
+ * folders in the home folder, so a launch file under `~/.agentlink` would never load there.
+ */
+export function launchFolder(
+  home: string = homedir(),
+  platform: NodeJS.Platform = process.platform,
+): string {
+  return platform === 'darwin' || platform === 'win32'
+    ? join(home, '.agentlink', 'open')
+    : join(home, 'AgentLink', 'open');
 }
 
 /**
@@ -161,7 +171,7 @@ const nodeSeams = (): OsSeams => ({
   platform: process.platform,
   env: process.env,
   writeLaunchFile: async (html) => {
-    const path = await writePrivateLaunchFile(launchFolder(), html);
+    const path = await writePrivateLaunchFile(launchFolder(homedir(), process.platform), html);
     if (path !== undefined) removeLater(path);
     return path;
   },

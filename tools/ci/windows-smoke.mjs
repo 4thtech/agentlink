@@ -47,7 +47,6 @@ for (const name of [
   'OPENCODE',
   'OPENCODE_CLIENT',
   'CURSOR_AGENT',
-  'CURSOR_TRACE_ID',
   'ANTIGRAVITY_AGENT',
   'AI_AGENT',
 ]) {
