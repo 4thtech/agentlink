@@ -23,7 +23,7 @@ export const CONTACTS_STRINGS = {
   emptyTitle:
     'No people yet. Ask your AI to create an invite and send it to someone you work with.',
   emptyPrompt: 'Create an AgentLink invite for Marko.',
-  notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
+  notSetUp: "AgentLink isn't set up on this computer yet. Create your first ID on Home.",
   listUnavailable: "Your people can't be loaded right now. Try again in a minute.",
   blocked: 'Blocked',
   blockedDetail: 'Blocked. Messages from this person are dropped.',

@@ -192,9 +192,12 @@ describe('a server without the app bundle (M1-11b-2c)', () => {
 });
 
 describe('the fixed pages (M1-11b-2c; 11 §6.2.1)', () => {
-  it('the expired-link page is fixed text that names the terminal command, nothing else', () => {
-    expect(EXPIRED_HTML).toContain(`<code>${CLI_COMMAND} approve</code>`);
-    expect(EXPIRED_HTML).toContain('This link has expired.');
+  it('the expired-link page gives plain steps per computer, the terminal only as a second line', () => {
+    expect(EXPIRED_HTML).toContain('<h1>This link has expired</h1>');
+    expect(EXPIRED_HTML).toContain('Applications folder');
+    expect(EXPIRED_HTML).toContain('Start menu');
+    expect(EXPIRED_HTML.indexOf('Start menu')).toBeLessThan(EXPIRED_HTML.indexOf('<code>'));
+    expect(EXPIRED_HTML).toContain(`<code>${CLI_COMMAND} ui</code>`);
     expectInert(EXPIRED_HTML);
   });
 
@@ -237,7 +240,7 @@ describe('the fixed pages (M1-11b-2c; 11 §6.2.1)', () => {
   });
 
   it('the words name the command that works and stay in plain words', () => {
-    expect(PAGE_STRINGS.expired).toContain(`${CLI_COMMAND} approve`);
+    expect(PAGE_STRINGS.expired).not.toContain(CLI_COMMAND);
     expect(PAGE_STRINGS.noApp).toContain(`${CLI_COMMAND} approve`);
     const all = Object.values(PAGE_STRINGS).join(' ').toLowerCase();
     expect(all).not.toMatch(/wallet|seed phrase|transaction|\bgas\b|owner key/);

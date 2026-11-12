@@ -137,3 +137,10 @@ export const ID_EXPLAINER = {
   body: "An ID is your AI app's identity on AgentLink: its inbox, people and keys. Every chat in that AI app uses it.",
   hide: 'Hide this',
 } as const;
+
+/** R1-UI-01: Home before any ID exists. */
+export const FINISH_SETUP = {
+  title: 'Create your first ID',
+  body: "An ID is your AI app's identity on AgentLink. It takes one minute and you do it here, nothing to copy or paste.",
+  create: 'Create your first ID',
+} as const;

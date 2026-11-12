@@ -421,16 +421,20 @@ describe('W4-WIZARD (was U3-g name and protect): step 2', () => {
     expect(buttonNames()).toContain('Try again');
   });
 
-  it('Enter in the field does not submit; focus moves to the button', async () => {
+  it('R1-UI-16: Enter in the field submits, like the button; an empty name does not', async () => {
     const { setup } = await toName();
-    await type('Ana');
     const input = field();
     await act(async () => {
       input.focus();
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     });
     expect(setup.begun).toEqual([]);
-    expect(document.activeElement).toBe(button(GO));
+    await type('Ana');
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    await settle();
+    expect(setup.begun.length).toBeGreaterThan(0);
   });
 
   it('a cancelled Touch ID says "Not protected yet. Try again." and keeps the text', async () => {

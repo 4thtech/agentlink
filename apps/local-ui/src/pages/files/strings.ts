@@ -14,7 +14,7 @@ export const FILES_STRINGS = {
   emptyTitle: "Your AI can't send files yet. Allow a folder it may send from.",
   emptyPrompt: 'Send proposal.pdf to Marko.',
   loading: 'Loading…',
-  notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
+  notSetUp: "AgentLink isn't set up on this computer yet. Create your first ID on Home.",
   unavailable: "Your folders can't be loaded right now. Try again in a minute.",
   folderField: 'Folder',
   folderHint: 'The full path, for example ~/Documents/Shared.',

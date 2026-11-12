@@ -112,6 +112,8 @@ export interface HomeScreenProps {
   readonly pollMs?: number;
   /** U2's "Get started · n of 3 done" card, on top while setup is not done. */
   readonly getStarted?: ReactNode;
+  /** R1-UI-01: there is no ID yet: this replaces everything else on Home (a way to create the first one). */
+  readonly noId?: ReactNode;
   /** W4-WIRE: keep the skeleton while the page still reads what goes on top (the Get started card). */
   readonly holding?: boolean;
   /** Why nothing can be approved here yet (owner not set up, no passkeys in this browser). */
@@ -999,7 +1001,8 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   return (
     <div className="hm-page hm-c" data-layer={pro ? 'pro' : 'simple'}>
       <h1 className="al-visually-hidden">{S.title}</h1>
-      {view.state === 'failed' ? (
+      {props.noId !== undefined ? props.noId : null}
+      {props.noId === undefined && view.state === 'failed' ? (
         <Banner tone="warning">
           {view.problem === 'not_set_up'
             ? S.notSetUp
@@ -1011,158 +1014,160 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
           </Button>
         </Banner>
       ) : null}
-      <SkeletonGate
-        loading={view.state === 'loading' || props.holding === true}
-        skeleton={<HomeSkeleton pro={pro} />}
-        label={S.loading}
-      >
-        <div className="hm-stack hm-c">
-          {props.getStarted ?? null}
-          {props.ownerNotice ?? null}
-          {unfinished.map((row) => (
-            <UnfinishedRemoval key={row.name} row={row} onFinish={setFinishing} />
-          ))}
-          {/* WP-1: an ID whose card still carries an older name: repaired here, one gesture. */}
-          <RenameBanner
-            api={clients.agents}
-            owner={clients.owner}
-            row={liveIds.rows.find((r) => r.current && !r.removing)}
-          />
-          <HomeApprovals
-            items={approvals}
-            owner={owner}
-            client={clients.approvals}
-            sheet={sheet}
-            pro={pro}
-            asker={
-              current === undefined
-                ? undefined
-                : appName === undefined
-                  ? fmt(S.askerId, { name: current.label })
-                  : fmt(S.askerApp, { name: current.label, app: appName })
-            }
-            askerSeed={many ? current?.name : undefined}
-            askerLabel={many ? agentLabel : undefined}
-            onChanged={() => void loadApprovals()}
-          />
-          {pro ? null : (
-            <a
-              className="al-btn al-btn-primary al-btn-lg al-btn-block hm-invite al-press"
-              href={INVITE_HREF}
-            >
-              <Icon name="user-plus" size={22} />
-              <span>{S.inviteSomeone}</span>
-            </a>
-          )}
-          {/* W5-PASTE-ENTRY: the other way in, right next to Invite someone. */}
-          {pro ? null : <PasteEntryLink className="inv-link-button" />}
-          <section aria-labelledby="hm-people-h" className="hm-people hm-c">
-            {peopleHead}
-            {idChips}
-            {many && current !== undefined && people.length > 0 ? (
-              <h3 className="hm-id-group hm-f al-text-label" data-id-group={current.name}>
-                <AgentIcon label={current.label} seed={current.name} />
-                <span>{agentLabel}</span>
-              </h3>
-            ) : null}
-            {otherAgent !== undefined ? (
-              <div className="hm-nomatch hm-f" data-other-id="">
-                <p className="al-text-body-sm al-muted">{otherLine(otherAgent)}</p>
-                <Button size="sm" onClick={() => void switchAgent(otherAgent.name)}>
-                  {fmt(S.openAgent, { name: otherAgent.label })}
-                </Button>
-              </div>
-            ) : data !== undefined &&
-              data.people.length === 0 &&
-              pending.length === 0 &&
-              connectingRows.length === 0 &&
-              othersWithPeople.length === 0 &&
-              props.pendingRows === undefined ? (
-              <EmptyState
-                title={S.noPeople}
-                icon="users"
-                action={<p className="al-text-body-sm al-muted">{S.noPeopleHint}</p>}
-              />
-            ) : (
-              <div className="hm-list">
-                {/* Under the hood, People is a table to assistive technology (rows and cells). */}
-                <div
-                  role={pro ? 'table' : undefined}
-                  aria-label={pro ? S.people : undefined}
-                  className="hm-table"
-                >
-                  {pro ? (
-                    <div
-                      className="hm-prow hm-prow-head al-text-label"
-                      data-people-head=""
-                      role="row"
-                    >
-                      <span role="columnheader">{S.colPerson}</span>
-                      <span role="columnheader" className="hm-opt">
-                        {S.colHandledBy}
-                      </span>
-                      <span role="columnheader">{S.colLastMessage}</span>
-                      <span role="columnheader" className="hm-opt">
-                        {S.colDelivery}
-                      </span>
-                      <span role="columnheader" className="hm-opt">
-                        {S.colProofs}
-                      </span>
-                      <span role="columnheader" className="hm-opt">
-                        {S.colFiles}
-                      </span>
-                      <span role="columnheader">
-                        <span className="al-visually-hidden">{S.colOpen}</span>
-                      </span>
-                    </div>
-                  ) : null}
-                  {people.map(personRow)}
-                </div>
-                {data !== undefined &&
-                people.length === 0 &&
-                archivedPeople.length === 0 &&
-                data.people.length > 0 ? (
-                  <div className="hm-nomatch hm-f">
-                    <p className="al-text-body-sm al-muted">{S.noMatch}</p>
-                  </div>
-                ) : null}
-                {connectingRows.map((row) => (
-                  <ConnectingRowView key={`c-${row.ref}`} row={row} api={clients.invites} />
-                ))}
-                {otherIdRows}
-                {props.pendingRows ??
-                  pending.map((invite) => (
-                    <PendingInviteRow
-                      key={invite.inviteId}
-                      invite={invite}
-                      pro={pro}
-                      agent={agentLabel}
-                      api={clients.invites}
-                      onCancelled={refresh}
-                    />
-                  ))}
-              </div>
+      {props.noId !== undefined ? null : (
+        <SkeletonGate
+          loading={view.state === 'loading' || props.holding === true}
+          skeleton={<HomeSkeleton pro={pro} />}
+          label={S.loading}
+        >
+          <div className="hm-stack hm-c">
+            {props.getStarted ?? null}
+            {props.ownerNotice ?? null}
+            {unfinished.map((row) => (
+              <UnfinishedRemoval key={row.name} row={row} onFinish={setFinishing} />
+            ))}
+            {/* WP-1: an ID whose card still carries an older name: repaired here, one gesture. */}
+            <RenameBanner
+              api={clients.agents}
+              owner={clients.owner}
+              row={liveIds.rows.find((r) => r.current && !r.removing)}
+            />
+            <HomeApprovals
+              items={approvals}
+              owner={owner}
+              client={clients.approvals}
+              sheet={sheet}
+              pro={pro}
+              asker={
+                current === undefined
+                  ? undefined
+                  : appName === undefined
+                    ? fmt(S.askerId, { name: current.label })
+                    : fmt(S.askerApp, { name: current.label, app: appName })
+              }
+              askerSeed={many ? current?.name : undefined}
+              askerLabel={many ? agentLabel : undefined}
+              onChanged={() => void loadApprovals()}
+            />
+            {pro ? null : (
+              <a
+                className="al-btn al-btn-primary al-btn-lg al-btn-block hm-invite al-press"
+                href={INVITE_HREF}
+              >
+                <Icon name="user-plus" size={22} />
+                <span>{S.inviteSomeone}</span>
+              </a>
             )}
-            {archivedPeople.length === 0 ? null : (
-              <details className="hm-archived" data-archived="">
-                <summary className="hm-kicker al-text-label">
-                  {fmt(S.archivedCount, { count: archivedPeople.length })}
-                </summary>
-                <p className="al-text-body-sm al-muted">{S.archivedHint}</p>
+            {/* W5-PASTE-ENTRY: the other way in, right next to Invite someone. */}
+            {pro ? null : <PasteEntryLink className="inv-link-button" />}
+            <section aria-labelledby="hm-people-h" className="hm-people hm-c">
+              {peopleHead}
+              {idChips}
+              {many && current !== undefined && people.length > 0 ? (
+                <h3 className="hm-id-group hm-f al-text-label" data-id-group={current.name}>
+                  <AgentIcon label={current.label} seed={current.name} />
+                  <span>{agentLabel}</span>
+                </h3>
+              ) : null}
+              {otherAgent !== undefined ? (
+                <div className="hm-nomatch hm-f" data-other-id="">
+                  <p className="al-text-body-sm al-muted">{otherLine(otherAgent)}</p>
+                  <Button size="sm" onClick={() => void switchAgent(otherAgent.name)}>
+                    {fmt(S.openAgent, { name: otherAgent.label })}
+                  </Button>
+                </div>
+              ) : data !== undefined &&
+                data.people.length === 0 &&
+                pending.length === 0 &&
+                connectingRows.length === 0 &&
+                othersWithPeople.length === 0 &&
+                props.pendingRows === undefined ? (
+                <EmptyState
+                  title={S.noPeople}
+                  icon="users"
+                  action={<p className="al-text-body-sm al-muted">{S.noPeopleHint}</p>}
+                />
+              ) : (
                 <div className="hm-list">
+                  {/* Under the hood, People is a table to assistive technology (rows and cells). */}
                   <div
                     role={pro ? 'table' : undefined}
-                    aria-label={pro ? S.archived : undefined}
+                    aria-label={pro ? S.people : undefined}
                     className="hm-table"
                   >
-                    {archivedPeople.map(personRow)}
+                    {pro ? (
+                      <div
+                        className="hm-prow hm-prow-head al-text-label"
+                        data-people-head=""
+                        role="row"
+                      >
+                        <span role="columnheader">{S.colPerson}</span>
+                        <span role="columnheader" className="hm-opt">
+                          {S.colHandledBy}
+                        </span>
+                        <span role="columnheader">{S.colLastMessage}</span>
+                        <span role="columnheader" className="hm-opt">
+                          {S.colDelivery}
+                        </span>
+                        <span role="columnheader" className="hm-opt">
+                          {S.colProofs}
+                        </span>
+                        <span role="columnheader" className="hm-opt">
+                          {S.colFiles}
+                        </span>
+                        <span role="columnheader">
+                          <span className="al-visually-hidden">{S.colOpen}</span>
+                        </span>
+                      </div>
+                    ) : null}
+                    {people.map(personRow)}
                   </div>
+                  {data !== undefined &&
+                  people.length === 0 &&
+                  archivedPeople.length === 0 &&
+                  data.people.length > 0 ? (
+                    <div className="hm-nomatch hm-f">
+                      <p className="al-text-body-sm al-muted">{S.noMatch}</p>
+                    </div>
+                  ) : null}
+                  {connectingRows.map((row) => (
+                    <ConnectingRowView key={`c-${row.ref}`} row={row} api={clients.invites} />
+                  ))}
+                  {otherIdRows}
+                  {props.pendingRows ??
+                    pending.map((invite) => (
+                      <PendingInviteRow
+                        key={invite.inviteId}
+                        invite={invite}
+                        pro={pro}
+                        agent={agentLabel}
+                        api={clients.invites}
+                        onCancelled={refresh}
+                      />
+                    ))}
                 </div>
-              </details>
-            )}
-          </section>
-        </div>
-      </SkeletonGate>
+              )}
+              {archivedPeople.length === 0 ? null : (
+                <details className="hm-archived" data-archived="">
+                  <summary className="hm-kicker al-text-label">
+                    {fmt(S.archivedCount, { count: archivedPeople.length })}
+                  </summary>
+                  <p className="al-text-body-sm al-muted">{S.archivedHint}</p>
+                  <div className="hm-list">
+                    <div
+                      role={pro ? 'table' : undefined}
+                      aria-label={pro ? S.archived : undefined}
+                      className="hm-table"
+                    >
+                      {archivedPeople.map(personRow)}
+                    </div>
+                  </div>
+                </details>
+              )}
+            </section>
+          </div>
+        </SkeletonGate>
+      )}
       {finishing === undefined ? null : (
         <FinishRemoveSheet
           row={finishing}

@@ -61,6 +61,9 @@ export const FIRST_RUN = {
   doneNoPasskeyTitle: 'Save your master code — you need it to approve.',
   doneNoPasskeyBody:
     "This browser can't protect approvals with a passkey here, so this master code is how you approve on this computer.",
+  /** R1-UI-02: leaving the once-only code screen (Skip to Home) asks first. */
+  leaveCode:
+    "Your master code is shown only once. If you leave now it is gone and we can't show it again. Copy it or save it as a file first. Leave anyway?",
   backupBody: (sensor: string): string =>
     `Your master code approves changes when ${sensor} isn't available and unlocks your AgentLink key. Save it once. We can't recover it for you. Never give it to your AI.`,
   backupLost:

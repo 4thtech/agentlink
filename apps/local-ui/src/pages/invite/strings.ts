@@ -30,7 +30,7 @@ export const INVITE_STRINGS = {
   done: 'Done',
   cantCreate: "Couldn't make the link. Try again in a minute.",
   tryAgain: 'Try again',
-  notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
+  notSetUp: "AgentLink isn't set up on this computer yet. Create your first ID on Home.",
   sessionExpired: 'This page has expired. Ask your AI to open AgentLink again.',
   fellBack: "Short links aren't available right now, so this is a long link. It works the same.",
   // Under the hood (pro): the long link, the QR code and the invite's facts.

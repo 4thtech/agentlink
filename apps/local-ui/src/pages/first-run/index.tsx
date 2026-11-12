@@ -69,6 +69,7 @@ import type { CreateAgentApi } from '../apps/create-agent-api.js';
 import { IdExplainerCard } from '../start/id-explainer.js';
 import { readAgentSignal } from '../home/start-here-api.js';
 import type { AgentSignal } from '../home/start-here.js';
+import { useLeaveGuard } from '../../leave-guard.js';
 import { markLeavingStart, skipToHome } from '../start/guard.js';
 import {
   forgetAbandonedAdd,
@@ -439,8 +440,8 @@ function sendLine(outcome: SendFolderOutcome): string | undefined {
 /**
  * W4-WIZARD (A1 step 2, "Confirm it's you"): the agent card with its suggested name ("Change name"
  * opens the field), and one primary button for the one gesture (D-140: it creates the owner and the
- * agent and connects the picked app). The master code stays the alternative. Enter in the field does
- * not submit: focus moves to the button.
+ * agent and connects the picked app). The master code stays the alternative. Enter in the field
+ * submits (R1-UI-16), as long as the name is not empty.
  */
 function ConnectFirstStep({
   view,
@@ -468,7 +469,9 @@ function ConnectFirstStep({
   const press = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    document.getElementById('fr-go')?.focus();
+    // R1-UI-16: Enter submits like every other form here (the button's one gesture).
+    if (!view.working && name.trim() !== '') onGo(noPrf);
+    else document.getElementById('fr-go')?.focus();
   };
   // W7-ID-B1: the name is asked for (the owner's name is not known here); nothing goes on without it.
   const shown = name.trim() === '' ? (appName ?? T.yourAiApp) : name.trim();
@@ -648,6 +651,8 @@ export function FirstRunPage({
   // M1-UX-FIRSTRUN-V2-c: the master code as typed, only while the switch is on screen.
   const [code, setCode] = useState('');
   const sensor = SENSOR[platform];
+  // R1-UI-02: the once-only master code is on screen: leaving (Skip to Home, a link) asks first.
+  useLeaveGuard(view.k === 'done' ? T.leaveCode : undefined);
   // What the person chose on earlier steps (kept in memory while the steps change; no secret).
   const memory = wizardMemory();
   // W4-WIRE: step 4's invite panel (U4) loads with the first step, so it is there, in place, when
@@ -1159,8 +1164,16 @@ export function FirstRunPage({
           else skipToHome();
         }
       : onSkip;
+  // R1-UI-01: before an ID exists (first run, the pick and the connect step) there is no Home to
+  // skip to: it would be a dead end. From the master code on, the ID exists.
+  const noIdYet =
+    mode?.k === 'first' && view.k !== 'done' && (step === 'app' || step === 'connect');
   const frame = (body: ReactElement, at: StepId = step): ReactElement => (
-    <WizardFrame step={at} {...(guardedSkip === undefined ? {} : { onSkip: guardedSkip })}>
+    <WizardFrame
+      step={at}
+      {...(guardedSkip === undefined ? {} : { onSkip: guardedSkip })}
+      {...(noIdYet ? { hideSkip: true } : {})}
+    >
       {body}
     </WizardFrame>
   );

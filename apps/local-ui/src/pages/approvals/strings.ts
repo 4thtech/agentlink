@@ -28,7 +28,8 @@ export const APPROVAL_STRINGS = Object.freeze({
   nativeAction: 'Turn on {sensor}',
   hideNotice: 'Hide this',
   needsOwnerTitle: 'Set up AgentLink',
-  needsOwner: `Set up your master code first: run ${CLI_PREFIX} owner init in your own terminal. Until then, nothing can be approved here.`,
+  needsOwner:
+    'Finish setting up AgentLink first: create your first ID on Home and save your master code. Until then, nothing can be approved here.',
   noPasskeys: "Passkeys aren't available in this browser. Approve with your master code.",
   appTitle: 'Approvals',
   // UX2-a (B-11 §26.2): the Grid/List control.
@@ -103,7 +104,8 @@ export const APPROVAL_STRINGS = Object.freeze({
   busy: 'Another approval is being confirmed. Try again in a moment.',
   refused: 'This decision was not applied. Nothing was changed.',
   listRefused: 'These decisions were not applied. Nothing was changed. Review the list again.',
-  needsSetup: `Set up your master code first: run ${CLI_PREFIX} owner init in your own terminal.`,
+  needsSetup:
+    'Finish setting up AgentLink first: create your first ID on Home and save your master code.',
   notUsed: "The passkey wasn't used. Nothing was changed. You can enter your master code instead.",
   paidAlone: 'This costs credits. Approve it on its own.',
   listPaid:

@@ -26,9 +26,13 @@
 //   full list above stays as `ApprovalsBoard` in board.tsx (its tests keep the review-together
 //   rules); nothing imports it at runtime, so neither it nor board.css is in the app bundle.
 import { HomeScreen } from '../home/home-screen.js';
+import { CONTACTS_CHANGED } from '../../api/contact-changes.js';
 import { GetStartedCard } from '../start/get-started-card.js';
+import { FinishSetupCard } from '../start/finish-setup-card.js';
 import {
+  invitedBefore,
   readSetupState,
+  rememberInvited,
   startProgress,
   type Progress,
   type SetupState,
@@ -316,18 +320,43 @@ export function useStartProgress(read: () => Promise<SetupState>): Progress | nu
     const settle = (p: Progress | null): void => {
       if (live) setProgress((now) => (now === undefined ? p : now));
     };
+    // R1-UI-10: the card follows the real state (a person accepted while Home is open); an answer
+    // that came later replaces the first one, an unanswered read keeps what is shown.
+    const again = (): void => {
+      read().then(
+        (state) => {
+          const p = startProgress(state, invitedBefore());
+          if (p.steps.find((s) => s.id === 'invite')?.done === true) rememberInvited();
+          if (live) setProgress(p);
+        },
+        () => undefined,
+      );
+    };
     const timer = setTimeout(() => settle(null), START_READ_WAIT_MS);
     read().then(
-      (state) => settle(startProgress(state)),
+      (state) => {
+        const p = startProgress(state, invitedBefore());
+        if (p.steps.find((s) => s.id === 'invite')?.done === true) rememberInvited();
+        settle(p);
+      },
       () => settle(null),
     );
+    const every = setInterval(() => {
+      if (typeof document === 'undefined' || !document.hidden) again();
+    }, START_REFRESH_MS);
+    window.addEventListener(CONTACTS_CHANGED, again);
     return () => {
       live = false;
       clearTimeout(timer);
+      clearInterval(every);
+      window.removeEventListener(CONTACTS_CHANGED, again);
     };
   }, [read]);
   return progress;
 }
+
+/** R1-UI-10: how often the Get started card reads the real state again while Home is open. */
+export const START_REFRESH_MS = 10_000;
 
 /** `/`: Home (W4-HOME), with the approvals as the card on top. */
 export function ApprovalsPage({
@@ -351,7 +380,9 @@ export function ApprovalsPage({
       holding={started === undefined}
       {...(started === null || started === undefined
         ? {}
-        : { getStarted: <GetStartedCard progress={started} /> })}
+        : started.needsFirstId
+          ? { noId: <FinishSetupCard /> }
+          : { getStarted: <GetStartedCard progress={started} /> })}
       {...(owner === undefined
         ? {}
         : {

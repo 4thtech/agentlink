@@ -39,7 +39,7 @@ import {
   formatDate,
   type ReviewState,
 } from './steps.js';
-import { CODE, KIT, PROBLEMS, WIZARD, type StepId } from './strings.js';
+import { CODE, KIT, PROBLEMS, PROTECT, WIZARD, type StepId } from './strings.js';
 
 export type RestoreMode = 'restore' | 'check';
 
@@ -66,6 +66,15 @@ export interface RestoreWizardProps {
 function leaveDefault(to: string): void {
   markLeavingStart();
   window.location.assign(to);
+}
+
+/** R1-UI-02: the once-only master code may be lost: confirm before leaving without ticking "I saved it". */
+function askLeaveCode(): boolean {
+  try {
+    return window.confirm(PROTECT.leaveUnsaved);
+  } catch {
+    return true;
+  }
 }
 
 const stepOf = (view: View): StepId =>
@@ -177,6 +186,8 @@ export function RestoreWizard({
   );
 
   const cancel = (): void => {
+    // R1-UI-02: the restore is done and its new master code is on screen, shown once: ask first.
+    if (outcome?.masterCode !== undefined && !saved && !askLeaveCode()) return;
     if (kitHandle !== undefined) void api.cancel(kitHandle);
     leave('/');
   };

@@ -566,7 +566,7 @@ describe('step 4: protect and reconnect', () => {
     expect(m.left).toEqual(['/']);
   });
 
-  async function newComputer(): Promise<void> {
+  async function newComputer(): Promise<{ left: string[] }> {
     const api = fakeApi({
       applyBegin: () =>
         ok({
@@ -603,8 +603,9 @@ describe('step 4: protect and reconnect', () => {
       body: new Uint8Array([1]),
       created: [new Uint8Array([1])],
     });
-    await toReview(api);
+    const m = await toReview(api);
     await click('Restore 2 IDs');
+    return m;
   }
 
   it('new computer: the master code is shown once, Home waits for "I saved it"', async () => {
@@ -621,6 +622,33 @@ describe('step 4: protect and reconnect', () => {
       box.click();
     });
     expect(button(S.PROTECT.home)?.disabled).toBe(false);
+  });
+
+  it('R1-UI-02: Cancel on step 4 asks first while the new master code is not saved', async () => {
+    const { left } = await newComputer();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await click(S.WIZARD.cancel);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(String(confirm.mock.calls[0]?.[0])).toMatch(/only once/);
+    expect(left).toEqual([]);
+    expect(text()).toContain(S.PROTECT.codeTitle);
+    confirm.mockReturnValue(true);
+    await click(S.WIZARD.cancel);
+    expect(left).toEqual(['/']);
+    confirm.mockRestore();
+  });
+
+  it('R1-UI-02: once "I saved it" is ticked, Cancel leaves without asking', async () => {
+    const { left } = await newComputer();
+    const box = host.querySelector<HTMLInputElement>('.rs-saved input') as HTMLInputElement;
+    await act(async () => {
+      box.click();
+    });
+    const confirm = vi.spyOn(window, 'confirm');
+    await click(S.WIZARD.cancel);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(left).toEqual(['/']);
+    confirm.mockRestore();
   });
 
   it('survives the page being mounted again for the ID that opened (step 4 keeps its result)', async () => {

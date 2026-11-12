@@ -14,7 +14,15 @@ import { CLI_COMMAND } from './cli-command.js';
 /** Every text the fixed pages show (11 §5 vocabulary). */
 export const PAGE_STRINGS = Object.freeze({
   title: 'AgentLink',
-  expired: `This link has expired. Open AgentLink again from your AI, or run ${CLI_COMMAND} approve in your own terminal.`,
+  // R1-UI-12: plain steps per computer first; the terminal is a small second line.
+  expiredTitle: 'This link has expired',
+  expired: 'Open AgentLink again to get a new one. It takes a few seconds.',
+  expiredMac:
+    'Mac: open AgentLink from your Applications folder, or press Cmd + Space and type AgentLink.',
+  expiredWindows: 'Windows: open AgentLink from the Start menu.',
+  expiredLinux: 'Linux: open AgentLink from your app menu.',
+  expiredAi: 'Or ask your AI to open AgentLink for you.',
+  expiredTerminal: 'If you use a terminal, run',
   noAppTitle: "Approvals can't open here",
   noApp: `This copy of AgentLink can't show approvals in the browser. Run ${CLI_COMMAND} approve in your own terminal, or update AgentLink.`,
 });
@@ -36,7 +44,19 @@ function fixedPage(heading: string, text: string): string {
 }
 
 /** The 401 page (11 §6.2.1 "local link expired"). Fixed text; nothing from the request. */
-export const EXPIRED_HTML = fixedPage(PAGE_STRINGS.title, PAGE_STRINGS.expired);
+export const EXPIRED_HTML = [
+  '<!doctype html>',
+  '<html lang="en"><head><meta charset="utf-8">',
+  '<meta name="viewport" content="width=device-width, initial-scale=1">',
+  `<title>${PAGE_STRINGS.title}</title></head>`,
+  `<body><main><h1>${PAGE_STRINGS.expiredTitle}</h1>`,
+  `<p>${PAGE_STRINGS.expired}</p>`,
+  `<ul><li>${PAGE_STRINGS.expiredMac}</li><li>${PAGE_STRINGS.expiredWindows}</li><li>${PAGE_STRINGS.expiredLinux}</li></ul>`,
+  `<p>${PAGE_STRINGS.expiredAi}</p>`,
+  `<p><small>${PAGE_STRINGS.expiredTerminal} <code>${CLI_COMMAND} ui</code></small></p>`,
+  '</main></body></html>',
+  '',
+].join('\n');
 
 /** `/` and `/approve/<id>` without the app bundle. Fixed text; nothing from the request. */
 export const NO_APP_HTML = fixedPage(PAGE_STRINGS.noAppTitle, PAGE_STRINGS.noApp);
