@@ -83,6 +83,14 @@ export const BACKUP_STRINGS = {
   stepCheck: 'Check that it opens',
   print: 'Print',
   printBlocked: "Couldn't open the print window. Allow pop-ups for AgentLink, or copy the code.",
+  // WP-R2b: IDs the kit does not hold. Only an ID that keeps its keys in a file is backed up in the
+  // terminal; the others say plainly why.
+  notIncludedTitle: 'Not in this kit',
+  notIncludedTerminal:
+    'it keeps its keys in a file, not the keychain, so back it up in the terminal.',
+  notIncludedCouldNotOpen:
+    "it couldn't be opened just now. Save a new kit in a moment to include it.",
+  notIncludedOverLimit: 'one kit holds up to 16 IDs.',
   checkNow: 'Check now',
   checking: 'Checking…',
   checkOk: 'This kit opens.',

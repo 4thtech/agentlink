@@ -11,7 +11,7 @@ import { createApiClient, type ApiClient, type OwnerApiResult } from '../../api/
 import { forgetRecoveryKitLater } from '../../states/index.js';
 import { gateMessage, OwnerGate } from '../agents/owner-gate.js';
 import { createOwnerClient, type PasskeyInfo, type PresenceProof } from '../contacts/owner.js';
-import { SaveChecklist } from './save-checklist.js';
+import { SaveChecklist, type CheckKit } from './save-checklist.js';
 import { BACKUP_STRINGS as S } from './strings.js';
 import { dayOf, joinNames } from './status.js';
 
@@ -29,6 +29,38 @@ export interface SavedKit {
   readonly covers: readonly string[];
   /** The one-use Check handle (WP-R2), when the server gave one. */
   readonly check?: string;
+  /** IDs of this owner the kit does not hold, and why (WP-R2b). */
+  readonly notIncluded?: readonly NotIncluded[];
+}
+
+/** WP-R2b: why an ID is not in the kit. Only `file_keystore` can be backed up in the terminal. */
+export type NotIncludedReason = 'file_keystore' | 'could_not_open' | 'over_limit';
+export interface NotIncluded {
+  readonly name: string;
+  readonly label: string;
+  readonly reason: NotIncludedReason;
+}
+
+const NOT_INCLUDED_REASONS: ReadonlySet<string> = new Set([
+  'file_keystore',
+  'could_not_open',
+  'over_limit',
+]);
+/** An ID's folder name: lower-case words joined by single hyphens (as on the ID card's path). */
+const ID_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function notIncludedOf(value: unknown): NotIncluded[] {
+  if (!Array.isArray(value)) return [];
+  const out: NotIncluded[] = [];
+  for (const item of value.slice(0, 32)) {
+    if (typeof item !== 'object' || item === null) continue;
+    const { name, label, reason } = item as Record<string, unknown>;
+    if (typeof name !== 'string' || name.length > 64 || !ID_NAME.test(name)) continue;
+    if (typeof reason !== 'string' || !NOT_INCLUDED_REASONS.has(reason)) continue;
+    const shown = typeof label === 'string' && label.length > 0 && label.length < 65 ? label : name;
+    out.push({ name, label: shown, reason: reason as NotIncludedReason });
+  }
+  return out;
 }
 
 /** What the export answered, in the page's terms. */
@@ -60,6 +92,7 @@ export function exportOutcomeOf(result: OwnerApiResult): ExportOutcome {
               .filter((n): n is string => typeof n === 'string' && n.length > 0 && n.length < 65)
               .slice(0, 12)
           : [];
+        const notIncluded = notIncludedOf(d['notIncluded']);
         const check =
           typeof d['check'] === 'string' && /^[A-Za-z0-9_-]{22}$/.test(d['check'])
             ? d['check']
@@ -72,6 +105,7 @@ export function exportOutcomeOf(result: OwnerApiResult): ExportOutcome {
             code: d['code'],
             covers,
             ...(check === undefined ? {} : { check }),
+            ...(notIncluded.length === 0 ? {} : { notIncluded }),
           },
         };
       }
@@ -121,8 +155,8 @@ export interface ExportKitProps {
   readonly known?: 'available' | 'not_available' | undefined;
   /** The button reads "Save a new kit" when a kit is on record. */
   readonly hasKit?: boolean;
-  /** Check my kit's route, when it is registered (default: save-checklist.ts). */
-  readonly checkPath?: string | undefined;
+  /** How Check my kit runs (default: R1's restore check, save-checklist.ts); tests inject theirs. */
+  readonly checkKit?: CheckKit | null | undefined;
   /** Called after Done, so the page can read the record again. */
   readonly onDone?: (() => void) | undefined;
   /** Tests inject the print window opener. */
@@ -174,7 +208,7 @@ export function ExportKit({
   label,
   known,
   hasKit = false,
-  checkPath,
+  checkKit,
   onDone,
   openWindow,
 }: ExportKitProps): ReactElement {
@@ -248,11 +282,31 @@ export function ExportKit({
           <p className="al-text-body-sm al-muted">{S.privacy}</p>
           <p className="al-text-caption al-muted">{S.copyNote}</p>
         </section>
+        {kit.notIncluded === undefined ? null : (
+          <section className="bk-not-included" aria-label={S.notIncludedTitle}>
+            <p className="al-text-label">{S.notIncludedTitle}</p>
+            <ul className="al-text-body-sm">
+              {kit.notIncluded.map((n) => (
+                <li key={n.name} data-not-included={n.reason}>
+                  <bdi>
+                    <strong>{n.label}</strong>
+                  </bdi>
+                  {': '}
+                  {n.reason === 'file_keystore'
+                    ? S.notIncludedTerminal
+                    : n.reason === 'over_limit'
+                      ? S.notIncludedOverLimit
+                      : S.notIncludedCouldNotOpen}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <SaveChecklist
           api={api}
           facts={{ code: kit.code, file: kit.file, date: dayOf(Date.now()) }}
           check={kit.check}
-          checkPath={checkPath}
+          checkKit={checkKit}
           copied={copied}
           onCopy={() => copy(kit.code)}
           open={openWindow}

@@ -148,8 +148,8 @@ export const REDIRECTS: Readonly<Record<string, string>> = {
   '/settings/contacts': PEOPLE_PATH,
   '/settings/agents': AGENTS_PATH,
   '/settings/activity': ACTIVITY_PATH,
-  // WP-N1: interim, until WP-S2 (Touch ID & master code) and WP-C1 (Advanced) build their pages.
-  '/settings/touch-id': '/settings/backup',
+  // WP-N1: interim, until WP-C1 (Advanced) builds its page. WP-S2's Touch ID & master code page is
+  // real now, so `/settings/touch-id` is no longer redirected.
   '/settings/advanced': ADVANCED_HOME,
   '/settings/about': '/advanced/diagnostics',
   '/settings/storage': '/settings/files',

@@ -38,9 +38,17 @@ afterEach(() => {
 const ok = (data: unknown): ApiResult<unknown> => ({ kind: 'ok', status: 200, data });
 const offline: ApiResult<unknown> = { kind: 'offline' };
 
+// The R2 shape of GET /api/ui/backup: `covers` and `missing.ids` are {name, label} objects.
 const KIT = {
-  lastKit: { at: Date.UTC(2026, 10, 3, 12), covers: ['Tali'], peopleAtSave: 4 },
-  missing: { ids: ['macbook-agent-1'], people: 2 },
+  export: 'available',
+  record: 'saved',
+  state: 'out_of_date',
+  lastKit: {
+    at: Date.UTC(2026, 10, 3, 12),
+    covers: [{ name: 'Tali', label: 'Tali' }],
+    peopleAtSave: 4,
+  },
+  missing: { ids: [{ name: 'macbook-agent-1', label: 'MacBook' }], people: 2 },
 };
 const ANSWERS: Record<string, unknown> = {
   '/api/ui/backup': KIT,
@@ -205,7 +213,18 @@ describe('Settings home', () => {
   });
 
   it('puts one notice on top by priority: no kit, then out of date, then Touch ID', async () => {
-    await mount(answerFrom({ ...ANSWERS, '/api/ui/backup': { lastKit: null, missing: {} } }));
+    await mount(
+      answerFrom({
+        ...ANSWERS,
+        '/api/ui/backup': {
+          export: 'available',
+          record: 'none',
+          state: 'none',
+          lastKit: null,
+          missing: null,
+        },
+      }),
+    );
     expect(host.querySelectorAll('section.al-notice, section.set-notice')).toHaveLength(1);
     expect(host.textContent).toContain(S.notice.noKitTitle);
     expect(host.querySelector('section.set-notice a.al-btn-primary')?.textContent).toBe(
@@ -223,7 +242,7 @@ describe('Settings home', () => {
     await mount(
       answerFrom({
         ...ANSWERS,
-        '/api/ui/backup': { lastKit: KIT.lastKit, missing: { ids: [], people: 0 } },
+        '/api/ui/backup': { ...KIT, state: 'backed_up', missing: { ids: [], people: 0 } },
       }),
       false,
     );
@@ -283,10 +302,23 @@ describe('the two-pane frame', () => {
 });
 
 describe('the kit record read', () => {
-  it('needs the lastKit key; a bad shape is unknown, not a guess', () => {
+  it('reads the R2 record; a bad shape or an unreadable record is unknown, not a guess', () => {
     expect(parseBackup({ export: 'available' })).toBeUndefined();
     expect(parseBackup({ lastKit: 'x' })).toBeUndefined();
-    expect(parseBackup({ lastKit: null })).toEqual({ kind: 'none' });
+    expect(parseBackup({ ...KIT, record: 'unreadable', state: 'unknown' })).toBeUndefined();
+    expect(parseBackup({ ...KIT, lastKit: { at: 'x', covers: [] } })).toBeUndefined();
+    expect(
+      parseBackup({ export: 'available', record: 'none', state: 'none', lastKit: null }),
+    ).toEqual({ kind: 'none' });
+    // `covers` and `missing.ids` are {name, label} objects (WP-R2).
+    expect(parseBackup(KIT)).toEqual({
+      kind: 'saved',
+      at: KIT.lastKit.at,
+      covers: ['Tali'],
+      stale: true,
+      missingIds: 1,
+      missingPeople: 2,
+    });
   });
 });
 

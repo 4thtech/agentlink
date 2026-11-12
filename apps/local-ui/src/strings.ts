@@ -76,7 +76,6 @@ export const PAGE_TITLES = {
   messages: 'Messages',
   contacts: 'People',
   agents: 'My IDs',
-  touchId: 'Touch ID & master code',
   apps: 'AI apps',
   files: 'Files',
   storage: 'Storage',
@@ -87,7 +86,8 @@ export const PAGE_TITLES = {
   advanced: 'Advanced',
   about: 'About',
   // W4-SHELL: the Settings and Advanced entries (b11 §34.6); the pages keep their own headings.
-  backupTouchId: 'Backup & Touch ID',
+  // WP-R4: Touch ID has its own page (WP-S2), so this entry is Backup & restore.
+  backupTouchId: 'Backup & restore',
   touchId: 'Touch ID & master code',
   defaultRules: 'Default rules',
   notifications: 'Notifications',

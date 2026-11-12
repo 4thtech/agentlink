@@ -48,6 +48,8 @@ const ENTRIES: ActivityEntry[] = [
     at: 1_760_000_500,
     approvalId: APPROVAL_ID,
     decision: 'approved_by_rules',
+    // WP-A1: what it was about (null when the stored action does not pass the schema).
+    action: null,
   },
   {
     kind: 'proof',

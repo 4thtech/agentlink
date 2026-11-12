@@ -64,7 +64,7 @@ export const FIRST_RUN = {
   backupBody: (sensor: string): string =>
     `Your master code approves changes when ${sensor} isn't available and unlocks your AgentLink key. Save it once. We can't recover it for you. Never give it to your AI.`,
   backupLost:
-    "Lost it? You can't get this code back. Save a recovery kit too: restoring from it arrives in the next update.",
+    "Lost it? You can't get this code back. Save a recovery kit too: it gets AgentLink back on any computer.",
   saveToManager: 'Save in my password manager',
   saveAsked: 'If your browser or password manager offered to save it, accept there.',
   savedAs: 'Saved as',

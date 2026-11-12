@@ -5,6 +5,8 @@
 import type { ApiResult } from '../../api/client.js';
 import { HEALTH_PATH, parseHealth } from '../../layout/health.js';
 import { parseApps, type AppsList } from '../apps/data.js';
+import { parseKitStatus } from '../backup/status.js';
+import { setKitRecordState } from '../../states/recovery-kit.js';
 import { LIST_PATH as FILES_PATH, parseList as parseFolders } from '../files/data.js';
 import { parseInboxFolder, RECEIVED_PATH } from '../files/io-api.js';
 import { CREDITS_PATH, parseCredits, type CreditsAnswer } from '../proofs/data.js';
@@ -28,37 +30,31 @@ export type BackupState =
       readonly kind: 'saved';
       /** Milliseconds. */
       readonly at: number;
+      /** The covered IDs' names (the record's `covers` entries are `{name, label}`). */
       readonly covers: readonly string[];
+      /** The server's word: `out_of_date` when an ID or person joined since the kit was saved. */
+      readonly stale: boolean;
       readonly missingIds: number;
       readonly missingPeople: number;
     };
 
-const NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$/;
-
 /**
- * The kit record, when the server sends one (`{lastKit: {at, covers[]} | null, missing: {ids[],
- * people}}`, the Backup page's read). Without a `lastKit` key the app does not know: undefined.
+ * The kit record from `GET /api/ui/backup` (`{export, record, state, lastKit, missing}`; WP-R2), read
+ * through the Backup page's own strict parser so both pages agree. A record the app cannot read
+ * (`state: 'unknown'`) gives undefined: the row falls back to plain words and invents nothing.
  */
 export function parseBackup(data: unknown): BackupState | undefined {
-  if (!isObject(data) || !('lastKit' in data)) return undefined;
-  const kit = data['lastKit'];
-  if (kit === null) return { kind: 'none' };
-  if (!isObject(kit)) return undefined;
-  const rawAt = kit['at'];
-  let at: number | undefined;
-  if (typeof rawAt === 'number' && Number.isFinite(rawAt) && rawAt > 0) {
-    at = rawAt < 1e11 ? rawAt * 1000 : rawAt;
-  } else if (typeof rawAt === 'string' && !Number.isNaN(Date.parse(rawAt))) {
-    at = Date.parse(rawAt);
-  }
-  const covers = kit['covers'];
-  if (at === undefined || !Array.isArray(covers)) return undefined;
-  const names = covers.filter((n): n is string => typeof n === 'string' && NAME.test(n));
-  const missing = isObject(data['missing']) ? data['missing'] : {};
-  const ids = Array.isArray(missing['ids']) ? missing['ids'].length : 0;
-  const p = missing['people'];
-  const people = typeof p === 'number' && Number.isSafeInteger(p) && p >= 0 ? p : 0;
-  return { kind: 'saved', at, covers: names.slice(0, 6), missingIds: ids, missingPeople: people };
+  const k = parseKitStatus(data);
+  if (k.state === 'none') return { kind: 'none' };
+  if (k.state === 'unknown' || k.at === undefined) return undefined;
+  return {
+    kind: 'saved',
+    at: k.at,
+    covers: k.covers.slice(0, 6),
+    stale: k.state === 'out_of_date',
+    missingIds: k.missingIds.length,
+    missingPeople: k.missingPeople,
+  };
 }
 
 // --- Touch ID ------------------------------------------------------------------------------------
@@ -116,6 +112,11 @@ export async function readSettingsState(get: Get): Promise<SettingsState> {
   const out: { -readonly [K in keyof SettingsState]: SettingsState[K] } = {};
   const b = parseBackup(okData(backup));
   if (b !== undefined) out.backup = b;
+  // WP-R4: the server's record is what the kit reminder (Home, first run) reads from now on.
+  if (backup.kind === 'ok') {
+    const k = parseKitStatus(backup.data).state;
+    setKitRecordState(k === 'unknown' ? undefined : k);
+  }
   const t = parseTouchId(owner);
   if (t !== undefined) out.touchId = t;
   const r = parseRules(okData(rules));

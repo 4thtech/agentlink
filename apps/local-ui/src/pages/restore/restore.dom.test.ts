@@ -12,7 +12,7 @@ import type { RestoreApi, Summary } from './api.js';
 import { clean, toGroups } from './code-field.js';
 import { createSetupApi } from '../first-run/setup-api.js';
 import { createRestoreApi } from './api.js';
-import { RestoreWizard } from './index.js';
+import { RestoreWizard, type RestoreWizardProps } from './index.js';
 import { setFinishRestore, setOutcome } from './outcome.js';
 import * as S from './strings.js';
 
@@ -154,7 +154,7 @@ async function mount(
   const left: string[] = [];
   await act(async () => {
     root.render(
-      h(RestoreWizard, {
+      h<RestoreWizardProps>(RestoreWizard, {
         api,
         appsApi: appsApi(),
         owner: owner(),
@@ -626,7 +626,7 @@ describe('copy and accessibility', () => {
 
 describe('round 2: busy, finish restoring, per-ID failure', () => {
   it('busy shows a calm sentence and Continue is off while a request is in flight', async () => {
-    let release: (v: unknown) => void = () => undefined;
+    let release: (v: Awaited<ReturnType<RestoreApi['header']>>) => void = () => undefined;
     const api = fakeApi({
       header: () => new Promise((r) => (release = r)) as ReturnType<RestoreApi['header']>,
     });

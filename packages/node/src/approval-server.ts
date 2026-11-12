@@ -436,9 +436,10 @@ const REVIEW_ITEM = /^(apr_[A-Za-z0-9_-]{22}):([0-9a-f]{64}):([ad])$/;
  * `/agents/<name>`), `/activity` (and `/activity/live`), `/advanced/<page>`, and the Get started
  * steps `/start/<step>`; one lower-case segment each, nothing deeper. UX1113-R3 (D-147): the
  * restore wizard's three pages, `/restore/kit`, `/restore/check` and `/restore/move`, exactly.
+ * WP-N1 (design-1112 §2.2): People's own path `/people` and My IDs' `/ids` (and one ID, `/ids/<name>`).
  */
 const APP_PAGE =
-  /^\/(?:first-run|inbox|contacts|start(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|agents(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|activity(?:\/live)?|restore\/(?:kit|check|move)|advanced(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|settings(?:\/[a-z0-9]+(?:-[a-z0-9]+)*){0,4})$/;
+  /^\/(?:first-run|inbox|contacts|start(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|people|(?:agents|ids)(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|activity(?:\/live)?|restore\/(?:kit|check|move)|advanced(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|settings(?:\/[a-z0-9]+(?:-[a-z0-9]+)*){0,4})$/;
 const ASSETS_PREFIX = '/assets/';
 /** One file name: no separator, no leading dot, no escape. */
 const ASSET_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;

@@ -54,7 +54,7 @@ describe('restore from a recovery kit', () => {
 
     // Ana saves a recovery kit (Settings › Backup & restore) and writes the recovery code down.
     await a.page.goto(new URL('/settings/backup', a.page.url()).toString());
-    await a.page.getByRole('button', { name: 'Save recovery kit' }).first().click();
+    await a.page.getByRole('button', { name: 'Save a recovery kit' }).first().click();
     const confirm = a.page.getByRole('button', { name: CONFIRM_PASSKEY });
     const code = a.page.getByRole('region', { name: 'Your recovery code' });
     await confirm.or(code).first().waitFor({ timeout: 30_000 });
@@ -62,7 +62,14 @@ describe('restore from a recovery kit', () => {
     await code.waitFor({ timeout: 30_000 });
     const recoveryCode = (await code.locator('[data-recovery-code] span').allInnerTexts()).join('');
     expect(recoveryCode).toMatch(/^[A-Z0-9]{24}$/);
-    await a.page.getByRole('button', { name: 'I saved it' }).click();
+    // WP-R4: the three-step checklist; Check runs the restore engine's check on the saved kit.
+    await a.page
+      .getByRole('checkbox', { name: 'Done: Move the kit file off this computer' })
+      .check();
+    await a.page.getByRole('checkbox', { name: 'Done: Write down the recovery code' }).check();
+    await a.page.getByRole('button', { name: 'Check now' }).click();
+    await a.page.getByText('This kit opens.').waitFor({ timeout: 30_000 });
+    await a.page.getByRole('button', { name: 'Done', exact: true }).click();
     const kit = findKit(pcA.home);
     expect(kit, 'the kit file was written into the temp home').toBeDefined();
 

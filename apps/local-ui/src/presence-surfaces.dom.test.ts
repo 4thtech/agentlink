@@ -391,7 +391,7 @@ const SURFACES: readonly Surface[] = [
         createElement(TouchIdPage, {
           api,
           platform: 'mac',
-          passkeyStatus: () => Promise.resolve({ kind: 'ready', info: PASSKEY }),
+          passkeyStatus: () => Promise.resolve({ kind: 'ready' as const, info: PASSKEY }),
           passkeyProof: gesture(gestures),
         }),
       );

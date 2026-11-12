@@ -107,7 +107,9 @@ describe('chapter 7: advanced', () => {
     expect(await text(page)).not.toMatch(/wss?:\/\//);
 
     await sections(page).getByRole('link', { name: 'Connections map' }).click();
-    await page.getByText('Coming next').first().waitFor();
+    // UX1113-QA-UTH: the live Connections map, not a "Coming next" stub.
+    await page.getByRole('heading', { name: 'Connections map', level: 1 }).waitFor();
+    expect(await text(page)).not.toContain('Coming next');
 
     // Diagnostics: the report copies, and says what it holds.
     await jp.context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => undefined);

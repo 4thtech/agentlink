@@ -59,7 +59,7 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/people', 'People', 'People'],
   ['/contacts', 'People', 'People'],
   ['/settings', 'Settings', 'Settings'],
-  ['/settings/backup', 'Backup & Touch ID', 'Settings'],
+  ['/settings/backup', 'Backup & restore', 'Settings'],
   // UX1113 WP-S2: the title carries the sensor's word for the platform the test runs on.
   [
     '/settings/touch-id',
@@ -152,7 +152,6 @@ describe('routes', () => {
     ['/settings/agents', '/agents'],
     ['/settings/activity', '/activity'],
     ['/settings/advanced', '/advanced/network'],
-    ['/settings/touch-id', '/settings/backup'],
     ['/settings/about', '/advanced/diagnostics'],
     ['/settings/messages', '/'],
     ['/inbox', '/'],
@@ -187,7 +186,7 @@ describe('the sections (nav.ts)', () => {
 
   it('Settings (A9) in order, ending with Advanced', () => {
     expect(SETTINGS_PAGES.map((p) => p.label)).toEqual([
-      'Backup & Touch ID',
+      'Backup & restore',
       'Touch ID & master code',
       'AI apps',
       'Files folder',
@@ -260,7 +259,7 @@ describe('the sections (nav.ts)', () => {
       history.pushState(null, '', '/settings/backup');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    expect(host.querySelector('main h1')?.textContent).toBe('Backup & Touch ID');
+    expect(host.querySelector('main h1')?.textContent).toBe('Backup & restore');
   });
 });
 

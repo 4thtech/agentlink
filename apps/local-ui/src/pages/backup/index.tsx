@@ -17,7 +17,7 @@ export const RESTORE_PATH = '/restore/kit';
 export const RESTORE_CHECK_PATH = '/restore/check';
 export const RESTORE_MOVE_PATH = '/restore/move';
 
-export type BackupPageProps = Pick<ExportKitProps, 'api' | 'passkey' | 'checkPath' | 'openWindow'>;
+export type BackupPageProps = Pick<ExportKitProps, 'api' | 'passkey' | 'checkKit' | 'openWindow'>;
 
 function useKitStatus(api: ApiClient): { status: KitStatus | undefined; reload: () => void } {
   const [status, setStatus] = useState<KitStatus | undefined>(undefined);

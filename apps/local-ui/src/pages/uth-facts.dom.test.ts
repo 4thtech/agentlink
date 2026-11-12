@@ -8,7 +8,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiResult } from '../api/client.js';
 import { createAgentsApi } from './agents/api.js';
-import { AgentsPage } from './agents/index.js';
+import { AgentsPage, type AgentsPageProps } from './agents/index.js';
 import { tildePath } from './apps/tilde.js';
 import { resetAgentsCacheForTests } from './agents/use-agents.js';
 import { AdvancedPage } from './advanced/index.js';
@@ -87,7 +87,7 @@ async function mount(page: ReactElement, hood: boolean): Promise<void> {
 
 describe('My IDs: folder name (Under the hood only)', () => {
   const page = (): ReactElement =>
-    createElement(AgentsPage, {
+    createElement<AgentsPageProps>(AgentsPage, {
       api: createAgentsApi({ fetch: fetchFn, token: 't' }),
       owner: createOwnerClient({ fetch: fetchFn, token: 't' }),
       fetch: fetchFn,

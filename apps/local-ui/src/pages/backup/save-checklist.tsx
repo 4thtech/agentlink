@@ -4,21 +4,52 @@
 import { Button, Icon } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { ApiClient } from '../../api/client.js';
+import { createRestoreApi, RESTORE_BASE } from '../restore/api.js';
 import { printSheet, type SheetFacts } from './print-sheet.js';
 import { BACKUP_STRINGS as S } from './strings.js';
 
 export const BACKUP_REVEAL_PATH = '/api/ui/backup/reveal';
 /**
- * Check my kit's route (WP-R1/R3). Not registered yet: until it is, the check step is disabled with a
- * plain note and the page cannot be finished. Set it when the route lands (or pass `checkPath`).
+ * Check my kit's route: R1's restore `check` (04 §2.3.3 "Check that my kit opens"). The export answer
+ * carries `check`, a one-use handle the restore engine bound to this page session; the recovery code
+ * goes as the body (never JSON, never a query) and the engine opens the kit read-only.
  */
-export const BACKUP_CHECK_PATH: string | undefined = undefined;
+export const BACKUP_CHECK_PATH = `${RESTORE_BASE}/check`;
+
+/** What a check said: it opens, that code does not open it, or no answer. */
+export type CheckOutcome = 'ok' | 'wrong' | 'failed';
+/** Checks the just-saved kit by its handle with its code. Tests inject their own. */
+export type CheckKit = (handle: string, code: string) => Promise<CheckOutcome>;
+
+const WRONG: ReadonlySet<string> = new Set([
+  'wrong_code',
+  'damaged',
+  'not_a_kit',
+  'other_owner',
+  'newer_version',
+]);
+
+/** The default check: through the restore wizard's own client, the code bytes wiped after. */
+export const checkWithRestore: CheckKit = async (handle, code) => {
+  const bytes = new TextEncoder().encode(code.replace(/-/g, ''));
+  try {
+    const r = await createRestoreApi().check(handle, bytes);
+    if (r.kind === 'ok') return 'ok';
+    return WRONG.has(r.problem) ? 'wrong' : 'failed';
+  } catch {
+    return 'failed';
+  } finally {
+    bytes.fill(0);
+  }
+};
 
 export interface SaveChecklistProps {
   readonly api: ApiClient;
   readonly facts: SheetFacts;
+  /** The export's one-use Check handle; without one the check step is disabled with a note. */
   readonly check?: string | undefined;
-  readonly checkPath?: string | undefined;
+  /** How the kit is checked (default: R1's restore check route); `null` turns the step off. */
+  readonly checkKit?: CheckKit | null | undefined;
   readonly copied: boolean;
   readonly onCopy: () => void;
   readonly onDone: () => void;
@@ -32,7 +63,7 @@ export function SaveChecklist({
   api,
   facts,
   check,
-  checkPath = BACKUP_CHECK_PATH,
+  checkKit = checkWithRestore,
   copied,
   onCopy,
   onDone,
@@ -42,7 +73,7 @@ export function SaveChecklist({
   const [written, setWritten] = useState(false);
   const [checked, setChecked] = useState<CheckState>('idle');
   const [note, setNote] = useState<string | undefined>(undefined);
-  const canCheck = checkPath !== undefined && check !== undefined;
+  const canCheck = checkKit !== null && check !== undefined;
 
   const reveal = (): void => {
     setNote(undefined);
@@ -58,18 +89,10 @@ export function SaveChecklist({
     if (!printSheet(facts, open)) setNote(S.printBlocked);
   };
   const runCheck = (): void => {
-    if (checkPath === undefined || check === undefined) return;
+    if (checkKit === null || check === undefined) return;
     setChecked('working');
     setNote(undefined);
-    void api.post(checkPath, { check }).then(
-      (r) => {
-        if (r.kind === 'ok') setChecked('ok');
-        else if (r.kind === 'error' && (r.status === 400 || r.status === 403 || r.status === 409)) {
-          setChecked('wrong');
-        } else setChecked('failed');
-      },
-      () => setChecked('failed'),
-    );
+    void checkKit(check, facts.code).then(setChecked, () => setChecked('failed'));
   };
 
   const allTicked = moved && written && checked === 'ok';

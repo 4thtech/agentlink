@@ -64,7 +64,7 @@ export function lineFor(
       if (b.kind === 'none') {
         return { line: S.backup.none, state: S.backup.notBackedUp, tone: 'warn' };
       }
-      const stale = b.missingIds > 0 || b.missingPeople > 0;
+      const stale = b.stale;
       return {
         line: S.backup.saved(DAY.format(b.at), b.covers.join(', ')),
         state: stale ? S.backup.outOfDate : S.backup.upToDate,
@@ -174,7 +174,7 @@ function KitNotice({ state }: { readonly state: SettingsState | undefined }): Re
       <KitCard title={S.notice.noKitTitle} line={S.notice.noKit} action={S.notice.noKitAction} />
     );
   }
-  if (b.missingIds === 0 && b.missingPeople === 0) return null;
+  if (!b.stale || (b.missingIds === 0 && b.missingPeople === 0)) return null;
   return (
     <KitCard
       title={S.notice.staleTitle(b.missingIds, b.missingPeople)}
@@ -231,8 +231,7 @@ export function SettingsPage({
     }))
     .filter((g) => g.rows.length > 0);
   const kit = state?.backup;
-  const kitNeedsOwner =
-    kit !== undefined && (kit.kind === 'none' || kit.missingIds + kit.missingPeople > 0);
+  const kitNeedsOwner = kit !== undefined && (kit.kind === 'none' || kit.stale);
   return (
     <div className="set-page">
       <div className="set-head">

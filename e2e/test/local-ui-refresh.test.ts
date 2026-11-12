@@ -53,12 +53,15 @@ const PAGES = [
   { path: '/activity', title: 'Activity' },
   // Interim: today's People page (U4 folds it into Home). W6-UI-POLISH: /inbox goes to Home.
   { path: '/contacts', title: 'People' },
+  // WP-N1: the new section paths are app pages too (a refresh or a deep link serves the shell).
+  { path: '/people', title: 'People' },
+  { path: '/ids', title: 'My IDs' },
   { path: '/settings/files', title: 'Files' },
   { path: '/settings/proofs', title: 'Proofs & credits' },
   { path: '/settings/rules', title: 'Rules' },
   { path: '/settings', title: 'Settings' },
   { path: '/activity/live', title: 'Live activity stream' },
-  { path: '/settings/backup', title: 'Backup & Touch ID' },
+  { path: '/settings/backup', title: 'Backup & restore' },
   { path: '/settings/apps', title: 'AI apps' },
   { path: '/settings/appearance', title: 'Appearance' },
   { path: '/advanced/network', title: 'Relays & network' },

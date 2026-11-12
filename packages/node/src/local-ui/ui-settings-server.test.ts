@@ -395,6 +395,13 @@ describe('the W4-SHELL-V2 pages are app pages (the shell is served)', () => {
       '/advanced/diagnostics',
       '/start/app',
       '/start/connect',
+      // WP-N1: People and My IDs; UX1113-R3: the restore wizard.
+      '/people',
+      '/ids',
+      '/ids/work',
+      '/restore/kit',
+      '/restore/check',
+      '/restore/move',
     ]) {
       const res = await send(h.port, path, { headers: { Cookie: h.cookie } });
       expect(res.status, path).toBe(200);
@@ -410,6 +417,11 @@ describe('the W4-SHELL-V2 pages are app pages (the shell is served)', () => {
       '/activity/other',
       '/advanced/a/b',
       '/start/a/b',
+      '/people/x',
+      '/ids/work/x',
+      '/ids/Work',
+      '/restore',
+      '/restore/other',
     ]) {
       const res = await send(h.port, path, { headers: { Cookie: h.cookie } });
       expect(res.status, path).toBe(404);

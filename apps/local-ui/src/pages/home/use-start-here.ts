@@ -11,7 +11,8 @@
 import { useReducedMotion } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createApiClient } from '../../api/client.js';
-import { recoveryKitPending } from '../../states/recovery-kit.js';
+import { recoveryKitPending, setKitRecordState } from '../../states/recovery-kit.js';
+import { parseKitStatus } from '../backup/status.js';
 import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
 import { passkeysAvailable } from '../first-run/passkey.js';
 import { createUpgradeApi } from '../first-run/setup-api.js';
@@ -88,6 +89,19 @@ const defaultReplied = (): Promise<boolean | undefined> => readReplied();
 
 const defaultKit = (): boolean => !recoveryKitPending();
 
+/**
+ * WP-R4: the kit step reads the server's kit record (GET /api/ui/backup), so every browser agrees;
+ * the browser's "Later" flag decides only while the record is unread or unreadable.
+ */
+async function defaultKitRead(): Promise<boolean> {
+  const r = await createApiClient().get<unknown>('/api/ui/backup');
+  if (r.kind === 'ok') {
+    const state = parseKitStatus(r.data).state;
+    setKitRecordState(state === 'unknown' ? undefined : state);
+  }
+  return defaultKit();
+}
+
 const HIDDEN: StartHereModel = { phase: 'hidden', view: null, announce: '', inviteDone: undefined };
 
 async function attempt<T>(read: (() => Promise<T> | T) | undefined): Promise<T | undefined> {
@@ -133,7 +147,7 @@ export function useStartHere(
         attempt(r.protect ?? defaultProtect),
         attempt(r.agent ?? defaultAgent),
         attempt(r.contacts ?? defaultContacts),
-        attempt(r.kitSaved ?? defaultKit),
+        attempt(r.kitSaved ?? defaultKitRead),
       ]);
       let sent: boolean | undefined;
       let replied: boolean | undefined;

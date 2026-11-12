@@ -436,14 +436,14 @@ describe('Agents, simple (A8)', () => {
     await mount();
     // WP-11: the open ID saves its recovery kit right here (no link away, no terminal command).
     await click(await inMore(card('default'), 'Back up'));
-    expect(button(card('default'), 'Save recovery kit')).toBeDefined();
+    expect(button(card('default'), 'Save a recovery kit')).toBeDefined();
     // Another ID is opened first: a kit is saved for the open ID.
     await click(await inMore(card('work'), 'Back up'));
     const panel = card('work').querySelector<HTMLElement>('[data-panel="backup"]')!;
     expect(plain(panel)).toContain('to save its recovery kit.');
     expect(button(panel, 'Open this ID')).toBeDefined();
     expect([...panel.querySelectorAll('button')].map((b) => b.textContent?.trim())).not.toContain(
-      'Save recovery kit',
+      'Save a recovery kit',
     );
     await click(await inMore(card('work'), 'Remove'));
     expect(plain(host)).toContain('Remove Work?');
