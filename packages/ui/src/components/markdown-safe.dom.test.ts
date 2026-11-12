@@ -201,11 +201,63 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
     md(`${'>'.repeat(5_000)} deep`);
     expect(host.querySelectorAll('blockquote').length).toBeLessThanOrEqual(8);
     expect(host.textContent).toContain('deep');
+    // 2000 levels written as indentation need about 4 MB, far over the 256 KB preview cap; the same
+    // 2000 levels fit on one line as list markers, and as quote-and-list pairs.
+    md(`${'- '.repeat(2_000)}deep list`);
+    expect(host.querySelectorAll('ul').length).toBeLessThanOrEqual(8);
+    expect(host.textContent).toContain('deep list');
+    md(`${'> - '.repeat(2_000)}deep mix`);
+    expect(host.querySelectorAll('ul, blockquote').length).toBeLessThanOrEqual(16);
+    expect(host.textContent).toContain('deep mix');
+    // Indented levels, as many as fit in a real file.
     const lines: string[] = [];
     for (let i = 0; i < 300; i += 1) lines.push(`${'  '.repeat(i)}- level ${String(i)}`);
     md(lines.join('\n'));
     expect(host.querySelectorAll('ul').length).toBeLessThanOrEqual(8);
     expect(host.textContent).toContain('level 299');
+  });
+
+  // IR-REL051-A34-1 (M1, M2, lows): every pathological 256 KB input renders in under 250 ms and
+  // under 50 000 elements; past the document budget the rest is plain text with a short note.
+  const K256 = 256 * 1024;
+  const fill = (unit: string): string => unit.repeat(Math.floor(K256 / unit.length));
+  const table = `| a | b |\n| - | - |\n${'| 1 | 2 |\n'.repeat(2_000)}\n`;
+  const BUDGET_CASES: Record<string, string> = {
+    'bare URL then punctuation': `http://x${'!'.repeat(K256)}a`,
+    'bare URL longer than the cap': `https://x.example/${'a'.repeat(K256)}`,
+    'repeated 2000-row tables': fill(table),
+    'empty fences': fill('```\n```\n'),
+    'open brackets then one close': `${'['.repeat(K256)}]`,
+    'open brackets with a close and no paren': fill('[a]x '),
+    'autolinks with spaces then one close': `${fill('<https://a ')}>`,
+    'list items': fill('- a\n'),
+    headings: fill('# h\n'),
+    paragraphs: fill('x\n\n'),
+    emphasis: fill('*a* '),
+    'code spans': fill('`a` '),
+    quotes: fill('> a\n\n'),
+    links: fill('[a](https://a.example) '),
+    images: fill('![a](https://a.example/i.png) '),
+  };
+  it.each(Object.keys(BUDGET_CASES))('%s: under 250 ms and 50 000 elements', (name) => {
+    const text = BUDGET_CASES[name] as string;
+    const start = performance.now();
+    md(text);
+    const took = performance.now() - start;
+    expect(took).toBeLessThan(250);
+    expect(host.querySelectorAll('*').length).toBeLessThan(50_000);
+    assertInert();
+  });
+
+  it('says when the rest is shown as plain text, and keeps that text', () => {
+    md(`${fill('- a\n')}\nLAST LINE`);
+    expect(host.textContent).toContain('The rest of this file is shown as plain text.');
+    expect(host.textContent).toContain('LAST LINE');
+  });
+
+  it('fills table rows only to their own cells', () => {
+    md('| a | b | c |\n| - | - | - |\n| 1 |\n| 1 | 2 | 3 |');
+    expect([...host.querySelectorAll('tbody tr')].map((r) => r.children.length)).toEqual([1, 3]);
   });
 
   it('renders pathological input quickly', () => {
@@ -253,6 +305,14 @@ describe('SafeCode: code, JSON and patches as text with line numbers (REL051-A34
     expect([...lines].map((l) => l.getAttribute('data-line'))).toEqual(['1', '2', '3']);
     expect(host.textContent).toContain('<script>x</script>');
     assertInert();
+  });
+
+  it('renders 256 KB of empty lines in under 250 ms and 50 000 elements', () => {
+    const start = performance.now();
+    act(() => root.render(h(SafeCode, { text: '\n'.repeat(256 * 1024), kind: 'text' })));
+    expect(performance.now() - start).toBeLessThan(250);
+    expect(host.querySelectorAll('*').length).toBeLessThan(50_000);
+    expect(host.textContent).toContain('The rest of this file is shown as plain text.');
   });
 
   it('marks added and removed lines of a patch', () => {

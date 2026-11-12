@@ -991,6 +991,22 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
     expect(document.querySelector<HTMLElement>('[role="dialog"]')).toBeNull();
   });
 
+  it('Copy all copies the text as shown, without hidden or direction characters', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel', clipboard: { writeText } });
+    await render({
+      ...planFiles('plan.md'),
+      [PREVIEW]: ok({ kind: 'markdown', size: 20, text: 'safe\u202Etxt\u200B.md\n' }),
+    });
+    await click(row('Denis'));
+    await click(byText('.hm-chip button', S.openFile));
+    const copy = [...document.querySelectorAll('[role="dialog"] button')].find(
+      (b) => b.textContent?.trim() === S.copyAll,
+    );
+    await click(copy);
+    expect(writeText).toHaveBeenCalledWith('safetxt.md\n');
+  });
+
   it('shows code with line numbers', async () => {
     vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
     await render(planFiles('main.ts'));
