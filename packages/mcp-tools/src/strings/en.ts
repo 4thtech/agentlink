@@ -51,9 +51,9 @@ export const en = {
   'chat.status.needs_setup.storage':
     "Your settings keep files in your own storage, which isn't connected yet: {url}.",
   'chat.status.needs_setup.keychain':
-    "AgentLink can't find a system keychain on this machine. Run `npx -y @4thtech-io/agentlink doctor` in a terminal to see how to fix it.",
+    "AgentLink can't find a system keychain on this machine. Open AgentLink on this computer and it will show you how to fix it.",
   'chat.status.needs_setup.keyLocked':
-    "AgentLink's key file is locked, so I can't use it yet. Run `npx -y @4thtech-io/agentlink doctor` in a terminal to see how to set up its unlock code.",
+    "AgentLink's key file is locked, so I can't use it yet. Open AgentLink on this computer and it will show you how to unlock it.",
   'chat.status.needs_credits':
     'Adding proof costs {fee} and your credits are at {balance}. Add credits: {url}. Messages and files stay free.',
 

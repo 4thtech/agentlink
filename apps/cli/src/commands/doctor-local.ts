@@ -1,8 +1,8 @@
 // R1: the local checks `agentlink doctor` adds (06 §8; plan "telemetry-free diagnostics"): why
 // AgentLink closed last time, a leftover app-host.json, half-removed IDs and AI-app entries that
 // start an ID that is gone. Everything is read-only and local; nothing is sent anywhere. What is
-// printed is fixed words, counts, an AI app's fixed display name and an ID folder name (06 §6 name
-// rule) - never a path, a token, a message or a label.
+// printed is fixed words, counts, an AI app's fixed display name and an ID's display name (sanitized to one line) - never a path,
+// a token or a message.
 import type { LocalUiAiApps } from '@4thtech-io/node';
 import { homedir } from 'node:os';
 import process from 'node:process';
@@ -36,8 +36,8 @@ export const DOCTOR_LOCAL_TEXT = Object.freeze({
   },
   halfRemoved: (count: number): string =>
     `Problem  ${String(count)} ${count === 1 ? 'ID was' : 'IDs were'} only half removed. Run \`agentlink\` to open AgentLink and finish removing ${count === 1 ? 'it' : 'them'}.`,
-  appMissingId: (app: string, id: string): string =>
-    `Problem  ${app} starts the ID "${id}", which isn't on this computer any more. Open AgentLink (run \`agentlink\`), go to AI apps and connect ${app} to another ID.`,
+  appMissingId: (app: string): string =>
+    `Problem  ${app} is connected to an ID that isn't on this computer any more. Open AgentLink (run \`agentlink\`), go to AI apps and connect ${app} to another ID.`,
 });
 
 /** The reasons that mean something went wrong, not that the person closed AgentLink. */
@@ -133,7 +133,7 @@ export async function localDoctorChecks(options: LocalChecksOptions = {}): Promi
         appsOf.set(id, [...(appsOf.get(id) ?? []), app.name]);
         continue;
       }
-      lines.push(DOCTOR_LOCAL_TEXT.appMissingId(app.name, id));
+      lines.push(DOCTOR_LOCAL_TEXT.appMissingId(app.name));
       problems += 1;
     }
     // The app's "Used by" shows the AI apps with a live session too (agent-peek); doctor agrees.

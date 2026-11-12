@@ -151,15 +151,15 @@ export const TEXT = Object.freeze({
   doctorRelays:
     '{count, plural, one {OK       Message network: 1 server for this ID} other {OK       Message network: # servers for this ID}}',
   get doctorNoRelays(): string {
-    return `Problem  This ID has no message network servers\n         Run \`${commandPrefix()} init\` again to set up this ID.`;
+    return `Problem  This ID has no message network servers\n         Open AgentLink to set up this ID again.`;
   },
   doctorSend: 'OK       This ID can send and sign',
   doctorSendBlocked:
     "Problem  This ID can't send or sign right now\n         Its identity is revoked, or a key change is unfinished.",
   get doctorPartial(): string {
-    return `Warning  Part of the message network did not answer\n         Run \`${commandPrefix()} doctor\` again, or check your connection.`;
+    return `Warning  Part of the message network did not answer\n         Check your connection and run \`${commandPrefix()} doctor\` again.`;
   },
-  doctorOpenFailed: "Problem  Couldn't open this ID\n         Check the folder under ~/.agentlink.",
+  doctorOpenFailed: "Problem  Couldn't open this ID\n         Open AgentLink to see what is wrong with it.",
   doctorNoAgent: 'Problem  {message}',
   doctorNoKeychain: 'Problem  {message}',
   doctorFix: '         {fix}',
