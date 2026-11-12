@@ -22,8 +22,14 @@ export function planFor(app, env = process.env, entitlements) {
   return macSignPlan({ app, files, bundles, mode, identity: env.CODESIGN_IDENTITY, entitlements });
 }
 
-export function signApp(app, env = process.env, entitlements) {
-  const plan = planFor(app, env, entitlements);
+/**
+ * Runs the plan. `skip`: targets already signed earlier (DESK051-C5: the presence helper is signed
+ * before app.asar is packed, because the ASAR records its hash; re-signing would change it).
+ */
+export function signApp(app, env = process.env, entitlements, { skip = new Set(), only } = {}) {
+  const plan = planFor(app, env, entitlements).filter(
+    (step) => !skip.has(step.target) && (only === undefined || only.has(step.target)),
+  );
   for (const step of plan) {
     const r = capture('codesign', [
       '--force',

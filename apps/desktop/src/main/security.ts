@@ -45,6 +45,9 @@ export const EXTERNAL_HOSTS: readonly string[] = [
   'sepolia.basescan.org',
 ];
 
+/** The only github.com path prefix a link may open (D15-11). */
+export const GITHUB_REPO_PATH = '/4thtech/agentlink';
+
 /** Where owner presence (passkey) may run, per platform (phase 1). */
 export type PasskeyPolicy = 'window' | 'browser';
 
@@ -171,7 +174,13 @@ export function isAllowedExternal(url: string): boolean {
   const parsed = parseUrl(url);
   if (parsed === null || parsed.protocol !== 'https:') return false;
   if (parsed.username !== '' || parsed.password !== '' || parsed.port !== '') return false;
-  return EXTERNAL_HOSTS.includes(parsed.hostname);
+  if (!EXTERNAL_HOSTS.includes(parsed.hostname)) return false;
+  // D15-11: on GitHub only this repository's pages (GitHub paths are case-insensitive).
+  if (parsed.hostname === 'github.com') {
+    const path = parsed.pathname.toLowerCase();
+    return path === GITHUB_REPO_PATH || path.startsWith(`${GITHUB_REPO_PATH}/`);
+  }
+  return true;
 }
 
 /** True when a request from the window may proceed (webRequest.onBeforeRequest). */

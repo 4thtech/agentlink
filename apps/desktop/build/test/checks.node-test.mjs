@@ -1,12 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { findPreviewString, PREVIEW_VAR } from '../lib/preview-check.mjs';
-import {
-  ENV_CASES,
-  EXTRA_CASES,
-  FORBIDDEN_SWITCHES,
-  runLockdown,
-} from '../lib/switch-check.mjs';
+import { ENV_CASES, EXTRA_CASES, FORBIDDEN_SWITCHES, runLockdown } from '../lib/switch-check.mjs';
 
 test('preview check flags the variable name anywhere in the content', () => {
   assert.equal(PREVIEW_VAR, 'AGENTLINK_DESKTOP_PREVIEW');
@@ -88,7 +83,8 @@ test('environment cases: ELECTRON_* and lowercase node_* are tried, never the fu
     launch: async (_e, _argv, env) => (envs.push(env ?? null), { code: 64, windowSeen: false }),
   });
   assert.equal(r.failures.length, 0);
-  for (const c of ENV_CASES) assert.ok(envs.some((e) => e && JSON.stringify(e) === JSON.stringify(c)));
+  for (const c of ENV_CASES)
+    assert.ok(envs.some((e) => e && JSON.stringify(e) === JSON.stringify(c)));
   const open = await runLockdown({
     exe: '/x',
     launch: async (_e, _argv, env) => ({ code: env ? 0 : 64, windowSeen: false }),

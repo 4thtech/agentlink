@@ -25,6 +25,8 @@ export interface App {
   getPath?(name: 'userData'): string;
   quit(): void;
   exit(code?: number): void;
+  /** D15-01: start an executable once this one exits (default: this app with its own arguments). */
+  relaunch?(options?: { execPath?: string; args?: string[] }): void;
   isInApplicationsFolder?(): boolean;
   moveToApplicationsFolder?(options?: {
     conflictHandler?: (conflictType: 'exists' | 'existsAndRunning') => boolean;

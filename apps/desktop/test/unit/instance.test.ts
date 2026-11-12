@@ -31,7 +31,9 @@ describe('forwardedBuild', () => {
     expect(forwardedBuild({ deepLink: null })).toBeNull();
     expect(forwardedBuild({ deepLink: null, build: { ...A, extra: 'x' } })).toBeNull();
     expect(forwardedBuild({ deepLink: null, build: { ...A, version: 5 } })).toBeNull();
-    expect(forwardedBuild({ deepLink: null, build: { ...A, execPath: 'x'.repeat(5000) } })).toBeNull();
+    expect(
+      forwardedBuild({ deepLink: null, build: { ...A, execPath: 'x'.repeat(5000) } }),
+    ).toBeNull();
     expect(forwardedBuild({ deepLink: null, build: Object.create(A) as unknown })).toBeNull();
     expect(forwardedBuild({ deepLink: null, build: A, argv: ['--inspect'] })).toBeNull();
     expect(forwardedBuild(null)).toBeNull();
@@ -48,7 +50,9 @@ describe('sameBuild', () => {
     expect(sameBuild(A, { ...A })).toBe(true);
     expect(sameBuild(A, B)).toBe(false);
     expect(sameBuild(A, { ...A, version: '0.5.2' })).toBe(false);
-    expect(sameBuild(A, { ...A, execPath: '/Users/x/Downloads/AgentLink.app/Contents/MacOS/AgentLink' })).toBe(false);
+    expect(
+      sameBuild(A, { ...A, execPath: '/Users/x/Downloads/AgentLink.app/Contents/MacOS/AgentLink' }),
+    ).toBe(false);
   });
 });
 
@@ -66,9 +70,9 @@ describe('the instance record', () => {
 describe('relaunchTarget', () => {
   it('accepts only the app executable of an AgentLink bundle (absolute, no ..)', () => {
     expect(relaunchTarget(A.execPath, 'darwin')).toBe(A.execPath);
-    expect(relaunchTarget('/Users/x/Downloads/AgentLink.app/Contents/MacOS/AgentLink', 'darwin')).toBe(
-      '/Users/x/Downloads/AgentLink.app/Contents/MacOS/AgentLink',
-    );
+    expect(
+      relaunchTarget('/Users/x/Downloads/AgentLink.app/Contents/MacOS/AgentLink', 'darwin'),
+    ).toBe('/Users/x/Downloads/AgentLink.app/Contents/MacOS/AgentLink');
     expect(relaunchTarget('/bin/sh', 'darwin')).toBeNull();
     expect(relaunchTarget('AgentLink.app/Contents/MacOS/AgentLink', 'darwin')).toBeNull();
     expect(relaunchTarget('/a/../AgentLink.app/Contents/MacOS/AgentLink', 'darwin')).toBeNull();

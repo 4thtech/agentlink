@@ -459,7 +459,10 @@ describe('single instance across builds (D15-01)', () => {
     const inst = new FakeInstance();
     const { electron, proc } = setup([], { instance: () => inst });
     await runShell(electron, proc);
-    electron.app.emit('second-instance', new FakeEvent(), [], '/', { deepLink: null, build: BUILD });
+    electron.app.emit('second-instance', new FakeEvent(), [], '/', {
+      deepLink: null,
+      build: BUILD,
+    });
     await tick();
     expect(electron.dialog.shown).toHaveLength(0);
     expect(electron.app.relaunches).toEqual([]);
@@ -582,7 +585,9 @@ describe('the session page goes away with its core (D15-12)', () => {
 
 describe('bundle tripwire (D15-07)', () => {
   it('changed bundled files → the fixed page, no core', async () => {
-    const { electron, children, proc } = setup([], { verifyBundle: () => Promise.resolve('changed') });
+    const { electron, children, proc } = setup([], {
+      verifyBundle: () => Promise.resolve('changed'),
+    });
     await runShell(electron, proc);
     expect(children).toHaveLength(0);
     expect(lastPage()).toBe(statusPageUrl('changed_files'));

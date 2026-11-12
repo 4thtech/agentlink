@@ -25,6 +25,7 @@ export const STATUS_KINDS = [
   'exited',
   'ai_app',
   'missing_files',
+  'changed_files',
 ] as const;
 export type StatusKind = (typeof STATUS_KINDS)[number];
 
@@ -73,6 +74,11 @@ export const STATUS_COPY: Readonly<Record<StatusKind, StatusCopy>> = Object.free
   missing_files: {
     heading: 'Some of AgentLink is missing',
     body: "Parts of the AgentLink app are missing, so it couldn't start. Install AgentLink again from agentlink.4thtech.io, then open it.",
+  },
+  // D15-07: the startup check found a bundled file that differs from the one this app was built with.
+  changed_files: {
+    heading: 'Some of AgentLink was changed',
+    body: "Parts of the AgentLink app were changed after it was built, so it didn't start. Install AgentLink again from agentlink.4thtech.io, then open it.",
   },
 });
 

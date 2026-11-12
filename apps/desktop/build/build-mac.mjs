@@ -5,9 +5,12 @@
 //
 // What it does (WP-D4; Decision 3 / H1):
 //   pinned Electron + Node fetched over plain HTTPS and hash-checked -> Electron.app renamed AgentLink.app
-//   -> app.asar from apps/desktop/dist (placeholder main if absent) -> official Node copied UNTOUCHED to
-//   Resources/node -> core tarball installed with --ignore-scripts -> fuses + ASAR integrity -> ad-hoc
-//   sign ONLY our bundle, Electron frameworks and helpers (never Resources/node) -> DMG + zip + SHA256SUMS.
+//   -> official Node copied UNTOUCHED to Resources/node -> presence helper placed and signed -> core
+//   tarball installed with --ignore-scripts -> app.asar from apps/desktop/dist (placeholder main if
+//   absent) with bundle-hashes.json (D15-07: SHA-256 of node, the core's desktop host and the signed
+//   helper, checked by the shell at start) -> fuses + ASAR integrity -> ad-hoc sign ONLY our bundle,
+//   Electron frameworks and helpers (never Resources/node; the helper is not re-signed) -> DMG + zip +
+//   SHA256SUMS.
 import {
   chmodSync,
   cpSync,
@@ -23,10 +26,12 @@ import { constants } from './lib/constants.mjs';
 import { BUILD_FUSES } from './lib/fuses.mjs';
 import { makeIcns } from './lib/icon.mjs';
 import { asarIntegrity, writeMacDigest } from './lib/integrity.mjs';
+import { BUNDLE_HASHES_FILE, bundleHashesJson } from './lib/bundle-hashes.mjs';
 import { describeSignature, planFor, signApp, verifyApp } from './lib/mac-sign.mjs';
 import { APP_NAME, infoPlist } from './lib/plist.mjs';
 import { parseArgs, run } from './lib/run.mjs';
 import { HELPER_APP, HELPER_ID, buildMacHelper, macHelperLayout } from './native.mjs';
+import { HELPER_BUNDLE_PATH, HELPER_PATH } from './lib/sign-plan.mjs';
 import {
   CACHE_DIR,
   DESKTOP_DIR,
@@ -81,24 +86,7 @@ rmSync(join(contents, 'Resources', 'default_app.asar'), { force: true });
 rmSync(join(contents, 'Resources', 'electron.icns'), { force: true });
 const iconSource = makeIcns(join(contents, 'Resources', `${APP_NAME}.icns`), work);
 
-console.log('[3/9] ASAR payload');
-const payload = buildPayload({
-  workDir: work,
-  version,
-  distDir: args['dist-dir'] ? resolve(args['dist-dir']) : undefined,
-});
-const asarPath = join(contents, 'Resources', 'app.asar');
-await packAsar(payload.dir, asarPath);
-await assertNoPreviewString(asarPath);
-const rootKeyMode = await assertPinnedRootKey(asarPath, process.env, args.updates ?? 'on');
-if (rootKeyMode === 'owner-local') {
-  console.log('NOTE: owner-local build without a pinned update root key. Never give it to anyone.');
-} else if (rootKeyMode === 'updates-off') {
-  console.log('NOTE: release build with updates off (no update root key in the app).');
-}
-const integrity = await asarIntegrity(asarPath);
-
-console.log('[4/9] bundled Node (official binary, left untouched)');
+console.log('[3/9] bundled Node (official binary, left untouched)');
 const nx = join(work, 'node-x');
 extract(rt.node, nx);
 const nodeSrc = join(nx, `node-v${constants.node.version}-${platform}`);
@@ -132,8 +120,17 @@ for (const part of [helperLayout.executable, helperLayout.infoPlist, helperLayou
   if (!existsSync(part)) throw new Error(`The presence helper app is incomplete: no ${part}.`);
 }
 chmodSync(presenceHelper, 0o755);
+// DESK051-C5: sign the helper now, with the same plan entries as step 7 (inside-out: executable,
+// then its bundle), so the hash recorded in app.asar is the shipped one. Step 7 skips these targets.
+const helperTargets = new Set([`${app}${HELPER_PATH}`, `${app}${HELPER_BUNDLE_PATH}`]);
+signHelper();
+function signHelper() {
+  const entitlementsFile = join(DESKTOP_DIR, 'assets', 'entitlements.mac.plist');
+  const done = signApp(app, process.env, entitlementsFile, { only: helperTargets });
+  if (done !== helperTargets.size) throw new Error('The presence helper was not signed.');
+}
 
-console.log('[5/9] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
+console.log('[4/9] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
 const core = installCore({
   tgz,
   dest: join(contents, 'Resources', ...LAYOUT.coreDir),
@@ -145,6 +142,29 @@ if (!existsSync(join(contents, 'Resources', ...LAYOUT.hostScript))) {
     `The core has no desktop host at Resources/${LAYOUT.hostScript.join('/')}: pack the CLI after \`pnpm --filter @4thtech-io/agentlink build\` (it builds dist/desktop-host.js).`,
   );
 }
+
+console.log('[5/9] ASAR payload (with bundle-hashes.json)');
+const payload = buildPayload({
+  workDir: work,
+  version,
+  distDir: args['dist-dir'] ? resolve(args['dist-dir']) : undefined,
+});
+const bundleHashes = {
+  node: await sha256Of(nodeBin),
+  host: await sha256Of(join(contents, 'Resources', ...LAYOUT.hostScript)),
+  helper: await sha256Of(presenceHelper),
+};
+writeFileSync(join(payload.dir, BUNDLE_HASHES_FILE), bundleHashesJson(bundleHashes));
+const asarPath = join(contents, 'Resources', 'app.asar');
+await packAsar(payload.dir, asarPath);
+await assertNoPreviewString(asarPath);
+const rootKeyMode = await assertPinnedRootKey(asarPath, process.env, args.updates ?? 'on');
+if (rootKeyMode === 'owner-local') {
+  console.log('NOTE: owner-local build without a pinned update root key. Never give it to anyone.');
+} else if (rootKeyMode === 'updates-off') {
+  console.log('NOTE: release build with updates off (no update root key in the app).');
+}
+const integrity = await asarIntegrity(asarPath);
 
 console.log('[6/9] Info.plist, fuses, ASAR integrity digest');
 writeFileSync(join(contents, 'Info.plist'), infoPlist({ version, asarHash: integrity.hash }));
@@ -168,8 +188,14 @@ const entitlements = join(DESKTOP_DIR, 'assets', 'entitlements.mac.plist'); // u
 mkdirSync(out, { recursive: true });
 const mode =
   planFor(app, process.env, entitlements).at(-1).identity === '-' ? 'ad-hoc' : 'developer-id';
-const signed = signApp(app, process.env, entitlements);
+const signed = signApp(app, process.env, entitlements, { skip: helperTargets });
 verifyApp(app);
+if ((await sha256Of(presenceHelper)) !== bundleHashes.helper) {
+  throw new Error('The presence helper changed after its hash was recorded in app.asar.');
+}
+if ((await sha256Of(nodeBin)) !== bundleHashes.node) {
+  throw new Error('The bundled node changed after its hash was recorded in app.asar.');
+}
 // The helper app keeps its fixed identity and its sealed Info.plist and icon (a strict verify fails
 // on any change to them after signing).
 if (describeSignature(helperLayout.bundle).identifier !== HELPER_ID) {
@@ -235,6 +261,7 @@ const inputs = {
     signature: nodeAfter,
   },
   presenceHelperSha256: await sha256Of(presenceHelper),
+  bundleHashes,
   presenceHelperInfoPlistSha256: await sha256Of(helperLayout.infoPlist),
   presenceHelperIconSha256: await sha256Of(helperLayout.icon),
   coreTgzSha256: await sha256Of(tgz),

@@ -4,7 +4,8 @@
 // 1. The launch lockdown (switches.ts) runs first: a forbidden switch, Node option or environment
 //    variable → exit LAUNCH_REFUSED_EXIT before the single-instance lock, any window or the core.
 // 2. The sandbox is enabled for every renderer; one instance only. A second launch forwards only its
-//    already-checked deep link (single-instance additionalData), never its raw argv.
+//    already-checked deep link and its build identity (single-instance additionalData), never its raw
+//    argv. A different build is never swallowed silently (instance.ts, D15-01).
 // 3. When ready: a packaged app refuses a translocated / read-only / temporary location (move.ts);
 //    the in-memory window session is hardened (security.ts); every webContents ever created is
 //    locked; the core desktop host starts under the supervisor (core-process.ts) with a clean env.
@@ -22,14 +23,37 @@
 //
 // The shell holds no key, no store and signs nothing (phases 1–2). Nothing here logs. The Electron
 // entry point is entry.ts (it imports the `electron` module; this file takes it by injection).
-import { accessSync, constants as fsConstants, existsSync } from 'node:fs';
-import { spawn as nodeSpawn } from 'node:child_process';
+import {
+  accessSync,
+  constants as fsConstants,
+  existsSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { spawn as nodeSpawn, spawnSync } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { BUNDLE_HASHES_FILE, bundleFilePaths, verifyBundle } from './bundle-check.js';
 import { CoreLog, logDir } from './core-log.js';
 import { CoreSupervisor, aiAppMarkerSet, type SpawnFn, type Timers } from './core-process.js';
 import { INVITE_RESULT_TITLE, inviteResultCopy, toInviteLink } from './deep-link.js';
-import type { ElectronModule } from './electron-api.js';
+import type { App, ElectronModule } from './electron-api.js';
+import {
+  INSTANCE_FILE,
+  forwardedBuild,
+  instanceRecord,
+  lockData,
+  parseInstanceRecord,
+  relaunchTarget,
+  runningDialog,
+  sameBuild,
+  secondLaunch,
+  type BuildIdentity,
+  type InstanceOps,
+} from './instance.js';
 import { ensureGoodLocation } from './move.js';
 import RESOURCE_LAYOUT from '../shared/resource-layout.json' with { type: 'json' };
 import { OriginLock, WINDOW_PARTITION, hardenSession, lockWebContents } from './security.js';
@@ -131,6 +155,10 @@ export interface ShellProcess {
   readonly logDir: string;
   /** WP-D10: starts the phase-1 update checks (packaged release builds only). Absent: none. */
   readonly startUpdates?: (electron: ElectronModule) => void;
+  /** D15-01: this build's identity and the running-copy record (instance.ts). Absent: legacy lock. */
+  readonly instance?: (app: App) => InstanceOps;
+  /** D15-07: the startup tripwire for the bundled files (bundle-check.ts). Absent: not checked. */
+  readonly verifyBundle?: () => Promise<'ok' | 'changed' | 'unchecked'>;
 }
 
 export type ShellOutcome = 'refused' | 'second-instance' | 'location' | 'running';
@@ -164,10 +192,40 @@ export async function runShell(
 
   // 2. Sandbox for every renderer; one instance.
   app.enableSandbox();
-  if (!app.requestSingleInstanceLock({ deepLink: launch.deepLink })) {
+  let instance: InstanceOps | null = null;
+  try {
+    instance = proc.instance?.(app) ?? null;
+  } catch {
+    instance = null;
+  }
+  const lockPayload =
+    instance === null ? { deepLink: launch.deepLink } : lockData(launch.deepLink, instance.build);
+  if (!app.requestSingleInstanceLock(lockPayload)) {
+    // D15-01: never a silent exit when the running copy cannot answer for itself.
+    if (instance !== null) {
+      await secondLaunch(app, electron.dialog, instance, proc.platform).catch(() => undefined);
+    }
     app.exit(0);
     return 'second-instance';
   }
+  const ownRecord = instance === null ? null : instanceRecord(instance.pid, instance.build);
+  const writeRecord = (): void => {
+    try {
+      if (instance !== null && ownRecord !== null) instance.write(ownRecord);
+    } catch {
+      // Without the record a later build tells the person "older copy" instead; nothing breaks.
+    }
+  };
+  const removeRecord = (): void => {
+    try {
+      if (instance !== null && parseInstanceRecord(instance.read())?.pid === instance.pid) {
+        instance.remove();
+      }
+    } catch {
+      // Best effort.
+    }
+  };
+  writeRecord();
 
   const lock = new OriginLock();
   let quitting = false;
@@ -215,12 +273,40 @@ export async function runShell(
     if (shown && window?.loaded === true) return;
     supervisor?.send({ v: 1, type: 'show', route: 'home' });
   };
+  // D15-01: another build was opened while this one runs. Fixed dialog (one at a time); "Quit and
+  // switch" relaunches that copy (an AgentLink app executable only) with the forwarded deep link.
+  let switchDialogOpen = false;
+  const offerSwitch = (mine: BuildIdentity, theirs: BuildIdentity, link: string | null): void => {
+    if (switchDialogOpen) return;
+    switchDialogOpen = true;
+    void electron.dialog
+      .showMessageBox(runningDialog(mine, theirs, proc.platform))
+      .then(({ response }) => {
+        const target = relaunchTarget(theirs.execPath, proc.platform);
+        if (response === 0 && target !== null && proc.exists(target) && app.relaunch) {
+          app.relaunch({ execPath: target, args: link === null ? [] : ['--', link] });
+          app.quit();
+          return;
+        }
+        if (link !== null) handleDeepLink(link);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        switchDialogOpen = false;
+      });
+  };
 
   app.on('web-contents-created', (_event, contents) =>
     lockWebContents(contents, lock, electron.shell),
   );
   app.on('second-instance', (_event, _argv, _cwd, additionalData) => {
     const link = forwardedDeepLink(additionalData);
+    const theirs = instance === null ? null : forwardedBuild(additionalData);
+    if (instance !== null && theirs !== null && !sameBuild(theirs, instance.build)) {
+      showWindow();
+      offerSwitch(instance.build, theirs, link);
+      return;
+    }
     if (link !== null) handleDeepLink(link);
     showWindow();
   });
@@ -243,6 +329,7 @@ export async function runShell(
     event.preventDefault();
     const stop = supervisor?.stop() ?? Promise.resolve();
     void stop.then(() => {
+      removeRecord();
       tray?.destroy();
       window?.destroy();
       app.quit();
@@ -265,6 +352,7 @@ export async function runShell(
     );
     if (outcome !== 'ok') {
       quitting = true;
+      removeRecord();
       app.exit(0);
       return 'location';
     }
@@ -329,6 +417,9 @@ export async function runShell(
       const how =
         signal !== null ? `signal ${signal.replace(/[^A-Z0-9]/g, '')}` : `code ${String(code)}`;
       coreLog.note(`core exited (${how})`);
+      // D15-12: the session page's server is gone; never leave that page up while nothing (or
+      // something else) answers on its port until the next start.
+      if (!quitting && window?.page === 'session') window.showStatus('starting');
     },
     onMessage: (message) => {
       switch (message.type) {
@@ -373,22 +464,44 @@ export async function runShell(
     if (!proc.exists(nodePath) || !proc.exists(hostScript)) return 'missing_files';
     return null;
   };
-  const startCore = (): void => {
-    const blocked = precheck();
-    if (blocked !== null) {
-      tray?.update('failed', approvals);
-      window?.showStatus(blocked);
-      return;
-    }
-    window?.showStatus('starting');
+  const blocked = (kind: 'ai_app' | 'missing_files' | 'changed_files'): void => {
+    tray?.update('failed', approvals);
+    window?.showStatus(kind);
+  };
+  const launchCore = (): void => {
     if (supervisor?.state === 'failed') supervisor.retry();
     else supervisor?.start();
   };
+  // D15-07: the tripwire runs before every core start (packaged release builds; a preview runs a
+  // development core). While it runs the window shows the starting page.
+  let verifying = false;
+  const startCore = (): Promise<void> | undefined => {
+    const problem = precheck();
+    if (problem !== null) {
+      blocked(problem);
+      return undefined;
+    }
+    window?.showStatus('starting');
+    const verify = preview === null ? proc.verifyBundle : undefined;
+    if (verify === undefined) {
+      launchCore();
+      return undefined;
+    }
+    verifying = true;
+    return verify()
+      .catch((): 'changed' => 'changed')
+      .then((result) => {
+        verifying = false;
+        if (quitting) return;
+        if (result === 'changed') blocked('changed_files');
+        else launchCore();
+      });
+  };
   const tryAgain = (): void => {
-    if (quitting) return;
+    if (quitting || verifying) return;
     const state = supervisor?.state;
     // Only when nothing is running (failed, or never started because of a check).
-    if (state === 'failed' || state === 'idle') startCore();
+    if (state === 'failed' || state === 'idle') void startCore();
   };
   onStatusAction = (action) => {
     if (action === 'try-again') {
@@ -399,7 +512,7 @@ export async function runShell(
     coreLog.ensureDir();
     void electron.shell.openPath(proc.logDir).catch(() => undefined);
   };
-  startCore();
+  await startCore();
   if (launch.deepLink !== null) handleDeepLink(launch.deepLink);
   if (app.isPackaged && preview === null) proc.startUpdates?.(electron);
   return 'running';
@@ -437,6 +550,93 @@ export function realProcess(): ShellProcess {
     toInviteLink,
     logDir: logDir(proc.platform, homedir(), proc.env),
     startUpdates: (electron) => startUpdates(electron, proc.platform, proc.arch),
+    instance: (app) => realInstanceOps(app, proc.platform, proc.execPath, proc.resourcesPath ?? ''),
+    verifyBundle: () => {
+      const resources = proc.resourcesPath ?? '';
+      let record: string | null;
+      try {
+        // Inside app.asar (Electron reads ASAR paths; ASAR integrity covers the record).
+        record = readFileSync(join(resources, 'app.asar', BUNDLE_HASHES_FILE), 'utf8');
+      } catch {
+        record = null;
+      }
+      return verifyBundle(record, bundleFilePaths(resources, proc.platform));
+    },
+  };
+}
+
+/** `<size>-<mtimeMs>-<ino>` of a file, or '' (D15-01 build stamp). */
+function fileStamp(path: string): string {
+  try {
+    const s = statSync(path);
+    return `${String(s.size)}-${String(Math.trunc(s.mtimeMs))}-${String(s.ino)}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * D15-01: the real instance record (user-data folder), lock owner (Chromium's SingletonLock link,
+ * `<host>-<pid>`, macOS and Linux) and quit request. The stamp is the bundle's Info.plist on macOS
+ * (outside app.asar; a replaced app has a new one) and the executable on Windows.
+ */
+function realInstanceOps(
+  app: App,
+  platform: string,
+  execPath: string,
+  resourcesPath: string,
+): InstanceOps {
+  const userData = app.getPath?.('userData') ?? '';
+  const file = join(userData, INSTANCE_FILE);
+  const stampOf = platform === 'darwin' ? join(resourcesPath, '..', 'Info.plist') : execPath;
+  const alive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === 'EPERM';
+    }
+  };
+  return {
+    build: { version: app.getVersion?.() ?? '', execPath, stamp: fileStamp(stampOf) },
+    pid: process.pid,
+    read: () => {
+      try {
+        return readFileSync(file, 'utf8');
+      } catch {
+        return null;
+      }
+    },
+    write: (text) => writeFileSync(file, text, { mode: 0o600 }),
+    remove: () => rmSync(file, { force: true }),
+    lockOwner: () => {
+      if (platform === 'win32' || userData === '') return null;
+      try {
+        const m = /-(\d{1,10})$/.exec(readlinkSync(join(userData, 'SingletonLock')));
+        return m === null ? null : Number(m[1]);
+      } catch {
+        return null;
+      }
+    },
+    alive,
+    askToQuit: (pid) => {
+      if (platform !== 'darwin') return false;
+      // Only an AgentLink app executable (any copy), never another program that reused the pid.
+      const ps = spawnSync('/bin/ps', ['-p', String(pid), '-o', 'comm='], {
+        encoding: 'utf8',
+        timeout: 5_000,
+      });
+      const comm = typeof ps.stdout === 'string' ? ps.stdout.trim() : '';
+      if (ps.status !== 0 || relaunchTarget(comm, platform) === null) return false;
+      try {
+        // Electron quits normally on SIGTERM (its before-quit stops the core first).
+        process.kill(pid, 'SIGTERM');
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   };
 }
 

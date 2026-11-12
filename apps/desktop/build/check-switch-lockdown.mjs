@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// CI-side launch test (H1): launches the BUILT binary once per forbidden switch and expects a quick
-// non-zero exit (so no window ever stays up). A process still running after the timeout is killed
+// CI-side launch test (H1): launches the BUILT binary once per forbidden switch and per forbidden
+// environment variable (D15-05, lib/switch-check.mjs ENV_CASES) and expects a quick non-zero exit (so
+// no window ever stays up). A process still running after the timeout is killed
 // and counts as a failure. Runs with a throw-away HOME, never a real profile.
 //
 //   node check-switch-lockdown.mjs --exe <path to the binary> [--timeout-ms 15000]
@@ -31,9 +32,9 @@ const env = {
   TMP: home,
 };
 
-function launch(bin, argv) {
+function launch(bin, argv, extraEnv) {
   return new Promise((resolveLaunch) => {
-    const child = spawn(bin, argv, { env, stdio: 'ignore' });
+    const child = spawn(bin, argv, { env: { ...env, ...extraEnv }, stdio: 'ignore' });
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       resolveLaunch({ code: null, windowSeen: true }); // still alive: a window may exist
@@ -58,7 +59,7 @@ try {
     process.exitCode = 1;
   } else {
     console.log(
-      `Switch lockdown passed: all ${checked} forbidden switches exit non-zero with no window.`,
+      `Switch lockdown passed: all ${checked} forbidden switches and variables exit non-zero with no window.`,
     );
   }
 } finally {

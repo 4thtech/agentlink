@@ -62,7 +62,11 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
     expect(attach).toContain('"AgentLink-$VERSION-mac-x64.dmg"');
     expect(attach).toContain('"AgentLink-$VERSION-win-x64-setup.exe"');
     expect(attach).toMatch(/sha256sum --check --strict SHA256SUMS-desktop-app\.txt/);
-    expect(attach).toMatch(/gh release upload "v\$VERSION" [^\n]*SHA256SUMS-desktop-app\.txt/);
+    // DESK051-C5: the sums file is in the attach list (uploaded, or already there with the same bytes).
+    expect(attach).toMatch(/for f in "\$\{files\[@\]\}" SHA256SUMS-desktop-app\.txt; do/);
+    expect(attach).toMatch(
+      /gh release upload "v\$VERSION" --repo "\$REPOSITORY" -- "\$\{upload\[@\]\}"/,
+    );
     expect(attach).not.toMatch(/gh release upload [^\n]* SHA256SUMS\s*$/m);
   });
 

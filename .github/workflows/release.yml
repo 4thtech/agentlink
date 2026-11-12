@@ -1882,14 +1882,45 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           VERSION: ${{ needs.desktop-extension-build.outputs.version }}
+        # D15-03: a missing release fails the job (the invite page links to these names; a warning on a
+        # green run is easy to miss). D15-10: never replaces an asset; one already on the release must have
+        # the same SHA-256 as the one built here (a re-run after a partial upload skips it), and every
+        # file uploaded must be listed in the sums. After the upload, every installer name must be there.
         run: |
           set -euo pipefail
-          if ! gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1; then
-            echo "::warning::GitHub Release v$VERSION does not exist, so the desktop app was not attached. Owner: create the release (docs/process/versioning.md §6), then re-run this job."
-            exit 0
+          gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1 ||
+            { echo "::error::GitHub Release v$VERSION does not exist, so the desktop app was not attached. Owner: create the release (docs/process/versioning.md §6), then re-run this job."; exit 1; }
+          shopt -s nullglob
+          files=( *.dmg *.zip *-setup.exe )
+          [ "${#files[@]}" -gt 0 ] || { echo "::error::No desktop app files to attach."; exit 1; }
+          for f in "${files[@]}"; do
+            grep -q -F -x -e "$(sha256sum -- "$f" | cut -d ' ' -f 1)  $f" SHA256SUMS-desktop-app.txt ||
+              { echo "::error::$f is not listed in SHA256SUMS-desktop-app.txt with its hash."; exit 1; }
+          done
+          existing="$(gh release view "v$VERSION" --repo "$REPOSITORY" --json assets --jq '.assets[].name')"
+          upload=()
+          mkdir -p ../existing-assets
+          for f in "${files[@]}" SHA256SUMS-desktop-app.txt; do
+            if grep -q -F -x -e "$f" <<< "$existing"; then
+              rm -f -- "../existing-assets/$f"
+              gh release download "v$VERSION" --repo "$REPOSITORY" --pattern "$f" --dir ../existing-assets
+              if ! cmp -s -- "$f" "../existing-assets/$f"; then
+                echo "::error::$f is already on v$VERSION with other bytes. Owner: delete that asset on purpose, then re-run this job."
+                exit 1
+              fi
+              echo "$f is already attached with the same bytes."
+            else
+              upload+=( "$f" )
+            fi
+          done
+          if [ "${#upload[@]}" -gt 0 ]; then
+            gh release upload "v$VERSION" --repo "$REPOSITORY" -- "${upload[@]}"
           fi
-          gh release upload "v$VERSION" --repo "$REPOSITORY" --clobber -- *.dmg *.zip *-setup.exe SHA256SUMS-desktop-app.txt
-          echo "Attached the desktop app ($(ls -- *.dmg *-setup.exe | wc -l) installers) to v$VERSION."
+          attached="$(gh release view "v$VERSION" --repo "$REPOSITORY" --json assets --jq '.assets[].name')"
+          for f in "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-win-x64-setup.exe" SHA256SUMS-desktop-app.txt; do
+            grep -q -F -x -e "$f" <<< "$attached" || { echo "::error::$f is not on v$VERSION after the upload."; exit 1; }
+          done
+          echo "Attached the desktop app (${#files[@]} files, ${#upload[@]} uploaded now) to v$VERSION."
 
   # One approval click: no unattended job can move `latest`.
   rollback-latest:

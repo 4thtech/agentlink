@@ -2858,8 +2858,14 @@ export async function startApprovalServerWith(
         }
         let presence: OwnerPresence;
         if (native) {
-          // DESK-D12c: one helper gesture for this one owner operation, after every check.
-          const got = await nativeFor(expectedNostr, 'approve', req, res);
+          // DESK-D12c: one helper gesture for this one owner operation, after every check. D15-04:
+          // Replace master code names itself on the OS sheet (reason `code`).
+          const got = await nativeFor(
+            expectedNostr,
+            codeStep === 'replace' ? 'code' : 'approve',
+            req,
+            res,
+          );
           if (!('presence' in got)) {
             finishOwner(res, got.http, 'presence_rejected', { native: got.state });
             return;

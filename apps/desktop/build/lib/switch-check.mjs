@@ -38,8 +38,23 @@ export const EXTRA_CASES = [
   ['--', 'agentlink://invite#x', 'agentlink://second#y'],
 ];
 
+// D15-05: environment variables the built app must refuse (exit 64 before the lock, a window or the
+// core). Each case is launched with no arguments. NOT listed: NODE_OPTIONS and NODE_EXTRA_CA_CERTS.
+// With the NodeOptions fuse off Electron removes them before any JS runs, so the app would START
+// (with the option ignored); the fuse check (check-fuses.mjs) covers them, and a launch here would
+// start the real core.
+export const ENV_CASES = [
+  { ELECTRON_RUN_AS_NODE: '1' },
+  { ELECTRON_ENABLE_LOGGING: '1' },
+  { ELECTRON_ENABLE_STACK_DUMPING: '1' },
+  { node_options: '--inspect=9339' },
+  { NODE_DEBUG: 'net' },
+  { SSLKEYLOGFILE: '/tmp/agentlink-lockdown-test/keys' },
+];
+
 /**
- * launch(exe, args) -> Promise<{code: number|null, windowSeen: boolean}> (code null = timed out).
+ * launch(exe, args, env?) -> Promise<{code: number|null, windowSeen: boolean}> (code null = timed
+ * out); `env` holds the extra variables of an environment case, undefined for argument cases.
  * Returns {checked, failures}; failures lists every switch that did not exit non-zero with no window.
  */
 export async function runLockdown({
@@ -47,14 +62,19 @@ export async function runLockdown({
   launch,
   switches = FORBIDDEN_SWITCHES,
   extra = EXTRA_CASES,
+  envCases = ENV_CASES,
 }) {
   const failures = [];
-  const cases = [...switches.map((sw) => [sw]), ...extra];
-  for (const argv of cases) {
-    const sw = argv.join(' ');
+  const cases = [
+    ...switches.map((sw) => ({ argv: [sw] })),
+    ...extra.map((argv) => ({ argv })),
+    ...envCases.map((env) => ({ argv: [], env })),
+  ];
+  for (const { argv, env } of cases) {
+    const sw = env ? `env ${Object.keys(env).join(' ')}` : argv.join(' ');
     let r;
     try {
-      r = await launch(exe, argv);
+      r = await launch(exe, argv, env);
     } catch (e) {
       failures.push(`${sw}: launch error (${e.message})`);
       continue;

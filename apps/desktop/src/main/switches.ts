@@ -16,8 +16,14 @@
 //   for the owner-feedback loop with a temp HOME. A release build has preview = false compiled in.
 //
 // The environment is checked too: variables that make Electron/Node behave differently
-// (ELECTRON_*, NODE_OPTIONS, …) cause an exit. Fuses also disable RunAsNode/NODE_OPTIONS/inspect in
-// release builds; these checks are the second layer. The deep link itself is NOT validated here
+// (ELECTRON_*, the NODE_ family, …) cause an exit. In a release build the fuses are the control for
+// RunAsNode, NODE_OPTIONS and inspect; this check is the second layer, with one exception (D15-05):
+// with the NodeOptions fuse off Electron removes NODE_OPTIONS (and NODE_EXTRA_CA_CERTS) from the
+// environment before any of this code runs, so the built app never sees them and starts normally,
+// with the option ignored. The check still refuses them in a development run (no fuses) and refuses
+// any other spelling Electron does not remove (`node_options` exits 64 on the built app). CI's launch
+// test (build/check-switch-lockdown.mjs) tries the variables the built app must refuse; the fuse
+// check (check-fuses.mjs) covers the removed ones. The deep link itself is NOT validated here
 // beyond its scheme: the deep-link handler (WP-D9) rebuilds and checks it.
 //
 // Pure: the inputs are passed in, so every denial is unit-tested.
@@ -218,14 +224,18 @@ export function commandLineIsClean(
 /**
  * The deep link a SECOND launch forwards to the running instance. The second instance checked its
  * own argv with checkLaunch and passes only the deep link as single-instance `additionalData`
- * (`{ deepLink: string | null }`); the first instance never reads the second one's raw argv (on
- * Windows Chromium adds its own switches there). Anything else → null (ignored silently).
+ * (`{ deepLink: string | null }`, and since D15-01 `{ deepLink, build }`, instance.ts); the first
+ * instance never reads the second one's raw argv (on Windows Chromium adds its own switches there).
+ * Anything else → null (ignored silently).
  */
 export function forwardedDeepLink(additionalData: unknown): string | null {
   if (typeof additionalData !== 'object' || additionalData === null) return null;
   if (Object.getPrototypeOf(additionalData) !== Object.prototype) return null;
-  const keys = Object.keys(additionalData);
-  if (keys.length !== 1 || keys[0] !== 'deepLink') return null;
+  const keys = Object.keys(additionalData).sort();
+  const shape =
+    (keys.length === 1 && keys[0] === 'deepLink') ||
+    (keys.length === 2 && keys[0] === 'build' && keys[1] === 'deepLink');
+  if (!shape) return null;
   const link = (additionalData as { deepLink: unknown }).deepLink;
   if (typeof link !== 'string') return null;
   if (!link.startsWith(DEEP_LINK_SCHEME) || link.length > MAX_DEEP_LINK_CHARS) return null;

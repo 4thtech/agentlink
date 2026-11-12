@@ -20,7 +20,7 @@
 //                        right now (DESK-NATIVE-DEBUG: a closed lid, a keyboard without Touch ID or
 //                        no enrolled finger exits 69, lockout 14, without a sheet), then one Touch ID
 //                        sheet; prints the 32-byte secret
-//   reason-id is one of: setup | approve | pay. The sheet text is fixed here (reasonText below);
+//   reason-id is one of: setup | approve | pay | code. The sheet text is fixed here (reasonText below);
 //   the caller cannot supply text. macOS shows it as "<app> is trying to <text>".
 //
 //   stdin: lowercase hex of the record, optionally followed by exactly one "\n"; at most 8192 bytes.
@@ -200,6 +200,8 @@ func reasonText(_ id: String) -> String? {
   case "setup": return "turn on Touch ID for AgentLink approvals"
   case "approve": return "approve this in AgentLink"
   case "pay": return "confirm this payment in AgentLink"
+  // D15-04: Replace master code mints a new root secret; the sheet names it.
+  case "code": return "replace your AgentLink master code"
   default: return nil
   }
 }
