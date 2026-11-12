@@ -92,16 +92,23 @@ export function ConnectingInviteRow({
   row,
   blocked = row.blocked === true,
   onUnblock,
+  onCancel,
 }: {
   readonly row: ConnectingRow;
   /** The person is blocked here (the server says so, or the page found them blocked). */
   readonly blocked?: boolean;
-  /** Opens the person where Unblock lives; absent when that is not possible from here. */
+  /** Unblocks the person (or opens them where Unblock lives); absent when not possible here. */
   readonly onUnblock?: () => void;
+  /**
+   * REL051-B1 (N2): Cancel, through the server (`POST /api/ui/invites/connecting/cancel`). The row
+   * leaves once the server dropped the accept ('cancelled' or 'gone'); absent, no Cancel is shown.
+   */
+  readonly onCancel?: () => Promise<CancelResult>;
 }): ReactElement {
-  // A blocked person's accept never finishes: say so, with Unblock and a Cancel that clears the row
-  // from this page (the accept itself is only ever answered or expires).
+  // A blocked person's accept never finishes: say so, with Unblock and Cancel.
   const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   if (hidden) return <></>;
   return (
     <li className="inv-pending inv-connecting" data-blocked={blocked ? 'true' : undefined}>
@@ -117,6 +124,11 @@ export function ConnectingInviteRow({
               ? F.connecting(row.name)
               : F.waitingOnline(row.name)}
         </span>
+        {failed ? (
+          <span role="alert" className="al-text-body-sm">
+            {F.cancelConnectingFailed}
+          </span>
+        ) : null}
       </span>
       {blocked ? (
         <span className="inv-pending-actions">
@@ -125,9 +137,30 @@ export function ConnectingInviteRow({
               {F.unblockAction}
             </Button>
           )}
-          <Button size="sm" variant="ghost" onClick={() => setHidden(true)}>
-            {F.cancelConnecting}
-          </Button>
+          {onCancel === undefined ? null : (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                setFailed(false);
+                void onCancel().then(
+                  (result) => {
+                    setBusy(false);
+                    if (result === 'failed') setFailed(true);
+                    else setHidden(true);
+                  },
+                  () => {
+                    setBusy(false);
+                    setFailed(true);
+                  },
+                );
+              }}
+            >
+              {F.cancelConnecting}
+            </Button>
+          )}
         </span>
       ) : null}
     </li>

@@ -48,12 +48,11 @@ export const TOOL_TEXT = Object.freeze({
   contactNotFoundNextStep:
     "Call agentlink_list_contacts to see the user's contacts, then use a contact's id or name.",
   contactAmbiguous: 'More than one contact matches that name, so nothing was done.',
+  // REL051-B1 (N12): the options, each by ID tag, short id and day connected (never a name).
+  contactAmbiguousOptions:
+    'More than one contact has that name, so nothing was done. They are: {options}.',
   contactAmbiguousNextStep:
-    'Ask the user which of these contacts they mean, then call the tool again with its id. If two contacts share a name, the user can rename or remove one in their own terminal with `' +
-    DEFAULT_PREFIX +
-    ' contacts rename` or `' +
-    DEFAULT_PREFIX +
-    ' contacts remove`.',
+    'Show the user these options and ask the user which one they mean; never pick one yourself. Then call the tool again with its id from candidates. To tell them apart for good, the user can rename one on People in the AgentLink app.',
 
   // agentlink_get_approval (06 §2.5)
   approvalPending: "The owner hasn't decided on this request yet.",

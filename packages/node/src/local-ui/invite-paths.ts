@@ -8,6 +8,11 @@ export const INVITE_CHECK_PATH = '/api/ui/invites/check';
 export const INVITES_LIST_PATH = '/api/ui/invites';
 /** W4-INVITES-LIST: cancel an open invite: the `presence: 'invite'` kind, step `cancel`. */
 export const INVITE_CANCEL_PATH = '/api/ui/invites/cancel';
+/**
+ * REL051-B1 (N2): cancel this agent's accepts that wait for one contact's answer: the
+ * `presence: 'invite'` kind, step `cancel-connecting`, body exactly `{"ref"}`.
+ */
+export const INVITE_CONNECTING_CANCEL_PATH = '/api/ui/invites/connecting/cancel';
 /** Accept an invite: an owner route (`presence: true`), behind the central presence gate. */
 export const INVITE_ACCEPT_PATH = '/api/ui/invites/accept';
 

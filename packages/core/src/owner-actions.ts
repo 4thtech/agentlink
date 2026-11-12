@@ -51,7 +51,7 @@ import {
 import { isCommitmentAction } from './commitments.js';
 import { isPaidPendingAction } from './pay-confirm.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
-import { removeContactTx, type ContactBook } from './contacts.js';
+import { removeContactTx, removedBlockedKeysTx, type ContactBook } from './contacts.js';
 import type { IdentityService } from './identity.js';
 import { isRestrictedAlias } from './names.js';
 import { credentialDigestsEqual, readStorageMark, type OwnStorageKeys } from './own-storage.js';
@@ -507,7 +507,9 @@ export class OwnerActions {
    * not removed (`contact_unknown`), not revoked by status or in the revoked set (`contact_revoked`:
    * blocking or unblocking never changes `revoked`), and `active` for a block (`already_blocked`)
    * or `blocked` for an unblock (`not_blocked`). Only then are the nonce row (the audit record) and
-   * the new status written; a refusal writes nothing. A blocked contact's later envelopes are dropped
+   * the new status written; a refusal writes nothing. REL051-B1 (N2): an unblock of a removed
+   * contact whose keys are still in `blocked_keys` (blocked, then removed) deletes those rows instead
+   * and leaves the contact removed; a removed contact with no blocked key stays `contact_unknown`. A blocked contact's later envelopes are dropped
    * at 04 §3.1.1 (screenInboundTx), never queued as requests or held; an unblock does not bring back
    * what was dropped. Nothing is sent to the contact.
    */
@@ -534,6 +536,15 @@ export class OwnerActions {
         return refused(op, 'nonce_used');
       }
       const state = contactBlockState(tx, contactId);
+      if (state === 'unknown' && op === 'contact.unblock') {
+        // REL051-B1 (N2): a contact blocked and then removed keeps its keys in `blocked_keys`; the
+        // unblock deletes those rows and leaves the contact removed (its removal time unchanged).
+        const keys = removedBlockedKeysTx(tx, contactId);
+        if (keys.length === 0) return refused(op, 'contact_unknown');
+        tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+        for (const key of keys) tx.delete('blocked_keys', { from_key: key });
+        return { status: 'applied', op };
+      }
       if (state === 'unknown') return refused(op, 'contact_unknown');
       if (state === 'revoked') return refused(op, 'contact_revoked');
       if (state !== from) {
@@ -1648,7 +1659,8 @@ export class OwnerActions {
 
   /**
    * The unsigned `contact.unblock` (WP-12): refused before any gesture for an unknown, removed or
-   * revoked contact and one that is not blocked.
+   * revoked contact and one that is not blocked. REL051-B1 (N2): prepared for a removed contact
+   * whose keys are still blocked (blocked, then removed).
    */
   async prepareContactUnblock(contactId: string): Promise<PreparedOwnerAction> {
     return this.#prepareContactBlock('contact.unblock', contactId);
@@ -1662,7 +1674,12 @@ export class OwnerActions {
     const signer = await this.#signer();
     if ('refusal' in signer) return refuse(signer.refusal);
     if (!evmAddress.safeParse(contactId).success) return refuse('contact_unknown');
-    const state = await this.#ctx.store.transaction((tx) => contactBlockState(tx, contactId));
+    const { state, removedBlocked } = await this.#ctx.store.transaction((tx) => ({
+      state: contactBlockState(tx, contactId),
+      removedBlocked: op === 'contact.unblock' && removedBlockedKeysTx(tx, contactId).length > 0,
+    }));
+    // REL051-B1 (N2): a removed contact whose keys are still blocked can be unblocked.
+    if (removedBlocked) return this.#build(signer, op, { contact: contactId });
     if (state === 'unknown') return refuse('contact_unknown');
     if (state === 'revoked') return refuse('contact_revoked');
     if (op === 'contact.block' && state !== 'active') return refuse('already_blocked');

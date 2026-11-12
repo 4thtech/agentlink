@@ -8,6 +8,7 @@
 import { renderContactName, type ContactView } from '@4thtech-io/core';
 import type { ContactDisplayName, IdentityLabel, NameSource } from '@4thtech-io/types';
 import { fail, type HandlerOutput } from './result.js';
+import { renderCopy } from './strings/index.js';
 import { TOOL_TEXT } from './text.js';
 import { removeInvisible } from './untrusted.js';
 
@@ -25,7 +26,40 @@ export interface ContactRef {
   readonly ownerFingerprint?: string;
   /** WAVE-030: the first ten characters of the contact ID, on candidates only. */
   readonly shortId?: string;
+  /**
+   * REL051-B1 (N12): when the pairing was made (RFC 3339; `createdAt` when core has no `pairedAt`),
+   * on candidates and listed contacts, so the user can tell same-named contacts apart.
+   */
+  readonly connectedAt?: string;
 }
+
+/** The short ID tag core shows (04 §2.9); anything else is left out of our text. */
+const TAG = /^[0-9A-F]{4}\u00b7[0-9A-F]{4}$/;
+const ID = /^0x[0-9a-f]{40}$/;
+
+const rfc3339 = (unixSeconds: number): string =>
+  new Date(unixSeconds * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+const unixTime = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value < 2 ** 33;
+
+/**
+ * REL051-B1 (N12): when the contact was connected (its pairing; else when it was added), as RFC
+ * 3339, or undefined when core has neither time.
+ */
+export function connectedAtOf(view: ContactView): string | undefined {
+  if (unixTime(view.pairedAt)) return rfc3339(view.pairedAt);
+  return unixTime(view.createdAt) ? rfc3339(view.createdAt) : undefined;
+}
+
+/** `{connectedAt}` when known, else nothing. */
+export function connectedAtField(view: ContactView): { readonly connectedAt?: string } {
+  const at = connectedAtOf(view);
+  return at === undefined ? {} : { connectedAt: at };
+}
+
+/** The first ten characters of a contact ID (`0x` and eight hex digits). */
+export const shortIdOf = (id: string): string => id.slice(0, 10);
 
 /** Owner aliases are owner text, shown unrestricted (06 §2.1 rule 1) but kept to one short line. */
 const ALIAS_MAX_CODE_POINTS = 64;
@@ -57,7 +91,11 @@ export function renderRef(ref: ContactRef): string {
     label: ref.label,
     nameSource: ref.nameSource,
   } as ContactDisplayName);
-  return ref.ownerFingerprint === undefined ? name : `${name} (owner ${ref.ownerFingerprint})`;
+  if (ref.ownerFingerprint === undefined) return name;
+  // N12: two same-named contacts with the same ID tag (one owner, two IDs) also show the short id.
+  return ref.shortId === undefined
+    ? `${name} (owner ${ref.ownerFingerprint})`
+    : `${name} (owner ${ref.ownerFingerprint}, id ${ref.shortId})`;
 }
 
 /** A candidate of `AMBIGUOUS_CONTACT`: the name-rule ref plus ID tag and short ID. */
@@ -65,7 +103,8 @@ export function candidateRef(view: ContactView): ContactRef {
   return Object.freeze({
     ...contactRef(view),
     ownerFingerprint: view.ownerFingerprint.short,
-    shortId: view.id.slice(0, 10),
+    shortId: shortIdOf(view.id),
+    ...connectedAtField(view),
   });
 }
 
@@ -76,17 +115,29 @@ export function candidateRef(view: ContactView): ContactRef {
  */
 export function refsById(views: readonly ContactView[]): Map<string, ContactRef> {
   const counts = new Map<string, number>();
+  // N12: same name AND same ID tag (one owner's two IDs): the short id tells them apart.
+  const tagCounts = new Map<string, number>();
+  const tagKey = (view: ContactView): string =>
+    `${fold(shownName(view.display))}\u0000${view.ownerFingerprint.short}`;
   for (const view of views) {
     const key = fold(shownName(view.display));
     counts.set(key, (counts.get(key) ?? 0) + 1);
+    tagCounts.set(tagKey(view), (tagCounts.get(tagKey(view)) ?? 0) + 1);
   }
   return new Map(
     views.map((view) => {
       const ref = contactRef(view);
       const dup = (counts.get(fold(shownName(view.display))) ?? 0) > 1;
+      const sameTag = (tagCounts.get(tagKey(view)) ?? 0) > 1;
       return [
         view.id,
-        dup ? Object.freeze({ ...ref, ownerFingerprint: view.ownerFingerprint.short }) : ref,
+        dup
+          ? Object.freeze({
+              ...ref,
+              ownerFingerprint: view.ownerFingerprint.short,
+              ...(sameTag ? { shortId: shortIdOf(view.id) } : {}),
+            })
+          : ref,
       ] as const;
     }),
   );
@@ -126,10 +177,35 @@ export function resolveContact(query: string, views: readonly ContactView[]): Co
     ok: false,
     output: fail(
       'error',
-      TOOL_TEXT.contactAmbiguous,
+      ambiguousSummary(matches),
       TOOL_TEXT.contactAmbiguousNextStep,
       'AMBIGUOUS_CONTACT',
       { candidates: matches.map(candidateRef) },
     ),
   };
+}
+
+/** At most this many options are spelled out in an ambiguous summary; `candidates` has them all. */
+const SUMMARY_OPTIONS = 5;
+
+/**
+ * REL051-B1 (N12): "More than one contact has that name … They are: 1) owner 1111·2222, id
+ * 0xbbbbbbbb, connected 2025-10-09; 2) …". Only what tells them apart and is not counterparty text
+ * (I-5): the ID tag from the verified card, the short contact ID and the day the pairing was made.
+ * Never a name, so never the query (IR-M1-9g-1 L1). A value of another shape is left out.
+ */
+function ambiguousSummary(matches: readonly ContactView[]): string {
+  const options = matches.slice(0, SUMMARY_OPTIONS).map((view, i) => {
+    const tag = view.ownerFingerprint.short;
+    const at = connectedAtOf(view);
+    const parts = [
+      ...(typeof tag === 'string' && TAG.test(tag) ? [`owner ${tag}`] : []),
+      ...(ID.test(view.id) ? [`id ${shortIdOf(view.id)}`] : []),
+      ...(at === undefined ? [] : [`connected ${at.slice(0, 10)}`]),
+    ];
+    return `${String(i + 1)}) ${parts.join(', ')}`;
+  });
+  const rest = matches.length - options.length;
+  const list = rest > 0 ? `${options.join('; ')}; and ${String(rest)} more` : options.join('; ');
+  return renderCopy(TOOL_TEXT.contactAmbiguousOptions, { options: list });
 }

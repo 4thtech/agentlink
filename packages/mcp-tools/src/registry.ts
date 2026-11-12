@@ -204,6 +204,8 @@ const contactRef = obj(
     // WAVE-030: only where two contacts share a name, and on `AMBIGUOUS_CONTACT` candidates.
     ownerFingerprint: str({ maxLength: 32 }),
     shortId: str({ maxLength: 16 }),
+    // REL051-B1 (N12): on `AMBIGUOUS_CONTACT` candidates, when the pairing was made.
+    connectedAt: timestamp,
   },
   ['id', 'name', 'label', 'nameSource'],
 );
@@ -453,8 +455,11 @@ const DEFINITIONS: readonly ToolDefinition[] = [
             label: oneOf(IDENTITY_LABELS),
             nameSource: oneOf(NAME_SOURCES),
             ownerFingerprint: fingerprint,
+            // REL051-B1 (N12): what tells same-named contacts apart.
+            shortId: str({ maxLength: 16 }),
             pairing,
             safetyCodeChecked: bool(),
+            connectedAt: timestamp,
             lastActivity: timestamp,
             unread: int(),
           },
