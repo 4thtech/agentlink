@@ -128,6 +128,9 @@ export const REVIEW = {
   comesBack: 'Comes back',
   /** UX1113-R1-LABEL: the kit names an ID by its folder; the label is inside, read after restore. */
   nameHint: 'Its name comes back with it',
+  /** REL051-UF3 (R1-UI-08): a new ID from the first-run folder (`default`), whose label is inside. */
+  firstId: 'Your first ID',
+  hoodFolder: (folder: string): string => `folder ${folder}`,
   comes: ['People and messages', 'Rules, proofs and credits'] as const,
   comesSince: (date: string): string =>
     `Messages sent to you since ${date} arrive in a minute or two`,

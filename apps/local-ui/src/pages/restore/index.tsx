@@ -238,10 +238,20 @@ export function RestoreWizard({
     setView({ k: 'code' });
   };
 
+  // REL051-UF3 (R1-UI-06): one sensor question per press; a double click is ignored until it settles.
   const passkeyPresence = async (): Promise<void> => {
-    const info = await owner.passkey();
-    if (info === undefined) return setError(PROBLEMS.presence_rejected);
-    await presence(await passkeyProof(info));
+    if (inflight.current) return;
+    inflight.current = true;
+    setWorking(true);
+    try {
+      const info = await owner.passkey();
+      if (info === undefined) return setError(PROBLEMS.presence_rejected);
+      const proof = await passkeyProof(info).catch(() => undefined);
+      await presence(proof);
+    } finally {
+      inflight.current = false;
+      setWorking(false);
+    }
   };
 
   // --- step 2 ---------------------------------------------------------------------------------

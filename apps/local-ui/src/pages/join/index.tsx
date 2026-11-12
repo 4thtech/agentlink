@@ -29,6 +29,7 @@ import {
   type PasskeyInfo,
   type PresenceProof,
 } from '../contacts/owner.js';
+import { usePresenceFlight } from '../contacts/presence-flight.js';
 import { PresencePrompt } from '../contacts/presence-prompt.js';
 import { UseCodeInstead } from '../first-run/backup-code.js';
 import { detectPlatform } from '../first-run/passkey.js';
@@ -94,6 +95,8 @@ export function JoinPage({
   const [passkey, setPasskey] = useState<PasskeyInfo | undefined>(undefined);
   const [askCode, setAskCode] = useState(false);
   const [busy, setBusy] = useState(false);
+  // REL051-UF3 (R1-UI-06): a double click on Accept asks for the sensor once.
+  const flight = usePresenceFlight(busy);
   const [error, setError] = useState<string | undefined>(undefined);
   const [waitingSince, setWaitingSince] = useState<number | undefined>(undefined);
   const [, tick] = useState(0);
@@ -177,11 +180,15 @@ export function JoinPage({
       setAskCode(true);
       return;
     }
-    void gesture(passkey).then((proof) => {
-      // Touch ID cancelled: the card stays.
-      if (proof === undefined) setError(S.notAccepted);
-      else send(proof);
-    });
+    if (!flight.start()) return;
+    void gesture(passkey)
+      .catch(() => undefined)
+      .then((proof) => {
+        flight.done();
+        // Touch ID cancelled: the card stays.
+        if (proof === undefined) setError(S.notAccepted);
+        else send(proof);
+      });
   };
 
   // "Not now" forgets the invite on this computer; the link itself keeps working until it expires.
@@ -328,7 +335,7 @@ export function JoinPage({
             block
             className="jn-primary al-press"
             onClick={accept}
-            disabled={busy || declined}
+            disabled={busy || flight.asking || declined}
           >
             <span className="inv-btn-in">
               {passkey === undefined ? null : <FingerprintIcon />}
@@ -338,7 +345,7 @@ export function JoinPage({
           {/* FB-8: the master code is always a way to confirm, also with a passkey here. */}
           {passkey === undefined || declined ? null : (
             <UseCodeInstead
-              disabled={busy}
+              disabled={busy || flight.asking}
               onClick={() => {
                 setError(undefined);
                 setAskCode(true);
@@ -361,7 +368,12 @@ export function JoinPage({
               </Button>
             </>
           ) : (
-            <button type="button" className="jn-not-now" onClick={notNow} disabled={busy}>
+            <button
+              type="button"
+              className="jn-not-now"
+              onClick={notNow}
+              disabled={busy || flight.asking}
+            >
               {S.notNow}
             </button>
           )}
