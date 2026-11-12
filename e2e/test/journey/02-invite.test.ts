@@ -30,7 +30,9 @@ import {
   inviteFromScreen,
   inviteLinkOnScreen,
   openInviteScreen,
-  seesConnected,
+  seesConnectedThenNames,
+  seesConnectedUnnamed,
+  namesContact,
 } from './helpers-u4.js';
 
 const ch = chapter();
@@ -177,9 +179,9 @@ describe('chapter 2: contacts and invites', () => {
     await acceptInviteInApp(b, link, 'Ana');
     await until('Bo is paired with Ana', () => pairedWith(mcpB, 'Ana'), 30_000);
     await until('Ana is paired with Bo', () => pairedWith(mcpA, 'Bo'), 30_000);
-    // Both pages show the Connected moment with the safety code, with no navigation (A7).
-    await seesConnected(b.page, 'Ana');
-    await seesConnected(a.page, 'Bo');
+    // Both pages show the Connected moment (A7): each owner names the contact (WP-3), then the digits.
+    await seesConnectedThenNames(b.page, 'Ana', 'Ana K');
+    await seesConnectedThenNames(a.page, 'Bo', 'Bo K');
     // W4-WIRE-3 (owner walkthrough 30 Oct): the accepted invite leaves the pending list at once, no
     // reload. The first link was copied (it may have gone to someone), so it stays as the one
     // unnamed row with Cancel invite: the "Someone" row of the walkthrough was that second link.
@@ -207,10 +209,12 @@ describe('chapter 2: contacts and invites', () => {
     await acceptInviteInApp(b, link, 'Ana');
     // The AI app's MCP server completes the pairing while the accept still waits for the relays.
     await until('Bo is paired with Ana', () => pairedWith(mcpB, 'Ana'), 30_000);
-    await seesConnected(b.page, 'Ana');
-    // Once the accept has returned (the relays answered), nothing says it is still connecting.
+    await seesConnectedUnnamed(b.page, 'Ana');
+    // Once the accept has returned (the relays answered), nothing says it is still connecting; the
+    // owner's naming waits for that (one owner operation at a time).
     await new Promise((r) => setTimeout(r, 6_000));
-    await seesConnected(b.page, 'Ana');
+    await seesConnectedUnnamed(b.page, 'Ana');
+    await namesContact(b.page, 'Ana K');
     expect(await text(b.page)).not.toContain('Connecting to Ana…');
   }, 180_000);
 
@@ -225,8 +229,8 @@ describe('chapter 2: contacts and invites', () => {
       const { a, b } = await twoOwners(ready.browser, ready.files, world, ch.closers);
       const link = await inviteFromScreen(a, 'Bo');
       await acceptInviteInApp(b, link, 'Ana');
-      await seesConnected(b.page, 'Ana');
-      await seesConnected(a.page, 'Bo');
+      await seesConnectedThenNames(b.page, 'Ana', 'Ana K');
+      await seesConnectedThenNames(a.page, 'Bo', 'Bo K');
     },
     180_000,
   );

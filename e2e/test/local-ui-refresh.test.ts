@@ -59,7 +59,7 @@ const PAGES = [
   { path: '/settings', title: 'Settings' },
   { path: '/activity/live', title: 'Live activity stream' },
   { path: '/settings/backup', title: 'Backup & Touch ID' },
-  { path: '/settings/notifications', title: 'Notifications' },
+  { path: '/settings/apps', title: 'AI apps' },
   { path: '/settings/appearance', title: 'Appearance' },
   { path: '/advanced/network', title: 'Relays & network' },
   { path: '/advanced/diagnostics', title: 'Diagnostics' },

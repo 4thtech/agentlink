@@ -387,7 +387,21 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
     closers.push(() => friendMcp.close());
     await page.getByText('Connected with Ana.').first().waitFor({ timeout: 60_000 });
     // W4-PEOPLE-INVITE (A7): the Connected moment with the 12-digit safety code.
+    // WP-3: Ana's own name is not trusted yet: "You are connected", nothing she chose in the hello
+    // prompt, then the owner names the contact and confirms it with the passkey.
+    await page.getByRole('heading', { name: 'You are connected', exact: true }).waitFor();
+    const before = await page.locator('body').innerText();
+    expect(before).toContain('Say hello to my new contact on AgentLink.');
+    expect(before).not.toContain('Say hello to Ana');
+    await page.getByLabel('Name this contact').fill('Ana');
+    await page.getByRole('button', { name: 'Save name', exact: true }).click();
+    await page
+      .getByRole('button', { name: /^Confirm with (Touch ID|Windows Hello|your passkey)$/ })
+      .click();
     await page.getByRole('heading', { name: /^You and “?Ana”? are connected$/ }).waitFor();
+    await page.getByText('Say hello to Ana on AgentLink.').first().waitFor();
+    // The 12 digits are behind the optional check.
+    await page.getByRole('button', { name: /^Optional: make sure it's really Ana/ }).click();
     await page
       .getByText(/\d{4}\D{1,3}\d{4}\D{1,3}\d{4}/)
       .first()
