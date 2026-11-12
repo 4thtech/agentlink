@@ -46,6 +46,7 @@ main() {
   DESKTOP_RELEASED=0
   DESKTOP_VERSION=0.0.0
   DESKTOP_RELEASES="https://github.com/4thtech/agentlink/releases/download"
+  DESKTOP_MAX_BYTES=1073741824
 
   dry_run=0
   uninstall=0
@@ -153,6 +154,9 @@ main() {
 say() { printf '%s\n' "$*"; }
 fail() {
   printf 'AgentLink installer: %s\n' "$*" >&2
+  # Also here, not only in the EXIT trap: zsh runs a trap set inside a function only when that
+  # function returns, not on an exit from a function it called.
+  cleanup
   exit 1
 }
 # A wrong command line: fixed text only, exit code 2 (as `agentlink join`).
@@ -189,8 +193,11 @@ valid_invite() {
   [ "${#payload}" -le 21846 ]
 }
 
-# Removes the download folder and the desktop app's unpack folder, if there are any.
+# Removes the download folder and the desktop app's unpack folder, if there are any. An installed
+# desktop app that was set aside for the swap and not yet replaced is put back first; if that fails
+# it stays where it is (never removed).
 cleanup() {
+  restore_previous
   if [ -n "${tmp:-}" ]; then rm -rf "$tmp"; fi
   tmp=""
   if [ -n "${stage:-}" ]; then rm -rf "$stage"; fi
@@ -304,8 +311,9 @@ install_node() {
 
 # --- the desktop app (--desktop) ------------------------------------------------------------------
 
-# The SHA-256 of each desktop app zip of DESKTOP_VERSION, copied from that release's SHA256SUMS
-# files when DESKTOP_VERSION is set (installer/README.md). Empty: no desktop app for that Mac.
+# The SHA-256 of each desktop app zip of DESKTOP_VERSION, taken from the owner-verified build output
+# or its provenance attestation, never from the release's own SHA256SUMS (installer/README.md). As
+# nothing is quarantined, Gatekeeper never checks this app: this hash is the check. Empty: no app.
 desktop_pinned_sha() {
   case "$1" in
     mac-arm64) echo "" ;;
@@ -340,11 +348,18 @@ fetch_release() {
   while :; do
     desktop_url_ok "$url" ||
       fail "The desktop app download was sent to an unexpected address, so nothing was installed."
-    reply="$(curl -sS --proto '=https' --tlsv1.2 --retry 2 --max-redirs 0 --max-filesize 1073741824 \
-      -o "$2" -w '%{http_code} %{redirect_url}' "$url")" ||
+    # -q first: no ~/.curlrc. --max-filesize stops early when the size is announced; the byte count
+    # below holds without it, and --max-time bounds the whole transfer.
+    reply="$(curl -q -sS --proto '=https' --tlsv1.2 --retry 2 --max-redirs 0 --max-time 1800 \
+      --max-filesize "$DESKTOP_MAX_BYTES" -o "$2" -w '%{http_code} %{redirect_url}' "$url")" ||
       fail "Could not download $1. Check your internet connection and run the installer again."
     case "${reply%% *}" in
-      200) return 0 ;;
+      200)
+        bytes="$(wc -c <"$2" | tr -d ' ')"
+        [ "$bytes" -le "$DESKTOP_MAX_BYTES" ] ||
+          fail "The desktop app download is larger than expected, so nothing was installed."
+        return 0
+        ;;
       301 | 302 | 303 | 307 | 308)
         hops=$((hops + 1))
         [ "$hops" -le 5 ] ||
@@ -359,6 +374,17 @@ fetch_release() {
 # --desktop: the desktop app into ~/Applications (Mac). No Node.js, no agentlink command, no PATH
 # change: the app brings its own. Nothing here touches the quarantine mark or Gatekeeper: curl marks
 # nothing, so the app opens as any app you built yourself would, and nothing else is changed.
+# Puts the set-aside desktop app back when the new one is not in its place (a failed step, Ctrl+C).
+restore_previous() {
+  if [ -n "${backup:-}" ] && [ -e "$backup" ] && [ ! -e "$app" ] && [ ! -L "$app" ]; then
+    if mv "$backup" "$app"; then
+      backup=""
+    else
+      printf 'AgentLink installer: Your previous AgentLink app is kept at %s.\n' "$backup" >&2
+    fi
+  fi
+}
+
 install_desktop() {
   [ "$os" = darwin ] ||
     fail "The desktop app is for Mac and Windows. On Linux, run the installer without --desktop."
@@ -382,6 +408,11 @@ install_desktop() {
   command -v curl >/dev/null 2>&1 || fail "curl is needed to download the desktop app."
   command -v ditto >/dev/null 2>&1 || fail "ditto (part of macOS) is needed to unpack the desktop app."
   [ ! -L "$app" ] || fail "$app is a link. Remove it, then run the installer again."
+  # The installed app is set aside here (outside the unpack folder) during the swap.
+  backup_path="$apps_dir/.AgentLink-previous.app"
+  if [ -e "$backup_path" ] || [ -L "$backup_path" ]; then
+    fail "$backup_path is left from an earlier run. Move it away (it may be your previous AgentLink), then run the installer again."
+  fi
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/agentlink-install.XXXXXX")" ||
     fail "Could not create a temporary folder."
   # Both folders are removed at the end, and on any abort before that (Ctrl+C included).
@@ -389,7 +420,8 @@ install_desktop() {
   trap 'cleanup; exit 130' INT TERM
   fetch_release "$release/$asset" "$tmp/$asset"
   fetch_release "$release/$sums" "$tmp/$sums"
-  listed="$(awk -v f="$asset" '$2 == f { print $1 }' "$tmp/$sums")"
+  # Exactly one line for the file, or nothing matches.
+  listed="$(awk -v f="$asset" '$2 == f { n++; h = $1 } END { if (n == 1) print h }' "$tmp/$sums")"
   actual="$(sha256_of "$tmp/$asset")"
   if [ "$actual" != "$listed" ] || [ "$actual" != "$pinned" ]; then
     fail "The desktop app download did not pass its safety check (SHA-256 mismatch), so nothing was installed. Please try again later."
@@ -406,12 +438,21 @@ install_desktop() {
     fail "The desktop app download is not a complete app, so nothing was installed."
   fi
   if [ -e "$app" ]; then
-    mv "$app" "$stage/previous.app" ||
+    backup="$backup_path"
+    mv "$app" "$backup" || {
+      backup=""
       fail "Could not replace $app. Quit AgentLink, then run the installer again."
+    }
   fi
-  if ! mv "$new_app" "$app"; then
-    if [ -e "$stage/previous.app" ]; then mv "$stage/previous.app" "$app" || :; fi
-    fail "Could not install AgentLink into $apps_dir."
+  # Nothing may have appeared there meanwhile: mv would put the new app inside it.
+  if [ -e "$app" ] || [ -L "$app" ]; then
+    fail "Something else appeared at $app. Remove it, then run the installer again."
+  fi
+  # On failure, cleanup (fail exits through the EXIT trap) puts the previous app back.
+  mv "$new_app" "$app" || fail "Could not install AgentLink into $apps_dir."
+  if [ -n "${backup:-}" ]; then
+    rm -rf "$backup"
+    backup=""
   fi
   cleanup
   trap - EXIT INT TERM

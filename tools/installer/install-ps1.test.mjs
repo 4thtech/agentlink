@@ -138,9 +138,17 @@ describe('install.ps1 source', () => {
   it('downloads the desktop app following no redirect itself, and runs only the checked setup', () => {
     expect(source).toContain('$request.AllowAutoRedirect = $false');
     expect(source.match(/Save-ReleaseFile "/g)).toHaveLength(2);
-    expect(source).toContain(
-      "Assert-DesktopSetup $setup ([IO.File]::ReadAllText($sums)) $setupName $pinned\n      Write-Host 'Checked: the download matches the release and this installer.'\n      $code = Invoke-DesktopSetup $setup",
+    expect(source).toMatch(
+      /Assert-DesktopSetup \$setup \(\[IO\.File\]::ReadAllText\(\$sums\)\) \$setupName \$pinned\n\s*Write-Host 'Checked: the download matches the release and this installer\.'\n(\s*#[^\n]*\n)?\s*\$lock = Open-VerifiedFile \$setup \$pinned\n\s*try \{\n\s*\$code = Invoke-DesktopSetup \$setup\n\s*\} finally \{\n\s*\$lock\.Dispose\(\)/,
     );
+    // The per-run folder is made private before anything is downloaded into it.
+    const flow = source.slice(source.indexOf('function Install-AgentLinkDesktop'));
+    expect(flow.indexOf('Protect-Directory $tmp')).toBeGreaterThan(-1);
+    expect(flow.indexOf('Protect-Directory $tmp')).toBeLessThan(flow.indexOf('Save-ReleaseFile'));
+    expect(source).toContain('$acl.SetAccessRuleProtection($true, $false)');
+    // The byte count, not Content-Length, is the size cap; the transfer has time limits.
+    expect(source).toMatch(/\$total \+= \$read\n\s*if \(\$total -gt \$limit\)/);
+    expect(source).toContain('$request.ReadWriteTimeout = 60000');
     expect(source).toContain("Start-Process -FilePath $Setup -ArgumentList '/S' -Wait -PassThru");
   });
 

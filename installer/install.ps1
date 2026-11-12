@@ -280,8 +280,10 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Desktop, $
 
   # --- the desktop app (-Desktop) ------------------------------------------------------------------
 
-  # The SHA-256 of each desktop setup.exe of $DesktopVersion, copied from that release's SHA256SUMS
-  # files when $DesktopVersion is set (installer/README.md). Empty: no desktop app for that computer.
+  # The SHA-256 of each desktop setup.exe of $DesktopVersion, taken from the owner-verified build
+  # output or its provenance attestation, never from the release's own SHA256SUMS
+  # (installer/README.md). With no mark of the web, SmartScreen never checks it: this hash is the
+  # check. Empty: no desktop app for that computer.
   function Get-DesktopPinnedSha([string]$Platform) {
     switch ($Platform) {
       'win-x64' { return '' }
@@ -298,11 +300,15 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Desktop, $
     return @('github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com') -ccontains $match.Groups[1].Value
   }
 
-  # One HTTPS request that follows no redirect. A 200 is saved to $OutFile (at most 1 GiB); returns
-  # the status code and, for a redirect, the Location header.
+  # One HTTPS request that follows no redirect. A 200 is saved to $OutFile (at most 1 GiB, counted
+  # byte by byte; Content-Length only stops it earlier), within 30 minutes; returns the status code
+  # and, for a redirect, the Location header.
   function Get-HttpHop([string]$Url, [string]$OutFile) {
     $request = [Net.WebRequest]::Create($Url)
     $request.AllowAutoRedirect = $false
+    $request.Timeout = 60000
+    $request.ReadWriteTimeout = 60000
+    $deadline = [DateTime]::UtcNow.AddMinutes(30)
     try {
       $response = $request.GetResponse()
     } catch {
@@ -325,6 +331,7 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Desktop, $
         while (($read = $in.Read($buffer, 0, $buffer.Length)) -gt 0) {
           $total += $read
           if ($total -gt $limit) { throw 'The download is too large.' }
+          if ([DateTime]::UtcNow -gt $deadline) { throw 'The download took too long.' }
           $out.Write($buffer, 0, $read)
         }
       } finally {
@@ -359,17 +366,51 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Desktop, $
     throw 'The desktop app download was redirected too often, so nothing was installed.'
   }
 
-  # Throws unless the file's SHA-256 equals both its SHA256SUMS line and the pinned hash.
+  # Throws unless the file's SHA-256 equals both its SHA256SUMS line (exactly one line for the file)
+  # and the pinned hash.
   function Assert-DesktopSetup([string]$Path, [string]$Sums, [string]$FileName, [string]$Pinned) {
     $listed = ''
+    $count = 0
     foreach ($line in ($Sums -split "`n")) {
       $parts = $line.Trim() -split '\s+'
-      if ($parts.Count -eq 2 -and $parts[1] -eq $FileName) { $listed = $parts[0].ToLowerInvariant() }
+      if ($parts.Count -eq 2 -and $parts[1] -eq $FileName) { $listed = $parts[0].ToLowerInvariant(); $count++ }
     }
+    if ($count -ne 1) { $listed = '' }
     $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
     if (-not $Pinned -or $actual -ne $listed -or $actual -ne $Pinned) {
       throw 'The desktop app download did not pass its safety check (SHA-256 mismatch), so nothing was installed. Please try again later.'
     }
+  }
+
+  # Gives the per-run download folder an ACL of its own: only this user, nothing inherited.
+  function Protect-Directory([string]$Path) {
+    $me = [Security.Principal.WindowsIdentity]::GetCurrent().User
+    $acl = New-Object Security.AccessControl.DirectorySecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    $acl.SetOwner($me)
+    $rule = New-Object Security.AccessControl.FileSystemAccessRule($me, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')
+    $acl.AddAccessRule($rule)
+    Set-Acl -LiteralPath $Path -AclObject $acl
+  }
+
+  # Opens the file so nobody can change it while it stays open (read sharing only) and hashes it
+  # through that handle; throws unless it is the pinned hash. The caller keeps it open while the
+  # setup runs, then closes it.
+  function Open-VerifiedFile([string]$Path, [string]$Pinned) {
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+      $sha = [Security.Cryptography.SHA256]::Create()
+      try { $hash = $sha.ComputeHash($stream) } finally { $sha.Dispose() }
+      $actual = ([BitConverter]::ToString($hash) -replace '-', '').ToLowerInvariant()
+    } catch {
+      $stream.Dispose()
+      throw
+    }
+    if (-not $Pinned -or $actual -ne $Pinned) {
+      $stream.Dispose()
+      throw 'The desktop app download did not pass its safety check (SHA-256 mismatch), so nothing was installed. Please try again later.'
+    }
+    return $stream
   }
 
   # Runs the per-user setup silently (/S) and waits; returns its exit code.
@@ -409,13 +450,24 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Desktop, $
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ('agentlink-install-' + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tmp | Out-Null
     try {
+      try {
+        Protect-Directory $tmp
+      } catch {
+        throw 'Could not make a private temporary folder, so nothing was installed.'
+      }
       $setup = Join-Path $tmp $setupName
       $sums = Join-Path $tmp $sumsName
       Save-ReleaseFile "$release/$setupName" $setup
       Save-ReleaseFile "$release/$sumsName" $sums
       Assert-DesktopSetup $setup ([IO.File]::ReadAllText($sums)) $setupName $pinned
       Write-Host 'Checked: the download matches the release and this installer.'
-      $code = Invoke-DesktopSetup $setup
+      # Checked again through a handle that keeps the file unchanged until the setup has run.
+      $lock = Open-VerifiedFile $setup $pinned
+      try {
+        $code = Invoke-DesktopSetup $setup
+      } finally {
+        $lock.Dispose()
+      }
       if ($code -ne 0) { throw "The desktop app setup stopped (exit code $code). Run the installer again." }
     } finally {
       Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

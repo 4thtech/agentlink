@@ -302,6 +302,12 @@ function Start-DesktopApp([string]$Exe, [string[]]$Arguments) {
   $script:Started += , (@($Exe) + @($Arguments))
 }
 function Get-DesktopPinnedSha([string]$Platform) { if ($Platform -eq 'win-x64') { return $script:DeskPinned } return '' }
+# Windows ACLs do not exist on the Linux CI runner: records the folder instead.
+$script:Protected = @()
+function Protect-Directory([string]$Path) {
+  if (@(Get-ChildItem -LiteralPath $Path -Force).Count -ne 0) { throw 'FAILED: the folder must be protected while still empty' }
+  $script:Protected += $Path
+}
 function New-Programs { $script:roots++; $script:Programs = Join-Path $Work "programs$($script:roots)"; return $script:Programs }
 
 Check 'the desktop app ships switched off' { $DesktopReleased -eq $false }
@@ -323,6 +329,7 @@ Set-Content -LiteralPath (Join-Path $deskServe $setupName) -Value 'the AgentLink
 $deskSha = (Get-FileHash -LiteralPath (Join-Path $deskServe $setupName) -Algorithm SHA256).Hash.ToLowerInvariant()
 $deskSums = "$('1' * 64)  AgentLink-9.9.9-win-x64.zip`n$deskSha  $setupName`n"
 function Reset-Desktop {
+  $script:Protected = @()
   $script:Downloads = @()
   $script:Hops = @()
   $script:Redirects = @{}
@@ -364,6 +371,42 @@ Check 'desktop: app only (no Node.js, no command), temporary folder removed, not
   $script:Downloads.Count -eq 0 -and (Get-TempCount) -eq $tempBefore -and $script:Started.Count -eq 0 -and
   $out -match 'Next time, open AgentLink from the Start menu\.' -and $out -match 'To open it now, run:'
 }
+Check 'desktop: the setup is downloaded into a fresh per-run folder made private before anything is in it' {
+  $script:Protected.Count -eq 1 -and
+  (Split-Path -Leaf $script:Protected[0]) -match '\Aagentlink-install-[0-9a-f]{32}\z' -and
+  -not (Test-Path -LiteralPath $script:Protected[0])
+}
+
+Reset-Desktop
+$line = "$deskSha  $setupName`n"
+Set-Content -LiteralPath (Join-Path $deskServe $sumsName) -Value ($line + $line) -NoNewline
+Expect-Throw 'desktop: a SHA256SUMS listing the setup twice is refused' 'SHA-256 mismatch' {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64'
+}
+Check '... and runs nothing' { $script:SetupRuns.Count -eq 0 }
+
+Check 'desktop: the setup is hashed again right before it runs, through a handle kept open' {
+  $file = Join-Path $Work 'verify-me.exe'
+  Set-Content -LiteralPath $file -Value 'the AgentLink setup 9.9.9' -NoNewline
+  $stream = Open-VerifiedFile $file $deskSha
+  $open = $stream.CanRead
+  $stream.Dispose()
+  $m = $null
+  try { Open-VerifiedFile $file ('4' * 64) } catch { $m = $_.Exception.Message }
+  $open -and $m -match 'SHA-256 mismatch'
+}
+
+# A setup swapped after the first check (the first check is skipped here) is caught by the second.
+Reset-Desktop
+$realAssert = ${function:Assert-DesktopSetup}
+function Assert-DesktopSetup([string]$Path, [string]$Sums, [string]$FileName, [string]$Pinned) {
+  Set-Content -LiteralPath $Path -Value 'swapped' -NoNewline
+}
+Expect-Throw 'desktop: a setup changed after the first check is not run' 'SHA-256 mismatch' {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64'
+}
+Check '... and runs nothing' { $script:SetupRuns.Count -eq 0 }
+${function:Assert-DesktopSetup} = $realAssert
 
 Reset-Desktop
 $hop1 = "https://objects.githubusercontent.com/github-production-release-asset/1/$setupName" + '?a=1'
