@@ -1,4 +1,5 @@
-// W4-PEOPLE-INVITE: the person ⋯ menu (prototype v23 A4: Rename · Check safety code · Remove).
+// W4-PEOPLE-INVITE: the person ⋯ menu (prototype v23 A4: Rename · Check safety code · Remove; UX1112
+// WP-12 adds Block, or Unblock on a blocked person, before Remove).
 // Exported for Home (U3). A menu button with aria-expanded; the menu opens with U0's al-menu, takes
 // focus on its first item, moves with the arrow keys, and closes on Escape, Tab or a click outside,
 // giving focus back to the button. The caller does the work (each action asks for Touch ID there);
@@ -12,6 +13,10 @@ export interface PersonMenuProps {
   readonly name: string;
   readonly onRename?: () => void;
   readonly onCheck?: () => void;
+  /** WP-12 (F-2): Block an active person. */
+  readonly onBlock?: () => void;
+  /** WP-12 (F-2): Unblock a blocked person. */
+  readonly onUnblock?: () => void;
   readonly onRemove?: () => void;
 }
 
@@ -45,13 +50,22 @@ const RENAME = svg(['M12 20h9', 'M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'])
 const CHECK = svg([
   'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z',
 ]);
+const BLOCK = svg(['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z', 'm4.9 4.9 14.2 14.2']);
+const UNBLOCK = svg(['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z', 'm9 12 2 2 4-4']);
 const REMOVE = svg([
   'M3 6h18',
   'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6',
   'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2',
 ]);
 
-export function PersonMenu({ name, onRename, onCheck, onRemove }: PersonMenuProps): ReactElement {
+export function PersonMenu({
+  name,
+  onRename,
+  onCheck,
+  onBlock,
+  onUnblock,
+  onRemove,
+}: PersonMenuProps): ReactElement {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -60,6 +74,8 @@ export function PersonMenu({ name, onRename, onCheck, onRemove }: PersonMenuProp
   const items: Item[] = [];
   if (onRename !== undefined) items.push({ label: S.rename, run: onRename, icon: RENAME });
   if (onCheck !== undefined) items.push({ label: S.checkCode, run: onCheck, icon: CHECK });
+  if (onBlock !== undefined) items.push({ label: S.block, run: onBlock, icon: BLOCK });
+  if (onUnblock !== undefined) items.push({ label: S.unblock, run: onUnblock, icon: UNBLOCK });
   if (onRemove !== undefined)
     items.push({ label: S.remove, run: onRemove, danger: true, icon: REMOVE });
 

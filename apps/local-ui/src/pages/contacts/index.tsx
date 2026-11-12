@@ -12,7 +12,8 @@
 // Self-declared.
 //
 // Rename and Remove ask for owner presence (the passkey, or the owner code). Every change is one POST
-// to a presence route; the page never signs (owner.ts).
+// to a presence route; the page never signs (owner.ts). UX1112 WP-12 (F-2; D-72): Block (after a
+// short explanation) and Unblock sit in the same menu and ask for presence the same way.
 //
 // W4-PEOPLE-INVITE (prototype v23 A4, A5, A7): "Invite someone" opens the Invite screen in place
 // (`?invite` too); open invites are PendingInviteRow rows that say so once cancelled; Rename, Check
@@ -121,7 +122,7 @@ type ListState =
 
 /** One owner operation waiting for presence. */
 interface Pending {
-  readonly what: 'check' | 'rename' | 'remove';
+  readonly what: 'check' | 'rename' | 'remove' | 'block' | 'unblock';
   readonly ref: string;
   readonly input?: unknown;
   readonly summary: string;
@@ -368,6 +369,7 @@ function Detail({
   const [alias, setAlias] = useState('');
   const [aliasError, setAliasError] = useState<string | undefined>(undefined);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
   // PRE-031-FIXES: "Remove older" goes through the same confirm step as Remove.
   const [confirmOlder, setConfirmOlder] = useState(false);
   const dupNoticeId = useId();
@@ -412,6 +414,8 @@ function Detail({
               setAlias('');
               setNotice(S.renamed);
             }
+            if (pending.what === 'block') setNotice(S.blockedNow);
+            if (pending.what === 'unblock') setNotice(S.unblocked);
             onChanged(pending.what);
             return;
           }
@@ -474,6 +478,7 @@ function Detail({
     pending !== undefined ||
     renaming ||
     confirmRemove ||
+    confirmBlock ||
     confirmOlder ? null : (
       <Surface level={3} className="ct-dup">
         <Banner tone="info" icon="users">
@@ -572,7 +577,7 @@ function Detail({
         <h2 className="al-text-title-2">
           <ContactName {...nameInput(contact)} label={labelKind(contact)} showLabel />
         </h2>
-        {pending === undefined && !renaming && !confirmRemove && !confirmOlder ? (
+        {pending === undefined && !renaming && !confirmRemove && !confirmBlock && !confirmOlder ? (
           <PersonMenu
             name={name}
             onRename={() => setRenaming(true)}
@@ -584,6 +589,17 @@ function Detail({
                     setCodeTick((n) => n + 1);
                   },
                 }
+              : {})}
+            {...(contact.status === 'active'
+              ? {
+                  onBlock: () => {
+                    setNotice(undefined);
+                    setConfirmBlock(true);
+                  },
+                }
+              : {})}
+            {...(contact.status === 'blocked'
+              ? { onUnblock: () => ask({ what: 'unblock', ref, summary: SUMMARY.unblock(name) }) }
               : {})}
             {...(contact.status === 'revoked' ? {} : { onRemove: () => setConfirmRemove(true) })}
           />
@@ -627,6 +643,25 @@ function Detail({
             </Button>
           </div>
         </form>
+      ) : null}
+      {confirmBlock && pending === undefined ? (
+        <div className="ct-confirm">
+          <p className="al-text-body">{S.blockExplain}</p>
+          <div className="ct-actions">
+            <Button
+              variant="danger"
+              onClick={() => {
+                setConfirmBlock(false);
+                ask({ what: 'block', ref, summary: SUMMARY.block(name) });
+              }}
+            >
+              {S.blockContact}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmBlock(false)}>
+              {S.cancel}
+            </Button>
+          </div>
+        </div>
       ) : null}
       {(confirmRemove || (confirmOlder && older !== undefined)) && pending === undefined ? (
         <div className="ct-confirm">

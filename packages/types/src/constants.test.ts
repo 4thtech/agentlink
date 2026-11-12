@@ -164,6 +164,9 @@ describe('constants (04, 05, 06)', () => {
         'contact.check',
         'contact.remove',
         'contact.rename',
+        // WP-12 (F-2): the owner blocks or unblocks a contact from the People page.
+        'contact.block',
+        'contact.unblock',
         'credits.deposit',
         'credits.withdraw',
         'policy.set',
@@ -249,6 +252,8 @@ describe('constants (04, 05, 06)', () => {
       'contact.check': 86_400,
       'contact.rename': 600,
       'contact.remove': 600,
+      'contact.block': 600,
+      'contact.unblock': 600,
       'storage.set': 600,
       'storage.remove': 600,
       'backup.export': 600,

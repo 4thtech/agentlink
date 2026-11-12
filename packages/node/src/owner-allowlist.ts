@@ -40,6 +40,9 @@ export const OWNER_ACTION_OPS: readonly string[] = Object.freeze([
   // M1-9za: the owner renames or removes a contact (`agentlink contacts rename | remove`).
   'contact.rename',
   'contact.remove',
+  // UX1112 WP-12 (F-2): the owner blocks or unblocks a contact from the local app (People).
+  'contact.block',
+  'contact.unblock',
   // M1-11c-a4c: the owner turns received funds into credits, or withdraws credits (local UI).
   'credits.deposit',
   'credits.withdraw',

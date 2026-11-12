@@ -205,6 +205,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/agents/resume',
       // W4-SHELL-V2: the app's UI settings (local-ui/ui-settings-server.test.ts).
       '/api/ui/ui-settings',
+      // UX1112 WP-12 (F-2): Block and Unblock a contact (local-ui/api/contacts.test.ts).
+      '/api/ui/contacts/:ref/block',
+      '/api/ui/contacts/:ref/unblock',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

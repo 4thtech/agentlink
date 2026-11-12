@@ -26,6 +26,7 @@ import {
   type FileSaveParams,
   type ContactCheckParams,
   type ContactRule,
+  type ContactBlockParams,
   type ContactRemoveParams,
   type ContactRenameParams,
   type OwnerAction,
@@ -47,6 +48,8 @@ export type PreparableOp =
   | 'contact.check'
   | 'contact.rename'
   | 'contact.remove'
+  | 'contact.block'
+  | 'contact.unblock'
   | 'agent.label'
   | 'app.connect'
   | 'app.disconnect'
@@ -58,6 +61,9 @@ const PREPARABLE: readonly string[] = [
   'contact.check',
   'contact.rename',
   'contact.remove',
+  // UX1112 WP-12 (F-2): the owner blocks or unblocks a contact from the local app (People).
+  'contact.block',
+  'contact.unblock',
   // U3-d (D-138): the owner names this agent from the local app.
   'agent.label',
   // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
@@ -74,6 +80,8 @@ interface ParamsOf {
   readonly 'contact.check': ContactCheckParams;
   readonly 'contact.rename': ContactRenameParams;
   readonly 'contact.remove': ContactRemoveParams;
+  readonly 'contact.block': ContactBlockParams;
+  readonly 'contact.unblock': ContactBlockParams;
   readonly 'agent.label': AgentLabelParams;
   readonly 'app.connect': AppChangeParams;
   readonly 'app.disconnect': AppChangeParams;
@@ -159,6 +167,10 @@ export type PrepareRefusal =
   | 'change_invalid'
   /** W4-PAUSE: Resume for an agent that is not paused (refused before the gesture). */
   | 'not_paused'
+  /** WP-12: Block for a contact that is already blocked (refused before the gesture). */
+  | 'already_blocked'
+  /** WP-12: Unblock for a contact that is not blocked (refused before the gesture). */
+  | 'not_blocked'
   /** W4-FILES-SAVE: not a received item ID `<envelope ID>.<index>` (index 00 to 15). */
   | 'item_invalid';
 
