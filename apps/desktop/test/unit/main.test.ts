@@ -1,7 +1,12 @@
 // The shell's startup order and wiring (src/main/main.ts) with a fake Electron: each forbidden
 // switch → exit, no window, no core; the session link only from the pipe; deep links only through
 // the (WP-D9) handler; quit stops the core.
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { CORE_LOG_FILE } from '../../src/main/core-log.js';
+import { STATUS_ACTION_URLS, statusPageUrl } from '../../src/main/status-page.js';
 import {
   LAUNCH_REFUSED_EXIT,
   readPreview,
@@ -10,7 +15,6 @@ import {
   type ShellProcess,
 } from '../../src/main/main.js';
 import { WINDOW_PARTITION } from '../../src/main/security.js';
-import { START_FAILURE_TEXT, START_FAILURE_TITLE } from '../../src/main/start-failure.js';
 import {
   FakeBrowserWindow,
   FakeEvent,
@@ -28,7 +32,14 @@ const RES = '/Applications/AgentLink.app/Contents/Resources';
 const SHORT = `2.${'A'.repeat(42)}A`;
 const INVITE = `https://agentlink.4thtech.io/i#${SHORT}`;
 
+const logDirs: string[] = [];
+afterEach(() => {
+  for (const dir of logDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
 function setup(args: string[] = [], over: Partial<ShellProcess> = {}) {
+  const logDir = join(mkdtempSync(join(tmpdir(), 'agentlink-main-')), 'Logs', 'AgentLink');
+  logDirs.push(join(logDir, '..', '..'));
   const electron = fakeElectron();
   const { spawn, children } = fakeSpawn();
   const proc: ShellProcess = {
@@ -45,10 +56,16 @@ function setup(args: string[] = [], over: Partial<ShellProcess> = {}) {
     spawn,
     timers: new FakeTimers(),
     preview: null,
+    logDir,
     ...over,
   };
   return { electron, children, proc };
 }
+
+/** The window's webContents emits a navigation to `url`; true when it was blocked. */
+const click = (url: string): boolean =>
+  FakeBrowserWindow.created[0]?.webContents.navigate('will-navigate', url) ?? false;
+const lastPage = (): string | undefined => FakeBrowserWindow.created[0]?.loaded.at(-1);
 
 const SWITCHES = [
   '--remote-debugging-port=9222',
@@ -140,8 +157,96 @@ describe('runShell startup', () => {
     expect(session?.permissionRequest).not.toBeNull();
     expect(session?.beforeRequest).not.toBeNull();
     expect(FakeTray.created).toHaveLength(1);
-    // No window before the core sends a link.
-    expect(FakeBrowserWindow.created).toHaveLength(0);
+  });
+
+  it('shows a window with the local starting page at once, before the core is ready', async () => {
+    const { electron, proc } = setup();
+    await runShell(electron, proc);
+    expect(FakeBrowserWindow.created).toHaveLength(1);
+    expect(FakeBrowserWindow.created[0]?.loaded).toEqual([statusPageUrl('starting')]);
+    expect(FakeBrowserWindow.created[0]?.visible).toBe(true);
+  });
+
+  it('always creates the tray: built-in image when the icon file is missing', async () => {
+    const { electron, proc } = setup([], { exists: (path) => !path.endsWith('.png') });
+    await runShell(electron, proc);
+    expect(FakeTray.created).toHaveLength(1);
+    expect(typeof FakeTray.created[0]?.icon).not.toBe('string');
+  });
+
+  it('missing core files → the fixed page, no core', async () => {
+    const { electron, children, proc } = setup([], { exists: (path) => !path.includes('node') });
+    await runShell(electron, proc);
+    expect(children).toHaveLength(0);
+    expect(lastPage()).toBe(statusPageUrl('missing_files'));
+  });
+
+  it('started from an AI app → the fixed page, no core (the core keeps its own guard)', async () => {
+    const { electron, children, proc } = setup([], {
+      env: { HOME: '/Users/x', PATH: '/usr/bin', CLAUDECODE: '1' },
+    });
+    await runShell(electron, proc);
+    expect(children).toHaveLength(0);
+    expect(lastPage()).toBe(statusPageUrl('ai_app'));
+    expect(click(STATUS_ACTION_URLS['try-again'])).toBe(true);
+    expect(children).toHaveLength(0);
+    expect(lastPage()).toBe(statusPageUrl('ai_app'));
+  });
+
+  it('five quick exits before ready → the "exited" page; Try again starts a new core', async () => {
+    const { electron, children, proc } = setup();
+    await runShell(electron, proc);
+    for (let i = 0; i < 5; i += 1) {
+      children[i]?.exit(1);
+      (proc.timers as FakeTimers).advance(30_000);
+    }
+    expect(children).toHaveLength(5);
+    expect(lastPage()).toBe(statusPageUrl('exited'));
+    expect(FakeTray.created[0]?.tooltip).toBe('AgentLink: Not running');
+    expect(click(STATUS_ACTION_URLS['try-again'])).toBe(true);
+    expect(children).toHaveLength(6);
+    expect(lastPage()).toBe(statusPageUrl('starting'));
+  });
+
+  it('a core that stops after ready → the starting page while it restarts', async () => {
+    const { electron, children, proc } = setup();
+    await runShell(electron, proc);
+    children[0]?.stream.push(readyLine());
+    expect(lastPage()).toBe(SESSION_URL);
+    children[0]?.exit(1);
+    (proc.timers as FakeTimers).advance(1_000);
+    expect(children).toHaveLength(2);
+    expect(lastPage()).toBe(statusPageUrl('starting'));
+    children[1]?.stream.push(readyLine(`http://localhost:5555/?t=${'C'.repeat(43)}`));
+    expect(lastPage()).toBe(`http://localhost:5555/?t=${'C'.repeat(43)}`);
+  });
+
+  it('keeps the core’s stderr, redacted, in core.log; Open log folder opens that folder', async () => {
+    const { electron, children, proc } = setup();
+    await runShell(electron, proc);
+    children[0]?.stderr.push(`Error: something broke at http://localhost:4567/?t=${'Z'.repeat(43)}\n`);
+    children[0]?.exit(1);
+    const text = readFileSync(join(proc.logDir, CORE_LOG_FILE), 'utf8');
+    expect(text).toContain('Error: something broke at [link removed]');
+    expect(text).not.toContain('ZZZZ');
+    expect(text).toMatch(/core started/);
+    expect(text).toMatch(/core exited \(code 1\)/);
+    for (let i = 1; i < 5; i += 1) {
+      (proc.timers as FakeTimers).advance(30_000);
+      children[i]?.exit(1);
+    }
+    expect(click(STATUS_ACTION_URLS['open-log-folder'])).toBe(true);
+    expect(electron.openedPaths).toEqual([proc.logDir]);
+  });
+
+  it('the session page cannot use the status actions', async () => {
+    const { electron, children, proc } = setup();
+    await runShell(electron, proc);
+    children[0]?.stream.push(readyLine());
+    expect(click(STATUS_ACTION_URLS['open-log-folder'])).toBe(true);
+    expect(click(STATUS_ACTION_URLS['try-again'])).toBe(true);
+    expect(electron.openedPaths).toEqual([]);
+    expect(children).toHaveLength(1);
   });
 
   it('loads only the session link from the pipe', async () => {
@@ -149,10 +254,10 @@ describe('runShell startup', () => {
     await runShell(electron, proc);
     children[0]?.stream.push(readyLine());
     const window = FakeBrowserWindow.created[0];
-    expect(window?.loaded).toEqual([SESSION_URL]);
+    expect(window?.loaded).toEqual([statusPageUrl('starting'), SESSION_URL]);
     // A link on another origin from the same core is refused.
     children[0]?.stream.push(readyLine(`http://localhost:1/?t=${'B'.repeat(43)}`));
-    expect(window?.loaded).toEqual([SESSION_URL]);
+    expect(window?.loaded).toEqual([statusPageUrl('starting'), SESSION_URL]);
   });
 
   it('locks every webContents that is ever created', async () => {
@@ -166,20 +271,23 @@ describe('runShell startup', () => {
     });
   });
 
-  it('a core that could not start → one fixed message, no restart, Try again in the tray', async () => {
+  it('a core that could not start → its fixed page in the window, no restart, Try again', async () => {
     const { electron, children, proc } = setup();
     await runShell(electron, proc);
     children[0]?.stream.push('{"v":1,"type":"stopped","reason":"keychain"}\n');
     children[0]?.exit(1);
-    expect(electron.dialog.shown).toHaveLength(1);
-    expect(electron.dialog.shown[0]?.title).toBe(START_FAILURE_TITLE);
-    expect(electron.dialog.shown[0]?.message).toBe(START_FAILURE_TEXT.keychain);
+    expect(lastPage()).toBe(statusPageUrl('keychain'));
+    expect(electron.dialog.shown).toHaveLength(0);
     (proc.timers as FakeTimers).advance(120_000);
     expect(children).toHaveLength(1);
-    expect(FakeBrowserWindow.created).toHaveLength(0);
+    expect(click(STATUS_ACTION_URLS['try-again'])).toBe(true);
+    expect(children).toHaveLength(2);
+    expect(lastPage()).toBe(statusPageUrl('starting'));
+    children[1]?.stream.push('{"v":1,"type":"stopped","reason":"keychain"}\n');
+    children[1]?.exit(1);
     const menu = FakeTray.created[0]?.menu as { template: { click?: () => void }[] };
     menu.template[1]?.click?.();
-    expect(children).toHaveLength(2);
+    expect(children).toHaveLength(3);
   });
 
   it('a protocol violation stops the core; nothing is loaded', async () => {
@@ -187,7 +295,7 @@ describe('runShell startup', () => {
     await runShell(electron, proc);
     children[0]?.stream.push('{"v":1,"type":"navigate","url":"https://evil.example/"}\n');
     expect(children[0]?.kills).toEqual(['SIGKILL']);
-    expect(FakeBrowserWindow.created).toHaveLength(0);
+    expect(FakeBrowserWindow.created[0]?.loaded).toEqual([statusPageUrl('starting')]);
   });
 });
 

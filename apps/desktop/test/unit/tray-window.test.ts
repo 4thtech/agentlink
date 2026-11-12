@@ -1,11 +1,13 @@
 // The minimal tray (src/main/tray.ts) and the main window (src/main/window.ts).
 import { describe, expect, it } from 'vitest';
-import { AppTray, TRAY_COPY, trayTooltip } from '../../src/main/tray.js';
+import { AppTray, BUILTIN_TRAY_PNG, TRAY_COPY, trayImage, trayTooltip } from '../../src/main/tray.js';
 import { OriginLock } from '../../src/main/security.js';
+import { STATUS_ACTION_URLS, statusPageUrl, type StatusAction } from '../../src/main/status-page.js';
 import { MainWindow } from '../../src/main/window.js';
 import {
   FakeBrowserWindow,
   FakeEvent,
+  FakeNativeImage,
   FakeTray,
   SESSION_URL,
   TOKEN,
@@ -55,19 +57,120 @@ describe('tray', () => {
   });
 });
 
+describe('trayImage', () => {
+  it('uses the icon file when it exists', () => {
+    const electron = fakeElectron();
+    electron.imageFiles.add('/res/assets/trayTemplate.png');
+    const image = trayImage(electron.nativeImage, '/res/assets/trayTemplate.png', 'darwin');
+    expect((image as FakeNativeImage).source).toBe('/res/assets/trayTemplate.png');
+    expect((image as FakeNativeImage).template).toBe(true);
+  });
+
+  it('falls back to the built-in template image when the file is missing or unreadable', () => {
+    const electron = fakeElectron();
+    const image = trayImage(electron.nativeImage, '/missing.png', 'darwin') as FakeNativeImage;
+    expect(image.source).toBe(`buffer:${BUILTIN_TRAY_PNG.length}`);
+    expect(image.scaleFactor).toBe(2);
+    expect(image.template).toBe(true);
+    expect(image.isEmpty()).toBe(false);
+  });
+
+  it('the built-in image is a PNG; template only on macOS', () => {
+    expect([...BUILTIN_TRAY_PNG.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    const electron = fakeElectron();
+    const image = trayImage(electron.nativeImage, '/missing.ico', 'win32') as FakeNativeImage;
+    expect(image.template).toBe(false);
+  });
+
+  it('a tray is created with the image', () => {
+    const electron = fakeElectron();
+    const image = trayImage(electron.nativeImage, '/missing.png', 'darwin');
+    new AppTray(electron, image, { open: () => undefined, retry: () => undefined, quit: () => undefined });
+    expect(FakeTray.created[0]?.icon).toBe(image);
+  });
+});
+
 describe('MainWindow', () => {
-  const make = (quitting = false): { window: MainWindow; lock: OriginLock } => {
+  const make = (
+    quitting = false,
+  ): { window: MainWindow; lock: OriginLock; actions: StatusAction[] } => {
     const electron = fakeElectron();
     const lock = new OriginLock();
+    const actions: StatusAction[] = [];
     const window = new MainWindow({
       BrowserWindow: electron.BrowserWindow,
       shell: electron.shell,
       lock,
       platform: 'darwin',
       quitting: () => quitting,
+      onStatusAction: (action) => actions.push(action),
     });
-    return { window, lock };
+    return { window, lock, actions };
   };
+
+  it('shows the local status page at once, without touching the origin lock', () => {
+    const { window, lock } = make();
+    window.showStatus('starting');
+    const fake = FakeBrowserWindow.created[0];
+    expect(fake?.loaded).toEqual([statusPageUrl('starting')]);
+    expect(fake?.visible).toBe(true);
+    expect(fake?.options.webPreferences.sandbox).toBe(true);
+    expect(lock.origin).toBeNull();
+    expect(window.page).toBe('status');
+    expect(window.loaded).toBe(false);
+    window.showStatus('starting');
+    expect(fake?.loaded).toHaveLength(1);
+  });
+
+  it('switches from the status page to the session link on ready (one window)', () => {
+    const { window, lock } = make();
+    window.showStatus('starting');
+    expect(window.loadSessionUrl(SESSION_URL)).toBe(true);
+    expect(FakeBrowserWindow.created).toHaveLength(1);
+    expect(FakeBrowserWindow.created[0]?.loaded).toEqual([statusPageUrl('starting'), SESSION_URL]);
+    expect(lock.origin).toBe('http://localhost:4567');
+    expect(window.page).toBe('session');
+  });
+
+  it('the status page buttons reach the shell; navigation never happens', () => {
+    const { window, actions } = make();
+    window.showStatus('exited');
+    const contents = FakeBrowserWindow.created[0]?.webContents;
+    expect(contents?.navigate('will-navigate', STATUS_ACTION_URLS['try-again'])).toBe(true);
+    expect(contents?.navigate('will-navigate', STATUS_ACTION_URLS['open-log-folder'])).toBe(true);
+    expect(contents?.navigate('will-navigate', 'http://agentlink.invalid/other')).toBe(true);
+    expect(contents?.navigate('will-redirect', STATUS_ACTION_URLS['try-again'])).toBe(true);
+    expect(actions).toEqual(['try-again', 'open-log-folder']);
+  });
+
+  it('the session page cannot trigger the status actions', () => {
+    const { window, actions } = make();
+    window.showStatus('starting');
+    window.loadSessionUrl(SESSION_URL);
+    const contents = FakeBrowserWindow.created[0]?.webContents;
+    expect(contents?.navigate('will-navigate', STATUS_ACTION_URLS['try-again'])).toBe(true);
+    expect(actions).toEqual([]);
+  });
+
+  it('a page that is not the fixed status page cannot trigger them either', () => {
+    const { window, actions } = make();
+    window.showStatus('exited');
+    const contents = FakeBrowserWindow.created[0]?.webContents;
+    if (contents !== undefined) contents.url = 'data:text/html,<a href=x>';
+    contents?.navigate('will-navigate', STATUS_ACTION_URLS['try-again']);
+    expect(actions).toEqual([]);
+  });
+
+  it('a failure page replaces the session page and the old origin is unlocked', () => {
+    const { window, lock } = make();
+    window.loadSessionUrl(SESSION_URL);
+    window.resetForNewCore();
+    window.showStatus('retries');
+    expect(lock.origin).toBeNull();
+    expect(window.page).toBe('status');
+    expect(window.loaded).toBe(false);
+    expect(FakeBrowserWindow.created[0]?.loaded.at(-1)).toBe(statusPageUrl('retries'));
+  });
 
   it('creates no window until the core sends a valid link', () => {
     const { window } = make();
