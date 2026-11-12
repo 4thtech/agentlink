@@ -126,7 +126,8 @@ export function AgentCard({
         {S.contactsCount(row.contacts)}
         {tidy ? ` · ${S.noAppNoContacts}` : ''}
       </p>
-      {row.current && a.cardName !== undefined && row.contacts !== 0 ? (
+      {/* WP-1 (R-1): also with no contacts yet (every new invite carries the card's name). */}
+      {row.current && a.cardName !== undefined ? (
         <CardNameNote
           row={row}
           cardName={a.cardName}
@@ -140,6 +141,7 @@ export function AgentCard({
           row={row}
           api={a.api}
           owner={a.owner}
+          {...(row.current && a.cardName !== undefined ? { cardName: a.cardName } : {})}
           onDone={() => setRenaming(false)}
           onCancel={() => setRenaming(false)}
           onChanged={a.onChanged}

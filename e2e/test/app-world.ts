@@ -44,7 +44,7 @@ import { serveUi, type UiDeps, type UiServer } from '../../apps/cli/dist/command
 import {
   openUiHostAgent,
   startUiWelcome,
-  withoutAssets,
+  hostUiOf,
   type UiHostDeps,
 } from '../../apps/cli/dist/commands/ui-host.js';
 import { joinStep } from '../../apps/cli/dist/commands/join.js';
@@ -325,7 +325,7 @@ export function uiDepsOf(
             name: agent.name,
             label: entry?.label ?? agent.name,
             source,
-            localUi: withoutAssets(localUi),
+            localUi: hostUiOf(agent, localUi),
             close: () => agent.close(),
           },
           open: (other) => openUiHostAgent(hostDeps, other),

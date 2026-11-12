@@ -178,7 +178,9 @@ function contextOf(w: World): LocalUiContext {
 }
 
 async function cardNameRead(w: World): Promise<unknown> {
-  const r = agentsManageRoutes.find((x) => x.path === '/api/ui/agents/card-name') as LocalUiReadRoute;
+  const r = agentsManageRoutes.find(
+    (x) => x.path === '/api/ui/agents/card-name',
+  ) as LocalUiReadRoute;
   const out = await r.handler(contextOf(w), {
     query: new URLSearchParams(),
   } as never);

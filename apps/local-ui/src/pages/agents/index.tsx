@@ -39,7 +39,7 @@ import { createDetailApi, type DetailApi } from './detail-api.js';
 import { Fleet, fleetSummary } from './fleet.js';
 import { recordLive } from './history.js';
 import { forgetIntent, rememberIntent, takeIntent, type IntentAction } from './intent.js';
-import { PausedBanner, PauseSheet, ResumeGate } from './parts.js';
+import { CardNameNote, PausedBanner, PauseSheet, ResumeGate } from './parts.js';
 import { RemoveSheet } from './sheets.js';
 import { AgentCard, type Panel } from './simple.js';
 import { AGENTS_STRINGS as S } from './strings.js';
@@ -186,16 +186,20 @@ export function AgentsPage({
     if (action !== undefined) act(action, row);
   }, [fresh, act]);
 
-  // D-141: "Contacts still see {cardName}" for the open agent, read once.
+  // D-141: "Contacts still see {cardName}" for the open agent. WP-1: read again whenever the open
+  // ID, its label or the generation changes (a switch, a rename elsewhere), not only once.
+  const openName = open?.name;
+  const openLabel = open?.label;
   useEffect(() => {
     let live = true;
     void api.cardName().then((out) => {
-      if (live && out.kind === 'differs') setCardName(out.cardName);
+      if (!live) return;
+      setCardName(out.kind === 'differs' ? out.cardName : undefined);
     });
     return () => {
       live = false;
     };
-  }, [api]);
+  }, [api, openName, openLabel, generation]);
 
   const doSwitch = useCallback(
     (row: AgentRow): void => {
@@ -239,6 +243,23 @@ export function AgentsPage({
   const onRenamed = (label: string, told: boolean): void => {
     setNotice(told ? S.renamedTold(label) : undefined);
   };
+
+  const onCardUpdated = (told: boolean): void => {
+    setCardName(undefined);
+    setNotice(told && open !== undefined ? S.renamedTold(open.label) : undefined);
+    changed();
+  };
+  // WP-1 (R-1): the note Under the hood and on the open ID's own page (the Simple card has its own).
+  const cardNote =
+    open === undefined || cardName === undefined ? null : (
+      <CardNameNote
+        row={open}
+        cardName={cardName}
+        api={api}
+        owner={owner}
+        onUpdated={onCardUpdated}
+      />
+    );
 
   const pausedOpen = open !== undefined && stateOf(open) === 'paused' ? open : undefined;
   const banner =
@@ -321,7 +342,14 @@ export function AgentsPage({
           owner={owner}
           {...(apps === undefined ? {} : { apps })}
           labelOf={labelOf}
-          banner={detail.current ? banner : null}
+          banner={
+            detail.current ? (
+              <>
+                {banner}
+                {cardNote}
+              </>
+            ) : null
+          }
           onPause={onPause}
           onResume={onResume}
           onSwitch={doSwitch}
@@ -388,13 +416,16 @@ export function AgentsPage({
     ) : hood && view === 'map' && MapView !== undefined ? (
       <MapView agents={rows} onShowList={() => setView('list')} onSwitch={doSwitch} />
     ) : hood ? (
-      <Fleet
-        rows={rows}
-        now={now}
-        onPause={onPause}
-        onResume={onResume}
-        onRemove={(picked) => setRemoveQueue(picked)}
-      />
+      <>
+        {cardNote}
+        <Fleet
+          rows={rows}
+          now={now}
+          onPause={onPause}
+          onResume={onResume}
+          onRemove={(picked) => setRemoveQueue(picked)}
+        />
+      </>
     ) : (
       <div className="ag-cards">
         {rows.map((row) => (
@@ -418,11 +449,7 @@ export function AgentsPage({
               onAppsElsewhere,
               onInvite,
               onRenamed,
-              onCardUpdated: (told) => {
-                setCardName(undefined);
-                setNotice(told && open !== undefined ? S.renamedTold(open.label) : undefined);
-                changed();
-              },
+              onCardUpdated,
               onChanged: changed,
               onAgentChanged: agentChanged,
             }}

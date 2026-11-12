@@ -291,7 +291,7 @@ async function addAgentWithOwner(
     throw error;
   }
   const fingerprint = ownerFingerprintText(owner);
-  let signed: SignedAfterCard = {};
+  let signed: SignedAfterCard;
   try {
     terminal.write(COPY.owner(fingerprint));
     writeAgentReview(terminal, card, plan);
@@ -419,7 +419,7 @@ async function addAgentWithoutCard(
     }
     const { store, session, owner } = unlocked;
     const fingerprint = ownerFingerprintText(owner);
-    let signed: SignedAfterCard = {};
+    let signed: SignedAfterCard;
     try {
       signed = await signFirstCard(session, card, owner, plan);
     } finally {
