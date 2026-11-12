@@ -40,7 +40,7 @@ function fake(ids: string[]) {
   const cancelled: { id: string; keepalive: boolean }[] = [];
   const api: InviteApi = {
     create: () => {
-      const id = ids.shift() ?? ID_2;
+      const id = ids.shift() ?? ID_1;
       return Promise.resolve<CreateOutcome>({
         kind: 'ok',
         invite: {

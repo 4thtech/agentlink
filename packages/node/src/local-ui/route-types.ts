@@ -16,7 +16,7 @@
 // no handler (the server's switch gate runs it); it writes only `app.json`. U3-c also adds route
 // stubs (`stub: true`) for the U3 routes later cards fill: a stub answers 501 `not_available` before
 // any presence check and never runs its handler.
-import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
+import type { CreatedInvite, InviteLinkResult, PendingContact } from '@4thtech-io/core';
 import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
 import { UI_SETTINGS_PATH, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { LocalUiContext } from './context.js';
@@ -286,7 +286,7 @@ export interface LocalUiKitRevealRoute {
 }
 
 /** UX2-d1: the steps of the invite kind (U3-invite adds `dismiss`, "Not now" on the join screen). */
-export type LocalUiInviteStep = 'create' | 'check' | 'dismiss' | 'cancel';
+export type LocalUiInviteStep = 'create' | 'check' | 'dismiss' | 'cancel' | 'link';
 
 /** UX2-d1: a pasted invite after core's accept step 1 (04 §3.6): who it is and its expiry. */
 export interface LocalUiCheckedInvite {
@@ -307,6 +307,12 @@ export interface LocalUiInviteDesk {
   check(link: string): Promise<LocalUiCheckedInvite>;
   /** W4-INVITES-LIST: core `cancelInvite` (04 §3.6.2: an owner action on the local page). */
   cancel(inviteId: string): Promise<'cancelled' | 'not_found'>;
+  /**
+   * REL051-B2: core `inviteLink`, the kept link of one open invite (Copy link, Show link). The link
+   * carries the invite secret: answered only to the page, never logged. Optional so older fakes stay
+   * valid; without it the route answers `no_link`.
+   */
+  link?(inviteId: string): Promise<InviteLinkResult>;
 }
 
 /**

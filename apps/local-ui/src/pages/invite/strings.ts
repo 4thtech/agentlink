@@ -52,6 +52,14 @@ export const INVITE_STRINGS = {
   cancelled: 'Invite cancelled. The link no longer works.',
   cantCancel: "Couldn't cancel the invite. Try again in a minute.",
   pendingLabel: 'Invites waiting for an answer',
+  // REL051-B2 (owner test, 13 Nov): a waiting invite's link, again, only on a click.
+  copyLink: 'Copy link',
+  linkCopied: 'Copied',
+  showLink: 'Show link',
+  hideLink: 'Hide link',
+  noLinkKept: 'This invite was made before AgentLink kept links. Cancel it and make a new one.',
+  linkGone: 'This invite was just accepted, cancelled or ran out.',
+  cantGetLink: "Couldn't get the link. Try again in a minute.",
   // The person menu.
   rename: 'Rename',
   checkCode: 'Contact check',

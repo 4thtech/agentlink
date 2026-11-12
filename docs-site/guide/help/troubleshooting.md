@@ -31,7 +31,7 @@ Run `npx -y @4thtech-io/agentlink@latest` (from 0.4.4; before that `npx -y @4tht
 ## Pairing and contacts
 
 **The invite expired or was already used.**
-Invites work once and expire after 7 days at most. Ask for a new one. If you made the invite and lost the link, open Invite someone, cancel the open invite and create a new one: a lost link cannot be shown again.
+Invites work once and expire after 7 days at most. Ask for a new one. If you made the invite and lost the link, find it on Home or in People under **Waiting for … to accept** and press **Copy link**.
 
 **The invite link I got is very long.**
 If the encrypted drop could not be reached within 10 seconds, you get the long link instead. It works the same. Older long links keep working.

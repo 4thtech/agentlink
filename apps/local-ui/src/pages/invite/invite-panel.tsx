@@ -9,8 +9,10 @@
 // - The optional name is only for your list (the invite's local label). A name added before the
 //   link went anywhere makes a fresh link with that name and cancels the unnamed one; once the link
 //   was copied, emailed, shared or shown as a QR code, the name is fixed.
-// - A link that never left the screen is cancelled when the panel goes, so a visit leaves no
-//   pending row behind.
+// - REL051-B2 (owner test, 13 Nov; replaces "a link that never left the screen is cancelled when
+//   the panel goes"): leaving keeps the link, copied or not. It waits under Home and People, where
+//   Copy link and Show link get it again (the app keeps it, sealed) and Cancel invite ends it. Only
+//   Get started's "Skip for now" (`discard`) ends a link that never left the screen.
 // - Copy (✓ moment), Email (a real `mailto:` link with our share text; a click does not count as
 //   sent, since nothing tells us a mail app opened), Copy invite message (the whole share text, the
 //   dependable way when there is no mail app), Share (only where the browser has a share sheet).
@@ -25,7 +27,7 @@ import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import { QrCode } from '../proofs/qr.js';
 import { CheckMark, CopyMark, MailIcon, ShareIcon } from './icons.js';
 import { INVITE_STRINGS as S, linkLabel, mailtoOf, worksFor } from './strings.js';
-import { forgetUnsent, rememberUnsent, unsentInvites } from './unsent-invites.js';
+import { clearUnsentInvites } from './unsent-invites.js';
 import './invite.css';
 
 const DAY_MS = 86_400_000;
@@ -37,8 +39,13 @@ export interface InvitePanelProps {
   readonly invites?: InviteApi;
   /** A link was made (the pending list can read again). */
   readonly onCreated?: () => void;
-  /** Whether a link is on screen that has not gone anywhere yet (leaving would cancel it). */
+  /** Whether a link is on screen that has not gone anywhere yet. */
   readonly onUnsent?: (unsent: boolean) => void;
+  /**
+   * REL051-B2: set to true just before the panel goes when the owner chose not to invite ("Skip for
+   * now" in Get started): a link that never left the screen is then cancelled. Otherwise it stays.
+   */
+  readonly discard?: { readonly current: boolean };
   /** WP-1: the IDs and owner clients of the name update asked before an invite (tests). */
   readonly agents?: AgentsApi;
   readonly owner?: OwnerClient;
@@ -80,6 +87,7 @@ export function InvitePanel({
   invites: givenInvites,
   onCreated,
   onUnsent,
+  discard,
   now = () => Date.now(),
   agents: givenAgents,
   owner: givenOwner,
@@ -171,57 +179,28 @@ export function InvitePanel({
         void invites.cancel(id);
         return;
       }
-      // W5-INVITE-FEEDBACK: kept in this tab until it leaves the screen, so a reload cancels it.
-      if (!sharedRef.current) rememberUnsent(id);
       madeRef.current = next;
       setMade(next);
       setPhase('ready');
       onCreated?.();
       // The one it replaces never left the screen: it goes.
-      if (previous !== undefined && !sharedRef.current) {
-        const gone = previous.id;
-        void invites.cancel(gone).then(() => forgetUnsent(gone));
-      }
+      if (previous !== undefined && !sharedRef.current) void invites.cancel(previous.id);
     },
     [invites, onCreated],
   );
 
   useEffect(() => {
     live.current = true;
-    // W5-INVITE-FEEDBACK: links an earlier load of this tab made that never left the screen.
-    for (const id of unsentInvites()) {
-      void invites.cancel(id).then((outcome) => {
-        if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') forgetUnsent(id);
-      });
-    }
+    // REL051-B2: an older build kept unsent invite IDs in this tab to cancel them later; those
+    // invites now wait under Home and People instead, so the key is only cleared.
+    clearUnsentInvites();
     void make('', false);
-    // A reload or a closed tab never unmounts: cancel what did not leave the screen as it hides.
-    let hidden: string | undefined;
-    const onHide = (): void => {
-      const last = madeRef.current;
-      if (last === undefined || sharedRef.current) return;
-      hidden = last.id;
-      void invites.cancel(last.id, { keepalive: true });
-    };
-    // Back from the browser's page cache: the link on screen was cancelled, so make a fresh one.
-    const onShow = (event: PageTransitionEvent): void => {
-      const last = madeRef.current;
-      if (!event.persisted || hidden === undefined || last?.id !== hidden) return;
-      hidden = undefined;
-      madeRef.current = undefined;
-      setMade(undefined);
-      void make(last.label, last.askedLong);
-    };
-    window.addEventListener('pagehide', onHide);
-    window.addEventListener('pageshow', onShow);
     return () => {
       live.current = false;
-      window.removeEventListener('pagehide', onHide);
-      window.removeEventListener('pageshow', onShow);
+      // The link stays (Home and People can copy it again), unless the owner chose not to invite.
       const last = madeRef.current;
-      // A link that never left the screen leaves no pending row behind.
-      if (last !== undefined && !sharedRef.current) {
-        void invites.cancel(last.id).then(() => forgetUnsent(last.id));
+      if (discard?.current === true && last !== undefined && !sharedRef.current) {
+        void invites.cancel(last.id);
       }
     };
     // Made once per panel.
@@ -252,7 +231,6 @@ export function InvitePanel({
   const markShared = (): void => {
     sharedRef.current = true;
     setShared(true);
-    if (madeRef.current !== undefined) forgetUnsent(madeRef.current.id);
   };
 
   // IR-1 low (a): any copy whose selection holds the link counts as sent (the box, a triple-click,
@@ -272,7 +250,6 @@ export function InvitePanel({
       if (inBox || selection.toString().includes(url.slice(-12))) {
         sharedRef.current = true;
         setShared(true);
-        if (madeRef.current !== undefined) forgetUnsent(madeRef.current.id);
       }
     };
     document.addEventListener('copy', onCopy);
@@ -312,7 +289,6 @@ export function InvitePanel({
   const keepPending = (): void => {
     keptRef.current = true;
     sharedRef.current = true;
-    if (madeRef.current !== undefined) forgetUnsent(madeRef.current.id);
   };
   // The whole invite text (our words around the link), for a mail written by hand or a chat.
   const copyMessage = (): void => {
@@ -424,8 +400,8 @@ export function InvitePanel({
           </div>
           <div className="inv-ways">
             {/* A real link: the mail app opens when there is one. Nothing tells us it did, so the
-                click is not "sent" (Copy invite message is); it only stops a hidden page from
-                cancelling the invite, which then waits until it expires. */}
+                click is not "sent" (Copy invite message is); it fixes the name and keeps Skip for
+                now from cancelling the invite, which then waits until it expires. */}
             {ready && invite !== undefined ? (
               <a
                 className="al-btn al-btn-secondary al-press inv-email"

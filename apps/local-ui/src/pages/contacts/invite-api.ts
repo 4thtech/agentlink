@@ -17,6 +17,8 @@ export const INVITE_CREATE_PATH = '/api/ui/invites';
 export const INVITE_CHECK_PATH = '/api/ui/invites/check';
 export const INVITE_ACCEPT_PATH = '/api/ui/invites/accept';
 export const INVITE_CANCEL_PATH = '/api/ui/invites/cancel';
+/** REL051-B2: the kept link of one open invite (Copy link, Show link). */
+export const INVITE_LINK_PATH = '/api/ui/invites/link';
 /** The open invites are read with a GET on the create path (W4-INVITES-LIST). */
 export const INVITES_LIST_PATH = '/api/ui/invites';
 
@@ -52,6 +54,16 @@ export interface OpenInvite {
   /** Unix milliseconds. */
   readonly expiresAt: number;
 }
+
+/**
+ * REL051-B2: an open invite's kept link, on the owner's click only. `no_link`: the invite was made
+ * before the app kept links; `not_found`: it was accepted, cancelled or expired meanwhile.
+ */
+export type LinkOutcome =
+  | { readonly kind: 'ok'; readonly inviteUrl: string; readonly shareText: string }
+  | {
+      readonly kind: 'no_link' | 'not_found' | 'session_expired' | 'offline' | 'failed';
+    };
 
 export type CancelOutcome = {
   readonly kind: 'cancelled' | 'not_found' | 'session_expired' | 'offline' | 'failed';
@@ -135,6 +147,8 @@ export interface InviteApi {
   cancel(inviteId: string, options?: { readonly keepalive?: boolean }): Promise<CancelOutcome>;
   check(invite: string): Promise<CheckOutcome>;
   accept(invite: string, proof: PresenceProof): Promise<AcceptOutcome>;
+  /** REL051-B2: the kept link of one open invite. Optional so older fakes stay valid. */
+  link?(inviteId: string): Promise<LinkOutcome>;
 }
 
 export interface InviteApiOptions {
@@ -161,6 +175,17 @@ function timeOf(value: unknown): number | undefined {
   if (typeof value !== 'string' || !RFC3339.test(value)) return undefined;
   const ms = Date.parse(value);
   return Number.isFinite(ms) ? ms : undefined;
+}
+
+/** A link of the canonical host in the form its format names; else undefined. */
+function linkOf(inviteUrl: unknown, format: unknown): string | undefined {
+  if (format !== 'short' && format !== 'long') return undefined;
+  if (typeof inviteUrl !== 'string' || !inviteUrl.startsWith(LINK_PREFIX)) return undefined;
+  const shaped =
+    format === 'short'
+      ? SHORT_LINK.test(inviteUrl)
+      : PAYLOAD.test(inviteUrl.slice(LINK_PREFIX.length));
+  return shaped ? inviteUrl : undefined;
 }
 
 function created(json: Record<string, unknown>): CreatedInvite | undefined {
@@ -350,6 +375,34 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
       if (status === 200 && json['status'] === 'cancelled') return { kind: 'cancelled' };
       if (status === 401) return { kind: 'session_expired' };
       if (status === 404 && json['error'] === 'not_found') return { kind: 'not_found' };
+      return { kind: 'failed' };
+    },
+
+    async link(inviteId) {
+      if (!INVITE_ID.test(inviteId)) return { kind: 'failed' };
+      const answer = await call(INVITE_LINK_PATH, {
+        headers: inviteHeaders(),
+        body: encode({ inviteId }),
+      });
+      if (answer.kind === 'offline') return { kind: 'offline' };
+      const { status, json } = answer;
+      if (status === 200 && json['status'] === 'ok') {
+        const inviteUrl = linkOf(json['inviteUrl'], json['format']);
+        const shareText = json['shareText'];
+        if (
+          inviteUrl === undefined ||
+          typeof shareText !== 'string' ||
+          shareText.length > MAX_SHARE_CHARS ||
+          // Our template around this very link (11 §6.1 J7), nothing else.
+          !shareText.endsWith(inviteUrl)
+        ) {
+          return { kind: 'failed' };
+        }
+        return { kind: 'ok', inviteUrl, shareText };
+      }
+      if (status === 401) return { kind: 'session_expired' };
+      if (status === 404 && json['error'] === 'not_found') return { kind: 'not_found' };
+      if (status === 404 && json['error'] === 'no_link') return { kind: 'no_link' };
       return { kind: 'failed' };
     },
 

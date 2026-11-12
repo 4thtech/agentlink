@@ -75,6 +75,7 @@ import {
   parseOpenInvites,
   type ConnectingRow,
   type InviteApi,
+  type LinkOutcome,
   type OpenInvite,
 } from './invite-api.js';
 import { CONTACTS_CHANGED, diffContacts } from '../../api/contact-changes.js';
@@ -926,8 +927,9 @@ const FOLLOW_AFTER_CONNECT_MS = 120_000;
 
 /**
  * W4-INVITES-LIST (b11 §21.3, Closing), W4-PEOPLE-INVITE (A4): the open invites the server holds,
- * and the ones cancelled in this visit, as PendingInviteRow rows. Never a link: a lost link is
- * cancelled and a new one made. The newest gets the 1.2 s highlight (a colour only).
+ * and the ones cancelled in this visit, as PendingInviteRow rows. The list carries no link; Copy
+ * link and Show link read the kept one on a click (REL051-B2). The newest gets the 1.2 s highlight
+ * (a colour only).
  */
 function PendingInvites({
   rows,
@@ -935,6 +937,7 @@ function PendingInvites({
   highlight,
   now,
   onCancel,
+  onLink,
   connecting = [],
   blockedRefs,
   onUnblock,
@@ -944,6 +947,8 @@ function PendingInvites({
   highlight: string | undefined;
   now: number;
   onCancel: (inviteId: string) => Promise<CancelResult>;
+  /** REL051-B2: the kept link of one open invite. */
+  onLink?: (inviteId: string) => Promise<LinkOutcome>;
   /** W5-INVITE-FEEDBACK: this agent's accepts that wait for the inviter's answer. */
   connecting?: readonly ConnectingRow[];
   /** Contacts the page knows are blocked (matched to a waiting accept by ref). */
@@ -973,6 +978,7 @@ function PendingInvites({
           cancelled={done.has(r.inviteId)}
           highlight={r.inviteId === highlight}
           onCancel={onCancel}
+          {...(onLink === undefined ? {} : { onLink })}
         />
       ))}
     </Surface>
@@ -1272,13 +1278,18 @@ export function ContactsPage({
 
   // IR-W4-WIRE-2X-1: "Have an invite link? Paste it" opens a paste screen that makes no invite.
   const [pasting, setPasting] = useState(openedForPaste);
+  // REL051-B2: Paste it from the Invite screen means "I was invited", not "I invite": the link the
+  // screen made and that never left it is ended as the screen goes. Done keeps it (it waits below).
+  const discardInvite = useRef(false);
   const openPaste = (): void => {
+    if (inviting) discardInvite.current = true;
     setSheetOpen(false);
     setNotice(undefined);
     setInviting(false);
     setPasting(true);
   };
   const openInvite = (): void => {
+    discardInvite.current = false;
     setSheetOpen(false);
     setNotice(undefined);
     setInviting(true);
@@ -1373,6 +1384,7 @@ export function ContactsPage({
         highlight={highlight}
         now={Date.now()}
         onCancel={cancelInvite}
+        {...(invites.link === undefined ? {} : { onLink: (id: string) => invites.link!(id) })}
         connecting={connectingRows}
         blockedRefs={
           new Set(
@@ -1711,6 +1723,7 @@ export function ContactsPage({
         {arrived === undefined ? (
           <InviteScreen
             invites={invites}
+            discard={discardInvite}
             paste={{
               passkey,
               onConnected: accepted,

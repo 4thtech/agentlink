@@ -643,7 +643,7 @@ describe(
       raw.prepare('INSERT INTO "agent_pause" ("slot", "paused_at") VALUES (?, 7)').run('current');
       raw.close();
       const v13 = await SqliteStore.open(path());
-      expect(v13.schemaVersion).toBe(13);
+      expect(v13.schemaVersion).toBe(STORE_SCHEMA_VERSION); // forward to the current version (14 since REL051-B2)
       expect(await v13.transaction((tx) => tx.select('mcp_sessions'))).toEqual([
         {
           session_id: 'AAAAAAAAAAAAAAAAAAAAAA',
@@ -686,7 +686,7 @@ describe(
       await v13.close();
       // Opening it again runs no migration and keeps the rows.
       const again = await SqliteStore.open(path());
-      expect(again.schemaVersion).toBe(13);
+      expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
       expect(await again.transaction((tx) => tx.select('mcp_sessions'))).toHaveLength(2);
       await again.close();
     });

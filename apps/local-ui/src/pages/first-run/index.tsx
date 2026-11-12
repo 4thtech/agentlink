@@ -655,15 +655,16 @@ export function FirstRunPage({
   useEffect(() => {
     if (invitePanel === undefined) void INVITE_PANEL.load().catch(() => undefined);
   }, [invitePanel]);
-  // A link that never left step 4 is cancelled when the panel goes (U4's rule). "Go to Home" is a
+  // REL051-B2 (owner test, 13 Nov): Done keeps the link made on step 4, copied or not; it waits on
+  // Home (Copy link, Cancel invite). "Skip for now" and the header's "Skip to Home" mean no invite:
+  // a link that never left the screen is cancelled as the panel goes (`discard`). "Go to Home" is a
   // full load, which would cut that cancel off: the panel goes first, its cancel is answered (at
   // most 1.5 s), then Home opens.
   const stepInvites = useMemo(() => trackCancels(createInviteApi()), []);
   const [inviteGone, setInviteGone] = useState(false);
-  const [linkUnsent, setLinkUnsent] = useState(false);
-  // The warning for a link nobody has copied: raised by Done, Skip for now or the header's "Skip to Home".
-  const [leaveWarned, setLeaveWarned] = useState(false);
-  const leaveInvite = (): void => {
+  const discardInvite = useRef(false);
+  const leaveInvite = (keep: boolean): void => {
+    discardInvite.current = !keep;
     setInviteGone(true);
     window.setTimeout(() => void stepInvites.settled().then(goHome), 0);
   };
@@ -1149,9 +1150,15 @@ export function FirstRunPage({
   }, [step]);
 
   const sensorWords = S.connect(sensor);
-  const unsentLink = step === 'invite' && linkUnsent && invitePanel === undefined;
-  // "Skip to Home" warns like Done does while the link on screen has not been copied (once).
-  const guardedSkip = unsentLink && !leaveWarned ? (): void => setLeaveWarned(true) : onSkip;
+  // On step 4 "Skip to Home" means no invite, as "Skip for now" does (REL051-B2).
+  const guardedSkip =
+    step === 'invite' && invitePanel === undefined
+      ? (): void => {
+          discardInvite.current = true;
+          if (onSkip !== undefined) onSkip();
+          else skipToHome();
+        }
+      : onSkip;
   const frame = (body: ReactElement, at: StepId = step): ReactElement => (
     <WizardFrame step={at} {...(guardedSkip === undefined ? {} : { onSkip: guardedSkip })}>
       {body}
@@ -1182,16 +1189,14 @@ export function FirstRunPage({
     return frame(
       <InviteStep
         inviteHref={INVITE_PATH}
-        unsent={linkUnsent && invitePanel === undefined}
-        warned={leaveWarned}
-        onWarn={() => setLeaveWarned(true)}
-        onHome={invitePanel === undefined ? leaveInvite : goHome}
+        onHome={invitePanel === undefined ? () => leaveInvite(true) : goHome}
+        onSkip={invitePanel === undefined ? () => leaveInvite(false) : goHome}
         panel={
           invitePanel ??
           (inviteGone ? (
             <></>
           ) : (
-            <INVITE_PANEL.Part invites={stepInvites.api} onUnsent={setLinkUnsent} />
+            <INVITE_PANEL.Part invites={stepInvites.api} discard={discardInvite} />
           ))
         }
       />,
