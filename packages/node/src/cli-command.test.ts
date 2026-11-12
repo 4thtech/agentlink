@@ -1,6 +1,6 @@
 // M1-36a-b: the approval pages and the owner-init messages never tell the user to run a bare
 // `agentlink ...` (it is not on PATH after the documented npx install). `ui` is a real command
-// (apps/cli dispatch.ts) since M1-11b-9; R1-UI-12 names it on the expired app link, and an expired
+// (apps/cli/src/dispatch.ts) since M1-11b-9; R1-UI-12 names it on the expired app link, and an expired
 // approval link names `approve` (REL051-INTFIX). The command is the fixed npx form: a constant, never built from a request,
 // a stored value or inbound content (I-5). M1-11b-2c: the server's pages are the fixed ones in
 // approval-pages.ts; the approvals' own words live in the app (apps/local-ui strings.test.ts checks
