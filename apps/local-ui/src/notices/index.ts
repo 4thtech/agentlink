@@ -10,6 +10,7 @@
 // page is open.
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import type { ToastItem } from '@4thtech-io/ui';
+import { keepInApp, onKeptLoaded } from '../prefs/app-kept.js';
 
 // --- toasts -----------------------------------------------------------------------------------
 
@@ -65,6 +66,8 @@ function writeList(name: string, list: readonly string[], max: number): void {
   } catch {
     // Not remembered; the page keeps it while it is open.
   }
+  // UX1113-QA-HOST: the app keeps it too (storage is per launch, prefs/app-kept.ts).
+  keepInApp(name);
 }
 
 const dismissedHere = new Set<string>();
@@ -162,6 +165,14 @@ export function setArchived(id: string, ref: string, archived: boolean): void {
   archiveVersion += 1;
   for (const l of archiveListeners) l();
 }
+
+// UX1113-QA-HOST: the app's copy of dismissals and Archive arrived at start: read storage again.
+onKeptLoaded(() => {
+  dismissVersion += 1;
+  archiveVersion += 1;
+  for (const l of dismissListeners) l();
+  for (const l of archiveListeners) l();
+});
 
 function subscribeArchived(l: () => void): () => void {
   archiveListeners.add(l);

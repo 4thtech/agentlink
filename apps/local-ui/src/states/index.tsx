@@ -28,7 +28,18 @@ export function NotAvailablePage({ title }: { title: string }): ReactElement {
 }
 
 export function NotFoundPage(): ReactElement {
-  return <EmptyState icon="search" title={`${S.notFoundTitle} ${S.notFoundHint}`} />;
+  // UX1113-QA-HOST: the host now serves the app for an unknown path too, so this is what shows.
+  return (
+    <EmptyState
+      icon="search"
+      title={`${S.notFoundTitle} ${S.notFoundHint}`}
+      action={
+        <a className="al-btn al-btn-secondary al-btn-sm" href="/">
+          {S.notFoundHome}
+        </a>
+      }
+    />
+  );
 }
 
 /** The session link was used or is too old (the server answered 401). */
