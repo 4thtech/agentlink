@@ -606,7 +606,8 @@
         "to": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
+          "maxLength": 256,
+          "description": "The contact, as the user names them (for example \"Natasa\" in \"send Natasa a message\"), or an id from agentlink_list_contacts. If none or more than one contact matches, ask the user which one; never guess."
         },
         "text": {
           "type": "string"
@@ -873,7 +874,8 @@
         "to": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
+          "maxLength": 256,
+          "description": "The contact, as the user names them (for example \"Natasa\" in \"send Natasa a message\"), or an id from agentlink_list_contacts. If none or more than one contact matches, ask the user which one; never guess."
         },
         "terms": {
           "type": "object",
@@ -1481,7 +1483,8 @@
         "contact": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
+          "maxLength": 256,
+          "description": "The contact, as the user names them (for example \"Natasa\" in \"send Natasa a message\"), or an id from agentlink_list_contacts. If none or more than one contact matches, ask the user which one; never guess."
         },
         "since": {
           "type": "string",

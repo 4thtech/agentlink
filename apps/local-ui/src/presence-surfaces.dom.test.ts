@@ -419,6 +419,7 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/proofs/top-up.tsx': { offers: /<UseCodeInstead\b/ },
   // Screens that confirm through the shared prompt (presence-prompt.tsx offers the code).
   'pages/agents/owner-gate.tsx': { offers: /<PresencePrompt\b/ },
+  'pages/agents/name-update.tsx': { offers: /<OwnerGate\b/ },
   'pages/agents/parts.tsx': { offers: /<OwnerGate\b/ },
   'pages/agents/sheets.tsx': { offers: /<OwnerGate\b/ },
   'pages/apps/panel.tsx': { offers: /<OwnerGate\b/ },
