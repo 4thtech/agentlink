@@ -76,6 +76,8 @@ Your browser opens the app. Pick your AI app, use one Touch ID (Windows Hello on
 
 **Got an invite link?** Open it: the page at [agentlink.4thtech.io](https://agentlink.4thtech.io) shows how to accept. Or paste it into the app with **Someone invited you? Paste link**.
 
+**Desktop app (coming soon).** An early-adopter preview for Mac and Windows is planned. It is not released yet and its first builds are not signed, so your computer shows a warning once. The [desktop app page](docs-site/guide/apps/desktop-app.md) has the steps.
+
 New to this? Follow the [quick guide, from install to first chat](docs-site/guide/quick-guide.md). The package is exactly `@4thtech-io/agentlink`; similar names are not ours.
 
 **Works with** Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, on Mac and Windows. Any AI app that can add an MCP server can use it.
