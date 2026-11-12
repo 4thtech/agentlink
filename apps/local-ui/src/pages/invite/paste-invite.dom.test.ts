@@ -80,11 +80,16 @@ interface Mounted {
 }
 
 async function mount(
-  o: { invites?: Fake; passkey?: PasskeyInfo | undefined; proof?: PresenceProof | undefined } = {},
+  o: {
+    invites?: Fake;
+    passkey?: PasskeyInfo | undefined;
+    proof?: PresenceProof | undefined;
+    gesture?: () => Promise<PresenceProof | undefined>;
+  } = {},
 ): Promise<Mounted> {
   const invites = o.invites ?? fakeInvites();
   const connected = vi.fn();
-  const gesture = vi.fn(() => Promise.resolve('proof' in o ? o.proof : PROOF));
+  const gesture = vi.fn(o.gesture ?? (() => Promise.resolve('proof' in o ? o.proof : PROOF)));
   await act(async () => {
     root.render(
       createElement(InviteScreen, {
@@ -201,6 +206,25 @@ describe('W4-WIRE-2: "Have an invite link? Paste it" on the Invite screen', () =
     expect(invites.accepted).toEqual([{ link: SHORT, proof: PROOF }]);
     expect(connected).toHaveBeenCalledTimes(1);
     expect(String(connected.mock.calls[0]?.[0])).toContain('Ana');
+  });
+
+  it('REL051-UF3 (R1-UI-06): a double click on Accept asks for Touch ID once and sends once', async () => {
+    let answer: ((p: PresenceProof) => void) | undefined;
+    const { invites, gesture } = await mount({
+      gesture: () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    });
+    await openAndPaste(SHORT);
+    const accept = button('Accept with Touch ID');
+    await act(async () => accept.click());
+    await act(async () => accept.click());
+    expect(gesture).toHaveBeenCalledTimes(1);
+    expect(accept.disabled).toBe(true);
+    await act(async () => answer?.(PROOF));
+    await settle();
+    expect(invites.accepted).toEqual([{ link: SHORT, proof: PROOF }]);
   });
 
   it('Touch ID cancelled: nothing is sent and the card stays', async () => {

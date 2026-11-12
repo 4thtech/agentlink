@@ -476,6 +476,31 @@ describe('step 3: what comes back', () => {
     expect(call[2]).toEqual({ ['0x' + '2'.repeat(40)]: 'work-2' });
   });
 
+  it('REL051-UF3 (R1-UI-08): rows use the name people see; the folder only Under the hood', async () => {
+    const named: Summary = {
+      ...SUMMARY,
+      ids: [
+        // Restore on the same computer: the server knows the label of an ID already here.
+        { ...SUMMARY.ids[2]!, label: 'Ana Novak' },
+        // A new ID from the first-run folder: its label is inside the kit, read once restored.
+        { ...SUMMARY.ids[0]!, name: 'default' },
+      ],
+    };
+    await toReview(fakeApi({ open: () => ok({ kit: 'kit-handle', summary: named }) }));
+    const rowNames = [...host.querySelectorAll('.rs-row-name')].map((n) => n.textContent);
+    expect(rowNames).toEqual(['Ana Novak', S.REVIEW.firstId]);
+    const boxes = [...host.querySelectorAll<HTMLInputElement>('.rs-row input[type="checkbox"]')];
+    expect(boxes.map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Restore Ana Novak',
+      `Restore ${S.REVIEW.firstId}`,
+    ]);
+    expect(text()).not.toContain('macbook');
+    expect(text()).not.toContain('default');
+    // R1-UI-26: no Under the hood block in Simple.
+    expect(host.querySelector('.rs-hood')).toBeNull();
+    expect(text()).not.toContain(S.REVIEW.hood);
+  });
+
   it('keeps Restore off when nothing is ticked', async () => {
     await toReview(fakeApi());
     for (const b of host.querySelectorAll<HTMLInputElement>('.rs-row input:not(:disabled)')) {

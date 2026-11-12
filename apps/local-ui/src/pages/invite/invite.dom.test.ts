@@ -293,6 +293,51 @@ describe('the invite panel (A3/A5)', () => {
     expect(nameField().readOnly).toBe(true);
   });
 
+  it('REL051-UF3 (R1-UI-04): type a name, click Copy at once: the named link is copied and it says Copied', async () => {
+    // The real order of a mouse click: press (the field loses focus, its name is saved and a fresh
+    // link is being made), then the click itself. The fresh link takes a moment.
+    const w = world();
+    const written = stubClipboard();
+    let release: (() => void) | undefined;
+    const slow: InviteApi = {
+      ...w.invites,
+      create: (label, options) =>
+        w.created.length === 0
+          ? w.invites.create(label, options)
+          : new Promise((resolve) => {
+              release = () => resolve(w.invites.create(label, options));
+            }),
+    };
+    await show(panel(w, { invites: slow }));
+    await typeName('Denis');
+    await act(async () => {
+      button(S.copy).dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      nameField().dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      button(S.copy).click();
+    });
+    await act(async () => release?.());
+    await settle();
+    expect(w.created.map((c) => c.label)).toEqual([undefined, 'Denis']);
+    expect(written).toEqual([SHORT_B]);
+    expect(hasButton(S.copied)).toBe(true);
+    expect(text()).toContain(S.copiedAnnounce);
+    expect(w.cancelled).toEqual(['invite-0000000000000001']);
+    expect(nameField().readOnly).toBe(true);
+  });
+
+  it('REL051-UF3 (R1-UI-04): a Copy click before the name was saved saves it first, once', async () => {
+    const w = world();
+    const written = stubClipboard();
+    await show(panel(w));
+    await typeName('Denis');
+    await click(S.copy);
+    // The blur that follows (focus moved to the button) makes nothing new: the name went out.
+    await blurName();
+    expect(w.created.map((c) => c.label)).toEqual([undefined, 'Denis']);
+    expect(written).toEqual([SHORT_B]);
+    expect(hasButton(S.copied)).toBe(true);
+  });
+
   it('leaving keeps the link, copied or not (REL051-B2: Copy link on Home gets it again)', async () => {
     const w = world();
     await show(panel(w));
