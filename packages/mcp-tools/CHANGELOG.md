@@ -1,5 +1,16 @@
 # @4thtech-io/mcp-tools
 
+## 0.4.14
+
+### Patch Changes
+
+- ce79b9f: Doctor speaks in plain words: no folder names, no npx commands, each ID by its own name with its connected AI apps (WP-14).
+- @4thtech-io/chain@0.4.14
+  - @4thtech-io/core@0.4.14
+  - @4thtech-io/crypto@0.4.14
+  - @4thtech-io/log@0.4.14
+  - @4thtech-io/types@0.4.14
+
 ## 0.4.13
 
 ### Patch Changes
