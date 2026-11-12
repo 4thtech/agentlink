@@ -107,4 +107,28 @@ describe('PresenceCeremonies', () => {
     expect(c.take(undefined, A, bindingOf('/a'))).toBe('unknown');
     expect(c.take('../x', A, bindingOf('/a'))).toBe('unknown');
   });
+
+  // DESK051-C6: a native ceremony (the desktop app's own Touch ID / Windows Hello) and a passkey
+  // ceremony never answer each other, and a native one is spent like any other.
+  it('a ceremony of one kind is a mismatch for the other and is spent', () => {
+    const c = new PresenceCeremonies(clock().now);
+    const native = c.issue(A, bindingOf('/a'), 'native');
+    expect(native.kind).toBe('native');
+    expect(c.take(native.id, A, bindingOf('/a'), 'passkey')).toBe('mismatch');
+    expect(c.take(native.id, A, bindingOf('/a'), 'native')).toBe('unknown');
+    const passkey = c.issue(A, bindingOf('/a'));
+    expect(passkey.kind).toBe('passkey');
+    expect(c.take(passkey.id, A, bindingOf('/a'), 'native')).toBe('mismatch');
+    expect(c.take(passkey.id, A, bindingOf('/a'))).toBe('unknown');
+  });
+
+  it('a native ceremony is taken once, for its session and binding only', () => {
+    const c = new PresenceCeremonies(clock().now);
+    const one = c.issue(A, bindingOf('/a'), 'native');
+    expect(c.take(one.id, B, bindingOf('/a'), 'native')).toBe('unknown');
+    expect(typeof c.take(one.id, A, bindingOf('/a'), 'native')).toBe('object');
+    expect(c.take(one.id, A, bindingOf('/a'), 'native')).toBe('unknown');
+    const two = c.issue(A, bindingOf('/a'), 'native');
+    expect(c.take(two.id, A, bindingOf('/b'), 'native')).toBe('mismatch');
+  });
 });

@@ -149,6 +149,40 @@ const register = async (h: Harness, page: Record<string, string>) =>
     body: encodeUtf8(world.code),
   });
 
+// DESK051-C6 (04 §2.5): native presence answers a ceremony the server issued for exactly this
+// request (`X-AgentLink-Presence: native-challenge`, then `native` with `X-AgentLink-Ceremony`).
+const NATIVE_CHALLENGE = { 'X-AgentLink-Presence': 'native-challenge' };
+
+/** Asks `path` for a native ceremony with `headers`; the ceremony ID, or the refusal. */
+async function nativeCeremony(
+  h: Harness,
+  path: string,
+  headers: Record<string, string>,
+): Promise<{ readonly id: string } | { readonly res: RawResponse }> {
+  const ask = await send(h.port, path, {
+    method: 'POST',
+    headers: { ...headers, ...NATIVE_CHALLENGE },
+  });
+  if (ask.status !== 200) return { res: ask };
+  return { id: json(ask)['ceremony'] as string };
+}
+
+/** The native request to `path`: a fresh ceremony first, then the request that answers it. */
+async function nativeSend(
+  h: Harness,
+  path: string,
+  headers: Record<string, string>,
+  body?: Uint8Array,
+): Promise<RawResponse> {
+  const ceremony = await nativeCeremony(h, path, headers);
+  if ('res' in ceremony) return ceremony.res;
+  return send(h.port, path, {
+    method: 'POST',
+    headers: { ...headers, ...NATIVE, 'X-AgentLink-Ceremony': ceremony.id },
+    ...(body === undefined ? {} : { body }),
+  });
+}
+
 async function decide(
   h: Harness,
   page: Record<string, string>,
@@ -157,9 +191,12 @@ async function decide(
   body?: Uint8Array,
 ) {
   const row = await h.source.get(approvalId(n));
-  return send(h.port, `/api/approvals/${approvalId(n)}/approve`, {
+  const path = `/api/approvals/${approvalId(n)}/approve`;
+  const headers = { ...page, 'X-AgentLink-Digest': row?.actionDigest ?? '0'.repeat(64) };
+  if (extra === NATIVE) return nativeSend(h, path, headers, body);
+  return send(h.port, path, {
     method: 'POST',
-    headers: { ...page, 'X-AgentLink-Digest': row?.actionDigest ?? '0'.repeat(64), ...extra },
+    headers: { ...headers, ...extra },
     ...(body === undefined ? {} : { body }),
   });
 }
@@ -236,10 +273,7 @@ describe('the native presence route kind on decisions and owner routes', () => {
     const page = await h.page();
     await register(h, page);
     h.helper.calls.length = 0;
-    const res = await send(h.port, '/api/ui/test/c1/check', {
-      method: 'POST',
-      headers: { ...page, ...NATIVE },
-    });
+    const res = await nativeSend(h, '/api/ui/test/c1/check', page);
     expect(res.status).toBe(200);
     expect(h.routeCalls).toEqual([1]);
     expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:approve']);
@@ -708,7 +742,10 @@ describe('owner-code steps with native presence (DESK051-C2)', () => {
     page: Record<string, string>,
     path: string,
     extra: Record<string, string> = NATIVE,
-  ) => send(h.port, path, { method: 'POST', headers: { ...page, ...CODE_STEP, ...extra } });
+  ) =>
+    extra === NATIVE
+      ? nativeSend(h, path, { ...page, ...CODE_STEP })
+      : send(h.port, path, { method: 'POST', headers: { ...page, ...CODE_STEP, ...extra } });
 
   it('Test Touch ID accepts native: one helper run, done, signs nothing', async () => {
     const h = await harness();
@@ -768,10 +805,238 @@ describe('owner-code steps with native presence (DESK051-C2)', () => {
       '/api/ui/owner-code/replace/finish',
       '/api/ui/owner-code/replace/cancel',
     ]) {
-      const res = await post(h, page, path);
+      // The bare native header (no ceremony) is refused at the step's proof rule…
+      const res = await send(h.port, path, {
+        method: 'POST',
+        headers: { ...page, ...CODE_STEP, ...NATIVE },
+      });
       expect(res.status, path).toBe(403);
       expect(json(res)['status'], path).toBe('presence_required');
+      // …and no native ceremony is issued for these steps (DESK051-C6).
+      const ask = await send(h.port, path, {
+        method: 'POST',
+        headers: { ...page, ...CODE_STEP, ...NATIVE_CHALLENGE },
+      });
+      expect(ask.status, path).not.toBe(200);
     }
     expect(h.helper.calls).toEqual([]);
+  });
+});
+
+// DESK051-C6 (04 §2.5 "each gesture unlocks the owner key for exactly one owner operation"; REL051-SF1
+// presence ceremony; I-4): every native gesture answers a fresh, single-use ceremony the server issued
+// for this page session and exactly this request. The ceremony is spent before the helper runs, so a
+// captured or replayed native request never starts a second OS sheet and never acts.
+describe('native presence answers a fresh ceremony per gesture (DESK051-C6)', () => {
+  const TEST_PATH = '/api/ui/owner-presence/test';
+  const CODE_STEP = { 'X-AgentLink-Input': 'e30' };
+
+  it('the challenge answers a ceremony ID only, runs no helper and opens nothing', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    const ask = await send(h.port, '/api/ui/test/c1/check', {
+      method: 'POST',
+      headers: { ...page, ...NATIVE_CHALLENGE },
+    });
+    expect(ask.status).toBe(200);
+    const answer = json(ask);
+    expect(answer['status']).toBe('ready');
+    expect(answer['ceremony']).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(answer['publicKey']).toBeUndefined();
+    expect(h.helper.calls).toEqual([]);
+    expect(h.routeCalls).toEqual([]);
+  });
+
+  it('outside the desktop app (no helper) no native ceremony is issued', async () => {
+    const h = await harness({ helper: null });
+    const page = await h.page();
+    const ask = await send(h.port, '/api/ui/test/c1/check', {
+      method: 'POST',
+      headers: { ...page, ...NATIVE_CHALLENGE },
+    });
+    expect(ask.status).toBe(403);
+    expect(json(ask)).toEqual({ status: 'presence_required', native: 'unavailable' });
+  });
+
+  it('a native request without a ceremony is refused before the helper runs', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    const row = h.source.add(30);
+    const decided = await send(h.port, `/api/approvals/${approvalId(30)}/approve`, {
+      method: 'POST',
+      headers: { ...page, 'X-AgentLink-Digest': row.storedDigest, ...NATIVE },
+    });
+    expect(decided.status).toBe(403);
+    expect(json(decided)['status']).toBe('presence_required');
+    const route = await send(h.port, '/api/ui/test/c1/check', {
+      method: 'POST',
+      headers: { ...page, ...NATIVE },
+    });
+    expect(route.status).toBe(403);
+    expect(json(route)['status']).toBe('presence_required');
+    const test = await send(h.port, TEST_PATH, {
+      method: 'POST',
+      headers: { ...page, ...CODE_STEP, ...NATIVE },
+    });
+    expect(test.status).toBe(403);
+    expect(json(test)['status']).toBe('presence_required');
+    expect(h.helper.calls).toEqual([]);
+    expect(h.routeCalls).toEqual([]);
+    expect(h.source.applied).toEqual([]);
+  });
+
+  it('a replayed native request is refused: its ceremony was spent by the first', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    const ceremony = await nativeCeremony(h, '/api/ui/test/c1/check', page);
+    if (!('id' in ceremony)) throw new Error('no ceremony');
+    const request = {
+      method: 'POST',
+      headers: { ...page, ...NATIVE, 'X-AgentLink-Ceremony': ceremony.id },
+    };
+    const first = await send(h.port, '/api/ui/test/c1/check', request);
+    expect(first.status).toBe(200);
+    const replay = await send(h.port, '/api/ui/test/c1/check', request);
+    expect(replay.status).toBe(403);
+    expect(json(replay)['status']).toBe('presence_required');
+    expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:approve']);
+    expect(h.routeCalls).toEqual([1]);
+  });
+
+  it('a replayed Test Touch ID and a replayed decision are refused before the helper runs', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    const test = await nativeCeremony(h, TEST_PATH, { ...page, ...CODE_STEP });
+    if (!('id' in test)) throw new Error('no ceremony');
+    const testRequest = {
+      method: 'POST',
+      headers: { ...page, ...CODE_STEP, ...NATIVE, 'X-AgentLink-Ceremony': test.id },
+    };
+    expect((await send(h.port, TEST_PATH, testRequest)).status).toBe(200);
+    const again = await send(h.port, TEST_PATH, testRequest);
+    expect(again.status).toBe(403);
+    expect(json(again)['status']).toBe('presence_required');
+    const row = h.source.add(31);
+    const path = `/api/approvals/${approvalId(31)}/deny`;
+    const headers = { ...page, 'X-AgentLink-Digest': row.storedDigest };
+    const ceremony = await nativeCeremony(h, path, headers);
+    if (!('id' in ceremony)) throw new Error('no ceremony');
+    const request = {
+      method: 'POST',
+      headers: { ...headers, ...NATIVE, 'X-AgentLink-Ceremony': ceremony.id },
+    };
+    // A gesture that was cancelled still spends the ceremony: the retry needs a new one.
+    h.helper.gesture = 'cancelled';
+    expect(json(await send(h.port, path, request))).toEqual({
+      status: 'presence_rejected',
+      native: 'cancelled',
+    });
+    h.helper.gesture = 'ok';
+    const replay = await send(h.port, path, request);
+    expect(replay.status).toBe(403);
+    expect(json(replay)['status']).toBe('presence_required');
+    expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual([
+      'release:approve',
+      'release:approve',
+    ]);
+    expect(h.source.applied).toEqual([]);
+  });
+
+  it('a ceremony for one request does not answer another, and is spent by the attempt', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    const ceremony = await nativeCeremony(h, '/api/ui/test/c1/check', page);
+    if (!('id' in ceremony)) throw new Error('no ceremony');
+    const other = await send(h.port, '/api/ui/test/c2/check', {
+      method: 'POST',
+      headers: { ...page, ...NATIVE, 'X-AgentLink-Ceremony': ceremony.id },
+    });
+    expect(other.status).toBe(403);
+    expect(json(other)['status']).toBe('presence_required');
+    const own = await send(h.port, '/api/ui/test/c1/check', {
+      method: 'POST',
+      headers: { ...page, ...NATIVE, 'X-AgentLink-Ceremony': ceremony.id },
+    });
+    expect(own.status).toBe(403);
+    expect(h.helper.calls).toEqual([]);
+    expect(h.routeCalls).toEqual([]);
+  });
+
+  it('another page session cannot use the ceremony', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    const ceremony = await nativeCeremony(h, '/api/ui/test/c1/check', page);
+    if (!('id' in ceremony)) throw new Error('no ceremony');
+    const second = await h.page();
+    const res = await send(h.port, '/api/ui/test/c1/check', {
+      method: 'POST',
+      headers: { ...second, ...NATIVE, 'X-AgentLink-Ceremony': ceremony.id },
+    });
+    expect(res.status).toBe(403);
+    expect(json(res)['status']).toBe('presence_required');
+    expect(h.helper.calls).toEqual([]);
+    expect(h.routeCalls).toEqual([]);
+  });
+
+  it('a native ceremony never answers a passkey proof (and is spent by the attempt)', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    const ceremony = await nativeCeremony(h, '/api/ui/test/c1/check', page);
+    if (!('id' in ceremony)) throw new Error('no ceremony');
+    const passkey = await send(h.port, '/api/ui/test/c1/check', {
+      method: 'POST',
+      headers: {
+        ...page,
+        'X-AgentLink-Presence': 'passkey',
+        'X-AgentLink-Ceremony': ceremony.id,
+      },
+      body: new Uint8Array(64).fill(1),
+    });
+    expect(passkey.status).toBe(403);
+    const native = await send(h.port, '/api/ui/test/c1/check', {
+      method: 'POST',
+      headers: { ...page, ...NATIVE, 'X-AgentLink-Ceremony': ceremony.id },
+    });
+    expect(native.status).toBe(403);
+    expect(json(native)['status']).toBe('presence_required');
+    expect(h.helper.calls).toEqual([]);
+    expect(h.routeCalls).toEqual([]);
+  });
+
+  it('Replace master code with native answers a ceremony too (reason code)', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    const path = '/api/ui/owner-code/replace';
+    const ceremony = await nativeCeremony(h, path, { ...page, ...CODE_STEP });
+    if (!('id' in ceremony)) throw new Error('no ceremony');
+    const request = {
+      method: 'POST',
+      headers: { ...page, ...CODE_STEP, ...NATIVE, 'X-AgentLink-Ceremony': ceremony.id },
+    };
+    expect(json(await send(h.port, path, request))['status']).toBe('staged');
+    await send(h.port, '/api/ui/owner-code/replace/cancel', {
+      method: 'POST',
+      headers: { ...page, ...CODE_STEP },
+    });
+    const replay = await send(h.port, path, request);
+    expect(replay.status).toBe(403);
+    expect(json(replay)['status']).toBe('presence_required');
+    expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:code']);
   });
 });
