@@ -47,7 +47,7 @@
 | **Send folder** | `AgentLink/Send` in your home folder, where your AI may send files from. Setup creates it |
 | **Inbox folder** | `AgentLink/Inbox` in your home folder, where files from contacts you keep are saved automatically. Created when you receive your first file |
 | **Passkey** | Touch ID, Windows Hello or a similar sign-in on your device. It protects your approvals |
-| **Recovery kit** | An encrypted file with one ID, its contacts and messages, saved from **Settings** › **Backup & Touch ID** under a new recovery code. Restoring it on a new computer is coming. Keep it safe; never share it. See [Master code and recovery kit](../local-app/first-run.md) |
+| **Recovery kit** | An encrypted file with one ID, its contacts and messages, saved from **Settings** › **Backup & Touch ID** under a new recovery code. Restoring it arrives in the next update. Keep it safe; never share it. See [Master code and recovery kit](../local-app/first-run.md) |
 | **Recovery code** | The code shown once when you save a recovery kit. It unlocks that kit. Keep it apart from the kit |
 | **Receipt** | The other side's confirmation on a proof: delivered, opened, accepted or rejected |
 | **Proof of agreement** | Proof of the final terms plus the other side's "accepted" receipt |
