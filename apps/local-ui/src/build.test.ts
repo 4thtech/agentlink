@@ -95,7 +95,7 @@ describe('production build', () => {
 // UI-REFRESH-u: the Settings pages and the Under the hood panel load on first use.
 describe('first load (UI-REFRESH-u)', () => {
   const LAZY_MODULES =
-    /\/pages\/(agents|apps|join|activity|messages|contacts|files|proofs|rules|about|appearance|backup|advanced)\/index\.tsx$|\/components\/hood\.js$/;
+    /\/pages\/(agents|apps|join|activity|contacts|files|proofs|rules|appearance|backup|advanced)\/index\.tsx$|\/components\/hood\.js$/;
 
   /** Every chunk the page loads at start: the scripts in index.html and what they import. */
   function initialChunks(): Out[] {

@@ -436,12 +436,12 @@ describe('the live agent dropdown', () => {
 });
 
 describe('the section menu (Decision 48)', () => {
-  it('is a minimized rail: Home, Agents, Activity, Settings, the current one marked', async () => {
+  it('is a minimized rail: Home, IDs, People, Activity, Settings, the current one marked', async () => {
     serve(world());
     await mountAt('/agents');
     expect(rail()?.getAttribute('aria-label')).toBe('Sections');
     expect(rail()?.dataset['expanded']).toBe('false');
-    expect(railLabels()).toEqual(['Home', 'IDs', 'Activity', 'Settings']);
+    expect(railLabels()).toEqual(['Home', 'IDs', 'People', 'Activity', 'Settings']);
     expect(
       qa('nav.al-rail [aria-current="page"]').map((a) => a.getAttribute('aria-label')),
     ).toEqual(['IDs']);
@@ -464,6 +464,7 @@ describe('the section menu (Decision 48)', () => {
       'Collapse',
       'Home',
       'IDs',
+      'People',
       'Activity',
       'Settings',
     ]);
@@ -509,6 +510,7 @@ describe('the section menu (Decision 48)', () => {
     expect([...(sheet?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual([
       'Home',
       'IDs',
+      'People',
       'Activity',
       'Settings',
     ]);
@@ -662,7 +664,7 @@ describe('Cmd+K (kept from #715), in both modes', () => {
     serve(world());
     await mountAt('/');
     expect(await open()).not.toBeNull();
-    expect(options().slice(0, 4)).toEqual(['Home', 'IDs', 'Activity', 'Settings']);
+    expect(options().slice(0, 5)).toEqual(['Home', 'IDs', 'People', 'Activity', 'Settings']);
     expect(options()).toContain('Get started');
     expect(options()).toContain('Turn on Under the hood');
     expect(options()).toContain('Keyboard shortcuts');

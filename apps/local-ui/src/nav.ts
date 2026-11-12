@@ -40,6 +40,7 @@ export const ADVANCED_HOME = '/advanced/network';
 export type SectionIcon =
   | 'home'
   | 'agents'
+  | 'people'
   | 'activity'
   | 'settings'
   | 'stream'
@@ -60,6 +61,7 @@ export interface Section {
 export const SECTIONS: readonly Section[] = [
   { id: 'home', label: PAGE_TITLES.home, icon: 'home', path: HOME_PATH },
   { id: 'agents', label: PAGE_TITLES.agents, icon: 'agents', path: AGENTS_PATH },
+  { id: 'people', label: PAGE_TITLES.people, icon: 'people', path: INTERIM_PEOPLE_PATH },
   { id: 'activity', label: PAGE_TITLES.activity, icon: 'activity', path: ACTIVITY_PATH },
   { id: 'settings', label: PAGE_TITLES.settings, icon: 'settings', path: SETTINGS_HOME },
 ];
@@ -90,7 +92,6 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   { label: PAGE_TITLES.apps, path: '/settings/apps' },
   { label: PAGE_TITLES.filesFolder, path: '/settings/files' },
   { label: PAGE_TITLES.appearance, path: '/settings/appearance' },
-  { label: PAGE_TITLES.notifications, path: '/settings/notifications' },
   { label: PAGE_TITLES.rules, path: '/settings/rules' },
   { label: PAGE_TITLES.proofs, path: '/settings/proofs' },
   { label: PAGE_TITLES.advanced, path: ADVANCED_HOME },
@@ -106,9 +107,8 @@ export function agentNameOf(path: string): string | undefined {
 
 /** The section a path belongs to (marked current in the menu), or undefined. */
 export function sectionOf(path: string): string | undefined {
-  if (path === HOME_PATH || path.startsWith('/approve/') || path === INTERIM_PEOPLE_PATH) {
-    return 'home';
-  }
+  if (path === INTERIM_PEOPLE_PATH) return 'people';
+  if (path === HOME_PATH || path.startsWith('/approve/')) return 'home';
   if (path === AGENTS_PATH || path === IDS_PATH || agentNameOf(path) !== undefined) return 'agents';
   if (path === LIVE_ACTIVITY_PATH) return 'live';
   if (path === ACTIVITY_PATH) return 'activity';
@@ -148,6 +148,7 @@ export const REDIRECTS: Readonly<Record<string, string>> = {
   '/settings/advanced': ADVANCED_HOME,
   '/settings/about': '/advanced/diagnostics',
   '/settings/storage': '/settings/files',
+  '/settings/notifications': SETTINGS_HOME,
   '/settings/passkeys': '/settings/backup',
   '/advanced': ADVANCED_HOME,
 };
@@ -175,12 +176,6 @@ export function goToEntries(hood: boolean): readonly GoToEntry[] {
       hint: 'Action',
       path: INVITE_PATH,
       keywords: 'contact add person',
-    },
-    {
-      label: PAGE_TITLES.people,
-      hint: go,
-      path: INTERIM_PEOPLE_PATH,
-      keywords: 'contacts connections',
     },
     // Files live with each person on Home (their conversation and files).
     { label: PAGE_TITLES.files, hint: go, path: HOME_PATH, keywords: 'inbox messages received' },

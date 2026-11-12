@@ -35,8 +35,6 @@ import { agentsRemoveRoutes } from './api/agents-remove.js';
 import { agentsPauseRoutes } from './api/agents-pause.js';
 import { appsRoutes } from './api/apps.js';
 import { flowRoutes } from './api/flow.js';
-import { advancedRoutes } from './api/advanced.js';
-import { approvalsRoutes } from './api/approvals.js';
 import { backupRoutes } from './api/backup.js';
 import { contactsRoutes } from './api/contacts.js';
 import { filesRoutes } from './api/files.js';
@@ -54,7 +52,6 @@ import { pulseRoute } from './api/messages-pulse.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
-import { storageRoutes } from './api/storage.js';
 import {
   AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
@@ -334,7 +331,6 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     firstRunRoutes,
     // M1-11s-a-d: the status bar's health read.
     healthRoutes,
-    approvalsRoutes,
     activityRoutes,
     // UX2-f1: the activity pulse, before the Messages routes so `pulse` never reaches :contactId.
     [pulseRoute],
@@ -348,12 +344,10 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     filesIoRoutes,
     // MSG-FILES-IO-h: Show in Finder (the one reveal route, D-134).
     [filesRevealRoute],
-    storageRoutes,
     proofsRoutes,
     rulesRoutes,
     payConfirmRoutes,
     backupRoutes,
-    advancedRoutes,
     // U3-c: every U3 route of 08 §1. The switch kind and the Agents list are live; the rest are
     // stubs answering `not_available` until their cards (U3-d, U3-e, U3-f, U3-flow) fill them.
     agentsRoutes,

@@ -63,7 +63,6 @@ describe('Settings', () => {
       S.appearance.title,
       S.rules.title,
       S.proofs.title,
-      S.notifications.title,
     ]);
     expect(rows.map((r) => r.getAttribute('href'))).toEqual([
       '/settings/backup',
@@ -71,7 +70,6 @@ describe('Settings', () => {
       '/settings/appearance',
       '/settings/rules',
       '/settings/proofs',
-      '/settings/notifications',
     ]);
     for (const r of rows) {
       expect(r.querySelector('.st-row-line')?.textContent?.length).toBeGreaterThan(0);
@@ -94,9 +92,10 @@ describe('Settings', () => {
     expect(host.textContent).toContain(S.appearance.dark);
   });
 
-  it('shows Notifications as not available yet', async () => {
+  it('has no Notifications row (nothing leads to a page that is not built)', async () => {
     await mount();
-    expect(host.textContent).toContain(S.notifications.line);
+    expect(host.textContent).not.toContain('Notifications');
+    expect(host.querySelector('a[href="/settings/notifications"]')).toBeNull();
   });
 
   it('opens and closes Advanced in place, with its rows as links or plain facts', async () => {
