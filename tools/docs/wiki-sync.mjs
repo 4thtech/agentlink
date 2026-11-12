@@ -11,7 +11,8 @@
 //   node tools/docs/wiki-sync.mjs --wiki <wiki checkout> --recorded-tag   # prints the synced tag
 //   node tools/docs/wiki-sync.mjs --latest-tag                        # prints the newest release tag
 //
-// Release tags only, never `main`: the wiki shows what is released. docs-site/guide -> agentlink/,
+// Release tags only, never `main`, and the tag must be on main: the wiki shows what is released.
+// Only .md pages and images are copied; symbolic links are refused; redirects stay inside agentlink/. docs-site/guide -> agentlink/,
 // docs-site/technical -> agentlink/technical/, docs-site/assets -> agentlink/.gitbook/assets/.
 // Ported from the wiki's scripts/sync-agentlink.mjs (same output byte for byte, same state file), so
 // the wiki's own `--check` keeps working. Runbook: docs-site/MAINTAINING.md §2.
@@ -53,10 +54,24 @@ export function destFor(srcRel) {
   return null;
 }
 
+// Symbolic links are refused everywhere (source and wiki): a link could pull a file from outside the
+// tree into the public copy, or make a write land outside the wiki checkout.
+export function assertNoLink(p) {
+  let st;
+  try {
+    st = fs.lstatSync(p);
+  } catch {
+    return;
+  }
+  if (st.isSymbolicLink()) throw new Error(`${p} is a symbolic link: refused`);
+}
+
 function walk(dir) {
+  assertNoLink(dir);
   const out = [];
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
+    if (e.isSymbolicLink()) throw new Error(`${p} is a symbolic link: refused`);
     if (e.isDirectory()) {
       if (e.name !== '.git' && e.name !== 'node_modules') out.push(...walk(p));
     } else out.push(p);
@@ -65,6 +80,16 @@ function walk(dir) {
 }
 
 const relOf = (root, f) => path.relative(root, f).split(path.sep).join('/');
+
+/**
+ * Only pages and images are published. Dotfiles and dot-folders are skipped, except `.gitbook/`
+ * (GitBook's own image folder, which the guide uses).
+ */
+export function isPublishable(rel) {
+  const parts = rel.split('/');
+  if (parts.some((seg) => seg.startsWith('.') && seg !== '.gitbook')) return false;
+  return /\.md$/i.test(rel) || IMAGE_RE.test(rel);
+}
 
 /** Source files (repo-relative, posix) that are copied. */
 export function collectSources(srcRoot) {
@@ -77,7 +102,7 @@ export function collectSources(srcRoot) {
       );
     for (const f of walk(dir)) {
       const rel = relOf(srcRoot, f);
-      if (SKIP_NAMES.has(path.basename(rel))) continue;
+      if (SKIP_NAMES.has(path.basename(rel)) || !isPublishable(rel)) continue;
       out.push(rel);
     }
   }
@@ -85,7 +110,7 @@ export function collectSources(srcRoot) {
   if (fs.existsSync(assets)) {
     for (const f of walk(assets)) {
       const rel = relOf(srcRoot, f);
-      if (IMAGE_RE.test(rel)) out.push(rel);
+      if (IMAGE_RE.test(rel) && isPublishable(rel)) out.push(rel);
     }
   }
   return out.sort();
@@ -204,6 +229,9 @@ export function parseSummary(text) {
 }
 
 // Where each source section goes in the wiki navigation. `anchor` is the entry the block hangs from.
+// The generator owns the CHILDREN of each anchor in the wiki's SUMMARY.md, never the anchor line:
+// under `protocols/occ-v2.md` (a hand-written wiki page) every child entry is replaced by the
+// technical Concepts pages on each sync, so do not add hand-written children there.
 export const BLOCKS = [
   { id: 'guide', anchor: `${GUIDE_DEST}/README.md`, insertAfter: null, group: 'Products' },
   { id: 'concepts', anchor: 'protocols/occ-v2.md', insertAfter: null, group: 'Protocols' },
@@ -359,6 +387,14 @@ export function readRedirects(yamlText) {
   return out;
 }
 
+/** A redirect may only map an agentlink/ URL to a file under ./agentlink/ (no `..`, no other section). */
+export function assertAgentlinkRedirect(from, to) {
+  const okFrom = /^agentlink\/[A-Za-z0-9._/-]+$/.test(from) && !from.split('/').includes('..');
+  const norm = posix.normalize(to);
+  const okTo = /^\.\/agentlink\/[A-Za-z0-9._/-]+\.md$/.test(to) && norm.startsWith('agentlink/');
+  if (!okFrom || !okTo) throw new Error(`redirect ${from} -> ${to} leaves agentlink/: refused`);
+}
+
 export function updateRedirects(gitbookYaml, redirects) {
   const a = gitbookYaml.indexOf(REDIRECT_START);
   const b = gitbookYaml.indexOf(REDIRECT_END);
@@ -368,6 +404,7 @@ export function updateRedirects(gitbookYaml, redirects) {
       gitbookYaml.slice(0, a).replace(/\n+$/, '\n') +
       gitbookYaml.slice(b + REDIRECT_END.length).replace(/^\n/, '');
   if (!redirects.length) return base;
+  for (const [from, to] of redirects) assertAgentlinkRedirect(from, to);
   const block = [
     REDIRECT_START,
     ...redirects.map(([from, to]) => `  ${from}: ${to}`),
@@ -408,6 +445,8 @@ export function parseState(text) {
 
 export function readState(root) {
   const p = path.join(root, STATE_FILE);
+  assertNoLink(path.join(root, 'data'));
+  assertNoLink(p);
   if (!fs.existsSync(p)) return null;
   return parseState(fs.readFileSync(p, 'utf8'));
 }
@@ -458,6 +497,20 @@ export function compareTags(x, y) {
   return 0;
 }
 
+/** Throws unless `commit` is on main (`mainRef`, default origin/main) of the source checkout. */
+export function assertOnMain(srcRoot, commit, mainRef = 'origin/main') {
+  try {
+    git(['rev-parse', '--verify', '--quiet', `${mainRef}^{commit}`], srcRoot);
+  } catch {
+    throw new Error(`the source checkout has no ${mainRef}: cannot check the tag is on main`);
+  }
+  try {
+    git(['merge-base', '--is-ancestor', commit, mainRef], srcRoot);
+  } catch {
+    throw new Error(`${commit.slice(0, 12)} is not on ${mainRef}: release tags from main only`);
+  }
+}
+
 export function latestTag(cwd = REPO_ROOT) {
   const out = git(['ls-remote', '--tags', '--refs', REPO_URL, 'v*'], cwd);
   const tags = out
@@ -469,6 +522,8 @@ export function latestTag(cwd = REPO_ROOT) {
 }
 
 export function sync({ tag, srcRoot, commit, root }) {
+  for (const rel of ['SUMMARY.md', '.gitbook.yaml', 'data', STATE_FILE, GUIDE_DEST])
+    assertNoLink(path.join(root, rel));
   const sources = collectSources(srcRoot);
   const map = new Map(sources.map((s) => [s, destFor(s)]));
   const kind = (rel) => {
@@ -680,7 +735,8 @@ function main() {
     if (!srcRoot) {
       tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentlink-sync-'));
       srcRoot = path.join(tmp, 'agentlink');
-      git(['clone', '--quiet', '--depth', '1', '--branch', tag, REPO_URL, srcRoot], tmp);
+      // Full history without file contents, so the tag can be checked against main.
+      git(['clone', '--quiet', '--filter=blob:none', '--branch', tag, REPO_URL, srcRoot], tmp);
     }
     const commit = git(['rev-parse', 'HEAD'], srcRoot);
     // `git describe` picks one tag when several point at HEAD; accept the tag if it is any of them.
@@ -692,6 +748,7 @@ function main() {
       throw new Error(
         `the source checkout is at ${pointing.join(', ') || 'no tag'}, not ${tag} (release tags only)`,
       );
+    assertOnMain(srcRoot, commit);
     const r = sync({ tag, srcRoot, commit, root });
     console.log(
       `Synced AgentLink ${tag} (${commit.slice(0, 12)}): ${r.pages} pages, ${r.files} files.`,

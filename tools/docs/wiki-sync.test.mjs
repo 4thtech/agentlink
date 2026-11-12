@@ -3,9 +3,14 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   REPO_ROOT,
+  assertAgentlinkRedirect,
+  assertOnMain,
+  collectSources,
+  isPublishable,
   TAG_RE,
   addHeader,
   checkState,
@@ -246,5 +251,95 @@ describe('preflight', () => {
   // The real tree: every docs-site change must still generate a clean 4thTech Docs copy.
   it('passes on this repository', () => {
     expect(preflight(REPO_ROOT)).toEqual([]);
+  });
+});
+
+describe('hardening (DOCS-UNIFY review)', () => {
+  it('refuses a symbolic link in the docs-site source', () => {
+    const { src, wiki } = fixture();
+    fs.symlinkSync('/etc/hosts', path.join(src, 'docs-site/guide/hosts.md'));
+    expect(() => sync({ tag: 'v9.9.9', srcRoot: src, commit: 'abc', root: wiki })).toThrow(
+      /symbolic link/,
+    );
+  });
+
+  it('refuses a symbolic link for the wiki SUMMARY.md or data/', () => {
+    const { src, wiki } = fixture();
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'outside-'));
+    fs.symlinkSync(outside, path.join(wiki, 'data'));
+    expect(() => sync({ tag: 'v9.9.9', srcRoot: src, commit: 'abc', root: wiki })).toThrow(
+      /symbolic link/,
+    );
+    const second = fixture();
+    const real = path.join(outside, 'SUMMARY.md');
+    fs.renameSync(path.join(second.wiki, 'SUMMARY.md'), real);
+    fs.symlinkSync(real, path.join(second.wiki, 'SUMMARY.md'));
+    expect(() =>
+      sync({ tag: 'v9.9.9', srcRoot: second.src, commit: 'abc', root: second.wiki }),
+    ).toThrow(/symbolic link/);
+  });
+
+  it('copies only pages and images, and skips dotfiles except .gitbook/', () => {
+    expect(isPublishable('docs-site/guide/a.md')).toBe(true);
+    expect(isPublishable('docs-site/guide/.gitbook/assets/x.png')).toBe(true);
+    expect(isPublishable('docs-site/guide/run.sh')).toBe(false);
+    expect(isPublishable('docs-site/guide/.env')).toBe(false);
+    expect(isPublishable('docs-site/guide/.hidden/x.md')).toBe(false);
+    const { src } = fixture();
+    fs.writeFileSync(path.join(src, 'docs-site/guide/notes.txt'), 'x');
+    fs.writeFileSync(path.join(src, 'docs-site/guide/.secret.md'), 'x');
+    fs.mkdirSync(path.join(src, 'docs-site/guide/.gitbook/assets'), { recursive: true });
+    fs.writeFileSync(path.join(src, 'docs-site/guide/.gitbook/assets/a.png'), 'x');
+    const files = collectSources(src);
+    expect(files).toContain('docs-site/guide/.gitbook/assets/a.png');
+    expect(files.some((f) => f.endsWith('notes.txt') || f.endsWith('.secret.md'))).toBe(false);
+  });
+
+  it('keeps redirects inside agentlink/', () => {
+    expect(() => assertAgentlinkRedirect('agentlink/a', './agentlink/b.md')).not.toThrow();
+    for (const [from, to] of [
+      ['home/news', './agentlink/b.md'],
+      ['agentlink/a', './home/news.md'],
+      ['agentlink/a', './agentlink/../home/news.md'],
+      ['agentlink/../x', './agentlink/b.md'],
+    ])
+      expect(() => assertAgentlinkRedirect(from, to), `${from} ${to}`).toThrow(/leaves agentlink/);
+    const { src, wiki } = fixture();
+    fs.writeFileSync(
+      path.join(src, 'docs-site/guide/.gitbook.yaml'),
+      'root: ./\nredirects:\n  old: ../../home/news.md\n',
+    );
+    expect(() => sync({ tag: 'v9.9.9', srcRoot: src, commit: 'abc', root: wiki })).toThrow(
+      /leaves agentlink/,
+    );
+  });
+
+  it('accepts a tag commit only when it is on main', () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'tag-on-main-'));
+    const g = (...a) =>
+      execFileSync(
+        'git',
+        [
+          '-c',
+          'user.name=t',
+          '-c',
+          'user.email=t@example.invalid',
+          '-c',
+          'core.hooksPath=/dev/null',
+          ...a,
+        ],
+        { cwd: repo, encoding: 'utf8' },
+      ).trim();
+    g('init', '-q', '-b', 'main');
+    g('commit', '-q', '--allow-empty', '-m', 'one');
+    const onMain = g('rev-parse', 'HEAD');
+    g('update-ref', 'refs/remotes/origin/main', onMain);
+    g('switch', '-q', '-c', 'side');
+    g('commit', '-q', '--allow-empty', '-m', 'two');
+    const offMain = g('rev-parse', 'HEAD');
+    expect(() => assertOnMain(repo, onMain)).not.toThrow();
+    expect(() => assertOnMain(repo, offMain)).toThrow(/not on origin\/main/);
+    g('update-ref', '-d', 'refs/remotes/origin/main');
+    expect(() => assertOnMain(repo, onMain)).toThrow(/has no origin\/main/);
   });
 });
