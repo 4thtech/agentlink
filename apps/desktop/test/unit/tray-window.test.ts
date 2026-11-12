@@ -15,10 +15,10 @@ import {
 
 describe('tray', () => {
   it('shows a state word and numbers only', () => {
-    expect(trayTooltip('online', 0)).toBe('AgentLink: Online');
-    expect(trayTooltip('online', 3)).toBe('AgentLink: Online · 3 waiting');
+    expect(trayTooltip('running', 0)).toBe('AgentLink: Running');
+    expect(trayTooltip('running', 3)).toBe('AgentLink: Running · 3 waiting');
     expect(trayTooltip('failed', 0)).toBe('AgentLink: Not running');
-    expect(trayTooltip('offline', Number.NaN)).toBe('AgentLink: Offline');
+    expect(trayTooltip('closing', Number.NaN)).toBe('AgentLink: Closing');
   });
 
   it('has Open and Quit only', () => {
@@ -44,8 +44,8 @@ describe('tray', () => {
     menu.template[2]?.click?.();
     fake?.emit('click');
     expect([opened, quit]).toEqual([2, 1]);
-    tray.update('online', 2);
-    expect(fake?.tooltip).toBe('AgentLink: Online · 2 waiting');
+    tray.update('running', 2);
+    expect(fake?.tooltip).toBe('AgentLink: Running · 2 waiting');
   });
 });
 

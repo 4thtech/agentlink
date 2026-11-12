@@ -283,11 +283,18 @@ export async function runShell(
           }
           return;
         case 'status':
-          approvals = message.counts.approvals;
+          approvals = message.counts.waitingApprovals;
           tray?.update(message.state, approvals);
           return;
         case 'approval-waiting':
+          // WP-D8 adds the text-free notification; the tray shows the number.
           approvals = message.count;
+          return;
+        case 'invite-result':
+          // WP-D9 shows the fixed copy for the outcome; nothing to do in the shell core.
+          return;
+        case 'stopped':
+          // The exit follows; the supervisor's exit handler decides on a restart.
           return;
       }
     },

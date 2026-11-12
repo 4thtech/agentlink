@@ -2,7 +2,8 @@
 // (bundled Node, apps/cli/src/desktop/host.ts). Plan 2026-11-12 Decision 2 and §2; WP-D2 / WP-D3.
 //
 // ------------------------------------------------------------------------------------------------
-// PIPE PROTOCOL v1 (the spec WP-D3 matches; change both sides together)
+// PIPE PROTOCOL v1. Reconciled with WP-D3's apps/cli/src/desktop/protocol.ts (desktop/wp-d3 @
+// 7a638fb7): same messages, keys, enums and limits; change both sides together.
 // ------------------------------------------------------------------------------------------------
 // Transport
 // - The shell spawns the core with stdio [ignore, ignore, ignore, pipe]: the pipe is the core's
@@ -26,15 +27,19 @@
 // Core -> shell
 //   {"v":1,"type":"ready","sessionUrl":"http://localhost:<port><path>?t=<token>"}
 //       A new one-shot session link (approval-server mintLink). The shell only hands it to
-//       BrowserWindow.loadURL. Sent once the app host listens, and again after a "show" (a fresh link
-//       for that page). <port> 1..65535 without leading zeros; <path> is "/" or "/" followed by
-//       [A-Za-z0-9_/-] (at most MAX_PATH_CHARS, no "//"); <token> is 43 base64url characters.
+//       BrowserWindow.loadURL. Sent once the app host listens, and again whenever the core opens a
+//       page (a "show", an accepted "invite", a terminal `agentlink join` handing over). <port>
+//       1..65535 without leading zeros; <path> is one of SESSION_PATHS; <token> is 43 base64url.
 //       Every "ready" of one core process must carry the same origin; the shell locks the window to
 //       the first one.
-//   {"v":1,"type":"status","state":<STATUS_STATES>,"counts":{"approvals":n,"unread":n}}
-//       Numbers and a state only (tray). "approvals" = owner approvals waiting; "unread" = new items.
+//   {"v":1,"type":"status","state":<HOST_STATES>,"counts":{"openPages":n,"waitingApprovals":n}}
+//       Numbers and a state only (tray). Sent when any of them changes.
 //   {"v":1,"type":"approval-waiting","count":n}
-//       An approval is waiting (n >= 1, the number waiting). No summary, no names.
+//       Requests waiting for the owner (n >= 0; sent when the count changes). No summary, no names.
+//   {"v":1,"type":"invite-result","outcome":<INVITE_OUTCOMES>}
+//       What happened to the shell's last "invite" (a fixed word; never the link or a name).
+//   {"v":1,"type":"stopped","reason":<STOP_REASONS>}
+//       The last message before the core exits.
 //
 // Shell -> core
 //   {"v":1,"type":"invite","link":"https://agentlink.4thtech.io/i#<payload>"}
@@ -61,22 +66,43 @@ export const MAX_LINE_BYTES = 32 * 1024;
 /** Largest count a status or approval-waiting message may carry. */
 export const MAX_COUNT = 1_000_000;
 
-/** Longest path part of a session link. */
-export const MAX_PATH_CHARS = 200;
+/** The session link paths the core may send (approval-server.ts open*, invite-paths.ts). */
+export const SESSION_PATHS = ['/', '/first-run', '/settings/home', '/settings/join'] as const;
 
 /** The core's states the tray can show (numbers and states only). */
-export const STATUS_STATES = ['starting', 'online', 'offline', 'no-agent', 'error'] as const;
-export type StatusState = (typeof STATUS_STATES)[number];
+export const HOST_STATES = ['starting', 'running', 'closing'] as const;
+export type HostState = (typeof HOST_STATES)[number];
+
+/** What happened to an "invite" (fixed words; the copy lives in the shell). */
+export const INVITE_OUTCOMES = [
+  'waiting',
+  'invite_waiting',
+  'refused',
+  'expired',
+  'unavailable',
+  'unreachable',
+  'failed',
+] as const;
+export type InviteOutcome = (typeof INVITE_OUTCOMES)[number];
+
+/** Why the core stopped (the first seven are `ui`'s start failures). */
+export const STOP_REASONS = [
+  'no_owner',
+  'no_ids',
+  'only_removing',
+  'port',
+  'keychain',
+  'open',
+  'failed',
+  'shutdown',
+  'pipe_closed',
+  'signal',
+  'fatal',
+] as const;
+export type StopReason = (typeof STOP_REASONS)[number];
 
 /** The pages the shell may ask the core to open; the core maps each to a fixed path. */
-export const SHOW_ROUTES = [
-  'home',
-  'approvals',
-  'activity',
-  'ids',
-  'contacts',
-  'settings',
-] as const;
+export const SHOW_ROUTES = ['home', 'approvals', 'join'] as const;
 export type ShowRoute = (typeof SHOW_ROUTES)[number];
 
 /** The canonical invite link prefix (packages/core INVITE_LINK_PREFIX; 04 §3.6). */
@@ -92,15 +118,26 @@ export interface ReadyMessage {
 export interface StatusMessage {
   readonly v: 1;
   readonly type: 'status';
-  readonly state: StatusState;
-  readonly counts: { readonly approvals: number; readonly unread: number };
+  readonly state: HostState;
+  readonly counts: { readonly openPages: number; readonly waitingApprovals: number };
 }
 export interface ApprovalWaitingMessage {
   readonly v: 1;
   readonly type: 'approval-waiting';
   readonly count: number;
 }
-export type CoreMessage = ReadyMessage | StatusMessage | ApprovalWaitingMessage;
+export interface InviteResultMessage {
+  readonly v: 1;
+  readonly type: 'invite-result';
+  readonly outcome: InviteOutcome;
+}
+export interface StoppedMessage {
+  readonly v: 1;
+  readonly type: 'stopped';
+  readonly reason: StopReason;
+}
+export type CoreMessage =
+  ReadyMessage | StatusMessage | ApprovalWaitingMessage | InviteResultMessage | StoppedMessage;
 
 export interface InviteMessage {
   readonly v: 1;
@@ -120,7 +157,7 @@ export type ShellMessage = InviteMessage | ShowMessage | ShutdownMessage;
 
 const TOKEN = '[A-Za-z0-9_-]{43}';
 const PORT = '([1-9][0-9]{0,4})';
-const PATH = `(/(?:[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*/?)?)`;
+const PATH = '(/|/first-run|/settings/home|/settings/join)';
 const SESSION_URL = new RegExp(`^http://localhost:${PORT}${PATH}\\?t=${TOKEN}$`);
 
 const SHORT_INVITE = /^2\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
@@ -135,8 +172,7 @@ export function sessionUrlOrigin(url: unknown): string | null {
   const match = SESSION_URL.exec(url);
   if (match === null) return null;
   const port = Number(match[1]);
-  const path = match[2] ?? '';
-  if (port < 1 || port > 65_535 || path.length > MAX_PATH_CHARS) return null;
+  if (port < 1 || port > 65_535) return null;
   return `http://localhost:${port}`;
 }
 
@@ -201,18 +237,30 @@ export function parseCoreMessage(line: string): CoreMessage | undefined {
       if (!hasExactKeys(value, ['v', 'type', 'state', 'counts'])) return undefined;
       const state = value['state'];
       const counts = value['counts'];
-      if (!isOneOf(STATUS_STATES, state) || !isPlainObject(counts)) return undefined;
-      if (!hasExactKeys(counts, ['approvals', 'unread'])) return undefined;
-      const approvals = counts['approvals'];
-      const unread = counts['unread'];
-      if (!isCount(approvals) || !isCount(unread)) return undefined;
-      return { v: 1, type: 'status', state, counts: { approvals, unread } };
+      if (!isOneOf(HOST_STATES, state) || !isPlainObject(counts)) return undefined;
+      if (!hasExactKeys(counts, ['openPages', 'waitingApprovals'])) return undefined;
+      const openPages = counts['openPages'];
+      const waitingApprovals = counts['waitingApprovals'];
+      if (!isCount(openPages) || !isCount(waitingApprovals)) return undefined;
+      return { v: 1, type: 'status', state, counts: { openPages, waitingApprovals } };
     }
     case 'approval-waiting': {
       if (!hasExactKeys(value, ['v', 'type', 'count'])) return undefined;
       const count = value['count'];
-      if (!isCount(count) || count < 1) return undefined;
+      if (!isCount(count)) return undefined;
       return { v: 1, type: 'approval-waiting', count };
+    }
+    case 'invite-result': {
+      if (!hasExactKeys(value, ['v', 'type', 'outcome'])) return undefined;
+      const outcome = value['outcome'];
+      if (!isOneOf(INVITE_OUTCOMES, outcome)) return undefined;
+      return { v: 1, type: 'invite-result', outcome };
+    }
+    case 'stopped': {
+      if (!hasExactKeys(value, ['v', 'type', 'reason'])) return undefined;
+      const reason = value['reason'];
+      if (!isOneOf(STOP_REASONS, reason)) return undefined;
+      return { v: 1, type: 'stopped', reason };
     }
     default:
       return undefined;
@@ -279,11 +327,20 @@ export function encodeCoreMessage(message: CoreMessage): string {
         v: 1,
         type: 'status',
         state: message.state,
-        counts: { approvals: message.counts.approvals, unread: message.counts.unread },
+        counts: {
+          openPages: message.counts.openPages,
+          waitingApprovals: message.counts.waitingApprovals,
+        },
       });
       break;
     case 'approval-waiting':
       line = JSON.stringify({ v: 1, type: 'approval-waiting', count: message.count });
+      break;
+    case 'invite-result':
+      line = JSON.stringify({ v: 1, type: 'invite-result', outcome: message.outcome });
+      break;
+    case 'stopped':
+      line = JSON.stringify({ v: 1, type: 'stopped', reason: message.reason });
       break;
     default:
       throw new Error('protocol: unknown core message');

@@ -22,7 +22,7 @@ describe('session links', () => {
   it.each([
     [`http://localhost:4567/?t=${TOKEN}`, 'http://localhost:4567'],
     [`http://localhost:1/first-run?t=${TOKEN}`, 'http://localhost:1'],
-    [`http://localhost:65535/approve/apr_${'a'.repeat(22)}?t=${TOKEN}`, 'http://localhost:65535'],
+    [`http://localhost:65535/settings/join?t=${TOKEN}`, 'http://localhost:65535'],
     [`http://localhost:80/settings/home?t=${TOKEN}`, 'http://localhost:80'],
   ])('accepts %s', (url, origin) => {
     expect(sessionUrlOrigin(url)).toBe(origin);
@@ -47,6 +47,9 @@ describe('session links', () => {
     `http://localhost:4567//evil?t=${TOKEN}`,
     `http://localhost:4567/a%2fb?t=${TOKEN}`,
     `http://localhost:4567/${'a'.repeat(201)}?t=${TOKEN}`,
+    `http://localhost:4567/approve/apr_${'a'.repeat(22)}?t=${TOKEN}`,
+    `http://localhost:4567/settings?t=${TOKEN}`,
+    `http://localhost:4567/first-run/?t=${TOKEN}`,
     `http://localhost:4567/`,
     `javascript:alert(1)`,
     ` ${SESSION_URL}`,
@@ -90,13 +93,33 @@ describe('core -> shell messages', () => {
     });
     expect(
       parseCoreMessage(
-        line({ v: 1, type: 'status', state: 'online', counts: { approvals: 2, unread: 0 } }),
+        line({
+          v: 1,
+          type: 'status',
+          state: 'running',
+          counts: { openPages: 1, waitingApprovals: 2 },
+        }),
       ),
-    ).toEqual({ v: 1, type: 'status', state: 'online', counts: { approvals: 2, unread: 0 } });
-    expect(parseCoreMessage(line({ v: 1, type: 'approval-waiting', count: 1 }))).toEqual({
+    ).toEqual({
+      v: 1,
+      type: 'status',
+      state: 'running',
+      counts: { openPages: 1, waitingApprovals: 2 },
+    });
+    expect(parseCoreMessage(line({ v: 1, type: 'approval-waiting', count: 0 }))).toEqual({
       v: 1,
       type: 'approval-waiting',
-      count: 1,
+      count: 0,
+    });
+    expect(parseCoreMessage(line({ v: 1, type: 'invite-result', outcome: 'waiting' }))).toEqual({
+      v: 1,
+      type: 'invite-result',
+      outcome: 'waiting',
+    });
+    expect(parseCoreMessage(line({ v: 1, type: 'stopped', reason: 'shutdown' }))).toEqual({
+      v: 1,
+      type: 'stopped',
+      reason: 'shutdown',
     });
   });
 
@@ -115,25 +138,41 @@ describe('core -> shell messages', () => {
     ['extra key', line({ v: 1, type: 'approval-waiting', count: 1, text: 'hi' })],
     ['missing key', line({ v: 1, type: 'approval-waiting' })],
     ['__proto__ key', '{"v":1,"type":"approval-waiting","count":1,"__proto__":{}}'],
-    ['zero waiting', line({ v: 1, type: 'approval-waiting', count: 0 })],
+    ['bad outcome', line({ v: 1, type: 'invite-result', outcome: 'accepted by Bob' })],
+    ['outcome extra key', line({ v: 1, type: 'invite-result', outcome: 'waiting', link: 'x' })],
+    ['bad stop reason', line({ v: 1, type: 'stopped', reason: 'because' })],
+    ['stopped without reason', line({ v: 1, type: 'stopped' })],
+    [
+      'old status keys',
+      line({ v: 1, type: 'status', state: 'running', counts: { approvals: 0, unread: 0 } }),
+    ],
+    [
+      'old status state',
+      line({
+        v: 1,
+        type: 'status',
+        state: 'online',
+        counts: { openPages: 0, waitingApprovals: 0 },
+      }),
+    ],
     ['negative', line({ v: 1, type: 'approval-waiting', count: -1 })],
     ['fraction', line({ v: 1, type: 'approval-waiting', count: 1.5 })],
     ['huge', line({ v: 1, type: 'approval-waiting', count: 1e9 })],
     ['count as string', line({ v: 1, type: 'approval-waiting', count: '1' })],
     [
       'bad state',
-      line({ v: 1, type: 'status', state: 'pwned', counts: { approvals: 0, unread: 0 } }),
+      line({ v: 1, type: 'status', state: 'pwned', counts: { openPages: 0, waitingApprovals: 0 } }),
     ],
     [
       'extra count',
       line({
         v: 1,
         type: 'status',
-        state: 'online',
-        counts: { approvals: 0, unread: 0, names: 1 },
+        state: 'running',
+        counts: { openPages: 0, waitingApprovals: 0, names: 1 },
       }),
     ],
-    ['counts array', line({ v: 1, type: 'status', state: 'online', counts: [0, 0] })],
+    ['counts array', line({ v: 1, type: 'status', state: 'running', counts: [0, 0] })],
     ['ready with bad url', line({ v: 1, type: 'ready', sessionUrl: 'https://evil.example/' })],
     ['ready with extra key', line({ v: 1, type: 'ready', sessionUrl: SESSION_URL, title: 'x' })],
     ['oversize', `{"v":1,"type":"ready","sessionUrl":"${'a'.repeat(MAX_LINE_BYTES)}"}`],

@@ -1,7 +1,7 @@
 // The minimal tray / menu-bar icon (WP-D2). Two items: open the window, quit. The tooltip shows a
 // fixed word for the core's state and numbers only (never a name or message text). WP-D8 replaces
 // this with the shape-coded icons, the popover and notifications.
-import type { StatusState } from '../shared/protocol.js';
+import type { HostState } from '../shared/protocol.js';
 import type { ElectronModule, Tray } from './electron-api.js';
 
 export const TRAY_COPY = {
@@ -10,17 +10,15 @@ export const TRAY_COPY = {
   base: 'AgentLink',
 } as const;
 
-const STATE_WORDS: Record<StatusState | 'failed', string> = {
+const STATE_WORDS: Record<HostState | 'failed', string> = {
   starting: 'Starting',
-  online: 'Online',
-  offline: 'Offline',
-  'no-agent': 'Set up',
-  error: 'Needs attention',
+  running: 'Running',
+  closing: 'Closing',
   failed: 'Not running',
 };
 
 /** The tooltip: "AgentLink: <state>", plus "· <n> waiting" when approvals wait. Numbers only. */
-export function trayTooltip(state: StatusState | 'failed', approvals: number): string {
+export function trayTooltip(state: HostState | 'failed', approvals: number): string {
   const waiting = Number.isSafeInteger(approvals) && approvals > 0 ? ` · ${approvals} waiting` : '';
   return `${TRAY_COPY.base}: ${STATE_WORDS[state]}${waiting}`;
 }
@@ -50,7 +48,7 @@ export class AppTray {
     this.#tray.on('click', actions.open);
   }
 
-  update(state: StatusState | 'failed', approvals: number): void {
+  update(state: HostState | 'failed', approvals: number): void {
     this.#tray.setToolTip(trayTooltip(state, approvals));
   }
 
