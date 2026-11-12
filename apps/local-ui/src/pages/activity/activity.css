@@ -110,11 +110,31 @@
   gap: var(--al-space-4);
 }
 .al-act-search {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-3);
-  color: var(--al-color-fg-muted);
   min-inline-size: 14em;
+  max-inline-size: 22em;
+  flex: 1 1 14em;
+}
+/* The filter has five options; the design system's thumb is sized for two to four, so it is sized here.
+   Only the chosen option is lit, and it carries no tick. */
+.al-activity-filter .al-seg[data-count='5'] {
+  --seg-n: 5;
+}
+.al-activity-filter .al-seg[data-index='4'] {
+  --seg-i: 4;
+}
+.al-activity-filter .al-seg::before {
+  background: var(--al-color-bg-surface);
+}
+.al-activity-filter .al-seg-opt .al-icon {
+  display: none;
+}
+.al-act-link {
+  color: var(--al-color-accent-fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.al-act-link:hover {
+  color: var(--al-color-accent-default);
 }
 .al-act-list {
   margin: 0;
@@ -175,6 +195,7 @@
   padding: 0 var(--al-space-4);
   border: var(--al-border-width-thin) solid var(--t-bd, var(--al-color-border-default));
   border-radius: 999px;
+  font-weight: var(--al-font-weight-medium);
   background: var(--t-bg, transparent);
   color: var(--t-fg, var(--al-color-fg-muted));
   white-space: nowrap;

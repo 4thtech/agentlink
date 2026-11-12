@@ -165,7 +165,6 @@ export const ACTIVITY_COPY = {
   backupSavedLine: 'Keep the file and your recovery code safe',
   pillBackup: 'Backup',
   // Links in an opened row
-  linkHome: 'Open Home',
   linkPeople: 'See in People',
   linkProofs: 'View proofs',
   linkRules: 'Open rules',

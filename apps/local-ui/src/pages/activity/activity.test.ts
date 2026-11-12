@@ -276,7 +276,8 @@ describe('Activity page (WP-A2)', () => {
     expect(facts).toContain('Q3-plan.pdf (2.1 MB)');
     expect(facts).toContain('You');
     expect(facts).not.toContain('—');
-    expect(first.querySelector('dl a')?.getAttribute('href')).toBe('/');
+    // No route opens one person's conversation, so an approval offers no link (never a vague one).
+    expect(first.querySelector('dl a')).toBeNull();
     // Escape closes it, from anywhere in the row.
     act(() => {
       button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -290,7 +291,7 @@ describe('Activity page (WP-A2)', () => {
     expect(rows()[1]?.querySelector('dl')?.textContent).toContain('$0.05');
   });
 
-  it('every kind opens to labelled facts with a link and no empty value', async () => {
+  it('every kind opens to labelled facts, with a link where a page exists, and no empty value', async () => {
     await mount(apiWith(async () => ok({ items: ALL_KINDS })));
     for (const row of rows()) {
       click(row.querySelector('button'));
@@ -299,7 +300,12 @@ describe('Activity page (WP-A2)', () => {
       for (const dd of dl?.querySelectorAll('dd') ?? []) {
         expect(dd.textContent?.trim().length).toBeGreaterThan(0);
       }
-      expect(dl?.querySelector('a')?.getAttribute('href')).toMatch(/^\//);
+      const a = dl?.querySelector('a');
+      if (a !== null && a !== undefined) expect(a.getAttribute('href')).toMatch(/^\//);
+      else
+        expect(row.querySelector('.al-act-pill')?.textContent).toMatch(
+          /Approved|By your rules|Denied|Cancelled/,
+        );
       click(row.querySelector('button'));
     }
   });
@@ -385,6 +391,31 @@ describe('counts, filters and search', () => {
     type('zzzz');
     expect(rows()).toHaveLength(0);
     expect(text()).toContain(S.searchEmpty);
+  });
+
+  it('lights only the chosen filter, sized for five options, with no tick', async () => {
+    await mount(apiWith(async () => ok({ items: ALL_KINDS })));
+    const seg = host.querySelector('.al-seg') as HTMLElement;
+    expect(seg.getAttribute('data-count')).toBe('5');
+    expect(seg.querySelectorAll('.is-on')).toHaveLength(1);
+    expect(seg.querySelector('.is-on')?.textContent).toBe('All');
+    click(seg.querySelectorAll('button')[4]);
+    expect(seg.getAttribute('data-index')).toBe('4');
+    expect(seg.querySelectorAll('.is-on')).toHaveLength(1);
+    const css = Object.values(
+      import.meta.glob<string>('./activity.css', { query: '?raw', import: 'default', eager: true }),
+    )[0] as string;
+    expect(css).toMatch(/\.al-seg\[data-count='5'\]\s*\{\s*--seg-n:\s*5/);
+    expect(css).toMatch(/\.al-seg\[data-index='4'\]\s*\{\s*--seg-i:\s*4/);
+  });
+
+  it('writes pills in sentence case', async () => {
+    await mount(apiWith(async () => ok({ items: ALL_KINDS })));
+    for (const pill of host.querySelectorAll('.al-act-pill')) {
+      expect(pill.className).not.toContain('al-text-label');
+      expect(pill.textContent).toMatch(/^[A-Z]/);
+    }
+    expect(rows()[2]?.querySelector('.al-act-icon')?.className).toContain('al-tone-danger');
   });
 
   it('says so when a filter has no rows', async () => {

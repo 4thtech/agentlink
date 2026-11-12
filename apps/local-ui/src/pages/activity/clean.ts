@@ -302,7 +302,7 @@ export interface Rendered {
   /** Labelled facts for the opened row (no label without a value). */
   readonly facts: readonly { readonly label: string; readonly parts: readonly Part[] }[];
   /** Where the opened row leads. */
-  readonly link: { readonly label: string; readonly href: string };
+  readonly link?: { readonly label: string; readonly href: string };
   /** Everything the search matches: the sentence in words, and the action words. */
   readonly search: string;
 }
@@ -402,7 +402,7 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
   const withWhen = (
     facts: readonly { label: string; parts: readonly Part[] }[],
   ): Rendered['facts'] => [...facts, when];
-  const link = (label: string, href: string): Rendered['link'] => ({ label, href });
+  const link = (label: string, href: string): { label: string; href: string } => ({ label, href });
   const build = (
     r: Omit<Rendered, 'search' | 'facts'> & { facts?: Rendered['facts']; words?: string },
   ): Rendered => ({
@@ -476,7 +476,9 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
             ? 'success'
             : item.decision === 'approved_by_rules'
               ? 'info'
-              : 'neutral',
+              : item.decision === 'denied'
+                ? 'danger'
+                : 'neutral',
         sentence,
         grey,
         pill:
@@ -488,7 +490,6 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
                 ? S.pillDenied
                 : S.pillCancelled,
         facts,
-        link: n === undefined ? link(S.linkHome, '/') : link(S.linkHome, '/'),
         words: `${t.what} ${a?.files.map((f) => f.name).join(' ') ?? ''}`,
       });
     }

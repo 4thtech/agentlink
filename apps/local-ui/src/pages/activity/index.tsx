@@ -101,7 +101,7 @@ function problemOf(result: ApiResult<unknown>): Problem {
   }
 }
 
-const TIME = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+const TIME = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
 const FULL_TIME = new Intl.DateTimeFormat(undefined, {
   hour: '2-digit',
   minute: '2-digit',
@@ -226,7 +226,7 @@ function Row({
           </span>
           <span className="al-act-grey al-text-body-sm">{r.grey}</span>
         </span>
-        <span className={`al-act-pill al-tone-${r.tone} al-text-label`}>{r.pill}</span>
+        <span className={`al-act-pill al-tone-${r.tone} al-text-body-sm`}>{r.pill}</span>
         <span className="al-act-chevron" aria-hidden="true">
           <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} />
         </span>
@@ -241,14 +241,16 @@ function Row({
               </dd>
             </div>
           ))}
-          <div className="al-act-fact">
-            <dt className="al-muted">{S.rowResult}</dt>
-            <dd>
-              <a className="al-link" href={r.link.href}>
-                {r.link.label}
-              </a>
-            </dd>
-          </div>
+          {r.link === undefined ? null : (
+            <div className="al-act-fact">
+              <dt className="al-muted">{S.rowResult}</dt>
+              <dd>
+                <a className="al-act-link" href={r.link.href}>
+                  {r.link.label}
+                </a>
+              </dd>
+            </div>
+          )}
         </dl>
       ) : null}
     </li>
@@ -526,17 +528,20 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
               onChange={(v) => pickFilter(FILTERS.find((f) => f.id === v)?.id ?? 'all')}
               options={FILTERS.map((f) => ({ value: f.id, label: f.label }))}
             />
-            <label className="al-act-search">
-              <Icon name="search" size={16} />
+            <span className="al-input-wrap al-act-search">
+              <span className="al-input-prefix" aria-hidden="true">
+                <Icon name="search" size={14} />
+              </span>
               <input
                 type="search"
                 className="al-input"
                 aria-label={S.searchLabel}
                 placeholder={S.searchPlaceholder}
+                autoComplete="off"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-            </label>
+            </span>
           </div>
           <div className="al-activity-stage">
             <FilteredList
