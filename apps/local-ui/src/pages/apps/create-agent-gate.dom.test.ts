@@ -178,6 +178,11 @@ describe('W8-F13: the New ID gate offers Touch ID to an owner without one here',
     expect(sw?.className).toContain('al-btn-ghost');
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     expect(labels()).not.toContain('Connect with Touch ID');
+    // F49 low (IR 11-03): the assertion removed with the old banner copy, restored on today's copy:
+    // the screen says in plain words why the backup code is asked for.
+    expect(host.querySelector('[role="status"]')?.textContent).toBe(
+      PASSKEY_WHY.not_set_up_here('Touch ID'),
+    );
   });
 
   it('with a passkey here: the one Touch ID button, no switch', async () => {
