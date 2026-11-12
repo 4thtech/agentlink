@@ -66,6 +66,29 @@ describe('pinned root', () => {
   });
 });
 
+describe('release build with updates off (DESK051-C4, until the offline key ceremony)', () => {
+  it('the updates-off root configures nothing, carries the mark and no placeholder', async () => {
+    const off = (await import('../../src/main/updater/root-key.updates-off.json', {
+      with: { type: 'json' },
+    })) as { default: Record<string, unknown> };
+    expect(JSON.stringify(off.default)).toContain('AGENTLINK-DESKTOP-UPDATES-OFF');
+    expect(JSON.stringify(off.default)).not.toContain('PLACEHOLDER-AGENTLINK-DESKTOP-ROOT-KEY');
+    expect(configuredRoot(off.default)).toBeUndefined();
+    const outcome = await runUpdateCheck({
+      currentVersion: '0.5.1',
+      channel: 'stable',
+      platform: 'darwin',
+      arch: 'arm64',
+      stateDir: '/nonexistent',
+      root: off.default,
+      fetch: () => Promise.reject(new Error('must not fetch')),
+      openPath: () => Promise.reject(new Error('must not open')),
+      showMessageBox: () => Promise.reject(new Error('must not ask')),
+    });
+    expect(outcome).toEqual({ kind: 'not_configured' });
+  });
+});
+
 describe('versions', () => {
   it('orders releases after their betas and compares numerically', () => {
     expect(compareVersions('0.5.0', '0.4.13')).toBe(1);
