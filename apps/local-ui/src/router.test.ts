@@ -213,15 +213,22 @@ describe('the sections (nav.ts)', () => {
     expect(sectionOf('/ids/work')).toBe('agents');
   });
 
-  it('shows the Settings sub-navigation on a Settings page only', () => {
+  it('shows the Settings side list (no tab strip) on a Settings sub-page only', () => {
     mountAt('/settings/rules');
-    const sub = host.querySelector('nav[aria-label="Settings"]');
-    expect([...(sub?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual(
-      SETTINGS_PAGES.map((p) => p.label),
+    expect(host.querySelector('.al-subnav')).toBeNull();
+    const side = host.querySelector('nav[aria-label="Settings pages"]');
+    const hrefs = [...(side?.querySelectorAll('a.set-side-link') ?? [])].map((a) =>
+      a.getAttribute('href'),
     );
-    expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Rules');
+    expect(hrefs).toEqual(expect.arrayContaining(SETTINGS_PAGES.map((p) => p.path)));
+    expect(side?.querySelector('a[aria-current="page"]')?.getAttribute('href')).toBe(
+      '/settings/rules',
+    );
+    expect(side?.querySelector('a.set-back')?.getAttribute('href')).toBe('/settings');
+    mountAt('/settings');
+    expect(host.querySelector('nav[aria-label="Settings pages"]')).toBeNull();
     mountAt('/agents');
-    expect(host.querySelector('nav[aria-label="Settings"]')).toBeNull();
+    expect(host.querySelector('nav[aria-label="Settings pages"]')).toBeNull();
   });
 
   it('changes page on a click without a reload and moves the current mark', () => {
