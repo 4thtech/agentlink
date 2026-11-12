@@ -37,6 +37,19 @@ function client(): NetworkHealthClient & {
 }
 
 describe('networkHealthSource (REL051-CF2)', () => {
+  it('says checking (never a bare running) until the first check has finished', async () => {
+    const c = client();
+    const source = networkHealthSource(c, { now: manual().now });
+    c.next = 'hang';
+    expect(await source()).toEqual({ agent: 'running', checking: true });
+    expect(await source()).toEqual({ agent: 'running', checking: true });
+    c.release({ connected: 2, total: 3 });
+    await new Promise((r) => setTimeout(r, 0));
+    const after = await source();
+    expect(after).not.toHaveProperty('checking');
+    expect(after).toMatchObject({ relays: { connected: 2, total: 3 } });
+  });
+
   it('answers 0 of 3 while no relay can be reached, and the real count once they are back', async () => {
     const c = client();
     const clock = manual();
@@ -85,7 +98,7 @@ describe('networkHealthSource (REL051-CF2)', () => {
     const source = networkHealthSource(c, { now: clock.now });
     c.next = 'hang';
     const started = Date.now();
-    expect(await source()).toEqual({ agent: 'running' });
+    expect(await source()).toEqual({ agent: 'running', checking: true });
     expect(Date.now() - started).toBeLessThan(NETWORK_FIRST_WAIT_MS + 500);
     c.release({ connected: 0, total: 3 });
     await new Promise((r) => setTimeout(r, 0));

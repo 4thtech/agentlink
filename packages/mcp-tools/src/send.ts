@@ -224,7 +224,9 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
       };
       const summary =
         delivery === 'queued'
-          ? copy('chat.status.ok.queued', { contactName: name })
+          ? withProof
+            ? copy('chat.status.ok.queuedProof', {})
+            : copy('chat.status.ok.queued', { contactName: name })
           : delivery === 'not_delivered'
             ? copy('chat.status.ok.notDelivered', { contactName: name })
             : copy('chat.status.ok.sent', { contactName: name, contactFirstName: name });
@@ -253,6 +255,7 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
         context,
         name,
         requestReceipt,
+        delivery !== undefined && delivery !== 'sent',
       );
     }
     case 'needs_setup':
@@ -301,6 +304,24 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
   }
 }
 
+/**
+ * REL051-CF2: the proof step's fixed words for a message that is queued, not sent: every "sent"
+ * claim of the proof copy is replaced (the proof is added to the message whether or not it went out).
+ */
+const UNSENT_WORDING: readonly (readonly [RegExp, string])[] = [
+  [/^Sent with proof\. /, 'Proof added. '],
+  [/^Sent\. /, ''],
+  [/The message was sent, but its proof/g, 'Its proof'],
+  [/The message is already sent/g, 'The message is saved and goes out on its own'],
+  [/a message already sent/g, 'a message that is saved to send'],
+];
+
+function unsentWording(text: string): string {
+  let out = text;
+  for (const [pattern, replacement] of UNSENT_WORDING) out = out.replace(pattern, replacement);
+  return out;
+}
+
 /** Proof outcomes after a send that are not failures (IR-M1-9d-2 M2). */
 const PROOF_PENDING: ReadonlySet<string> = new Set([
   'ok',
@@ -328,6 +349,7 @@ async function withProofOf(
   context: ToolContext,
   contactName: string,
   requestReceipt: boolean,
+  notSent = false,
 ): Promise<HandlerOutput> {
   const proofs = context.client.proofs;
   if (proofs === undefined || !ENVELOPE_ID.test(envelopeId)) return internalError();
@@ -393,12 +415,14 @@ async function withProofOf(
     ...(receiptRequestNotAdded === true ? { receiptRequestNotAdded: true } : {}),
   };
   context.logger.info('message proof', { status });
+  // REL051-CF2: a message that has not gone out yet is never called sent in the proof words.
+  const words = (text: string): string => (notSent ? unsentWording(text) : text);
   return {
     result: {
       ...sentFields,
       status,
-      summary: `${sentSummary} ${summary}`,
-      ...(nextStep === undefined ? {} : { nextStep }),
+      summary: `${sentSummary} ${words(summary)}`.trim(),
+      ...(nextStep === undefined ? {} : { nextStep: words(nextStep) }),
       ...(code === undefined ? {} : { code }),
       ...(pending === undefined ? {} : { approvalId: pending }),
       ...(url === undefined ? {} : { url }),

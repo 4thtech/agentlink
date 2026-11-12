@@ -15,7 +15,9 @@
 //   beyond NETWORK_FIRST_WAIT_MS: it answers the last result (or no counts) and the next read gets
 //   the new one. Recovery is automatic: the next check reconnects.
 // - `lastSyncAt` is the last time a check found at least one relay connected (unix seconds): what
-//   "Last update" shows, frozen while the network cannot be reached.
+//   "Last checked" shows, frozen while the network cannot be reached. It is not a message sync.
+// - Until the first check has finished the answer says `checking` (the app shows "Checking the
+//   connection…"), never a bare running that would read as Connected.
 // - Counts only: the client answers numbers, and a failed check (or a paused agent, or no own list)
 //   answers no counts. No relay address, reason or error text ever leaves here.
 // - `agent` stays `running` (the agent is open in the process that answers), as before.
@@ -58,6 +60,7 @@ export function networkHealthSource(
   let lastOkAt: number | undefined;
   let startedAt: number | undefined;
   let inFlight: Promise<void> | undefined;
+  let checked = false;
 
   const check = (): Promise<void> => {
     startedAt = options.now();
@@ -72,6 +75,7 @@ export function networkHealthSource(
       if (counts !== undefined && counts.connected > 0) {
         lastOkAt = Math.floor(options.now() / 1000);
       }
+      checked = true;
     })().finally(() => {
       inFlight = undefined;
     });
@@ -81,6 +85,7 @@ export function networkHealthSource(
 
   const snapshot = (): LocalUiHealthSnapshot => ({
     agent: 'running',
+    ...(checked ? {} : { checking: true }),
     ...(counts === undefined ? {} : { relays: counts }),
     ...(lastOkAt === undefined ? {} : { lastSyncAt: lastOkAt }),
   });

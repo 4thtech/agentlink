@@ -141,6 +141,7 @@ export function stripItems(
 const APP_STATE: Readonly<Record<ConnectionState, { value: string; state: LiveState }>> = {
   connected: { value: 'running', state: 'ready' },
   unreachable: { value: "running, can't reach the network", state: 'off' },
+  checking: { value: 'running, checking the connection', state: 'off' },
   unknown: { value: 'checking', state: 'off' },
   paused: { value: 'paused', state: 'paused' },
   not_running: { value: 'not running', state: 'off' },

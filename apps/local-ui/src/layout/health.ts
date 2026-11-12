@@ -27,9 +27,11 @@ export const READ_TIMEOUT_MS = 10_000;
  * The states the health read can set (the layout adds `unknown` and the browser's `offline`).
  * REL051-CF2: `unreachable` is a running agent whose check found none of its relays connected
  * (`relays: {connected: 0, total > 0}`): the message network can't be reached from this computer,
- * so messages wait. Never Connected then.
+ * so messages wait. Never Connected then. `checking`: running, but the first relay check from this
+ * computer has not finished (`network: 'checking'`): "Checking the connection…", never Connected.
  */
-export type HealthState = 'connected' | 'unreachable' | 'paused' | 'not_running' | 'needs_setup';
+export type HealthState =
+  'connected' | 'checking' | 'unreachable' | 'paused' | 'not_running' | 'needs_setup';
 
 export interface HealthAnswer {
   readonly state: HealthState;
@@ -63,14 +65,16 @@ export function parseHealth(result: ApiResult<unknown>): HealthAnswer | undefine
   if (result.kind !== 'ok') return undefined;
   const data = result.data;
   if (typeof data !== 'object' || data === null) return undefined;
-  const { agent, version, relays } = data as {
+  const { agent, version, relays, network } = data as {
     agent?: unknown;
     version?: unknown;
     relays?: unknown;
+    network?: unknown;
   };
   if (typeof agent !== 'string' || !Object.hasOwn(AGENT_STATE, agent)) return undefined;
   let state = AGENT_STATE[agent] as HealthState;
-  if (state === 'connected' && noRelayConnected(relays)) state = 'unreachable';
+  if (state === 'connected' && network === 'checking') state = 'checking';
+  else if (state === 'connected' && noRelayConnected(relays)) state = 'unreachable';
   return typeof version === 'string' && VERSION.test(version) ? { state, version } : { state };
 }
 

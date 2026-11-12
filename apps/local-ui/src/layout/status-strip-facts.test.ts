@@ -20,7 +20,7 @@ describe('serverFacts', () => {
       ['Version', '0.5.1'],
       ['Port', '48123'],
       ['Relays', '2 of 3 connected'],
-      ['Last sync', expect.stringMatching(/^\d\d:\d\d$/)],
+      ['Last checked', expect.stringMatching(/^\d\d:\d\d$/)],
     ]);
   });
 

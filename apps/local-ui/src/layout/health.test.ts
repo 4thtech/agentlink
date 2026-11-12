@@ -291,6 +291,23 @@ describe('the status bar (M1-11s-a-c)', () => {
     expect(text).not.toMatch(/wss:|nsec|relay/i);
   });
 
+  it('REL051-CF2: says Checking the connection until the first relay check finished', async () => {
+    await render(() =>
+      Promise.resolve(
+        ok({
+          agent: 'running',
+          relays: null,
+          lastSyncAt: null,
+          network: 'checking',
+          version: '0.5.1',
+        }),
+      ),
+    );
+    const text = bar()?.textContent ?? '';
+    expect(text).toContain('Checking the connection…');
+    expect(text).not.toContain('Connected');
+  });
+
   it('REL051-CF2: says the message network cannot be reached when no relay is connected, never Connected', async () => {
     let connected = 0;
     await render(() =>
@@ -327,6 +344,11 @@ describe('the status bar (M1-11s-a-c)', () => {
 });
 
 describe('REL051-CF2: unreachable network', () => {
+  it('parses running with network checking as checking, never connected', () => {
+    const r = ok({ agent: 'running', relays: null, network: 'checking', version: '0.5.1' });
+    expect(connectionFromHealth(r)).toBe('checking');
+    expect(connectionFromHealth(ok({ agent: 'paused', network: 'checking' }))).toBe('paused');
+  });
   it('parses running with 0 of N relays as unreachable; counts above 0 or none stay connected', () => {
     const at = (relays: unknown): ApiResult<unknown> =>
       ok({ agent: 'running', relays, lastSyncAt: null, version: '0.5.1' });

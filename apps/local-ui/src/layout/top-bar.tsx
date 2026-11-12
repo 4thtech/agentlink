@@ -25,6 +25,7 @@ const CHIP: Readonly<Record<ConnectionState, SwitcherChip>> = {
   connected: { state: 'connected' },
   // REL051-CF2: running, but no relay can be reached from this computer.
   unreachable: { state: 'reconnecting', label: S.networkUnreachableChip },
+  checking: { state: 'checking' },
   paused: { state: 'paused' },
   not_running: { state: 'not-running' },
   needs_setup: { state: 'needs-setup' },

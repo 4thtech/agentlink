@@ -23,7 +23,7 @@ import {
   type LocalUiHealthSnapshot,
 } from './health.js';
 
-const KEYS = ['agent', 'relays', 'lastSyncAt', 'version', 'dataFolder', 'uptimeSeconds'];
+const KEYS = ['agent', 'relays', 'lastSyncAt', 'network', 'version', 'dataFolder', 'uptimeSeconds'];
 
 function contextWith(health: LocalUiContext['health']): LocalUiContext {
   return {
@@ -75,6 +75,7 @@ describe('the health reader (M1-11s-a-d)', () => {
       agent: 'running',
       relays: null,
       lastSyncAt: null,
+      network: null,
       version: '0.3.0',
       dataFolder: null,
       uptimeSeconds: null,
@@ -97,6 +98,7 @@ describe('the health reader (M1-11s-a-d)', () => {
       agent: 'running',
       relays: { connected: 2, total: 3 },
       lastSyncAt: Math.floor(c.now() / 1000) - 30,
+      network: null,
       version: '0.3.0-next.2',
       dataFolder: null,
       uptimeSeconds: null,
@@ -283,6 +285,7 @@ describe('GET /api/ui/health (M1-11s-a-d)', () => {
       agent: 'paused',
       relays: null,
       lastSyncAt: null,
+      network: null,
       version: null,
       dataFolder: null,
       uptimeSeconds: null,
@@ -306,6 +309,7 @@ describe('GET /api/ui/health (M1-11s-a-d)', () => {
         agent: 'needs_setup',
         relays: null,
         lastSyncAt: null,
+        network: null,
         version: null,
         dataFolder: null,
         uptimeSeconds: null,
@@ -433,6 +437,7 @@ describe('the health route through the server (M1-11s-a-d)', () => {
       agent: 'running',
       relays: null,
       lastSyncAt: null,
+      network: null,
       version: '0.3.0',
       dataFolder: null,
       uptimeSeconds: expect.any(Number),
@@ -460,6 +465,7 @@ describe('the health route through the server (M1-11s-a-d)', () => {
       agent: 'paused',
       relays: { connected: 1, total: 2 },
       lastSyncAt: null,
+      network: null,
       version: null,
       dataFolder: null,
       uptimeSeconds: expect.any(Number),
@@ -483,6 +489,15 @@ describe('the health route through the server (M1-11s-a-d)', () => {
     expect(parsed['uptimeSeconds']).toBeGreaterThanOrEqual(0);
     expect(res.body).not.toContain('alice');
     expect(res.body).not.toContain('/Users');
+  });
+
+  it('REL051-CF2: answers network checking until the first relay check finished', async () => {
+    const { port, cookie, csrf } = await serve(undefined, '0.5.1', undefined, {
+      relayReachability: () => new Promise(() => undefined),
+    });
+    const res = await send(port, '/api/ui/health', { Cookie: cookie, 'X-AgentLink-CSRF': csrf });
+    const body = JSON.parse(res.body) as Record<string, unknown>;
+    expect(body).toMatchObject({ agent: 'running', relays: null, network: 'checking' });
   });
 
   it("REL051-CF2: with no source wired, answers the open agent's real relay counts (0 of 3 while unreachable)", async () => {

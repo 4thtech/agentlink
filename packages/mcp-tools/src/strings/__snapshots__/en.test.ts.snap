@@ -88,7 +88,9 @@ exports[`copy catalogue (M1-9g) > chat.status.ok.notDelivered > renders as desig
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.proof > renders as designed 1`] = `"Sent with proof. Recorded 20 Oct 2026 at 14:02. $0.10 from credits."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.ok.queued > renders as designed 1`] = `"Not sent yet: AgentLink can't reach the message network right now. The message to Marko is saved, and AgentLink sends it on its own when the connection is back. End-to-end encrypted."`;
+exports[`copy catalogue (M1-9g) > chat.status.ok.queued > renders as designed 1`] = `"Not sent yet: AgentLink can't reach the message network right now. The message to Marko is saved, and AgentLink sends it on its own when the connection is back."`;
+
+exports[`copy catalogue (M1-9g) > chat.status.ok.queuedProof > renders as designed 1`] = `"Not sent yet: AgentLink can't reach the message network. It sends it on its own when the connection is back."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.sent > renders as designed 1`] = `"Sent to Marko. End-to-end encrypted: only you, Marko and your AIs can read it."`;
 
