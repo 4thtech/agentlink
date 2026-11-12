@@ -60,7 +60,12 @@
 //   failed, lockout, reregister, unavailable, retry_later, not_registered), never counted towards the
 //   wrong-code backoff (the OS limits its own tries). `/api/owner/native` shows whether the helper is
 //   there and registered for the owner (GET) and registers it (POST: the master code, or a passkey
-//   assertion with `X-AgentLink-Presence: passkey`), its own owner operation that signs nothing.
+//   assertion with `X-AgentLink-Presence: passkey` answering its ceremony), its own owner operation
+//   that signs nothing. DESK051-C6 (04 §2.5): every native gesture answers a fresh, single-use
+//   ceremony of kind `native` (`X-AgentLink-Presence: native-challenge` first, then `native` with
+//   `X-AgentLink-Ceremony`), bound to the page session and exactly this request and spent before the
+//   helper runs, so a replayed native request never starts a second OS sheet and never acts. A paid
+//   action's native confirmation answers its own pay-confirm ceremony (single-use hold).
 // - What is signed is what the page showed: the page sends back the action digest it displayed; the
 //   server re-reads the request, recomputes the digest from the stored action and refuses any
 //   difference before the owner store is opened.
@@ -236,8 +241,10 @@ import {
   PRESENCE_CEREMONY_HEADER,
   PRESENCE_CEREMONY_TTL_MS,
   PRESENCE_CHALLENGE_MODE,
+  NATIVE_CHALLENGE_MODE,
   PresenceCeremonies,
   presenceBinding,
+  type PresenceCeremonyKind,
 } from './presence-ceremony.js';
 import { takeReviewedRules } from './local-ui/api/rules.js';
 import { grouped } from './owner-init.js';
@@ -2322,6 +2329,12 @@ export async function startApprovalServerWith(
         }
         assertion = proof.assertion;
       }
+      // DESK051-C6: a native gesture answers this request's native ceremony, spent here (before any
+      // await and before the helper runs): a replayed native request is refused.
+      if (native && !takeNativeCeremony(req)) {
+        finishDecision(res, 403, 'presence_required');
+        return;
+      }
       // Check and claim with no await in between: one owner operation at a time.
       const already = ids.filter((approvalId) => decided.has(approvalId));
       if (already.length > 0) {
@@ -2906,9 +2919,18 @@ export async function startApprovalServerWith(
       generation: header(req, 'x-agentlink-generation'),
     });
 
-  /** True when the request asks for a ceremony (`X-AgentLink-Presence: challenge`). */
-  const asksChallenge = (req: IncomingMessage): boolean =>
-    header(req, 'x-agentlink-presence') === PRESENCE_CHALLENGE_MODE;
+  /**
+   * The kind of ceremony the request asks for (`X-AgentLink-Presence: challenge` for a passkey,
+   * `native-challenge` for the desktop app's native gesture, DESK051-C6), or undefined.
+   */
+  const asksChallenge = (req: IncomingMessage): PresenceCeremonyKind | undefined => {
+    const mode = header(req, 'x-agentlink-presence');
+    return mode === PRESENCE_CHALLENGE_MODE
+      ? 'passkey'
+      : mode === NATIVE_CHALLENGE_MODE
+        ? 'native'
+        : undefined;
+  };
 
   /**
    * Answers a ceremony request for the route this request names (it is never acted on): an empty
@@ -2939,6 +2961,24 @@ export async function startApprovalServerWith(
     const session = sessionOf(req);
     if (session === undefined) {
       sendJson(res, 401, { error: 'token' });
+      return;
+    }
+    if (asksChallenge(req) === 'native') {
+      // DESK051-C6: a ceremony for the desktop app's native gesture. Only where this computer has
+      // the presence helper; the server runs the gesture itself, so only the ceremony ID goes back
+      // (no challenge leaves the server). Whether native presence is turned on is checked when the
+      // gesture is asked for, as before.
+      if (nativeHelper === undefined) {
+        sendJson(res, 403, { status: 'presence_required', ...NO_NATIVE });
+        return;
+      }
+      ceremonies.sweep((held) => sessions.some((s) => equalBytes(s, held)));
+      const ceremony = ceremonies.issue(session, bindingOf(req), 'native');
+      sendJson(res, 200, {
+        status: 'ready',
+        ceremony: ceremony.id,
+        expiresInMs: PRESENCE_CEREMONY_TTL_MS,
+      });
       return;
     }
     let credentialId: Uint8Array | undefined;
@@ -3003,6 +3043,22 @@ export async function startApprovalServerWith(
       return undefined;
     }
     return { assertion, challenge };
+  };
+
+  /**
+   * DESK051-C6 (04 §2.5): takes the native ceremony a native request names (single use, before any
+   * await, before the helper runs). False (`presence_required`) when no ceremony is named, or it is
+   * unknown, another session's, expired, bound to another request or a passkey ceremony; it is spent
+   * whatever the outcome, so a replayed native request never starts a second OS sheet.
+   */
+  const takeNativeCeremony = (req: IncomingMessage): boolean => {
+    const session = sessionOf(req);
+    const id = header(req, PRESENCE_CEREMONY_HEADER);
+    if (session === undefined || id === undefined) return false;
+    const taken = ceremonies.take(id, session, bindingOf(req), 'native');
+    if (typeof taken === 'string') return false;
+    PresenceCeremonies.wipeOf(taken);
+    return true;
   };
 
   /**
@@ -3173,6 +3229,12 @@ export async function startApprovalServerWith(
           return;
         }
         assertion = proof.assertion;
+      }
+      // DESK051-C6: a native gesture answers this request's native ceremony, spent here (before any
+      // await and before the helper runs): a replayed native request is refused.
+      if (native && !takeNativeCeremony(req)) {
+        finishOwner(res, 403, 'presence_required');
+        return;
       }
       if (busy) {
         finishOwner(res, 409, 'busy');
@@ -6366,15 +6428,17 @@ export async function startApprovalServerWith(
       sendResult(res, NOT_AVAILABLE);
       return;
     }
-    if (asksChallenge(req)) {
+    const asked = asksChallenge(req);
+    if (asked !== undefined) {
       // REL051-SF1: a ceremony for a passkey gesture on this route, before anything else runs. Only
       // routes the central gate takes a passkey on (an owner-code step only where its one kind of
       // proof is the passkey) and Remove (which runs the central gate); never acted on.
-      const takesPasskey =
+      // DESK051-C6: the same for a native gesture, where the step takes native presence.
+      const takesProof =
         route.presence === 'remove' ||
         (route.presence === true &&
-          (route.ownerCode === undefined || ownerCodeProofAllowed(route.ownerCode, 'passkey')));
-      if (takesPasskey) await presenceChallenge(req, res);
+          (route.ownerCode === undefined || ownerCodeProofAllowed(route.ownerCode, asked)));
+      if (takesProof) await presenceChallenge(req, res);
       else {
         req.resume();
         sendJson(res, 400, { status: 'invalid' });
@@ -6662,10 +6726,16 @@ export async function startApprovalServerWith(
     nativeOp?: 'register' | 'off' | 'replace',
   ): Promise<void> {
     {
-      if (asksChallenge(req)) {
-        // REL051-SF1: a ceremony for this decision (or review list). DESK051-C6: and for turning
-        // native presence on, off or on again with the passkey.
-        if (reviewRoute || decideMatch !== null || nativeOp !== undefined) {
+      const asked = asksChallenge(req);
+      if (asked !== undefined) {
+        // REL051-SF1: a ceremony for this decision (or review list), passkey or native (DESK051-C6).
+        // DESK051-C6: and a passkey one for turning native presence on, off or on again; those never
+        // take native presence.
+        if (
+          reviewRoute ||
+          decideMatch !== null ||
+          (nativeOp !== undefined && asked === 'passkey')
+        ) {
           await presenceChallenge(req, res);
         } else {
           req.resume();

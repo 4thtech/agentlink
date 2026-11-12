@@ -24,6 +24,12 @@
 //   path (`passkey_update_needed`); the master code still works.
 // - So a captured request body is no longer a credential: it carries a signature over a challenge
 //   that was consumed when it was first used, for one route and one input.
+// - DESK051-C6 (04 §2.5 "Desktop app owner presence"): the desktop app's native presence (Touch ID,
+//   Windows Hello) answers a ceremony too, of kind `native`: the page asks with
+//   `X-AgentLink-Presence: native-challenge`, the server answers the ceremony ID only (it runs the OS
+//   gesture itself, so no challenge leaves it), and the request then names the ceremony with
+//   `X-AgentLink-Presence: native`. It is taken (spent) before the helper runs, so a replayed native
+//   request never starts a second sheet. A ceremony of one kind never answers the other.
 // - I-7: no nonce, challenge, binding or assertion is logged, emitted or put in an error. Ceremonies
 //   live in memory only and are wiped when taken, expired, dropped or cleared.
 import {
@@ -44,6 +50,11 @@ export const MAX_PRESENCE_CEREMONIES = 8;
 export const PRESENCE_CEREMONY_HEADER = 'x-agentlink-ceremony';
 /** The `X-AgentLink-Presence` value that asks for a ceremony instead of acting. */
 export const PRESENCE_CHALLENGE_MODE = 'challenge';
+/** DESK051-C6: the `X-AgentLink-Presence` value that asks for a native presence ceremony. */
+export const NATIVE_CHALLENGE_MODE = 'native-challenge';
+
+/** Which proof a ceremony is for: a passkey assertion, or the desktop app's native gesture. */
+export type PresenceCeremonyKind = 'passkey' | 'native';
 
 const DOMAIN = encodeUtf8('agentlink/presence-ceremony/v1');
 const ID = /^[A-Za-z0-9_-]{22}$/;
@@ -76,6 +87,7 @@ export function presenceBinding(parts: PresenceBindingInput): Uint8Array {
 
 export interface PresenceCeremony {
   readonly id: string;
+  readonly kind: PresenceCeremonyKind;
   readonly challenge: Uint8Array;
   readonly session: Uint8Array;
   readonly binding: Uint8Array;
@@ -93,8 +105,12 @@ export class PresenceCeremonies {
     this.#now = now;
   }
 
-  /** A new ceremony for `session` and `binding`; its challenge goes to the page. */
-  issue(session: Uint8Array, binding: Uint8Array): PresenceCeremony {
+  /** A new ceremony for `session` and `binding`; a passkey's challenge goes to the page. */
+  issue(
+    session: Uint8Array,
+    binding: Uint8Array,
+    kind: PresenceCeremonyKind = 'passkey',
+  ): PresenceCeremony {
     this.sweep();
     while (this.#open.size >= MAX_PRESENCE_CEREMONIES) {
       const oldest = this.#open.keys().next();
@@ -106,6 +122,7 @@ export class PresenceCeremonies {
     wipe(nonce);
     const ceremony: PresenceCeremony = {
       id: encodeBase64url(randomBytes(16)),
+      kind,
       challenge,
       session: session.slice(),
       binding: binding.slice(),
@@ -116,11 +133,17 @@ export class PresenceCeremonies {
   }
 
   /**
-   * Takes the ceremony `id` for `session` and `binding`: single use, removed whatever the outcome
-   * once it names an open ceremony. Another session's ceremony is `unknown` and is not consumed
-   * (another page session can neither see nor spend it). The caller wipes the result (`wipeOf`).
+   * Takes the ceremony `id` for `session`, `binding` and `kind`: single use, removed whatever the
+   * outcome once it names an open ceremony. Another session's ceremony is `unknown` and is not
+   * consumed (another page session can neither see nor spend it); another kind is a `mismatch`. The
+   * caller wipes the result (`wipeOf`).
    */
-  take(id: unknown, session: Uint8Array, binding: Uint8Array): PresenceCeremonyTake {
+  take(
+    id: unknown,
+    session: Uint8Array,
+    binding: Uint8Array,
+    kind: PresenceCeremonyKind = 'passkey',
+  ): PresenceCeremonyTake {
     if (typeof id !== 'string' || !ID.test(id)) return 'unknown';
     const ceremony = this.#open.get(id);
     if (ceremony === undefined || !equalBytes(ceremony.session, session)) return 'unknown';
@@ -129,7 +152,7 @@ export class PresenceCeremonies {
       PresenceCeremonies.wipeOf(ceremony);
       return 'expired';
     }
-    if (!equalBytes(ceremony.binding, binding)) {
+    if (ceremony.kind !== kind || !equalBytes(ceremony.binding, binding)) {
       PresenceCeremonies.wipeOf(ceremony);
       return 'mismatch';
     }

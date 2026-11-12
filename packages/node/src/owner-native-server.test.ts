@@ -486,6 +486,12 @@ describe('Fable review fixes on the server (M1, L1, L4)', () => {
     let touch: () => void = () => undefined;
     h.helper.touch = new Promise((resolve) => (touch = resolve));
     h.helper.calls.length = 0;
+    // DESK051-C6: the native request answers its ceremony.
+    const ceremony = await nativeCeremony(h, `/api/approvals/${approvalId(8)}/approve`, {
+      ...page,
+      'X-AgentLink-Digest': row.actionDigest,
+    });
+    if (!('id' in ceremony)) throw new Error('no ceremony');
     const req = httpRequest({
       host: '127.0.0.1',
       port: h.port,
@@ -495,6 +501,7 @@ describe('Fable review fixes on the server (M1, L1, L4)', () => {
         Host: `localhost:${String(h.port)}`,
         ...page,
         ...NATIVE,
+        'X-AgentLink-Ceremony': ceremony.id,
         'X-AgentLink-Digest': row.actionDigest,
       },
       setHost: false,
@@ -865,8 +872,8 @@ describe('native presence answers a fresh ceremony per gesture (DESK051-C6)', ()
     const page = await h.page();
     await register(h, page);
     h.helper.calls.length = 0;
-    const row = h.source.add(30);
-    const decided = await send(h.port, `/api/approvals/${approvalId(30)}/approve`, {
+    const row = h.source.add(20);
+    const decided = await send(h.port, `/api/approvals/${approvalId(20)}/approve`, {
       method: 'POST',
       headers: { ...page, 'X-AgentLink-Digest': row.storedDigest, ...NATIVE },
     });
@@ -924,11 +931,12 @@ describe('native presence answers a fresh ceremony per gesture (DESK051-C6)', ()
     const again = await send(h.port, TEST_PATH, testRequest);
     expect(again.status).toBe(403);
     expect(json(again)['status']).toBe('presence_required');
-    const row = h.source.add(31);
-    const path = `/api/approvals/${approvalId(31)}/deny`;
+    const row = h.source.add(21);
+    const path = `/api/approvals/${approvalId(21)}/deny`;
     const headers = { ...page, 'X-AgentLink-Digest': row.storedDigest };
     const ceremony = await nativeCeremony(h, path, headers);
-    if (!('id' in ceremony)) throw new Error('no ceremony');
+    if (!('id' in ceremony))
+      throw new Error(`no ceremony ${ceremony.res.status} ${ceremony.res.body}`);
     const request = {
       method: 'POST',
       headers: { ...headers, ...NATIVE, 'X-AgentLink-Ceremony': ceremony.id },
