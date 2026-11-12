@@ -77,7 +77,7 @@ import {
 import { STORAGE_PREFIX_BYTES } from './constants.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
-import { isRestrictedAlias } from './names.js';
+import { isOwnIdName } from './names.js';
 import { SINGLETON_SLOT, type Row, type Sealed } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -698,7 +698,7 @@ function renameAllowanceOf(stored: OwnStoredCard, now: number): RenameAllowance 
  * already its own restricted form (06 §2.1), 1 to 32 code points; then the card name rule.
  */
 function checkRenameName(name: unknown): string {
-  if (!isRestrictedAlias(name)) {
+  if (!isOwnIdName(name)) {
     throw new CoreError('name_invalid', 'The display name is not valid.');
   }
   return checkName(name);

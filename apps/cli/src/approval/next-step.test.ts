@@ -10,7 +10,7 @@ const newId = (): string => `apr_${encodeBase64url(randomBytes(16))}`;
 describe('approvalNextStep (06 §2.5 step 2)', () => {
   it('the default agent: the fixed text with `agentlink approve <id>`', () => {
     const id = newId();
-    const expected = `Tell the user: Approval needed. Open the AgentLink app and approve it on Home. If the app isn't open, run this in your own terminal: \`${P} approve ${id}\`. Your AI can't approve this for you. After they approve, call the same tool again with approvalId.`;
+    const expected = `Tell the user: Approve on Home in the AgentLink app, or in your own terminal run \`${P} approve ${id}\`. Your AI can't approve this for you. Then call the same tool again with approvalId.`;
     expect(approvalNextStep(id)).toBe(expected);
     expect(approvalNextStep(id, 'default')).toBe(expected);
   });
@@ -26,7 +26,7 @@ describe('approvalNextStep (06 §2.5 step 2)', () => {
       const id = newId();
       const text = approvalNextStep(id, name);
       expect(text).toBe(
-        `Tell the user: Approval needed. Open the AgentLink app and approve it on Home. If the app isn't open, run this in your own terminal: \`${P} approve ${id}\`. If you have more than one AgentLink ID, add --agent with this ID's name. Your AI can't approve this for you. After they approve, call the same tool again with approvalId.`,
+        `Tell the user: Approve on Home in the AgentLink app, or in your own terminal run \`${P} approve ${id}\`. If you have more than one AgentLink ID, add --agent with this ID's name. Your AI can't approve this for you. Then call the same tool again with approvalId.`,
       );
       if (name !== '') expect(text).not.toContain(`--agent ${name}`);
     },

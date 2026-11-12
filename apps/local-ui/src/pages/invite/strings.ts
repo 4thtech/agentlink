@@ -198,6 +198,13 @@ export const FEEDBACK_STRINGS = {
   cancelConnectingFailed: "Couldn't cancel. Try again in a minute.",
   waitingOnline: (name: string): string =>
     `Waiting for ${name} to come online. This finishes on its own.`,
+  // REL051-CF1 (R1-CLASS-06): sent, no answer after a short wait (the inviter's app may be closed).
+  waitingAnswer: (name: string): string =>
+    `Waiting for ${name}'s AgentLink to come online. It connects by itself; you can close this.`,
+  // REL051-CF1 (R1-CLASS-01): no answer after the bound. Honest: this side cannot know whether the
+  // invite was used, cancelled or the inviter is just away, and never who else answered.
+  noAnswer: (name: string): string =>
+    `No answer from ${name} yet. If this invite was already used or cancelled, it won't connect. Ask ${name} for a new one.`,
   already: (name: string): string => `You're already connected to ${name}. Connect again?`,
   againResets: 'Connecting again starts the Contact check over.',
   checkAction: 'Check the code',

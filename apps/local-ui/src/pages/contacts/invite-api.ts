@@ -86,6 +86,8 @@ export interface ConnectingRow {
   readonly again: boolean;
   /** The server says this person is blocked here: the accept can't finish until they are unblocked. */
   readonly blocked?: boolean;
+  /** REL051-CF1 (R1-CLASS-01, -06): when the accept began, unix milliseconds (from the server). */
+  readonly startedAt?: number;
 }
 
 export type CreateOutcome =
@@ -218,6 +220,7 @@ export function parseConnecting(data: unknown): readonly ConnectingRow[] {
     if (!isObject(item)) continue;
     const { ref, name, sent, again } = item;
     const expiresAt = timeOf(item['expiresAt']);
+    const startedAt = timeOf(item['startedAt']);
     if (typeof ref !== 'string' || !REF.test(ref) || expiresAt === undefined) continue;
     if (typeof name !== 'string' || name.length === 0 || name.length > MAX_NAME_CHARS) continue;
     if (typeof sent !== 'boolean' || typeof again !== 'boolean') continue;
@@ -228,6 +231,7 @@ export function parseConnecting(data: unknown): readonly ConnectingRow[] {
       sent,
       again,
       ...(item['blocked'] === true ? { blocked: true } : {}),
+      ...(startedAt === undefined ? {} : { startedAt }),
     });
   }
   return out;

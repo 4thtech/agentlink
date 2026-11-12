@@ -894,11 +894,12 @@ export class PairingService implements PairingHandler {
     usedAt: number,
     senderContactId: string | undefined,
   ): Promise<PairingOutcome> {
-    const refused = (id: string | undefined): PairingOutcome => ({
+    const refused = (id: string | undefined, filedForOwner = false): PairingOutcome => ({
       kind: 'refuse',
       reason: 'invite_used',
       ...(id === undefined ? {} : { contactId: id }),
       flagged: false,
+      ...(filedForOwner ? { filedForOwner: true as const } : {}),
     });
     let paired: string | undefined;
     try {
@@ -918,7 +919,10 @@ export class PairingService implements PairingHandler {
         })
         .some((r) => (r.refused_at ?? 0) >= usedAt),
     );
-    return warned ? drop('invite_used', senderContactId) : refused(paired);
+    if (warned) return drop('invite_used', senderContactId);
+    // REL051-CF1 (R2-6): filed under the invite's contact; it spends that contact's rate only when
+    // that contact sent it.
+    return refused(paired, paired !== senderContactId);
   }
 
   /** The contact whose stored, processed `handshake` used `inviteId` (this agent as inviter). */

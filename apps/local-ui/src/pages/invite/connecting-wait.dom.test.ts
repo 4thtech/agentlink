@@ -69,7 +69,8 @@ describe('connectingStage: from when the accept began', () => {
   });
 
   it('with no start time (an older server) it stays as before', () => {
-    const { startedAt: _drop, ...old } = at(0);
+    const old: ConnectingRow = { ...at(0) };
+    delete (old as { startedAt?: number }).startedAt;
     expect(connectingStage(old, NOW)).toBe('connecting');
     expect(connectingStage({ ...old, sent: false }, NOW)).toBe('notSent');
   });

@@ -14,7 +14,7 @@
 // - I-4: nothing here is reachable from MCP. The owner session never leaves node.
 import {
   PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
-  isRestrictedAlias,
+  isOwnIdName,
   type OwnerActionOutcome,
   type PreparedOwnerAction,
 } from '@4thtech-io/core';
@@ -215,7 +215,7 @@ const MAX_LABEL_CODE_POINTS = 32;
 export function cardNameOf(first: FirstAgentCard): string {
   const label = first.firstLabel?.label;
   if (label === undefined) return first.name;
-  if (!isRestrictedAlias(label) || [...label].length > MAX_LABEL_CODE_POINTS) {
+  if (!isOwnIdName(label) || [...label].length > MAX_LABEL_CODE_POINTS) {
     throw new NodeKeyStoreError('owner_operation_invalid', 'The label is not a restricted name.');
   }
   return label;

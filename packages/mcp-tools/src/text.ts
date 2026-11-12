@@ -47,6 +47,12 @@ export const TOOL_TEXT = Object.freeze({
   contactNotFound: "I couldn't find that contact, so nothing was done.",
   contactNotFoundNextStep:
     "Call agentlink_list_contacts to see the user's contacts, then use a contact's id or name.",
+  // REL051-CF1 (R1-CLASS-11): found by its previous name. Slot: the current name under 06 §2.1.
+  contactRenamedNote: 'This contact is now called {contactName}.',
+  // REL051-CF1 (R1-CLASS-11): a blocked contact is not "not found". Fixed text, no slot (I-5).
+  contactBlocked: 'The owner blocked this contact, so nothing was done.',
+  contactBlockedNextStep:
+    'Tell the user this contact is blocked. Only the user can unblock it, on People in the AgentLink app.',
   contactAmbiguous: 'More than one contact matches that name, so nothing was done.',
   // REL051-B1 (N12): the options, each by ID tag, short id and day connected (never a name).
   contactAmbiguousOptions:

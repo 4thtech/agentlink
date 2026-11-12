@@ -123,6 +123,12 @@ export interface ContactView {
     readonly newName: string;
     readonly at: number;
   };
+  /**
+   * REL051-CF1 (R1-CLASS-11): the contact's own name before its last rename, restricted like
+   * `display` (06 §2.1), kept after the owner saw the note. Lets the tools find the contact by the
+   * name the user still says. Display and lookup only; never shown as the contact's name.
+   */
+  readonly previousName?: string;
   readonly createdAt: number;
   readonly updatedAt: number;
   /**
@@ -159,6 +165,11 @@ export interface ConnectingContact {
    * the accept can't finish until the owner unblocks them (`contact.unblock`) or cancels it.
    */
   readonly blocked: boolean;
+  /**
+   * REL051-CF1 (R1-CLASS-01, -06): when this accept began (the staged row's `created_at`, unix
+   * seconds), so the app can say "still waiting" and later "no answer", also after a restart.
+   */
+  readonly startedAt: number;
 }
 
 /** W5-INVITE-FEEDBACK: the kept `handshake` row's plain time and direction. */
@@ -515,6 +526,7 @@ export class ContactBook {
       pairing: row.pairing,
       safetyCodeChecked,
       ...(await this.#nameChange(row, short)),
+      ...(await this.#previousName(row, short)),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       ...pairedFields(
@@ -552,8 +564,10 @@ export class ContactBook {
             row: r,
             contact,
             delivery: tx.get('envelopes', { envelope_id: r.pairing_id })?.delivery ?? null,
+            // REL051-CF1 (R2-7): blocked exactly when completion would be refused (R1-SEC-02, bound to
+            // the contact, so a key it rotated to is caught) or the staged key itself is blocked.
             blocked:
-              contact?.status === 'blocked' ||
+              !pairingAllowedTx(tx, r.contact_id, r.created_at) ||
               tx.get('blocked_keys', { from_key: r.agent_nostr }) !== undefined,
           };
         }),
@@ -581,6 +595,7 @@ export class ContactBook {
         id: row.contact_id,
         display,
         expiresAt: row.expires_at,
+        startedAt: row.created_at,
         sent: delivery === 'sent',
         again,
         blocked,
@@ -601,6 +616,28 @@ export class ContactBook {
       tx.delete('pairings', { contact_id: id, role: 'invitee' }),
     );
     return deleted > 0 ? 'cancelled' : 'not_found';
+  }
+
+  /**
+   * REL051-CF1 (R1-CLASS-11; D-141): the contact's own name before its last rename, under the name
+   * rule (restrictName), whether or not the owner has seen the note, so a tool can still find the
+   * contact by the name the user knows. Absent when none is stored, when the rule leaves only the
+   * fallback, or when it is the name shown now. Never the raw text (I-5).
+   */
+  async #previousName(
+    row: Row<'contacts'>,
+    short: string,
+  ): Promise<{ readonly previousName?: string }> {
+    if (row.former_name === null) return {};
+    let former: string;
+    try {
+      former = await open(this.#ctx, 'contacts', 'former_name', [row.contact_id], row.former_name);
+    } catch {
+      return {};
+    }
+    const restricted = restrictName(former, short);
+    if (restricted === restrictName(undefined, short)) return {};
+    return { previousName: restricted };
   }
 
   /** D-141: the unseen former-name note of a contact shown by its own name, if any. */

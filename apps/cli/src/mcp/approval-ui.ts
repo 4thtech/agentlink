@@ -42,11 +42,11 @@ const UI_ORIGIN = /^http:\/\/localhost:([1-9][0-9]{0,4})$/;
 
 const NEVER_FETCH = 'Never open or fetch this link yourself. ';
 // M1-36a: shortened so the longer `npx` command still fits the 500-character limit (06 §2.5).
-const LEAD = 'Tell the user: Approve here: ';
-const OR_CLI = ' or in your terminal run ';
+// REL051-CF1 (carried C5): the AgentLink app's Home first, then the link, the terminal last.
+const LEAD = 'Tell the user: Approve on Home in the AgentLink app or at ';
+const OR_CLI = '; terminal: ';
 const ADD_AGENT = " If you have more than one AgentLink ID, add --agent with this ID's name.";
-const TAIL =
-  " Your AI can't approve this for you. After they approve, call the same tool again with approvalId.";
+const TAIL = " Your AI can't approve this for you. Then call the same tool again with approvalId.";
 
 /**
  * The nextStep of a `pending_approval` with the local UI link. Both inserted values are checked by

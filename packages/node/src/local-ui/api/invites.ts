@@ -50,6 +50,10 @@
 // `{"ref"}`, drops this agent's accepts that wait for that contact (core `cancelConnecting`; nothing
 // is signed or sent), as Cancel on an open invite does for the other side.
 //
+// REL051-CF1 (R1-CLASS-01, -06): a `connecting` row also answers `startedAt` (RFC 3339, from core's
+// staged row), so the app can move from "Connecting" to a "still waiting" hint and, after a bounded
+// time, to "no answer: ask for a new invite", with Cancel on every row.
+//
 // Only the canonical link `https://agentlink.4thtech.io/i#<payload>` or the bare payload ever reaches
 // core: any other host, scheme, path, percent-escape, whitespace or size is refused here first, and
 // nothing in these routes fetches anything (04 §4). The link holds the invite secret: it is answered
@@ -400,6 +404,7 @@ async function listInvites(
   try {
     for (const item of await port.connecting()) {
       const when = rfc3339(item.expiresAt);
+      const started = rfc3339(item.startedAt);
       const name: unknown = item.display.name;
       if (typeof item.id !== 'string' || !REF.test(item.id) || when === undefined) continue;
       if (typeof name !== 'string' || name.length === 0 || name.length > MAX_NAME_CHARS) continue;
@@ -411,6 +416,9 @@ async function listInvites(
         again: item.again === true,
         // REL051-B1 (N2): only while core says this person is blocked here.
         ...(item.blocked === true ? { blocked: true } : {}),
+        // REL051-CF1 (R1-CLASS-01, -06): when the accept began, so the app can say "still waiting"
+        // and, after a bounded time, "no answer" (also after a restart).
+        ...(started === undefined ? {} : { startedAt: started }),
       });
     }
   } catch {

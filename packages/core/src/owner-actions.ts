@@ -53,7 +53,7 @@ import { isPaidPendingAction } from './pay-confirm.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { removeContactTx, removedBlockedKeysTx, type ContactBook } from './contacts.js';
 import type { IdentityService } from './identity.js';
-import { isRestrictedAlias } from './names.js';
+import { isOwnIdName, isRestrictedAlias } from './names.js';
 import { credentialDigestsEqual, readStorageMark, type OwnStorageKeys } from './own-storage.js';
 import {
   computeActionDigest,
@@ -585,7 +585,7 @@ export class OwnerActions {
     if (body.op !== 'agent.label' || body.params.agent !== base.agent) {
       return this.#report(refused(body.op, 'agent_mismatch'));
     }
-    if (!isRestrictedAlias(body.params.label)) {
+    if (!isOwnIdName(body.params.label)) {
       return this.#report(refused('agent.label', 'label_invalid'));
     }
     const sealed = await seal(
@@ -733,7 +733,7 @@ export class OwnerActions {
     if (
       body.op !== 'agent.label' ||
       body.params.agent !== self.agent ||
-      !isRestrictedAlias(body.params.label)
+      !isOwnIdName(body.params.label)
     ) {
       return { status: 'unverified' };
     }
@@ -1490,7 +1490,7 @@ export class OwnerActions {
     if ('refusal' in signer) return refuse(signer.refusal);
     if (
       !agentLabelParamsSchema.safeParse({ agent: signer.agent, label }).success ||
-      !isRestrictedAlias(label)
+      !isOwnIdName(label)
     ) {
       return refuse('label_invalid');
     }

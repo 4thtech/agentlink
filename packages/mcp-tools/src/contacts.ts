@@ -148,26 +148,76 @@ export const activeContacts = (views: readonly ContactView[]): ContactView[] =>
   views.filter((view) => view.status === 'active');
 
 export type ContactResolution =
-  | { readonly ok: true; readonly contact: ContactView }
+  | {
+      readonly ok: true;
+      readonly contact: ContactView;
+      /**
+       * REL051-CF1 (R1-CLASS-11): found by its previous name (it renamed its ID); the caller adds
+       * `renamedNote` to its summary so the AI learns the current name.
+       */
+      readonly renamed?: true;
+    }
   | { readonly ok: false; readonly output: HandlerOutput };
 
 const fold = (text: string): string =>
   removeInvisible(text).normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
 
+/** REL051-CF1: the contact's previous name (restricted by core), when it has one. */
+const previousOf = (view: ContactView): string | undefined => {
+  const previous: unknown = (view as { readonly previousName?: unknown }).previousName;
+  return typeof previous === 'string' && previous !== '' ? previous : undefined;
+};
+
+/** REL051-CF1 (R1-CLASS-11): fixed text, no slot (the query and the name are never echoed). */
+const blockedOutput = (): HandlerOutput =>
+  fail('error', TOOL_TEXT.contactBlocked, TOOL_TEXT.contactBlockedNextStep, 'CONTACT_BLOCKED');
+
 /**
  * Resolves a `Contact` argument against the active contacts: an exact contact ID, or the shown name
  * (alias or restricted name), compared after NFKC and case folding. The query is agent-written text:
  * it is never echoed in a summary, `nextStep` or error (IR-M1-9g-1 L1).
+ *
+ * REL051-CF1 (R1-CLASS-11): when no shown name matches, the contacts' previous names (core's
+ * restricted `previousName`, after a rename of their ID) are tried the same way, and a match says so
+ * (`renamed`). When no active contact matches, a blocked one that does (ID, shown or previous name)
+ * answers CONTACT_BLOCKED, so the AI can tell the user it is blocked rather than unknown. Removed
+ * and revoked contacts stay not found.
  */
 export function resolveContact(query: string, views: readonly ContactView[]): ContactResolution {
   const contacts = activeContacts(views);
-  const byId = contacts.find((view) => view.id === query.trim().toLowerCase());
+  const id = query.trim().toLowerCase();
+  const byId = contacts.find((view) => view.id === id);
   if (byId !== undefined) return { ok: true, contact: byId };
   const wanted = fold(query);
-  const matches =
-    wanted === '' ? [] : contacts.filter((view) => fold(shownName(view.display)) === wanted);
-  if (matches.length === 1) return { ok: true, contact: matches[0]! };
+  const named = (list: readonly ContactView[]): ContactView[] =>
+    wanted === '' ? [] : list.filter((view) => fold(shownName(view.display)) === wanted);
+  const formerly = (list: readonly ContactView[]): ContactView[] =>
+    wanted === ''
+      ? []
+      : list.filter((view) => {
+          const previous = previousOf(view);
+          return previous !== undefined && fold(previous) === wanted;
+        });
+  let matches = named(contacts);
+  let renamed = false;
   if (matches.length === 0) {
+    matches = formerly(contacts);
+    renamed = matches.length > 0;
+  }
+  if (matches.length === 1) {
+    return renamed
+      ? { ok: true, contact: matches[0]!, renamed: true }
+      : { ok: true, contact: matches[0]! };
+  }
+  if (matches.length === 0) {
+    const blocked = views.filter((view) => view.status === 'blocked');
+    if (
+      blocked.some((view) => view.id === id) ||
+      named(blocked).length > 0 ||
+      formerly(blocked).length > 0
+    ) {
+      return { ok: false, output: blockedOutput() };
+    }
     return {
       ok: false,
       output: fail('not_found', TOOL_TEXT.contactNotFound, TOOL_TEXT.contactNotFoundNextStep),
@@ -184,6 +234,26 @@ export function resolveContact(query: string, views: readonly ContactView[]): Co
     ),
   };
 }
+
+/**
+ * REL051-CF1 (R1-CLASS-11): appends "This contact is now called “X” (label)." to a result found by a
+ * previous name. X is the contact's current shown name under the 06 §2.1 rule (renderRef), never the
+ * query. Left out when the summary would pass the 500 code point limit.
+ */
+export function withRenamedNote(
+  output: HandlerOutput,
+  resolution: { readonly renamed?: true; readonly contact: ContactView },
+): HandlerOutput {
+  if (resolution.renamed !== true || output.text !== undefined) return output;
+  const note = renderCopy(TOOL_TEXT.contactRenamedNote, {
+    contactName: renderRef(contactRef(resolution.contact)),
+  });
+  const summary = `${output.result.summary} ${note}`;
+  if (Array.from(summary).length > SUMMARY_MAX_CODE_POINTS) return output;
+  return { ...output, result: { ...output.result, summary } };
+}
+
+const SUMMARY_MAX_CODE_POINTS = 500;
 
 /** At most this many options are spelled out in an ambiguous summary; `candidates` has them all. */
 const SUMMARY_OPTIONS = 5;

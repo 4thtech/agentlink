@@ -20,6 +20,11 @@
 //   handshakes, acks, messages), then `outbox.processDue` (due rows, each under its per-row claim).
 //   No relay subscription, no renewal, no loop of its own: the lease is released right after, so an
 //   MCP server that starts takes it at its next 20 s try.
+// - REL051-CF1 (R1-CLASS-10): on a slow network (each relay frame seconds late) a 3 s budget can end
+//   before the first answer arrives, on every pass, so the accepter never sees the inviter's ack.
+//   A pass whose fetch ended partial (`partial`: a relay did not finish) doubles the next pass's
+//   budget, up to PAIRING_FOLLOW_MAX_BUDGET_MS (12 s, well inside the 20 s an MCP server waits for
+//   the lease); a pass that finished, or failed, goes back to the base budget.
 // - Passes never overlap: one at a time per follower (and one follower per open agent).
 // - `passing` is true during a pass, so the app shows the agent as its own, not as "Running" in an
 //   AI app, while the host briefly holds the lease row.
@@ -32,6 +37,7 @@
 /** The core calls a pass needs (`AgentLinkClient` fits). */
 export interface PairingFollowClient {
   publisherLease(): { take(): Promise<boolean>; release(): Promise<boolean> };
+  /** REL051-CF1: `partial` (core's FetchSummary) lengthens the next pass on a slow network. */
   syncInbox(options?: { readonly budgetMs?: number }): Promise<unknown>;
   readonly outbox: { processDue(): Promise<unknown> };
   readonly pairing: {
@@ -70,13 +76,23 @@ export const PAIRING_FOLLOW_INTERVAL_MS = 5_000;
 /** (c): with nothing pending, a visible app runs a pass at most this often. */
 export const VISIBLE_PASS_INTERVAL_MS = 15_000;
 export const PAIRING_FOLLOW_BUDGET_MS = 3_000;
+/** REL051-CF1 (R1-CLASS-10): the longest budget a pass grows to after partial fetches. */
+export const PAIRING_FOLLOW_MAX_BUDGET_MS = 12_000;
+
+/** True when a sync answer says a relay did not finish (core `FetchSummary.partial`). */
+const partialOf = (result: unknown): boolean =>
+  typeof result === 'object' &&
+  result !== null &&
+  (result as { readonly partial?: unknown }).partial === true;
 
 /** A follower for one open agent (a fresh one per agent the host opens). */
 export function pairingFollower(
   client: PairingFollowClient,
   options: PairingFollowOptions,
 ): PairingFollower {
-  const budgetMs = options.budgetMs ?? PAIRING_FOLLOW_BUDGET_MS;
+  const baseBudgetMs = options.budgetMs ?? PAIRING_FOLLOW_BUDGET_MS;
+  const maxBudgetMs = Math.max(baseBudgetMs, PAIRING_FOLLOW_MAX_BUDGET_MS);
+  let budgetMs = baseBudgetMs;
   let inFlight = false;
   let passing = false;
   let lastAt = Number.NEGATIVE_INFINITY;
@@ -101,7 +117,13 @@ export function pairingFollower(
     }
     passing = true;
     try {
-      await client.syncInbox({ budgetMs });
+      let partial = false;
+      try {
+        partial = partialOf(await client.syncInbox({ budgetMs }));
+      } finally {
+        // R1-CLASS-10: a partial fetch gets a longer next pass; anything else the base budget.
+        budgetMs = partial ? Math.min(budgetMs * 2, maxBudgetMs) : baseBudgetMs;
+      }
       await client.outbox.processDue();
       // W4-SHORT-INVITE (O-L3): the drop-object sweep runs in the background, never holding the
       // pass or the lease (core dedupes a sweep in flight). A failed DELETE is retried with backoff

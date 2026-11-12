@@ -152,8 +152,11 @@ const RESERVED_SKELETON = RESERVED_SQUEEZED.map(skeleton);
 const ROLES = new Set(RESERVED_NAME_ROLES.map((w) => skeleton(squeeze(w.toLowerCase()))));
 const FALLBACK_WORD = skeleton(RESTRICTED_NAME_FALLBACK.toLowerCase());
 
-/** True when lower-cased text holds a reserved word or is a role word, look-alikes folded. */
-function reservedName(lower: string): boolean {
+/**
+ * True when lower-cased text holds a reserved word or is a role word, look-alikes folded. `roles`
+ * false (the owner's own ID names, REL051-CF1 R2-5) skips the role words and the fallback form.
+ */
+function reservedName(lower: string, roles: boolean): boolean {
   const squeezed = squeeze(lower);
   if (
     RESERVED.some((w) => lower.includes(w)) ||
@@ -163,6 +166,7 @@ function reservedName(lower: string): boolean {
   }
   const skel = skeleton(squeezed);
   if (RESERVED_SKELETON.some((w) => skel.includes(w))) return true;
+  if (!roles) return false;
   if (ROLES.has(skel)) return true;
   // The fallback's own form, "Contact" plus a fingerprint, in any separators.
   const first = skeleton(lower.split(/[ .'-]/u)[0] ?? '');
@@ -194,6 +198,10 @@ function moderatelyRestrictive(scripts: ReadonlySet<Script>): boolean {
  * owner fingerprint (04 §2.9), used by the fallback.
  */
 export function restrictName(name: unknown, ownerFingerprintShort: string): RestrictedName {
+  return restrict(name, ownerFingerprintShort, true);
+}
+
+function restrict(name: unknown, ownerFingerprintShort: string, roles: boolean): RestrictedName {
   const fallback = `${RESTRICTED_NAME_FALLBACK} ${ownerFingerprintShort}` as RestrictedName;
   if (typeof name !== 'string') return fallback;
   let text: string;
@@ -213,7 +221,7 @@ export function restrictName(name: unknown, ownerFingerprintShort: string): Rest
     if (script !== 'common') scripts.add(script);
   }
   if (!moderatelyRestrictive(scripts)) return fallback;
-  if (reservedName(text.toLowerCase())) return fallback;
+  if (reservedName(text.toLowerCase(), roles)) return fallback;
   return text as RestrictedName;
 }
 
@@ -225,6 +233,19 @@ export function restrictName(name: unknown, ownerFingerprintShort: string): Rest
  */
 export function isRestrictedAlias(alias: unknown): alias is string {
   return typeof alias === 'string' && alias !== '' && restrictName(alias, '\u00b7') === alias;
+}
+
+/**
+ * REL051-CF1 (R2-5; 06 §2.1, §6; proposed, owner confirms at merge): true when `name` is valid as the
+ * owner's OWN ID name (an `agent.label`, the card name a rename or first label signs): the alias rule
+ * of isRestrictedAlias without the role words and the "Contact …" fallback form. Those protect the
+ * owner from other people's names; an ID called "Assistant", "Agent" or "Me" (allowed in 0.5.0) is
+ * the owner's own choice. Reserved words and their look-alikes stay refused, and every receiver still
+ * restricts the name it gets with restrictName, so another person never sees an own "Assistant" as a
+ * role word.
+ */
+export function isOwnIdName(name: unknown): name is string {
+  return typeof name === 'string' && name !== '' && restrict(name, '\u00b7', false) === name;
 }
 
 /** A shown name: quoted, followed by its identity label, e.g. `“Marko Novak” (self-declared)`. */

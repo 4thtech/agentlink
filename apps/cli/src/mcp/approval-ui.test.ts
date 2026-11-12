@@ -259,7 +259,7 @@ describe('the link nextStep command prefix (M1-36a)', () => {
     const url = `http://localhost:47321/approve/${APPROVAL}`;
     const npx = 'npx -y @4thtech-io/agentlink';
     const text = approvalLinkNextStep(APPROVAL, url, `a${'b'.repeat(31)}`, npx);
-    expect(text).toContain('run this in your own terminal: ');
+    expect(text).toContain('; terminal: ');
     expect(Array.from(text).length).toBeLessThanOrEqual(500);
   });
 

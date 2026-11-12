@@ -29,7 +29,13 @@
 // text: none of it reaches a summary, `nextStep`, error or log line. Summaries name the contact under the
 // 06 §2.1 rule only. Core errors become fixed text by their code; any other failure is INTERNAL.
 import { CoreError, type CoreErrorCode, type SendMessageInput } from '@4thtech-io/core';
-import { contactRef, renderRef, resolveContact } from './contacts.js';
+import {
+  contactRef,
+  renderRef,
+  resolveContact,
+  withRenamedNote,
+  type ContactResolution,
+} from './contacts.js';
 import type { AttachedFile, ToolContext } from './context.js';
 import {
   attachRefusal,
@@ -133,6 +139,19 @@ function coreErrorOutput(code: CoreErrorCode): HandlerOutput | undefined {
 }
 
 export async function sendHandler(input: unknown, context: ToolContext): Promise<HandlerOutput> {
+  // REL051-CF1 (R1-CLASS-11): a contact found by its previous name gets the "now called" note.
+  let resolution: ContactResolution | undefined;
+  const output = await send(input, context, (r) => {
+    resolution = r;
+  });
+  return resolution?.ok === true ? withRenamedNote(output, resolution) : output;
+}
+
+async function send(
+  input: unknown,
+  context: ToolContext,
+  onResolved: (resolution: ContactResolution) => void,
+): Promise<HandlerOutput> {
   if (!isPlainObject(input)) return invalidArgument();
   const { to, text, body, type, replyTo, clientRequestId, path, notarize, approvalId } = input;
   const requestReceipt = input['requestReceipt'] === true;
@@ -170,6 +189,7 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
 
   // 3. The contact.
   const resolved = resolveContact(to, await client.contacts());
+  onResolved(resolved);
   if (!resolved.ok) return resolved.output;
   if (resolved.contact.pairing !== 'complete') return contactNotReady();
   const ref = contactRef(resolved.contact);

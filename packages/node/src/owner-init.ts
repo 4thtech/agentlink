@@ -33,7 +33,7 @@ import {
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
 import { generateSecretCode } from '@4thtech-io/crypto/keystore';
-import { isRestrictedAlias, restrictName } from '@4thtech-io/core';
+import { isOwnIdName } from '@4thtech-io/core';
 import { CLI_COMMAND } from './cli-command.js';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS } from './keychain-keystore.js';
@@ -438,7 +438,7 @@ async function issueFirstCard(
 /**
  * M1-8h-b: a display name the owner typed is used only when it fits the restricted-name rule of
  * 11 §5.2 (06 §2.1), so contacts can show it: after NFC and trimming, 1 to 32 letters, digits,
- * spaces, `.`, `'` and `-` (combining marks allowed), and core `restrictName` returns it unchanged
+ * spaces, `.`, `'` and `-` (combining marks allowed), and core `isOwnIdName` holds (REL051-CF1 R2-5)
  * (IR-M1-8h-b-1 L1: no NFKC change, no reserved word, no mixed or look-alike script). Control,
  * format (bidi) and other characters are refused, never stripped.
  */
@@ -446,7 +446,7 @@ const DISPLAY_NAME = /^[\p{L}\p{M}\p{N} .'-]{1,32}$/u;
 
 function displayNameAllowed(typed: string): boolean {
   // The fingerprint argument only shapes the fallback, which never equals an accepted name here.
-  return DISPLAY_NAME.test(typed) && restrictName(typed, '0000·0000') === typed;
+  return DISPLAY_NAME.test(typed) && isOwnIdName(typed);
 }
 
 /**
@@ -472,7 +472,7 @@ async function withDisplayName(
     const typed = (await terminal.readText(COPY.nameQuestion(current))).normalize('NFC').trim();
     if (typed === '') return first;
     if (firstLabel !== undefined) {
-      if (displayNameAllowed(typed) && isRestrictedAlias(typed)) {
+      if (displayNameAllowed(typed)) {
         return { ...first, firstLabel: { ...firstLabel, label: typed } };
       }
     } else if (displayNameAllowed(typed)) return { ...first, name: typed };
