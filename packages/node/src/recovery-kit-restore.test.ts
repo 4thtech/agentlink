@@ -753,8 +753,8 @@ describe.runIf(POSIX)('the exact log and error surface (T-3, T-11)', () => {
     ];
     onTestFinished(() => {
       for (const spy of spies) spy.mockRestore();
-      expect(logged).toEqual([]);
     });
+    expect(spies.every((spy) => vi.isMockFunction(spy))).toBe(true);
     const handle = await foundHandle();
     await openKit('S1', handle, 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA');
     const kit = body(await openKit('S1', handle, c))['kit'] as string;
@@ -790,6 +790,8 @@ describe.runIf(POSIX)('the exact log and error surface (T-3, T-11)', () => {
       }
     }
     expect(decodeBase64url(kit).length).toBe(16);
+    // Nothing was logged on any console channel by the engine or the cores it opened.
+    expect(logged).toEqual([]);
   });
 });
 
@@ -1142,5 +1144,70 @@ describe.runIf(POSIX)('uploads in parallel (IR Low)', () => {
     expect(body(await engine.upload('S1', big(), undefined))['error']).toBe('too_large');
     const dir = join(t.home, '.agentlink', 'restore');
     expect((await readdir(dir)).filter((n) => n.startsWith('.upload-'))).toEqual([]);
+  });
+});
+
+// --- IR-UX1113-R1 round 2 -------------------------------------------------------------------------
+
+describe.runIf(POSIX)('round 2: bounded keychain, silent cores, cancel during presence', () => {
+  it('a keychain call that never answers ends in `failed` and releases the lock', async () => {
+    const { code: c } = await kitOnDisk();
+    let hang = true;
+    const real = keychain;
+    const hung = {
+      get: (account: string) =>
+        hang ? new Promise<Uint8Array | null>(() => undefined) : real.get(account),
+      set: (account: string, value: Uint8Array) => real.set(account, value),
+      delete: (account: string) => real.delete(account),
+    };
+    await engine.close();
+    engine = createRestoreEngine({
+      home: t.home,
+      keychain: () => hung,
+      origin: ORIGIN,
+      now: () => clock,
+      keychainTimeoutMs: 50,
+    });
+    const handle = await foundHandle();
+    expect(body(await openKit('S1', handle, c))['error']).toBe('failed');
+    hang = false;
+    expect((await openKit('S1', handle, c)).status).toBe(200);
+  });
+
+  it('the cores opened for verified cards (first run, doctor, header) log nothing', async () => {
+    const { code: c, agents } = await kitOnDisk();
+    const handle = await foundHandle();
+    const kit = body(await openKit('S1', handle, c))['kit'] as string;
+    await gestureAndFinish('S1', kit, [agents[0]?.agentId as string]);
+    for (const account of [...keychain.items.keys()]) {
+      if (account.startsWith('owner')) keychain.items.delete(account);
+    }
+    const logged: unknown[] = [];
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) =>
+      vi.spyOn(console, m).mockImplementation((...a: unknown[]) => void logged.push(a)),
+    );
+    onTestFinished(() => {
+      for (const spy of spies) spy.mockRestore();
+    });
+    expect(await engine.restorePending()).toBe(true);
+    const other = await kitOnDisk([{ name: 'z' }], undefined, 'agentlink-recovery-kit-z.alkk');
+    expect(other.code.length).toBeGreaterThan(0);
+    const zh = await foundHandle('S1', 'agentlink-recovery-kit-z.alkk');
+    logged.length = 0;
+    expect(body(await engine.header('S1', { handle: zh }))['header']).toBe('other_owner');
+    expect(await engine.restorePending()).toBe(true);
+    expect(logged).toEqual([]);
+  });
+
+  it('a cancel while presence runs closes the new seedless session', async () => {
+    const owner = await makeOwner(keychain);
+    await engine.close();
+    engine = newEngine({ knownOwner: owner.keys.ownerNostr });
+    const { code: c } = await kitOnDisk(undefined, owner);
+    const handle = await foundHandle();
+    const presence = engine.presence('S1', { handle }, owner.code.slice(), 'passphrase');
+    await engine.cancel('S1', { kit: 'none' });
+    expect(body(await presence)['error']).toBe('expired');
+    expect(body(await openKit('S1', handle, c))['error']).toBe('presence_required');
   });
 });
