@@ -129,15 +129,21 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     input: unknown,
     presence: OwnerPresence,
   ): Promise<OwnerApiResult> {
-    checkPath(path);
-    const headers = new Headers({
-      [CSRF_HEADER]: options.token ?? pageToken(),
-      'content-type': 'application/octet-stream',
-      'X-AgentLink-Input': base64url(JSON.stringify(input)),
-    });
-    if (typeof presence !== 'string') headers.set('X-AgentLink-Presence', 'passkey');
     let res: Response;
+    let refused: unknown;
     try {
+      try {
+        checkPath(path);
+      } catch (error) {
+        refused = error;
+        throw error;
+      }
+      const headers = new Headers({
+        [CSRF_HEADER]: options.token ?? pageToken(),
+        'content-type': 'application/octet-stream',
+        'X-AgentLink-Input': base64url(JSON.stringify(input)),
+      });
+      if (typeof presence !== 'string') headers.set('X-AgentLink-Presence', 'passkey');
       res = await doFetch(path, {
         method: 'POST',
         headers,
@@ -145,7 +151,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         credentials: 'same-origin',
         cache: 'no-store',
       });
-    } catch {
+    } catch (error) {
+      if (refused !== undefined) throw error;
       noteHostUnreachable();
       return { kind: 'offline' };
     } finally {

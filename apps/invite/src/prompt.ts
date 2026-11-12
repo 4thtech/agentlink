@@ -61,7 +61,7 @@ const CANONICAL_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,218
  * 08 §4 (D-139, 04 §3.6.2): the short link, `https://agentlink.4thtech.io/i#2.` and exactly 43
  * base64url characters. `.` is not special to any of the shells above.
  */
-const SHORT_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#2\.[A-Za-z0-9_-]{43}$/;
+const SHORT_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#2\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
 
 /** True for the canonical invite link, long (format 1) or short (format 2). */
 export const isCanonicalLink = (link: string): boolean =>

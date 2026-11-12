@@ -248,7 +248,7 @@ export function InvitePanel({
   /** The name is committed (the field lost focus, or Enter): a fresh link while nothing went out. */
   const commitName = (): void => {
     const wanted = name.trim();
-    if (shared || phase === 'making' || made === undefined) return;
+    if (sharedRef.current || phase === 'making' || made === undefined) return;
     if (wanted === made.label) return;
     void make(wanted, made.askedLong);
   };

@@ -20,7 +20,7 @@
 # Your IDs and messages (in %USERPROFILE%\.agentlink) are never touched, not even by -Uninstall.
 # Works on Windows PowerShell 5.1 and PowerShell 7. Source: installer/ in
 # https://github.com/4thtech/agentlink (MIT).
-param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite)
+param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite, [Parameter(ValueFromRemainingArguments = $true)]$Rest)
 
 # Everything below runs as one script block: nothing it defines stays in your PowerShell session,
 # and a download cut off midway does not parse, so none of it runs.
@@ -87,6 +87,14 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite)
   function Assert-InviteLink([string]$Link) {
     if (-not (Test-InviteLink $Link)) {
       throw "This isn't a complete AgentLink invite. Open the link again and copy the command."
+    }
+  }
+
+  # Anything the script does not know (a mistyped option, a link split by smart quotes) is refused
+  # with one fixed line; no part of it is ever printed.
+  function Assert-NoStrayArguments($Stray) {
+    if (@($Stray).Count -gt 0) {
+      throw 'This installer was given something it does not know. Copy the command again from the invite page.'
     }
   }
 
@@ -276,6 +284,7 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite)
       } catch {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
       }
+      Assert-NoStrayArguments $Rest
       # An -Invite that is given must be a whole invite link: empty or not text is refused too.
       $inviteLink = ''
       if ($null -ne $Invite) {

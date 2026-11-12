@@ -203,11 +203,25 @@ $badInvites = @(
   ('https://agentlink.4thtech.io/i#' + ('A' * 21847)),
   ('https://agentlink.4thtech.io/i#2.' + ('a' * 42) + 'b'),
   ('https://agentlink.4thtech.io/i#2.' + ('a' * 41) + 'w'),
-  ('https://agentlink.4thtech.io/i#2.' + ('a' * 43) + 'w')
+  ('https://agentlink.4thtech.io/i#2.' + ('a' * 43) + 'w'),
+  "$([char]0x2018)$long$([char]0x2019)", "$([char]0x201C)$long$([char]0x201D)",
+  ($long + [char]0x2019)
 )
 Check 'anything else fails the check (case, spaces, line breaks, quotes, shell characters, length)' {
   $passed = @($badInvites | Where-Object { Test-InviteLink $_ })
   $passed.Count -eq 0
+}
+
+Expect-Throw 'an unknown option or stray words are refused with a fixed line, naming nothing of them' '^This installer was given something it does not know\. Copy the command again from the invite page\.$' {
+  Assert-NoStrayArguments @('-Bogus', 'secret-word')
+}
+Check 'no stray arguments passes the guard' {
+  $null -eq (Assert-NoStrayArguments @()) -and $null -eq (Assert-NoStrayArguments $null)
+}
+Check 'the guard message echoes nothing it was given' {
+  $m = $null
+  try { Assert-NoStrayArguments @('-Bogus', 'secret-word') } catch { $m = $_.Exception.Message }
+  $m -notmatch 'Bogus' -and $m -notmatch 'secret'
 }
 
 Reset

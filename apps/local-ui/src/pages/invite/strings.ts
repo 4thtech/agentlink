@@ -70,7 +70,8 @@ export const INVITE_STRINGS = {
   connectedGeneric: 'You are connected',
   thisContact: 'your new contact',
   nameThisContact: 'Name this contact',
-  nameThisContactHint: 'Only you see it. Confirm it to use it in your AI prompts.',
+  nameThisContactHint:
+    'Only you see it. Check the name, then confirm it to use it in your AI prompts.',
   nameSummary: (alias: string): string => `Name this contact ${alias}.`,
   optionalCheck: (name: string): string => `Optional: make sure it's really ${name}. Check →`,
   checkPurpose: (name: string): string =>

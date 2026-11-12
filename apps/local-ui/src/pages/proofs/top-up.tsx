@@ -792,9 +792,12 @@ export function ConfirmMove({
   const confirmWithPasskey = (): void => {
     if (busy || info === undefined) return;
     setLine(undefined);
+    setBusy(true);
     void gesture(info).then((proof) => {
-      if (proof === undefined) setLine(C.passkeyNotUsed);
-      else send(proof);
+      if (proof === undefined) {
+        setBusy(false);
+        setLine(C.passkeyNotUsed);
+      } else send(proof);
     });
   };
 

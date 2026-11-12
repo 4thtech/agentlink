@@ -423,6 +423,7 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/agents/sheets.tsx': { offers: /<OwnerGate\b/ },
   'pages/apps/panel.tsx': { offers: /<OwnerGate\b/ },
   'pages/contacts/index.tsx': { offers: /<PresencePrompt\b/ },
+  'pages/invite/name-contact.tsx': { offers: /<PresencePrompt\b/ },
   'pages/home/person-menu.tsx': { offers: /<PresencePrompt\b/ },
   // Approvals: OwnerStep draws the passkey button with the code field under it (approvals/card.tsx).
   'pages/approvals/card.tsx': { offers: /<CodeForm\b/ },
@@ -437,7 +438,6 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   // Not confirm screens.
   'pages/approvals/index.tsx': { notAScreen: 'reads the passkey state for the approval cards' },
   'pages/home/home-screen.tsx': { notAScreen: 'reads the passkey state; HomeApprovals confirms' },
-  'pages/inbox/index.tsx': { notAScreen: 'reads the passkey state; SingleApproval confirms' },
 };
 
 describe('FB-8 guard: every owner-presence screen is listed and offers the backup code', () => {

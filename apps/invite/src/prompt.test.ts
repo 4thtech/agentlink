@@ -19,7 +19,7 @@ import { BANNED } from './testing/vocabulary.js';
 
 const LINK = 'https://agentlink.4thtech.io/i#abcDEF_-123';
 /** A short link (link format 2, D-139, 04 §3.6.2): `2.` and 43 base64url characters. */
-const SHORT_LINK = `https://agentlink.4thtech.io/i#2.${'aB3_-'.repeat(8)}xyz`;
+const SHORT_LINK = `https://agentlink.4thtech.io/i#2.${'aB3_-'.repeat(8)}xyw`;
 
 /** Forms that must never become a command or a sentence (08 §4). */
 const BAD_LINKS = [

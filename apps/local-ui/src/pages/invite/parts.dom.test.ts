@@ -205,6 +205,7 @@ describe('ConnectedMoment (A7)', () => {
     await show(
       createElement(ConnectedMoment, {
         name: 'Denis',
+        selfDeclared: false,
         me: 'Tali',
         contactRef: REF,
         api: client,
@@ -299,7 +300,7 @@ describe('ConnectedMoment (A7)', () => {
 
   // IR-1 low (b): the two letters meet and the check pops (U0 classes; reduced motion is the kit's).
   it('the letters meet and the check pops, from the U0 motion kit', async () => {
-    await show(createElement(ConnectedMoment, { name: 'Denis', me: 'Tali' }));
+    await show(createElement(ConnectedMoment, { name: 'Denis', selfDeclared: false, me: 'Tali' }));
     const me = host.querySelector('.inv-avatar--me');
     const them = host.querySelector('.inv-avatar--them');
     expect(me?.closest('.al-slide-in')).not.toBeNull();
@@ -314,7 +315,11 @@ describe('ConnectedMoment (A7)', () => {
 
   it('without the code yet it says where it will appear; never a wrong code', async () => {
     await show(
-      createElement(ConnectedMoment, { name: 'Ana', api: api({ status: 'ok', code: 'x' }) }),
+      createElement(ConnectedMoment, {
+        name: 'Ana',
+        selfDeclared: false,
+        api: api({ status: 'ok', code: 'x' }),
+      }),
     );
     expect(text()).not.toContain(S.codeLater);
     await click(byText(S.optionalCheck('Ana')));

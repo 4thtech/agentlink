@@ -89,7 +89,7 @@ describe('install.ps1 source', () => {
 
   it('WP-2: takes the invite as -Invite, checks it before anything else, and hands it to join', () => {
     expect(source).toContain(
-      'param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite)',
+      'param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite, [Parameter(ValueFromRemainingArguments = $true)]$Rest)',
     );
     // The same patterns as `agentlink join` (08 §4), case-sensitive and anchored at the very end.
     expect(source).toContain("$prefix = [regex]::Escape('https://agentlink.4thtech.io/i#')");

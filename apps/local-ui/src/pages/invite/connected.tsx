@@ -44,7 +44,7 @@ export function ConnectedMoment({
   contactRef,
   api: givenApi,
   onDone,
-  selfDeclared = false,
+  selfDeclared = true,
   owner,
   headingLevel = 1,
 }: ConnectedMomentProps): ReactElement {
