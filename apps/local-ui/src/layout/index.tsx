@@ -129,6 +129,10 @@ export function useHealth(
 const STATUS: Readonly<Record<ConnectionState, readonly [cls: string, word: string]>> = {
   unknown: ['checking', 'Checking…'],
   connected: ['connected', 'Connected'],
+  // REL051-CF2 (R1-CLASS-02): the agent runs but none of its relays can be reached from here.
+  unreachable: ['unreachable', SHELL_STRINGS.networkUnreachable],
+  // REL051-CF2: running, the first relay check has not finished yet.
+  checking: ['checking', SHELL_STRINGS.networkChecking],
   offline: ['disconnected', 'Not connected'],
   paused: ['paused', 'Paused'],
   not_running: ['not-running', 'Not running'],

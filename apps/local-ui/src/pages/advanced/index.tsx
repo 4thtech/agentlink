@@ -20,7 +20,12 @@ export interface AdvancedPageProps {
 
 type State =
   | { readonly loading: true }
-  | { readonly loading: false; readonly relays?: Relays; readonly working?: boolean };
+  | {
+      readonly loading: false;
+      readonly relays?: Relays;
+      readonly working?: boolean;
+      readonly checking?: boolean;
+    };
 
 const WHEN = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' });
 
@@ -34,8 +39,13 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
         if (!live) return;
         const relays = parseRelays(r);
         // The same read as Settings home's "All working": a running answer is never contradicted.
-        const working = parseHealth(r)?.state === 'connected';
-        setState(relays === undefined ? { loading: false } : { loading: false, relays, working });
+        const state = parseHealth(r)?.state;
+        const working = state === 'connected';
+        // REL051-CF2: the first relay check from this computer has not finished yet.
+        const checking = state === 'checking';
+        setState(
+          relays === undefined ? { loading: false } : { loading: false, relays, working, checking },
+        );
       },
       () => {
         if (live) setState({ loading: false });
@@ -49,7 +59,10 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
   const relays = state.loading ? undefined : state.relays;
   const sync = relays?.lastSyncAt;
   const working = !state.loading && state.working === true;
+  const checking = !state.loading && state.checking === true;
   const answered = !state.loading && relays !== undefined;
+  // REL051-CF2: counts known and none connected: say so in words, never "Working".
+  const unreachable = relays?.connected === 0 && relays.total !== undefined && relays.total > 0;
   return (
     <div className="ad-page">
       <header className="ad-head">
@@ -58,6 +71,11 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
         <p className="al-text-body al-muted">{S.intro}</p>
       </header>
       <Skeleton loading={state.loading} lines={3}>
+        {unreachable ? (
+          <p className="al-text-body ad-unreachable" role="status">
+            {S.unreachable}
+          </p>
+        ) : null}
         {answered ? (
           <dl className="ad-list">
             <div className="ad-row">
@@ -66,7 +84,9 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
                 {relays.connected === undefined || relays.total === undefined
                   ? working
                     ? S.relaysWorking
-                    : S.noRelays
+                    : checking
+                      ? S.checking
+                      : S.noRelays
                   : S.relayCount(relays.connected, relays.total)}
               </dd>
             </div>

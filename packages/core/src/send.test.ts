@@ -45,7 +45,15 @@ let clock: FakeClock;
 class RelaySpy {
   readonly published: { event: NostrEvent; relays: string[] }[] = [];
   mode: 'ack' | 'none' | 'hang' | 'too_large' = 'ack';
+  /** REL051-CF2: how many relays a reachability check finds connected. */
+  reach = Number.POSITIVE_INFINITY;
+  readonly checked: string[][] = [];
   readonly factory: TransportFactory = (deps) => ({
+    relayStatus: (relays) => {
+      this.checked.push([...relays]);
+      const total = new Set(relays).size;
+      return Promise.resolve({ connected: Math.min(this.reach, total), total });
+    },
     wrap: (envelope, recipients, keys) =>
       wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
     publish: (event, relays) => {
@@ -903,5 +911,50 @@ describe('W4-PAUSE: a queued row waits while the agent is paused (06 §6 "Paused
     });
     expect(sent.status).toBe('ok');
     expect(a.spy.published).toHaveLength(4);
+  });
+});
+
+describe('REL051-CF2: the send result says sent or queued (06 §2.2; 07 §4.2)', () => {
+  it('reports delivery "sent" once the relays accepted it, and "queued" while no relay can be reached', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    const sent = await a.client.sendMessage({ to: b.id, text: 'up' });
+    expect(sent).toMatchObject({ status: 'ok', delivery: 'sent' });
+
+    a.spy.mode = 'none';
+    const queued = await a.client.sendMessage({ to: b.id, text: 'down', clientRequestId: 'q-1' });
+    expect(queued).toMatchObject({ status: 'ok', delivery: 'queued' });
+    // A repeat reports where the message is now (still queued), never a stored "sent".
+    const again = await a.client.sendMessage({ to: b.id, text: 'down', clientRequestId: 'q-1' });
+    expect(again).toMatchObject({ status: 'ok', delivery: 'queued' });
+
+    // Recovery stays automatic: the outbox sends it once the relays are back.
+    a.spy.mode = 'ack';
+    clock.t += 40;
+    await a.client.outbox.processDue();
+    const later = await a.client.sendMessage({ to: b.id, text: 'down', clientRequestId: 'q-1' });
+    expect(later).toMatchObject({ status: 'ok', delivery: 'sent' });
+  });
+});
+
+describe("REL051-CF2: relayReachability (the app's network status)", () => {
+  it("checks exactly the agent's own relays and answers counts only", async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    a.spy.reach = 0;
+    expect(await a.client.relayReachability()).toEqual({ connected: 0, total: 3 });
+    a.spy.reach = 3;
+    expect(await a.client.relayReachability()).toEqual({ connected: 3, total: 3 });
+    const own = [...RELAYS_A].sort().join();
+    expect(a.spy.checked.every((list) => [...list].sort().join() === own)).toBe(true);
+  });
+
+  it('checks nothing while the agent is paused or has no transport', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    await a.client.pause.pause();
+    expect(await a.client.relayReachability()).toBeUndefined();
+    expect(a.spy.checked).toEqual([]);
+    const c = await openAgent(3, ownerA, 'carol', RELAYS_C, { transport: false });
+    expect(await c.client.relayReachability()).toBeUndefined();
   });
 });

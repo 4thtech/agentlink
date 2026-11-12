@@ -5,7 +5,7 @@ import type { ApiResult } from '../../api/client.js';
 export interface Relays {
   readonly connected?: number;
   readonly total?: number;
-  /** Unix seconds of the last completed sync. */
+  /** Unix seconds of the last time a relay answered a check from this computer (REL051-CF2). */
   readonly lastSyncAt?: number;
 }
 

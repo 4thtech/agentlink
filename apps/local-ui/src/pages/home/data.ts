@@ -17,9 +17,10 @@ const isSeconds = (v: unknown): v is number =>
   typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 
 export interface HealthSnapshot {
-  readonly agent: HealthState;
+  /** The agent itself (REL051-CF2: an unreachable network is in `relays`, not here). */
+  readonly agent: Exclude<HealthState, 'unreachable' | 'checking'>;
   readonly relays: { readonly connected: number; readonly total: number } | null;
-  /** Unix seconds of the last completed sync. */
+  /** Unix seconds of the last time a relay answered a check from this computer (REL051-CF2). */
   readonly lastSyncAt: number | null;
   readonly version: string | null;
 }
@@ -45,7 +46,9 @@ export function parseHealthSnapshot(result: ApiResult<unknown>): HealthSnapshot 
     }
   }
   return {
-    agent: answer.state,
+    // REL051-CF2: the agent runs; Home's network tile reads the relay counts itself.
+    agent:
+      answer.state === 'unreachable' || answer.state === 'checking' ? 'connected' : answer.state,
     relays: routes,
     lastSyncAt: isSeconds(lastSyncAt) ? lastSyncAt : null,
     version: answer.version ?? null,

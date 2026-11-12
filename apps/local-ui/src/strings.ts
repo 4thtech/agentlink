@@ -21,6 +21,12 @@ export const SHELL_STRINGS = {
   themeLight: 'Light',
   themeDark: 'Dark',
   offlineChip: 'Not connected',
+  /** REL051-CF2 (R1-CLASS-02; 11 §5 "Can't reach the message network"): the status bar while no relay is reachable. */
+  networkUnreachable: "Can't reach the message network. Messages wait and send when it's back.",
+  /** REL051-CF2: the same state on the ID chip (short). */
+  networkUnreachableChip: "Can't reach the network",
+  /** REL051-CF2: the status bar until the first relay check from this computer has finished. */
+  networkChecking: 'Checking the connection…',
   goTo: 'Go to',
   goToButton: 'Go to…',
   goToFind: 'Go to a page or run a command',
@@ -47,7 +53,7 @@ export const SHELL_STRINGS = {
   hoodServerVersion: 'Version',
   hoodServerPort: 'Port',
   hoodServerRelays: 'Relays',
-  hoodServerLastSync: 'Last sync',
+  hoodServerLastSync: 'Last checked',
   hoodServerDataFolder: 'Data folder',
   hoodServerUptime: 'Uptime',
   hoodUptimeUnderMinute: 'Under a minute',

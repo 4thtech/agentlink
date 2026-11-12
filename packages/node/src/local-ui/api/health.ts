@@ -7,7 +7,9 @@
 // One fixed, allowlisted answer, built field by field (nothing of the source object is passed on):
 //   { agent: 'running' | 'paused' | 'not_running' | 'needs_setup',
 //     relays: { connected, total } | null,   // counts only: never an address
-//     lastSyncAt: number | null,             // unix seconds
+//     lastSyncAt: number | null,             // unix seconds: the last time a relay answered a
+//                                            // check from this computer (REL051-CF2; "Last checked")
+//     network: 'checking' | null,            // REL051-CF2: the first relay check has not finished
 //     version: string | null,                // a plain x.y.z[-pre] version
 //     dataFolder: string | null,             // REL051-B3b: home-relative (`~/.agentlink`) only
 //     uptimeSeconds: number | null }         // REL051-B3b: whole seconds since the server started
@@ -15,12 +17,13 @@
 // but the data folder with the home folder shown as `~` (the account name never shows): a folder
 // outside the home folder, or one that is not showable, answers null, never the path.
 //
-// Cheap and bounded: the source (in-process state the caller already keeps, never a network read
-// per request) is asked at most once per HEALTH_CACHE_MS, one read in flight shared by every
-// concurrent request, and a read that takes longer than HEALTH_SOURCE_TIMEOUT_MS or throws answers
-// `not_running` (fail closed: never "running" without evidence). With no agent set up the answer is
-// `needs_setup` and the source is not asked. With no source wired, an opened agent is `running`:
-// the agent is open in the process that answers.
+// Cheap and bounded: the source is asked at most once per HEALTH_CACHE_MS, one read in flight shared
+// by every concurrent request, and a read that takes longer than HEALTH_SOURCE_TIMEOUT_MS or throws
+// answers `not_running` (fail closed: never "running" without evidence). With no agent set up the
+// answer is `needs_setup` and the source is not asked. REL051-CF2: the server wires the open agent's
+// relay check (network-health.ts) when the caller gives no source; it answers from its last result
+// and starts at most one bounded check (connect only, the agent's own relays) per 5 s, so a request
+// never waits on the network beyond a short bound. With neither, an opened agent is `running`.
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { LocalUiContext } from '../context.js';
 import type { LocalUiReadRoute, LocalUiResult, LocalUiRoute } from '../route-types.js';
@@ -32,8 +35,10 @@ export type LocalUiAgentState = 'running' | 'paused' | 'not_running' | 'needs_se
 export interface LocalUiHealthSnapshot {
   readonly agent: 'running' | 'paused' | 'not_running';
   readonly relays?: { readonly connected: number; readonly total: number };
-  /** Unix seconds of the last completed sync. */
+  /** Unix seconds of the last time a relay answered a check from this computer (REL051-CF2). */
   readonly lastSyncAt?: number;
+  /** REL051-CF2: true until the first relay check finished (the app shows "Checking…"). */
+  readonly checking?: boolean;
 }
 
 /** The caller's health source (LocalUiOptions.health). */
@@ -44,6 +49,8 @@ export interface LocalUiHealthBody extends JsonObject {
   readonly agent: LocalUiAgentState;
   readonly relays: { readonly connected: number; readonly total: number } | null;
   readonly lastSyncAt: number | null;
+  /** REL051-CF2: `checking` until the first relay check finished, else null. */
+  readonly network: 'checking' | null;
   readonly version: string | null;
   /** REL051-B3b: the data folder with the home folder as `~`; null when it is not under home. */
   readonly dataFolder: string | null;
@@ -138,11 +145,13 @@ const body = (
   facts: ServerFacts = NO_FACTS,
   relays: LocalUiHealthBody['relays'] = null,
   lastSyncAt: number | null = null,
+  network: 'checking' | null = null,
 ): LocalUiHealthBody =>
   Object.freeze({
     agent,
     relays,
     lastSyncAt,
+    network,
     version: facts.version,
     dataFolder: facts.dataFolder,
     uptimeSeconds: facts.uptimeSeconds,
@@ -187,7 +196,7 @@ export function createHealthReader(options: HealthReaderOptions): () => Promise<
       if (typeof snapshot !== 'object' || snapshot === null) {
         return body('not_running', facts);
       }
-      const { agent, relays, lastSyncAt } = snapshot as Record<string, unknown>;
+      const { agent, relays, lastSyncAt, checking } = snapshot as Record<string, unknown>;
       if (typeof agent !== 'string' || !SOURCE_STATES.has(agent)) {
         return body('not_running', facts);
       }
@@ -196,6 +205,7 @@ export function createHealthReader(options: HealthReaderOptions): () => Promise<
         facts,
         relaysOf(relays),
         lastSyncOf(lastSyncAt, now()),
+        checking === true && agent === 'running' ? 'checking' : null,
       );
     } catch {
       // Fixed answer: the error (and its text) is never passed on.

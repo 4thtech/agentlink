@@ -24,7 +24,7 @@ import { AgentPause } from './agent-pause.js';
 import { McpSession } from './mcp-session.js';
 import { PublisherLease } from './publisher-lease.js';
 import { SendService, type SendMessageInput, type SendMessageResult } from './send.js';
-import type { TransportFactory } from './transport.js';
+import type { RelayStatus, TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
 import { AgentRemovalService } from './agent-removal.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
@@ -536,6 +536,16 @@ export class AgentLinkClient {
    */
   paused(): Promise<boolean> {
     return this.pause.paused();
+  }
+
+  /**
+   * REL051-CF2 (R1-CLASS-02): how many of the agent's own relays this machine can reach now, for the
+   * app's network status. Undefined without a transport, while paused, or when the own list cannot
+   * be read. Counts only (never an address); never throws. A check may take up to the 10 s connect
+   * bound for a relay that never answers; callers that must answer fast keep the last result.
+   */
+  relayReachability(): Promise<RelayStatus | undefined> {
+    return this.outbox.relayReachability();
   }
 
   /**
