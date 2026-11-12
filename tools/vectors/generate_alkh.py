@@ -38,11 +38,14 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric import padding as rsa_padding
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import generate_hkdf_derive as hkdf  # noqa: E402
 import generate_keystore_file as ksf  # noqa: E402
 import generate_prf_wrap as prf  # noqa: E402
+import generate_recovery_kit as rk  # noqa: E402
+import generate_stream as st  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "alkh"
@@ -53,6 +56,7 @@ MAX_CRED_ID = 1024
 MAX_CRED_PUB = 2048
 MAX_NAME = 64
 KIND_MAC, KIND_WIN = 1, 2
+P256_P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
 P256_N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
 P256_G = bytes.fromhex(
     "04"
@@ -104,8 +108,12 @@ class LabelledStream:
         return out
 
 
-def rsa_key(label):
-    return RSA.generate(2048, randfunc=LabelledStream(label))
+def rsa_key(label, bits=2048):
+    return RSA.generate(bits, randfunc=LabelledStream(label))
+
+
+def ec_spki(key):
+    return key.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
 
 
 def rsa_spki(key):
@@ -188,12 +196,33 @@ def is_name(cred_id):
     return 1 <= len(cred_id) <= MAX_NAME and all(0x21 <= b <= 0x7E for b in cred_id)
 
 
+def rsa_modulus_bytes(spki):
+    """The byte length of an RSA SubjectPublicKeyInfo's modulus (256, 384 or 512), else None."""
+    try:
+        key = serialization.load_der_public_key(spki)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(key, rsa.RSAPublicKey):
+        return None
+    if key.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo) != spki:
+        return None
+    n = (key.key_size + 7) // 8
+    return n if n in (256, 384, 512) else None
+
+
 def credential_fits(kind, cred_id, cred_pub, challenge):
     if not 1 <= len(cred_id) <= MAX_CRED_ID:
         return False
     if kind == KIND_MAC:
-        return on_p256(cred_pub) and on_p256(challenge) and challenge not in (P256_G, cred_pub)
-    return is_name(cred_id) and 1 <= len(cred_pub) <= MAX_CRED_PUB and len(challenge) == 32
+        # Fable review of DESK-D12a (low 1): a peer with the X coordinate of G or of the credential
+        # key is refused, so -G and -credPub are refused as well as G and credPub.
+        return on_p256(cred_pub) and on_p256(challenge) and challenge[1:33] not in (P256_G[1:33], cred_pub[1:33])
+    return (
+        is_name(cred_id)
+        and 1 <= len(cred_pub) <= MAX_CRED_PUB
+        and rsa_modulus_bytes(cred_pub) is not None
+        and len(challenge) == 32
+    )
 
 
 # The helper records of DESK-D12b (apps/desktop/native/*/agentlink-presence.*, record v1), rebuilt
@@ -225,17 +254,18 @@ def read_helper_record(kind, rec):
     return fields
 
 
-def secret_fits(kind, secret):
+def secret_fits(kind, secret, cred_pub=None):
     if kind == KIND_MAC and len(secret) != 32:
         return False
-    if kind == KIND_WIN and len(secret) not in (256, 384, 512):
+    # Fable review of DESK-D12a (low 3): the signature is exactly as long as the SPKI modulus.
+    if kind == KIND_WIN and (len(secret) not in (256, 384, 512) or len(secret) != rsa_modulus_bytes(cred_pub)):
         return False
     return any(secret)
 
 
 def open_alkh(blob, secret, expected_owner=None, expected_kind=None):
     h = parse(blob)
-    if not secret_fits(h["kind"], secret):
+    if not secret_fits(h["kind"], secret, h["credPub"]):
         raise ValueError("native secret does not fit the kind")
     if expected_owner is not None and h["owner"] != expected_owner:
         raise ValueError("header owner is not the expected owner")
@@ -286,6 +316,7 @@ def build():
         v.fail("ECDH with G is not the public X coordinate")
 
     rsa1, rsa2 = rsa_key("alkh/hello-key/1"), rsa_key("alkh/hello-key/2")
+    rsa3072, rsa4096 = rsa_key("alkh/hello-key/3072", 3072), rsa_key("alkh/hello-key/4096", 4096)
     win_pub, win_pub2 = rsa_spki(rsa1), rsa_spki(rsa2)
     challenge, challenge2 = v.det("alkh/hello-challenge/1", 32), v.det("alkh/hello-challenge/2", 32)
     win_secret = hello_sign(rsa1, challenge)
@@ -331,6 +362,8 @@ def build():
         ("mac-1", "kind 1 with the shortest credential ID (1 byte)", KIND_MAC, mac_secret, v.det("alkh/cred/1", 1), se_pub, peer),
         ("mac-1024", "kind 1 with the longest credential ID (1024 bytes)", KIND_MAC, mac_secret, v.det("alkh/cred/1024", 1024), se_pub, peer),
         ("win-name", "kind 2 with a KeyCredential name and an RSA-2048 SubjectPublicKeyInfo", KIND_WIN, win_secret, win_cred, win_pub, challenge),
+        ("win-3072", "kind 2 with an RSA-3072 SubjectPublicKeyInfo and its 384-byte signature", KIND_WIN, hello_sign(rsa3072, challenge), win_cred, rsa_spki(rsa3072), challenge),
+        ("win-4096", "kind 2 with an RSA-4096 SubjectPublicKeyInfo and its 512-byte signature", KIND_WIN, hello_sign(rsa4096, challenge), win_cred, rsa_spki(rsa4096), challenge),
     ]:
         nonce = v.det(f"alkh/{case_id}/nonce", 12)
         blob = seal(secret, kind, seed, cred, pub, ch, nonce)
@@ -421,6 +454,19 @@ def build():
     reject("mac-pub-prefix-06", "kind 1: a credential public key with the hybrid prefix 06 (sealed validly)", mac_seal(cred_pub=b"\x06" + mpub[1:]), msecret)
     g_secret = se_ecdh(se_key, P256_G)
     reject("mac-challenge-g", "kind 1: the base point G as the peer key, whose ECDH secret is public (sealed validly)", mac_seal(challenge=P256_G, secret=g_secret), g_secret)
+    neg_g = P256_G[:33] + (P256_P - int.from_bytes(P256_G[33:], "big")).to_bytes(32, "big")
+    if not on_p256(neg_g) or neg_g == P256_G:
+        v.fail("-G is not a point other than G")
+    neg_g_secret = se_ecdh(se_key, neg_g)
+    reject("mac-challenge-neg-g", "kind 1: -G as the peer key (the X coordinate of G; its ECDH secret is the public X coordinate too) (sealed validly)", mac_seal(challenge=neg_g, secret=neg_g_secret), neg_g_secret)
+    neg_pub = mpub[:33] + (P256_P - int.from_bytes(mpub[33:], "big")).to_bytes(32, "big")
+    if not on_p256(neg_pub):
+        v.fail("-credPub is not on the curve")
+    reject("mac-challenge-neg-pub", "kind 1: -credPub as the peer key (the X coordinate of the credential key) (sealed validly)", mac_seal(challenge=neg_pub, secret=se_ecdh(se_key, neg_pub)), se_ecdh(se_key, neg_pub))
+    w3 = blobs["win-3072"]
+    reject("win-secret-384-for-2048", "kind 2: a 384-byte signature for an RSA-2048 credential (the length is tied to the SPKI modulus), refused before decryption", w, hello_sign(rsa3072, wch))
+    reject("win-secret-256-for-3072", "kind 2: a 256-byte signature for an RSA-3072 credential, refused before decryption", w3[0], wsecret)
+    reject("win-pub-not-rsa", "kind 2: a credential public key that is not an RSA SubjectPublicKeyInfo (a P-256 SPKI; sealed validly)", win_seal(cred_pub=ec_spki(se_key)), wsecret)
     reject("mac-challenge-is-pub", "kind 1: the credential public key as the peer key (sealed validly)", mac_seal(challenge=mpub, secret=se_ecdh(se_key, mpub)), se_ecdh(se_key, mpub))
     # Bit flips in every field.
     hl = 39 + 2 + len(mcred) + 2 + 65 + 1 + 65 + 12
@@ -477,6 +523,17 @@ def build():
     if ksf.open_alko(alko, code_text, ksf.owner_keys(seed), True) != seed:
         v.fail("the ALKO reference opener disagrees")
     reject("alko-blob", "an ALKO blob given to the ALKH reader", alko, msecret)
+    # Fable review of DESK-D12a (low 4): the other blob types given to the ALKH reader.
+    alkr = prf.seal_alkr(code_text, seed, v.det("alkh/alkr/salt", 16), v.det("alkh/alkr/nonce", 12), FLOOR)
+    reject("alkr-blob", "an ALKR (recovery code) blob given to the ALKH reader", alkr, msecret)
+    alks = ksf.seal(code_text, 2, *FLOOR, v.det("alkh/alks/salt", 16), v.det("alkh/alks/nonce", 12), "0x" + "11" * 20, seed)
+    reject("alks-blob", "an ALKS (agent keystore file) blob given to the ALKH reader", alks, msecret)
+    alkk = rk.header(v.det("alkh/alkk/salt", 16), 1 << 16, v.det("alkh/alkk/prefix", 8), owner, *FLOOR) + v.det("alkh/alkk/body", 64)
+    reject("alkk-blob", "an ALKK (recovery kit) header and body given to the ALKH reader", alkk, msecret)
+    alf1 = st.seal(v.det("alkh/alf1/key", 32), v.det("alkh/alf1/prefix", 8), 1 << 16, seed)
+    reject("alf1-blob", "an ALF1 (encrypted file) object given to the ALKH reader", alf1, msecret)
+    for name, blob in [("alkr", alkr), ("alks", alks), ("alkk", alkk), ("alf1", alf1)]:
+        cases.append(v.case(f"header-reject-{name}", f"{SPEC}: the header reader refuses an {name.upper()} blob", {"op": "nativeHeader", "blob": v.hx(blob)}, {"outcome": "reject"}))
 
     def cross(case_id, why, reader, blob, secret):
         cases.append(v.case(f"cross-{case_id}", f"{SPEC} type separation: {why}", {"op": "crossOpen", "reader": reader, "blob": v.hx(blob), "secret": secret}, {"outcome": "reject"}))

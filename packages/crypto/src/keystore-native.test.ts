@@ -6,6 +6,7 @@
 // no secret in any error (I-7). The Secure Enclave key is stood in for by a test P-256 key.
 import { p256 } from '@noble/curves/nist.js';
 import { describe, expect, it } from 'vitest';
+import { RSA_2048_SPKI, RSA_3072_SPKI } from './keystore-native-spki.fixture.js';
 import { randomBytes } from './random.js';
 import {
   CryptoInputError,
@@ -16,6 +17,7 @@ import {
   encodeNativeHelperRecord,
   encodeUtf8,
   readNativeBlobHeader,
+  readNativeCreateOutput,
   readNativeHelperRecord,
   sha256,
 } from './index.js';
@@ -55,7 +57,7 @@ function createNativeChallenge(kind: number): Uint8Array {
   if (kind === NATIVE_PRESENCE_WINDOWS) return randomBytes(32);
   return p256.getPublicKey(p256.utils.randomSecretKey(), false);
 }
-const HELLO_SPKI = new Uint8Array(294).fill(0x30);
+const HELLO_SPKI = RSA_2048_SPKI;
 const HELLO_SIGNATURE = new Uint8Array(256).map((_, i) => (i * 7 + 1) & 0xff);
 
 async function refusal(run: () => Promise<unknown> | unknown): Promise<CryptoInputError> {
@@ -288,5 +290,78 @@ describe('ALKH v1 seal and open (04 §2.3.4)', () => {
     patched.set(encodeUtf8('ALKP'), 0);
     await refusal(() => openPasskeySeed(patched, secret));
     await refusal(() => readNativeBlobHeader(alkp));
+  });
+});
+
+// DESK-D12c, folding in the Fable review of DESK-D12a (lows 1 to 3).
+describe('Fable review of DESK-D12a: -G, the Windows create output, the RSA modulus', () => {
+  const negate = (point: Uint8Array): Uint8Array => p256.Point.fromBytes(point).negate().toBytes(false);
+
+  it('refuses -G and -credPub as the peer (the X coordinate of G or of the SE key)', async () => {
+    for (const peer of [negate(G), negate(SE_PUB)]) {
+      await refusal(() => sealNativeSeed(macInput(peer)));
+      expect(() =>
+        encodeNativeHelperRecord(NATIVE_PRESENCE_MACOS, {
+          credentialId: SE_HANDLE,
+          credentialPublicKey: SE_PUB,
+          challenge: peer,
+        }),
+      ).toThrow(CryptoInputError);
+    }
+  });
+
+  it('refuses a kind 2 credential key that is not an RSA SubjectPublicKeyInfo', async () => {
+    await refusal(() =>
+      sealNativeSeed({ ...winInput(randomBytes(32)), credentialPublicKey: new Uint8Array(294).fill(0x30) }),
+    );
+    await refusal(() => sealNativeSeed({ ...winInput(randomBytes(32)), credentialPublicKey: SE_PUB }));
+  });
+
+  it('ties the signature length to the SPKI modulus (256 for RSA-2048, 384 for RSA-3072)', async () => {
+    const challenge = randomBytes(32);
+    await refusal(() => sealNativeSeed({ ...winInput(challenge), nativeSecret: new Uint8Array(384).fill(1) }));
+    const sig384 = new Uint8Array(384).fill(3);
+    const blob = await sealNativeSeed({
+      ...winInput(challenge),
+      credentialPublicKey: RSA_3072_SPKI,
+      nativeSecret: sig384,
+    });
+    expect(encodeHex(await openNativeSeed(blob, sig384))).toBe(encodeHex(SEED));
+    await refusal(() => openNativeSeed(blob, HELLO_SIGNATURE));
+  });
+
+  it('reads the Windows create output: record ‖ u16be L ‖ signature, L the modulus size', () => {
+    const challenge = randomBytes(32);
+    const fields = { credentialId: HELLO_NAME, credentialPublicKey: HELLO_SPKI, challenge };
+    const record = encodeNativeHelperRecord(NATIVE_PRESENCE_WINDOWS, fields);
+    const out = new Uint8Array([...record, 0x01, 0x00, ...HELLO_SIGNATURE]);
+    const read = readNativeCreateOutput(NATIVE_PRESENCE_WINDOWS, out);
+    expect(encodeHex(read.record)).toBe(encodeHex(record));
+    expect(encodeHex(read.credential.challenge)).toBe(encodeHex(challenge));
+    expect(encodeHex(read.firstSecret ?? new Uint8Array(0))).toBe(encodeHex(HELLO_SIGNATURE));
+    for (const bad of [
+      record,
+      out.subarray(0, out.length - 1),
+      new Uint8Array([...out, 0]),
+      new Uint8Array([...record, 0x01, 0x80, ...new Uint8Array(384).fill(1)]),
+      new Uint8Array([...record, 0x01, 0x00, ...new Uint8Array(256)]),
+    ]) {
+      expect(() => readNativeCreateOutput(NATIVE_PRESENCE_WINDOWS, bad)).toThrow(CryptoInputError);
+    }
+  });
+
+  it('reads the macOS create output: the record alone, no secret (create needs no gesture)', () => {
+    const peer = createNativeChallenge(NATIVE_PRESENCE_MACOS);
+    const record = encodeNativeHelperRecord(NATIVE_PRESENCE_MACOS, {
+      credentialId: SE_HANDLE,
+      credentialPublicKey: SE_PUB,
+      challenge: peer,
+    });
+    const read = readNativeCreateOutput(NATIVE_PRESENCE_MACOS, record);
+    expect(encodeHex(read.record)).toBe(encodeHex(record));
+    expect(read.firstSecret).toBeUndefined();
+    expect(() =>
+      readNativeCreateOutput(NATIVE_PRESENCE_MACOS, new Uint8Array([...record, 0, 32, ...new Uint8Array(32).fill(1)])),
+    ).toThrow(CryptoInputError);
   });
 });
