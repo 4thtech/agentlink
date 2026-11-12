@@ -1,12 +1,11 @@
 // Steps shared by build-mac.mjs and build-win.mjs.
-import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { assetFor, constants } from './constants.mjs';
 import { fetchVerified, sha256File } from './fetch-verified.mjs';
 import { checkTgzDeps, lockRegistryProblems, treeHash } from './core-lock.mjs';
+import { sha256Hex } from './hash.mjs';
 import { PREVIEW_VAR, findPreviewString } from './preview-check.mjs';
 import { assertRootKeyPinned, readRootKeyJson } from './root-key-check.mjs';
 import { capture, run, walk } from './run.mjs';
@@ -106,8 +105,7 @@ export async function assertNoPreviewString(asarPath) {
 
 /** The raw app.asar bytes and every file in it, as [{path, content}]. */
 async function asarFiles(asarPath) {
-  const req = createRequire(new URL('../package.json', import.meta.url));
-  const asar = await import(pathToFileURL(req.resolve('@electron/asar')).href);
+  const asar = await import('@electron/asar');
   const files = [{ path: '(raw app.asar bytes)', content: readFileSync(asarPath) }];
   for (const p of asar.listPackage(asarPath, { isPack: false })) {
     const rel = p.replace(/^[\\/]/, '');
@@ -134,8 +132,7 @@ export async function assertPinnedRootKey(asarPath, env = process.env) {
 
 /** Packs the payload dir into app.asar (deterministic file order from @electron/asar). */
 export async function packAsar(payloadDir, asarPath) {
-  const req = createRequire(new URL('../package.json', import.meta.url));
-  const asar = await import(pathToFileURL(req.resolve('@electron/asar')).href);
+  const asar = await import('@electron/asar');
   await asar.createPackage(payloadDir, asarPath);
 }
 
@@ -198,7 +195,7 @@ export function installCore({ tgz, dest, os, cpu }) {
       `Installed packages declare install scripts (none may run):\n${bad.join('\n')}`,
     );
   return {
-    lockSha256: createHash('sha256').update(lockText).digest('hex'),
+    lockSha256: sha256Hex(lockText),
     treeSha256: treeHash(join(dest, 'node_modules')),
   };
 }

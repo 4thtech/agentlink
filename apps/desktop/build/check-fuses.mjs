@@ -5,9 +5,7 @@
 //
 //   node check-fuses.mjs --app <AgentLink.app | AgentLink.exe>
 import { existsSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { FUSE_NAMES, FUSES, diffFuses } from './lib/fuses.mjs';
 import { asarIntegrity, integrityDigest } from './lib/integrity.mjs';
 import { parseArgs, capture } from './lib/run.mjs';
@@ -17,8 +15,7 @@ if (!args.app) throw new Error('--app <AgentLink.app | AgentLink.exe> is require
 const app = resolve(args.app);
 if (!existsSync(app)) throw new Error(`Not found: ${app}`);
 
-const req = createRequire(new URL('./package.json', import.meta.url));
-const fuses = await import(pathToFileURL(req.resolve('@electron/fuses')).href);
+const fuses = await import('@electron/fuses');
 
 // The numeric indices in @electron/fuses must still match our name table (guards a library change).
 for (const [i, name] of FUSE_NAMES.entries()) {

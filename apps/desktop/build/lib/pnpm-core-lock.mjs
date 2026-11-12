@@ -2,8 +2,6 @@
 // name@version and integrity the repository already locked, reviewed and tested (no second
 // resolution). Pure: takes the parsed pnpm lock and the CLI's production dependencies.
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
 
 const REGISTRY = 'https://registry.npmjs.org/';
 
@@ -15,8 +13,7 @@ const split = (key) => {
 
 /** Reads pnpm-lock.yaml (it may hold several YAML documents) and returns the main lockfile object. */
 export async function readPnpmLock(path) {
-  const req = createRequire(new URL('../package.json', import.meta.url));
-  const YAML = await import(pathToFileURL(req.resolve('yaml')).href);
+  const YAML = await import('yaml');
   const docs = YAML.parseAllDocuments(readFileSync(path, 'utf8')).map((d) => d.toJS());
   const main = docs.find((d) => d?.importers?.['apps/cli'] && d?.snapshots);
   if (!main) throw new Error('No document with importers and snapshots in pnpm-lock.yaml.');

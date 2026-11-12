@@ -1,0 +1,25 @@
+AgentLink: how to open it the first time
+========================================
+
+This early preview of AgentLink is not signed by Apple yet. The first time you
+open it, your Mac asks you to allow it once. After that it opens like any other app.
+
+1. Drag AgentLink to the Applications folder (in this window).
+2. Open AgentLink from Applications. macOS says it cannot check the app.
+   Click "Done" (not "Move to Bin").
+3. Allow it once:
+   - macOS 15 or newer: open System Settings, then Privacy & Security.
+     Scroll down to the message about AgentLink and click "Open Anyway".
+     Confirm when your Mac asks, then click "Open Anyway" again.
+   - macOS 13 or 14: in Applications, hold Control and click AgentLink
+     (or right-click it), choose "Open", then click "Open" again.
+
+If macOS says "AgentLink.app is damaged": the app is not damaged. Click
+"Cancel", open Terminal, run this one line, then open AgentLink again:
+
+    xattr -dr com.apple.quarantine /Applications/AgentLink.app
+
+You do not need to turn off any Mac security setting.
+
+Download AgentLink only from https://github.com/4thtech/agentlink/releases
+More help: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md

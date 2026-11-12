@@ -7,9 +7,7 @@
 //
 // Signing: Authenticode is a hook that is OFF. DESKTOP_SIGNING=on is refused here until WP-D18.
 import { cpSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { basename, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { constants } from './lib/constants.mjs';
 import { BUILD_FUSES } from './lib/fuses.mjs';
 import { asarIntegrity, writeWinIcon, writeWinIntegrity } from './lib/integrity.mjs';
@@ -49,8 +47,7 @@ const out = resolve(args.out ?? OUT_DIR);
 const work = join(CACHE_DIR, `work-${platform}`);
 const tgz = resolve(args.tgz);
 
-const req = createRequire(new URL('./package.json', import.meta.url));
-const fuses = await import(pathToFileURL(req.resolve('@electron/fuses')).href);
+const fuses = await import('@electron/fuses');
 
 console.log(`[1/7] fetch pinned runtimes for ${platform}`);
 const rt = await fetchRuntimes(platform);

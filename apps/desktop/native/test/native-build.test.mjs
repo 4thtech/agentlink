@@ -175,6 +175,7 @@ test('mac helper Info.plist: fixed identifier, AgentLink name and icon, no Dock 
   const value = (key) =>
     (plist.match(new RegExp(`<key>${key}</key>\\s*<(string|true|false)\\s*/?>([^<]*)`)) ?? [])
       .slice(1)
+      .map((part) => part.trim())
       .join(':');
   assert.equal(value('CFBundleIdentifier'), `string:${HELPER_ID}`);
   assert.equal(value('CFBundleExecutable'), `string:${HELPER_NAME}`);

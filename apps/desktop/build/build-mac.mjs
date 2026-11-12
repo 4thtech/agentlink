@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds AgentLink.app + DMG + zip for macOS (arm64 or x64). Run on macOS (needs ditto, codesign, hdiutil).
 //
-//   node build-mac.mjs --arch arm64 --tgz <packed-cli.tgz> [--helper <agentlink-presence>] [--version 0.5.0] [--out dir]
+//   node build-mac.mjs --arch arm64 --tgz <packed-cli.tgz> [--helper <AgentLink.app from native.mjs>] [--version 0.5.0] [--out dir]
 //
 // What it does (WP-D4; Decision 3 / H1):
 //   pinned Electron + Node fetched over plain HTTPS and hash-checked -> Electron.app renamed AgentLink.app
@@ -18,9 +18,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { constants } from './lib/constants.mjs';
 import { BUILD_FUSES } from './lib/fuses.mjs';
 import { makeIcns } from './lib/icon.mjs';
@@ -28,7 +26,7 @@ import { asarIntegrity, writeMacDigest } from './lib/integrity.mjs';
 import { describeSignature, planFor, signApp, verifyApp } from './lib/mac-sign.mjs';
 import { APP_NAME, infoPlist } from './lib/plist.mjs';
 import { parseArgs, run } from './lib/run.mjs';
-import { buildMacHelper } from './native.mjs';
+import { HELPER_APP, HELPER_ID, buildMacHelper, macHelperLayout } from './native.mjs';
 import {
   CACHE_DIR,
   DESKTOP_DIR,
@@ -65,8 +63,7 @@ const out = resolve(args.out ?? OUT_DIR);
 const work = join(CACHE_DIR, `work-${platform}`);
 const tgz = resolve(args.tgz);
 
-const req = createRequire(new URL('./package.json', import.meta.url));
-const fuses = await import(pathToFileURL(req.resolve('@electron/fuses')).href);
+const fuses = await import('@electron/fuses');
 
 console.log(`[1/9] fetch pinned runtimes for ${platform}`);
 const rt = await fetchRuntimes(platform);
@@ -108,17 +105,27 @@ cpSync(join(nodeSrc, 'bin', 'node'), nodeBin);
 cpSync(join(nodeSrc, 'LICENSE'), join(nodeDest, 'LICENSE'));
 chmodSync(nodeBin, 0o755);
 const nodeBefore = describeSignature(join(nodeSrc, 'bin', 'node'));
-// Owner-presence helper (WP-D12b): built from source for this arch, or a prebuilt one (--helper);
-// signed in step 7. It must sit at Contents/Helpers/agentlink-presence (owner-native-helper.ts
+// Owner-presence helper (WP-D12b): the helper app (DESK051-C3: Info.plist + AgentLink icon, so the
+// Touch ID sheet names AgentLink), built from source for this arch or a prebuilt one from native.mjs
+// (--helper <AgentLink.app>); re-signed in step 7. It must sit at
+// Contents/Helpers/AgentLink.app/Contents/MacOS/agentlink-presence (owner-native-helper.ts
 // desktopHelperPath), or the app offers no Touch ID.
 const helpersDir = join(contents, 'Helpers');
-let presenceHelper;
+const helperLayout = macHelperLayout(helpersDir);
 if (args.helper) {
+  const given = resolve(args.helper);
+  if (basename(given) !== HELPER_APP) {
+    throw new Error(`--helper must be the ${HELPER_APP} bundle that native.mjs builds.`);
+  }
   mkdirSync(helpersDir, { recursive: true });
-  presenceHelper = join(helpersDir, 'agentlink-presence');
-  cpSync(resolve(args.helper), presenceHelper);
+  rmSync(helperLayout.bundle, { recursive: true, force: true });
+  run('ditto', [given, helperLayout.bundle]);
 } else {
-  presenceHelper = buildMacHelper({ arch, outDir: helpersDir });
+  buildMacHelper({ arch, outDir: helpersDir });
+}
+const presenceHelper = helperLayout.executable;
+for (const part of [helperLayout.executable, helperLayout.infoPlist, helperLayout.icon]) {
+  if (!existsSync(part)) throw new Error(`The presence helper app is incomplete: no ${part}.`);
 }
 chmodSync(presenceHelper, 0o755);
 
@@ -159,9 +166,12 @@ const mode =
   planFor(app, process.env, entitlements).at(-1).identity === '-' ? 'ad-hoc' : 'developer-id';
 const signed = signApp(app, process.env, entitlements);
 verifyApp(app);
-if (!existsSync(presenceHelper) || describeSignature(presenceHelper).identifier === null) {
-  throw new Error('The presence helper is missing or unsigned in Contents/Helpers.');
+// The helper app keeps its fixed identity and its sealed Info.plist and icon (a strict verify fails
+// on any change to them after signing).
+if (describeSignature(helperLayout.bundle).identifier !== HELPER_ID) {
+  throw new Error(`The presence helper in Contents/Helpers is unsigned or not ${HELPER_ID}.`);
 }
+run('codesign', ['--verify', '--strict', '--deep', helperLayout.bundle]);
 const nodeAfter = describeSignature(nodeBin);
 if (nodeAfter.cdhash !== nodeBefore.cdhash || nodeAfter.teamId !== nodeBefore.teamId) {
   throw new Error(
@@ -176,6 +186,11 @@ rmSync(dmgStage, { recursive: true, force: true });
 mkdirSync(dmgStage, { recursive: true });
 run('ditto', [app, join(dmgStage, `${APP_NAME}.app`)]);
 symlinkSync('/Applications', join(dmgStage, 'Applications'));
+// DESK051-C3: first-open steps for the unsigned build (Open Anyway), next to the app in the DMG.
+cpSync(
+  join(DESKTOP_DIR, 'assets', 'dmg', 'read-me-first.txt'),
+  join(dmgStage, 'Read me first.txt'),
+);
 const dmg = join(out, `${base}.dmg`);
 const zip = join(out, `${base}.zip`);
 rmSync(dmg, { force: true });
@@ -216,6 +231,8 @@ const inputs = {
     signature: nodeAfter,
   },
   presenceHelperSha256: await sha256Of(presenceHelper),
+  presenceHelperInfoPlistSha256: await sha256Of(helperLayout.infoPlist),
+  presenceHelperIconSha256: await sha256Of(helperLayout.icon),
   coreTgzSha256: await sha256Of(tgz),
   asarHeaderSha256: integrity.hash,
   integritySlotsPatched: slots,

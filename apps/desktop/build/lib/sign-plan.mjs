@@ -12,7 +12,9 @@ const NODE_DIR = '/Contents/Resources/node';
 // The owner-presence helper (WP-D12b) keeps a fixed identifier and the hardened runtime even when
 // ad-hoc signed, so phase 3 can check it by identity.
 export const HELPER_ID = 'io.4thtech.agentlink.presence';
-export const HELPER_PATH = '/Contents/Helpers/agentlink-presence';
+// DESK051-C3: an app bundle (Info.plist + AgentLink icon), so the Touch ID sheet names AgentLink.
+export const HELPER_BUNDLE_PATH = '/Contents/Helpers/AgentLink.app';
+export const HELPER_PATH = `${HELPER_BUNDLE_PATH}/Contents/MacOS/agentlink-presence`;
 export const HELPER_SIGN_OPTIONS = Object.freeze([
   '--identifier',
   HELPER_ID,
@@ -46,10 +48,12 @@ export function macSignPlan({ app, files, bundles, mode = 'adhoc', identity, ent
     ...[...files].filter((f) => !isBundledNode(f)).sort((a, b) => depth(b) - depth(a)),
     ...[...bundles].sort((a, b) => depth(b) - depth(a)),
   ];
+  // Exactly this app's presence helper (its executable and its bundle), nothing that merely ends alike.
+  const helperTargets = new Set([`${app}${HELPER_PATH}`, `${app}${HELPER_BUNDLE_PATH}`]);
   const plan = ordered.map((target) => ({
     target,
     identity: id,
-    options: target.endsWith(HELPER_PATH)
+    options: helperTargets.has(target)
       ? [
           ...options.filter((o, i, a) => o !== '--options' && a[i - 1] !== '--options'),
           ...HELPER_SIGN_OPTIONS,

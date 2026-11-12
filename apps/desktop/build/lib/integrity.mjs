@@ -5,36 +5,28 @@
 //    Framework binary at a sentinel. An unpatched slot FAILS OPEN, so patching is mandatory here:
 //    zero sentinels found is an error, not a warning;
 //  - Windows: an INTEGRITY/ELECTRONASAR resource in the exe (PE resource edit via `resedit`).
-import { createHash } from 'node:crypto';
 import { open, readFile, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
+import { sha256Hex, sha256Stream } from './hash.mjs';
 
 const SENTINEL = Buffer.from('AGbevlPCksUGKNL8TSn7wGmJEuJsXb2A');
 const PAYLOAD_LEN = 34; // used(1) + version(1) + SHA-256(32)
 
-async function importDep(name, fromDir) {
-  // Resolve from the build dir's own node_modules (pnpm workspace) regardless of the cwd.
-  const req = createRequire(new URL('../package.json', import.meta.url));
-  void fromDir;
-  return import(pathToFileURL(req.resolve(name)).href);
-}
-
 export async function asarIntegrity(asarPath) {
-  const asar = await importDep('@electron/asar');
+  // A literal specifier resolves from this file, so from the build package's own node_modules.
+  const asar = await import('@electron/asar');
   const { headerString } = asar.getRawHeader(asarPath);
-  return { algorithm: 'SHA256', hash: createHash('sha256').update(headerString).digest('hex') };
+  return { algorithm: 'SHA256', hash: sha256Hex(headerString) };
 }
 
 /** SHA-256 over the sorted (key, algorithm, hash) tuples, as Electron's integrity_digest.mm. */
 export function integrityDigest(integrity) {
-  const h = createHash('sha256');
+  const h = sha256Stream();
   for (const key of Object.keys(integrity).sort()) {
     h.update(key);
     h.update(integrity[key].algorithm);
     h.update(integrity[key].hash);
   }
-  return h.digest();
+  return Buffer.from(h.digest());
 }
 
 /** Patches every sentinel slot in the Electron Framework binary. Returns the number of slots written. */
@@ -67,7 +59,7 @@ export async function writeMacDigest(frameworkBinary, integrity) {
 
 /** Adds the INTEGRITY/ELECTRONASAR resource to a Windows exe. key is e.g. 'resources\\app.asar'. */
 export async function writeWinIntegrity(exePath, key, integrity) {
-  const { NtExecutable, NtExecutableResource, Resource } = await importDep('resedit');
+  const { NtExecutable, NtExecutableResource, Resource } = await import('resedit');
   const exe = NtExecutable.from(await readFile(exePath));
   const res = NtExecutableResource.from(exe);
   const versions = Resource.VersionInfo.fromEntries(res.entries);
@@ -87,7 +79,7 @@ export async function writeWinIntegrity(exePath, key, integrity) {
 
 /** Embeds the app icon (.ico) into a Windows exe as its icon group (resedit). */
 export async function writeWinIcon(exePath, icoPath) {
-  const { NtExecutable, NtExecutableResource, Resource, Data } = await importDep('resedit');
+  const { NtExecutable, NtExecutableResource, Resource, Data } = await import('resedit');
   const exe = NtExecutable.from(await readFile(exePath));
   const res = NtExecutableResource.from(exe);
   const iconFile = Data.IconFile.from(await readFile(icoPath));
