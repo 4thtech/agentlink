@@ -125,12 +125,18 @@ describe('the restore gate (08 §1; T-3, T-6)', () => {
     expect(JSON.parse(found.body)).toEqual({ kits: [] });
     const noCsrf = await send(port, RESTORE_PATHS.header, {
       method: 'POST',
-      headers: h.headers({ 'X-AgentLink-CSRF': 'x', 'X-AgentLink-Input': input({ handle: 'a'.repeat(22) }) }),
+      headers: h.headers({
+        'X-AgentLink-CSRF': 'x',
+        'X-AgentLink-Input': input({ handle: 'a'.repeat(22) }),
+      }),
     });
     expect(noCsrf.status).toBe(403);
     const cross = await send(port, RESTORE_PATHS.header, {
       method: 'POST',
-      headers: h.headers({ 'Sec-Fetch-Site': 'cross-site', 'X-AgentLink-Input': input({ handle: 'a'.repeat(22) }) }),
+      headers: h.headers({
+        'Sec-Fetch-Site': 'cross-site',
+        'X-AgentLink-Input': input({ handle: 'a'.repeat(22) }),
+      }),
     });
     expect(cross.status).toBe(403);
     const unknown = await send(port, RESTORE_PATHS.header, {

@@ -23,6 +23,9 @@
 // - A path is fixed segments `[a-z0-9-]` and `:name` parameters; a parameter matches only
 //   `[A-Za-z0-9_-]{1,128}` (no dot, no percent-escape, no slash), so no handler sees `..` or an
 //   encoded separator. Duplicates throw.
+// - UX1113-R1 (D-147): a `presence: 'restore'` route is one of the nine fixed RESTORE_PATHS, each
+//   registered once, `found` a GET and every other step a POST, with no handler; the server's restore
+//   gate runs it (recovery-kit-restore.ts). No other path, method or route can use the kind.
 // - The page files in api/ each own their routes; this file only lists them.
 import { activityRoutes } from './api/activity.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
@@ -52,6 +55,8 @@ import { pulseRoute } from './api/messages-pulse.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
+// UX1113-R1: restore from a recovery kit (the restore kind).
+import { restoreRoutes } from './api/restore.js';
 import {
   AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
@@ -60,6 +65,7 @@ import {
   BACKUP_EXPORT_PATH,
   BACKUP_PATH,
   CREATE_AGENT_PATHS,
+  RESTORE_PATHS,
   UI_SETTINGS_WRITE_PATH,
   type LocalUiRoute,
 } from './route-types.js';
@@ -186,7 +192,21 @@ export class LocalUiRouteRegistry {
     if (stub !== undefined && (stub !== true || presence !== true || method !== 'POST')) {
       throw invalid('only a POST owner route can be a stub');
     }
-    if (presence === 'handoff') {
+    if (presence === 'restore') {
+      // UX1113-R1 (D-147): restore from a recovery kit; the server's restore gate runs it.
+      const paths = RESTORE_PATHS as Readonly<Record<string, string>>;
+      if (typeof step !== 'string' || !Object.hasOwn(paths, step)) {
+        throw invalid('unknown restore step');
+      }
+      if (route.path !== paths[step]) throw invalid('a restore route is only at its fixed path');
+      if (method !== (step === 'found' ? 'GET' : 'POST')) {
+        throw invalid('a restore route has its fixed method');
+      }
+      if (handler !== undefined) throw invalid('a restore route has no handler');
+      if (this.#entries.some((e) => e.route.presence === 'restore' && e.route.step === step)) {
+        throw invalid('this restore step is already registered');
+      }
+    } else if (presence === 'handoff') {
       // U3-invite: `agentlink join` to a running app host; the server's handoff gate runs it.
       if (method !== 'POST') throw invalid('a handoff route is a POST');
       if (route.path !== JOIN_HANDOFF_PATH) {
@@ -381,6 +401,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     // W4-PAUSE (D-143 (5)): Pause and Resume.
     agentsPauseRoutes,
     uiSettingsRoutes,
+    // UX1113-R1 (D-147): restore from a recovery kit, in the app.
+    restoreRoutes,
   ]) {
     for (const route of routes) registry.register(route);
   }

@@ -36,11 +36,15 @@ export const FAST: Argon2idParams = Object.freeze({
 export class MemoryKeychain implements KeychainBackend {
   readonly items = new Map<string, Uint8Array>();
   failSetAfter = Infinity;
+  /** A set() of this account fails (a crash or a keychain refusal at that write). */
+  failAccount: string | undefined;
   get(account: string): Promise<Uint8Array | null> {
     return Promise.resolve(this.items.get(account)?.slice() ?? null);
   }
   set(account: string, value: Uint8Array): Promise<void> {
-    if (this.failSetAfter <= 0) return Promise.reject(new Error('native failure'));
+    if (this.failSetAfter <= 0 || account === this.failAccount) {
+      return Promise.reject(new Error('native failure'));
+    }
     this.failSetAfter -= 1;
     this.items.set(account, value.slice());
     return Promise.resolve();

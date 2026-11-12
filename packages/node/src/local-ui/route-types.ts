@@ -388,7 +388,40 @@ export interface LocalUiUiSettingsRoute {
   readonly handler: (context: LocalUiContext, change: UiSettings) => Promise<LocalUiResult>;
 }
 
+/** UX1113-R1 (D-147): the steps of the restore kind, each at one fixed path (04 §2.3.3). */
+export const RESTORE_PATHS = Object.freeze({
+  found: '/api/ui/restore/found',
+  upload: '/api/ui/restore/upload',
+  header: '/api/ui/restore/header',
+  presence: '/api/ui/restore/presence',
+  open: '/api/ui/restore/open',
+  check: '/api/ui/restore/check',
+  cancel: '/api/ui/restore/cancel',
+  applyBegin: '/api/ui/restore/apply/begin',
+  applyFinish: '/api/ui/restore/apply/finish',
+} as const);
+
+export type LocalUiRestoreStep = keyof typeof RESTORE_PATHS;
+
+/**
+ * UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app"; 08 §1): restoring from a recovery kit, the
+ * eleventh named route kind. Nine fixed paths (RESTORE_PATHS), each registered once, `found` a GET
+ * and the rest POSTs, with no handler: the server's restore gate runs them after the session, CSRF,
+ * Host, fetch-metadata (and, for a POST, Origin and octet-stream) checks, refuses a query, and hands
+ * the restore engine (recovery-kit-restore.ts) only the page session, the parsed
+ * `X-AgentLink-Input` and the body bytes (the recovery code, the presence proof, the WebAuthn
+ * response or the uploaded kit). No page file and no MCP handler reaches the engine (I-4; the
+ * import fence). It works with no agent open and needs no generation: it changes no open agent.
+ */
+export interface LocalUiRestoreRoute {
+  readonly method: 'GET' | 'POST';
+  readonly path: string;
+  readonly presence: 'restore';
+  readonly step: LocalUiRestoreStep;
+}
+
 export type LocalUiRoute =
+  | LocalUiRestoreRoute
   | LocalUiPauseRoute
   | LocalUiUiSettingsRoute
   | LocalUiHandoffRoute

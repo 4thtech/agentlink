@@ -80,6 +80,14 @@ export type { SendFolderResult } from './owner-first-policy.js';
 // M1-11b-6: whether the first-run page may offer owner setup (no owner anywhere: card, owner items,
 // file-KeyStore owner files). A store-only boolean like hasOwnerOnMachine; the keychain seam stays.
 export { ownerSetupAvailable } from './owner-setup.js';
+// UX1113-R1 (D-147; 06 §8): `agentlink restore` on this user's keychain, home and own TTY prompt.
+// The engine, its seams and the restore-only owner session stay inside the package.
+export {
+  restoreInTerminal,
+  type RestoreError,
+  type RestoreTerminalText,
+  type TerminalRestoreOutcome,
+} from './recovery-kit-restore.js';
 export {
   performOwnerOperation,
   type OwnerOperationItem,

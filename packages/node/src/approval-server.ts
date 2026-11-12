@@ -148,7 +148,7 @@
 // by port, so another local server the owner's browser visits could receive the session cookie; it
 // grants viewing only. The opener's argv briefly holds the session link (approval-os.ts).
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { hostname as osHostname } from 'node:os';
+import { homedir, hostname as osHostname } from 'node:os';
 import type { AddressInfo, ListenOptions } from 'node:net';
 import {
   PayConfirmError,
@@ -236,6 +236,7 @@ import {
   type SetupFolders,
   type SetupRegistration,
 } from './owner-setup.js';
+import { createRestoreEngine, type RestoreEngine } from './recovery-kit-restore.js';
 import {
   keepsFolder,
   prepareSendFolder,
@@ -300,6 +301,7 @@ import type {
   LocalUiRoute,
   LocalUiSwitchRoute,
   LocalUiPauseRoute,
+  LocalUiRestoreRoute,
   LocalUiCreateAgentStep,
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
@@ -836,6 +838,11 @@ export interface ApprovalServerInternals {
   readonly checkInvite?: JoinCheck;
   /** W4-LIVE-STATUS: the live event hub's read interval (tests: shorter). Default 2 s. */
   readonly liveEvents?: { readonly readIntervalMs?: number };
+  /**
+   * UX1113-R1 (D-147): the restore engine's home folder and the new master code's KDF parameters
+   * (tests use a temporary HOME and the floor). Default: the OS user's home and the kit defaults.
+   */
+  readonly restore?: { readonly home?: string; readonly kdf?: Argon2idParams };
 }
 
 export interface ApprovalServer {
@@ -1555,6 +1562,28 @@ export async function startApprovalServerWith(
   const hostValue = `${APPROVAL_SERVER_HOST}:${String(port)}`;
   const origin = `http://${hostValue}`;
   const cookieName = `agentlink_${String(port)}`;
+  // UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app"): the restore engine of the restore gate. Its
+  // only caller is restoreGate below (and WP-R2's export route, through registerExportedKit).
+  let restoreInstance: RestoreEngine | undefined;
+  const restoreEngine = (): RestoreEngine =>
+    (restoreInstance ??= createRestoreEngine({
+      home: internals.restore?.home ?? homedir(),
+      keychain: keychainOf,
+      origin,
+      now,
+      ...(internals.restore?.kdf === undefined ? {} : { kdf: internals.restore.kdf }),
+      knownOwnerNostr: async () => {
+        if (noAgentOpen()) return undefined;
+        return (await source.context().catch(() => undefined))?.owner.ownerNostr;
+      },
+      onRestored: async (names) => {
+        // First run with no agent open: the app opens the first restored ID.
+        const first = names[0];
+        if (host !== undefined && host.current === undefined && first !== undefined) {
+          await host.adoptFirst(first).catch(() => false);
+        }
+      },
+    }));
 
   const wellFormed = (candidate: string | undefined): candidate is string =>
     candidate !== undefined &&
@@ -3417,6 +3446,13 @@ export async function startApprovalServerWith(
       finishSetup(res, 429, 'wait', { retryAfter: wait });
       return;
     }
+    // UX1113-R1 (04 §2.3.3, T-7): restored IDs wait for their owner (a crash between the agents and
+    // the owner): first run never mints another owner over them; the page says "Finish restoring".
+    if (await restoreEngine().restorePending()) {
+      req.resume();
+      sendJson(res, 409, { status: 'finish_restore' });
+      return;
+    }
     // U3-g-b: the open agent's setup, else first run with no agent yet (the host's firstRun).
     const setup = agentUi?.ownerSetup;
     const firstRun = setup === undefined ? noAgentFirstRun() : undefined;
@@ -4458,6 +4494,104 @@ export async function startApprovalServerWith(
    * object and the invite desk only. The body is wiped afterwards (a pasted link holds the invite
    * secret); nothing here logs it, and an error answers a fixed code (I-7).
    */
+  /**
+   * UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app"): the restore kind. After the session, CSRF,
+   * Host and fetch-metadata checks of handleUi: no query; a POST needs Origin and an octet-stream
+   * body; the engine gets only the page session, the parsed `X-AgentLink-Input` and the body bytes.
+   * A presence header only on the presence step. Nothing here reads, logs or echoes a body.
+   */
+  async function restoreGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiRestoreRoute,
+    cookie: string,
+    originHeader: string | undefined,
+  ): Promise<void> {
+    const engine = restoreEngine();
+    const refuse = (status: number, error: string): void => {
+      req.resume();
+      sendJson(res, status, { error });
+    };
+    if (url.search !== '') return refuse(400, 'invalid');
+    if (route.step === 'found') {
+      req.resume();
+      sendResult(res, await engine.found(cookie));
+      return;
+    }
+    if (originHeader === undefined) return refuse(403, 'origin');
+    const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
+    if (type !== 'application/octet-stream') return refuse(415, 'content_type');
+    const mode = header(req, 'x-agentlink-presence');
+    if (mode !== undefined && (route.step !== 'presence' || mode !== 'passkey')) {
+      return refuse(400, 'invalid');
+    }
+    if (route.step === 'upload') {
+      if (header(req, 'x-agentlink-input') !== undefined) return refuse(400, 'invalid');
+      const declaredText = header(req, 'content-length');
+      const declared = declaredText === undefined ? undefined : Number(declaredText);
+      const answer = await engine.upload(cookie, req, declared);
+      if (answer.status !== 200) {
+        res.setHeader('Connection', 'close');
+        req.resume();
+      }
+      sendResult(res, answer);
+      return;
+    }
+    const input = operationInput(req);
+    if (input === 'invalid') return refuse(400, 'invalid');
+    const limit =
+      route.step === 'applyFinish'
+        ? MAX_SETUP_REGISTRATION_BYTES
+        : route.step === 'presence'
+          ? MAX_PASSKEY_BYTES
+          : route.step === 'open' || route.step === 'check'
+            ? MAX_SECRET_BYTES
+            : 0;
+    const body = await boundedBody(req, res, limit);
+    if (body === undefined) return;
+    try {
+      let answer;
+      switch (route.step) {
+        case 'header':
+          answer = await engine.header(cookie, input);
+          break;
+        case 'presence':
+          answer = await engine.presence(
+            cookie,
+            input,
+            body.slice(),
+            mode === 'passkey' ? 'passkey' : 'passphrase',
+          );
+          break;
+        case 'open':
+          answer = await engine.open(cookie, input, body.slice());
+          break;
+        case 'check':
+          answer = await engine.check(cookie, input, body.slice());
+          break;
+        case 'cancel':
+          answer = await engine.cancel(cookie, input);
+          break;
+        case 'applyBegin':
+          answer = await engine.applyBegin(cookie, input);
+          break;
+        case 'applyFinish':
+          answer = await engine.applyFinish(cookie, input, body.slice());
+          break;
+      }
+      if (answer.status === 429) {
+        const retry = (answer.body as { retryAfter?: unknown }).retryAfter;
+        if (typeof retry === 'number') res.setHeader('Retry-After', String(retry));
+      }
+      sendResult(res, answer);
+    } catch {
+      sendJson(res, 500, { error: 'failed' });
+    } finally {
+      wipe(body);
+    }
+  }
+
   async function inviteGate(
     req: IncomingMessage,
     res: ServerResponse,
@@ -4663,6 +4797,13 @@ export async function startApprovalServerWith(
     if (matchIndex(cookie, sessions) < 0) return fail(401, 'token');
     if (!fetchSiteOk(req)) return fail(403, 'fetch_site');
     const { route, params } = found;
+    if (route.presence === 'restore') {
+      // UX1113-R1 (D-147): restore has its own gate. It works with no agent open and takes no
+      // generation (it changes no open agent); Origin and the content type are checked there.
+      if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
+      await restoreGate(req, res, url, route, cookie as string, originHeader);
+      return;
+    }
     if (route.presence && originHeader === undefined) return fail(403, 'origin');
     if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
     if (!route.presence && route.stream === true) {
@@ -4742,7 +4883,11 @@ export async function startApprovalServerWith(
     url: URL,
     route: Exclude<
       LocalUiRoute,
-      LocalUiReadRoute | LocalUiSwitchRoute | LocalUiPauseRoute | LocalUiUiSettingsRoute
+      | LocalUiReadRoute
+      | LocalUiSwitchRoute
+      | LocalUiPauseRoute
+      | LocalUiUiSettingsRoute
+      | LocalUiRestoreRoute
     >,
     params: Readonly<Record<string, string>>,
     cookie: string,
@@ -5764,6 +5909,7 @@ export async function startApprovalServerWith(
       return url;
     },
     close: async () => {
+      await restoreInstance?.close();
       dropSetup();
       payHolds.clear();
       dropCreate();

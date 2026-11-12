@@ -1,24 +1,20 @@
 // UX1113-R1 (D-147; 06 §8 `agentlink backup restore [file] [--check]`, alias `agentlink restore`;
-// 04 §2.3.3 "Restore"): interactive terminal only, harness-marker guard, the recovery code only from
-// the hidden prompt, never overwrites, a new master code shown once when it creates the owner.
-import { mkdtemp, readFile, rm, lstat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { OwnerTerminal } from '@4thtech-io/node';
+// 04 §2.3.3 "Restore"): interactive terminal only, harness-marker guard, no piped stdin. The flow
+// itself (hidden prompts, never overwrites, the new master code once) is node's restoreInTerminal,
+// tested over a temporary HOME in packages/node/src/recovery-kit-restore.test.ts ("the terminal").
+import { describe, expect, it } from 'vitest';
 import {
-  FAST,
-  MemoryKeychain,
-  makeAgent,
-  makeKit,
-  makeOwner,
-} from '../../../../packages/node/src/recovery-kit-restore.fixture.js';
-import { COMMAND_NAMES, EXIT_FAILED, EXIT_OK, createDispatcher, type DispatchIO } from '../dispatch.js';
+  COMMAND_NAMES,
+  EXIT_FAILED,
+  EXIT_OK,
+  EXIT_USAGE,
+  createDispatcher,
+  type DispatchIO,
+} from '../dispatch.js';
 import type { TerminalContext } from '../runtime/guards.js';
-import { BACKUP_TEXT } from './backup-strings.js';
+import { BACKUP_TEXT, restoreText } from './backup-strings.js';
 import { createBackupHandler } from './backup.js';
 
-const POSIX = process.platform !== 'win32';
 const OWNER_TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 
 function io(terminal: TerminalContext = OWNER_TTY) {
@@ -31,39 +27,6 @@ function io(terminal: TerminalContext = OWNER_TTY) {
   };
   return { value, out, err };
 }
-
-/** A scripted owner terminal: answers in order; records everything written. */
-function scripted(answers: string[]) {
-  const written: string[] = [];
-  const asked: string[] = [];
-  const terminal: OwnerTerminal = {
-    write: (text) => void written.push(text),
-    readSecret: (label) => {
-      asked.push(`secret:${label}`);
-      return Promise.resolve(new TextEncoder().encode(answers.shift() ?? ''));
-    },
-    confirm: (question) => {
-      asked.push(`confirm:${question}`);
-      return Promise.resolve(/^y/i.test(answers.shift() ?? ''));
-    },
-    readText: (label) => {
-      asked.push(`text:${label}`);
-      return Promise.resolve(answers.shift() ?? '');
-    },
-    clearScreen: () => void written.push('<clear>'),
-  };
-  return { terminal, written, asked };
-}
-
-let root: string;
-let home: string;
-beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'al-r1-cli-'));
-  home = join(root, 'home');
-});
-afterEach(async () => {
-  await rm(root, { recursive: true, force: true });
-});
 
 describe('agentlink backup restore and agentlink restore (06 §8)', () => {
   it('both commands are registered as owner commands (†)', () => {
@@ -86,83 +49,53 @@ describe('agentlink backup restore and agentlink restore (06 §8)', () => {
     expect(ran).toBe(0);
   });
 
-  it.runIf(POSIX)('restores a kit on a clean computer and shows the new master code once', async () => {
-    const owner = await makeOwner();
-    const agent = await makeAgent(root, owner, 'helper', { people: 1 });
-    const kit = await makeKit(root, owner, [agent], 'agentlink-recovery-kit-a.alkk', join(home, 'Downloads'));
-    const keychain = new MemoryKeychain();
-    const { terminal, written } = scripted([kit.code, 'yes', 'yes']);
+  it('passes the file and --check to the node flow (never a code) and maps its outcome', async () => {
+    const calls: unknown[] = [];
+    const outcomes = ['restored', 'checked', 'refused', 'cancelled'] as const;
+    let next = 0;
     const handler = createBackupHandler({
-      home: () => home,
-      keychain: () => keychain,
-      terminal: () => terminal,
-      kdf: FAST,
+      restore: (request, text) => {
+        calls.push(request);
+        expect(text.checkOpens).toBe(BACKUP_TEXT.checkOpens);
+        const outcome = outcomes[next] ?? 'refused';
+        next += 1;
+        return Promise.resolve(outcome);
+      },
     });
-    const out = io();
-    const code = await handler({
-      command: 'restore',
-      parsed: { values: {}, positionals: [kit.path], agent: undefined },
-      output: out.value.output,
-      terminal: OWNER_TTY,
-    });
-    expect(code).toBe(EXIT_OK);
-    const config = await readFile(join(home, '.agentlink', 'agents', 'helper', 'config.json'), 'utf8');
-    expect(config).toContain(agent.agentId);
-    const shown = written.join('\n');
-    expect(shown).toMatch(/[A-Z2-7]{4}(?:-[A-Z2-7]{4}){5}/);
-    expect(shown).not.toContain(kit.code);
-    expect([...out.out, ...out.err].join('\n')).not.toContain(kit.code);
-    expect(written).toContain('<clear>');
+    const dispatch = createDispatcher({ backup: handler, restore: handler });
+    const run = (argv: string[]) => dispatch(argv, io().value);
+    expect(await run(['restore', '/tmp/kit.alkk'])).toBe(EXIT_OK);
+    expect(await run(['backup', 'restore', '--check'])).toBe(EXIT_OK);
+    expect(await run(['restore'])).toBe(EXIT_FAILED);
+    expect(await run(['restore', '--check'])).toBe(EXIT_FAILED);
+    expect(calls).toEqual([
+      { file: '/tmp/kit.alkk', check: false },
+      { check: true },
+      { check: false },
+      { check: true },
+    ]);
+    // `backup` alone, another subcommand, or two files is a usage error; the flow never runs.
+    expect(await run(['backup'])).toBe(EXIT_USAGE);
+    expect(await run(['backup', 'export'])).toBe(EXIT_USAGE);
+    expect(await run(['restore', 'a.alkk', 'b.alkk'])).toBe(EXIT_USAGE);
+    expect(calls).toHaveLength(4);
   });
 
-  it.runIf(POSIX)('--check opens and lists without writing anything', async () => {
-    const owner = await makeOwner();
-    const agent = await makeAgent(root, owner, 'helper');
-    const kit = await makeKit(root, owner, [agent], 'agentlink-recovery-kit-b.alkk', join(home, 'Downloads'));
-    const keychain = new MemoryKeychain();
-    const { terminal, written } = scripted([kit.code]);
-    const handler = createBackupHandler({
-      home: () => home,
-      keychain: () => keychain,
-      terminal: () => terminal,
-      kdf: FAST,
-    });
-    const out = io();
-    // Without a file: the kit found in Downloads is offered (the newest is the default).
-    const code = await handler({
-      command: 'backup',
-      parsed: { values: { check: true }, positionals: ['restore'], agent: undefined },
-      output: out.value.output,
-      terminal: OWNER_TTY,
-    });
-    expect(code).toBe(EXIT_OK);
-    expect(written.join('\n')).toContain(BACKUP_TEXT.checkOpens);
-    expect([...keychain.items.keys()]).toEqual([]);
-    await expect(lstat(join(home, '.agentlink', 'agents'))).rejects.toThrow();
-  });
-
-  it.runIf(POSIX)('a wrong code three times ends with nothing written and the code never echoed', async () => {
-    const owner = await makeOwner();
-    const agent = await makeAgent(root, owner, 'helper');
-    const kit = await makeKit(root, owner, [agent], 'agentlink-recovery-kit-c.alkk', join(home, 'Downloads'));
-    const keychain = new MemoryKeychain();
-    const wrong = 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA';
-    const { terminal, written } = scripted([wrong, wrong, wrong]);
-    const handler = createBackupHandler({
-      home: () => home,
-      keychain: () => keychain,
-      terminal: () => terminal,
-      kdf: FAST,
-    });
-    const out = io();
-    const code = await handler({
-      command: 'restore',
-      parsed: { values: {}, positionals: [kit.path], agent: undefined },
-      output: out.value.output,
-      terminal: OWNER_TTY,
-    });
-    expect(code).toBe(EXIT_FAILED);
-    expect([...written, ...out.out, ...out.err].join('\n')).not.toContain(wrong);
-    expect([...keychain.items.keys()]).toEqual([]);
+  it('every word is plain language (no seed phrase, wallet or transaction)', () => {
+    const text = restoreText();
+    const all = [
+      text.noKit,
+      text.pickKit,
+      text.masterCodePrompt,
+      text.recoveryCodePrompt,
+      text.checkOpens,
+      text.nothingToRestore,
+      text.masterCodeShown,
+      text.savedIt,
+      text.nextSteps,
+      ...Object.values(text.errors),
+    ].join('\n');
+    expect(all).not.toMatch(/seed phrase|wallet|transaction|\bgas\b/i);
+    expect(text.recoveryCodePrompt).toMatch(/never give it to your AI/);
   });
 });

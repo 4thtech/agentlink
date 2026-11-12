@@ -2,7 +2,16 @@
 // "Restore-only owner session"; threats T-1 to T-12): the restore engine behind the app's
 // /api/ui/restore/* routes, against a temporary HOME, an in-memory keychain and kits sealed by the
 // real KeyExportControl. Each describe names the threat rows it proves.
-import { lstat, mkdir, readFile, readdir, rename, stat, symlink, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   decodeBase64url,
@@ -16,6 +25,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { keychainAccount } from './keychain.js';
 import {
   OWNER_ACCOUNT,
+  OWNER_NEXT_ACCOUNT,
   OWNER_PASSKEY_ACCOUNT,
   exportSeedOf,
   ownerItemPresent,
@@ -32,14 +42,17 @@ import {
   tempRoot,
   webauthnCreate,
   webauthnCreateThenGet,
-  type TestAgent,
   type TestOwner,
 } from './recovery-kit-restore.fixture.js';
 import {
   RESTORE_HANDLE_TTL_MS,
   createRestoreEngine,
+  createTerminalRestore,
+  runRestoreInTerminal,
   type RestoreAnswer,
   type RestoreEngine,
+  type RestoreTerminal,
+  type RestoreTerminalText,
 } from './recovery-kit-restore.js';
 
 const POSIX = process.platform !== 'win32';
@@ -63,19 +76,17 @@ function newEngine(over: { knownOwner?: Uint8Array; maxUpload?: number } = {}): 
     ...(over.maxUpload === undefined ? {} : { maxUploadBytes: over.maxUpload }),
   });
   // Record every answer.
-  return new Proxy(made, {
-    get(target, key) {
-      const value = Reflect.get(target, key) as unknown;
-      if (typeof value !== 'function') return value;
-      return async (...args: unknown[]) => {
-        const out = (await (value as (...a: unknown[]) => unknown).apply(target, args)) as unknown;
-        if (typeof out === 'object' && out !== null && 'status' in out) {
-          answers.push(out as RestoreAnswer);
-        }
-        return out;
-      };
-    },
-  });
+  const wrapped: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(made)) {
+    wrapped[key] = async (...args: unknown[]) => {
+      const out = (await (value as (...a: unknown[]) => unknown)(...args)) as unknown;
+      if (typeof out === 'object' && out !== null && 'status' in out) {
+        answers.push(out as RestoreAnswer);
+      }
+      return out;
+    };
+  }
+  return wrapped as unknown as RestoreEngine;
 }
 
 beforeEach(async () => {
@@ -111,27 +122,12 @@ async function kitOnDisk(
   const o = owner ?? (await makeOwner());
   const made = [];
   for (const a of agents) made.push(await makeAgent(t.root, o, a.name, a));
-  const kit = await makeKit(
-    t.root,
-    o,
-    made,
-    file,
-    join(t.home, 'Downloads'),
-  );
+  const kit = await makeKit(t.root, o, made, file, join(t.home, 'Downloads'));
   return { owner: o, agents: made, ...kit };
 }
 
 async function openKit(session: string, handle: string, text: string) {
   return engine.open(session, { handle }, code(text));
-}
-
-/** How many keychain writes restoring `agent` makes (its kit items, storage-mark always). */
-async function itemCount(agent: TestAgent): Promise<number> {
-  let n = 0;
-  for (const item of ['seed', 'store-key', 'policy-version', 'receipts-kept', 'key-epoch']) {
-    if ((await agent.keychain.get(keychainAccount(agent.agentId, item))) !== null) n += 1;
-  }
-  return n + 1;
 }
 
 /** The keychain and the agents folder hold nothing (T-1, T-7). */
@@ -308,7 +304,9 @@ describe.runIf(POSIX)('wrong code (T-4)', () => {
 
 describe.runIf(POSIX)('a computer without an owner (T-1, T-10, T-12)', () => {
   it('opens to a public summary with counts and dates only, and writes nothing without the gesture', async () => {
-    const { code: c, agents } = await kitOnDisk([{ name: 'helper', people: 2, lastAt: 1_761_000_000 }]);
+    const { code: c, agents } = await kitOnDisk([
+      { name: 'helper', people: 2, lastAt: 1_761_000_000 },
+    ]);
     const handle = await foundHandle();
     const opened = await openKit('S1', handle, c);
     expect(opened.status).toBe(200);
@@ -333,13 +331,21 @@ describe.runIf(POSIX)('a computer without an owner (T-1, T-10, T-12)', () => {
     // A creation for another challenge, or without user verification, writes nothing.
     const pk = body(begun)['publicKey'] as { challenge: string; userId: string; prfSalt: string };
     const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
-    const forged = webauthnCreate(auth, { ...pk, challenge: encodeBase64url(new Uint8Array(32)) }, ORIGIN);
-    expect(body(await engine.applyFinish('S1', { nonce: body(begun)['nonce'] as string }, forged))['error']).toBe(
-      'presence_rejected',
+    const forged = webauthnCreate(
+      auth,
+      { ...pk, challenge: encodeBase64url(new Uint8Array(32)) },
+      ORIGIN,
     );
+    expect(
+      body(await engine.applyFinish('S1', { nonce: body(begun)['nonce'] as string }, forged))[
+        'error'
+      ],
+    ).toBe('presence_rejected');
     const noUv = webauthnCreate(new VirtualPrfAuthenticator({ uv: false }), pk, ORIGIN);
     expect(
-      body(await engine.applyFinish('S1', { nonce: body(begun)['nonce'] as string }, noUv))['error'],
+      body(await engine.applyFinish('S1', { nonce: body(begun)['nonce'] as string }, noUv))[
+        'error'
+      ],
     ).toBe('presence_rejected');
     // Another page session cannot finish it.
     expect(
@@ -372,15 +378,25 @@ describe.runIf(POSIX)('a computer without an owner (T-1, T-10, T-12)', () => {
     const config = JSON.parse(
       await readFile(join(t.home, '.agentlink', 'agents', 'helper', 'config.json'), 'utf8'),
     ) as Record<string, unknown>;
-    expect(config).toEqual({ v: 1, name: 'helper', agentId: agents[0]?.agentId, keyStore: 'keychain' });
-    expect((await stat(join(t.home, '.agentlink', 'agents', 'helper', 'store.sqlite'))).mode & 0o777).toBe(
-      0o600,
-    );
+    expect(config).toEqual({
+      v: 1,
+      name: 'helper',
+      agentId: agents[0]?.agentId,
+      keyStore: 'keychain',
+    });
+    expect(
+      (await stat(join(t.home, '.agentlink', 'agents', 'helper', 'store.sqlite'))).mode & 0o777,
+    ).toBe(0o600);
     // Single use: the kit is consumed and the code is in no later answer.
     expect(body(await engine.applyBegin('S1', { kit, selection: [], names: {} }))['error']).toBe(
       'expired',
     );
-    const later = JSON.stringify(answers.slice(answers.indexOf(answers.find((a) => body(a)['masterCode'] !== undefined) as RestoreAnswer) + 1));
+    const later = JSON.stringify(
+      answers.slice(
+        answers.indexOf(answers.find((a) => body(a)['masterCode'] !== undefined) as RestoreAnswer) +
+          1,
+      ),
+    );
     expect(later).not.toContain(master);
     expect(owner.keys.ownerNostr.length).toBe(32);
     expect(await engine.restorePending()).toBe(false);
@@ -398,15 +414,25 @@ describe.runIf(POSIX)('a computer without an owner (T-1, T-10, T-12)', () => {
     const pk = body(begun)['publicKey'] as { challenge: string; userId: string; prfSalt: string };
     const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
     const created = webauthnCreate(auth, pk, ORIGIN, false);
-    const need = await engine.applyFinish('S1', { nonce: body(begun)['nonce'] as string }, created);
+    const need = await engine.applyFinish(
+      'S1',
+      { nonce: body(begun)['nonce'] as string },
+      created.slice(),
+    );
     expect(body(need)['status']).toBe('prf_needed');
     await expectNothingWritten();
-    const pk2 = body(need)['publicKey'] as { challenge: string; prfSalt: string; credentialId: string };
+    const pk2 = body(need)['publicKey'] as {
+      challenge: string;
+      prfSalt: string;
+      credentialId: string;
+    };
     expect(pk2.challenge).not.toBe(pk.challenge);
     // A get() for the first challenge is refused.
     const stale = webauthnCreateThenGet(auth, created, { ...pk2, challenge: pk.challenge }, ORIGIN);
     expect(
-      body(await engine.applyFinish('S1', { nonce: body(need)['nonce'] as string }, stale))['error'],
+      body(await engine.applyFinish('S1', { nonce: body(need)['nonce'] as string }, stale))[
+        'error'
+      ],
     ).toBe('presence_rejected');
     await expectNothingWritten();
     const good = webauthnCreateThenGet(auth, created, pk2, ORIGIN);
@@ -423,7 +449,7 @@ describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
       [{ name: 'helper' }, { name: 'work' }, { name: 'old' }],
       owner,
     );
-    const [a, b, gone] = agents as [typeof agents[0], typeof agents[0], typeof agents[0]];
+    const [a, b, gone] = agents as [(typeof agents)[0], (typeof agents)[0], (typeof agents)[0]];
     // `helper` is already here (same agentId); a different `work` folder exists; `old` was removed.
     for (const [name, id] of [
       ['helper', a.agentId],
@@ -492,16 +518,29 @@ describe.runIf(POSIX)('a computer with an owner (T-2; restore-only session)', ()
     engine = newEngine({ knownOwner: owner.keys.ownerNostr });
     const { code: c, agents } = await kitOnDisk(undefined, owner);
     const handle = await foundHandle('S1', 'agentlink-recovery-kit-2026-11-12.alkk');
-    expect(body(await engine.header('S1', { handle }))).toEqual({ header: 'ok', ownerPresent: true });
+    expect(body(await engine.header('S1', { handle }))).toEqual({
+      header: 'ok',
+      ownerPresent: true,
+    });
     expect(body(await openKit('S1', handle, c))['error']).toBe('presence_required');
-    const wrong = await engine.presence('S1', { handle }, code('not-the-code-at-all'), 'passphrase');
+    const wrong = await engine.presence(
+      'S1',
+      { handle },
+      code('not-the-code-at-all'),
+      'passphrase',
+    );
     expect(body(wrong)['error']).toBe('presence_rejected');
     // Presence for another kit file (another header) does not open this one.
     await kitOnDisk([{ name: 'other' }], owner, 'agentlink-recovery-kit-other.alkk');
     const otherHandle = await foundHandle('S1', 'agentlink-recovery-kit-other.alkk');
-    expect((await engine.presence('S1', { handle: otherHandle }, owner.code.slice(), 'passphrase')).status).toBe(200);
+    expect(
+      (await engine.presence('S1', { handle: otherHandle }, owner.code.slice(), 'passphrase'))
+        .status,
+    ).toBe(200);
     expect(body(await openKit('S1', handle, c))['error']).toBe('presence_required');
-    expect((await engine.presence('S1', { handle }, owner.code.slice(), 'passphrase')).status).toBe(200);
+    expect((await engine.presence('S1', { handle }, owner.code.slice(), 'passphrase')).status).toBe(
+      200,
+    );
     // Bound to its page session.
     expect(body(await openKit('S2', handle, c))['error']).toBe('expired');
     const opened = await openKit('S1', handle, c);
@@ -530,12 +569,18 @@ describe.runIf(POSIX)('the opened-kit hold (T-7)', () => {
     expect(body(await engine.check('S2', { handle: h2 }, code(c)))['error']).toBe('busy');
     const again = await openKit('S1', handle, c);
     expect(again.status).toBe(200);
-    expect(body(await engine.applyBegin('S1', { kit, selection: [], names: {} }))['error']).toBe('expired');
+    expect(body(await engine.applyBegin('S1', { kit, selection: [], names: {} }))['error']).toBe(
+      'expired',
+    );
     const kit2 = body(again)['kit'] as string;
     expect((await engine.cancel('S1', { kit: kit2 })).status).toBe(200);
     expect(
       body(
-        await engine.applyBegin('S1', { kit: kit2, selection: [agents[0]?.agentId as string], names: {} }),
+        await engine.applyBegin('S1', {
+          kit: kit2,
+          selection: [agents[0]?.agentId as string],
+          names: {},
+        }),
       )['error'],
     ).toBe('expired');
     const q = join(t.home, '.agentlink', 'restore');
@@ -547,7 +592,11 @@ describe.runIf(POSIX)('the opened-kit hold (T-7)', () => {
     clock += RESTORE_HANDLE_TTL_MS + 1;
     expect(
       body(
-        await engine.applyBegin('S2', { kit: third, selection: [agents[0]?.agentId as string], names: {} }),
+        await engine.applyBegin('S2', {
+          kit: third,
+          selection: [agents[0]?.agentId as string],
+          names: {},
+        }),
       )['error'],
     ).toBe('expired');
   });
@@ -561,7 +610,9 @@ describe.runIf(POSIX)('the opened-kit hold (T-7)', () => {
     expect((body(checked)['summary'] as { ids: unknown[] }).ids).toHaveLength(1);
     await expectNothingWritten();
     const q = join(t.home, '.agentlink', 'restore');
-    expect((await readdir(q).catch(() => [] as string[])).filter((n) => n.startsWith('.restore-'))).toEqual([]);
+    expect(
+      (await readdir(q).catch(() => [] as string[])).filter((n) => n.startsWith('.restore-')),
+    ).toEqual([]);
   });
 });
 
@@ -579,7 +630,10 @@ describe.runIf(POSIX)('a crash or failure part way (T-7)', () => {
     const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
     // The first ID (kit order) writes its items; the second fails part way through its items.
     const first = [...agents].sort((x, y) => (x.agentId < y.agentId ? -1 : 1))[0]!;
-    keychain.failSetAfter = (await itemCount(first)) + 1;
+    keychain.failAccount = keychainAccount(
+      agents.find((a) => a.agentId !== first.agentId)!.agentId,
+      'store-key',
+    );
     const done = await engine.applyFinish(
       'S1',
       { nonce: body(begun)['nonce'] as string },
@@ -593,9 +647,9 @@ describe.runIf(POSIX)('a crash or failure part way (T-7)', () => {
       expect(keychain.items.has(keychainAccount(second.agentId, item))).toBe(false);
     }
     await expect(lstat(join(t.home, '.agentlink', 'agents', second.name))).rejects.toThrow();
-    expect(await readFile(join(t.home, '.agentlink', 'agents', first.name, 'config.json'), 'utf8')).toContain(
-      first.agentId,
-    );
+    expect(
+      await readFile(join(t.home, '.agentlink', 'agents', first.name, 'config.json'), 'utf8'),
+    ).toContain(first.agentId);
   });
 
   it('a crash between the agents and the owner: first run is held; owner-only completion with the same kit', async () => {
@@ -610,7 +664,7 @@ describe.runIf(POSIX)('a crash or failure part way (T-7)', () => {
     const pk = body(begun)['publicKey'] as { challenge: string; userId: string; prfSalt: string };
     const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
     // Six agent items, then the owner write fails.
-    keychain.failSetAfter = await itemCount(agents[0] as TestAgent);
+    keychain.failAccount = OWNER_NEXT_ACCOUNT;
     const done = await engine.applyFinish(
       'S1',
       { nonce: body(begun)['nonce'] as string },
@@ -620,7 +674,7 @@ describe.runIf(POSIX)('a crash or failure part way (T-7)', () => {
     expect(body(done)['masterCode']).toBeUndefined();
     expect(await ownerItemPresent(keychain)).toBe(false);
     expect(await engine.restorePending()).toBe(true);
-    keychain.failSetAfter = Infinity;
+    keychain.failAccount = undefined;
     // A kit of another owner cannot complete it.
     const stranger = await kitOnDisk([{ name: 'x' }], undefined, 'agentlink-recovery-kit-x.alkk');
     expect(stranger.owner.keys.ownerNostr).not.toEqual(owner.keys.ownerNostr);
@@ -628,7 +682,13 @@ describe.runIf(POSIX)('a crash or failure part way (T-7)', () => {
     const strangerOpen = await openKit('S1', sh, stranger.code);
     expect(body(strangerOpen)['error']).toBe('other_owner');
     // The same kit: every ID is already here; an empty selection completes the owner only.
-    const again = await makeKit(t.root, owner, agents, 'agentlink-recovery-kit-again.alkk', join(t.home, 'Desktop'));
+    const again = await makeKit(
+      t.root,
+      owner,
+      agents,
+      'agentlink-recovery-kit-again.alkk',
+      join(t.home, 'Desktop'),
+    );
     const h3 = await foundHandle('S1', 'agentlink-recovery-kit-again.alkk');
     const reopened = await openKit('S1', h3, again.code);
     expect(
@@ -660,7 +720,9 @@ describe.runIf(POSIX)('uploads (T-5, T-6, T-7)', () => {
     // A new upload of the same session replaces the old one.
     expect((await engine.upload('S1', chunks(4), 400)).status).toBe(200);
     expect((await readdir(dir)).filter((n) => n.startsWith('.upload-'))).toHaveLength(1);
-    expect(body(await engine.header('S1', { handle: body(a)['handle'] as string }))['error']).toBe('expired');
+    expect(body(await engine.header('S1', { handle: body(a)['handle'] as string }))['error']).toBe(
+      'expired',
+    );
     // Two in all, and together within the cap.
     expect((await engine.upload('S2', chunks(5), 500)).status).toBe(200);
     expect(body(await engine.upload('S3', chunks(1), 100))['error']).toBe('busy');
@@ -728,14 +790,153 @@ describe.runIf(POSIX)('the export handle for Check after a save (WP-R2 hook, T-6
     const checked = await engine.check('S1', { handle: handle as string }, code(c));
     expect(checked.status).toBe(200);
     // Single use.
-    expect(body(await engine.check('S1', { handle: handle as string }, code(c)))['error']).toBe('expired');
+    expect(body(await engine.check('S1', { handle: handle as string }, code(c)))['error']).toBe(
+      'expired',
+    );
     const wrongId = await engine.registerExportedKit('S1', {
       path,
       kitId: encodeBase64url(new Uint8Array(16)),
     });
-    expect(body(await engine.check('S1', { handle: wrongId as string }, code(c)))['error']).toBe('damaged');
+    expect(body(await engine.check('S1', { handle: wrongId as string }, code(c)))['error']).toBe(
+      'damaged',
+    );
     // Never opened by `open` (it is for Check only).
     const h3 = await engine.registerExportedKit('S1', { path, kitId });
     expect(body(await openKit('S1', h3 as string, c))['error']).toBe('expired');
+  });
+});
+
+// --- The terminal (06 §8 `agentlink restore`) -----------------------------------------------------
+
+const TEXT: RestoreTerminalText = {
+  noKit: 'no kit',
+  pickKit: 'which',
+  kitLine: (n, name) => `${String(n)} ${name}`,
+  errors: Object.fromEntries(
+    [
+      'not_a_kit',
+      'newer_version',
+      'other_owner',
+      'wrong_code',
+      'damaged',
+      'wait',
+      'busy',
+      'presence_required',
+      'presence_rejected',
+      'needs_terminal',
+      'expired',
+      'too_large',
+      'invalid',
+      'failed',
+    ].map((k) => [k, `error ${k}`]),
+  ) as RestoreTerminalText['errors'],
+  masterCodePrompt: 'master code',
+  recoveryCodePrompt: 'recovery code',
+  checkOpens: 'This kit opens.',
+  idLine: (name, state, people) => `${name} ${state} ${String(people)}`,
+  newName: (name, suggested) => `rename ${name} ${suggested}`,
+  confirm: (n) => `restore ${String(n)}?`,
+  nothingToRestore: 'nothing',
+  outcomeLine: (name, outcome) => `${name} ${outcome}`,
+  masterCodeShown: 'new master code:',
+  savedIt: 'saved?',
+  nextSteps: 'next',
+};
+
+/** A scripted owner terminal: answers in order; records everything written. */
+function scripted(answers: string[]) {
+  const written: string[] = [];
+  const terminal: RestoreTerminal = {
+    write: (text) => void written.push(text),
+    readSecret: () => Promise.resolve(encodeUtf8(answers.shift() ?? '')),
+    confirm: () => Promise.resolve(/^y/i.test(answers.shift() ?? '')),
+    readText: () => Promise.resolve(answers.shift() ?? ''),
+    clearScreen: () => void written.push('<clear>'),
+  };
+  return { terminal, written };
+}
+
+const terminalEngine = () =>
+  createTerminalRestore({ home: t.home, keychain: () => keychain, origin: 'terminal', kdf: FAST });
+
+describe.runIf(POSIX)('the terminal: agentlink restore (06 §8)', () => {
+  it('restores a kit on a clean computer and shows the new master code once, then clears', async () => {
+    const { code: c, agents, path } = await kitOnDisk([{ name: 'helper', people: 1 }]);
+    const { terminal, written } = scripted([c, 'yes', 'yes']);
+    expect(
+      await runRestoreInTerminal(terminalEngine(), terminal, { file: path, check: false }, TEXT),
+    ).toBe('restored');
+    const config = await readFile(
+      join(t.home, '.agentlink', 'agents', 'helper', 'config.json'),
+      'utf8',
+    );
+    expect(config).toContain(agents[0]?.agentId);
+    const shown = written.join('\n');
+    expect(shown).toMatch(/[A-Z2-7]{4}(?:-[A-Z2-7]{4}){5}/);
+    expect(shown).not.toContain(c);
+    expect(written).toContain('<clear>');
+    expect(await ownerItemPresent(keychain)).toBe(true);
+  });
+
+  it('--check without a file offers the kit found, opens it and writes nothing', async () => {
+    const { code: c } = await kitOnDisk();
+    const { terminal, written } = scripted([c]);
+    expect(await runRestoreInTerminal(terminalEngine(), terminal, { check: true }, TEXT)).toBe(
+      'checked',
+    );
+    expect(written).toContain('This kit opens.');
+    await expectNothingWritten();
+  });
+
+  it('three wrong codes end with nothing written and no code echoed; No at the confirm writes nothing', async () => {
+    const { path, code: c } = await kitOnDisk();
+    const wrong = 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA';
+    const first = scripted([wrong, wrong, wrong]);
+    expect(
+      await runRestoreInTerminal(
+        terminalEngine(),
+        first.terminal,
+        { file: path, check: false },
+        TEXT,
+      ),
+    ).toBe('refused');
+    expect(first.written.join('\n')).not.toContain(wrong);
+    await expectNothingWritten();
+    clock += 30 * 60_000;
+    const second = scripted([c, 'no']);
+    expect(
+      await runRestoreInTerminal(
+        terminalEngine(),
+        second.terminal,
+        { file: path, check: false },
+        TEXT,
+      ),
+    ).toBe('cancelled');
+    await expectNothingWritten();
+  });
+
+  it('a file argument that is a link is refused', async () => {
+    const { path } = await kitOnDisk();
+    const link = join(t.root, 'agentlink-recovery-kit-link.alkk');
+    await symlink(path, link);
+    const { terminal, written } = scripted([]);
+    expect(
+      await runRestoreInTerminal(terminalEngine(), terminal, { file: link, check: false }, TEXT),
+    ).toBe('refused');
+    expect(written).toEqual(['error not_a_kit']);
+  });
+});
+
+describe('the route engine has no path to an owner without the gesture (T-1)', () => {
+  it('createRestoreEngine offers neither the terminal apply nor a path handle', () => {
+    const routeEngine = createRestoreEngine({
+      home: t.home,
+      keychain: () => keychain,
+      origin: ORIGIN,
+    });
+    expect(Object.keys(routeEngine)).not.toContain('applyInTerminal');
+    expect(Object.keys(routeEngine)).not.toContain('fileHandle');
+    expect(Object.isFrozen(routeEngine)).toBe(true);
+    void routeEngine.close();
   });
 });
