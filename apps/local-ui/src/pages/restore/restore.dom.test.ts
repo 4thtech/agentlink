@@ -427,6 +427,8 @@ describe('step 3: what comes back', () => {
     expect(button('Restore 2 IDs')).toBeDefined();
     expect(text()).toContain(S.REVIEW.comesBack);
     expect(text()).toContain(S.REVIEW.doNext);
+    // UX1113-R1-LABEL: the kit names each ID by its folder; its name comes back with it.
+    expect(text()).toContain(S.REVIEW.nameHint);
   });
 
   it('changes the name an ID comes back as, and refuses a clash', async () => {
@@ -693,5 +695,36 @@ describe('round 2: busy, finish restoring, per-ID failure', () => {
     await click('Restore 2 IDs');
     expect(text()).toContain("You're back. 1 ID restored.");
     expect(text()).toContain(S.REVIEW.notRestored('work'));
+  });
+
+  it('UX1113-R1-LABEL: step 4 names restored IDs by their verified label; a hostile one falls back', async () => {
+    const fetch = (() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            status: 'done',
+            ids: [
+              { agentId: 'a', name: 'default', label: 'Ana', outcome: 'restored' },
+              { agentId: 'b', name: 'work', label: '\u202eevil\u202c', outcome: 'restored' },
+              { agentId: 'c', name: 'home', label: 'x'.repeat(40), outcome: 'failed' },
+            ],
+            touchId: 'unchanged',
+          }),
+          { status: 200 },
+        ),
+      )) as typeof globalThis.fetch;
+    const real = createRestoreApi({ fetch, token: 't' });
+    await toReview(
+      fakeApi({
+        applyBegin: (k, s, n) => real.applyBegin(k, s, n),
+      }),
+    );
+    await click('Restore 2 IDs');
+    expect(text()).toContain("You're back. 2 IDs restored.");
+    expect(text()).toContain('Ana and work');
+    expect(text()).not.toContain('default and');
+    expect(text()).not.toContain('\u202e');
+    expect(text()).toContain(S.REVIEW.notRestored('home'));
+    expect(host.querySelector('.rs-lead bdi')?.textContent).toBe('Ana');
   });
 });

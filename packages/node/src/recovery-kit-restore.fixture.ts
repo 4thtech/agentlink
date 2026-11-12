@@ -86,7 +86,13 @@ export async function makeAgent(
   root: string,
   owner: TestOwner,
   name: string,
-  extra: { readonly people?: number; readonly lastAt?: number; readonly policyMark?: number } = {},
+  extra: {
+    readonly people?: number;
+    readonly lastAt?: number;
+    readonly policyMark?: number;
+    /** An owner-signed `agent.label` applied through core (UX1113-R1-LABEL). */
+    readonly label?: string;
+  } = {},
 ): Promise<TestAgent> {
   const keychain = new MemoryKeychain();
   const agentId = await createKeychainAgent(keychain);
@@ -120,6 +126,18 @@ export async function makeAgent(
       name,
       relays: ['wss://relay.agentlink.dev', 'wss://nos.lol'],
     });
+    if (extra.label !== undefined) {
+      const prepared = await client.ownerActions.prepareLabel(extra.label);
+      if (prepared.status !== 'prepared') throw new Error('fixture: label not prepared');
+      const body = JSON.parse(JSON.stringify(prepared.body)) as Parameters<
+        typeof session.signOwnerAction
+      >[0];
+      const applied = await client.ownerActions.apply({
+        body,
+        sig: await session.signOwnerAction(body),
+      });
+      if (applied.status !== 'applied') throw new Error('fixture: label not applied');
+    }
     const contacts: Record<string, unknown>[] = [];
     for (let i = 0; i < (extra.people ?? 0); i += 1) {
       contacts.push({

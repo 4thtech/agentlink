@@ -48,6 +48,7 @@ import {
   RESTORE_HANDLE_TTL_MS,
   createRestoreEngine,
   createTerminalRestore,
+  restoredLabel,
   runRestoreInTerminal,
   type RestoreAnswer,
   type RestoreEngine,
@@ -1043,6 +1044,61 @@ describe.runIf(POSIX)('restore step 7: the read-back (IR M2)', () => {
     expect(
       await readFile(join(t.home, '.agentlink', 'agents', 'good', 'config.json'), 'utf8'),
     ).toContain(good.agentId);
+  });
+});
+
+describe.runIf(POSIX)('UX1113-R1-LABEL: the done answer names IDs by their verified label', () => {
+  it('a restored ID carries its verified label from the read-back; no label: the folder name', async () => {
+    const owner = await makeOwner();
+    const ana = await makeAgent(t.root, owner, 'default', { label: 'Ana' });
+    const plain = await makeAgent(t.root, owner, 'work');
+    const kit = await makeKit(
+      t.root,
+      owner,
+      [ana, plain],
+      'agentlink-recovery-kit-lb.alkk',
+      join(t.home, 'Downloads'),
+    );
+    const handle = await foundHandle();
+    const opened = await openKit('S1', handle, kit.code);
+    // Step 3 (before anything is written) still names each ID by its folder only.
+    const summary = body(opened)['summary'] as { ids: Record<string, unknown>[] };
+    expect(summary.ids.map((r) => r['name']).sort()).toEqual(['default', 'work']);
+    expect(summary.ids.every((r) => !('label' in r))).toBe(true);
+    const done = await gestureAndFinish('S1', body(opened)['kit'] as string, [
+      ana.agentId,
+      plain.agentId,
+    ]);
+    const ids = done['ids'] as { agentId: string; name: string; label: string; outcome: string }[];
+    expect(ids.find((r) => r.agentId === ana.agentId)).toMatchObject({
+      name: 'default',
+      label: 'Ana',
+      outcome: 'restored',
+    });
+    expect(ids.find((r) => r.agentId === plain.agentId)).toMatchObject({
+      name: 'work',
+      label: 'work',
+      outcome: 'restored',
+    });
+  });
+
+  it('a label is display text only: anything not a plain restricted label shows the folder name', () => {
+    expect(restoredLabel({ status: 'verified', label: 'Ana' }, 'default')).toBe('Ana');
+    expect(restoredLabel({ status: 'verified', label: 'Work agent' }, 'default')).toBe('Work agent');
+    for (const hostile of [
+      '\u202eevil\u202c',
+      'a\u200bb',
+      'x'.repeat(33),
+      '<img src=x onerror=alert(1)>',
+      'line\nbreak',
+      '',
+      ' Ana',
+    ]) {
+      expect(restoredLabel({ status: 'verified', label: hostile }, 'default')).toBe('default');
+    }
+    expect(restoredLabel({ status: 'unverified' }, 'default')).toBe('default');
+    expect(restoredLabel({ status: 'none' }, 'default')).toBe('default');
+    expect(restoredLabel(undefined, 'default')).toBe('default');
   });
 });
 
