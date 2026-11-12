@@ -6,13 +6,19 @@
 // The record is `~/.agentlink/kit-record.json` (mode 0600, written through a temporary file and a
 // rename):
 //   {"v":1,"kitId","at","covers":[agentId…],"names":{agentId:name},"peopleAtSave":{agentId:n},
-//    "exports":{agentId:{body,sig}},"contents","file"}
+//    "exports":{agentId:{body,sig}},"contents","file","checked"?:true}
 // `names` (each covered ID's folder name, the kit manifest's) lets the page match today's IDs, and
 // `exports` (each covered ID's signed `backup.export`, public: no secret in it) lets core say this
 // very save was applied (core `backupExportRecorded` matches the nonce row's action hash, so the
 // kitId is bound too, WP-R2b IR L-3); both are additions to the 04 §2.3.3 format, proposed, owner confirms
 // at merge. `file` is the kit's absolute path, kept for Show in Finder only: it never leaves the
 // server, and Check never opens a kit by it.
+//
+// UX1113-QA2 N14 (design-1112 §6.3: Done needs "Check that it opens"): the save writes the record
+// without `checked`; it reads as `unfinished`, never "You're backed up", until this very kit (its
+// kitId) opened with its code in Check (the checklist's step 3, or Check my kit later), which adds
+// `checked: true`. A save the owner left before the code was checked therefore keeps asking for a
+// kit. An addition to the 04 §2.3.3 format, proposed, owner confirms at merge.
 //
 // It holds no secret and nothing is logged from it. It is a display aid, not a security boundary: a
 // same-user process can forge or delete it, which only changes a status card (G-1). A record that
@@ -88,6 +94,8 @@ export interface KitRecord {
   readonly contents: 'full' | 'identity';
   /** The kit's absolute path: for Show in Finder only, never answered to the page. */
   readonly file: string;
+  /** UX1113-QA2 N14: this kit opened with its code (Check); absent until then. */
+  readonly checked?: true;
 }
 
 export type KitRecordRead =
@@ -117,7 +125,10 @@ const RECORD_KEYS = [
 
 /** The record exactly as written, or undefined (nothing of it is trusted in part). */
 function parseRecord(value: unknown): KitRecord | undefined {
-  if (!isObject(value) || !sameKeys(value, RECORD_KEYS)) return undefined;
+  if (!isObject(value)) return undefined;
+  const hasChecked = Object.hasOwn(value, 'checked');
+  if (!sameKeys(value, hasChecked ? [...RECORD_KEYS, 'checked'] : RECORD_KEYS)) return undefined;
+  if (hasChecked && value['checked'] !== true) return undefined;
   const { v, kitId, at, covers, names, peopleAtSave, exports, contents, file } = value;
   if (v !== 1) return undefined;
   if (typeof kitId !== 'string' || !B64_16.test(kitId)) return undefined;
@@ -174,6 +185,7 @@ function parseRecord(value: unknown): KitRecord | undefined {
     exports: pick<KitExportProof>(proofs),
     contents,
     file,
+    ...(hasChecked ? { checked: true as const } : {}),
   });
 }
 
@@ -222,6 +234,7 @@ export async function writeKitRecord(agentlinkDir: string, record: KitRecord): P
     exports: checked.exports,
     contents: checked.contents,
     file: checked.file,
+    ...(checked.checked === true ? { checked: true } : {}),
   })}\n`;
   const temp = join(agentlinkDir, `.${KIT_RECORD_FILE}.${encodeBase64url(randomBytes(12))}.tmp`);
   let handle: FileHandle | undefined;
@@ -244,6 +257,24 @@ export async function writeKitRecord(agentlinkDir: string, record: KitRecord): P
   } finally {
     if (handle !== undefined) await handle.close().catch(() => undefined);
     if (!renamed) await unlink(temp).catch(() => undefined);
+  }
+}
+
+/**
+ * UX1113-QA2 N14: marks the record checked when its kit is `kitId` (a kit that just opened with its
+ * code in Check). True when the record now says checked; false (nothing written) for no record, an
+ * unreadable one or another kit. Never throws: a display aid (G-1).
+ */
+export async function markKitRecordChecked(agentlinkDir: string, kitId: string): Promise<boolean> {
+  if (typeof kitId !== 'string' || !B64_16.test(kitId)) return false;
+  const read = await readKitRecord(agentlinkDir);
+  if (read.status !== 'saved' || read.record.kitId !== kitId) return false;
+  if (read.record.checked === true) return true;
+  try {
+    await writeKitRecord(agentlinkDir, { ...read.record, checked: true });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -270,7 +301,8 @@ export interface KitIdView {
  * The body of `GET /api/ui/backup` beyond `export` (frozen for WP-R4):
  * - `record`: `saved` (a record names an applied save), `none` (no save, or a record core does not
  *   hold) or `unreadable` (the page then keeps its own fallback flag);
- * - `state`: `backed_up`, `out_of_date`, `none` or `unknown` (record unreadable);
+ * - `state`: `backed_up`, `out_of_date`, `unfinished` (UX1113-QA2 N14: saved, but the kit never
+ *   opened with its code), `none` or `unknown` (record unreadable);
  * - `lastKit`: `{at, covers, peopleAtSave}` (unix seconds, the covered IDs by name and label, the
  *   people in the kit in all) or null;
  * - `missing`: `{ids, people}` (today's IDs not in the kit, and people who joined a covered ID since)
@@ -278,7 +310,7 @@ export interface KitIdView {
  */
 export interface KitStatus {
   readonly record: 'saved' | 'none' | 'unreadable';
-  readonly state: 'backed_up' | 'out_of_date' | 'none' | 'unknown';
+  readonly state: 'backed_up' | 'out_of_date' | 'unfinished' | 'none' | 'unknown';
   readonly lastKit: {
     readonly at: number;
     readonly covers: readonly KitIdView[];
@@ -331,7 +363,13 @@ export function kitStatus(
   const peopleAtSave = record.covers.reduce((n, id) => n + (record.peopleAtSave[id] ?? 0), 0);
   return Object.freeze({
     record: 'saved',
-    state: missingIds.length > 0 || people > 0 ? 'out_of_date' : 'backed_up',
+    // N14: whether this kit opens at all is unknown until it was checked; that comes first.
+    state:
+      record.checked !== true
+        ? 'unfinished'
+        : missingIds.length > 0 || people > 0
+          ? 'out_of_date'
+          : 'backed_up',
     lastKit: Object.freeze({ at: record.at, covers: Object.freeze(covers), peopleAtSave }),
     missing: Object.freeze({ ids: Object.freeze(missingIds), people }),
   });

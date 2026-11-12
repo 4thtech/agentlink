@@ -11,6 +11,12 @@ export const BACKUP_STRINGS = {
   // --- status card (three states, plus plain words when the record cannot be read)
   upToDateTitle: "You're backed up",
   staleTitle: 'Your kit is out of date',
+  // UX1113-QA2 N14: saved, but it was never checked that the kit opens with its code.
+  leaveWarning:
+    "Your recovery kit isn't finished. If you leave now, its code is gone and you'll need to save a new kit. Leave anyway?",
+  unfinishedTitle: "Your last kit isn't finished",
+  unfinishedLine:
+    'It was saved, but no one checked that it opens with its code. If you wrote the code down, check that your kit opens. If not, save a new kit.',
   peopleJoined: (n: number): string =>
     n === 1 ? '1 person who joined since' : `${n} people who joined since`,
   noneTitle: 'No recovery kit yet',

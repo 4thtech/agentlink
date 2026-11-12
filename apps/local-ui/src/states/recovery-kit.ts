@@ -37,7 +37,8 @@ export function forgetRecoveryKitLater(): void {
 
 // WP-R4: the server's kit record is the truth (every browser agrees). The browser flag above is only
 // the fallback while the record is unread or unreadable. Holds one word, never a code or a path.
-export type KitRecordState = 'backed_up' | 'out_of_date' | 'none';
+// UX1113-QA2 N14: `unfinished` (saved, never checked) still asks for a kit, as `none` does.
+export type KitRecordState = 'backed_up' | 'out_of_date' | 'unfinished' | 'none';
 let serverState: KitRecordState | undefined;
 
 /** Remembers what the server's record said (`undefined`: unread or unreadable). */
@@ -53,7 +54,7 @@ export function kitRecordState(): KitRecordState | undefined {
 
 /** True while the owner has no kit on record; the browser flag decides only without a record. */
 export function recoveryKitPending(): boolean {
-  if (serverState !== undefined) return serverState === 'none';
+  if (serverState !== undefined) return serverState === 'none' || serverState === 'unfinished';
   try {
     const value = storage()?.getItem(RECOVERY_KIT_LATER_KEY);
     return value !== null && value !== undefined && /^[0-9]{1,16}$/.test(value);

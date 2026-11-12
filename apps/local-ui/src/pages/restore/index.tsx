@@ -295,13 +295,14 @@ export function RestoreWizard({
   // --- step 3 ---------------------------------------------------------------------------------
 
   const finishRestore = (
-    ids: readonly { name: string; outcome: 'restored' | 'failed' }[],
+    ids: readonly { name: string; label?: string; outcome: 'restored' | 'failed' }[],
     code: string | undefined,
     withTouchId: boolean,
   ): void => {
     setOutcome({
-      restored: ids.filter((i) => i.outcome === 'restored').map((i) => i.name),
-      failed: ids.filter((i) => i.outcome === 'failed').map((i) => i.name),
+      restored: ids.filter((i) => i.outcome === 'restored').map((i) => i.label ?? i.name),
+      restoredFolders: ids.filter((i) => i.outcome === 'restored').map((i) => i.name),
+      failed: ids.filter((i) => i.outcome === 'failed').map((i) => i.label ?? i.name),
       masterCode: code,
       touchId: withTouchId,
       kitDate: summary?.createdAt,
@@ -374,7 +375,8 @@ export function RestoreWizard({
 
   if (outcome !== undefined) {
     // The restore is done; this survives the page being mounted again for the ID that opened.
-    const first = outcome.restored[0] ?? '';
+    const first = outcome.restoredFolders[0] ?? '';
+    const firstLabel = outcome.restored[0] ?? first;
     return frame(
       <ProtectStep
         restored={outcome.restored}
@@ -385,6 +387,7 @@ export function RestoreWizard({
         savedDate={outcome.kitDate === undefined ? '' : formatDate(outcome.kitDate)}
         apps={apps}
         idName={first}
+        idLabel={firstLabel}
         connecting={connecting}
         onConnect={setConnecting}
         connectView={
@@ -394,7 +397,7 @@ export function RestoreWizard({
               appId={connecting}
               appName={apps.find((a) => a.id === connecting)?.name ?? ''}
               folder={first}
-              agentLabel={first}
+              agentLabel={firstLabel}
               sensor={sensor}
               passkeyProof={passkeyProof}
               onDone={() => {

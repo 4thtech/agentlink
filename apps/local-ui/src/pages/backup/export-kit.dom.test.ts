@@ -5,9 +5,10 @@
 // in storage, a URL, an attribute or a file.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient, OwnerApiResult, OwnerPresence } from '../../api/client.js';
 import { RECOVERY_KIT_LATER_KEY, rememberRecoveryKitLater } from '../../states/index.js';
+import { navigate } from '../../router.js';
 import { BackupPage } from './index.js';
 import { BACKUP_CHECK_PATH } from './save-checklist.js';
 import { BACKUP_STRINGS as S } from './strings.js';
@@ -179,6 +180,36 @@ describe('Back up: save the recovery kit in the app', () => {
     expect(host.querySelector('[data-recovery-code]')?.textContent).toBe(CODE.replace(/-/g, ''));
   });
 
+  it('UX1113-QA2 N14: leaving while the code and checklist are up asks first; after Done it does not', async () => {
+    history.replaceState(null, '', '/settings/backup');
+    const f = fakeApi(SAVED);
+    await saveKit(f, { checkKit: checkKit(), openWindow: fakeWindow().open });
+    const unload = (): boolean => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(unload()).toBe(true);
+    // In the app: "stay" keeps the page and the code.
+    const stay = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    act(() => navigate('/settings'));
+    expect(stay).toHaveBeenCalledWith(S.leaveWarning);
+    expect(location.pathname).toBe('/settings/backup');
+    expect(host.querySelector('[data-recovery-code]')).not.toBeNull();
+    stay.mockRestore();
+    // Finishing the checklist lifts the guard.
+    await tick(S.stepMove);
+    await tick(S.stepWrite);
+    await click(S.checkNow);
+    await click(S.finish);
+    const asked = vi.spyOn(window, 'confirm');
+    expect(unload()).toBe(false);
+    act(() => navigate('/settings'));
+    expect(asked).not.toHaveBeenCalled();
+    expect(location.pathname).toBe('/settings');
+    asked.mockRestore();
+  });
+
   it('Done stays off until the three steps are ticked; the check ticks itself when it opens', async () => {
     const f = fakeApi(SAVED);
     await saveKit(f, { checkKit: checkKit(), openWindow: fakeWindow().open });
@@ -197,6 +228,22 @@ describe('Back up: save the recovery kit in the app', () => {
     expect(host.textContent).not.toContain(CODE.replace(/-/g, ''));
     expect(host.textContent).toContain(S.done('Tali'));
     expect(localStorage.getItem(RECOVERY_KIT_LATER_KEY)).toBeNull();
+  });
+
+  it('UX1113-QA2 N4: the Done toast names the IDs by their labels, never their folders', async () => {
+    const { exportOutcomeOf } = await import('./export-kit.js');
+    const out = exportOutcomeOf({
+      ...SAVED,
+      data: {
+        ...(SAVED as { data: Record<string, unknown> }).data,
+        covers: [
+          { name: 'default', label: 'Ana' },
+          { name: 'work', label: 'Work' },
+          { name: 'odd', label: '<b>x</b>' },
+        ],
+      },
+    } as OwnerApiResult);
+    expect(out.kind === 'saved' && out.kit.covers).toEqual(['Ana', 'Work', 'odd']);
   });
 
   it('a wrong check does not tick and says nothing was changed', async () => {

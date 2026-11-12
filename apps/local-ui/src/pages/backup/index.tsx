@@ -96,6 +96,16 @@ function StatusText({ status }: { status: KitStatus }): ReactElement {
         </>
       );
     }
+    case 'unfinished':
+      return (
+        <>
+          <h2 className="al-text-h3">{S.unfinishedTitle}</h2>
+          <p className="al-text-body">
+            {`Saved ${date}. `}
+            {S.unfinishedLine}
+          </p>
+        </>
+      );
     case 'none':
       return (
         <>
@@ -149,7 +159,7 @@ export function BackupPage({ api: given, ...rest }: BackupPageProps): ReactEleme
   const hood = useHood();
   const [shown, setShown] = useState<string | undefined>(undefined);
   const state = status?.state ?? 'unknown';
-  const hasKit = state === 'backed_up' || state === 'out_of_date';
+  const hasKit = state === 'backed_up' || state === 'out_of_date' || state === 'unfinished';
   const tone = state === 'backed_up' ? 'good' : 'warn';
 
   const reveal = (): void => {

@@ -387,6 +387,19 @@ describe('Check my kit', () => {
     expect(api.calls).not.toContain('applyBegin');
   });
 
+  it('UX1113-QA2 N4: names an ID already on this computer by its label', async () => {
+    const labelled: Summary = {
+      ...SUMMARY,
+      ids: SUMMARY.ids.map((r) => (r.state === 'already_here' ? { ...r, label: 'My Mac' } : r)),
+    };
+    const api = fakeApi({ check: () => ok({ summary: labelled }) });
+    await mount(api, { mode: 'check' });
+    await click(S.KIT.next);
+    await fillCode();
+    await click(S.CODE.open);
+    expect(text()).toContain('tali, work, My Mac and demo');
+  });
+
   it('says a wrong code changed nothing', async () => {
     await mount(
       fakeApi({ check: () => Promise.resolve({ kind: 'error', problem: 'wrong_code' }) }),
@@ -414,8 +427,9 @@ describe('step 3: what comes back', () => {
     await toReview(fakeApi());
     expect(text()).toContain(S.REVIEW.title);
     expect(text()).toContain('3 people · messages up to');
-    expect(text()).toContain('already has an ID called work');
-    expect(text()).toContain('work-2');
+    expect(text()).toContain('This computer already has an ID called work.');
+    // UX1113-QA2 (Fable ruling): the folder is not a name; the slug is never shown as one.
+    expect(text()).not.toContain('work-2');
     expect(text()).toContain(S.REVIEW.hereLine);
     expect(text()).toContain("A removed ID can't come back.");
     expect(text()).toContain(S.REVIEW.willBeRestored);
@@ -427,38 +441,39 @@ describe('step 3: what comes back', () => {
     expect(button('Restore 2 IDs')).toBeDefined();
     expect(text()).toContain(S.REVIEW.comesBack);
     expect(text()).toContain(S.REVIEW.doNext);
+    // UX1113-R1-LABEL: the kit names each ID by its folder; its name comes back with it.
+    expect(text()).toContain(S.REVIEW.nameHint);
   });
 
-  it('changes the name an ID comes back as, and refuses a clash', async () => {
+  it('UX1113-QA2: a clash is said honestly: it comes back next to it, still named the same; no folder editor', async () => {
     const begin = vi.fn(() =>
       ok({
         answer: {
           status: 'done' as const,
-          ids: [{ agentId: 'a', name: 'work-3', outcome: 'restored' as const }],
+          ids: [{ agentId: 'a', name: 'work-2', outcome: 'restored' as const }],
         },
       }),
     );
-    await toReview(fakeApi({ applyBegin: begin }));
-    await click(S.REVIEW.changeName);
-    const field = host.querySelector<HTMLInputElement>('.rs-row-edit input') as HTMLInputElement;
-    const set = async (v: string): Promise<void> => {
-      await act(async () => {
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, v);
-        field.dispatchEvent(new Event('input', { bubbles: true }));
-      });
+    const labelled: Summary = {
+      ...SUMMARY,
+      ids: SUMMARY.ids.map((r) => (r.state === 'name_taken' ? { ...r, takenLabel: 'Work' } : r)),
     };
-    await set('tali');
-    await click(S.REVIEW.nameSave);
-    expect(text()).toContain(S.REVIEW.nameClash);
-    await set('Bad name');
-    await click(S.REVIEW.nameSave);
-    expect(text()).toContain(S.REVIEW.nameInvalid);
-    await set('work-3');
-    await click(S.REVIEW.nameSave);
+    await toReview(
+      fakeApi({ applyBegin: begin, open: () => ok({ kit: 'kit-handle', summary: labelled }) }),
+    );
+    expect(text()).toContain(S.REVIEW.takenLine(0, 'Work'));
+    expect(text()).toContain(
+      'This computer already has an ID called Work. This one comes back next to it, still named the same. You can rename it afterwards.',
+    );
+    expect([...host.querySelectorAll('button')].map((b) => b.textContent)).not.toContain(
+      'Change name',
+    );
+    expect(host.querySelector('.rs-row-edit')).toBeNull();
     await click('Restore 2 IDs');
     const call = begin.mock.calls[0] as unknown as [string, string[], Record<string, string>];
     expect(call[1]).toEqual(['0x' + '1'.repeat(40), '0x' + '2'.repeat(40)]);
-    expect(call[2]).toEqual({ ['0x' + '2'.repeat(40)]: 'work-3' });
+    // The folder only (the server's suggestion); the ID keeps its name.
+    expect(call[2]).toEqual({ ['0x' + '2'.repeat(40)]: 'work-2' });
   });
 
   it('keeps Restore off when nothing is ticked', async () => {
@@ -693,5 +708,36 @@ describe('round 2: busy, finish restoring, per-ID failure', () => {
     await click('Restore 2 IDs');
     expect(text()).toContain("You're back. 1 ID restored.");
     expect(text()).toContain(S.REVIEW.notRestored('work'));
+  });
+
+  it('UX1113-R1-LABEL: step 4 names restored IDs by their verified label; a hostile one falls back', async () => {
+    const fetch = (() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            status: 'done',
+            ids: [
+              { agentId: 'a', name: 'default', label: 'Ana', outcome: 'restored' },
+              { agentId: 'b', name: 'work', label: '\u202eevil\u202c', outcome: 'restored' },
+              { agentId: 'c', name: 'home', label: 'x'.repeat(40), outcome: 'failed' },
+            ],
+            touchId: 'unchanged',
+          }),
+          { status: 200 },
+        ),
+      )) as typeof globalThis.fetch;
+    const real = createRestoreApi({ fetch, token: 't' });
+    await toReview(
+      fakeApi({
+        applyBegin: (k, s, n) => real.applyBegin(k, s, n),
+      }),
+    );
+    await click('Restore 2 IDs');
+    expect(text()).toContain("You're back. 2 IDs restored.");
+    expect(text()).toContain('Ana and work');
+    expect(text()).not.toContain('default and');
+    expect(text()).not.toContain('\u202e');
+    expect(text()).toContain(S.REVIEW.notRestored('home'));
+    expect(host.querySelector('.rs-lead bdi')?.textContent).toBe('Ana');
   });
 });

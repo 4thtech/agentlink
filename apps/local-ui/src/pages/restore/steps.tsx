@@ -55,6 +55,20 @@ export function nameList(names: readonly string[]): string {
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] as string}`;
 }
 
+/** nameList as markup: each name (a label: untrusted display text) in its own <bdi>. */
+function NameList({ names }: { readonly names: readonly string[] }): ReactElement {
+  return (
+    <>
+      {names.map((n, i) => (
+        <span key={i}>
+          {i === 0 ? '' : i === names.length - 1 ? ' and ' : ', '}
+          <bdi>{n}</bdi>
+        </span>
+      ))}
+    </>
+  );
+}
+
 // --- frame --------------------------------------------------------------------------------------
 
 export interface FrameProps {
@@ -469,7 +483,8 @@ export function CheckedStep({
   readonly onDone: () => void;
   readonly onAnother: () => void;
 }): ReactElement {
-  const names = summary.ids.map((r) => r.name);
+  // UX1113-QA2 N4: an ID already on this computer by its label; a new one by its folder name.
+  const names = summary.ids.map((r) => r.label ?? r.name);
   const people = summary.ids.reduce((n, r) => n + r.people, 0);
   const last = summary.ids.reduce<number | null>(
     (m, r) => (r.lastMessageAt === null ? m : Math.max(m ?? 0, r.lastMessageAt)),
@@ -508,12 +523,10 @@ export function CheckedStep({
 
 // --- step 3 -------------------------------------------------------------------------------------
 
-const NAME_RULE = /^[a-z][a-z0-9-]{0,31}$/;
-
 export interface ReviewState {
   /** Ticked agent ids. */
   readonly selected: ReadonlySet<string>;
-  /** The name each ID comes back as (suggested or typed). */
+  /** The folder each clashing ID comes back in (the server's suggestion; UX1113-QA2: folder only). */
   readonly names: Readonly<Record<string, string>>;
 }
 
@@ -545,11 +558,6 @@ function Row({
 }): ReactElement {
   const off = row.state === 'already_here' || row.state === 'removed_earlier';
   const checked = !off && state.selected.has(row.agentId);
-  const [editing, setEditing] = useState(false);
-  const typed = state.names[row.agentId] ?? row.suggestedName ?? row.name;
-  const [draft, setDraft] = useState(typed);
-  const [problem, setProblem] = useState<string | undefined>(undefined);
-  const nameId = useId();
   const last =
     row.lastMessageAt === null || summary.contents === 'identity'
       ? undefined
@@ -560,16 +568,6 @@ function Row({
     if (checked) next.delete(row.agentId);
     else next.add(row.agentId);
     onState({ ...state, selected: next });
-  };
-  const useName = (): void => {
-    const name = draft.trim().toLowerCase();
-    if (!NAME_RULE.test(name)) return setProblem(REVIEW.nameInvalid);
-    const clash = summary.ids.some((r) => r.agentId !== row.agentId && r.name === name);
-    const other = Object.entries(state.names).some(([id, n]) => id !== row.agentId && n === name);
-    if (clash || other) return setProblem(REVIEW.nameClash);
-    setProblem(undefined);
-    setEditing(false);
-    onState({ ...state, names: { ...state.names, [row.agentId]: name } });
   };
   const initial = [...row.name][0]?.toUpperCase() ?? '?';
   return (
@@ -591,77 +589,29 @@ function Row({
       </span>
       <span className="rs-row-text">
         <bdi className="rs-row-name">{row.name}</bdi>
+        <span className="rs-row-line">{REVIEW.nameHint}</span>
         <span className="rs-row-line">
-          {row.state === 'new' ? (
-            summary.contents === 'identity' ? (
-              REVIEW.newLineIdentity(row.people)
-            ) : (
-              REVIEW.newLine(row.people, last)
-            )
-          ) : row.state === 'name_taken' ? (
-            <>
-              {REVIEW.takenLine(row.people, row.name)}
-              <strong>
-                <bdi>{typed}</bdi>
-              </strong>
-            </>
-          ) : row.state === 'already_here' ? (
-            REVIEW.hereLine
-          ) : (
-            REVIEW.removedLine('')
-          )}
-        </span>
-        {editing ? (
-          <span className="rs-row-edit">
-            <label htmlFor={nameId} className="al-sr-only">
-              {REVIEW.nameLabel(row.name)}
-            </label>
-            <input
-              id={nameId}
-              className="rs-code-box"
-              style={{
-                blockSize: 40,
-                textAlign: 'start',
-                paddingInline: 'var(--al-space-3)',
-                maxInlineSize: 220,
-              }}
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              maxLength={32}
-              value={draft}
-              onChange={(e) => setDraft(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  useName();
-                }
-              }}
-            />
-            <Button size="sm" onClick={useName}>
-              {REVIEW.nameSave}
-            </Button>
-            {problem === undefined ? null : (
-              <span className="rs-error" role="alert">
-                {problem}
-              </span>
-            )}
-          </span>
-        ) : null}
-      </span>
-      {row.state === 'name_taken' ? (
-        <Button size="sm" disabled={disabled} onClick={() => setEditing(!editing)}>
-          {REVIEW.changeName}
-        </Button>
-      ) : (
-        <span className="rs-chip" data-tone={row.state === 'new' ? 'success' : 'neutral'}>
           {row.state === 'new'
-            ? REVIEW.willBeRestored
-            : row.state === 'already_here'
-              ? REVIEW.alreadyHere
-              : REVIEW.removedEarlier}
+            ? summary.contents === 'identity'
+              ? REVIEW.newLineIdentity(row.people)
+              : REVIEW.newLine(row.people, last)
+            : row.state === 'name_taken'
+              ? REVIEW.takenLine(row.people, row.takenLabel ?? row.name)
+              : row.state === 'already_here'
+                ? REVIEW.hereLine
+                : REVIEW.removedLine('')}
         </span>
-      )}
+      </span>
+      <span
+        className="rs-chip"
+        data-tone={row.state === 'new' || row.state === 'name_taken' ? 'success' : 'neutral'}
+      >
+        {row.state === 'new' || row.state === 'name_taken'
+          ? REVIEW.willBeRestored
+          : row.state === 'already_here'
+            ? REVIEW.alreadyHere
+            : REVIEW.removedEarlier}
+      </span>
     </li>
   );
 }
@@ -788,6 +738,8 @@ export interface ProtectStepProps {
   readonly savedDate: string;
   readonly apps: readonly DetectedApp[] | undefined;
   readonly idName: string;
+  /** The first restored ID's label (display text). */
+  readonly idLabel?: string;
   readonly connecting: string | undefined;
   readonly onConnect: (appId: string) => void;
   /** The inline connect flow for the app being connected. */
@@ -851,7 +803,10 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
       <div className="rs-intro">
         <Title id="rs-h">{PROTECT.title(p.restored.length)}</Title>
         {p.restored.length === 0 ? null : (
-          <p className="rs-lead">{PROTECT.lead(nameList(p.restored))}</p>
+          <p className="rs-lead">
+            <NameList names={p.restored} />
+            {PROTECT.leadRest(p.restored.length)}
+          </p>
         )}
       </div>
       {p.failed.length === 0 ? null : (
@@ -908,7 +863,7 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
                     <span className="rs-row-name">{app.name}</span>
                     <span className="rs-row-line">
                       {app.state === 'connected' && app.agent === p.idName
-                        ? PROTECT.appUses(p.idName)
+                        ? PROTECT.appUses(p.idLabel ?? p.idName)
                         : PROTECT.appFound}
                     </span>
                   </span>
@@ -922,7 +877,7 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
                       disabled={app.state === 'not_ours' || app.state === 'unreadable'}
                       onClick={() => p.onConnect(app.id)}
                     >
-                      {PROTECT.connect(p.idName)}
+                      {PROTECT.connect(p.idLabel ?? p.idName)}
                     </Button>
                   )}
                 </div>

@@ -64,6 +64,13 @@ export function lineFor(
       if (b.kind === 'none') {
         return { line: S.backup.none, state: S.backup.notBackedUp, tone: 'warn' };
       }
+      if (b.unfinished === true) {
+        return {
+          line: S.backup.saved(DAY.format(b.at), b.covers.join(', ')),
+          state: S.backup.notFinished,
+          tone: 'warn',
+        };
+      }
       const stale = b.stale;
       return {
         line: S.backup.saved(DAY.format(b.at), b.covers.join(', ')),
@@ -196,8 +203,9 @@ export function SettingsPage({
   const passkeys = browserPasskeys();
   const owner = useOwner(client, passkeys);
   const live = useSyncExternalStore(subscribeLive, getLive, () => LIVE_EMPTY);
-  // The ID's name beside Rules, only when the owner has two or more IDs.
-  const idName = live.agents.length >= 2 ? live.agents.find((a) => a.current)?.name : undefined;
+  // The ID's name beside Rules, only when the owner has two or more IDs (UX1113-QA2 N4: its label,
+  // the name people know; the folder name is for Under the hood).
+  const idName = live.agents.length >= 2 ? live.agents.find((a) => a.current)?.label : undefined;
 
   useEffect(() => {
     let current = true;

@@ -8,6 +8,7 @@
 import { Button } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient, type OwnerApiResult } from '../../api/client.js';
+import { useLeaveGuard } from '../../leave-guard.js';
 import { forgetRecoveryKitLater } from '../../states/index.js';
 import { gateMessage, OwnerGate } from '../agents/owner-gate.js';
 import { createOwnerClient, type PasskeyInfo, type PresenceProof } from '../contacts/owner.js';
@@ -63,6 +64,9 @@ function notIncludedOf(value: unknown): NotIncluded[] {
   return out;
 }
 
+/** A label shown as is: letters, numbers, spaces and `._'-` only (else the folder name). */
+const SHOWN_LABEL = /^[\p{L}\p{N}][\p{L}\p{N} ._'-]{0,63}$/u;
+
 /** What the export answered, in the page's terms. */
 export type ExportOutcome =
   | { readonly kind: 'saved'; readonly kit: SavedKit }
@@ -84,11 +88,14 @@ export function exportOutcomeOf(result: OwnerApiResult): ExportOutcome {
         typeof d['code'] === 'string' &&
         CODE.test(d['code'])
       ) {
+        // UX1113-QA2 N4: the label people know; the folder name only when there is no plain label.
         const covers = Array.isArray(d['covers'])
           ? d['covers']
-              .map((c) =>
-                typeof c === 'object' && c !== null ? (c as { name?: unknown }).name : c,
-              )
+              .map((c) => {
+                if (typeof c !== 'object' || c === null) return c;
+                const { name, label } = c as { name?: unknown; label?: unknown };
+                return typeof label === 'string' && SHOWN_LABEL.test(label) ? label : name;
+              })
               .filter((n): n is string => typeof n === 'string' && n.length > 0 && n.length < 65)
               .slice(0, 12)
           : [];
@@ -216,6 +223,8 @@ export function ExportKit({
   const availability = useAvailability(api, known);
   const passkey = usePasskeyInfo(readPasskey);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  // UX1113-QA2 N14: while the kit is being saved, or its code and checklist are up, leaving asks.
+  useLeaveGuard(phase.kind === 'working' || phase.kind === 'saved' ? S.leaveWarning : undefined);
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState<string | undefined>(undefined);
   const codeId = useId();

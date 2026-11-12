@@ -119,6 +119,20 @@ describe('Backup & restore', () => {
     expect(labels()).not.toContain(S.showInFinder);
   });
 
+  it('UX1113-QA2 N14: a save that never opened with its code is not "backed up"', async () => {
+    await show({ ...BACKED_UP, state: 'unfinished' });
+    const card = host.querySelector('[data-kit-state="unfinished"]');
+    expect(card?.className).toContain('is-warn');
+    expect(text()).toContain(S.unfinishedTitle);
+    expect(text()).toContain(S.unfinishedLine);
+    expect(text()).not.toContain(S.upToDateTitle);
+    expect(labels()).toContain(S.saveNew);
+    expect(kitRecordState()).toBe('unfinished');
+    // Nudges keep asking for a kit until one is finished.
+    expect(recoveryKitPending()).toBe(true);
+    expect(lintVocabulary(S.unfinishedTitle + ' ' + S.unfinishedLine)).toEqual([]);
+  });
+
   it('an unreadable record or a failed read says so and invents no state', async () => {
     for (const data of [UNREADABLE, 'fail']) {
       act(() => root.unmount());

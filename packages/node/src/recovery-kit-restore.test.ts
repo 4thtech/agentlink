@@ -23,6 +23,7 @@ import {
 import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { keychainAccount } from './keychain.js';
+import { readKitRecord, writeKitRecord } from './kit-record.js';
 import {
   OWNER_ACCOUNT,
   OWNER_NEXT_ACCOUNT,
@@ -42,12 +43,14 @@ import {
   tempRoot,
   webauthnCreate,
   webauthnCreateThenGet,
+  type TestAgent,
   type TestOwner,
 } from './recovery-kit-restore.fixture.js';
 import {
   RESTORE_HANDLE_TTL_MS,
   createRestoreEngine,
   createTerminalRestore,
+  restoredLabel,
   runRestoreInTerminal,
   type RestoreAnswer,
   type RestoreEngine,
@@ -366,7 +369,7 @@ describe.runIf(POSIX)('a computer without an owner (T-1, T-10, T-12)', () => {
     const kit = body(await openKit('S1', handle, c))['kit'] as string;
     const done = await gestureAndFinish('S1', kit, [agents[0]?.agentId as string]);
     expect(done['ids']).toEqual([
-      { agentId: agents[0]?.agentId, name: 'helper', outcome: 'restored' },
+      { agentId: agents[0]?.agentId, name: 'helper', label: 'helper', outcome: 'restored' },
     ]);
     expect(done['touchId']).toBe(true);
     const master = done['masterCode'] as string;
@@ -489,7 +492,9 @@ describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
     }
     expect([...keychain.items.keys()]).toEqual([]);
     const done = await gestureAndFinish('S1', kit, [b.agentId], { [b.agentId]: 'work-2' });
-    expect(done['ids']).toEqual([{ agentId: b.agentId, name: 'work-2', outcome: 'restored' }]);
+    expect(done['ids']).toEqual([
+      { agentId: b.agentId, name: 'work-2', label: 'work-2', outcome: 'restored' },
+    ]);
     expect(keychain.items.has(keychainAccount(gone.agentId, 'seed'))).toBe(false);
     expect(keychain.items.has(keychainAccount(a.agentId, 'seed'))).toBe(false);
   });
@@ -1046,6 +1051,63 @@ describe.runIf(POSIX)('restore step 7: the read-back (IR M2)', () => {
   });
 });
 
+describe.runIf(POSIX)('UX1113-R1-LABEL: the done answer names IDs by their verified label', () => {
+  it('a restored ID carries its verified label from the read-back; no label: the folder name', async () => {
+    const owner = await makeOwner();
+    const ana = await makeAgent(t.root, owner, 'default', { label: 'Ana' });
+    const plain = await makeAgent(t.root, owner, 'work');
+    const kit = await makeKit(
+      t.root,
+      owner,
+      [ana, plain],
+      'agentlink-recovery-kit-lb.alkk',
+      join(t.home, 'Downloads'),
+    );
+    const handle = await foundHandle();
+    const opened = await openKit('S1', handle, kit.code);
+    // Step 3 (before anything is written) still names each ID by its folder only.
+    const summary = body(opened)['summary'] as { ids: Record<string, unknown>[] };
+    expect(summary.ids.map((r) => r['name']).sort()).toEqual(['default', 'work']);
+    expect(summary.ids.every((r) => !('label' in r))).toBe(true);
+    const done = await gestureAndFinish('S1', body(opened)['kit'] as string, [
+      ana.agentId,
+      plain.agentId,
+    ]);
+    const ids = done['ids'] as { agentId: string; name: string; label: string; outcome: string }[];
+    expect(ids.find((r) => r.agentId === ana.agentId)).toMatchObject({
+      name: 'default',
+      label: 'Ana',
+      outcome: 'restored',
+    });
+    expect(ids.find((r) => r.agentId === plain.agentId)).toMatchObject({
+      name: 'work',
+      label: 'work',
+      outcome: 'restored',
+    });
+  });
+
+  it('a label is display text only: anything not a plain restricted label shows the folder name', () => {
+    expect(restoredLabel({ status: 'verified', label: 'Ana' }, 'default')).toBe('Ana');
+    expect(restoredLabel({ status: 'verified', label: 'Work agent' }, 'default')).toBe(
+      'Work agent',
+    );
+    for (const hostile of [
+      '\u202eevil\u202c',
+      'a\u200bb',
+      'x'.repeat(33),
+      '<img src=x onerror=alert(1)>',
+      'line\nbreak',
+      '',
+      ' Ana',
+    ]) {
+      expect(restoredLabel({ status: 'verified', label: hostile }, 'default')).toBe('default');
+    }
+    expect(restoredLabel({ status: 'unverified' }, 'default')).toBe('default');
+    expect(restoredLabel({ status: 'none' }, 'default')).toBe('default');
+    expect(restoredLabel(undefined, 'default')).toBe('default');
+  });
+});
+
 describe.runIf(POSIX)(
   'first run is held by verified cards, not only the marker (IR deviation 1)',
   () => {
@@ -1238,4 +1300,218 @@ describe.runIf(POSIX)('first run fails closed on a hung keychain (owner decision
     hang = false;
     expect(await engine.firstRunHold()).toBeUndefined();
   });
+});
+
+// --- UX1113-QA2 ------------------------------------------------------------------------------------
+
+describe.runIf(POSIX)('UX1113-QA2 N5: a damaged kit with the right code says damaged', () => {
+  /** An agent whose store snapshot spans more than one 1 MiB chunk of the kit. */
+  async function bigAgent(owner: TestOwner, name: string): Promise<TestAgent> {
+    const made = await makeAgent(t.root, owner, name);
+    const pad = new Uint8Array(1_600_000).fill(7);
+    const snapshot = new Uint8Array(made.snapshot.length + pad.length);
+    snapshot.set(made.snapshot);
+    snapshot.set(pad, made.snapshot.length);
+    return { ...made, snapshot };
+  }
+
+  it('a half-copied kit (an authentic first chunk) is damaged, never wrong_code, and never counts', async () => {
+    const owner = await makeOwner();
+    const big = await bigAgent(owner, 'helper');
+    const kit = await makeKit(t.root, owner, [big], 'agentlink-recovery-kit-big.alkk', t.root);
+    const bytes = new Uint8Array(await readFile(kit.path));
+    expect(bytes.length).toBeGreaterThan(1_100_000);
+    const half = bytes.slice(0, 1_300_000);
+    await writeFile(join(t.home, 'Downloads', 'agentlink-recovery-kit-2026-11-12.alkk'), half);
+    const handle = await foundHandle();
+    for (let i = 0; i < 4; i += 1) {
+      const opened = await openKit('S1', handle, kit.code);
+      expect(opened.status).toBe(422);
+      expect(opened.body).toEqual({ error: 'damaged' });
+      const checked = await engine.check('S1', { handle }, code(kit.code));
+      expect(checked.body).toEqual({ error: 'damaged' });
+    }
+    // A wrong code on the same file is still wrong_code, and counts as before (no oracle: the
+    // answer differs only when the code itself opened part of the kit).
+    const wrong = 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA';
+    for (let i = 0; i < 3; i += 1) {
+      expect(body(await openKit('S1', handle, wrong))['error']).toBe('wrong_code');
+    }
+    expect(body(await openKit('S1', handle, kit.code))['error']).toBe('wait');
+    await expectNothingWritten();
+  }, 60_000);
+});
+
+describe.runIf(POSIX)('UX1113-QA2 N14: a kit counts as backed up only once it opened', () => {
+  const proofOf = (agent: string, kitId: string) => ({
+    body: {
+      v: 1,
+      agent,
+      owner: 'aa'.repeat(32),
+      op: 'backup.export',
+      params: { kitId, contents: 'full' },
+      nonce: 'n'.repeat(22),
+      issuedAt: 1_800_000_000,
+      expiresAt: 1_800_000_600,
+    },
+    sig: 'cd'.repeat(64),
+  });
+
+  it('Check of the recorded kit marks the record checked; another kit never does', async () => {
+    const { path, code: c, kitId, agents } = await kitOnDisk();
+    const agentId = (agents[0] as TestAgent).agentId;
+    const dir = join(t.home, '.agentlink');
+    await mkdir(dir, { recursive: true });
+    await writeKitRecord(dir, {
+      v: 1,
+      kitId,
+      at: 1_800_000_000,
+      covers: [agentId],
+      names: { [agentId]: 'helper' },
+      peopleAtSave: { [agentId]: 0 },
+      exports: { [agentId]: proofOf(agentId, kitId) },
+      contents: 'full',
+      file: path,
+    });
+    // A wrong code marks nothing.
+    const handle = await foundHandle();
+    expect(
+      body(await engine.check('S1', { handle }, code('AAAA-AAAA-AAAA-AAAA-AAAA-AAAA')))['error'],
+    ).toBe('wrong_code');
+    let read = await readKitRecord(dir);
+    expect(read.status === 'saved' && read.record.checked).toBeFalsy();
+    // The export handle right after the save (checklist step 3).
+    const exported = await engine.registerExportedKit('S1', { path, kitId });
+    expect((await engine.check('S1', { handle: exported as string }, code(c))).status).toBe(200);
+    read = await readKitRecord(dir);
+    expect(read.status === 'saved' && read.record.checked).toBe(true);
+  });
+
+  it('a typed Check of a kit that is not the recorded one leaves the record unchecked', async () => {
+    const { path, kitId, agents } = await kitOnDisk();
+    const other = await kitOnDisk([{ name: 'other' }], undefined, 'agentlink-recovery-kit-b.alkk');
+    const agentId = (agents[0] as TestAgent).agentId;
+    const dir = join(t.home, '.agentlink');
+    await mkdir(dir, { recursive: true });
+    await writeKitRecord(dir, {
+      v: 1,
+      kitId,
+      at: 1_800_000_000,
+      covers: [agentId],
+      names: { [agentId]: 'helper' },
+      peopleAtSave: { [agentId]: 0 },
+      exports: { [agentId]: proofOf(agentId, kitId) },
+      contents: 'full',
+      file: path,
+    });
+    const handle = await foundHandle('S1', 'agentlink-recovery-kit-b.alkk');
+    expect((await engine.check('S1', { handle }, code(other.code))).status).toBe(200);
+    const read = await readKitRecord(dir);
+    expect(read.status === 'saved' && read.record.checked).toBeFalsy();
+  });
+});
+
+describe.runIf(POSIX)('UX1113-QA2 N4: a restored ID keeps the name people know', () => {
+  async function configOf(folder: string): Promise<Record<string, unknown>> {
+    return JSON.parse(
+      await readFile(join(t.home, '.agentlink', 'agents', folder, 'config.json'), 'utf8'),
+    ) as Record<string, unknown>;
+  }
+
+  it('config.json carries the verified label, also under a new folder name; no label: none', async () => {
+    const owner = await makeOwner();
+    const ana = await makeAgent(t.root, owner, 'default', { label: 'Ana' });
+    const plain = await makeAgent(t.root, owner, 'work');
+    const kit = await makeKit(
+      t.root,
+      owner,
+      [ana, plain],
+      'agentlink-recovery-kit-n4.alkk',
+      join(t.home, 'Downloads'),
+    );
+    const handle = await foundHandle();
+    const opened = await openKit('S1', handle, kit.code);
+    const done = await gestureAndFinish(
+      'S1',
+      body(opened)['kit'] as string,
+      [ana.agentId, plain.agentId],
+      { [ana.agentId]: 'ana-home' },
+    );
+    const ids = done['ids'] as { agentId: string; name: string; label: string }[];
+    // The folder changes; the name people know does not become the slug.
+    expect(ids.find((r) => r.agentId === ana.agentId)).toMatchObject({
+      name: 'ana-home',
+      label: 'Ana',
+    });
+    expect(await configOf('ana-home')).toEqual({
+      v: 1,
+      name: 'ana-home',
+      agentId: ana.agentId,
+      keyStore: 'keychain',
+      label: 'Ana',
+    });
+    expect(await configOf('work')).toEqual({
+      v: 1,
+      name: 'work',
+      agentId: plain.agentId,
+      keyStore: 'keychain',
+    });
+    // No temporary file is left beside it.
+    expect((await readdir(join(t.home, '.agentlink', 'agents', 'ana-home'))).sort()).toEqual(
+      expect.arrayContaining(['config.json', 'store.sqlite']),
+    );
+    expect(
+      (await readdir(join(t.home, '.agentlink', 'agents', 'ana-home'))).filter((f) =>
+        f.endsWith('.tmp'),
+      ),
+    ).toEqual([]);
+
+    // Check that the kit opens, now that both IDs are here: each row names the ID by the label
+    // this computer shows for it (an ID already here only; a new one keeps its folder name).
+    await engine.close();
+    engine = newEngine({ knownOwner: owner.keys.ownerNostr });
+    const h2 = await foundHandle('S2');
+    const checked = await engine.check('S2', { handle: h2 }, code(kit.code));
+    expect(checked.status).toBe(200);
+    const rows = (body(checked)['summary'] as { ids: Record<string, unknown>[] }).ids;
+    expect(rows.find((r) => r['agentId'] === ana.agentId)).toMatchObject({
+      state: 'already_here',
+      label: 'Ana',
+    });
+    expect(rows.find((r) => r['agentId'] === plain.agentId)).not.toHaveProperty('label');
+  }, 60_000);
+
+  it("a clash names the ID already here by its label (per request, never another ID's)", async () => {
+    const owner = await makeOwner();
+    const ana = await makeAgent(t.root, owner, 'default', { label: 'Ana' });
+    const first = await makeKit(t.root, owner, [ana], 'agentlink-recovery-kit-c1.alkk', t.root);
+    await writeFile(
+      join(t.home, 'Downloads', 'agentlink-recovery-kit-c1.alkk'),
+      await readFile(first.path),
+    );
+    const opened = await openKit('S1', await foundHandle('S1'), first.code);
+    await gestureAndFinish('S1', body(opened)['kit'] as string, [ana.agentId]);
+    // Another ID of this owner whose folder is also `default`.
+    const other = await makeAgent(t.root, owner, 'default');
+    const second = await makeKit(t.root, owner, [other], 'agentlink-recovery-kit-c2.alkk', t.root);
+    await writeFile(
+      join(t.home, 'Downloads', 'agentlink-recovery-kit-c2.alkk'),
+      await readFile(second.path),
+    );
+    await engine.close();
+    engine = newEngine({ knownOwner: owner.keys.ownerNostr });
+    const h = await foundHandle('S2', 'agentlink-recovery-kit-c2.alkk');
+    const checked = await engine.check('S2', { handle: h }, code(second.code));
+    const rows = (body(checked)['summary'] as { ids: Record<string, unknown>[] }).ids;
+    expect(rows).toEqual([
+      expect.objectContaining({
+        agentId: other.agentId,
+        name: 'default',
+        state: 'name_taken',
+        suggestedName: 'default-2',
+        takenLabel: 'Ana',
+      }),
+    ]);
+    expect(rows[0]).not.toHaveProperty('label');
+  }, 60_000);
 });

@@ -1,7 +1,8 @@
 // WP-R4: the page's strict read of `GET /api/ui/backup` (WP-R2, frozen): `{export, record, state,
 // lastKit, missing}`. Names are text only (rendered inside <bdi>); anything unexpected reads as
 // "unknown", never as an invented state. The answer never carries a path or a kit ID.
-export type KitState = 'backed_up' | 'out_of_date' | 'none' | 'unknown';
+// UX1113-QA2 N14: `unfinished`: saved, but the kit never opened with its code (Check).
+export type KitState = 'backed_up' | 'out_of_date' | 'unfinished' | 'none' | 'unknown';
 
 export interface KitStatus {
   readonly export: 'available' | 'not_available' | 'unknown';
@@ -64,7 +65,9 @@ export function parseKitStatus(data: unknown): KitStatus {
   const state = data['state'];
   if (record !== 'saved' && record !== 'none') return { ...UNKNOWN, export: exportWord };
   if (state === 'none') return { ...UNKNOWN, export: exportWord, state: 'none' };
-  if (state !== 'backed_up' && state !== 'out_of_date') return { ...UNKNOWN, export: exportWord };
+  if (state !== 'backed_up' && state !== 'out_of_date' && state !== 'unfinished') {
+    return { ...UNKNOWN, export: exportWord };
+  }
   const kit = data['lastKit'];
   const at = isObject(kit) ? millis(kit['at']) : undefined;
   if (!isObject(kit) || at === undefined) return { ...UNKNOWN, export: exportWord };

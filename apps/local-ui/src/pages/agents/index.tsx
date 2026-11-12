@@ -157,6 +157,18 @@ export function AgentsPage({
 
   const rows = useMemo(() => orderAgents(list?.agents ?? []), [list]);
   const tidy = useMemo(() => new Set(tidyCandidates(rows).map((r) => r.name)), [rows]);
+  // UX1113-QA2: every ID after the first with the same name (case ignored) gets the name nudge.
+  const duplicates = useMemo(() => {
+    const seen = new Set<string>();
+    const out = new Set<string>();
+    for (const r of rows) {
+      if (r.removing) continue;
+      const key = r.label.toLocaleLowerCase();
+      if (seen.has(key)) out.add(r.name);
+      else seen.add(key);
+    }
+    return out;
+  }, [rows]);
   const generation = list?.generation;
   const open = rows.find((r) => r.current);
   const labelOf = useCallback(
@@ -178,6 +190,7 @@ export function AgentsPage({
   const act = useCallback((action: IntentAction, row: AgentRow): void => {
     if (action === 'pause') setPausing(row);
     else if (action === 'resume') setResuming(true);
+    else if (action === 'rename') setPanel({ name: row.name, panel: 'rename' });
     else setPanel({ name: row.name, panel: 'apps' });
   }, []);
   const fresh = state.kind === 'ready' ? state.list : undefined;
@@ -232,6 +245,7 @@ export function AgentsPage({
   const onPause = (row: AgentRow): void => firstOpen(row, 'pause');
   const onResume = (row: AgentRow): void => firstOpen(row, 'resume');
   const onAppsElsewhere = (row: AgentRow): void => firstOpen(row, 'apps');
+  const onRenameElsewhere = (row: AgentRow): void => firstOpen(row, 'rename');
   /** F27: Invite someone for this ID: the open ID goes straight to the Invite screen; another opens first. */
   const onInvite = (row: AgentRow): void => {
     if (row.current) return navigate(INVITE_PATH);
@@ -440,6 +454,7 @@ export function AgentsPage({
             key={row.name}
             row={row}
             tidy={tidy.has(row.name)}
+            duplicate={duplicates.has(row.name)}
             actions={{
               api,
               owner,
@@ -454,6 +469,7 @@ export function AgentsPage({
               onSwitch: doSwitch,
               onRemove: (r) => setRemoveQueue([r]),
               onAppsElsewhere,
+              onRenameElsewhere,
               onInvite,
               onRenamed,
               onCardUpdated,

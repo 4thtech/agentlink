@@ -34,6 +34,8 @@ export type BackupState =
       readonly covers: readonly string[];
       /** The server's word: `out_of_date` when an ID or person joined since the kit was saved. */
       readonly stale: boolean;
+      /** UX1113-QA2 N14: saved, but the kit never opened with its code. */
+      readonly unfinished?: true;
       readonly missingIds: number;
       readonly missingPeople: number;
     };
@@ -52,6 +54,7 @@ export function parseBackup(data: unknown): BackupState | undefined {
     at: k.at,
     covers: k.covers.slice(0, 6),
     stale: k.state === 'out_of_date',
+    ...(k.state === 'unfinished' ? { unfinished: true as const } : {}),
     missingIds: k.missingIds.length,
     missingPeople: k.missingPeople,
   };

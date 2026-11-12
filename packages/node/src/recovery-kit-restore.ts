@@ -25,6 +25,7 @@ import {
   readFile,
   readdir,
   realpath,
+  rename,
   rmdir,
   statfs,
   unlink,
@@ -32,7 +33,7 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { AgentLinkClient, type ApprovalChannel } from '@4thtech-io/core';
+import { AgentLinkClient, isRestrictedAlias, type ApprovalChannel } from '@4thtech-io/core';
 import {
   CryptoInputError,
   KeyStoreError,
@@ -70,6 +71,7 @@ import {
   type RestoreOwnerSessionHold,
 } from './key-controls.js';
 import { keychainAccount, osKeychain, type KeychainBackend } from './keychain.js';
+import { markKitRecordChecked } from './kit-record.js';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded, openRecordedKeyStore } from './keychain-keystore.js';
 import { ttyOwnerTerminal } from './owner-terminal.js';
@@ -283,6 +285,14 @@ interface SummaryRow {
   readonly lastMessageAt: number | null;
   readonly state: 'new' | 'name_taken' | 'already_here' | 'removed_earlier';
   readonly suggestedName?: string;
+  /**
+   * UX1113-QA2 N4: for an ID already on this computer, the label this computer shows for it (its
+   * config.json `label`, written only after core verified an `agent.label`); never for a new ID
+   * (the kit's manifest has no label, so step 3 stays by folder).
+   */
+  readonly label?: string;
+  /** UX1113-QA2: for `name_taken`, the label of the ID already here in that folder, when known. */
+  readonly takenLabel?: string;
 }
 
 interface HeldKit {
@@ -407,9 +417,49 @@ async function readBack(
   agentId: string,
   ownerNostr: Uint8Array,
   path: string,
-): Promise<boolean> {
+): Promise<{ readonly label: LabelReadingLike | undefined } | undefined> {
   const seen = await inspectId(keychain, agentId, path);
-  return seen !== undefined && seen.policyLoads && equalBytes(seen.ownerNostr, ownerNostr);
+  if (seen === undefined || !seen.policyLoads || !equalBytes(seen.ownerNostr, ownerNostr)) {
+    return undefined;
+  }
+  return { label: seen.label };
+}
+
+/** Core `loadLabel`'s answer, as the read-back keeps it. */
+type LabelReadingLike =
+  | { readonly status: 'verified'; readonly label: string }
+  | { readonly status: 'none' | 'unverified' };
+
+const LABEL_CHARS = /^[\p{L}\p{M}\p{N}](?:[\p{L}\p{M}\p{N} ._'-]*[\p{L}\p{M}\p{N}._'-])?$/u;
+
+/**
+ * UX1113-QA2 N4: the agent-folder label rule (apps/cli agent-name.ts `isAgentLabel`, 06 §6, 11 §5.8):
+ * 1 to 32 code points of letters, digits, spaces, `.`, `'` and `-`, NFC, no space at either end and
+ * no two in a row. Only such a label is written to a restored ID's config.json, so the folder always
+ * parses (a label outside it would make the CLI refuse the folder).
+ */
+const CONFIG_LABEL_CHARS = /^[\p{L}\p{N} .'-]+$/u;
+export function isConfigLabel(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const length = [...value].length;
+  if (length < 1 || length > 32) return false;
+  if (value.normalize('NFC') !== value) return false;
+  if (value.startsWith(' ') || value.endsWith(' ') || value.includes('  ')) return false;
+  return CONFIG_LABEL_CHARS.test(value);
+}
+
+/**
+ * UX1113-R1-LABEL: what the done answer names a restored ID by. Display text only (never decides
+ * anything): the label core verified at the read-back (owner-signed `agent.label` in the restored
+ * store), only when it is still its own restricted form, at most 32 code points and plain letters,
+ * numbers, spaces and `._'-`; anything else (unverified, none, hostile) is the folder name.
+ */
+export function restoredLabel(reading: LabelReadingLike | undefined, folder: string): string {
+  if (reading?.status !== 'verified') return folder;
+  const label = reading.label;
+  if (typeof label !== 'string' || [...label].length > 32) return folder;
+  if (!LABEL_CHARS.test(label) || label.includes('  ') || !isRestrictedAlias(label)) return folder;
+  return label;
 }
 
 /**
@@ -421,7 +471,14 @@ async function inspectId(
   keychain: KeychainBackend,
   agentId: string,
   path: string,
-): Promise<{ readonly ownerNostr: Uint8Array; readonly policyLoads: boolean } | undefined> {
+): Promise<
+  | {
+      readonly ownerNostr: Uint8Array;
+      readonly policyLoads: boolean;
+      readonly label: LabelReadingLike | undefined;
+    }
+  | undefined
+> {
   let opened: AgentStore | undefined;
   let keyStore: KeyStore | undefined;
   try {
@@ -443,7 +500,9 @@ async function inspectId(
     if (typeof named !== 'string') return undefined;
     const owner = decodeHex0x(named, { length: 32 });
     const policy = await client.ownerActions.loadPolicy();
-    return { ownerNostr: owner, policyLoads: policy.mode !== 'fail_closed' };
+    // UX1113-R1-LABEL: the verified label (core re-verifies the stored `agent.label`); display only.
+    const label = await client.ownerActions.loadLabel().catch(() => undefined);
+    return { ownerNostr: owner, policyLoads: policy.mode !== 'fail_closed', label };
   } catch {
     return undefined;
   } finally {
@@ -804,8 +863,14 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     }
   }
 
-  /** The agent folders here: name → the agentId of its config (undefined when unreadable). */
-  async function existingFolders(): Promise<Map<string, string | undefined>> {
+  /**
+   * The agent folders here: name → the agentId of its config (undefined when unreadable). UX1113-QA2
+   * N4: `labels`, when given (one per request, never shared), receives the label each local agentId's
+   * config.json carries (display text only).
+   */
+  async function existingFolders(
+    labels?: Map<string, string>,
+  ): Promise<Map<string, string | undefined>> {
     const out = new Map<string, string | undefined>();
     let names: string[];
     try {
@@ -820,9 +885,13 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         const config = join(agentsDir, name, 'config.json');
         const info = await lstat(config);
         if (info.isFile()) {
-          const parsed = JSON.parse(await readFile(config, 'utf8')) as { agentId?: unknown };
+          const parsed = JSON.parse(await readFile(config, 'utf8')) as {
+            agentId?: unknown;
+            label?: unknown;
+          };
           if (typeof parsed.agentId === 'string' && AGENT_ID.test(parsed.agentId)) {
             agentId = parsed.agentId;
+            if (isConfigLabel(parsed.label)) labels?.set(agentId, parsed.label);
           }
         }
       } catch {
@@ -834,7 +903,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   }
 
   async function summaryOf(kit: RecoveryKitImport): Promise<SummaryRow[]> {
-    const folders = await existingFolders();
+    const localLabels = new Map<string, string>();
+    const folders = await existingFolders(localLabels);
     const ids = new Set([...folders.values()].filter((v): v is string => v !== undefined));
     const taken = new Set([...folders.keys()]);
     const kitNames = new Set(kit.agents.map((a) => ascii(a.name)));
@@ -870,6 +940,10 @@ function build(options: RestoreEngineOptions): TerminalRestore {
           }
         }
       }
+      const label = state === 'already_here' ? localLabels.get(agent.agentId) : undefined;
+      // UX1113-QA2 (Fable ruling): a clash names the ID already here by the name people see.
+      const takenId = state === 'name_taken' ? folders.get(name) : undefined;
+      const takenLabel = takenId === undefined ? undefined : localLabels.get(takenId);
       rows.push(
         Object.freeze({
           agentId: agent.agentId,
@@ -878,6 +952,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
           lastMessageAt: counts.lastMessageAt,
           state,
           ...(suggestedName === undefined ? {} : { suggestedName }),
+          ...(label === undefined ? {} : { label }),
+          ...(takenLabel === undefined ? {} : { takenLabel }),
         }),
       );
     }
@@ -975,7 +1051,14 @@ function build(options: RestoreEngineOptions): TerminalRestore {
           },
         );
       } catch (error) {
-        if (sinks.some((s) => quarantineAuthenticated(s))) return fail('damaged');
+        // UX1113-QA2 N5: a store sink is only created for plaintext of a chunk that authenticated
+        // under this code, so the code was right and the file is damaged (a half-copied kit). Not
+        // an oracle: a wrong code never authenticates a chunk, and anyone holding the file can test
+        // a code offline the same way; a wrong code still counts toward the wait below. A kit of one
+        // chunk cannot tell a cut file from a wrong code (one tag), and says wrong_code.
+        if (sinks.length > 0 || sinks.some((s) => quarantineAuthenticated(s))) {
+          return fail('damaged');
+        }
         if (error instanceof CryptoInputError || error instanceof KeyStoreError) {
           const counter = fails.get(key) ?? { count: 0, until: 0 };
           fails.set(key, counter);
@@ -1000,6 +1083,9 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       }
       const summary = summaryBody(kit, rows);
       if (mode === 'check') {
+        // UX1113-QA2 N14: this very kit opened with its code; the kit record of the same kitId (and
+        // only it) now counts as backed up. A display aid (G-1): a failure changes nothing here.
+        await markKitRecordChecked(agentlinkDir, encodeBase64url(kit.kitId)).catch(() => false);
         kit.wipe();
         return ok({ summary });
       }
@@ -1106,9 +1192,43 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     }
   }
 
+  /**
+   * UX1113-QA2 N4 (04 §2.3.3 rename map; 07 §9.1): after the read-back, the restored ID's config.json
+   * also carries the label core verified (as a rename writes it, only after core verified an
+   * `agent.label`), so the IDs list names it as before even under a new folder name. Written through
+   * a new temporary file and a rename; a label outside the folder label rule, or any failure, leaves
+   * the config without a label (the folder name shows, as before). Display only.
+   */
+  async function writeConfigLabel(agentId: string, name: string, label: string): Promise<void> {
+    if (!isConfigLabel(label)) return;
+    const dir = join(agentsDir, name);
+    const temp = join(dir, `.config.json.${encodeHex(randomBytes(8))}.tmp`);
+    let renamed = false;
+    try {
+      const fh = await open(temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, FILE_MODE);
+      try {
+        await fh.writeFile(
+          `${JSON.stringify({ v: 1, name, agentId, keyStore: 'keychain', label })}\n`,
+          'utf8',
+        );
+        await fh.sync();
+      } finally {
+        await fh.close();
+      }
+      await rename(temp, join(dir, 'config.json'));
+      renamed = true;
+    } catch {
+      // The config without a label stands.
+    } finally {
+      if (!renamed) await unlink(temp).catch(() => undefined);
+    }
+  }
+
   interface Outcome {
     readonly agentId: string;
     readonly name: string;
+    /** UX1113-R1-LABEL: the verified label from the read-back, else the folder name. */
+    readonly label: string;
     readonly outcome: 'restored' | 'failed';
   }
 
@@ -1143,14 +1263,18 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         // Restore step 7 (IR-UX1113-R1 M2): the ID opens with its KeyStore and store, its card names
         // the kit's owner, and its policy loads at the restored mark; else this ID is rolled back.
         const storePath = join(agentsDir, name, 'store.sqlite');
-        if (!(await readBack(keychain, agent.agentId, current.kit.ownerNostr, storePath))) {
-          throw new Error('read-back');
+        const back = await readBack(keychain, agent.agentId, current.kit.ownerNostr, storePath);
+        if (back === undefined) throw new Error('read-back');
+        const label = restoredLabel(back.label, name);
+        // UX1113-QA2 N4: the ID keeps the name people know, also under a new folder name.
+        if (back.label?.status === 'verified' && label === back.label.label) {
+          await writeConfigLabel(agent.agentId, name, label);
         }
-        out.push({ agentId: agent.agentId, name, outcome: 'restored' });
+        out.push({ agentId: agent.agentId, name, label, outcome: 'restored' });
       } catch {
         if (installed) await removeInstalledFolder(name);
         if (written) await discardImportedAgent(keychain, agent.agentId);
-        out.push({ agentId: agent.agentId, name, outcome: 'failed' });
+        out.push({ agentId: agent.agentId, name, label: name, outcome: 'failed' });
       }
     }
     return out;

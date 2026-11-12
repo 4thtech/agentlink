@@ -159,6 +159,15 @@ describe('My IDs (WP-I1)', () => {
   });
 
   it('the name nudge shows for macbook-agent-1 and not for Tali; Rename opens the editor', async () => {
+    // UX1113-QA2 N1: the editor opens in place on the open ID (another one switches first).
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: {
+        ...list(THREE().map((a) => ({ ...a, current: a.name === 'macbook-agent-1' }))),
+        current: 'macbook-agent-1',
+        label: 'macbook-agent-1',
+      },
+    };
     await mount();
     expect(card('default').querySelector('[data-nudge]')).toBeNull();
     const nudge = card('macbook-agent-1').querySelector<HTMLElement>('[data-nudge]')!;
@@ -171,6 +180,23 @@ describe('My IDs (WP-I1)', () => {
     });
     expect(card('macbook-agent-1').querySelector('[data-nudge]')).toBeNull();
     expect(card('macbook-agent-1').querySelector('input')).not.toBeNull();
+  });
+
+  it('UX1113-QA2: two IDs with the same name: the second one asks for a name people can tell apart', async () => {
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list([
+        ...THREE(),
+        agent('work-2', 'Work', { state: 'ready', apps: [{ app: 'codex', state: 'ready' }] }),
+      ]),
+    };
+    await mount();
+    expect(card('work').querySelector('[data-nudge]')).toBeNull();
+    const nudge = card('work-2').querySelector<HTMLElement>('[data-nudge]')!;
+    expect(nudge.textContent).toContain(
+      'Another of your IDs is also called Work. Give this one a name people can tell apart.',
+    );
+    expect(nudge.querySelector('strong bdi')?.textContent).toBe('Work');
   });
 
   it('the machine-name rule', () => {

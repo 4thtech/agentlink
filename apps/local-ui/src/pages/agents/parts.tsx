@@ -30,19 +30,22 @@ export function machineNamed(row: Pick<AgentRow, 'label' | 'name'>): boolean {
 export function NameNudge({
   row,
   onRename,
+  duplicate = false,
 }: {
   row: AgentRow;
   onRename: () => void;
+  /** UX1113-QA2: another ID has the same name (a restore keeps names; folders differ). */
+  duplicate?: boolean;
 }): ReactElement {
   return (
     <div className="ag-nudge" role="note" data-nudge>
       <Icon name="info" size={18} />
       <p className="al-text-body-sm">
-        {S.nudgeBefore}
+        {duplicate ? S.duplicateBefore : S.nudgeBefore}
         <strong>
           <bdi>{row.label}</bdi>
         </strong>
-        {S.nudgeAfter}
+        {duplicate ? S.duplicateAfter : S.nudgeAfter}
       </p>
       <Button variant="secondary" size="sm" onClick={onRename}>
         {S.rename}

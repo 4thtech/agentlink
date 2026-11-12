@@ -19,6 +19,7 @@ import {
   type ReactElement,
 } from 'react';
 import { onAgentChanged } from './api/generation.js';
+import { mayLeave } from './leave-guard.js';
 import { Layout } from './layout/index.js';
 import { withRouteTransition } from './layout/transition.js';
 import { ApprovalsPage } from './pages/approvals/index.js';
@@ -97,6 +98,8 @@ function normalize(pathname: string): string {
 export function navigate(to: string, replace = false): void {
   const target = normalize(new URL(to, location.href).pathname);
   const changesPage = target !== normalize(location.pathname);
+  // UX1113-QA2 N14: a page that would lose something (a kit save in progress) asks first.
+  if (changesPage && !mayLeave()) return;
   // The address changes at once; only the re-render may sit inside a view transition.
   if (replace) history.replaceState(null, '', to);
   else history.pushState(null, '', to);

@@ -71,6 +71,10 @@ export interface SummaryRow {
   readonly lastMessageAt: number | null;
   readonly state: RowState;
   readonly suggestedName?: string;
+  /** UX1113-QA2 N4: an ID already here: the label this computer shows for it. */
+  readonly label?: string;
+  /** UX1113-QA2: for `name_taken`, the name of the ID already here in that folder. */
+  readonly takenLabel?: string;
 }
 export interface Summary {
   readonly kitId: string;
@@ -81,8 +85,22 @@ export interface Summary {
 
 export interface Outcome {
   readonly agentId: string;
+  /** The folder name. */
   readonly name: string;
+  /** UX1113-R1-LABEL: the verified label from the read-back (display text), else the folder name. */
+  readonly label?: string;
   readonly outcome: 'restored' | 'failed';
+}
+
+const LABEL = /^[\p{L}\p{M}\p{N}](?:[\p{L}\p{M}\p{N} ._'-]*[\p{L}\p{M}\p{N}._'-])?$/u;
+
+/**
+ * UX1113-R1-LABEL: an ID's label as the page shows it (plain text in a <bdi>): 1 to 32 code points of
+ * letters, numbers, spaces and `._'-`, no double space; anything else shows the folder name.
+ */
+export function shownLabel(label: unknown, folder: string): string {
+  if (typeof label !== 'string' || [...label].length > 32 || label.includes('  ')) return folder;
+  return LABEL.test(label) ? label : folder;
 }
 
 /** The public WebAuthn creation values of `apply/begin` (no owner here). */
@@ -159,6 +177,8 @@ function inputOf(value: unknown): string {
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+/** A row label shown as text: 1 to 32 letters, numbers, spaces and `.'-` (the folder label rule). */
+const ROW_LABEL = /^[\p{L}\p{N}](?:[\p{L}\p{N} .'-]{0,30}[\p{L}\p{N}.'-])?$/u;
 
 function summaryOf(value: unknown): Summary | undefined {
   if (!isRecord(value) || !Array.isArray(value['ids'])) return undefined;
@@ -170,7 +190,7 @@ function summaryOf(value: unknown): Summary | undefined {
   const ids: SummaryRow[] = [];
   for (const row of value['ids']) {
     if (!isRecord(row)) return undefined;
-    const { agentId, name, people, lastMessageAt, state, suggestedName } = row;
+    const { agentId, name, people, lastMessageAt, state, suggestedName, label, takenLabel } = row;
     if (
       typeof agentId !== 'string' ||
       typeof name !== 'string' ||
@@ -190,6 +210,8 @@ function summaryOf(value: unknown): Summary | undefined {
       lastMessageAt,
       state,
       ...(typeof suggestedName === 'string' ? { suggestedName } : {}),
+      ...(typeof label === 'string' && ROW_LABEL.test(label) ? { label } : {}),
+      ...(typeof takenLabel === 'string' && ROW_LABEL.test(takenLabel) ? { takenLabel } : {}),
     });
   }
   return { kitId, createdAt, contents, ids };
@@ -200,10 +222,10 @@ function outcomesOf(value: unknown): Outcome[] | undefined {
   const out: Outcome[] = [];
   for (const o of value) {
     if (!isRecord(o)) return undefined;
-    const { agentId, name, outcome } = o;
+    const { agentId, name, outcome, label } = o;
     if (typeof agentId !== 'string' || typeof name !== 'string') return undefined;
     if (outcome !== 'restored' && outcome !== 'failed') return undefined;
-    out.push({ agentId, name, outcome });
+    out.push({ agentId, name, label: shownLabel(label, name), outcome });
   }
   return out;
 }
