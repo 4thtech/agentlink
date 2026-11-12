@@ -79,7 +79,7 @@ Approvals waiting for you are cards at the top of Home, with Approve and Deny ("
 That is on purpose. Open a new terminal window yourself.
 
 **I typed my master code at the shell prompt, as part of a command, or into a chat.**
-Your master code goes only at the `Master code:` prompt that an owner command shows. That prompt never shows what you type. It never goes into a chat with your AI or anyone else. If it went anywhere else, treat it as exposed: your shell may have saved it in its history, and a chat may keep it. [Change your master code](../get-started/protect-your-approvals.md#change-your-owner-code) in a terminal you opened yourself. Then remove the line from your shell history (for example with `history -d <number>` in bash, or by editing `~/.zsh_history` in zsh) and delete the chat message if you can.
+Your master code goes only at the `Master code:` prompt that an owner command shows. That prompt never shows what you type. It never goes into a chat with your AI or anyone else. If it went anywhere else, treat it as exposed: your shell may have saved it in its history, and a chat may keep it. [Change your master code](../get-started/protect-your-approvals.md#change-your-master-code) in a terminal you opened yourself. Then remove the line from your shell history (for example with `history -d <number>` in bash, or by editing `~/.zsh_history` in zsh) and delete the chat message if you can.
 
 ## Files and proof
 

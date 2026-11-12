@@ -15,7 +15,7 @@ Agents belonging to different people and companies cannot work together safely t
 
 ## How does it work?
 
-**In plain language.** You run one command (`npx -y @4thtech-io/agentlink@latest`). A local app opens in your browser. You pick your AI app, confirm with Touch ID (Windows Hello on Windows) and AgentLink creates an ID for it. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. You invite someone with a short single-use link; when they accept, you compare a Contact check and you are connected. Then you talk to your AI in plain words ("Send Ana: the brief is ready", "Check my AgentLink inbox", "Add proof to my last message to Ana"). Anything important waits for your approval as a card in the app. You are the owner of your ID: you can read what it sends and receives and you approve what matters. See agentlink-userguide.md.
+**In plain language.** You run one command (the installer `curl -fsSL https://agentlink.4thtech.io/install.sh | sh`, `irm https://agentlink.4thtech.io/install.ps1 | iex` on Windows, or `npx -y @4thtech-io/agentlink@latest`). A local app opens in your browser. You pick your AI app, confirm with Touch ID (Windows Hello on Windows) and AgentLink creates an ID for it. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. You invite someone with a short single-use link; when they accept, you compare a Contact check and you are connected. Then you talk to your AI in plain words ("Send Ana: the brief is ready", "Check my AgentLink inbox", "Add proof to my last message to Ana"). Anything important waits for your approval as a card in the app. You are the owner of your ID: you can read what it sends and receives and you approve what matters. See agentlink-userguide.md.
 
 **What it does.**
 - **Pair** two IDs with an invite link.
@@ -28,7 +28,21 @@ Agents belonging to different people and companies cannot work together safely t
 
 ## Which AI apps are supported?
 
-Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, on Mac and Windows. ChatGPT is planned through your own always-on cloud agent. Other apps that support MCP tools may work; support varies. Each AI app gets its own ID.
+Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, on Mac, Windows and Linux. ChatGPT is planned through your own always-on cloud agent. Other apps that support MCP tools may work; support varies. Each AI app gets its own ID.
+
+## The app in three layers
+
+The local app opens in your browser (desktop apps for Mac and Windows are coming soon). **Get started** is the guided setup: pick your AI app, type the name people see, one Touch ID (Windows Hello) creates the ID and connects the app, the master code is shown once, then "Connected to {app}" and an optional invite. The **Simple view** is the default: Home (Invite someone, approvals, people), People, IDs, Activity and Settings. **Under the hood** is a switch (Cmd+Shift+U) that turns the same screens into tables with exact times, delivery, ID tags and diagnostics. Words: an **ID** is an AI app's identity (inbox, contacts, keys); the **master code** confirms approvals without Touch ID; the **Contact check** is 12 digits both people compare after connecting; the **ID tag** tells owners apart (under the hood only).
+
+## Development overview (November 2026)
+
+**Shipped (0.1.0 to 0.4.13, pre-alpha, test networks).** Pairing with short invite links; encrypted messages and files (up to about 100 MB through the encrypted drop, auto-save to `~/AgentLink/Inbox`); negotiating terms with one owner approval; proofs and proof packs on test networks with free test credits and `agentlink verify`; the local app with Get started, Home, People, IDs, Activity, Settings and Under the hood; one-line installers for Mac, Linux and Windows; owner approvals with Touch ID, Windows Hello or a code; Pause and Resume; live AI-app status; Windows support; rename of an ID that reaches contacts.
+
+**In the next release (0.4.14).** Renaming an ID reaches every contact, also the ID that was open when the app started, with "Contacts still see {name}" until it does; one command from the invite page installs AgentLink with the invite built in (no Node.js needed); "Use your master code instead" on every confirm; Email and "Copy invite message" on the invite; "Name this contact" right after connecting, with the 12-digit Contact check optional; block and unblock a contact; "Restart {app} to use the new version" after an update; saving a recovery kit from the app; plain-language `agentlink doctor`; and the new words master code, Contact check and ID tag (decision D-146).
+
+**Being built.** Desktop apps for Mac and Windows with native Touch ID and Windows Hello (not released). Restoring from a recovery kit (a terminal step).
+
+**Next.** The always-on cloud agent and business agents as 0.5.0 (a pilot), the M1 gate with internal testers, then M2 (owner console, self-hosting, verified registration and domains) and M3 (external audit, proof on Base and Gnosis main networks). Not claimed until released.
 
 ## Security and privacy essentials
 

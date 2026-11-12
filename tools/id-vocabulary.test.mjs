@@ -24,11 +24,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** Reviewed exceptions: file (repo-relative) + the lower-case phrase the rule matches. */
 const ALLOWED = [
   {
-    file: 'llms.txt',
-    phrase: 'your agents',
-    reason: 'the release history names v0.4.4 as shipped ("all your agents in one window")',
-  },
-  {
     file: 'docs-site/guide/local-app/ids.md',
     phrase: 'add agent',
     reason:

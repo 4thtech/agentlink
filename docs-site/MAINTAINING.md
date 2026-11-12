@@ -24,7 +24,7 @@ Both sections follow [Diátaxis](https://diataxis.fr), with plain navigation lab
 
 This repo is the source of truth (D-57, amends D-29). GitBook is **one space**, the 4thTech Docs site at [wiki.4thtech.io](https://wiki.4thtech.io), Git-synced from the private repo `4thtech/wiki.4thtech.io` (decided by Tali, 2026-10-26; model in the [docs model](../docs/process/docs-model.md) §8). Nothing here syncs to GitBook directly.
 
-- **Release-time copy.** Planned (the script is not built yet; today the AgentLink section of 4thTech Docs is a short summary): at each AgentLink release, a script in the wiki repo will copy `docs-site/guide` and `docs-site/technical` from the **release tag** into the wiki repo and opens a PR there (no secrets). Merging it will publish. Release tags only, never `main`. After two releases the script will move to a GitHub Action. A merge to `main` here does not change the published site until the next release.
+- **Release-time copy.** At each AgentLink release, `scripts/sync-agentlink.mjs` in the wiki repo copies `docs-site/guide`, `docs-site/technical` and (from the docs overhaul) `docs-site/assets` from the **release tag** into the wiki repo, rewrites links and records hashes; a PR there publishes on merge (no secrets). Release tags only, never `main`. A merge to `main` here does not change the published site until the next release.
 - **Review class.** `docs-site/**` is S1 (`audit-rules.md` §2.2): every change gets an independent review and the orchestrator's audit, then auto-merges when the checks are green. Until `review-gate` derives this itself (owner follow-up), the PR declares S1.
 - **Owner-only.** Any change to the publishing setup (the wiki repo, Git Sync, domain, site structure) is made by the owner.
 - **Rollback.** Revert the PR on `main`; the next release copy, or a revert PR in the wiki repo, republishes the previous pages.
@@ -32,7 +32,7 @@ This repo is the source of truth (D-57, amends D-29). GitBook is **one space**, 
 - **Never edit in GitBook.** Changes go through a pull request here like any other change; the wiki repo holds only copies. `main` accepts changes only through pull requests, so a GitBook-side edit could not sync back without bypassing review. Never add the GitBook app as a ruleset bypass actor.
 - **Moving or renaming a page** needs a redirect on the site (a `redirects:` entry in `.gitbook.yaml` if the sync script keeps those files, otherwise in the wiki repo), so published links keep working.
 - **Links.** Between guide and technical pages, use relative links (both folders are copied together). Links to the specs or to other repository files use absolute GitHub URLs (`https://github.com/4thtech/agentlink/blob/main/...`), because the copy contains only `docs-site/guide` and `docs-site/technical`.
-- **Images** go in the folder's `.gitbook/assets/`. Screenshots are dark theme only; the intro GIF is pinned to the release tag.
+- **Images:** screenshots come from `pnpm docs:screens` into `docs-site/assets/screens/` (light theme; [docs architecture](../docs/process/docs-architecture.md) §3); the wiki sync copies that folder with the guide. Other images go in the folder's `.gitbook/assets/`. The intro GIF is pinned to the release tag.
 
 ### One-time setup (owner)
 
