@@ -1,5 +1,5 @@
 // Settings (W4-SETTINGS-ADVANCED; prototype v23 "Settings", A9). One list: Backup & Touch ID, Files
-// folder, Appearance, Rules for approvals, Proofs & credits, Notifications ("not yet") and Advanced,
+// folder, Appearance, Rules for approvals, Proofs & credits and Advanced,
 // which opens in place. Each row is a link to its page (the same pages as before) with one line that
 // says where it stands, from real reads: the credits and the relay count. When a read fails the line
 // falls back to plain words; nothing is made up, and no address, key or path of this computer shows.
@@ -27,11 +27,7 @@ function Row(props: {
   readonly title: string;
   readonly line: string;
 }): ReactElement {
-  const own =
-    props.icon === 'backup' ||
-    props.icon === 'folder' ||
-    props.icon === 'appearance' ||
-    props.icon === 'bell';
+  const own = props.icon === 'backup' || props.icon === 'folder' || props.icon === 'appearance';
   return (
     <a className="st-row" href={props.href}>
       {own ? (
@@ -143,12 +139,6 @@ export function SettingsPage({ get = productionGet }: SettingsPageProps): ReactE
         />
         <Row href="/settings/rules" icon="rules" title={S.rules.title} line={S.rules.line} />
         <Row href="/settings/proofs" icon="proofs" title={S.proofs.title} line={proofsLine} />
-        <Row
-          href="/settings/notifications"
-          icon="bell"
-          title={S.notifications.title}
-          line={S.notifications.line}
-        />
         <button
           type="button"
           className="st-row"
