@@ -112,7 +112,7 @@ async function render(
 ) {
   const { api, calls } = fakeApi(answers);
   const proof = vi.fn((): Promise<PresenceProof | undefined> =>
-    Promise.resolve({ kind: 'passkey', body: new Uint8Array([1, 2, 3]) }),
+    Promise.resolve({ kind: 'passkey', gesture: () => Promise.resolve(new Uint8Array([1, 2, 3])) }),
   );
   await act(async () => {
     root.render(
@@ -303,6 +303,34 @@ describe('Touch ID & master code (WP-S2, §3.3)', () => {
     await click('Confirm with Touch ID');
     expect(calls[0]?.path).toBe('/api/ui/owner-code/replace');
     expect(typeof calls[0]?.presence).toBe('object');
+  });
+
+  it('REL051-UF3 (R1-UI-06): a double click on Confirm with Touch ID in Replace asks once', async () => {
+    let answer: ((p: PresenceProof) => void) | undefined;
+    const proof = vi.fn(
+      (): Promise<PresenceProof | undefined> =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    const { calls } = await render(
+      READY,
+      { '/api/ui/owner-code/replace': [STAGED] },
+      { passkeyProof: proof },
+    );
+    await click('Replace master code');
+    const confirm = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (b) => (b.textContent ?? '').trim() === 'Confirm with Touch ID',
+    );
+    await act(async () => confirm?.click());
+    await act(async () => confirm?.click());
+    expect(proof).toHaveBeenCalledTimes(1);
+    expect(confirm?.disabled).toBe(true);
+    await act(async () =>
+      answer?.({ kind: 'passkey', gesture: () => Promise.resolve(new Uint8Array([1])) }),
+    );
+    await settle();
+    expect(calls.filter((c) => c.path === '/api/ui/owner-code/replace')).toHaveLength(1);
   });
 
   it('Replace, then Cancel: the staged change is dropped and the code leaves the page', async () => {

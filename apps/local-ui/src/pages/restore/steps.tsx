@@ -2,7 +2,7 @@
 // page (UX1113-R3; spec §6.4 to §6.6). They draw only what their props hold: the page (index.tsx)
 // owns the calls. Names from a kit are rendered as text. The master code is held in a prop for as
 // long as the card is on screen: never stored, never put in an attribute or a URL.
-import { Banner, Button, Icon, Lockup } from '@4thtech-io/ui';
+import { Banner, Button, Icon, Lockup, useHood } from '@4thtech-io/ui';
 import {
   useEffect,
   useId,
@@ -261,7 +261,7 @@ export function KitStep(p: KitStepProps): ReactElement {
       </div>
       <Assure>{KIT.assurance}</Assure>
       {p.error === undefined ? null : (
-        <div id={errId} role="alert">
+        <div id={errId}>
           <Banner tone="warning">
             {p.error}
             {p.errorHint === undefined ? null : <> {p.errorHint}</>}
@@ -369,7 +369,7 @@ export function PresenceStep(p: PresenceStepProps): ReactElement {
         </div>
       )}
       {p.error === undefined ? null : (
-        <div role="alert">
+        <div>
           <Banner tone="warning">{p.error}</Banner>
         </div>
       )}
@@ -426,7 +426,7 @@ export function CodeStep(p: CodeStepProps): ReactElement {
       </Banner>
       <Assure>{CODE.assurance}</Assure>
       {p.error === undefined ? null : (
-        <div role="alert">
+        <div>
           <Banner tone="danger">{p.error}</Banner>
         </div>
       )}
@@ -484,7 +484,7 @@ export function CheckedStep({
   readonly onAnother: () => void;
 }): ReactElement {
   // UX1113-QA2 N4: an ID already on this computer by its label; a new one by its folder name.
-  const names = summary.ids.map((r) => r.label ?? r.name);
+  const names = summary.ids.map(rowName);
   const people = summary.ids.reduce((n, r) => n + r.people, 0);
   const last = summary.ids.reduce<number | null>(
     (m, r) => (r.lastMessageAt === null ? m : Math.max(m ?? 0, r.lastMessageAt)),
@@ -543,6 +543,17 @@ export interface ReviewStepProps {
   readonly onDone: () => void;
 }
 
+/**
+ * REL051-UF3 (R1-UI-08): the name a kit row shows. An ID already on this computer has its label (the
+ * name people see). A new one has no label yet: the kit's manifest names it only by its folder, and
+ * its label is sealed inside its store, read back once restored. The first-run folder `default` then
+ * reads "Your first ID"; any other folder shows as it is. Text only.
+ */
+export function rowName(row: SummaryRow): string {
+  if (row.label !== undefined) return row.label;
+  return row.name === 'default' ? REVIEW.firstId : row.name;
+}
+
 function Row({
   row,
   state,
@@ -569,7 +580,8 @@ function Row({
     else next.add(row.agentId);
     onState({ ...state, selected: next });
   };
-  const initial = [...row.name][0]?.toUpperCase() ?? '?';
+  const shown = rowName(row);
+  const initial = [...shown][0]?.toUpperCase() ?? '?';
   return (
     <li className="rs-row" data-state={row.state} data-off={off}>
       <label className="rs-pick">
@@ -577,7 +589,7 @@ function Row({
           type="checkbox"
           checked={checked}
           disabled={off || disabled}
-          aria-label={REVIEW.pick(row.name)}
+          aria-label={REVIEW.pick(shown)}
           onChange={toggle}
         />
         <span className="rs-tick" aria-hidden="true">
@@ -588,8 +600,10 @@ function Row({
         {initial}
       </span>
       <span className="rs-row-text">
-        <bdi className="rs-row-name">{row.name}</bdi>
-        <span className="rs-row-line">{REVIEW.nameHint}</span>
+        <bdi className="rs-row-name">{shown}</bdi>
+        {row.label === undefined && row.state !== 'already_here' ? (
+          <span className="rs-row-line">{REVIEW.nameHint}</span>
+        ) : null}
         <span className="rs-row-line">
           {row.state === 'new'
             ? summary.contents === 'identity'
@@ -621,8 +635,7 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
   const choosable = summary.ids.filter((r) => r.state === 'new' || r.state === 'name_taken');
   const count = choosable.filter((r) => p.state.selected.has(r.agentId)).length;
   const date = formatDate(summary.createdAt);
-  const names = summary.ids.filter((r) => r.state === 'new' || r.state === 'name_taken').length;
-  void names;
+  const hood = useHood();
   return (
     <section className="rs-screen rs-wide" aria-labelledby="rs-h">
       <div className="rs-intro">
@@ -674,14 +687,17 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
         </div>
       )}
       {p.error === undefined ? null : (
-        <div role="alert">
+        <div>
           <Banner tone="danger">{p.error}</Banner>
         </div>
       )}
       {p.working ? (
         <p className="rs-spin" role="status">
           {REVIEW.progress(
-            choosable.find((r) => p.state.selected.has(r.agentId))?.name ?? '',
+            (() => {
+              const first = choosable.find((r) => p.state.selected.has(r.agentId));
+              return first === undefined ? '' : rowName(first);
+            })(),
             1,
             Math.max(1, count),
           )}
@@ -710,15 +726,18 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
           {WIZARD.back}
         </Button>
       </div>
-      <details className="rs-hood">
-        <summary>{REVIEW.hood}</summary>
-        <p>{REVIEW.hoodKit(summary.kitId, summary.contents)}</p>
-        {summary.ids.map((r) => (
-          <p key={r.agentId}>
-            <bdi>{r.name}</bdi> · <code>{r.agentId}</code>
-          </p>
-        ))}
-      </details>
+      {/* R1-UI-26: the kit's facts are for Under the hood only; the folder name lives here. */}
+      {hood ? (
+        <details className="rs-hood">
+          <summary>{REVIEW.hood}</summary>
+          <p>{REVIEW.hoodKit(summary.kitId, summary.contents)}</p>
+          {summary.ids.map((r) => (
+            <p key={r.agentId}>
+              <bdi>{rowName(r)}</bdi> · {REVIEW.hoodFolder(r.name)} · <code>{r.agentId}</code>
+            </p>
+          ))}
+        </details>
+      ) : null}
     </section>
   );
 }

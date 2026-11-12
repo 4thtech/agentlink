@@ -75,6 +75,7 @@ import {
   parseOpenInvites,
   type ConnectingRow,
   type InviteApi,
+  type LinkOutcome,
   type OpenInvite,
 } from './invite-api.js';
 import { CONTACTS_CHANGED, diffContacts } from '../../api/contact-changes.js';
@@ -96,6 +97,7 @@ import { ConnectedMoment, type ConnectedMomentProps } from '../invite/connected.
 import { useOwnName } from '../invite/own-name.js';
 import { InviteScreen, PasteScreen } from '../invite/invite-screen.js';
 import { PendingInviteRow, type CancelResult } from '../invite/pending-row.js';
+import { initials } from '../../initials.js';
 import { PersonMenu } from '../invite/person-menu.js';
 import { INVITE_STRINGS as I } from '../invite/strings.js';
 import { START_STRINGS } from '../home/strings.js';
@@ -190,19 +192,6 @@ export const renameNote = (c: ContactRow): string => {
 
 const labelKind = (c: ContactRow): IdentityKind =>
   c.label === 'safety-code-checked' ? 'checked' : 'selfdeclared';
-
-function initials(text: string): string {
-  const t = text.replace(/[“”"]/g, '').trim();
-  if (t.startsWith('Contact ')) return '#';
-  return (
-    t
-      .split(/\s+/)
-      .map((w) => w.charAt(0))
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() || '?'
-  );
-}
 
 function Chip({ icon, tone, children }: { icon: string; tone: string; children: string }) {
   return (
@@ -926,8 +915,9 @@ const FOLLOW_AFTER_CONNECT_MS = 120_000;
 
 /**
  * W4-INVITES-LIST (b11 §21.3, Closing), W4-PEOPLE-INVITE (A4): the open invites the server holds,
- * and the ones cancelled in this visit, as PendingInviteRow rows. Never a link: a lost link is
- * cancelled and a new one made. The newest gets the 1.2 s highlight (a colour only).
+ * and the ones cancelled in this visit, as PendingInviteRow rows. The list carries no link; Copy
+ * link and Show link read the kept one on a click (REL051-B2). The newest gets the 1.2 s highlight
+ * (a colour only).
  */
 function PendingInvites({
   rows,
@@ -935,20 +925,27 @@ function PendingInvites({
   highlight,
   now,
   onCancel,
+  onLink,
   connecting = [],
   blockedRefs,
   onUnblock,
+  onCancelConnecting,
 }: {
   rows: readonly OpenInvite[];
   cancelled: readonly OpenInvite[];
   highlight: string | undefined;
   now: number;
   onCancel: (inviteId: string) => Promise<CancelResult>;
+  /** REL051-B2: the kept link of one open invite. */
+  onLink?: (inviteId: string) => Promise<LinkOutcome>;
   /** W5-INVITE-FEEDBACK: this agent's accepts that wait for the inviter's answer. */
   connecting?: readonly ConnectingRow[];
   /** Contacts the page knows are blocked (matched to a waiting accept by ref). */
   blockedRefs?: ReadonlySet<string>;
-  onUnblock?: (ref: string) => void;
+  /** REL051-B1 (N2): Unblock for a waiting accept on a blocked person (the server flag or the list). */
+  onUnblock?: (ref: string, name: string) => void;
+  /** REL051-B1 (N2): Cancel a waiting accept through the server. */
+  onCancelConnecting?: (ref: string) => Promise<CancelResult>;
 }): ReactElement | null {
   const gone = cancelled.filter((c) => !rows.some((r) => r.inviteId === c.inviteId));
   if (rows.length === 0 && gone.length === 0 && connecting.length === 0) return null;
@@ -960,9 +957,12 @@ function PendingInvites({
           key={`c-${c.ref}`}
           row={c}
           blocked={c.blocked === true || blockedRefs?.has(c.ref) === true}
-          {...(onUnblock === undefined || blockedRefs?.has(c.ref) !== true
+          {...(onUnblock === undefined || (c.blocked !== true && blockedRefs?.has(c.ref) !== true)
             ? {}
-            : { onUnblock: () => onUnblock(c.ref) })}
+            : { onUnblock: () => onUnblock(c.ref, c.name) })}
+          {...(onCancelConnecting === undefined
+            ? {}
+            : { onCancel: () => onCancelConnecting(c.ref) })}
         />
       ))}
       {[...gone, ...rows].map((r) => (
@@ -973,6 +973,7 @@ function PendingInvites({
           cancelled={done.has(r.inviteId)}
           highlight={r.inviteId === highlight}
           onCancel={onCancel}
+          {...(onLink === undefined ? {} : { onLink })}
         />
       ))}
     </Surface>
@@ -1272,13 +1273,18 @@ export function ContactsPage({
 
   // IR-W4-WIRE-2X-1: "Have an invite link? Paste it" opens a paste screen that makes no invite.
   const [pasting, setPasting] = useState(openedForPaste);
+  // REL051-B2: Paste it from the Invite screen means "I was invited", not "I invite": the link the
+  // screen made and that never left it is ended as the screen goes. Done keeps it (it waits below).
+  const discardInvite = useRef(false);
   const openPaste = (): void => {
+    if (inviting) discardInvite.current = true;
     setSheetOpen(false);
     setNotice(undefined);
     setInviting(false);
     setPasting(true);
   };
   const openInvite = (): void => {
+    discardInvite.current = false;
     setSheetOpen(false);
     setNotice(undefined);
     setInviting(true);
@@ -1361,6 +1367,46 @@ export function ContactsPage({
     }
     return 'failed';
   };
+  // REL051-B1 (N2): Unblock for a waiting accept on a person who is not in the list (blocked, then
+  // removed): owner presence here, then `POST /api/ui/contacts/:ref/unblock`; the page never signs.
+  const [unblocking, setUnblocking] = useState<{ ref: string; name: string } | undefined>(
+    undefined,
+  );
+  const [unblockBusy, setUnblockBusy] = useState(false);
+  const [unblockError, setUnblockError] = useState<string | undefined>(undefined);
+  const submitUnblock = (proof: PresenceProof): void => {
+    if (unblocking === undefined) return;
+    setUnblockBusy(true);
+    setUnblockError(undefined);
+    void owner.post(contactPath(unblocking.ref, 'unblock'), undefined, proof).then((result) => {
+      setUnblockBusy(false);
+      if (result.kind === 'wait') {
+        setUnblockError(waitSeconds(result.seconds));
+        return;
+      }
+      if (result.kind === 'rejected' || result.kind === 'required') {
+        setUnblockError(MESSAGE[result.kind]);
+        return;
+      }
+      setUnblocking(undefined);
+      if (result.kind === 'done') {
+        setNotice(S.unblocked);
+        setTick((n) => n + 1);
+        return;
+      }
+      setNotice(result.kind === 'failed' ? failureCopy(result.reason) : MESSAGE[result.kind]);
+    });
+  };
+  const cancelConnecting = async (ref: string): Promise<CancelResult> => {
+    if (invites.cancelConnecting === undefined) return 'failed';
+    const outcome = await invites.cancelConnecting(ref);
+    if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') {
+      setConnectingRows((list) => list.filter((c) => c.ref !== ref));
+      setTick((n) => n + 1);
+      return outcome.kind === 'cancelled' ? 'cancelled' : 'gone';
+    }
+    return 'failed';
+  };
   const waitingCount = rows.length + connectingRows.length;
   const invitesList = (
     <>
@@ -1373,6 +1419,7 @@ export function ContactsPage({
         highlight={highlight}
         now={Date.now()}
         onCancel={cancelInvite}
+        {...(invites.link === undefined ? {} : { onLink: (id: string) => invites.link!(id) })}
         connecting={connectingRows}
         blockedRefs={
           new Set(
@@ -1381,12 +1428,35 @@ export function ContactsPage({
               .map((c) => c.ref),
           )
         }
-        onUnblock={(ref) => {
-          setRemoved(false);
-          setSelected(ref);
-          setSheetOpen(true);
+        onUnblock={(ref, name) => {
+          const known = (list.phase === 'ok' ? list.contacts : []).some(
+            (c) => c.ref === ref && c.status === 'blocked',
+          );
+          if (known) {
+            setRemoved(false);
+            setSelected(ref);
+            setSheetOpen(true);
+            return;
+          }
+          setNotice(undefined);
+          setUnblockError(undefined);
+          setUnblocking({ ref, name });
         }}
+        onCancelConnecting={cancelConnecting}
       />
+      {unblocking === undefined ? null : (
+        <PresencePrompt
+          summary={SUMMARY.unblock(unblocking.name)}
+          passkey={passkey}
+          busy={unblockBusy}
+          error={unblockError}
+          onSubmit={submitUnblock}
+          onCancel={() => {
+            setUnblocking(undefined);
+            setUnblockError(undefined);
+          }}
+        />
+      )}
     </>
   );
   const moment =
@@ -1711,6 +1781,7 @@ export function ContactsPage({
         {arrived === undefined ? (
           <InviteScreen
             invites={invites}
+            discard={discardInvite}
             paste={{
               passkey,
               onConnected: accepted,

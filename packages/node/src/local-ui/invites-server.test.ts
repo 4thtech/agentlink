@@ -36,7 +36,12 @@ import { ownerSigValid, ownerWorld, send, type OwnerWorld } from '../approval-ui
 import { KeychainOwnerKeyStore } from '../owner-keystore.js';
 import type { LocalUiAssets } from './context.js';
 import { INVITE_LINK_MAX_CHARS } from './api/invites.js';
-import { INVITE_ACCEPT_PATH, INVITE_CHECK_PATH, INVITE_CREATE_PATH } from './invite-paths.js';
+import {
+  INVITE_ACCEPT_PATH,
+  INVITE_CHECK_PATH,
+  INVITE_CREATE_PATH,
+  INVITE_LINK_PATH,
+} from './invite-paths.js';
 
 const hex = (n: number, pair: string): string => pair.repeat(n);
 
@@ -107,6 +112,7 @@ const APPROVAL = `apr_${'Q'.repeat(22)}`;
 
 interface Core {
   created: unknown[];
+  linked: string[];
   accepted: { link: string; allowed: boolean }[];
   requested: unknown[];
   used: unknown[];
@@ -137,6 +143,7 @@ interface Harness {
 async function harness(): Promise<Harness> {
   const core: Core = {
     created: [],
+    linked: [],
     accepted: [],
     requested: [],
     used: [],
@@ -161,6 +168,20 @@ async function harness(): Promise<Harness> {
       resolveInviteLink: (link: string) => Promise.resolve(link),
       openInvites: () => Promise.resolve([]),
       cancelInvite: () => Promise.resolve('not_found'),
+      // REL051-B2: the kept link of an open invite (core answers only for an open one).
+      inviteLink: (inviteId: string) => {
+        core.linked.push(inviteId);
+        if (inviteId === 'AQEBAQEBAQEBAQEBAQEBAQ') {
+          return Promise.resolve({
+            status: 'ok',
+            inviteUrl: LINK,
+            format: 'long',
+            expiresAt: 1_793_786_400,
+          });
+        }
+        if (inviteId === 'AgICAgICAgICAgICAgICAg') return Promise.resolve({ status: 'no_link' });
+        return Promise.resolve({ status: 'not_found' });
+      },
       acceptInvite: async ({ link, allowed }: { link: string; allowed?: boolean }) => {
         // The real codec runs first, as core's accept step 1 does.
         await decodeInviteLink(link);
@@ -479,6 +500,88 @@ describe('one size bound for check and accept (IR UX2-d1 L)', () => {
     expect(check.status).toBe(400);
     expect(JSON.parse(check.body)).toEqual({ error: 'invalid_invite' });
     expect(h.core.accepted).toHaveLength(0);
+  });
+});
+
+describe('copy an open invite link again (REL051-B2): the invite gate, never logged', () => {
+  const ID = 'AQEBAQEBAQEBAQEBAQEBAQ';
+  it('answers the kept link, its share text, format and expiry to the page only, not cached', async () => {
+    const h = await harness();
+    const res = await h.post(INVITE_LINK_PATH, json({ inviteId: ID }));
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      status: 'ok',
+      inviteUrl: LINK,
+      format: 'long',
+      expiresAt: '2026-11-04T10:00:00Z',
+    });
+    expect(String(body['shareText']).endsWith(LINK)).toBe(true);
+    expect(Object.keys(body).sort()).toEqual([
+      'expiresAt',
+      'format',
+      'inviteUrl',
+      'shareText',
+      'status',
+    ]);
+    expect(String(res.headers['cache-control'])).toContain('no-store');
+    expect(h.core.linked).toEqual([ID]);
+    expect(h.core.ownerStores).toBe(0);
+  });
+
+  it('needs the session, CSRF, Origin, same-origin metadata and an octet-stream body; never a GET', async () => {
+    const h = await harness();
+    for (const [extra, omit, status] of GATE_VARIANTS) {
+      const res = await h.post(INVITE_LINK_PATH, json({ inviteId: ID }), extra, omit);
+      expect(res.status, JSON.stringify({ extra, omit })).toBe(status);
+      expect(res.body).not.toContain(PAYLOAD.slice(0, 40));
+    }
+    const get = await send(h.port, INVITE_LINK_PATH);
+    expect([401, 404, 405]).toContain(get.status);
+    expect(h.core.linked).toHaveLength(0);
+  });
+
+  it('takes exactly {inviteId}; refuses a query, an input or a presence header', async () => {
+    const h = await harness();
+    for (const body of [{}, { inviteId: 'short' }, { inviteId: ID, extra: 1 }, { id: ID }]) {
+      const res = await h.post(INVITE_LINK_PATH, json(body));
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    expect((await h.post(`${INVITE_LINK_PATH}?x=1`, json({ inviteId: ID }))).status).toBe(400);
+    const withInput = await h.post(INVITE_LINK_PATH, json({ inviteId: ID }), {
+      'X-AgentLink-Input': input({ inviteId: ID }),
+    });
+    expect(withInput.status).toBe(400);
+    const withPresence = await h.post(INVITE_LINK_PATH, json({ inviteId: ID }), {
+      'X-AgentLink-Presence': 'passkey',
+    });
+    expect(withPresence.status).toBe(400);
+    expect(h.core.linked).toHaveLength(0);
+  });
+
+  it('a used, cancelled, expired or unknown invite is 404 not_found; one kept from before is 404 no_link', async () => {
+    const h = await harness();
+    const gone = await h.post(INVITE_LINK_PATH, json({ inviteId: 'BwcHBwcHBwcHBwcHBwcHBw' }));
+    expect(gone.status).toBe(404);
+    expect(JSON.parse(gone.body)).toEqual({ error: 'not_found' });
+    const old = await h.post(INVITE_LINK_PATH, json({ inviteId: 'AgICAgICAgICAgICAgICAg' }));
+    expect(old.status).toBe(404);
+    expect(JSON.parse(old.body)).toEqual({ error: 'no_link' });
+  });
+
+  it('no event or console line carries the link it answers', async () => {
+    const lines: string[] = [];
+    for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+        lines.push(args.map(String).join(' '));
+      });
+    }
+    const h = await harness();
+    const res = await h.post(INVITE_LINK_PATH, json({ inviteId: ID }));
+    expect(res.body).toContain(PAYLOAD.slice(0, 40));
+    const logged = JSON.stringify(h.events) + lines.join('\n');
+    expect(logged).not.toContain(PAYLOAD.slice(0, 40));
+    expect(logged).not.toContain(inviteObject().secret);
   });
 });
 

@@ -72,7 +72,7 @@ import type { IdentityService } from './identity.js';
 import { INBOX_TYPES } from './inbox.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
-import type { Transport, TransportFactory } from './transport.js';
+import type { RelayStatus, Transport, TransportFactory } from './transport.js';
 
 /**
  * How long listing a due row claims it for this process (07 §3.2; M1-9 plan finding 4). Equal to
@@ -325,6 +325,27 @@ export class OutboxService {
     if (this.#transportClosed) return;
     this.#transportClosed = true;
     this.#transport?.close?.();
+  }
+
+  /**
+   * REL051-CF2: how many of the agent's own relays (its signed card's list, 07 §4.3) this machine
+   * can connect to now. Undefined without a transport that can check, while paused (a paused agent
+   * opens no relay connection) or when the own list cannot be read. Counts only; never throws.
+   */
+  async relayReachability(): Promise<RelayStatus | undefined> {
+    const transport = this.#transport;
+    if (transport?.relayStatus === undefined || this.#transportClosed) return undefined;
+    try {
+      if (this.#pause !== undefined && (await this.#pause.paused())) return undefined;
+      const own = checkList((await this.#identity.signedCard()).relays);
+      const status = await transport.relayStatus(own);
+      const { connected, total } = status;
+      if (!Number.isInteger(connected) || !Number.isInteger(total)) return undefined;
+      if (connected < 0 || connected > total) return undefined;
+      return { connected, total };
+    } catch {
+      return undefined;
+    }
   }
 
   /** The transport, or `transport_unavailable` before anything is stored. Internal (send.ts). */

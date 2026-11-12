@@ -9,9 +9,10 @@
 // rename answers how many contacts are told, or `rename_limited` with its time (D-141).
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { knownFailureReason, type FailureReasonCode } from '../../api/failure-reasons.js';
-import { presenceBody, presenceMode, type PresenceProof } from '../contacts/owner.js';
+import type { PresenceProof } from '../contacts/owner.js';
 import { appNameOf, parseAppNames } from './app-names.js';
 import { parseAgents, type AgentsList } from './data.js';
+import { sendWithProof } from '../../api/presence-ceremony.js';
 
 export type ReadOutcome =
   { readonly kind: 'ok'; readonly list: AgentsList } | { readonly kind: 'error' };
@@ -167,22 +168,11 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
       'Content-Type': 'application/octet-stream',
       'X-AgentLink-Input': base64url(JSON.stringify(input)),
     });
-    const mode = presenceMode(proof);
-    if (mode !== undefined) headers.set('X-AgentLink-Presence', mode);
-    const body = presenceBody(proof);
     let res: Response;
     try {
-      res = await doFetch(path, {
-        method: 'POST',
-        headers,
-        body: body as BodyInit,
-        credentials: 'same-origin',
-        cache: 'no-store',
-      });
+      res = await sendWithProof(doFetch, path, headers, proof);
     } catch {
       return { kind: 'offline' };
-    } finally {
-      body.fill(0);
     }
     if (res.status === 501) return { kind: 'not_available' };
     if (res.status === 401) return { kind: 'session' };

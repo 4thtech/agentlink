@@ -1,0 +1,66 @@
+# REL051-G1: classroom golden-path rehearsal with the PUBLISHED npm package on fresh runners.
+#
+# Installs `@4thtech-io/agentlink` the way the README tells students (installer/install.sh and
+# installer/install.ps1 from this checkout), then runs tools/ci/golden-path-published.mjs with two
+# temporary profiles on macOS, Windows and Linux. It never reaches 4thTech services: the installers
+# fetch Node.js from nodejs.org and the package from npm. Step S7 (invite, accept, messages both
+# ways) is reported as a gap: the published package has no relay override, and relays must be public
+# wss:// hosts (docs/foundation/04 §4), so that leg can only use the production default relays.
+#
+# Manual (workflow_dispatch, input: version, default latest) and on pull requests that change this
+# workflow or its script. Not part of ci-gate. No secrets, read-only token, no checkout credentials.
+name: Golden path (published package)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "latest only (the student installer always installs latest); another version stops with an error"
+        type: string
+        default: latest
+  pull_request:
+    paths:
+      - ".github/workflows/golden-path-published.yml"
+      - "tools/ci/golden-path-published.mjs"
+
+permissions: {}
+
+concurrency:
+  group: golden-path-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  golden-path:
+    name: golden-path (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Linux: a Secret Service keyring in a D-Bus session, as a desktop has (the app stores keys there).
+      - name: Install a keyring (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnome-keyring dbus-x11 libsecret-1-0
+
+      - name: Run the golden path
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version || 'latest' }}
+        run: |
+          case "$VERSION" in
+            *[!A-Za-z0-9.+_-]*) echo "::error::Unexpected version."; exit 1 ;;
+          esac
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            dbus-run-session -- bash -c 'printf ci | gnome-keyring-daemon --unlock --components=secrets > /dev/null; node tools/ci/golden-path-published.mjs "$1"' _ "$VERSION"
+          else
+            node tools/ci/golden-path-published.mjs "$VERSION"
+          fi

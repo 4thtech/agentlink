@@ -237,7 +237,7 @@ export function ExportKit({
         ? proof.code
         : proof.kind === 'native'
           ? { native: true as const }
-          : { passkey: proof.body };
+          : { passkey: proof.gesture };
     void api.owner(BACKUP_EXPORT_PATH, {}, presence).then(
       (result) => {
         const outcome = exportOutcomeOf(result);

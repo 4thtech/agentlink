@@ -104,7 +104,7 @@ interface Surface {
 
 const gesture = (gestures: { n: number }) => (): Promise<PresenceProof | undefined> => {
   gestures.n += 1;
-  return Promise.resolve({ kind: 'passkey', body: new Uint8Array([1]) });
+  return Promise.resolve({ kind: 'passkey', gesture: () => Promise.resolve(new Uint8Array([1])) });
 };
 const codeOf = (proof: PresenceProof): string => (proof.kind === 'code' ? proof.code : 'PASSKEY');
 

@@ -42,7 +42,7 @@ import {
   passphrase,
   seed,
 } from './testing/fixtures.js';
-import { agentSigner, craft, giftWrapId, type TestAgent } from './testing/envelopes.js';
+import { agentSigner, craft, giftWrapId, rotate, type TestAgent } from './testing/envelopes.js';
 import { compress } from './testing/platform.js';
 
 // M1-9zf-b: a switch that makes agentCardJcsHash return one fixed value, so the card-hash clause of
@@ -587,6 +587,8 @@ describe('refusals (04 §3.6 Accept and Complete, §2.9)', () => {
         envelopeId: second.handshake.envelope.id,
         outcome: 'refused',
         reason: 'invite_used',
+        // R1-SEC-03: filed under the contact the invite connected (the owner's warning).
+        contactId: b.id,
         flagged: false,
       },
     ]);
@@ -1235,5 +1237,181 @@ describe('U3-invite: checkInviteLink is Accept step 1 alone (04 §3.6; 08 §4)',
     await expect(checkInviteLink('not a link', clock.t)).rejects.toMatchObject({
       code: expect.stringMatching(/^invite_/) as unknown as string,
     });
+  });
+});
+
+// R1-SEC-02: a removed or blocked contact never comes back through an invite it should not reach,
+// whatever key it answers from (07 §3 `removed`; 04 §2.9). The rule is bound to the contact, not to
+// one sender key: a key rotated after the remove or block is caught too.
+describe('remove and block bind open invites, across a key rotation (R1-SEC-02)', () => {
+  const inviteRow = (x: Agent, inviteId: string) =>
+    x.store.transaction((tx) => tx.get('invites', { invite_id: inviteId }));
+
+  it('an invite made before the remove does not re-activate a contact that rotated its key', async () => {
+    await pairFully(a, b);
+    clock.t += 10;
+    const old = await a.client.pairing.createInvite();
+    clock.t += 10;
+    await a.client.contacts.remove(b.id);
+    clock.t += 10;
+    await rotate(b);
+    const accepted = await b.client.pairing.acceptInvite({ link: old.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('test');
+    const reports = await deliver(a, accepted.handshake.envelope);
+    expect(reports.map((r) => r.outcome)).toEqual(['dropped']);
+    expect((await contactRow(a, b.id))?.status).toBe('removed');
+    expect((await inviteRow(a, old.inviteId))?.used_at).toBeNull();
+  });
+
+  it('block then remove: an older invite answered from a rotated key stays refused', async () => {
+    await pairFully(a, b);
+    clock.t += 10;
+    const old = await a.client.pairing.createInvite();
+    clock.t += 10;
+    await a.client.contacts.block(b.id);
+    await a.client.contacts.remove(b.id);
+    clock.t += 10;
+    await rotate(b);
+    const accepted = await b.client.pairing.acceptInvite({ link: old.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('test');
+    const reports = await deliver(a, accepted.handshake.envelope);
+    expect(reports.map((r) => r.outcome)).toEqual(['dropped']);
+    expect((await contactRow(a, b.id))?.status).toBe('removed');
+  });
+
+  it('block then remove: even an invite made after the remove waits for Unblock', async () => {
+    await pairFully(a, b);
+    clock.t += 10;
+    await a.client.contacts.block(b.id);
+    await a.client.contacts.remove(b.id);
+    clock.t += 10;
+    await rotate(b);
+    const fresh = await a.client.pairing.createInvite();
+    const accepted = await b.client.pairing.acceptInvite({ link: fresh.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('test');
+    const reports = await deliver(a, accepted.handshake.envelope);
+    expect(reports.map((r) => r.outcome)).toEqual(['dropped']);
+    expect((await contactRow(a, b.id))?.status).toBe('removed');
+    expect((await inviteRow(a, fresh.inviteId))?.used_at).toBeNull();
+  });
+
+  it('a blocked contact that rotated its key completes no pairing and changes nothing', async () => {
+    await pairFully(a, b);
+    clock.t += 10;
+    await a.client.contacts.block(b.id);
+    const before = await contactRow(a, b.id);
+    const envelopes = await count(a, 'envelopes');
+    const invite = await a.client.pairing.createInvite();
+    clock.t += 10;
+    await rotate(b);
+    const accepted = await b.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('test');
+    const reports = await deliver(a, accepted.handshake.envelope);
+    expect(reports.map((r) => r.outcome)).toEqual(['dropped']);
+    expect(await contactRow(a, b.id)).toEqual(before);
+    expect(await count(a, 'envelopes')).toBe(envelopes);
+    expect((await inviteRow(a, invite.inviteId))?.used_at).toBeNull();
+  });
+
+  it('a fresh invite after a plain remove still reconnects a rotated contact', async () => {
+    await pairFully(a, b);
+    clock.t += 10;
+    await a.client.contacts.remove(b.id);
+    clock.t += 10;
+    await rotate(b);
+    const fresh = await a.client.pairing.createInvite();
+    const accepted = await b.client.pairing.acceptInvite({ link: fresh.inviteUrl, allowed: true });
+    if (accepted.status !== 'pending') throw new Error('test');
+    const reports = await deliver(a, accepted.handshake.envelope);
+    expect(reports.map((r) => r.outcome)).toEqual(['ok']);
+    expect((await contactRow(a, b.id))?.status).toBe('active');
+  });
+});
+
+// R1-SEC-03: a second answer to a used invite is refused AND the owner is told (04 §3.6): the
+// activity feed lists it under the contact the invite connected, never with inbound text.
+describe('a second answer to a used invite reaches the activity feed (R1-SEC-03, 04 §3.6)', () => {
+  const warnings = async (x: Agent) =>
+    (await x.client.activity.list()).items.filter(
+      (e) => (e.kind as string) === 'invite_answered_twice',
+    );
+
+  it('lists one warning naming the contact the invite connected', async () => {
+    const { invite } = await pairFully(a, b);
+    expect(await warnings(a)).toEqual([]);
+    clock.t += 10;
+    const c = await agent(3, ownerC, 'carol');
+    const second = await c.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+    if (second.status !== 'pending') throw new Error('test');
+    expect((await deliver(a, second.handshake.envelope)).map((r) => r.outcome)).toEqual([
+      'refused',
+    ]);
+    const found = await warnings(a);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ kind: 'invite_answered_twice', contactId: b.id, at: clock.t });
+    // Nothing the second party wrote is in the entry.
+    expect(JSON.stringify(found[0])).not.toContain('carol');
+    await expect(a.client.contacts.get(c.id)).rejects.toMatchObject({ code: 'contact_not_found' });
+  });
+
+  it('repeated answers to the same used invite add no more rows and outlive the refused-row pruning', async () => {
+    const { invite } = await pairFully(a, b);
+    const c = await agent(3, ownerC, 'carol');
+    for (let i = 0; i < 3; i += 1) {
+      clock.t += 10;
+      const again = await c.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+      if (again.status !== 'pending') throw new Error('test');
+      await deliver(a, again.handshake.envelope);
+    }
+    expect(await warnings(a)).toHaveLength(1);
+    clock.t += 30 * 86_400;
+    await a.client.envelopes.processReceived();
+    expect(await warnings(a)).toHaveLength(1);
+  });
+});
+
+// R1-SEC-10: an invite label the AI wrote is a suggested alias, shown only under the name rule
+// (06 §2.1 rule 1) until the owner confirms it.
+describe('open invites show the label only under the name rule (R1-SEC-10, 06 §2.1)', () => {
+  it('restricts the label; one that falls back is shown as no label', async () => {
+    await a.client.pairing.createInvite({ label: 'Marko Novak' });
+    clock.t += 1;
+    await a.client.pairing.createInvite({ label: 'Mom ✓ verified ‮edoc‬​' });
+    clock.t += 1;
+    await a.client.pairing.createInvite({ label: 'Ana‮ (work)' });
+    const open = await a.client.pairing.openInvites();
+    expect(open.map((o) => o.label)).toEqual(['Ana work', null, 'Marko Novak']);
+  });
+});
+
+// R1-SEC-11: a pairing never waits longer than an invite can live (04 §2.9, §3.6: at most 7 days).
+// `expiresAt` in a link is not signed, so the invitee caps it itself.
+describe('the invitee caps a staged accept at 7 days (R1-SEC-11, 04 §3.6)', () => {
+  it('refuses a link whose expiry is beyond 7 days', async () => {
+    const invite = await a.client.pairing.createInvite();
+    const link = await tamper(invite.inviteUrl, (i) => {
+      i['expiresAt'] = 4_102_444_800;
+    });
+    await expect(b.client.pairing.acceptInvite({ link, allowed: true })).rejects.toMatchObject({
+      code: 'invite_invalid',
+    });
+    await expect(checkInviteLink(link, clock.t)).rejects.toMatchObject({
+      code: 'invite_invalid',
+    });
+    expect(await count(b, 'pairings')).toBe(0);
+  });
+
+  it('stages at most 7 days from now, and the pairing lapses after that', async () => {
+    const invite = await a.client.pairing.createInvite();
+    // Within the clock skew allowance: accepted, but staged no longer than 7 days.
+    const link = await tamper(invite.inviteUrl, (i) => {
+      i['expiresAt'] = clock.t + 7 * 86_400 + 200;
+    });
+    const accepted = await b.client.pairing.acceptInvite({ link, allowed: true });
+    expect(accepted.status).toBe('pending');
+    const staged = await b.store.transaction((tx) => tx.select('pairings'));
+    expect(staged.map((r) => r.expires_at)).toEqual([clock.t + 7 * 86_400]);
+    clock.t += 7 * 86_400 + 1;
+    expect(await b.client.pairing.waiting()).toBe(false);
   });
 });

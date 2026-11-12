@@ -24,18 +24,9 @@ export const START_LEAVING_KEY = 'agentlink.start.leaving';
 
 /**
  * Get started was left on purpose (Skip to Home, or the end of it): kept for the owner (the app's
- * kept choices), so a reload of Home, or the next launch, does not open it by itself again while an
- * owner and an ID exist. The Home card and Help → Get started still lead back to it.
+ * kept choices). The Home card and Help → Get started still lead back to it.
  */
 export const START_LEFT_KEY = 'agentlink.getStarted.left';
-
-function leftStart(): boolean {
-  try {
-    return localStorage.getItem(START_LEFT_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
 
 /** Remembers that Get started was left on purpose. */
 export function rememberLeftStart(): void {
@@ -61,10 +52,10 @@ export function shouldOpenStart(path: string, state: SetupState): boolean {
   if (!GUARDED_PATHS.includes(shown(path)) || !setupIncomplete(state) || state.waiting !== 0) {
     return false;
   }
-  // Left on purpose, with an owner and an ID in place: only a missing owner or ID (a first run)
-  // takes the page over again.
-  const firstRun = state.owner === 'missing' || state.agent === false;
-  return firstRun || !leftStart();
+  // R1-UI-14: Get started opens by itself only on a first run (no owner, or no ID). An owner with an
+  // ID but no AI app yet gets Home, where the Get started card is a gentle nudge: it must not open
+  // on every launch.
+  return state.owner === 'missing' || state.agent === false;
 }
 
 /** Get started ends on Home with a full load: the check of that load keeps Home. */

@@ -9,8 +9,10 @@
 // - The optional name is only for your list (the invite's local label). A name added before the
 //   link went anywhere makes a fresh link with that name and cancels the unnamed one; once the link
 //   was copied, emailed, shared or shown as a QR code, the name is fixed.
-// - A link that never left the screen is cancelled when the panel goes, so a visit leaves no
-//   pending row behind.
+// - REL051-B2 (owner test, 13 Nov; replaces "a link that never left the screen is cancelled when
+//   the panel goes"): leaving keeps the link, copied or not. It waits under Home and People, where
+//   Copy link and Show link get it again (the app keeps it, sealed) and Cancel invite ends it. Only
+//   Get started's "Skip for now" (`discard`) ends a link that never left the screen.
 // - Copy (✓ moment), Email (a real `mailto:` link with our share text; a click does not count as
 //   sent, since nothing tells us a mail app opened), Copy invite message (the whole share text, the
 //   dependable way when there is no mail app), Share (only where the browser has a share sheet).
@@ -25,7 +27,12 @@ import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import { QrCode } from '../proofs/qr.js';
 import { CheckMark, CopyMark, MailIcon, ShareIcon } from './icons.js';
 import { INVITE_STRINGS as S, linkLabel, mailtoOf, worksFor } from './strings.js';
-import { forgetUnsent, rememberUnsent, unsentInvites } from './unsent-invites.js';
+import {
+  clearUnsentInvites,
+  forgetScreenInvite,
+  rememberScreenInvite,
+  screenInvite,
+} from './unsent-invites.js';
 import './invite.css';
 
 const DAY_MS = 86_400_000;
@@ -37,8 +44,13 @@ export interface InvitePanelProps {
   readonly invites?: InviteApi;
   /** A link was made (the pending list can read again). */
   readonly onCreated?: () => void;
-  /** Whether a link is on screen that has not gone anywhere yet (leaving would cancel it). */
+  /** Whether a link is on screen that has not gone anywhere yet. */
   readonly onUnsent?: (unsent: boolean) => void;
+  /**
+   * REL051-B2: set to true just before the panel goes when the owner chose not to invite ("Skip for
+   * now" in Get started): a link that never left the screen is then cancelled. Otherwise it stays.
+   */
+  readonly discard?: { readonly current: boolean };
   /** WP-1: the IDs and owner clients of the name update asked before an invite (tests). */
   readonly agents?: AgentsApi;
   readonly owner?: OwnerClient;
@@ -80,6 +92,7 @@ export function InvitePanel({
   invites: givenInvites,
   onCreated,
   onUnsent,
+  discard,
   now = () => Date.now(),
   agents: givenAgents,
   owner: givenOwner,
@@ -125,8 +138,14 @@ export function InvitePanel({
   madeRef.current = made;
   sharedRef.current = shared || keptRef.current;
 
-  const make = useCallback(
-    async (label: string, long: boolean, oldName = false): Promise<void> => {
+  // REL051-UF3 (R1-UI-04): the link being made right now and the name it is for, so a Copy pressed
+  // while the name is being saved copies that link, not nothing (the field's blur used to disable
+  // Copy between the mouse press and the click, and the click was lost).
+  const pendingRef = useRef<
+    { readonly label: string; readonly promise: Promise<Made | undefined> } | undefined
+  >(undefined);
+  const makeNow = useCallback(
+    async (label: string, long: boolean, oldName = false): Promise<Made | undefined> => {
       const mine = (run.current += 1);
       const previous = madeRef.current;
       setPhase('making');
@@ -140,17 +159,17 @@ export function InvitePanel({
           : undefined,
       );
       if (outcome.kind !== 'ok') {
-        if (mine !== run.current || !live.current) return;
+        if (mine !== run.current || !live.current) return undefined;
         if (outcome.kind === 'name_update') {
           setNameGate({ cardName: outcome.cardName, label: outcome.label, name: label, long });
           setPhase(previous === undefined ? 'error' : 'ready');
-          return;
+          return undefined;
         }
         if (outcome.kind === 'invalid_name') {
           setNameError(S.nameInvalid);
           setPhase(previous === undefined ? 'error' : 'ready');
           if (previous === undefined) setError(S.cantCreate);
-          return;
+          return undefined;
         }
         setPhase(previous === undefined ? 'error' : 'ready');
         setError(
@@ -160,7 +179,7 @@ export function InvitePanel({
               ? S.sessionExpired
               : S.cantCreate,
         );
-        return;
+        return undefined;
       }
       // IR-W4-PEOPLE-INVITE-1 (M): the ID comes only from this create's own answer, so the panel can
       // never cancel another invite (one sent earlier, or one the AI app made meanwhile).
@@ -169,59 +188,80 @@ export function InvitePanel({
       if (mine !== run.current || !live.current) {
         // A newer link (or leaving) won: this one never reached the screen.
         void invites.cancel(id);
-        return;
+        return undefined;
       }
-      // W5-INVITE-FEEDBACK: kept in this tab until it leaves the screen, so a reload cancels it.
-      if (!sharedRef.current) rememberUnsent(id);
       madeRef.current = next;
+      // IR-REL051-B2-1 (4): a reload shows this invite again instead of making another.
+      rememberScreenInvite(id, label);
       setMade(next);
       setPhase('ready');
       onCreated?.();
       // The one it replaces never left the screen: it goes.
-      if (previous !== undefined && !sharedRef.current) {
-        const gone = previous.id;
-        void invites.cancel(gone).then(() => forgetUnsent(gone));
-      }
+      if (previous !== undefined && !sharedRef.current) void invites.cancel(previous.id);
+      return next;
     },
     [invites, onCreated],
+  );
+  const make = useCallback(
+    (label: string, long: boolean, oldName = false): Promise<Made | undefined> => {
+      const promise = makeNow(label, long, oldName);
+      const entry = { label, promise };
+      pendingRef.current = entry;
+      const done = (): void => {
+        if (pendingRef.current === entry) pendingRef.current = undefined;
+      };
+      promise.then(done, done);
+      return promise;
+    },
+    [makeNow],
   );
 
   useEffect(() => {
     live.current = true;
-    // W5-INVITE-FEEDBACK: links an earlier load of this tab made that never left the screen.
-    for (const id of unsentInvites()) {
-      void invites.cancel(id).then((outcome) => {
-        if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') forgetUnsent(id);
-      });
-    }
-    void make('', false);
-    // A reload or a closed tab never unmounts: cancel what did not leave the screen as it hides.
-    let hidden: string | undefined;
-    const onHide = (): void => {
-      const last = madeRef.current;
-      if (last === undefined || sharedRef.current) return;
-      hidden = last.id;
-      void invites.cancel(last.id, { keepalive: true });
+    // REL051-B2: an older build kept unsent invite IDs in this tab to cancel them later; those
+    // invites now wait under Home and People instead, so the key is only cleared.
+    clearUnsentInvites();
+    // IR-REL051-B2-1 (4): this tab's screen made an invite before the reload: show it again, while
+    // it is still open (the link route answers only an open invite); otherwise make one.
+    const kept = screenInvite();
+    const reuse = async (): Promise<void> => {
+      if (kept === undefined || invites.link === undefined) {
+        await make('', false);
+        return;
+      }
+      const out = await invites.link(kept.id);
+      if (!live.current) return;
+      if (out.kind !== 'ok' || madeRef.current !== undefined) {
+        forgetScreenInvite();
+        if (madeRef.current === undefined) await make('', false);
+        return;
+      }
+      const next: Made = {
+        invite: {
+          inviteUrl: out.inviteUrl,
+          shareText: out.shareText,
+          expiresAt: out.expiresAt,
+          format: out.format,
+          inviteId: kept.id,
+        },
+        id: kept.id,
+        label: kept.label,
+        askedLong: false,
+      };
+      madeRef.current = next;
+      setName(kept.label);
+      setMade(next);
+      setPhase('ready');
     };
-    // Back from the browser's page cache: the link on screen was cancelled, so make a fresh one.
-    const onShow = (event: PageTransitionEvent): void => {
-      const last = madeRef.current;
-      if (!event.persisted || hidden === undefined || last?.id !== hidden) return;
-      hidden = undefined;
-      madeRef.current = undefined;
-      setMade(undefined);
-      void make(last.label, last.askedLong);
-    };
-    window.addEventListener('pagehide', onHide);
-    window.addEventListener('pageshow', onShow);
+    void reuse();
     return () => {
       live.current = false;
-      window.removeEventListener('pagehide', onHide);
-      window.removeEventListener('pageshow', onShow);
+      // Left in the app (Done, Back): the next visit is a new invite.
+      forgetScreenInvite();
+      // The link stays (Home and People can copy it again), unless the owner chose not to invite.
       const last = madeRef.current;
-      // A link that never left the screen leaves no pending row behind.
-      if (last !== undefined && !sharedRef.current) {
-        void invites.cancel(last.id).then(() => forgetUnsent(last.id));
+      if (discard?.current === true && last !== undefined && !sharedRef.current) {
+        void invites.cancel(last.id);
       }
     };
     // Made once per panel.
@@ -252,7 +292,6 @@ export function InvitePanel({
   const markShared = (): void => {
     sharedRef.current = true;
     setShared(true);
-    if (madeRef.current !== undefined) forgetUnsent(madeRef.current.id);
   };
 
   // IR-1 low (a): any copy whose selection holds the link counts as sent (the box, a triple-click,
@@ -272,7 +311,6 @@ export function InvitePanel({
       if (inBox || selection.toString().includes(url.slice(-12))) {
         sharedRef.current = true;
         setShared(true);
-        if (madeRef.current !== undefined) forgetUnsent(madeRef.current.id);
       }
     };
     document.addEventListener('copy', onCopy);
@@ -287,59 +325,144 @@ export function InvitePanel({
     void make(wanted, made.askedLong);
   };
 
+  /**
+   * REL051-UF3 (R1-UI-04): the link a Copy, Email or Share click sends. A name typed and not saved
+   * yet (the click came before or during the field's blur) is saved first, so what goes out is the
+   * link for that name; a link being made is waited for. Undefined when making it failed (the panel
+   * then says why).
+   */
+  const finalInvite = (): CreatedInvite | Promise<CreatedInvite | undefined> | undefined => {
+    const current = madeRef.current;
+    const pending = pendingRef.current;
+    const wanted = name.trim();
+    if (current !== undefined && !sharedRef.current && wanted !== current.label) {
+      if (pending?.label === wanted) return pending.promise.then((m) => m?.invite);
+      return make(wanted, current.askedLong).then((m) => m?.invite);
+    }
+    if (pending !== undefined) {
+      // IR-REL051-UF3-1: a link for another name is on its way (the field changed back): never copy
+      // that one; make the link for the name in the field (the other is cancelled when it lands).
+      if (current !== undefined && !sharedRef.current && pending.label !== wanted) {
+        return make(wanted, current.askedLong).then((m) => m?.invite);
+      }
+      return pending.promise.then((m) => m?.invite ?? madeRef.current?.invite);
+    }
+    return current?.invite;
+  };
+
+  /**
+   * Puts the text on the clipboard. While the link is still being made, a ClipboardItem holding a
+   * promise keeps the click's user gesture (Safari needs that); without one it writes once made.
+   * 'none' when there was no link to copy (the panel already says why), 'failed' when refused.
+   */
+  const writeClip = (
+    text: string | Promise<string | undefined>,
+  ): Promise<'copied' | 'failed' | 'none'> => {
+    const clip = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+    if (clip === undefined) return Promise.resolve('failed');
+    if (typeof text === 'string') {
+      return clip.writeText(text).then(
+        () => 'copied' as const,
+        () => 'failed' as const,
+      );
+    }
+    let none = false;
+    const later = text.then((t) => {
+      if (t === undefined) none = true;
+      return t;
+    });
+    const Item = (globalThis as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+    const written: Promise<unknown> =
+      Item !== undefined && typeof clip.write === 'function'
+        ? clip.write([
+            new Item({
+              'text/plain': later.then((t) => {
+                if (t === undefined) throw new Error('no link');
+                return new Blob([t], { type: 'text/plain' });
+              }),
+            }),
+          ])
+        : later.then((t) => (t === undefined ? undefined : clip.writeText(t)));
+    return written.then(
+      () => (none ? ('none' as const) : ('copied' as const)),
+      () => (none ? ('none' as const) : ('failed' as const)),
+    );
+  };
+
   const invite = made?.invite;
   const ready = phase === 'ready' && invite !== undefined;
+  // A link is on screen (a fresh one may be on its way for a new name): Copy, Email and Share work.
+  const usable = invite !== undefined && phase !== 'error';
   const fellBack = invite !== undefined && invite.format === 'long' && made?.askedLong !== true;
   const days =
     invite === undefined ? 7 : Math.max(1, Math.round((invite.expiresAt - now()) / DAY_MS));
 
   const copy = (): void => {
-    if (invite === undefined) return;
-    const clip = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
-    if (clip === undefined) {
-      setCopied('failed');
-      return;
-    }
-    void clip.writeText(invite.inviteUrl).then(
-      () => {
-        markShared();
-        setCopied('copied');
-        setAnnounce(S.copiedAnnounce);
-      },
-      () => setCopied('failed'),
-    );
+    if (madeRef.current === undefined) return;
+    const target = finalInvite();
+    const text = target instanceof Promise ? target.then((i) => i?.inviteUrl) : target?.inviteUrl;
+    if (text === undefined) return;
+    void writeClip(text).then((result) => {
+      if (!live.current || result === 'none') return;
+      if (result === 'failed') {
+        setCopied('failed');
+        return;
+      }
+      markShared();
+      setCopied('copied');
+      setAnnounce(S.copiedAnnounce);
+    });
   };
   const keepPending = (): void => {
     keptRef.current = true;
     sharedRef.current = true;
-    if (madeRef.current !== undefined) forgetUnsent(madeRef.current.id);
   };
   // The whole invite text (our words around the link), for a mail written by hand or a chat.
   const copyMessage = (): void => {
-    if (invite === undefined) return;
-    const clip = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
-    if (clip === undefined) {
-      setCopiedMessage('failed');
-      return;
-    }
-    void clip.writeText(invite.shareText).then(
-      () => {
-        markShared();
-        setCopiedMessage('copied');
-        setAnnounce(S.copiedMessageAnnounce);
-      },
-      () => setCopiedMessage('failed'),
-    );
+    if (madeRef.current === undefined) return;
+    const target = finalInvite();
+    const text = target instanceof Promise ? target.then((i) => i?.shareText) : target?.shareText;
+    if (text === undefined) return;
+    void writeClip(text).then((result) => {
+      if (!live.current || result === 'none') return;
+      if (result === 'failed') {
+        setCopiedMessage('failed');
+        return;
+      }
+      markShared();
+      setCopiedMessage('copied');
+      setAnnounce(S.copiedMessageAnnounce);
+    });
   };
   const share = (): void => {
-    if (invite === undefined) return;
+    if (madeRef.current === undefined) return;
     setShareFailed(false);
-    void navigator.share({ title: S.shareTitle, text: invite.shareText }).then(
-      () => markShared(),
-      (e: unknown) => {
-        if (!isAbort(e)) setShareFailed(true);
-      },
-    );
+    const send = (target: CreatedInvite | undefined): void => {
+      if (target === undefined || !live.current) return;
+      void navigator.share({ title: S.shareTitle, text: target.shareText }).then(
+        () => markShared(),
+        (e: unknown) => {
+          if (!isAbort(e)) setShareFailed(true);
+        },
+      );
+    };
+    const target = finalInvite();
+    if (target instanceof Promise) void target.then(send);
+    else send(target);
+  };
+  // Email: a name not saved yet is saved first, then the mail app opens with that name's link.
+  const email = (e: { preventDefault: () => void }): void => {
+    const target = finalInvite();
+    if (!(target instanceof Promise)) {
+      keepPending();
+      return;
+    }
+    e.preventDefault();
+    void target.then((next) => {
+      if (next === undefined || !live.current) return;
+      keepPending();
+      window.location.href = mailtoOf(next.shareText);
+    });
   };
 
   const wanted = name.trim();
@@ -413,7 +536,7 @@ export function InvitePanel({
             <Button
               variant="primary"
               className="inv-copy al-press"
-              disabled={!ready}
+              disabled={!usable}
               onClick={copy}
             >
               <span className="inv-btn-in">
@@ -424,13 +547,13 @@ export function InvitePanel({
           </div>
           <div className="inv-ways">
             {/* A real link: the mail app opens when there is one. Nothing tells us it did, so the
-                click is not "sent" (Copy invite message is); it only stops a hidden page from
-                cancelling the invite, which then waits until it expires. */}
-            {ready && invite !== undefined ? (
+                click is not "sent" (Copy invite message is); it fixes the name and keeps Skip for
+                now from cancelling the invite, which then waits until it expires. */}
+            {usable ? (
               <a
                 className="al-btn al-btn-secondary al-press inv-email"
                 href={mailtoOf(invite.shareText)}
-                onClick={keepPending}
+                onClick={email}
               >
                 <span className="inv-btn-in">
                   <MailIcon />
@@ -445,14 +568,14 @@ export function InvitePanel({
                 </span>
               </Button>
             )}
-            <Button className="al-press" disabled={!ready} onClick={copyMessage}>
+            <Button className="al-press" disabled={!usable} onClick={copyMessage}>
               <span className="inv-btn-in">
                 {copiedMessage === 'copied' ? <CheckMark /> : <CopyMark />}
                 {S.copyMessage}
               </span>
             </Button>
             {invite !== undefined && canShareText(invite.shareText) ? (
-              <Button className="al-press" disabled={!ready} onClick={share}>
+              <Button className="al-press" disabled={!usable} onClick={share}>
                 <span className="inv-btn-in">
                   <ShareIcon />
                   {S.share}

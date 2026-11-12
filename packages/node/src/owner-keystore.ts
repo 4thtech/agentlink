@@ -606,13 +606,19 @@ const restoreOwnerFailed = (): NodeKeyStoreError =>
  *
  * Any failure removes `owner-next` (the kit still holds the seed) and leaves no `owner` item this
  * run wrote. `seed` and `secret` are not modified; the kek and every read-back are wiped.
+ *
+ * REL051-CF3: `beforeWrite` is awaited with the sealed blob (ciphertext) before anything is written;
+ * the restore records its hash there, so a start after a crash can tell its own item apart. When it
+ * throws, nothing is written.
  */
 export async function storeRestoredOwnerSeed(
   keychain: KeychainBackend,
   seed: Uint8Array,
   expectedOwnerNostr: Uint8Array,
   secret: Uint8Array,
-  options: StoreOwnerSeedOptions = {},
+  options: StoreOwnerSeedOptions & {
+    readonly beforeWrite?: (blob: Uint8Array) => Promise<void>;
+  } = {},
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   for (const account of [
@@ -640,6 +646,13 @@ export async function storeRestoredOwnerSeed(
   }
   let staged = false;
   try {
+    if (options.beforeWrite !== undefined) {
+      try {
+        await options.beforeWrite(blob.slice());
+      } catch {
+        throw restoreOwnerFailed();
+      }
+    }
     staged = true;
     await guarded(() => keychain.set(OWNER_NEXT_ACCOUNT, blob), timeoutMs);
     const back = await guarded(() => keychain.get(OWNER_NEXT_ACCOUNT), timeoutMs);

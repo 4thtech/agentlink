@@ -49,7 +49,10 @@ const SHORT = `https://agentlink.4thtech.io/i#2.${SECRET}`;
 const REF_A = `0x${'3d'.repeat(20)}`;
 const REF_B = `0x${'4e'.repeat(20)}`;
 const PASSKEY = { credentialId: 'AQID', prfSalt: 'BwgJ' } as unknown as PasskeyInfo;
-const PROOF: PresenceProof = { kind: 'passkey', body: new Uint8Array([1, 2, 3]) };
+const PROOF: PresenceProof = {
+  kind: 'passkey',
+  gesture: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+};
 
 let host: HTMLElement;
 let root: Root;
@@ -115,11 +118,24 @@ describe('the client reads the new answer fields (contract samples)', () => {
   it('reads alreadyContact from check, and sent and again from accept', async () => {
     const api = createInviteApi({
       token: 't',
-      fetch: (input) =>
+      fetch: (input, init) =>
         Promise.resolve(
           String(input).endsWith('/check')
             ? answer(200, INVITE_CHECK_AGAIN.answer.body)
-            : answer(200, INVITE_ACCEPT_AGAIN_OFFLINE.answer.body),
+            : new Headers(init?.headers).get('X-AgentLink-Presence') === 'challenge'
+              ? // REL051-SF1: the ceremony ask is answered with a challenge.
+                answer(200, {
+                  status: 'ready',
+                  ceremony: 'C'.repeat(22),
+                  publicKey: {
+                    rpId: 'localhost',
+                    challenge: 'AAEC',
+                    allowCredentials: ['AQID'],
+                    timeoutMs: 120000,
+                    prfSalt: 'BwgJ',
+                  },
+                })
+              : answer(200, INVITE_ACCEPT_AGAIN_OFFLINE.answer.body),
         ),
     });
     const checked = await api.check(SHORT);

@@ -71,6 +71,7 @@ export {
   // W4-SHORT-INVITE / W4-INVITES-LIST (D-139): the drop fetcher of a short link, and an open invite.
   shortInviteFetcher,
   type OpenInvite,
+  type InviteLinkResult,
   type CheckedInviteLink,
   type CreateInviteInput,
   type CreatedInvite,
@@ -126,7 +127,7 @@ export {
   type ContactCheckVerdict,
   type PairingDigestLookup,
 } from './contact-check.js';
-export { isRestrictedAlias, renderContactName, restrictName } from './names.js';
+export { isOwnIdName, isRestrictedAlias, renderContactName, restrictName } from './names.js';
 export {
   computeActionDigest,
   ownerActionHash,
@@ -279,12 +280,14 @@ export {
   SEND_TOOL,
   USE_TERMS_TOOLS,
   type SendMessageInput,
+  type SendDelivery,
   type SendMessageResult,
   type SendMessageType,
 } from './send.js';
 export {
   nostrTransport,
   type NostrTransportOptions,
+  type RelayStatus,
   type Transport,
   type TransportDeps,
   type TransportFactory,
@@ -458,6 +461,7 @@ export {
   type ExchangeTime,
   type ExchangeTimes,
   type FilesIoViewOptions,
+  type PreviewSource,
   type InboxMessage,
   type MessageBox,
   type MessageFile,
@@ -626,7 +630,7 @@ export {
   type AutoSavePause,
   type AutoSaveRun,
 } from './files/auto-save.js';
-export type { FetchFileInput, FetchFileResult } from './files/incoming.js';
+export type { FetchFileInput, FetchFileResult, SavedFileRef } from './files/incoming.js';
 export type { SaveReceivedFileResult } from './files/save.js';
 export {
   MAX_LINK_ANSWERS_PER_PASS,

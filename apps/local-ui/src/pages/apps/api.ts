@@ -5,8 +5,9 @@
 // mutating request by the page's generation guard (api/generation.ts). The file paths and entries
 // that come back are shown as text only (I-5).
 import { createApiClient, type ApiClient } from '../../api/client.js';
-import { presenceBody, presenceMode, type PresenceProof } from '../contacts/owner.js';
+import type { PresenceProof } from '../contacts/owner.js';
 import { parseApps, parsePreview, type AppChange, type AppsList } from './data.js';
+import { sendWithProof } from '../../api/presence-ceremony.js';
 
 export type ReadOutcome =
   { readonly kind: 'ok'; readonly list: AppsList } | { readonly kind: 'error' };
@@ -119,22 +120,11 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
       'Content-Type': 'application/octet-stream',
       'X-AgentLink-Input': base64url(JSON.stringify({ changeId })),
     });
-    const mode = presenceMode(proof);
-    if (mode !== undefined) headers.set('X-AgentLink-Presence', mode);
-    const body = presenceBody(proof);
     let res: Response;
     try {
-      res = await doFetch(path, {
-        method: 'POST',
-        headers,
-        body: body as BodyInit,
-        credentials: 'same-origin',
-        cache: 'no-store',
-      });
+      res = await sendWithProof(doFetch, path, headers, proof);
     } catch {
       return { kind: 'offline' };
-    } finally {
-      body.fill(0);
     }
     if (res.status === 501) return { kind: 'not_available' };
     if (res.status === 401) return { kind: 'session' };

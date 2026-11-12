@@ -84,16 +84,16 @@ function sheetTree(onClose: () => void, open = true): ReactNode {
 describe('Sheet', () => {
   it('renders nothing while closed', () => {
     render(sheetTree(() => undefined, false));
-    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('is a level-3 modal dialog named by its title, with focus on the title', () => {
     render(sheetTree(() => undefined));
-    const dlg = host.querySelector('[role="dialog"]') as HTMLElement;
+    const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
     expect(dlg.getAttribute('aria-modal')).toBe('true');
     expect(dlg.classList.contains('al-sheet')).toBe(true);
     expect(dlg.classList.contains('al-surface--l3')).toBe(true);
-    const title = host.querySelector(`#${dlg.getAttribute('aria-labelledby')}`) as HTMLElement;
+    const title = document.querySelector(`#${dlg.getAttribute('aria-labelledby')}`) as HTMLElement;
     expect(title.textContent).toBe('Marko');
     expect(document.activeElement).toBe(title);
   });
@@ -108,7 +108,7 @@ describe('Sheet', () => {
   it('the close button closes it', () => {
     const onClose = vi.fn();
     render(sheetTree(onClose));
-    const close = host.querySelector('.al-sheet-close') as HTMLButtonElement;
+    const close = document.querySelector('.al-sheet-close') as HTMLButtonElement;
     expect(close.getAttribute('aria-label')).toBe('Close');
     act(() => close.click());
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -116,8 +116,8 @@ describe('Sheet', () => {
 
   it('keeps Tab inside: last wraps to first, Shift+Tab on the first wraps to last', () => {
     render(sheetTree(() => undefined));
-    const first = host.querySelector('.al-sheet-close') as HTMLElement;
-    const last = host.querySelector('#two') as HTMLElement;
+    const first = document.querySelector('.al-sheet-close') as HTMLElement;
+    const last = document.querySelector('#two') as HTMLElement;
     last.focus();
     key(last, 'Tab');
     expect(document.activeElement).toBe(first);
@@ -127,7 +127,7 @@ describe('Sheet', () => {
 
   it('returns focus to the opener when it closes', () => {
     render(sheetTree(() => undefined, false));
-    const opener = host.querySelector('#opener') as HTMLElement;
+    const opener = document.querySelector('#opener') as HTMLElement;
     opener.focus();
     render(sheetTree(() => undefined, true));
     expect(document.activeElement).not.toBe(opener);
@@ -158,7 +158,7 @@ describe('DialogFrame', () => {
   it('is a level-4 modal over the overlay, focus on the title, Escape closes', () => {
     const onClose = vi.fn();
     render(h(DialogFrame, { open: true, title: 'Confirm', onClose }, h('button', null, 'Go')));
-    const dlg = host.querySelector('[role="dialog"]') as HTMLElement;
+    const dlg = document.querySelector('[role="dialog"]') as HTMLElement;
     expect(dlg.getAttribute('aria-modal')).toBe('true');
     expect(dlg.classList.contains('al-surface--l4')).toBe(true);
     expect(dlg.parentElement?.classList.contains('al-dialog-overlay')).toBe(true);
@@ -176,8 +176,8 @@ describe('DialogFrame', () => {
         h('button', { id: 'y' }, 'Y'),
       ),
     );
-    const first = host.querySelector('#x') as HTMLElement;
-    const last = host.querySelector('#y') as HTMLElement;
+    const first = document.querySelector('#x') as HTMLElement;
+    const last = document.querySelector('#y') as HTMLElement;
     last.focus();
     key(last, 'Tab');
     expect(document.activeElement).toBe(first);
@@ -187,7 +187,7 @@ describe('DialogFrame', () => {
 
   it('returns focus to the opener on close', () => {
     render(dialogTree(false, false));
-    const opener = host.querySelector('#opener') as HTMLElement;
+    const opener = document.querySelector('#opener') as HTMLElement;
     opener.focus();
     render(dialogTree(true, false));
     render(dialogTree(false, false));
@@ -196,12 +196,12 @@ describe('DialogFrame', () => {
 
   it('shows one level-4 layer at a time: a second one waits until the first closes', () => {
     render(dialogTree(true, true));
-    expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1);
-    expect(host.querySelector('#a')).not.toBeNull();
-    expect(host.querySelector('#b')).toBeNull();
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(document.querySelector('#a')).not.toBeNull();
+    expect(document.querySelector('#b')).toBeNull();
     render(dialogTree(false, true));
-    expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1);
-    expect(host.querySelector('#b')).not.toBeNull();
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(document.querySelector('#b')).not.toBeNull();
   });
 });
 
@@ -245,9 +245,9 @@ describe('Sheet: never trapped (W5-SHEET-CLOSE)', () => {
   it('a click on the backdrop closes it; a click inside does not', () => {
     const onClose = vi.fn();
     render(page(true, onClose));
-    act(() => (host.querySelector('#text') as HTMLElement).click());
+    act(() => (document.querySelector('#text') as HTMLElement).click());
     expect(onClose).not.toHaveBeenCalled();
-    const backdrop = host.querySelector('.al-sheet-backdrop') as HTMLElement;
+    const backdrop = document.querySelector('.al-sheet-backdrop') as HTMLElement;
     expect(backdrop.closest('[inert]')).toBeNull();
     act(() => backdrop.click());
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -272,13 +272,13 @@ describe('Sheet: never trapped (W5-SHEET-CLOSE)', () => {
     vi.useFakeTimers();
     try {
       render(page(true, () => undefined, h('button', { id: 'gone' }, 'x')));
-      const gone = host.querySelector('#gone') as HTMLElement;
+      const gone = document.querySelector('#gone') as HTMLElement;
       gone.focus();
       act(() => {
         gone.blur();
         vi.runAllTimers();
       });
-      expect(document.activeElement).toBe(host.querySelector('.al-sheet-title'));
+      expect(document.activeElement).toBe(document.querySelector('.al-sheet-title'));
     } finally {
       vi.useRealTimers();
     }
@@ -286,14 +286,31 @@ describe('Sheet: never trapped (W5-SHEET-CLOSE)', () => {
 
   it('clears inert on close and on unmount, and sweeps a stray hold', () => {
     render(page(true, () => undefined));
-    expect(host.querySelector('#page')?.hasAttribute('inert')).toBe(true);
+    expect(host.hasAttribute('inert')).toBe(true);
     render(page(false, () => undefined));
-    expect(host.querySelector('#page')?.hasAttribute('inert')).toBe(false);
+    expect(host.hasAttribute('inert')).toBe(false);
     render(page(true, () => undefined));
     act(() => root.unmount());
     expect(document.querySelectorAll('[inert]')).toHaveLength(0);
     expect(document.querySelectorAll('[data-al-inert]')).toHaveLength(0);
     root = createRoot(host);
     render(bare());
+  });
+});
+
+describe('layers are drawn on <body> (R1-UI-03)', () => {
+  it('puts a Sheet and a DialogFrame outside the page, so no stacking context in the page can hide them', () => {
+    render(
+      h(
+        'main',
+        { id: 'vt' },
+        h(Sheet, { open: true, title: 'Person', onClose: () => undefined }, 'x'),
+        h(DialogFrame, { open: true, title: 'Sure?', onClose: () => undefined }, 'y'),
+      ),
+    );
+    expect(host.querySelector('.al-sheet-layer')).toBeNull();
+    expect(host.querySelector('.al-dialog-overlay')).toBeNull();
+    expect(document.querySelector('.al-sheet-layer')?.parentElement).toBe(document.body);
+    expect(document.querySelector('.al-dialog-overlay')?.parentElement).toBe(document.body);
   });
 });

@@ -29,7 +29,7 @@ export const FILES_IO_STRINGS = {
   gotIt: 'Got it',
   loading: 'Loading files…',
   unavailable: "Your files can't be loaded right now. Try again in a minute.",
-  notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
+  notSetUp: "AgentLink isn't set up on this computer yet. Create your first ID on Home.",
   tryAgain: 'Try again',
   showMore: 'Show more',
   receivedEmptyTitle: 'No files received yet.',

@@ -16,9 +16,10 @@ import { RuntimeError } from '../runtime/errors.js';
 /** `apr_` + 16 bytes as unpadded base64url: 22 characters of `[A-Za-z0-9_-]`. */
 const APPROVAL_ID_CHARS = /^apr_[A-Za-z0-9_-]{22}$/;
 
-const LEAD = 'Tell the user: Approval needed. In your own terminal, run ';
-const TAIL =
-  " Your AI can't approve this for you. After they approve, call the same tool again with approvalId.";
+// REL051-CF1 (carried C5): the app first (its Home lists the request), the terminal only as the
+// fallback for an owner without the app open.
+const LEAD = 'Tell the user: Approve on Home in the AgentLink app, or in your own terminal run ';
+const TAIL = " Your AI can't approve this for you. Then call the same tool again with approvalId.";
 const ADD_AGENT = " If you have more than one AgentLink ID, add --agent with this ID's name.";
 
 /** True only for a canonical approval ID (both the schema and the character pattern). */

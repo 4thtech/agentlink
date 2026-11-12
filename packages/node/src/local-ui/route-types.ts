@@ -16,7 +16,7 @@
 // no handler (the server's switch gate runs it); it writes only `app.json`. U3-c also adds route
 // stubs (`stub: true`) for the U3 routes later cards fill: a stub answers 501 `not_available` before
 // any presence check and never runs its handler.
-import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
+import type { CreatedInvite, InviteLinkResult, PendingContact } from '@4thtech-io/core';
 import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
 import { UI_SETTINGS_PATH, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { LocalUiContext } from './context.js';
@@ -286,7 +286,8 @@ export interface LocalUiKitRevealRoute {
 }
 
 /** UX2-d1: the steps of the invite kind (U3-invite adds `dismiss`, "Not now" on the join screen). */
-export type LocalUiInviteStep = 'create' | 'check' | 'dismiss' | 'cancel';
+export type LocalUiInviteStep =
+  'create' | 'check' | 'dismiss' | 'cancel' | 'cancel-connecting' | 'link';
 
 /** UX2-d1: a pasted invite after core's accept step 1 (04 §3.6): who it is and its expiry. */
 export interface LocalUiCheckedInvite {
@@ -307,6 +308,17 @@ export interface LocalUiInviteDesk {
   check(link: string): Promise<LocalUiCheckedInvite>;
   /** W4-INVITES-LIST: core `cancelInvite` (04 §3.6.2: an owner action on the local page). */
   cancel(inviteId: string): Promise<'cancelled' | 'not_found'>;
+  /**
+   * REL051-B1 (N2): core `contacts.cancelConnecting`: drops this agent's accepts that wait for that
+   * contact's answer (its staged invitee pairings). Signs and sends nothing.
+   */
+  cancelConnecting(ref: string): Promise<'cancelled' | 'not_found'>;
+  /**
+   * REL051-B2: core `inviteLink`, the kept link of one open invite (Copy link, Show link). The link
+   * carries the invite secret: answered only to the page, never logged. Optional so older fakes stay
+   * valid; without it the route answers `no_link`.
+   */
+  link?(inviteId: string): Promise<InviteLinkResult>;
 }
 
 /**
@@ -438,13 +450,19 @@ export const RESTORE_PATHS = Object.freeze({
   cancel: '/api/ui/restore/cancel',
   applyBegin: '/api/ui/restore/apply/begin',
   applyFinish: '/api/ui/restore/apply/finish',
+  /**
+   * REL051-CF3: the master code first run or a restore just showed, again for the same page session
+   * after a reload (or what to say instead); and "I saved it". Restore-kind gate, no input, no body.
+   */
+  codeShow: '/api/ui/master-code/show',
+  codeSaved: '/api/ui/master-code/saved',
 } as const);
 
 export type LocalUiRestoreStep = keyof typeof RESTORE_PATHS;
 
 /**
  * UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app"; 08 §1): restoring from a recovery kit, the
- * eleventh named route kind. Nine fixed paths (RESTORE_PATHS), each registered once, `found` a GET
+ * eleventh named route kind. Eleven fixed paths (RESTORE_PATHS; REL051-CF3 added the two master-code steps), each registered once, `found` a GET
  * and the rest POSTs, with no handler: the server's restore gate runs them after the session, CSRF,
  * Host, fetch-metadata (and, for a POST, Origin and octet-stream) checks, refuses a query, and hands
  * the restore engine (recovery-kit-restore.ts) only the page session, the parsed
@@ -459,7 +477,33 @@ export interface LocalUiRestoreRoute {
   readonly step: LocalUiRestoreStep;
 }
 
+/**
+ * R1-SEC-16 (routes.ts rule: a GET is a read; a change is a POST with Origin and an octet-stream
+ * body): the display marks, the `mark` kind. Only at MARK_PATHS: the auto-save notice's dismiss
+ * (D-142) and a contact's former-name seen mark (D-141), each registered once. The server's mark
+ * gate runs after the same session, CSRF, Origin, fetch-metadata, octet-stream and generation checks
+ * as every write, refuses a query, an `X-AgentLink-Input` or presence header and any body byte, and
+ * hands the handler only the context and the route parameters. No owner presence, nothing signed:
+ * display state only (07 §3: nothing is decided from it).
+ */
+export interface LocalUiMarkRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'mark';
+  readonly handler: (
+    context: LocalUiContext,
+    params: Readonly<Record<string, string>>,
+  ) => Promise<LocalUiResult>;
+}
+
+/** R1-SEC-16: the only paths of the mark kind. */
+export const MARK_PATHS: readonly string[] = Object.freeze([
+  '/api/ui/files/auto-save-notice/dismiss',
+  '/api/ui/contacts/:ref/name-seen',
+]);
+
 export type LocalUiRoute =
+  | LocalUiMarkRoute
   | LocalUiRestoreRoute
   | LocalUiPauseRoute
   | LocalUiUiSettingsRoute

@@ -4,7 +4,8 @@
 //   one of the fixed codes); anything else is left out. Never error text, a path or a link.
 // - The received page carries `autoSave: {on, folder, notice}`: the owner's own Inbox folder setting
 //   with home as `~`; off and no folder while the rules are not valid.
-// - `GET /api/ui/files/auto-save-notice/dismiss` dismisses the notice: display state only.
+// - `POST /api/ui/files/auto-save-notice/dismiss` (the mark kind, R1-SEC-16) dismisses the notice:
+//   display state only.
 // - `POST /api/ui/files/save` (W4-FILES-SAVE, SEC-L1): an ID that names no received file is 404
 //   before presence is asked.
 import {
@@ -15,7 +16,12 @@ import {
 import { AUTO_SAVE_NOTICE_PATH } from '@4thtech-io/types/ui-contract/auto-save';
 import { describe, expect, it } from 'vitest';
 import type { LocalUiContext, LocalUiReadClient } from '../context.js';
-import type { LocalUiOwnerRoute, LocalUiReadRoute, LocalUiResult } from '../route-types.js';
+import type {
+  LocalUiMarkRoute,
+  LocalUiOwnerRoute,
+  LocalUiReadRoute,
+  LocalUiResult,
+} from '../route-types.js';
 import { createLocalUiRoutes } from '../routes.js';
 import { displayFolder, filesIoRoutes } from './files-io.js';
 import { filesSaveRoute } from './files-save.js';
@@ -123,23 +129,24 @@ describe('the autoSave block and the notice (08 §1, Decision 51)', () => {
     expect(displayFolder('/Users/anabel/In', '/Users/ana')).toBe('/Users/anabel/In');
   });
 
-  it('dismiss: a read-kind route, idempotent, fixed answer; the notice is gone after it', async () => {
+  it('dismiss: a mark-kind POST, idempotent, fixed answer; the notice is gone after it', async () => {
     const { context: ctx, dismissed } = context([]);
-    const r = route(AUTO_SAVE_NOTICE_PATH);
-    expect(r.method).toBe('GET');
-    expect(r.presence).toBe(false);
-    expect((await get(AUTO_SAVE_NOTICE_PATH, ctx)).body).toEqual({ status: 'dismissed' });
-    expect((await get(AUTO_SAVE_NOTICE_PATH, ctx)).body).toEqual({ status: 'dismissed' });
+    const r = filesIoRoutes.find((x) => x.path === AUTO_SAVE_NOTICE_PATH) as LocalUiMarkRoute;
+    expect(r.method).toBe('POST');
+    expect(r.presence).toBe('mark');
+    expect((await r.handler(ctx, {})).body).toEqual({ status: 'dismissed' });
+    expect((await r.handler(ctx, {})).body).toEqual({ status: 'dismissed' });
     expect(dismissed.n).toBe(2);
     const after = await get('/api/ui/files/received', ctx);
     expect((after.body as { autoSave: { notice: boolean } }).autoSave.notice).toBe(false);
-    expect((await get(AUTO_SAVE_NOTICE_PATH, ctx, 'x=1')).status).toBe(400);
+    // A query, a body or a GET never reach it: the server's mark gate (local-ui-server.test.ts).
   });
 
   it('the routes are registered, and no route changes an auto-save setting without presence', () => {
     const registry = createLocalUiRoutes();
     const paths = registry.routes().map((r) => `${r.method} ${r.path}`);
-    expect(paths).toContain(`GET ${AUTO_SAVE_NOTICE_PATH}`);
+    expect(paths).toContain(`POST ${AUTO_SAVE_NOTICE_PATH}`);
+    expect(paths).not.toContain(`GET ${AUTO_SAVE_NOTICE_PATH}`);
   });
 });
 

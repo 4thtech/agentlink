@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Applies to AgentLink 0.4.8, a pre-alpha release.
+Applies to AgentLink 0.4.8, a pre-alpha release; the recovery kit section applies to 0.5.0.
 
 Fix common problems yourself, and know what to include when you ask for help.
 
@@ -31,7 +31,7 @@ Run `npx -y @4thtech-io/agentlink@latest` (from 0.4.4; before that `npx -y @4tht
 ## Pairing and contacts
 
 **The invite expired or was already used.**
-Invites work once and expire after 7 days at most. Ask for a new one. If you made the invite and lost the link, open Invite someone, cancel the open invite and create a new one: a lost link cannot be shown again.
+Invites work once and expire after 7 days at most. Ask for a new one. If you made the invite and lost the link, find it on Home or in People under **Waiting for … to accept** and press **Copy link**.
 
 **The invite link I got is very long.**
 If the encrypted drop could not be reached within 10 seconds, you get the long link instead. It works the same. Older long links keep working.
@@ -59,10 +59,10 @@ They are not a contact yet. In your own terminal, run `npx -y @4thtech-io/agentl
 ## Files, status and Pause
 
 **My AI app shows Not running or Not set up.**
-Not running means the app is closed or crashed; start it again. Not set up means AgentLink is not connected to it: connect it from **IDs** (quit the app first, then restart it afterwards). The status updates by itself within seconds; if the live updates cannot reach the page, it checks every 5 seconds instead.
+Not running means the app is closed or crashed; start it again. Not set up means AgentLink is not connected to it: connect it from **My IDs** (quit the app first, then restart it afterwards). The status updates by itself within seconds; if the live updates cannot reach the page, it checks every 5 seconds instead.
 
 **My AI says it is paused ("This AgentLink ID is paused. The owner can resume it in the AgentLink app.").**
-Open **IDs** and choose **Resume** (Touch ID). Messages that were waiting to go out are sent after that. Nothing is received while an ID is paused.
+Open **My IDs** and choose **Resume** (Touch ID). Messages that were waiting to go out are sent after that. Nothing is received while an ID is paused.
 
 **A file says "Arrived · not saved".**
 It was over a daily limit, or arrived while the ID was paused. Choose **Save to Inbox** (Touch ID) on Home, under the person. Saved files are in `~/AgentLink/Inbox`; **Show in Finder** (Show in Explorer on Windows, Show in folder on Linux) opens it.
@@ -91,6 +91,17 @@ Approve or deny it on the card at the top of Home, or on the page your AI linked
 
 **A file link stopped working.**
 The storage can refuse a link before it expires. The receiving ID can ask the sender's ID for a fresh link, which works while the sender's ID is online. Ask your AI to try again.
+
+## Recovery kit and restore
+
+- **"Your last kit isn't finished".** The kit was saved, but nobody checked that it opens. If you wrote the code down, press **Check that my kit opens**; if not, save a new kit. See [Backup & restore](../local-app/backup-and-restore.md).
+- **"Your kit is out of date".** An ID or people joined since your last kit. Press **Save a new kit**.
+- **"That code doesn't open this kit".** Check each group of four and try again; nothing was changed. Too many wrong tries make you wait a little. The recovery code is the one shown when you saved that kit, not your master code.
+- **"This kit file is damaged or incomplete".** The file was cut off, for example by an unfinished copy. Try another copy of it.
+- **"This kit was made by a newer AgentLink".** Update AgentLink, then try again.
+- **"This kit belongs to a different owner".** Restore it on another computer or another user account.
+- **An ID is "Not in this kit".** The saved kit says why: an ID kept with a passphrase file is backed up in the terminal, and an ID that couldn't be opened just now is included when you save again in a moment.
+- **"This computer can't finish restoring here".** The browser has no Touch ID, Windows Hello or passkey to protect this computer. Run `agentlink restore` in a terminal you opened yourself.
 
 ## Getting help
 

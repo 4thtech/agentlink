@@ -191,6 +191,17 @@ export interface SentFileItem {
   readonly expiresAt: number | null;
 }
 
+/** REL051-A34: one received file as the in-app preview needs it (`FilesIoView.previewSource`). */
+export interface PreviewSource {
+  /** sanitizeFileName's output. Untrusted (I-5). */
+  readonly name: string;
+  readonly size: number;
+  /** The plaintext SHA-256 the sender stated, 64 lowercase hex. */
+  readonly plaintextSha256: string;
+  /** The single saved name in the Inbox folder, or null when not saved yet. */
+  readonly savedName: string | null;
+}
+
 /**
  * Reads where a fetched file was saved (MSG-FILES-IO-b, `files.saved_name`): the single file name,
  * or null when it was not saved. Never a path.
@@ -754,6 +765,54 @@ export class FilesIoView {
       return typeof name === 'string' && name.length > 0 && sanitizeFileName(name) === name
         ? name
         : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * REL051-A34 (D-149, the in-app preview of a received text file): what the local app's preview
+   * route needs about one received file, by its item ID only. The same selection as `savedName`.
+   * The sanitised name (for the kind), the size and plaintext hash the sender stated (the route
+   * re-checks the saved bytes against it), and the saved name, or null when not saved yet. Never a
+   * path, a link, a key or the file's bytes. Null for anything else. Never log the result (I-7).
+   */
+  async previewSource(id: string): Promise<PreviewSource | null> {
+    if (typeof id !== 'string') return null;
+    const m = SAVED_ITEM_ID.exec(id);
+    if (m === null) return null;
+    const envelopeId = m[1] as string;
+    const idx = Number(m[2]);
+    const found = await this.#ctx.store.transaction((tx) => {
+      const scope = visibleTx(tx);
+      if (scope.length === 0) return undefined;
+      const message = tx.select(
+        'envelopes',
+        { ...whereOf('in', scope), envelope_id: envelopeId },
+        { limit: 1 },
+      )[0];
+      if (message === undefined) return undefined;
+      const row = tx.select('files', { envelope_id: envelopeId, idx }, { limit: 1 })[0];
+      return row === undefined ? undefined : { message, row };
+    });
+    if (found === undefined || found.row.deleted_at !== null) return null;
+    try {
+      const opened = await openStoredPayload(this.#ctx, found.message);
+      const entry = opened?.payload.files[idx];
+      if (entry === undefined) return null;
+      const savedName = this.#savedName === undefined ? null : await this.#savedName(found.row);
+      const cleanSaved =
+        typeof savedName === 'string' &&
+        savedName.length > 0 &&
+        sanitizeFileName(savedName) === savedName
+          ? savedName
+          : null;
+      return Object.freeze({
+        name: sanitizeFileName(entry.name),
+        size: entry.size,
+        plaintextSha256: entry.plaintextSha256,
+        savedName: cleanSaved,
+      });
     } catch {
       return null;
     }

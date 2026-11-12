@@ -30,10 +30,11 @@ import {
   parseJson,
   verifyTermsHash,
 } from '@4thtech-io/crypto';
-import { payloadSchema, type Payload } from '@4thtech-io/types';
+import { fileKindOf, payloadSchema, type FileKind, type Payload } from '@4thtech-io/types';
 import type { ContactBook, ContactView } from './contacts.js';
 import { nowOf, open, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
+import { sanitizeFileName } from './file-name.js';
 import type { InboxSender } from './inbox.js';
 import { receiptRequestedSetTx } from './proofs/receipt-request.js';
 import { unknownSenderCodesTx } from './sender-codes.js';
@@ -102,6 +103,11 @@ export interface InboxPageFile {
   readonly name: string;
   /** Untrusted (I-5): the sender's MIME type, for the untrusted block only. */
   readonly mime: string;
+  /**
+   * REL051-A12: ours, derived from the sanitised name alone (fixed table); the sender's MIME type
+   * never decides it.
+   */
+  readonly kind: FileKind;
 }
 
 /** The terms reference of an `offer`, `accept` or `reject` whose `termsHash` the core recomputed. */
@@ -416,6 +422,7 @@ function baseOf(row: Row<'envelopes'>, payload: Payload, drop: ReadonlySet<strin
     expiresAt: f.inline !== null ? null : f.expiresAt,
     name: f.name,
     mime: f.mime,
+    kind: fileKindOf(sanitizeFileName(f.name)),
   }));
   const base = {
     envelopeId: row.envelope_id,

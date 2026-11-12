@@ -24,7 +24,8 @@ import {
   type Summary,
 } from './api.js';
 import { emptyGroups, codeOf } from './code-field.js';
-import { setOutcome, takeFinishRestore, useOutcome } from './outcome.js';
+import { getOutcome, setOutcome, takeFinishRestore, useOutcome } from './outcome.js';
+import { createMasterCodeApi, type MasterCodeApi } from './master-code-api.js';
 import { canRestoreHere, createRestorePasskey, getRestorePrf } from './passkey.js';
 import {
   CheckedStep,
@@ -39,7 +40,7 @@ import {
   formatDate,
   type ReviewState,
 } from './steps.js';
-import { CODE, KIT, PROBLEMS, WIZARD, type StepId } from './strings.js';
+import { CODE, KIT, PROBLEMS, PROTECT, WIZARD, type StepId } from './strings.js';
 
 export type RestoreMode = 'restore' | 'check';
 
@@ -61,11 +62,25 @@ export interface RestoreWizardProps {
   readonly passkeyProof?: (info: PasskeyInfo) => Promise<PresenceProof | undefined>;
   /** Test seam: leaves the wizard (Cancel, Done, Go to Home). Default: a full load of Home. */
   readonly onLeave?: (to: string) => void;
+  /**
+   * REL051-CF3: step 4's master code again after a reload. Default: the server's (with a test `api`
+   * and none given: nothing held).
+   */
+  readonly masterCodeApi?: MasterCodeApi;
 }
 
 function leaveDefault(to: string): void {
   markLeavingStart();
   window.location.assign(to);
+}
+
+/** R1-UI-02: the once-only master code may be lost: confirm before leaving without ticking "I saved it". */
+function askLeaveCode(): boolean {
+  try {
+    return window.confirm(PROTECT.leaveUnsaved);
+  } catch {
+    return true;
+  }
 }
 
 const stepOf = (view: View): StepId =>
@@ -92,9 +107,17 @@ export function RestoreWizard({
   platform: givenPlatform,
   passkeyProof = browserPasskeyProof,
   onLeave = leaveDefault,
+  masterCodeApi: givenMasterCode,
 }: RestoreWizardProps = {}): ReactElement {
   const check = mode === 'check';
   const [api] = useState<RestoreApi>(() => givenApi ?? createRestoreApi());
+  const [masterCode] = useState<MasterCodeApi>(
+    () =>
+      givenMasterCode ??
+      (givenApi === undefined
+        ? createMasterCodeApi()
+        : { show: () => Promise.resolve({ kind: 'none' }), saved: () => Promise.resolve() }),
+  );
   const [appsApi] = useState<AppsApi>(() => givenApps ?? createAppsApi());
   const [owner] = useState<OwnerClient>(() => givenOwner ?? createOwnerClient());
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
@@ -122,6 +145,28 @@ export function RestoreWizard({
   /** One request at a time: Continue and Open stay off while one is in flight (no double submit). */
   const inflight = useRef(false);
   const [finishing] = useState(() => takeFinishRestore());
+
+  // REL051-CF3 (R1-CLASS-03): a reload on step 4 shows the same new master code and outcome again
+  // (the server keeps them for this page session only, 10 minutes, until "I saved it").
+  useEffect(() => {
+    if (check || getOutcome() !== undefined) return undefined;
+    let live = true;
+    void masterCode.show().then((held) => {
+      if (!live || held.kind !== 'shown' || held.which !== 'restore') return;
+      if (getOutcome() !== undefined) return;
+      setOutcome({
+        restored: held.ids.filter((i) => i.outcome === 'restored').map((i) => i.label ?? i.name),
+        restoredFolders: held.ids.filter((i) => i.outcome === 'restored').map((i) => i.name),
+        failed: held.ids.filter((i) => i.outcome === 'failed').map((i) => i.label ?? i.name),
+        masterCode: held.code,
+        touchId: held.touchId,
+        kitDate: undefined,
+      });
+    });
+    return () => {
+      live = false;
+    };
+  }, [check, masterCode]);
 
   // Found kit files (name pattern and header only; nothing is opened).
   useEffect(() => {
@@ -177,6 +222,8 @@ export function RestoreWizard({
   );
 
   const cancel = (): void => {
+    // R1-UI-02: the restore is done and its new master code is on screen, shown once: ask first.
+    if (outcome?.masterCode !== undefined && !saved && !askLeaveCode()) return;
     if (kitHandle !== undefined) void api.cancel(kitHandle);
     leave('/');
   };
@@ -238,10 +285,20 @@ export function RestoreWizard({
     setView({ k: 'code' });
   };
 
+  // REL051-UF3 (R1-UI-06): one sensor question per press; a double click is ignored until it settles.
   const passkeyPresence = async (): Promise<void> => {
-    const info = await owner.passkey();
-    if (info === undefined) return setError(PROBLEMS.presence_rejected);
-    await presence(await passkeyProof(info));
+    if (inflight.current) return;
+    inflight.current = true;
+    setWorking(true);
+    try {
+      const info = await owner.passkey();
+      if (info === undefined) return setError(PROBLEMS.presence_rejected);
+      const proof = await passkeyProof(info).catch(() => undefined);
+      await presence(proof);
+    } finally {
+      inflight.current = false;
+      setWorking(false);
+    }
   };
 
   // --- step 2 ---------------------------------------------------------------------------------
@@ -410,7 +467,11 @@ export function RestoreWizard({
         }
         saved={saved}
         onSaved={setSaved}
-        onHome={() => leave('/')}
+        onHome={() => {
+          // REL051-CF3: "I saved it" was ticked: the server forgets the code it kept for a reload.
+          if (outcome.masterCode !== undefined && saved) void masterCode.saved();
+          leave('/');
+        }}
         storage={false}
       />,
       'protect',

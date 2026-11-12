@@ -12,6 +12,7 @@ const ICONS: Readonly<Record<string, Icon>> = {
   '/settings/rules': { shell: 'rules' },
   '/settings/apps': { own: 'plug' },
   '/settings/files': { own: 'folder' },
+  '/settings/storage': { own: 'folder' },
   '/settings/appearance': { own: 'sun' },
   '/settings/proofs': { shell: 'proofs' },
   '/settings/advanced': { shell: 'diag' },
@@ -36,6 +37,8 @@ export function titleFor(path: string, label: string): string {
       return S.apps.title;
     case '/settings/files':
       return S.files.title;
+    case '/settings/storage':
+      return S.storage.title;
     case '/settings/appearance':
       return S.appearance.title;
     case '/settings/proofs':

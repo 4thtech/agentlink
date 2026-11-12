@@ -774,7 +774,7 @@ export function ConfirmMove({
         ? proof.code
         : proof.kind === 'native'
           ? { native: true as const }
-          : { passkey: proof.body };
+          : { passkey: proof.gesture };
     void api.owner(deposit ? TOP_UP_PATH : WITHDRAW_PATH, input, presence).then((res) => {
       setBusy(false);
       const out = outcomeLine(res);

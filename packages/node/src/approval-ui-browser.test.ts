@@ -420,7 +420,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     const second = await pageWithoutPasskeys();
     const res = await second.goto(url);
     expect(res?.status()).toBe(401);
-    await second.getByText('This link has expired.', { exact: false }).waitFor();
+    await second.getByText('This link has expired', { exact: false }).waitFor();
   }, 60_000);
 
   it('after repeated wrong codes the page asks the owner to wait', async (ctx) => {

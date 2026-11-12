@@ -4,10 +4,12 @@
 // (`again`), and contact rows carry `pairedAt`. Real handlers, fake core ports; answers against the
 // shared contract samples.
 import type { ContactView, PendingContact } from '@4thtech-io/core';
-import type { OwnerPublicKeys } from '@4thtech-io/crypto';
+import type { JsonObject, OwnerPublicKeys } from '@4thtech-io/crypto';
 import {
+  CONNECTING_CANCEL,
   FEEDBACK_WORLD,
   INVITES_CONNECTING,
+  INVITES_CONNECTING_BLOCKED,
   INVITE_ACCEPT_AGAIN_OFFLINE,
   INVITE_CHECK_AGAIN,
 } from '@4thtech-io/types/ui-contract/invite-feedback';
@@ -20,7 +22,12 @@ import type {
   LocalUiRequest,
 } from '../route-types.js';
 import { contactsRoutes } from './contacts.js';
-import { inviteAcceptRoute, inviteCheckRoute, invitesListRoute } from './invites.js';
+import {
+  inviteAcceptRoute,
+  inviteCheckRoute,
+  inviteConnectingCancelRoute,
+  invitesListRoute,
+} from './invites.js';
 
 const LINK = `https://agentlink.4thtech.io/i#${'q'.repeat(60)}`;
 const EXPIRES = 1_800_000_000; // 2027-01-15T08:00:00Z
@@ -67,6 +74,7 @@ const desk: LocalUiInviteDesk = {
   create: () => Promise.reject(new Error('unused')),
   check: () => Promise.resolve<LocalUiCheckedInvite>({ contact: PENDING, expiresAt: EXPIRES }),
   cancel: () => Promise.resolve('not_found'),
+  cancelConnecting: () => Promise.resolve('not_found'),
 };
 
 const request = (over: Record<string, unknown> = {}): LocalUiRequest =>
@@ -123,6 +131,96 @@ describe('open invites also list the accepts that wait (connecting)', () => {
     expect(second.status).toBe(200);
     expect((second.body as { connecting: unknown[] }).connecting).toEqual([]);
     expect(JSON.stringify(second)).not.toContain('secret');
+  });
+});
+
+describe('N2 (REL051-B1): a waiting accept on a person blocked here', () => {
+  const port = (blocked: unknown) =>
+    ({
+      list: () => Promise.resolve([]),
+      connecting: () =>
+        Promise.resolve([
+          {
+            id: FEEDBACK_WORLD.ref,
+            display: { name: 'Marko', label: 'self-declared', nameSource: 'counterparty' },
+            expiresAt: EXPIRES,
+            sent: true,
+            again: false,
+            blocked,
+          },
+        ]),
+    }) as unknown as LocalUiInviteAcceptPort;
+
+  it('answers blocked: true, as the contract sample', async () => {
+    const result = await invitesListRoute.handler(context({ invites: port(true) }), request());
+    expect(result).toEqual(INVITES_CONNECTING_BLOCKED.answer);
+  });
+
+  it('answers no blocked field for anything but core true', async () => {
+    for (const value of [false, undefined, 'true', 1]) {
+      const result = await invitesListRoute.handler(context({ invites: port(value) }), request());
+      const [row] = (result.body as { connecting: Record<string, unknown>[] }).connecting;
+      expect(row).toBeDefined();
+      expect(Object.hasOwn(row ?? {}, 'blocked')).toBe(false);
+    }
+  });
+
+  it('Cancel is the invite kind at /api/ui/invites/connecting/cancel with exactly {ref}', async () => {
+    expect(inviteConnectingCancelRoute).toMatchObject({
+      method: 'POST',
+      path: CONNECTING_CANCEL.path,
+      presence: 'invite',
+      step: 'cancel-connecting',
+    });
+    const asked: string[] = [];
+    const d: LocalUiInviteDesk = {
+      ...desk,
+      cancelConnecting: (ref) => {
+        asked.push(ref);
+        return Promise.resolve(ref === FEEDBACK_WORLD.ref ? 'cancelled' : 'not_found');
+      },
+    };
+    expect(
+      await inviteConnectingCancelRoute.handler(context(), CONNECTING_CANCEL.cancelled.body, d),
+    ).toEqual(CONNECTING_CANCEL.cancelled.answer);
+    expect(
+      await inviteConnectingCancelRoute.handler(context(), CONNECTING_CANCEL.gone.body, d),
+    ).toEqual(CONNECTING_CANCEL.gone.answer);
+    for (const body of [
+      {},
+      { ref: 'bo' },
+      { ref: `0x${'A'.repeat(40)}` },
+      { ref: 7 },
+      { ref: FEEDBACK_WORLD.ref, x: 1 },
+      { inviteId: FEEDBACK_WORLD.ref },
+    ] as unknown as JsonObject[]) {
+      expect(await inviteConnectingCancelRoute.handler(context(), body, d)).toEqual({
+        status: 400,
+        body: { error: 'invalid' },
+      });
+    }
+    expect(asked).toEqual([FEEDBACK_WORLD.ref, CONNECTING_CANCEL.gone.body.ref]);
+  });
+
+  it('Cancel answers not_set_up without a desk and unavailable (no text) when core throws', async () => {
+    expect(
+      await inviteConnectingCancelRoute.handler(
+        context(),
+        CONNECTING_CANCEL.cancelled.body,
+        undefined,
+      ),
+    ).toMatchObject({ status: 409 });
+    const failing: LocalUiInviteDesk = {
+      ...desk,
+      cancelConnecting: () => Promise.reject(new Error(`secret ${LINK}`)),
+    };
+    const out = await inviteConnectingCancelRoute.handler(
+      context(),
+      CONNECTING_CANCEL.cancelled.body,
+      failing,
+    );
+    expect(out.status).toBeGreaterThanOrEqual(500);
+    expect(JSON.stringify(out)).not.toContain('secret');
   });
 });
 
@@ -213,5 +311,45 @@ describe('contact rows carry pairedAt', () => {
     expect(rows[0]?.['pairedAt']).toBe(1_790_000_100);
     expect(rows[0]?.['pairedAs']).toBe('invitee');
     expect(rows[1]).not.toHaveProperty('pairedAt');
+  });
+});
+
+// REL051-CF1 (R1-CLASS-01, -06): a waiting accept also answers when it began (`startedAt`, RFC 3339
+// from core's unix seconds), so the app can say "still waiting" and, later, "no answer" (also after a
+// restart). A value of another shape is left out.
+describe('R1-CLASS-01/06: a waiting accept answers startedAt', () => {
+  const port = (startedAt: unknown) =>
+    ({
+      list: () => Promise.resolve([]),
+      connecting: () =>
+        Promise.resolve([
+          {
+            id: FEEDBACK_WORLD.ref,
+            display: { name: 'Marko', label: 'self-declared', nameSource: 'counterparty' },
+            expiresAt: EXPIRES,
+            startedAt,
+            sent: true,
+            again: false,
+            blocked: false,
+          },
+        ]),
+    }) as unknown as LocalUiInviteAcceptPort;
+
+  it('answers startedAt as RFC 3339', async () => {
+    const result = await invitesListRoute.handler(
+      context({ invites: port(1_799_999_000) }),
+      request(),
+    );
+    const [row] = (result.body as { connecting: Record<string, unknown>[] }).connecting;
+    expect(row?.['startedAt']).toBe('2027-01-15T07:43:20Z');
+  });
+
+  it('leaves startedAt out for anything but a unix time', async () => {
+    for (const value of [undefined, -1, 'x', 1.5]) {
+      const result = await invitesListRoute.handler(context({ invites: port(value) }), request());
+      const [row] = (result.body as { connecting: Record<string, unknown>[] }).connecting;
+      expect(row).toBeDefined();
+      expect(Object.hasOwn(row ?? {}, 'startedAt')).toBe(false);
+    }
   });
 });

@@ -41,7 +41,7 @@ import {
   type KeyStore,
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
-import { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { MemoryOwnerKeyStore, newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { holdAgentFolderShared, withAgentFolderExclusive } from '../agent-folder-lock.js';
 import { openAgentStoreWith, type AgentStore } from '../agent-store.js';
@@ -55,8 +55,9 @@ import { createKeychainAgent, openRecordedKeyStore } from '../keychain-keystore.
 import { keychainAccount, type KeychainBackend } from '../keychain.js';
 import { initOwnerWith } from '../owner-init.js';
 import { KeychainOwnerKeyStore, OWNER_PASSKEY_ACCOUNT } from '../owner-keystore.js';
-import { encodePasskeyAssertion, registerOwnerPasskey } from '../owner-passkey.js';
+import { OWNER_PASSKEY_KEY_ACCOUNT, registerOwnerPasskey } from '../owner-passkey.js';
 import { VirtualPrfAuthenticator } from '../passkey-authenticator.fixture.js';
+import { ceremonyMaker, withCeremony, type CeremonyMaker } from '../presence-ceremony.fixture.js';
 import type { OwnerTerminal } from '../owner-terminal.js';
 import {
   removeStatement,
@@ -508,24 +509,37 @@ async function world(
 async function remove(
   w: World,
   input: unknown,
-  options: { presence?: string; generation?: string; passkey?: Uint8Array } = {},
+  options: { presence?: string; generation?: string; passkey?: Uint8Array | CeremonyMaker } = {},
 ): Promise<Response & { json: Record<string, unknown> }> {
   const cookie = await w.cookie();
   const csrf = await w.csrf(cookie);
-  const res = await send(w.server.port, '/api/ui/agents/remove', {
-    method: 'POST',
-    headers: {
-      Cookie: cookie,
-      Origin: w.server.origin,
-      'X-AgentLink-CSRF': csrf,
-      'Content-Type': 'application/octet-stream',
-      'X-AgentLink-Generation': options.generation ?? '1',
-      'X-AgentLink-Input': encodeBase64url(encodeUtf8(JSON.stringify(input))),
-      ...(options.passkey === undefined ? {} : { 'X-AgentLink-Presence': 'passkey' }),
-    },
-    body: options.passkey ?? encodeUtf8(options.presence ?? code),
-  });
-  return { ...res, json: JSON.parse(res.body) as Record<string, unknown> };
+  const one = async (
+    extra: Record<string, string>,
+    body: Uint8Array,
+  ): Promise<Response & { json: Record<string, unknown> }> => {
+    const res = await send(w.server.port, '/api/ui/agents/remove', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: w.server.origin,
+        'X-AgentLink-CSRF': csrf,
+        'Content-Type': 'application/octet-stream',
+        'X-AgentLink-Generation': options.generation ?? '1',
+        'X-AgentLink-Input': encodeBase64url(encodeUtf8(JSON.stringify(input))),
+        ...extra,
+      },
+      body,
+    });
+    return { ...res, json: JSON.parse(res.body) as Record<string, unknown> };
+  };
+  // REL051-SF1: a passkey proof answers the ceremony the route issued for this request.
+  if (typeof options.passkey === 'function') {
+    return withCeremony(one, options.passkey, w.server.origin);
+  }
+  return one(
+    options.passkey === undefined ? {} : { 'X-AgentLink-Presence': 'passkey' },
+    options.passkey ?? encodeUtf8(options.presence ?? code),
+  );
 }
 
 const generationOf = async (w: World): Promise<string | undefined> => {
@@ -1143,11 +1157,12 @@ beforeEach(() => {
 describe('HOTFIX-045-TOUCHID: Remove with no agent open, with Touch ID', () => {
   afterEach(async () => {
     await keychain.delete(OWNER_PASSKEY_ACCOUNT);
+    await keychain.delete(OWNER_PASSKEY_KEY_ACCOUNT);
   });
 
   it('offers the passkey and removes with it (200 removed)', async () => {
     const salt = ownerPrfSalt();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
     await registerOwnerPasskey(
       keychain,
       owner,
@@ -1170,7 +1185,7 @@ describe('HOTFIX-045-TOUCHID: Remove with no agent open, with Touch ID', () => {
       { name: 'work', typedLabel: 'Work' },
       {
         generation: (await generationOf(w)) ?? '0',
-        passkey: encodePasskeyAssertion(auth.get(salt)),
+        passkey: ceremonyMaker(auth, salt),
       },
     );
     expect(res.json).toEqual({ status: 'removed' });

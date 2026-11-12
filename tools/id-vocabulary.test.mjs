@@ -24,12 +24,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** Reviewed exceptions: file (repo-relative) + the lower-case phrase the rule matches. */
 const ALLOWED = [
   {
-    file: 'docs-site/guide/local-app/ids.md',
-    phrase: 'add agent',
-    reason:
-      'the version note quotes the old button name ("Switch and Add agent") to say what it became',
-  },
-  {
     file: 'docs-site/guide/local-app/contacts.md',
     phrase: "ana's agent",
     reason:

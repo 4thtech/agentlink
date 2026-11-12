@@ -208,14 +208,20 @@ export function ttyOwnerTerminal(streams: TtyStreams = {}): OwnerTerminal {
 /**
  * Environment markers of AI apps that run shell commands (04 §2.8). While one is set, the owner
  * step is refused, and so is every owner operation (IR-M1-8c-1 F-2). A UX guard against an AI running it by accident, not a security boundary; M1-8f
- * maintains the full list.
+ * maintains the full list (R1-SEC-14: the CLI's HARNESS_MARKERS_BY_APP names the app each one is for).
  */
 export const HARNESS_MARKERS: readonly string[] = Object.freeze([
   'CLAUDECODE',
   'CLAUDE_CODE_ENTRYPOINT',
   'CODEX_SANDBOX',
   'CODEX_SANDBOX_NETWORK_DISABLED',
+  'CODEX_THREAD_ID',
   'GEMINI_CLI',
+  'OPENCODE',
+  'OPENCODE_CLIENT',
+  'CURSOR_AGENT',
+  'ANTIGRAVITY_AGENT',
+  'AI_AGENT',
 ]);
 
 /** Throws `harness_detected` when any HARNESS_MARKERS variable is set (non-empty). */

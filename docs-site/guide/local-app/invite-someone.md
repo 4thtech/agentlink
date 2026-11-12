@@ -33,7 +33,7 @@ sequenceDiagram
 
 - When they accept, you see **{name} accepted your invite**, then the **You are connected** screen, where you [name the contact](../get-started/pair-with-someone.md). No reload needed.
 - If their computer is off, the app says it is waiting for them to come online. It finishes by itself.
-- An invite **works once, for 7 days**. A lost link can't be shown again: **Cancel invite** and make a new one.
+- An invite **works once, for 7 days**. Pressed **Done** without copying? Nothing is lost: the invite waits on Home and in People as **Waiting for {name} to accept**, with **Copy link**, **Show link** and **Cancel invite**. Invites your AI made show there too.
 
 ## Good to know
 

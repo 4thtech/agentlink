@@ -142,6 +142,8 @@ interface FakeOptions {
   propose?: () => unknown;
   /** M1-36i: the free test credits claim, when the runtime offers it. */
   freeCredits?: (chainId: number) => Promise<FreeCreditsOutcome>;
+  /** REL051-CF2: the core's delivery state for the send. */
+  delivery?: 'sent' | 'queued' | 'not_delivered';
 }
 
 function fake(options: FakeOptions = {}): { client: ToolClient; calls: Calls } {
@@ -280,6 +282,7 @@ function fake(options: FakeOptions = {}): { client: ToolClient; calls: Calls } {
         envelopeId: ENVELOPE,
         thread: THREAD,
         sentAt: '2026-10-19T10:00:00Z',
+        ...(options.delivery === undefined ? {} : { delivery: options.delivery }),
       });
     },
     terms: {
@@ -1006,6 +1009,47 @@ describe('agentlink_verify_proof_pack (06 §2.4, D-87, D-95, D-96)', () => {
 });
 
 // ---- notarize on send, propose and respond --------------------------------------------------------
+
+describe('REL051-CF2: a queued send with proof never says it was sent', () => {
+  const said = (r: FinishedResult): string =>
+    `${String(r.structured.summary)}\n${String(r.structured.nextStep ?? '')}`;
+
+  for (const [name, notarize] of [
+    ['recorded', () => recorded()],
+    ['submitted', () => ({ ...recorded(), status: 'submitted' }) as unknown as NotarizeResult],
+    [
+      'failed',
+      () => {
+        throw new Error('boom');
+      },
+    ],
+    [
+      'needs approval',
+      () =>
+        ({
+          status: 'pending_approval',
+          approvalId: 'apr_AAAAAAAAAAAAAAAAAAAAAA',
+          url: 'http://127.0.0.1:7777/approve/apr_AAAAAAAAAAAAAAAAAAAAAA',
+        }) as unknown as NotarizeResult,
+    ],
+  ] as const) {
+    it(`proof ${name}: no "sent" wording while the message is queued`, async () => {
+      const { client } = fake({ delivery: 'queued', notarize });
+      const r = await call('agentlink_send', { to: B, text: 'hi', notarize: true }, client);
+      expect(r.structured).toMatchObject({ delivery: 'queued', envelopeId: ENVELOPE });
+      const text = said(r);
+      expect(text).not.toMatch(/\bSent\b|already sent|was sent|is sent/);
+      expect(text).toContain('Not sent yet');
+    });
+  }
+
+  it('a sent message keeps the proof wording as before', async () => {
+    const { client } = fake({ delivery: 'sent' });
+    const r = await call('agentlink_send', { to: B, text: 'hi', notarize: true }, client);
+    expect(String(r.structured.summary)).toMatch(/^Sent to /);
+    expect(String(r.structured.summary)).not.toContain('Not sent yet');
+  });
+});
 
 describe('notarize on agentlink_send (06 §2.2: the proofs policy as for agentlink_notarize)', () => {
   it('ok: sent, then recorded; the proof is part of the result', async () => {

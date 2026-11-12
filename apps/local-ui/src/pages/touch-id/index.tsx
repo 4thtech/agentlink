@@ -40,6 +40,7 @@ import {
   type PresenceProof,
 } from '../contacts/owner.js';
 import { switchToPasskey, type SwitchToPasskey } from '../contacts/passkey-switch.js';
+import { usePresenceFlight } from '../contacts/presence-flight.js';
 import { PASSKEY_WHY } from '../contacts/strings.js';
 import { BackupCodeField, UseCodeInstead } from '../first-run/backup-code.js';
 import { detectPlatform } from '../first-run/passkey.js';
@@ -119,7 +120,7 @@ const presenceOf = (proof: PresenceProof): OwnerPresence =>
     ? proof.code
     : proof.kind === 'native'
       ? { native: true }
-      : { passkey: proof.body };
+      : { passkey: proof.gesture };
 
 /** The gate's own outcomes in plain words (the shared presence messages). */
 function gateWords(result: OwnerApiResult): string | undefined {
@@ -292,6 +293,14 @@ export function TouchIdPage({
                 </h2>
                 <p className="al-text-body-sm al-muted">{S.offLine}</p>
               </>
+            ) : status.kind === 'unavailable' && status.reason === 'unknown' ? (
+              // R1-UI-13: a failed read is not "can't be used here".
+              <>
+                <h2 id="ti-sensor" className="al-text-h3">
+                  {S.couldntCheckTitle(sensor)}
+                </h2>
+                <p className="al-text-body-sm al-muted">{S.couldntCheckLine}</p>
+              </>
             ) : (
               <>
                 <h2 id="ti-sensor" className="al-text-h3">
@@ -308,6 +317,10 @@ export function TouchIdPage({
           ) : canSwitch && panel !== 'turn-on' ? (
             <Button variant="primary" icon="key-round" onClick={() => open('turn-on')}>
               {S.turnOn(sensor)}
+            </Button>
+          ) : status?.kind === 'unavailable' && status.reason === 'unknown' ? (
+            <Button variant="secondary" onClick={readStatus}>
+              {S.tryAgain}
             </Button>
           ) : null}
         </div>
@@ -616,6 +629,8 @@ function ReplaceCode({
   const [note, setNote] = useState<Note>(undefined);
   const [newCode, setNewCode] = useState<string | undefined>(undefined);
   const [copied, setCopied] = useState(false);
+  // REL051-UF3 (R1-UI-06): a double click on the sensor button asks once.
+  const flight = usePresenceFlight(busy);
   // IR WP-S2 M-1: the keychain may have taken the new code without confirming it. The new code stays
   // on screen (never cleared on this path) and no Finish or Cancel is offered.
   const [unconfirmed, setUnconfirmed] = useState(false);
@@ -663,14 +678,14 @@ function ReplaceCode({
   };
 
   const usePasskey = (): void => {
-    if (sensorProof === undefined || busy) return;
-    void sensorProof().then(
-      (proof) =>
-        proof === undefined
-          ? setNote({ tone: 'plain', text: S.testCancelled(sensor) })
-          : begin(proof),
-      () => setNote({ tone: 'plain', text: S.testCancelled(sensor) }),
-    );
+    if (sensorProof === undefined || busy || !flight.start()) return;
+    void sensorProof()
+      .catch(() => undefined)
+      .then((proof) => {
+        flight.done();
+        if (proof === undefined) setNote({ tone: 'plain', text: S.testCancelled(sensor) });
+        else begin(proof);
+      });
   };
 
   const submitFinish = (event: FormEvent): void => {
@@ -807,11 +822,16 @@ function ReplaceCode({
         </form>
       ) : (
         <div className="ti-row">
-          <Button variant="primary" icon="approval" onClick={usePasskey} disabled={busy}>
+          <Button
+            variant="primary"
+            icon="approval"
+            onClick={usePasskey}
+            disabled={busy || flight.asking}
+          >
             {S.confirmWith(sensor)}
           </Button>
-          <UseCodeInstead onClick={() => setUseCode(true)} disabled={busy} />
-          <Button variant="ghost" onClick={cancel} disabled={busy}>
+          <UseCodeInstead onClick={() => setUseCode(true)} disabled={busy || flight.asking} />
+          <Button variant="ghost" onClick={cancel} disabled={busy || flight.asking}>
             {S.cancel}
           </Button>
         </div>

@@ -2,6 +2,7 @@
 // boundary: an agent with a shell can fake a terminal or clear its environment (G-1, D-67). They
 // keep an AI app from starting an owner command by accident and from seeing its prompt. Authority
 // comes only from the owner signature that core verifies (I-4).
+import type { HarnessId } from '../harness/harnesses.js';
 
 /**
  * Environment markers of AI apps that run shell commands. Mirrors the list in
@@ -13,8 +14,42 @@ export const HARNESS_MARKERS: readonly string[] = Object.freeze([
   'CLAUDE_CODE_ENTRYPOINT',
   'CODEX_SANDBOX',
   'CODEX_SANDBOX_NETWORK_DISABLED',
+  'CODEX_THREAD_ID',
   'GEMINI_CLI',
+  'OPENCODE',
+  'OPENCODE_CLIENT',
+  'CURSOR_AGENT',
+  'ANTIGRAVITY_AGENT',
+  'AI_AGENT',
 ]);
+
+/**
+ * R1-SEC-14 (04 §2.8 "known harness markers", maintained): where each marker comes from, one entry
+ * per AI app `init` supports (harness/harnesses.ts HARNESS_IDS; a test fails for an app with no
+ * entry). An app with no app-specific marker says so; the TTY guard and owner presence still apply.
+ * `AI_AGENT` is the shared convention some AI apps set for the commands they run. Cursor's own
+ * terminal marker `CURSOR_TRACE_ID` is left out on purpose (orchestrator decision, 0.5.1): it is set
+ * in every Cursor terminal, including the one the owner types in, and refusing `agentlink ui` there
+ * would break the golden path. Residual: Cursor's AI can read that terminal (04 §2.8).
+ */
+export const HARNESS_MARKERS_BY_APP: Readonly<
+  Record<HarnessId, { readonly markers: readonly string[]; readonly note?: string }>
+> = Object.freeze({
+  'claude-code': { markers: ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'AI_AGENT'] },
+  'claude-desktop': {
+    markers: ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'AI_AGENT'],
+    note: 'Its built-in Claude Code sets the Claude Code markers; the chat runs no shell of its own.',
+  },
+  codex: { markers: ['CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED', 'CODEX_THREAD_ID'] },
+  'gemini-cli': { markers: ['GEMINI_CLI'] },
+  opencode: { markers: ['OPENCODE', 'OPENCODE_CLIENT'] },
+  cursor: { markers: ['CURSOR_AGENT', 'AI_AGENT'] },
+  antigravity: { markers: ['ANTIGRAVITY_AGENT', 'AI_AGENT'] },
+  windsurf: {
+    markers: ['AI_AGENT'],
+    note: 'No app-specific marker is known; the shared AI_AGENT convention only.',
+  },
+});
 
 export type Env = Readonly<Record<string, string | undefined>>;
 

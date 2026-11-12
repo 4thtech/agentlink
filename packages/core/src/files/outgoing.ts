@@ -33,7 +33,7 @@ import {
   type StorageAdapter,
   type StoredObject,
 } from '@4thtech-io/storage';
-import { MAX_URL_LENGTH } from '@4thtech-io/types';
+import { MAX_URL_LENGTH, mimeForName } from '@4thtech-io/types';
 import { nowOf, type CoreContext } from '../context.js';
 import { isBrokenOwnStorageAdapter } from '../own-storage.js';
 import { CoreError } from '../errors.js';
@@ -44,7 +44,6 @@ import type { FilesPlatform, OutgoingFile } from './platform.js';
 
 const DAY = 86_400;
 const MAX_EXPIRY_DAYS = 7;
-const DEFAULT_MIME = 'application/octet-stream';
 const MAX_NAME_CODE_POINTS = 256;
 
 /**
@@ -221,7 +220,8 @@ export async function prepareOutgoing(
     const { realpath, size } = file;
     if (typeof realpath !== 'string' || !Number.isSafeInteger(size) || size < 0) throw invalid();
     const name = file.name ?? baseName(realpath, flavor);
-    const mime = file.mime ?? DEFAULT_MIME;
+    // REL051-A12: labelled from the extension (fixed table); the receiver never trusts it.
+    const mime = file.mime ?? (typeof name === 'string' ? mimeForName(name) : undefined);
     if (
       typeof name !== 'string' ||
       name.length === 0 ||

@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { HARNESS_IDS } from '../harness/harnesses.js';
 import { HARNESS_MARKERS, checkOwnerTerminal, harnessMarkerSet, isInteractive } from './guards.js';
 
 const tty = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
@@ -43,5 +44,38 @@ describe('terminal guards', () => {
     const names = [...block.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
     expect(names.length).toBeGreaterThan(0);
     expect([...HARNESS_MARKERS]).toEqual(names);
+  });
+
+  // R1-SEC-14 (04 §2.8 "known harness markers", maintained): every AI app `init` supports has an
+  // entry: its markers, or a stated reason none is known. A new harness without one fails here.
+  it('every supported AI app has a marker entry, and its markers are in the list', async () => {
+    const guards = (await import('./guards.js')) as Record<string, unknown>;
+    const byApp = guards['HARNESS_MARKERS_BY_APP'] as
+      | Readonly<Record<string, { readonly markers: readonly string[]; readonly note?: string }>>
+      | undefined;
+    expect(byApp).toBeDefined();
+    for (const id of HARNESS_IDS) {
+      const entry = byApp?.[id];
+      expect(entry, id).toBeDefined();
+      if (entry === undefined) continue;
+      if (entry.markers.length === 0) expect(entry.note, id).toMatch(/\S/);
+      for (const marker of entry.markers) expect(HARNESS_MARKERS, id).toContain(marker);
+    }
+    expect(Object.keys(byApp ?? {}).sort()).toEqual([...HARNESS_IDS].sort());
+  });
+
+  it.each(['OPENCODE', 'CURSOR_AGENT', 'CODEX_THREAD_ID', 'ANTIGRAVITY_AGENT', 'AI_AGENT'])(
+    'refuses the owner step while %s is set',
+    (marker) => {
+      expect(checkOwnerTerminal({ ...tty, env: { [marker]: '1' } })).toEqual({
+        ok: false,
+        reason: 'harness_detected',
+      });
+    },
+  );
+
+  // Orchestrator decision (0.5.1): the owner may type `agentlink ui` in Cursor's own terminal.
+  it("does not refuse Cursor's own terminal (CURSOR_TRACE_ID alone)", () => {
+    expect(checkOwnerTerminal({ ...tty, env: { CURSOR_TRACE_ID: 'x' } })).toEqual({ ok: true });
   });
 });

@@ -57,7 +57,7 @@ export function fold(text: string): string {
 
 /** True when the text holds something a reader could take for an untrusted_content tag. */
 export function hasTag(text: string): boolean {
-  return /<\s*\/?\s*untrusted[^\p{L}\p{N}]{0,8}content/u.test(fold(text));
+  return /<\s*(?:\/\s*)?untrusted[^\p{L}\p{N}]{0,8}content/u.test(fold(text));
 }
 
 export interface Split {

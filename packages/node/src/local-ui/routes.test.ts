@@ -169,6 +169,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/health',
       // MSG-FILES-IO-h: Show in Finder (api/files-io-reveal.test.ts).
       '/api/ui/files/received/reveal',
+      // REL051-A34: the in-app preview of a received text file (api/files-preview.test.ts).
+      '/api/ui/files/received/preview',
       // W4-FILES-SAVE: Save to Inbox (api/files-save.test.ts).
       '/api/ui/files/save',
       // UX2-d1: create, check and accept an invite (api/invites.test.ts).
@@ -198,6 +200,10 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // W4-INVITES-LIST: the open invites (a read) and Cancel (api/invites-short.test.ts).
       '/api/ui/invites',
       '/api/ui/invites/cancel',
+      // REL051-B1 (N2): cancel a waiting accept (api/invites-feedback.test.ts).
+      '/api/ui/invites/connecting/cancel',
+      // REL051-B2: copy an open invite's link again (api/invites-short.test.ts, invites-server.test.ts).
+      '/api/ui/invites/link',
       // W4-LIVE-STATUS: the live event stream (local-ui/events-server.test.ts).
       '/api/ui/events',
       // W4-PAUSE: Pause (its own kind) and Resume (local-ui/agents-pause-server.test.ts).
@@ -213,6 +219,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/backup/export',
       // WP-P2: People across all IDs (local-ui/api/people-all.test.ts).
       '/api/ui/people',
+      // REL051-RET1: Settings > Storage, sizes only (local-ui/api/storage.test.ts).
+      '/api/ui/storage',
       // UX1113 WP-S2: Touch ID & master code (local-ui/owner-presence-server.test.ts).
       '/api/ui/owner-code/check',
       '/api/ui/owner-presence/test',
@@ -378,6 +386,10 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
       `POST ${INVITE_CHECK_PATH}`,
       // W4-INVITES-LIST: Cancel an open invite (no presence, signs nothing).
       'POST /api/ui/invites/cancel',
+      // REL051-B1 (N2): Cancel a waiting accept (no presence, signs nothing).
+      'POST /api/ui/invites/connecting/cancel',
+      // REL051-B2: the kept link of an open invite (no presence, signs nothing, never logged).
+      'POST /api/ui/invites/link',
       'POST /api/ui/join/dismiss',
     ]);
     expect(routes.find((r) => r.path === INVITE_ACCEPT_PATH)).toMatchObject({

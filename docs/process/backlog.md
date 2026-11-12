@@ -8552,6 +8552,17 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Acceptance:**
   - A search for cloud-agent mentions of 0.4.0 finds none that is not history; links and docs-status checks pass; edits marked "proposed, owner confirms at merge".
 
+#### DOCS-050 · docs: the 0.5.0 docs pass (redesign, one recovery kit, restore) (new)
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S0 (docs) · **Phase:** M1b
+- **Repo/path:** agentlink · `README.md`, `docs/status.yaml`, `docs-site/`, `knowledge/`, `llms.txt`, `docs/runbooks/owner-feedback-loop.md`
+- **Depends on:** UX1113 (#802), the 0.5.0 version PR (#803)
+- **Spec:** D-147, 11 §5
+- **Scope:**
+  - README Status and Roadmap, the guide (Your IDs and your people, My IDs, People, Settings, Backup & restore, Touch ID & master code, Rules, Activity, help), knowledge and llms.txt for 0.5.0, each fact checked against the released strings; the cloud agent becomes 0.6.0 in the public docs.
+  - RB-21: owner test builds on the e2e harness (keychain stand-in file, in-memory relay), not a bare temp HOME; MAINTAINING.md: the wiki PR verifier and merge.
+- **Acceptance:**
+  - `pnpm lint` (docs preflight, docs-status check) and the docs tests green; no page claims an unreleased feature.
+
 #### M1-UX-MULTI-AGENT-b · cli agent choice: stale comment and a loose assertion (new, low, IR-M1-UX-MULTI-AGENT-1, #562)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (comment and test only)
 - **Repo/path:** agentlink · `apps/cli/src/runtime/agent-name.ts` and the `toContain('codex')` assertion in `apps/cli/src/commands/init.test.ts`
@@ -10828,3 +10839,74 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** UX1113-R1
 - **Spec:** 08 §8 "Restore from a recovery kit"; 04 §2.3.3 "Restore in the app" (T-1, T-6)
 - **Done when:** the picked path never reaches the renderer (test); native presence satisfies the restore gesture and the presence step; first run on a clean profile shows "I have a recovery kit". Fable audit; Tali's "merge".
+
+#### RET-0 · Local history management spec and decision D-148 (retention plan RET-0)
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Fable security design review (04 §4.2, 06 §2.0 and §3) · **Security:** S2 (spec: owner operations, deletion, MCP surface)
+- **Repo/path:** agentlink · `docs/foundation/{00-README,04-security-and-crypto,06-mcp-server,07-sdk-transport-storage,08-clients-console-cloud,11-claude-design-brief}.md`; `docs/process/backlog.md`; `changelog.d/`
+- **Depends on:** D-148 (Tali, 2026-11-12, OD-1 to OD-6)
+- **Spec:** D-148; 04 §3.1.1 step 9, §4.1, §4.2; 06 §2.0, §3; 07 §3, §3.8; 08 §1; 11 §5.7
+- **Done when:** independent review passes; Fable signs off 04 §4.2 and the 06 changes; Tali says "merge". RET-2 to RET-7 do not start before.
+
+#### RET-1 · Read-only Storage view (0.5.1)
+- **Status:** new · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · new `packages/core/src/storage-usage.ts`; `packages/node/src` UI route `GET /api/ui/storage`; `apps/local-ui/src/pages/settings/storage*`
+- **Depends on:** RET-0 copy (11 §5.7); may start before RET-0 merges, since it reads only
+- **Spec:** 04 §4.2 "Storage view"; 08 §1 "Storage, archive and delete"; 11 §5.7
+- **Done when:** sizes match fixtures (store and WAL, messages per person, indexed saved files, unassigned Inbox files, drop usage); no Show in Finder (deferred to RET-4); works with 2+ IDs; no name, path or link in logs or the answer beyond 11 §5.2 names (I-7); vocabulary lint; one e2e-browser journey; screenshots.
+
+#### RET-2 · Store schema: tombstones, `saved_files`, migration (0.5.2)
+- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `packages/core/src/store/schema.ts`, `packages/node/src/sqlite-schema.ts`, `packages/core/src/files/auto-save.ts`, `files/fetch*`
+- **Depends on:** RET-0
+- **Spec:** 07 §3, §3.8; 04 §4.2
+- **Done when:** `RED (expected):` commit first; migration from the 0.5.0 store fixture; `saved_files` written by auto-save, Save and `agentlink_fetch_file` and kept after the day-7 shred; backfill from live `files` rows; `auto_vacuum` switch only with 2× free space; changeset.
+
+#### RET-3 · Core history delete and the Inbox trash mover (0.5.2)
+- **Status:** new · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Repo/path:** agentlink · new `packages/core/src/history/delete.ts`, new `packages/node/src/trash.ts`
+- **Depends on:** RET-2
+- **Spec:** 04 §4.2; 07 §3.8
+- **Done when:** `RED (expected):` commit first; a relay replay of a deleted envelope is dropped; a proof pack verifies after delete (OD-4); the Contact check digits still recompute; protected items refused with a fixed reason; a moved, renamed, edited or symlinked file is untouched; files go to the OS Trash on macOS, Linux and Windows (no shell); secure_delete zeroes pages; no path or name in logs.
+
+#### RET-4 · Delete sheet, Free up space and message selection in the app (0.5.2)
+- **Status:** new · **Size:** M · **Tier:** Opus build (routes), Sonnet (UI) · **Security:** S2
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/messages/*`, `pages/settings/storage*`; node UI server routes `POST /api/ui/history/delete/begin` and `/finish`
+- **Depends on:** RET-1, RET-3
+- **Spec:** 08 §1 "Storage, archive and delete"; 04 §4.2 "Presence and undo"; 11 §5.7
+- **Also:** Show in Finder for the Inbox folder on Settings › Storage (moved from RET-1): a new reveal route kind with no presence that opens only the configured Inbox folder (04 §4 realpath rules), takes no path from the page and signs nothing; S2 review of the new route kind.
+- **Done when:** `RED (expected):` commit first for the routes; presence required once per sheet; the list is bound at begin; Undo within 10 s cancels the commit; copy per 11 §5.7 with the OS sensor word; integrated walkthrough screenshots.
+
+#### RET-5 · Archive conversations as a store flag (0.5.2)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · core store, node UI route, `apps/local-ui` (replaces the browser-only flag)
+- **Depends on:** RET-2
+- **Spec:** 04 §4.2 "Two words, two actions"; 08 §1
+- **Done when:** archive and unarchive are reversible and seen in every browser; `agentlink_inbox` and the AI are unaffected; DOM tests.
+
+#### RET-6 · Retention policy `history.*` and the daily pass (0.5.2)
+- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Repo/path:** agentlink · `packages/types/src/policy*`, `packages/core/src/policy*`, `files/retention.ts`, Settings › Storage, CLI `owner policy`
+- **Depends on:** RET-3
+- **Spec:** 06 §3 (`history`, absent-key rule); 04 §4.2 "Retention policy"
+- **Done when:** `RED (expected):` commit first; a pre-D-148 policy reads as `0`/`0`; new policies default `filesKeepDays: 90`; invalid policy or paused ID deletes nothing; no MCP tool can set it (I-4 test); preview before the first turn-on; the existing-install hint shows once.
+
+#### RET-7 · `agentlink_tidy`: the AI proposes a cleanup, the owner approves (0.5.2 or later)
+- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (MCP surface)
+- **Repo/path:** agentlink · `packages/mcp-tools/src`, core approvals, tool-surface snapshot, 06 §2.0 table
+- **Depends on:** RET-3; its own spec PR for the tool-surface change (06 §2.0)
+- **Spec:** D-148 (3); 06 §2.0; 04 §4.2 "The AI proposes, the owner approves"
+- **Done when:** always `pending_approval`; takes a filter only, never IDs from inbound text (I-5); protected items excluded; an injection test; the owner sees the exact list in the app.
+
+#### RET-8 · Cloud agent history delete and retention (0.5.3)
+- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `apps/cloud-agent`
+- **Depends on:** RET-3, RET-6
+- **Spec:** 04 §4.2 "Cloud agent"; 08 §3
+- **Done when:** parity tests with the local store (tombstones, protected items, `history.messagesKeepDays`).
+
+#### RET-9 · Docs for Free up space (with each release)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S0
+- **Repo/path:** agentlink · `README.md` Status, `docs-site/`, `knowledge/`, `changelog.d/`
+- **Depends on:** RET-1 (0.5.1 part), RET-4 and RET-6 (0.5.2 part)
+- **Spec:** 08 §1; 11 §5.7
+- **Done when:** README Status and docs-site "Free up space" match what shipped; drift checks green; never claims an unbuilt part.

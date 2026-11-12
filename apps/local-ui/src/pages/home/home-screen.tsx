@@ -41,6 +41,7 @@ import {
 } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { getLive, subscribeLive, switchAgent, type LiveAgent } from '../../api/live.js';
+import { initials } from '../../initials.js';
 import { INVITE_PATH, PEOPLE_PATH } from '../../nav.js';
 import { notify, setArchived, useArchived } from '../../notices/index.js';
 import { checkHref } from '../contacts/safety.js';
@@ -66,11 +67,19 @@ import {
   type InviteApi,
   type OpenInvite,
 } from '../contacts/invite-api.js';
-import { FEEDBACK_STRINGS as F } from '../invite/strings.js';
+import { connectingLine, useConnectingNow } from '../invite/connecting-stage.js';
+import { FEEDBACK_STRINGS as F, linkLabel } from '../invite/strings.js';
+import {
+  InviteLinkButtons,
+  InviteLinkReveal,
+  useInviteLink,
+} from '../invite/invite-link-actions.js';
 import { createFilesApi } from '../files/files-api.js';
 import type { Conversation as Person, MessagesApi, Problem } from '../messages/api.js';
 import { createSaveApi, type SaveApi } from '../inbox/save-api.js';
 import { Conversation, exactTime, useThread } from './conversation.js';
+import { useTerms } from './terms-trail.js';
+import type { Preview } from './file-reader.js';
 import { HomeApprovals } from './home-approvals.js';
 import { RenameBanner } from './rename-banner.js';
 import {
@@ -105,6 +114,8 @@ export interface HomeScreenProps {
   readonly pollMs?: number;
   /** U2's "Get started · n of 3 done" card, on top while setup is not done. */
   readonly getStarted?: ReactNode;
+  /** R1-UI-01: there is no ID yet: this replaces everything else on Home (a way to create the first one). */
+  readonly noId?: ReactNode;
   /** W4-WIRE: keep the skeleton while the page still reads what goes on top (the Get started card). */
   readonly holding?: boolean;
   /** Why nothing can be approved here yet (owner not set up, no passkeys in this browser). */
@@ -130,6 +141,8 @@ interface Clients {
   readonly approvals: ApprovalsClient;
   readonly save: SaveApi;
   readonly reveal: Reveal;
+  /** REL051-A34: open a saved received text file in the reader, by item ID only. */
+  readonly preview: Preview;
   readonly invites: InviteApi;
   /** W8-S4: Finish removing (the Remove sheet's own calls). */
   readonly agents: AgentsApi;
@@ -152,6 +165,7 @@ function useClients(props: HomeScreenProps): Clients {
       approvals: approvalsClient ?? createApprovalsClient(withKeys),
       save: createSaveApi(withKeys),
       reveal: (id: string) => files.reveal(id),
+      preview: (id: string) => files.preview(id),
       invites: createInviteApi(opts),
       agents: createAgentsApi(opts),
       owner: createOwnerClient(opts),
@@ -192,7 +206,7 @@ function Avatar({
   readonly name: string;
   readonly small?: boolean;
 }): ReactElement {
-  const letter = [...name.trim()][0]?.toUpperCase() ?? '?';
+  const letter = initials(name);
   // A tint picked from the name, so a person keeps their colour (no image, no key).
   let tint = 0;
   for (const ch of name) tint = (tint * 31 + (ch.codePointAt(0) ?? 0)) % 2;
@@ -266,8 +280,19 @@ function PersonOpen({
 }): ReactElement {
   const messages: MessagesApi = clients.people.messages;
   const { thread, loadEarlier } = useThread(messages, person.contactId, tick);
+  const terms = useTerms(clients.api, person.contactId, tick);
   const files = thread.state === 'ready' ? filesOf(thread.inbox.items, thread.sent.items) : [];
   const removed = contact?.status === 'revoked';
+  const fileContext = useMemo(
+    () => ({
+      received: data.received,
+      sent: data.sent,
+      folder: data.inboxFolder,
+      reveal: clients.reveal,
+      preview: clients.preview,
+    }),
+    [data.received, data.sent, data.inboxFolder, clients.reveal, clients.preview],
+  );
   return (
     <div className="hm-open hm-c al-expand" data-person-open={person.contactId}>
       {/* UX 2026-11-12: one calm line here; the full explanation is on the contact's own page. */}
@@ -338,7 +363,9 @@ function PersonOpen({
         pro={pro}
         thread={thread}
         loadEarlier={loadEarlier}
+        terms={terms}
         removed={removed}
+        files={fileContext}
       />
       <PersonFiles
         name={person.name}
@@ -381,7 +408,11 @@ function ArchiveButton({
 
 const DAY_MS = 86_400_000;
 
-/** An invite that waits to be accepted: who, how long the link works, and Cancel. Never the link. */
+/**
+ * An invite that waits to be accepted: who, how long the link works, Copy link, Show link and
+ * Cancel. The list carries no link; Copy link and Show link read the kept one on a click
+ * (REL051-B2, owner test 13 Nov: Done without Copy no longer loses it).
+ */
 function PendingInviteRow({
   invite,
   pro,
@@ -397,6 +428,10 @@ function PendingInviteRow({
 }): ReactElement {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const link = useInviteLink(
+    invite.inviteId,
+    api.link === undefined ? undefined : (id) => api.link!(id),
+  );
   const left = Math.max(0, Math.ceil((invite.expiresAt - Date.now()) / DAY_MS));
   const name = invite.name ?? undefined;
   return (
@@ -426,9 +461,14 @@ function PendingInviteRow({
             {S.cantCancel}
           </span>
         ) : null}
+        {api.link === undefined ? null : (
+          <InviteLinkReveal link={link} label={linkLabel(name ?? '')} />
+        )}
       </span>
+      {api.link === undefined ? null : <InviteLinkButtons link={link} />}
       <Button
         size="sm"
+        variant="ghost"
         disabled={busy}
         onClick={() => {
           setBusy(true);
@@ -447,12 +487,23 @@ function PendingInviteRow({
 }
 
 /**
- * W5-INVITE-FEEDBACK: an accept of this agent that waits for the inviter's answer: "Connecting to
- * {name}…", or "Waiting for {name} to come online. This finishes on its own." Text only (I-5).
+ * W5-INVITE-FEEDBACK: an accept of this agent that waits for the inviter's answer. REL051-CF1
+ * (R1-CLASS-01, -06): the line follows how long it has waited (connecting-stage.ts, shared with
+ * People), and every row has Cancel through the server (`POST /api/ui/invites/connecting/cancel`),
+ * so a row that will never finish can be removed. A blocked person also gets Unblock, which lives on
+ * People. Text only (I-5).
  */
-function ConnectingRowView({ row }: { readonly row: ConnectingRow }): ReactElement {
-  // A blocked person's accept never finishes: say so; Unblock lives on People.
+function ConnectingRowView({
+  row,
+  api,
+}: {
+  readonly row: ConnectingRow;
+  readonly api: InviteApi;
+}): ReactElement {
   const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const now = useConnectingNow(row);
   if (hidden) return <></>;
   return (
     <div className="hm-invite-row hm-f" data-blocked={row.blocked === true ? 'true' : undefined}>
@@ -461,24 +512,38 @@ function ConnectingRowView({ row }: { readonly row: ConnectingRow }): ReactEleme
       </span>
       <span className="hm-row-main hm-c">
         <PersonName name={row.name} />
-        <span className="hm-sub al-text-body-sm">
-          {row.blocked === true
-            ? F.youBlocked(row.name)
-            : row.sent
-              ? F.connecting(row.name)
-              : F.waitingOnline(row.name)}
-        </span>
+        <span className="hm-sub al-text-body-sm">{connectingLine(row, now)}</span>
+        {failed ? (
+          <span role="alert" className="hm-inline-error al-text-body-sm">
+            {F.cancelConnectingFailed}
+          </span>
+        ) : null}
       </span>
       {row.blocked === true ? (
-        <>
-          <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH}>
-            {F.unblockAction}
-          </a>
-          <Button size="sm" variant="ghost" onClick={() => setHidden(true)}>
-            {F.cancelConnecting}
-          </Button>
-        </>
+        <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH}>
+          {F.unblockAction}
+        </a>
       ) : null}
+      {api.cancelConnecting === undefined ? null : (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onClick={() => {
+            const cancel = api.cancelConnecting;
+            if (cancel === undefined) return;
+            setBusy(true);
+            setFailed(false);
+            void cancel(row.ref).then((outcome) => {
+              setBusy(false);
+              if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') setHidden(true);
+              else setFailed(true);
+            });
+          }}
+        >
+          {F.cancelConnecting}
+        </Button>
+      )}
     </div>
   );
 }
@@ -559,6 +624,11 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
     ]);
     if (!live.current) return;
     if (list.kind === 'ok') setApprovals(list.items);
+    // R1-UI-13: a failed passkey read changes nothing (the notice above says "couldn't check").
+    if (passkey.kind === 'unknown') {
+      setOwner((prev) => (prev.ready ? prev : { ready: true }));
+      return;
+    }
     setOwner(
       passkey.kind === 'ready'
         ? {
@@ -715,6 +785,21 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
       ? fmt(S.otherIdOne, { name: a.label })
       : fmt(S.otherIdPeople, { name: a.label, count: String(n) });
   };
+  // R1-UI-07: in "All IDs", another ID's people are not on this page (its names are sealed in its
+  // own store, 04 §2.5), so each other ID that has people gets its line and an Open button. The
+  // empty state is for when no ID has anyone.
+  const othersWithPeople =
+    filter === 'all' && many
+      ? agents.filter((a) => !a.current && (data?.idCounts?.get(a.name) ?? 0) > 0)
+      : [];
+  const otherIdRows = othersWithPeople.map((a) => (
+    <div className="hm-nomatch hm-f" data-other-id={a.name} key={`other-${a.name}`}>
+      <p className="al-text-body-sm al-muted">{otherLine(a)}</p>
+      <Button size="sm" onClick={() => void switchAgent(a.name)}>
+        {fmt(S.openAgent, { name: a.label })}
+      </Button>
+    </div>
+  ));
   const idChips = many ? (
     <div className="hm-id-chips hm-f" role="group" aria-label={S.idChips} data-id-chips="">
       <button
@@ -926,7 +1011,8 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   return (
     <div className="hm-page hm-c" data-layer={pro ? 'pro' : 'simple'}>
       <h1 className="al-visually-hidden">{S.title}</h1>
-      {view.state === 'failed' ? (
+      {props.noId !== undefined ? props.noId : null}
+      {props.noId === undefined && view.state === 'failed' ? (
         <Banner tone="warning">
           {view.problem === 'not_set_up'
             ? S.notSetUp
@@ -938,156 +1024,160 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
           </Button>
         </Banner>
       ) : null}
-      <SkeletonGate
-        loading={view.state === 'loading' || props.holding === true}
-        skeleton={<HomeSkeleton pro={pro} />}
-        label={S.loading}
-      >
-        <div className="hm-stack hm-c">
-          {props.getStarted ?? null}
-          {props.ownerNotice ?? null}
-          {unfinished.map((row) => (
-            <UnfinishedRemoval key={row.name} row={row} onFinish={setFinishing} />
-          ))}
-          {/* WP-1: an ID whose card still carries an older name: repaired here, one gesture. */}
-          <RenameBanner
-            api={clients.agents}
-            owner={clients.owner}
-            row={liveIds.rows.find((r) => r.current && !r.removing)}
-          />
-          <HomeApprovals
-            items={approvals}
-            owner={owner}
-            client={clients.approvals}
-            sheet={sheet}
-            pro={pro}
-            asker={
-              current === undefined
-                ? undefined
-                : appName === undefined
-                  ? fmt(S.askerId, { name: current.label })
-                  : fmt(S.askerApp, { name: current.label, app: appName })
-            }
-            askerSeed={many ? current?.name : undefined}
-            askerLabel={many ? agentLabel : undefined}
-            onChanged={() => void loadApprovals()}
-          />
-          {pro ? null : (
-            <a
-              className="al-btn al-btn-primary al-btn-lg al-btn-block hm-invite al-press"
-              href={INVITE_HREF}
-            >
-              <Icon name="user-plus" size={22} />
-              <span>{S.inviteSomeone}</span>
-            </a>
-          )}
-          {/* W5-PASTE-ENTRY: the other way in, right next to Invite someone. */}
-          {pro ? null : <PasteEntryLink className="inv-link-button" />}
-          <section aria-labelledby="hm-people-h" className="hm-people hm-c">
-            {peopleHead}
-            {idChips}
-            {many && current !== undefined && people.length > 0 ? (
-              <h3 className="hm-id-group hm-f al-text-label" data-id-group={current.name}>
-                <AgentIcon label={current.label} seed={current.name} />
-                <span>{agentLabel}</span>
-              </h3>
-            ) : null}
-            {otherAgent !== undefined ? (
-              <div className="hm-nomatch hm-f" data-other-id="">
-                <p className="al-text-body-sm al-muted">{otherLine(otherAgent)}</p>
-                <Button size="sm" onClick={() => void switchAgent(otherAgent.name)}>
-                  {fmt(S.openAgent, { name: otherAgent.label })}
-                </Button>
-              </div>
-            ) : data !== undefined &&
-              data.people.length === 0 &&
-              pending.length === 0 &&
-              connectingRows.length === 0 &&
-              props.pendingRows === undefined ? (
-              <EmptyState
-                title={S.noPeople}
-                icon="users"
-                action={<p className="al-text-body-sm al-muted">{S.noPeopleHint}</p>}
-              />
-            ) : (
-              <div className="hm-list">
-                {/* Under the hood, People is a table to assistive technology (rows and cells). */}
-                <div
-                  role={pro ? 'table' : undefined}
-                  aria-label={pro ? S.people : undefined}
-                  className="hm-table"
-                >
-                  {pro ? (
-                    <div
-                      className="hm-prow hm-prow-head al-text-label"
-                      data-people-head=""
-                      role="row"
-                    >
-                      <span role="columnheader">{S.colPerson}</span>
-                      <span role="columnheader" className="hm-opt">
-                        {S.colHandledBy}
-                      </span>
-                      <span role="columnheader">{S.colLastMessage}</span>
-                      <span role="columnheader" className="hm-opt">
-                        {S.colDelivery}
-                      </span>
-                      <span role="columnheader" className="hm-opt">
-                        {S.colProofs}
-                      </span>
-                      <span role="columnheader" className="hm-opt">
-                        {S.colFiles}
-                      </span>
-                      <span role="columnheader">
-                        <span className="al-visually-hidden">{S.colOpen}</span>
-                      </span>
-                    </div>
-                  ) : null}
-                  {people.map(personRow)}
-                </div>
-                {data !== undefined &&
-                people.length === 0 &&
-                archivedPeople.length === 0 &&
-                data.people.length > 0 ? (
-                  <div className="hm-nomatch hm-f">
-                    <p className="al-text-body-sm al-muted">{S.noMatch}</p>
-                  </div>
-                ) : null}
-                {connectingRows.map((row) => (
-                  <ConnectingRowView key={`c-${row.ref}`} row={row} />
-                ))}
-                {props.pendingRows ??
-                  pending.map((invite) => (
-                    <PendingInviteRow
-                      key={invite.inviteId}
-                      invite={invite}
-                      pro={pro}
-                      agent={agentLabel}
-                      api={clients.invites}
-                      onCancelled={refresh}
-                    />
-                  ))}
-              </div>
+      {props.noId !== undefined ? null : (
+        <SkeletonGate
+          loading={view.state === 'loading' || props.holding === true}
+          skeleton={<HomeSkeleton pro={pro} />}
+          label={S.loading}
+        >
+          <div className="hm-stack hm-c">
+            {props.getStarted ?? null}
+            {props.ownerNotice ?? null}
+            {unfinished.map((row) => (
+              <UnfinishedRemoval key={row.name} row={row} onFinish={setFinishing} />
+            ))}
+            {/* WP-1: an ID whose card still carries an older name: repaired here, one gesture. */}
+            <RenameBanner
+              api={clients.agents}
+              owner={clients.owner}
+              row={liveIds.rows.find((r) => r.current && !r.removing)}
+            />
+            <HomeApprovals
+              items={approvals}
+              owner={owner}
+              client={clients.approvals}
+              sheet={sheet}
+              pro={pro}
+              asker={
+                current === undefined
+                  ? undefined
+                  : appName === undefined
+                    ? fmt(S.askerId, { name: current.label })
+                    : fmt(S.askerApp, { name: current.label, app: appName })
+              }
+              askerSeed={many ? current?.name : undefined}
+              askerLabel={many ? agentLabel : undefined}
+              onChanged={() => void loadApprovals()}
+            />
+            {pro ? null : (
+              <a
+                className="al-btn al-btn-primary al-btn-lg al-btn-block hm-invite al-press"
+                href={INVITE_HREF}
+              >
+                <Icon name="user-plus" size={22} />
+                <span>{S.inviteSomeone}</span>
+              </a>
             )}
-            {archivedPeople.length === 0 ? null : (
-              <details className="hm-archived" data-archived="">
-                <summary className="hm-kicker al-text-label">
-                  {fmt(S.archivedCount, { count: archivedPeople.length })}
-                </summary>
-                <p className="al-text-body-sm al-muted">{S.archivedHint}</p>
+            {/* W5-PASTE-ENTRY: the other way in, right next to Invite someone. */}
+            {pro ? null : <PasteEntryLink className="inv-link-button" />}
+            <section aria-labelledby="hm-people-h" className="hm-people hm-c">
+              {peopleHead}
+              {idChips}
+              {many && current !== undefined && people.length > 0 ? (
+                <h3 className="hm-id-group hm-f al-text-label" data-id-group={current.name}>
+                  <AgentIcon label={current.label} seed={current.name} />
+                  <span>{agentLabel}</span>
+                </h3>
+              ) : null}
+              {otherAgent !== undefined ? (
+                <div className="hm-nomatch hm-f" data-other-id="">
+                  <p className="al-text-body-sm al-muted">{otherLine(otherAgent)}</p>
+                  <Button size="sm" onClick={() => void switchAgent(otherAgent.name)}>
+                    {fmt(S.openAgent, { name: otherAgent.label })}
+                  </Button>
+                </div>
+              ) : data !== undefined &&
+                data.people.length === 0 &&
+                pending.length === 0 &&
+                connectingRows.length === 0 &&
+                othersWithPeople.length === 0 &&
+                props.pendingRows === undefined ? (
+                <EmptyState
+                  title={S.noPeople}
+                  icon="users"
+                  action={<p className="al-text-body-sm al-muted">{S.noPeopleHint}</p>}
+                />
+              ) : (
                 <div className="hm-list">
+                  {/* Under the hood, People is a table to assistive technology (rows and cells). */}
                   <div
                     role={pro ? 'table' : undefined}
-                    aria-label={pro ? S.archived : undefined}
+                    aria-label={pro ? S.people : undefined}
                     className="hm-table"
                   >
-                    {archivedPeople.map(personRow)}
+                    {pro ? (
+                      <div
+                        className="hm-prow hm-prow-head al-text-label"
+                        data-people-head=""
+                        role="row"
+                      >
+                        <span role="columnheader">{S.colPerson}</span>
+                        <span role="columnheader" className="hm-opt">
+                          {S.colHandledBy}
+                        </span>
+                        <span role="columnheader">{S.colLastMessage}</span>
+                        <span role="columnheader" className="hm-opt">
+                          {S.colDelivery}
+                        </span>
+                        <span role="columnheader" className="hm-opt">
+                          {S.colProofs}
+                        </span>
+                        <span role="columnheader" className="hm-opt">
+                          {S.colFiles}
+                        </span>
+                        <span role="columnheader">
+                          <span className="al-visually-hidden">{S.colOpen}</span>
+                        </span>
+                      </div>
+                    ) : null}
+                    {people.map(personRow)}
                   </div>
+                  {data !== undefined &&
+                  people.length === 0 &&
+                  archivedPeople.length === 0 &&
+                  data.people.length > 0 ? (
+                    <div className="hm-nomatch hm-f">
+                      <p className="al-text-body-sm al-muted">{S.noMatch}</p>
+                    </div>
+                  ) : null}
+                  {connectingRows.map((row) => (
+                    <ConnectingRowView key={`c-${row.ref}`} row={row} api={clients.invites} />
+                  ))}
+                  {otherIdRows}
+                  {props.pendingRows ??
+                    pending.map((invite) => (
+                      <PendingInviteRow
+                        key={invite.inviteId}
+                        invite={invite}
+                        pro={pro}
+                        agent={agentLabel}
+                        api={clients.invites}
+                        onCancelled={refresh}
+                      />
+                    ))}
                 </div>
-              </details>
-            )}
-          </section>
-        </div>
-      </SkeletonGate>
+              )}
+              {archivedPeople.length === 0 ? null : (
+                <details className="hm-archived" data-archived="">
+                  <summary className="hm-kicker al-text-label">
+                    {fmt(S.archivedCount, { count: archivedPeople.length })}
+                  </summary>
+                  <p className="al-text-body-sm al-muted">{S.archivedHint}</p>
+                  <div className="hm-list">
+                    <div
+                      role={pro ? 'table' : undefined}
+                      aria-label={pro ? S.archived : undefined}
+                      className="hm-table"
+                    >
+                      {archivedPeople.map(personRow)}
+                    </div>
+                  </div>
+                </details>
+              )}
+            </section>
+          </div>
+        </SkeletonGate>
+      )}
       {finishing === undefined ? null : (
         <FinishRemoveSheet
           row={finishing}

@@ -9,13 +9,9 @@
 // The page sends no path and never any file content: it shows only what the server answers, as text,
 // and only the answers' fixed fields. Answers from a server that does not have the route yet (501)
 // are `not_available`; the page then offers "Later". Nothing is logged.
+import { sendWithProof } from '../../api/presence-ceremony.js';
 import { createOwnerClient } from '../contacts/owner.js';
-import {
-  presenceBody,
-  presenceMode,
-  type PasskeyInfo,
-  type PresenceProof,
-} from '../contacts/owner.js';
+import type { PasskeyInfo, PresenceProof } from '../contacts/owner.js';
 
 export const APPS_PATH = '/api/ui/apps';
 export const APPS_PREVIEW_PATH = '/api/ui/apps/preview';
@@ -290,23 +286,13 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
         'Content-Type': 'application/octet-stream',
         'X-AgentLink-Input': base64url(JSON.stringify({ changeId })),
       });
-      const mode = presenceMode(proof);
-      if (mode !== undefined) headers.set('X-AgentLink-Presence', mode);
-      const body = presenceBody(proof);
       let res: Response;
       try {
-        res = await doFetch(APPS_APPLY_PATH, {
-          method: 'POST',
-          headers,
-          body: body as BodyInit,
-          credentials: 'same-origin',
-          cache: 'no-store',
-        });
+        // The proof (a passkey output or the typed code) is zeroed once fetch has it; the passkey
+        // answers a ceremony for this request (REL051-SF1, api/presence-ceremony.ts).
+        res = await sendWithProof(doFetch, APPS_APPLY_PATH, headers, proof);
       } catch {
         return { kind: 'offline' };
-      } finally {
-        // The proof (a passkey output or the typed code) is zeroed once fetch has it.
-        body.fill(0);
       }
       const json = await jsonOf(res);
       const status = json?.['status'];

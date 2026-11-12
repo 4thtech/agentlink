@@ -70,6 +70,7 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ],
   ['/settings/apps', 'AI apps', 'Settings'],
   ['/settings/files', 'Files', 'Settings'],
+  ['/settings/storage', 'Storage', 'Settings'],
   ['/settings/appearance', 'Appearance', 'Settings'],
   ['/settings/rules', 'Rules', 'Settings'],
   ['/settings/proofs', 'Proofs & credits', 'Settings'],
@@ -117,8 +118,15 @@ describe('routes', () => {
     mountAt('/agents/work');
     expect(location.pathname).toBe('/agents/work');
     // The Agents page draws the agent's page (its heading is the agent's label once read).
-    expect(host.querySelector('main.ag-page')).not.toBeNull();
+    expect(host.querySelector('main .ag-page')).not.toBeNull();
     expect(currentSection()).toBe('My IDs');
+  });
+
+  it('R1-UI-17: each page sets its own document title', () => {
+    mountAt('/people');
+    expect(document.title).toBe('People · AgentLink');
+    mountAt('/activity');
+    expect(document.title).toBe('Activity · AgentLink');
   });
 
   it('shows the not-found state for an unknown path, still in the layout', () => {
@@ -158,7 +166,6 @@ describe('routes', () => {
     ['/settings/messages', '/'],
     ['/inbox', '/'],
     ['/settings/contacts', '/people'],
-    ['/settings/storage', '/settings/files'],
     ['/settings/passkeys', '/settings/backup'],
     ['/settings/notifications', '/settings'],
     ['/advanced', '/advanced/network'],
@@ -192,6 +199,7 @@ describe('the sections (nav.ts)', () => {
       'Touch ID & master code',
       'AI apps',
       'Files folder',
+      'Storage',
       'Appearance',
       'Rules',
       'Proofs & credits',

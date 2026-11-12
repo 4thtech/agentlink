@@ -28,6 +28,7 @@ import {
 import { switchToPasskey, type SwitchToPasskey } from './passkey-switch.js';
 import { desktopPlatform, nativeConfirmLabel } from '../../presence/desktop.js';
 import { readNativeStatus, type NativeStatus } from '../../presence/native-api.js';
+import { usePresenceFlight } from './presence-flight.js';
 import { CONTACTS_STRINGS as S, PASSKEY_WHY } from './strings.js';
 
 type Unavailable = Extract<PasskeyStatus, { kind: 'unavailable' }>;
@@ -81,6 +82,9 @@ export function PresencePrompt({
   const platform = detectPlatform();
   const sensor = SENSOR[platform];
   const info = passkey ?? found;
+  // REL051-UF3 (R1-UI-06): a double click on the sensor button asks once.
+  const flight = usePresenceFlight(busy);
+  const held = busy || flight.asking;
 
   const readStatus = async (): Promise<PasskeyStatus> => {
     try {
@@ -137,12 +141,16 @@ export function PresencePrompt({
     onSubmit(proof);
   };
   const usePasskey = (): void => {
-    if (info === undefined || busy) return;
+    if (info === undefined || busy || !flight.start()) return;
     setNotUsed(false);
-    void passkeyProof(info).then((proof) => {
-      if (proof === undefined) setNotUsed(true);
-      else onSubmit(proof);
-    });
+    void passkeyProof(info)
+      .catch(() => undefined)
+      .then((proof) => {
+        flight.done();
+        if (!mounted.current) return;
+        if (proof === undefined) setNotUsed(true);
+        else onSubmit(proof);
+      });
   };
 
   const submitSwitch = (event: FormEvent): void => {
@@ -331,11 +339,11 @@ export function PresencePrompt({
         </>
       ) : (
         <div className="ct-actions">
-          <Button variant="primary" icon="approval" onClick={usePasskey} disabled={busy}>
+          <Button variant="primary" icon="approval" onClick={usePasskey} disabled={held}>
             {S.usePasskeyOn(sensor)}
           </Button>
-          <UseCodeInstead onClick={() => setUseCode(true)} disabled={busy} />
-          <Button variant="ghost" onClick={onCancel} disabled={busy}>
+          <UseCodeInstead onClick={() => setUseCode(true)} disabled={held} />
+          <Button variant="ghost" onClick={onCancel} disabled={held}>
             {S.cancel}
           </Button>
         </div>

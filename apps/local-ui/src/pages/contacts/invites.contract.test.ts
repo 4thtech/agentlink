@@ -8,6 +8,8 @@ import {
   INVITE_CANCEL,
   INVITE_CANCEL_PATH,
   INVITE_CREATE,
+  INVITE_LINK,
+  INVITE_LINK_PATH,
   INVITES_LIST,
   INVITES_PATH,
   INVITES_WORLD,
@@ -19,6 +21,7 @@ import { createApiClient } from '../../api/client.js';
 import {
   INVITE_CANCEL_PATH as PAGE_CANCEL_PATH,
   INVITE_CREATE_PATH as PAGE_CREATE_PATH,
+  INVITE_LINK_PATH as PAGE_LINK_PATH,
   INVITES_LIST_PATH,
   createInviteApi,
   parseOpenInvites,
@@ -219,6 +222,49 @@ describe('cancel', () => {
   it('never sends an ID of another shape', async () => {
     const s = answering(INVITE_CANCEL.cancelled.answer);
     const out = await createInviteApi({ fetch: s.fetch, token: 't' }).cancel('../../x');
+    expect(s.sent).toEqual([]);
+    expect(out.kind).toBe('failed');
+  });
+});
+
+describe('copy an open invite link again (REL051-B2)', () => {
+  it('uses the contract path', () => {
+    expect(PAGE_LINK_PATH).toBe(INVITE_LINK_PATH);
+  });
+
+  it.each([
+    ['ok', INVITE_LINK.ok],
+    ['gone', INVITE_LINK.gone],
+    ['old', INVITE_LINK.old],
+  ] as const)('builds the sample request and reads %s', async (_name, sample) => {
+    const s = answering(sample.answer);
+    const out = await createInviteApi({ fetch: s.fetch, token: 't' }).link!(sample.body.inviteId);
+    expect(s.sent).toHaveLength(1);
+    expect(s.sent[0]?.method).toBe('POST');
+    expect(s.sent[0]?.path).toBe(INVITE_LINK_PATH);
+    expect(s.sent[0]?.search).toBe('');
+    expect(s.sent[0]?.headers.get('content-type')).toBe('application/octet-stream');
+    expect(s.sent[0]?.headers.get('x-agentlink-csrf')).toBe('t');
+    expect(s.sent[0]?.headers.get('x-agentlink-input')).toBeNull();
+    expect(JSON.parse(s.sent[0]?.body ?? '')).toEqual(sample.body);
+    expect(out.kind).toBe(sample.outcome);
+    if (out.kind === 'ok') expect(out.inviteUrl).toBe(INVITES_WORLD.shortLink);
+  });
+
+  it('refuses a link of another host or shape, or a share text around another link', async () => {
+    const api = (body: unknown) =>
+      createInviteApi({ fetch: answering({ status: 200, body }).fetch, token: 't' }).link!(
+        INVITES_WORLD.inviteId,
+      );
+    const good = INVITE_LINK.ok.answer.body;
+    expect((await api({ ...good, inviteUrl: 'https://evil.example/i#2.x' })).kind).toBe('failed');
+    expect((await api({ ...good, shareText: 'see https://evil.example' })).kind).toBe('failed');
+    expect((await api({ ...good, format: 'odd' })).kind).toBe('failed');
+  });
+
+  it('never sends an ID of another shape', async () => {
+    const s = answering(INVITE_LINK.ok.answer);
+    const out = await createInviteApi({ fetch: s.fetch, token: 't' }).link!('../../x');
     expect(s.sent).toEqual([]);
     expect(out.kind).toBe('failed');
   });

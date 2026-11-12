@@ -395,7 +395,7 @@ describe('the page behind the open sheet is inert (UI-REFRESH-f-b)', () => {
     mount(props());
     expect(page.hasAttribute('inert')).toBe(true);
     expect(dialog().closest('[inert]')).toBeNull();
-    expect(host.hasAttribute('inert')).toBe(false);
+    expect(host.hasAttribute('inert')).toBe(true); // the layer is drawn on <body>: the page's root is a sibling
     expect(document.activeElement?.closest('[inert]') ?? null).toBeNull();
   });
 

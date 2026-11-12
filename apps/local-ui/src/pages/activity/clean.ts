@@ -65,6 +65,8 @@ export type ActivityItem =
   | { readonly kind: 'contact_checked'; readonly at: number; readonly contactId?: string }
   | { readonly kind: 'contact_removed'; readonly at: number; readonly contactId?: string }
   | { readonly kind: 'contact_revoked'; readonly at: number; readonly contactId?: string }
+  // R1-SEC-03 (04 §3.6): someone else also answered the invite this contact used.
+  | { readonly kind: 'invite_answered_twice'; readonly at: number; readonly contactId?: string }
   | {
       readonly kind: 'contact_renamed';
       readonly at: number;
@@ -206,6 +208,7 @@ export function parseItem(raw: unknown): ActivityItem | undefined {
     case 'contact_checked':
     case 'contact_removed':
     case 'contact_revoked':
+    case 'invite_answered_twice':
       return { kind, at, ...ref(raw['contactId']) };
     case 'contact_renamed': {
       const formerName = plain(raw['formerName']);
@@ -606,6 +609,17 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
         pill: S.pillRemoved,
         link: link(S.linkPeople, '/contacts'),
       });
+    case 'invite_answered_twice':
+      // R1-SEC-03 (04 §3.6; 11 §6 "Invite answered twice"; D-146: the 12 digits, the Contact check).
+      return build({
+        icon: 'untrusted',
+        tone: 'warning',
+        sentence: names(S.inviteAnsweredTwice, item.contactId),
+        grey: S.inviteAnsweredTwiceLine,
+        pill: S.pillAnsweredTwice,
+        link: link(S.linkPeople, '/contacts'),
+        words: 'invite answered twice contact check 12 digits',
+      });
     case 'contact_renamed':
       return build({
         icon: 'users',
@@ -747,6 +761,7 @@ export const WEEK_SECONDS = 7 * 24 * 3600;
 /** QA2: the kinds the Safety filter shows (with denied approvals). */
 const SAFETY_KINDS: ReadonlySet<string> = new Set([
   'rules_changed',
+  'invite_answered_twice',
   'sender_blocked',
   'contact_blocked',
   'contact_unblocked',

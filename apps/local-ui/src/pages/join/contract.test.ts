@@ -134,7 +134,7 @@ describe('contract (page): the join screen client and the shared samples', () =>
     expect(
       await api.accept(JOIN_ACCEPT.changed.input.inviteId, {
         kind: 'passkey',
-        body: new Uint8Array([1, 2, 3]),
+        gesture: () => Promise.resolve(new Uint8Array([1, 2, 3])),
       }),
     ).toEqual({ kind: JOIN_ACCEPT.changed.outcome });
   });

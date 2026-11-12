@@ -12,7 +12,7 @@ export const PROOFS_STRINGS = {
   emptyTitle: 'No proofs yet. Ask your AI to send something with proof.',
   emptyPrompt: 'Send contract.pdf to Marko with proof.',
   listUnavailable: "Your proofs can't be loaded right now. Try again in a minute.",
-  notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
+  notSetUp: "AgentLink isn't set up on this computer yet. Create your first ID on Home.",
   creditsLabel: 'Credits',
   testCreditsLabel: 'Test credits',
   testCredits: 'During the beta, proofs use free test credits.',

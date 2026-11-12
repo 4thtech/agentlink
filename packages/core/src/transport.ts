@@ -63,6 +63,15 @@ export interface TransportSubscribeOptions {
 /** Ends a live subscription: CLOSE on each relay, no reconnect; resolves once in-flight handlers settle. */
 export type TransportUnsubscribe = Unsubscribe;
 
+/** REL051-CF2: relays reachable from here now, out of the distinct relays asked about. */
+export interface RelayStatus {
+  readonly connected: number;
+  readonly total: number;
+}
+
+/** REL051-CF2: at most this many relays are checked at once (07 §4.3: a list holds at most 32). */
+const MAX_STATUS_RELAYS = 32;
+
 /** The transport as the core's send pipeline and outbox use it (07 §4.1, split as above). */
 export interface Transport {
   /**
@@ -89,6 +98,12 @@ export interface Transport {
    * @throws TransportError for bad arguments (no relays, no keys).
    */
   subscribe?(options: TransportSubscribeOptions): TransportUnsubscribe;
+  /**
+   * REL051-CF2: how many of `relays` this machine can connect to now (the app's network status).
+   * Opens (or reuses) a pooled connection to each, with the pool's checks and 10 s connect bound,
+   * sends nothing on it and releases it. Counts only: never an address or a reason. Optional.
+   */
+  relayStatus?(relays: readonly string[]): Promise<RelayStatus>;
   /**
    * Closes every relay connection and ends what waits on one. Idempotent. Optional: a transport
    * that holds nothing open has nothing to close. A one-shot command calls it so the process can
@@ -155,6 +170,23 @@ export function nostrTransport(options: NostrTransportOptions): TransportFactory
         wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
       publish: (event, relays) => pool.publish(event, relays),
       close: () => pool.close(),
+      relayStatus: async (relays) => {
+        const unique = [...new Set(relays)].slice(0, MAX_STATUS_RELAYS);
+        const open = await Promise.all(
+          unique.map(async (relay) => {
+            try {
+              const link = await pool.connect(relay);
+              if (typeof link === 'string') return false;
+              const up = link.isOpen();
+              link.release();
+              return up;
+            } catch {
+              return false;
+            }
+          }),
+        );
+        return { connected: open.filter(Boolean).length, total: unique.length };
+      },
       sync: (sync) =>
         engineFor(sync.persistence).sync({
           relays: sync.relays,

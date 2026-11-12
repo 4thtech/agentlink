@@ -7,7 +7,7 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppsApi } from '../first-run/apps-api.js';
-import type { OwnerClient } from '../contacts/owner.js';
+import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import type { RestoreApi, Summary } from './api.js';
 import { clean, toGroups } from './code-field.js';
 import { createSetupApi } from '../first-run/setup-api.js';
@@ -347,6 +347,34 @@ describe('step 2: your recovery code', () => {
     expect(text()).toContain(S.CODE.assurance);
   });
 
+  it('REL051-UF3 (R1-UI-06): a double click on Confirm with Touch ID asks once and confirms once', async () => {
+    const presence = vi.fn(() => ok({}));
+    const api = fakeApi({
+      header: () => ok({ header: 'ok' as const, ownerPresent: true }),
+      presence,
+    });
+    let answer: ((p: PresenceProof) => void) | undefined;
+    const passkeyProof = vi.fn(
+      (): Promise<PresenceProof | undefined> =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    await mount(api, { owner: owner(true), passkeyProof });
+    await click(S.KIT.next);
+    const confirm = button(S.PRESENCE.usePasskey('Touch ID'));
+    await act(async () => confirm?.click());
+    await act(async () => confirm?.click());
+    expect(passkeyProof).toHaveBeenCalledTimes(1);
+    expect(confirm?.disabled).toBe(true);
+    await act(async () =>
+      answer?.({ kind: 'passkey', gesture: () => Promise.resolve(new Uint8Array([1])) }),
+    );
+    await settle();
+    expect(presence).toHaveBeenCalledTimes(1);
+    expect(text()).toContain(S.CODE.title);
+  });
+
   it('asks for presence first on a computer that already has an owner', async () => {
     const presence = vi.fn(() => ok({}));
     const api = fakeApi({
@@ -476,6 +504,31 @@ describe('step 3: what comes back', () => {
     expect(call[2]).toEqual({ ['0x' + '2'.repeat(40)]: 'work-2' });
   });
 
+  it('REL051-UF3 (R1-UI-08): rows use the name people see; the folder only Under the hood', async () => {
+    const named: Summary = {
+      ...SUMMARY,
+      ids: [
+        // Restore on the same computer: the server knows the label of an ID already here.
+        { ...SUMMARY.ids[2]!, label: 'Ana Novak' },
+        // A new ID from the first-run folder: its label is inside the kit, read once restored.
+        { ...SUMMARY.ids[0]!, name: 'default' },
+      ],
+    };
+    await toReview(fakeApi({ open: () => ok({ kit: 'kit-handle', summary: named }) }));
+    const rowNames = [...host.querySelectorAll('.rs-row-name')].map((n) => n.textContent);
+    expect(rowNames).toEqual(['Ana Novak', S.REVIEW.firstId]);
+    const boxes = [...host.querySelectorAll<HTMLInputElement>('.rs-row input[type="checkbox"]')];
+    expect(boxes.map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Restore Ana Novak',
+      `Restore ${S.REVIEW.firstId}`,
+    ]);
+    expect(text()).not.toContain('macbook');
+    expect(text()).not.toContain('default');
+    // R1-UI-26: no Under the hood block in Simple.
+    expect(host.querySelector('.rs-hood')).toBeNull();
+    expect(text()).not.toContain(S.REVIEW.hood);
+  });
+
   it('keeps Restore off when nothing is ticked', async () => {
     await toReview(fakeApi());
     for (const b of host.querySelectorAll<HTMLInputElement>('.rs-row input:not(:disabled)')) {
@@ -515,7 +568,7 @@ describe('step 4: protect and reconnect', () => {
     expect(m.left).toEqual(['/']);
   });
 
-  async function newComputer(): Promise<void> {
+  async function newComputer(): Promise<{ left: string[] }> {
     const api = fakeApi({
       applyBegin: () =>
         ok({
@@ -552,8 +605,9 @@ describe('step 4: protect and reconnect', () => {
       body: new Uint8Array([1]),
       created: [new Uint8Array([1])],
     });
-    await toReview(api);
+    const m = await toReview(api);
     await click('Restore 2 IDs');
+    return m;
   }
 
   it('new computer: the master code is shown once, Home waits for "I saved it"', async () => {
@@ -570,6 +624,33 @@ describe('step 4: protect and reconnect', () => {
       box.click();
     });
     expect(button(S.PROTECT.home)?.disabled).toBe(false);
+  });
+
+  it('R1-UI-02: Cancel on step 4 asks first while the new master code is not saved', async () => {
+    const { left } = await newComputer();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await click(S.WIZARD.cancel);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(String(confirm.mock.calls[0]?.[0])).toMatch(/only once/);
+    expect(left).toEqual([]);
+    expect(text()).toContain(S.PROTECT.codeTitle);
+    confirm.mockReturnValue(true);
+    await click(S.WIZARD.cancel);
+    expect(left).toEqual(['/']);
+    confirm.mockRestore();
+  });
+
+  it('R1-UI-02: once "I saved it" is ticked, Cancel leaves without asking', async () => {
+    const { left } = await newComputer();
+    const box = host.querySelector<HTMLInputElement>('.rs-saved input') as HTMLInputElement;
+    await act(async () => {
+      box.click();
+    });
+    const confirm = vi.spyOn(window, 'confirm');
+    await click(S.WIZARD.cancel);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(left).toEqual(['/']);
+    confirm.mockRestore();
   });
 
   it('survives the page being mounted again for the ID that opened (step 4 keeps its result)', async () => {

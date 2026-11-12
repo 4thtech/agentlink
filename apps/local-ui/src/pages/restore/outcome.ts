@@ -2,7 +2,8 @@
 // the app then swaps the shell and the page for the ID that is open now (router.tsx, useAgentEpoch):
 // the wizard mounts again. The result of the restore, including the new master code that is shown once,
 // therefore lives here, in memory of this page only, until "Go to Home" or Cancel. It is never written
-// to storage, a URL or an attribute, and a reload of the page loses it by design.
+// to storage, a URL or an attribute. REL051-CF3: a reload no longer loses it: the server keeps the
+// code and outcome for this page session (10 minutes, until "I saved it") and the wizard asks again.
 import { useSyncExternalStore } from 'react';
 
 export interface RestoreOutcome {

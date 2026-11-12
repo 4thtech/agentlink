@@ -166,6 +166,11 @@ export const TABLES = {
       drop_lookup_id: opt('enc'),
       drop_key_epoch: opt('enc'),
       cancelled_at: opt('int'),
+      // REL051-B2 (owner test, 13 Nov; 04 §3.6; schema version 14): the link this invite was handed
+      // out as (short, long or the long fallback), sealed like proof_key, so the owner can copy it
+      // again from Home or People while the invite is open. Cleared when it is used or cancelled;
+      // null on a row from before version 14.
+      invite_link: opt('enc'),
     },
     primaryKey: ['invite_id'],
   },

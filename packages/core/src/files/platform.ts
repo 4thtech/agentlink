@@ -21,7 +21,7 @@ export interface OutgoingFile {
   readonly realpath: string;
   /** The name the contact sees. Default: the last segment of `realpath`. */
   readonly name?: string;
-  /** Default `application/octet-stream`. */
+  /** Default: from the name's extension (`mimeForName`, REL051-A12), else `application/octet-stream`. */
   readonly mime?: string;
   /** Plaintext bytes; a file that reads to another length is refused (`file_changed`). */
   readonly size: number;
@@ -57,6 +57,11 @@ export interface InboxFolder {
   mark?(name: string): Promise<QuarantineMark>;
   /** W4-AUTO-SAVE: true when `name` is a regular file directly inside the folder (no link followed). */
   isSavedFile?(name: string): Promise<boolean>;
+  /**
+   * REL051-A12: the bytes of `name` when it is a regular file directly inside the folder (no link
+   * followed) of at most `maxBytes`; otherwise undefined. The core re-hashes them before any use.
+   */
+  readSaved?(name: string, maxBytes: number): Promise<Uint8Array | undefined>;
   /** W4-AUTO-SAVE: releases the held folder handle; the core calls it once the save ended. */
   close?(): Promise<void>;
 }

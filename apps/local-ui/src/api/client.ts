@@ -4,6 +4,7 @@
 // results; bodies and the token are never logged.
 
 import { noteHostReached, noteHostUnreachable } from './host-closed.js';
+import { sendWithProof, type CeremonyGesture } from './presence-ceremony.js';
 
 export type ApiResult<T> =
   | { readonly kind: 'ok'; readonly status: number; readonly data: T }
@@ -46,12 +47,12 @@ export interface ApiClient {
   owner(path: string, input: unknown, presence: OwnerPresence): Promise<OwnerApiResult>;
 }
 
-/** The master code as typed, or a passkey assertion body (contacts/owner.ts `passkeyProof`). */
+/**
+ * The master code as typed, the passkey gesture (contacts/owner.ts `passkeyProof`; REL051-SF1), or
+ * Touch ID / Windows Hello in the desktop app (DESK-D12c; no bytes, a ceremony per gesture: C6).
+ */
 export type OwnerPresence =
-  | string
-  | { readonly passkey: Uint8Array }
-  /** DESK-D12c: Touch ID / Windows Hello in the desktop app (no bytes). */
-  | { readonly native: true };
+  string | { readonly passkey: CeremonyGesture } | { readonly native: true };
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
 
@@ -147,27 +148,29 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         'content-type': 'application/octet-stream',
         'X-AgentLink-Input': base64url(JSON.stringify(input)),
       });
-      if (typeof presence !== 'string') {
-        headers.set('X-AgentLink-Presence', 'native' in presence ? 'native' : 'passkey');
-      }
-      res = await doFetch(path, {
-        method: 'POST',
-        headers,
-        body:
-          typeof presence === 'string'
-            ? presence
-            : 'native' in presence
-              ? new Uint8Array(0)
-              : (presence.passkey as BodyInit),
-        credentials: 'same-origin',
-        cache: 'no-store',
-      });
+      // REL051-SF1: the passkey answers a ceremony for exactly this request; DESK051-C6: so does
+      // native presence (the server runs the gesture for its ceremony).
+      res =
+        typeof presence === 'string'
+          ? await doFetch(path, {
+              method: 'POST',
+              headers,
+              body: presence,
+              credentials: 'same-origin',
+              cache: 'no-store',
+            })
+          : await sendWithProof(
+              doFetch,
+              path,
+              headers,
+              'native' in presence
+                ? { kind: 'native' }
+                : { kind: 'passkey', gesture: presence.passkey },
+            );
     } catch (error) {
       if (refused !== undefined) throw error;
       noteHostUnreachable();
       return { kind: 'offline' };
-    } finally {
-      if (typeof presence !== 'string' && 'passkey' in presence) presence.passkey.fill(0);
     }
     noteHostReached();
     const parsed = await readJson(res);

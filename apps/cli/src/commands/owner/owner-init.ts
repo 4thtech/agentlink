@@ -17,7 +17,7 @@
 import type { OwnerPublicKeys } from '@4thtech-io/crypto';
 import { decodeHex0x } from '@4thtech-io/crypto';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../../dispatch.js';
-import { isRestrictedAlias } from '@4thtech-io/core';
+import { isOwnIdName } from '@4thtech-io/core';
 import type { OwnerSetupOptions } from '@4thtech-io/node';
 import { isAgentLabel, isAgentName } from '../../runtime/agent-name.js';
 import { badArguments, openOne, ownerStep } from './common.js';
@@ -40,7 +40,7 @@ function firstLabelOf(
 ): { readonly label: string; readonly actions: FirstLabelActions } | undefined {
   const given = context.parsed.values['label'];
   const label = typeof given === 'string' ? given.normalize('NFC') : folder;
-  if (!isAgentLabel(label) || !isRestrictedAlias(label)) return undefined;
+  if (!isAgentLabel(label) || !isOwnIdName(label)) return undefined;
   return { label, actions };
 }
 

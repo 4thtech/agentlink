@@ -582,8 +582,10 @@ describe('agentlink_list_contacts (06 §2.1)', () => {
         label: 'self-declared',
         nameSource: 'counterparty',
         ownerFingerprint: '7F3A\u00b719C2',
+        shortId: B.slice(0, 10),
         pairing: 'complete',
         safetyCodeChecked: true,
+        connectedAt: '2025-10-09T08:53:20Z',
         lastActivity: '2025-10-15T03:46:40Z',
         unread: 5,
       },
@@ -608,6 +610,22 @@ describe('agentlink_list_contacts (06 §2.1)', () => {
     expect(result.structured.summary).toBe(
       'You have 3 contacts: \u201coc-test\u201d (self-declared) (owner 1111\u00b72222), \u201coc-test\u201d (self-declared) (owner 3333\u00b74444), \u201cAna\u201d (self-declared).',
     );
+  });
+
+  it('N12: two same-named contacts with the same ID tag are told apart by their short id', async () => {
+    const client = fakeClient({
+      contacts: [contact(B, display('Bo')), contact(C, display('Bo')), contact(A, display('Ana'))],
+    });
+    const result = await callTool('agentlink_list_contacts', {}, context(client));
+    expect(result.structured.summary).toBe(
+      'You have 3 contacts: \u201cBo\u201d (self-declared) (owner 7F3A\u00b719C2, id 0xbbbbbbbb), \u201cBo\u201d (self-declared) (owner 7F3A\u00b719C2, id 0xcccccccc), \u201cAna\u201d (self-declared).',
+    );
+    const listed = result.structured['contacts'] as { id: string; connectedAt: string }[];
+    expect(listed.map((c) => c.connectedAt)).toEqual([
+      '2025-10-09T08:53:20Z',
+      '2025-10-09T08:53:20Z',
+      '2025-10-09T08:53:20Z',
+    ]);
   });
 
   it('ok: no contacts yet', async () => {
@@ -978,6 +996,7 @@ describe('resolveContact (06 §2: ID, name; AMBIGUOUS_CONTACT with candidates)',
         nameSource: 'counterparty',
         ownerFingerprint: '7F3A\u00b719C2',
         shortId: '0xbbbbbbbb',
+        connectedAt: '2025-10-09T08:53:20Z',
       },
       {
         id: C,
@@ -986,8 +1005,50 @@ describe('resolveContact (06 §2: ID, name; AMBIGUOUS_CONTACT with candidates)',
         nameSource: 'counterparty',
         ownerFingerprint: '7F3A\u00b719C2',
         shortId: '0xcccccccc',
+        connectedAt: '2025-10-09T08:53:20Z',
       },
     ]);
+  });
+
+  it('N12: the summary lists every option by ID tag, short id and day connected; never a name', () => {
+    const out = resolveContact('bo', [
+      contact(B, display('Bo'), { fingerprint: '1111\u00b72222' }),
+      contact(C, display('Bo'), { fingerprint: '3333\u00b74444' }),
+      contact(A, display('Ana')),
+    ]);
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    const result = finalizeResult(out.output, []);
+    expect(result.structured.status).toBe('error');
+    expect(result.structured.code).toBe('AMBIGUOUS_CONTACT');
+    expect(result.structured.summary).toBe(
+      'More than one contact has that name, so nothing was done. They are: 1) owner 1111\u00b72222, id 0xbbbbbbbb, connected 2025-10-09; 2) owner 3333\u00b74444, id 0xcccccccc, connected 2025-10-09.',
+    );
+    expect(String(result.structured.summary)).not.toMatch(/Bo|Ana/);
+  });
+
+  it('N12: the next step asks the user which one and never sends them to a terminal to rename', () => {
+    const out = resolveContact('bo', [contact(B, display('Bo')), contact(C, display('Bo'))]);
+    if (out.ok) throw new Error('resolved');
+    const next = String(finalizeResult(out.output, []).structured.nextStep);
+    expect(next).toContain('ask the user which one they mean');
+    expect(next).toContain('never pick one yourself');
+    expect(next).toContain('with its id');
+    expect(next).toContain('People');
+    expect(next).not.toContain('terminal');
+    expect(next).not.toContain('contacts rename');
+  });
+
+  it('N12: many same-named contacts still fit one summary', () => {
+    const many = Array.from({ length: 9 }, (_, i) =>
+      contact(`0x${String(i + 1).repeat(40)}`, display('Bo')),
+    );
+    const out = resolveContact('Bo', many);
+    if (out.ok) throw new Error('resolved');
+    const result = finalizeResult(out.output, []);
+    expect(result.structured.code).toBe('AMBIGUOUS_CONTACT');
+    expect(String(result.structured.summary)).toContain('and 4 more');
+    expect(result.structured['candidates']).toHaveLength(9);
   });
 
   it('C-3: candidates carry the full id, which resolves; the query is never echoed', () => {
@@ -1027,8 +1088,8 @@ describe('resolveContact (06 §2: ID, name; AMBIGUOUS_CONTACT with candidates)',
     expect(dump(result)).not.toContain('CANARY');
   });
 
-  it('not found (and blocked contacts are not offered) without echoing the query', () => {
-    for (const query of [MESSAGE_CANARY, 'Old', '']) {
+  it('not found without echoing the query', () => {
+    for (const query of [MESSAGE_CANARY, '']) {
       const out = resolveContact(query, views);
       expect(out.ok).toBe(false);
       if (out.ok) return;
@@ -1036,6 +1097,18 @@ describe('resolveContact (06 §2: ID, name; AMBIGUOUS_CONTACT with candidates)',
       expect(result.structured.status).toBe('not_found');
       expect(dump(result)).not.toContain('CANARY');
     }
+  });
+
+  // REL051-CF1 (R1-CLASS-11): a blocked contact is still never offered, but it reads as blocked,
+  // with fixed text and no name or candidates.
+  it('a blocked contact is not offered: CONTACT_BLOCKED, never its name', () => {
+    const out = resolveContact('Old', views);
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    const result = finalizeResult(out.output, []);
+    expect(result.structured).toMatchObject({ status: 'error', code: 'CONTACT_BLOCKED' });
+    expect(result.structured['candidates']).toBeUndefined();
+    expect(dump(result)).not.toContain('Old');
   });
 });
 

@@ -7,7 +7,7 @@ import { navigate } from '../../router.js';
 import type { AgentsApi } from './api.js';
 import { AGENTS_PATH, tidyCandidates } from './data.js';
 import { AGENTS_STRINGS as S } from './strings.js';
-import { agentsOpened, dismissTidy, tidyDismissed } from './tidy.js';
+import { agentsOpened, dismissTidy, dueForTidy, tidyDismissed } from './tidy.js';
 import { listOf, useAgents } from './use-agents.js';
 import './agents.css';
 
@@ -15,7 +15,14 @@ export function TidyNote({ api }: { api?: AgentsApi } = {}): ReactElement | null
   const { state } = useAgents(api, () => undefined);
   const [hidden, setHidden] = useState(() => tidyDismissed() || agentsOpened());
   const list = listOf(state);
-  const count = useMemo(() => tidyCandidates(list?.agents ?? []).length, [list]);
+  // R1-UI-09: never right after a restore or a first run: only IDs that stayed unused for days, and
+  // never for the only ID (there is nothing to tidy).
+  const count = useMemo(() => {
+    const rows = list?.agents ?? [];
+    const names = tidyCandidates(rows).map((r) => r.name);
+    const due = dueForTidy(names);
+    return rows.filter((r) => !r.removing).length < 2 ? 0 : due.length;
+  }, [list]);
   if (hidden || list === undefined || !list.switchable || count === 0) return null;
   return (
     <PageNotice

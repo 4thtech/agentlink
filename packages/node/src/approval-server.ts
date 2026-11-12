@@ -25,10 +25,15 @@
 //   link token, in memory only, put in the URL it opens (`/?t=…`). The first request with it
 //   exchanges it for a new random session secret in an HttpOnly, SameSite=Strict cookie scoped to this
 //   port's name and redirects to the same path without the token; the link token is then gone, so a
-//   link left in browser history never opens the page again. An unused link dies after
+//   link left in browser history never opens the page again. R1-SEC-05: the OS opener never puts
+//   the link in a program's argv (approval-os.ts: a private launch file); a link that arrives as a
+//   navigation that is not the OS's own (fetch metadata other than `none`) gets the cookie with a
+//   same-origin continue page instead of the redirect, since browsers drop a SameSite=Strict cookie
+//   on such a redirect. An unused link dies after
 //   SESSION_LINK_LIFETIME_MS. At most MAX_LINKS links and MAX_SESSIONS sessions are held (the oldest
-//   is dropped). No token, cookie or CSRF value is written to disk, logged, put in an event, an
-//   approval URL or an error body.
+//   is dropped). No token, cookie or CSRF value is written to disk (except the one-shot link inside
+//   the OS opener's private 0600 launch file, R1-SEC-05), logged, put in an event, an approval URL
+//   or an error body.
 // - DNS rebinding: the `Host` header must be exactly `localhost:<port>` (so `127.0.0.1:<port>`,
 //   `[::1]:<port>`, `LOCALHOST:<port>` and `localhost.:<port>` are refused); any `Origin` header present
 //   must be exactly `http://localhost:<port>`; a POST must carry that Origin.
@@ -207,6 +212,7 @@ import {
 } from './approval-os.js';
 import { failedBody } from './local-ui/failure-reasons.js';
 import { revealSavedFile } from './local-ui/reveal-file.js';
+import { readSavedText, type PreviewReadLimits } from './local-ui/read-preview.js';
 import { EXPIRED_HTML, NOT_FOUND_HTML, NO_APP_HTML } from './approval-pages.js';
 import { isAppPagePath } from '@4thtech-io/types/ui-contract/app-pages';
 import { NodeKeyStoreError } from './errors.js';
@@ -226,6 +232,13 @@ import {
   type PayConfirmHold,
   type PayConfirmTarget,
 } from './pay-confirm.js';
+import {
+  PRESENCE_CEREMONY_HEADER,
+  PRESENCE_CEREMONY_TTL_MS,
+  PRESENCE_CHALLENGE_MODE,
+  PresenceCeremonies,
+  presenceBinding,
+} from './presence-ceremony.js';
 import { takeReviewedRules } from './local-ui/api/rules.js';
 import { grouped } from './owner-init.js';
 import {
@@ -268,6 +281,16 @@ import {
   type SetupRegistration,
 } from './owner-setup.js';
 import { createRestoreEngine, type RestoreEngine } from './recovery-kit-restore.js';
+import { removeStaleRestoreFiles } from './restore-quarantine.js';
+import { MasterCodeHold } from './local-ui/master-code-hold.js';
+import {
+  readUnsavedMarker,
+  removeUnsavedMarker,
+  writeUnsavedMarker,
+} from './master-code-unsaved.js';
+
+/** REL051-CF3: how long a /api/ui/ request waits for the start-up settle at most. */
+const SETTLE_WAIT_MS = 5_000;
 import {
   keepsFolder,
   prepareSendFolder,
@@ -298,7 +321,7 @@ import { AI_APP_IDS, appChangeId } from './local-ui/api/apps.js';
 import {
   PASSKEY_RP_ID,
   assertPasskeyAssertion,
-  parsePasskeyAssertion,
+  encodePasskeyAssertion,
   parsePasskeyRegistration,
   readOwnerPasskeyHeader,
   readOwnerPasskeyKey,
@@ -340,6 +363,7 @@ import type {
   LocalUiResult,
   LocalUiRevealRoute,
   LocalUiKitRevealRoute,
+  LocalUiMarkRoute,
   LocalUiUiSettingsRoute,
   LocalUiSetupStep,
 } from './local-ui/route-types.js';
@@ -351,6 +375,7 @@ import {
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
 import { createPeopleAllDesk } from './local-ui/api/people-all.js';
+import { createStorageDesk, inboxUsageOf } from './local-ui/api/storage.js';
 import {
   AppHostSlot,
   FIRST_AGENT_LABEL,
@@ -389,6 +414,7 @@ import {
   createLocalUiRoutes,
 } from './local-ui/routes.js';
 import { createHealthReader } from './local-ui/api/health.js';
+import { networkHealthSource, type NetworkHealthClient } from './local-ui/network-health.js';
 import { LiveEvents, type LiveEventSink } from './local-ui/api/events.js';
 import { LiveStatusTracker, liveAgentRecord } from './local-ui/live-status.js';
 import {
@@ -494,6 +520,23 @@ const REVIEW_ITEM = /^(apr_[A-Za-z0-9_-]{22}):([0-9a-f]{64}):([ad])$/;
  * fixed page), never raw JSON; the API keeps its JSON answers.
  */
 const APP_PAGE = { test: (path: string): boolean => path !== '/' && isAppPagePath(path) };
+
+/**
+ * R1-SEC-05: the same-origin continue page after a session link opened from the launch file. `path`
+ * is a checked page path (`/`, APPROVE_PAGE or APP_PAGE); it is escaped anyway. No script, no token.
+ */
+function continuePage(path: string): string {
+  const safe = path.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? '',
+  );
+  return (
+    '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+    `<meta http-equiv="refresh" content="0;url=${safe}">` +
+    '<title>AgentLink</title></head>' +
+    `<body><p><a href="${safe}">Open AgentLink</a></p></body></html>`
+  );
+}
 const API_PREFIX = '/api/';
 const ASSETS_PREFIX = '/assets/';
 /** One file name: no separator, no leading dot, no escape. */
@@ -720,6 +763,10 @@ export type ApprovalServerEvent =
         | 'paid_item_in_batch'
         /** M1-PAY-CONFIRM-a: approving a paid item takes its own confirmation (begin, finish). */
         | 'confirm_required'
+        /** REL051-SF1: the passkey has no kept credential key; the master code works. */
+        | 'passkey_update_needed'
+        /** REL051-SF1: the gesture was signed without user verification. */
+        | 'verification_required'
         /** M1-11a: wrong-code backoff in force. */
         | 'wait'
         | 'refused'
@@ -758,6 +805,10 @@ export type ApprovalServerEvent =
         | 'invalid'
         | 'presence_required'
         | 'presence_rejected'
+        /** REL051-SF1: the passkey has no kept credential key; the master code works. */
+        | 'passkey_update_needed'
+        /** REL051-SF1: the gesture was signed without user verification. */
+        | 'verification_required'
         | 'busy'
         | 'needs_setup'
         | 'refused'
@@ -934,6 +985,11 @@ export interface ApprovalServerInternals {
   readonly notifier?: OsNotifier;
   /** MSG-FILES-IO-h: the OS file revealer behind Show in Finder. Default: osFileRevealer. */
   readonly fileRevealer?: FileRevealer;
+  /**
+   * REL051-A34: the home folder a `~/` Inbox folder resolves against for the in-app preview (tests
+   * use a temporary HOME, as the agent's own runtime does). Default: the OS user's home.
+   */
+  readonly filesHome?: string;
   /** The clock in milliseconds (link lifetime, backoff). Default: Date.now. */
   readonly now?: () => number;
   /** M1-11s-b: the /api/ui/ routes. Default: createLocalUiRoutes() (the page files). */
@@ -960,6 +1016,11 @@ export interface ApprovalServerInternals {
     /** The restore engine's keychain read limit (tests). */
     readonly keychainTimeoutMs?: number;
   };
+  /**
+   * REL051-SF3 (T-7): remove the restore folder's stale uploads and quarantined stores when the
+   * server starts. startApprovalServer sets it; a test server sweeps only its own `restore.home`.
+   */
+  readonly sweepRestoreAtStart?: boolean;
   /**
    * WP-R2b (IR M-1): the recovery-kit export walk's per-ID limit and the settle time of a late open
    * (tests: shorter). Default VISIT_STEP_MS and VISIT_SETTLE_MS (app-host.ts).
@@ -1454,6 +1515,15 @@ export async function startApprovalServerWith(
   const fileRevealer = internals.fileRevealer ?? osFileRevealer;
   const revealFile = (inboxFolder: string, savedName: string) =>
     revealSavedFile(inboxFolder, savedName, { opener: fileRevealer });
+  // REL051-A34: the in-app preview's checked read (local-ui/read-preview.ts).
+  const filesHome = internals.filesHome;
+  const previewRead = (inboxFolder: string, savedName: string, limits: PreviewReadLimits) =>
+    readSavedText(
+      inboxFolder,
+      savedName,
+      limits,
+      filesHome === undefined ? {} : { home: filesHome },
+    );
   const notifier = internals.notifier ?? osNotifier;
   const listen = internals.listen ?? listenOnce;
   const emit = (event: ApprovalServerEvent): void => {
@@ -1465,6 +1535,8 @@ export async function startApprovalServerWith(
   };
 
   const now = internals.now ?? Date.now;
+  // REL051-B3b: the health read's uptime counts from here.
+  const serverStartedAt = now();
   /** One-shot session links (M1-11a): token bytes and the time each dies, oldest first. */
   const links: { readonly bytes: Uint8Array; readonly expiresAt: number }[] = [];
   /** Live session secrets (the cookie values), oldest first. */
@@ -1513,6 +1585,11 @@ export async function startApprovalServerWith(
   /** Rejected presence proofs in a row, and when the wait they caused ends (ms). */
   let failures = 0;
   let waitUntil = 0;
+  /**
+   * REL051-CF3: the master code first run or a restore just showed, for a reload of that step
+   * (memory only, this page session, 10 minutes; master-code-hold.ts).
+   */
+  const codeHold = new MasterCodeHold({ now: () => now() });
   /** UX1113 WP-S2: the one staged master-code change, bound to its page session. */
   const ownerCodes = new OwnerCodeChanges({
     keychain: () => keychainOf(),
@@ -1543,6 +1620,8 @@ export async function startApprovalServerWith(
   const handoffBytes = handoffToken === undefined ? undefined : encodeUtf8(handoffToken);
   /** U3-invite: when the last handoff arrived and when the join screen was last opened (ms). */
   let lastHandoffAt = Number.NEGATIVE_INFINITY;
+  /** R1-SEC-15: when the last handoff with a wrong token was refused (ms); throttled on its own. */
+  let lastHandoffRefusedAt = Number.NEGATIVE_INFINITY;
   let lastJoinOpenAt = Number.NEGATIVE_INFINITY;
   // U3-d (D-138; 08 §1; 04 §2.8 "From the local app"): create an agent and save a verified label.
   // Nothing here signs. W4-ONE-TOUCH: creating an agent is the create-agent gate's (createAgentGate).
@@ -1595,6 +1674,41 @@ export async function startApprovalServerWith(
           },
           generation: () => host?.generation ?? 0,
           count: async (name) => (await host?.directory.stats(name))?.contacts,
+        });
+  // REL051-RET1: the read-only Storage view. The open ID through its own client; every other ID as
+  // totals from the read-only store peek (directory.storage); no other store or KeyStore is opened.
+  const storageDesk =
+    options.host === undefined
+      ? undefined
+      : createStorageDesk({
+          entries: async () => (host === undefined ? [] : await host.directory.list()),
+          open: () => {
+            const slot = host;
+            const name = slot?.current;
+            const client = agentUi?.client;
+            if (slot === undefined || name === undefined) return undefined;
+            return {
+              name,
+              label: agentLabel ?? name,
+              generation: slot.generation,
+              contacts: () =>
+                client === undefined
+                  ? Promise.reject(new Error('no client'))
+                  : client.contacts.list(),
+              dropUsage: async () => {
+                const usage = await client?.files.dropUsage();
+                return usage === undefined || !usage.available
+                  ? undefined
+                  : { usedBytes: usage.usedBytes, quotaBytes: usage.quotaBytes };
+              },
+            };
+          },
+          generation: () => host?.generation ?? 0,
+          usage: async (name) => await host?.directory.storage?.(name),
+          inbox: async () =>
+            agentUi?.client === undefined
+              ? undefined
+              : await inboxUsageOf(readOnlyClient(agentUi.client)),
         });
   /**
    * WP-R2b (04 §2.3.3 "Kit record"): what `GET /api/ui/backup` and Show in Finder read. Reads only;
@@ -1678,6 +1792,8 @@ export async function startApprovalServerWith(
       // W4-FILES-SAVE: for the save owner route only; core takes only a `file.save` and re-verifies
       // the owner signature before it saves (I-4).
       ...(agentUi?.client === undefined ? {} : { fileSave: fileSavePort(agentUi.client) }),
+      // REL051-A34: the in-app preview's checked read (the route passes only store values).
+      previewRead,
       // UX2-d1: accepting an invite, for the accept owner route; it pairs only after core used an
       // owner-signed, applied approval (I-4).
       ...(agentUi?.client === undefined ? {} : { invites: inviteAcceptPort(agentUi.client) }),
@@ -1686,14 +1802,32 @@ export async function startApprovalServerWith(
       now: () => now(),
       // M1-11s-a-d: the status bar's health read (fixed fields, cached, bounded).
       health: createHealthReader({
-        ...(agentUi?.health === undefined ? {} : { source: agentUi.health }),
+        // REL051-CF2: with no source wired, the open agent's own relay check (network-health.ts),
+        // so the app never says Connected while no relay can be reached.
+        ...(() => {
+          if (agentUi?.health !== undefined) return { source: agentUi.health };
+          const client = agentUi?.client as Partial<NetworkHealthClient> | undefined;
+          if (typeof client?.relayReachability !== 'function') return {};
+          return {
+            source: networkHealthSource(client as NetworkHealthClient, { now: () => now() }),
+          };
+        })(),
         hasClient: agentUi?.client !== undefined,
-        ...(options.localUi?.version === undefined ? {} : { version: options.localUi.version }),
+        // REL051-B3b: the app host's version when the page options carry none (the strip's Version).
+        ...(() => {
+          const version = options.localUi?.version ?? options.host?.version;
+          return version === undefined ? {} : { version };
+        })(),
+        ...(options.localUi?.dataFolder === undefined
+          ? {}
+          : { dataFolder: options.localUi.dataFolder }),
+        startedAt: serverStartedAt,
         now: () => now(),
       }),
       // U3-c: the Agents list, in the app host only.
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
       ...(peopleAllDesk === undefined ? {} : { peopleAll: peopleAllDesk }),
+      ...(storageDesk === undefined ? {} : { storage: storageDesk }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
       ...(uiSettingsDesk === undefined ? {} : { uiSettings: uiSettingsDesk }),
       // U3-d: create an agent and save a verified label, in the app host only.
@@ -1816,7 +1950,43 @@ export async function startApprovalServerWith(
           await host.adoptFirst(first).catch(() => false);
         }
       },
+      // REL051-SF3 (04 §2.5): wrong proofs on restore presence count on the shared backoff.
+      presenceBackoff: {
+        waitSeconds: () => waitSeconds(),
+        failed: () => {
+          presenceFailed();
+        },
+        succeeded: () => {
+          presenceSucceeded();
+        },
+      },
     }));
+  // REL051-SF3 (T-7): stale uploads and quarantined stores of a crashed run go at start-up, not on
+  // a first restore request. Files a live engine (this or another process) still uses are kept.
+  if (internals.sweepRestoreAtStart === true || internals.restore?.home !== undefined) {
+    const restoreHome = internals.restore?.home ?? homedir();
+    void removeStaleRestoreFiles(join(restoreHome, '.agentlink', 'restore')).catch(() => undefined);
+  }
+  /**
+   * REL051-CF3 (R1-CLASS-03/04; T-7): where the unsaved-master-code marker lives: the restore home
+   * (a test's) or, in the shipped server, this user's home. Undefined: no marker is written or read
+   * (a test server without a home never touches the real one).
+   */
+  const markerHome =
+    internals.restore?.home ?? (internals.sweepRestoreAtStart === true ? homedir() : undefined);
+  /**
+   * REL051-CF3 (R1-CLASS-04): at start-up an owner item a restore wrote whose code never left a
+   * server that is gone is rolled back to "Finish restoring" (recovery-kit-restore.ts settle). Every
+   * /api/ui/ request waits for it, so no page reads the state before it is settled.
+   */
+  const settled: Promise<void> =
+    markerHome === undefined
+      ? Promise.resolve()
+      : Promise.race([
+          restoreEngine().settle(),
+          // Never holds the app back for long: a keychain that does not answer leaves it as is.
+          new Promise<void>((resolve) => setTimeout(resolve, SETTLE_WAIT_MS).unref()),
+        ]);
 
   /**
    * WP-R2b (04 §2.3.3 "In the local app"; §2.5 "KeyStore isolation"): the recovery-kit export's walk
@@ -2123,11 +2293,16 @@ export async function startApprovalServerWith(
       req.resume();
       return;
     }
-    const body = await boundedBody(req, res, passkey ? MAX_PASSKEY_BYTES : MAX_SECRET_BYTES);
+    const body = await boundedBody(
+      req,
+      res,
+      passkey ? MAX_PAY_CONFIRM_ASSERTION_BYTES : MAX_SECRET_BYTES,
+    );
     if (body === undefined) return;
     const ids = picks.map((p) => p.approvalId);
     const listed = (items: readonly string[]): Record<string, unknown> => (review ? { items } : {});
     // Every secret byte this request carried; wiped whatever happens (unlock also wipes its copy).
+    let proof: CeremonyProof | undefined;
     let assertion: PasskeyAssertion | undefined;
     let presence: OwnerPresence | undefined;
     try {
@@ -2137,17 +2312,15 @@ export async function startApprovalServerWith(
         return;
       }
       if (passkey) {
-        try {
-          assertion = parsePasskeyAssertion(body);
-        } catch {
+        // REL051-SF1: the ceremony this gesture answers (this approval, digest or list) is taken
+        // (spent) before any await. A PRF-less authenticator never gets this far: the page offers
+        // the master code.
+        proof = takeCeremonyProof(req, body);
+        if (proof === undefined) {
           finishDecision(res, 403, 'presence_required');
           return;
         }
-        if (assertion.prfOutput.length === 0) {
-          // A PRF-less authenticator: the master code is the way (the page offers it).
-          finishDecision(res, 403, 'presence_required');
-          return;
-        }
+        assertion = proof.assertion;
       }
       // Check and claim with no await in between: one owner operation at a time.
       const already = ids.filter((approvalId) => decided.has(approvalId));
@@ -2228,19 +2401,21 @@ export async function startApprovalServerWith(
             return;
           }
           presence = got.presence;
-        } else if (assertion !== undefined) {
+        } else if (proof !== undefined) {
           // 04 §2.3.1: the assertion names the stored credential, the owner as user handle, RP ID
-          // localhost and UP and UV, before its PRF output is used at all.
-          try {
-            const stored = await readOwnerPasskeyHeader(keychainOf());
-            if (stored === null) throw new KeyStoreError('presence_rejected', 'presence');
-            assertPasskeyAssertion(stored, context.owner, assertion);
-          } catch {
+          // localhost and UP and UV, before its PRF output is used at all; REL051-SF1: it answers
+          // this request's ceremony and is signed by the stored passkey.
+          const check = await checkCeremonyProof(proof, context.owner.ownerNostr);
+          if (check === 'passkey_update_needed' || check === 'verification_required') {
+            finishDecision(res, check === 'passkey_update_needed' ? 409 : 403, check);
+            return;
+          }
+          if (check !== 'ok') {
             presenceFailed();
             finishDecision(res, 403, 'presence_rejected');
             return;
           }
-          presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
+          presence = { kind: 'passkey-prf', prfOutput: proof.assertion.prfOutput };
         } else {
           presence = { kind: 'passphrase', secret: body };
         }
@@ -2318,6 +2493,7 @@ export async function startApprovalServerWith(
       }
     } finally {
       wipe(body, assertion?.prfOutput);
+      wipeCeremonyProof(proof);
       wipeNative(presence);
     }
   }
@@ -2452,22 +2628,23 @@ export async function startApprovalServerWith(
       reply(409, 'native_unavailable');
       return;
     }
-    const body = await boundedBody(req, res, passkey ? MAX_PASSKEY_BYTES : MAX_SECRET_BYTES);
+    const body = await boundedBody(
+      req,
+      res,
+      passkey ? MAX_PAY_CONFIRM_ASSERTION_BYTES : MAX_SECRET_BYTES,
+    );
     if (body === undefined) return;
-    let assertion: PasskeyAssertion | undefined;
+    let proof: CeremonyProof | undefined;
     try {
       if (body.length === 0) {
         reply(403, 'presence_required');
         return;
       }
       if (passkey) {
-        try {
-          assertion = parsePasskeyAssertion(body);
-        } catch {
-          reply(403, 'presence_required');
-          return;
-        }
-        if (assertion.prfOutput.length === 0) {
+        // REL051-SF1 / DESK051-C6: the passkey answers a ceremony for exactly this request, taken
+        // (spent) before any await.
+        proof = takeCeremonyProof(req, body);
+        if (proof === undefined) {
           reply(403, 'presence_required');
           return;
         }
@@ -2484,17 +2661,18 @@ export async function startApprovalServerWith(
           return;
         }
         let presence: OwnerPresence;
-        if (assertion !== undefined) {
-          try {
-            const stored = await readOwnerPasskeyHeader(keychainOf());
-            if (stored === null) throw new KeyStoreError('presence_rejected', 'presence');
-            assertPasskeyAssertion(stored, context.owner, assertion);
-          } catch {
+        if (proof !== undefined) {
+          const check = await checkCeremonyProof(proof, context.owner.ownerNostr);
+          if (check === 'passkey_update_needed' || check === 'verification_required') {
+            reply(check === 'passkey_update_needed' ? 409 : 403, check);
+            return;
+          }
+          if (check !== 'ok') {
             presenceFailed();
             reply(403, 'presence_rejected');
             return;
           }
-          presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
+          presence = { kind: 'passkey-prf', prfOutput: proof.assertion.prfOutput };
         } else {
           presence = { kind: 'passphrase', secret: body };
         }
@@ -2563,7 +2741,8 @@ export async function startApprovalServerWith(
         busy = false;
       }
     } finally {
-      wipe(body, assertion?.prfOutput);
+      wipe(body);
+      wipeCeremonyProof(proof);
     }
   }
 
@@ -2706,6 +2885,162 @@ export async function startApprovalServerWith(
     sendJson(res, result.status, result.body);
   };
 
+  // --- REL051-SF1: the single-use, action-bound challenge of a passkey proof (presence-ceremony.ts) --
+
+  const ceremonies = new PresenceCeremonies(() => now());
+
+  /** The page session (its held bytes) a request carries, or undefined. */
+  const sessionOf = (req: IncomingMessage): Uint8Array | undefined => {
+    const at = matchIndex(cookieToken(req), sessions);
+    return at < 0 ? undefined : sessions[at];
+  };
+
+  /** What a ceremony is bound to: the method, the target and the action headers, as sent. */
+  const bindingOf = (req: IncomingMessage): Uint8Array =>
+    presenceBinding({
+      method: req.method ?? '',
+      target: req.url ?? '',
+      input: header(req, 'x-agentlink-input'),
+      items: header(req, 'x-agentlink-items'),
+      digest: header(req, 'x-agentlink-digest'),
+      generation: header(req, 'x-agentlink-generation'),
+    });
+
+  /** True when the request asks for a ceremony (`X-AgentLink-Presence: challenge`). */
+  const asksChallenge = (req: IncomingMessage): boolean =>
+    header(req, 'x-agentlink-presence') === PRESENCE_CHALLENGE_MODE;
+
+  /**
+   * Answers a ceremony request for the route this request names (it is never acted on): an empty
+   * body, the wrong-code wait, a stored passkey with its credential key, then a new ceremony bound to
+   * this page session and this request. Nothing is unlocked, counted or emitted; the answer carries
+   * the WebAuthn request values and nothing else (I-7).
+   */
+  async function presenceChallenge(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (header(req, PRESENCE_CEREMONY_HEADER) !== undefined) {
+      req.resume();
+      sendJson(res, 400, { status: 'invalid' });
+      return;
+    }
+    // At most one byte is read: anything but an empty body is refused.
+    const body = await boundedBody(req, res, 1);
+    if (body === undefined) return;
+    if (body.length !== 0) {
+      wipe(body);
+      sendJson(res, 400, { status: 'invalid' });
+      return;
+    }
+    const wait = waitSeconds();
+    if (wait > 0) {
+      res.setHeader('Retry-After', String(wait));
+      sendJson(res, 429, { status: 'wait', retryAfter: wait });
+      return;
+    }
+    const session = sessionOf(req);
+    if (session === undefined) {
+      sendJson(res, 401, { error: 'token' });
+      return;
+    }
+    let credentialId: Uint8Array | undefined;
+    let keyKept = false;
+    try {
+      const stored = await readOwnerPasskeyHeader(keychainOf());
+      if (stored !== null) {
+        credentialId = stored.credentialId;
+        keyKept = (await readOwnerPasskeyKey(keychainOf(), stored.credentialId)) !== null;
+      }
+    } catch {
+      credentialId = undefined;
+    }
+    if (credentialId === undefined) {
+      sendJson(res, 403, { status: 'presence_required' });
+      return;
+    }
+    if (!keyKept) {
+      // No kept credential key: a gesture could not be verified, so the passkey path is refused.
+      sendJson(res, 409, { status: 'passkey_update_needed' });
+      return;
+    }
+    ceremonies.sweep((held) => sessions.some((s) => equalBytes(s, held)));
+    const ceremony = ceremonies.issue(session, bindingOf(req));
+    sendJson(res, 200, {
+      status: 'ready',
+      ceremony: ceremony.id,
+      expiresInMs: PRESENCE_CEREMONY_TTL_MS,
+      publicKey: {
+        rpId: PASSKEY_RP_ID,
+        challenge: encodeBase64url(ceremony.challenge),
+        allowCredentials: [encodeBase64url(credentialId)],
+        userVerification: 'required',
+        timeoutMs: PRESENCE_CEREMONY_TTL_MS,
+        prfSalt: encodeBase64url(ownerPrfSalt()),
+      },
+    });
+  }
+
+  /** A passkey proof taken with its ceremony: the assertion and the challenge it must answer. */
+  interface CeremonyProof {
+    readonly assertion: PayConfirmAssertion;
+    readonly challenge: Uint8Array;
+  }
+
+  /**
+   * Parses a passkey body and takes the ceremony it names (single use, before any await). Undefined
+   * (`presence_required`) when the body is malformed, no ceremony is named, or the ceremony is
+   * unknown, another session's, expired or bound to another request.
+   */
+  const takeCeremonyProof = (req: IncomingMessage, body: Uint8Array): CeremonyProof | undefined => {
+    const session = sessionOf(req);
+    const id = header(req, PRESENCE_CEREMONY_HEADER);
+    if (session === undefined || id === undefined) return undefined;
+    const taken = ceremonies.take(id, session, bindingOf(req));
+    if (typeof taken === 'string') return undefined;
+    const challenge = taken.challenge.slice();
+    PresenceCeremonies.wipeOf(taken);
+    const assertion = parsePayConfirmAssertion(body);
+    if (assertion === undefined) {
+      wipe(challenge);
+      return undefined;
+    }
+    return { assertion, challenge };
+  };
+
+  /**
+   * The assertion of a taken ceremony against the stored passkey, its kept credential key and the
+   * owner (pay-confirm.ts checkPayConfirmAssertion: type, challenge, origin, rpIdHash, UP, credential,
+   * user handle, signature, UV). The challenge is wiped.
+   */
+  async function checkCeremonyProof(
+    proof: CeremonyProof,
+    ownerNostr: Uint8Array,
+  ): Promise<'ok' | 'presence_rejected' | 'verification_required' | 'passkey_update_needed'> {
+    try {
+      const stored = await readOwnerPasskeyHeader(keychainOf());
+      if (stored === null) return 'presence_rejected';
+      const check = checkPayConfirmAssertion(proof.assertion, {
+        challenge: proof.challenge,
+        origin,
+        passkey: stored,
+        publicKey: await readOwnerPasskeyKey(keychainOf(), stored.credentialId),
+        owner: { ownerNostr },
+      });
+      if (check === 'key_missing') return 'passkey_update_needed';
+      if (check !== 'ok') return check;
+      assertPasskeyAssertion(stored, { ownerNostr }, proof.assertion);
+      return 'ok';
+    } catch {
+      return 'presence_rejected';
+    } finally {
+      wipe(proof.challenge);
+    }
+  }
+
+  /** Wipes a ceremony proof's bytes (the challenge, the signature, the PRF output once used). */
+  const wipeCeremonyProof = (proof: CeremonyProof | undefined): void => {
+    if (proof === undefined) return;
+    wipe(proof.challenge, proof.assertion.prfOutput, proof.assertion.signature);
+  };
+
   /**
    * M1-11s-b, the central presence gate for a /api/ui/ owner route (04 §2.5, I-4; IR-M1-11s-b-1 H-1).
    * Owner presence is verified before `run` (the handler) is called: the wrong-code backoff, a
@@ -2815,8 +3150,13 @@ export async function startApprovalServerWith(
         return;
       }
     }
-    const body = await boundedBody(req, res, passkey ? MAX_PASSKEY_BYTES : MAX_SECRET_BYTES);
+    const body = await boundedBody(
+      req,
+      res,
+      passkey ? MAX_PAY_CONFIRM_ASSERTION_BYTES : MAX_SECRET_BYTES,
+    );
     if (body === undefined) return;
+    let proof: CeremonyProof | undefined;
     let assertion: PasskeyAssertion | undefined;
     let nativeHeld: OwnerPresence | undefined;
     try {
@@ -2826,16 +3166,13 @@ export async function startApprovalServerWith(
         return;
       }
       if (passkey) {
-        try {
-          assertion = parsePasskeyAssertion(body);
-        } catch {
+        // REL051-SF1: the ceremony this gesture answers is taken (spent) before any await.
+        proof = takeCeremonyProof(req, body);
+        if (proof === undefined) {
           finishOwner(res, 403, 'presence_required');
           return;
         }
-        if (assertion.prfOutput.length === 0) {
-          finishOwner(res, 403, 'presence_required');
-          return;
-        }
+        assertion = proof.assertion;
       }
       if (busy) {
         finishOwner(res, 409, 'busy');
@@ -2872,17 +3209,23 @@ export async function startApprovalServerWith(
           }
           presence = got.presence;
           nativeHeld = presence;
-        } else if (assertion !== undefined) {
-          try {
-            const stored = await readOwnerPasskeyHeader(keychainOf());
-            if (stored === null) throw new KeyStoreError('presence_rejected', 'presence');
-            assertPasskeyAssertion(stored, { ownerNostr: expectedNostr }, assertion);
-          } catch {
+        } else if (proof !== undefined) {
+          // REL051-SF1: the gesture answers this ceremony, signed by the stored passkey.
+          const check = await checkCeremonyProof(proof, expectedNostr);
+          if (check === 'passkey_update_needed') {
+            finishOwner(res, 409, 'passkey_update_needed');
+            return;
+          }
+          if (check === 'verification_required') {
+            finishOwner(res, 403, 'verification_required');
+            return;
+          }
+          if (check !== 'ok') {
             presenceFailed();
             finishOwner(res, 403, 'presence_rejected');
             return;
           }
-          presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
+          presence = { kind: 'passkey-prf', prfOutput: proof.assertion.prfOutput };
         } else {
           presence = { kind: 'passphrase', secret: body };
         }
@@ -3162,6 +3505,7 @@ export async function startApprovalServerWith(
     } finally {
       wipe(body, assertion?.prfOutput);
       wipeNative(nativeHeld);
+      wipeCeremonyProof(proof);
     }
   }
 
@@ -3287,7 +3631,15 @@ export async function startApprovalServerWith(
         sign: () => Promise.reject(ownerOperationRefused()),
         finishOwnerCode: async () => {
           once();
-          return ownerCodes.finish(held);
+          const outcome = await ownerCodes.finish(held);
+          // REL051-CF3: a new master code replaced the one that was never saved.
+          codeHold.clear();
+          if (markerHome !== undefined) {
+            await restoreEngine()
+              .masterCodeSaved()
+              .catch(() => undefined);
+          }
+          return outcome;
         },
       }),
       run,
@@ -4322,6 +4674,11 @@ export async function startApprovalServerWith(
       .firstRunHold()
       .catch(() => 'keychain_unavailable' as const);
     if (hold !== undefined) {
+      // REL051-SF3: a finish refused here ends this session's hold (its seed is wiped now).
+      const held = pendingSetup;
+      if (step === 'finish' && !busy && held !== undefined && matches(cookie, held.session)) {
+        dropSetup(held);
+      }
       req.resume();
       sendJson(res, 409, { status: hold });
       return;
@@ -4705,6 +5062,22 @@ export async function startApprovalServerWith(
       }
       const firstCard = planned ?? labelled;
       let result: Awaited<ReturnType<typeof completeOwnerSetup>>;
+      // REL051-CF3 (R1-CLASS-03): a new master code is about to be made; until the owner says "I
+      // saved it", a later start tells the page it was never saved (never asks for it).
+      // An earlier marker (another run's) is never overwritten here, and only this run's is removed.
+      let markerOurs = false;
+      if (markerHome !== undefined && (await readUnsavedMarker(markerHome)) === undefined) {
+        markerOurs = await writeUnsavedMarker(markerHome, {
+          kind: 'first_run',
+          stage: 'writing',
+          ownerNostr: held.keys.ownerNostr,
+          pid: process.pid,
+          at: now(),
+        }).then(
+          () => true,
+          () => false,
+        );
+      }
       try {
         result = await completeOwnerSetup(
           keychainOf(),
@@ -4723,6 +5096,8 @@ export async function startApprovalServerWith(
           },
         );
       } catch (error) {
+        // REL051-CF3: rolled back (or another owner's): no code of this run exists.
+        if (markerHome !== undefined && markerOurs) await removeUnsavedMarker(markerHome);
         const code = error instanceof NodeKeyStoreError ? error.code : undefined;
         if (code === 'owner_exists') await answer(res, 409, 'owner_exists');
         else if (code === 'owner_card_failed') {
@@ -4782,13 +5157,34 @@ export async function startApprovalServerWith(
           : connected === 'not_connected'
             ? 'created_not_connected'
             : 'done';
+        const shownCode = grouped(result.ownerCode);
+        // REL051-CF3 (R1-CLASS-03): a reload of "Your master code" shows this code and step again,
+        // to this page session only, until "I saved it" (master-code-hold.ts).
+        codeHold.hold(encodeUtf8(cookie), shownCode, 'first_run', {
+          outcome,
+          passkey: result.passkey,
+          fingerprint,
+          computerName: computerNameOf(safeHostname()),
+          ...(sendFolder === undefined ? {} : { sendFolder }),
+          ...(held.app === undefined ? {} : { app: held.app.app }),
+          ...(connected === undefined ? {} : { connected: connected !== 'not_connected' }),
+        });
+        if (markerHome !== undefined) {
+          await writeUnsavedMarker(markerHome, {
+            kind: 'first_run',
+            stage: 'shown',
+            ownerNostr: held.keys.ownerNostr,
+            pid: process.pid,
+            at: now(),
+          }).catch(() => undefined);
+        }
         await answer(
           res,
           200,
           outcome,
           {
             passkey: result.passkey,
-            ownerCode: grouped(result.ownerCode),
+            ownerCode: shownCode,
             fingerprint,
             computerName: computerNameOf(safeHostname()),
             ...(sendFolder === undefined ? {} : { sendFolder }),
@@ -5401,6 +5797,48 @@ export async function startApprovalServerWith(
   }
 
   /**
+   * R1-SEC-16: the gate of the mark kind (a display mark). The caller checked the session, CSRF,
+   * Origin, fetch metadata, the octet-stream type and the generation. No query, operation input or
+   * presence header and no body byte; no owner presence, no owner store, nothing signed. The handler
+   * gets the context and the checked route parameters only.
+   */
+  async function markGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiMarkRoute,
+    params: Readonly<Record<string, string>>,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_KIT_REVEAL_BODY_BYTES);
+    if (body === undefined) return;
+    if (body.length !== 0) {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (!stillCurrent(req)) {
+      agentChanged(res);
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext, params);
+    } catch (error) {
+      sendJson(res, 500, failedBody(error));
+      return;
+    }
+    sendResult(res, result);
+  }
+
+  /**
    * UX2-d1 (owner decision 1.1): the gate of the two invite-kind routes (create, check). The caller
    * checked the session, CSRF, Origin, fetch metadata and the octet-stream type. No query, operation
    * input or presence header; create is rate-limited before the body is read; the body must be one
@@ -5437,8 +5875,25 @@ export async function startApprovalServerWith(
     const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
     if (type !== 'application/octet-stream') return refuse(415, 'content_type');
     const mode = header(req, 'x-agentlink-presence');
+    if (route.step === 'presence' && mode === PRESENCE_CHALLENGE_MODE) {
+      // REL051-SF1: a ceremony for the restore's passkey gesture (this handle, this session).
+      await presenceChallenge(req, res);
+      return;
+    }
     if (mode !== undefined && (route.step !== 'presence' || mode !== 'passkey')) {
       return refuse(400, 'invalid');
+    }
+    if (route.step === 'codeShow' || route.step === 'codeSaved') {
+      // REL051-CF3: no input and no body; the answer is for this page session only.
+      if (header(req, 'x-agentlink-input') !== undefined) return refuse(400, 'invalid');
+      const empty = await boundedBody(req, res, 0);
+      if (empty === undefined) return;
+      try {
+        await masterCodeStep(res, route.step, cookie);
+      } catch {
+        sendJson(res, 500, { error: 'failed' });
+      }
+      return;
     }
     if (route.step === 'upload') {
       if (header(req, 'x-agentlink-input') !== undefined) return refuse(400, 'invalid');
@@ -5458,26 +5913,50 @@ export async function startApprovalServerWith(
       route.step === 'applyFinish'
         ? MAX_SETUP_REGISTRATION_BYTES
         : route.step === 'presence'
-          ? MAX_PASSKEY_BYTES
+          ? MAX_PAY_CONFIRM_ASSERTION_BYTES
           : route.step === 'open' || route.step === 'check'
             ? MAX_SECRET_BYTES
             : 0;
     const body = await boundedBody(req, res, limit);
     if (body === undefined) return;
+    let proof: CeremonyProof | undefined;
     try {
       let answer;
       switch (route.step) {
         case 'header':
           answer = await engine.header(cookie, input);
           break;
-        case 'presence':
+        case 'presence': {
+          let presented: Uint8Array = body.slice();
+          if (mode === 'passkey' && body.length > 0) {
+            // REL051-SF1: the gesture answers this request's ceremony and is signed by the stored
+            // passkey; the engine then checks it against the kit's owner as before.
+            wipe(presented);
+            proof = takeCeremonyProof(req, body);
+            if (proof === undefined) {
+              sendJson(res, 403, { error: 'presence_required' });
+              return;
+            }
+            const stored = await readOwnerPasskeyHeader(keychainOf()).catch(() => null);
+            const check =
+              stored === null
+                ? 'presence_rejected'
+                : await checkCeremonyProof(proof, stored.ownerNostr);
+            if (check !== 'ok') {
+              if (check === 'presence_rejected') presenceFailed();
+              sendJson(res, check === 'passkey_update_needed' ? 409 : 403, { error: check });
+              return;
+            }
+            presented = encodePasskeyAssertion(proof.assertion);
+          }
           answer = await engine.presence(
             cookie,
             input,
-            body.slice(),
+            presented,
             mode === 'passkey' ? 'passkey' : 'passphrase',
           );
           break;
+        }
         case 'open':
           answer = await engine.open(cookie, input, body.slice());
           break;
@@ -5492,7 +5971,10 @@ export async function startApprovalServerWith(
           break;
         case 'applyFinish':
           answer = await engine.applyFinish(cookie, input, body.slice());
+          holdRestoredCode(answer, cookie);
           break;
+        default:
+          answer = { status: 400, body: { error: 'invalid' } };
       }
       if (answer.status === 429) {
         const retry = (answer.body as { retryAfter?: unknown }).retryAfter;
@@ -5503,6 +5985,62 @@ export async function startApprovalServerWith(
       sendJson(res, 500, { error: 'failed' });
     } finally {
       wipe(body);
+      wipeCeremonyProof(proof);
+    }
+  }
+
+  /**
+   * REL051-CF3: a restore that made a new master code: that code and the step-4 outcome are held for
+   * this page session (a reload shows them again until "I saved it").
+   */
+  function holdRestoredCode(answer: { status: number; body: unknown }, cookie: string): void {
+    if (answer.status !== 200 || typeof answer.body !== 'object' || answer.body === null) return;
+    const done = answer.body as Record<string, JsonValue>;
+    const code = done['masterCode'];
+    if (done['status'] !== 'done' || typeof code !== 'string') return;
+    codeHold.hold(encodeUtf8(cookie), code, 'restore', {
+      ids: done['ids'] ?? [],
+      touchId: done['touchId'] === true,
+    });
+  }
+
+  /**
+   * REL051-CF3 (R1-CLASS-03/04, R1-UI-02): `show` answers this session's held code with its step, or
+   * what the page should say instead (`lost`: made and never saved, with whether Touch ID can make
+   * a new one; `finish_restore`; `none`); never a code to another session. `saved` ends it.
+   */
+  async function masterCodeStep(
+    res: ServerResponse,
+    step: 'codeShow' | 'codeSaved',
+    cookie: string,
+  ): Promise<void> {
+    const session = encodeUtf8(cookie);
+    try {
+      if (step === 'codeSaved') {
+        // Only the session that holds it ends another session's display.
+        const mine = codeHold.saved(session);
+        if (mine && markerHome !== undefined) await restoreEngine().masterCodeSaved();
+        sendJson(res, 200, { status: 'saved' });
+        return;
+      }
+      const held = codeHold.shownTo(session);
+      if (held.status === 'shown') {
+        sendJson(res, 200, {
+          status: 'shown',
+          kind: held.kind,
+          code: held.code,
+          ...held.view,
+        });
+        return;
+      }
+      if (held.status === 'elsewhere' || markerHome === undefined) {
+        sendJson(res, 200, { status: 'none' });
+        return;
+      }
+      const state = await restoreEngine().masterCodeState();
+      sendJson(res, 200, state as unknown as JsonValue);
+    } finally {
+      wipe(session);
     }
   }
 
@@ -5612,9 +6150,10 @@ export async function startApprovalServerWith(
    * U3-invite (08 §4 "An app host already running"): `POST /api/ui/join/handoff` from `agentlink
    * join`, the handoff kind. Run before the session gate: the caller is a local process with the
    * handoff token from the 0600 record, never the page. It refuses an Origin, any Sec-Fetch-*
-   * header, a cookie, a CSRF value, an operation input, a presence header and a query; takes at most
-   * one handoff per HANDOFF_INTERVAL_MS (counted before the token is checked, so the token cannot be
-   * guessed quickly); compares the token in constant time; parses exactly `{"invite":"<link>"}`; and
+   * header, a cookie, a CSRF value, an operation input, a presence header and a query; compares the
+   * token in constant time; takes at most one handoff per HANDOFF_INTERVAL_MS, and answers at most
+   * one wrong token per HANDOFF_INTERVAL_MS (R1-SEC-15: counted apart, so a caller without the token
+   * cannot hold the real handoff at 429); parses exactly `{"invite":"<link>"}`; and
    * hands the link to the join desk, which runs Accept step 1 and stores it in memory. Nothing is
    * signed, written or logged; the body is wiped. The token grants nothing else.
    */
@@ -5639,14 +6178,22 @@ export async function startApprovalServerWith(
     if (url.search !== '') return refuse(400, 'invalid');
     const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
     if (type !== 'application/octet-stream') return refuse(415, 'content_type');
+    // R1-SEC-15: the token (32 random bytes, constant-time compare) is checked first, and accepted
+    // and refused handoffs are throttled apart, so a caller without the token cannot hold the real
+    // `join` at 429. Each kind: at most one per HANDOFF_INTERVAL_MS.
     const at = now();
-    if (at - lastHandoffAt < HANDOFF_INTERVAL_MS) {
-      const retryAfter = Math.max(1, Math.ceil((lastHandoffAt + HANDOFF_INTERVAL_MS - at) / 1000));
+    const valid = matches(header(req, HANDOFF_HEADER), handoffBytes);
+    const last = valid ? lastHandoffAt : lastHandoffRefusedAt;
+    if (at - last < HANDOFF_INTERVAL_MS) {
+      const retryAfter = Math.max(1, Math.ceil((last + HANDOFF_INTERVAL_MS - at) / 1000));
       res.setHeader('Retry-After', String(retryAfter));
       return refuse(429, 'wait');
     }
+    if (!valid) {
+      lastHandoffRefusedAt = at;
+      return refuse(401, 'refused');
+    }
     lastHandoffAt = at;
-    if (!matches(header(req, HANDOFF_HEADER), handoffBytes)) return refuse(401, 'refused');
     const body = await boundedBody(req, res, MAX_INVITE_CHECK_BODY_BYTES);
     if (body === undefined) return;
     let link: unknown;
@@ -5688,6 +6235,7 @@ export async function startApprovalServerWith(
     method: string,
     originHeader: string | undefined,
   ): Promise<void> {
+    await settled;
     const found = routes.match(method, url.pathname);
     if (found === undefined) {
       req.resume();
@@ -5818,6 +6366,21 @@ export async function startApprovalServerWith(
       sendResult(res, NOT_AVAILABLE);
       return;
     }
+    if (asksChallenge(req)) {
+      // REL051-SF1: a ceremony for a passkey gesture on this route, before anything else runs. Only
+      // routes the central gate takes a passkey on (an owner-code step only where its one kind of
+      // proof is the passkey) and Remove (which runs the central gate); never acted on.
+      const takesPasskey =
+        route.presence === 'remove' ||
+        (route.presence === true &&
+          (route.ownerCode === undefined || ownerCodeProofAllowed(route.ownerCode, 'passkey')));
+      if (takesPasskey) await presenceChallenge(req, res);
+      else {
+        req.resume();
+        sendJson(res, 400, { status: 'invalid' });
+      }
+      return;
+    }
     if (route.presence === 'remove') {
       // U3-e: removing an agent has its own gate around ownerGate (the folder lock, its context).
       await removeGate(req, res, url);
@@ -5826,6 +6389,11 @@ export async function startApprovalServerWith(
     if (route.presence === 'kit-reveal') {
       // WP-R2b: Show in Finder for the recovery kit has its own gate; no presence, no input.
       await kitRevealGate(req, res, url, route);
+      return;
+    }
+    if (route.presence === 'mark') {
+      // R1-SEC-16: a display mark has its own gate; no presence, no input.
+      await markGate(req, res, url, route, params);
       return;
     }
     if (route.presence === 'reveal') {
@@ -5923,7 +6491,10 @@ export async function startApprovalServerWith(
     const path = url.pathname;
     const method = req.method ?? 'GET';
     // F25: page API activity (a poll, a read, a write) keeps `ui` open; static files do not.
-    if (path.startsWith('/api/ui/')) lastActivityAt = Date.now();
+    // R1-SEC-15: only a request with a live session counts, so no other local caller keeps it open.
+    if (path.startsWith('/api/ui/') && matchIndex(cookieToken(req), sessions) >= 0) {
+      lastActivityAt = Date.now();
+    }
     if (!path.startsWith(SETUP_PATH_PREFIX)) sweepSetup();
 
     if (path.startsWith(ASSETS_PREFIX)) {
@@ -5960,6 +6531,14 @@ export async function startApprovalServerWith(
           // set over http://localhost (checked with Playwright WebKit), so the page would not open.
           `${cookieName}=${newSession()}; HttpOnly; SameSite=Strict; Path=/`,
         );
+        const site = header(req, 'sec-fetch-site');
+        if (site !== undefined && site !== 'none') {
+          // R1-SEC-05: opened from the private launch file (approval-os.ts), the navigation is not
+          // same-site, and browsers drop a SameSite=Strict cookie on its redirect. A same-origin
+          // continue page (no script, no token, the checked page path only) goes on with it.
+          sendText(res, 200, 'text/html; charset=utf-8', continuePage(path));
+          return;
+        }
         res.setHeader('Location', path);
         sendText(res, 303, 'text/plain; charset=utf-8', '');
         return;
@@ -6083,6 +6662,17 @@ export async function startApprovalServerWith(
     nativeOp?: 'register' | 'off' | 'replace',
   ): Promise<void> {
     {
+      if (asksChallenge(req)) {
+        // REL051-SF1: a ceremony for this decision (or review list). DESK051-C6: and for turning
+        // native presence on, off or on again with the passkey.
+        if (reviewRoute || decideMatch !== null || nativeOp !== undefined) {
+          await presenceChallenge(req, res);
+        } else {
+          req.resume();
+          sendJson(res, 400, { status: 'invalid' });
+        }
+        return;
+      }
       if (reviewRoute) {
         const picks = parseReviewItems(header(req, 'x-agentlink-items'));
         if (picks === undefined) {
@@ -6877,9 +7467,12 @@ export async function startApprovalServerWith(
       await restoreInstance?.close();
       dropSetup();
       payHolds.clear();
+      ceremonies.clear();
       dropCreate();
       // WP-S2: a staged master-code change this server began is removed (the old code keeps working).
       await ownerCodes.clear();
+      // REL051-CF3: a held master code goes with the server (a restart never shows it again).
+      codeHold.clear();
       await folderRemoval;
       // U3-invite: the handoff record goes first, so no `join` hands over to a closing host.
       if (handoffWritten) await options.host?.handoff?.remove().catch(() => undefined);
@@ -6900,7 +7493,7 @@ export async function startApprovalServerWith(
  * `owner` item for owner presence and the platform's browser opener and notifier.
  */
 export function startApprovalServer(options: ApprovalServerOptions): Promise<ApprovalServer> {
-  return startApprovalServerWith(options);
+  return startApprovalServerWith(options, { sweepRestoreAtStart: true });
 }
 
 /**

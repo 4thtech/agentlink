@@ -51,6 +51,10 @@ export const SETTINGS_STRINGS = {
     line: (n: number): string =>
       `Your AI may send from ${String(n)} ${n === 1 ? 'folder' : 'folders'}.`,
   },
+  storage: {
+    title: 'Storage',
+    line: 'How much room your messages and saved files take',
+  },
   appearance: {
     title: 'Appearance',
     line: 'Theme, motion and the Under the hood view',
