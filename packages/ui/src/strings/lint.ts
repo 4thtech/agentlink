@@ -21,6 +21,8 @@ export const NEVER_SAY: readonly (readonly [name: string, pattern: RegExp])[] = 
   ['keystore', /\bkeystore\b|\.alks\b/i],
   // D-146 (11 §5.5): one name for each code; the old user-facing words are gone.
   ['old code names', /\b(?:backup|owner|safety) codes?\b|\bowner fingerprints?\b/i],
+  ['12-digit code', /\b12-digit codes?\b/i],
+  ['pairing code', /\bpairing codes?\b/i],
   ['password', /\bpasswords?\b/i],
   ['contract', /\bcontracts?\b|\blegally binding\b/i],
   ['commitment label', /\bcommitments?\b/i],

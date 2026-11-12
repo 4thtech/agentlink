@@ -66,6 +66,8 @@ export const NEVER_SAY: readonly BannedTerm[] = Object.freeze([
     name: 'old code names',
     pattern: /\b(?:backup|owner|safety) codes?\b|\bowner fingerprints?\b/i,
   },
+  { name: '12-digit code', pattern: /\b12-digit codes?\b/i },
+  { name: 'pairing code', pattern: /\bpairing codes?\b/i },
   // "Password manager" names the user's own tool (11 §5.5), not one of our codes.
   { name: 'password', pattern: /\bpasswords?\b(?! managers?\b)/i },
   { name: 'approximation', pattern: /≈/ },

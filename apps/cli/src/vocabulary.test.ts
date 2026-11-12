@@ -243,6 +243,8 @@ describe('the lint itself (self-test)', () => {
     ]) {
       expect(lintVocabulary(phrase), phrase).toEqual(['old code names']);
     }
+    expect(lintVocabulary('the 12-digit code')).toEqual(['12-digit code']);
+    expect(lintVocabulary('your pairing code')).toEqual(['pairing code']);
     expect(lintVocabulary('Your master code and the 12 digits')).toEqual([]);
   });
 

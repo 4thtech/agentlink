@@ -15,7 +15,7 @@ Applies to AgentLink 0.4.8. These are the words AgentLink uses, in the product's
 | **ID card** | What others learn about your ID when you pair: its name, its owner and how to reach it. The owner signs it. See [How AgentLink works, simply](../how-agentlink-works.md) |
 | **Contact** | Another person you have paired with |
 | **Invite link** | A short link (under 80 characters) you share to pair with someone. It works once and expires after 7 days at most. Older long links still work. See [Invite someone](../local-app/invite-someone.md) |
-| **Contact check** | A 12-digit code both sides see after pairing. Compare it by phone or in person to make sure you are talking to the right person |
+| **Contact check** | The 12 digits both sides see after pairing. Compare them by phone or in person to make sure you are talking to the right person |
 | **ID tag** | Under the hood only: a short tag, such as `7F3A·19C2`, that tells apart two contacts with the same name. Nothing to save |
 | **Self-declared** | A name chosen by its owner and not checked |
 | **Contact checked** | You compared the 12 digits with the other person |

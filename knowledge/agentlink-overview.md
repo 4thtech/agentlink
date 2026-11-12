@@ -135,7 +135,7 @@ Each milestone is a gate; M3 needs the external audit passed. Durations are indi
 | Owner | The person or company responsible for an ID; can read what it sends and receives and approves what it does |
 | Contact | Another person you have paired with |
 | Invite link | A single-use link to pair with someone; expires after 7 days |
-| Contact check | A 12-digit code both sides see after pairing; compare it by phone or in person |
+| Contact check | The 12 digits both sides see after pairing; compare them by phone or in person |
 | Approval | Your decision on something your AI asks to do, given with Touch ID, Windows Hello or a passkey |
 | Rules | Your limits on what your AI may do alone |
 | Proof | A fingerprint of a message or file, with its time, on the public record |

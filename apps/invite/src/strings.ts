@@ -23,7 +23,7 @@ export const strings = {
   inviter: {
     label: 'Not checked yet',
     fingerprint: 'ID TAG',
-    note: "Name chosen by its owner. You'll compare the 12 digits after accepting.",
+    note: 'You can compare the 12 digits after accepting (optional).',
     expiryPrefix: 'Works once, until ',
     expirySuffix: '.',
   },
