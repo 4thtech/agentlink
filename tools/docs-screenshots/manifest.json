@@ -1,0 +1,312 @@
+{
+  "_note": "Every user-guide image the pipeline writes (pnpm docs:screenshots). Checked against docs-site by tools/docs-screenshots/check.mjs.",
+  "shots": [
+    {
+      "name": "invite-page",
+      "image": "docs-site/assets/screens/invite-page.webp",
+      "page": "The invite page a friend opens (built apps/invite, made-up invite)",
+      "state": "Tali's invite, full page",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "get-started-pick-app",
+      "image": "docs-site/assets/screens/get-started-pick-app.webp",
+      "page": "Get started, step 1",
+      "state": "Which AI app do you use? (Claude Code found)",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "get-started-confirm",
+      "image": "docs-site/assets/screens/get-started-confirm.webp",
+      "page": "Get started, step 2",
+      "state": "Name typed, Connect with Touch ID",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "master-code",
+      "image": "docs-site/assets/screens/master-code.webp",
+      "page": "Get started, master code",
+      "state": "Master code shown once (made-up code)",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "get-started-connected",
+      "image": "docs-site/assets/screens/get-started-connected.webp",
+      "page": "Get started, step 3",
+      "state": "Connected to Claude Code",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "home-first",
+      "image": "docs-site/assets/screens/home-first.webp",
+      "page": "Home",
+      "state": "Right after setup, Get started 1 of 2 done",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "invite-someone",
+      "image": "docs-site/assets/screens/invite-someone.webp",
+      "page": "Invite someone",
+      "state": "Invite link for Natasa, Copied",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "accept-invite",
+      "image": "docs-site/assets/screens/accept-invite.webp",
+      "page": "Accept an invite (Natasa)",
+      "state": "Pasted invite, Accept with Touch ID",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "connected-name-contact",
+      "image": "docs-site/assets/screens/connected-name-contact.webp",
+      "page": "You are connected (Natasa)",
+      "state": "Name this contact",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "confirm-presence",
+      "image": "docs-site/assets/screens/confirm-presence.webp",
+      "page": "Confirm it's you",
+      "state": "Confirm box under Save name",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "connected",
+      "image": "docs-site/assets/screens/connected.webp",
+      "page": "You and Tali are connected (Natasa)",
+      "state": "Contact check open (made-up digits)",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "home",
+      "image": "docs-site/assets/screens/home.webp",
+      "page": "Home",
+      "state": "Simple view, Natasa under People after two messages",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "conversation",
+      "image": "docs-site/assets/screens/conversation.webp",
+      "page": "Home, Natasa opened",
+      "state": "Messages both ways, a file each way, an offer of terms",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "contact",
+      "image": "docs-site/assets/screens/contact.webp",
+      "page": "People, Natasa opened",
+      "state": "Contact page with Contact check",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "id-rename",
+      "image": "docs-site/assets/screens/id-rename.webp",
+      "page": "My IDs, Rename",
+      "state": "Name field holds Tali R",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "id-remove",
+      "image": "docs-site/assets/screens/id-remove.webp",
+      "page": "My IDs, Remove",
+      "state": "What will be deleted, not confirmed",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "home-under-the-hood",
+      "image": "docs-site/assets/screens/home-under-the-hood.webp",
+      "page": "Home, Under the hood on",
+      "state": "Table view",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "ai-apps",
+      "image": "docs-site/assets/screens/ai-apps.webp",
+      "page": "Settings, AI apps",
+      "state": "Claude Code connected",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "files-received",
+      "image": "docs-site/assets/screens/files-received.webp",
+      "page": "Settings, Files, Received",
+      "state": "One file from Natasa",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "files-sent",
+      "image": "docs-site/assets/screens/files-sent.webp",
+      "page": "Settings, Files, Sent",
+      "state": "One file to Natasa",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "files-folders",
+      "image": "docs-site/assets/screens/files-folders.webp",
+      "page": "Settings, Files, Send folders",
+      "state": "The default Send folder",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "files-add-folder",
+      "image": "docs-site/assets/screens/files-add-folder.webp",
+      "page": "Settings, Files, Allow a folder",
+      "state": "Folder field filled",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "files-add-folder-confirm",
+      "image": "docs-site/assets/screens/files-add-folder-confirm.webp",
+      "page": "Settings, Files, confirm step",
+      "state": "Line ticked, Allow folder",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "rules-confirm-spending",
+      "image": "docs-site/assets/screens/rules-confirm-spending.webp",
+      "page": "Settings, Rules, spending sheet",
+      "state": "Per-proof limit $1 to $2, Confirm with Touch ID",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "proofs",
+      "image": "docs-site/assets/screens/proofs.webp",
+      "page": "Settings, Proofs and credits",
+      "state": "New ID, no proofs",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "activity",
+      "image": "docs-site/assets/screens/activity.webp",
+      "page": "Activity",
+      "state": "Today's entries",
+      "viewport": "1280x800",
+      "theme": "light"
+    },
+    {
+      "name": "backup-restore",
+      "image": "docs-site/assets/screens/backup-restore.webp",
+      "page": "Settings, Backup and restore (Ana)",
+      "state": "Backup and restore overview",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "restore-1-kit",
+      "image": "docs-site/assets/screens/restore-1-kit.webp",
+      "page": "Restore, step 1",
+      "state": "Pick the recovery kit",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "restore-2-code",
+      "image": "docs-site/assets/screens/restore-2-code.webp",
+      "page": "Restore, step 2",
+      "state": "Recovery code",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "restore-3-what-comes-back",
+      "image": "docs-site/assets/screens/restore-3-what-comes-back.webp",
+      "page": "Restore, step 3",
+      "state": "What comes back",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "restore-4-done",
+      "image": "docs-site/assets/screens/restore-4-done.webp",
+      "page": "Restore, step 4",
+      "state": "Done",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "people-all-ids",
+      "image": "docs-site/assets/screens/people-all-ids.webp",
+      "page": "People, all IDs",
+      "state": "People across IDs",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "my-ids",
+      "image": "docs-site/assets/screens/my-ids.webp",
+      "page": "My IDs",
+      "state": "Simple view",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "my-ids-under-the-hood",
+      "image": "docs-site/assets/screens/my-ids-under-the-hood.webp",
+      "page": "My IDs, Under the hood on",
+      "state": "Table view",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "rules",
+      "image": "docs-site/assets/screens/rules.webp",
+      "page": "Settings, Rules (Ana)",
+      "state": "Rules in force with a changed row",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "settings-home",
+      "image": "docs-site/assets/screens/settings-home.webp",
+      "page": "Settings",
+      "state": "Index",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "touch-id-master-code",
+      "image": "docs-site/assets/screens/touch-id-master-code.webp",
+      "page": "Settings, Touch ID and master code",
+      "state": "Page overview",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    }
+  ]
+}

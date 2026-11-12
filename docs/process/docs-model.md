@@ -52,13 +52,13 @@ Every screen guide ends with a table inside **For the technically curious**: *On
 
 **Updated 2026-11-12 (docs overhaul, owner request):** light theme, generated, one shared folder. The full pipeline is in [docs-architecture.md](docs-architecture.md) §3.
 
-- **Real app, generated.** `pnpm docs:screens` renders the real app on the journey harness (temp homes, keychain stand-in, in-memory relay, virtual passkey): never a real home, keychain, key, code or person. The two people are **Tali** and **Natasa**.
+- **Real app, generated.** `pnpm docs:screenshots` renders the real app on the journey harness (temp homes, keychain stand-in, in-memory relay, virtual passkey): never a real home, keychain, key, code or person. The two people are **Tali** and **Natasa**.
 - **Fixed frame.** 1280 × 800 at device scale 2, light theme, WebP, about 40 to 70 KB each.
 - **Names.** `<page-or-moment>.webp`, lowercase with hyphens, for example `accept-invite.webp`. Add a shot by adding one `shot(page, '<name>')` step to the generator.
 - **Stored** in `docs-site/assets/screens/`, shared by the README, the guide and the technical docs; embedded as `<figure><img src="../assets/screens/NAME.webp" alt="<what it shows and why>"><figcaption><p><caption></p></figcaption></figure>` (one more `../` per folder level).
 - **Alt text** says what the reader should notice, not "screenshot".
 - **Placeholder** until captured: `<!-- screenshot: <name> | shows: <state> -->`.
-- **Refresh** with `pnpm docs:screens` when any string on a shot changes. The older dark, fixture-based shots in `docs-site/guide/.gitbook/assets/` stay only until the generator covers their pages (files, proofs, rules).
+- **Refresh** with `pnpm docs:screenshots` when any string on a shot changes. Every image the guide shows is in `tools/docs-screenshots/manifest.json`; `pnpm docs:screenshots:check` fails on a mismatch ([runbook](../runbooks/docs-screenshots.md)).
 
 ## 6. Wording
 

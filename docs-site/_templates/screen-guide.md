@@ -5,9 +5,9 @@
 
 <What the page is for, in one or two sentences. Then what looking changes (nothing) and what a change needs.> Every change needs your [passkey](../help/glossary.md) or your [master code](../help/glossary.md).
 
-<!-- screenshot: local-<page>--<state>.png | shows: <the default state, with test data> -->
+<!-- screenshot: <name>.webp, add it to tools/docs-screenshots/manifest.json and capture it in e2e/docs-screens | shows: <the default state, with test data> -->
 <!-- When captured, replace the comment with:
-<figure><img src="../.gitbook/assets/local-<page>--<state>.png" alt="<What the reader should notice>"><figcaption><p><Short caption></p></figcaption></figure>
+<figure><img src="../../assets/screens/<name>.webp" alt="<What the reader should notice>"><figcaption><p><Short caption></p></figcaption></figure>
 -->
 
 ## What you see

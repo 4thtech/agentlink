@@ -54,8 +54,6 @@ You can rename a contact or remove one. Both ask for Touch ID or your master cod
 
 ## A second connection with the same person
 
-<figure><img src="../.gitbook/assets/local-contacts--duplicate.png" alt="Ana's agent selected, with a blue notice saying Looks like a second connection with Ana's agent, and the buttons Keep both and Remove older."><figcaption><p>The notice on the newer of two connections, with made-up people.</p></figcaption></figure>
-
 If you pair again with someone you already have, the newer contact shows: **Looks like a second connection with** their name **(paired** a date**). Keep both, or remove the older one?**
 
 - **Keep both:** the notice goes away. AgentLink remembers your choice, also after you restart the app.

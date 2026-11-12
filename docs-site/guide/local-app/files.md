@@ -18,15 +18,15 @@ A file that is not saved reads **Arrived · not saved**. Press **Save to Inbox**
 
 The Files page has three tabs: **Received**, **Sent** and **Send folders**. Received and Sent list your files. Send folders is where you allow a folder. Your AI can send a file only from a folder you have allowed, and that tab shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [master code](../help/glossary.md).
 
-<figure><img src="../.gitbook/assets/local-files--list.png" alt="Three allowed folders; the last one opens at another location."><figcaption><p>Files, with made-up folders. The last folder is a link to somewhere else.</p></figcaption></figure>
+<figure><img src="../../assets/screens/files-folders.webp" alt="The Send folders tab with the one folder your AI may send from, ~/AgentLink/Send."><figcaption><p>Send folders, on made-up data.</p></figcaption></figure>
 
 A file that is being sent or received right now shows the same small mark as in [Messages](messages.md#moving-right-now) on its row, for about a minute. It shows a word and a direction only.
 
 ## Received and Sent
 
-<figure><img src="../.gitbook/assets/local-files--received.png" alt="The Received tab with two files, each with who sent it, the name it was saved under and a Show in Finder button."><figcaption><p>Received files, with made-up names.</p></figcaption></figure>
+<figure><img src="../../assets/screens/files-received.webp" alt="The Received tab with one file from Natasa, the name it was saved under and a Show in Finder button."><figcaption><p>Received files, on made-up data.</p></figcaption></figure>
 
-<figure><img src="../.gitbook/assets/local-files--sent.png" alt="The Sent tab with two files, each with who it went to and where it stands."><figcaption><p>Sent files, with made-up names.</p></figcaption></figure>
+<figure><img src="../../assets/screens/files-sent.webp" alt="The Sent tab with one file sent to Natasa and where it stands."><figcaption><p>Sent files, on made-up data.</p></figcaption></figure>
 
 You don't upload files here. Put a file in your Send folder, or ask your AI to send it. Files you receive appear under **Received**.
 
@@ -63,7 +63,7 @@ With no folders yet, the page says **Your AI can't send files yet. Allow a folde
 
 ## Allow a folder
 
-<figure><img src="../.gitbook/assets/local-files--enter.png" alt="The Folder field with ~/Documents/Shared typed in, and the Check folder button."><figcaption><p>The Folder field after you press Allow a folder.</p></figcaption></figure>
+<figure><img src="../../assets/screens/files-add-folder.webp" alt="The Folder field with ~/Documents/Shared typed in, and the Check folder button."><figcaption><p>The Folder field after you press Allow a folder.</p></figcaption></figure>
 
 1. Press **Allow a folder**.
 2. In **Folder**, type the full path, for example `~/Documents/Shared`. Press **Check folder**.
@@ -72,7 +72,7 @@ With no folders yet, the page says **Your AI can't send files yet. Allow a folde
 5. Press **Allow folder** and confirm with your passkey. No passkey? Press **Use your master code instead** and type your master code.
 6. The page says **Allowed. Your AI can now send files from this folder.**
 
-<figure><img src="../.gitbook/assets/local-files--confirm-add.png" alt="The confirm step: the folder, one ticked line saying what your AI may do, and the Allow folder button."><figcaption><p>The confirm step. Allow folder stays off until every line is ticked.</p></figcaption></figure>
+<figure><img src="../../assets/screens/files-add-folder-confirm.webp" alt="The confirm step: the folder, one ticked line saying what your AI may do, and the Allow folder button."><figcaption><p>The confirm step. Allow folder stays off until every line is ticked.</p></figcaption></figure>
 
 {% hint style="warning" %}
 **Before you continue:** type your master code only on this page. Never give it to your AI or paste it into a chat.
