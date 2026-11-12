@@ -203,6 +203,8 @@ export function startServerOf(
         },
         notifier: () => Promise.resolve(true),
         ownerKdf: KDF,
+        // UX1113-R3: restore reads this computer's Downloads, never the real home.
+        restore: { home: pc.home, kdf: KDF },
       },
     );
   };

@@ -46,6 +46,10 @@ export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   '/advanced/network': advanced,
   '/advanced/diagnostics': diagnostics,
   '/advanced/map': part(async () => (await import('../pages/advanced/map.js')).ConnectionsMapPage),
+  // UX1113-R3 (D-147): restore from a recovery kit, in the focused shell.
+  '/restore/kit': part(async () => (await import('../pages/restore/index.js')).RestoreKitPage),
+  '/restore/check': part(async () => (await import('../pages/restore/index.js')).RestoreCheckPage),
+  '/restore/move': part(async () => (await import('../pages/restore/index.js')).RestoreMovePage),
   // U3-invite: "Accept {name}'s invite?" (b11 §33.2), in the focused shell.
   '/settings/join': part(async () => (await import('../pages/join/index.js')).JoinPage),
 };

@@ -434,10 +434,11 @@ const REVIEW_ITEM = /^(apr_[A-Za-z0-9_-]{22}):([0-9a-f]{64}):([ad])$/;
  * W4-SHELL (Decision 40): the wave-4 destinations `/inbox` and `/contacts`, exactly; nothing below
  * or beside them. W4-SHELL-V2 (Decisions 49–51): the sections `/agents` (and one agent,
  * `/agents/<name>`), `/activity` (and `/activity/live`), `/advanced/<page>`, and the Get started
- * steps `/start/<step>`; one lower-case segment each, nothing deeper.
+ * steps `/start/<step>`; one lower-case segment each, nothing deeper. UX1113-R3 (D-147): the
+ * restore wizard's three pages, `/restore/kit`, `/restore/check` and `/restore/move`, exactly.
  */
 const APP_PAGE =
-  /^\/(?:first-run|inbox|contacts|start(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|agents(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|activity(?:\/live)?|advanced(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|settings(?:\/[a-z0-9]+(?:-[a-z0-9]+)*){0,4})$/;
+  /^\/(?:first-run|inbox|contacts|start(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|agents(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|activity(?:\/live)?|restore\/(?:kit|check|move)|advanced(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|settings(?:\/[a-z0-9]+(?:-[a-z0-9]+)*){0,4})$/;
 const ASSETS_PREFIX = '/assets/';
 /** One file name: no separator, no leading dot, no escape. */
 const ASSET_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;

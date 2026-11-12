@@ -147,7 +147,12 @@ export async function needsPasskeySwitch(): Promise<boolean> {
 
 /** Get started and the join screen: a focused column with no chrome (b11 §28, §33.2). */
 export function isFocusedPath(path: string): boolean {
-  return path.startsWith('/start/') || path === '/first-run' || path === '/settings/join';
+  return (
+    path.startsWith('/start/') ||
+    path.startsWith('/restore/') ||
+    path === '/first-run' ||
+    path === '/settings/join'
+  );
 }
 
 /** UI-REFRESH-t: the first Tab stop. Focus goes to the page content (it is made focusable here). */

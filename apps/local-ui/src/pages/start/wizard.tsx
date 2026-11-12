@@ -318,6 +318,13 @@ export function PickStep({
           {lookFailed ? P.lookFailed : P.later}
         </p>
       </div>
+      {eyebrow === P.eyebrow ? (
+        <p className="st-note">
+          <a href="/restore/kit" data-restore-link="">
+            {P.restore}
+          </a>
+        </p>
+      ) : null}
     </section>
   );
 }
