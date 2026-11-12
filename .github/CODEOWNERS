@@ -34,6 +34,11 @@
 /tools/installer/                               @talirezun @denisjazbec
 /apps/invite/                                   @talirezun @denisjazbec
 
+# S2 (D-145): the desktop apps (shell lockdown, updater keys, presence helpers, owner process) and
+# the core desktop host entry of the CLI.
+/apps/desktop/                                  @talirezun @denisjazbec
+/apps/cli/src/desktop/                          @talirezun @denisjazbec
+
 # CI, release and repository configuration (incl. this file, review-gate and release workflows)
 /.github/                                       @talirezun @denisjazbec
 
