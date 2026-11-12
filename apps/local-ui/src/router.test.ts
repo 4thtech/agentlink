@@ -53,13 +53,12 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/ids', 'IDs', 'IDs'],
   ['/activity', 'Activity', 'Activity'],
   ['/activity/live', 'Live activity stream', null],
-  ['/contacts', 'People', 'Home'],
+  ['/contacts', 'People', 'People'],
   ['/settings', 'Settings', 'Settings'],
   ['/settings/backup', 'Backup & Touch ID', 'Settings'],
   ['/settings/apps', 'AI apps', 'Settings'],
   ['/settings/files', 'Files', 'Settings'],
   ['/settings/appearance', 'Appearance', 'Settings'],
-  ['/settings/notifications', 'Notifications', 'Settings'],
   ['/settings/rules', 'Rules', 'Settings'],
   ['/settings/proofs', 'Proofs & credits', 'Settings'],
   ['/advanced/rules', 'Rules', null],
@@ -146,6 +145,7 @@ describe('routes', () => {
     ['/settings/contacts', '/contacts'],
     ['/settings/storage', '/settings/files'],
     ['/settings/passkeys', '/settings/backup'],
+    ['/settings/notifications', '/settings'],
     ['/advanced', '/advanced/network'],
   ])('keeps the old path %s working: it goes to %s', (from, to) => {
     expect(REDIRECTS[from]).toBe(to);
@@ -155,10 +155,11 @@ describe('routes', () => {
 });
 
 describe('the sections (nav.ts)', () => {
-  it('Home, IDs, Activity, Settings; Advanced holds six pages', () => {
+  it('Home, IDs, People, Activity, Settings; Advanced holds six pages', () => {
     expect(SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Home', '/'],
       ['IDs', '/agents'],
+      ['People', '/contacts'],
       ['Activity', '/activity'],
       ['Settings', '/settings'],
     ]);
@@ -178,7 +179,6 @@ describe('the sections (nav.ts)', () => {
       'AI apps',
       'Files folder',
       'Appearance',
-      'Notifications',
       'Rules',
       'Proofs & credits',
       'Advanced',

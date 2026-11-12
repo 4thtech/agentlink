@@ -3,7 +3,7 @@
 // these routes never see the link except to hand it to the one accept path of api/invites.ts.
 //
 // - `GET /api/ui/join` (read; also before an owner exists, like the other reads): the state, the
-//   public `inviteId`, the name-rule name with its Self-declared label, the short owner fingerprint
+//   public `inviteId`, the name-rule name with its Self-declared label, the short ID tag
 //   and the expiry. Never the link, the payload or any other invite field. While the state is
 //   `waiting_for_them`, it first runs the host's lease-gated pass (`followPairing`, U3-invite-b), so
 //   the pairing completes with no AI app running; with an MCP server holding the lease it only reads.

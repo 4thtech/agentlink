@@ -22,8 +22,8 @@ export const strings = {
   },
   inviter: {
     label: 'Not checked yet',
-    fingerprint: 'FINGERPRINT',
-    note: "Name chosen by its owner. You'll compare a safety code after accepting.",
+    fingerprint: 'ID TAG',
+    note: 'You can compare the 12 digits after accepting (optional).',
     expiryPrefix: 'Works once, until ',
     expirySuffix: '.',
   },
@@ -33,10 +33,22 @@ export const strings = {
     askAiHelp:
       'For an AI app that can run commands on this computer, like Claude Code or Codex. It shows you the change before it makes it.',
     command: 'Install and accept with one command',
-    commandHelp: 'Paste it into Terminal and press Return. Needs Node.js 22 or later.',
+    /** WP-2: the computer the command is for; chosen from the browser, the person can change it. */
+    os: {
+      label: 'Your computer',
+      unix: 'Mac or Linux',
+      windows: 'Windows',
+      node: 'Node.js',
+    },
+    /** WP-2 (I-1, I-2): one help line per command. */
+    commandHelp: {
+      unix: 'Paste it into Terminal and press Return. It installs AgentLink, and Node.js if needed, then opens the invite.',
+      windows:
+        'Paste it into PowerShell and press Enter. It installs AgentLink, and Node.js if needed, then opens the invite.',
+      node: 'For a computer with Node.js 22.14 or later. Paste it into Terminal and press Return.',
+    },
     link: 'Already have AgentLink? Open it and paste the link',
-    linkHelp: 'In AgentLink, choose Accept an invite and paste this link.',
-    node: 'Need Node.js? Get it here',
+    linkHelp: 'In AgentLink, choose “Have an invite link? Paste it” and paste this link.',
     copy: 'Copy',
     copyLink: 'Copy link',
     copied: 'Copied',
@@ -44,9 +56,6 @@ export const strings = {
     nextSomeone: 'AgentLink opens in your browser. Set it up, then accept the invite.',
   },
 } as const;
-
-/** The official download page (08 §4): a fixed link in the page source, carrying nothing. */
-export const NODE_DOWNLOAD_URL = 'https://nodejs.org/en/download';
 
 /** "{name} invites you to connect your AI agents." (`name`: the name-rule output). */
 export const invitesHeading = (name: string): string =>

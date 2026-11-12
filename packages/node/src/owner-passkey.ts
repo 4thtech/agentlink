@@ -6,10 +6,10 @@
 //   (`http://localhost:<port>`, D-79), with `user.id` = the owner's x-only Nostr key (04 §2.3 step 2).
 // - The owner seed is stored a second time, as an `ALKP` v1 blob (04 §2.3.1, D-82) under that
 //   passkey's PRF output, in the keychain item service `agentlink`, account `owner-passkey`. The
-//   `owner` item (`ALKO`, the owner code) is unchanged and stays the fallback. Several passkeys
+//   `owner` item (`ALKO`, the master code) is unchanged and stays the fallback. Several passkeys
 //   (per-credential accounts) are a later extension.
-// - Registering is its own owner operation: one entry of the owner code on the localhost page opens
-//   the `ALKO` item, the seed is sealed under the PRF output, and the seed, the owner code and the
+// - Registering is its own owner operation: one entry of the master code on the localhost page opens
+//   the `ALKO` item, the seed is sealed under the PRF output, and the seed, the master code and the
 //   PRF output are wiped. It signs nothing (no SignedOwnerAction).
 // - Unlocking: the page asks the authenticator with `allowCredentials = [credId]`, user verification
 //   required, and sends the credential ID, the authenticator data, the user handle and the PRF
@@ -22,11 +22,11 @@
 // any localhost port, including one a shell-capable agent starts, can ask for this passkey and, after
 // the owner's gesture, get the same PRF output. The gesture is still the owner's; what the owner
 // meant is not proven (presence, not intent). The PRF output for the fixed salt is a static key: a
-// leaked PRF output opens the blob like a leaked owner code. The desktop app's native approval window
+// leaked PRF output opens the blob like a leaked master code. The desktop app's native approval window
 // and app-bound keystore (D-36, G-42) are the long-term mitigation.
 // Registration does not prove a real authenticator (no attestation is checked): it is gated by the
-// owner code, which already has the same power. Two concurrent registrations race between the read
-// and the write; the read-back catches it and the owner code gates both. The other G-1 residuals (package
+// master code, which already has the same power. Two concurrent registrations race between the read
+// and the write; the read-back catches it and the master code gates both. The other G-1 residuals (package
 // modification, memory reads) apply unchanged.
 //
 // Everything secret is a Uint8Array wiped after use (04 §8.3, best effort). No error carries an
@@ -94,19 +94,19 @@ const presenceRejected = (): KeyStoreError =>
 const passkeyExists = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'owner_passkey_exists',
-    'A passkey is already set up for approvals on this computer. Keep using it, or your owner code.',
+    'A passkey is already set up for approvals on this computer. Keep using it, or your master code.',
   );
 
 const passkeyUnsupported = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'passkey_unsupported',
-    "This passkey can't protect approvals here. Keep using your owner code.",
+    "This passkey can't protect approvals here. Keep using your master code.",
   );
 
 const passkeyDamaged = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'owner_mismatch',
-    `The saved passkey copy of your owner key is damaged. Use your owner code; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
+    `The saved passkey copy of your owner key is damaged. Use your master code; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
 
 function u16(value: number): Uint8Array {
@@ -188,7 +188,7 @@ export function parsePasskeyAssertion(bytes: Uint8Array): PasskeyAssertion {
 }
 
 /**
- * The registration body: the owner code (16-bit big-endian length first), then the assertion, then
+ * The registration body: the master code (16-bit big-endian length first), then the assertion, then
  * (M1-PAY-CONFIRM-b) optionally the `create()` response's authenticator data as a fifth field, also
  * length-prefixed. The page sends it when the authenticator evaluates PRF only on use, so the
  * assertion comes from a second gesture whose authenticator data carries no credential public key.
@@ -219,8 +219,8 @@ export function encodePasskeyRegistration(
 }
 
 /**
- * Splits a registration body into the owner code and the assertion (fresh copies; the caller wipes
- * `bytes`, the code and the PRF output). An empty owner code is `presence_required`.
+ * Splits a registration body into the master code and the assertion (fresh copies; the caller wipes
+ * `bytes`, the code and the PRF output). An empty master code is `presence_required`.
  */
 export function parsePasskeyRegistration(bytes: Uint8Array): {
   readonly ownerSecret: Uint8Array;
@@ -350,7 +350,7 @@ export interface RegisterOwnerPasskeyOptions {
    * M1-PAY-CONFIRM-b: the `create()` response's authenticator data, when the assertion came from a
    * second gesture (PRF only on use). The credential public key is kept from it (rule 5) when its
    * rpIdHash is this page's and its attested credential is the asserted one; otherwise no key is
-   * kept, as before, and paid actions use the backup code.
+   * kept, as before, and paid actions use the master code.
    */
   readonly creationAuthenticatorData?: Uint8Array;
 }
@@ -359,9 +359,9 @@ export interface RegisterOwnerPasskeyOptions {
  * Registers the localhost passkey: one owner operation (proposed, owner confirms at merge). Checks
  * the assertion (PRF output present, else `passkey_unsupported`; rpIdHash, UP, UV and user handle,
  * else `presence_rejected`), refuses when a passkey is already set up (`owner_passkey_exists`), opens
- * the `owner` item with the owner code (`presence_rejected` for a wrong code or another owner), seals
+ * the `owner` item with the master code (`presence_rejected` for a wrong code or another owner), seals
  * the seed as `ALKP` v1 under the PRF output for this credential, stores it as `owner-passkey`, reads
- * it back and opens it once with the same PRF output. The owner code, the PRF output and the seed are
+ * it back and opens it once with the same PRF output. The master code, the PRF output and the seed are
  * wiped whatever happens; the `owner` item is never written.
  */
 export async function registerOwnerPasskey(
@@ -540,7 +540,7 @@ const PASSKEY_KEY_VERSION = 1;
  * Stores the credential public key from a registration's authenticator data (attested credential
  * data for `credentialId`). Returns false, writing nothing, when the authenticator data carries no
  * supported key (an RS256 key, say): the passkey still unlocks approvals, and a paid action then
- * uses the backup code until the passkey is set up again.
+ * uses the master code until the passkey is set up again.
  */
 export async function storeOwnerPasskeyKey(
   keychain: KeychainBackend,

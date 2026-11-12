@@ -3,12 +3,12 @@
 // PRF, user verification, resident keys; no hardware). M1-11b-2c: the server-rendered page is gone,
 // so this runs the built local app (apps/local-ui, the CLI's bundle) against the real server, the
 // real owner store and real owner signatures. The passkey is set up where the app offers it: the
-// first-run page, with the backup code once (M1-UX-FIRSTRUN-V2-c).
+// first-run page, with the master code once (M1-UX-FIRSTRUN-V2-c).
 //
 // Covered: J4 end to end with the passkey; review together (W4-HOME: Home's bulk approve under
 // Under the hood) signs exactly the picked items with one passkey gesture; a commitment cannot be selected and "Remember for this contact" is absent
 // from the batch view; injected HTML and script in request text render inert; a PRF-less
-// authenticator, or a browser with no passkeys at all, falls back to the backup code; the session
+// authenticator, or a browser with no passkeys at all, falls back to the master code; the session
 // link is single-use; wrong codes back off; the page loads nothing from the removed page.
 //
 // CI installs Chromium for Playwright and builds the app (ci.yml), so there the test always runs
@@ -155,7 +155,7 @@ async function pageWithoutPasskeys(): Promise<Page> {
   return page;
 }
 
-/** The owner sets up the localhost passkey in the app with the backup code once. */
+/** The owner sets up the localhost passkey in the app with the master code once. */
 async function setUpPasskey(page: Page, origin: string): Promise<void> {
   await switchToPasskey(page, origin, world.code);
 }
@@ -178,7 +178,7 @@ const pick = (page: Page, n: number) =>
     name: `Select Send a message to Contact ${String(n)}`,
     exact: true,
   });
-const CODE_LABEL = 'Backup code';
+const CODE_LABEL = 'Master code';
 /** The wrong-code backoff's free attempts (approval-server.ts), pinned. */
 const FREE_ATTEMPTS = 3;
 const XSS = '<img src=x onerror="window.__xss=1"><script>window.__xss=2</script>';
@@ -350,18 +350,18 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     }
   }, 120_000);
 
-  it('a PRF-less authenticator registers nothing; the backup code or owner passphrase approves', async (ctx) => {
+  it('a PRF-less authenticator registers nothing; the master code or owner passphrase approves', async (ctx) => {
     needBrowser(() => ctx.skip());
     const { server, source, link } = await start();
     const { page } = await pageWithAuthenticator(false);
     await page.goto(await link());
     await page.goto(`${server.origin}/first-run`);
-    await page.getByLabel('Backup code').fill(world.code);
+    await page.getByLabel('Master code').fill(world.code);
     await page.getByRole('button', { name: USE_PASSKEY }).click();
     // F49: in the browser the copy would suggest (Chrome on Linux) it says so plainly instead.
     await page
       .getByText(
-        /This passkey can't protect approvals here\.|can't protect approvals yet, so AgentLink uses your backup code/,
+        /This passkey can't protect approvals here\.|can't protect approvals yet, so AgentLink uses your master code/,
       )
       .waitFor();
     expect(await world.keychain.get(OWNER_PASSKEY_ACCOUNT)).toBeNull();
@@ -382,7 +382,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     expect(source.applied).toHaveLength(1);
   }, 120_000);
 
-  it('a browser without passkeys says so and uses the backup code', async (ctx) => {
+  it('a browser without passkeys says so and uses the master code', async (ctx) => {
     needBrowser(() => ctx.skip());
     const { server, source, link } = await start();
     const page = await pageWithoutPasskeys();
@@ -450,7 +450,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     const { link } = await start(source);
     const { page } = await pageWithAuthenticator(true);
     await page.goto(await link());
-    await page.getByText('Set up your backup code first', { exact: false }).first().waitFor();
+    await page.getByText('Set up your master code first', { exact: false }).first().waitFor();
     // 11 §5.1: never "owner key" in the default UI.
     expect(await page.getByText('owner key', { exact: false }).count()).toBe(0);
     expect(await page.getByRole('button', { name: 'Set up a passkey' }).count()).toBe(0);
@@ -459,14 +459,14 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
 });
 
 // M1-11a-ux (owner test 2026-10-25): the page was unstyled, printed the raw invite link and
-// had a tiny owner code box. The card leads with a plain headline, never shows the invite link,
+// had a tiny master code box. The card leads with a plain headline, never shows the invite link,
 // and the code field is full width, paste-friendly and can be shown. M1-11b-2c: in the app.
 describe('the approvals as the owner sees them (M1-11a-ux; Chromium)', () => {
   const INVITE =
     'https://agentlink.4thtech.io/i#c2VjcmV0LWludml0ZS1ib2R5LXRoYXQtaXMtcXVpdGUtbG9uZw';
   const WHO = '“Ana” (self-declared) · owner 7F3A·19C2 · not in your contacts yet';
   const HEADLINE = 'Connect with “Ana” (self-declared)';
-  const HINT = 'Paste the backup code AgentLink showed you when you set up';
+  const HINT = 'Paste the master code AgentLink showed you when you set up';
   const addInvite = (source: FakeSource): void => {
     source.add(1, {
       summary: `Connect with a new contact · ${WHO} · Free`,

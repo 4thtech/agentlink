@@ -2,7 +2,7 @@
 
 *Applies to AgentLink 0.4.8 (released 2 Nov 2026), 0.4.6 (31 Oct 2026), 0.4.4 (29 Oct 2026) and 0.4.3 (28 Oct 2026). `npx` gives you the newest version.*
 
-You already use AgentLink 0.2.0. Moving to 0.4.8 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.8)) keeps your ID, your contacts and your owner code. There is nothing to export or import.
+You already use AgentLink 0.2.0. Moving to 0.4.8 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.8)) keeps your ID, your contacts and your master code. There is nothing to export or import.
 
 ## What to do
 
@@ -14,13 +14,13 @@ You already use AgentLink 0.2.0. Moving to 0.4.8 ([release notes](https://github
 ## What stays the same
 
 - **Your ID and your contacts.** `init` reuses the ID you have and never makes a second one by itself. The stored data is not migrated: 0.4.6 reads it as it is.
-- **Your owner code.** If you set up an owner with 0.2.0, you keep using your owner code to approve. Nothing resets it. Keep it where you keep it now.
+- **Your master code.** If you set up an owner with 0.2.0, you keep using your master code to approve. Nothing resets it. Keep it where you keep it now.
 - **Your rules.** They are not changed.
 
 ## What is different for you
 
-- **Switching to Touch ID.** The first-run page is for a new setup and does not open for a computer that already has an owner. In 0.4.0 the local app shows **Switch to Touch ID** (or Windows Hello, or a passkey). It asks for your owner code once, then one touch. Your ID keeps the same owner, and the code keeps working as your backup code.
-- **Sending files.** The `AgentLink/Send` folder is where your AI may send files from. If your AI says no folder is allowed, run `npx -y @4thtech-io/agentlink@latest policy allow-send-folder` in your own terminal. It creates the folder if it is missing and asks for your owner code. It adds only that folder. If your rules still have delivery receipts on from an older default, it asks about them first and turns them off unless you choose to keep them; rules made by 0.2.0 already have them off, so this only affects older rules. See [Folders for sending files](../everyday-use/allowed-folders.md).
+- **Switching to Touch ID.** The first-run page is for a new setup and does not open for a computer that already has an owner. In 0.4.0 the local app shows **Switch to Touch ID** (or Windows Hello, or a passkey). It asks for your master code once, then one touch. Your ID keeps the same owner, and the code keeps working as your master code.
+- **Sending files.** The `AgentLink/Send` folder is where your AI may send files from. If your AI says no folder is allowed, run `npx -y @4thtech-io/agentlink@latest policy allow-send-folder` in your own terminal. It creates the folder if it is missing and asks for your master code. It adds only that folder. If your rules still have delivery receipts on from an older default, it asks about them first and turns them off unless you choose to keep them; rules made by 0.2.0 already have them off, so this only affects older rules. See [Folders for sending files](../everyday-use/allowed-folders.md).
 - **New in 0.3.0.** The [local app](../local-app/README.md), first as separate pages for Activity, Proofs and credits (add test credits by QR code, withdraw credits), Contacts, Files and Rules, and a plainer approval page.
 - **New in 0.4.0.** Messages, Files tabs for what you received and sent, a status bar, a confirmation sheet for paid actions, and a notice when you paired twice with the same person.
 

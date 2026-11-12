@@ -202,9 +202,9 @@ jobs:
       - name: Build the invite page
         run: pnpm exec turbo run build --filter='@4thtech-io/invite...'
 
-      # The same site goes to both environments. The site has exactly seven files (08 §4: one
+      # The same site goes to both environments. The site has exactly eight files (08 §4: one
       # first-party script, one first-party style file, no source map, no second chunk; plus the two
-      # one-line installers of INSTALLER-1, plain text); anything else fails the build.
+      # one-line installers of INSTALLER-1, plain text; the favicon, WP-2 F33); anything else fails the build.
       - name: Stage the site and hash it
         id: site
         shell: bash
@@ -216,8 +216,8 @@ jobs:
           rm -rf "$SITE_DIR"
           cp -R apps/invite/dist/site "$SITE_DIR"
           found="$(cd "$SITE_DIR" && find . -type f | LC_ALL=C sort | tr '\n' ' ')"
-          if [ "$found" != "./_headers ./i/index.html ./index.html ./install.ps1 ./install.sh ./invite.css ./invite.js " ]; then
-            echo "::error::The built site is not exactly _headers, i/index.html, index.html, install.ps1, install.sh, invite.css and invite.js."
+          if [ "$found" != "./_headers ./favicon.svg ./i/index.html ./index.html ./install.ps1 ./install.sh ./invite.css ./invite.js " ]; then
+            echo "::error::The built site is not exactly _headers, favicon.svg, i/index.html, index.html, install.ps1, install.sh, invite.css and invite.js."
             exit 1
           fi
           # MANIFEST-BEGIN
@@ -451,7 +451,7 @@ jobs:
           }
           site_check() {
             local entry path asset name wanted_value seen want got
-            for entry in "/|index.html" "/i|i/index.html" "/invite.js|invite.js" "/invite.css|invite.css" "/install.sh|install.sh" "/install.ps1|install.ps1"; do
+            for entry in "/|index.html" "/i|i/index.html" "/invite.js|invite.js" "/invite.css|invite.css" "/favicon.svg|favicon.svg" "/install.sh|install.sh" "/install.ps1|install.ps1"; do
               path="${entry%%|*}"
               asset="${entry##*|}"
               fetch "$path"
@@ -497,7 +497,7 @@ jobs:
               echo "An unknown path answered HTTP ${status:-none}, expected 404."
               return 1
             fi
-            echo "Healthy: the pages, the script, the style file and the installers equal the build, headers match, unknown path 404."
+            echo "Healthy: the pages, the script, the style file, the favicon and the installers equal the build, headers match, unknown path 404."
             return 0
           }
           # SITE-CHECK-END
@@ -713,7 +713,7 @@ jobs:
           }
           site_check() {
             local entry path asset name wanted_value seen want got
-            for entry in "/|index.html" "/i|i/index.html" "/invite.js|invite.js" "/invite.css|invite.css" "/install.sh|install.sh" "/install.ps1|install.ps1"; do
+            for entry in "/|index.html" "/i|i/index.html" "/invite.js|invite.js" "/invite.css|invite.css" "/favicon.svg|favicon.svg" "/install.sh|install.sh" "/install.ps1|install.ps1"; do
               path="${entry%%|*}"
               asset="${entry##*|}"
               fetch "$path"
@@ -759,7 +759,7 @@ jobs:
               echo "An unknown path answered HTTP ${status:-none}, expected 404."
               return 1
             fi
-            echo "Healthy: the pages, the script, the style file and the installers equal the build, headers match, unknown path 404."
+            echo "Healthy: the pages, the script, the style file, the favicon and the installers equal the build, headers match, unknown path 404."
             return 0
           }
           # SITE-CHECK-END

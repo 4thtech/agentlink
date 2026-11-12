@@ -2,7 +2,7 @@
 // first `policy.set`, the 06 §3 defaults with only `files.allowedFolders` = the empty
 // `~/AgentLink/Send` folder (its real path), in the same owner-code entry as the first card.
 //
-// - One entry: the owner code is typed once for the card and the first rules.
+// - One entry: the master code is typed once for the card and the first rules.
 // - Defaults unchanged apart from the Send folder; node refuses to sign anything wider, whatever core
 //   prepared (policy widening).
 // - A failure leaves no half-set state: no policy, the folder this run created removed, the card and
@@ -148,8 +148,8 @@ function ownerAtInit(retype?: string) {
   const written: string[] = [];
   const labels: string[] = [];
   const shown = (): string =>
-    (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-      'Your owner code: '.length,
+    (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+      'Your master code: '.length,
     );
   const terminal: OwnerTerminal = {
     write: (text) => void written.push(text),
@@ -294,12 +294,12 @@ describe('owner init signs the first rules with the first card (M1-36b-2; 04 §2
     expect(await realpath(folder)).toBe(folder);
   });
 
-  it('tells the owner about the Send folder before the owner code is shown, and after', async () => {
+  it('tells the owner about the Send folder before the master code is shown, and after', async () => {
     const alice = await initAgent('alice');
     const { run } = await ownerInitFor(alice, withPolicy(alice, 'alice'));
     const folder = await sendFolder();
     const review = run.written.findIndex((t) => t.includes(folder) && t.includes('Send'));
-    const code = run.written.findIndex((t) => t.startsWith('Your owner code: '));
+    const code = run.written.findIndex((t) => t.startsWith('Your master code: '));
     expect(review).toBeGreaterThanOrEqual(0);
     expect(review).toBeLessThan(code);
     expect(run.written.join('\n')).toContain(`${CLI_COMMAND} policy remove-folder`);
@@ -562,7 +562,7 @@ describe('owner add-agent signs the first rules with the card (M1-36b-2; 04 §2.
       owner,
       card: withPolicy(bob, 'bob'),
     });
-    expect(run.labels).toEqual(['Owner code:']);
+    expect(run.labels).toEqual(['Master code:']);
     expect(result.sendFolder).toEqual({ status: 'allowed', folder: await sendFolder() });
     const effective = await bob.client.ownerActions.loadPolicy();
     expect(effective.mode).toBe('signed');
@@ -647,7 +647,7 @@ describe('owner add-agent signs the first rules with the card (M1-36b-2; 04 §2.
 });
 
 // M1-UX-FIRSTRUN-V2-b (IR-M1-36b-2-d-1, #545; 04 §2.5, G-1): the agent runs as the same OS user and
-// can replace the Send folder at any moment. The folder checked before the owner code is pinned (its
+// can replace the Send folder at any moment. The folder checked before the master code is pinned (its
 // real path, device and inode, allowed-path `pinFolder`) and must still be that same real, empty
 // folder just before signing AND after signing, just before the first rules are applied; otherwise
 // nothing is applied. This covers `owner init`, `owner add-agent` and the first run (all three sign

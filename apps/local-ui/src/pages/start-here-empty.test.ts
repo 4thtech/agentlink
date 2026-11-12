@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// UX2-g (S1): the empty states on Contacts, Messages and Files point to step 2 of Start here
+// UX2-g (S1): the empty states on Contacts and Files point to step 2 of Start here
 // (B-11 §27.4). While step 2 is known not done they say "Invite someone first" and offer the
 // primary Add contact; once it is done (or while it is unknown) they keep today's empty states.
 // Until the Add contact sheet (UX2-d1/d2) lands, Add contact goes to Home, where the existing
@@ -15,8 +15,6 @@ import { FilesPage } from './files/index.js';
 import { FILES_IO_STRINGS } from './files/strings.js';
 import { START_STRINGS } from './home/strings.js';
 import { StartHereContext, type StartHereModel } from './home/start-here-context.js';
-import { MessagesPage } from './messages/index.js';
-import { MESSAGES_STRINGS } from './messages/strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -63,15 +61,13 @@ async function settle(): Promise<void> {
   }
 }
 
-type Which = 'contacts' | 'messages' | 'files';
+type Which = 'contacts' | 'files';
 async function mount(which: Which, ctx: StartHereModel | null): Promise<void> {
   const api = createApiClient({ fetch: fetcher, token: 't' });
   const page =
     which === 'contacts'
       ? h(ContactsPage, { api } as never)
-      : which === 'messages'
-        ? h(MessagesPage, { api })
-        : h(FilesPage, { fetch: fetcher, token: 't', initialTab: 'received' } as never);
+      : h(FilesPage, { fetch: fetcher, token: 't', initialTab: 'received' } as never);
   await act(async () => {
     root.render(h(StartHereContext.Provider, { value: ctx }, page));
   });
@@ -106,15 +102,6 @@ describe('Empty states point to step 2 of Start here', () => {
     expect(document.body.textContent).toContain('Have an invite link? Paste it');
   });
 
-  it('Inbox (W4-SHELL, owner 29 Oct): "Nothing here yet. Invite someone, then ask your AI to say hello."', async () => {
-    await mount('messages', model(false));
-    expect(host.textContent).toContain(
-      'Nothing here yet. Invite someone, then ask your AI to say hello.',
-    );
-    expect(addContact()?.classList.contains('al-btn-primary')).toBe(true);
-    expect(addContact()?.getAttribute('href')).toBe(ADD_CONTACT_HREF);
-  });
-
   it('Files: "No files yet. Invite someone first." with Add contact', async () => {
     await mount('files', model(false));
     expect(host.textContent).toContain('No files yet. Invite someone first.');
@@ -124,11 +111,6 @@ describe('Empty states point to step 2 of Start here', () => {
   it("once step 2 is done they return to today's empty states, with no Add contact", async () => {
     await mount('contacts', model(true));
     expect(host.textContent).toContain(CONTACTS_STRINGS.emptyTitle);
-    expect(addContact()).toBeUndefined();
-    act(() => root.unmount());
-    root = createRoot(host);
-    await mount('messages', model(true));
-    expect(host.textContent).toContain(MESSAGES_STRINGS.noContacts);
     expect(addContact()).toBeUndefined();
     act(() => root.unmount());
     root = createRoot(host);

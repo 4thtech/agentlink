@@ -4,6 +4,7 @@
 #   cmd.exe:     powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"
 #   Options:     & ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -DryRun
 #                (or -Uninstall, -NoStart)
+#   From an invite page: & ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Invite '<invite link>'
 #
 # What it does, and nothing more:
 #   1. Uses your Node.js if it is 22.14 or newer. Otherwise it downloads the official Node.js
@@ -11,12 +12,15 @@
 #      its SHA-256 against nodejs.org's SHASUMS256.txt AND against the hash written in this file.
 #   2. Writes a small `agentlink.cmd` to %LOCALAPPDATA%\AgentLink\bin and adds that folder to your
 #      own (user) PATH. A .cmd file runs whatever the PowerShell execution policy is.
-#   3. Starts AgentLink (only when run from a terminal window).
+#   3. Starts AgentLink (only when run from a terminal window). With -Invite (the command on an
+#      invite page), it opens AgentLink on that invite: `agentlink join` with the link. The link is
+#      checked first, with the same patterns as `agentlink join`; anything else is refused with one
+#      fixed line, and the link is never printed or stored by this script.
 # No admin rights, no telemetry. It never asks for or prints a secret. Run it again to update.
 # Your IDs and messages (in %USERPROFILE%\.agentlink) are never touched, not even by -Uninstall.
 # Works on Windows PowerShell 5.1 and PowerShell 7. Source: installer/ in
 # https://github.com/4thtech/agentlink (MIT).
-param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart)
+param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite, [Parameter(ValueFromRemainingArguments = $true)]$Rest)
 
 # Everything below runs as one script block: nothing it defines stays in your PowerShell session,
 # and a download cut off midway does not parse, so none of it runs.
@@ -71,6 +75,35 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart)
     return $dir
   }
 
+  # True when $Link is a whole AgentLink invite link: the patterns of `agentlink join` (08 section 4),
+  # case-sensitive, anchored at the very start and end (\z: no line break after it). None of these
+  # characters is special to PowerShell or cmd.exe.
+  function Test-InviteLink([string]$Link) {
+    $prefix = [regex]::Escape('https://agentlink.4thtech.io/i#')
+    return [regex]::IsMatch($Link, '\A' + $prefix + '(?:[A-Za-z0-9_-]{1,21846}|2\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048])\z')
+  }
+
+  # One fixed line; no part of the value is ever printed.
+  function Assert-InviteLink([string]$Link) {
+    if (-not (Test-InviteLink $Link)) {
+      throw "This isn't a complete AgentLink invite. Open the link again and copy the command."
+    }
+  }
+
+  # Anything the script does not know (a mistyped option, a link split by smart quotes) is refused
+  # with one fixed line; no part of it is ever printed.
+  # With nothing left over, $Stray is $null, and @($null) has one item: count only real ones.
+  function Assert-NoStrayArguments($Stray) {
+    if (@($Stray | Where-Object { $null -ne $_ }).Count -gt 0) {
+      throw 'This installer was given something it does not know. Copy the command again from the invite page.'
+    }
+  }
+
+  # Runs agentlink.cmd with these arguments, in this window.
+  function Invoke-Launcher([string]$Launcher, [string[]]$Arguments) {
+    & $Launcher @Arguments
+  }
+
   # Throws unless the file's SHA-256 equals both the SHASUMS256.txt line and the pinned hash.
   function Assert-NodeArchive([string]$Path, [string]$Shasums, [string]$FileName, [string]$Pinned) {
     $listed = ''
@@ -93,6 +126,8 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart)
       'rem AgentLink launcher, written by https://agentlink.4thtech.io/install.ps1.'
       'rem Remove with: irm https://agentlink.4thtech.io/install.ps1 | iex, run with -Uninstall.'
       'setlocal'
+      # Tells AgentLink it was started by this launcher, so it names the `agentlink` command (D4).
+      'set "AGENTLINK_LAUNCHER=installer"'
       "set `"PATH=$dir;%PATH%`""
       # npm reads a project .npmrc from the folder it is started in (node-options, proxies, TLS...).
       # --prefix points that lookup at our own folder instead, and the registry is pinned on the
@@ -137,7 +172,12 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart)
   }
 
   function Install-AgentLink {
-    param([string]$Root, [string]$Arch, [switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Interactive)
+    param([string]$Root, [string]$Arch, [switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Interactive, [string]$Invite)
+    # 08 section 4: the invite is checked before anything else happens.
+    if ($Invite) {
+      Assert-InviteLink $Invite
+      if ($Uninstall) { throw "-Invite can't be used with -Uninstall." }
+    }
     $binDir = Join-Path $Root 'bin'
     $runtimeRoot = Join-Path $Root 'runtime'
     $launcher = Join-Path $binDir 'agentlink.cmd'
@@ -196,6 +236,7 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart)
     if ($DryRun) {
       Write-Host "  would run: $nodeDir\npx.cmd -y $Package"
       Write-Host "  would add $binDir to your PATH"
+      if ($Invite) { Write-Host '  would open the invite in AgentLink' }
       Write-Host 'Dry run: nothing was changed.'
       return
     }
@@ -204,12 +245,26 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart)
     Add-UserPath $binDir
     if (-not (($env:Path -split ';') -contains $binDir)) { $env:Path = "$binDir;$env:Path" }
 
-    Write-Host 'AgentLink is installed. Next time, open a new terminal and type: agentlink'
+    Write-Host 'AgentLink is installed.'
     if ($Interactive -and -not $NoStart) {
       Write-Host 'Starting AgentLink. Your browser opens the app. Press Ctrl+C here to close it.'
-      & $launcher
+      # The last line comes after the app closes, also on Ctrl+C (F43).
+      try {
+        if ($Invite) {
+          Invoke-Launcher $launcher @('join', $Invite)
+        } else {
+          Invoke-Launcher $launcher @()
+        }
+      } finally {
+        Write-Host 'Next time, open a new terminal and type: agentlink'
+      }
     } else {
-      Write-Host "To start it now, run: $launcher"
+      Write-Host 'Next time, open a new terminal and type: agentlink'
+      if ($Invite) {
+        Write-Host 'To open the invite, run the command from the invite page again in your own terminal.'
+      } else {
+        Write-Host "To start it now, run: $launcher"
+      }
     }
   }
 
@@ -230,10 +285,17 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart)
       } catch {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
       }
+      Assert-NoStrayArguments $Rest
+      # An -Invite that is given must be a whole invite link: empty or not text is refused too.
+      $inviteLink = ''
+      if ($null -ne $Invite) {
+        if ($Invite -is [string]) { $inviteLink = $Invite }
+        Assert-InviteLink $inviteLink
+      }
       $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
       $interactive = [Environment]::UserInteractive -and -not [Console]::IsOutputRedirected
       Install-AgentLink -Root (Join-Path $env:LOCALAPPDATA 'AgentLink') -Arch $arch `
-        -DryRun:$DryRun -Uninstall:$Uninstall -NoStart:$NoStart -Interactive:$interactive
+        -DryRun:$DryRun -Uninstall:$Uninstall -NoStart:$NoStart -Interactive:$interactive -Invite $inviteLink
     } finally {
       [Net.ServicePointManager]::SecurityProtocol = $savedProtocol
     }

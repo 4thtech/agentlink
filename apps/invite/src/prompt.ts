@@ -15,6 +15,27 @@ export const INSTALL_AND_ACCEPT_TEMPLATE =
 /** U3-invite: the command (08 §4). The link is single-quoted; no line break at the end. */
 export const JOIN_COMMAND_TEMPLATE = "npx -y @4thtech-io/agentlink join '{inviteUrl}'";
 
+/**
+ * WP-2 (08 §4): the one-line installers with the invite built in. They need no Node.js: the
+ * installer brings it, then opens AgentLink on the invite (`agentlink join`). The installer checks
+ * the link again with the patterns of `join`. The link is single-quoted; no line break at the end.
+ */
+export const INSTALL_SH_TEMPLATE =
+  "curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite '{inviteUrl}'";
+/** WP-2: the same for Windows PowerShell 5.1 and PowerShell 7. */
+export const INSTALL_PS1_TEMPLATE =
+  "& ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Invite '{inviteUrl}'";
+
+/** The page's commands, one per kind of computer (WP-2). */
+export interface InviteCommands {
+  /** macOS and Linux: the shell installer. */
+  readonly unix: string;
+  /** Windows: the PowerShell installer. */
+  readonly windows: string;
+  /** Any computer with Node.js 22.14 or later: `npx … join`. */
+  readonly node: string;
+}
+
 /** U3-invite: the sentence for an AI app that can run commands on this computer (08 §4). */
 export const ASK_AI_TEMPLATE =
   "Set up AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm. Then show me this command so I can run it myself in my own terminal, and don't run it for me: `npx -y @4thtech-io/agentlink join '{inviteUrl}'`. It opens the AgentLink app, where I accept the invite. Never ask me for a code or passphrase.";
@@ -40,7 +61,7 @@ const CANONICAL_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,218
  * 08 §4 (D-139, 04 §3.6.2): the short link, `https://agentlink.4thtech.io/i#2.` and exactly 43
  * base64url characters. `.` is not special to any of the shells above.
  */
-const SHORT_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#2\.[A-Za-z0-9_-]{43}$/;
+const SHORT_LINK = /^https:\/\/agentlink\.4thtech\.io\/i#2\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
 
 /** True for the canonical invite link, long (format 1) or short (format 2). */
 export const isCanonicalLink = (link: string): boolean =>
@@ -62,6 +83,21 @@ export const buildPrompt = (inviteUrl: string): string =>
 export function buildJoinCommand(inviteUrl: string): string | undefined {
   const command = fill(JOIN_COMMAND_TEMPLATE, inviteUrl);
   return command.length > MAX_COMMAND_CHARS ? undefined : command;
+}
+
+/**
+ * WP-2: the three commands for a canonical link, or undefined when any of them would be longer than
+ * MAX_COMMAND_CHARS (then the page shows only the sentence). Anything else is refused.
+ */
+export function buildCommands(inviteUrl: string): InviteCommands | undefined {
+  const commands: InviteCommands = {
+    unix: fill(INSTALL_SH_TEMPLATE, inviteUrl),
+    windows: fill(INSTALL_PS1_TEMPLATE, inviteUrl),
+    node: fill(JOIN_COMMAND_TEMPLATE, inviteUrl),
+  };
+  return Object.values(commands).some((c) => c.length > MAX_COMMAND_CHARS)
+    ? undefined
+    : Object.freeze(commands);
 }
 
 /** U3-invite: the sentence for a canonical link. Anything else is refused. */

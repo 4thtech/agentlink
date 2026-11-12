@@ -61,6 +61,13 @@ export const NEVER_SAY: readonly BannedTerm[] = Object.freeze([
   { name: 'contract', pattern: /\bcontracts?\b|\blegally binding\b/i },
   { name: 'commitment', pattern: /\bcommitments?\b/i },
   { name: 'unverified', pattern: /\bunverified\b/i },
+  // D-146 (11 §5.5): master code, Contact check and ID tag replace the old words.
+  {
+    name: 'old code names',
+    pattern: /\b(?:backup|owner|safety) codes?\b|\bowner fingerprints?\b/i,
+  },
+  { name: '12-digit code', pattern: /\b12-digit codes?\b/i },
+  { name: 'pairing code', pattern: /\bpairing codes?\b/i },
   // "Password manager" names the user's own tool (11 §5.5), not one of our codes.
   { name: 'password', pattern: /\bpasswords?\b(?! managers?\b)/i },
   { name: 'approximation', pattern: /≈/ },

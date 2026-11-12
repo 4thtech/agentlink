@@ -179,7 +179,7 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     await page.getByRole('heading', { name: "Confirm it's you" }).waitFor();
     await page.getByLabel('Name people see').fill('Home base');
     await page.getByRole('button', { name: CONNECT_WITH }).click();
-    await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
+    await page.getByRole('heading', { name: 'Your master code' }).waitFor();
     await page.getByRole('button', { name: 'I saved it' }).click();
     await page.getByRole('heading', { name: 'Connected to Claude Code' }).waitFor();
     await page.getByRole('button', { name: 'Go to Home' }).click();
@@ -367,7 +367,7 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
       .click();
     await page.getByLabel('Name people see').fill('Friend agent');
     await page.getByRole('button', { name: CONNECT_WITH }).click();
-    await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
+    await page.getByRole('heading', { name: 'Your master code' }).waitFor();
     await page.getByRole('button', { name: 'I saved it' }).click();
 
     // First run ends on the invite, named by the inviter (Self-declared) with a short fingerprint.
@@ -375,19 +375,33 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
     await page.getByRole('heading', { name: 'Ana invites you to connect your AIs' }).waitFor();
     const text = await page.locator('body').innerText();
     expect(text).toContain('Name set by the sender');
-    expect(text).toContain("Check it's Ana:");
+    expect(text).toContain('Invite from Ana');
     expect(text).not.toContain(inviteUrl.split('#')[1] ?? '?');
     await page
       .getByRole('button', { name: /^Accept with (Touch ID|Windows Hello|your passkey)$/ })
       .click();
     await page.getByText('Waiting for Ana to answer.').waitFor();
 
-    // The friend's AI app starts the agent; its sync brings Ana's answer, then the safety code.
+    // The friend's AI app starts the agent; its sync brings Ana's answer, then the 12 digits.
     const friendMcp = await startAiAppMcp(friendPc, undefined);
     closers.push(() => friendMcp.close());
     await page.getByText('Connected with Ana.').first().waitFor({ timeout: 60_000 });
-    // W4-PEOPLE-INVITE (A7): the Connected moment with the 12-digit safety code.
+    // W4-PEOPLE-INVITE (A7): the Connected moment with the 12-digit Contact check.
+    // WP-3: Ana's own name is not trusted yet: "You are connected", nothing she chose in the hello
+    // prompt, then the owner names the contact and confirms it with the passkey.
+    await page.getByRole('heading', { name: 'You are connected', exact: true }).waitFor();
+    const before = await page.locator('body').innerText();
+    expect(before).toContain('Say hello to my new contact on AgentLink.');
+    expect(before).not.toContain('Say hello to Ana');
+    await page.getByLabel('Name this contact').fill('Ana');
+    await page.getByRole('button', { name: 'Save name', exact: true }).click();
+    await page
+      .getByRole('button', { name: /^Confirm with (Touch ID|Windows Hello|your passkey)$/ })
+      .click();
     await page.getByRole('heading', { name: /^You and “?Ana”? are connected$/ }).waitFor();
+    await page.getByText('Say hello to Ana on AgentLink.').first().waitFor();
+    // The 12 digits are behind the optional check.
+    await page.getByRole('button', { name: /^Optional: make sure it's really Ana/ }).click();
     await page
       .getByText(/\d{4}\D{1,3}\d{4}\D{1,3}\d{4}/)
       .first()

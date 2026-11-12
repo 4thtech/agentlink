@@ -5,7 +5,7 @@
 // and the begin's challenge. It sends the get() PRF output with the assertion (credential ID,
 // authenticator data, clientDataJSON, signature) after the creation fields, so the server can check
 // the gesture and store the passkey. Without a PRF output from get() either, nothing more is sent:
-// the backup code stays the way to approve.
+// the master code stays the way to approve.
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSetupPasskey } from './passkey.js';
 import type { CreationValues } from './setup-api.js';
@@ -134,7 +134,7 @@ describe('owner setup: PRF only on get() (M1-11s-c-c, F48)', () => {
     ]);
   });
 
-  it('get() without a PRF output either: the creation alone is sent (backup code only)', async () => {
+  it('get() without a PRF output either: the creation alone is sent (master code only)', async () => {
     const asked = install({ prf: { enabled: true } }, { prf: {} });
     const made = await createSetupPasskey(VALUES, { platform: true });
     expect(asked.gets).toHaveLength(1);

@@ -6,7 +6,6 @@ import activity from './pages/activity/activity.css?raw';
 import map from './pages/agents/map/map.css?raw';
 import moving from './pages/moving/moving.css?raw';
 import agentsPage from './pages/agents/index.tsx?raw';
-import messages from './pages/messages/messages.css?raw';
 
 const squash = (css: string): string =>
   css
@@ -22,14 +21,6 @@ function block(css: string, selector: string): string {
   }
   return '';
 }
-
-describe('Messages scrolling (b)', () => {
-  it('buttons inside the messages change colour at once, not with a fade', () => {
-    // A resting pointer crosses a button on every row while the page scrolls; each colour fade
-    // repainted the scroller and dropped a frame at 4x CPU.
-    expect(block(messages, '.ms-item .al-btn')).toMatch(/transition:\s*none/);
-  });
-});
 
 describe('Activity first render (a)', () => {
   it('day sections far off screen are not laid out or painted', () => {

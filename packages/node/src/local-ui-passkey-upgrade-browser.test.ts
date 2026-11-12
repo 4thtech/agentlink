@@ -1,13 +1,13 @@
 // M1-UX-FIRSTRUN-V2-c acceptance in a real browser (B-9; 08 §1 first run v2; 04 §2.5, §2.3.1; I-1,
 // I-4, I-7): an owner set up before 0.3.0 in the terminal (`owner init`: an `owner` item and its
-// owner code, no passkey) opens the local app. Approvals (`/`) and every app page show the
-// "Switch to …" next step; the first-run page asks for the backup code once, then one passkey
+// master code, no passkey) opens the local app. Approvals (`/`) and every app page show the
+// "Switch to …" next step; the first-run page asks for the master code once, then one passkey
 // gesture registers the passkey through the existing `/api/owner/passkey` owner operation.
 //
 // - The owner identity is the same before and after: the `owner` item is byte for byte unchanged,
 //   and the passkey item opens to the same owner key. Never a second owner.
 // - A wrong code registers nothing and changes nothing.
-// - The backup code keeps approving afterwards.
+// - The master code keeps approving afterwards.
 // - Canary: the code never reaches a URL, a server event, the console, or a later page.
 // - The next step is gone once the passkey is registered.
 //
@@ -123,7 +123,7 @@ const SWITCH = /^Switch to (Touch ID|Windows Hello|a passkey)$/;
 const USE = /^Use (Touch ID|Windows Hello|a passkey)$/;
 
 describe('a 0.2.0 owner switches to a passkey in the local app (M1-UX-FIRSTRUN-V2-c; Chromium)', () => {
-  it('backup code once, one gesture, same owner; the code still approves; nothing leaks', async (ctx) => {
+  it('master code once, one gesture, same owner; the code still approves; nothing leaks', async (ctx) => {
     const files = appAssets();
     if (browser === undefined && process.env['CI'] !== undefined) throw launchError;
     if (browser === undefined || files === undefined) {
@@ -173,12 +173,12 @@ describe('a 0.2.0 owner switches to a passkey in the local app (M1-UX-FIRSTRUN-V
     await page.goto(`${server.origin}/first-run`);
     await page.getByRole('heading', { level: 1, name: SWITCH }).waitFor();
     expect(await axeViolations(page)).toEqual([]);
-    const field = page.getByLabel('Backup code');
+    const field = page.getByLabel('Master code');
 
     // A wrong code registers nothing.
     await field.fill('WRNG WRNG WRNG WRNG WRNG WRNG');
     await page.getByRole('button', { name: USE }).click();
-    await page.getByText("That backup code didn't work.").waitFor();
+    await page.getByText("That master code didn't work.").waitFor();
     expect(await world.keychain.get(OWNER_PASSKEY_ACCOUNT)).toBeNull();
 
     // The right code and one gesture.
@@ -203,9 +203,9 @@ describe('a 0.2.0 owner switches to a passkey in the local app (M1-UX-FIRSTRUN-V
     // W4-WIRE-2: no agent is open in this server, so it is New agent, which names the agent first.
     await page.goto(`${server.origin}/first-run`);
     await page.getByRole('heading', { name: 'Name this ID' }).waitFor();
-    expect(await page.getByLabel('Backup code').count()).toBe(0);
+    expect(await page.getByLabel('Master code').count()).toBe(0);
 
-    // The backup code keeps approving (it is the recovery way when the passkey isn't there).
+    // The master code keeps approving (it is the recovery way when the passkey isn't there).
     source.add(1);
     await page.goto(server.approvalUrl(approvalId(1)));
     expect(await page.getByRole('link', { name: SWITCH }).count()).toBe(0);

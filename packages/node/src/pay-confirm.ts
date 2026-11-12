@@ -16,7 +16,7 @@
 //   cross-origin, no top origin), the rpIdHash is SHA-256("localhost"), UP is set, the credential is
 //   the stored owner passkey and the user handle the owner. Without UV it is `verification_required`,
 //   never presence alone (rule 1).
-// - Finish with the backup code (the owner code, rule 6) keeps the hold for at most
+// - Finish with the master code (rule 6) keeps the hold for at most
 //   BACKUP_CODE_TRIES wrong entries; the third ends it and nothing is signed.
 // - Before the owner store is opened the server rebuilds the flow from the store as it is now and
 //   compares both digests with the hold's: any change of amount, limit, contact or expiry after
@@ -25,7 +25,7 @@
 //   what is signed. A hold that signs a proof approval cannot also sign a `policy.set`.
 // - Rule 4: no MCP tool, CLI flag or URL reaches begin or finish. They are /api/ui/ routes behind the
 //   page session cookie, the CSRF token, the page's Origin and same-origin fetch metadata.
-// - I-7: no challenge, nonce, assertion, owner code or credential is logged, put in an event or an
+// - I-7: no challenge, nonce, assertion, master code or credential is logged, put in an event or an
 //   error. Holds live in memory only and are wiped when used, expired, dropped or closed.
 //
 // Rule 5: the assertion signature over authenticatorData ‖ SHA-256(clientDataJSON) is verified
@@ -33,7 +33,7 @@
 // (owner-passkey.ts `owner-passkey-key`, bound to the credential ID). Without it a same-user process
 // could send any clientDataJSON with the UV flag set; with it, only the authenticator can answer
 // this challenge. A passkey registered before keys were kept (or with an unsupported key) has no
-// stored key: its passkey path answers `key_missing` (the page offers the backup code and setting
+// stored key: its passkey path answers `key_missing` (the page offers the master code and setting
 // the passkey up again); it is never accepted on the PRF unlock alone. signCount is not checked
 // (platform passkeys report 0; replay is stopped by the single-use challenge). The stored key is
 // writable by the same OS user: the G-1 residual of 04 §2.5, unchanged.
@@ -353,7 +353,7 @@ export class PayConfirmHolds {
     return hold;
   }
 
-  /** Rule 6: one wrong backup code; true when that was the last try (the hold is gone). */
+  /** Rule 6: one wrong master code; true when that was the last try (the hold is gone). */
   backupFailed(hold: PayConfirmHold): boolean {
     hold.backupFailures += 1;
     if (hold.backupFailures >= BACKUP_CODE_TRIES) {

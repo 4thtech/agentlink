@@ -1,4 +1,4 @@
-// F49 (owner feedback, Windows): the backup code is easy to type, paste, see and keep.
+// F49 (owner feedback, Windows): the master code is easy to type, paste, see and keep.
 // - BackupCodeField: every backup-code input. Paste is never blocked; a Show/Hide toggle lets the
 //   person check what they typed or pasted; pasted invisible separators are removed (below).
 // - saveBackupCodeFile: "Save as file" on the once-shown code, a small .txt made in this page and
@@ -37,12 +37,52 @@ export const BACKUP_CODE_FIELD = {
   hide: 'Hide',
 } as const;
 
+/**
+ * F49 low (IR 11-03): the cleanup runs on what arrives in one piece (a paste, a drop, a password
+ * manager's fill), never on what the person types key by key. A chosen passphrase typed with a
+ * no-break space (Option+Space on a Mac) or a dash from the keyboard is sent exactly as typed, even
+ * when what is left looks like a code; the cleanup exists only for what a copy adds.
+ */
+const TYPED = /^(insertText|insertCompositionText|insertLineBreak|insertParagraph|delete)/;
+
+export function typedByKey(event: Event): boolean {
+  const kind = (event as Partial<InputEvent>).inputType;
+  return typeof kind === 'string' && TYPED.test(kind);
+}
+
+/**
+ * FB-8: every screen that asks for Touch ID, Windows Hello or a passkey also offers this. It only
+ * switches the screen to the backup-code field, whose submit is that screen's existing code path.
+ * `data-use-code` is what the presence-surface guard (src/presence-surfaces.dom.test.ts) looks for.
+ */
+export const USE_CODE_INSTEAD = 'Use your master code instead';
+
+export function UseCodeInstead({
+  onClick,
+  disabled,
+}: {
+  readonly onClick: () => void;
+  readonly disabled?: boolean;
+}): ReactElement {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      data-use-code=""
+      {...(disabled === undefined ? {} : { disabled })}
+      onClick={onClick}
+    >
+      {USE_CODE_INSTEAD}
+    </Button>
+  );
+}
+
 export type BackupCodeFieldProps = Omit<
   TextFieldProps,
   'type' | 'onChange' | 'value' | 'suffix'
 > & {
   readonly value: string;
-  /** The typed or pasted value, with pasted invisible separators removed (normaliseBackupCode). */
+  /** The typed or pasted value; a paste has its invisible separators removed (normaliseBackupCode). */
   readonly onValue: (value: string) => void;
 };
 
@@ -69,7 +109,10 @@ export function BackupCodeField({
       disabled={disabled}
       type={shown ? 'text' : 'password'}
       value={value}
-      onChange={(event) => onValue(normaliseBackupCode(event.currentTarget.value))}
+      onChange={(event) => {
+        const raw = event.currentTarget.value;
+        onValue(typedByKey(event.nativeEvent) ? raw : normaliseBackupCode(raw));
+      }}
       suffix={
         <Button
           variant="ghost"
@@ -91,7 +134,7 @@ export const BACKUP_CODE_FILE_NAME = 'agentlink-backup-code.txt';
 
 /** The file's text: the code and one line on what it is for. */
 export function backupCodeFileText(code: string, sensor: string): string {
-  return `AgentLink backup code: ${code}\nUse it to approve when ${sensor} isn't available. Keep this file private and never give the code to your AI.\n`;
+  return `AgentLink master code: ${code}\nUse it to approve when ${sensor} isn't available. Keep this file private and never give the code to your AI.\n`;
 }
 
 /**

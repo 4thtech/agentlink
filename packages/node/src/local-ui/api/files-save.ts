@@ -2,7 +2,7 @@
 // §2.5.1 `file.save`, §4; D-118; I-1, I-4, I-5, I-7; proposed, owner confirms at merge).
 //
 // An owner route (`presence: true`): the server's central gate checks owner presence (the passkey
-// assertion or the backup code) before the handler runs. The handler then:
+// assertion or the master code) before the handler runs. The handler then:
 // 1. reads only `{id}` from the input, the received item's ID `<envelope ID>.<index>`. Never a name,
 //    a folder or a path; anything else is 400 `bad_request` (also in the precheck, before presence);
 // 2. answers 409 `already_saved` for a file already saved, and 404 `not_found` for an ID that names

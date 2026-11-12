@@ -83,7 +83,7 @@
   flex: none;
 }
 /* M1-11b-2c: the code field is as tall as its large Confirm button (the control-lg token), so the
-   owner code box is never the tiny one of the owner test (M1-11a-ux, 2026-10-25). */
+   master code box is never the tiny one of the owner test (M1-11a-ux, 2026-10-25). */
 .al-approvals .al-code .al-input-wrap {
   height: var(--al-size-control-lg);
 }

@@ -2,7 +2,7 @@
 // UX2-g + U3-j (S1): Start here, the pure part (B-11 §27.1, §27.3 v2; owner decision 7.1).
 // - Each step is derived from real local reads only; an unread signal never counts as done.
 // - Seven counted steps ("x of 7"): Protect, Name, Connect your AI app, Invite, Say hello, See the
-//   reply, Recovery kit. The safety code check is shown and ticks but is not counted: it never holds
+//   reply, Recovery kit. The Contact check is shown and ticks but is not counted: it never holds
 //   the card and never blocks the steps after it. The next step is the first counted step not done.
 // - Connect follows the open agent (never remembered) and carries the agent's AI app and Running.
 // - "Done" means "has happened once": it is remembered in this browser and does not untick.
@@ -88,7 +88,7 @@ describe('deriveStart: the eight rows and the count of seven', () => {
     expect(state(v, 'invite')).toBe('later');
   });
 
-  it('all done: 7 of 7, complete, whether or not the safety code was checked', () => {
+  it('all done: 7 of 7, complete, whether or not the 12 digits were checked', () => {
     const v = deriveStart(all(), NONE);
     expect(v.doneCount).toBe(7);
     expect(v.complete).toBe(true);
@@ -167,8 +167,8 @@ describe('deriveStart: connect your AI app follows the open agent', () => {
   });
 });
 
-describe('deriveStart: the safety code never holds the card', () => {
-  it('ticks when any contact shows Safety code checked', () => {
+describe('deriveStart: the 12 digits never holds the card', () => {
+  it('ticks when any contact shows Contact checked', () => {
     const v = deriveStart(all({ contacts: [contact({ label: 'safety-code-checked' })] }), NONE);
     expect(state(v, 'check')).toBe('done');
   });
@@ -182,7 +182,7 @@ describe('deriveStart: the safety code never holds the card', () => {
     expect(v.nextId).toBe('send');
   });
 
-  it('once they answered, it offers Compare safety code but is never the next step', () => {
+  it('once they answered, it offers Compare the 12 digits but is never the next step', () => {
     const v = deriveStart(all(fewer), NONE);
     const step = v.steps.find((s) => s.id === 'check');
     expect(step?.state).toBe('later');

@@ -29,3 +29,6 @@ strictDepBuilds: true
 # of this repository (development-process.md §11).
 overrides:
   sharp: '-'
+  # WP-10: miniflare (dev-only, Workers test-vector pool) pins undici 7.29.1; 7.30.1 is the first patched
+  # version. Remove when miniflare ships a patched pin.
+  'miniflare>undici': 7.30.2

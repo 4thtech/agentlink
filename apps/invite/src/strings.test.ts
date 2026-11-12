@@ -2,7 +2,7 @@
 // none of the fixed strings is built from the invite, and the three that name the inviter take only
 // the name-rule output.
 import { describe, expect, it } from 'vitest';
-import { NODE_DOWNLOAD_URL, expiredFor, invitesHeading, nextFor, strings } from './strings.js';
+import { expiredFor, invitesHeading, nextFor, strings } from './strings.js';
 import { BANNED } from './testing/vocabulary.js';
 
 const texts = (value: unknown): string[] =>
@@ -43,10 +43,19 @@ describe('page copy', () => {
     expect(strings.step.command).toBe('Install and accept with one command');
     expect(strings.step.link).toBe('Already have AgentLink? Open it and paste the link');
     expect(strings.step.copyLink).toBe('Copy link');
-    expect(strings.step.commandHelp).toBe(
-      'Paste it into Terminal and press Return. Needs Node.js 22 or later.',
-    );
-    expect(strings.step.node).toBe('Need Node.js? Get it here');
+    // WP-2 (I-1, I-2): the installer brings Node.js; the Node.js choice names the real floor.
+    expect(strings.step.os).toEqual({
+      label: 'Your computer',
+      unix: 'Mac or Linux',
+      windows: 'Windows',
+      node: 'Node.js',
+    });
+    expect(strings.step.commandHelp).toEqual({
+      unix: 'Paste it into Terminal and press Return. It installs AgentLink, and Node.js if needed, then opens the invite.',
+      windows:
+        'Paste it into PowerShell and press Enter. It installs AgentLink, and Node.js if needed, then opens the invite.',
+      node: 'For a computer with Node.js 22.14 or later. Paste it into Terminal and press Return.',
+    });
     expect(strings.step.copyFailed).toBe("Copy didn't work. Select the text and copy it.");
     expect(expiredFor('Marko')).toBe('This invite has expired. Ask Marko for a new one.');
     expect(nextFor('Marko')).toBe(
@@ -55,9 +64,5 @@ describe('page copy', () => {
     expect(strings.states.damaged).toBe(
       'This invite is damaged or not supported. Ask the person who sent it for a new one.',
     );
-  });
-
-  it('links Node.js only to the fixed official download page', () => {
-    expect(NODE_DOWNLOAD_URL).toBe('https://nodejs.org/en/download');
   });
 });

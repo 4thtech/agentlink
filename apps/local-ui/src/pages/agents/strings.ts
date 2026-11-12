@@ -69,7 +69,7 @@ export const AGENTS_STRINGS = {
   contactsTold: (label: string, n: number): string =>
     `Your ${n} ${n === 1 ? 'contact' : 'contacts'} will be told ${iso(label)} is retired.`,
   cantUndo: "This can't be undone.",
-  exportFirst: 'Export history first',
+  exportFirst: 'Save recovery kit first',
   typeName: "Type the ID's name to confirm",
   typeNameLabel: (label: string): string => `Type ${iso(label)} to confirm`,
   typeNameDisabled: 'Type the name to enable this',
@@ -133,7 +133,8 @@ export const AGENTS_STRINGS = {
   restartToFinish: (app: string): string => `Restart ${app} to finish.`,
   backupTitle: 'Recovery kit',
   backupHint: 'Save a recovery kit. Keep it somewhere safe, away from this computer.',
-  backupLink: 'Back up recovery kit',
+  // WP-11: a recovery kit is saved for the open ID.
+  backupOpenFirst: (label: string): string => `Open ${iso(label)} to save its recovery kit.`,
   switching: (label: string): string => `Opening ${iso(label)}…`,
 
   // Pause (08 §1 "Pause an ID", D-143 (5)): one click, no Touch ID; Resume with Touch ID.
@@ -158,9 +159,23 @@ export const AGENTS_STRINGS = {
   renameLimited: (label: string, time: string): string =>
     `You can rename ${label} again at ${time}.`,
   renamePending: 'Your last rename is still reaching your contacts. Try again in a minute.',
+  // WP-1: the server could not offer the rename that updates the card (an app started before 0.4.14).
+  renameRestart:
+    "This ID can't be renamed from here yet. Quit the AgentLink app and open it again, then try again. Nothing was changed.",
   /** Before the card name (in its own bdi run): "Contacts still see {cardName}". */
   contactsStillSee: 'Contacts still see ',
   updateContacts: 'Update contacts',
+  // WP-1 (R-1): the same note for an ID with no contacts yet (F23: no word about contacts).
+  /** Before the card name (in its own bdi run): "New invites still show {cardName}". */
+  newInvitesStillShow: 'New invites still show ',
+  updateName: 'Update name',
+  /** After the label (in its own bdi run): "… so everyone sees {label}." */
+  noteHint: 'One Touch ID, so everyone sees ',
+  // WP-1 (R-2): the invite asks for the update first.
+  /** Before the card name: "Your invites still show {cardName}". */
+  invitesStillShow: 'Your invites still show ',
+  /** Before the card name (in its own bdi run): "Invite as {cardName}". */
+  inviteAs: 'Invite as ',
 
   // Fleet (A11, Under the hood).
   fleetSummary: (working: number, ready: number, rest: number): string =>
@@ -206,6 +221,7 @@ export const AGENTS_STRINGS = {
   peopleOther: (label: string): string => `Open ${iso(label)} to see its people.`,
   rulesOther: (label: string): string => `Open ${iso(label)} to see its rules.`,
   openAgent: 'Open this ID',
+  openForKit: (label: string): string => `Open ${iso(label)} to save its recovery kit?`,
   seeAllActivity: 'See all activity',
   seeRules: 'Change rules',
   noActivity: 'Nothing yet while this page is open.',

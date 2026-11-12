@@ -23,13 +23,15 @@ export interface ContactRow {
   readonly since: number;
   /**
    * M1-UX3-DUP-CONTACTS: the ref of the next older contact with the same owner (the server groups
-   * by owner fingerprint and sends only the ref). Never shown.
+   * by ID tag and sends only the ref). Never shown.
    */
   readonly olderSameOwner?: string;
   /** W5-INVITE-FEEDBACK: unix seconds of the kept pairing; a later one is a re-pair. Never shown. */
   readonly pairedAt?: number;
   /** W5-INVITE-FEEDBACK: this agent's role in that pairing. Never shown. */
   readonly pairedAs?: 'inviter' | 'invitee';
+  /** D-141 (08 §1 C2): the name before a rename, while the note is due; plain text only. */
+  readonly formerName?: string;
 }
 
 export type ListAnswer =
@@ -67,6 +69,7 @@ function row(v: unknown): ContactRow | undefined {
   const { ref, name, nameSource, fingerprint, label, status, pairing, since, olderSameOwner } = v;
   const pairedAt = v['pairedAt'];
   const pairedAs = v['pairedAs'];
+  const former = v['formerName'];
   if (typeof ref !== 'string' || !REF.test(ref)) return undefined;
   if (typeof name !== 'string' || name.length > MAX_NAME) return undefined;
   if (!oneOf(nameSource, ['owner', 'counterparty'] as const)) return undefined;
@@ -93,6 +96,9 @@ function row(v: unknown): ContactRow | undefined {
       ? { pairedAt }
       : {}),
     ...(pairedAs === 'inviter' || pairedAs === 'invitee' ? { pairedAs } : {}),
+    ...(typeof former === 'string' && former !== '' && former.length <= MAX_NAME
+      ? { formerName: former }
+      : {}),
   };
 }
 

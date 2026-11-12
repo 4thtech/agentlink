@@ -47,7 +47,7 @@ import { DEFAULT_AGENT_NAME } from '../runtime/agent-name.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
 import { appServes, chooseCurrentAgent } from './current-agent.js';
 import { nodeOwnerDeps } from './owner/deps.js';
-import { openUiHostAgent, startUiWelcome, withoutAssets, type UiHostDeps } from './ui-host.js';
+import { hostUiOf, openUiHostAgent, startUiWelcome, type UiHostDeps } from './ui-host.js';
 import { uiRemovalPort } from './ui-remove.js';
 import { removeAppHostRecord, writeAppHostRecord } from '../runtime/app-host-record.js';
 import { writeLastExit, type LastExitReason } from '../runtime/last-exit.js';
@@ -487,7 +487,8 @@ export function nodeUiDeps(): UiDeps {
           localUi: (opened) => localUiOptions(opened),
           now,
         };
-        const initialUi = withoutAssets(localUi);
+        // WP-1: the ID open at launch carries its key-items token too, so it can be renamed (D-141).
+        const initialUi = hostUiOf(agent, localUi);
         const server = await startApprovalServer({
           source,
           localUi,
@@ -502,6 +503,9 @@ export function nodeUiDeps(): UiDeps {
               close: () => agent.close(),
             },
             open: (other) => openUiHostAgent(hostDeps, other),
+            // WP-13 (F45): this app's version; an AI app still running an older one gets the
+            // "Restart {app} to use the new version" hint.
+            version: cliVersion(),
             // F2: Welcome's "Which AI app" list also works when a switch left no agent open.
             aiAppsList: Object.freeze({
               list: () => createAiAppsDesk({ home: homedir(), env: process.env }).list(),

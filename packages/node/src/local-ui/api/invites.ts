@@ -4,7 +4,7 @@
 // Invite kind (`presence: 'invite'`; no owner presence, nothing signed; the server's invite gate
 // checked the session, CSRF, Origin, fetch metadata and the octet-stream type, refused a query, an
 // operation input and a presence header, rate-limited create and parsed the body):
-// - `POST /api/ui/invites`, body `{}` or `{"label": "<name>"}`: core `createInvite`. Answers what
+// - `POST /api/ui/invites`, body `{}` or `{"label": "<name>"}` (WP-1: also `"oldName": true`): core `createInvite`. Answers what
 //   `agentlink_create_invite` answers: the link, the ready-to-send text, the owner's short
 //   fingerprint and the expiry. The label is stored sealed as a suggested alias and stays one until
 //   the owner confirms the contact (06 §2.1 rule 1); it is never echoed here.
@@ -19,7 +19,7 @@
 //   `approval.decide` (approve) for the accept action, the same action the MCP tool and the CLI build,
 //   under the open request for it or a new one; core verifies and applies it, uses it once, and only
 //   then stages the pairing (04 §3.6 Accept steps 2 and 3; I-4). The pairing stays pending until the
-//   inviter's agent answers; the safety code follows as on Contacts.
+//   inviter's agent answers; the 12 digits follows as on Contacts.
 //
 // W4-SHORT-INVITE and W4-INVITES-LIST (D-139; 04 §3.6.2; 08 §1):
 // - create takes `{"long": true}` from Advanced only (D-139 (7)) and answers the link `format` and
@@ -32,6 +32,13 @@
 //   with one GET from the configured drop host; accept resolves it FIRST and uses the resolved invite
 //   for every step, so the approval action keeps it sealed and nothing re-fetches it. A gone object
 //   is `unavailable_invite`, an unreachable drop `try_again`.
+//
+// WP-1 Rename truth (D-141, Decision 46; 08 §1): create answers 409 `name_update_needed` with
+// `cardName` and `label` while the open agent's verified label differs from the name in its card
+// (an ID renamed before D-141, or made in the terminal and renamed later): the invite would carry
+// the card's old name, so the page asks for "Update contacts" (the rename gesture) first. The body
+// `{"oldName": true}` makes the invite anyway, under the card's name. Nothing is signed either way;
+// the check reads only, and a read that fails never blocks an invite.
 //
 // W5-INVITE-FEEDBACK (08 §1): the list also answers `connecting` (the accepts that wait: ref, name,
 // expiry, `sent`, `again`), check answers `alreadyContact` `{ref, name}` for an invite from a paired
@@ -96,7 +103,7 @@ const PAYLOAD = /^[A-Za-z0-9_-]+$/;
 /** The longest name typed for an invite; core checks the restricted form (06 §2.1). */
 const MAX_LABEL_CHARS = 128;
 const MAX_NAME_CHARS = 128;
-/** The short owner fingerprint core shows (04 §2.9). */
+/** The short ID tag core shows (04 §2.9). */
 const FINGERPRINT = /^[0-9A-F]{4}·[0-9A-F]{4}$/;
 
 const fixed = (status: number, error: string): LocalUiResult =>
@@ -246,14 +253,51 @@ async function existingContact(
 
 // --- create -----------------------------------------------------------------------------------
 
+/** The longest card name or label the refusal names (the label rule allows 32 code points). */
+const MAX_SHOWN_NAME_CHARS = 128;
+
+/**
+ * WP-1: the refusal while the open agent's verified label differs from its card's name, else
+ * undefined. Reads only; a failed read never blocks an invite.
+ */
+async function nameUpdateNeeded(context: LocalUiContext): Promise<LocalUiResult | undefined> {
+  const agent = context.client?.agent;
+  if (agent?.cardName === undefined) return undefined;
+  try {
+    const reading = await agent.label();
+    if (reading.status !== 'verified') return undefined;
+    const cardName = await agent.cardName();
+    if (
+      typeof cardName !== 'string' ||
+      cardName === reading.label ||
+      cardName.length > MAX_SHOWN_NAME_CHARS ||
+      reading.label.length > MAX_SHOWN_NAME_CHARS
+    ) {
+      return undefined;
+    }
+    return Object.freeze({
+      status: 409,
+      body: Object.freeze({ error: 'name_update_needed', cardName, label: reading.label }),
+    });
+  } catch {
+    return undefined;
+  }
+}
+
 async function createInvite(
-  _context: LocalUiContext,
+  context: LocalUiContext,
   body: JsonObject,
   invites: LocalUiInviteDesk | undefined,
 ): Promise<LocalUiResult> {
   if (invites === undefined) return UI_NOT_SET_UP;
   const keys = Object.keys(body);
-  if (keys.some((k) => k !== 'label' && k !== 'long')) return INVALID;
+  if (keys.some((k) => k !== 'label' && k !== 'long' && k !== 'oldName')) return INVALID;
+  // WP-1: only `true` makes the invite under the card's old name.
+  if (keys.includes('oldName') && body['oldName'] !== true) return INVALID;
+  if (body['oldName'] !== true) {
+    const refusal = await nameUpdateNeeded(context);
+    if (refusal !== undefined) return refusal;
+  }
   let label: string | undefined;
   if (keys.includes('label')) {
     const value: JsonValue | undefined = body['label'];
@@ -472,7 +516,7 @@ export async function acceptInviteLink(
   if ((await port.decision()) === 'deny') return POLICY_DENIED;
 
   const action = await port.action(link);
-  // IR UX2-d1 M: core's one summary (name, label, owner fingerprint), as the MCP tool and the CLI.
+  // IR UX2-d1 M: core's one summary (name, label, ID tag), as the MCP tool and the CLI.
   const summary = acceptInviteSummary(contact);
   const opened = await port.openRequest(action, summary);
   const operation = buildApprovalOperation(
@@ -498,7 +542,7 @@ export async function acceptInviteLink(
   const outcome = await context.applyOwnerAction(signature.signed);
   if (outcome.status !== 'applied') return NOT_APPLIED;
 
-  // W5-INVITE-FEEDBACK: a re-pair (the safety code check starts over once it completes, 04 §2.9).
+  // W5-INVITE-FEEDBACK: a re-pair (the Contact check starts over once it completes, 04 §2.9).
   const again = (await existingContact(context, contact.id)) !== undefined;
   // Step 3: core uses the applied approval once, then stages and sends the handshake.
   let done: Awaited<ReturnType<typeof port.acceptApproved>>;

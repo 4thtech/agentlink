@@ -12,10 +12,10 @@
 // 1. refuse unless no owner exists anywhere: no card names one, and none of the `owner`,
 //    `owner-passkey` and `owner-next` items exists (a partial earlier setup is never reused or
 //    overwritten, D-78, 04 §2.8);
-// 2. generate an owner code (secretKind 1) and store the seed under it as the `owner` item (`ALKO`),
+// 2. generate a master code (secretKind 1) and store the seed under it as the `owner` item (`ALKO`),
 //    the backup way to approve that every existing owner-code path keeps using;
 // 3. when the authenticator returned a PRF output, store the seed under it as the `owner-passkey`
-//    item (`ALKP` v1, 04 §2.3.1); without PRF the owner code is the only way (nothing else changes);
+//    item (`ALKP` v1, 04 §2.3.1); without PRF the master code is the only way (nothing else changes);
 // 4. sign the agent's first card with the owner just stored (signFirstCardWith, the `owner init`
 //    path: one card for this agent and this owner, read back and verified from core);
 // 5. on any failure, remove exactly the items this run stored (passkey first, then the owner item;
@@ -32,7 +32,7 @@
 // (removing the owner would lock the agent out of its card), no policy is in force, and the caller
 // removes the folders this run created (removeSetupFolders).
 //
-// The owner code is returned once to the caller, which sends it to the page for the collapsed
+// The master code is returned once to the caller, which sends it to the page for the collapsed
 // "backup way to approve" display and wipes it; it is never logged, put in an event or an error.
 // The seed and the PRF output belong to the caller, which wipes them.
 //
@@ -41,7 +41,7 @@
 // set up an owner it controls. If it used the human's one-shot link, the human sees an expired page
 // and never a setup step. The signal is: "I never finished a setup, yet approvals are already
 // protected" (or the link has expired); the human must then treat the owner as not theirs.
-// `agentlink doctor` names the owner fingerprint; the CLI logs a fixed line with the fingerprint of
+// `agentlink doctor` names the ID tag; the CLI logs a fixed line with the fingerprint of
 // an owner set up from the page, and the page shows it after setup, so a human who did finish setup
 // can compare. The passkey
 // response's attestation statement is not verified ("none"): what is checked binds it to this begin
@@ -319,7 +319,7 @@ function checkClientData(
   }
 }
 
-/** What the checked response gives the setup: the passkey, or (M1-11s-c-c) the owner code only. */
+/** What the checked response gives the setup: the passkey, or (M1-11s-c-c) the master code only. */
 export type SetupCheck = 'passkey' | 'code_only';
 
 /**
@@ -331,7 +331,7 @@ export type SetupCheck = 'passkey' | 'code_only';
  *
  * M1-11s-c-c: with a get() assertion, that too (checkSetupAssertion). Answers `code_only` when the
  * assertion's signature cannot be verified because the creation's key is not one this build verifies:
- * the caller then wipes the PRF output and sets up with the owner code only.
+ * the caller then wipes the PRF output and sets up with the master code only.
  */
 export function checkSetupRegistration(
   registration: SetupRegistration,
@@ -548,7 +548,7 @@ export interface OwnerSetupInput {
   readonly keys: OwnerPublicKeys;
   /** The checked creation response's credential ID. */
   readonly credentialId: Uint8Array;
-  /** Its PRF output (32 bytes), or empty (owner code only). Not modified; the caller wipes it. */
+  /** Its PRF output (32 bytes), or empty (master code only). Not modified; the caller wipes it. */
   readonly prfOutput: Uint8Array;
   /**
    * M1-PAY-CONFIRM-a: the checked creation response's authenticator data, whose attested
@@ -565,7 +565,7 @@ export interface OwnerSetupInput {
 }
 
 export interface OwnerSetupOptions {
-  /** Argon2id parameters for the owner code's wrap; default KEYSTORE_KDF_DEFAULTS. */
+  /** Argon2id parameters for the master code's wrap; default KEYSTORE_KDF_DEFAULTS. */
   readonly kdf?: Argon2idParams;
   readonly timeoutMs?: number;
   /** The file-KeyStore owner files to check; default defaultOwnerFiles(). */
@@ -581,10 +581,10 @@ export interface OwnerSetupResult {
   /**
    * IR-M1-11s-c-1 M-1: false when core could not be read back after signing. The owner is kept
    * (rolling it back could leave a stored card whose owner key is gone, locking the agent), so the
-   * owner code is still handed out: the owner is the human's and the code is their way in.
+   * master code is still handed out: the owner is the human's and the code is their way in.
    */
   readonly confirmed: boolean;
-  /** The generated owner code (24 characters). Shown once; the caller wipes it. Never logged. */
+  /** The generated master code (24 characters). Shown once; the caller wipes it. Never logged. */
   readonly ownerCode: Uint8Array;
   /** True when the passkey item was stored too. */
   readonly passkey: boolean;
@@ -629,7 +629,7 @@ function seedIsOwner(seed: Uint8Array, keys: OwnerPublicKeys): boolean {
  * written), `owner_card_failed` (rolled back, or nothing written when `seed` does not derive
  * `keys`, M1-11s-c-b), `keychain_failed` (a rollback delete failed; items may
  * remain). When core cannot be read back after signing, the owner is kept and the result has
- * `confirmed: false` (with the owner code). Error texts are fixed.
+ * `confirmed: false` (with the master code). Error texts are fixed.
  */
 export async function completeOwnerSetup(
   keychain: KeychainBackend,
@@ -723,7 +723,7 @@ export async function completeOwnerSetup(
     }
     if (outcome.kind === 'unknown') {
       // IR-M1-11s-c-1 M-1: unknown whether a card names this owner. Keep the owner (a card without
-      // its owner key would lock the agent out for good) and hand the owner code out anyway, so the
+      // its owner key would lock the agent out for good) and hand the master code out anyway, so the
       // human holds the way into what was created; the page points to `agentlink doctor`.
       handedOut = true;
       return Object.freeze({
@@ -826,7 +826,7 @@ export const UNNAMED_COMPUTER = 'this computer';
 
 /**
  * M1-UX-FIRSTRUN-V2: the computer's name for the backup-code entry in the owner's password manager
- * ("AgentLink backup code – <computer name>", 08 §1): the host name without a `.local` suffix, when
+ * ("AgentLink master code – <computer name>", 08 §1): the host name without a `.local` suffix, when
  * it is 1..63 plain characters (letters, digits, space, `.`, `_`, `-`); otherwise "this computer".
  */
 export function computerNameOf(hostname: string): string {

@@ -123,6 +123,9 @@ describe('Contacts rows', () => {
       '5 messages in the last 24 hours',
     );
     expect(rows()[2]?.querySelectorAll('.act-bar').length).toBe(12);
+    // A row with no messages draws no bars (no stray dashed line), the image keeps its label.
+    expect(rows()[0]?.querySelectorAll('.act-bar').length).toBe(0);
+    expect(rows()[0]?.querySelector('.act-spark')?.getAttribute('aria-label')).toBeTruthy();
   });
 
   it('keeps the list when the read fails: no word, a flat pulse, no alert', async () => {

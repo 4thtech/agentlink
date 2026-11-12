@@ -258,9 +258,9 @@ describe('DESIGN-ADJ-1 (a) copy items', () => {
 
   it('names every owner-presence option (X-10, LF-1, LS-2)', () => {
     expect(en['local.firstRun.body']).toBe(
-      'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey, owner code or owner passphrase, and only after you click Approve. Never give them to your AI.',
+      'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey, master code or owner passphrase, and only after you click Approve. Never give them to your AI.',
     );
-    expect(en['common.state.passkeyUnsupported']).toMatch(/owner code or owner passphrase/);
+    expect(en['common.state.passkeyUnsupported']).toMatch(/master code or owner passphrase/);
     expect(en['local.firstRun.waits']).not.toMatch(/over your limit/);
   });
 
@@ -289,8 +289,8 @@ describe('DESIGN-ADJ-1 (a) copy items', () => {
     expect(en['common.suggestedPassOn']).toBe('Suggested way to pass it on');
   });
 
-  it('makes the owner code the terminal default (T-1)', () => {
-    expect(en['cli.init.ownerCode']).toMatch(/owner code/);
+  it('makes the master code the terminal default (T-1)', () => {
+    expect(en['cli.init.ownerCode']).toMatch(/master code/);
     expect(en['cli.init.ownerCode']).not.toMatch(/passphrase/);
   });
 });

@@ -4,7 +4,7 @@
 //
 // - GET /api/approvals, GET /api/approvals/<id>, GET /api/owner/passkey;
 // - POST /api/approvals/<id>/(approve|deny) with `X-AgentLink-Digest`, and POST /api/approvals/review
-//   with `X-AgentLink-Items` (`<id>:<digest>:a|d,…`). The body is the owner code (octet-stream), or,
+//   with `X-AgentLink-Items` (`<id>:<digest>:a|d,…`). The body is the master code (octet-stream), or,
 //   with `X-AgentLink-Presence: passkey`, the assertion: credential ID, authenticator data, user
 //   handle and PRF output, each with a 16-bit length first.
 //

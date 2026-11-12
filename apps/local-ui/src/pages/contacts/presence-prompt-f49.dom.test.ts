@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// F49 (Windows 11, Chrome: Windows Hello gives no PRF): an owner with only the backup code confirms
+// F49 (Windows 11, Chrome: Windows Hello gives no PRF): an owner with only the master code confirms
 // every owner approval with it as the one primary action; "Switch to …" is a quiet link. After a
 // switch fails for lack of PRF, the sheet goes back to the code (nothing changed), stops offering
 // the switch in this browser, and never tells someone in Chrome or Edge to open Chrome or Edge.
@@ -98,8 +98,8 @@ async function render(
   return out;
 }
 
-describe('F49: no passkey here, the backup code confirms', () => {
-  it('one primary action "Confirm with your backup code"; the switch is a ghost link', async () => {
+describe('F49: no passkey here, the master code confirms', () => {
+  it('one primary action "Confirm with your master code"; the switch is a ghost link', async () => {
     await render(NONE_HERE);
     const primary = host.querySelectorAll('.al-btn-primary');
     expect(primary).toHaveLength(1);
@@ -120,7 +120,7 @@ describe('F49: no passkey here, the backup code confirms', () => {
     const r = await render(NONE_HERE);
     await act(async () => find(S.confirmWithCode)?.click());
     expect(r.submitted).toEqual([]);
-    expect(host.querySelector('[role="alert"]')?.textContent).toBe('Enter your backup code first.');
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('Enter your master code first.');
   });
 
   it('a switch without PRF goes back to the code, is remembered, and is not offered again', async () => {
@@ -160,7 +160,7 @@ describe('F49: no passkey here, the backup code confirms', () => {
       await flush();
       expect(host.textContent).not.toMatch(/Chrome or Edge/);
       expect(host.textContent).toMatch(
-        /can't protect approvals yet, so AgentLink uses your backup code/,
+        /can't protect approvals yet, so AgentLink uses your master code/,
       );
     } finally {
       delete (navigator as { userAgent?: string }).userAgent;
@@ -183,5 +183,5 @@ describe('F49: with a passkey, the sheet is unchanged', () => {
 
 function PASSKEY_SENSOR_LINE(): string {
   const sensor = SENSOR[detectPlatform()];
-  return `${sensor.charAt(0).toUpperCase()}${sensor.slice(1)} on this computer can't protect approvals yet, so this asks for your backup code.`;
+  return `${sensor.charAt(0).toUpperCase()}${sensor.slice(1)} on this computer can't protect approvals yet, so this asks for your master code.`;
 }

@@ -1,6 +1,6 @@
 // Owner operations from this page (04 §2.5; D-118; I-4). The page never signs and never builds an
 // owner action: it sends one POST to a `presence: true` route with
-// - the presence proof as the octet-stream body: the owner code the owner typed, or the localhost
+// - the presence proof as the octet-stream body: the master code the owner typed, or the localhost
 //   passkey assertion (M1-8e; `X-AgentLink-Presence: passkey`), exactly as the approval page sends
 //   them;
 // - the operation's input, JSON base64url-encoded in `X-AgentLink-Input`;
@@ -233,7 +233,7 @@ export async function passkeyProof(info: PasskeyInfo): Promise<PresenceProof | u
 //
 // `GET /api/owner/passkey` answers from the owner store, with or without an open agent. When the
 // passkey can't be used it names why in a fixed code (`reason`); the page shows that in plain words
-// instead of falling back to the backup code silently. `switchTo` is present only when this owner
+// instead of falling back to the master code silently. `switchTo` is present only when this owner
 // can switch here (the server gives `userId`, the owner the new passkey is bound to).
 
 /** Why the passkey isn't offered (strings.ts PASSKEY_WHY). */
@@ -256,7 +256,7 @@ export type PasskeyStatus =
 
 const REASONS: ReadonlySet<string> = new Set(['not_set_up_here', 'other_owner']);
 
-/** Reads the passkey state; any failure is `unknown` (the backup code still works). */
+/** Reads the passkey state; any failure is `unknown` (the master code still works). */
 export async function readPasskeyStatus(options: OwnerClientOptions = {}): Promise<PasskeyStatus> {
   if (!canPasskey()) return { kind: 'unavailable', reason: 'browser' };
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));

@@ -1,7 +1,7 @@
-// F49: an owner with only the backup code, on a computer whose passkey gives AgentLink no PRF
+// F49: an owner with only the master code, on a computer whose passkey gives AgentLink no PRF
 // (Windows Hello on some Windows 11 machines, even in Chrome). After a switch attempt there fails for
 // that reason, this browser stops pushing the switch: the shell's "Switch to …" banner leaves and the
-// presence sheets offer the backup code alone. Kept in this browser's localStorage as one flag (no
+// presence sheets offer the master code alone. Kept in this browser's localStorage as one flag (no
 // owner value, no code). It only decides what the page suggests; every approval is still checked by
 // the server's owner gate, so this is never a security decision. Storage can be missing or blocked:
 // every access is wrapped, and the page then remembers it only while it is open.

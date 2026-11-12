@@ -22,11 +22,11 @@ export interface ApiClientOptions {
 
 /**
  * An owner operation's answer (M1-11c-a4c): the central presence gate's own outcomes, or the
- * route's JSON. The owner code is never echoed back or logged.
+ * route's JSON. The master code is never echoed back or logged.
  */
 export type OwnerApiResult =
   | { readonly kind: 'ok'; readonly status: number; readonly data: unknown }
-  /** The gate: no owner code, a wrong one, a wait after wrong codes, or another operation running. */
+  /** The gate: no master code, a wrong one, a wait after wrong codes, or another operation running. */
   | { readonly kind: 'presence_required' | 'presence_rejected' | 'wait' | 'busy' }
   /** The route signed nothing (409 `refused`) or answered a fixed error word. */
   | { readonly kind: 'answer'; readonly status: number; readonly data: unknown }
@@ -39,11 +39,15 @@ export interface ApiClient {
   post<T = unknown>(path: string, body?: unknown): Promise<ApiResult<T>>;
   /**
    * One owner operation (M1-11c-a4c; 04 §2.5): `input` travels base64url JSON in
-   * `X-AgentLink-Input`, the owner code is the octet-stream body (the server's presence gate reads
-   * it once and wipes it). Never in the URL.
+   * `X-AgentLink-Input`, the master code is the octet-stream body (the server's presence gate reads
+   * it once and wipes it). Never in the URL. FB-8 (P-5): or the localhost passkey assertion as the
+   * body with `X-AgentLink-Presence: passkey` (as contacts/owner.ts sends it); wiped after sending.
    */
-  owner(path: string, input: unknown, ownerCode: string): Promise<OwnerApiResult>;
+  owner(path: string, input: unknown, presence: OwnerPresence): Promise<OwnerApiResult>;
 }
+
+/** The master code as typed, or a passkey assertion body (contacts/owner.ts `passkeyProof`). */
+export type OwnerPresence = string | { readonly passkey: Uint8Array };
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
 
@@ -120,25 +124,39 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     return { kind: 'ok', status: res.status, data: parsed.value as T };
   }
 
-  async function owner(path: string, input: unknown, ownerCode: string): Promise<OwnerApiResult> {
-    checkPath(path);
-    const headers = new Headers({
-      [CSRF_HEADER]: options.token ?? pageToken(),
-      'content-type': 'application/octet-stream',
-      'X-AgentLink-Input': base64url(JSON.stringify(input)),
-    });
+  async function owner(
+    path: string,
+    input: unknown,
+    presence: OwnerPresence,
+  ): Promise<OwnerApiResult> {
     let res: Response;
+    let refused: unknown;
     try {
+      try {
+        checkPath(path);
+      } catch (error) {
+        refused = error;
+        throw error;
+      }
+      const headers = new Headers({
+        [CSRF_HEADER]: options.token ?? pageToken(),
+        'content-type': 'application/octet-stream',
+        'X-AgentLink-Input': base64url(JSON.stringify(input)),
+      });
+      if (typeof presence !== 'string') headers.set('X-AgentLink-Presence', 'passkey');
       res = await doFetch(path, {
         method: 'POST',
         headers,
-        body: ownerCode,
+        body: typeof presence === 'string' ? presence : (presence.passkey as BodyInit),
         credentials: 'same-origin',
         cache: 'no-store',
       });
-    } catch {
+    } catch (error) {
+      if (refused !== undefined) throw error;
       noteHostUnreachable();
       return { kind: 'offline' };
+    } finally {
+      if (typeof presence !== 'string') presence.passkey.fill(0);
     }
     noteHostReached();
     const parsed = await readJson(res);

@@ -2,7 +2,7 @@
 // line and Pause or Resume; its AI apps with their words, Connect and Disconnect, and a heartbeat
 // history drawn only from the reads this page saw while it was open (history.ts: never a made-up
 // bar); its people and rules (the open agent's; another agent's page offers to open it); what
-// changed while the page was open; and the recovery kit in Settings. Labels and names are text only:
+// changed while the page was open; and saving its recovery kit (WP-11). Labels and names are text only:
 // labels in their own bidi run, contact names under the name rule (I-5, 11 §5.2).
 import { AgentIcon, Button, ContactName, Icon, useHood } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
@@ -255,7 +255,7 @@ export function AgentDetail({
         </Section>
 
         <Section title={S.backup}>
-          <BackupPanel />
+          <BackupPanel row={row} onSwitch={onSwitch} />
         </Section>
       </div>
     </div>

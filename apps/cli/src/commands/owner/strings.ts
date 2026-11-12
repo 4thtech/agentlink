@@ -64,6 +64,9 @@ export const OWNER_TEXT = Object.freeze({
   cancelFailed: "Problem  The cancel didn't go through. Nothing was changed.",
 
   // Owner add-agent (M1-9t, D-78; 04 §2.8).
+  // WP-1 (R-3): `--label` outside the label rule (06 §6); nothing ran.
+  labelInvalid:
+    'That name can’t be used. Use 1 to 32 letters, numbers, spaces, dots, dashes or apostrophes. Nothing was changed.',
   addAgentDone: 'OK       This ID can now pair. Restart the app that uses it.',
   get addAgentUnknown(): string {
     return `AgentLink is not set up for this ID on this machine yet. Run \`${prefix()} init --agent <name>\` yourself first, in your own terminal.`;
@@ -77,17 +80,17 @@ export const OWNER_TEXT = Object.freeze({
     return `The IDs on this computer name different owners, so AgentLink can't tell which one to use. Nothing was changed. Run \`${prefix()} doctor\` in your own terminal.`;
   },
 
-  // Owner change-code (M1-9z; 04 §2.8 "Changing the owner code").
-  changeCodeDone: 'OK       Use your new owner code from now on, for every ID on this computer.',
+  // Owner change-code (M1-9z; 04 §2.8 "Changing the master code").
+  changeCodeDone: 'OK       Use your new master code from now on, for every ID on this computer.',
 
-  // The owner code prompt (M1-9zd; 11 §5.5, §6.10). Printed right before every owner code prompt,
+  // The master code prompt (M1-9zd; 11 §5.5, §6.10). Printed right before every master code prompt,
   // and after a wrong code: the code goes only at the prompt, never into a command or a chat.
   codeHint:
-    "Type your owner code only at the prompt below. It isn't a shell command, and never paste it into a chat.",
+    "Type your master code only at the prompt below. It isn't a shell command, and never paste it into a chat.",
   newCodeHint:
-    "Your new owner code is shown below. Type it only at AgentLink's own prompts. It isn't a shell command, and never paste it into a chat.",
+    "Your new master code is shown below. Type it only at AgentLink's own prompts. It isn't a shell command, and never paste it into a chat.",
   wrongCode:
-    "Problem  That owner code didn't work. Nothing was changed. Type only your owner code at the prompt, not a shell command, then run the command again.",
+    "Problem  That master code didn't work. Nothing was changed. Type only your master code at the prompt, not a shell command, then run the command again.",
 
   // Owner init.
   get ownerUnknownAgent(): string {

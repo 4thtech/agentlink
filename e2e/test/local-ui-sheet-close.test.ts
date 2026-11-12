@@ -194,7 +194,7 @@ describe('W5-SHEET-CLOSE: the contact panel can always be closed (real Chromium)
   }, 60_000);
 });
 
-describe('W5-SAFETY-STEP: the Home link opens the contact at its safety code', () => {
+describe('W5-SAFETY-STEP: the Home link opens the contact at its Contact check', () => {
   it('?check=<ref> opens that contact panel with no click, and leaves the address clean', async () => {
     const { ctx, page } = await open();
     try {
@@ -203,7 +203,7 @@ describe('W5-SAFETY-STEP: the Home link opens the contact at its safety code', (
       expect(
         await page
           .getByRole('dialog')
-          .getByText(/safety code/i)
+          .getByText(/Contact check/i)
           .count(),
       ).toBeGreaterThan(0);
       expect(new URL(page.url()).search).toBe('');

@@ -1,14 +1,14 @@
-// W4-HOME: a person's ⋯ menu (prototype v23 A4: Rename · Check safety code · Remove). Each item
+// W4-HOME: a person's ⋯ menu (prototype v23 A4: Rename · Contact check · Remove). Each item
 // calls the existing Contacts routes, exactly as the Contacts page does (04 §2.5, §3.6.1; D-118;
 // I-4): nothing new is signed here and the page never signs.
 //
 // - Rename: "Name in your list", checked first (`GET …/rename-check`), then one presence step and
 //   one POST to `…/rename` (the server signs `contact.rename`).
-// - Check safety code: the 12 digits (`GET …/safety-code`), "They match" → presence → `…/check`
+// - Contact check: the 12 digits (`GET …/safety-code`), "They match" → presence → `…/check`
 //   with the code that was shown (`contact.check`); "They don't match" signs nothing and explains.
 // - Remove: asks first in plain words, then presence → `…/remove`.
 //
-// The presence step is Contacts' own PresencePrompt (the passkey, or the backup code). U4 may
+// The presence step is Contacts' own PresencePrompt (the passkey, or the master code). U4 may
 // replace this menu with its PersonMenu; the routes and the steps stay the same.
 import { Button, Icon } from '@4thtech-io/ui';
 import {
@@ -122,7 +122,7 @@ export function PersonMenu({
     };
   }, [open]);
 
-  // The safety code, read when Check opens.
+  // The 12 digits, read when Check opens.
   useEffect(() => {
     if (mode !== 'check' || contact === undefined) return undefined;
     if (contact.label === 'safety-code-checked' || contact.pairing !== 'complete') return undefined;

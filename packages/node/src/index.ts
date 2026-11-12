@@ -59,7 +59,7 @@ export {
   // U3-d: removes the keychain items of an agent the app just created and could not complete.
   discardNewOsKeychainAgent,
 } from './owner-add-agent.js';
-// M1-9z: `owner change-code` re-wraps the owner seed under a new generated owner code, at the same
+// M1-9z: `owner change-code` re-wraps the owner seed under a new generated master code, at the same
 // TTY prompt; the owner identity does not change and nothing secret leaves the package.
 export {
   changeOwnerCode,
@@ -112,6 +112,8 @@ export type {
   LocalUiContext,
   LocalUiOptions,
   LocalUiOwnerSetup,
+  // WP-11 (D-117 A): the open agent's recovery-kit source for the app host's Back up page.
+  LocalUiRecoveryKitSource,
 } from './local-ui/context.js';
 // U3-f (06 §7 "The app as a second path"): the AI apps seam the CLI implements over its harness
 // code (the one config writer); the routes, the changeId and the signing stay inside the package.

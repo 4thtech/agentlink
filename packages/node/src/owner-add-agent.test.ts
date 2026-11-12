@@ -7,7 +7,7 @@
 // - Two agents each get a card naming the same owner, with separate keychain items, stores and Nostr
 //   identities; the owner item is never written.
 // - Presence: the harness marker refuses before the owner key is read; refusals (no owner key, an
-//   agent that already has a card) come before the owner code is asked for; three wrong entries end
+//   agent that already has a card) come before the master code is asked for; three wrong entries end
 //   the command and nothing is written.
 // - A card that cannot be stored never removes the owner item (unlike `owner init`, M1-8h).
 // - An approval decided for one agent is refused by the other (04 §2.5.1 binding).
@@ -123,8 +123,8 @@ const firstCard = (agent: Agent, name: string, relays = RELAYS): FirstAgentCard 
 async function ownerInit(agent: Agent): Promise<{ owner: OwnerPublicKeys; code: string }> {
   const written: string[] = [];
   const shown = (): string =>
-    (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-      'Your owner code: '.length,
+    (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+      'Your master code: '.length,
     );
   const terminal: OwnerTerminal = {
     write: (text) => void written.push(text),
@@ -200,16 +200,40 @@ describe('owner add-agent: one owner, many local agents (D-78; 04 §2.8)', () =>
     expect(b.card.agentEnc).not.toBe(a.card.agentEnc);
     expect(keychain.items.has(alice.agentId)).toBe(true);
     expect(keychain.items.has(bob.agentId)).toBe(true);
-    // One entry of the owner code; the owner item is never written.
-    expect(run.labels).toEqual(['Owner code:']);
+    // One entry of the master code; the owner item is never written.
+    expect(run.labels).toEqual(['Master code:']);
     const after = keychain.items.get(OWNER_ACCOUNT);
     expect(ownerItem !== undefined && after !== undefined && equalBytes(after, ownerItem)).toBe(
       true,
     );
-    // The owner saw the owner fingerprint and which agent before the prompt; never a code.
+    // The owner saw the ID tag and which agent before the prompt; never a code.
     expect(run.written.join('\n')).toContain(result.fingerprint);
     expect(run.written.join('\n')).toContain('bob');
     expect(run.written.join('\n')).not.toContain(code);
+  });
+
+  it('WP-1 (R-3): `--label` signs the card and the label alike, in the same code entry', async () => {
+    const alice = await initAgent('alice');
+    const bob = await initAgent('bob');
+    const { owner, code } = await ownerInit(alice);
+    const run = ownerTyping([code]);
+    const actions = bob.client.ownerActions;
+    const result = await addAgentWith(keychain, run.terminal, {
+      backend: 'keychain',
+      env: {},
+      owner,
+      card: { ...firstCard(bob, 'bob'), firstLabel: { label: 'Work Mac', actions } },
+    });
+    // What contacts see (the card) and what the app shows (the label) are the same name.
+    expect(await bob.client.identity.cardName()).toBe('Work Mac');
+    expect(await bob.client.ownerActions.loadLabel()).toMatchObject({
+      status: 'verified',
+      label: 'Work Mac',
+    });
+    expect(result.label).toBe('saved');
+    expect(run.labels).toEqual(['Master code:']);
+    // The owner read the name the card will carry before the prompt.
+    expect(run.written.join('\n')).toContain('Work Mac');
   });
 
   it('refuses with an AI-app marker set, before the owner key is read', async () => {
@@ -256,7 +280,7 @@ describe('owner add-agent: one owner, many local agents (D-78; 04 §2.8)', () =>
     expect(refused.code).toBe('harness_detected');
   });
 
-  it('refuses an agent that already has a card, before the owner code is asked for', async () => {
+  it('refuses an agent that already has a card, before the master code is asked for', async () => {
     const alice = await initAgent('alice');
     const { owner, code } = await ownerInit(alice);
     const before = await alice.client.identity.get();
@@ -274,7 +298,7 @@ describe('owner add-agent: one owner, many local agents (D-78; 04 §2.8)', () =>
     expect(await alice.client.identity.get()).toEqual(before);
   });
 
-  it('refuses without an owner key on the machine, before the owner code is asked for', async () => {
+  it('refuses without an owner key on the machine, before the master code is asked for', async () => {
     const alice = await initAgent('alice');
     const bob = await initAgent('bob');
     const { owner, code } = await ownerInit(alice);
@@ -323,7 +347,7 @@ describe('owner add-agent: one owner, many local agents (D-78; 04 §2.8)', () =>
     const bob = await initAgent('bob');
     const { owner, code } = await ownerInit(alice);
     const run = ownerTyping([code]);
-    // Two identical relays: core refuses the list after the owner code was accepted.
+    // Two identical relays: core refuses the list after the master code was accepted.
     const refused = await failure(() =>
       addAgentWith(keychain, run.terminal, {
         backend: 'keychain',
@@ -447,7 +471,7 @@ describe('owner init with an owner already on the machine (D-78)', () => {
     );
     expect(refused.code).toBe('owner_exists');
     expect(refused.message).toContain('agentlink owner add-agent --agent');
-    expect(run.written.some((t) => t.startsWith('Your owner code: '))).toBe(false);
+    expect(run.written.some((t) => t.startsWith('Your master code: '))).toBe(false);
     const after = keychain.items.get(OWNER_ACCOUNT);
     expect(ownerItem !== undefined && after !== undefined && equalBytes(after, ownerItem)).toBe(
       true,

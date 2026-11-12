@@ -57,7 +57,7 @@ export interface Progress {
   /** The counted steps: connect your AI app, invite someone (connected with someone). */
   readonly steps: readonly CardStep[];
   /**
-   * W6-UI-POLISH: "Check a safety code" is a recommended extra, never required. It is done only
+   * W6-UI-POLISH: "Contact check" is a recommended extra, never required. It is done only
    * by the signed "They match" (I-4), and it never holds the card.
    */
   readonly suggestion: CardStep;
@@ -74,7 +74,7 @@ function ownerAlias(row: ContactRow): string | null {
     : null;
 }
 
-/** The Home card (A4): two steps, connect your AI app and invite someone; a safety code is a suggestion. */
+/** The Home card (A4): two steps, connect your AI app and invite someone; the 12 digits are a suggestion. */
 export function startProgress(state: SetupState): Progress {
   const rows = state.contacts?.filter((r) => r.status === 'active');
   const connect = state.owner === 'set_up' && state.agent === true && state.appConnected === true;

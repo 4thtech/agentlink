@@ -188,6 +188,16 @@ describe('ContactsPage: the list', () => {
     expect(empty?.textContent).toContain(`Try: ${S.emptyPrompt}`);
   });
 
+  it('D-141 (08 §1 C2): a renamed contact shows "(was {old})" as plain text in <bdi>', async () => {
+    const renamed = { ...marko, name: 'Marko Studio', formerName: '<b>Marko</b>' };
+    await mount({ [LIST]: { status: 'ok', contacts: [renamed, ana] } });
+    const bdi = host.querySelector('.ct-former bdi');
+    expect(bdi?.textContent).toBe('(was <b>Marko</b>)');
+    expect(host.querySelector('.ct-former b')).toBeNull();
+    expect(text()).toMatch(/Marko Studio.*\(was /);
+    expect(host.querySelectorAll('.ct-former').length).toBe(1);
+  });
+
   it('shows names as text and never an ID or key', async () => {
     const evil = { ...marko, name: '<img src=x onerror=alert(1)>' };
     await mount({ [LIST]: { status: 'ok', contacts: [evil, ana] } });
@@ -205,7 +215,7 @@ describe('ContactsPage: the list', () => {
     await mount({ [LIST]: { status: 'ok', contacts: [marko, ana] } });
     expect(text()).toContain('Marko Novak');
     expect(text()).toContain('Not checked yet');
-    expect(text()).toContain('Safety code checked');
+    expect(text()).toContain('Contact checked');
     expect(text()).not.toMatch(/wallet|gas|seed phrase|transaction|address|hash|chain/i);
     // A paired contact never shows presence (X-11).
     expect(text()).not.toMatch(/online|last seen/i);
@@ -235,7 +245,7 @@ describe('ContactsPage: the list', () => {
   });
 });
 
-describe('ContactsPage: the safety code (04 §3.6.1)', () => {
+describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
   const routes = (extra: Routes = {}): Routes => ({
     [LIST]: { status: 'ok', contacts: [marko] },
     [`/api/ui/contacts/${MARKO}/safety-code`]: { status: 'ok', code: CODE },
@@ -253,7 +263,7 @@ describe('ContactsPage: the safety code (04 §3.6.1)', () => {
     expect(button(S.skip)).toBeDefined();
   });
 
-  it('UX-031-QUICKWINS: explains the safety code in one line', async () => {
+  it('UX-031-QUICKWINS: explains the 12 digits in one line', async () => {
     await mount(routes());
     expect(text()).toContain(
       'Compare these 12 digits with the other person by call or in person; if they match, it’s really them.',
@@ -304,7 +314,7 @@ describe('ContactsPage: the safety code (04 §3.6.1)', () => {
     expect(inputOf(sent[0] as Call)).toBeUndefined();
   });
 
-  it('a wrong owner code changes nothing and says so', async () => {
+  it('a wrong master code changes nothing and says so', async () => {
     await mount(
       routes({
         [`POST /api/ui/contacts/${MARKO}/check`]: new Answer(403, {
@@ -390,6 +400,81 @@ describe('ContactsPage: rename and remove', () => {
     await click(S.cancel);
     expect(posts(calls)).toHaveLength(0);
     expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+  });
+});
+
+// WP-12 (F-2; D-72; 04 §2.5.1 `contact.block`, `contact.unblock`): Block and Unblock in the person
+// ⋯ menu. Block explains first, then asks for owner presence; Unblock asks for presence. Each is one
+// POST to a presence route; the page never signs.
+describe('ContactsPage: block and unblock (WP-12)', () => {
+  it('Block explains first, then asks for presence, then posts /block and says Blocked', async () => {
+    const calls = await mount({
+      [LIST]: { status: 'ok', contacts: [ana] },
+      [`POST /api/ui/contacts/${ANA}/block`]: { status: 'done' },
+    });
+    await openMenu();
+    await click(S.block);
+    expect(posts(calls)).toHaveLength(0);
+    expect(text()).toContain(S.blockExplain);
+    await click(S.blockContact);
+    expect(text()).toContain('Block Ana.');
+    await confirmWithCode();
+    const sent = posts(calls);
+    expect(sent.map((c) => c.url)).toEqual([`/api/ui/contacts/${ANA}/block`]);
+    expect(inputOf(sent[0] as Call)).toBeUndefined();
+    expect(text()).toContain(S.blockedNow);
+  });
+
+  it('a blocked contact offers Unblock (not Block) in the menu; it asks for presence and posts /unblock', async () => {
+    const calls = await mount({
+      [LIST]: { status: 'ok', contacts: [{ ...ana, status: 'blocked' }] },
+      [`POST /api/ui/contacts/${ANA}/unblock`]: { status: 'done' },
+    });
+    expect(text()).toContain(S.blockedDetail);
+    await openMenu();
+    const items = [...host.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
+    expect(items).toContain(S.unblock);
+    expect(items).not.toContain(S.block);
+    await click(S.unblock);
+    expect(text()).toContain('Unblock Ana.');
+    await confirmWithCode();
+    expect(posts(calls).map((c) => c.url)).toEqual([`/api/ui/contacts/${ANA}/unblock`]);
+    expect(text()).toContain(S.unblocked);
+  });
+
+  it('a revoked contact offers neither Block nor Unblock', async () => {
+    await mount({ [LIST]: { status: 'ok', contacts: [{ ...ana, status: 'revoked' }] } });
+    await openMenu();
+    const items = [...host.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
+    expect(items).not.toContain(S.block);
+    expect(items).not.toContain(S.unblock);
+  });
+
+  it('Cancel at the explain step or the presence step sends nothing', async () => {
+    const calls = await mount({ [LIST]: { status: 'ok', contacts: [ana] } });
+    await openMenu();
+    await click(S.block);
+    await click(S.cancel);
+    expect(text()).not.toContain(S.blockExplain);
+    await openMenu();
+    await click(S.block);
+    await click(S.blockContact);
+    await click(S.cancel);
+    expect(posts(calls)).toHaveLength(0);
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+  });
+
+  it('the copy follows 11 §5: plain words, no wallet, key or address', () => {
+    for (const line of [
+      S.block,
+      S.unblock,
+      S.blockContact,
+      S.blockExplain,
+      S.blockedNow,
+      S.unblocked,
+    ]) {
+      expect(line).not.toMatch(/wallet|gas|seed|transaction|key|address|0x/i);
+    }
   });
 });
 
@@ -590,7 +675,7 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
   });
 });
 
-describe('ContactsPage: the Home link to a safety code (W5-SAFETY-STEP)', () => {
+describe('ContactsPage: the Home link to the 12 digits (W5-SAFETY-STEP)', () => {
   const open = async (search: string): Promise<void> => {
     history.replaceState(null, '', `/contacts${search}`);
     const s = server({

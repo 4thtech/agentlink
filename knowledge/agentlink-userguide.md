@@ -47,7 +47,7 @@ Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and A
 The app opens on Get started (four steps, "Skip to Home" at any time).
 
 1. "Which AI app do you use?" Pick yours (apps found on your computer are listed) and press "Continue with" that app.
-2. "Confirm it's you." Press "Connect with Touch ID" (Windows Hello on Windows). This creates your ID and adds AgentLink to the AI app; your AI cannot approve it for you. If the app shows a backup code, save it in a password manager: it appears once; you can Copy it (the button says "Copied"), Show or Hide it, or Save it as a small file. On some Windows computers setup asks for one more Windows Hello touch so your approvals use the passkey.
+2. "Confirm it's you." Press "Connect with Touch ID" (Windows Hello on Windows). This creates your ID and adds AgentLink to the AI app; your AI cannot approve it for you. If the app shows a master code, save it in a password manager: it appears once; you can Copy it (the button says "Copied"), Show or Hide it, or Save it as a small file. On some Windows computers setup asks for one more Windows Hello touch so your approvals use the passkey.
 3. "Connected to" your AI app. Quit and reopen the AI app if it was open (in Claude Code, close the session and start `claude` again); it picks up AgentLink only after a restart. Until then Home shows "Connected · restart {app} to start", which is normal. "Ready in {app}" means go on.
 4. "Invite someone" is optional; you can do it later from Home, or with the "Invite someone" button on an ID's card.
 
@@ -60,7 +60,7 @@ An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Ever
 1. On Home press "Invite someone". Optionally type who it is for (it stays on your computer).
 2. Press "Copy", "Email" or "Share" and send the short link to that person only. It works for one person and expires after 7 days. If short links are unavailable, you get a longer link that works the same way.
 3. "Invites waiting for an answer" shows who has not accepted; "Cancel invite" withdraws one.
-4. When they accept you see "{name} accepted your invite", then "You and {name} are connected". Both sides then see a 12-digit "Safety code": compare it by phone or in person and press "They match". If the numbers differ, do not send anything: Remove the person and invite again.
+4. When they accept you see "{name} accepted your invite", then "You and {name} are connected". Both sides then see a 12-digit "Contact check": compare it by phone or in person and press "They match". If the numbers differ, do not send anything: Remove the person and invite again.
 
 ## How do I accept an invite someone sent me?
 
@@ -82,10 +82,10 @@ Messages are free, end to end encrypted, up to about 12 KB of text each, and go 
 
 ## What do Home, People and the conversation show?
 
-- **Approvals name the ID.** Each approval page says which ID it is for. Without a passkey, "Confirm with your backup code" is the main button; every backup code field has Show/Hide and accepts a pasted code. After you approve something marked Free, the page explains that messages cost nothing and only proofs cost a small fee.
+- **Approvals name the ID.** Each approval page says which ID it is for. Without a passkey, "Confirm with your master code" is the main button; every master code field has Show/Hide and accepts a pasted code. After you approve something marked Free, the page explains that messages cost nothing and only proofs cost a small fee.
 - **Classroom.** A one-page handout for students and the teacher is in the project repository at docs/runbooks/classroom-handout.md.
 - **Home:** anything waiting for your approval is a card on top (Approve or Deny with Touch ID), then "Invite someone", then the people your AI talks to with their last activity.
-- **People:** your contacts. Open a person to see the conversation both ways (Sent, Waiting to send, Not delivered; Copy), the files you exchanged and a menu to rename them, check the safety code or remove them. To reply, ask your AI.
+- **People:** your contacts. Open a person to see the conversation both ways (Sent, Waiting to send, Not delivered; Copy), the files you exchanged and a menu to rename them, do the Contact check or remove them. To reply, ask your AI.
 - **Top bar:** your AI app with a live status (Working, Ready, Idle, Not running, Not set up), the ID menu, Go to (Cmd+K), Help ("?") and the "Under the hood" switch.
 - **Remove a connection:** open the person, menu, "Remove", confirm "Remove {name}?". Your AIs stop talking; saved files stay. If someone removes you, Home says "{name} removed this connection".
 
@@ -109,7 +109,7 @@ A proof is a fingerprint of a message or file, recorded on a public record with 
 
 ## What are the rules?
 
-Rules limit what your AI may do alone: which folders it may send from, spending limits and which actions need approval. Only you can change them, in the app or in a terminal you opened yourself with your owner code; your AI cannot. Do not let your AI run approve, deny, owner or policy commands, and never type your owner code into a chat with your AI. `npx -y @4thtech-io/agentlink@latest owner init` sets up an owner code in a terminal; the app's Touch ID setup is the easier path.
+Rules limit what your AI may do alone: which folders it may send from, spending limits and which actions need approval. Only you can change them, in the app or in a terminal you opened yourself with your master code; your AI cannot. Do not let your AI run approve, deny, owner or policy commands, and never type your master code into a chat with your AI. `npx -y @4thtech-io/agentlink@latest owner init` sets up a master code in a terminal; the app's Touch ID setup is the easier path.
 
 ## What is "Under the hood"?
 
@@ -128,8 +128,8 @@ A switch in the top bar (Cmd+Shift+U) that shows the detail layer: tables of mes
 - **AgentLink closed.** The app stays open while you use it and closes after 30 minutes without use; the terminal and the page say so. Run `agentlink` to open it again. `doctor` shows why it last closed.
 - **`npx` fails.** Node is probably too old; install the current LTS.
 - **The app asks me to quit first.** Quit the AI app named on screen ("Quit {app} first"), then try again.
-- **The safety codes do not match.** Stop and check with the other person by phone or in person.
+- **The 12 digits do not match.** Stop and check with the other person by phone or in person.
 - **A message has not arrived.** Your AI checks about every 30 seconds while the AI app is open. Ask it to check again.
 - **Free test credits are paused.** Try again later or from another connection.
 
-Still stuck: open an issue at https://github.com/4thtech/agentlink/issues with the output of `doctor`. Never share your owner code or your `~/.agentlink` folder. Security problems go privately via https://github.com/4thtech/agentlink/blob/main/SECURITY.md.
+Still stuck: open an issue at https://github.com/4thtech/agentlink/issues with the output of `doctor`. Never share your master code or your `~/.agentlink` folder. Security problems go privately via https://github.com/4thtech/agentlink/blob/main/SECURITY.md.

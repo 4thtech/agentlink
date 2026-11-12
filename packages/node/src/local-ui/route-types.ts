@@ -4,7 +4,7 @@
 // its handler gets the context and the request. A mutating route (POST, PUT, PATCH, DELETE) must
 // declare `presence: true` (routes.ts refuses it otherwise): the approval server's central gate
 // checks owner presence before its handler runs, and the handler gets a one-use owner operation that
-// signs with the presence this request carried. No handler ever sees the owner code, the passkey
+// signs with the presence this request carried. No handler ever sees the master code, the passkey
 // assertion or the session values. M1-11s-c adds a third kind, `presence: 'setup'`, for owner setup
 // on the first-run page: no handler, run by the server's own setup gate. MSG-FILES-IO-h (D-134) adds
 // a fourth, `presence: 'reveal'`, for Show in Finder only: one fixed POST, no presence, no signing,
@@ -57,7 +57,7 @@ export interface LocalUiResult {
 /**
  * One owner operation with the presence this request carried (04 §2.5, D-68): `sign` runs once,
  * shows nothing (the page was the confirmation), and signs exactly the given objects (one, or the
- * pairs runOwnerGesture allows). A second call throws. A wrong owner code throws KeyStoreError
+ * pairs runOwnerGesture allows). A second call throws. A wrong master code throws KeyStoreError
  * `presence_rejected`, which the gate answers as 403 and counts towards the wrong-code backoff.
  */
 export interface LocalUiOwnerOperation {
@@ -80,7 +80,34 @@ export interface LocalUiOwnerOperation {
    * session or the epoch control. Absent outside the app host or without the agent's key items.
    */
   renameAgent?(review: OwnerReview, request: LocalUiRenameRequest): Promise<LocalUiRenameOutcome>;
+  /**
+   * WP-11 (F-1, D-117 A; 04 §2.3.3 "Export: who sees the seeds", §2.5.1 `backup.export`): the one
+   * owner operation of saving a recovery kit, instead of `sign` (one or the other, once). Offered
+   * only on a route that declares `recoveryKit: true`, whose gate unlocked the owner store for an
+   * export, and only for the open agent's LocalUiOptions `recoveryKit`. With the presence this
+   * request carried it signs exactly one `backup.export` for the open agent (core prepared it, the
+   * server drew its kitId), has core apply it (the audit record) and only then seals the kit into a
+   * new file. The handler never sees the owner session, the seeds or the path; it gets the file name,
+   * the folder's display name and the new recovery code, which it answers to the page once.
+   */
+  exportRecoveryKit?(review: OwnerReview): Promise<LocalUiRecoveryKitOutcome>;
 }
+
+/** WP-11: how saving a recovery kit ended (route-types.ts `exportRecoveryKit`). */
+export type LocalUiRecoveryKitOutcome =
+  | {
+      readonly status: 'saved';
+      /** The kit's file name, `agentlink-recovery-kit-YYYY-MM-DD[-n].alkk`. */
+      readonly file: string;
+      /** Where it is, as shown: `Downloads` or `Home`. Never a full path. */
+      readonly folder: 'Downloads' | 'Home';
+      /** The new recovery code, 24 characters in six groups of four (`XXXX-…`), for display once. */
+      readonly code: string;
+    }
+  /** Core did not apply the signed `backup.export`: nothing was sealed. */
+  | { readonly status: 'not_applied' }
+  /** The kit could not be written (no file is left behind). */
+  | { readonly status: 'failed' };
 
 /** D-141: what the rename route hands the gate: the new label and the `agent.label` core prepared. */
 export interface LocalUiRenameRequest {
@@ -114,6 +141,11 @@ export interface LocalUiOwnerRoute {
    */
   readonly stub?: true;
   /**
+   * WP-11: the recovery-kit export route. Its gate unlocks the owner store for an export
+   * (unlockForExport) and offers `exportRecoveryKit` instead of `sign`; no other route does.
+   */
+  readonly recoveryKit?: true;
+  /**
    * U3-invite: a read-only check run after the generation check and before the presence gate. A
    * result refuses the request with it (the owner store is never opened, nothing is signed); the
    * handler still checks again after presence. Undefined lets the request on.
@@ -135,7 +167,7 @@ export type LocalUiSetupStep = 'begin' | 'finish';
 /**
  * M1-11s-c: an owner setup route (D-120 (1)). It has no page handler: the approval server's own
  * setupGate runs the step (approval-server.ts, owner-setup.ts), so no page file ever touches the
- * owner seed, the PRF output or the owner code. Only POST, only under /api/ui/first-run/, one route
+ * owner seed, the PRF output or the master code. Only POST, only under /api/ui/first-run/, one route
  * per step (routes.ts). Reached only while no owner exists anywhere.
  */
 export interface LocalUiSetupRoute {
@@ -151,7 +183,7 @@ export type LocalUiPayConfirmStep = 'begin' | 'finish';
 /**
  * M1-PAY-CONFIRM-a: a paid-action confirmation route (04 §2.5.3, D-132). Like a setup route it has
  * no page handler: the approval server's own payConfirmGate runs the step (approval-server.ts,
- * pay-confirm.ts), so no page file ever touches the challenge, the assertion, the backup code or
+ * pay-confirm.ts), so no page file ever touches the challenge, the assertion, the master code or
  * the owner key. Only POST, only under /api/ui/pay-confirm/, one route per step (routes.ts).
  */
 export interface LocalUiPayConfirmRoute {
@@ -174,7 +206,7 @@ export const CREATE_AGENT_PATHS: Readonly<Record<LocalUiCreateAgentStep, string>
  * W4-ONE-TOUCH (D-140; 08 §1 `POST /api/ui/agents/begin` and `POST /api/ui/agents`): creating an
  * agent (and connecting its AI app) with one gesture. Like a pay-confirm route it has no page
  * handler: the approval server's own createAgentGate runs the step, so no page file ever touches the
- * held seed, the challenge, the assertion, the backup code or the owner key. Only POST, only these
+ * held seed, the challenge, the assertion, the master code or the owner key. Only POST, only these
  * two paths, one route per step (routes.ts).
  */
 export interface LocalUiCreateAgentRoute {
@@ -311,6 +343,10 @@ export interface LocalUiHandoffRoute {
   readonly path: string;
   readonly presence: 'handoff';
 }
+
+/** WP-11 (08 §1 Backup): the Backup page's read and the recovery-kit export (a presence route). */
+export const BACKUP_PATH = '/api/ui/backup';
+export const BACKUP_EXPORT_PATH = '/api/ui/backup/export';
 
 /** W4-PAUSE: the fixed paths of Pause (its own kind) and Resume (a presence route) (08 §1). */
 export const AGENTS_PAUSE_PATH = '/api/ui/agents/pause';

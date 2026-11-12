@@ -119,7 +119,7 @@ describe('doctor: AI apps that start an ID that is gone (R1)', () => {
           }),
       },
     });
-    expect(r.lines).toEqual([DOCTOR_LOCAL_TEXT.appMissingId('Claude Code', 'gone')]);
+    expect(r.lines).toEqual([DOCTOR_LOCAL_TEXT.appMissingId('Claude Code')]);
     expect(r.problems).toBe(1);
     expect(r.lines.join('\n')).not.toContain('~/.claude.json');
   });
@@ -166,10 +166,10 @@ describe('doctor: AI apps that start an ID that is gone (R1)', () => {
     ]);
   });
 
-  it('the missing-ID line names the app and the ID and points to the app, never a command to type', () => {
-    const line = DOCTOR_LOCAL_TEXT.appMissingId('Cursor', 'old');
+  it('the missing-ID line names the app, not a folder name, and points to the app, never a command to type', () => {
+    const line = DOCTOR_LOCAL_TEXT.appMissingId('Cursor');
     expect(line).toContain('Cursor');
-    expect(line).toContain('"old"');
+    expect(line).not.toContain('"');
     expect(line).toContain('connect Cursor to another ID');
     expect(line).not.toContain('add-agent');
   });
@@ -182,7 +182,7 @@ describe('doctor: AI apps that start an ID that is gone (R1)', () => {
         list: () => Promise.resolve({ apps: [app('Cursor', 'old')], desktopRunning: false }),
       },
     });
-    expect(r.lines).toContain(DOCTOR_LOCAL_TEXT.appMissingId('Cursor', 'old'));
+    expect(r.lines).toContain(DOCTOR_LOCAL_TEXT.appMissingId('Cursor'));
   });
 
   it('reads the real harness config of a temp home, read-only', async () => {
@@ -205,7 +205,7 @@ describe('doctor: AI apps that start an ID that is gone (R1)', () => {
       platform: 'darwin',
       ids: () => Promise.resolve([]),
     });
-    expect(r.lines).toEqual([DOCTOR_LOCAL_TEXT.appMissingId('Claude Code', 'gone')]);
+    expect(r.lines).toEqual([DOCTOR_LOCAL_TEXT.appMissingId('Claude Code')]);
     const { readFile } = await import('node:fs/promises');
     expect(await readFile(path, 'utf8')).toBe(text);
   });

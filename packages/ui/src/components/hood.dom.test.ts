@@ -45,7 +45,7 @@ const record = (href: string): unknown => ({ kind: 'proofLink', label: 'Public r
 const FORBIDDEN: readonly [string, unknown][] = [
   ['a private key', { kind: 'text', label: 'Key', value: 'a'.repeat(64) }],
   ['a base64 key', { kind: 'text', label: 'Note', value: 'Zm9vYmFy-Zm9vYmFy-Zm9vYmFy' }],
-  ['a code', { kind: 'text', label: 'Backup code', value: 'ABCD-EFGH-JKLM-NPQR' }],
+  ['a code', { kind: 'text', label: 'Master code', value: 'ABCD-EFGH-JKLM-NPQR' }],
   ['a token', { kind: 'text', label: 'Access token', value: 'tok_example_1' }],
   ['a token by value', { kind: 'text', label: 'Detail', value: 'Bearer zzzzzzzzzzzzzzzzzzzzzzzz' }],
   [
@@ -74,8 +74,8 @@ const FORBIDDEN: readonly [string, unknown][] = [
   ['a short tx path', record('https://basescan.org/tx/0xabc')],
   ['an upper-case tx path', record('https://basescan.org/tx/0x' + 'AB'.repeat(32))],
   ['a port', record('https://basescan.org:8443/tx/0x' + 'ab'.repeat(32))],
-  ['a backup code with dashes', { kind: 'text', label: 'Note', value: 'k3f9-a82d-77qz-10bc-x9y8' }],
-  ['a backup code with spaces', { kind: 'text', label: 'Note', value: 'k3f9 a82d 77qz 10bc' }],
+  ['a master code with dashes', { kind: 'text', label: 'Note', value: 'k3f9-a82d-77qz-10bc-x9y8' }],
+  ['a master code with spaces', { kind: 'text', label: 'Note', value: 'k3f9 a82d 77qz 10bc' }],
   ['a lower-case id code', { kind: 'id', label: 'Reference', value: 'abcd-efgh-jklm' }],
   [
     'a recovery phrase',
@@ -287,7 +287,7 @@ describe('the path kind (UI-REFRESH-e2)', () => {
     expect(host.textContent).toContain('m-1');
   });
 
-  it.each(['Key', 'Session link', 'Upload folder', 'Download URL', 'Access token', 'Backup code'])(
+  it.each(['Key', 'Session link', 'Upload folder', 'Download URL', 'Access token', 'Master code'])(
     'refuses a path labelled %s',
     (label) => {
       expect(acceptHoodField({ kind: 'path', label, value: '/Users/tali/Files' })).toBeNull();

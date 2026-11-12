@@ -6,7 +6,7 @@
 import { Button, Sheet, TextField } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type FormEvent, type ReactElement } from 'react';
 import { FAILURE_COPY } from '../../api/failure-reasons.js';
-import { navigate } from '../../router.js';
+import { ExportKit } from '../backup/export-kit.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import { AppMark } from './app-mark.js';
 import type { AgentsApi, OwnerOutcome } from './api.js';
@@ -55,8 +55,14 @@ export function RenameEditor({
   onCancel,
   onChanged,
   onRenamed,
+  cardName,
 }: Shared & {
   row: AgentRow;
+  /**
+   * WP-1 (R-5): the open ID's card name when it differs from its label: then the same label is a
+   * change too (it puts the label in the card, D-141), so Save is not refused for it.
+   */
+  cardName?: string;
   onDone: () => void;
   onCancel: () => void;
   onChanged: () => void;
@@ -69,7 +75,7 @@ export function RenameEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const label = text.trim();
-  const unchanged = label === row.label;
+  const unchanged = label === row.label && (cardName === undefined || cardName === label);
 
   const send = (proof: PresenceProof): void => {
     if (busy) return;
@@ -83,33 +89,9 @@ export function RenameEditor({
         onDone();
         return;
       }
-      const said = gateMessage(outcome);
-      if (said !== undefined) return setError(said);
-      if (outcome.kind === 'agent_changed') {
-        onChanged();
-        return setError(S.agentChanged);
-      }
-      // D-141 (11 §5.8): three renames a day; the time of the next one.
-      if (outcome.kind === 'rename_limited') {
-        setStep('edit');
-        return setError(
-          outcome.retryAt === undefined
-            ? S.renameFailed
-            : S.renameLimited(row.label, retryTime(outcome.retryAt)),
-        );
-      }
-      if (outcome.kind === 'rotation_pending') {
-        setStep('edit');
-        return setError(S.renamePending);
-      }
-      setError(
-        outcome.kind === 'label_invalid' || outcome.kind === 'invalid'
-          ? S.labelInvalid
-          : outcome.kind === 'not_applied' || outcome.kind === 'not_available'
-            ? S.notRenamed
-            : renameFailedCopy(outcome),
-      );
-      if (!RETRY_IN_PLACE.has(outcome.kind)) setStep('edit');
+      if (outcome.kind === 'agent_changed') onChanged();
+      setError(renameProblem(outcome, row.label));
+      if (!RETRY_IN_PLACE.has(outcome.kind) && outcome.kind !== 'agent_changed') setStep('edit');
     });
   };
 
@@ -222,14 +204,19 @@ export function RemoveSheet({
   onChanged,
   onRemoved,
   onAgentChanged,
+  onSwitch,
 }: Shared & {
   row: AgentRow;
   onClose: () => void;
   onChanged: () => void;
   onRemoved: (label: string) => void;
   onAgentChanged: () => void;
+  /** Opens another ID, since a recovery kit is saved for the open ID (WP-11). */
+  onSwitch?: (row: AgentRow) => void;
 }): ReactElement {
   const passkey = usePasskey(owner);
+  const [exporting, setExporting] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   const [phase, setPhase] = useState<RemovePhase>({ kind: 'form' });
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
@@ -370,16 +357,43 @@ export function RemoveSheet({
         {phase.kind === 'form' ? (
           <>
             <div className="ag-actions">
-              <Button
-                variant="secondary"
-                icon="download"
-                onClick={() => {
-                  onClose();
-                  navigate('/settings/backup');
-                }}
-              >
-                {S.exportFirst}
-              </Button>
+              {exporting && row.current ? (
+                <ExportKit label={row.label} />
+              ) : (
+                <>
+                  <Button
+                    variant="secondary"
+                    icon="download"
+                    onClick={() => {
+                      if (row.current) setExporting(true);
+                      else setAskOpen(true);
+                    }}
+                  >
+                    {S.exportFirst}
+                  </Button>
+                  {askOpen && !row.current ? (
+                    <div role="group" aria-label={S.openForKit(row.label)}>
+                      <p className="al-text-body-sm">{S.openForKit(row.label)}</p>
+                      <div className="ag-actions">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            setAskOpen(false);
+                            setExporting(true);
+                            onSwitch?.(row);
+                          }}
+                        >
+                          {S.open}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setAskOpen(false)}>
+                          {S.cancel}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
             {finishing ? null : (
               <TextField
@@ -504,5 +518,34 @@ export function RemoveSheet({
 /** F23: a failed rename says why when the server sent a fixed reason; else the generic line. */
 function renameFailedCopy(outcome: OwnerOutcome): string {
   const reason = outcome.kind === 'failed' ? outcome.reason : undefined;
-  return reason === undefined || reason === 'internal' ? S.renameFailed : FAILURE_COPY[reason];
+  return reason === undefined ? S.renameFailed : FAILURE_COPY[reason];
+}
+
+/**
+ * WP-1: what a rename that did not finish says, for the Rename editor and for "Update contacts"
+ * alike. Each answer has its own words (the owner's 0.4.13 run got one generic sentence for all).
+ */
+export function renameProblem(outcome: OwnerOutcome, label: string): string {
+  const said = gateMessage(outcome);
+  if (said !== undefined) return said;
+  switch (outcome.kind) {
+    case 'agent_changed':
+      return S.agentChanged;
+    // D-141 (11 §5.8): three renames a day; the time of the next one.
+    case 'rename_limited':
+      return outcome.retryAt === undefined
+        ? S.renameFailed
+        : S.renameLimited(label, retryTime(outcome.retryAt));
+    case 'rotation_pending':
+      return S.renamePending;
+    case 'label_invalid':
+    case 'invalid':
+      return S.labelInvalid;
+    case 'not_available':
+      return S.renameRestart;
+    case 'not_applied':
+      return S.notRenamed;
+    default:
+      return renameFailedCopy(outcome);
+  }
 }

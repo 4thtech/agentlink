@@ -9,7 +9,7 @@
 // - `GET /api/ui/join` answers only the state, the public inviteId, name, label, fingerprint and the
 //   expiry; never the link.
 // - `POST /api/ui/join/accept {inviteId}` is an owner route: a mismatch is `invite_changed` before
-//   the presence gate (no owner store) and nothing is signed; with the owner code one
+//   the presence gate (no owner store) and nothing is signed; with the master code one
 //   `approval.decide` is signed by the owner key, applied and used once; then the link is dropped.
 // - `POST /api/ui/join/dismiss` ("Not now") is the invite kind: no presence, nothing signed.
 // - The link (the invite secret) is in no event, opener URL, answer or record.
@@ -392,7 +392,7 @@ async function harness(opts: Options = {}) {
     /** The status bar's read (every 5 s while a page is visible). */
     health: () => send(port, '/api/ui/health', { headers: pageHeaders() }),
     agents: () => send(port, '/api/ui/agents', { headers: pageHeaders() }),
-    /** The Contacts page's accept (POST /api/ui/invites/accept) with the owner code. */
+    /** The Contacts page's accept (POST /api/ui/invites/accept) with the master code. */
     contactsAccept: (presence: string) =>
       send(port, INVITE_ACCEPT_PATH, {
         method: 'POST',
@@ -686,7 +686,7 @@ describe('POST /api/ui/join/accept (08 §4)', () => {
     expect(h.core.ownerStores).toBe(0);
   });
 
-  it('with the owner code: one approval.decide by the owner key, used once; the link is dropped', async () => {
+  it('with the master code: one approval.decide by the owner key, used once; the link is dropped', async () => {
     // The inviter's agent has not answered yet: a pass finds nothing (U3-invite-b).
     const h = await harness({ waitingInvite: LINK, sync: () => Promise.resolve() });
     const res = await h.accept(INVITE_ID, world.code);
@@ -718,7 +718,7 @@ describe('POST /api/ui/join/accept (08 §4)', () => {
     // Connected once the inviter's agent answered (the contact exists).
     h.core.contacts.push({ id: CONTACT_ID, status: 'active' });
     // W4-PEOPLE-INVITE (IR SEC-1 L3): connected names the new contact's ref (its ID, as the
-    // contacts routes use it), so the screen reads that contact's safety code and no other.
+    // contacts routes use it), so the screen reads that contact's Contact check and no other.
     expect(parse((await h.read()).body)).toMatchObject({
       state: 'connected',
       contactRef: CONTACT_ID.toLowerCase(),
@@ -945,8 +945,8 @@ describe('the host passes for the open agent (Decision 37 (b), (c))', () => {
 // HOTFIX-045-TOUCHID: the owner's 0.4.4 case on the second Mac. The owner was set up before 0.3.0,
 // so this computer had no `owner-passkey` item (Touch ID was switched on only on the other Mac); an
 // agent is open and an invite waits. On main the passkey read said only `registered: false` and the
-// accept sheet silently asked for the backup code. Now the read says why and carries the values to
-// switch; the switch (backup code once + one touch, the existing registration) runs from the sheet;
+// accept sheet silently asked for the master code. Now the read says why and carries the values to
+// switch; the switch (master code once + one touch, the existing registration) runs from the sheet;
 // then Accept is confirmed with Touch ID: one approval.decide signed by the owner key. Real host,
 // real owner store and central presence gate; only the authenticator is virtual.
 describe('HOTFIX-045-TOUCHID: Accept on a computer without Touch ID set up yet', () => {
@@ -967,7 +967,7 @@ describe('HOTFIX-045-TOUCHID: Accept on a computer without Touch ID set up yet',
     expect(before['registered']).toBe(false);
     expect(before['reason']).toBe('not_set_up_here');
     expect(before['userId']).toBe(encodeBase64url(world.owner.ownerNostr));
-    // 2. "Switch to Touch ID": the backup code once and one touch (the existing registration).
+    // 2. "Switch to Touch ID": the master code once and one touch (the existing registration).
     const salt = ownerPrfSalt();
     const auth = new VirtualPrfAuthenticator();
     const register = await h.registerPasskey(

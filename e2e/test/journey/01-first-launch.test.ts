@@ -53,7 +53,7 @@ describe('chapter 1: onboarding', () => {
     expect(await page.getByRole('button', { name: CONNECT_WITH }).isDisabled()).toBe(true);
     await name.fill('Home base');
     await page.getByRole('button', { name: CONNECT_WITH }).click();
-    // The owner code is still shown once on first run.
+    // The master code is still shown once on first run.
     const saved = page.getByRole('button', { name: 'I saved it' });
     await saved.waitFor();
     await saved.click();
@@ -61,7 +61,7 @@ describe('chapter 1: onboarding', () => {
     // Step 3 (A2): Connected ✓.
     await page.waitForURL((url) => url.pathname === '/start/connected');
     await page.getByRole('heading', { name: 'Connected to Claude Code' }).waitFor();
-    expect(await text(page)).not.toContain('Your backup code');
+    expect(await text(page)).not.toContain('Your master code');
 
     // Exactly one gesture: the passkey create that also signs card, policy, label and app.connect.
     expect(jp.gestures.create).toBe(1);

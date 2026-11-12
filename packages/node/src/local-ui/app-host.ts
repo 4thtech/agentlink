@@ -186,6 +186,12 @@ export interface AppHostOptions {
    * agent is open its own full desk (`localUi.aiApps`) answers every AI apps route instead.
    */
   readonly aiAppsList?: Pick<LocalUiAiApps, 'list'>;
+  /**
+   * WP-13 (F-4 / F45; 08 §1 "Live AI-app status"): this app's own AgentLink version. An AI app whose
+   * live MCP session runs an older one is `outdated` ("Restart {app} to use the new version").
+   * Absent: nothing is outdated.
+   */
+  readonly version?: string;
 }
 
 /** U3-invite: the handoff record (08 §4). The token is not the page's session token. */

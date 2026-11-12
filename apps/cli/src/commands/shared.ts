@@ -42,7 +42,7 @@ export interface CommandDeps {
    */
   readonly strayItems?: StrayItems;
   /**
-   * M1-9z (IR-M1-9z-1 F2): true when an owner code change didn't finish (a leftover `owner-next`
+   * M1-9z (IR-M1-9z-1 F2): true when a master code change didn't finish (a leftover `owner-next`
    * item). Store-only: nothing is unlocked. Production wires @4thtech-io/node's check in doctor.ts;
    * there is no default, so tests never touch the OS keychain.
    */
@@ -94,13 +94,13 @@ export const TEXT = Object.freeze({
   inviteReady:
     'Invite ready: it works once, until {date}. Send it only to the person you want to connect with: whoever uses it first is connected.',
   inviteNext:
-    'Once they accept, you will be connected. Checking each other with a safety code arrives in a later version; until then the name they show is self-declared.',
+    'Once they accept, you will be connected. Checking each other with the 12 digits arrives in a later version; until then the name they show is self-declared.',
   inviteShareHeader: 'Text you can send with it:',
   acceptNeedsApprovalLead: 'Approval needed to accept this invite.',
   acceptThenRetry:
     'After you approve, run the same accept command again and add `--approval {approvalId}`.',
   acceptWaiting:
-    "Invite accepted. You'll be connected when {contactName} answers. Checking each other with a safety code arrives in a later version; until then the name they show is self-declared.",
+    "Invite accepted. You'll be connected when {contactName} answers. Checking each other with the 12 digits arrives in a later version; until then the name they show is self-declared.",
   acceptOffline:
     "Warning  Invite accepted, but the message network can't be reached right now. AgentLink keeps the answer ready and sends it when the network is back.",
   acceptStillWaiting:
@@ -151,15 +151,16 @@ export const TEXT = Object.freeze({
   doctorRelays:
     '{count, plural, one {OK       Message network: 1 server for this ID} other {OK       Message network: # servers for this ID}}',
   get doctorNoRelays(): string {
-    return `Problem  This ID has no message network servers\n         Run \`${commandPrefix()} init\` again to set up this ID.`;
+    return `Problem  This ID has no message network servers\n         Open AgentLink to set up this ID again.`;
   },
   doctorSend: 'OK       This ID can send and sign',
   doctorSendBlocked:
     "Problem  This ID can't send or sign right now\n         Its identity is revoked, or a key change is unfinished.",
   get doctorPartial(): string {
-    return `Warning  Part of the message network did not answer\n         Run \`${commandPrefix()} doctor\` again, or check your connection.`;
+    return `Warning  Part of the message network did not answer\n         Check your connection and run \`${commandPrefix()} doctor\` again.`;
   },
-  doctorOpenFailed: "Problem  Couldn't open this ID\n         Check the folder under ~/.agentlink.",
+  doctorOpenFailed:
+    "Problem  Couldn't open this ID\n         Open AgentLink to see what is wrong with it.",
   doctorNoAgent: 'Problem  {message}',
   doctorNoKeychain: 'Problem  {message}',
   doctorFix: '         {fix}',
@@ -167,7 +168,7 @@ export const TEXT = Object.freeze({
     '{count, plural, one {Warning  1 leftover item from an interrupted setup is in your keychain} other {Warning  # leftover items from an interrupted setup are in your keychain}}',
   doctorStrayAsk: 'Remove them? (y/N)',
   get doctorOwnerCodeUnfinished(): string {
-    return `Problem  An owner code change didn't finish. In a terminal you opened yourself, run \`${commandPrefix()} owner change-code\` to finish or clean it up. Keep both your current and your new owner code until then.`;
+    return `Problem  A master code change didn't finish. In a terminal you opened yourself, run \`${commandPrefix()} owner change-code\` to finish or clean it up. Keep both your current and your new master code until then.`;
   },
   doctorStrayRemoved: 'OK       Removed {count} leftover items',
 } as const);

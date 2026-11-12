@@ -2,7 +2,7 @@
 //
 // Every step is derived from real local reads, never from a click, a timer or a copy. An unread
 // signal is not "done" and is reported as unknown. Seven steps are counted ("x of 7"): Protect, Name,
-// Connect your AI app, Invite, Say hello, See the reply, Recovery kit. The safety code check is
+// Connect your AI app, Invite, Say hello, See the reply, Recovery kit. The Contact check is
 // shown and ticks, but is not counted: it never holds the card and never blocks the steps after it.
 // "Done" means "has happened once": it is remembered in this browser (ids only) and does not untick,
 // so removing the only contact does not bring the card back. Two steps are never remembered: the
@@ -71,11 +71,11 @@ export type StepState = 'done' | 'next' | 'waiting' | 'later';
 export interface StepView {
   readonly id: StepId;
   readonly state: StepState;
-  /** The safety code and reply rows: the owner-confirmed name of the contact we wait for. */
+  /** The 12 digits and reply rows: the owner-confirmed name of the contact we wait for. */
   readonly name?: string | undefined;
-  /** The safety code row only: a contact whose code can be compared exists, so "Compare safety code" is offered. */
+  /** The 12 digits row only: a contact whose code can be compared exists, so "Compare the 12 digits" is offered. */
   readonly compare?: boolean | undefined;
-  /** The safety code row only: the first such contact, whose panel the link opens at its code. */
+  /** The 12 digits row only: the first such contact, whose panel the link opens at its code. */
   readonly compareRef?: string | undefined;
   /** Connect only: the open agent's AI app (plain text), or null. */
   readonly appName?: string | null | undefined;

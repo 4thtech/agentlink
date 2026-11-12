@@ -207,7 +207,7 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
       try {
         emit(copy('cli.doctor.keysFound'));
 
-        // M1-9z (IR-M1-9z-1 F2): a leftover owner code change; `owner change-code` finishes it.
+        // M1-9z (IR-M1-9z-1 F2): a leftover master code change; `owner change-code` finishes it.
         if (deps.unfinishedOwnerCodeChange !== undefined) {
           if (await deps.unfinishedOwnerCodeChange().catch(() => false)) {
             emit(TEXT.doctorOwnerCodeUnfinished, true);

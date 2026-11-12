@@ -5,19 +5,20 @@
 // name under the ui name rule (formatContactName), always as React text; the short fingerprint only
 // as that rule's fallback. No presence for contacts (X-11).
 //
-// The safety code: on a paired contact that is not yet checked, the page shows the 12 digits with a
+// The 12 digits: on a paired contact that is not yet checked, the page shows the 12 digits with a
 // gentle nudge and three choices. "They match" asks for owner presence and posts the code it showed;
 // the server signs `contact.check` (it signs only if that is still the code). "They don't match"
 // signs nothing by itself (04 §3.6.1): it explains and offers Remove. "Skip" keeps the contact
 // Self-declared.
 //
-// Rename and Remove ask for owner presence (the passkey, or the owner code). Every change is one POST
-// to a presence route; the page never signs (owner.ts).
+// Rename and Remove ask for owner presence (the passkey, or the master code). Every change is one POST
+// to a presence route; the page never signs (owner.ts). UX1112 WP-12 (F-2; D-72): Block (after a
+// short explanation) and Unblock sit in the same menu and ask for presence the same way.
 //
 // W4-PEOPLE-INVITE (prototype v23 A4, A5, A7): "Invite someone" opens the Invite screen in place
 // (`?invite` too); open invites are PendingInviteRow rows that say so once cancelled; Rename, Check
-// safety code and Remove sit in the person ⋯ menu; and when an open invite is answered (or a pasted
-// one connects), the new contact arrives with the Connected moment and its safety code.
+// Contact check and Remove sit in the person ⋯ menu; and when an open invite is answered (or a pasted
+// one connects), the new contact arrives with the Connected moment and its Contact check.
 import {
   Banner,
   Button,
@@ -121,7 +122,7 @@ type ListState =
 
 /** One owner operation waiting for presence. */
 interface Pending {
-  readonly what: 'check' | 'rename' | 'remove';
+  readonly what: 'check' | 'rename' | 'remove' | 'block' | 'unblock';
   readonly ref: string;
   readonly input?: unknown;
   readonly summary: string;
@@ -245,6 +246,12 @@ function ContactList({
             <span className="al-contact-main">
               <span className="al-contact-name">
                 <ContactName {...nameInput(c)} label={labelKind(c)} showLabel />
+                {c.formerName === undefined ? null : (
+                  <span className="al-text-caption al-muted ct-former">
+                    {' '}
+                    <bdi>{S.wasName(c.formerName)}</bdi>
+                  </span>
+                )}
               </span>
               {dupes.has(shownName(c).trim().toLowerCase()) ? (
                 <span className="al-text-caption al-muted ct-same-name">{S.sameName}</span>
@@ -362,6 +369,7 @@ function Detail({
   const [alias, setAlias] = useState('');
   const [aliasError, setAliasError] = useState<string | undefined>(undefined);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
   // PRE-031-FIXES: "Remove older" goes through the same confirm step as Remove.
   const [confirmOlder, setConfirmOlder] = useState(false);
   const dupNoticeId = useId();
@@ -406,6 +414,8 @@ function Detail({
               setAlias('');
               setNotice(S.renamed);
             }
+            if (pending.what === 'block') setNotice(S.blockedNow);
+            if (pending.what === 'unblock') setNotice(S.unblocked);
             onChanged(pending.what);
             return;
           }
@@ -468,6 +478,7 @@ function Detail({
     pending !== undefined ||
     renaming ||
     confirmRemove ||
+    confirmBlock ||
     confirmOlder ? null : (
       <Surface level={3} className="ct-dup">
         <Banner tone="info" icon="users">
@@ -566,7 +577,7 @@ function Detail({
         <h2 className="al-text-title-2">
           <ContactName {...nameInput(contact)} label={labelKind(contact)} showLabel />
         </h2>
-        {pending === undefined && !renaming && !confirmRemove && !confirmOlder ? (
+        {pending === undefined && !renaming && !confirmRemove && !confirmBlock && !confirmOlder ? (
           <PersonMenu
             name={name}
             onRename={() => setRenaming(true)}
@@ -578,6 +589,17 @@ function Detail({
                     setCodeTick((n) => n + 1);
                   },
                 }
+              : {})}
+            {...(contact.status === 'active'
+              ? {
+                  onBlock: () => {
+                    setNotice(undefined);
+                    setConfirmBlock(true);
+                  },
+                }
+              : {})}
+            {...(contact.status === 'blocked'
+              ? { onUnblock: () => ask({ what: 'unblock', ref, summary: SUMMARY.unblock(name) }) }
               : {})}
             {...(contact.status === 'revoked' ? {} : { onRemove: () => setConfirmRemove(true) })}
           />
@@ -621,6 +643,25 @@ function Detail({
             </Button>
           </div>
         </form>
+      ) : null}
+      {confirmBlock && pending === undefined ? (
+        <div className="ct-confirm">
+          <p className="al-text-body">{S.blockExplain}</p>
+          <div className="ct-actions">
+            <Button
+              variant="danger"
+              onClick={() => {
+                setConfirmBlock(false);
+                ask({ what: 'block', ref, summary: SUMMARY.block(name) });
+              }}
+            >
+              {S.blockContact}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmBlock(false)}>
+              {S.cancel}
+            </Button>
+          </div>
+        </div>
       ) : null}
       {(confirmRemove || (confirmOlder && older !== undefined)) && pending === undefined ? (
         <div className="ct-confirm">
@@ -806,7 +847,7 @@ export function ContactsPage({
   const [removed, setRemoved] = useState(false);
   const [kept, setKept] = useState(loadKept);
   const [sheetOpen, setSheetOpen] = useState(false);
-  // W5-SAFETY-STEP: Home's "Compare safety code" link (`?check=<ref>`) opens that contact's panel.
+  // W5-SAFETY-STEP: Home's "Compare the 12 digits" link (`?check=<ref>`) opens that contact's panel.
   const wantsCheck = useRef(peekCheckRef());
   const [rows, setRows] = useState<readonly OpenInvite[]>([]);
   const [highlight, setHighlight] = useState<string | undefined>(undefined);
@@ -885,7 +926,7 @@ export function ContactsPage({
         }
         setList({ phase: 'ok', contacts: answer.contacts });
         // W5-INVITE-FEEDBACK: the contact that connected (or connected again) gets a short pulse;
-        // after a re-pair the safety code check starts over, so the page says so.
+        // after a re-pair the Contact check starts over, so the page says so.
         const prior = lastRead.current;
         lastRead.current = {
           contacts: answer.contacts,
@@ -1120,6 +1161,8 @@ export function ContactsPage({
       <div className="inv-connected-card">
         <OwnMoment
           name={shownName(arrived)}
+          selfDeclared={arrived.nameSource !== 'owner'}
+          owner={owner}
           contactRef={arrived.ref}
           api={api}
           headingLevel={2}

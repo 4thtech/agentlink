@@ -150,7 +150,7 @@ export async function readRow(
 }
 
 /**
- * Right before the owner code prompt (04 §2.5.2 step 4): the requests that are still live and
+ * Right before the master code prompt (04 §2.5.2 step 4): the requests that are still live and
  * unchanged since they were shown. Everything else is dropped, and the caller tells the owner.
  */
 export async function stillPending(

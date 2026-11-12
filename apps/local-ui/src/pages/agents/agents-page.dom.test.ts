@@ -272,7 +272,7 @@ describe('Rename', () => {
     await click(button(rowOf('work'), 'Rename with Touch ID'));
     expect(plain(host)).toContain('Rename Work to Home');
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your backup code'));
+    await click(button(host, 'Confirm with your master code'));
     const post = calls.find((c) => c.url === '/api/ui/agents/label')!;
     expect(post.body).toBe('123456');
     expect(post.headers.get('X-AgentLink-Input')).toBeTruthy();
@@ -284,8 +284,9 @@ describe('Rename', () => {
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
     await click(button(rowOf('work'), 'Rename with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your backup code'));
-    expect(plain(host)).toContain('Not renamed yet. Try again.');
+    await click(button(host, 'Confirm with your master code'));
+    // WP-1: a 501 (the rename that updates the card was not offered) says what to do, not "Try again".
+    expect(plain(host)).toContain('Quit the AgentLink app and open it again');
     expect(rowOf('work')).toBeTruthy();
   });
 });
@@ -311,7 +312,7 @@ describe('label check and removal states', () => {
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your backup code'));
+    await click(button(host, 'Confirm with your master code'));
     expect(host.querySelector('[role="dialog"]')).toBeNull();
   });
 });
@@ -326,7 +327,7 @@ describe('Remove', () => {
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your backup code'));
+    await click(button(host, 'Confirm with your master code'));
   };
   it('names what goes and keeps the button off until the exact label is typed', async () => {
     const sheet = await open('work');
@@ -336,7 +337,7 @@ describe('Remove', () => {
     expect(plain(sheet)).toContain('Your 1 contact will be told Work is retired.');
     expect(plain(sheet)).toContain("This can't be undone.");
     expect(plain(sheet)).toContain('ID folder: work');
-    expect(button(sheet, 'Export history first')).toBeDefined();
+    expect(button(sheet, 'Save recovery kit first')).toBeDefined();
     expect(button(sheet, 'Remove with Touch ID')!.disabled).toBe(true);
     const field = sheet.querySelector<HTMLInputElement>('input[type="text"]')!;
     await type(field, 'work');
@@ -487,6 +488,31 @@ describe('Remove', () => {
     expect(host.querySelector('[role="dialog"]')).toBeNull();
     expect(plain(host)).toContain('Work was removed.');
   });
+  it('the carried removal note is shown once: a second mount within 5 s does not show it again', async () => {
+    answers['POST /api/ui/agents/remove'] = { status: 200, body: { status: 'done' } };
+    const sheet = await open('work');
+    await confirmTyped(sheet);
+    expect(plain(host)).toContain('Work was removed.');
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await mountPage();
+    expect(plain(host)).toContain('Work was removed.');
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await mountPage();
+    expect(plain(host)).not.toContain('Work was removed.');
+  });
+  it('Save recovery kit first on an ID that is not open asks before switching; Cancel keeps the sheet', async () => {
+    const sheet = await open('work');
+    await click(button(sheet, 'Save recovery kit first'));
+    expect(plain(sheet)).toContain('Open Work to save its recovery kit?');
+    expect(button(sheet, 'Open')).toBeDefined();
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    await click(button(sheet, 'Cancel'));
+    expect(plain(sheet)).not.toContain('Open Work to save its recovery kit?');
+    expect(host.querySelector('[role="dialog"]')).toBe(sheet);
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+  });
 });
 
 const backupCode = (): HTMLInputElement =>
@@ -526,7 +552,7 @@ describe('Add', () => {
   };
   // W4-WIRE-2 (Decision 52 (2)): New agent is Get started's add mode (`/start/app?add=agent`, its
   // own "Name your agent" step); the quick Add sheet is retired. The one-gesture gate keeps its
-  // contract: begin, then the backup code finishes with only the nonce.
+  // contract: begin, then the master code finishes with only the nonce.
   async function mountGate(onDone = vi.fn()): Promise<Mock> {
     await act(async () => {
       root.render(
@@ -550,16 +576,16 @@ describe('Add', () => {
       'Add with Touch ID',
     );
   });
-  it('the gate: begin, then the backup code finishes with only the nonce', async () => {
+  it('the gate: begin, then the master code finishes with only the nonce', async () => {
     answers['POST /api/ui/agents/begin'] = READY;
     answers['POST /api/ui/agents'] = {
       status: 200,
       body: { status: 'done', name: 'second-agent', label: 'Second agent' },
     };
     const onDone = await mountGate();
-    await click(button(host, 'Use a backup code instead'));
+    await click(button(host, 'Use your master code instead'));
     await type(backupCode(), '123456');
-    await click(button(host, 'Confirm with my backup code'));
+    await click(button(host, 'Confirm with my master code'));
     await settle();
     const begin = calls.find((c) => c.url === '/api/ui/agents/begin' && c.method === 'POST');
     const finish = calls.find((c) => c.url === '/api/ui/agents' && c.method === 'POST');
@@ -571,9 +597,9 @@ describe('Add', () => {
   it('a refused begin says why and creates nothing', async () => {
     answers['POST /api/ui/agents/begin'] = { status: 409, body: { status: 'busy' } };
     const onDone = await mountGate();
-    await click(button(host, 'Use a backup code instead'));
+    await click(button(host, 'Use your master code instead'));
     await type(backupCode(), '123456');
-    await click(button(host, 'Confirm with my backup code'));
+    await click(button(host, 'Confirm with my master code'));
     await settle();
     expect(calls.some((c) => c.url === '/api/ui/agents' && c.method === 'POST')).toBe(false);
     expect(plain(host)).toContain('Another setup or approval is running.');
@@ -603,10 +629,10 @@ describe('W8-S4: finish removing, and one "Not used" line', () => {
     const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
     expect(unisolated(sheet)).toContain('Finish removing Old test');
     expect(sheet.querySelector('input[type="text"]')).toBeNull();
-    expect(button(sheet, 'Export history first')).toBeDefined();
+    expect(button(sheet, 'Save recovery kit first')).toBeDefined();
     await click(button(sheet, 'Finish with Touch ID'));
     await type(host.querySelector<HTMLInputElement>('input[name="owner-code"]')!, '123456');
-    await click(button(host, 'Confirm with your backup code'));
+    await click(button(host, 'Confirm with your master code'));
     const post = calls.find((c) => c.url === '/api/ui/agents/remove')!;
     const sent = JSON.parse(
       atob(post.headers.get('X-AgentLink-Input')!.replace(/-/g, '+').replace(/_/g, '/')),

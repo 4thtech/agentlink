@@ -20,7 +20,6 @@ export const SETTINGS_STRINGS = {
     credits: (balance: string): string => `${balance} in credits`,
     left: (n: number): string => `about ${String(n)} ${n === 1 ? 'proof' : 'proofs'}`,
   },
-  notifications: { title: 'Notifications', line: 'Not yet' },
   advanced: {
     title: 'Advanced',
     line: 'Activity log, network, relays, long invite links',

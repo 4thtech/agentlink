@@ -7,7 +7,7 @@
 //   CSRF meta;
 // - builtApp(): the built app (`pnpm build`), as the CLI embeds it, for the Chromium tests;
 // - switchToPasskey(): the owner registers the localhost passkey in the app's first-run page with
-//   the backup code once and one gesture (M1-UX-FIRSTRUN-V2-c), the one place the app offers it.
+//   the master code once and one gesture (M1-UX-FIRSTRUN-V2-c), the one place the app offers it.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,13 +58,13 @@ export const USE_PASSKEY = /^Use (Touch ID|Windows Hello|a passkey)$/;
 export const SWITCH_TO_PASSKEY = /^Switch to (Touch ID|Windows Hello|a passkey)$/;
 
 /**
- * The owner switches to a passkey in the app: the first-run page, the backup code once, one
+ * The owner switches to a passkey in the app: the first-run page, the master code once, one
  * gesture. Resolves when the page says the passkey is on.
  */
 export async function switchToPasskey(page: Page, origin: string, code: string): Promise<void> {
   await page.goto(`${origin}/first-run`);
   await page.getByRole('heading', { level: 1, name: SWITCH_TO_PASSKEY }).waitFor();
-  await page.getByLabel('Backup code').fill(code);
+  await page.getByLabel('Master code').fill(code);
   await page.getByRole('button', { name: USE_PASSKEY }).click();
   await page.getByRole('heading', { level: 1, name: /is on$/ }).waitFor();
 }

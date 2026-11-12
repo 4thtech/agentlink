@@ -247,7 +247,7 @@ describe('Toast', () => {
 
 describe('TextField', () => {
   it('connects the label, the input and the hint, and passes paste-friendly props through', () => {
-    mount(h(ui.TextField, { label: 'Owner code', hint: 'Paste it', autoComplete: 'off' }));
+    mount(h(ui.TextField, { label: 'Master code', hint: 'Paste it', autoComplete: 'off' }));
     const input = q<HTMLInputElement>('input');
     expect(host.querySelector(`label[for="${input.id}"]`)).not.toBeNull();
     expect(input.getAttribute('aria-describedby')).not.toBeNull();

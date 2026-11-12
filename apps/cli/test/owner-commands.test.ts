@@ -367,7 +367,7 @@ describe('an agent without a terminal can never approve (04 §2.5, 06 §8; UX gu
     });
   }
 
-  it('never takes the owner code from an argument or the environment', async () => {
+  it('never takes the master code from an argument or the environment', async () => {
     const w = await world();
     const r = await w.request();
     expect(await w.run(['approve', r.approvalId, '--code', 'ABCD-EFGH'])).toBe(2);
@@ -493,7 +493,7 @@ describe('approve <id> and deny <id> (06 §2.5 step 3, D-73 (3))', () => {
     expect(w.codeEntries).toEqual([]);
   });
 
-  it('asks for the owner code again at every run: one entry, one owner operation', async () => {
+  it('asks for the master code again at every run: one entry, one owner operation', async () => {
     const w = await world();
     const a = await w.request();
     const b = await w.request();
@@ -503,7 +503,7 @@ describe('approve <id> and deny <id> (06 §2.5 step 3, D-73 (3))', () => {
   });
 });
 
-describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2.5.2)', () => {
+describe('approve with no ID: one agent list, one master code entry (D-68, 04 §2.5.2)', () => {
   it('three requests approved with one entry; each proceeds exactly once', async () => {
     const w = await world();
     const rs = [await w.freeRequest(), await w.freeRequest(), await w.freeRequest()];
@@ -660,7 +660,7 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
   });
 });
 
-describe('the owner code prompt says where the code goes (M1-9zd; 11 §5.5, §6.10)', () => {
+describe('the master code prompt says where the code goes (M1-9zd; 11 §5.5, §6.10)', () => {
   /** Records the output lines printed so far each time an owner step would prompt for the code. */
   function atPrompt(w: World): string[][] {
     const seen: string[][] = [];
@@ -699,7 +699,7 @@ describe('the owner code prompt says where the code goes (M1-9zd; 11 §5.5, §6.
     expect(w.out).not.toContain(OWNER_TEXT.codeHint);
   });
 
-  it('a wrong owner code: nothing is decided, and the reminder says to type only the code', async () => {
+  it('a wrong master code: nothing is decided, and the reminder says to type only the code', async () => {
     const w = await world();
     const r = await w.request();
     w.deps.decide = () => Promise.reject(new KeyStoreError('presence_rejected', 'presence'));

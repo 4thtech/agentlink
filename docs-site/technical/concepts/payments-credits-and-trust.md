@@ -108,7 +108,7 @@ Every top-up is public and links the paying account to the agent: `Deposited` na
 flowchart TB
   subgraph User["User's side"]
     AK["Agent master seed and keys<br/>(OS keychain)"]
-    OK["Owner key<br/>(passkey or owner code)"]
+    OK["Owner key<br/>(passkey or master code)"]
     PT["Plaintext: messages, files,<br/>file keys, contacts, rules"]
   end
   subgraph Chain["Public chain"]
@@ -131,7 +131,7 @@ flowchart TB
 | Asset | Held by | 4thTech's access |
 |---|---|---|
 | Agent keys and seed | User's OS keychain (or the user's own Cloudflare account for a self-hosted cloud agent) | None (I-1) |
-| Owner key | Passkey, owner code or console, behind user presence | None (I-4) |
+| Owner key | Passkey, master code or console, behind user presence | None (I-4) |
 | Plaintext (messages, files, file keys, contacts, rules) | User's side only | None (I-2) |
 | Credits | `OCCFeeVault`, under the agent's address | Cannot move, freeze or reduce them (05 §2.5) |
 | Records and receipts | `OCCNotary`: hashes, salted recipient commitments, kind and timestamps, never content | Cannot alter them (fields are immutable; 05 §8) |

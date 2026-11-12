@@ -5,8 +5,8 @@
 //
 // A small, strict JSON Schema subset: exactly the keywords registry.ts uses (type, properties,
 // required, additionalProperties: false, enum, const, pattern, minLength and maxLength in code
-// points, minimum, maximum, minItems, maxItems, items, anyOf). Any other keyword fails closed, so a
-// registry change that uses one cannot be silently ignored. Handlers still apply the core's own
+// points, minimum, maximum, minItems, maxItems, items, anyOf; `description` is only an annotation).
+// Any other keyword fails closed, so a registry change that uses one cannot be silently ignored. Handlers still apply the core's own
 // schemas (for example `TermsInput`) on top.
 import type { JsonSchema } from './registry.js';
 
@@ -26,6 +26,7 @@ const KNOWN = new Set([
   'maxItems',
   'items',
   'anyOf',
+  'description', // annotation only (WP-6): fixed text, never checked against a value
 ]);
 
 const isObject = (value: unknown): value is Record<string, unknown> =>

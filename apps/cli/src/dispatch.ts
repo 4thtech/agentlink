@@ -7,14 +7,14 @@
 //   The `agentlink mcp` process itself never passes it, because its stdin and stdout are the MCP
 //   pipe. But any shell the agent controls can pass it (a pseudo-terminal such as `script`, with the
 //   markers removed from the environment), so nothing may rely on it. What stops the agent is the
-//   owner-presence step each owner handler takes (the owner code at the prompt, M1-9b) and the
+//   owner-presence step each owner handler takes (the master code at the prompt, M1-9b) and the
 //   owner signature core verifies (I-4); the D-67 residual (an agent that fakes the prompt and
 //   learns the code) is accepted for M1.
 // - `--agent` is checked against the local agent-name pattern (06 §6); an approval ID against its
 //   exact pattern (04 §2.4.1).
 // - Nothing the caller typed is ever echoed: usage errors and refusals are fixed text (I-5), and
 //   values a handler prints go through the terminal output rule (src/terminal/sanitize.ts, 06 §8).
-// - M1-9zd: an argument shaped like a generated owner code (04 §2.8 kind 1) stops every command
+// - M1-9zd: an argument shaped like a generated master code (04 §2.8 kind 1) stops every command
 //   before anything else runs, with fixed text that never echoes it. A UX guard, like the others:
 //   the code is already in the shell's history, so the text says how to change it.
 //
@@ -104,12 +104,14 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   {
     name: 'owner',
     usage: [
-      'agentlink owner init                     †',
-      'agentlink owner add-agent --id <name>   †',
+      'agentlink owner init [--label <name>]    †',
+      'agentlink owner add-agent --id <name> [--label <name>]   †',
       'agentlink owner change-code              †',
     ],
     guard: 'owner',
-    options: AGENT,
+    // WP-1 (R-3): `--label` is the name the first card and the first label carry (default: the
+    // folder name), so contacts and the app show one name.
+    options: { ...AGENT, label: { type: 'string' } },
   },
   {
     name: 'status',
@@ -272,10 +274,10 @@ export const DISPATCH_TEXT = Object.freeze({
   // M1-9zd (11 §5.5, §6.10): fixed text; nothing of what was typed is repeated.
   get ownerCodeInCommand(): string {
     return [
-      "Problem  That looks like your owner code, so AgentLink didn't run anything.",
-      '         Type your owner code only at the prompt a command shows. It is never',
+      "Problem  That looks like your master code, so AgentLink didn't run anything.",
+      '         Type your master code only at the prompt a command shows. It is never',
       '         part of a command, and never paste it into a chat. Your shell may have',
-      '         kept what you typed in its history, so change your owner code:',
+      '         kept what you typed in its history, so change your master code:',
       `         ${commandPrefix()} owner change-code`,
     ].join('\n');
   },

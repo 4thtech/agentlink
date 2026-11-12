@@ -49,7 +49,7 @@ export const INVITE_TEXT = Object.freeze({
   acceptedOffline:
     "Invite accepted, but the message network can't be reached right now. AgentLink keeps the answer ready and sends it when the network is back.",
   acceptedNextStep:
-    "Tell the user they will be connected when the other person answers; nothing else is needed now. Checking the contact's safety code arrives in a later version; until then the name is self-declared.",
+    'Tell the user they will be connected when the other person answers; nothing else is needed now. The owner can do the Contact check with the contact under People in the AgentLink app; until then the name is self-declared.',
 });
 
 /** The core's `apr_` ID: the schema and the exact character pattern (04 §2.4.1). */

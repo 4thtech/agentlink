@@ -65,6 +65,10 @@ export type OwnerActionRefusal =
   | 'label_invalid'
   // W4-PAUSE (D-143 (5)): an `agent.resume` for an agent that is not paused
   | 'not_paused'
+  // UX1112 WP-12 (F-2): a `contact.block` for a blocked contact, a `contact.unblock` for one that
+  // is not blocked
+  | 'already_blocked'
+  | 'not_blocked'
   | 'pairing_unavailable'
   | 'credential_missing'
   | 'credential_mismatch'
@@ -311,6 +315,8 @@ export function verifyOwnerAction(
     case 'policy.set':
     case 'contact.rename':
     case 'contact.remove':
+    case 'contact.block':
+    case 'contact.unblock':
     case 'storage.set':
     case 'storage.remove':
     case 'backup.export':
@@ -327,7 +333,8 @@ export function verifyOwnerAction(
       // agent.label (U3-d): the restricted-label rule and the store record are the store side's;
       // app.connect and app.disconnect (U3-f): the recomputed changeId is the owner surface's.
       // Their rules need the store (cancel: an approved row; policy.set: the version above, already
-      // checked; contact.rename and contact.remove: a stored contact, M1-9za; storage.set: the
+      // checked; contact.rename, contact.remove, contact.block and contact.unblock: a stored
+      // contact, M1-9za, WP-12; storage.set: the
       // KeyStore item `s3:<id>` and its digest, storage.remove: the active row, backup.export: none,
       // M1-9i-a; credits.deposit and credits.withdraw: the top-up chain, the amount and the
       // recipient, M1-11c-a4c, proofs/credits-move.ts; agent.revoke: none) and are applied by the

@@ -1,6 +1,6 @@
 // `agentlink owner init` † (M1-9b; 04 §2.2, §2.8 "owner init rules"; 06 §7; 07 §9.3; D-67, D-68 (3)).
 //
-// Creates the owner key on this machine with a generated owner code (@4thtech-io/node `initOwner`,
+// Creates the owner key on this machine with a generated master code (@4thtech-io/node `initOwner`,
 // M1-8c): the code is shown once at this process's own terminal, re-typed and cleared; the owner
 // seed is stored only wrapped under it, never in plain text (04 §2.2, G-5). It never replaces an
 // existing owner key, nor an owner the agent's card already names. No argument, environment variable
@@ -17,13 +17,39 @@
 import type { OwnerPublicKeys } from '@4thtech-io/crypto';
 import { decodeHex0x } from '@4thtech-io/crypto';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../../dispatch.js';
-import { isAgentName } from '../../runtime/agent-name.js';
+import { isRestrictedAlias } from '@4thtech-io/core';
+import type { OwnerSetupOptions } from '@4thtech-io/node';
+import { isAgentLabel, isAgentName } from '../../runtime/agent-name.js';
 import { badArguments, openOne, ownerStep } from './common.js';
 import type { OwnerCommandDeps } from './deps.js';
 import { OWNER_TEXT } from './strings.js';
 
+/** What signs and applies the first label (node's FirstLabelActions). */
+type FirstLabelActions = NonNullable<OwnerSetupOptions['firstCard']['firstLabel']>['actions'];
+
+/**
+ * WP-1 (R-3; D-141): the first label of a terminal-made ID: `--label`, else the folder name. The
+ * card is named by it and the same owner entry signs it as `agent.label` (node signFirstParts), so
+ * what contacts see and what the app shows start out as one name. Undefined: a `--label` the label
+ * rule refuses (06 §6, 06 §2.1); nothing runs then.
+ */
+function firstLabelOf(
+  context: CommandContext,
+  folder: string,
+  actions: FirstLabelActions,
+): { readonly label: string; readonly actions: FirstLabelActions } | undefined {
+  const given = context.parsed.values['label'];
+  const label = typeof given === 'string' ? given.normalize('NFC') : folder;
+  if (!isAgentLabel(label) || !isRestrictedAlias(label)) return undefined;
+  return { label, actions };
+}
+
 async function initOne(deps: OwnerCommandDeps, context: CommandContext): Promise<number> {
   const { output, parsed, terminal } = context;
+  if (!labelGiven(context)) {
+    output.printError(OWNER_TEXT.labelInvalid);
+    return EXIT_FAILED;
+  }
   const backend = await deps.backendOf(parsed.agent);
   if (backend === undefined) {
     output.printError(OWNER_TEXT.ownerUnknownAgent);
@@ -43,7 +69,7 @@ async function initOne(deps: OwnerCommandDeps, context: CommandContext): Promise
         ownerEnc: decodeHex0x(view.card.ownerEnc),
       };
     }
-    await deps.initOwner({
+    const result = await deps.initOwner({
       backend,
       ...(cardOwner === undefined ? {} : { cardOwner }),
       // Read for AI-app markers only (04 §2.8), never for a secret.
@@ -57,12 +83,46 @@ async function initOne(deps: OwnerCommandDeps, context: CommandContext): Promise
         // M1-36b-2 (D-121 D6): the first rules (the empty ~/AgentLink/Send folder), signed by node
         // in this same owner-code entry; node checks what core prepares before it signs.
         firstPolicy: { actions: agent.client.ownerActions },
+        // WP-1 (R-3): the card and the label carry one name.
+        ...withLabel(context, agent.name, agent.client.ownerActions),
       },
     });
+    await labelSaved(deps, agent.name, result.label, result.labelName);
   } finally {
     await agent.close();
   }
   return EXIT_OK;
+}
+
+/** False for a `--label` the label rule refuses (checked before anything is opened). */
+function labelGiven(context: CommandContext): boolean {
+  const given = context.parsed.values['label'];
+  if (given === undefined) return true;
+  return firstLabelOf(context, 'x', NO_ACTIONS) !== undefined;
+}
+const NO_ACTIONS: FirstLabelActions = {
+  prepareLabel: () => Promise.reject(new Error('unused')),
+  apply: () => Promise.reject(new Error('unused')),
+};
+
+function withLabel(
+  context: CommandContext,
+  folder: string,
+  actions: FirstLabelActions,
+): { firstLabel?: { readonly label: string; readonly actions: FirstLabelActions } } {
+  const firstLabel = firstLabelOf(context, folder, actions);
+  return firstLabel === undefined ? {} : { firstLabel };
+}
+
+/** 07 §9.1: config.json's label (display only), once core applied the signed one. */
+async function labelSaved(
+  deps: OwnerCommandDeps,
+  folder: string,
+  saved: unknown,
+  label: string | undefined,
+): Promise<void> {
+  if (saved !== 'saved' || label === undefined || deps.writeLabel === undefined) return;
+  await deps.writeLabel(folder, label).catch(() => undefined);
 }
 
 /** The owner keys a card names. */
@@ -137,6 +197,10 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
   const { output, parsed, terminal } = context;
   const name = parsed.agent;
   if (name === undefined) return badArguments(output);
+  if (!labelGiven(context)) {
+    output.printError(OWNER_TEXT.labelInvalid);
+    return EXIT_FAILED;
+  }
   const backend = await deps.backendOf(name);
   if (backend === undefined) {
     output.printError(OWNER_TEXT.addAgentUnknown);
@@ -167,11 +231,13 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
   }
   const again = await openOne(deps, output, name);
   if (!again.ok) return again.exit;
+  let added: Awaited<ReturnType<OwnerCommandDeps['addAgent']>>;
+  const firstLabel = withLabel(context, again.agent.name, again.agent.client.ownerActions);
   try {
-    await deps.addAgent({
+    added = await deps.addAgent({
       backend,
       // M1-9x: no other agent names an owner, so node takes the owner keys from the owner item
-      // itself (after the owner code), or refuses with `owner init` when there is none.
+      // itself (after the master code), or refuses with `owner init` when there is none.
       ...(found.status === 'one' ? { owner: found.owner } : {}),
       // Read for AI-app markers only (04 §2.8), never for a secret.
       env: terminal.env,
@@ -182,8 +248,11 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
         identity: again.agent.client.identity,
         // M1-36b-2 (D-121 D6): the first rules, signed in this same owner-code entry.
         firstPolicy: { actions: again.agent.client.ownerActions },
+        // WP-1 (R-3): the card and the label carry one name.
+        ...firstLabel,
       },
     });
+    await labelSaved(deps, again.agent.name, added.label, firstLabel.firstLabel?.label);
   } finally {
     await again.agent.close();
   }
@@ -192,8 +261,8 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
 }
 
 /**
- * `agentlink owner change-code` † (M1-9z; 04 §2.8 "Changing the owner code"): replaces an exposed
- * owner code. The owner the machine's agents name is handed to node as the expected owner, so the
+ * `agentlink owner change-code` † (M1-9z; 04 §2.8 "Changing the master code"): replaces an exposed
+ * master code. The owner the machine's agents name is handed to node as the expected owner, so the
  * owner item must unlock to exactly that owner; node asks for the current code, shows the new one
  * and re-wraps the owner key. The owner, its fingerprint and every card stay the same.
  */

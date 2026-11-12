@@ -1,4 +1,4 @@
-// M1-9z (04 §2.8 "Changing the owner code"; 07 §9.3): `agentlink owner change-code` †. The command
+// M1-9z (04 §2.8 "Changing the master code"; 07 §9.3): `agentlink owner change-code` †. The command
 // runs under the owner-terminal guard, finds the owner this computer's agents name (so node can check
 // the owner item unlocks to exactly that owner) and hands the owner step to @4thtech-io/node, whose
 // TTY prompt reads the current code and shows the new one (node's owner-change-code.test.ts runs the
@@ -132,7 +132,7 @@ describe('agentlink owner change-code (M1-9z)', () => {
   });
 
   it('shows node’s refusal and exits 1', async () => {
-    const refusal = "The owner code wasn't accepted three times. Nothing was changed.";
+    const refusal = "The master code wasn't accepted three times. Nothing was changed.";
     const m = machine({ default: OWNER }, () =>
       Promise.reject(new NodeKeyStoreError('owner_secret_refused', refusal)),
     );

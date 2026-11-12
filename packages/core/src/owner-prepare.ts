@@ -23,9 +23,11 @@ import {
   type AgentLabelParams,
   type AgentResumeParams,
   type AppChangeParams,
+  type BackupExportParams,
   type FileSaveParams,
   type ContactCheckParams,
   type ContactRule,
+  type ContactBlockParams,
   type ContactRemoveParams,
   type ContactRenameParams,
   type OwnerAction,
@@ -47,17 +49,23 @@ export type PreparableOp =
   | 'contact.check'
   | 'contact.rename'
   | 'contact.remove'
+  | 'contact.block'
+  | 'contact.unblock'
   | 'agent.label'
   | 'app.connect'
   | 'app.disconnect'
   | 'agent.resume'
-  | 'file.save';
+  | 'file.save'
+  | 'backup.export';
 
 const PREPARABLE: readonly string[] = [
   'policy.set',
   'contact.check',
   'contact.rename',
   'contact.remove',
+  // UX1112 WP-12 (F-2): the owner blocks or unblocks a contact from the local app (People).
+  'contact.block',
+  'contact.unblock',
   // U3-d (D-138): the owner names this agent from the local app.
   'agent.label',
   // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
@@ -67,6 +75,8 @@ const PREPARABLE: readonly string[] = [
   'agent.resume',
   // W4-FILES-SAVE: the owner saves one received file into the Inbox folder from the local app.
   'file.save',
+  // WP-11 (D-117 A): the owner saves a recovery kit from the local app (04 §2.3.3).
+  'backup.export',
 ];
 
 interface ParamsOf {
@@ -74,11 +84,14 @@ interface ParamsOf {
   readonly 'contact.check': ContactCheckParams;
   readonly 'contact.rename': ContactRenameParams;
   readonly 'contact.remove': ContactRemoveParams;
+  readonly 'contact.block': ContactBlockParams;
+  readonly 'contact.unblock': ContactBlockParams;
   readonly 'agent.label': AgentLabelParams;
   readonly 'app.connect': AppChangeParams;
   readonly 'app.disconnect': AppChangeParams;
   readonly 'agent.resume': AgentResumeParams;
   readonly 'file.save': FileSaveParams;
+  readonly 'backup.export': BackupExportParams;
 }
 
 export interface OwnerActionBodyInput<O extends PreparableOp = PreparableOp> {
@@ -159,8 +172,14 @@ export type PrepareRefusal =
   | 'change_invalid'
   /** W4-PAUSE: Resume for an agent that is not paused (refused before the gesture). */
   | 'not_paused'
+  /** WP-12: Block for a contact that is already blocked (refused before the gesture). */
+  | 'already_blocked'
+  /** WP-12: Unblock for a contact that is not blocked (refused before the gesture). */
+  | 'not_blocked'
   /** W4-FILES-SAVE: not a received item ID `<envelope ID>.<index>` (index 00 to 15). */
-  | 'item_invalid';
+  | 'item_invalid'
+  /** WP-11: `backup.export` params that are not a 16-byte base64url kitId and full/identity. */
+  | 'params_invalid';
 
 export type PreparedOwnerAction =
   | {

@@ -317,6 +317,8 @@ export {
   mcpAppId,
   mcpPidValid,
   mcpSessionLive,
+  mcpVersionOutdated,
+  mcpVersionValid,
   type McpSessionOptions,
 } from './mcp-session.js';
 // M1-7k-b: the per-agent publisher lease (07 §3.2 `publisher_lease`; 06 §6).

@@ -4,6 +4,7 @@
 import { APPROVAL_TOOL_NAMES, MCP_TOOL_NAMES } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { PENDING_M1A_TOOLS, TOOLS } from './registry.js';
+import { matchesSchema } from './input.js';
 
 /** 06 §2.0, the M1a rows: [readOnly, destructive, idempotent, openWorld]. */
 const M1A_TABLE: Readonly<Record<string, readonly [boolean, boolean, boolean, boolean]>> = {
@@ -50,6 +51,32 @@ const NAME_EXCEPTIONS: readonly string[] = ['agentlink_export_proof_pack'];
 describe('tool surface (06 §2.0, D-53)', () => {
   it('matches the committed snapshot', () => {
     expect(TOOLS).toMatchSnapshot();
+  });
+
+  it('C-1: the recipient arguments tell the AI it can use the name the user says', () => {
+    for (const [tool, arg] of [
+      ['agentlink_send', 'to'],
+      ['agentlink_propose_terms', 'to'],
+      ['agentlink_inbox', 'contact'],
+    ] as const) {
+      const props = TOOLS.find((t) => t.name === tool)!.inputSchema['properties'] as Record<
+        string,
+        { description?: string }
+      >;
+      const text = props[arg]!.description ?? '';
+      expect(text).toContain('send Natasa a message');
+      expect(text).toContain('agentlink_list_contacts');
+      expect(text).toContain('more than one');
+      expect(text).toContain('never guess');
+    }
+  });
+
+  it('C-1: a `to` argument with a description still rejects a too-long value and an extra key', () => {
+    const send = TOOLS.find((t) => t.name === 'agentlink_send')!;
+    const max = (send.inputSchema['properties'] as { to: { maxLength: number } }).to.maxLength;
+    expect(matchesSchema(send.inputSchema, { to: 'a'.repeat(max), text: 'hi' })).toBe(true);
+    expect(matchesSchema(send.inputSchema, { to: 'a'.repeat(max + 1), text: 'hi' })).toBe(false);
+    expect(matchesSchema(send.inputSchema, { to: 'Natasa', text: 'hi', extra: 1 })).toBe(false);
   });
 
   it('registers exactly the nine M1a tools and the six M1b tools', () => {

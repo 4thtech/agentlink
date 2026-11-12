@@ -198,6 +198,27 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
     expect(first?.home).toBeUndefined();
   });
 
+  it('WP-1 (R-3): --label names the card and signs the label in the same entry', async () => {
+    const m = await machine(['alice', 'bob']);
+    expect(await m.run(['owner', 'add-agent', '--agent', 'bob', '--label', 'Work Mac'])).toBe(0);
+    const card = m.calls[0]?.card;
+    expect(card?.name).toBe('bob');
+    expect(card?.firstLabel?.label).toBe('Work Mac');
+    expect(typeof card?.firstLabel?.actions.prepareLabel).toBe('function');
+  });
+
+  it('WP-1 (R-3): without --label the folder name is card and label alike', async () => {
+    const m = await machine(['alice', 'bob']);
+    expect(await m.run(['owner', 'add-agent', '--agent', 'bob'])).toBe(0);
+    expect(m.calls[0]?.card.firstLabel?.label).toBe('bob');
+  });
+
+  it('WP-1 (R-3): a --label the label rule refuses runs nothing', async () => {
+    const m = await machine(['alice', 'bob']);
+    expect(await m.run(['owner', 'add-agent', '--agent', 'bob', '--label', ' '])).not.toBe(0);
+    expect(m.calls).toHaveLength(0);
+  });
+
   it('needs --agent: without it nothing runs', async () => {
     const m = await machine(['alice', 'bob']);
     expect(await m.run(['owner', 'add-agent'])).toBe(2);
@@ -219,7 +240,7 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
   });
 
   // M1-9x: no agent names an owner (for example after every carded agent was removed). The command
-  // hands node no owner keys; node takes them from the owner item itself after the owner code, or
+  // hands node no owner keys; node takes them from the owner item itself after the master code, or
   // refuses with `owner init` when there is no owner item (node's owner-recovery.test.ts).
   it('with no agent naming an owner, hands node no owner keys so it reads them from the owner item', async () => {
     const m = await machine(['alice', 'bob'], false);

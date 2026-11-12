@@ -2,18 +2,50 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cliPrefix, GLOBAL_PREFIX, NPX_PREFIX } from './cli-prefix.js';
+import { cliPrefix, GLOBAL_PREFIX, LAUNCHER_MARKER, NPX_PREFIX } from './cli-prefix.js';
 
 describe('cliPrefix (M1-36a)', () => {
-  // The runner itself may be started by `npx`/`pnpm exec`, which sets npm_command=exec.
+  // The runner itself may be started by `npx`/`pnpm exec`, which sets npm_command=exec, or by the
+  // installers' launcher, which sets the WP-2 marker.
   let savedCommand: string | undefined;
+  let savedMarker: string | undefined;
   beforeEach(() => {
     savedCommand = process.env['npm_command'];
+    savedMarker = process.env['AGENTLINK_LAUNCHER'];
     delete process.env['npm_command'];
+    delete process.env['AGENTLINK_LAUNCHER'];
   });
   afterEach(() => {
     if (savedCommand === undefined) delete process.env['npm_command'];
     else process.env['npm_command'] = savedCommand;
+    if (savedMarker === undefined) delete process.env['AGENTLINK_LAUNCHER'];
+    else process.env['AGENTLINK_LAUNCHER'] = savedMarker;
+  });
+
+  // WP-2 (D4): the installers' launcher (installer/install.sh, install.ps1) runs npx, but it put the
+  // bare `agentlink` on the user's PATH, so that is the command to name.
+  describe('started by the installers launcher (WP-2, D4)', () => {
+    it('the marker gives the bare name, even though npx ran the program', () => {
+      expect(LAUNCHER_MARKER).toBe('AGENTLINK_LAUNCHER');
+      process.env['AGENTLINK_LAUNCHER'] = 'installer';
+      process.env['npm_command'] = 'exec';
+      expect(
+        cliPrefix({
+          script: '/Users/a/.npm/_npx/abc/node_modules/@4thtech-io/agentlink/dist/bin.js',
+          onPath: () => false,
+        }),
+      ).toBe(GLOBAL_PREFIX);
+      expect(cliPrefix({ onPath: () => false })).toBe(GLOBAL_PREFIX);
+    });
+
+    it.each(['', '1', 'Installer', 'installer ', 'npx'])(
+      'any other marker value (%j) changes nothing',
+      (value) => {
+        process.env['AGENTLINK_LAUNCHER'] = value;
+        process.env['npm_command'] = 'exec';
+        expect(cliPrefix({ script: '/x/_npx/1/bin.js', onPath: () => true })).toBe(NPX_PREFIX);
+      },
+    );
   });
 
   it('a global install found on PATH gives the bare name', () => {

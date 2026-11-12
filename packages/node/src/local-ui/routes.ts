@@ -35,8 +35,6 @@ import { agentsRemoveRoutes } from './api/agents-remove.js';
 import { agentsPauseRoutes } from './api/agents-pause.js';
 import { appsRoutes } from './api/apps.js';
 import { flowRoutes } from './api/flow.js';
-import { advancedRoutes } from './api/advanced.js';
-import { approvalsRoutes } from './api/approvals.js';
 import { backupRoutes } from './api/backup.js';
 import { contactsRoutes } from './api/contacts.js';
 import { filesRoutes } from './api/files.js';
@@ -54,12 +52,13 @@ import { pulseRoute } from './api/messages-pulse.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
-import { storageRoutes } from './api/storage.js';
 import {
   AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
   AGENTS_RESUME_PATH,
   AGENTS_SWITCH_PATH,
+  BACKUP_EXPORT_PATH,
+  BACKUP_PATH,
   CREATE_AGENT_PATHS,
   UI_SETTINGS_WRITE_PATH,
   type LocalUiRoute,
@@ -83,6 +82,8 @@ import {
 import { joinRoutes } from './api/join.js';
 
 export {
+  BACKUP_EXPORT_PATH,
+  BACKUP_PATH,
   AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
   AGENTS_RESUME_PATH,
@@ -163,13 +164,24 @@ export class LocalUiRouteRegistry {
   /** Adds a route, or throws when it breaks a rule above (nothing is added then). */
   register(route: LocalUiRoute): void {
     if (typeof route !== 'object' || route === null) throw invalid('malformed');
-    const { method, presence, handler, step, stub } = route as unknown as {
+    const { method, presence, handler, step, stub, recoveryKit } = route as unknown as {
       method: unknown;
       presence: unknown;
       handler: unknown;
       step: unknown;
       stub: unknown;
+      recoveryKit: unknown;
     };
+    // WP-11: only the one export route unlocks the owner store for a recovery kit.
+    if (
+      recoveryKit !== undefined &&
+      (recoveryKit !== true ||
+        presence !== true ||
+        method !== 'POST' ||
+        route.path !== BACKUP_EXPORT_PATH)
+    ) {
+      throw invalid('only the recovery-kit export route can export');
+    }
     // U3-c: only an owner route (POST, presence) can be a stub; the flag is `true` or absent.
     if (stub !== undefined && (stub !== true || presence !== true || method !== 'POST')) {
       throw invalid('only a POST owner route can be a stub');
@@ -334,7 +346,6 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     firstRunRoutes,
     // M1-11s-a-d: the status bar's health read.
     healthRoutes,
-    approvalsRoutes,
     activityRoutes,
     // UX2-f1: the activity pulse, before the Messages routes so `pulse` never reaches :contactId.
     [pulseRoute],
@@ -348,12 +359,10 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     filesIoRoutes,
     // MSG-FILES-IO-h: Show in Finder (the one reveal route, D-134).
     [filesRevealRoute],
-    storageRoutes,
     proofsRoutes,
     rulesRoutes,
     payConfirmRoutes,
     backupRoutes,
-    advancedRoutes,
     // U3-c: every U3 route of 08 §1. The switch kind and the Agents list are live; the rest are
     // stubs answering `not_available` until their cards (U3-d, U3-e, U3-f, U3-flow) fill them.
     agentsRoutes,

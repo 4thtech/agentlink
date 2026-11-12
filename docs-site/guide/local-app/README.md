@@ -43,7 +43,7 @@ Old links from earlier versions still work.
 - [Proofs and credits](proofs-and-credits.md): your proofs and your credits.
 - [Confirming paid actions](confirm-paid-actions.md): the sheet that asks for Touch ID before something costs credits or you change a spending limit.
 - [Files](files.md): files you receive and send, including [automatic saving](files.md).
-- [First run and your backup code](first-run.md): what the first Touch ID protects, and the backup code.
+- [First run and your master code](first-run.md): what the first Touch ID protects, and the master code.
 
 ## Not in the app yet
 
@@ -51,4 +51,4 @@ Old links from earlier versions still work.
 - The **Backup & Touch ID** and **Notifications** pages in Settings say plainly that they are not available yet.
 - Adding real credits is not available yet. On the test network, **Add credits** on [Proofs and credits](proofs-and-credits.md) shows a QR code. See [Credits](../everyday-use/credits.md).
 
-Looking at a page changes nothing. Any change asks for Touch ID (or your backup code) first.
+Looking at a page changes nothing. Any change asks for Touch ID (or your master code) first.

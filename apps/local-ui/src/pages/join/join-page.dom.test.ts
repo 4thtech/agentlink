@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // U3-invite (b11 §33.2): "Accept {name}'s invite?" and its states. The inviter is text only; the
 // accept is bound to the shown inviteId; Touch ID cancelled keeps the card; "Not now" forgets it;
-// the safety code is never shown before the pairing completed; first run ends here when an invite
+// the 12 digits are never shown before the pairing completed; first run ends here when an invite
 // waits.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -96,7 +96,7 @@ const click = async (label: string): Promise<void> => {
 };
 const PASSKEY = () => Promise.resolve({ credentialId: 'c', prfSalt: 's' });
 
-/** This app's contacts and the safety code, for the Connected moment. */
+/** This app's contacts and the 12 digits, for the Connected moment. */
 function contactsApi(): ApiClient & { paths: string[] } {
   const paths: string[] = [];
   const answer = (path: string): unknown =>
@@ -133,7 +133,7 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
     const { api } = fakeApi(['waiting']);
     await render({ api, passkey: PASSKEY });
     expect(host.querySelector('h1')?.textContent).toBe('Marko invites you to connect your AIs');
-    expect(text()).toContain("Check it's Marko: 7F3A·19C2");
+    expect(text()).toContain('Invite from Marko');
     expect(text()).toContain('Name set by the sender');
     expect(text()).toContain(
       'Your AI and Marko can then send each other messages and files. Encrypted end to end. You approve anything that matters.',
@@ -171,7 +171,7 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
     await click('Accept with Touch ID');
     expect(calls.accepted).toEqual([{ id: INVITE.inviteId, proof }]);
     expect(host.querySelector('h1')?.textContent).toBe('Waiting for Marko to answer.');
-    expect(text()).not.toMatch(/safety code with Marko$/);
+    expect(text()).not.toMatch(/Contact check with Marko$/);
   });
 
   it('Touch ID cancelled: "Not accepted yet. Try again." and the card stays; nothing sent', async () => {
@@ -183,10 +183,10 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
     expect(host.querySelector('h1')?.textContent).toBe('Marko invites you to connect your AIs');
   });
 
-  it('no passkey: the backup code prompt', async () => {
+  it('no passkey: the master code prompt', async () => {
     const { api } = fakeApi(['waiting']);
     await render({ api, passkey: () => Promise.resolve(undefined) });
-    await click('Accept with your backup code');
+    await click('Accept with your master code');
     expect(host.querySelector('input[type="password"]')).not.toBeNull();
   });
 
@@ -243,7 +243,7 @@ describe('the other states (b11 §33.2)', () => {
     );
   });
 
-  it('connected: the Connected moment with the 12-digit safety code, then Done goes Home', async () => {
+  it('connected: the Connected moment with the 12-digit Contact check, then Done goes Home', async () => {
     const { api } = fakeApi(['connected']);
     const contacts = contactsApi();
     const go = vi.fn();
@@ -251,8 +251,11 @@ describe('the other states (b11 §33.2)', () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
-    expect(host.querySelector('h1')?.textContent).toBe('You and Marko are connected');
+    expect(host.querySelector('h1')?.textContent).toBe('You are connected');
     // The code of exactly the contact the server named: no lookup by fingerprint in the list.
+    expect(contacts.paths).toEqual([]);
+    expect(text()).not.toContain('4821');
+    await click("Optional: make sure it's really your new contact. Contact check →");
     expect(contacts.paths).toEqual([`/api/ui/contacts/${MARKO_REF}/safety-code`]);
     expect(text()).toContain('4821');
     await click('Done');

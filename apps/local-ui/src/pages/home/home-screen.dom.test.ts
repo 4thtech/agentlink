@@ -3,7 +3,7 @@
 // §9 items 1–4): Home at `/`. Simple: the approval card on top (+N more), Invite someone, People
 // with the last activity; a row opens in place to the conversation (both ways, Sent / Waiting to send
 // / Not delivered, Copy, earlier messages), the files (received and sent, Show in Finder / Explorer
-// / folder by OS, Save to Inbox until auto-save lands) and the ⋯ menu (Rename, Check safety code,
+// / folder by OS, Save to Inbox until auto-save lands) and the ⋯ menu (Rename, Contact check,
 // Remove: the existing presence routes). Pro (Under the hood on): the same route as a dense table
 // (person, handled by, last message, delivery, proofs, files), search and the agent filter, message
 // details (ID, exact time, size, agent, receipt, proof), contact facts, approval ID/kind/expiry and
@@ -412,7 +412,7 @@ describe('Home simple (A4)', () => {
     expect(byText('button', fmtCount(S.hideMore, 1))).toBeTruthy();
   });
 
-  it('the ⋯ menu offers Rename, Check safety code and Remove; Remove asks first, then presence', async () => {
+  it('the ⋯ menu offers Rename, Contact check and Remove; Remove asks first, then presence', async () => {
     await render(base());
     await click(row('Ana'));
     await click(all('button').find((b) => b.getAttribute('aria-label') === 'More for Ana'));
@@ -423,7 +423,7 @@ describe('Home simple (A4)', () => {
     expect(confirm?.textContent).toContain('Remove Ana?');
     await click(byText('[role="alertdialog"] button', S.remove));
     // The presence step of Contacts: nothing is sent before the owner confirms.
-    expect(host.textContent).toMatch(/backup code/i);
+    expect(host.textContent).toMatch(/master code/i);
   });
 
   it('lists invites that wait to be accepted, never the link, with Cancel', async () => {
@@ -528,7 +528,7 @@ describe('W6-FLOW-FIXES: a connection the other side removed', () => {
     expect(row('Ana')?.textContent).not.toContain('removed this connection');
   });
 
-  it('the conversation says sending is over; no "send it again", no safety code to check', async () => {
+  it('the conversation says sending is over; no "send it again", no Contact check to check', async () => {
     await render(revoked());
     await click(row('Denis'));
     expect(host.textContent).toContain(fmtName(S.connectionRemovedBody, 'Denis'));

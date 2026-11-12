@@ -705,7 +705,7 @@ describe.runIf(POSIX)('agent ≠ owner (04 §2.8 "Passphrase strength")', () => 
     expect(codeOf(error)).toBe('keystore_passphrase_refused');
   });
 
-  it('refuses a passphrase change to the owner code', async () => {
+  it('refuses a passphrase change to the master code', async () => {
     const agentId = await createWithPassphrase();
     const ownerCode = await plantOwner();
     const error = await rejection(

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// F49 (owner feedback, Windows): the backup code can be pasted, seen and kept.
+// F49 (owner feedback, Windows): the master code can be pasted, seen and kept.
 // - normaliseBackupCode follows the server's rule (packages/crypto secret-code.ts) and never
 //   changes a valid code, nor anything that is not a code's shape (a chosen passphrase).
 // - BackupCodeField: Show/Hide, paste is never blocked.
@@ -92,7 +92,7 @@ describe('BackupCodeField and copy', () => {
   function Harness(): ReactElement {
     const [v, setV] = useState('');
     seen = v;
-    return createElement(BackupCodeField, { label: 'Backup code', value: v, onValue: setV });
+    return createElement(BackupCodeField, { label: 'Master code', value: v, onValue: setV });
   }
 
   it('Show/Hide toggles the field between masked and visible; paste is not blocked', async () => {
@@ -118,6 +118,38 @@ describe('BackupCodeField and copy', () => {
     });
     expect(seen).toBe('ABCDEFGH IJKL MNOP QRST UVWX');
     expect(input.value).toBe('ABCDEFGH IJKL MNOP QRST UVWX');
+  });
+
+  // F49 low (IR 11-03): the cleanup is for what a copy adds, so a passphrase typed key by key with a
+  // no-break space (Option+Space) or a typed dash is sent exactly as typed, even in a code's shape.
+  async function input(value: string, inputType: string): Promise<void> {
+    const el = host.querySelector('input')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(el, value);
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType }));
+    });
+  }
+
+  it('typed key by key: never changed, even when it has a code shape', async () => {
+    await act(async () => root.render(createElement(Harness)));
+    const typed = 'ABCD\u00a0EFGH\u2013IJKL MNOP QRST UVWX';
+    await input(typed, 'insertText');
+    expect(seen).toBe(typed);
+    await input(`${typed}\u00a0`, 'insertText');
+    expect(seen).toBe(`${typed}\u00a0`);
+    await input(typed, 'deleteContentBackward');
+    expect(seen).toBe(typed);
+  });
+
+  it('pasted, dropped or filled in one piece: the separators a copy adds are removed', async () => {
+    await act(async () => root.render(createElement(Harness)));
+    await input('ABCD\u00a0EFGH\u2013IJKL\tMNOP QRST UVWX', 'insertFromPaste');
+    expect(seen).toBe('ABCDEFGHIJKLMNOP QRST UVWX');
+    await input('ABCD\u200bEFGH IJKL MNOP QRST UVWX', 'insertFromDrop');
+    expect(seen).toBe('ABCDEFGH IJKL MNOP QRST UVWX');
+    // A pasted passphrase (not a code's shape) is sent as pasted.
+    await input('my own\u00a0passphrase\u2013here', 'insertFromPaste');
+    expect(seen).toBe('my own\u00a0passphrase\u2013here');
   });
 
   it('copy uses the clipboard API when it works', async () => {

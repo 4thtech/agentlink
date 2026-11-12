@@ -12,6 +12,12 @@ const c = (cx: string, cy: string, r: string): Shape => ['circle', { cx, cy, r }
 export const SHELL_ICONS = {
   home: [p('m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'), p('M9 22V12h6v10')],
   agents: [c('12', '8', '4'), p('M4 21a8 8 0 0 1 16 0')],
+  people: [
+    c('9', '7', '4'),
+    p('M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2'),
+    p('M16 3.13a4 4 0 0 1 0 7.75'),
+    p('M21 21v-2a4 4 0 0 0-3-3.85'),
+  ],
   activity: [p('M22 12h-4l-3 9L9 3l-3 9H2')],
   settings: [
     p(

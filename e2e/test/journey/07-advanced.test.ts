@@ -59,10 +59,12 @@ describe('chapter 7: advanced', () => {
       'Appearance',
       'Rules for approvals',
       'Proofs & credits',
-      'Notifications',
     ]) {
       expect(list).toContain(row);
     }
+    // WP-7: no Notifications row, and the old address lands on Settings.
+    expect(list).not.toContain('Notifications');
+    expect(await page.locator('a[href="/settings/notifications"]').count()).toBe(0);
     await page.locator('button.st-row[aria-expanded]').click();
     await page.getByText('Activity log', { exact: true }).waitFor();
     expect(await text(page)).toContain('Long invite links');
@@ -133,6 +135,10 @@ describe('chapter 7: advanced', () => {
     await expectFadesOnly(page);
     expect((await layoutShiftScore(page)) - shiftedBefore).toBeLessThanOrEqual(CLS_BUDGET);
     await probe.check();
+    // WP-7: the old Notifications address lands on Settings (a fresh load, so after the probe).
+    await page.goto(new URL('/settings/notifications', page.url()).href);
+    await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
+    expect(new URL(page.url()).pathname).toBe('/settings');
   }, 240_000);
 
   // W4-WIRE-3 (owner walkthrough 30 Oct): on a phone (375 px) every section is one tap from the

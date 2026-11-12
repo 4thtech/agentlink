@@ -573,7 +573,7 @@ describe('status (06 §2.0, D-73)', () => {
 });
 
 describe('doctor (07 §9.4)', () => {
-  it('names an unfinished owner code change and points to owner change-code (M1-9z)', async () => {
+  it('names an unfinished master code change and points to owner change-code (M1-9z)', async () => {
     const yes = await harness(fakeAgent(), {
       unfinishedOwnerCodeChange: () => Promise.resolve(true),
     }).run(['doctor']);

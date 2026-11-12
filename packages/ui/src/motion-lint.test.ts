@@ -208,7 +208,6 @@ describe('motion lint on the real stylesheets', () => {
       'packages/ui/src/components/components.css',
       'packages/ui/src/tokens/tokens.css',
       'apps/local-ui/src/pages/files/files.css',
-      'apps/local-ui/src/pages/messages/messages.css',
       'apps/local-ui/src/pages/contacts/contacts.css',
     ]) {
       expect(Object.keys(sheets), f).toContain(f);

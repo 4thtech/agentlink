@@ -70,6 +70,7 @@ import type { Conversation as Person, MessagesApi, Problem } from '../messages/a
 import { createSaveApi, type SaveApi } from '../inbox/save-api.js';
 import { Conversation, exactTime, useThread } from './conversation.js';
 import { HomeApprovals } from './home-approvals.js';
+import { RenameBanner } from './rename-banner.js';
 import {
   createPeopleApi,
   MAX_SUMMARIES,
@@ -700,6 +701,12 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
           {unfinished.map((row) => (
             <UnfinishedRemoval key={row.name} row={row} onFinish={setFinishing} />
           ))}
+          {/* WP-1: an ID whose card still carries an older name: repaired here, one gesture. */}
+          <RenameBanner
+            api={clients.agents}
+            owner={clients.owner}
+            row={liveIds.rows.find((r) => r.current && !r.removing)}
+          />
           <HomeApprovals
             items={approvals}
             owner={owner}

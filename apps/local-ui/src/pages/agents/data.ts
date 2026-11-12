@@ -33,6 +33,11 @@ export interface AppLive {
   readonly lastSeenAt?: number;
   /** The earlier read form (a plain id), which never carries a last seen time. */
   readonly legacy?: true;
+  /**
+   * WP-13 (F-4 / F45): a live session of this app runs an older AgentLink than the app ("Restart
+   * {app} to use the new version"). Only while the app is live.
+   */
+  readonly outdated?: true;
 }
 
 export interface AgentRow {
@@ -108,6 +113,7 @@ function appLiveOf(a: unknown, fallback: AppState): AppLive[] {
   if (state === null) return [];
   const since = seconds(a['since']);
   const lastSeenAt = seconds(a['lastSeenAt']);
+  const live = state === 'working' || state === 'ready' || state === 'idle';
   return [
     {
       id: a['app'],
@@ -115,6 +121,7 @@ function appLiveOf(a: unknown, fallback: AppState): AppLive[] {
       state: state as AppState,
       ...(since === undefined ? {} : { since }),
       ...(lastSeenAt === undefined ? {} : { lastSeenAt }),
+      ...(live && a['outdated'] === true ? { outdated: true as const } : {}),
     },
   ];
 }
@@ -259,7 +266,8 @@ function liveApps(row: AgentRow): AppLive[] {
 /**
  * The agent's one line (08 §1): "Working in {app}", "Ready in {app}" ("and {n} more"), "Idle",
  * "Offline · last seen {time}" ("Connected · restart {app} to start" when an app is set up but has
- * never run it, else "Offline"), "Paused"; "Removal not finished".
+ * never run it, else "Offline"), "Paused"; "Removal not finished". WP-13: "Restart {app} to use the
+ * new version" while a live AI app runs an older AgentLink (before Working and Connected).
  */
 export function agentLine(row: AgentRow, now: number): string {
   if (row.removing) return S.removalNotFinished;
@@ -267,6 +275,11 @@ export function agentLine(row: AgentRow, now: number): string {
   if (state === 'paused') return W.paused;
   const live = liveApps(row);
   const [first] = live;
+  // WP-13 (F45): an AI app still runs the older AgentLink after an update: say what to do.
+  const outdated = live.find((a) => a.outdated === true);
+  if (outdated !== undefined && (state === 'working' || state === 'ready' || state === 'idle')) {
+    return W.restartToUpdate(outdated.name);
+  }
   if (state === 'working' && first !== undefined) return W.workingIn(first.name);
   if (state === 'ready' && first !== undefined) {
     return live.length > 1 ? W.readyInMore(first.name, live.length - 1) : W.readyIn(first.name);
@@ -287,6 +300,7 @@ export function agentLine(row: AgentRow, now: number): string {
 
 /** One AI app's word: "Working", "Ready", "Idle", "Not running · last seen {time}", "Not set up". */
 export function appWord(app: AppLive, now: number): string {
+  if (app.outdated === true) return W.restartApp;
   switch (app.state) {
     case 'working':
       return W.working;

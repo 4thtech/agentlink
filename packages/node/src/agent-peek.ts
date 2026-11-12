@@ -5,7 +5,8 @@
 // W4-LIVE-STATUS (D-143; 06 §6 "MCP session heartbeat" "Read"; 04 §2.5 "Live status and Pause"):
 // Running and the live sessions come from the `mcp_sessions` rows that are live (now < beat_until <=
 // now + 90, the row names this store's agent, the pid passes pid-alive.ts: an integer in 2..2^31-1
-// that answers signal 0). The publisher lease no longer decides Running (the host never reads or
+// that answers signal 0); WP-13 (F45) adds each live row's `version` when valid (store schema 13). The
+// publisher lease no longer decides Running (the host never reads or
 // takes it here). `mcp_last_seen` gives "last seen" per AI app. Only the app id (an id of the 06 §7
 // table, else `other`) and times leave this file: never a pid, a session ID or a holder ID (I-7).
 //
@@ -21,7 +22,7 @@
 // The caller passes the store path from the checked agent folder (agent-dir.ts readAgentConfig:
 // realpath, no links, regular files).
 import Database from 'better-sqlite3';
-import { mcpAppId, mcpSessionLive } from '@4thtech-io/core';
+import { mcpAppId, mcpSessionLive, mcpVersionValid } from '@4thtech-io/core';
 import { pidAlive as defaultPidAlive } from './pid-alive.js';
 
 /** One live MCP session as the app may know it: the app id and times only. */
@@ -32,6 +33,12 @@ export interface AgentLiveSession {
   readonly startedAt: number;
   /** Unix seconds of the last tool call start or end; null before the first. */
   readonly lastToolAt: number | null;
+  /**
+   * WP-13 (F45; 07 §3.2): the AgentLink version the process runs, when its row carries a valid one;
+   * absent for a row from before store schema version 13 (or a forged value). Used only to compute
+   * the `outdated` flag (live-status.ts); the version text never leaves the app host.
+   */
+  readonly version?: string;
 }
 
 /** When an AI app id last ran this agent (`mcp_last_seen`). */
@@ -132,20 +139,27 @@ function readLive(
   const agentId = typeof identity?.id === 'string' && identity.id !== '' ? identity.id : undefined;
   const sessions: AgentLiveSession[] = [];
   if (agentId !== undefined) {
+    // WP-13: a store from before schema version 13 has no `version` column (its rows read as none).
+    const versioned = db
+      .prepare("SELECT count(*) AS n FROM pragma_table_info('mcp_sessions') WHERE name = 'version'")
+      .get() as { n?: unknown } | undefined;
     const rows = db
       .prepare(
-        'SELECT app, agent_id, pid, started_at, beat_until, last_tool_at FROM mcp_sessions ' +
-          `ORDER BY rowid LIMIT ${String(MAX_SESSIONS)}`,
+        'SELECT app, agent_id, pid, started_at, beat_until, last_tool_at' +
+          (versioned?.n === 1 ? ', version' : '') +
+          ` FROM mcp_sessions ORDER BY rowid LIMIT ${String(MAX_SESSIONS)}`,
       )
       .all() as Record<string, unknown>[];
     for (const row of rows) {
       if (!mcpSessionLive(row, now, agentId, alive)) continue;
       const tool = row['last_tool_at'];
+      const version = row['version'];
       sessions.push(
         Object.freeze({
           app: mcpAppId(row['app']),
           startedAt: row['started_at'] as number,
           lastToolAt: isTime(tool) ? tool : null,
+          ...(mcpVersionValid(version) ? { version } : {}),
         }),
       );
     }

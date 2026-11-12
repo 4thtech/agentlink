@@ -36,9 +36,6 @@ export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   '/settings/appearance': part(
     async () => (await import('../pages/appearance/index.js')).AppearancePage,
   ),
-  '/settings/notifications': part(
-    async () => (await import('../pages/notifications/index.js')).NotificationsPage,
-  ),
   '/settings/rules': rules,
   '/settings/proofs': proofs,
   // Advanced (Under the hood).

@@ -3,7 +3,7 @@
 // Parity with the former server-rendered approval page (removed in M1-11b-2c): the
 // same endpoints, headers and bodies, the same words, the same rules. A paid request is never a list
 // item: its card has its own Approve, which opens the confirmation sheet (proof flow, "Remember for
-// this contact" when offered, the backup code with the server's three tries). Review together leaves
+// this contact" when offered, the master code with the server's three tries). Review together leaves
 // out paid and terms items and what is no longer waiting. `/approve/<id>` renders inside the shell.
 // Every value from the server is text only (I-5).
 import { act, createElement } from 'react';
@@ -271,7 +271,7 @@ describe('a request that costs credits (M1-PAY-CONFIRM-b parity)', () => {
     expect(decodeInput(begins[1])).toEqual({ flow: 'proof', approvalId: id('C'), remember: true });
   });
 
-  it('the backup code: the body, no presence header; a wrong one, then the third try ends it', async () => {
+  it('the master code: the body, no presence header; a wrong one, then the third try ends it', async () => {
     const srv = await mount({
       [LIST]: [ok({ approvals: [item('C', { paid: true })] })],
       [BEGIN]: [ok(PROOF_READY)],
@@ -335,7 +335,7 @@ describe('a request that costs credits (M1-PAY-CONFIRM-b parity)', () => {
 });
 
 describe('review together (04 §2.5.2): batch rules', () => {
-  it('checks again, leaves out paid, terms and changed items, then one owner code signs exactly those', async () => {
+  it('checks again, leaves out paid, terms and changed items, then one master code signs exactly those', async () => {
     const A = item('A');
     const B = item('B');
     const srv = await mount({
@@ -401,7 +401,7 @@ describe('review together (04 §2.5.2): batch rules', () => {
 });
 
 describe('one request: its own Approve or Deny, then presence', () => {
-  it('Approve, then the owner code: the decide route with the digest; "Approved."', async () => {
+  it('Approve, then the master code: the decide route with the digest; "Approved."', async () => {
     const srv = await mount({
       [LIST]: [ok({ approvals: [item('D', { commitment: true })] })],
       [`/api/approvals/${id('D')}/approve`]: [ok({ status: 'applied', decision: 'approve' })],

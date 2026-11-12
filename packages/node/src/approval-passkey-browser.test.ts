@@ -2,7 +2,7 @@
 // registers a PRF passkey and approves with it, in Chromium with a CDP virtual authenticator
 // (WebAuthn PRF, user verification, resident keys; no hardware). M1-11b-2c: the server-rendered
 // page is gone, so this runs the built local app (apps/local-ui, the CLI's bundle): the passkey is
-// registered on its first-run page with the backup code once, then approves in Approvals.
+// registered on its first-run page with the master code once, then approves in Approvals.
 //
 // CI installs Chromium for Playwright and builds the app (ci.yml), so there the test always runs
 // and a browser that cannot start, or a missing build, fails it. Locally, without the Playwright
@@ -93,7 +93,7 @@ beforeAll(async () => {
     write: (text) => void written.push(text),
     readSecret: () =>
       Promise.resolve(
-        encodeUtf8((written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(-4)),
+        encodeUtf8((written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(-4)),
       ),
     confirm: () => Promise.resolve(true),
     clearScreen: () => undefined,
@@ -104,8 +104,8 @@ beforeAll(async () => {
     { backend: 'keychain', env: {} },
     { kdf: KDF },
   ));
-  code = (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-    'Your owner code: '.length,
+  code = (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+    'Your master code: '.length,
   );
   const executablePath = process.env['AGENTLINK_TEST_CHROMIUM'];
   try {
@@ -320,19 +320,19 @@ describe('the localhost app with a PRF passkey (M1-8e, M1-31; Chromium)', () => 
     await page.context().close();
   }, 120_000);
 
-  it('a PRF-less authenticator registers nothing; the owner code still approves', async (ctx) => {
+  it('a PRF-less authenticator registers nothing; the master code still approves', async (ctx) => {
     needBrowser(() => ctx.skip());
     const { server, source, sessionUrl } = await start();
     const { page } = await pageWithAuthenticator(false);
 
     await page.goto(sessionUrl);
     await page.goto(`${server.origin}/first-run`);
-    await page.getByLabel('Backup code').fill(code);
+    await page.getByLabel('Master code').fill(code);
     await page.getByRole('button', { name: USE_PASSKEY }).click();
     // F49: in the browser the copy would suggest (Chrome on Linux) it says so plainly instead.
     await page
       .getByText(
-        /This passkey can't protect approvals here\.|can't protect approvals yet, so AgentLink uses your backup code/,
+        /This passkey can't protect approvals here\.|can't protect approvals yet, so AgentLink uses your master code/,
       )
       .waitFor();
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).toBeNull();
@@ -367,7 +367,7 @@ describe('the localhost app with a PRF passkey (M1-8e, M1-31; Chromium)', () => 
           nonce: 'n'.repeat(22),
           params: { contact: req.params['id'] ?? '' },
         };
-        const [result] = await ownerOp.sign({ lines: ['Mark the safety code as checked'] }, [
+        const [result] = await ownerOp.sign({ lines: ['Mark the 12 digits as checked'] }, [
           { kind: 'owner-action', action },
         ]);
         if (result?.kind !== 'owner-action') throw new Error('unreachable');

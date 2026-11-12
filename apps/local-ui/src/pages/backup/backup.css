@@ -16,3 +16,27 @@
   gap: var(--al-space-3);
   padding: var(--al-space-5);
 }
+/* WP-11: Save recovery kit, and the recovery code shown once. */
+.bk-export {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.bk-export p {
+  margin: 0;
+}
+.bk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+.bk-file {
+  overflow-wrap: anywhere;
+}
+.bk-code {
+  user-select: all;
+}
+.bk-error {
+  color: var(--al-color-status-danger-fg);
+}

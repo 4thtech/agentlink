@@ -3,20 +3,25 @@
 //
 // - The link is made at once (a short link on the encrypted drop; the server falls back to a long
 //   one when the drop is down, and the panel says so in plain words). It exists only as the text of
-//   the link box and, Under the hood, as the QR code's drawing: never in an attribute, the title,
-//   the address, a log or an error. Everything goes to this same-origin server only.
+//   the link box, as the text of Email's `mailto:` address and, Under the hood, as the QR code's
+//   drawing: never the title, the address, a log or an error. Everything goes to this same-origin
+//   server only; a `mailto:` link is opened by the computer's mail app, not by us.
 // - The optional name is only for your list (the invite's local label). A name added before the
 //   link went anywhere makes a fresh link with that name and cancels the unnamed one; once the link
 //   was copied, emailed, shared or shown as a QR code, the name is fixed.
 // - A link that never left the screen is cancelled when the panel goes, so a visit leaves no
 //   pending row behind.
-// - Copy (✓ moment), Email (the mail app, with our share text), Share (only where the browser has a
-//   share sheet for text).
+// - Copy (✓ moment), Email (a real `mailto:` link with our share text; a click does not count as
+//   sent, since nothing tells us a mail app opened), Copy invite message (the whole share text, the
+//   dependable way when there is no mail app), Share (only where the browser has a share sheet).
 // - Under the hood: the invite's facts, a long link instead (D-139 fallback, nothing stored on the
 //   service) and the QR code.
 import { Button, InlineError, SkeletonLine, useHood } from '@4thtech-io/ui';
 import { useCallback, useEffect, useId, useRef, useState, type ReactElement } from 'react';
+import { createAgentsApi, type AgentsApi } from '../agents/api.js';
+import { InviteNameGate } from '../agents/name-update.js';
 import { createInviteApi, type CreatedInvite, type InviteApi } from '../contacts/invite-api.js';
+import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import { QrCode } from '../proofs/qr.js';
 import { CheckMark, CopyMark, MailIcon, ShareIcon } from './icons.js';
 import { INVITE_STRINGS as S, linkLabel, mailtoOf, worksFor } from './strings.js';
@@ -30,10 +35,11 @@ const MAX_NAME = 32;
 export interface InvitePanelProps {
   /** For tests; the page's own same-origin clients by default. */
   readonly invites?: InviteApi;
-  /** Opens the mail app with a `mailto:` address. Default: the browser's location. */
-  readonly openMail?: (url: string) => void;
   /** A link was made (the pending list can read again). */
   readonly onCreated?: () => void;
+  /** WP-1: the IDs and owner clients of the name update asked before an invite (tests). */
+  readonly agents?: AgentsApi;
+  readonly owner?: OwnerClient;
   readonly now?: () => number;
 }
 
@@ -64,21 +70,30 @@ function isAbort(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as Error).name === 'AbortError';
 }
 
-function defaultMail(url: string): void {
-  window.location.assign(url);
-}
-
 /** RFC 3339 to the minute, UTC: the exact expiry Under the hood. */
 const exact = (ms: number): string =>
   `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
 export function InvitePanel({
   invites: givenInvites,
-  openMail = defaultMail,
   onCreated,
   now = () => Date.now(),
+  agents: givenAgents,
+  owner: givenOwner,
 }: InvitePanelProps): ReactElement {
   const [invites] = useState<InviteApi>(() => givenInvites ?? createInviteApi());
+  const [agents] = useState<AgentsApi>(() => givenAgents ?? createAgentsApi());
+  const [owner] = useState<OwnerClient>(() => givenOwner ?? createOwnerClient());
+  // WP-1 (R-2; D-141): the card still carries an older name: ask for the update before a link.
+  const [nameGate, setNameGate] = useState<
+    | {
+        readonly cardName: string;
+        readonly label: string;
+        readonly name: string;
+        readonly long: boolean;
+      }
+    | undefined
+  >(undefined);
   const hood = useHood();
   const nameId = useId();
   const hintId = `${nameId}-hint`;
@@ -89,6 +104,7 @@ export function InvitePanel({
   const [error, setError] = useState<string | undefined>(undefined);
   const [shared, setShared] = useState(false);
   const [copied, setCopied] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [copiedMessage, setCopiedMessage] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [shareFailed, setShareFailed] = useState(false);
   const [qr, setQr] = useState(false);
   const [announce, setAnnounce] = useState('');
@@ -96,24 +112,34 @@ export function InvitePanel({
   // The latest values for the leave-time cancel and for stale answers.
   const madeRef = useRef<Made | undefined>(undefined);
   const sharedRef = useRef(false);
+  // An Email click: the mail app may hide the page; the invite stays pending (not shown as sent).
+  const keptRef = useRef(false);
   const run = useRef(0);
   const live = useRef(true);
   madeRef.current = made;
-  sharedRef.current = shared;
+  sharedRef.current = shared || keptRef.current;
 
   const make = useCallback(
-    async (label: string, long: boolean): Promise<void> => {
+    async (label: string, long: boolean, oldName = false): Promise<void> => {
       const mine = (run.current += 1);
       const previous = madeRef.current;
       setPhase('making');
       setError(undefined);
       setNameError(undefined);
+      setNameGate(undefined);
       const outcome = await invites.create(
         label === '' ? undefined : label,
-        long ? { long } : undefined,
+        long || oldName
+          ? { ...(long ? { long } : {}), ...(oldName ? { oldName } : {}) }
+          : undefined,
       );
       if (outcome.kind !== 'ok') {
         if (mine !== run.current || !live.current) return;
+        if (outcome.kind === 'name_update') {
+          setNameGate({ cardName: outcome.cardName, label: outcome.label, name: label, long });
+          setPhase(previous === undefined ? 'error' : 'ready');
+          return;
+        }
         if (outcome.kind === 'invalid_name') {
           setNameError(S.nameInvalid);
           setPhase(previous === undefined ? 'error' : 'ready');
@@ -201,6 +227,12 @@ export function InvitePanel({
     return () => clearTimeout(t);
   }, [copied]);
 
+  useEffect(() => {
+    if (copiedMessage !== 'copied') return undefined;
+    const t = setTimeout(() => setCopiedMessage('idle'), COPIED_MS * 2);
+    return () => clearTimeout(t);
+  }, [copiedMessage]);
+
   // A name typed while the first link was still being made: apply it once the link is there, unless
   // the field still has focus (its blur commits it).
   useEffect(() => {
@@ -244,7 +276,7 @@ export function InvitePanel({
   /** The name is committed (the field lost focus, or Enter): a fresh link while nothing went out. */
   const commitName = (): void => {
     const wanted = name.trim();
-    if (shared || phase === 'making' || made === undefined) return;
+    if (sharedRef.current || phase === 'making' || made === undefined) return;
     if (wanted === made.label) return;
     void make(wanted, made.askedLong);
   };
@@ -271,10 +303,27 @@ export function InvitePanel({
       () => setCopied('failed'),
     );
   };
-  const email = (): void => {
+  const keepPending = (): void => {
+    keptRef.current = true;
+    sharedRef.current = true;
+    if (madeRef.current !== undefined) forgetUnsent(madeRef.current.id);
+  };
+  // The whole invite text (our words around the link), for a mail written by hand or a chat.
+  const copyMessage = (): void => {
     if (invite === undefined) return;
-    markShared();
-    openMail(mailtoOf(invite.shareText));
+    const clip = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+    if (clip === undefined) {
+      setCopiedMessage('failed');
+      return;
+    }
+    void clip.writeText(invite.shareText).then(
+      () => {
+        markShared();
+        setCopiedMessage('copied');
+        setAnnounce(S.copiedMessageAnnounce);
+      },
+      () => setCopiedMessage('failed'),
+    );
   };
   const share = (): void => {
     if (invite === undefined) return;
@@ -322,111 +371,156 @@ export function InvitePanel({
         </span>
       </form>
 
-      <section className="inv-card al-reveal" aria-label={linkLabel(wanted)}>
-        <span className="inv-eyebrow">{linkLabel(wanted)}</span>
-        <div className="inv-row">
-          <div
-            ref={boxRef}
-            className="inv-link"
-            data-state={ready ? 'ready' : 'making'}
-            aria-busy={ready ? undefined : 'true'}
-          >
-            {invite !== undefined && phase !== 'making' ? (
-              invite.inviteUrl
-            ) : phase === 'error' ? null : (
-              <>
-                <SkeletonLine width={70} />
-                <span className="al-visually-hidden">{S.making}</span>
-              </>
-            )}
-          </div>
-          <Button variant="primary" className="inv-copy al-press" disabled={!ready} onClick={copy}>
-            <span className="inv-btn-in">
-              {copied === 'copied' ? <CheckMark /> : <CopyMark />}
-              {copied === 'copied' ? S.copied : S.copy}
-            </span>
-          </Button>
-        </div>
-        <div className="inv-ways">
-          <Button className="al-press" disabled={!ready} onClick={email}>
-            <span className="inv-btn-in">
-              <MailIcon />
-              {S.email}
-            </span>
-          </Button>
-          {invite !== undefined && canShareText(invite.shareText) ? (
-            <Button className="al-press" disabled={!ready} onClick={share}>
+      {nameGate === undefined ? null : (
+        <InviteNameGate
+          cardName={nameGate.cardName}
+          label={nameGate.label}
+          agents={agents}
+          owner={owner}
+          onUpdated={() => void make(nameGate.name, nameGate.long)}
+          onOldName={() => void make(nameGate.name, nameGate.long, true)}
+        />
+      )}
+      {nameGate !== undefined && made === undefined ? null : (
+        <section className="inv-card al-reveal" aria-label={linkLabel(wanted)}>
+          <span className="inv-eyebrow">{linkLabel(wanted)}</span>
+          <div className="inv-row">
+            <div
+              ref={boxRef}
+              className="inv-link"
+              data-state={ready ? 'ready' : 'making'}
+              aria-busy={ready ? undefined : 'true'}
+            >
+              {invite !== undefined && phase !== 'making' ? (
+                invite.inviteUrl
+              ) : phase === 'error' ? null : (
+                <>
+                  <SkeletonLine width={70} />
+                  <span className="al-visually-hidden">{S.making}</span>
+                </>
+              )}
+            </div>
+            <Button
+              variant="primary"
+              className="inv-copy al-press"
+              disabled={!ready}
+              onClick={copy}
+            >
               <span className="inv-btn-in">
-                <ShareIcon />
-                {S.share}
+                {copied === 'copied' ? <CheckMark /> : <CopyMark />}
+                {copied === 'copied' ? S.copied : S.copy}
               </span>
             </Button>
-          ) : null}
-        </div>
-        <p className="al-text-body-sm al-muted inv-note">{worksFor(days)}</p>
-        {fellBack ? <p className="al-text-body-sm inv-note">{S.fellBack}</p> : null}
-        {copied === 'failed' ? (
-          <p className="al-text-body-sm" role="alert">
-            {S.copyFailed}
-          </p>
-        ) : null}
-        {shareFailed ? (
-          <p className="al-text-body-sm" role="alert">
-            {S.shareFailed}
-          </p>
-        ) : null}
-        {error === undefined ? null : (
-          <InlineError
-            action={
-              <Button size="sm" onClick={() => void make(wanted, made?.askedLong === true)}>
-                {S.tryAgain}
-              </Button>
-            }
-          >
-            {error}
-          </InlineError>
-        )}
-        {hood && invite !== undefined ? (
-          <section className="inv-details al-expand" aria-label={S.details}>
-            <h3 className="inv-eyebrow">{S.details}</h3>
-            <dl className="inv-facts al-text-body-sm">
-              <dt>{S.kind}</dt>
-              <dd>{invite.format === 'short' ? S.kindShort : S.kindLong}</dd>
-              <dt>{S.expires}</dt>
-              <dd className="inv-mono">{exact(invite.expiresAt)}</dd>
-            </dl>
-            <div className="inv-ways">
-              <Button
-                size="sm"
-                aria-expanded={qr}
-                disabled={!ready}
-                onClick={() => {
-                  if (!qr) markShared();
-                  setQr((on) => !on);
-                }}
+          </div>
+          <div className="inv-ways">
+            {/* A real link: the mail app opens when there is one. Nothing tells us it did, so the
+                click is not "sent" (Copy invite message is); it only stops a hidden page from
+                cancelling the invite, which then waits until it expires. */}
+            {ready && invite !== undefined ? (
+              <a
+                className="al-btn al-btn-secondary al-press inv-email"
+                href={mailtoOf(invite.shareText)}
+                onClick={keepPending}
               >
-                {qr ? S.hideQr : S.showQr}
+                <span className="inv-btn-in">
+                  <MailIcon />
+                  {S.email}
+                </span>
+              </a>
+            ) : (
+              <Button className="al-press" disabled>
+                <span className="inv-btn-in">
+                  <MailIcon />
+                  {S.email}
+                </span>
               </Button>
-              <Button
-                size="sm"
-                disabled={!ready}
-                onClick={() => {
-                  setQr(false);
-                  void make(made?.label ?? '', invite.format !== 'long');
-                }}
-              >
-                {invite.format === 'long' ? S.makeShort : S.makeLong}
+            )}
+            <Button className="al-press" disabled={!ready} onClick={copyMessage}>
+              <span className="inv-btn-in">
+                {copiedMessage === 'copied' ? <CheckMark /> : <CopyMark />}
+                {S.copyMessage}
+              </span>
+            </Button>
+            {invite !== undefined && canShareText(invite.shareText) ? (
+              <Button className="al-press" disabled={!ready} onClick={share}>
+                <span className="inv-btn-in">
+                  <ShareIcon />
+                  {S.share}
+                </span>
               </Button>
-            </div>
-            {qr ? (
-              <figure className="inv-qr al-reveal">
-                <QrCode value={invite.inviteUrl} label={S.qrLabel} className="inv-qr-code" />
-                <figcaption className="al-text-caption al-muted">{S.qrCaption}</figcaption>
-              </figure>
             ) : null}
-          </section>
-        ) : null}
-      </section>
+          </div>
+          <p className="al-text-body-sm al-muted inv-note">{worksFor(days)}</p>
+          {fellBack ? <p className="al-text-body-sm inv-note">{S.fellBack}</p> : null}
+          {copiedMessage === 'copied' ? (
+            <p className="al-text-body-sm inv-status" role="status">
+              <CheckMark />
+              <span>{S.copiedMessage}</span>
+            </p>
+          ) : null}
+          {copied === 'failed' || copiedMessage === 'failed' ? (
+            <p className="al-text-body-sm" role="alert">
+              {S.copyFailed}
+            </p>
+          ) : null}
+          {shareFailed ? (
+            <p className="al-text-body-sm" role="alert">
+              {S.shareFailed}
+            </p>
+          ) : null}
+          {error === undefined ? null : (
+            <InlineError
+              action={
+                <Button size="sm" onClick={() => void make(wanted, made?.askedLong === true)}>
+                  {S.tryAgain}
+                </Button>
+              }
+            >
+              {error}
+            </InlineError>
+          )}
+          {hood && invite !== undefined ? (
+            <section className="inv-details al-expand" aria-label={S.details}>
+              <h3 className="inv-eyebrow">{S.details}</h3>
+              <dl className="inv-facts al-text-body-sm">
+                <dt>{S.kind}</dt>
+                <dd>{invite.format === 'short' ? S.kindShort : S.kindLong}</dd>
+                <dt>{S.expires}</dt>
+                <dd className="inv-mono">{exact(invite.expiresAt)}</dd>
+              </dl>
+              <div className="inv-ways">
+                <Button
+                  size="sm"
+                  aria-expanded={qr}
+                  disabled={!ready}
+                  onClick={() => {
+                    if (!qr) markShared();
+                    setQr((on) => !on);
+                  }}
+                >
+                  {qr ? S.hideQr : S.showQr}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!ready}
+                  onClick={() => {
+                    setQr(false);
+                    void make(made?.label ?? '', invite.format !== 'long');
+                  }}
+                >
+                  {invite.format === 'long' ? S.makeShort : S.makeLong}
+                </Button>
+              </div>
+              {qr ? (
+                <figure className="inv-qr al-reveal">
+                  <QrCode value={invite.inviteUrl} label={S.qrLabel} className="inv-qr-code" />
+                  <figcaption className="al-text-caption al-muted">{S.qrCaption}</figcaption>
+                </figure>
+              ) : null}
+            </section>
+          ) : null}
+        </section>
+      )}
       <p className="al-visually-hidden" role="status" aria-live="polite">
         {announce}
       </p>

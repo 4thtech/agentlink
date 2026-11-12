@@ -15,8 +15,6 @@ import { ACTIVITY_STRINGS as A } from './activity/strings.js';
 import { AppearancePage } from './appearance/index.js';
 import { APPEARANCE_STRINGS as P } from './appearance/strings.js';
 import { FilesPage, type FilesPageProps } from './files/index.js';
-import { MessagesPage } from './messages/index.js';
-import { MESSAGES_STRINGS as M } from './messages/strings.js';
 import { RulesPage, type RulesPageProps } from './rules/index.js';
 import { createOwnerClient } from './rules/owner.js';
 import { RULES_STRINGS as R } from './rules/strings.js';
@@ -64,62 +62,6 @@ const key = async (el: Element, k: string): Promise<void> => {
 };
 const all = (sel: string): HTMLElement[] => [...host.querySelectorAll<HTMLElement>(sel)];
 const ok = (data: unknown): ApiResult<unknown> => ({ kind: 'ok', status: 200, data });
-
-// --- Messages: Inbox / Sent are tabs --------------------------------------------------------------
-
-describe('Messages: Inbox / Sent', () => {
-  const AT = 1_760_000_000;
-  const client = (): ApiClient => {
-    const get = vi.fn((path: string) => {
-      if (path === '/api/ui/messages')
-        return Promise.resolve(
-          ok({
-            conversations: [{ contactId: 'c-marko', name: 'Marko', lastAt: AT, lastInAt: AT }],
-          }),
-        );
-      return Promise.resolve(ok({ items: [] }));
-    });
-    return { get, post: vi.fn(), owner: vi.fn() } as unknown as ApiClient;
-  };
-  const open = async (): Promise<void> => {
-    await act(async () => {
-      root.render(h(HoodProvider, { value: false }, h(MessagesPage, { api: client() })));
-    });
-    await click(all('button').find((b) => b.textContent?.includes('Marko')));
-  };
-
-  it('is a tablist in the segmented look, controlling a tabpanel that the selected tab labels', async () => {
-    await open();
-    const list = host.querySelector('[role="tablist"]');
-    expect(list?.classList.contains('al-seg')).toBe(true);
-    expect(list?.getAttribute('aria-label')).toBe(M.boxLabel);
-    // The list's own Sort control (UX2-f2) is a radiogroup; Inbox / Sent must not be one.
-    expect(host.querySelector(`[role="radiogroup"][aria-label="${M.boxLabel}"]`)).toBeNull();
-    const tabs = all('[role="tab"]');
-    const panel = host.querySelector('[role="tabpanel"]');
-    expect(panel).not.toBeNull();
-    expect(tabs[0]?.getAttribute('aria-controls')).toBe(panel?.id);
-    expect(panel?.getAttribute('aria-labelledby')).toBe(tabs[0]?.id);
-  });
-
-  it('arrow keys move and select, and the panel follows', async () => {
-    await open();
-    const tabs = all('[role="tab"]');
-    expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1]);
-    await key(tabs[0]!, 'ArrowRight');
-    await flush();
-    expect(tabs[1]?.getAttribute('aria-selected')).toBe('true');
-    expect(document.activeElement).toBe(tabs[1]);
-    expect(host.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toBe(
-      tabs[1]?.id,
-    );
-  });
-
-  it('has no axe violation', async () => {
-    await open();
-    expect(await violations()).toEqual([]);
-  });
-});
 
 // --- Files: Received / Sent / Send folders --------------------------------------------------------
 

@@ -1205,12 +1205,12 @@ body {
 .al-secret {
   display: flex;
   flex-direction: column;
-  gap: var(--al-space-3);
-  padding: var(--al-space-5);
+  gap: var(--al-space-4);
+  padding: var(--al-space-6);
   border: var(--al-border-width-thin) solid var(--al-color-border-default);
   border-radius: var(--al-radius-lg);
   background: var(--al-color-bg-surface);
-  max-width: 440px;
+  max-width: 520px;
   box-sizing: border-box;
 }
 .al-secret p {
@@ -1221,20 +1221,40 @@ body {
   justify-content: space-between;
   color: var(--al-color-fg-muted);
 }
+.al-secret-row {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+.al-secret-row > .al-secret-val {
+  flex: 1;
+  min-width: 0;
+}
 .al-secret-val {
   display: grid;
   grid-template-columns: repeat(3, auto);
   justify-content: space-between;
-  gap: var(--al-space-2) var(--al-space-4);
-  padding: var(--al-space-4);
+  gap: var(--al-space-3) var(--al-space-5);
+  padding: var(--al-space-4) var(--al-space-5);
   background: var(--al-color-bg-sunken);
   border: var(--al-border-width-thin) solid var(--al-color-border-default);
   border-radius: var(--al-radius-md);
   font-size: 20px;
 }
+.al-secret-form {
+  margin: 0;
+}
+/* Save form: the primary action on its own row, Copy and Save as file side by side below it. */
+.al-secret-form .al-secret-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.al-secret-form .al-secret-actions > :first-child {
+  grid-column: 1 / -1;
+}
 .al-secret-actions {
   display: flex;
-  gap: var(--al-space-2);
+  gap: var(--al-space-3);
   flex-wrap: wrap;
 }
 

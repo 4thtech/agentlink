@@ -173,4 +173,106 @@ Expect-Throw 'a failed download says so plainly' 'Could not download .*internet 
   Install-AgentLink -Root $root -Arch 'AMD64'
 }
 $env:Path = $savedPath
+
+# --- WP-2: the one command from the invite page ----------------------------------------------------
+# The link is checked with the patterns of `agentlink join` (08 section 4) before anything happens;
+# anything else gets one fixed line, and no part of it is ever printed.
+Set-Content -LiteralPath (Join-Path $serve 'SHASUMS256.txt') -Value $goodSums -NoNewline
+Compress-Archive -Path (Join-Path $build $name) -DestinationPath (Join-Path $serve "$name.zip") -Force
+function Get-PinnedSha([string]$Platform) { if ($Platform -eq 'win-x64') { return $fixtureSha } return '' }
+$script:Launched = @()
+function Invoke-Launcher([string]$Launcher, [string[]]$Arguments) {
+  Write-Host 'LAUNCHED'
+  $script:Launched += , @($Arguments)
+}
+$long = 'https://agentlink.4thtech.io/i#' + ('Ab9_-' * 40)
+$short = 'https://agentlink.4thtech.io/i#2.' + ('a' * 42) + 'w'
+$refused = "^This isn't a complete AgentLink invite\. Open the link again and copy the command\.$"
+Check 'an AgentLink invite link, long or short, passes the check' {
+  (Test-InviteLink $long) -and (Test-InviteLink $short) -and
+  (Test-InviteLink ('https://agentlink.4thtech.io/i#' + ('A' * 21846)))
+}
+$badInvites = @(
+  '', 'Ab9_-', 'http://agentlink.4thtech.io/i#Ab9_-', 'https://agentlink.4thtech.io/i#',
+  'https://agentlink.4thtech.io/x#Ab9_-', 'https://agentlink.4thtech.io.evil.example/i#Ab9_-',
+  'https://AGENTLINK.4thtech.io/i#Ab9_-', 'https://agentlinkx4thtech.io/i#Ab9_-',
+  ("https://$([char]0x0430)gentlink.4thtech.io/i#Ab9_-"),
+  "$long ", " $long", "$long`n", "$long`r`n", "'$long'", "$long'", "$long`"", "$long;calc",
+  "$long`$(calc)", "$long``calc", "$long&calc", "$long|calc", "$long%41", "$long^", "$long!",
+  "$long#x", ($long + [char]0x00e9), "$long.",
+  ('https://agentlink.4thtech.io/i#' + ('A' * 21847)),
+  ('https://agentlink.4thtech.io/i#2.' + ('a' * 42) + 'b'),
+  ('https://agentlink.4thtech.io/i#2.' + ('a' * 41) + 'w'),
+  ('https://agentlink.4thtech.io/i#2.' + ('a' * 43) + 'w'),
+  "$([char]0x2018)$long$([char]0x2019)", "$([char]0x201C)$long$([char]0x201D)",
+  ($long + [char]0x2019)
+)
+Check 'anything else fails the check (case, spaces, line breaks, quotes, shell characters, length)' {
+  $passed = @($badInvites | Where-Object { Test-InviteLink $_ })
+  $passed.Count -eq 0
+}
+
+Expect-Throw 'an unknown option or stray words are refused with a fixed line, naming nothing of them' '^This installer was given something it does not know\. Copy the command again from the invite page\.$' {
+  Assert-NoStrayArguments @('-Bogus', 'secret-word')
+}
+Check 'no stray arguments passes the guard' {
+  $null -eq (Assert-NoStrayArguments @()) -and $null -eq (Assert-NoStrayArguments $null)
+}
+Check 'the guard message echoes nothing it was given' {
+  $m = $null
+  try { Assert-NoStrayArguments @('-Bogus', 'secret-word') } catch { $m = $_.Exception.Message }
+  $m -notmatch 'Bogus' -and $m -notmatch 'secret'
+}
+
+Reset
+$root = New-Root
+Expect-Throw 'a malformed invite is refused with the fixed line, naming nothing of it' $refused {
+  Install-AgentLink -Root $root -Arch 'AMD64' -Invite "$long;calc"
+}
+Check '... before anything is downloaded or written' {
+  $script:Downloads.Count -eq 0 -and -not (Test-Path -LiteralPath $root)
+}
+Expect-Throw 'an invite with -Uninstall is refused' 'Uninstall' {
+  Install-AgentLink -Root $root -Arch 'AMD64' -Uninstall -Invite $short
+}
+
+Reset
+$root = New-Root
+$out = Install-AgentLink -Root $root -Arch 'AMD64' -Invite $short 6>&1 | Out-String
+Check 'not run from a terminal, with an invite: installs, says how to open it, never prints it' {
+  $out -match 'To open the invite, run the command from the invite page again in your own terminal\.' -and
+  $out -notmatch 'aaaa' -and $out -notmatch 'LAUNCHED' -and
+  (Test-Path -LiteralPath (Join-Path (Join-Path $root 'bin') 'agentlink.cmd'))
+}
+
+Reset
+$script:Launched = @()
+$out = Install-AgentLink -Root $root -Arch 'AMD64' -Interactive -Invite $short 6>&1 | Out-String
+$lines = @($out -split "`r?`n")
+Check 'in a terminal, with an invite: runs agentlink join with the link as one argument' {
+  $script:Launched.Count -eq 1 -and $script:Launched[0].Count -eq 2 -and
+  $script:Launched[0][0] -eq 'join' -and $script:Launched[0][1] -eq $short -and $out -notmatch 'aaaa'
+}
+Check 'F43: installed, then starting, then the app, then how to start it next time' {
+  $installed = [array]::IndexOf($lines, 'AgentLink is installed.')
+  $starting = [array]::IndexOf($lines, 'Starting AgentLink. Your browser opens the app. Press Ctrl+C here to close it.')
+  $launched = [array]::IndexOf($lines, 'LAUNCHED')
+  $next = [array]::IndexOf($lines, 'Next time, open a new terminal and type: agentlink')
+  $installed -ge 0 -and $starting -gt $installed -and $launched -gt $starting -and $next -gt $launched
+}
+
+Reset
+$script:Launched = @()
+$out = Install-AgentLink -Root $root -Arch 'AMD64' -Interactive 6>&1 | Out-String
+Check 'in a terminal, without an invite: runs agentlink with no arguments' {
+  $script:Launched.Count -eq 1 -and $script:Launched[0].Count -eq 0 -and
+  $out -match 'Next time, open a new terminal and type: agentlink'
+}
+
+Check 'the launcher tells AgentLink it was started by the installer (D4)' {
+  $text = Format-Launcher 'C:\node' 'C:\AgentLink'
+  $lines = $text -split "`r`n"
+  $set = [array]::IndexOf($lines, 'set "AGENTLINK_LAUNCHER=installer"')
+  $set -gt [array]::IndexOf($lines, 'setlocal') -and $set -lt ($lines.Count - 1)
+}
 Write-Output 'all install.ps1 checks passed'

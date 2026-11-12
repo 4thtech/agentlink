@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // U3-g acceptance (b11 §28; 08 §1 "First run v3"; D-137, D-138): Welcome, pick your AI app, one
-// screen that names the agent and protects it (one gesture), the backup code, then "Connect your AI
+// screen that names the agent and protects it (one gesture), the master code, then "Connect your AI
 // app" as its own signed step that "Later" skips; the end lands on Home.
 //
 // The server shapes used by the fakes of `GET /api/ui/apps`, `/preview` and `/apply` are the ones
@@ -343,7 +343,7 @@ describe('W4-WIZARD (was U3-g name and protect): step 2', () => {
     expect(field().value).toBe('');
     expect(field().placeholder).toBe('Your first name, e.g. Ana');
     expect(button(GO).disabled).toBe(true);
-    expect(button('Use a backup code instead').disabled).toBe(true);
+    expect(button('Use your master code instead').disabled).toBe(true);
     await type('Ana');
     expect(button(GO).disabled).toBe(false);
     expect([...host.querySelectorAll('label')].map((l) => l.textContent)).toContain(
@@ -352,7 +352,7 @@ describe('W4-WIZARD (was U3-g name and protect): step 2', () => {
     expect(text()).toContain('People see this name on your invites.');
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     expect(button(GO).className).toContain('al-btn-primary');
-    expect(buttonNames()).toContain('Use a backup code instead');
+    expect(buttonNames()).toContain('Use your master code instead');
   });
 
   it('Back keeps the typed name', async () => {
@@ -401,7 +401,7 @@ describe('W4-WIZARD (was U3-g name and protect): step 2', () => {
     expect(setup.finished).toHaveLength(1);
     expect(setup.finished[0]?.nonce).toBe(NONCE);
     expect(setup.finished[0]?.body).toEqual(BODY);
-    expect(h1()).toBe('Your backup code');
+    expect(h1()).toBe('Your master code');
   });
 
   it('W4-ONE-TOUCH: Claude Desktop running refuses before the gesture, in plain words; nothing is created', async () => {
@@ -461,7 +461,7 @@ describe('W4-WIZARD (was U3-g the end of first run): step 3 and E1', () => {
     await click(PICK_STEP.next('Claude Code'));
     await settle();
     await click(GO);
-    expect(h1()).toBe('Your backup code');
+    expect(h1()).toBe('Your master code');
     return { home, setup };
   }
   /** E1: the not-connected step, then Connect (the signed AI apps step). */
@@ -631,7 +631,7 @@ describe('W4-WIZARD (was U3-g): accessibility', () => {
     return result.violations.map((v) => v.id);
   }
 
-  it('axe finds nothing on Pick, Confirm, Backup code, Connected and Connect', async () => {
+  it('axe finds nothing on Pick, Confirm, Master code, Connected and Connect', async () => {
     await mount(fakeSetup({ connected: false }), fakeApps());
     await settle();
     expect(await violations()).toEqual([]);

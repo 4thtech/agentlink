@@ -466,3 +466,35 @@
 .st-explainer p {
   margin: 0;
 }
+
+/* Phones: logo and "Skip to Home" share the first row; the step bar sits on its own row below. */
+@media (max-width: 480px) {
+  .st-head {
+    gap: 0 var(--al-space-4);
+  }
+  .st-head-end {
+    display: contents;
+  }
+  .st-skip {
+    order: 1;
+    padding-inline-end: 0;
+  }
+  .st-progress {
+    order: 2;
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+    gap: var(--al-space-2) var(--al-space-3);
+  }
+}
+
+/* The Touch ID button's glyph and label sit in one span (the Button wraps its children): space them. */
+.st-go > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+/* "Use your master code instead" reads at the normal 14 px, not the small button's 12. */
+.st-actions > .al-btn-ghost {
+  font-size: 14px;
+  line-height: 20px;
+}

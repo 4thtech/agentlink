@@ -4,6 +4,7 @@
 #   curl -fsSL https://agentlink.4thtech.io/install.sh | sh
 #   curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --dry-run
 #   curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --uninstall
+#   curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite '<invite link>'
 #
 # What it does, and nothing more:
 #   1. Uses your Node.js if it is 22.14 or newer. Otherwise it downloads the official Node.js
@@ -11,7 +12,10 @@
 #      against nodejs.org's SHASUMS256.txt AND against the hash written in this file.
 #   2. Writes a small `agentlink` command to ~/.agentlink/bin and adds that folder to PATH in your
 #      shell profile (one marked line).
-#   3. Starts AgentLink (only when run from a terminal).
+#   3. Starts AgentLink (only when run from a terminal). With --invite (the command on an invite
+#      page), it opens AgentLink on that invite: `agentlink join` with the link. The link is checked
+#      first, with the same patterns as `agentlink join`; anything else is refused with one fixed
+#      line, and the link is never printed or stored by this script.
 # No sudo, no admin rights, no telemetry. It never asks for or prints a secret. Run it again to
 # update. Your IDs and messages (the rest of ~/.agentlink) are never touched, not even by --uninstall.
 #
@@ -29,22 +33,39 @@ main() {
   NODE_DIST="https://nodejs.org/dist/v$NODE_VERSION"
   PACKAGE="@4thtech-io/agentlink@latest"
   MARK="# added by the AgentLink installer"
+  INVITE_PREFIX="https://agentlink.4thtech.io/i#"
 
   dry_run=0
   uninstall=0
   start=1
-  for arg in "$@"; do
-    case "$arg" in
+  invite=""
+  has_invite=0
+  # No option value is ever printed: an invite link pasted in the wrong place stays unseen.
+  while [ $# -gt 0 ]; do
+    case "$1" in
       --dry-run) dry_run=1 ;;
       --uninstall) uninstall=1 ;;
       --no-start) start=0 ;;
+      --invite)
+        [ "$has_invite" -eq 0 ] || refuse "Give one invite only."
+        [ $# -ge 2 ] || refuse_invite
+        has_invite=1
+        invite="$2"
+        shift
+        ;;
       -h | --help)
-        echo "Usage: install.sh [--dry-run] [--uninstall] [--no-start]"
+        echo "Usage: install.sh [--dry-run] [--uninstall] [--no-start] [--invite '<invite link>']"
         return 0
         ;;
-      *) fail "Unknown option: $arg (try --help)." ;;
+      *) refuse "Unknown option (try --help)." ;;
     esac
+    shift
   done
+  # 08 section 4: the invite is checked before anything else happens.
+  if [ "$has_invite" -eq 1 ]; then
+    valid_invite "$invite" || refuse_invite
+    [ "$uninstall" -eq 0 ] || refuse "--invite can't be used with --uninstall."
+  fi
 
   [ -n "${HOME:-}" ] || fail "HOME is not set."
   base="$HOME/.agentlink"
@@ -76,16 +97,32 @@ main() {
   add_to_path
 
   if [ "$dry_run" -eq 1 ]; then
+    if [ "$has_invite" -eq 1 ]; then say "  would open the invite in AgentLink"; fi
     say "Dry run: nothing was changed."
     return 0
   fi
 
-  say "AgentLink is installed. Next time, open a new terminal and type: agentlink"
+  say "AgentLink is installed."
+  next_time="Next time, open a new terminal and type: agentlink"
   if [ "$start" -eq 1 ] && [ -t 1 ] && { : </dev/tty; } 2>/dev/null; then
     say "Starting AgentLink. Your browser opens the app. Press Ctrl+C here to close it."
-    "$launcher" </dev/tty
+    # Ctrl+C closes the app; this handler (not an ignored signal, which the app would inherit) lets
+    # the installer print its last line afterwards (F43).
+    trap ':' INT
+    if [ "$has_invite" -eq 1 ]; then
+      "$launcher" join "$invite" </dev/tty || :
+    else
+      "$launcher" </dev/tty || :
+    fi
+    trap - INT
+    say "$next_time"
   else
-    say "To start it now, run: $launcher"
+    say "$next_time"
+    if [ "$has_invite" -eq 1 ]; then
+      say "To open the invite, run the command from the invite page again in your own terminal."
+    else
+      say "To start it now, run: $launcher"
+    fi
   fi
 }
 
@@ -93,6 +130,39 @@ say() { printf '%s\n' "$*"; }
 fail() {
   printf 'AgentLink installer: %s\n' "$*" >&2
   exit 1
+}
+# A wrong command line: fixed text only, exit code 2 (as `agentlink join`).
+refuse() {
+  printf 'AgentLink installer: %s\n' "$1" >&2
+  exit 2
+}
+refuse_invite() {
+  refuse "This isn't a complete AgentLink invite. Open the link again and copy the command."
+}
+
+# True when $1 is a whole AgentLink invite link: the patterns of `agentlink join` (08 section 4),
+#   https://agentlink.4thtech.io/i#  and 1 to 21846 base64url characters, or
+#   https://agentlink.4thtech.io/i#2.  and 43 base64url characters, the last with no trailing bits.
+# The characters are listed one by one (no ranges), so no locale can widen the set. None of them is
+# special to any shell or to cmd.exe.
+valid_invite() {
+  case "$1" in "$INVITE_PREFIX"*) ;; *) return 1 ;; esac
+  payload="${1#"$INVITE_PREFIX"}"
+  case "$payload" in
+    2.*)
+      payload="${payload#2.}"
+      case "$payload" in
+        *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-]*) return 1 ;;
+      esac
+      [ "${#payload}" -eq 43 ] || return 1
+      case "$payload" in *[AEIMQUYcgkosw048]) return 0 ;; esac
+      return 1
+      ;;
+  esac
+  case "$payload" in
+    '' | *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-]*) return 1 ;;
+  esac
+  [ "${#payload}" -le 21846 ]
 }
 
 # Removes the download folder, if there is one.
@@ -230,6 +300,9 @@ write_launcher() {
     echo "# Remove with: curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --uninstall"
     echo "PATH=$(quote "$node_bin"):\"\$PATH\""
     echo 'export PATH'
+    # Tells AgentLink it was started by this launcher, so it names the `agentlink` command (D4).
+    echo 'AGENTLINK_LAUNCHER=installer'
+    echo 'export AGENTLINK_LAUNCHER'
     # npm reads a project .npmrc from the folder it is started in (node-options, proxies, TLS...).
     # --prefix points that lookup at our own folder instead, and the registry is pinned on the
     # command line. The start folder is kept: `agentlink verify ./pack` names files relative to it.

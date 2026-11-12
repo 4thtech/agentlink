@@ -367,8 +367,8 @@ describe('invite and accept: a pairing round trip over a relay double (M1-9l; 04
     expect(atAlice.out.join('\n')).toContain('paired');
     const atBob = await w.run(w.bob, ['contacts']);
     expect(atBob.out.join('\n')).toContain('“Alice” (self-declared)');
-    expect(atBob.out.join('\n')).toContain('safety code not checked');
-    // No safety code and no declared-name block anywhere in `contacts`.
+    expect(atBob.out.join('\n')).toContain('Contact check not done');
+    // No Contact check and no declared-name block anywhere in `contacts`.
     expect(atBob.text).not.toMatch(/\b\d{4}\b.*\b\d{4}\b.*\b\d{4}\b/);
   });
 

@@ -7,8 +7,8 @@
 // - The QR code ships only with crediting: Add credits exists only where the server offers the
 //   agent's address and a way to turn received funds into credits (the Gnosis test network).
 // - Turning funds into credits and withdrawing are owner operations: a confirm screen with the amount
-//   and where it goes from and to, then the owner code, sent once as the request body to the
-//   server's presence gate. The owner code is never kept after the request or put in a URL.
+//   and where it goes from and to, then the master code, sent once as the request body to the
+//   server's presence gate. The master code is never kept after the request or put in a URL.
 // - Withdrawals go to the agent's own account only (the recipient grant is a later card).
 // - UX2-e2 (B-11 §23, D-137): under the details, a three-step tracker, Waiting for your funds →
 //   Arrived · $X → Added to credits. Steps move only on server reads (the existing top-up and credits
@@ -16,7 +16,16 @@
 //   a submitted owner operation is not "added", and a failed read keeps the step. The waiting mark
 //   (UX2-e1, the one brand exception) turns only on step 1.
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
-import { BackupCodeField } from '../first-run/backup-code.js';
+import { BackupCodeField, UseCodeInstead } from '../first-run/backup-code.js';
+import { detectPlatform } from '../first-run/passkey.js';
+import { SENSOR } from '../first-run/strings.js';
+import {
+  createOwnerClient,
+  passkeyProof,
+  type PasskeyInfo,
+  type PresenceProof,
+} from '../contacts/owner.js';
+import { CONTACTS_STRINGS as C } from '../contacts/strings.js';
 import {
   Button,
   ProgressBar,
@@ -713,38 +722,82 @@ export function AddCreditsPanel({
   );
 }
 
+const readOwnerPasskey = (): Promise<PasskeyInfo | undefined> => createOwnerClient().passkey();
+
 export function ConfirmMove({
   api,
   move,
   onClose,
   onDone,
+  passkey: readPasskey = readOwnerPasskey,
+  gesture = passkeyProof,
 }: {
   readonly api: ApiClient;
   readonly move: Move;
   readonly onClose: () => void;
   /** `ok`: the owner operation went through (submitted; for credits, not yet added). */
   readonly onDone: (line: string, ok: boolean) => void;
+  /** FB-8 (P-5) seams: the stored passkey on this computer, and the one gesture. */
+  readonly passkey?: () => Promise<PasskeyInfo | undefined>;
+  readonly gesture?: (info: PasskeyInfo) => Promise<PresenceProof | undefined>;
 }): ReactElement {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [line, setLine] = useState<string | undefined>(undefined);
+  // FB-8 (P-5): Touch ID / Windows Hello when this computer has the passkey; the master code always.
+  const [info, setInfo] = useState<PasskeyInfo | undefined>(undefined);
+  const [codeChosen, setCodeChosen] = useState(false);
   const name = NETWORK_NAMES[move.net.network];
   const deposit = move.kind === 'deposit';
+  const sensor = SENSOR[detectPlatform()];
+  const withPasskey = info !== undefined && !codeChosen;
+
+  useEffect(() => {
+    let live = true;
+    void readPasskey()
+      .catch(() => undefined)
+      .then((found) => {
+        if (live) setInfo(found);
+      });
+    return () => {
+      live = false;
+    };
+    // Read once per confirm.
+  }, []);
+
+  const send = (proof: PresenceProof): void => {
+    setBusy(true);
+    setLine(undefined);
+    const input = { network: move.net.network, amount: move.money.amount };
+    const presence = proof.kind === 'code' ? proof.code : { passkey: proof.body };
+    void api.owner(deposit ? TOP_UP_PATH : WITHDRAW_PATH, input, presence).then((res) => {
+      setBusy(false);
+      const out = outcomeLine(res);
+      if (out.done) onDone(out.text, res.kind === 'ok');
+      else if (proof.kind === 'passkey' && res.kind === 'presence_rejected') {
+        setLine(C.presenceRejected);
+      } else setLine(out.text);
+    });
+  };
 
   const submit = (event?: FormEvent): void => {
     event?.preventDefault();
     if (busy || code.length === 0) return;
-    setBusy(true);
-    setLine(undefined);
-    const input = { network: move.net.network, amount: move.money.amount };
     const sent = code;
-    // The owner code lives only in this request; the field is cleared whatever happens.
+    // The master code lives only in this request; the field is cleared whatever happens.
     setCode('');
-    void api.owner(deposit ? TOP_UP_PATH : WITHDRAW_PATH, input, sent).then((res) => {
-      setBusy(false);
-      const out = outcomeLine(res);
-      if (out.done) onDone(out.text, res.kind === 'ok');
-      else setLine(out.text);
+    send({ kind: 'code', code: sent });
+  };
+
+  const confirmWithPasskey = (): void => {
+    if (busy || info === undefined) return;
+    setLine(undefined);
+    setBusy(true);
+    void gesture(info).then((proof) => {
+      if (proof === undefined) {
+        setBusy(false);
+        setLine(C.passkeyNotUsed);
+      } else send(proof);
     });
   };
 
@@ -773,27 +826,62 @@ export function ConfirmMove({
         <dd>{name}</dd>
       </dl>
       <p className="al-text-caption al-muted">{deposit ? S.reserveNote : S.withdrawNote}</p>
-      <form className="pf-confirm-form" onSubmit={submit}>
-        <BackupCodeField
-          label={S.ownerCode}
-          hint={EARLIER_OWNER_CODE_HINT}
-          value={code}
-          onValue={setCode}
-        />
-        {line === undefined ? null : (
-          <p className="al-text-body-sm" role="alert">
-            {line}
-          </p>
-        )}
-        <div className="pf-confirm-actions">
-          <Button type="submit" variant="primary" disabled={busy || code.length === 0}>
-            {busy ? S.working : S.confirm}
-          </Button>
-          <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
-            {S.cancel}
-          </Button>
+      {withPasskey ? (
+        <div className="pf-confirm-form">
+          {line === undefined ? null : (
+            <p className="al-text-body-sm" role="alert">
+              {line}
+            </p>
+          )}
+          <div className="pf-confirm-actions">
+            <Button
+              type="button"
+              variant="primary"
+              icon="approval"
+              disabled={busy}
+              onClick={confirmWithPasskey}
+            >
+              {busy ? S.working : C.usePasskeyOn(sensor)}
+            </Button>
+            <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
+              {S.cancel}
+            </Button>
+          </div>
+          <UseCodeInstead
+            disabled={busy}
+            onClick={() => {
+              setLine(undefined);
+              setCodeChosen(true);
+            }}
+          />
         </div>
-      </form>
+      ) : (
+        <form className="pf-confirm-form" onSubmit={submit}>
+          <BackupCodeField
+            label={S.ownerCode}
+            hint={EARLIER_OWNER_CODE_HINT}
+            value={code}
+            onValue={(value) => {
+              setCode(value);
+              // Typed before the passkey read answered: the code stays the way to confirm.
+              if (value !== '') setCodeChosen(true);
+            }}
+          />
+          {line === undefined ? null : (
+            <p className="al-text-body-sm" role="alert">
+              {line}
+            </p>
+          )}
+          <div className="pf-confirm-actions">
+            <Button type="submit" variant="primary" disabled={busy || code.length === 0}>
+              {busy ? S.working : S.confirm}
+            </Button>
+            <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
+              {S.cancel}
+            </Button>
+          </div>
+        </form>
+      )}
     </section>
   );
 }

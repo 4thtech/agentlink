@@ -46,9 +46,28 @@ import type {
 } from '@4thtech-io/node';
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import { newAgentFirstCard } from '../mcp/local-ui-wiring.js';
+import { cliVersion } from '../runtime/cli-version.js';
 import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
 
 /** The per-agent part of the local UI options: everything but the app's files. */
+/**
+ * WP-1 (D-141; root cause of "Couldn't rename it" in 0.4.13): an app-host agent's page wiring, without
+ * the app files, with the agent's key-items token (epochKeysOf its KeyStore). The server offers the
+ * rename that rotates (approval-server.ts `renameAgent`) only with it, so every app-host agent takes
+ * this one path: the one open at launch (ui.ts `start`) as much as one opened by a switch.
+ */
+export function hostUiOf(
+  agent: Pick<OwnerAgent, 'epochKeys' | 'recoveryKit'>,
+  localUi: LocalUiOptions,
+): Omit<LocalUiOptions, 'assets'> {
+  return {
+    ...withoutAssets(localUi),
+    ...(agent.epochKeys === undefined ? {} : { epochKeys: agent.epochKeys }),
+    // WP-11 (D-117 A): the Back up page saves this agent's recovery kit (keychain agents only).
+    ...(agent.recoveryKit === undefined ? {} : { recoveryKit: agent.recoveryKit }),
+  };
+}
+
 export function withoutAssets(options: LocalUiOptions): Omit<LocalUiOptions, 'assets'> {
   const copy: { -readonly [K in keyof LocalUiOptions]: LocalUiOptions[K] } = { ...options };
   delete copy.assets;
@@ -82,10 +101,7 @@ export async function openUiHostAgent(
   try {
     // The app's files are the server's and never change on a switch. W4-RENAME-REACHES-CONTACTS
     // (D-141): the host's agent also gets its key-items token, for the rename gesture only.
-    const localUi = {
-      ...withoutAssets(await deps.localUi(agent)),
-      ...(agent.epochKeys === undefined ? {} : { epochKeys: agent.epochKeys }),
-    };
+    const localUi = hostUiOf(agent, await deps.localUi(agent));
     const source = createUiApprovalSource(
       // The host owns the agent's lifetime; the source never closes it.
       { ...agent, close: () => Promise.resolve() },
@@ -184,6 +200,8 @@ export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServ
       ...(deps.handoff === undefined ? {} : { handoff: deps.handoff }),
       // U3-g-c: Welcome's "Pick your AI app" (GET /api/ui/apps) with no agent yet.
       ...(aiAppsList === undefined ? {} : { aiAppsList }),
+      // WP-13 (F45): this app's version, for the "Restart {app} to use the new version" hint.
+      version: cliVersion(),
     },
     ...(deps.onEvent === undefined ? {} : { onEvent: deps.onEvent }),
   });

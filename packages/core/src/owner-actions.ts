@@ -11,6 +11,8 @@
 //   pairing digest from the stored pair; `agent.revoke` is applied by M1-7h. `contact.rename` and
 //   `contact.remove` (M1-9za) change one stored contact: the owner alias (06 §2.1 rule 1), or the
 //   07 §3 tombstone. The nonce row is their audit record; nothing is sent to the contact.
+//   `contact.block` and `contact.unblock` (UX1112 WP-12, F-2) set one contact's status to `blocked`
+//   or back to `active` (02 F-14), with the nonce row as the audit record; nothing is sent.
 //   `storage.set` and `storage.remove` (M1-9i-a, D-115) replace or delete the one `own_storage` row
 //   with the nonce row in one transaction, then set the KeyStore `storage-mark`; `backup.export`
 //   records its nonce row only (the audit record of a recovery kit export).
@@ -35,6 +37,7 @@ import {
   agentLabelParamsSchema,
   appChangeParamsSchema,
   approvalIdSchema,
+  backupExportParamsSchema,
   contactRenameParamsSchema,
   evmAddress,
   fileSaveParamsSchema,
@@ -231,6 +234,25 @@ const unchanged = (row: Row<'approvals'> | undefined, snap: Snapshot): boolean =
   row.expires_at === snap.expiresAt &&
   row.scope_json === snap.scopeJson;
 
+/**
+ * WP-12: one contact's state for Block and Unblock. `unknown` for a missing or removed row;
+ * `revoked` by status or by the revoked set (07 §3), which neither op ever changes.
+ */
+function contactBlockState(
+  tx: StoreTx,
+  contactId: string,
+): 'unknown' | 'revoked' | 'active' | 'blocked' {
+  const row = tx.get('contacts', { contact_id: contactId });
+  if (row === undefined || row.status === 'removed') return 'unknown';
+  if (
+    row.status === 'revoked' ||
+    tx.get('revoked_agents', { agent_evm: contactId }) !== undefined
+  ) {
+    return 'revoked';
+  }
+  return row.status === 'blocked' ? 'blocked' : 'active';
+}
+
 const nonceRow = (signed: SignedOwnerAction, actionHash: string, now: number) => ({
   nonce: signed.body.nonce,
   op: signed.body.op,
@@ -339,6 +361,9 @@ export class OwnerActions {
       case 'contact.rename':
       case 'contact.remove':
         return this.#applyContactChange(value, base);
+      case 'contact.block':
+      case 'contact.unblock':
+        return this.#applyContactBlock(value, base);
       case 'storage.set':
       case 'storage.remove':
         return this.#applyStorage(text, value, base);
@@ -473,6 +498,60 @@ export class OwnerActions {
         { contact_id: contactId, status: { in: ['active', 'blocked'] } },
         { status: 'removed', updated_at: now },
       );
+      return { status: 'applied', op };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * `contact.block` and `contact.unblock` (UX1112 WP-12, F-2; 04 §2.5.1; 02 F-14; D-72; proposed,
+   * owner confirms at merge). The object checks and the nonce first (L(op) = 600 s). Then, in one
+   * store transaction, the nonce is checked again and the op's rule: the contact must be stored and
+   * not removed (`contact_unknown`), not revoked by status or in the revoked set (`contact_revoked`:
+   * blocking or unblocking never changes `revoked`), and `active` for a block (`already_blocked`)
+   * or `blocked` for an unblock (`not_blocked`). Only then are the nonce row (the audit record) and
+   * the new status written; a refusal writes nothing. A blocked contact's later envelopes are dropped
+   * at 04 §3.1.1 (screenInboundTx), never queued as requests or held; an unblock does not bring back
+   * what was dropped. Nothing is sent to the contact.
+   */
+  async #applyContactBlock(
+    value: unknown,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    const { body } = signed;
+    if (body.op !== 'contact.block' && body.op !== 'contact.unblock') {
+      return this.#report(refused(body.op, 'malformed'));
+    }
+    const op = body.op;
+    const contactId = body.params.contact;
+    const from = op === 'contact.block' ? 'active' : 'blocked';
+    const to = op === 'contact.block' ? 'blocked' : 'active';
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) {
+        return refused(op, 'nonce_used');
+      }
+      const state = contactBlockState(tx, contactId);
+      if (state === 'unknown') return refused(op, 'contact_unknown');
+      if (state === 'revoked') return refused(op, 'contact_revoked');
+      if (state !== from) {
+        return refused(op, op === 'contact.block' ? 'already_blocked' : 'not_blocked');
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      if (
+        tx.update(
+          'contacts',
+          { contact_id: contactId, status: from },
+          { status: to, updated_at: now },
+        ) !== 1
+      ) {
+        throw new Error('contact status changed inside the transaction');
+      }
       return { status: 'applied', op };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
@@ -1480,6 +1559,25 @@ export class OwnerActions {
   }
 
   /**
+   * The unsigned `backup.export` for this agent (WP-11, D-117 A; 04 §2.3.3, §2.5.1): `kitId` is the
+   * 16 CSPRNG bytes the local app server drew for this kit (base64url without padding) and
+   * `contents` is `full` or `identity`; anything else is `params_invalid`. apply() records its nonce
+   * row, the audit record of the export, and only then may the kit be sealed. Writes nothing.
+   */
+  async prepareBackupExport(
+    kitId: string,
+    contents: 'full' | 'identity',
+  ): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'backup.export', reason }) as const;
+    const params = backupExportParamsSchema.safeParse({ kitId, contents });
+    if (!params.success) return refuse('params_invalid');
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    return this.#build(signer, 'backup.export', params.data);
+  }
+
+  /**
    * The unsigned `contact.remove` (04 §2.5.1; 07 §3): refused for an unknown or removed contact and
    * for a revoked one (removing never changes `revoked`), as apply() refuses them.
    */
@@ -1503,6 +1601,38 @@ export class OwnerActions {
     if (state === 'unknown') return refuse('contact_unknown');
     if (state === 'revoked') return refuse('contact_revoked');
     return this.#build(signer, 'contact.remove', { contact: contactId });
+  }
+
+  /**
+   * The unsigned `contact.block` (UX1112 WP-12, F-2; 04 §2.5.1): refused before any gesture, as
+   * apply() refuses it, for an unknown, removed or revoked contact and one that is already blocked.
+   */
+  async prepareContactBlock(contactId: string): Promise<PreparedOwnerAction> {
+    return this.#prepareContactBlock('contact.block', contactId);
+  }
+
+  /**
+   * The unsigned `contact.unblock` (WP-12): refused before any gesture for an unknown, removed or
+   * revoked contact and one that is not blocked.
+   */
+  async prepareContactUnblock(contactId: string): Promise<PreparedOwnerAction> {
+    return this.#prepareContactBlock('contact.unblock', contactId);
+  }
+
+  async #prepareContactBlock(
+    op: 'contact.block' | 'contact.unblock',
+    contactId: string,
+  ): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) => ({ status: 'refused', op, reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    if (!evmAddress.safeParse(contactId).success) return refuse('contact_unknown');
+    const state = await this.#ctx.store.transaction((tx) => contactBlockState(tx, contactId));
+    if (state === 'unknown') return refuse('contact_unknown');
+    if (state === 'revoked') return refuse('contact_revoked');
+    if (op === 'contact.block' && state !== 'active') return refuse('already_blocked');
+    if (op === 'contact.unblock' && state !== 'blocked') return refuse('not_blocked');
+    return this.#build(signer, op, { contact: contactId });
   }
 
   /**

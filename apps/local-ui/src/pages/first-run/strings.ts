@@ -1,10 +1,10 @@
 // First-run copy (d1 Local-firstrun with the DESIGN-ADJ-1 (a) fixes LF-1 and LF-3; UX audit 1b, 1c,
 // 1d; D-120). Plain words only (11 §5): no key, hash, wallet, gas, chain or transaction in the default
-// view. The owner fingerprint is an identity value (11 §5.2) and is shown once setup is done.
+// view. The ID tag is an identity value (11 §5.2) and is shown once setup is done.
 //
 // M1-UX-FIRSTRUN-V2 (D-130 (1), (2); 11 §5.5, §6.2.1; copy proposed, owner confirms at merge): the
-// passkey-first flow, Protect approvals (with the folders) → Your backup code (save form, "I saved
-// it") → Recovery kit → Ready. The button names the platform. The backup code is never "password".
+// passkey-first flow, Protect approvals (with the folders) → Your master code (save form, "I saved
+// it") → Recovery kit → Ready. The button names the platform. The master code is never "password".
 import { FAILURE_COPY } from '../../api/failure-reasons.js';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 
@@ -49,26 +49,26 @@ export const FIRST_RUN = {
   // F49: `browser` is undefined when the page already runs in the browser that would be suggested.
   noPrf: (sensor: string, browser: string | undefined): string =>
     browser === undefined
-      ? `${sensor} on this computer can't protect approvals yet. Continue with a backup code only.`
-      : `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to use it, or continue with a backup code only.`,
-  backupOnly: 'Continue with a backup code only',
+      ? `${sensor} on this computer can't protect approvals yet. Continue with a master code only.`
+      : `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to use it, or continue with a master code only.`,
+  backupOnly: 'Continue with a master code only',
   waiting: 'Waiting for your passkey…',
 
-  // 11 §5.5 "Backup code at first run" (D-130 (1)).
-  backupTitle: 'Your backup code',
+  // 11 §5.5 "Master code at first run" (D-130 (1)).
+  backupTitle: 'Your master code',
   doneBody: 'Approvals on this computer are protected.',
   // M1-11s-c-c: shown prominently, before the code, when no passkey protects approvals.
-  doneNoPasskeyTitle: 'Save your backup code — you need it to approve.',
+  doneNoPasskeyTitle: 'Save your master code — you need it to approve.',
   doneNoPasskeyBody:
-    "This browser can't protect approvals with a passkey here, so this backup code is how you approve on this computer.",
+    "This browser can't protect approvals with a passkey here, so this master code is how you approve on this computer.",
   backupBody: (sensor: string): string =>
-    `This opens your approvals if ${sensor} isn't available. Never give it to your AI.`,
+    `Your master code approves changes when ${sensor} isn't available and unlocks your AgentLink key. Save it once. We can't recover it for you. Never give it to your AI.`,
   backupLost:
     "Lost it? You can't get this code back. Your recovery kit restores everything instead.",
   saveToManager: 'Save in my password manager',
   saveAsked: 'If your browser or password manager offered to save it, accept there.',
   savedAs: 'Saved as',
-  savedAsLabel: (computer: string): string => `AgentLink backup code – ${computer}`,
+  savedAsLabel: (computer: string): string => `AgentLink master code – ${computer}`,
   clipboardWarning: 'Other apps can read your clipboard.',
   savedIt: 'I saved it',
   // The first policy's outcome (D-130 (2)).
@@ -78,15 +78,16 @@ export const FIRST_RUN = {
     "AgentLink couldn't allow your Send folder, so your AI can't send files yet. You can allow a folder later in Files.",
   sendNotConfirmed:
     "Your Send folder was set up, but AgentLink couldn't confirm it. Run `agentlink doctor` in your own terminal.",
-  fingerprintLabel: 'Your owner fingerprint',
-  fingerprintNote: 'Run `agentlink doctor` in your own terminal: it shows the same fingerprint.',
-  backupLabel: 'Backup code',
+  fingerprintLabel: 'Your ID tag',
+  fingerprintNote: 'Run `agentlink doctor` in your own terminal: it shows the same ID tag.',
+  backupLabel: 'Master code',
   shownOnce: 'Shown once',
   copy: 'Copy',
   copied: 'Copied',
   // F49: Copy never fails silently; "Save as file" downloads a small .txt (local only).
   copyFailed: "Couldn't copy here. Select the code above and copy it, or save it as a file.",
   saveFile: 'Save as file',
+  fileSavedShort: 'Saved',
   fileSaved: 'Saved to your Downloads folder as agentlink-backup-code.txt. Keep that file private.',
   fileFailed: "Couldn't save a file here. Copy the code or save it in your password manager.",
   // 08 §1 `done_unconfirmed`.
@@ -95,12 +96,12 @@ export const FIRST_RUN = {
 
   // U3-a (D-138; 08 §1): the end of first run lands on Home.
   toHome: 'Go to Home',
-  // The recovery kit is put off ("Later", remembered for the banner) when the backup code is saved.
+  // The recovery kit is put off ("Later", remembered for the banner) when the master code is saved.
   leaving: 'Opening Home…',
 
   alreadyTitle: 'Approvals are already protected on this computer',
   alreadyBody:
-    "If you didn't set this up yourself, don't use this ID: run `agentlink doctor` in your own terminal and compare the owner fingerprint.",
+    "If you didn't set this up yourself, don't use this ID: run `agentlink doctor` in your own terminal and compare the ID tag.",
 
   unsupportedTitle: "This browser can't make a passkey",
   unsupportedBody:
@@ -164,9 +165,9 @@ export const SETUP_MESSAGES = {
   changed: 'Its settings changed since you looked. Nothing was saved. Try again.',
   tries_exhausted: 'That was the third try. Nothing was saved. Start again.',
   // IR-M1-11b-1-1 L-2: the connection dropped after finish was sent, and the re-check says the owner
-  // exists: the setup probably finished, but its answer (with the backup code) never arrived.
+  // exists: the setup probably finished, but its answer (with the master code) never arrived.
   finishedNoCode:
-    "Setup probably finished, but the connection dropped before your backup code could be shown. Approve with your passkey. If your passkey doesn't work, run `agentlink doctor` in your own terminal.",
+    "Setup probably finished, but the connection dropped before your master code could be shown. Approve with your passkey. If your passkey doesn't work, run `agentlink doctor` in your own terminal.",
   notFinished: "The connection dropped and setup didn't finish. Nothing was kept. Try again.",
 } as const;
 
@@ -189,43 +190,43 @@ const APPROVE_WITH: Readonly<Record<Platform, string>> = {
 
 /**
  * M1-UX-FIRSTRUN-V2-c (B-9; 08 §1 first run v2; 11 §5.5, §6.2.1; copy proposed, owner confirms at
- * merge): an owner set up before 0.3.0 (in the terminal, with the code `owner init` printed, the backup code
- * in the local app) enters it once, then one passkey gesture. The backup code keeps working.
+ * merge): an owner set up before 0.3.0 (in the terminal, with the code `owner init` printed, the master code
+ * in the local app) enters it once, then one passkey gesture. The master code keeps working.
  */
 export const UPGRADE = {
   title: (platform: Platform): string => SWITCH_TITLE[platform],
   body: (sensor: string): string =>
-    `Enter your backup code once, then approve with ${sensor} instead of typing it. Your backup code keeps working when ${sensor} isn't available. Never give it to your AI.`,
-  codeLabel: 'Backup code',
+    `Enter your master code once, then approve with ${sensor} instead of typing it. Your master code keeps working when ${sensor} isn't available. Never give it to your AI.`,
+  codeLabel: 'Master code',
   // 0.2.0 owners know the code by its terminal name (the one shared hint, src/strings.ts).
   codeHint: EARLIER_OWNER_CODE_HINT,
   // F49: `browser` is undefined when the page already runs in the browser that would be suggested.
   noPrf: (sensor: string, browser: string | undefined): string =>
     browser === undefined
-      ? `${sensor} on this computer can't protect approvals yet, so AgentLink uses your backup code.`
-      : `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to switch. Until then, approve with your backup code.`,
+      ? `${sensor} on this computer can't protect approvals yet, so AgentLink uses your master code.`
+      : `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to switch. Until then, approve with your master code.`,
   doneTitle: (platform: Platform): string => ON_TITLE[platform],
   doneBody: (sensor: string): string =>
-    `Next time, approve with ${sensor}. Your backup code still works if ${sensor} isn't available, so keep it saved.`,
+    `Next time, approve with ${sensor}. Your master code still works if ${sensor} isn't available, so keep it saved.`,
   // U3-a (D-138): the end of the first-run page lands on Home.
   toHome: 'Go to Home',
   // The next step on every app page (b11 Home "Next step"; the d1 shared-states banner).
   bannerTitle: (platform: Platform): string => APPROVE_WITH[platform],
-  bannerBody: 'Enter your backup code once to switch. It keeps working as your backup.',
+  bannerBody: 'Enter your master code once to switch. It keeps working as your backup.',
   bannerAction: (platform: Platform): string => SWITCH_TITLE[platform],
 } as const;
 
 /** The switch's fixed answers in plain words (setup-api.ts UpgradeProblem); never server text. */
 export const UPGRADE_MESSAGES = {
-  empty: 'Enter your backup code first.',
-  presence_rejected: "That backup code didn't work. Check it and try again. Nothing changed.",
-  presence_required: "Your browser didn't send the backup code. Nothing changed. Try again.",
+  empty: 'Enter your master code first.',
+  presence_rejected: "That master code didn't work. Check it and try again. Nothing changed.",
+  presence_required: "Your browser didn't send the master code. Nothing changed. Try again.",
   cancelled: "The passkey wasn't created. Nothing changed. Try again when you're ready.",
   // F49: `browser` is undefined when the page already runs in the browser that would be suggested.
   unsupported: (browser: string | undefined, sensor = 'This passkey'): string =>
     browser === undefined
-      ? `${sensor} on this computer can't protect approvals yet, so AgentLink uses your backup code. Nothing changed.`
-      : `This passkey can't protect approvals here. Nothing changed. Keep approving with your backup code, or open this page in ${browser}.`,
+      ? `${sensor} on this computer can't protect approvals yet, so AgentLink uses your master code. Nothing changed.`
+      : `This passkey can't protect approvals here. Nothing changed. Keep approving with your master code, or open this page in ${browser}.`,
   busy: SETUP_MESSAGES.busy,
   wait: SETUP_MESSAGES.wait,
   failed: "The switch didn't finish. Run `agentlink doctor` in your own terminal for details.",
@@ -266,15 +267,15 @@ export const NAME = {
   change: 'Change',
   changeLabel: (app: string): string => `Change the AI app (${app})`,
   setting: 'Setting up…',
-  backupInstead: 'Use a backup code instead',
+  backupInstead: 'Use your master code instead',
   back: 'Back',
   /** W4-ONE-TOUCH (D-140; 11 §5.8 "Create and connect"): prefilled; unticked = "Not now". */
   connectTo: (app: string): string => `Connect to ${app}`,
   notNow: 'Not now',
-  /** W4-ONE-TOUCH: New ID with the backup code. */
-  confirmCode: 'Confirm with my backup code',
-  /** W8-F12 (11 §5.5 "backup code"; copy proposed, owner confirms at merge): what the code is. */
-  codeWhat: 'Your backup code is the code you saved when you first set up AgentLink.',
+  /** W4-ONE-TOUCH: New ID with the master code. */
+  confirmCode: 'Confirm with my master code',
+  /** W8-F12 (11 §5.5 "master code"; copy proposed, owner confirms at merge): what the code is. */
+  codeWhat: 'Your master code is the code you saved when you first set up AgentLink.',
 } as const;
 
 /** W4-ONE-TOUCH (D-140; 11 §5.8 "Create and connect"): after the one gesture. */
@@ -302,7 +303,7 @@ export const CONNECT = {
     `ID folder: ${folder}. A backup of the file is saved first. Nothing else in it changes.`,
   loading: 'Checking the settings…',
   apply: (sensor: string): string => `Apply with ${sensor}`,
-  applyCode: 'Apply with my backup code',
+  applyCode: 'Apply with my master code',
   later: 'Later',
   connecting: 'Connecting…',
   notYet: 'Not connected yet. Try again.',
@@ -323,6 +324,6 @@ export const CONNECT = {
   restart: (app: string): string => `Restart ${app} to finish`,
   restartNote: 'AgentLink never restarts it for you. Open it again when you are ready.',
   alreadyDone: (app: string): string => `${app} already works with this ID.`,
-  codeLabel: 'Backup code',
-  presenceHint: 'Confirm it’s you. Never give your backup code to your AI.',
+  codeLabel: 'Master code',
+  presenceHint: 'Confirm it’s you. Never give your master code to your AI.',
 } as const;

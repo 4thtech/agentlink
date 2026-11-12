@@ -91,6 +91,36 @@ describe('chapter 4: agents', () => {
     await probe.check();
   }, 180_000);
 
+  // WP-1 (the owner's 0.4.13 run, root cause): the ID open when `agentlink ui` starts could not be
+  // renamed with a new card ("Couldn't rename it") until another ID was opened: the launch path
+  // gave the server no key-items token. Here the app is quit and launched again, then Rename runs
+  // on the ID open at launch, with one Touch ID, and the card carries the new name.
+  it('renames the ID open at launch, one Touch ID, and the card takes the new name', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    const first = await startUiRun(pc, ready.files, ch.closers);
+    await firstRunWithTouchId(jp, first.link, 'Ana');
+    await first.stop();
+    await jp.page.goto(await startUi(pc, ready.files, ch.closers));
+    await skipGetStartedIfShown(jp.page);
+    const before = jp.gestures.total();
+    await openAgents(jp.page);
+    await agentCard(jp.page, 'Ana').getByRole('button', { name: 'Rename', exact: true }).click();
+    await jp.page.getByLabel('Name').fill('Ana Studio');
+    await jp.page.getByRole('button', { name: 'Rename with Touch ID' }).click();
+    await withDiagnostics(jp.page, 'Rename asks for Touch ID', () =>
+      jp.page.getByRole('button', { name: CONFIRM_PASSKEY }).click({ timeout: 60_000 }),
+    );
+    await agentCard(jp.page, 'Ana Studio').waitFor({ timeout: 30_000 });
+    expect(await text(jp.page)).not.toContain("Couldn't rename it");
+    expect(jp.gestures.total() - before).toBe(1);
+    // The card itself: an invite made now names the new name (no note left).
+    expect(await text(jp.page)).not.toContain('still see');
+  }, 240_000);
+
   // W4-SHELL (D1): the switcher lists every agent with its letter icon (Decision 44 B1), and a
   // switch changes the agent in place (the generation guard swaps the views, no reload).
   it('the switcher lists every agent with its letter icon, and switching does not reload', async (ctx) => {
@@ -345,7 +375,8 @@ describe('chapter 4: agents', () => {
       expect(await a.page.getByRole('menuitemradio').filter({ hasText: 'Ana' }).count()).toBe(0);
       await eventually(
         'Bo sees Ana retired',
-        async () => (await text(b.page)).includes('No longer active'),
+        // The badge is drawn in capitals (text-transform), so innerText reads it upper-case.
+        async () => (await text(b.page)).toLowerCase().includes('no longer active'),
         30_000,
       );
       await bProbe.check();

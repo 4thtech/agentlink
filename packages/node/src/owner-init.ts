@@ -2,12 +2,12 @@
 // (04 §2.2, §2.8 "owner init rules"; 07 §9.3, §9.4; D-67). Until the M1b setup page exists the owner
 // runs it personally, in a terminal the agent does not control.
 //
-// - Default: a generated 120-bit owner code (secretKind 1), shown once, re-typed, screen cleared.
+// - Default: a generated 120-bit master code (secretKind 1), shown once, re-typed, screen cleared.
 // - A chosen owner passphrase (secretKind 2) only after an explicit opt-in that first states the
 //   offline-guessing exposure (04 §2.2); at least 12 code points after NFKC (D-66 (3)).
 // - Never overwrites: an existing `owner` item, or an owner the agent card already names, refuses.
 // - The code is display-only: never written to a file, never offered as one (04 §2.8).
-// - The owner fingerprint and the lost-code consequence are shown before the code.
+// - The ID tag and the lost-code consequence are shown before the code.
 // - File-KeyStore machines: a chosen passphrase is refused; their `owner.alko` is M1-8f.
 // - M1-8h: in the same owner operation, the agent's first card (04 §2.5 "the card signature at owner
 //   setup"; owner-first-card.ts). The new owner is stored, unlocked once with the secret still in
@@ -33,7 +33,7 @@ import {
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
 import { generateSecretCode } from '@4thtech-io/crypto/keystore';
-import { restrictName } from '@4thtech-io/core';
+import { isRestrictedAlias, restrictName } from '@4thtech-io/core';
 import { CLI_COMMAND } from './cli-command.js';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS } from './keychain-keystore.js';
@@ -45,6 +45,7 @@ import {
 } from './keychain.js';
 import type { FirstAgentCard } from './owner-first-card.js';
 import {
+  cardNameOf,
   signFirstParts,
   type FirstConnectResult,
   type FirstLabelResult,
@@ -97,14 +98,18 @@ export type OwnerSetupOptions = OwnerInitOptions & { readonly firstCard: FirstAg
 export interface OwnerInitResult {
   /** The new owner's public keys, for the agent card (04 §2.4). */
   readonly owner: OwnerPublicKeys;
-  /** The short owner fingerprint (11 §5.2). */
+  /** The short ID tag (11 §5.2). */
   readonly fingerprint: string;
-  /** 1 = generated owner code, 2 = chosen owner passphrase. */
+  /** 1 = generated master code, 2 = chosen owner passphrase. */
   readonly secretKind: 1 | 2;
   /** M1-8h: the first card, signed by the new owner and stored, when `firstCard` was given. */
   readonly card?: AgentCard;
   /** M1-36b-2: the first rules (the Send folder), when `firstCard.firstPolicy` was given. */
   readonly sendFolder?: SendFolderResult;
+  /** WP-1 (R-3): the first label, when `firstCard.firstLabel` was given (`--label`). */
+  readonly label?: FirstLabelResult;
+  /** WP-1: the label now in force (the typed or given one), only when `label` is `saved`. */
+  readonly labelName?: string;
 }
 
 /** Internal options (tests): Argon2id parameters and keychain timeout. */
@@ -115,30 +120,30 @@ export interface OwnerInitInternals {
 
 const ATTEMPTS = 3;
 
-// 07 §9.4 copy (string keys cli.owner_init.*). "Owner code" and "owner passphrase" are the 11 §5.5
+// 07 §9.4 copy (string keys cli.owner_init.*). "Master code" and "owner passphrase" are the 11 §5.5
 // names; never "password".
 const COPY = {
   ownerExists: (fingerprint: string): string =>
     `This agent already has an owner (${fingerprint}). AgentLink won't replace it. To use an owner from another device, link it from that device.`,
-  fingerprint: (fingerprint: string): string => `Your owner fingerprint: ${fingerprint}.`,
+  fingerprint: (fingerprint: string): string => `Your ID tag: ${fingerprint}.`,
   beforeCode:
-    "Store this owner code off this machine, for example in your password manager. Without it, nobody can approve for this agent or remove it, and until backups are available you'd have to set up a new agent and pair again.",
+    "Store this master code off this machine, for example in your password manager. Without it, nobody can approve for this agent or remove it, and until backups are available you'd have to set up a new agent and pair again.",
   beforePassphrase:
     "Keep this owner passphrase off this machine, for example in your password manager. Without it, nobody can approve for this agent or remove it, and until backups are available you'd have to set up a new agent and pair again.",
-  code: (grouped: string): string => `Your owner code: ${grouped}`,
+  code: (grouped: string): string => `Your master code: ${grouped}`,
   retype: 'Type its last four characters to continue:',
-  retypeWrong: "That doesn't match. Check the last four characters of your owner code.",
-  retypeFailed: `The owner code wasn't confirmed. Nothing was saved; run \`${CLI_COMMAND} owner init\` again.`,
+  retypeWrong: "That doesn't match. Check the last four characters of your master code.",
+  retypeFailed: `The master code wasn't confirmed. Nothing was saved; run \`${CLI_COMMAND} owner init\` again.`,
   passphraseNote:
-    'A passphrase you choose is weaker than a generated owner code. Any program running as you on this computer, including your AI app, can read the locked copy your passphrase protects and try to guess the passphrase offline. A generated owner code makes that infeasible.',
+    'A passphrase you choose is weaker than a generated master code. Any program running as you on this computer, including your AI app, can read the locked copy your passphrase protects and try to guess the passphrase offline. A generated master code makes that infeasible.',
   passphraseConfirm: 'Use your own owner passphrase anyway? [y/N]',
   passphrase: 'Owner passphrase (at least 12 characters):',
   passphraseAgain: 'Type it again:',
   passphraseMismatch: "The two entries don't match.",
   done: (fingerprint: string): string =>
-    `Owner set up. Your owner fingerprint: ${fingerprint}. Check that \`${CLI_COMMAND} doctor\` shows the same one.`,
+    `Owner set up. Your ID tag: ${fingerprint}. Check that \`${CLI_COMMAND} doctor\` shows the same one.`,
   fileNoPassphrase:
-    'On a computer without a system keychain, approvals are protected by a generated owner code only.',
+    'On a computer without a system keychain, approvals are protected by a generated master code only.',
   fileUnavailable:
     "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't set up an owner for yet. Update AgentLink.",
   ownerOnMachine: `An owner is already set up on this computer, so AgentLink won't create another. To give this agent a card from it, run \`${CLI_COMMAND} owner add-agent --agent <name>\` yourself, in your own terminal.`,
@@ -228,6 +233,8 @@ export async function initOwnerWith(
 
   // M1-8h-b: the display name the first card commits to, asked before any code is shown.
   const named = first === undefined ? undefined : await withDisplayName(terminal, first);
+  // WP-1 (R-3): a first label core would not sign is refused before any code is shown.
+  if (named !== undefined) cardNameOf(named);
 
   // M1-36b-2: the Send folder for the first rules, checked or created before any code is shown, and
   // removed again (only while empty and only if this run created it) unless the rules took effect.
@@ -296,6 +303,10 @@ async function setUpOwner(
       secretKind: usePassphrase ? 2 : 1,
       ...(issued === undefined ? {} : { card: issued.card }),
       ...(sendFolder === undefined ? {} : { sendFolder }),
+      ...(issued?.label === undefined ? {} : { label: issued.label }),
+      ...(issued?.label === 'saved' && named?.firstLabel !== undefined
+        ? { labelName: named.firstLabel.label }
+        : {}),
     });
   } finally {
     wipe(seed, secret);
@@ -408,7 +419,11 @@ async function issueFirstCard(
   blob: Uint8Array,
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
   plan?: SendFolderPlan,
-): Promise<{ readonly card: AgentCard; readonly sendFolder?: SendFolderResult }> {
+): Promise<{
+  readonly card: AgentCard;
+  readonly sendFolder?: SendFolderResult;
+  readonly label?: FirstLabelResult;
+}> {
   const outcome = await signFirstCardWith(keychain, owner, secret, first, timeoutMs, plan);
   if (outcome.kind === 'signed') return outcome;
   if (outcome.kind === 'unknown')
@@ -438,6 +453,10 @@ function displayNameAllowed(typed: string): boolean {
  * M1-8h-b: asks the owner for the agent's display name (self-declared, 04 §2.4), on terminals that
  * can read a visible line. Enter keeps the name the caller passed (the local agent name); a name
  * outside the rule is asked again, and after three refusals the caller's name is kept.
+ *
+ * WP-1 (R-3): with a first label (`--label`, default the folder name), the question starts from that
+ * label and the answer becomes the label, which also names the card (cardNameOf): card and label are
+ * one name from the start, as in the app. Without one, the typed name names the card only.
  */
 async function withDisplayName(
   terminal: OwnerTerminal,
@@ -445,14 +464,21 @@ async function withDisplayName(
 ): Promise<FirstAgentCard> {
   if (terminal.readText === undefined) return first;
   assertPrintable(first.name, 'The agent name');
+  const firstLabel = first.firstLabel;
+  const current = firstLabel?.label ?? first.name;
+  assertPrintable(current, 'The agent name');
   terminal.write(COPY.nameNote);
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
-    const typed = (await terminal.readText(COPY.nameQuestion(first.name))).normalize('NFC').trim();
+    const typed = (await terminal.readText(COPY.nameQuestion(current))).normalize('NFC').trim();
     if (typed === '') return first;
-    if (displayNameAllowed(typed)) return { ...first, name: typed };
+    if (firstLabel !== undefined) {
+      if (displayNameAllowed(typed) && isRestrictedAlias(typed)) {
+        return { ...first, firstLabel: { ...firstLabel, label: typed } };
+      }
+    } else if (displayNameAllowed(typed)) return { ...first, name: typed };
     terminal.write(COPY.nameRefused);
   }
-  terminal.write(COPY.nameKept(first.name));
+  terminal.write(COPY.nameKept(current));
   return first;
 }
 

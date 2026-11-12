@@ -541,6 +541,8 @@ export class AgentLinkClient {
   mcpSession(options: {
     readonly pid: number;
     readonly pidAlive?: (pid: number) => boolean;
+    /** WP-13 (F45): the AgentLink version this process runs, for the restart hint (08 §1). */
+    readonly version?: string;
   }): McpSession {
     return new McpSession({
       store: this.#ctx.store,
@@ -548,6 +550,7 @@ export class AgentLinkClient {
       agentId: this.agentId,
       pid: options.pid,
       ...(options.pidAlive === undefined ? {} : { pidAlive: options.pidAlive }),
+      ...(options.version === undefined ? {} : { version: options.version }),
     });
   }
 
