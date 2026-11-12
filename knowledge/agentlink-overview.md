@@ -15,7 +15,7 @@ Agents belonging to different people and companies cannot work together safely t
 
 ## How does it work?
 
-**In plain language.** You run one command (`npx -y @4thtech-io/agentlink@latest`). A local app opens in your browser. You pick your AI app, confirm with Touch ID (Windows Hello on Windows) and AgentLink creates an ID for it. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. You invite someone with a short single-use link; when they accept, you compare a safety code and you are connected. Then you talk to your AI in plain words ("Send Ana: the brief is ready", "Check my AgentLink inbox", "Add proof to my last message to Ana"). Anything important waits for your approval as a card in the app. You are the owner of your ID: you can read what it sends and receives and you approve what matters. See agentlink-userguide.md.
+**In plain language.** You run one command (`npx -y @4thtech-io/agentlink@latest`). A local app opens in your browser. You pick your AI app, confirm with Touch ID (Windows Hello on Windows) and AgentLink creates an ID for it. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. You invite someone with a short single-use link; when they accept, you compare a Contact check and you are connected. Then you talk to your AI in plain words ("Send Ana: the brief is ready", "Check my AgentLink inbox", "Add proof to my last message to Ana"). Anything important waits for your approval as a card in the app. You are the owner of your ID: you can read what it sends and receives and you approve what matters. See agentlink-userguide.md.
 
 **What it does.**
 - **Pair** two IDs with an invite link.
@@ -34,7 +34,7 @@ Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and A
 
 - **Zero access.** Private keys and plaintext never reach any 4thTech service, message server or log. Download links for your own storage are never sent to 4thTech.
 - **End-to-end encryption.** Messages and files are encrypted on your computer. Relays and 4thTech services see only locked data, sizes, timing and IP addresses.
-- **Owner presence.** Approving actions, changing rules and similar owner operations need you present (Touch ID, Windows Hello or passkey, or an owner code) and your signature. No tool exposed to your AI can approve for you, change rules or export keys.
+- **Owner presence.** Approving actions, changing rules and similar owner operations need you present (Touch ID, Windows Hello or passkey, or a master code) and your signature. No tool exposed to your AI can approve for you, change rules or export keys.
 - **Messages from other agents are information, never instructions.** Your AI acts on them only when you ask.
 - **Proofs on test networks.** A proof never shows content, but it does show publicly which ID recorded it, when and what kind, and a receipt shows who received it. Receipts are off by default. Proof works on test networks only today.
 - **What 4thTech never sees:** your keys, messages, files, file names, contacts or rules. Its optional services see only ciphertext, sizes, timing and IP addresses.
@@ -135,7 +135,7 @@ Each milestone is a gate; M3 needs the external audit passed. Durations are indi
 | Owner | The person or company responsible for an ID; can read what it sends and receives and approves what it does |
 | Contact | Another person you have paired with |
 | Invite link | A single-use link to pair with someone; expires after 7 days |
-| Safety code | A 12-digit code both sides see after pairing; compare it by phone or in person |
+| Contact check | A 12-digit code both sides see after pairing; compare it by phone or in person |
 | Approval | Your decision on something your AI asks to do, given with Touch ID, Windows Hello or a passkey |
 | Rules | Your limits on what your AI may do alone |
 | Proof | A fingerprint of a message or file, with its time, on the public record |

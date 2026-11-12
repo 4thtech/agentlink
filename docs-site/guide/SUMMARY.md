@@ -2,13 +2,12 @@
 
 * [What is AgentLink?](README.md)
 * [How AgentLink works, simply](how-agentlink-works.md)
+* [Quick start: from install to first chat](quick-guide.md)
 
-## Get started
+## Step by step
 
-* [Quick guide: from install to first chat](quick-guide.md)
-* [Get started](get-started/README.md)
-  * [Start fast](get-started/start-fast.md)
-  * [Set up in your AI tool](get-started/set-up-in-your-ai-tool.md)
+* [Install AgentLink](get-started/start-fast.md)
+* [Connect your AI app](get-started/README.md)
   * [Claude Code](get-started/claude-code.md)
   * [Codex](get-started/codex.md)
   * [Gemini CLI](get-started/gemini-cli.md)
@@ -19,42 +18,43 @@
   * [Windows](get-started/windows.md)
   * [ChatGPT (coming later)](get-started/chatgpt.md)
   * [Other AI apps](get-started/other-ai-apps.md)
+  * [Set up in your AI tool, the long way](get-started/set-up-in-your-ai-tool.md)
+* [Invite someone](local-app/invite-someone.md)
+* [Accept an invite](get-started/join-from-an-invite.md)
+* [Name and check a contact](get-started/pair-with-someone.md)
+* [Talk to a contact through your AI](get-started/first-message.md)
+* [Approve with Touch ID or your master code](everyday-use/approvals.md)
+* [Add a proof](everyday-use/agreements-and-proof.md)
+* [Send and receive files](everyday-use/files.md)
+* [Rename, remove and back up IDs](local-app/ids.md)
+* [Manage contacts](everyday-use/contacts.md)
+* [Your master code and recovery kit](local-app/first-run.md)
 * [Protect your approvals](get-started/protect-your-approvals.md)
 * [Upgrading from 0.2.0](get-started/upgrading-from-0.2.0.md)
-* [Join from an invite](get-started/join-from-an-invite.md)
-* [Pair with someone](get-started/pair-with-someone.md)
-* [Send your first message](get-started/first-message.md)
 
-## The local app
+## The app, screen by screen
 
 * [The local app](local-app/README.md)
   * [Home](local-app/home.md)
   * [Get started](local-app/get-started-wizard.md)
-  * [Invite someone](local-app/invite-someone.md)
   * [Approvals](local-app/approvals.md)
-  * [First run and your backup code](local-app/first-run.md)
-  * [IDs](local-app/ids.md)
   * [AI apps page](local-app/ai-apps.md)
   * [Activity](local-app/activity.md)
   * [Proofs and credits](local-app/proofs-and-credits.md)
   * [Messages page](local-app/messages.md)
-  * [Contacts page](local-app/contacts.md)
+  * [People page](local-app/contacts.md)
   * [Files page](local-app/files.md)
   * [Rules page](local-app/rules.md)
-  * [Appearance and Under the hood](local-app/appearance.md)
+  * [Appearance](local-app/appearance.md)
   * [Under the hood](local-app/under-the-hood.md)
   * [Confirming paid actions](local-app/confirm-paid-actions.md)
 
-## Everyday use
+## More everyday use
 
-* [Contacts](everyday-use/contacts.md)
 * [Messages](everyday-use/messages.md)
 * [How messages are delivered](everyday-use/how-messages-are-delivered.md)
-* [Files](everyday-use/files.md)
 * [Folders for sending files](everyday-use/allowed-folders.md)
-* [Approvals](everyday-use/approvals.md)
 * [Negotiating terms](everyday-use/negotiating-terms.md)
-* [Agreements and proof](everyday-use/agreements-and-proof.md)
 * [Credits](everyday-use/credits.md)
 
 ## Coming later

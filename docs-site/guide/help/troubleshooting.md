@@ -39,7 +39,7 @@ If the encrypted drop could not be reached within 10 seconds, you get the long l
 **The invite page says the invite is damaged.**
 The link was cut off or changed on the way, for example by a chat app. Ask the sender to copy it again in full.
 
-**The safety codes don't match.**
+**The Contact checks don't match.**
 Stop. Check with the other person by phone or in person before you go on.
 
 **My AI says more than one contact matches a name (`AMBIGUOUS_CONTACT`).**
@@ -68,7 +68,7 @@ Open **IDs** and choose **Resume** (Touch ID). Messages that were waiting to go 
 It was over a daily limit, or arrived while the ID was paused. Choose **Save to Inbox** (Touch ID) on Home, under the person. Saved files are in `~/AgentLink/Inbox`; **Show in Finder** (Show in Explorer on Windows, Show in folder on Linux) opens it.
 
 **Something else is wrong and I need details.**
-Turn on **Under the hood** (Cmd+Shift+U), then open Diagnostics for a copyable report. Include it when you ask for help, and never include your backup code.
+Turn on **Under the hood** (Cmd+Shift+U), then open Diagnostics for a copyable report. Include it when you ask for help, and never include your master code.
 
 ## Approvals
 
@@ -78,8 +78,8 @@ Approvals waiting for you are cards at the top of Home, with Approve and Deny ("
 **The approval command says it looks like a terminal my AI controls.**
 That is on purpose. Open a new terminal window yourself.
 
-**I typed my owner code at the shell prompt, as part of a command, or into a chat.**
-Your owner code goes only at the `Owner code:` prompt that an owner command shows. That prompt never shows what you type. It never goes into a chat with your AI or anyone else. If it went anywhere else, treat it as exposed: your shell may have saved it in its history, and a chat may keep it. [Change your owner code](../get-started/protect-your-approvals.md#change-your-owner-code) in a terminal you opened yourself. Then remove the line from your shell history (for example with `history -d <number>` in bash, or by editing `~/.zsh_history` in zsh) and delete the chat message if you can.
+**I typed my master code at the shell prompt, as part of a command, or into a chat.**
+Your master code goes only at the `Master code:` prompt that an owner command shows. That prompt never shows what you type. It never goes into a chat with your AI or anyone else. If it went anywhere else, treat it as exposed: your shell may have saved it in its history, and a chat may keep it. [Change your master code](../get-started/protect-your-approvals.md#change-your-owner-code) in a terminal you opened yourself. Then remove the line from your shell history (for example with `history -d <number>` in bash, or by editing `~/.zsh_history` in zsh) and delete the chat message if you can.
 
 ## Files and proof
 
@@ -98,6 +98,6 @@ The storage can refuse a link before it expires. The receiving ID can ask the se
 
 AgentLink stays open while you use it and closes after 30 minutes without use. The terminal and the page both say "AgentLink closed. Run `agentlink` to open it again." Run `agentlink` and it opens again. To see why it last closed, run `npx -y @4thtech-io/agentlink@latest doctor`.
 
-Open an [issue](https://github.com/4thtech/agentlink/issues) with the output of `doctor`. Never share your owner code or your private folder.
+Open an [issue](https://github.com/4thtech/agentlink/issues) with the output of `doctor`. Never share your master code or your private folder.
 
 Words you don't know? See the [Glossary](glossary.md).

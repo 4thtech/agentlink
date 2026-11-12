@@ -27,9 +27,9 @@ The drop key signs through the `KeyStore` and nowhere else: `KeyStore.signDropRe
 
 | Packaging | Agent seed | Owner seed |
 |---|---|---|
-| Local | OS keychain | Never stored in plaintext on the agent machine: a keychain item wrapped under a generated 120-bit owner code by default, or a chosen owner passphrase as an explicit opt-in (Argon2id, D-67); from M1b also by a localhost passkey (WebAuthn PRF); or absent (the owner uses the console) |
+| Local | OS keychain | Never stored in plaintext on the agent machine: a keychain item wrapped under a generated 120-bit master code by default, or a chosen owner passphrase as an explicit opt-in (Argon2id, D-67); from M1b also by a localhost passkey (WebAuthn PRF); or absent (the owner uses the console) |
 | Desktop app (M2) | OS keychain | Wrapped by a key the OS releases only after a user-presence check and only to the signed app (macOS Keychain access control, Windows Hello); on Linux a passphrase or polkit, documented as weaker |
-| Headless machines (containers, WSL, SSH; D-54) | OS keychain if usable; otherwise, only after the user opts in at an interactive terminal, a passphrase-locked file (`ALKS` v1) | Own file (`owner.alko`), wrapped with a generated 120-bit owner code (no chosen passphrase) and created in a separate interactive owner step; unlocked only at an interactive prompt or with a passkey, never from an environment variable, file or argument (04 §2.8) |
+| Headless machines (containers, WSL, SSH; D-54) | OS keychain if usable; otherwise, only after the user opts in at an interactive terminal, a passphrase-locked file (`ALKS` v1) | Own file (`owner.alko`), wrapped with a generated 120-bit master code (no chosen passphrase) and created in a separate interactive owner step; unlocked only at an interactive prompt or with a passkey, never from an environment variable, file or argument (04 §2.8) |
 | Self-hosted Worker | Worker secrets in the user's own account | Not present |
 | Console (browser) | — | IndexedDB, wrapped with a key from the passkey's PRF output |
 
@@ -69,7 +69,7 @@ Passkey provider on top of the browser:
 
 Playwright coverage today: only Chromium with a virtual authenticator (`packages/node/src/approval-passkey-browser.test.ts`), which proves the page script, not any real Touch ID or Windows Hello. WebKit and Firefox are not tested.
 
-When PRF is missing, the page finds no PRF and shows "unsupported", or the browser creates a passkey that returns no PRF output. The page then sends an empty value and the server does not wrap the owner key under that passkey. The owner code (`ALKO`) stays the way to approve, so nothing is lost and no key is ever derived from a passkey without PRF.
+When PRF is missing, the page finds no PRF and shows "unsupported", or the browser creates a passkey that returns no PRF output. The page then sends an empty value and the server does not wrap the owner key under that passkey. The master code (`ALKO`) stays the way to approve, so nothing is lost and no key is ever derived from a passkey without PRF.
 
 Sources: MDN, WebAuthn extensions (modified 17 Sep 2026); Mozilla bug 1863819 and Firefox 148 release notes (24 Feb 2026); WebKit bug 311099 (Apr 2026); Corbado, Passkeys and WebAuthn PRF (2026); Chromium Intent to Ship, WebAuthn PRF (Apr 2023).
 

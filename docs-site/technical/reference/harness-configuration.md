@@ -16,7 +16,7 @@ An existing `agentlink` entry that differs is left alone. Existing config is bac
 
 From 0.4.4 the local app can do the same job: since 0.4.6, **Connect** and **Disconnect** on the IDs screen (and the AI app step of Get started and New ID) connect an AI app to an ID, move it to another ID or disconnect it, with one Touch ID; the first Touch ID of Get started also creates the ID and connects the app ("{label} is ready in {app}. Restart {app} to finish."). Quit the AI app first (Claude Desktop is never written while it runs) and restart it afterwards. It shows the exact `agentlink` entry it adds, changes or removes, saves a backup of the file first, touches nothing else in it, and does not change Claude Desktop's settings while that app is open. The result is the same single entry; `init` stays the way for an AI to set itself up.
 
-Each app's config holds one `agentlink` entry, so each app runs one agent. Give each app its own agent with `init --agent <name> --harness <id>`; its entry then ends in `--agent <name>`. The owner key is set up once per computer user (`owner init`); every further agent gets its card from it with `agentlink owner add-agent --agent <name>`, run in your own terminal, one owner code entry for exactly that agent ([04 §2.8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), D-78). An approval for one agent is refused by every other. The agents still run as the same user, so this is logical isolation, not a security boundary.
+Each app's config holds one `agentlink` entry, so each app runs one agent. Give each app its own agent with `init --agent <name> --harness <id>`; its entry then ends in `--agent <name>`. The owner key is set up once per computer user (`owner init`); every further agent gets its card from it with `agentlink owner add-agent --agent <name>`, run in your own terminal, one master code entry for exactly that agent ([04 §2.8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), D-78). An approval for one agent is refused by every other. The agents still run as the same user, so this is logical isolation, not a security boundary.
 
 ## Configuration by harness
 
@@ -221,7 +221,7 @@ MCP tool names are `agentlink_*`. Harnesses show them under the server name, for
 | `agentlink_send`, `agentlink_accept_invite` | no | Ask |
 | `agentlink_propose_terms`, `agentlink_respond_to_terms` | no | Ask. Accepting terms is a commitment and also needs your owner approval by default |
 
-Never auto-allow, by tool rule or by running them through a shell rule, any of the owner commands `agentlink approve`, `deny`, `cancel`, `owner` and `policy`. No MCP tool can approve, change rules or export keys (I-4), so the only way an agent approves its own commitments is by getting hold of the owner code (see the residual risk below).
+Never auto-allow, by tool rule or by running them through a shell rule, any of the owner commands `agentlink approve`, `deny`, `cancel`, `owner` and `policy`. No MCP tool can approve, change rules or export keys (I-4), so the only way an agent approves its own commitments is by getting hold of the master code (see the residual risk below).
 
 ## Permission settings that keep an agent away from AgentLink's private files
 
@@ -374,8 +374,8 @@ Leave MCP tool confirmation on (never set `trust: true`). Gemini CLI asks before
 
 An agent that can run any shell command as the same operating-system user is outside what software can fully fence off. This applies to all three harnesses, and the permission settings above only make it harder:
 
-- It could change the installed package, the npx cache, or what your shell runs when you type `agentlink` or `npx` (startup files, aliases, `PATH` folders, `~/.npmrc`). The next owner step you do would then give your owner code to the changed program, or sign a different action from the one shown, even in a terminal you opened.
-- It could read process memory or the clipboard while you type the owner code, or imitate the owner prompt in a fake terminal or page.
+- It could change the installed package, the npx cache, or what your shell runs when you type `agentlink` or `npx` (startup files, aliases, `PATH` folders, `~/.npmrc`). The next owner step you do would then give your master code to the changed program, or sign a different action from the one shown, even in a terminal you opened.
+- It could read process memory or the clipboard while you type the master code, or imitate the owner prompt in a fake terminal or page.
 - It could use the agent's own key and credits.
 
 The M1 release runs on test networks only, and this is an accepted, documented residual (G-1, D-67); it is re-decided before outside testers rely on it. What M1 does claim: a script that does not modify the installation and does not read process memory cannot approve anything or change rules, even if it can read `~/.agentlink`, the keychain items and the database. Mitigations: do owner steps in a terminal your agent does not control, add the rules above, keep credits small, and revoke an agent you do not trust.

@@ -9,7 +9,7 @@
 - Prerequisites (Node.js LTS; a test relay or public relays)
 - Install `@4thtech-io/core` and `@4thtech-io/node`
 - Create two identities with an in-memory or keychain `KeyStore`
-- Create and accept an invite; compare safety codes
+- Create and accept an invite; compare Contact checks
 - Send and receive a typed message; handle untrusted content correctly
 - Notarize on a testnet with free faucet credits, and export a proof pack (v0.2.0)
 - Pass an `appId` to earn integrator fees (M3)

@@ -82,7 +82,7 @@ Run `npx -y @4thtech-io/agentlink@latest` in a terminal you opened yourself (`ui
 
 ### What if I lose my computer?
 
-Your keys live on your computer. Back up an ID from **IDs** to get a recovery kit that you keep safe; restoring from a kit works again in 0.4.6. Keep your backup code safe as well.
+Your keys live on your computer. Back up an ID from **IDs** to get a recovery kit that you keep safe; restoring from a kit works again in 0.4.6. Keep your master code safe as well.
 
 ## The project
 

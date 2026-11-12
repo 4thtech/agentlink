@@ -101,12 +101,6 @@ const ALLOWED = [
     reason: 'an IP (connection) address, not an agent address',
   },
   {
-    page: 'quick-guide.md',
-    terms: ['network name'],
-    reason:
-      'the proof step names the two test networks proof runs on (Base Sepolia and Gnosis Chiado) so a student can recognise them in the proof file (11 §5.1 D-111)',
-  },
-  {
     page: 'pricing.md',
     terms: ['network name', 'token'],
     reason:

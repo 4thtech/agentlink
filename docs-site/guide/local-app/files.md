@@ -12,11 +12,11 @@ From 0.4.6, a file from a contact you keep is downloaded, checked and saved for 
 - Saved files get the system's downloaded mark on macOS and Windows, are never made runnable and never replace another file. Names the system could act on get `.download` added.
 - AgentLink never opens a file.
 
-A file that is not saved reads **Arrived · not saved**. Press **Save to Inbox** and confirm with Touch ID (or your backup code). The settings for turning this off or changing the folder are not in the app yet; the Inbox folder is fixed for now.
+A file that is not saved reads **Arrived · not saved**. Press **Save to Inbox** and confirm with Touch ID (or your master code). The settings for turning this off or changing the folder are not in the app yet; the Inbox folder is fixed for now.
 
 ## The three views
 
-The Files page has three tabs: **Received**, **Sent** and **Send folders**. Received and Sent list your files. Send folders is where you allow a folder. Your AI can send a file only from a folder you have allowed, and that tab shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [owner code](../help/glossary.md).
+The Files page has three tabs: **Received**, **Sent** and **Send folders**. Received and Sent list your files. Send folders is where you allow a folder. Your AI can send a file only from a folder you have allowed, and that tab shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [master code](../help/glossary.md).
 
 <figure><img src="../.gitbook/assets/local-files--list.png" alt="Three allowed folders; the last one opens at another location."><figcaption><p>Files, with made-up folders. The last folder is a link to somewhere else.</p></figcaption></figure>
 
@@ -57,7 +57,7 @@ The rest of this page is about the **Send folders** tab.
 | **Not found on this computer. Your AI can't send from it.** | The folder was moved or deleted | Nothing can be sent from it until it is back |
 | The **×** button (**Stop sending from** …) | Stop your AI using this folder | Opens a confirm step first |
 | **Allow a folder** | Add a folder | Opens the **Folder** field |
-| **Every change here needs your passkey or owner code.** | Your AI cannot change this list | No tool your AI uses can add a folder |
+| **Every change here needs your passkey or master code.** | Your AI cannot change this list | No tool your AI uses can add a folder |
 
 With no folders yet, the page says **Your AI can't send files yet. Allow a folder it may send from.** New setups already have the `~/AgentLink/Send` folder. See [Folders for sending files](../everyday-use/allowed-folders.md).
 
@@ -69,13 +69,13 @@ With no folders yet, the page says **Your AI can't send files yet. Allow a folde
 2. In **Folder**, type the full path, for example `~/Documents/Shared`. Press **Check folder**.
 3. The confirm step asks **Allow your AI to send files from this folder?** It shows the real folder that will be allowed. If you typed a link or another spelling, it says so: "You typed … It leads to the folder above, so that is the folder allowed."
 4. Under **Before you confirm, tick each one:**, tick every line. Each line says, in plain words, what the change lets your AI do. **Allow folder** stays off until all are ticked.
-5. Press **Allow folder** and confirm with your passkey. No passkey? Press **Use owner code instead** and type your owner code.
+5. Press **Allow folder** and confirm with your passkey. No passkey? Press **Use master code instead** and type your master code.
 6. The page says **Allowed. Your AI can now send files from this folder.**
 
 <figure><img src="../.gitbook/assets/local-files--confirm-add.png" alt="The confirm step: the folder, one ticked line saying what your AI may do, and the Allow folder button."><figcaption><p>The confirm step. Allow folder stays off until every line is ticked.</p></figcaption></figure>
 
 {% hint style="warning" %}
-**Before you continue:** type your owner code only on this page. Never give it to your AI or paste it into a chat.
+**Before you continue:** type your master code only on this page. Never give it to your AI or paste it into a chat.
 {% endhint %}
 
 Your AI can send any file in the folder and its subfolders to your contacts. Hidden files, such as `.env`, are never sent.
@@ -88,7 +88,7 @@ Your AI can send any file in the folder and its subfolders to your contacts. Hid
 
 1. Press the **×** next to the folder.
 2. The page asks **Stop your AI sending files from this folder?**
-3. Press **Stop sending** and confirm with your passkey or owner code.
+3. Press **Stop sending** and confirm with your passkey or master code.
 
 Files already sent stay sent. Your AI can no longer send new ones from that folder.
 
@@ -108,7 +108,7 @@ AgentLink refuses these, and says why:
 |---|---|
 | **This check timed out. Nothing was changed.** | Press **Check folder** again |
 | **Your rules changed in the meantime. Nothing was changed.** | Something else changed your rules. Check the folder again |
-| **That didn't match your passkey or owner code. Nothing was changed.** | Try again. After too many tries, the page asks you to wait |
+| **That didn't match your passkey or master code. Nothing was changed.** | Try again. After too many tries, the page asks you to wait |
 | **Before changing folders, answer one question about delivery receipts on the Rules page.** | Press **Open Rules**, answer, then come back |
 | **Your change was saved, but AgentLink couldn't confirm it** | Run `agentlink doctor` in your own terminal. Until then AgentLink uses its strictest settings |
 | **Your rules couldn't be checked, so no folder can be changed.** | Run `agentlink policy recover` in your own terminal |
@@ -118,7 +118,7 @@ AgentLink refuses these, and says why:
 
 <summary>For the technically curious: how this page is built</summary>
 
-The page never makes the change itself. The local AgentLink server on your computer checks the folder, prepares the change and, after your passkey or owner code, makes it. Your browser only sees the folder, the warning lines and a one-time review token.
+The page never makes the change itself. The local AgentLink server on your computer checks the folder, prepares the change and, after your passkey or master code, makes it. Your browser only sees the folder, the warning lines and a one-time review token.
 
 ```mermaid
 sequenceDiagram
@@ -139,7 +139,7 @@ sequenceDiagram
 | Folder list, **Opens at**, **Not found** | The allowed folders and where each really points | `GET /api/ui/files` · [`files.ts`](https://github.com/4thtech/agentlink/blob/main/packages/node/src/local-ui/api/files.ts) · [06 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) `files.allowedFolders` |
 | **Check folder** | Full path, no `.` or `..`, real folder found, protected and too-broad folders refused | `GET /api/ui/files/review?add=` · [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) · D-99 |
 | The tick list | Allowed only when the ticked set is exactly the warnings for this change | `preparePolicyEdit` in `@4thtech-io/core` · D-119 |
-| **Allow folder**, **Stop sending** | Your passkey or owner code is checked first; then the local server signs exactly the reviewed change, once. The browser never signs | `POST /api/ui/files/folders` (`presence: true`) · [04 §2.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) · I-4 |
+| **Allow folder**, **Stop sending** | Your passkey or master code is checked first; then the local server signs exactly the reviewed change, once. The browser never signs | `POST /api/ui/files/folders` (`presence: true`) · [04 §2.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) · I-4 |
 | Delivery receipts question | A folder change never switches receipts off silently | D-109 · [Rules page](rules.md) |
 | Page text | Every string on this page | [`strings.ts`](https://github.com/4thtech/agentlink/blob/main/apps/local-ui/src/pages/files/strings.ts) · [`index.tsx`](https://github.com/4thtech/agentlink/blob/main/apps/local-ui/src/pages/files/index.tsx) |
 

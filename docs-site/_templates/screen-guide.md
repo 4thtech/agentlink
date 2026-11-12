@@ -3,7 +3,7 @@
 *Applies to AgentLink <version>.*
 <!-- One status line (MAINTAINING §3). No release history. -->
 
-<What the page is for, in one or two sentences. Then what looking changes (nothing) and what a change needs.> Every change needs your [passkey](../help/glossary.md) or your [owner code](../help/glossary.md).
+<What the page is for, in one or two sentences. Then what looking changes (nothing) and what a change needs.> Every change needs your [passkey](../help/glossary.md) or your [master code](../help/glossary.md).
 
 <!-- screenshot: local-<page>--<state>.png | shows: <the default state, with test data> -->
 <!-- When captured, replace the comment with:
@@ -25,7 +25,7 @@
 
 1. Press **<Button>**.
 2. <One action per step. The result in the same step.>
-3. Confirm with your passkey, or press **<Use owner code instead>**.
+3. Confirm with your passkey, or press **<Use master code instead>**.
 4. The page says **<success message>**.
 
 {% hint style="warning" %}

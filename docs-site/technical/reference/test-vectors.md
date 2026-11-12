@@ -6,7 +6,7 @@
 
 ## Outline
 
-- Coverage: key derivation; BIP-340 envelope signatures; HPKE content key wrapping and payload AEAD; envelope hash (JCS); owner passphrase wrapping; pairing proof and safety code; agent card EIP-712 hash; `terms` and `termsHash` (v0.1.0)
+- Coverage: key derivation; BIP-340 envelope signatures; HPKE content key wrapping and payload AEAD; envelope hash (JCS); owner passphrase wrapping; pairing proof and Contact check; agent card EIP-712 hash; `terms` and `termsHash` (v0.1.0)
 - STREAM file encryption; EIP-712 `Record`, `Receipt`, `Registration`; passkey PRF wrapping; recovery code; drop request signatures (v0.2.0)
 - File layout and how to consume the vectors from another language
 - Which runtimes they run in (Node, browser, Workers) and in CI

@@ -1,33 +1,57 @@
 # Invite someone
 
-*Applies to AgentLink 0.4.8. Short invite links are new in 0.4.6; older long links keep working. Both-sides feedback and Paste link on Home are new in 0.4.7.*
+*Applies to AgentLink 0.4.14. Short invite links since 0.4.6; Email and "Copy invite message" since 0.4.14.*
 
-Open **Invite someone** from [Home](home.md), from **Go to**, or from the last step of [Get started](get-started-wizard.md). Inviting needs no Touch ID.
+**Goal:** send one person a link that lets their AI and yours talk. Inviting needs no Touch ID; they accept on their side.
 
-## Your invite
+## Steps
 
-The screen shows your short link, ready to **Copy**, **Email** or **Share**, and a preview of what your friend sees. A new link is under 80 characters.
+1. Press **Invite someone**: on [Home](home.md), on **People**, on an ID's card on **IDs**, or in the last step of [Get started](get-started-wizard.md).
+2. Optional: under **Who is it for?**, type their name. It is only for your list and isn't sent anywhere. The link box then says **Invite link for {name}**.
+3. Send the link one of three ways:
+   - **Copy**: copies the link (the button says **Copied**). Paste it into a chat or a message to that one person.
+   - **Email**: opens your mail app with a ready message.
+   - **Copy invite message**: copies a short message with the link and how to accept.
+4. Press **Done**. Your invite waits under **Invites waiting for an answer** until they accept.
 
-- The invite is encrypted on your computer. It is kept as ciphertext on the encrypted drop until it is used, you cancel it, or it expires (at most 7 days). 4thTech only ever holds ciphertext.
-- If the drop can't be reached within 10 seconds, you get the long link automatically.
-- With Under the hood on, **Invite details** shows the kind of link, when it expires and **Make a long link instead**, plus a QR code. You can also make a long link with `agentlink invite --long`.
+<figure><img src="../../assets/screens/invite-someone.webp" alt="Invite someone: Natasa under Who is it for, Invite link for Natasa with Copied, Email and Copy invite message, Works for 7 days. Only the person with the link can accept."><figcaption><p>An invite link for Natasa, copied and ready to send.</p></figcaption></figure>
 
-## Open invites
+**See what they'll see** opens a preview of the invite page your friend gets.
 
-The screen lists the invites you created, with who they are for and when they expire, and a **Cancel invite** button. A lost link can't be shown again: cancel it and create a new one.
+## What happens next
 
-## Have an invite link? Paste it
+```mermaid
+sequenceDiagram
+  participant Y as You
+  participant F as Your friend
+  Y->>F: the link (chat, email, message)
+  F->>F: opens it: invite page with one install command
+  F->>F: Accept with Touch ID
+  F-->>Y: accepted
+  Note over Y,F: Both: "You are connected", then name the contact
+```
 
-If someone sent you a link, choose **Someone invited you? Paste link** (on Home, in Get started, on People or on the Invite screen). You can turn on an optional clipboard check yourself, in which case the app offers a link it finds there. One Touch ID accepts it, without making an invite of your own. See [Join from an invite](../get-started/join-from-an-invite.md).
+- When they accept, you see **{name} accepted your invite**, then the **You are connected** screen, where you [name the contact](../get-started/pair-with-someone.md). No reload needed.
+- If their computer is off, the app says it is waiting for them to come online. It finishes by itself.
+- An invite **works once, for 7 days**. A lost link can't be shown again: **Cancel invite** and make a new one.
 
-## What you see
+## Good to know
 
-You do not need to reload. When your friend accepts, you see **{name} accepted your invite** and the new person is highlighted on [Home](home.md). The person who pastes a link sees **Connecting to {name}…** and then **You're connected with {name}**. Invites that are still waiting stay in the list after a reload, and you can cancel them. If your friend's computer is offline, the app says it is waiting for them to come online.
+- Send each link to one person only: whoever opens it first can accept.
+- If your ID's name changed and your contacts still see the old one, the app asks you to update the name first, or to invite under the older name. See [IDs](ids.md).
+- If short links aren't available right now, you get a longer link. It works the same way.
+- Have an invite link from someone else? Press **Have an invite link? Paste it** (or **Someone invited you? Paste link** on Home). See [Accept an invite](../get-started/join-from-an-invite.md).
 
-If you paste an invite from someone you are already connected to, AgentLink asks **Connect again?** first. After that, both sides say **Connected again** and ask you to check the safety code again.
+<details>
+<summary>For the technically curious</summary>
 
-## You are connected
+The invite is encrypted on your computer. A short link keeps only scrambled data on the 4thTech encrypted drop until it is used, cancelled or expires (at most 7 days); the key to it is the part after `#`, which your browser never sends to a server. If the drop can't be reached within 10 seconds, the app gives the long link, which carries the whole invite after the `#`. With **Under the hood** on, **Invite details** shows the kind of link, when it expires, a QR code and **Make a long link instead**; `agentlink invite --long` does the same in a terminal.
 
-When your friend accepts, both computers show **You and {name} are connected**, with a safety code to compare. Read it to each other over a channel you trust, such as a call. The person then appears on [Home](home.md).
+| On the page | What happens | Where it is built |
+|---|---|---|
+| The link appears | The app makes a signed, encrypted invite for the open ID | [Invites](../../technical/concepts/identities-and-keys.md) |
+| **Cancel invite** | The invite is withdrawn; a later accept is refused | `apps/local-ui/src/pages/invite` |
 
-Back to [The local app](README.md).
+</details>
+
+Back to [The local app](README.md) · Next: [Accept an invite](../get-started/join-from-an-invite.md).

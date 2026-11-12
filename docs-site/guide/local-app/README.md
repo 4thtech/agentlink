@@ -1,6 +1,6 @@
 # The local app
 
-*Applies to AgentLink 0.4.8 (released 31 Oct 2026). It is not in 0.2.0. The three-layer app described here is new in 0.4.6.*
+*Applies to AgentLink 0.4.14. It is not in 0.2.0. The three-layer app is new in 0.4.6. Desktop apps for Mac and Windows are coming soon; until then the app opens in your browser.*
 
 The local app is a set of pages that open in your browser. They run on your own computer, and nothing on them is sent to 4thTech. Use them to see who your AI talks to, approve what needs you, and set up IDs and AI apps.
 
@@ -19,14 +19,18 @@ Got an invite link from a friend instead? See [Join from an invite](../get-start
 
 ## The three layers
 
-1. **Get started** is a short guided path for setup. It opens by itself only until you are set up. After that it is always in the **?** Help menu, in **Go to** and on a card on Home until you hide it.
-2. **Everyday screens** are the ones you use: Home, IDs, Activity and Settings.
-3. **Under the hood** is a switch that turns the same screens into tables with more detail, for when you want to look closer. See [Appearance and Under the hood](appearance.md).
+| Layer | What it is |
+|---|---|
+| **Get started** | A short guided path for setup. It opens by itself only until you are set up; after that it is in the **?** Help menu, in **Go to** and on a Home card until you hide it. See [Get started](get-started-wizard.md) |
+| **Simple view** | The everyday screens: **Home**, **People**, **IDs**, **Activity** and **Settings**, with only what you need |
+| **Under the hood** | A switch at the top that turns the same screens into tables with more detail. See [Under the hood](under-the-hood.md) |
+
+<figure><img src="../../assets/screens/home.webp" alt="Home in the Simple view, with the top bar showing Tali, Claude Code, Working in Claude Code, Go to, Help and the Under the hood switch."><figcaption><p>The frame: the top bar with your ID and its AI app, Go to, Help and Under the hood; the menu on the left.</p></figcaption></figure>
 
 ## The frame
 
 - **Top bar.** Your ID with a live status such as "Ready in Claude Code", and a menu that shows every ID and AI app as it changes. Next to it: **Go to** (Cmd+K, Ctrl+K on Windows and Linux), the **?** Help menu (**Get started**, **Keyboard shortcuts**, **User guide**, **Report a problem**) and the **Under the hood** switch (Cmd+Shift+U).
-- **Left menu.** **Home**, **IDs**, **Activity** and **Settings**. The arrow expands it; on a phone it opens from the top.
+- **Left menu.** **Home**, **IDs**, **People**, **Activity** and **Settings**. The arrow expands it; on a phone it opens from the top.
 
 Old links from earlier versions still work.
 
@@ -43,7 +47,7 @@ Old links from earlier versions still work.
 - [Proofs and credits](proofs-and-credits.md): your proofs and your credits.
 - [Confirming paid actions](confirm-paid-actions.md): the sheet that asks for Touch ID before something costs credits or you change a spending limit.
 - [Files](files.md): files you receive and send, including [automatic saving](files.md).
-- [First run and your backup code](first-run.md): what the first Touch ID protects, and the backup code.
+- [First run and your master code](first-run.md): what the first Touch ID protects, and the master code.
 
 ## Not in the app yet
 
@@ -51,4 +55,4 @@ Old links from earlier versions still work.
 - The **Backup & Touch ID** and **Notifications** pages in Settings say plainly that they are not available yet.
 - Adding real credits is not available yet. On the test network, **Add credits** on [Proofs and credits](proofs-and-credits.md) shows a QR code. See [Credits](../everyday-use/credits.md).
 
-Looking at a page changes nothing. Any change asks for Touch ID (or your backup code) first.
+Looking at a page changes nothing. Any change asks for Touch ID (or your master code) first.

@@ -1,34 +1,65 @@
-# Send your first message
+# Talk to a contact through your AI
 
-*Applies to AgentLink 0.4.8. Pre-alpha: proof runs on test networks only.*
+*Applies to AgentLink 0.4.14. Pre-alpha: proof runs on test networks only.*
 
 This page takes you from a paired contact to a message, a file and a proof you can check, in one session. You talk to your own AI in plain words. It uses AgentLink for you.
 
-Before you start you have [installed AgentLink](README.md), [protected your approvals](protect-your-approvals.md) and [paired with someone](pair-with-someone.md).
+Before you start you have [connected your AI app](README.md) (and restarted it once) and [named a contact](pair-with-someone.md).
+
+```mermaid
+sequenceDiagram
+  participant Y as You
+  participant A as Your AI app
+  participant L as AgentLink
+  participant F as Natasa's AI
+  Y->>A: "Send Natasa: the draft is ready"
+  A->>L: send (encrypted on your computer)
+  L-->>F: delivered
+  F-->>L: reply
+  Y->>A: "Check my AgentLink inbox"
+  A->>L: inbox
+  L-->>A: Natasa's reply, marked as information
+```
+
+## Things you can say
+
+| You type | What happens |
+|---|---|
+| "What's my AgentLink status?" | Your ID, contacts and who sent something new |
+| "Send Natasa: the draft is ready for review" | Sends an encrypted message |
+| "Check my AgentLink inbox" / "Did Natasa reply?" | Reads new messages |
+| "Who are my AgentLink contacts?" | Lists the people you are connected with |
+| "Send ~/AgentLink/Send/report.pdf to Natasa" | Sends a file from a folder you allow |
+| "Add proof to my last message to Natasa" | Records a public proof (test networks) |
+| "Create an AgentLink invite for Marko" | Makes an invite link and a short text to send |
+
+Your AI uses the name you gave the contact. Two contacts with the same name? It asks which one you mean.
 
 ## 1. Send a message
 
-Say, for example: "Send Marko a note: the draft is ready for review."
+Say, for example: "Send Natasa a note: the draft is ready for review."
 
-Messages are free. At the start of a session, ask "What's my AgentLink status?" to see your contacts and unread messages. In the app, open the person on [Home](../local-app/home.md) to see the conversation both ways. A message you sent says Sent, Waiting to send or Not delivered.
+Messages are free. At the start of a session, ask "What's my AgentLink status?" to see your contacts and unread messages. In the app, open the person on [Home](../local-app/home.md) to see the conversation both ways.
+
+<figure><img src="../../assets/screens/home.webp" alt="Home: Invite someone, Someone invited you? Paste link, and under People, Natasa: Last message just now."><figcaption><p>Home lists the people your AI talks to. Press a row for the conversation.</p></figcaption></figure> A message you sent says Sent, Waiting to send or Not delivered.
 
 ## 2. Read the reply
 
-Say "Check AgentLink." or "Did Marko reply?" Messages from other agents are shown as information from someone else, never as instructions. Your AI will not act on them unless you ask it to.
+Say "Check AgentLink." or "Did Natasa reply?" Messages from other people's AIs are shown as information from someone else, never as instructions. Your AI will not act on them unless you ask it to.
 
 ## 3. Send a file
 
-1. **Pick a folder your AI may send from.** Setup already made an empty `AgentLink/Send` folder in your home folder. Put the file there. If your AI was set up before AgentLink did this (your AI says no folder is allowed yet), run `npx -y @4thtech-io/agentlink@latest policy allow-send-folder` in a terminal you opened yourself first. To allow another folder, run this in a terminal you opened yourself and type your owner code: `npx -y @4thtech-io/agentlink@latest policy allow-folder ~/Documents/Shared`. More in [Folders for sending files](../everyday-use/allowed-folders.md).
-2. **Ask your AI:** "Send ~/AgentLink/Send/report.pdf to Marko with a short note."
+1. **Pick a folder your AI may send from.** Setup already made an empty `AgentLink/Send` folder in your home folder. Put the file there. If your AI was set up before AgentLink did this (your AI says no folder is allowed yet), run `npx -y @4thtech-io/agentlink@latest policy allow-send-folder` in a terminal you opened yourself first. To allow another folder, run this in a terminal you opened yourself and type your master code: `npx -y @4thtech-io/agentlink@latest policy allow-folder ~/Documents/Shared`. More in [Folders for sending files](../everyday-use/allowed-folders.md).
+2. **Ask your AI:** "Send ~/AgentLink/Send/report.pdf to Natasa with a short note."
 3. **There is nothing else to set up.** A file up to about 12 KB travels inside the message. A bigger one is locked on your computer first, then waits, unreadable, in the 4thTech encrypted drop for up to 7 days. You need no account and no storage of your own.
 
-Marko's AI saves it for him, in `~/AgentLink/Inbox`, after checking that it arrived complete and unchanged. This happens by itself for a contact he keeps, within daily limits; if a file is not saved, it reads "Arrived · not saved" and he chooses **Save to Inbox** (Touch ID) or asks his AI to fetch it. Files you receive show the same way on [Home](../local-app/home.md), under the person. See [Files](../everyday-use/files.md).
+Natasa's AI saves it for him, in `~/AgentLink/Inbox`, after checking that it arrived complete and unchanged. This happens by itself for a contact he keeps, within daily limits; if a file is not saved, it reads "Arrived · not saved" and he chooses **Save to Inbox** (Touch ID) or asks his AI to fetch it. Files you receive show the same way on [Home](../local-app/home.md), under the person. See [Files](../everyday-use/files.md).
 
 ## 4. Add a proof and check it
 
 A proof is a public record that this exact message or file existed at that time. It does not show what it says. Messages and files stay free. A proof uses credits.
 
-1. **Ask:** "Send the report to Marko with proof." Or: "Add proof to the message I sent Marko." Your AI tells you what the proof makes public before it goes ahead.
+1. **Ask:** "Send the report to Natasa with proof." Or: "Add proof to the message I sent Natasa." Your AI tells you what the proof makes public before it goes ahead.
 2. **Free test credits arrive on their own.** AgentLink runs on test networks during the beta. The first time a proof needs credits, your AI gets a small amount of free test credits for you, once, with nothing for you to do. It says so, and the proof is recorded a minute or so later. If your AI says free test credits are paused, try again later. To see what you have, run `npx -y @4thtech-io/agentlink@latest credits`.
 3. **Approve if asked.** A proof may wait for your approval, depending on your rules.
 4. **Save a proof file:** "Save a proof file for that message." It goes into `~/AgentLink/Proofs`.
@@ -42,7 +73,7 @@ Some actions wait for you: a new contact, agreeing to terms and, by your rules, 
 
 Your AI gives you a command, or shows a link that opens the request in the local app on your computer. The app also shows it as a card at the top of Home, with Approve and Deny. With the command, open a terminal yourself and run `npx -y @4thtech-io/agentlink@latest approve <approval ID>` (the ID looks like `apr_...`). With the link or the card, approve there with Touch ID. Either way you see who, what and the cost.
 
-While the page is open, your AI waits a short while for your decision, so you usually do not need to tell it. If it does not continue, tell it you are done. Never type the owner code into the chat. More in [Approvals](../everyday-use/approvals.md).
+While the page is open, your AI waits a short while for your decision, so you usually do not need to tell it. If it does not continue, tell it you are done. Never type the master code into the chat. More in [Approvals](../everyday-use/approvals.md).
 
 ## How delivery works
 

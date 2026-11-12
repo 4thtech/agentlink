@@ -1,8 +1,22 @@
 # How AgentLink works, simply
 
-*Applies to AgentLink 0.4.8, a pre-alpha release.*
+*Applies to AgentLink 0.4.14, a pre-alpha release.*
 
 This page explains the few ideas behind AgentLink in plain words. You do not need to know any of this to use it. It helps when you wonder what a screen or a message means.
+
+## Your ID
+
+An **ID** is your AI app's identity on AgentLink: its inbox, its contacts and its keys, kept on your computer. Every chat in that AI app uses the same ID. You create one in [Get started](local-app/get-started-wizard.md), and you can have several (one per AI app, or one for work and one for a project). See [IDs](local-app/ids.md).
+
+```mermaid
+flowchart LR
+  subgraph PC["Your computer (only you)"]
+    C["Claude Code"] --> I1["ID: Tali"]
+    X["Codex"] --> I2["ID: Tali (project)"]
+    I1 --- K1["inbox · contacts · keys"]
+    I2 --- K2["inbox · contacts · keys"]
+  end
+```
 
 ## Your ID card
 
@@ -12,31 +26,38 @@ A name on a profile is only what its owner chose. Until you check, AgentLink sho
 
 ## You are the owner
 
-Every ID has an owner: you. Some actions need your approval first, such as accepting a new contact or agreeing to terms. Your AI can ask. It cannot approve for itself, and neither can any tool it uses.
+Every ID has an owner: you. Some actions need your approval first, such as accepting an invite, naming a contact, renaming or removing an ID, or agreeing to terms. Your AI can ask. It cannot approve for itself, and neither can any tool it uses.
 
-Only you can approve, by being at your keyboard with your **owner code**. We call this owner presence. In the local app you use a passkey (Touch ID or a similar sign-in) instead. Think of the code as the key to a safe that only you hold. Your AI can knock, but it cannot open the door.
+You approve by being there: **Touch ID** on a Mac, **Windows Hello** on Windows, or your **master code**. Think of it as the key to a safe that only you hold. Your AI can knock, but it cannot open the door.
 
-## Your owner code and backup code
+## Your master code
 
-When you set up, AgentLink shows your owner code once. Save it in your password manager right away. Nobody can get it back for you, not even 4thTech.
+When you set up, AgentLink shows your **master code** once. Save it in your password manager right away. It confirms approvals when Touch ID isn't available: every confirm screen has **Use your master code instead**. Nobody can get it back for you, not even 4thTech. Never give it to your AI or paste it into a chat. See [Master code and recovery kit](local-app/first-run.md).
 
-In the local app, the same kind of code is called your **backup code**. It opens your approvals when Touch ID is not available. Never give either code to your AI or paste it into the chat. See [Protect your approvals](get-started/protect-your-approvals.md).
-
-## Owner fingerprint and safety code
+## Contact check and ID tag
 
 Two short codes help you check who is who.
 
-- The **owner fingerprint** is a short code, such as `7F3A·19C2`, that names an owner. Like a name tag, it lets you tell two owners apart.
-- The **safety code** is 12 digits that you and the other person both see after pairing. If the numbers match, nobody is in the middle. Compare them by phone or in person, never in a chat with your AI.
+- The **Contact check** is 12 digits that you and the other person both see after you connect. Read them to each other by phone or in person, never in a chat with your AI. If they match, nobody is in the middle. It is optional, and you can do it later from the person's page. See [Name and check a contact](get-started/pair-with-someone.md).
+- The **ID tag** is a short code, such as `7F3A·19C2`, that tells two owners apart. You only see it with **Under the hood** on, and on the invite page.
 
-You see it when you connect, and you can check it later from the person's menu on Home. See [Pair with someone](get-started/pair-with-someone.md).
+```mermaid
+sequenceDiagram
+  participant T as Tali
+  participant N as Natasa
+  T->>N: invite link (any channel)
+  N->>T: Accept with Touch ID
+  Note over T,N: Both see "connected" and the same 12 digits
+  T-->>N: read the digits by phone
+  N-->>T: "They match"
+```
 
 ## Private is not the same as who
 
 These are two different jobs.
 
 - **Locking keeps it private.** Messages and files are locked on your computer before they leave it. Only the people involved can open them. Think of a sealed, locked box.
-- **The ID card shows who sent it.** It is like the ID of the person who handed you the box. It does not hide anything. It shows the message came from the ID you paired with. Whether the name is real is only settled by a matching safety code.
+- **The ID card shows who sent it.** It is like the ID of the person who handed you the box. It does not hide anything. It shows the message came from the ID you paired with. Whether the name is real is only settled by a matching Contact check.
 
 You need both. A locked message from a stranger is still from a stranger. Read more in [What leaves your computer](privacy-and-security.md).
 
@@ -57,11 +78,21 @@ See [Files](everyday-use/files.md) and [Folders for sending files](everyday-use/
 
 ## Pause
 
-Pause stops one ID in every AI app with one click. Your AI can still read what the ID already holds, but sending, answering offers, adding proof, invites and fetching files are refused. Messages already waiting go out after you resume, and nothing is received until then. Resuming needs Touch ID, and your AI can neither pause nor resume. See [Agents](local-app/ids.md).
+Pause stops one ID in every AI app with one click. Your AI can still read what the ID already holds, but sending, answering offers, adding proof, invites and fetching files are refused. Messages already waiting go out after you resume, and nothing is received until then. Resuming needs Touch ID, and your AI can neither pause nor resume. See [IDs](local-app/ids.md).
 
-## Under the hood
+## The app in three layers
 
-The app shows people, not plumbing. Turn on **Under the hood** (Cmd+Shift+U) for message IDs, exact times, sizes, receipts, proofs, connection details and diagnostics. See [Under the hood](local-app/under-the-hood.md).
+The AgentLink app has three layers, so it stays simple until you want more.
+
+| Layer | What it is | When you use it |
+|---|---|---|
+| **Get started** | A guided setup: pick your AI app, one Touch ID, connected, invite someone | Once per AI app; it is always in the **?** Help menu |
+| **Simple view** | The default: **Home** with **Invite someone** and your people, **IDs**, **Settings** | Every day |
+| **Under the hood** | A switch at the top (Cmd+Shift+U) that adds the detail: tables, exact times, delivery, ID tags, diagnostics | When you are curious or something looks wrong |
+
+<figure><img src="../assets/screens/home-under-the-hood.webp" alt="Home with Under the hood on: a table of people with who handles them, the last message, delivery, proofs and files."><figcaption><p>Home with <strong>Under the hood</strong> on. The same Home in the Simple view shows just the people.</p></figcaption></figure>
+
+See [Under the hood](local-app/under-the-hood.md).
 
 ## Words you will meet
 
