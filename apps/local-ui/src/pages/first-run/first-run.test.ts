@@ -236,8 +236,8 @@ describe('first run: protect approvals (D-120 (1))', () => {
     await mount(fakeApi());
     await click(GO.other);
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
-    expect(text()).toContain(FIRST_RUN.fingerprintLabel);
-    expect(host.querySelector('.al-fp')?.textContent).toContain(FP);
+    // WP-5 (B-3): the fingerprint is not on the backup code screen.
+    expect(host.querySelector('.al-fp')).toBeNull();
     // The code is plain, readable text on the page (Q-130-1 stays open), never collapsed.
     expect(host.querySelector('details')).toBeNull();
     expect(host.querySelector('.al-secret-val')?.textContent?.replace(/\s/g, '')).toBe(
@@ -257,7 +257,6 @@ describe('first run: protect approvals (D-120 (1))', () => {
       "Setup finished, but we couldn't confirm one step. Your AI app may need a restart.",
     );
     expect(host.querySelector('.al-secret-val')?.textContent).toContain('UVWX');
-    expect(host.querySelector('.al-fp')?.textContent).toContain(FP);
   });
 
   it('without a passkey that protects approvals, the backup code is the way to approve here', async () => {
@@ -441,8 +440,10 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(button(FIRST_RUN.copy).className).not.toContain('al-btn-primary');
     expect(text()).toContain(FIRST_RUN.clipboardWarning);
     expect(text()).toContain(FIRST_RUN.backupBody('Touch ID'));
-    expect(text()).toContain(FIRST_RUN.backupLost);
     expect(text()).not.toMatch(/password\b(?! manager)/i);
+    // WP-5 (B-1): one visible code. The save form's fields are visually hidden, not display:none.
+    expect(host.querySelectorAll('[data-backup-code]')).toHaveLength(1);
+    expect(secret?.closest('.al-sr-only')).not.toBeNull();
   });
 
   it('F49: Copy says Copied, falls back, and says so when it cannot; Show reveals; Save as file', async () => {
@@ -455,10 +456,15 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     // The once-shown code selects as one piece, and a copy of it is the code on one line.
     const grid = host.querySelector<HTMLElement>('[data-backup-code]')!;
     expect(grid.className).toContain('fr-code-select');
+    // The password-manager field stays a password field; Show/Hide acts on the one visible display.
     const field = host.querySelector<HTMLInputElement>('input[autocomplete="new-password"]')!;
     expect(field.type).toBe('password');
+    expect(grid.textContent).toContain('ABCD');
     await act(async () => host.querySelector<HTMLButtonElement>('[data-reveal-code]')?.click());
-    expect(field.type).toBe('text');
+    expect(grid.textContent).not.toContain('ABCD');
+    expect(field.type).toBe('password');
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-reveal-code]')?.click());
+    expect(grid.textContent).toContain('ABCD');
     await click(FIRST_RUN.copy);
     await act(async () => {
       for (let i = 0; i < 5; i += 1) await Promise.resolve();
@@ -466,6 +472,15 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(writeText).toHaveBeenCalledWith(CODE);
     expect(exec).toHaveBeenCalledWith('copy');
     expect(host.querySelector('[data-copy-status]')?.textContent).toContain(FIRST_RUN.copied);
+    // WP-5 (B-2): "Copied" is visible once (the button); the status line is for screen readers.
+    expect(host.querySelector('[data-copy-status]')?.className).toContain('al-sr-only');
+    const visible = [...host.querySelectorAll('section *')].filter(
+      (el) =>
+        el.children.length === 0 &&
+        !el.closest('.al-sr-only') &&
+        el.textContent?.includes(FIRST_RUN.copied),
+    );
+    expect(visible).toHaveLength(1);
     Object.defineProperty(document, 'execCommand', { value: () => false, configurable: true });
     await click(FIRST_RUN.copied);
     await act(async () => {
@@ -490,7 +505,7 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     await mount(fakeApi());
     await click(GO.other);
     expect(buttons()).toEqual([
-      'Show',
+      'Hide',
       FIRST_RUN.saveToManager,
       FIRST_RUN.copy,
       FIRST_RUN.saveFile,
