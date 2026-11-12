@@ -7,6 +7,7 @@ import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { ContactRow } from '../contacts/data.js';
 import {
   START_LEFT_KEY,
+  heldStepOpensStart,
   markLeavingStart,
   openStartIfIncomplete,
   shouldOpenStart,
@@ -297,5 +298,80 @@ describe('openStartIfIncomplete: the open-on-launch check', () => {
     };
     expect(await openStartIfIncomplete({ path: () => at, read, go })).toBe(false);
     expect(go).not.toHaveBeenCalled();
+  });
+});
+
+// REL051-INTFIX (REL051-CF3 with R1-UI-14): an owner with an ID gets Home, unless the server still
+// holds a master code step: the code was made and never saved (the app was closed before "I saved
+// it"), this session's first-run code, or restored IDs waiting for their owner. Then Get started
+// opens and shows that screen (journey 01 "a restart says it was not saved").
+describe('openStartIfIncomplete: a master code step the server still holds', () => {
+  const noApp = (): Promise<SetupState> => Promise.resolve({ ...SET_UP, appConnected: false });
+  const lost = () => Promise.resolve({ kind: 'lost', which: 'first_run', touchId: true } as const);
+  const none = () => Promise.resolve({ kind: 'none' } as const);
+
+  it('a lost (never saved) code opens Get started, with or without an AI app', async () => {
+    for (const read of [noApp, () => Promise.resolve(SET_UP)]) {
+      resetAutoShown();
+      const go = vi.fn();
+      expect(await openStartIfIncomplete({ path: () => '/', read, go, held: lost })).toBe(true);
+      expect(go).toHaveBeenCalledWith('/start/app');
+    }
+  });
+
+  it('nothing held, an unanswered hold read or a waiting approval: Home stays', async () => {
+    for (const [read, held] of [
+      [noApp, none],
+      [noApp, () => Promise.reject(new Error('down'))],
+      [() => Promise.resolve({ ...SET_UP, waiting: 1 }), lost],
+      [() => Promise.resolve({ ...SET_UP, waiting: undefined }), lost],
+    ] as const) {
+      resetAutoShown();
+      const go = vi.fn();
+      expect(await openStartIfIncomplete({ path: () => '/', read, go, held })).toBe(false);
+      expect(go).not.toHaveBeenCalled();
+    }
+  });
+
+  it('never asks the hold for a deep link, and a first run opens Get started without asking', async () => {
+    resetAutoShown();
+    const held = vi.fn(lost);
+    const go = vi.fn();
+    expect(await openStartIfIncomplete({ path: () => '/approve/abc', read: noApp, go, held })).toBe(
+      false,
+    );
+    resetAutoShown();
+    expect(
+      await openStartIfIncomplete({
+        path: () => '/',
+        read: () => Promise.resolve({ ...SET_UP, owner: 'missing' }),
+        go,
+        held,
+      }),
+    ).toBe(true);
+    expect(held).not.toHaveBeenCalled();
+  });
+
+  it('which held steps open Get started', () => {
+    expect(heldStepOpensStart({ kind: 'lost', which: 'restore', touchId: false })).toBe(true);
+    expect(heldStepOpensStart({ kind: 'finish_restore' })).toBe(true);
+    expect(
+      heldStepOpensStart({
+        kind: 'shown',
+        which: 'first_run',
+        code: 'ABCD ABCD ABCD ABCD ABCD ABCD',
+        view: { outcome: 'done', passkey: true, fingerprint: 'f' },
+      }),
+    ).toBe(true);
+    expect(
+      heldStepOpensStart({
+        kind: 'shown',
+        which: 'restore',
+        code: 'ABCD ABCD ABCD ABCD ABCD ABCD',
+        ids: [],
+        touchId: true,
+      }),
+    ).toBe(false);
+    expect(heldStepOpensStart({ kind: 'none' })).toBe(false);
   });
 });

@@ -458,7 +458,10 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     const { link } = await start(source);
     const { page } = await pageWithAuthenticator(true);
     await page.goto(await link());
-    await page.getByText('Set up your master code first', { exact: false }).first().waitFor();
+    // REL051-UF1: with no ID yet, Home leads with "Create your first ID"; the waiting approval keeps
+    // its reason visible next to it (REL051-INTFIX).
+    await page.getByText('Finish setting up AgentLink first', { exact: false }).first().waitFor();
+    await page.getByRole('button', { name: 'Create your first ID' }).waitFor();
     // 11 §5.1: never "owner key" in the default UI.
     expect(await page.getByText('owner key', { exact: false }).count()).toBe(0);
     expect(await page.getByRole('button', { name: 'Set up a passkey' }).count()).toBe(0);

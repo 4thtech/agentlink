@@ -17,7 +17,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { EXPIRED_HTML, NO_APP_HTML, PAGE_STRINGS } from './approval-pages.js';
+import {
+  EXPIRED_APPROVAL_HTML,
+  EXPIRED_HTML,
+  NO_APP_HTML,
+  PAGE_STRINGS,
+} from './approval-pages.js';
 import {
   startApprovalServerWith,
   type ApprovalDetails,
@@ -157,8 +162,14 @@ describe('a server without the app bundle (M1-11b-2c)', () => {
     for (const path of ['/', `/approve/${id(1)}`]) {
       const res = await send(server.port, path);
       expect(res.status, path).toBe(401);
-      expect(res.body, path).toBe(EXPIRED_HTML);
+      // REL051-INTFIX: an approval link's expired page points to Waiting for you and `approve`.
+      expect(res.body, path).toBe(path === '/' ? EXPIRED_HTML : EXPIRED_APPROVAL_HTML);
+      expect(res.body, path).not.toContain('apr_');
     }
+    // A used approval link (consumed once) answers with the approval page too.
+    const used = await send(server.port, `/approve/${id(1)}?t=${'A'.repeat(43)}`);
+    expect(used.status).toBe(401);
+    expect(used.body).toBe(EXPIRED_APPROVAL_HTML);
     const c = await cookie();
     expect((await send(server.port, '/', { method: 'POST', headers: { Cookie: c } })).status).toBe(
       405,
@@ -199,6 +210,18 @@ describe('the fixed pages (M1-11b-2c; 11 §6.2.1)', () => {
     expect(EXPIRED_HTML.indexOf('Start menu')).toBeLessThan(EXPIRED_HTML.indexOf('<code>'));
     expect(EXPIRED_HTML).toContain(`<code>${CLI_COMMAND} ui</code>`);
     expectInert(EXPIRED_HTML);
+  });
+
+  it('the expired approval link says where the approval waits and names `approve`', () => {
+    expect(EXPIRED_APPROVAL_HTML).toContain('<h1>This link has expired</h1>');
+    expect(EXPIRED_APPROVAL_HTML).toContain('Waiting for you');
+    expect(EXPIRED_APPROVAL_HTML).toContain('Start menu');
+    expect(EXPIRED_APPROVAL_HTML.indexOf('Start menu')).toBeLessThan(
+      EXPIRED_APPROVAL_HTML.indexOf('<code>'),
+    );
+    expect(EXPIRED_APPROVAL_HTML).toContain(`<code>${CLI_COMMAND} approve</code>`);
+    expect(EXPIRED_APPROVAL_HTML).not.toContain(`${CLI_COMMAND} ui`);
+    expectInert(EXPIRED_APPROVAL_HTML);
   });
 
   it('keeps the CSP byte for byte on the app pages, the fixed page and the expired page', async () => {

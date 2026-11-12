@@ -1,6 +1,7 @@
 // M1-36a-b: the approval pages and the owner-init messages never tell the user to run a bare
-// `agentlink ...` (it is not on PATH after the documented npx install) or a command that does not
-// exist (`agentlink ui`). The command is the fixed npx form: a constant, never built from a request,
+// `agentlink ...` (it is not on PATH after the documented npx install). `ui` is a real command
+// (apps/cli dispatch.ts) since M1-11b-9; R1-UI-12 names it on the expired app link, and an expired
+// approval link names `approve` (REL051-INTFIX). The command is the fixed npx form: a constant, never built from a request,
 // a stored value or inbound content (I-5). M1-11b-2c: the server's pages are the fixed ones in
 // approval-pages.ts; the approvals' own words live in the app (apps/local-ui strings.test.ts checks
 // the same rules there).
@@ -8,7 +9,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { EXPIRED_HTML, NO_APP_HTML, PAGE_STRINGS } from './approval-pages.js';
+import {
+  EXPIRED_APPROVAL_HTML,
+  EXPIRED_HTML,
+  NO_APP_HTML,
+  PAGE_STRINGS,
+} from './approval-pages.js';
 import { CLI_COMMAND } from './cli-command.js';
 
 const SRC = dirname(fileURLToPath(import.meta.url));
@@ -32,17 +38,27 @@ describe('the npx command form (M1-36a-b)', () => {
     },
   );
 
-  it('the page texts have no bare prefix and no dead `ui` command', () => {
-    const texts = [...Object.values(PAGE_STRINGS), EXPIRED_HTML, NO_APP_HTML];
+  it('the page texts have no bare prefix, and `ui` only in its npx form on the app link', () => {
+    const texts = [
+      ...Object.values(PAGE_STRINGS),
+      EXPIRED_HTML,
+      EXPIRED_APPROVAL_HTML,
+      NO_APP_HTML,
+    ];
     expect(texts.filter((t) => BARE.test(t))).toEqual([]);
-    expect(texts.filter((t) => t.includes('agentlink ui'))).toEqual([]);
+    const ui = texts.filter((t) => t.includes('agentlink ui'));
+    expect(ui).toEqual([EXPIRED_HTML]);
+    expect(EXPIRED_HTML).toContain(`<code>${CLI_COMMAND} ui</code>`);
   });
 
   it('the owner steps on the page name the command that works', () => {
-    expect(PAGE_STRINGS.expired).toContain(`${CLI_COMMAND} approve`);
+    // An approval link (expired, or with no app) leads to `approve`, which lists what waits.
     expect(PAGE_STRINGS.noApp).toContain(`${CLI_COMMAND} approve`);
-    expect(EXPIRED_HTML).toContain(`<code>${CLI_COMMAND} approve</code>`);
+    expect(EXPIRED_APPROVAL_HTML).toContain(`<code>${CLI_COMMAND} approve</code>`);
     expect(NO_APP_HTML).toContain(`<code>${CLI_COMMAND} approve</code>`);
+    // The app link leads back to the app.
+    expect(EXPIRED_HTML).toContain(`<code>${CLI_COMMAND} ui</code>`);
+    expect(EXPIRED_HTML).not.toContain(`${CLI_COMMAND} approve`);
   });
 
   it('the checker itself finds a bare prefix (self-test)', () => {
