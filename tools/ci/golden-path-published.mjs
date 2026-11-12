@@ -156,8 +156,13 @@ if (process.platform === 'darwin') {
     ]) {
       const r = spawnSync('security', args, { env: profileEnv(home) });
       if (r.status !== 0) {
-        console.error(`FAIL setup: security ${args[0]} exited ${r.status}`);
-        process.exit(1);
+        // Only creating the keychain is fatal; the later calls can fail on a runner whose keychain
+        // is already unlocked system-wide, and S4 then tells the truth about the result.
+        const fatal = args[0] === 'create-keychain';
+        console.error(
+          `${fatal ? 'FAIL' : '::warning::'} setup: security ${args[0]} exited ${r.status}`,
+        );
+        if (fatal) process.exit(1);
       }
     }
   }
