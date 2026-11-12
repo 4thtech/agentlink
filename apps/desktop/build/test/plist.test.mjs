@@ -13,6 +13,15 @@ test('Info.plist registers agentlink:// and sets the identity', () => {
   assert.match(p, /Resources\/app\.asar/);
 });
 
+test('assets/entitlements.mac.plist is the generated text', async () => {
+  const { readFileSync } = await import('node:fs');
+  const file = readFileSync(
+    new URL('../../assets/entitlements.mac.plist', import.meta.url),
+    'utf8',
+  );
+  assert.equal(file, entitlementsPlist());
+});
+
 test('Info.plist rejects a bad version or hash', () => {
   assert.throws(() => infoPlist({ version: '1.0<x>', asarHash: 'ab'.repeat(32) }));
   assert.throws(() => infoPlist({ version: '1.0.0', asarHash: 'zz' }));

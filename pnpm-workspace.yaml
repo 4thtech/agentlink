@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - apps/*
+  - apps/desktop/build
   - test-vectors
   - e2e
   - tools

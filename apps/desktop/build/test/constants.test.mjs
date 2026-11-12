@@ -11,16 +11,26 @@ test('every pinned asset has a 64-hex SHA-256 and an https url on an allowed hos
       assert.match(a.sha256, /^[0-9a-f]{64}$/, `${kind} ${platform}`);
       const u = new URL(a.url);
       assert.equal(u.protocol, 'https:');
-      assert.ok(constants.allowedHosts.includes(u.hostname), `${kind} ${platform} host ${u.hostname}`);
+      assert.ok(
+        constants.allowedHosts.includes(u.hostname),
+        `${kind} ${platform} host ${u.hostname}`,
+      );
     }
   }
 });
 
 test('covers darwin arm64, darwin x64 and win32 x64 for both runtimes', () => {
   for (const kind of ['node', 'electron']) {
-    assert.deepEqual(Object.keys(constants[kind].assets).sort(), ['darwin-arm64', 'darwin-x64', 'win32-x64']);
+    assert.deepEqual(Object.keys(constants[kind].assets).sort(), [
+      'darwin-arm64',
+      'darwin-x64',
+      'win32-x64',
+    ]);
   }
-  assert.equal(assetFor('node', 'darwin-arm64').sha256, constants.node.assets['darwin-arm64'].sha256);
+  assert.equal(
+    assetFor('node', 'darwin-arm64').sha256,
+    constants.node.assets['darwin-arm64'].sha256,
+  );
   assert.throws(() => assetFor('node', 'linux-x64'));
 });
 

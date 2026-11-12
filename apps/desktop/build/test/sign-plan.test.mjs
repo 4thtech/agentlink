@@ -19,8 +19,14 @@ test('ad-hoc plan signs Electron parts and the outer bundle inside-out, and neve
   const targets = plan.map((s) => s.target);
   assert.ok(!targets.some((t) => t.includes('/Resources/node/')));
   assert.equal(targets.at(-1), app);
-  assert.ok(targets.indexOf(`${app}/Contents/Frameworks/AgentLink Helper.app`) < targets.indexOf(app));
-  assert.ok(targets.indexOf(`${app}/Contents/Frameworks/AgentLink Helper.app/Contents/MacOS/AgentLink Helper`) < targets.indexOf(`${app}/Contents/Frameworks/AgentLink Helper.app`));
+  assert.ok(
+    targets.indexOf(`${app}/Contents/Frameworks/AgentLink Helper.app`) < targets.indexOf(app),
+  );
+  assert.ok(
+    targets.indexOf(
+      `${app}/Contents/Frameworks/AgentLink Helper.app/Contents/MacOS/AgentLink Helper`,
+    ) < targets.indexOf(`${app}/Contents/Frameworks/AgentLink Helper.app`),
+  );
   for (const s of plan) assert.equal(s.identity, '-');
 });
 
@@ -35,5 +41,8 @@ test('developer-id mode needs an identity and is refused without one', () => {
 });
 
 test('a bundled node outside the expected path is still refused', () => {
-  assert.throws(() => macSignPlan({ app, files, bundles: [...bundles, `${app}/Contents/Resources/node`] }), /node/);
+  assert.throws(
+    () => macSignPlan({ app, files, bundles: [...bundles, `${app}/Contents/Resources/node`] }),
+    /node/,
+  );
 });

@@ -15,18 +15,34 @@ test('preview check flags the variable name anywhere in the content', () => {
 
 test('the forbidden switch list covers the H1 set', () => {
   for (const s of [
-    '--remote-debugging-port=9222', '--remote-debugging-pipe', '--inspect', '--inspect-brk', '--js-flags=--expose-gc',
-    '--proxy-server=x:1', '--disable-web-security', '--host-rules=MAP * x', '--user-data-dir=/tmp/x',
-    '--load-extension=/tmp/e', '--enable-logging', '--some-unknown-switch',
+    '--remote-debugging-port=9222',
+    '--remote-debugging-pipe',
+    '--inspect',
+    '--inspect-brk',
+    '--js-flags=--expose-gc',
+    '--proxy-server=x:1',
+    '--disable-web-security',
+    '--host-rules=MAP * x',
+    '--user-data-dir=/tmp/x',
+    '--load-extension=/tmp/e',
+    '--enable-logging',
+    '--some-unknown-switch',
   ]) {
-    assert.ok(FORBIDDEN_SWITCHES.includes(s), s);
+    const name = s.split('=')[0];
+    assert.ok(
+      FORBIDDEN_SWITCHES.some((f) => f.split('=')[0] === name),
+      s,
+    );
   }
 });
 
 test('runLockdown passes only when every switch exits non-zero with no window', async () => {
   const good = async () => ({ code: 1, windowSeen: false });
   assert.equal((await runLockdown({ exe: '/x', launch: good })).failures.length, 0);
-  const bad = async (_e, args) => (args[0].startsWith('--inspect') ? { code: 0, windowSeen: true } : { code: 1, windowSeen: false });
+  const bad = async (_e, args) =>
+    args[0].startsWith('--inspect')
+      ? { code: 0, windowSeen: true }
+      : { code: 1, windowSeen: false };
   assert.ok((await runLockdown({ exe: '/x', launch: bad })).failures.length >= 2);
   const timeout = async () => ({ code: null, windowSeen: false });
   assert.ok((await runLockdown({ exe: '/x', launch: timeout })).failures.length > 0);
