@@ -14,6 +14,8 @@ export const TOUCH_ID_STRINGS = {
   onLine: 'Set up on this computer. AgentLink asks for it before every change that needs you.',
   off: (sensor: string): string => `${cap(sensor)} is off`,
   offLine: 'You confirm with your master code.',
+  /** DESK051-C2: in the desktop app, its own switch below turns it on. */
+  offNativeLine: 'You confirm with your master code. Turn it on with the switch below.',
   couldntCheckTitle: (sensor: string): string => `Couldn't check ${sensor}`,
   couldntCheckLine:
     "AgentLink didn't answer just now. Try again. Your master code works meanwhile.",

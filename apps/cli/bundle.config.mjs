@@ -19,7 +19,7 @@
 //   `__AGENTLINK_LOCAL_UI__` (scripts/local-ui-embed.mjs), read by src/mcp/local-ui-assets.ts and
 //   served from memory by the approval server. Build apps/local-ui first; without it the bundle
 //   is empty and the app pages answer 404.
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
@@ -69,6 +69,10 @@ export function stagePackage(dir = packageDir) {
   rmSync(stage, { recursive: true, force: true });
   mkdirSync(join(stage, 'dist'), { recursive: true });
   copyFileSync(join(dir, 'dist', 'agentlink.js'), join(stage, 'dist', 'agentlink.js'));
+  // WP-D4: the hidden desktop host entry (src/desktop/host.ts) is a second bundle built by a second
+  // run (AGENTLINK_BUNDLE_ENTRY=desktop-host); the app installs it from the packed tarball.
+  const host = join(dir, 'dist', 'desktop-host.js');
+  if (existsSync(host)) copyFileSync(host, join(stage, 'dist', 'desktop-host.js'));
   copyFileSync(join(dir, 'README.md'), join(stage, 'README.md'));
   copyFileSync(join(dir, 'LICENSE'), join(stage, 'LICENSE'));
   writeFileSync(
@@ -92,6 +96,8 @@ export function isExternal(id) {
   return !id.startsWith('@4thtech-io/');
 }
 
+const desktopHost = process.env.AGENTLINK_BUNDLE_ENTRY === 'desktop-host';
+
 export default defineConfig({
   plugins: [{ name: 'agentlink-stage-package', writeBundle: () => stagePackage() }],
   // No public dir, no .env loading: nothing outside the module graph may enter the bundle.
@@ -108,7 +114,7 @@ export default defineConfig({
     noExternal: [/^@4thtech-io\//],
   },
   build: {
-    ssr: 'src/cli.ts',
+    ssr: desktopHost ? 'src/desktop/host.ts' : 'src/cli.ts',
     outDir: 'dist',
     // tsc -b owns dist/; this build adds one file and never deletes the rest.
     emptyOutDir: false,
@@ -121,7 +127,7 @@ export default defineConfig({
       external: isExternal,
       output: {
         format: 'es',
-        entryFileNames: 'agentlink.js',
+        entryFileNames: desktopHost ? 'desktop-host.js' : 'agentlink.js',
         codeSplitting: false,
       },
     },

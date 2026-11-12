@@ -12,7 +12,7 @@
 import { knownFailureReason, type FailureReasonCode } from '../../api/failure-reasons.js';
 import {
   browserCeremonyGesture,
-  passkeyCeremony,
+  proofBody,
   type CeremonyGesture,
 } from '../../api/presence-ceremony.js';
 
@@ -22,7 +22,13 @@ import {
  */
 export type PresenceProof =
   | { readonly kind: 'code'; readonly code: string }
-  | { readonly kind: 'passkey'; readonly gesture: CeremonyGesture };
+  | { readonly kind: 'passkey'; readonly gesture: CeremonyGesture }
+  /**
+   * DESK-D12c: Touch ID / Windows Hello in the desktop app. No bytes: the server runs this computer's
+   * presence helper for this one operation, for a ceremony it issued for exactly this request
+   * (DESK051-C6; `X-AgentLink-Presence: native`, `X-AgentLink-Ceremony`, empty body).
+   */
+  | { readonly kind: 'native' };
 
 export type OwnerResult =
   | { readonly kind: 'done' }
@@ -143,13 +149,9 @@ export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient
       let res: Response | undefined;
       let body: Uint8Array | undefined;
       try {
-        if (proof.kind === 'passkey') {
-          const ceremony = await passkeyCeremony(doFetch, path, headers, proof.gesture);
-          if ('res' in ceremony) res = ceremony.res;
-          else body = ceremony.body;
-        } else {
-          body = new TextEncoder().encode(proof.code);
-        }
+        const ready = await proofBody(doFetch, path, headers, proof);
+        if ('res' in ready) res = ready.res;
+        else body = ready.body;
         if (body !== undefined) {
           res = await doFetch(path, {
             method: 'POST',
@@ -167,6 +169,9 @@ export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient
       if (res === undefined) return { kind: 'failed' };
       const { status, reason } = await answerOf(res);
       if (res.status === 200 && status === 'done') return { kind: 'done' };
+      // DESK-D12c: a refused Touch ID / Windows Hello gesture (cancel, lockout, …) changed nothing;
+      // the screen says so and keeps "Use your master code instead".
+      if (proof.kind === 'native' && status === 'presence_rejected') return { kind: 'rejected' };
       if (res.status === 401) return { kind: 'session' };
       if (res.status === 403 && status === 'presence_rejected') return { kind: 'rejected' };
       if (res.status === 403 && status === 'presence_required') return { kind: 'required' };

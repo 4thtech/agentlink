@@ -51,6 +51,21 @@
 //   owner operation. `/api/owner/passkey` shows the public registration data (GET) and registers the
 //   one passkey (POST: the master code plus the assertion), its own owner operation that signs
 //   nothing. The PRF output never leaves this process and is wiped after use.
+// - DESK-D12c, native presence in the desktop app (04 §2.3.4, §2.5 phase 2; owner-native.ts): with
+//   `X-AgentLink-Presence: native` the body must be empty and the server runs this computer's presence
+//   helper (ApprovalServerOptions.nativePresence; only the desktop app passes one) once, with a fixed
+//   reason (`approve`, or `pay` for a paid action's confirmation), after every check of the request
+//   and before the owner store is opened. The released secret opens the `owner-native` item for that
+//   one owner operation and is wiped. A refused gesture answers a fixed state in `native` (cancelled,
+//   failed, lockout, reregister, unavailable, retry_later, not_registered), never counted towards the
+//   wrong-code backoff (the OS limits its own tries). `/api/owner/native` shows whether the helper is
+//   there and registered for the owner (GET) and registers it (POST: the master code, or a passkey
+//   assertion with `X-AgentLink-Presence: passkey` answering its ceremony), its own owner operation
+//   that signs nothing. DESK051-C6 (04 §2.5): every native gesture answers a fresh, single-use
+//   ceremony of kind `native` (`X-AgentLink-Presence: native-challenge` first, then `native` with
+//   `X-AgentLink-Ceremony`), bound to the page session and exactly this request and spent before the
+//   helper runs, so a replayed native request never starts a second OS sheet and never acts. A paid
+//   action's native confirmation answers its own pay-confirm ceremony (single-use hold).
 // - What is signed is what the page showed: the page sends back the action digest it displayed; the
 //   server re-reads the request, recomputes the digest from the stored action and refuses any
 //   difference before the owner store is opened.
@@ -231,8 +246,10 @@ import {
   PRESENCE_CEREMONY_HEADER,
   PRESENCE_CEREMONY_TTL_MS,
   PRESENCE_CHALLENGE_MODE,
+  NATIVE_CHALLENGE_MODE,
   PresenceCeremonies,
   presenceBinding,
+  type PresenceCeremonyKind,
 } from './presence-ceremony.js';
 import { takeReviewedRules } from './local-ui/api/rules.js';
 import { grouped } from './owner-init.js';
@@ -246,6 +263,21 @@ import {
 // UX1113 WP-S2: Touch ID & master code (check, test, replace through ownerGate).
 import { OwnerCodeChanges } from './local-ui/api/owner-presence.js';
 import { ownerCodeProofAllowed, type LocalUiOwnerCodeStep } from './local-ui/owner-code-paths.js';
+import {
+  NativeHelperError,
+  type NativeHelper,
+  type NativeReason,
+  type NativeUiState,
+} from './owner-native-helper.js';
+import {
+  nativePresence,
+  nativePresenceStatus,
+  type NativePresenceStatus,
+  registerOwnerNative,
+  replaceOwnerNative,
+  turnOffOwnerNative,
+  type NativeStep,
+} from './owner-native.js';
 import {
   MAX_SETUP_REGISTRATION_BYTES,
   SETUP_HOLD_MS,
@@ -423,6 +455,36 @@ const MAX_SECRET_BYTES = 1024;
  */
 const MAX_PASSKEY_BYTES = 6144;
 const PASSKEY_PATH = '/api/owner/passkey';
+/** DESK-D12c: the desktop app's native presence (GET status, POST register). */
+const NATIVE_PATH = '/api/owner/native';
+/** Fable review M1: turn native presence off, or on again (replace), each its own owner operation. */
+const NATIVE_OFF_PATH = '/api/owner/native/off';
+const NATIVE_REPLACE_PATH = '/api/owner/native/replace';
+/**
+ * DESK-TOUCHID-FIX review (Fable M-1): the page's Cancel while the presence helper waits. Stops the
+ * helper of the native presence operation in progress (turn on, on again, or a native approval); that
+ * request then answers with what really happened. Changes nothing else; no body.
+ */
+const NATIVE_CANCEL_PATH = '/api/owner/native/cancel';
+/** DESK-D12c: the HTTP status of each fixed native presence state (never counted as a wrong code). */
+type NativeAnswerState = NativeUiState | 'not_registered' | 'damaged' | 'keychain';
+const NATIVE_HTTP: Readonly<Record<NativeAnswerState, number>> = Object.freeze({
+  cancelled: 403,
+  failed: 403,
+  not_registered: 403,
+  // Fable review L4: a blob that does not open after a real gesture (corrupted, or swapped by a
+  // same-user process) is its own state, never a wrong code: no wrong-code wait.
+  damaged: 409,
+  // Fable review L5: the keychain could not be read; not the same as "not turned on".
+  keychain: 503,
+  lockout: 423,
+  reregister: 409,
+  unavailable: 409,
+  retry_later: 503,
+  // DESK-NATIVE-DEBUG: the OS prompt got no answer in time (never a wrong code).
+  timeout: 403,
+  error: 500,
+});
 const NOTIFICATION = ['AgentLink', 'An approval is waiting for you.'] as const;
 const REVIEW_PATH = '/api/approvals/review';
 
@@ -879,6 +941,40 @@ export interface ApprovalServerOptions {
    * switched; `source` and `localUi.client` are ignored (`localUi.assets` and `version` are used).
    */
   readonly host?: AppHostOptions;
+  /**
+   * DESK-D12c: this computer's presence helper, when core runs inside the desktop app
+   * (owner-native-helper.ts desktopNativeHelper). Undefined everywhere else: the native presence kind
+   * is then refused and nothing changes for the browser.
+   */
+  readonly nativePresence?: NativeHelper;
+  /**
+   * DESK-NATIVE-DEBUG: receives ONE fixed diagnostic line per native presence operation outcome
+   * (nativeDiagnostic: fixed words, step names and error codes only; never a secret, a path, a
+   * handle, a record or a system message). The desktop host writes it to stderr, which the shell's
+   * redacting core log keeps. Exceptions in it are ignored.
+   */
+  readonly diagnose?: (line: string) => void;
+}
+
+/**
+ * DESK-NATIVE-DEBUG: the fixed reason of a native presence failure for the diagnostic line: the
+ * helper's state, how its run ended and its own fixed diagnostic; or a keystore error's code (and
+ * `timeout` / `refused` for the keychain); `unexpected` for anything else. Only fixed tokens.
+ */
+export function nativeFailureReason(error: unknown): string {
+  if (error instanceof NativeHelperError) {
+    return [
+      `helper_${error.state}`,
+      ...(error.detail === undefined ? [] : [error.detail]),
+      ...(error.diag === undefined ? [] : [`[${error.diag}]`]),
+    ].join(' ');
+  }
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === 'string' && /^[a-z_]{1,40}$/.test(code)) {
+    const detail = (error as { detail?: unknown }).detail;
+    return detail === 'timeout' || detail === 'refused' ? `${code} ${detail}` : code;
+  }
+  return 'unexpected';
 }
 
 /** One listen call: a loopback host, a port (0 = the OS picks), IPv6-only for ::1. */
@@ -2204,8 +2300,14 @@ export async function startApprovalServerWith(
     if (waiting(req, res, 'decision')) return;
     const mode = header(req, 'x-agentlink-presence');
     const passkey = mode === 'passkey';
-    if (mode !== undefined && !passkey) {
+    const native = mode === 'native';
+    if (mode !== undefined && !passkey && !native) {
       finishDecision(res, 403, 'presence_required');
+      req.resume();
+      return;
+    }
+    if (native && nativeHelper === undefined) {
+      finishDecision(res, 403, 'presence_required', NO_NATIVE);
       req.resume();
       return;
     }
@@ -2222,7 +2324,8 @@ export async function startApprovalServerWith(
     let assertion: PasskeyAssertion | undefined;
     let presence: OwnerPresence | undefined;
     try {
-      if (body.length === 0) {
+      // DESK-D12c: the native presence kind carries no bytes; every other kind needs some.
+      if (native ? body.length !== 0 : body.length === 0) {
         finishDecision(res, 403, 'presence_required');
         return;
       }
@@ -2236,6 +2339,12 @@ export async function startApprovalServerWith(
           return;
         }
         assertion = proof.assertion;
+      }
+      // DESK051-C6: a native gesture answers this request's native ceremony, spent here (before any
+      // await and before the helper runs): a replayed native request is refused.
+      if (native && !takeNativeCeremony(req)) {
+        finishDecision(res, 403, 'presence_required');
+        return;
       }
       // Check and claim with no await in between: one owner operation at a time.
       const already = ids.filter((approvalId) => decided.has(approvalId));
@@ -2308,7 +2417,15 @@ export async function startApprovalServerWith(
           finishDecision(res, 503, 'needs_setup');
           return;
         }
-        if (proof !== undefined) {
+        if (native) {
+          // DESK-D12c: one helper gesture for this one decision (or review list), after every check.
+          const got = await nativeFor(context.owner.ownerNostr, 'approve', req, res);
+          if (!('presence' in got)) {
+            finishDecision(res, got.http, 'presence_rejected', { native: got.state });
+            return;
+          }
+          presence = got.presence;
+        } else if (proof !== undefined) {
           // 04 §2.3.1: the assertion names the stored credential, the owner as user handle, RP ID
           // localhost and UP and UV, before its PRF output is used at all; REL051-SF1: it answers
           // this request's ceremony and is signed by the stored passkey.
@@ -2360,7 +2477,9 @@ export async function startApprovalServerWith(
             }),
           );
         } catch (error) {
-          if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+          if (error instanceof KeyStoreError && error.code === 'presence_rejected' && native) {
+            finishDecision(res, NATIVE_HTTP.damaged, 'presence_rejected', { native: 'damaged' });
+          } else if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
             presenceFailed();
             finishDecision(res, 403, 'presence_rejected');
           } else if (error instanceof NodeKeyStoreError) {
@@ -2398,6 +2517,255 @@ export async function startApprovalServerWith(
       }
     } finally {
       wipe(body, assertion?.prfOutput);
+      wipeCeremonyProof(proof);
+      wipeNative(presence);
+    }
+  }
+
+  // --- DESK-D12c: native presence (04 §2.3.4, §2.5 phase 2) ------------------------------------
+  const nativeHelper: NativeHelper | undefined = options.nativePresence;
+  /** DESK-NATIVE-DEBUG: one fixed line (see ApprovalServerOptions.diagnose). */
+  const nativeDiagnostic = (line: string): void => {
+    try {
+      options.diagnose?.(`native presence: ${line}`);
+    } catch {
+      // Diagnostics never change the outcome.
+    }
+  };
+  /**
+   * DESK-TOUCHID-FIX review (Fable M-1): the abort of the native presence operation in progress (one
+   * at a time: `busy`), for POST /api/owner/native/cancel.
+   */
+  let nativeInProgress: AbortController | undefined;
+  /** Aborts `stop` when the page goes away before the answer; returns the cleanup. */
+  const abortOnClose = (
+    req: IncomingMessage,
+    res: ServerResponse,
+    stop: AbortController,
+  ): (() => void) => {
+    const abandon = (): void => {
+      if (!res.writableFinished) stop.abort();
+    };
+    req.once('close', abandon);
+    res.once('close', abandon);
+    nativeInProgress = stop;
+    return () => {
+      req.off('close', abandon);
+      res.off('close', abandon);
+      if (nativeInProgress === stop) nativeInProgress = undefined;
+    };
+  };
+  /** The answer when the page asks for native presence where there is no helper (not the app). */
+  const NO_NATIVE = Object.freeze({ native: 'unavailable' });
+
+  /**
+   * One native presence for one owner operation, for `ownerNostr`, after every check of the request:
+   * the helper runs once with `reason`. A refusal is a fixed state with its HTTP status.
+   */
+  async function nativeFor(
+    ownerNostr: Uint8Array,
+    reason: NativeReason,
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<
+    | { readonly presence: OwnerPresence }
+    | { readonly http: number; readonly state: NativeAnswerState }
+  > {
+    if (nativeHelper === undefined) return { http: NATIVE_HTTP.unavailable, state: 'unavailable' };
+    // Fable review L1: when the page goes away (the client disconnects, the sheet is abandoned) the
+    // helper is killed, its OS prompt closes, `busy` is released by the gate's own finally, and a
+    // touch that still arrives approves nothing.
+    const abandoned = new AbortController();
+    const cleanup = abortOnClose(req, res, abandoned);
+    try {
+      return {
+        presence: await nativePresence(keychainOf(), nativeHelper, ownerNostr, reason, {
+          signal: abandoned.signal,
+        }),
+      };
+    } catch (error) {
+      const state: NativeAnswerState =
+        error instanceof NativeHelperError
+          ? error.state
+          : error instanceof KeyStoreError && error.code === 'presence_rejected'
+            ? 'not_registered'
+            : 'keychain';
+      nativeDiagnostic(`${reason} failed (${nativeFailureReason(error)})`);
+      return { http: NATIVE_HTTP[state], state };
+    } finally {
+      cleanup();
+    }
+  }
+
+  /** The native secret of a presence that was not handed to an unlock (unlock wipes its own). */
+  const wipeNative = (presence: OwnerPresence | undefined): void => {
+    if (presence?.kind === 'native') wipe(presence.secret);
+  };
+
+  /** GET /api/owner/native: whether this computer's helper is here and registered for the owner. */
+  async function nativeInfo(res: ServerResponse): Promise<void> {
+    if (nativeHelper === undefined) {
+      sendJson(res, 200, { native: { available: false, registered: false } });
+      return;
+    }
+    const context = noAgentOpen() ? undefined : await source.context().catch(() => undefined);
+    const status = await nativePresenceStatus(
+      keychainOf(),
+      nativeHelper,
+      context?.owner.ownerNostr,
+    ).catch((): NativePresenceStatus => ({ available: false, registered: false }));
+    sendJson(res, 200, {
+      native: {
+        available: status.available,
+        registered: status.registered,
+        ...(status.reason === undefined ? {} : { reason: status.reason }),
+        platform: nativeHelper.kind === 1 ? 'mac' : 'windows',
+      },
+    });
+  }
+
+  /**
+   * POST /api/owner/native: turns on native presence, its own owner operation (04 §2.3.4
+   * "Registration"): the master code as the body, or a passkey assertion with
+   * `X-AgentLink-Presence: passkey`; then the helper's one gesture. Signs nothing.
+   */
+  async function nativeRegister(
+    req: IncomingMessage,
+    res: ServerResponse,
+    op: 'register' | 'off' | 'replace' = 'register',
+  ): Promise<void> {
+    const reply = (status: number, outcome: string, extra: Record<string, unknown> = {}): void => {
+      emit({ kind: 'owner_operation', outcome: status === 200 ? 'done' : 'failed' });
+      sendJson(res, status, { status: outcome, ...extra });
+    };
+    if (waiting(req, res, 'passkey')) return;
+    const mode = header(req, 'x-agentlink-presence');
+    const passkey = mode === 'passkey';
+    if (mode !== undefined && !passkey) {
+      req.resume();
+      reply(403, 'presence_required');
+      return;
+    }
+    const helper = nativeHelper;
+    if (helper === undefined) {
+      req.resume();
+      reply(409, 'native_unavailable');
+      return;
+    }
+    const body = await boundedBody(
+      req,
+      res,
+      passkey ? MAX_PAY_CONFIRM_ASSERTION_BYTES : MAX_SECRET_BYTES,
+    );
+    if (body === undefined) return;
+    let proof: CeremonyProof | undefined;
+    try {
+      if (body.length === 0) {
+        reply(403, 'presence_required');
+        return;
+      }
+      if (passkey) {
+        // REL051-SF1 / DESK051-C6: the passkey answers a ceremony for exactly this request, taken
+        // (spent) before any await.
+        proof = takeCeremonyProof(req, body);
+        if (proof === undefined) {
+          reply(403, 'presence_required');
+          return;
+        }
+      }
+      if (busy) {
+        reply(409, 'busy');
+        return;
+      }
+      busy = true;
+      try {
+        const context = await source.context();
+        if (context === undefined) {
+          reply(503, 'needs_setup');
+          return;
+        }
+        let presence: OwnerPresence;
+        if (proof !== undefined) {
+          const check = await checkCeremonyProof(proof, context.owner.ownerNostr);
+          if (check === 'passkey_update_needed' || check === 'verification_required') {
+            reply(check === 'passkey_update_needed' ? 409 : 403, check);
+            return;
+          }
+          if (check !== 'ok') {
+            presenceFailed();
+            reply(403, 'presence_rejected');
+            return;
+          }
+          presence = { kind: 'passkey-prf', prfOutput: proof.assertion.prfOutput };
+        } else {
+          presence = { kind: 'passphrase', secret: body };
+        }
+        // DESK-NATIVE-DEBUG: the step reached, for the one diagnostic line of this operation.
+        const name = op === 'off' ? 'turn_off' : op;
+        let step: NativeStep | 'presence' = 'presence';
+        // DESK-TOUCHID-FIX review (Fable M-1): Cancel, or the page going away, stops the helper.
+        const stop = new AbortController();
+        const cleanup = abortOnClose(req, res, stop);
+        const steps = {
+          onStep: (next: NativeStep): void => {
+            step = next;
+          },
+          signal: stop.signal,
+        };
+        nativeDiagnostic(`${name} started`);
+        /**
+         * DESK-TOUCHID-FIX review (Fable L-2): on again removes the old one first; a failure after
+         * that leaves it off, and the answer says so (never "nothing was changed").
+         */
+        const nowOff = (): Record<string, unknown> =>
+          op === 'replace' && step !== 'presence' && step !== 'master_code' && step !== 'remove_old'
+            ? { nowOff: true }
+            : {};
+        try {
+          // Each wipes the presented bytes, whether or not it succeeds. None takes native presence.
+          if (op === 'off') {
+            await turnOffOwnerNative(keychainOf(), helper, context.owner, presence, steps);
+          } else if (op === 'replace') {
+            await replaceOwnerNative(keychainOf(), helper, context.owner, presence, steps);
+          } else await registerOwnerNative(keychainOf(), helper, context.owner, presence, steps);
+        } catch (error) {
+          nativeDiagnostic(`${name} failed at ${step} (${nativeFailureReason(error)})`);
+          if (error instanceof NativeHelperError) {
+            reply(NATIVE_HTTP[error.state], 'presence_rejected', {
+              native: error.state,
+              ...nowOff(),
+            });
+            return;
+          }
+          const code = (error as { code?: unknown } | null)?.code;
+          if (code === 'owner_native_exists') reply(409, 'native_exists');
+          else if (code === 'owner_native_missing') reply(409, 'native_missing');
+          else if (code === 'presence_rejected') {
+            presenceFailed();
+            reply(403, 'presence_rejected');
+          } else if (code === 'presence_required') reply(403, 'presence_required');
+          else if (code === 'owner_missing') reply(503, 'needs_setup');
+          // DESK-NATIVE-DEBUG: the keychain did not answer or refused: its own message, not "error".
+          else if (code === 'keychain_failed') {
+            // Fable review L-1: a write that may still have landed is its own answer.
+            const unsure = (error as { detail?: unknown }).detail === 'unsure';
+            reply(NATIVE_HTTP.keychain, 'failed', {
+              native: unsure ? 'keychain_unsure' : 'keychain',
+              ...nowOff(),
+            });
+          } else reply(500, 'failed', nowOff());
+          return;
+        } finally {
+          cleanup();
+        }
+        nativeDiagnostic(`${name} done`);
+        presenceSucceeded();
+        reply(200, op === 'off' ? 'off' : 'registered');
+      } finally {
+        busy = false;
+      }
+    } finally {
+      wipe(body);
       wipeCeremonyProof(proof);
     }
   }
@@ -2562,9 +2930,18 @@ export async function startApprovalServerWith(
       generation: header(req, 'x-agentlink-generation'),
     });
 
-  /** True when the request asks for a ceremony (`X-AgentLink-Presence: challenge`). */
-  const asksChallenge = (req: IncomingMessage): boolean =>
-    header(req, 'x-agentlink-presence') === PRESENCE_CHALLENGE_MODE;
+  /**
+   * The kind of ceremony the request asks for (`X-AgentLink-Presence: challenge` for a passkey,
+   * `native-challenge` for the desktop app's native gesture, DESK051-C6), or undefined.
+   */
+  const asksChallenge = (req: IncomingMessage): PresenceCeremonyKind | undefined => {
+    const mode = header(req, 'x-agentlink-presence');
+    return mode === PRESENCE_CHALLENGE_MODE
+      ? 'passkey'
+      : mode === NATIVE_CHALLENGE_MODE
+        ? 'native'
+        : undefined;
+  };
 
   /**
    * Answers a ceremony request for the route this request names (it is never acted on): an empty
@@ -2595,6 +2972,24 @@ export async function startApprovalServerWith(
     const session = sessionOf(req);
     if (session === undefined) {
       sendJson(res, 401, { error: 'token' });
+      return;
+    }
+    if (asksChallenge(req) === 'native') {
+      // DESK051-C6: a ceremony for the desktop app's native gesture. Only where this computer has
+      // the presence helper; the server runs the gesture itself, so only the ceremony ID goes back
+      // (no challenge leaves the server). Whether native presence is turned on is checked when the
+      // gesture is asked for, as before.
+      if (nativeHelper === undefined) {
+        sendJson(res, 403, { status: 'presence_required', ...NO_NATIVE });
+        return;
+      }
+      ceremonies.sweep((held) => sessions.some((s) => equalBytes(s, held)));
+      const ceremony = ceremonies.issue(session, bindingOf(req), 'native');
+      sendJson(res, 200, {
+        status: 'ready',
+        ceremony: ceremony.id,
+        expiresInMs: PRESENCE_CEREMONY_TTL_MS,
+      });
       return;
     }
     let credentialId: Uint8Array | undefined;
@@ -2659,6 +3054,22 @@ export async function startApprovalServerWith(
       return undefined;
     }
     return { assertion, challenge };
+  };
+
+  /**
+   * DESK051-C6 (04 §2.5): takes the native ceremony a native request names (single use, before any
+   * await, before the helper runs). False (`presence_required`) when no ceremony is named, or it is
+   * unknown, another session's, expired, bound to another request or a passkey ceremony; it is spent
+   * whatever the outcome, so a replayed native request never starts a second OS sheet.
+   */
+  const takeNativeCeremony = (req: IncomingMessage): boolean => {
+    const session = sessionOf(req);
+    const id = header(req, PRESENCE_CEREMONY_HEADER);
+    if (session === undefined || id === undefined) return false;
+    const taken = ceremonies.take(id, session, bindingOf(req), 'native');
+    if (typeof taken === 'string') return false;
+    PresenceCeremonies.wipeOf(taken);
+    return true;
   };
 
   /**
@@ -2782,15 +3193,25 @@ export async function startApprovalServerWith(
     }
     const mode = header(req, 'x-agentlink-presence');
     const passkey = mode === 'passkey';
-    if (mode !== undefined && !passkey) {
+    const native = mode === 'native';
+    if (mode !== undefined && !passkey && !native) {
       req.resume();
       finishOwner(res, 403, 'presence_required');
+      return;
+    }
+    if (native && nativeHelper === undefined) {
+      req.resume();
+      finishOwner(res, 403, 'presence_required', NO_NATIVE);
       return;
     }
     const codeStep = gate.ownerCode;
     if (codeStep !== undefined) {
       // WP-S2: the step's one kind of proof, before the body is read or anything is opened.
-      if (!ownerCodeProofAllowed(codeStep, passkey)) {
+      // DESK051-C2: native presence carries no typed code and no passkey assertion, so of the
+      // owner-code steps it is taken by Test Touch ID (the desktop app's own Touch ID) and Replace
+      // (any presence) only; never by Check or finish (owner-code-paths.ts).
+      const kind = native ? 'native' : passkey ? 'passkey' : 'code';
+      if (!ownerCodeProofAllowed(codeStep, kind)) {
         req.resume();
         finishOwner(res, 403, 'presence_required');
         return;
@@ -2804,8 +3225,10 @@ export async function startApprovalServerWith(
     if (body === undefined) return;
     let proof: CeremonyProof | undefined;
     let assertion: PasskeyAssertion | undefined;
+    let nativeHeld: OwnerPresence | undefined;
     try {
-      if (body.length === 0) {
+      // DESK-D12c: the native presence kind carries no bytes; every other kind needs some.
+      if (native ? body.length !== 0 : body.length === 0) {
         finishOwner(res, 403, 'presence_required');
         return;
       }
@@ -2817,6 +3240,12 @@ export async function startApprovalServerWith(
           return;
         }
         assertion = proof.assertion;
+      }
+      // DESK051-C6: a native gesture answers this request's native ceremony, spent here (before any
+      // await and before the helper runs): a replayed native request is refused.
+      if (native && !takeNativeCeremony(req)) {
+        finishOwner(res, 403, 'presence_required');
+        return;
       }
       if (busy) {
         finishOwner(res, 409, 'busy');
@@ -2838,7 +3267,22 @@ export async function startApprovalServerWith(
           return;
         }
         let presence: OwnerPresence;
-        if (proof !== undefined) {
+        if (native) {
+          // DESK-D12c: one helper gesture for this one owner operation, after every check. D15-04:
+          // Replace master code names itself on the OS sheet (reason `code`).
+          const got = await nativeFor(
+            expectedNostr,
+            codeStep === 'replace' ? 'code' : 'approve',
+            req,
+            res,
+          );
+          if (!('presence' in got)) {
+            finishOwner(res, got.http, 'presence_rejected', { native: got.state });
+            return;
+          }
+          presence = got.presence;
+          nativeHeld = presence;
+        } else if (proof !== undefined) {
           // REL051-SF1: the gesture answers this ceremony, signed by the stored passkey.
           const check = await checkCeremonyProof(proof, expectedNostr);
           if (check === 'passkey_update_needed') {
@@ -2877,7 +3321,9 @@ export async function startApprovalServerWith(
             );
             ({ store, session, owner: ownerKeys } = unlocked);
           } catch (error) {
-            if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+            if (error instanceof KeyStoreError && error.code === 'presence_rejected' && native) {
+              finishOwner(res, NATIVE_HTTP.damaged, 'presence_rejected', { native: 'damaged' });
+            } else if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
               presenceFailed();
               finishOwner(res, 403, 'presence_rejected');
             } else if (error instanceof NodeKeyStoreError && error.code === 'owner_missing') {
@@ -2920,7 +3366,9 @@ export async function startApprovalServerWith(
                 ? await opened.unlockForExport(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS })
                 : await opened.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
           } catch (error) {
-            if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+            if (error instanceof KeyStoreError && error.code === 'presence_rejected' && native) {
+              finishOwner(res, NATIVE_HTTP.damaged, 'presence_rejected', { native: 'damaged' });
+            } else if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
               presenceFailed();
               finishOwner(res, 403, 'presence_rejected');
             } else {
@@ -3129,6 +3577,7 @@ export async function startApprovalServerWith(
       }
     } finally {
       wipe(body, assertion?.prfOutput);
+      wipeNative(nativeHeld);
       wipeCeremonyProof(proof);
     }
   }
@@ -3588,9 +4037,15 @@ export async function startApprovalServerWith(
     const input = operationInput(req);
     const mode = header(req, 'x-agentlink-presence');
     const passkey = mode === 'passkey';
-    if (input === 'invalid' || (mode !== undefined && !passkey)) {
+    const native = mode === 'native';
+    if (input === 'invalid' || (mode !== undefined && !passkey && !native)) {
       req.resume();
       finishPay(res, 400, 'invalid');
+      return;
+    }
+    if (native && (nativeHelper === undefined || step === 'begin')) {
+      req.resume();
+      finishPay(res, 403, 'presence_required', NO_NATIVE);
       return;
     }
     const body = await boundedBody(
@@ -3612,7 +4067,7 @@ export async function startApprovalServerWith(
         return;
       }
       if (step === 'begin') await payBegin(res, input, body, session, passkey);
-      else await payFinish(res, input, body, session, passkey);
+      else await payFinish(res, input, body, session, passkey, native, req);
     } finally {
       wipe(body);
     }
@@ -3660,8 +4115,17 @@ export async function startApprovalServerWith(
       } catch {
         credentialId = undefined;
       }
+      // DESK-D12c: the sheet offers Touch ID / Windows Hello when it is turned on for this owner.
+      const nativeOn =
+        nativeHelper !== undefined &&
+        (
+          await nativePresenceStatus(keychainOf(), nativeHelper, context.owner.ownerNostr).catch(
+            () => ({ registered: false }),
+          )
+        ).registered;
       finishPay(res, 200, 'ready', {
         ceremony: hold.id,
+        native: nativeOn,
         statement: hold.statement as unknown as JsonValue,
         // M1-PAY-CONFIRM-b: the sheet offers "Remember for this contact" only when core would.
         ...(built.target.kind === 'proof'
@@ -3693,12 +4157,15 @@ export async function startApprovalServerWith(
     body: Uint8Array,
     session: Uint8Array,
     passkey: boolean,
+    native = false,
+    payReq?: IncomingMessage,
   ): Promise<void> {
     if (!onlyKeys(input, ['ceremony']) || typeof input['ceremony'] !== 'string') {
       finishPay(res, 400, 'invalid');
       return;
     }
-    if (body.length === 0) {
+    // DESK-D12c: the native presence kind carries no bytes; every other kind needs some.
+    if (native ? body.length !== 0 : body.length === 0) {
       finishPay(res, 403, 'presence_required');
       return;
     }
@@ -3706,15 +4173,16 @@ export async function startApprovalServerWith(
       finishPay(res, 409, 'busy');
       return;
     }
-    // A passkey finish takes the hold before any await: single use, whatever happens below.
-    const found = payHolds.get(input['ceremony'], session, passkey);
+    // A passkey or native finish takes the hold before any await: single use, whatever happens below.
+    const found = payHolds.get(input['ceremony'], session, passkey || native);
     if (found === 'unknown' || found === 'expired') {
       finishPay(res, 409, found);
       return;
     }
     const hold = found;
     let assertion: PayConfirmAssertion | undefined;
-    let consumed = passkey;
+    let consumed = passkey || native;
+    let nativeHeld: OwnerPresence | undefined;
     busy = true;
     try {
       if (passkey) {
@@ -3738,7 +4206,18 @@ export async function startApprovalServerWith(
         return;
       }
       let presence: OwnerPresence;
-      if (assertion !== undefined) {
+      if (native) {
+        // DESK-D12c (04 §2.5.3, 04 §2.3.4 "The reason is display-only"): the statement of this hold
+        // was shown at begin; the one unlock below signs exactly this hold's objects (rule 3) and
+        // nothing else. The helper's `pay` text is display-only and binds nothing.
+        const got = await nativeFor(context.owner.ownerNostr, 'pay', payReq ?? res.req, res);
+        if (!('presence' in got)) {
+          finishPay(res, got.http, 'presence_rejected', { native: got.state });
+          return;
+        }
+        presence = got.presence;
+        nativeHeld = presence;
+      } else if (assertion !== undefined) {
         let check: ReturnType<typeof checkPayConfirmAssertion> = 'presence_rejected';
         try {
           const stored = await readOwnerPasskeyHeader(keychainOf());
@@ -3786,9 +4265,11 @@ export async function startApprovalServerWith(
           // unlock wipes the presented bytes, whether or not they unlock.
           ownerSession = await store.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
         } catch (error) {
-          if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+          if (error instanceof KeyStoreError && error.code === 'presence_rejected' && native) {
+            finishPay(res, NATIVE_HTTP.damaged, 'presence_rejected', { native: 'damaged' });
+          } else if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
             presenceFailed();
-            if (!passkey && payHolds.backupFailed(hold)) {
+            if (!passkey && !native && payHolds.backupFailed(hold)) {
               consumed = true;
               finishPay(res, 403, 'tries_exhausted');
             } else {
@@ -3800,7 +4281,7 @@ export async function startApprovalServerWith(
           return;
         }
         presenceSucceeded();
-        if (!passkey) {
+        if (!passkey && !native) {
           payHolds.get(hold.id, session, true);
           consumed = true;
         }
@@ -3839,6 +4320,7 @@ export async function startApprovalServerWith(
       finishPay(res, 500, 'failed');
     } finally {
       busy = false;
+      wipeNative(nativeHeld);
       if (consumed) PayConfirmHolds.wipe(hold);
       if (assertion !== undefined) {
         wipe(
@@ -5957,15 +6439,17 @@ export async function startApprovalServerWith(
       sendResult(res, NOT_AVAILABLE);
       return;
     }
-    if (asksChallenge(req)) {
+    const asked = asksChallenge(req);
+    if (asked !== undefined) {
       // REL051-SF1: a ceremony for a passkey gesture on this route, before anything else runs. Only
       // routes the central gate takes a passkey on (an owner-code step only where its one kind of
       // proof is the passkey) and Remove (which runs the central gate); never acted on.
-      const takesPasskey =
+      // DESK051-C6: the same for a native gesture, where the step takes native presence.
+      const takesProof =
         route.presence === 'remove' ||
         (route.presence === true &&
-          (route.ownerCode === undefined || ownerCodeProofAllowed(route.ownerCode, true)));
-      if (takesPasskey) await presenceChallenge(req, res);
+          (route.ownerCode === undefined || ownerCodeProofAllowed(route.ownerCode, asked)));
+      if (takesProof) await presenceChallenge(req, res);
       else {
         req.resume();
         sendJson(res, 400, { status: 'invalid' });
@@ -6167,23 +6651,49 @@ export async function startApprovalServerWith(
     const one = API_ONE.exec(path);
     const decideMatch = API_DECIDE.exec(path);
     const passkeyRoute = path === PASSKEY_PATH;
+    const nativeOp: 'register' | 'off' | 'replace' | undefined =
+      path === NATIVE_PATH
+        ? 'register'
+        : path === NATIVE_OFF_PATH
+          ? 'off'
+          : path === NATIVE_REPLACE_PATH
+            ? 'replace'
+            : undefined;
+    const nativeRoute = nativeOp !== undefined;
+    const cancelRoute = path === NATIVE_CANCEL_PATH;
     const reviewRoute = path === REVIEW_PATH;
     if (
       path !== '/api/approvals' &&
+      !cancelRoute &&
       one === null &&
       decideMatch === null &&
       !passkeyRoute &&
+      !nativeRoute &&
       !reviewRoute
     ) {
       reject(res, 404, 'not_found');
       return;
     }
-    const post = decideMatch !== null || reviewRoute || (passkeyRoute && method === 'POST');
+    const post =
+      decideMatch !== null ||
+      reviewRoute ||
+      cancelRoute ||
+      ((passkeyRoute || nativeRoute) && method === 'POST') ||
+      (nativeOp !== undefined && nativeOp !== 'register');
     if (method !== (post ? 'POST' : 'GET')) return reject(res, 405, 'method');
     if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token');
     if (!fetchSiteOk(req)) return reject(res, 403, 'fetch_site');
     if (post && originHeader === undefined) return reject(res, 403, 'origin');
     if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return reject(res, 403, 'csrf');
+    if (cancelRoute) {
+      // DESK-TOUCHID-FIX review (Fable M-1): before the generation hold (the operation it stops
+      // holds one), after the session, fetch-metadata, origin and CSRF gates. No body.
+      req.resume();
+      const running = nativeInProgress;
+      running?.abort();
+      sendJson(res, 200, { status: running === undefined ? 'none' : 'cancelling' });
+      return;
+    }
 
     if (post) {
       const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
@@ -6198,7 +6708,7 @@ export async function startApprovalServerWith(
           noAgent(res);
           return;
         }
-        await approvalsPost(req, res, reviewRoute, decideMatch);
+        await approvalsPost(req, res, reviewRoute, decideMatch, nativeOp);
       } finally {
         hold?.leave();
       }
@@ -6208,12 +6718,13 @@ export async function startApprovalServerWith(
     try {
       // HOTFIX-045-TOUCHID: the passkey's public data is the owner's, not an agent's: it answers
       // with no agent open too (after the same session, fetch-metadata and CSRF gates above).
-      if (noAgentOpen() && !passkeyRoute) {
+      if (noAgentOpen() && !passkeyRoute && !nativeRoute) {
         noAgent(res);
         return;
       }
       stamp(res);
-      await approvalsRead(res, passkeyRoute, one);
+      if (nativeRoute) await nativeInfo(res);
+      else await approvalsRead(res, passkeyRoute, one);
     } finally {
       hold?.leave();
     }
@@ -6225,12 +6736,21 @@ export async function startApprovalServerWith(
     res: ServerResponse,
     reviewRoute: boolean,
     decideMatch: RegExpExecArray | null,
+    nativeOp?: 'register' | 'off' | 'replace',
   ): Promise<void> {
     {
-      if (asksChallenge(req)) {
-        // REL051-SF1: a ceremony for this decision (or review list), never for registering.
-        if (reviewRoute || decideMatch !== null) await presenceChallenge(req, res);
-        else {
+      const asked = asksChallenge(req);
+      if (asked !== undefined) {
+        // REL051-SF1: a ceremony for this decision (or review list), passkey or native (DESK051-C6).
+        // DESK051-C6: and a passkey one for turning native presence on, off or on again; those never
+        // take native presence.
+        if (
+          reviewRoute ||
+          decideMatch !== null ||
+          (nativeOp !== undefined && asked === 'passkey')
+        ) {
+          await presenceChallenge(req, res);
+        } else {
           req.resume();
           sendJson(res, 400, { status: 'invalid' });
         }
@@ -6247,7 +6767,8 @@ export async function startApprovalServerWith(
         return;
       }
       if (decideMatch === null) {
-        await passkeyRegister(req, res);
+        if (nativeOp !== undefined) await nativeRegister(req, res, nativeOp);
+        else await passkeyRegister(req, res);
         return;
       }
       await decide(
@@ -7056,4 +7577,20 @@ export async function startApprovalServerWith(
  */
 export function startApprovalServer(options: ApprovalServerOptions): Promise<ApprovalServer> {
   return startApprovalServerWith(options, { sweepRestoreAtStart: true });
+}
+
+/**
+ * WP-D3 (desktop host; 08 §1, 04 §2.5 "opening a page adds no authority"): the same server as
+ * startApprovalServer, except that every one-shot session link it would hand to the OS browser
+ * opener (`open`, `openHome`, `openFirstRun`, `openJoin` and the join handoff's open) goes to
+ * `linkSink` instead: the desktop app's core hands it to the app window over its private pipe only.
+ * Nothing else changes: the same routes, session, CSRF, presence gate and owner signature. The sink
+ * gets exactly what the opener would (a fixed path and a fresh one-shot token), resolves true when
+ * it delivered the link, and must never log, print or store it.
+ */
+export function startApprovalServerWithLinkSink(
+  options: ApprovalServerOptions,
+  linkSink: (sessionUrl: string) => Promise<boolean>,
+): Promise<ApprovalServer> {
+  return startApprovalServerWith(options, { opener: linkSink });
 }

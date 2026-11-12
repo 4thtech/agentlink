@@ -132,6 +132,7 @@ import {
   type UpgradeValues,
 } from './setup-api.js';
 import './first-run.css';
+import { NativeSetupOffer } from '../../presence/native-setup.js';
 import {
   BACKUP_CODE_FIELD,
   BackupCodeField,
@@ -1476,6 +1477,8 @@ export function FirstRunPage({
           {line === undefined ? null : (
             <Banner tone={done.sendFolder === 'allowed' ? 'success' : 'warning'}>{line}</Banner>
           )}
+          {/* DESK-D12c: in the desktop app, "Turn on Touch ID for approvals" (one gesture). */}
+          {done.ownerCode === undefined ? null : <NativeSetupOffer backupCode={done.ownerCode} />}
           <BackupCode
             code={done.ownerCode ?? ''}
             computer={done.computerName ?? ''}

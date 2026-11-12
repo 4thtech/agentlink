@@ -9,6 +9,8 @@ import {
   INSTALL_PS1_TEMPLATE,
   INSTALL_SH_TEMPLATE,
   JOIN_COMMAND_TEMPLATE,
+  APP_LINK_PREFIX,
+  buildAppLink,
   buildAskAi,
   buildCommands,
   buildJoinCommand,
@@ -167,5 +169,21 @@ describe('U3-invite: the command and the sentence (08 §4)', () => {
   it('passes the vocabulary lint (11 §5.1)', () => {
     const text = buildAskAi(LINK).replace(/`[^`]*`/g, '');
     for (const [name, pattern] of BANNED) expect(pattern.test(text), name).toBe(false);
+  });
+});
+
+describe('WP-D9: the link that opens the AgentLink app (plan Decision 4, 08 §4)', () => {
+  it('is agentlink://join# and the checked payload, nothing else', () => {
+    expect(APP_LINK_PREFIX).toBe('agentlink://join#');
+    expect(buildAppLink(LINK)).toBe('agentlink://join#abcDEF_-123');
+    expect(buildAppLink(SHORT_LINK)).toBe(
+      `agentlink://join#${SHORT_LINK.slice(SHORT_LINK.indexOf('#') + 1)}`,
+    );
+    const max = 'A'.repeat(21846);
+    expect(buildAppLink(`https://agentlink.4thtech.io/i#${max}`)).toBe(`agentlink://join#${max}`);
+  });
+
+  it('is built from nothing but the strict canonical link', () => {
+    for (const link of BAD_LINKS) expect(() => buildAppLink(link), link).toThrow();
   });
 });

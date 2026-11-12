@@ -135,3 +135,60 @@ describe('the presence ceremony (REL051-SF1)', () => {
     expect(ceremonyPublicKeyOf(null)).toBeUndefined();
   });
 });
+
+// DESK051-C6 (04 §2.5): the desktop app's native presence answers a ceremony too. The page asks with
+// `native-challenge` and no body; the server answers the ceremony ID only (it runs the gesture);
+// the request then names it with `native` and an empty body. A refusal is the answer; nothing else
+// is sent.
+describe('the native presence ceremony (DESK051-C6)', () => {
+  const NATIVE_READY = { status: 'ready', ceremony: CEREMONY, expiresInMs: 120000 };
+
+  it('asks with the same headers and no body, then sends native with the ceremony, no body', async () => {
+    const { sent, fetchFn } = fake(
+      { status: 200, body: NATIVE_READY },
+      { status: 200, body: { status: 'done' } },
+    );
+    const res = await sendWithProof(fetchFn, '/api/ui/owner-presence/test', headers(), {
+      kind: 'native',
+    });
+    expect(res.status).toBe(200);
+    expect(sent).toHaveLength(2);
+    const [ask, proof] = sent;
+    expect(ask?.headers.get('X-AgentLink-Presence')).toBe('native-challenge');
+    expect(ask?.headers.get('X-AgentLink-Ceremony')).toBeNull();
+    expect(ask?.headers.get('X-AgentLink-Input')).toBe('e30');
+    expect(ask?.body).toHaveLength(0);
+    expect(proof?.headers.get('X-AgentLink-Presence')).toBe('native');
+    expect(proof?.headers.get('X-AgentLink-Ceremony')).toBe(CEREMONY);
+    expect(proof?.headers.get('X-AgentLink-Input')).toBe('e30');
+    expect(proof?.body).toHaveLength(0);
+  });
+
+  it('a refused ask is the answer (no native here); nothing else is sent', async () => {
+    const { sent, fetchFn } = fake({
+      status: 403,
+      body: { status: 'presence_required', native: 'unavailable' },
+    });
+    const res = await sendWithProof(fetchFn, '/api/ui/owner-presence/test', headers(), {
+      kind: 'native',
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ status: 'presence_required', native: 'unavailable' });
+    expect(sent).toHaveLength(1);
+  });
+
+  it('a malformed ready answer sends nothing and reads as presence_required', async () => {
+    for (const body of [
+      { status: 'ready' },
+      { status: 'ready', ceremony: '../x' },
+      { status: 'wait', ceremony: CEREMONY },
+      null,
+    ]) {
+      const { sent, fetchFn } = fake({ status: 200, body });
+      const res = await sendWithProof(fetchFn, '/p', headers(), { kind: 'native' });
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ status: 'presence_required' });
+      expect(sent).toHaveLength(1);
+    }
+  });
+});

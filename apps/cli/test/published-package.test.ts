@@ -46,7 +46,13 @@ const manifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8
 const rootManifest = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as Manifest;
 
 /** The files `npm pack` puts into the tarball: exactly these, nothing else. */
-const PACKED_FILES = ['LICENSE', 'README.md', 'dist/agentlink.js', 'package.json'];
+const PACKED_FILES = [
+  'LICENSE',
+  'README.md',
+  'dist/agentlink.js',
+  'dist/desktop-host.js',
+  'package.json',
+];
 
 /** An exact version: no range, tag, protocol or URL. */
 const EXACT = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
@@ -127,8 +133,8 @@ describe('the published manifest (@4thtech-io/agentlink)', () => {
     });
   });
 
-  it('lists exactly the bundle in `files` and exports no library entry', () => {
-    expect(manifest.files).toEqual(['dist/agentlink.js']);
+  it('lists exactly the bundle and the desktop host bundle in `files` and exports no library entry', () => {
+    expect(manifest.files).toEqual(['dist/agentlink.js', 'dist/desktop-host.js']);
     expect(manifest.main).toBeUndefined();
     expect(manifest.exports).toBeUndefined();
   });

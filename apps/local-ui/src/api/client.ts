@@ -47,8 +47,12 @@ export interface ApiClient {
   owner(path: string, input: unknown, presence: OwnerPresence): Promise<OwnerApiResult>;
 }
 
-/** The master code as typed, or the passkey gesture (contacts/owner.ts `passkeyProof`; REL051-SF1). */
-export type OwnerPresence = string | { readonly passkey: CeremonyGesture };
+/**
+ * The master code as typed, the passkey gesture (contacts/owner.ts `passkeyProof`; REL051-SF1), or
+ * Touch ID / Windows Hello in the desktop app (DESK-D12c; no bytes, a ceremony per gesture: C6).
+ */
+export type OwnerPresence =
+  string | { readonly passkey: CeremonyGesture } | { readonly native: true };
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
 
@@ -144,7 +148,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         'content-type': 'application/octet-stream',
         'X-AgentLink-Input': base64url(JSON.stringify(input)),
       });
-      // REL051-SF1: the passkey answers a ceremony for exactly this request.
+      // REL051-SF1: the passkey answers a ceremony for exactly this request; DESK051-C6: so does
+      // native presence (the server runs the gesture for its ceremony).
       res =
         typeof presence === 'string'
           ? await doFetch(path, {
@@ -154,10 +159,14 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
               credentials: 'same-origin',
               cache: 'no-store',
             })
-          : await sendWithProof(doFetch, path, headers, {
-              kind: 'passkey',
-              gesture: presence.passkey,
-            });
+          : await sendWithProof(
+              doFetch,
+              path,
+              headers,
+              'native' in presence
+                ? { kind: 'native' }
+                : { kind: 'passkey', gesture: presence.passkey },
+            );
     } catch (error) {
       if (refused !== undefined) throw error;
       noteHostUnreachable();

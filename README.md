@@ -109,7 +109,7 @@ sequenceDiagram
 
 **New in 0.5.0 (12 Nov 2026):** the app is redesigned around you, your IDs and your people. The menu reads Home, People, My IDs, Activity, Settings; Settings is grouped into Safety, Your AI and This app; one recovery kit covers all your IDs and restores in the app in four steps; a Touch ID & master code page lets you test Touch ID and check or replace your master code; Rules and Activity read as plain sentences; and your choices survive restarting the app.
 
-Not built yet, and not claimed: desktop apps for Mac and Windows (coming soon), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
+Not built yet, and not claimed: desktop apps for Mac and Windows (coming soon; see the [desktop app page](docs-site/guide/apps/desktop-app.md)), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
 
 ## Private by design
 

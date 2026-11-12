@@ -7,6 +7,7 @@
 // - M1-1f: sealKeystoreFile and sealOwnerSeed with a fixed nonce, Argon2id with a secret value (K)
 //   and associated data (X) for the RFC 9106 vector, and pairingDigest for the `labels` vectors.
 // - M1-1k: sealPasskeySeed and sealRecoverySeed with a fixed nonce (and salt).
+// - DESK-D12a: sealNativeSeed (ALKH) with a fixed nonce.
 // - M1-1d: the ALF1 sealer with a fixed nonce prefix and any chunk size from 1 B to 16 MiB (the
 //   `stream` vectors use 16 and 32 B chunks besides the 1 MiB default).
 // - M1-1g: MemoryKeyStore and MemoryOwnerKeyStore, in-memory KeyStore doubles that hold a seed in
@@ -158,6 +159,9 @@ export {
   sealPasskeySeedWithNonceUnsafe as sealPasskeySeedWithNonce,
   sealRecoverySeedWithSaltAndNonceUnsafe as sealRecoverySeedWithSaltAndNonce,
 } from './owner-seed-wrap.js';
+
+// DESK-D12a: the ALKH seal with a fixed nonce for the alkh vectors.
+export { sealNativeSeedWithNonceUnsafe as sealNativeSeedWithNonce } from './keystore-native.js';
 
 // M1-9i-b: the ALKK recovery kit with a fixed code, salt, nonce prefix and chunk size, its kek, and
 // opening with a known kek (the `recovery-kit` vectors; the 4 GiB cap with a lower limit in tests).

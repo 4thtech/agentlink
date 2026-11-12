@@ -211,7 +211,8 @@ describe('the waiting mark is used in no other loading state', () => {
   it('appears only in its own component, styles, exports, tests and Add credits (UX2-e2)', () => {
     const hits = Object.entries(files)
       .filter(([k]) => /\.(tsx?|css)$/.test(k) && !k.includes('node_modules'))
-      .filter(([, text]) => /WaitingMark|al-waiting/.test(text))
+      // `\b`: the desktop protocol message "approval-waiting" is not the class.
+      .filter(([, text]) => /WaitingMark|\bal-waiting/.test(text))
       .map(([k]) => k.split('/').pop() as string)
       .sort();
     expect(Object.keys(files).some((k) => k.includes('apps/local-ui'))).toBe(true);

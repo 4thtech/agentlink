@@ -85,18 +85,32 @@ describe('the pages', () => {
         expect(html).not.toMatch(/javascript:/i);
         // WP-2, REL051-INV: the only outside URLs are the two help links to 4thTech Docs (the
         // build constants of config.ts), each a plain link in a new tab with no referrer. The Mac
-        // app's link has no href in the HTML (its release switch is off).
+        // app's links have no href in the HTML (its release switch is off). WP-D9: the two app
+        // links of the command card are in the file only as empty, hidden placeholders with no
+        // address and no text; only a build with the desktop app links flag on (src/flags.ts)
+        // fills and shows them.
         expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([
           DOCS_LINKS.guide,
           DOCS_LINKS.windows,
         ]);
         const anchors = [...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0]);
-        expect(anchors).toHaveLength(4);
-        for (const a of anchors) {
+        expect(anchors).toHaveLength(6);
+        const appAnchors = [
+          '<a id="open-app" class="btn secondary">',
+          '<a id="get-app" class="btn secondary" rel="noopener noreferrer">',
+        ];
+        expect(anchors.filter((a) => /id="(open|get)-app"/.test(a))).toEqual(appAnchors);
+        for (const a of anchors.filter((x) => !appAnchors.includes(x))) {
           expect(a).toMatch(/\btarget="_blank"/);
           expect(a).toMatch(/\brel="noopener noreferrer"/);
         }
         expect(anchors.filter((a) => /\bhref=/.test(a))).toHaveLength(2);
+        expect(html).toMatch(
+          /<p id="app-links" class="actions" hidden>\s*<a id="open-app" class="btn secondary"><\/a>\s*<a id="get-app" class="btn secondary" rel="noopener noreferrer"><\/a>\s*<\/p>/,
+        );
+        const command = /<article id="way-command"[\s\S]*?<\/article>/.exec(html)?.[0] ?? '';
+        expect(command).toContain('id="app-links"');
+        expect(html).not.toMatch(/agentlink:\/\/|Open in the AgentLink app|Get the app/);
         // One first-party style file (CSP style-src 'self') and the site's own favicon (F33).
         const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((m) => m[0]);
         expect(links).toEqual([
@@ -145,6 +159,9 @@ describe('the pages', () => {
           'copy-ai',
           'copy',
           'copy-link',
+          'app-links',
+          'open-app',
+          'get-app',
           'next',
         ]) {
           expect(html, id).toMatch(new RegExp(`id="${id}"`));

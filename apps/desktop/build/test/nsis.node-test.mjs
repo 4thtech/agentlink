@@ -1,0 +1,44 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { nsisScript } from '../lib/nsis.mjs';
+
+test('NSIS script: per-user, scheme with -- separator, uninstaller keeps ~/.agentlink', () => {
+  const s = nsisScript({
+    version: '0.5.0',
+    sourceDir: 'C:\\stage\\AgentLink',
+    outFile: 'C:\\out\\setup.exe',
+  });
+  assert.match(s, /RequestExecutionLevel user/);
+  assert.match(s, /\$LOCALAPPDATA\\Programs\\AgentLink/);
+  assert.match(s, /HKCU/);
+  assert.match(s, /Software\\Classes\\agentlink\\shell\\open\\command/);
+  assert.ok(
+    s.includes('AgentLink.exe$\\" -- $\\"%1$\\"'),
+    'command is "<exe>" -- "%1" (NSIS quoting)',
+  );
+  assert.match(s, /4thTech\.AgentLink/);
+  assert.doesNotMatch(s, /\.agentlink/);
+  assert.doesNotMatch(s, /HKLM/);
+  assert.doesNotMatch(s, /\$PROFILE/);
+});
+
+test('uninstall deletes recursively only after the folder guards, never anything else', () => {
+  const s = nsisScript({ version: '0.5.0', sourceDir: 'a', outFile: 'b' });
+  const un = s.slice(s.indexOf('Section "Uninstall"'));
+  const rm = un.indexOf('RMDir /r "$INSTDIR"');
+  assert.ok(rm > 0);
+  assert.equal(un.split('RMDir /r').length - 1, 1, 'one recursive delete only');
+  for (const guard of [
+    'StrCmp "$INSTDIR" "$LOCALAPPDATA\\Programs\\AgentLink"',
+    'IfFileExists "$INSTDIR\\AgentLink.exe"',
+    'IfFileExists "$INSTDIR\\Uninstall.exe"',
+  ]) {
+    const at = un.indexOf(guard);
+    assert.ok(at >= 0 && at < rm, guard);
+  }
+  assert.doesNotMatch(un, /\$PROFILE|\$APPDATA|\$DOCUMENTS|\$LOCALAPPDATA"/);
+});
+
+test('NSIS script rejects an unsafe version', () => {
+  assert.throws(() => nsisScript({ version: '1"; ExecShell', sourceDir: 'a', outFile: 'b' }));
+});

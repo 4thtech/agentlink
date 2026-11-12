@@ -11,6 +11,11 @@
 //   contents (json-config.ts canonicalForm), so re-printing keeps every other member's bytes. Codex
 //   TOML: the three lines AgentLink writes are replaced or removed; no other line changes.
 // - Errors are HarnessError codes with fixed text: never a path, a value or file content (I-7).
+// - WP-D7 (plan 2026-11-12 Decision 2): the app form is ours too: `<node> <cli> mcp [--agent <name>]`
+//   with the AgentLink desktop app's bundled Node and CLI (desktop-app.ts), on Windows `node.exe`
+//   itself (no `cmd /c`). It is recognised only for the app this computer has (`options.app`): an
+//   entry pointing at any other program stays foreign. The npx forms stay recognised as before.
+import { appMcpWords, type AppStart } from './desktop-app.js';
 import { HarnessError } from './errors.js';
 import { mcpArgs, startWords, tomlTableFor, type HarnessDef } from './harnesses.js';
 import {
@@ -21,14 +26,30 @@ import {
   type Json,
   type Plain,
 } from './json-config.js';
-import { addTomlMcpServer, scanToml } from './toml-config.js';
+import { addTomlMcpServer, agentlinkTable, scanToml } from './toml-config.js';
 import { DEFAULT_AGENT_NAME, isAgentName } from '../runtime/agent-name.js';
+
+/** How an entry of ours starts AgentLink: `npx …`, or the desktop app's bundled Node and CLI. */
+export type EntryForm = 'npx' | 'app';
+
+/** WP-D7: which forms count as ours, and which one a written entry gets. */
+export interface EntryOptions {
+  /** The desktop app on this computer: its form is recognised (and written when `form` is 'app'). */
+  readonly app?: AppStart;
+  /** The form a written entry gets. Default: the form the entry has now, else `npx`. */
+  readonly form?: EntryForm;
+}
 
 /** What the `agentlink` member of a config is, as far as the app may know. */
 export type EntryState =
   | { readonly kind: 'none' }
-  /** Exactly the entry AgentLink writes for `agent` (a valid local agent name). */
-  | { readonly kind: 'agent'; readonly agent: string; readonly entry: Plain }
+  /** Exactly the entry AgentLink writes for `agent` (a valid local agent name), in `form`. */
+  | {
+      readonly kind: 'agent';
+      readonly agent: string;
+      readonly entry: Plain;
+      readonly form: EntryForm;
+    }
   /** An entry AgentLink did not write: left alone, nothing of it is shown. */
   | { readonly kind: 'foreign' };
 
@@ -53,6 +74,29 @@ export function agentlinkEntry(
   return { command, args: rest };
 }
 
+/** WP-D7: the app-form entry for `agent`: the app's own Node runs its CLI; no shell, no npx. */
+export function appEntry(def: HarnessDef, agent: string, start: AppStart): Plain {
+  if (!isAgentName(agent)) throw new HarnessError('unsafe_path');
+  const { command, args } = appMcpWords(start, agent === DEFAULT_AGENT_NAME ? undefined : agent);
+  if (def.format.kind === 'json') return def.format.shape(command, args);
+  return { command, args };
+}
+
+/** The entry of `form` for `agent` (the app form needs the app). */
+export function entryOf(def: HarnessDef, agent: string, form: EntryForm, app?: AppStart): Plain {
+  if (form === 'npx') return agentlinkEntry(def, agent);
+  if (app === undefined) throw new HarnessError('unsafe_path');
+  return appEntry(def, agent, app);
+}
+
+/** Codex's three table lines for `agent` in `form`. */
+function tomlLinesOf(agent: string, form: EntryForm, app?: AppStart): string[] {
+  if (form === 'npx') return tomlTableFor(agentlinkArgs(agent));
+  if (app === undefined || !isAgentName(agent)) throw new HarnessError('unsafe_path');
+  const { command, args } = appMcpWords(app, agent === DEFAULT_AGENT_NAME ? undefined : agent);
+  return agentlinkTable(command, args);
+}
+
 /** The agent an entry's words name: the value after `--agent`, else `default`. */
 function candidateAgent(words: readonly unknown[]): string | undefined {
   const at = words.indexOf('--agent');
@@ -72,8 +116,8 @@ function wordsOf(entry: Json): readonly unknown[] {
 const PLATFORMS: readonly NodeJS.Platform[] = ['win32', 'linux'];
 
 /**
- * The forms AgentLink writes for `agent`: ours, and for `default` also with `--agent default`. Both
- * start forms count (`npx …` and Windows' `cmd /c npx …`), so an entry written before a system
+ * The npx forms AgentLink writes for `agent`: ours, and for `default` also with `--agent default`.
+ * Both start forms count (`npx …` and Windows' `cmd /c npx …`), so an entry written before a system
  * switched forms (or copied between systems) is still ours; the next write brings it to this system's.
  */
 function oursFor(def: HarnessDef, agent: string): Plain[] {
@@ -85,6 +129,18 @@ function oursFor(def: HarnessDef, agent: string): Plain[] {
     }
   }
   return forms;
+}
+
+/** The form of an entry that is exactly one of ours, or `undefined`. */
+function formOf(
+  def: HarnessDef,
+  agent: string,
+  entry: Json,
+  app: AppStart | undefined,
+): EntryForm | undefined {
+  if (oursFor(def, agent).some((form) => same(entry, form))) return 'npx';
+  if (app !== undefined && same(entry, appEntry(def, agent, app))) return 'app';
+  return undefined;
 }
 
 interface ParsedJson {
@@ -109,15 +165,21 @@ function parseJsonConfig(def: HarnessDef, text: string): ParsedJson {
   return { parsed, form, servers };
 }
 
-function jsonState(def: HarnessDef, text: string): EntryState {
+function jsonState(def: HarnessDef, text: string, app: AppStart | undefined): EntryState {
   const { servers } = parseJsonConfig(def, text);
   if (servers === undefined || !Object.hasOwn(servers, 'agentlink')) return NONE;
   const entry = servers['agentlink'] as Json;
   const agent = candidateAgent(wordsOf(entry));
   if (agent === undefined) return FOREIGN;
-  if (!oursFor(def, agent).some((form) => same(entry, form))) return FOREIGN;
+  const form = formOf(def, agent, entry, app);
+  if (form === undefined) return FOREIGN;
   // A copy of an entry known to be exactly ours: it holds no other value of the file.
-  return Object.freeze({ kind: 'agent', agent, entry: JSON.parse(JSON.stringify(entry)) as Plain });
+  return Object.freeze({
+    kind: 'agent',
+    agent,
+    entry: JSON.parse(JSON.stringify(entry)) as Plain,
+    form,
+  });
 }
 
 const TOML_HEADER = '[mcp_servers.agentlink]';
@@ -127,10 +189,11 @@ interface TomlTable {
   /** The index of the header line in `lines` (split on `\n`; a CRLF line keeps its `\r`). */
   readonly at: number;
   readonly agent: string;
+  readonly form: EntryForm;
 }
 
 /** Codex: the one `[mcp_servers.agentlink]` table, when it is exactly the three lines we write. */
-function tomlTable(text: string): TomlTable | 'none' | 'foreign' {
+function tomlTable(text: string, app: AppStart | undefined): TomlTable | 'none' | 'foreign' {
   const paths = scanToml(text).paths;
   const ours = paths.filter((p) => p.path[0] === 'mcp_servers');
   // `mcp_servers = { … }` as one value: an agentlink entry inside it cannot be told apart.
@@ -163,25 +226,33 @@ function tomlTable(text: string): TomlTable | 'none' | 'foreign' {
   if (agent === undefined) return 'foreign';
   const found = lines.slice(at, at + 3).join('\n');
   const tables = PLATFORMS.map((p) => tomlTableFor(agentlinkArgs(agent), p).join('\n'));
-  if (!tables.includes(found)) return 'foreign';
-  return { at, agent };
+  if (tables.includes(found)) return { at, agent, form: 'npx' };
+  if (app !== undefined && tomlLinesOf(agent, 'app', app).join('\n') === found) {
+    return { at, agent, form: 'app' };
+  }
+  return 'foreign';
 }
 
 /**
  * The `agentlink` entry of this harness's config text (`undefined`: no file), entry-only. Throws
  * `malformed` or `unsupported_format` for a file the app cannot read or rewrite exactly.
  */
-export function readEntryState(def: HarnessDef, text: string | undefined): EntryState {
+export function readEntryState(
+  def: HarnessDef,
+  text: string | undefined,
+  options: EntryOptions = {},
+): EntryState {
   if (text === undefined) return NONE;
-  if (def.format.kind === 'json') return jsonState(def, text);
+  if (def.format.kind === 'json') return jsonState(def, text, options.app);
   if (text === '') return NONE;
-  const table = tomlTable(text);
+  const table = tomlTable(text, options.app);
   if (table === 'none') return NONE;
   if (table === 'foreign') return FOREIGN;
   return Object.freeze({
     kind: 'agent',
     agent: table.agent,
-    entry: agentlinkEntry(def, table.agent),
+    entry: entryOf(def, table.agent, table.form, options.app),
+    form: table.form,
   });
 }
 
@@ -209,45 +280,61 @@ function rewriteJson(def: HarnessDef, text: string, entry: Plain | undefined): s
 }
 
 /** Codex: the three table lines replaced (`agent`) or removed (`undefined`); other lines unchanged. */
-function rewriteToml(text: string, agent: string | undefined): string {
-  const table = tomlTable(text);
+function rewriteToml(
+  text: string,
+  agent: string | undefined,
+  form: EntryForm,
+  app: AppStart | undefined,
+): string {
+  const table = tomlTable(text, app);
   if (table === 'none' || table === 'foreign') throw new HarnessError('changed');
   const crlf = text.includes('\r\n');
   const lines = text.split('\n');
   const replacement =
     agent === undefined
       ? []
-      : tomlTableFor(agentlinkArgs(agent)).map((line) => (crlf ? `${line}\r` : line));
+      : tomlLinesOf(agent, form, app).map((line) => (crlf ? `${line}\r` : line));
   lines.splice(table.at, 3, ...replacement);
   return lines.join('\n');
 }
 
 /**
  * The config text with this harness running `agent`: added when there is no entry, replaced when
- * the entry is AgentLink's for another agent (a move). A foreign entry is never touched: `changed`.
+ * the entry is AgentLink's for another agent (a move) or in another form (WP-D7 "Use the app").
+ * A foreign entry is never touched: `changed`.
  */
-export function setEntry(def: HarnessDef, text: string | undefined, agent: string): string {
-  const state = readEntryState(def, text);
+export function setEntry(
+  def: HarnessDef,
+  text: string | undefined,
+  agent: string,
+  options: EntryOptions = {},
+): string {
+  const state = readEntryState(def, text, options);
   if (state.kind === 'foreign') throw new HarnessError('changed');
+  const form = options.form ?? (state.kind === 'agent' ? state.form : 'npx');
   if (state.kind === 'none') {
     const edit =
       def.format.kind === 'json'
-        ? addJsonMcpServer(text, agentlinkEntry(def, agent), def.format.key)
-        : addTomlMcpServer(text, tomlTableFor(agentlinkArgs(agent)));
+        ? addJsonMcpServer(text, entryOf(def, agent, form, options.app), def.format.key)
+        : addTomlMcpServer(text, tomlLinesOf(agent, form, options.app));
     if (edit.status !== 'change') throw new HarnessError('changed');
     return edit.text;
   }
   if (text === undefined) throw new HarnessError('changed');
   return def.format.kind === 'json'
-    ? rewriteJson(def, text, agentlinkEntry(def, agent))
-    : rewriteToml(text, agent);
+    ? rewriteJson(def, text, entryOf(def, agent, form, options.app))
+    : rewriteToml(text, agent, form, options.app);
 }
 
 /** The config text without AgentLink's entry. Only an entry AgentLink wrote is removed. */
-export function removeEntry(def: HarnessDef, text: string | undefined): string {
-  const state = readEntryState(def, text);
+export function removeEntry(
+  def: HarnessDef,
+  text: string | undefined,
+  options: EntryOptions = {},
+): string {
+  const state = readEntryState(def, text, options);
   if (state.kind !== 'agent' || text === undefined) throw new HarnessError('changed');
   return def.format.kind === 'json'
     ? rewriteJson(def, text, undefined)
-    : rewriteToml(text, undefined);
+    : rewriteToml(text, undefined, 'npx', options.app);
 }

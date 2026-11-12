@@ -588,7 +588,7 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 | | macOS | Windows | Linux |
 |---|---|---|---|
 | Background icon | Menu-bar template icon (§2.4) | Notification-area icon, light and dark taskbars | Tray where the desktop has one (some, like GNOME, hide it); **everything works without the tray** via the app window and notifications |
-| Owner presence | Touch ID, or the device password | Windows Hello (face, fingerprint, PIN) | Owner passphrase or a polkit prompt (documented as weaker) |
+| Owner presence | Touch ID only (biometrics, D-145 Q-145-2; in phase 1 the Touch ID step runs in the browser), with the master code as the fallback | Windows Hello (face, fingerprint, PIN), with the master code as the fallback | Owner passphrase or a polkit prompt (documented as weaker) |
 | Settings shortcut | ⌘, | Ctrl+, | Ctrl+, |
 | Close and quit | ⌘W closes the window; the app keeps running in the menu bar; Quit in the menu | Close button hides to the notification area (first time: a one-line note); Quit in the tray menu | As Windows; if no tray, closing asks whether to keep running |
 | App menu | Standard menu bar (AgentLink, Edit, View, Window, Help) while a window is open | In-window menu or none | In-window menu or none |

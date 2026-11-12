@@ -151,9 +151,40 @@ export interface LocalUiRecoveryKitSource {
  */
 export type LocalUiAiAppEntryState =
   | { readonly kind: 'none' }
-  | { readonly kind: 'agent'; readonly agent: string }
+  | {
+      readonly kind: 'agent';
+      readonly agent: string;
+      /** WP-D7: how the entry starts AgentLink (`npx`, or the desktop app's bundled CLI). */
+      readonly form?: LocalUiAiAppForm;
+    }
   | { readonly kind: 'foreign' }
   | { readonly kind: 'unreadable' };
+
+/** WP-D7: an entry of ours starts AgentLink with `npx`, or with the desktop app's bundled CLI. */
+export type LocalUiAiAppForm = 'npx' | 'app';
+
+/**
+ * WP-D7: whether AI apps can be pointed at the desktop app: `available`, or `move_first` (the app runs
+ * from a translocated, temporary or read-only place, which is never written into a config).
+ */
+export type LocalUiDesktopAppState = 'available' | 'move_first';
+
+/** WP-D7: the optional launcher change of a plan (the installer's `agentlink` command). */
+export interface LocalUiLauncherChange {
+  /** As shown (`~/…`). */
+  readonly path: string;
+  /** AgentLink's own launcher text, before and after (it holds no secret). */
+  readonly oldText: string;
+  readonly newText: string;
+}
+
+/** WP-D7: what the page asked the plan for. */
+export interface LocalUiAiAppPlanRequest {
+  /** `app`: the entry starts the desktop app's bundled CLI ("Use the app for …"). */
+  readonly form?: LocalUiAiAppForm;
+  /** Also point the installer's `agentlink` command at the app (app form only). */
+  readonly launcher?: boolean;
+}
 
 /** U3-f: one detected AI app. Fixed names and display paths only; never file content. */
 export interface LocalUiAiAppView {
@@ -173,12 +204,16 @@ export interface LocalUiAiAppView {
 /** U3-f: how a planned write ended. */
 export type LocalUiAiAppWrite =
   | 'written'
+  /** WP-D7: the entry is written, the `agentlink` command (asked for) could not be changed. */
+  | 'written_launcher_unchanged'
   /** The file is not the one planned (bytes or identity): nothing written. */
   | 'changed'
   /** Claude Desktop runs: nothing written. */
   | 'quit_first'
   /** The agent the entry runs is not the agent the owner signed for: nothing written. */
   | 'agent_mismatch'
+  /** WP-D7: the desktop app moved or now runs from a place that is never written: nothing written. */
+  | 'app_location'
   | 'failed';
 
 /**
@@ -191,7 +226,8 @@ export type LocalUiAiAppWrite =
 export type LocalUiAiAppPlan =
   | {
       readonly status: 'change';
-      readonly kind: 'connect' | 'move' | 'disconnect';
+      /** WP-D7 `switch`: the same agent, its entry pointed at the desktop app. */
+      readonly kind: 'connect' | 'move' | 'disconnect' | 'switch';
       readonly app: string;
       readonly name: string;
       readonly path: string;
@@ -201,11 +237,22 @@ export type LocalUiAiAppPlan =
       readonly oldAgent: string | null;
       readonly newAgent: string | null;
       readonly identity: string;
+      /** WP-D7: the launcher change written with it (asked for, app form only), else absent. */
+      readonly launcher?: LocalUiLauncherChange;
+      /** WP-D7: the installer's launcher could also be pointed at the app (not asked for yet). */
+      readonly launcherOffer?: boolean;
       commit(agentId: string): Promise<LocalUiAiAppWrite>;
     }
   | {
       readonly status:
-        'present' | 'not_connected' | 'conflict' | 'quit_first' | 'unreadable' | 'not_found';
+        | 'present'
+        | 'not_connected'
+        | 'conflict'
+        | 'quit_first'
+        | 'unreadable'
+        | 'not_found'
+        /** WP-D7: no desktop app, or one in a place that is never written into a config. */
+        | 'app_location';
       readonly app: string;
       readonly name: string;
     };
@@ -217,12 +264,18 @@ export type LocalUiAiAppPlan =
  */
 export interface LocalUiAiApps {
   /** The detected apps, entry-only, and whether Claude Desktop runs. */
-  list(): Promise<{ readonly apps: readonly LocalUiAiAppView[]; readonly desktopRunning: boolean }>;
+  list(): Promise<{
+    readonly apps: readonly LocalUiAiAppView[];
+    readonly desktopRunning: boolean;
+    /** WP-D7: the desktop app, when this computer has one. */
+    readonly desktopApp?: LocalUiDesktopAppState;
+  }>;
   /**
    * The change that makes `app` run `agent` (connect, or move from another agent), or, when it
-   * already runs `agent`, the change that disconnects it.
+   * already runs `agent`, the change that disconnects it. WP-D7: with `{form: 'app'}` and `app`
+   * already running `agent` with npx, the change that points it at the desktop app (`switch`).
    */
-  plan(app: string, agent: string): Promise<LocalUiAiAppPlan>;
+  plan(app: string, agent: string, request?: LocalUiAiAppPlanRequest): Promise<LocalUiAiAppPlan>;
   /** The agentId recorded for an agent folder (07 §9.1); undefined when it cannot be read. */
   agentIdOf(agent: string): Promise<string | undefined>;
 }

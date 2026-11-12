@@ -15,7 +15,7 @@ import { resetPrefsForTests, setPref } from '../../prefs/index.js';
 import { settingsGroups } from './groups.js';
 import { lineFor, SettingsPage } from './index.js';
 import { isSettingsSubpage, SettingsFrame } from './side-nav.js';
-import { parseBackup } from './state.js';
+import { parseBackup, readSettingsState } from './state.js';
 import { SETTINGS_STRINGS as S } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -376,6 +376,42 @@ describe('round 2', () => {
     expect(rowFor('/settings/touch-id')?.querySelector('.set-state')?.textContent).toBe(
       S.touchId.masterOnly,
     );
+  });
+
+  it('DESK051-C2: the Touch ID row counts the desktop app’s own Touch ID (native), not only a passkey', async () => {
+    const noPasskey = {
+      ...ANSWERS,
+      '/api/owner/passkey': { passkey: { rpId: 'localhost', registered: false } },
+    };
+    const native = (n: unknown) =>
+      readSettingsState(answerFrom({ ...noPasskey, '/api/owner/native': n }));
+    expect((await native({ native: { available: true, registered: true } })).touchId).toBe(true);
+    expect((await native({ native: { available: false, registered: false } })).touchId).toBe(false);
+    expect(
+      (await native({ native: { available: true, registered: true, reason: 'reregister' } }))
+        .touchId,
+    ).toBe(false);
+    expect((await native({ native: 'yes' })).touchId).toBe(false);
+    // A failed native read leaves the passkey answer alone.
+    expect((await readSettingsState(answerFrom(ANSWERS))).touchId).toBe(true);
+    await act(async () => {
+      root.render(
+        h(
+          HoodProvider,
+          { value: false },
+          h(SettingsPage, {
+            get: answerFrom({
+              ...noPasskey,
+              '/api/owner/native': { native: { available: true, registered: true } },
+            }),
+            approvals: approvals(false),
+          }),
+        ),
+      );
+    });
+    const state = rowFor('/settings/touch-id')?.querySelector('.set-state');
+    expect(state?.className).toContain('is-good');
+    expect(state?.textContent).toMatch(/ on$/);
   });
 
   it('finds a setting by title or line, Esc clears, and says so when nothing matches', async () => {

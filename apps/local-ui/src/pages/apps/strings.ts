@@ -87,4 +87,21 @@ export const APPS_STRINGS = {
   switchFirst: (label: string): string =>
     `This is for ${label}. Switch to it to connect an AI app.`,
   switchTo: (label: string): string => `Switch to ${label}`,
+  // WP-D7 "Use the app for …" (new copy, owner confirms at merge; 11 §5).
+  useApp: (app: string): string => `Use the app for ${app}`,
+  runsFromApp: 'Runs from the AgentLink app',
+  moveAppFirst:
+    'To use the AgentLink app here, move it to your Applications folder and open it from there.',
+  switchTitle: (app: string): string => `Use the AgentLink app for ${app}`,
+  switchIntro: (app: string): string =>
+    `${app} will start AgentLink from the app on this computer instead of downloading it each time.`,
+  launcherOption: 'Also use the app for the agentlink command in your terminal',
+  launcherRemovedRegion: 'The agentlink command now',
+  launcherRegion: 'The agentlink command after the change',
+  statementSwitch: (app: string, label: string): string =>
+    `${app} will use the AgentLink app for ${label}`,
+  launcherNotChanged:
+    "The agentlink command in your terminal wasn't changed. It still starts AgentLink with npx.",
+  appLocation:
+    'The AgentLink app moved or runs from a temporary place. Open it from your Applications folder and try again.',
 } as const;

@@ -6,7 +6,12 @@
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ApiClient, OwnerApiResult, OwnerPresence } from '../../api/client.js';
+import {
+  createApiClient,
+  type ApiClient,
+  type OwnerApiResult,
+  type OwnerPresence,
+} from '../../api/client.js';
 import { subscribeToasts } from '../../notices/index.js';
 import type { PasskeyStatus, PresenceProof } from '../contacts/owner.js';
 import { TouchIdPage } from './index.js';
@@ -397,5 +402,110 @@ describe('Touch ID & master code (WP-S2, §3.3)', () => {
     } finally {
       for (const s of spies) s.mockRestore();
     }
+  });
+});
+
+// DESK051-C2: in the desktop app the page recognises the app's own Touch ID (native presence), not
+// only the browser passkey: the card says it is on, Test Touch ID and Replace use the native gesture,
+// and the browser's one-time switch is not offered there (the app's switch below is the way).
+describe('Touch ID & master code in the desktop app (DESK051-C2)', () => {
+  const MAC_APP =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Electron/39.0 AgentLinkDesktop/1';
+  const desktop = (registered: boolean) => ({
+    userAgent: MAC_APP,
+    nativeStatus: () => Promise.resolve({ available: true, registered }),
+  });
+
+  it('native Touch ID on: the card says on and Test Touch ID uses the native gesture', async () => {
+    const { calls, proof } = await render(
+      UNKNOWN,
+      { '/api/ui/owner-presence/test': [DONE] },
+      desktop(true),
+    );
+    expect(text()).toContain('Touch ID is on');
+    expect(text()).not.toContain("Touch ID can't be used here");
+    await click('Test Touch ID');
+    expect(calls).toEqual([{ path: '/api/ui/owner-presence/test', presence: { native: true } }]);
+    expect(proof).not.toHaveBeenCalled();
+    expect(toasts).toContain('Touch ID works.');
+  });
+
+  it('native Touch ID on: Replace confirms with the native gesture', async () => {
+    const { calls } = await render(
+      UNKNOWN,
+      { '/api/ui/owner-code/replace': [STAGED] },
+      desktop(true),
+    );
+    await click('Replace master code');
+    await click('Confirm with Touch ID');
+    expect(calls[0]).toEqual({ path: '/api/ui/owner-code/replace', presence: { native: true } });
+    expect(host.querySelector('[data-new-code]')?.textContent).toBe(NEW);
+  });
+
+  it('native Touch ID off: the card says off and points to the switch; no browser switch offered', async () => {
+    await render(OFF, {}, desktop(false));
+    expect(text()).toContain('Touch ID is off');
+    expect(labels()).not.toContain('Turn on Touch ID');
+    expect(
+      host.querySelector('[data-slot="native-touch-id-switch"] [role="switch"]'),
+    ).not.toBeNull();
+  });
+
+  // DESK051-C6: through the real API client, Test Touch ID asks the server for a native ceremony
+  // first and then answers it (no body); a refused proof (a replay, say) reads as "didn't work".
+  it('Test Touch ID over the real client: native ceremony, then the gesture that answers it', async () => {
+    const sent: { presence: string | null; ceremony: string | null; bytes: number }[] = [];
+    const answers = [
+      { status: 200, body: { status: 'ready', ceremony: 'N'.repeat(22), expiresInMs: 120000 } },
+      { status: 200, body: { status: 'done' } },
+      { status: 200, body: { status: 'ready', ceremony: 'M'.repeat(22), expiresInMs: 120000 } },
+      { status: 403, body: { status: 'presence_required' } },
+    ];
+    const fetchFn = ((_path: string, init: RequestInit) => {
+      const headers = new Headers(init.headers);
+      sent.push({
+        presence: headers.get('X-AgentLink-Presence'),
+        ceremony: headers.get('X-AgentLink-Ceremony'),
+        bytes: init.body instanceof Uint8Array ? init.body.length : -1,
+      });
+      const a = answers.shift() ?? { status: 500, body: {} };
+      return Promise.resolve(
+        new Response(JSON.stringify(a.body), {
+          status: a.status,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    }) as unknown as typeof fetch;
+    await act(async () => {
+      root.render(
+        h(TouchIdPage, {
+          api: createApiClient({ fetch: fetchFn, token: 't' }),
+          platform: 'mac',
+          passkeyStatus: () => Promise.resolve(UNKNOWN),
+          ...desktop(true),
+        }),
+      );
+    });
+    await settle();
+    await click('Test Touch ID');
+    await settle();
+    expect(toasts).toContain('Touch ID works.');
+    expect(sent.slice(0, 2)).toEqual([
+      { presence: 'native-challenge', ceremony: null, bytes: 0 },
+      { presence: 'native', ceremony: 'N'.repeat(22), bytes: 0 },
+    ]);
+    await click('Test Touch ID');
+    await settle();
+    expect(sent.slice(2)).toEqual([
+      { presence: 'native-challenge', ceremony: null, bytes: 0 },
+      { presence: 'native', ceremony: 'M'.repeat(22), bytes: 0 },
+    ]);
+    expect(toasts.filter((t) => t === 'Touch ID works.')).toHaveLength(1);
+  });
+
+  it('in a browser nothing changes: the passkey decides, no native switch', async () => {
+    await render(OFF);
+    expect(labels()).toContain('Turn on Touch ID');
+    expect(host.querySelector('[data-slot="native-touch-id-switch"]')).toBeNull();
   });
 });

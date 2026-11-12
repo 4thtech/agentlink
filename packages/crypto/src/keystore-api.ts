@@ -503,7 +503,13 @@ export type OwnerPresence =
   /** The owner passphrase or generated owner code, typed at a prompt the agent does not control. */
   | { readonly kind: 'passphrase'; readonly secret: Uint8Array }
   /** The 32-byte WebAuthn PRF output of the owner passkey (04 §2.3), after the owner's gesture. */
-  | { readonly kind: 'passkey-prf'; readonly prfOutput: Uint8Array };
+  | { readonly kind: 'passkey-prf'; readonly prfOutput: Uint8Array }
+  /**
+   * DESK-D12c (04 §2.3.4, D-145 phase 2): the secret the desktop app's presence helper released
+   * after the owner's OS gesture (macOS: 32-byte ECDH secret; Windows: the RSA signature), for an
+   * `ALKH` blob of `nativeKind` (1 = macOS, 2 = Windows).
+   */
+  | { readonly kind: 'native'; readonly nativeKind: 1 | 2; readonly secret: Uint8Array };
 
 /** The owner's public keys (04 §2.4 card fields). Public; available without presence. */
 export interface OwnerPublicKeys {

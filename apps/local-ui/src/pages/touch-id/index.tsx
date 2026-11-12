@@ -4,7 +4,8 @@
 // - The page never signs and never sees a seed. Each action is one POST to its owner-code route
 //   (`/api/ui/owner-code/*`, `/api/ui/owner-presence/test`) through the server's central presence gate,
 //   which shares the wrong-code backoff of every presence route.
-// - Test Touch ID: one passkey gesture; signs nothing. Check my master code: the typed code; the answer
+// - Test Touch ID: one gesture (the desktop app's own Touch ID when it is on there, else the
+//   browser passkey; DESK051-C2); signs nothing. Check my master code: the typed code; the answer
 //   is only right or doesn't match. Replace master code: Touch ID or the current code, then the new
 //   code shown once; the owner types it back to finish (the current code works until then).
 // - A typed or shown code lives only in this component's state: cleared after each request, at
@@ -22,8 +23,12 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { createApiClient, type ApiClient, type OwnerApiResult } from '../../api/client.js';
-import type { CeremonyGesture } from '../../api/presence-ceremony.js';
+import {
+  createApiClient,
+  type ApiClient,
+  type OwnerApiResult,
+  type OwnerPresence,
+} from '../../api/client.js';
 import { UnderTheHood } from '../../lazy/hood.js';
 import { notify } from '../../notices/index.js';
 import { gateMessage } from '../agents/owner-gate.js';
@@ -43,6 +48,10 @@ import { otherBrowser } from '../first-run/passkey-nudge.js';
 import { FIRST_RUN, SENSOR, UPGRADE_MESSAGES, type Platform } from '../first-run/strings.js';
 import { SettingsIcon } from '../settings/icons.js';
 import { nativeTouchIdSwitch } from './native-slot.js';
+import { desktopPlatform } from '../../presence/desktop.js';
+import type { NativeRegistration, NativeStatus } from '../../presence/native-api.js';
+import { NativeSettings } from '../../presence/native-settings.js';
+import { nativeStoredOf, type NativeOp } from '../../presence/native-switch.js';
 import { TOUCH_ID_STRINGS as S } from './strings.js';
 import './touch-id.css';
 
@@ -91,13 +100,27 @@ export interface TouchIdPageProps {
   readonly switchPasskey?: SwitchToPasskey;
   /** The desktop app's native Touch ID switch, mounted in the `native-touch-id-switch` slot. */
   readonly nativeSwitch?: ReactNode;
+  /**
+   * DESK051-C2 seams (tests): the user agent (the desktop app's marker), and the native switch's
+   * status read and operations (NativeSettings).
+   */
+  readonly userAgent?: string;
+  readonly nativeStatus?: () => Promise<NativeStatus>;
+  readonly nativeOps?: Readonly<Record<NativeOp, (code: string) => Promise<NativeRegistration>>>;
 }
+
+/** DESK051-C2: the desktop app's own Touch ID, as a presence proof (no bytes; the server's helper). */
+const NATIVE_PROOF: PresenceProof = Object.freeze({ kind: 'native' });
 
 type Panel = 'none' | 'check' | 'replace' | 'lost' | 'turn-on';
 type Note = { readonly tone: 'good' | 'bad' | 'plain'; readonly text: string } | undefined;
 
-const presenceOf = (proof: PresenceProof): string | { passkey: CeremonyGesture } =>
-  proof.kind === 'code' ? proof.code : { passkey: proof.gesture };
+const presenceOf = (proof: PresenceProof): OwnerPresence =>
+  proof.kind === 'code'
+    ? proof.code
+    : proof.kind === 'native'
+      ? { native: true }
+      : { passkey: proof.gesture };
 
 /** The gate's own outcomes in plain words (the shared presence messages). */
 function gateWords(result: OwnerApiResult): string | undefined {
@@ -143,6 +166,9 @@ export function TouchIdPage({
   passkeyProof = browserPasskeyProof,
   switchPasskey = switchToPasskey,
   nativeSwitch,
+  userAgent,
+  nativeStatus,
+  nativeOps,
 }: TouchIdPageProps): ReactElement {
   const [api] = useState<ApiClient>(() => givenApi ?? createApiClient());
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
@@ -152,7 +178,14 @@ export function TouchIdPage({
   const [sensorNote, setSensorNote] = useState<Note>(undefined);
   const [codeNote, setCodeNote] = useState<Note>(undefined);
   const [working, setWorking] = useState(false);
-  const Native = nativeTouchIdSwitch();
+  // Desktop integration: in the desktop app (and nowhere else) the native switch fills the slot.
+  const desktop = desktopPlatform(userAgent) !== undefined;
+  const registeredSwitch = nativeTouchIdSwitch();
+  const Native = registeredSwitch ?? (desktop ? NativeSettings : undefined);
+  // DESK051-C2: what the desktop app's own Touch ID has stored (reported by its switch below).
+  const [native, setNative] = useState<NativeStatus | undefined>(undefined);
+  const nativeAvailable = desktop && native?.available === true;
+  const nativeOn = nativeAvailable && native !== undefined && nativeStoredOf(native) === 'on';
 
   const readStatus = useCallback((): void => {
     void passkeyStatus().then(
@@ -163,10 +196,20 @@ export function TouchIdPage({
   useEffect(readStatus, [readStatus]);
 
   const ready = status?.kind === 'ready' ? status.info : undefined;
+  // The browser's one-time switch is never offered in the desktop app: its own switch is the way.
   const canSwitch =
+    !nativeAvailable &&
     status?.kind === 'unavailable' &&
     status.reason === 'not_set_up_here' &&
     status.switchTo !== undefined;
+  // DESK051-C2: Touch ID is on when the desktop app's own Touch ID is on, or this browser's passkey.
+  const sensorOn = nativeOn || ready !== undefined;
+  /** The gesture Test and Replace use: the desktop app's own Touch ID first, else the passkey. */
+  const sensorProof: (() => Promise<PresenceProof | undefined>) | undefined = nativeOn
+    ? () => Promise.resolve(NATIVE_PROOF)
+    : ready !== undefined
+      ? () => passkeyProof(ready)
+      : undefined;
 
   const open = (next: Panel): void => {
     setPanel((p) => (p === next ? 'none' : next));
@@ -175,12 +218,12 @@ export function TouchIdPage({
 
   // --- Test Touch ID: one gesture, signs nothing ------------------------------------------------
   const test = async (): Promise<void> => {
-    if (ready === undefined || working) return;
+    if (sensorProof === undefined || working) return;
     setWorking(true);
     setSensorNote(undefined);
     try {
-      const proof = await passkeyProof(ready);
-      if (proof === undefined || proof.kind !== 'passkey') {
+      const proof = await sensorProof();
+      if (proof === undefined || proof.kind === 'code') {
         setSensorNote({ tone: 'plain', text: S.testCancelled(sensor) });
         return;
       }
@@ -214,11 +257,25 @@ export function TouchIdPage({
       {/* Card 1: the sensor. */}
       <Surface as="section" level={1} className="ti-card" aria-labelledby="ti-sensor">
         <div className="ti-hero">
-          <span className={`ti-hero-ic${ready === undefined ? '' : ' is-on'}`} aria-hidden="true">
+          <span className={`ti-hero-ic${sensorOn ? ' is-on' : ''}`} aria-hidden="true">
             <SettingsIcon name="fingerprint" />
           </span>
           <div className="ti-hero-text">
-            {status === undefined ? (
+            {sensorOn ? (
+              <>
+                <h2 id="ti-sensor" className="al-text-h3">
+                  {S.on(sensor)}
+                </h2>
+                <p className="al-text-body-sm al-muted">{S.onLine}</p>
+              </>
+            ) : nativeAvailable ? (
+              <>
+                <h2 id="ti-sensor" className="al-text-h3">
+                  {S.off(sensor)}
+                </h2>
+                <p className="al-text-body-sm al-muted">{S.offNativeLine}</p>
+              </>
+            ) : status === undefined ? (
               <h2 id="ti-sensor" className="al-text-h3 al-muted">
                 {S.title(sensor)}
               </h2>
@@ -253,7 +310,7 @@ export function TouchIdPage({
               </>
             )}
           </div>
-          {ready !== undefined ? (
+          {sensorOn ? (
             <Button variant="secondary" onClick={() => void test()} disabled={working}>
               {working ? S.testing : S.test(sensor)}
             </Button>
@@ -285,7 +342,17 @@ export function TouchIdPage({
         {/* The desktop app's native Touch ID switch (NativeSettings) mounts here. */}
         {nativeSwitch !== undefined || Native !== undefined ? (
           <div className="ti-native" data-slot="native-touch-id-switch">
-            {nativeSwitch ?? (Native === undefined ? null : <Native />)}
+            {nativeSwitch ??
+              (Native === NativeSettings ? (
+                <NativeSettings
+                  onStatus={setNative}
+                  {...(userAgent === undefined ? {} : { userAgent })}
+                  {...(nativeStatus === undefined ? {} : { nativeStatus })}
+                  {...(nativeOps === undefined ? {} : { ops: nativeOps })}
+                />
+              ) : Native === undefined ? null : (
+                <Native />
+              ))}
           </div>
         ) : null}
       </Surface>
@@ -345,8 +412,7 @@ export function TouchIdPage({
           <ReplaceCode
             api={api}
             sensor={sensor}
-            passkey={ready}
-            passkeyProof={passkeyProof}
+            sensorProof={sensorProof}
             onEnd={(note) => {
               setPanel('none');
               setCodeNote(note);
@@ -357,7 +423,7 @@ export function TouchIdPage({
           <div className="ti-panel" role="region" aria-label={S.lost}>
             <p className="al-text-body">{S.lostBody(sensor)}</p>
             <div className="ti-row">
-              {ready !== undefined ? (
+              {sensorOn ? (
                 <Button variant="secondary" onClick={() => open('replace')}>
                   {S.lostReplace}
                 </Button>
@@ -399,7 +465,7 @@ export function TouchIdPage({
           {
             kind: 'text',
             label: S.hoodSensor,
-            value: ready !== undefined ? S.hoodSensorOn : S.hoodSensorOff,
+            value: sensorOn ? S.hoodSensorOn : S.hoodSensorOff,
           },
           { kind: 'text', label: S.hoodWhere, value: S.hoodKeychain },
         ]}
@@ -548,17 +614,16 @@ function CheckCode({
 function ReplaceCode({
   api,
   sensor,
-  passkey,
-  passkeyProof,
+  sensorProof,
   onEnd,
 }: {
   readonly api: ApiClient;
   readonly sensor: string;
-  readonly passkey: PasskeyInfo | undefined;
-  readonly passkeyProof: (info: PasskeyInfo) => Promise<PresenceProof | undefined>;
+  /** The sensor's gesture (the desktop app's own Touch ID, or the passkey); none: the code only. */
+  readonly sensorProof: (() => Promise<PresenceProof | undefined>) | undefined;
   readonly onEnd: (note: Note) => void;
 }): ReactElement {
-  const [useCode, setUseCode] = useState(passkey === undefined);
+  const [useCode, setUseCode] = useState(sensorProof === undefined);
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<Note>(undefined);
@@ -613,8 +678,8 @@ function ReplaceCode({
   };
 
   const usePasskey = (): void => {
-    if (passkey === undefined || busy || !flight.start()) return;
-    void passkeyProof(passkey)
+    if (sensorProof === undefined || busy || !flight.start()) return;
+    void sensorProof()
       .catch(() => undefined)
       .then((proof) => {
         flight.done();

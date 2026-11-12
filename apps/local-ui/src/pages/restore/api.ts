@@ -380,6 +380,9 @@ export function createRestoreApi(options: RestoreApiOptions = {}): RestoreApi {
       return { kind: 'ok', header, ownerPresent: a.json?.['ownerPresent'] === true };
     },
     async presence(handle, proof) {
+      // The restore's presence step takes the master code or the passkey; the server refuses the
+      // desktop app's native presence there, so it is never sent.
+      if (proof.kind === 'native') return bad;
       const a =
         proof.kind === 'passkey'
           ? await call('POST', `${RESTORE_BASE}/presence`, undefined, { handle }, proof)

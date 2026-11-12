@@ -132,3 +132,24 @@ describe('createApiClient', () => {
     for (const spy of spies) expect(spy).not.toHaveBeenCalled();
   });
 });
+
+// DESK051-C6: an owner call with native presence (the desktop app's Touch ID / Windows Hello) asks
+// for a native ceremony first, then sends `native` with that ceremony and no body.
+describe('owner calls with native presence (DESK051-C6)', () => {
+  it('asks for a native ceremony, then answers it with an empty body', async () => {
+    const answers = [
+      json(200, { status: 'ready', ceremony: 'N'.repeat(22), expiresInMs: 120000 }),
+      json(200, { status: 'done' }),
+    ];
+    const fetchMock = vi.fn(async () => answers.shift() ?? json(500, {}));
+    const api = createApiClient({ fetch: fetchMock, token: 't' });
+    const result = await api.owner('/api/ui/owner-presence/test', {}, { native: true });
+    expect(result.kind).toBe('ok');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [ask, send] = fetchMock.mock.calls.map((c) => (c as unknown as [string, RequestInit])[1]);
+    expect(new Headers(ask?.headers).get('X-AgentLink-Presence')).toBe('native-challenge');
+    expect(new Headers(send?.headers).get('X-AgentLink-Presence')).toBe('native');
+    expect(new Headers(send?.headers).get('X-AgentLink-Ceremony')).toBe('N'.repeat(22));
+    expect((send?.body as Uint8Array).length).toBe(0);
+  });
+});

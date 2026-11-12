@@ -67,6 +67,9 @@ describe('page copy', () => {
       expect(strings.step.openHelp[os]).not.toBe('');
       expect(strings.step.commandHelp[os]).not.toBe('');
     }
+    // WP-D9: the app link and the download page, next to the command.
+    expect(strings.step.openApp).toBe('Open in the AgentLink app');
+    expect(strings.step.getApp).toBe('Get the app (coming soon)');
     expect(strings.step.copyFailed).toBe("Copy didn't work. Select the text and copy it.");
     expect(expiredFor('Marko')).toBe('This invite has expired. Ask Marko for a new one.');
     expect(nextFor('Marko')).toBe(

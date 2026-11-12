@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    // The Electron main process runs on Node. Electron's own API is typed locally in
+    // src/main/electron-api.ts (no `electron` package: plan 2026-11-12 Decision 1, M4).
+    "types": ["node"],
+    // src/shared/resource-layout.json (the packaged layout, shared with build/).
+    "resolveJsonModule": true
+  },
+  // The JSON the shell imports (resource-layout.json, updater/root-key.json) must be listed: composite.
+  "include": ["src", "src/**/*.json"],
+  "exclude": ["src/**/*.test.ts"],
+  // WP-D10: the updater verifies BIP-340 signatures and SHA-256 through @4thtech-io/crypto (main entry).
+  "references": [{ "path": "../../packages/crypto" }]
+}

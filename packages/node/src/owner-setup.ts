@@ -93,6 +93,7 @@ import type { FirstConnectResult, FirstLabelResult } from './owner-first-label.j
 import {
   OWNER_ACCOUNT,
   OWNER_NEXT_ACCOUNT,
+  OWNER_NATIVE_ACCOUNT,
   OWNER_PASSKEY_ACCOUNT,
   removeOwnerItemIfOurs,
   sameOwnerKeys,
@@ -478,7 +479,12 @@ export async function noOwnerAnywhere(
   ownerFiles: readonly string[] = defaultOwnerFiles(),
 ): Promise<boolean> {
   if ((await first.identity.get()) !== undefined) return false;
-  for (const account of [OWNER_ACCOUNT, OWNER_PASSKEY_ACCOUNT, OWNER_NEXT_ACCOUNT]) {
+  for (const account of [
+    OWNER_ACCOUNT,
+    OWNER_PASSKEY_ACCOUNT,
+    OWNER_NEXT_ACCOUNT,
+    OWNER_NATIVE_ACCOUNT,
+  ]) {
     const item = await guarded(() => keychain.get(account), timeoutMs);
     if (item !== null) {
       wipe(item);
@@ -504,7 +510,12 @@ export async function noOwnerAndNoAgent(
   ownerFiles: readonly string[] = defaultOwnerFiles(),
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
 ): Promise<boolean> {
-  for (const account of [OWNER_ACCOUNT, OWNER_PASSKEY_ACCOUNT, OWNER_NEXT_ACCOUNT]) {
+  for (const account of [
+    OWNER_ACCOUNT,
+    OWNER_PASSKEY_ACCOUNT,
+    OWNER_NEXT_ACCOUNT,
+    OWNER_NATIVE_ACCOUNT,
+  ]) {
     const item = await guarded(() => keychain.get(account), timeoutMs);
     if (item !== null) {
       wipe(item);

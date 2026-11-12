@@ -11,5 +11,8 @@
     "status:check": "node docs-status/index.mjs --check",
     "lint": "eslint .",
     "test": "vitest run"
+  },
+  "devDependencies": {
+    "@4thtech-io/crypto": "workspace:*"
   }
 }

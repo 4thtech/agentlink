@@ -103,10 +103,12 @@ export {
   type ReviewedApproval,
 } from './owner-approval.js';
 // M1-8d: the local approval server (08 §1). Only the entry point and its types: the owner store,
-// browser opener and notifier seams stay inside the package (startApprovalServerWith).
+// browser opener and notifier seams stay inside the package (startApprovalServerWith). WP-D3: the
+// desktop app's core passes a link sink (its private pipe) in place of the OS browser opener.
 export {
   APPROVAL_SERVER_HOST,
   startApprovalServer,
+  startApprovalServerWithLinkSink,
   type ApprovalDetails,
   type ApprovalForDecision,
   type ApprovalServer,
@@ -133,6 +135,10 @@ export type {
   LocalUiAiApps,
   LocalUiAiAppView,
   LocalUiAiAppWrite,
+  LocalUiAiAppForm,
+  LocalUiAiAppPlanRequest,
+  LocalUiDesktopAppState,
+  LocalUiLauncherChange,
 } from './local-ui/context.js';
 // U3-c (D-138, 08 §1): the app host's seams the CLI implements (the agent folders, opening an agent);
 // the generation, the switch gate and the route stubs stay inside the package.
@@ -242,3 +248,11 @@ export {
   type SendFolderSetupOptions,
   type SendFolderSetupResult,
 } from './owner-send-folder.js';
+// DESK-D12c (04 §2.3.4, D-145 phase 2): the desktop app's native presence helper, for the desktop
+// host (apps/cli/src/desktop/host-main.ts passes it to the approval server as `nativePresence`).
+export {
+  desktopNativeHelper,
+  type NativeHelper,
+  type NativeReason,
+  type NativeUiState,
+} from './owner-native-helper.js';
