@@ -6,7 +6,11 @@
 // the page can follow yet (credits are a chain read on Proofs & credits): they are not shown, never
 // a made-up value. Its height is fixed and it shows no item until the first answer, so the apps never
 // push an item along (layout shift). App and agent names are text only (I-5).
-import { useSyncExternalStore, type ReactElement } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactElement } from 'react';
+import type { ApiResult } from '../api/client.js';
+import { parseRelays } from '../pages/advanced/relays.js';
+import { parseHealth, readHealth } from './health.js';
+import { subscribeHealth } from './health-feed.js';
 import { getLive, subscribeLive, LIVE_WORDS, type LiveState } from '../api/live.js';
 import { LiveDot } from './agent-switcher.js';
 import { SHELL_STRINGS as S } from '../strings.js';
@@ -16,7 +20,51 @@ import { VT_CLASS } from '@4thtech-io/ui';
 export interface StripItem {
   readonly label: string;
   readonly value: string;
-  readonly state: LiveState;
+  /** Absent for a plain fact (no dot). */
+  readonly state?: LiveState;
+}
+
+/**
+ * N19 (spec §2.3): the server's own facts from the health read it already answers: version, the port
+ * the page is served on, the relays connected and the last sync. Counts and words only; never an
+ * address, path or key. The data folder and uptime have no read yet, so they are not shown.
+ */
+export function serverFacts(
+  result: ApiResult<unknown> | undefined,
+  port: string,
+  locale?: string,
+): StripItem[] {
+  if (result === undefined) return [];
+  const health = parseHealth(result);
+  if (health === undefined) return [];
+  const items: StripItem[] = [];
+  if (health.version !== undefined)
+    items.push({ label: S.hoodServerVersion, value: health.version });
+  if (/^\d{1,5}$/.test(port)) items.push({ label: S.hoodServerPort, value: port });
+  const relays = parseRelays(result);
+  if (relays?.connected !== undefined && relays.total !== undefined) {
+    items.push({
+      label: S.hoodServerRelays,
+      value: `${String(relays.connected)} of ${String(relays.total)} connected`,
+    });
+  }
+  if (relays?.lastSyncAt !== undefined) {
+    items.push({
+      label: S.hoodServerLastSync,
+      value: new Date(relays.lastSyncAt * 1000).toLocaleTimeString(locale, {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    });
+  }
+  return items;
+}
+
+function useServerFacts(): StripItem[] {
+  const [result, setResult] = useState<ApiResult<unknown> | undefined>(undefined);
+  useEffect(() => subscribeHealth(readHealth, { onResult: setResult }), []);
+  const port = typeof window === 'undefined' ? '' : window.location.port;
+  return serverFacts(result, port);
 }
 
 const RANK: Readonly<Record<LiveState, number>> = {
@@ -75,16 +123,25 @@ export function StatusStrip({
   const live = useSyncExternalStore((on) => subscribeLive(on), getLive, getLive);
   // No item before the first answer (the region keeps its height): nothing moves when it comes.
   const items = live.list === undefined && !live.error ? [] : stripItems(live.agents, connection);
+  const facts = useServerFacts();
   return (
     <div className={`al-strip ${VT_CLASS.strip}`} role="region" aria-label={S.liveStatus}>
       <ul className="al-strip-list al-text-code">
         {items.map((item) => (
           <li key={item.label} className="al-strip-item">
-            <LiveDot state={item.state} />
+            {item.state === undefined ? null : <LiveDot state={item.state} />}
             <span className="al-strip-label">{item.label}</span>
             <span className="al-strip-value">{item.value}</span>
           </li>
         ))}
+        {items.length === 0
+          ? null
+          : facts.map((item) => (
+              <li key={item.label} className="al-strip-item" data-server-fact>
+                <span className="al-strip-label">{item.label}</span>
+                <span className="al-strip-value">{item.value}</span>
+              </li>
+            ))}
       </ul>
     </div>
   );

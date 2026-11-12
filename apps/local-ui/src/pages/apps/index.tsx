@@ -377,6 +377,7 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
           app={panel.app}
           folder={open ?? 'default'}
           entry={panel.entry}
+          known={list?.apps ?? []}
           onClose={closePanel}
         />
       ) : null}
