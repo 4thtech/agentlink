@@ -42,7 +42,11 @@ describe('the native switch state machine', () => {
       outcome: { kind: 'registered' },
       text: 'on now',
     });
-    expect(done).toMatchObject({ stored: 'on', step: 'idle', note: { tone: 'ok', text: 'on now' } });
+    expect(done).toMatchObject({
+      stored: 'on',
+      step: 'idle',
+      note: { tone: 'ok', text: 'on now' },
+    });
     expect(done.op).toBeUndefined();
     expect(nativeSwitchLook(done)).toBe('on');
   });
@@ -97,7 +101,10 @@ describe('the native switch state machine', () => {
     const asking = run([ON, { type: 'toggle' }]);
     expect(asking).toMatchObject({ op: 'off', step: 'code' });
     expect(nativeSwitchLook(asking)).toBe('pending');
-    const off = run([{ type: 'send' }, { type: 'answer', outcome: { kind: 'off' }, text: 'x' }], asking);
+    const off = run(
+      [{ type: 'send' }, { type: 'answer', outcome: { kind: 'off' }, text: 'x' }],
+      asking,
+    );
     expect(off.stored).toBe('off');
     expect(nativeSwitchLook(off)).toBe('off');
     // Cancel while turning off: back to on, unchanged.
@@ -125,7 +132,10 @@ describe('the native switch state machine', () => {
   it('a broken registration cannot be toggled; only Turn on again starts the code step', () => {
     const broken = run([BROKEN]);
     expect(nativeSwitchStep(broken, { type: 'toggle' })).toBe(broken);
-    expect(nativeSwitchStep(broken, { type: 'again' })).toMatchObject({ op: 'again', step: 'code' });
+    expect(nativeSwitchStep(broken, { type: 'again' })).toMatchObject({
+      op: 'again',
+      step: 'code',
+    });
   });
 
   it('an answer without a request in flight is ignored; a status read keeps the step', () => {

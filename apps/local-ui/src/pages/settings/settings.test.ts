@@ -383,11 +383,13 @@ describe('round 2', () => {
       ...ANSWERS,
       '/api/owner/passkey': { passkey: { rpId: 'localhost', registered: false } },
     };
-    const native = (n: unknown) => readSettingsState(answerFrom({ ...noPasskey, '/api/owner/native': n }));
+    const native = (n: unknown) =>
+      readSettingsState(answerFrom({ ...noPasskey, '/api/owner/native': n }));
     expect((await native({ native: { available: true, registered: true } })).touchId).toBe(true);
     expect((await native({ native: { available: false, registered: false } })).touchId).toBe(false);
     expect(
-      (await native({ native: { available: true, registered: true, reason: 'reregister' } })).touchId,
+      (await native({ native: { available: true, registered: true, reason: 'reregister' } }))
+        .touchId,
     ).toBe(false);
     expect((await native({ native: 'yes' })).touchId).toBe(false);
     // A failed native read leaves the passkey answer alone.

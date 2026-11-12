@@ -703,8 +703,12 @@ describe('cancel, replace wording and a late keychain write (DESK-TOUCHID-FIX re
 // code typed back are about the typed master code, so native is refused there before the helper runs.
 describe('owner-code steps with native presence (DESK051-C2)', () => {
   const CODE_STEP = { 'X-AgentLink-Input': 'e30' }; // base64url of `{}`
-  const post = (h: Harness, page: Record<string, string>, path: string, extra = NATIVE) =>
-    send(h.port, path, { method: 'POST', headers: { ...page, ...CODE_STEP, ...extra } });
+  const post = (
+    h: Harness,
+    page: Record<string, string>,
+    path: string,
+    extra: Record<string, string> = NATIVE,
+  ) => send(h.port, path, { method: 'POST', headers: { ...page, ...CODE_STEP, ...extra } });
 
   it('Test Touch ID accepts native: one helper run, done, signs nothing', async () => {
     const h = await harness();

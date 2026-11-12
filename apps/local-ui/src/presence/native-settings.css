@@ -46,3 +46,38 @@
 .st-native-note.is-error {
   color: var(--al-color-status-danger-fg);
 }
+/* DESK051-C2: the in-between state while the owner confirms (master code, then the sensor). Its own
+   look: the knob in the middle, a dashed info-coloured outline, no On/Off word. Fully on keeps the
+   shared accent look (`.al-switch.is-on`). Tokens only. */
+.st-native-row .al-switch.is-pending {
+  background: var(--al-color-status-info-bg);
+  border-style: dashed;
+  border-color: var(--al-color-status-info-border);
+}
+.st-native-row .al-switch.is-pending .al-switch-knob {
+  transform: translateX(20px);
+  background: var(--al-color-status-info-icon);
+}
+.st-native-row .al-switch.is-pending:disabled {
+  opacity: 1;
+}
+.st-native-body p {
+  max-inline-size: 60ch;
+}
+/* DESK051-C2: the row's own text styles (the Settings redesign renamed its rows to `set-row-*`, so
+   the title and its line ran together on the Touch ID page). The same metrics as `.set-row-*`. */
+.st-native .st-row-text {
+  flex: 1;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+}
+.st-native .st-row-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+.st-native .st-row-line {
+  font-size: 13px;
+  color: var(--al-color-fg-subtle);
+}

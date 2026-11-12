@@ -264,7 +264,7 @@ export function SettingsPage({
       </div>
       {kitNeedsOwner ? (
         <KitNotice state={state} />
-      ) : owner === undefined ? null : (
+      ) : owner === undefined || state?.nativeOn === true ? null : (
         <OwnerPanel owner={owner} canPasskey={passkeys} />
       )}
       {shown.map((g) => (

@@ -45,6 +45,17 @@ export const NATIVE_STRINGS = Object.freeze({
     `On: approve with ${nativeSensor(platform)} on this computer. Your master code still works.`,
   settingsOff: 'Off: approvals use your master code.',
   turnOnAgain: 'Turn on again',
+  /**
+   * DESK051-C2 (owner feedback): why the master code comes first, said once in the in-between step.
+   * Adding a way to confirm is itself an owner action, so the master code proves it is the owner.
+   */
+  whyOn: (platform: DesktopPlatform): string =>
+    `Confirm it's you once with your master code, so this computer can add ${nativeSensor(platform)}. Then ${
+      platform === 'mac' ? 'touch the sensor' : 'follow the Windows Hello prompt'
+    } to finish.`,
+  whyOff: (platform: DesktopPlatform): string =>
+    `Confirm with your master code to turn off ${nativeSensor(platform)} for approvals. Your master code keeps working.`,
+  turnOff: 'Turn off',
   confirmCode: 'Confirm with your master code',
   codeLabel: 'Master code',
   cancel: 'Cancel',
