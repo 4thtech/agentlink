@@ -25,17 +25,17 @@ Every place that asks for Touch ID also offers **Use your master code instead**.
 
 ## Your recovery kit
 
-A recovery kit gets an ID back on a new computer: the ID, its contacts and its messages, locked under a new **recovery code** that is shown once.
+A recovery kit holds an ID, its contacts and its messages, locked under a new **recovery code** that is shown once. Restoring from it arrives in the next update; keep the file and the code safe, and apart.
 
 1. Open **Settings** › **Backup & Touch ID**, or press **Back up** on an ID's card on [IDs](ids.md).
 2. Press **Save recovery kit** and confirm with Touch ID or your master code.
 3. The kit is saved to your Downloads folder (or your home folder when there is none). Write down the recovery code shown once, and keep it apart from the kit.
 
-<figure><img src="../../assets/screens/recovery-kit.webp" alt="Settings, Backup and Touch ID: the Recovery kit section explains that the kit gets you back in on a new computer, and the Touch ID section explains that Touch ID confirms anything that changes who can act for you."><figcaption><p>Settings › Backup &amp; Touch ID.</p></figcaption></figure>
+<figure><img src="../../assets/screens/recovery-kit.webp" alt="Settings, Backup and Touch ID: the Recovery kit section explains that the kit holds your IDs, people and messages and restoring arrives in the next update, and the Touch ID section explains that Touch ID confirms anything that changes who can act for you."><figcaption><p>Settings › Backup &amp; Touch ID.</p></figcaption></figure>
 
 <figure><img src="../../assets/screens/recovery-kit-saved.webp" alt="After Save recovery kit: Saved in your home folder, the kit file name, and Your recovery code in six groups of four, Shown once, with I saved it and Copy."><figcaption><p>The kit is saved and its recovery code is shown once.</p></figcaption></figure>
 
-Nothing is sent anywhere. To back up another ID, open that ID first. Restoring from a kit is not available in the app yet; it is coming as a terminal step.
+Nothing is sent anywhere. To back up another ID, open that ID first. Restoring from a kit is not available yet; it arrives in the next update.
 
 ## If you set up before 0.3.0
 

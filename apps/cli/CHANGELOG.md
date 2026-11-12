@@ -1,5 +1,11 @@
 # @4thtech-io/agentlink
 
+## 0.4.15
+
+### Patch Changes
+
+- 2f71b08: Honest recovery kit copy: the app and docs no longer claim a kit restores anything until restore ships (WP-0).
+
 ## 0.4.14
 
 ### Patch Changes

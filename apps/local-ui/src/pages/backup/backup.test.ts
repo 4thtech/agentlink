@@ -7,6 +7,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ApiClient } from '../../api/client.js';
 import { rememberRecoveryKitLater } from '../../states/index.js';
+import { FIRST_RUN as FIRST_RUN_STRINGS } from '../first-run/strings.js';
+import { START_STRINGS as HOME_STRINGS } from '../home/strings.js';
 import { BackupPage } from './index.js';
 import { BACKUP_STRINGS as S } from './strings.js';
 
@@ -25,6 +27,15 @@ afterEach(() => {
 });
 
 describe('Backup & Touch ID', () => {
+  it('claims no restore until restore ships (WP-0)', async () => {
+    await act(async () => root.render(h(BackupPage)));
+    expect(S.kitBody).toContain('Restoring from it arrives in the next update');
+    expect(S.kitBody).toContain('keep the file and the code safe');
+    expect(S.codeBody).toContain('Keep them apart');
+    const all = JSON.stringify([S, FIRST_RUN_STRINGS.backupLost, HOME_STRINGS.kitBody]);
+    expect(all).not.toMatch(/gets you back|get back in|new computer|restores everything/i);
+    expect(host.textContent).not.toMatch(/gets you back|new computer/i);
+  });
   it('has one h1 and a section for the recovery kit and one for Touch ID', async () => {
     await act(async () => root.render(h(BackupPage)));
     expect(host.querySelectorAll('h1')).toHaveLength(1);
