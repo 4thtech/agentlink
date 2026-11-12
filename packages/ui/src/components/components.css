@@ -1344,6 +1344,11 @@ body {
   flex-direction: column;
   gap: var(--al-space-1);
 }
+.al-banner-text a,
+.al-notice-body a:not(.al-btn) {
+  color: var(--al-color-fg-link);
+  text-underline-offset: 2px;
+}
 .al-notice-title {
   margin: 0;
   font-weight: var(--al-font-weight-semibold);
