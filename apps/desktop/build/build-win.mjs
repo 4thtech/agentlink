@@ -78,7 +78,12 @@ cpSync(join(nodeSrc, 'node.exe'), nodeExe);
 cpSync(join(nodeSrc, 'LICENSE'), join(nodeExe, '..', 'LICENSE'));
 
 console.log('[5/7] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
-const core = installCore({ tgz, dest: join(dir, 'resources', ...LAYOUT.coreDir), os: 'win32', cpu: 'x64' });
+const core = installCore({
+  tgz,
+  dest: join(dir, 'resources', ...LAYOUT.coreDir),
+  os: 'win32',
+  cpu: 'x64',
+});
 
 console.log('[6/7] fuses and ASAR integrity resource');
 const exe = join(dir, 'AgentLink.exe');

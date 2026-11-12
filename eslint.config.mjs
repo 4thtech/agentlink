@@ -158,6 +158,8 @@ export default tseslint.config(
       '{packages,apps,tools,e2e,test-vectors}/*/{dist,coverage,.turbo}/**',
       '{dist,coverage,.turbo}/**',
       'docs/**',
+      // WP-D2/D4 build outputs (the release bundle, packaged app work dir, DMGs).
+      'apps/desktop/{dist-release,out,.cache}/**',
     ],
   },
   js.configs.recommended,
