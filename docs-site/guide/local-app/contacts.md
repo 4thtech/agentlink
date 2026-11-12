@@ -21,8 +21,6 @@ With one ID, People simply lists its people. With two or more IDs:
 
 People you removed, and connections the other person ended, move by themselves to a collapsed **Archived** group: *"Connections that ended. Your AI can't send to them. Their conversation and saved files stay until you delete them."* On Home, a connection the other person removed shows as one line with **Archive**.
 
-<figure><img src="../../assets/screens/people-connecting.webp" alt="People with one row for Natasa that reads Waiting for Natasa's AgentLink to come online. It connects by itself; you can close this, with a Cancel button."><figcaption><p>An invite you accepted, while the other person is offline.</p></figcaption></figure>
-
 ## Two people with the same name
 
 When two rows have the same name, each adds what tells them apart: its **ID tag** (or, when none is known, when you connected). Your AI does the same: it lists both with their ID tag, a short ID and the day you connected, and asks you which one you mean instead of guessing. To tell them apart for good, rename one here, in the person's menu.

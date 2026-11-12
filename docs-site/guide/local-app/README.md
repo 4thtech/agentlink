@@ -13,7 +13,7 @@ The local app is a set of pages that open in your browser. They run on your own 
 
 It never asks which ID you mean. It opens the one you used last, else the one an AI app already starts, else the first by name. You switch IDs inside the app: see [My IDs](ids.md).
 
-If your AI runs this command, nothing opens (this also holds in the terminals of more AI apps since 0.5.1, such as OpenCode, Cursor's agent and Antigravity). It tells you to run it yourself. That is on purpose: only you should see these pages.
+If your AI runs this command, nothing opens (this also holds in the terminals of more AI apps since 0.5.1, such as OpenCode, Cursor's AI and Antigravity). It tells you to run it yourself. That is on purpose: only you should see these pages.
 
 Got an invite link from a friend instead? See [Join from an invite](../get-started/join-from-an-invite.md).
 

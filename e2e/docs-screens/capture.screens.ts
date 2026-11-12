@@ -16,6 +16,8 @@
 // Natasa, the same messages); keys, links and the Contact check digits are new on every run, so the
 // pixels are not byte-identical between runs. Nothing is printed; a failed step names itself.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
@@ -358,11 +360,79 @@ describe('docs screens', () => {
       await shot(a, 'contact');
     });
 
+    // ---- 0.5.1: a file in the conversation and the reader (REL051-A34) ----
+    await step('file and reader', async () => {
+      await a.keyboard.press('Escape');
+      const folder = join(pcB.home, 'AgentLink', 'Send');
+      await mkdir(folder, { recursive: true });
+      const path = join(folder, 'workshop-plan.md');
+      await writeFile(
+        path,
+        [
+          '# Workshop plan',
+          '',
+          '1. Welcome and goals',
+          '2. Walk through the agenda',
+          '3. Questions',
+          '',
+          '| When | What |',
+          '|---|---|',
+          '| 10:00 | Start |',
+          '| 10:45 | Break |',
+          '',
+          '```',
+          'agenda: draft 2',
+          '```',
+        ].join('\n'),
+        { mode: 0o600 },
+      );
+      await mcpB.call('agentlink_send', {
+        to: 'Tali',
+        text: 'Here is the plan for the workshop.',
+        path,
+      });
+      await until('Tali has the plan', () => inboxHas(mcpA, 'workshop-plan.md'), 60_000);
+      await navTo(a, 'Home');
+      await a.getByText('Natasa').first().click();
+      const open = a.getByRole('button', { name: 'Open', exact: true }).first();
+      await open.waitFor({ timeout: 60_000 });
+      await open.click();
+      await a.getByText('Workshop plan').first().waitFor();
+      await a.waitForTimeout(600);
+      await shot(a, 'conversation-file-reader');
+      await a.keyboard.press('Escape');
+    });
+
+    // ---- 0.5.1: a waiting invite (REL051-B2) and a connecting row (REL051-CF1) ----
+    await step('waiting invite', async () => {
+      await goTo(a, 'Invite someone');
+      await a.getByRole('heading', { name: 'Invite someone', level: 1 }).waitFor();
+      await a.getByLabel('Who is it for?').fill('Marko');
+      await a.getByLabel('Who is it for?').blur();
+      await a.locator('.inv-link[data-state="ready"]').waitFor();
+      await a.getByRole('button', { name: 'Done', exact: true }).click();
+      await navTo(a, 'Home');
+      await a.getByText('Waiting for Marko to accept').first().waitFor();
+      await a.waitForTimeout(600);
+      await shot(a, 'home-waiting-invite');
+    });
+    // ---- 0.5.1: Storage and Activity ----
+    await step('storage and activity', async () => {
+      await a.goto(new URL('/settings/storage', a.url()).toString());
+      await a.getByRole('heading', { name: 'Storage', level: 1 }).first().waitFor();
+      await a.waitForTimeout(800);
+      await shot(a, 'storage');
+      await navTo(a, 'Activity');
+      await a.getByRole('heading', { name: 'Activity', level: 1 }).first().waitFor();
+      await a.waitForTimeout(800);
+      await shot(a, 'activity');
+    });
+
     // ---- IDs: the simple card, rename, remove (not confirmed) ----
     await step('ids', async () => {
       await a.keyboard.press('Escape');
-      await goTo(a, 'IDs');
-      await a.getByRole('heading', { name: 'IDs', level: 1 }).first().waitFor();
+      await goTo(a, 'My IDs');
+      await a.getByRole('heading', { name: 'My IDs', level: 1 }).first().waitFor();
       await shot(a, 'ids');
       const card = a.getByRole('main').getByRole('region', { name: 'Tali', exact: true }).first();
       await card.getByRole('button', { name: 'Rename', exact: true }).click();
