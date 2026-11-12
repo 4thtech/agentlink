@@ -283,6 +283,8 @@ export class FakeApp extends Emitter implements App {
   inApplications = false;
   moveResult = true;
   moveCalls = 0;
+  /** D15-01: app.relaunch calls (the options, or null when called without any). */
+  readonly relaunches: ({ execPath?: string; args?: string[] } | null)[] = [];
   readonly order: string[] = [];
   enableSandbox(): void {
     this.sandboxEnabled = true;
@@ -305,6 +307,10 @@ export class FakeApp extends Emitter implements App {
   exit(code?: number): void {
     this.exitCode = code ?? 0;
     this.order.push(`exit:${this.exitCode}`);
+  }
+  relaunch(options?: { execPath?: string; args?: string[] }): void {
+    this.relaunches.push(options ?? null);
+    this.order.push('relaunch');
   }
   isInApplicationsFolder(): boolean {
     return this.inApplications;

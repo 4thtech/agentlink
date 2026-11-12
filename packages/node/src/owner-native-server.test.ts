@@ -752,7 +752,8 @@ describe('owner-code steps with native presence (DESK051-C2)', () => {
     const res = await post(h, page, '/api/ui/owner-code/replace');
     expect(res.status).toBe(200);
     expect(json(res)['status']).toBe('staged');
-    expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:approve']);
+    // D15-04: the OS sheet names the operation (reason id `code`), not a routine approval.
+    expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:code']);
     const drop = await post(h, page, '/api/ui/owner-code/replace/cancel', {});
     expect(json(drop)['status']).toBe('cancelled');
   });

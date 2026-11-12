@@ -1,7 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { findPreviewString, PREVIEW_VAR } from '../lib/preview-check.mjs';
-import { EXTRA_CASES, FORBIDDEN_SWITCHES, runLockdown } from '../lib/switch-check.mjs';
+import {
+  ENV_CASES,
+  EXTRA_CASES,
+  FORBIDDEN_SWITCHES,
+  runLockdown,
+} from '../lib/switch-check.mjs';
 
 test('preview check flags the variable name anywhere in the content', () => {
   assert.equal(PREVIEW_VAR, 'AGENTLINK_DESKTOP_PREVIEW');
@@ -66,4 +71,27 @@ test('runLockdown passes only when every switch exits non-zero with no window', 
   assert.ok((await runLockdown({ exe: '/x', launch: bad })).failures.length >= 2);
   const timeout = async () => ({ code: null, windowSeen: false });
   assert.ok((await runLockdown({ exe: '/x', launch: timeout })).failures.length > 0);
+});
+
+// D15-05: the launch check is also tried with variables the JS check must refuse. NODE_OPTIONS and
+// NODE_EXTRA_CA_CERTS are NOT in the list: with the NodeOptions fuse off Electron removes them before
+// any JS runs, so the app starts (harmlessly); the fuse check covers them.
+test('environment cases: ELECTRON_* and lowercase node_* are tried, never the fuse-stripped names', async () => {
+  const names = ENV_CASES.map((c) => Object.keys(c)[0]);
+  assert.ok(names.includes('ELECTRON_RUN_AS_NODE'));
+  assert.ok(names.includes('node_options'));
+  assert.ok(!names.includes('NODE_OPTIONS'));
+  assert.ok(!names.includes('NODE_EXTRA_CA_CERTS'));
+  const envs = [];
+  const r = await runLockdown({
+    exe: '/x',
+    launch: async (_e, _argv, env) => (envs.push(env ?? null), { code: 64, windowSeen: false }),
+  });
+  assert.equal(r.failures.length, 0);
+  for (const c of ENV_CASES) assert.ok(envs.some((e) => e && JSON.stringify(e) === JSON.stringify(c)));
+  const open = await runLockdown({
+    exe: '/x',
+    launch: async (_e, _argv, env) => ({ code: env ? 0 : 64, windowSeen: false }),
+  });
+  assert.equal(open.failures.length, ENV_CASES.length);
 });

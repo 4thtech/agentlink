@@ -239,7 +239,7 @@ describe('presence: one gesture = one owner operation (D-68)', () => {
     const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
     const keychain = await withOwner();
     await registerOwnerNative(keychain, helper, owner, code());
-    for (const reason of ['setup', 'approve', 'pay'] as const)
+    for (const reason of ['setup', 'approve', 'pay', 'code'] as const)
       await nativeOp(keychain, helper, reason);
   });
 });

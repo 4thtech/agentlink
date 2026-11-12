@@ -66,6 +66,28 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
     expect(attach).not.toMatch(/gh release upload [^\n]* SHA256SUMS\s*$/m);
   });
 
+  // D15-03: a missing release or a missing asset is a red job, never a warning on a green run.
+  it('fails when Release v<version> does not exist, and checks what got attached', () => {
+    const step = attach.slice(attach.indexOf('Attach the app to the GitHub Release'));
+    expect(step).not.toBe('');
+    expect(step).not.toMatch(/::warning::/);
+    expect(step).toMatch(/gh release view "v\$VERSION"[^\n]*\|\|[^\n]*\n?[^\n]*::error::/);
+    expect(step).not.toMatch(/exit 0/);
+    // After the upload: every installer name must be on the release.
+    expect(step).toMatch(/gh release view "v\$VERSION" [^\n]*--json assets/);
+    for (const name of ['mac-arm64.dmg', 'mac-x64.dmg', 'win-x64-setup.exe']) {
+      expect(step).toContain(`AgentLink-$VERSION-${name}`);
+    }
+  });
+
+  // D15-10: a re-run never silently replaces a published installer with other bytes.
+  it('never clobbers; an existing asset must have the same hash; every uploaded file is in the sums', () => {
+    const step = attach.slice(attach.indexOf('Attach the app to the GitHub Release'));
+    expect(step).not.toMatch(/--clobber/);
+    expect(step).toMatch(/gh release download "v\$VERSION"/);
+    expect(step).toMatch(/is not listed in SHA256SUMS-desktop-app\.txt/);
+  });
+
   it('pins every action to a full commit SHA', () => {
     const uses = [...`${attach}${desktop}`.matchAll(/uses: ([^\s#]+)/g)].map((m) => m[1]);
     expect(uses.length).toBeGreaterThan(2);

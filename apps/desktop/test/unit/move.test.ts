@@ -58,6 +58,19 @@ describe('locationProblem', () => {
     expect(locationProblem(mac(TRANSLOCATED))).toBe('translocated');
   });
 
+  it('refuses /tmp, /private/tmp and /private/var/folders even when $TMPDIR is elsewhere (D15-06)', () => {
+    for (const root of [
+      '/tmp/x/AgentLink.app',
+      '/private/tmp/x/AgentLink.app',
+      '/private/var/folders/zz/other/T/AgentLink.app',
+      '/var/folders/zz/other/T/AgentLink.app',
+    ]) {
+      expect(locationProblem(mac(`${root}/Contents/MacOS/AgentLink`)), root).toBe('temporary');
+    }
+    // A folder that merely starts alike is not temporary.
+    expect(locationProblem(mac('/tmpfoo/AgentLink.app/Contents/MacOS/AgentLink'))).toBeNull();
+  });
+
   it('refuses a read-only disk image and a read-only folder', () => {
     expect(
       locationProblem(mac('/Volumes/AgentLink/AgentLink.app/Contents/MacOS/AgentLink', false)),

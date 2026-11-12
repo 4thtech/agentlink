@@ -56,7 +56,9 @@ test('exit code table is fixed and the same in both helpers', () => {
 });
 
 test('reason ids are a fixed set and the macOS reason texts live in the helper', () => {
-  assert.deepEqual(REASONS, ['setup', 'approve', 'pay']);
+  assert.deepEqual(REASONS, ['setup', 'approve', 'pay', 'code']);
+  // D15-04: Replace master code names the operation on the OS sheet.
+  assert.match(macSrc, /case "code": return "replace your AgentLink master code"/);
   for (const r of REASONS) {
     assert.match(macSrc, new RegExp(`case "${r}": return "[^"]+"`));
     assert.match(winSrc, new RegExp(`L"${r}"`));

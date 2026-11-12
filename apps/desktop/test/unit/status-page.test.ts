@@ -30,6 +30,7 @@ describe('status page', () => {
         'exited',
         'ai_app',
         'missing_files',
+        'changed_files',
       ].sort(),
     );
     for (const kind of STATUS_KINDS) {

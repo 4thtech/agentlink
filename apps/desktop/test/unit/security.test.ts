@@ -164,6 +164,13 @@ describe('isAllowedExternal', () => {
     ['https://evil.basescan.org/', false],
     ['https://user@github.com/', false],
     ['https://github.com:8443/', false],
+    // D15-11: only this repository's pages on GitHub.
+    ['https://github.com/4thtech/agentlink/releases', true],
+    ['https://github.com/4thtech/agentlink', true],
+    ['https://github.com/4thTech/AgentLink/issues', true],
+    ['https://github.com/evil/agentlink', false],
+    ['https://github.com/4thtech/agentlink-evil', false],
+    ['https://github.com/', false],
     ['javascript:alert(1)', false],
   ])('%s → %s', (url, expected) => {
     expect(isAllowedExternal(url)).toBe(expected);

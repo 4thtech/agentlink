@@ -16,6 +16,12 @@ import {
 } from '../../src/main/main.js';
 import { WINDOW_PARTITION } from '../../src/main/security.js';
 import {
+  INSTANCE_COPY,
+  instanceRecord,
+  type BuildIdentity,
+  type InstanceOps,
+} from '../../src/main/instance.js';
+import {
   FakeBrowserWindow,
   FakeEvent,
   FakeWebContents,
@@ -388,5 +394,203 @@ describe('runShell quit', () => {
 describe('preview mode', () => {
   it('is off without the build-time constant (tests and release builds)', () => {
     expect(readPreview({ AGENTLINK_DESKTOP_PREVIEW: '1' })).toBeNull();
+  });
+});
+
+// D15-01 (DESK051-C5): one AgentLink per profile, never a silent exit for a different build.
+const BUILD: BuildIdentity = { version: '0.5.1', execPath: EXE, stamp: '1-1-1' };
+const OTHER_EXE = '/Users/x/Downloads/AgentLink.app/Contents/MacOS/AgentLink';
+
+class FakeInstance implements InstanceOps {
+  record: string | null = null;
+  owner: number | null = null;
+  readonly living = new Set<number>();
+  quitAsked: number[] = [];
+  quitWorks = true;
+  sleeps = 0;
+  constructor(
+    readonly build: BuildIdentity = BUILD,
+    readonly pid = 100,
+  ) {}
+  read(): string | null {
+    return this.record;
+  }
+  write(text: string): void {
+    this.record = text;
+  }
+  remove(): void {
+    this.record = null;
+  }
+  lockOwner(): number | null {
+    return this.owner;
+  }
+  alive(pid: number): boolean {
+    return this.living.has(pid);
+  }
+  askToQuit(pid: number): boolean {
+    this.quitAsked.push(pid);
+    if (this.quitWorks) this.living.delete(pid);
+    return this.quitWorks;
+  }
+  sleep(): Promise<void> {
+    this.sleeps += 1;
+    return Promise.resolve();
+  }
+}
+
+const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe('single instance across builds (D15-01)', () => {
+  it('the lock carries this build; the running copy records itself and removes the record on quit', async () => {
+    const inst = new FakeInstance();
+    const { electron, children, proc } = setup(['--', 'agentlink://join#abc'], {
+      instance: () => inst,
+    });
+    expect(await runShell(electron, proc)).toBe('running');
+    expect(electron.app.lockData).toEqual({ deepLink: 'agentlink://join#abc', build: BUILD });
+    expect(inst.record).toBe(instanceRecord(100, BUILD));
+    electron.app.emit('before-quit', new FakeEvent());
+    children[0]?.exit(0);
+    await tick();
+    expect(inst.record).toBeNull();
+  });
+
+  it('the same build opened again: the window comes forward, no dialog', async () => {
+    const inst = new FakeInstance();
+    const { electron, proc } = setup([], { instance: () => inst });
+    await runShell(electron, proc);
+    electron.app.emit('second-instance', new FakeEvent(), [], '/', { deepLink: null, build: BUILD });
+    await tick();
+    expect(electron.dialog.shown).toHaveLength(0);
+    expect(electron.app.relaunches).toEqual([]);
+  });
+
+  it('a different build opened: the running copy says so and switches on request', async () => {
+    const inst = new FakeInstance();
+    const { electron, proc } = setup([], { instance: () => inst });
+    await runShell(electron, proc);
+    electron.dialog.responses = [0];
+    const theirs = { version: '0.5.2', execPath: OTHER_EXE, stamp: '2-2-2' };
+    electron.app.emit('second-instance', new FakeEvent(), [], '/', {
+      deepLink: 'agentlink://join#fwd',
+      build: theirs,
+    });
+    await tick();
+    expect(electron.dialog.shown).toHaveLength(1);
+    expect(electron.dialog.shown[0]?.message).toBe(INSTANCE_COPY.olderOpen);
+    expect(electron.app.relaunches).toEqual([
+      { execPath: OTHER_EXE, args: ['--', 'agentlink://join#fwd'] },
+    ]);
+    expect(electron.app.quitCalls).toBe(1);
+  });
+
+  it('the app replaced in place (same path and version, new files): still offered', async () => {
+    const inst = new FakeInstance();
+    const { electron, proc } = setup([], { instance: () => inst });
+    await runShell(electron, proc);
+    electron.dialog.responses = [1];
+    electron.app.emit('second-instance', new FakeEvent(), [], '/', {
+      deepLink: null,
+      build: { ...BUILD, stamp: '9-9-9' },
+    });
+    await tick();
+    expect(electron.dialog.shown[0]?.message).toBe(INSTANCE_COPY.anotherOpen);
+    // Keep this one: nothing relaunches, nothing quits.
+    expect(electron.app.relaunches).toEqual([]);
+    expect(electron.app.quitCalls).toBe(0);
+  });
+
+  it('a forwarded path that is not an AgentLink app is never relaunched', async () => {
+    const inst = new FakeInstance();
+    const { electron, proc } = setup([], { instance: () => inst });
+    await runShell(electron, proc);
+    electron.dialog.responses = [0, 0];
+    electron.app.emit('second-instance', new FakeEvent(), [], '/', {
+      deepLink: null,
+      build: { version: '0.5.2', execPath: '/bin/sh', stamp: '2' },
+    });
+    await tick();
+    expect(electron.app.relaunches).toEqual([]);
+    expect(electron.app.quitCalls).toBe(0);
+  });
+
+  it('second launch while a recorded copy runs: exit quietly, that copy answers', async () => {
+    const inst = new FakeInstance(BUILD, 200);
+    inst.record = instanceRecord(100, BUILD);
+    inst.living.add(100);
+    inst.owner = 100;
+    const { electron, children, proc } = setup([], { instance: () => inst });
+    electron.app.lockGranted = false;
+    expect(await runShell(electron, proc)).toBe('second-instance');
+    expect(electron.app.exitCode).toBe(0);
+    expect(electron.dialog.shown).toHaveLength(0);
+    expect(children).toHaveLength(0);
+  });
+
+  it('second launch while an older copy (no record) runs: told plainly, can quit it and relaunch', async () => {
+    const inst = new FakeInstance(BUILD, 200);
+    inst.owner = 39177;
+    inst.living.add(39177);
+    const { electron, children, proc } = setup([], { instance: () => inst });
+    electron.app.lockGranted = false;
+    electron.dialog.responses = [0];
+    expect(await runShell(electron, proc)).toBe('second-instance');
+    expect(electron.dialog.shown[0]?.message).toBe('An older AgentLink is still open');
+    expect(inst.quitAsked).toEqual([39177]);
+    expect(electron.app.relaunches).toEqual([null]);
+    expect(electron.app.exitCode).toBe(0);
+    expect(children).toHaveLength(0);
+    expect(FakeBrowserWindow.created).toHaveLength(0);
+  });
+
+  it('an older copy that does not quit: a second dialog says how to quit it', async () => {
+    const inst = new FakeInstance(BUILD, 200);
+    inst.owner = 39177;
+    inst.living.add(39177);
+    inst.quitWorks = false;
+    const { electron, proc } = setup([], { instance: () => inst });
+    electron.app.lockGranted = false;
+    electron.dialog.responses = [0, 0];
+    await runShell(electron, proc);
+    expect(electron.dialog.shown).toHaveLength(2);
+    expect(electron.dialog.shown[1]?.message).toBe(INSTANCE_COPY.couldNotQuit);
+    expect(electron.app.relaunches).toEqual([]);
+  });
+
+  it('no way to find the older copy (Windows): told how to quit it, never silent', async () => {
+    const inst = new FakeInstance(BUILD, 200);
+    const { electron, proc } = setup([], { instance: () => inst, platform: 'win32' });
+    electron.app.lockGranted = false;
+    await runShell(electron, proc);
+    expect(electron.dialog.shown).toHaveLength(1);
+    expect(electron.dialog.shown[0]?.buttons).toEqual([INSTANCE_COPY.ok]);
+    expect(inst.quitAsked).toEqual([]);
+  });
+});
+
+describe('the session page goes away with its core (D15-12)', () => {
+  it('a core that exits after ready → the starting page at once, before any restart', async () => {
+    const { electron, children, proc } = setup();
+    await runShell(electron, proc);
+    children[0]?.stream.push(readyLine());
+    expect(lastPage()).toBe(SESSION_URL);
+    children[0]?.exit(1);
+    expect(children).toHaveLength(1);
+    expect(lastPage()).toBe(statusPageUrl('starting'));
+  });
+});
+
+describe('bundle tripwire (D15-07)', () => {
+  it('changed bundled files → the fixed page, no core', async () => {
+    const { electron, children, proc } = setup([], { verifyBundle: () => Promise.resolve('changed') });
+    await runShell(electron, proc);
+    expect(children).toHaveLength(0);
+    expect(lastPage()).toBe(statusPageUrl('changed_files'));
+  });
+
+  it('unchanged files → the core starts', async () => {
+    const { electron, children, proc } = setup([], { verifyBundle: () => Promise.resolve('ok') });
+    await runShell(electron, proc);
+    expect(children).toHaveLength(1);
   });
 });
