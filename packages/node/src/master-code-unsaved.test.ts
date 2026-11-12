@@ -268,3 +268,123 @@ describe('IR-REL051-CF3-1: the marker never outlives a shown code as `writing`',
     expect(await readUnsavedMarker(t.home)).toBeUndefined();
   });
 });
+
+// REL051-R2C (R2-CLASS-02): the app closed 0.4 s after "Restore 2 IDs". The server's close reached
+// the restore while it was still writing; the page never got the answer. The next start (here, the
+// same process, as a restart of `agentlink ui` in it) must land on "Finish restoring" with the same
+// kit, never on a master code nobody was shown.
+class HoldingKeychain extends HangingKeychain {
+  /** A set() of an account this matches waits until `release()`. */
+  holdWhen: ((account: string) => boolean) | undefined;
+  held = false;
+  #release: (() => void) | undefined;
+  release(): void {
+    this.holdWhen = undefined;
+    this.#release?.();
+  }
+  override set(account: string, value: Uint8Array): Promise<void> {
+    if (this.holdWhen?.(account) === true) {
+      this.held = true;
+      const copy = value.slice();
+      return new Promise<void>((resolve) => {
+        this.#release = resolve;
+      }).then(() => super.set(account, copy));
+    }
+    return super.set(account, value);
+  }
+}
+
+async function twoIdKit() {
+  const owner = await makeOwner();
+  const a1 = await makeAgent(t.root, owner, 'alpha');
+  const a2 = await makeAgent(t.root, owner, 'beta');
+  const kit = await makeKit(t.root, owner, [a1, a2], KIT, join(t.home, 'Downloads'));
+  return { owner, a1, a2, kit };
+}
+
+describe('R2-CLASS-02: the app closed right after "Restore 2 IDs"', () => {
+  let holding: HoldingKeychain;
+  beforeEach(() => {
+    holding = new HoldingKeychain();
+    keychain = holding;
+  });
+
+  async function closedWhile(
+    holdWhen: (account: string) => boolean,
+  ): Promise<{ kit: Awaited<ReturnType<typeof twoIdKit>>['kit']; answer: RestoreAnswer }> {
+    const { a1, a2, kit } = await twoIdKit();
+    holding.holdWhen = holdWhen;
+    const first = engineOf();
+    const click = restoreClick(first, kit.code, [a1.agentId, a2.agentId]);
+    await until('the restore is writing', () => holding.held);
+    // The app quits: the server closes the restore engine while that write is still open.
+    const closing = first.close();
+    holding.release();
+    await closing;
+    return { kit, answer: await click };
+  }
+
+  async function landsOnFinishRestoring(code: string): Promise<void> {
+    // Opened again: a new server in this process (as `agentlink ui` started again).
+    const next = engineOf();
+    await next.settle();
+    expect(keychain.items.has(OWNER_ACCOUNT)).toBe(false);
+    expect(keychain.items.has(OWNER_PASSKEY_ACCOUNT)).toBe(false);
+    expect(await next.firstRunHold()).toBe('finish_restore');
+    expect(await next.masterCodeState()).toEqual({ status: 'finish_restore' });
+    // "Finish restoring" with the same kit shows a new master code.
+    const done = await restoreClick(next, code, []);
+    expect(body(done)['status']).toBe('done');
+    expect(body(done)['masterCode']).toMatch(/^[A-Z2-7]{4}(-[A-Z2-7]{4}){5}$/);
+    expect(keychain.items.has(OWNER_ACCOUNT)).toBe(true);
+  }
+
+  it('closed while the owner item is written: no code in an answer nobody reads; next start says Finish restoring', async () => {
+    const { kit, answer } = await closedWhile((account) => account === OWNER_ACCOUNT);
+    expect(body(answer)['masterCode']).toBeUndefined();
+    await landsOnFinishRestoring(kit.code);
+  });
+
+  it('closed while the Touch ID wrap is written: rolled back too; next start says Finish restoring', async () => {
+    const { kit, answer } = await closedWhile((account) => account === OWNER_PASSKEY_ACCOUNT);
+    expect(body(answer)['masterCode']).toBeUndefined();
+    await landsOnFinishRestoring(kit.code);
+  });
+
+  it('closed while the IDs are written: the IDs that made it wait for Finish restoring', async () => {
+    let writes = 0;
+    const { kit, answer } = await closedWhile(() => {
+      writes += 1;
+      return writes === 1;
+    });
+    expect(body(answer)['masterCode']).toBeUndefined();
+    await landsOnFinishRestoring(kit.code);
+  });
+
+  it('the page went away before the answer (the server still runs): rolled back at once', async () => {
+    const { a1, a2, kit } = await twoIdKit();
+    const engine = engineOf();
+    const kits = body(await engine.found('S1'))['kits'] as { handle: string; name: string }[];
+    const handle = (kits.find((k) => k.name === KIT) as { handle: string }).handle;
+    await engine.header('S1', { handle });
+    const opened = await engine.open('S1', { handle }, encodeUtf8(kit.code));
+    const begun = await engine.applyBegin('S1', {
+      kit: body(opened)['kit'] as JsonValue,
+      selection: [a1.agentId, a2.agentId],
+      names: {},
+    });
+    const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+    const pk = body(begun)['publicKey'] as { challenge: string; userId: string; prfSalt: string };
+    const answer = await engine.applyFinish(
+      'S1',
+      { nonce: body(begun)['nonce'] as JsonValue },
+      webauthnCreate(auth, pk, ORIGIN),
+      { open: () => false },
+    );
+    expect(body(answer)['masterCode']).toBeUndefined();
+    expect(keychain.items.has(OWNER_ACCOUNT)).toBe(false);
+    expect(keychain.items.has(OWNER_PASSKEY_ACCOUNT)).toBe(false);
+    expect(await readUnsavedMarker(t.home)).toBeUndefined();
+    expect(await engine.firstRunHold()).toBe('finish_restore');
+  });
+});
