@@ -187,6 +187,25 @@ describe('Activity page (WP-A2)', () => {
     ]);
   });
 
+  // R1-SEC-03 (04 §3.6; 11 §6 "Invite answered twice"; D-146 words): a warning row naming the
+  // contact the invite connected, from the people read only.
+  it('warns when someone else also answered an invite', async () => {
+    await mount(
+      apiWith(async () =>
+        ok({
+          items: [
+            { kind: 'invite_answered_twice', at: AT + 2, contactId: MARKO },
+            { kind: 'invite_answered_twice', at: AT + 1, contactId: GONE },
+          ],
+        }),
+      ),
+    );
+    expect(rows().map(sentenceOf)).toEqual([
+      'Someone else also answered your invite. Compare the 12 digits with Marko Novak before you trust this contact.',
+      'Someone else also answered your invite. Do the Contact check before you trust this contact.',
+    ]);
+  });
+
   it('has no "—" cell and no empty sentence or grey line in any row', async () => {
     await mount(apiWith(async () => ok({ items: ALL_KINDS })));
     expect(text()).not.toContain('—');

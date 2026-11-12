@@ -23,6 +23,26 @@ describe('restrictName (06 §2.1)', () => {
     expect(restrictName(input, FP)).toBe(expected);
   });
 
+  // R1-SEC-12: the tighter checks never touch an ordinary name, in any script.
+  it.each([
+    'Youssef',
+    'Mei',
+    'Samuel',
+    'Ai Weiwei',
+    'Yousra Mehmedović',
+    'Ivan Iliev',
+    'Наташа',
+    'Αλέξανδρος',
+    'Ольга Петровна',
+    '山田 Taro',
+    'محمد',
+    'Marko 1',
+    'Contacts Ltd',
+    'Agent Smith',
+  ])('%j stays as it is', (input) => {
+    expect(restrictName(input, FP)).toBe(input);
+  });
+
   it('caps the result at 32 code points', () => {
     const out = restrictName('x'.repeat(200), FP);
     expect([...out]).toHaveLength(32);
@@ -48,6 +68,26 @@ describe('restrictName (06 §2.1)', () => {
     ['Checked', 'reserved word: checked'],
     ['Approved', 'reserved word: approved'],
     ['Registered', 'reserved word: registered'],
+    // R1-SEC-12: role words the tools use for themselves, as the whole name.
+    ['you', 'role word: you'],
+    ['You', 'role word: You'],
+    ['me', 'role word: me'],
+    ['User', 'role word: user'],
+    ['the user', 'role word: the user'],
+    ['Assistant', 'role word: assistant'],
+    ['unknown sender', 'role word: unknown sender'],
+    ['a contact', 'role word: a contact'],
+    ['Contact', 'the fallback word alone'],
+    ['Contact 7F3A-19C2', 'reads as another contact fallback'],
+    ['contact 7f3a 19c2', 'fallback form, other case and separators'],
+    // R1-SEC-12: same-script look-alikes of reserved words.
+    ['AgentIink', 'look-alike: capital I for l'],
+    ['Agent1ink', 'look-alike: digit 1 for l'],
+    ['0wner', 'look-alike: digit 0 for o'],
+    ['The 0WNER', 'look-alike in capitals'],
+    ['Syst3m', 'look-alike: digit 3 for e'],
+    ['ѕуѕтем', 'whole-script Cyrillic look-alike of a reserved word'],
+    ['Y0U', 'role word written with a look-alike digit'],
   ])('%j falls back (%s)', (input) => {
     expect(restrictName(input, FP)).toBe(FALLBACK);
   });
