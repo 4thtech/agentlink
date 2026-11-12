@@ -391,6 +391,10 @@ export const TABLES = {
       started_at: int,
       beat_until: int,
       last_tool_at: opt('int'),
+      // WP-13 (F45; schema version 13): the AgentLink version the process runs (x.y.z, optional
+      // short prerelease), so the app can say "Restart {app} to use the new version". Null on a row
+      // written by a process from before version 13. Status only, like the rest of the row.
+      version: opt('text'),
     },
     primaryKey: ['session_id'],
   },

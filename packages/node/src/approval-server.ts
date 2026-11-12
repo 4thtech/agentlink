@@ -5082,6 +5082,8 @@ export async function startApprovalServerWith(
           detected,
           // W4-PAUSE (08 §1 "Per agent state"): `paused` wins over every live state.
           paused: stats?.paused === true,
+          // WP-13 (F45): a live session older than this app marks its AI app `outdated`.
+          ...(options.host?.version === undefined ? {} : { currentVersion: options.host.version }),
         },
         at,
       );

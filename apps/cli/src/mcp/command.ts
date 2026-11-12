@@ -42,6 +42,7 @@ import {
   type OpenAgentResult,
   type OpenedAgent,
 } from '../runtime/index.js';
+import { cliVersion } from '../runtime/cli-version.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
 import { ownerKnownAbsent } from '../runtime/owner-on-machine.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '@4thtech-io/mcp-tools';
@@ -232,8 +233,14 @@ export function stdioTransport(io?: StdioSource): Transport {
  * row as `agentlink mcp`; without it no row is written and the app shows the AI app Not running.
  */
 export const processHeartbeat: NonNullable<McpCommandDeps['heartbeat']> = Object.freeze({
+  // WP-13 (F45): the row carries the version this process runs, so the app can say "Restart {app}
+  // to use the new version" after an update.
   session: (agent: OpenedAgent) =>
-    agent.client.mcpSession({ pid: process.pid, pidAlive: (pid: number) => pidAlive(pid) }),
+    agent.client.mcpSession({
+      pid: process.pid,
+      pidAlive: (pid: number) => pidAlive(pid),
+      version: cliVersion(),
+    }),
 });
 
 export const mcpCommand = (version: string): CommandHandler => {

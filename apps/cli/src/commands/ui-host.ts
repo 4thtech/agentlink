@@ -46,6 +46,7 @@ import type {
 } from '@4thtech-io/node';
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import { newAgentFirstCard } from '../mcp/local-ui-wiring.js';
+import { cliVersion } from '../runtime/cli-version.js';
 import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
 
 /** The per-agent part of the local UI options: everything but the app's files. */
@@ -197,6 +198,8 @@ export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServ
       ...(deps.handoff === undefined ? {} : { handoff: deps.handoff }),
       // U3-g-c: Welcome's "Pick your AI app" (GET /api/ui/apps) with no agent yet.
       ...(aiAppsList === undefined ? {} : { aiAppsList }),
+      // WP-13 (F45): this app's version, for the "Restart {app} to use the new version" hint.
+      version: cliVersion(),
     },
     ...(deps.onEvent === undefined ? {} : { onEvent: deps.onEvent }),
   });

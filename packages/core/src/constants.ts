@@ -11,11 +11,11 @@
  * Version 9 (W4-RENAME-REACHES-CONTACTS, D-141) adds the contacts former-name columns (07 §3).
  * Version 10 (W4-LIVE-STATUS, D-143) adds `mcp_sessions` and `mcp_last_seen` (07 §3.2). Version 11
  * (W4-AUTO-SAVE, D-142) adds the `files.auto_*` columns, `auto_save_log` and `auto_save_state`.
- * Version 12 (W4-PAUSE, D-143 (5)) adds `agent_pause` (07 §3.2). An
- * older build refuses a newer store (`store_schema_newer`), so an upgrade
- * cannot be rolled back.
+ * Version 12 (W4-PAUSE, D-143 (5)) adds `agent_pause` (07 §3.2). Version 13 (WP-13, F45) adds
+ * `mcp_sessions.version` (07 §3.2). An older build refuses a newer store (`store_schema_newer`) when
+ * it opens it, so an upgrade cannot be rolled back.
  */
-export const STORE_SCHEMA_VERSION = 12;
+export const STORE_SCHEMA_VERSION = 13;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;
