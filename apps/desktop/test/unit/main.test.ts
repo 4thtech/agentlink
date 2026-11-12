@@ -224,7 +224,9 @@ describe('runShell startup', () => {
   it('keeps the core’s stderr, redacted, in core.log; Open log folder opens that folder', async () => {
     const { electron, children, proc } = setup();
     await runShell(electron, proc);
-    children[0]?.stderr.push(`Error: something broke at http://localhost:4567/?t=${'Z'.repeat(43)}\n`);
+    children[0]?.stderr.push(
+      `Error: something broke at http://localhost:4567/?t=${'Z'.repeat(43)}\n`,
+    );
     children[0]?.exit(1);
     const text = readFileSync(join(proc.logDir, CORE_LOG_FILE), 'utf8');
     expect(text).toContain('Error: something broke at [link removed]');

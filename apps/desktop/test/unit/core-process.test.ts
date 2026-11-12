@@ -62,7 +62,8 @@ function setup(env: Record<string, string> = { HOME: '/Users/x', PATH: '/usr/bin
 /** Lets every quick start of the series fail, until the supervisor gives up. */
 function failAll(
   ctx: ReturnType<typeof setup>,
-  each: (child: NonNullable<ReturnType<typeof setup>['children'][number]>) => void = () => undefined,
+  each: (child: NonNullable<ReturnType<typeof setup>['children'][number]>) => void = () =>
+    undefined,
 ): void {
   ctx.supervisor.start();
   for (let i = 0; i < MAX_FAST_FAILURES; i += 1) {
@@ -353,9 +354,7 @@ describe('CoreSupervisor', () => {
 
   it('failureKind: "port" when the last core said its port was taken', () => {
     const ctx = setup();
-    failAll(ctx, (child) =>
-      child.stream.push('{"v":1,"type":"stopped","reason":"port"}\n'),
-    );
+    failAll(ctx, (child) => child.stream.push('{"v":1,"type":"stopped","reason":"port"}\n'));
     expect(ctx.supervisor.failureKind).toBe('port');
   });
 

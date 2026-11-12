@@ -3,8 +3,9 @@
 // when it dies, and stops it on quit (shutdown message, then a kill after a grace period).
 //
 // - argv: exactly [<bundled node>, <host script>]. No Node options, ever.
-// - stdio: [ignore, ignore, ignore, pipe]. The core's stdout/stderr are not read or kept, so nothing
-//   it prints can reach a shell log; the session link travels only on fd 3.
+// - stdio: [ignore, ignore, pipe, pipe]. stdout is ignored; the session link travels only on fd 3.
+//   stderr is read and handed to `onStderr` (core-log.ts redacts it and keeps the last lines in
+//   memory and in a 0600 log file), so a core that dies before `ready` leaves a trace.
 // - env: built from an allowlist (home, temp, locale, PATH and the OS basics). NODE_OPTIONS, NODE_*,
 //   ELECTRON_*, AGENTLINK_* secrets (passphrases, owner codes) and everything else are dropped.
 // - A protocol violation closes the pipe and stops that core; the supervisor starts a new one with
@@ -12,13 +13,26 @@
 // - A core that says `stopped` with a start-failure reason (no owner, keychain, port, …) is not
 //   restarted: a restart cannot fix it. The state goes to "failed" with that reason
 //   (`failureReason`), and the shell shows a fixed message for it (D2 open question 4).
+// - `failureKind` says why the state is "failed": that start-failure reason; `port` when the last
+//   core said its port was taken; `exited` when no core of the series reached `ready` (including a
+//   core that could not be spawned); `retries` when a core had been ready but kept stopping.
 import {
   isStartFailure,
   type CoreMessage,
   type ShellMessage,
   type StartFailureReason,
+  type StopReason,
 } from '../shared/protocol.js';
 import { PipeClient, type PipeStream, type PipeViolation } from './pipe.js';
+
+/** The AI app markers (same list as apps/cli/src/runtime/guards.ts HARNESS_MARKERS). */
+export const AI_APP_MARKERS: readonly string[] = Object.freeze([
+  'CLAUDECODE',
+  'CLAUDE_CODE_ENTRYPOINT',
+  'CODEX_SANDBOX',
+  'CODEX_SANDBOX_NETWORK_DISABLED',
+  'GEMINI_CLI',
+]);
 
 /** Environment variables passed to the core (exact names; case-insensitive match on Windows). */
 export const CORE_ENV_ALLOWLIST: readonly string[] = [
@@ -58,12 +72,23 @@ export const CORE_ENV_ALLOWLIST: readonly string[] = [
   'WAYLAND_DISPLAY',
   // AI app markers (apps/cli/src/runtime/guards.ts HARNESS_MARKERS). Passed through so the core's
   // guard against an AI starting the owner pages (G-1) still sees an app launched from an AI app.
-  'CLAUDECODE',
-  'CLAUDE_CODE_ENTRYPOINT',
-  'CODEX_SANDBOX',
-  'CODEX_SANDBOX_NETWORK_DISABLED',
-  'GEMINI_CLI',
+  ...AI_APP_MARKERS,
 ];
+
+/**
+ * True when an AI app marker is set to a non-empty value (names match case-insensitively on
+ * Windows). The core refuses to start then (G-1); the shell uses this only to show a clear page.
+ */
+export function aiAppMarkerSet(
+  env: Readonly<Record<string, string | undefined>>,
+  platform: string,
+): boolean {
+  const markers = new Set(AI_APP_MARKERS);
+  return Object.entries(env).some(([name, value]) => {
+    const key = platform === 'win32' ? name.toUpperCase() : name;
+    return markers.has(key) && value !== undefined && value !== '';
+  });
+}
 
 /** Backoff between restarts: 1 s, 2 s, 4 s … capped at 30 s. */
 export const BACKOFF_BASE_MS = 1_000;
@@ -103,7 +128,7 @@ export interface CoreChild {
 
 export interface SpawnOptions {
   readonly env: Record<string, string>;
-  readonly stdio: readonly ['ignore', 'ignore', 'ignore', 'pipe'];
+  readonly stdio: readonly ['ignore', 'ignore', 'pipe', 'pipe'];
   readonly windowsHide: true;
   readonly shell: false;
   readonly detached: false;
@@ -140,7 +165,22 @@ export interface CoreSupervisorOptions {
   readonly onStart?: () => void;
   readonly onViolation?: (violation: PipeViolation) => void;
   readonly onStateChange?: (state: SupervisorState) => void;
+  /** A chunk of the core's stderr (core-log.ts redacts it; it goes nowhere else). */
+  readonly onStderr?: (chunk: Uint8Array) => void;
+  /** A core process exited (also after a spawn error: code and signal null). */
+  readonly onExit?: (code: number | null, signal: string | null) => void;
 }
+
+/** Why the supervisor is in "failed". */
+export type CoreFailureKind = StartFailureReason | 'port' | 'retries' | 'exited';
+
+interface ReadableLike {
+  on(event: 'data', listener: (chunk: Uint8Array | string) => void): unknown;
+  on(event: 'error', listener: (error: unknown) => void): unknown;
+}
+
+const isReadable = (value: unknown): value is ReadableLike =>
+  typeof value === 'object' && value !== null && typeof (value as ReadableLike).on === 'function';
 
 const isAbsolute = (path: string): boolean => path.startsWith('/') || /^[A-Za-z]:\\/.test(path);
 
@@ -160,6 +200,12 @@ export class CoreSupervisor {
   #failures = 0;
   #restartTimer: unknown = null;
   #startFailure: StartFailureReason | null = null;
+  /** The last `stopped` reason of the current core. */
+  #lastStop: StopReason | null = null;
+  /** True when a core of the current failure series sent a valid `ready`. */
+  #seriesReady = false;
+  /** True when the current core sent a valid `ready`. */
+  #runReady = false;
   #stopWaiters: Array<() => void> = [];
 
   constructor(options: CoreSupervisorOptions) {
@@ -178,6 +224,14 @@ export class CoreSupervisor {
     return this.#state === 'failed' ? this.#startFailure : null;
   }
 
+  /** Why the state is "failed" (see the header); null in any other state. */
+  get failureKind(): CoreFailureKind | null {
+    if (this.#state !== 'failed') return null;
+    if (this.#startFailure !== null) return this.#startFailure;
+    if (this.#lastStop === 'port') return 'port';
+    return this.#seriesReady ? 'retries' : 'exited';
+  }
+
   #setState(state: SupervisorState): void {
     this.#state = state;
     this.#options.onStateChange?.(state);
@@ -187,26 +241,44 @@ export class CoreSupervisor {
     if (this.#state !== 'idle' && this.#state !== 'waiting') return;
     this.#restartTimer = null;
     this.#startFailure = null;
+    this.#lastStop = null;
+    this.#runReady = false;
     const o = this.#options;
     this.#startedAt = o.timers.now();
     let child: CoreChild;
     try {
       child = o.spawn(o.nodePath, [o.hostScript], {
         env: cleanCoreEnv(o.env, o.platform),
-        stdio: ['ignore', 'ignore', 'ignore', 'pipe'],
+        stdio: ['ignore', 'ignore', 'pipe', 'pipe'],
         windowsHide: true,
         shell: false,
         detached: false,
         cwd: o.cwd,
       });
     } catch {
+      o.onExit?.(null, null);
       this.#onExit();
       return;
     }
     this.#child = child;
     this.#setState('running');
-    child.on('error', () => this.#onExit(child));
-    child.on('exit', () => this.#onExit(child));
+    let exited = false;
+    const exitOnce = (code: number | null, signal: string | null): void => {
+      if (exited) return;
+      exited = true;
+      o.onExit?.(code, signal);
+      this.#onExit(child);
+    };
+    child.on('error', () => exitOnce(null, null));
+    child.on('exit', (code, signal) => exitOnce(code, signal));
+    const stderr = child.stdio[2];
+    if (isReadable(stderr)) {
+      stderr.on('data', (chunk) => {
+        if (o.onStderr === undefined) return;
+        o.onStderr(typeof chunk === 'string' ? new TextEncoder().encode(chunk) : chunk);
+      });
+      stderr.on('error', () => undefined);
+    }
     const stream = child.stdio[3];
     if (!isPipeStream(stream)) {
       child.kill('SIGKILL');
@@ -221,8 +293,13 @@ export class CoreSupervisor {
     this.#pipe = new PipeClient(stream, {
       onMessage: (message) => {
         if (this.#child !== child || this.#state !== 'running') return;
-        if (message.type === 'stopped' && isStartFailure(message.reason)) {
-          this.#startFailure = message.reason;
+        if (message.type === 'stopped') {
+          this.#lastStop = message.reason;
+          if (isStartFailure(message.reason)) this.#startFailure = message.reason;
+        }
+        if (message.type === 'ready') {
+          this.#runReady = true;
+          this.#seriesReady = true;
         }
         o.onMessage(message);
       },
@@ -261,7 +338,13 @@ export class CoreSupervisor {
       return;
     }
     const ranFor = o.timers.now() - this.#startedAt;
-    this.#failures = ranFor >= STABLE_RUN_MS ? 1 : this.#failures + 1;
+    if (ranFor >= STABLE_RUN_MS) {
+      // A new series: only what happens from here on counts for failureKind.
+      this.#failures = 1;
+      this.#seriesReady = this.#runReady;
+    } else {
+      this.#failures += 1;
+    }
     if (this.#failures >= MAX_FAST_FAILURES) {
       this.#setState('failed');
       return;
@@ -275,6 +358,7 @@ export class CoreSupervisor {
   retry(): void {
     if (this.#state !== 'failed') return;
     this.#failures = 0;
+    this.#seriesReady = false;
     this.#setState('idle');
     this.start();
   }

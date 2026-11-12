@@ -1,8 +1,18 @@
 // The minimal tray (src/main/tray.ts) and the main window (src/main/window.ts).
 import { describe, expect, it } from 'vitest';
-import { AppTray, BUILTIN_TRAY_PNG, TRAY_COPY, trayImage, trayTooltip } from '../../src/main/tray.js';
+import {
+  AppTray,
+  BUILTIN_TRAY_PNG,
+  TRAY_COPY,
+  trayImage,
+  trayTooltip,
+} from '../../src/main/tray.js';
 import { OriginLock } from '../../src/main/security.js';
-import { STATUS_ACTION_URLS, statusPageUrl, type StatusAction } from '../../src/main/status-page.js';
+import {
+  STATUS_ACTION_URLS,
+  statusPageUrl,
+  type StatusAction,
+} from '../../src/main/status-page.js';
 import { MainWindow } from '../../src/main/window.js';
 import {
   FakeBrowserWindow,
@@ -85,7 +95,11 @@ describe('trayImage', () => {
   it('a tray is created with the image', () => {
     const electron = fakeElectron();
     const image = trayImage(electron.nativeImage, '/missing.png', 'darwin');
-    new AppTray(electron, image, { open: () => undefined, retry: () => undefined, quit: () => undefined });
+    new AppTray(electron, image, {
+      open: () => undefined,
+      retry: () => undefined,
+      quit: () => undefined,
+    });
     expect(FakeTray.created[0]?.icon).toBe(image);
   });
 });

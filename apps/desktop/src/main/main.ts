@@ -8,7 +8,11 @@
 // 3. When ready: a packaged app refuses a translocated / read-only / temporary location (move.ts);
 //    the in-memory window session is hardened (security.ts); every webContents ever created is
 //    locked; the core desktop host starts under the supervisor (core-process.ts) with a clean env.
-// 4. The window loads only a session link the core sent over fd 3 (`ready`), on the locked origin.
+// 4. The window opens AT ONCE with the fixed local status page ("Starting AgentLink…",
+//    status-page.ts) and loads only a session link the core sent over fd 3 (`ready`), on the locked
+//    origin. When the core cannot start, the window shows a fixed page for the reason with Try again
+//    and Open log folder. The core's stderr is kept, redacted, in a capped ring and a 0600 log file
+//    (core-log.ts). The tray always exists (built-in image when the icon file is missing).
 // 5. Quit sends `shutdown`, waits for the core (kill after the grace period), then exits.
 //
 // Preview mode (owner-feedback loop, dev builds only): `__AGENTLINK_DESKTOP_PREVIEW__` is a
@@ -22,11 +26,11 @@ import { accessSync, constants as fsConstants, existsSync } from 'node:fs';
 import { spawn as nodeSpawn } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CoreSupervisor, type SpawnFn, type Timers } from './core-process.js';
+import { CoreLog, logDir } from './core-log.js';
+import { CoreSupervisor, aiAppMarkerSet, type SpawnFn, type Timers } from './core-process.js';
 import { INVITE_RESULT_TITLE, inviteResultCopy, toInviteLink } from './deep-link.js';
 import type { ElectronModule } from './electron-api.js';
 import { ensureGoodLocation } from './move.js';
-import { showStartFailure } from './start-failure.js';
 import RESOURCE_LAYOUT from '../shared/resource-layout.json' with { type: 'json' };
 import { OriginLock, WINDOW_PARTITION, hardenSession, lockWebContents } from './security.js';
 import {
@@ -36,7 +40,8 @@ import {
   commandLineIsClean,
   forwardedDeepLink,
 } from './switches.js';
-import { AppTray } from './tray.js';
+import type { StatusAction } from './status-page.js';
+import { AppTray, trayImage } from './tray.js';
 import { MainWindow } from './window.js';
 import type { InviteOutcome } from '../shared/protocol.js';
 
@@ -121,6 +126,8 @@ export interface ShellProcess {
    * argument → the canonical invite link, or null to ignore it. Absent → nothing is accepted.
    */
   readonly toInviteLink?: (deepLink: string) => string | null;
+  /** The per-user folder for core.log (core-log.ts logDir). */
+  readonly logDir: string;
 }
 
 export type ShellOutcome = 'refused' | 'second-instance' | 'location' | 'running';
@@ -201,7 +208,8 @@ export async function runShell(
       });
   };
   const showWindow = (): void => {
-    if (window?.loaded === true && window.show()) return;
+    const shown = window?.show() === true;
+    if (shown && window?.loaded === true) return;
     supervisor?.send({ v: 1, type: 'show', route: 'home' });
   };
 
@@ -262,13 +270,19 @@ export async function runShell(
   const windowSession = electron.session.fromPartition(WINDOW_PARTITION, { cache: false });
   await hardenSession(windowSession, lock, proc.platform);
 
+  const coreLog = new CoreLog({ dir: proc.logDir });
+  // Set below, once the supervisor and the checks exist.
+  let onStatusAction: (action: StatusAction) => void = () => undefined;
   window = new MainWindow({
     BrowserWindow: electron.BrowserWindow,
     shell: electron.shell,
     lock,
     platform: proc.platform,
     quitting: () => quitting,
+    onStatusAction: (action) => onStatusAction(action),
   });
+  // The window comes up at once: the person sees AgentLink starting, never nothing.
+  window.showStatus('starting');
 
   const paths = resourcePaths(proc.resourcesPath, proc.platform);
   let nodePath = paths.node;
@@ -279,13 +293,13 @@ export async function runShell(
     hostScript = preview.hostScript ?? hostScript;
   }
 
-  if (proc.exists(paths.trayIcon)) {
-    tray = new AppTray(electron, paths.trayIcon, {
-      open: showWindow,
-      retry: () => supervisor?.retry(),
-      quit: () => app.quit(),
-    });
-  }
+  // Always a tray (the only way back after the window is closed): built-in image as a fallback.
+  const icon = proc.exists(paths.trayIcon) ? paths.trayIcon : '';
+  tray = new AppTray(electron, trayImage(electron.nativeImage, icon, proc.platform), {
+    open: showWindow,
+    retry: () => tryAgain(),
+    quit: () => app.quit(),
+  });
 
   let approvals = 0;
   supervisor = new CoreSupervisor({
@@ -296,7 +310,19 @@ export async function runShell(
     platform: proc.platform,
     spawn: proc.spawn,
     timers: proc.timers,
-    onStart: () => window?.resetForNewCore(),
+    onStart: () => {
+      coreLog.note('core started');
+      window?.resetForNewCore();
+      // The old page's server is gone: show the starting page until the new core is ready.
+      if (window?.page === 'session') window.showStatus('starting');
+    },
+    onStderr: (chunk) => coreLog.write(chunk),
+    onExit: (code, signal) => {
+      coreLog.flush();
+      const how =
+        signal !== null ? `signal ${signal.replace(/[^A-Z0-9]/g, '')}` : `code ${String(code)}`;
+      coreLog.note(`core exited (${how})`);
+    },
     onMessage: (message) => {
       switch (message.type) {
         case 'ready':
@@ -328,12 +354,45 @@ export async function runShell(
     onStateChange: (state) => {
       if (state !== 'failed') return;
       tray?.update('failed', approvals);
-      const reason = supervisor?.failureReason ?? null;
-      if (reason === null || quitting) return;
-      void showStartFailure(electron.dialog, reason);
+      if (quitting) return;
+      window?.showStatus(supervisor?.failureKind ?? 'exited');
     },
   });
-  supervisor.start();
+
+  /** The checks the shell can make itself before starting the core (fixed pages, no core). */
+  const precheck = (): 'ai_app' | 'missing_files' | null => {
+    // A UX check only: the core keeps its own guard (G-1) and refuses on its own.
+    if (aiAppMarkerSet(proc.env, proc.platform)) return 'ai_app';
+    if (!proc.exists(nodePath) || !proc.exists(hostScript)) return 'missing_files';
+    return null;
+  };
+  const startCore = (): void => {
+    const blocked = precheck();
+    if (blocked !== null) {
+      tray?.update('failed', approvals);
+      window?.showStatus(blocked);
+      return;
+    }
+    window?.showStatus('starting');
+    if (supervisor?.state === 'failed') supervisor.retry();
+    else supervisor?.start();
+  };
+  const tryAgain = (): void => {
+    if (quitting) return;
+    const state = supervisor?.state;
+    // Only when nothing is running (failed, or never started because of a check).
+    if (state === 'failed' || state === 'idle') startCore();
+  };
+  onStatusAction = (action) => {
+    if (action === 'try-again') {
+      tryAgain();
+      return;
+    }
+    // Open log folder: create it first, so the file manager opens something.
+    coreLog.ensureDir();
+    void electron.shell.openPath(proc.logDir).catch(() => undefined);
+  };
+  startCore();
   if (launch.deepLink !== null) handleDeepLink(launch.deepLink);
   return 'running';
 }
@@ -368,5 +427,6 @@ export function realProcess(): ShellProcess {
     },
     preview: readPreview(proc.env),
     toInviteLink,
+    logDir: logDir(proc.platform, homedir(), proc.env),
   };
 }

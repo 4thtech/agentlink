@@ -52,8 +52,12 @@ describe('status page', () => {
       expect(isStatusPageUrl(url)).toBe(true);
       const html = decode(url);
       expect(html).toBe(statusPageHtml(kind));
-      expect(html).toContain(`<meta http-equiv="Content-Security-Policy" content="${STATUS_PAGE_CSP}">`);
-      expect(html.toLowerCase()).not.toMatch(/<script|<form|<iframe|<object|<embed|<link|src=|https:/);
+      expect(html).toContain(
+        `<meta http-equiv="Content-Security-Policy" content="${STATUS_PAGE_CSP}">`,
+      );
+      expect(html.toLowerCase()).not.toMatch(
+        /<script|<form|<iframe|<object|<embed|<link|src=|https:/,
+      );
       expect(html).toContain(STATUS_COPY[kind].heading.replace(/'/g, '&#39;'));
     }
     expect(STATUS_PAGE_CSP).toContain("default-src 'none'");
