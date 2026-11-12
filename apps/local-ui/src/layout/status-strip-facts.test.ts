@@ -43,4 +43,38 @@ describe('serverFacts', () => {
     );
     expect(JSON.stringify(facts)).not.toMatch(/Users|wss/);
   });
+
+  it('shows the data folder (home as ~) and the uptime when the server answers them', () => {
+    const facts = serverFacts(
+      ok({
+        agent: 'running',
+        version: '0.5.1',
+        relays: null,
+        lastSyncAt: null,
+        dataFolder: '~/.agentlink',
+        uptimeSeconds: 3_725,
+      }),
+      '48123',
+    );
+    expect(facts.map((f) => [f.label, f.value])).toEqual([
+      ['Version', '0.5.1'],
+      ['Port', '48123'],
+      ['Data folder', '~/.agentlink'],
+      ['Uptime', '1 h 2 min'],
+    ]);
+    const short = serverFacts(ok({ agent: 'running', uptimeSeconds: 42 }), '');
+    expect(short).toEqual([{ label: 'Uptime', value: 'Under a minute' }]);
+    const days = serverFacts(ok({ agent: 'running', uptimeSeconds: 2 * 86_400 + 3_600 }), '');
+    expect(days).toEqual([{ label: 'Uptime', value: '2 d 1 h' }]);
+  });
+
+  it('never shows an absolute data folder or a malformed uptime', () => {
+    for (const dataFolder of ['/Users/alice/.agentlink', 'C:\\Users\\alice', '~/a\nb', 42, '']) {
+      const facts = serverFacts(ok({ agent: 'running', dataFolder }), '');
+      expect(facts).toEqual([]);
+    }
+    for (const uptimeSeconds of [-1, 1.5, '60', Number.NaN, null]) {
+      expect(serverFacts(ok({ agent: 'running', uptimeSeconds }), '')).toEqual([]);
+    }
+  });
 });
