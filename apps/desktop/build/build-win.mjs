@@ -35,6 +35,7 @@ const args = parseArgs(process.argv.slice(2), {
   version: 'v',
   out: 'v',
   'dist-dir': 'v',
+  updates: 'v',
   'nsi-only': 'flag',
   helper: 'v',
 });
@@ -67,8 +68,11 @@ const payload = buildPayload({
 const asarPath = join(dir, 'resources', 'app.asar');
 await packAsar(payload.dir, asarPath);
 await assertNoPreviewString(asarPath);
-if ((await assertPinnedRootKey(asarPath)) === 'owner-local') {
+const rootKeyMode = await assertPinnedRootKey(asarPath, process.env, args.updates ?? 'on');
+if (rootKeyMode === 'owner-local') {
   console.log('NOTE: owner-local build without a pinned update root key. Never give it to anyone.');
+} else if (rootKeyMode === 'updates-off') {
+  console.log('NOTE: release build with updates off (no update root key in the app).');
 }
 const integrity = await asarIntegrity(asarPath);
 

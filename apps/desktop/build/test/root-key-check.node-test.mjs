@@ -82,9 +82,7 @@ test('the owner-local exception never applies in CI', () => {
 // root-key.updates-off.json (no key, the updates-off mark) instead of the placeholder, so the app's
 // updater is not configured and never fetches. Allowed in CI; no owner-local flag involved.
 const OFF_JSON = readFileSync(`${DESKTOP}/src/main/updater/root-key.updates-off.json`, 'utf8');
-const offAsar = [
-  { path: 'dist/main/entry.js', content: Buffer.from(`var r=${OFF_JSON.trim()};`) },
-];
+const offAsar = [{ path: 'dist/main/entry.js', content: Buffer.from(`var r=${OFF_JSON.trim()};`) }];
 
 test('the updates-off root holds the mark, no key and no placeholder', () => {
   assert.ok(OFF_JSON.includes(UPDATES_OFF_MARK));
@@ -146,7 +144,10 @@ test('the release bundle swaps in the updates-off root only when asked', async (
         },
       ),
     );
-  assert.match(JSON.stringify(probe({ AGENTLINK_DESKTOP_UPDATES: 'off' })), /root-key\.updates-off\.json/);
+  assert.match(
+    JSON.stringify(probe({ AGENTLINK_DESKTOP_UPDATES: 'off' })),
+    /root-key\.updates-off\.json/,
+  );
   assert.doesNotMatch(JSON.stringify(probe({})), /updates-off/);
   assert.throws(() => probe({ AGENTLINK_DESKTOP_UPDATES: 'maybe' }));
 });

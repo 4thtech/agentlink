@@ -122,11 +122,12 @@ async function asarFiles(asarPath) {
  * WP-D10 (Decision 5): the release build carries the owner's real offline root key, never the
  * placeholder (lib/root-key-check.mjs). Returns 'pinned', or 'owner-local' for an owner-only build.
  */
-export async function assertPinnedRootKey(asarPath, env = process.env) {
+export async function assertPinnedRootKey(asarPath, env = process.env, updates = 'on') {
   return assertRootKeyPinned({
     rootKeyJson: readRootKeyJson(DESKTOP_DIR),
     files: await asarFiles(asarPath),
     env,
+    updates,
   });
 }
 

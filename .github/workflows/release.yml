@@ -100,6 +100,12 @@
 #                   provenance and attaches them to the GitHub Release v<version>. Environment
 #                   `desktop-sign` (it holds the key; no reviewer, main only, OPS-UNSTICK-B): it runs
 #                   only after the approved publish-latest, so the release needs no second click.
+#   desktop-app-build    (WP-D11) calls desktop.yml for the published CLI version: the AgentLink app
+#                   for macOS arm64 + x64 (DMG, zip) and Windows x64 (NSIS installer, zip), unsigned,
+#                   updates off until the key ceremony; checks, smoke test, provenance attestation.
+#   desktop-app-release  after a green smoke-latest: checks the names and SHA256SUMS and attaches
+#                   them to the GitHub Release v<version> (AgentLink-<version>-mac-{arm64,x64}.dmg,
+#                   ...-win-x64-setup.exe). No environment and no secret; DEPLOY_FREEZE stops it.
 #
 # RELEASE APP (OPS-UNSTICK-B)
 #   The `version` job opens the "Version packages" PR with an installation token of the release GitHub
@@ -1800,6 +1806,90 @@ jobs:
           fi
           gh release upload "v$VERSION" --repo "$REPOSITORY" --clobber -- *.mcpb SHA256SUMS
           echo "Attached $(ls -- *.mcpb | wc -l) desktop extension bundles and SHA256SUMS to v$VERSION."
+
+  # ---------------------------------------------------------------------------
+  # WP-D11 (DESK051-C4): the AgentLink desktop app for the npm version just published. desktop.yml
+  # builds it on macOS (arm64, x64) and Windows x64, runs the hardening checks and the smoke test on
+  # the built binaries and attests build provenance. UNSIGNED (signing stays off, D-91 is the
+  # owner's) and with updates OFF until the offline key ceremony (no update root key in the app, so
+  # it never checks for updates; desktop.yml header). No secret is passed or referenced.
+  desktop-app-build:
+    name: desktop-app-build
+    needs: [publish-latest, desktop-extension-build]
+    if: needs.desktop-extension-build.result == 'success' && needs.desktop-extension-build.outputs.version != ''
+    permissions:
+      contents: read
+      id-token: write # desktop.yml `attest`: build provenance attestation (Sigstore OIDC)
+      attestations: write # desktop.yml `attest`: store the attestation
+    uses: ./.github/workflows/desktop.yml
+    with:
+      version: ${{ needs.desktop-extension-build.outputs.version }}
+      updates: "off"
+
+  # Attaches the app to the GitHub Release v<version> after a green smoke test, under the exact names
+  # the invite page links to (releases/download/v<version>/AgentLink-<version>-mac-{arm64,x64}.dmg),
+  # plus the Windows installer and zips and SHA256SUMS-desktop-app.txt (the extension's SHA256SUMS
+  # stays its own). Every file is checked against the sums written by the build jobs first.
+  desktop-app-release:
+    name: desktop-app-release
+    needs: [publish-latest, smoke-latest, desktop-extension-build, desktop-app-build]
+    if: needs.smoke-latest.result == 'success' && needs.desktop-app-build.result == 'success' && needs.desktop-extension-build.outputs.version != '' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: release-desktop-app
+      cancel-in-progress: false
+    permissions:
+      contents: write # attach the app to the GitHub Release v<version>
+    steps:
+      - name: Stop if DEPLOY_FREEZE is set
+        shell: bash
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
+            echo "::error::DEPLOY_FREEZE is set; nothing is published until the owner clears it."
+            exit 1
+          fi
+
+      - name: Download the app builds
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-app-*
+          path: ${{ runner.temp }}/desktop-app
+          merge-multiple: true
+
+      - name: Check the names and the sums
+        shell: bash
+        working-directory: ${{ runner.temp }}/desktop-app
+        env:
+          VERSION: ${{ needs.desktop-extension-build.outputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
+          for f in "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-win-x64-setup.exe"; do
+            [ -f "$f" ] || { echo "::error::$f is missing."; exit 1; }
+          done
+          mv SHA256SUMS SHA256SUMS-desktop-app.txt
+          sha256sum --check --strict SHA256SUMS-desktop-app.txt
+          cat SHA256SUMS-desktop-app.txt
+
+      - name: Attach the app to the GitHub Release
+        shell: bash
+        working-directory: ${{ runner.temp }}/desktop-app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ needs.desktop-extension-build.outputs.version }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1; then
+            echo "::warning::GitHub Release v$VERSION does not exist, so the desktop app was not attached. Owner: create the release (docs/process/versioning.md §6), then re-run this job."
+            exit 0
+          fi
+          gh release upload "v$VERSION" --repo "$REPOSITORY" --clobber -- *.dmg *.zip *-setup.exe SHA256SUMS-desktop-app.txt
+          echo "Attached the desktop app ($(ls -- *.dmg *-setup.exe | wc -l) installers) to v$VERSION."
 
   # One approval click: no unattended job can move `latest`.
   rollback-latest:

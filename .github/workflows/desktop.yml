@@ -5,7 +5,7 @@
 #
 # Triggers
 #   workflow_dispatch  a manual build (input `version`, default 0.0.0-dev).
-#   workflow_call      for release.yml's desktop jobs (WP-D11); input `version`.
+#   workflow_call      for release.yml's desktop-app jobs (WP-D11, DESK051-C4); inputs `version`, `updates`.
 #   pull_request       only for a change under apps/desktop/**, apps/cli/src/desktop/** or this file.
 #
 # Jobs (4, well inside the Free-plan cap of 20 concurrent jobs)
@@ -17,6 +17,12 @@
 #           (apps/desktop/test/smoke/smoke.mjs). The x64 macOS binaries are launched only when
 #           Rosetta runs on the runner. Uploads the artifacts with a per-platform SHA256SUMS.
 #   attest  not on pull requests: merges the sums into SHA256SUMS and attests build provenance.
+#
+# Updates (DESK051-C4): input `updates`, default "off" until the offline key ceremony. "off" bundles
+# the shell with AGENTLINK_DESKTOP_UPDATES=off (src/main/updater/root-key.updates-off.json: no key, so
+# the app's updater is not configured and never fetches) and builds with `--updates off`, which the
+# build accepts only when the ASAR has the updates-off mark and no root-key placeholder. "on" needs
+# the real pinned root key (build/lib/root-key-check.mjs). No owner-local flag is ever set here.
 #
 # Security posture (docs/foundation/04 section 7, docs/process/ci-cd.md): `permissions: {}` at the top,
 # `contents: read` for the build, the attestation permissions only in `attest`; every action pinned to
@@ -33,6 +39,11 @@ on:
         type: string
         required: false
         default: "0.0.0-dev"
+      updates:
+        description: "Update checks in the app: off (no update root key in the app) or on (needs the pinned root key)"
+        type: string
+        required: false
+        default: "off"
   workflow_dispatch:
     inputs:
       version:
@@ -40,6 +51,11 @@ on:
         type: string
         required: false
         default: "0.0.0-dev"
+      updates:
+        description: "Update checks in the app: off (no update root key in the app) or on (needs the pinned root key)"
+        type: string
+        required: false
+        default: "off"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
@@ -82,6 +98,7 @@ jobs:
             arch: x64
     env:
       VERSION: ${{ inputs.version || '0.0.0-dev' }}
+      UPDATES: ${{ inputs.updates || 'off' }}
       TARGET: ${{ matrix.target }}
       ARCH: ${{ matrix.arch }}
     steps:
@@ -95,6 +112,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::Unexpected version."; exit 1; }
+          [[ "$UPDATES" == "on" || "$UPDATES" == "off" ]] || { echo "::error::updates must be on or off."; exit 1; }
 
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
@@ -115,10 +133,11 @@ jobs:
           (cd apps/cli/dist/package && npm pack --pack-destination "$RUNNER_TEMP/pack")
           ls "$RUNNER_TEMP/pack"/*.tgz
 
-      # The release bundle of the shell: the preview constant is defined false (bundle.config.mjs).
+      # The release bundle of the shell: the preview constant is defined false (bundle.config.mjs);
+      # with updates off, the updates-off root replaces root-key.json.
       - name: Bundle the shell (release, no preview mode)
         shell: bash
-        run: pnpm --filter @4thtech-io/desktop run bundle
+        run: AGENTLINK_DESKTOP_UPDATES="$UPDATES" pnpm --filter @4thtech-io/desktop run bundle
 
       # The owner-presence helper (WP-D12b), built from source for this target and handed to the app
       # build with --helper. native.mjs takes --arch and --out (it has no --target).
@@ -149,7 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           tgz="$(ls "$RUNNER_TEMP"/pack/*.tgz)"
-          node apps/desktop/build/build-mac.mjs --arch "$ARCH" --tgz "$tgz" --version "$VERSION" --helper "$RUNNER_TEMP/native/AgentLink.app" --out apps/desktop/out
+          node apps/desktop/build/build-mac.mjs --arch "$ARCH" --tgz "$tgz" --version "$VERSION" --updates "$UPDATES" --helper "$RUNNER_TEMP/native/AgentLink.app" --out apps/desktop/out
 
       # windows-2022 ships NSIS; makensis is put on PATH for build-win.mjs.
       - name: Build the app (Windows)
@@ -160,7 +179,7 @@ jobs:
           tgz="$(ls "$RUNNER_TEMP"/pack/*.tgz)"
           echo "C:\\Program Files (x86)\\NSIS" >> "$GITHUB_PATH"
           export PATH="/c/Program Files (x86)/NSIS:$PATH"
-          node apps/desktop/build/build-win.mjs --tgz "$tgz" --version "$VERSION" --helper "$RUNNER_TEMP/native/agentlink-presence.exe" --out apps/desktop/out
+          node apps/desktop/build/build-win.mjs --tgz "$tgz" --version "$VERSION" --updates "$UPDATES" --helper "$RUNNER_TEMP/native/agentlink-presence.exe" --out apps/desktop/out
 
       # Where build-mac.mjs and build-win.mjs leave the unpacked app (apps/desktop/.cache/work-*).
       - name: Locate the built binary
@@ -236,7 +255,7 @@ jobs:
       - name: Upload the build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: desktop-${{ matrix.target }}
+          name: desktop-app-${{ matrix.target }}
           path: |
             apps/desktop/out/*.dmg
             apps/desktop/out/*.zip
@@ -260,7 +279,7 @@ jobs:
       - name: Download the builds
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: desktop-*
+          pattern: desktop-app-*
           path: ${{ runner.temp }}/desktop
           merge-multiple: true
 
@@ -286,7 +305,7 @@ jobs:
       - name: Upload the checked sums
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: desktop-sha256sums
+          name: desktop-app-sha256sums
           path: ${{ runner.temp }}/desktop/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
