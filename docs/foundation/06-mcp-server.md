@@ -56,7 +56,7 @@ Notation: `?` = optional. `Contact` = contact ID, display name or invite alias (
 | `agentlink_verify_proof_pack` | true | false | true | true | — | M1b |
 
 - `openWorldHint: true` means the tool reaches relays, the chain, storage or another party. `agentlink_create_invite` uploads the encrypted invite to the drop for a short link (D-139, 04 §3.6.2; changed with the W4-SHORT-INVITE build in this table and the code registry together), so its `openWorldHint` is `true`; the drop sees only ciphertext.
-- No tool is destructive: nothing is deleted through MCP (crypto-shredding runs in the core by policy, 04 §4).
+- No tool is destructive: nothing is deleted through MCP (crypto-shredding runs in the core by policy, 04 §4). Deleting local history is the owner's, in the app with presence or under the owner-signed `history.*` policy (04 §4.2, D-148). The AI may later *propose* a cleanup (OD-3, RET-7, not in 0.5.1): a future `agentlink_tidy` would take only a filter (older than N days, an optional contact, kinds), never IDs taken from inbound text, and always answer `pending_approval`, so the owner approves the exact list in the app. Adding it is a tool-surface change with its own spec PR and Fable review; until then the AI points the person to Settings › Storage.
 - `agentlink_inbox` is deliberately not read-only, so inbound text reaches the model only through a tool the harness does not auto-allow on its read-only hint. The session-start check (`agentlink_status`, §6.1) carries counts and contact names under the §2.1 name rule only.
 - No tool installs, changes or removes harness hooks or harness configuration; only `init` does, after the user confirms the diff (§7).
 
@@ -346,6 +346,9 @@ commitments:
   autoAcceptMaxUSD: "0"     # buy: auto-accept only when we pay a price > 0 and ≤ this, and only for allowlisted contacts
   autoAcceptDirection: buy  # buy (we pay, they deliver everything) | sell (they pay, we deliver everything); mixed terms always ask
   autoAcceptMinUSD: null    # sell: auto-accept only when they pay at least this; null (default) = sell never auto-accepts; setting it shows the sell warning
+history:                    # D-148, built in RET-6 for 0.5.2 (proposed, owner confirms at merge): local history retention, 04 §4.2; never set through MCP (I-4)
+  messagesKeepDays: 0       # 0 = keep forever (default) | 90 | 365 | 730
+  filesKeepDays: 90         # 0 = keep forever | 30 | 90 (default for a policy first created from 0.5.2 on) | 180 | 365; older saved files go to the OS Trash
 contactRules: []            # per-contact proof rules (G-32), at most 256; created by "Remember for this contact" on a proof approval, or in the rules editor
 ```
 
@@ -358,6 +361,7 @@ contactRules: []            # per-contact proof rules (G-32), at most 256; creat
 | Kind | Keys | JSON type and bounds |
 |---|---|---|
 | Enum | `contacts.acceptInvites` (`approval`, `auto`); `contacts.unknownSenders` (`queue`, `drop`); `files.storage` (`auto`, `drop`, `own`); `files.deleteAfter` (`expiry`, `receipt`); `proofs.notarize` and `commitments.accept` (each `allow`, `approval`, `deny`); `proofs.allowKeyDisclosure` (`approval`, `deny`: never `allow`, because disclosing a content key is owner-only, 04 §2.5); `commitments.autoAcceptDirection` (`buy`, `sell`) | String, exactly one of the listed values |
+| Retention days (D-148) | `history.messagesKeepDays` (`0`, `90`, `365`, `730`); `history.filesKeepDays` (`0`, `30`, `90`, `180`, `365`) | A JSON integer from that list; any other value is rejected |
 | Contact list | `contacts.allowed` | The string `"paired"`, or a JSON array of 1–256 agent IDs |
 | Contact list | `commitments.autoAcceptContacts` | A JSON array of 0–256 agent IDs |
 | Boolean | `files.ownerArchive`, `files.autoSave.on` (D-142), `receipts.autoDelivered`, `receipts.autoOpened`, `contactRules[].receipts.autoDelivered` (D-109) | `true` or `false`; `contactRules[].files.askBeforeSaving` (D-142) is exactly `true` |
@@ -369,6 +373,7 @@ contactRules: []            # per-contact proof rules (G-32), at most 256; creat
 
 - **Agent IDs** in policy lists are `0x` + 40 lowercase hex (04 §2.4.1, §2.9). Each list is sorted in strictly ascending byte order, which also makes the entries unique, so one set of contacts has one spelling. An unsorted list or a duplicate is rejected.
 - **`files.autoSave` in policies signed before D-142 (proposed, owner confirms at merge).** It is the one key that may be absent: a stored policy without it, signed before D-142, stays valid and is read with the `autoSave` defaults above (auto-save on; decided, Decision 51, 2026-10-30), so updating never turns a valid policy into "policy not valid, confirm it again". When present it is a strict object with all five keys. Every `policy.set` signed by a core that knows D-142 includes it; an older core refuses such a policy (fail closed, as for any added key). No other key may be absent.
+- **`history` in policies signed before D-148 (proposed, owner confirms at merge).** Like `files.autoSave`, it may be absent: a stored policy without it, signed before D-148, stays valid and is read as `messagesKeepDays: 0` and `filesKeepDays: 0`, so an update never starts deleting (OD-2: existing installs keep everything; they get a one-time "Free up space" hint). Every new `policy.set` carries it; a policy first created from 0.5.2 on has `filesKeepDays: 90`. While the stored policy is invalid, the retention pass deletes nothing (fail closed, below).
 - **The defaults** in this JSON form are the listing above, with `contacts.allowed: "paired"`, empty arrays, the USD values `"5"`, `"1"` and `"0"`, and `autoAcceptMinUSD: null`. M1-2b's snapshot test compares them with this section.
 
 **Per-contact rules (G-32; accepted, D-90).** "Remember for this contact" on a proof approval (11 §8) is an owner-signed `policy.set` that adds or changes one entry in `contactRules`. No other mechanism exists: there is no separate rule object and no partial patch, so one signed document and one `version` stay the only source of policy (04 §2.5.1, G-6). *Later (D-130 (6), M2, card M2-UX-REMEMBER-MORE):* offering "Remember for this contact" for more kinds of approval (incoming files over the size limit, receipts for this contact) is planned for M2 and needs its own rule fields and decision entry; until then it stays proof-only as specified here.
