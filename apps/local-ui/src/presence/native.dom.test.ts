@@ -9,7 +9,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PresencePrompt } from '../pages/contacts/presence-prompt.js';
-import type { PresenceProof } from '../pages/contacts/owner.js';
+import type { PasskeyStatus, PresenceProof } from '../pages/contacts/owner.js';
 import {
   DESKTOP_MARKER,
   desktopPlatform,
@@ -22,10 +22,14 @@ import { NATIVE_STRINGS } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+const UNAVAILABLE: PasskeyStatus = { kind: 'unavailable', reason: 'not_set_up_here' };
+
 const MAC_APP = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/142.0 Electron/39.0 Safari/537.36 ${DESKTOP_MARKER}`;
 const WIN_APP = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0 Electron/39.0 Safari/537.36 ${DESKTOP_MARKER}`;
-const MAC_SAFARI = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15';
-const WIN_CHROME = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0 Safari/537.36';
+const MAC_SAFARI =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15';
+const WIN_CHROME =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/142.0 Safari/537.36';
 
 let host: HTMLElement;
 let root: Root;
@@ -44,7 +48,8 @@ async function flush(): Promise<void> {
     for (let i = 0; i < 6; i += 1) await Promise.resolve();
   });
 }
-const buttons = (): string[] => [...host.querySelectorAll('button')].map((b) => b.textContent ?? '');
+const buttons = (): string[] =>
+  [...host.querySelectorAll('button')].map((b) => b.textContent ?? '');
 function button(text: string): HTMLButtonElement {
   const found = [...host.querySelectorAll('button')].find((b) => b.textContent === text);
   if (found === undefined) throw new Error(`no button ${text}: ${buttons().join(' | ')}`);
@@ -81,33 +86,62 @@ describe('the desktop marker and the platform words', () => {
 
 describe('the status and registration calls (GET / POST /api/owner/native)', () => {
   it('reads the server answer strictly; anything else is not available', async () => {
-    const answer = (body: unknown, status = 200) => () =>
-      Promise.resolve(new Response(JSON.stringify(body), { status }));
-    expect(await readNativeStatus(answer({ native: { available: true, registered: true, platform: 'mac' } }))).toEqual({
+    const answer =
+      (body: unknown, status = 200) =>
+      () =>
+        Promise.resolve(new Response(JSON.stringify(body), { status }));
+    expect(
+      await readNativeStatus(
+        answer({ native: { available: true, registered: true, platform: 'mac' } }),
+      ),
+    ).toEqual({
       available: true,
       registered: true,
     });
     for (const bad of [{}, { native: { available: 'yes' } }, { native: null }]) {
       expect(await readNativeStatus(answer(bad))).toEqual({ available: false, registered: false });
     }
-    expect(await readNativeStatus(answer({}, 500))).toEqual({ available: false, registered: false });
+    expect(await readNativeStatus(answer({}, 500))).toEqual({
+      available: false,
+      registered: false,
+    });
   });
 
   it('registers with the backup code as the body and maps the fixed answers', async () => {
     const seen: { url: string; body: string; headers: Headers }[] = [];
-    const fetcher = (status: number, body: unknown) => (url: RequestInfo | URL, init?: RequestInit) => {
-      seen.push({ url: String(url), body: new TextDecoder().decode(init?.body as Uint8Array), headers: new Headers(init?.headers) });
-      return Promise.resolve(new Response(JSON.stringify(body), { status }));
-    };
-    expect(await registerNative('ABCD', fetcher(200, { status: 'registered' }), 'tok')).toEqual({ kind: 'registered' });
+    const fetcher =
+      (status: number, body: unknown) => (url: RequestInfo | URL, init?: RequestInit) => {
+        seen.push({
+          url: String(url),
+          body: new TextDecoder().decode(init?.body as Uint8Array),
+          headers: new Headers(init?.headers),
+        });
+        return Promise.resolve(new Response(JSON.stringify(body), { status }));
+      };
+    expect(await registerNative('ABCD', fetcher(200, { status: 'registered' }), 'tok')).toEqual({
+      kind: 'registered',
+    });
     expect(seen[0]?.url).toBe('/api/owner/native');
     expect(seen[0]?.body).toBe('ABCD');
     expect(seen[0]?.headers.get('X-AgentLink-CSRF')).toBe('tok');
     expect(seen[0]?.headers.get('Content-Type')).toBe('application/octet-stream');
-    expect(await registerNative('x', fetcher(403, { status: 'presence_rejected', native: 'cancelled' }), 't')).toEqual({ kind: 'native', state: 'cancelled' });
-    expect(await registerNative('x', fetcher(403, { status: 'presence_rejected' }), 't')).toEqual({ kind: 'rejected' });
-    expect(await registerNative('x', fetcher(409, { status: 'native_exists' }), 't')).toEqual({ kind: 'registered' });
-    expect(await registerNative('x', fetcher(409, { status: 'native_unavailable' }), 't')).toEqual({ kind: 'native', state: 'unavailable' });
+    expect(
+      await registerNative(
+        'x',
+        fetcher(403, { status: 'presence_rejected', native: 'cancelled' }),
+        't',
+      ),
+    ).toEqual({ kind: 'native', state: 'cancelled' });
+    expect(await registerNative('x', fetcher(403, { status: 'presence_rejected' }), 't')).toEqual({
+      kind: 'rejected',
+    });
+    expect(await registerNative('x', fetcher(409, { status: 'native_exists' }), 't')).toEqual({
+      kind: 'registered',
+    });
+    expect(await registerNative('x', fetcher(409, { status: 'native_unavailable' }), 't')).toEqual({
+      kind: 'native',
+      state: 'unavailable',
+    });
   });
 });
 
@@ -123,7 +157,7 @@ describe('the presence prompt in the desktop app', () => {
           error: undefined,
           onSubmit: (proof: PresenceProof) => void submitted.push(proof),
           onCancel: () => undefined,
-          passkeyStatus: () => Promise.resolve({ kind: 'unavailable', reason: 'not_set_up_here' }),
+          passkeyStatus: () => Promise.resolve(UNAVAILABLE),
           nativeStatus: () => Promise.resolve(status),
           userAgent: ua,
         }),
@@ -168,7 +202,7 @@ describe('the presence prompt in the desktop app', () => {
           error: undefined,
           onSubmit: () => undefined,
           onCancel: () => undefined,
-          passkeyStatus: () => Promise.resolve({ kind: 'unavailable', reason: 'not_set_up_here' }),
+          passkeyStatus: () => Promise.resolve(UNAVAILABLE),
           nativeStatus: () => {
             read += 1;
             return Promise.resolve({ available: true, registered: true });

@@ -295,7 +295,8 @@ describe('ALKH v1 seal and open (04 §2.3.4)', () => {
 
 // DESK-D12c, folding in the Fable review of DESK-D12a (lows 1 to 3).
 describe('Fable review of DESK-D12a: -G, the Windows create output, the RSA modulus', () => {
-  const negate = (point: Uint8Array): Uint8Array => p256.Point.fromBytes(point).negate().toBytes(false);
+  const negate = (point: Uint8Array): Uint8Array =>
+    p256.Point.fromBytes(point).negate().toBytes(false);
 
   it('refuses -G and -credPub as the peer (the X coordinate of G or of the SE key)', async () => {
     for (const peer of [negate(G), negate(SE_PUB)]) {
@@ -312,14 +313,21 @@ describe('Fable review of DESK-D12a: -G, the Windows create output, the RSA modu
 
   it('refuses a kind 2 credential key that is not an RSA SubjectPublicKeyInfo', async () => {
     await refusal(() =>
-      sealNativeSeed({ ...winInput(randomBytes(32)), credentialPublicKey: new Uint8Array(294).fill(0x30) }),
+      sealNativeSeed({
+        ...winInput(randomBytes(32)),
+        credentialPublicKey: new Uint8Array(294).fill(0x30),
+      }),
     );
-    await refusal(() => sealNativeSeed({ ...winInput(randomBytes(32)), credentialPublicKey: SE_PUB }));
+    await refusal(() =>
+      sealNativeSeed({ ...winInput(randomBytes(32)), credentialPublicKey: SE_PUB }),
+    );
   });
 
   it('ties the signature length to the SPKI modulus (256 for RSA-2048, 384 for RSA-3072)', async () => {
     const challenge = randomBytes(32);
-    await refusal(() => sealNativeSeed({ ...winInput(challenge), nativeSecret: new Uint8Array(384).fill(1) }));
+    await refusal(() =>
+      sealNativeSeed({ ...winInput(challenge), nativeSecret: new Uint8Array(384).fill(1) }),
+    );
     const sig384 = new Uint8Array(384).fill(3);
     const blob = await sealNativeSeed({
       ...winInput(challenge),
@@ -361,7 +369,10 @@ describe('Fable review of DESK-D12a: -G, the Windows create output, the RSA modu
     expect(encodeHex(read.record)).toBe(encodeHex(record));
     expect(read.firstSecret).toBeUndefined();
     expect(() =>
-      readNativeCreateOutput(NATIVE_PRESENCE_MACOS, new Uint8Array([...record, 0, 32, ...new Uint8Array(32).fill(1)])),
+      readNativeCreateOutput(
+        NATIVE_PRESENCE_MACOS,
+        new Uint8Array([...record, 0, 32, ...new Uint8Array(32).fill(1)]),
+      ),
     ).toThrow(CryptoInputError);
   });
 });

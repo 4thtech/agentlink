@@ -53,6 +53,8 @@ export type NodeKeyStoreErrorCode =
   | 'receipts_kept_not_written'
   /** M1-8e: a localhost passkey is already set up for this OS user (one in M1b); never replaced. */
   | 'owner_passkey_exists'
+  /** DESK-D12c: native presence (Touch ID or Windows Hello in the app) is already turned on. */
+  | 'owner_native_exists'
   /** M1-8e: the authenticator returned no PRF output; nothing is stored, the owner code stays. */
   | 'passkey_unsupported'
   /**

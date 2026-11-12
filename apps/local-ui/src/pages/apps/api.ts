@@ -5,7 +5,7 @@
 // mutating request by the page's generation guard (api/generation.ts). The file paths and entries
 // that come back are shown as text only (I-5).
 import { createApiClient, type ApiClient } from '../../api/client.js';
-import type { PresenceProof } from '../contacts/owner.js';
+import { presenceBody, presenceMode, type PresenceProof } from '../contacts/owner.js';
 import { parseApps, parsePreview, type AppChange, type AppsList } from './data.js';
 
 export type ReadOutcome =
@@ -103,8 +103,9 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
       'Content-Type': 'application/octet-stream',
       'X-AgentLink-Input': base64url(JSON.stringify({ changeId })),
     });
-    if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-    const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
+    const mode = presenceMode(proof);
+    if (mode !== undefined) headers.set('X-AgentLink-Presence', mode);
+    const body = presenceBody(proof);
     let res: Response;
     try {
       res = await doFetch(path, {

@@ -25,8 +25,9 @@
 //   stdout: on success only, lowercase hex followed by "\n". Nothing else, ever.
 //   stderr: never written. Errors are reported only by the exit code.
 //
-//   Record v1 (what `create` prints and `check`/`ecdh` read back; the core stores it verbatim
-//   next to the ALKH blob — it is not secret, and useless on any other Mac):
+//   Record v1 (what `create` prints and `check`/`ecdh` read back; not secret, and useless on any
+//   other Mac). The core does not store it: it reads it into the ALKH header fields and rebuilds it
+//   from the stored header for every later call (04 §2.3.4 "Helper record"; DESK-D12c):
 //     [0]        0x01                       record version
 //     [1..2]     L, u16 big-endian, 1..1024 length of the SE key handle
 //     [3..3+L)   SE key handle               CryptoKit dataRepresentation (SE-wrapped, device-bound)
@@ -36,8 +37,8 @@
 //
 //   ecdh output: hex of the 32-byte X coordinate of ECDH(SE private key, peer public key), raw
 //   (not hashed). Deterministic for the same record across gestures and processes.
-//   Suggested ALKH bindings for WP-D12a: credential ID = SHA-256(SE key handle), credential
-//   public-key hash = SHA-256(SE public key X9.63), plus the record version (0x01).
+//   The ALKH binding (HKDF info) is in 04 §2.3.4: version, kind, credential ID, SHA-256 of the
+//   credential public key, SHA-256 of the peer public key, owner key.
 //
 //   Exit codes (fixed, same numbers on Windows):
 //     0 ok · 10 cancelled (Cancel, Use Password, system or app cancel) · 11 failed (not recognised)

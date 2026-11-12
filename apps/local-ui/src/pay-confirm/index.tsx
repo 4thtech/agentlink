@@ -10,6 +10,7 @@
 //   with a 16-bit length first. Or the backup code as the body.
 // - The browser never signs (D-118), and nothing here is logged; the presence bytes are wiped.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { desktopPlatform } from '../presence/desktop.js';
 import {
   PAY_CONFIRM_STRINGS as P,
   PayConfirmSheet,
@@ -44,6 +45,8 @@ export type BeginAnswer =
       readonly statementJson: string;
       readonly publicKey: PayPublicKey;
       readonly rememberOffered: boolean;
+      /** DESK-D12c: Touch ID / Windows Hello in the desktop app is on for this owner. */
+      readonly native?: boolean;
     }
   /** A fixed refusal word from the server (`not_pending`, `busy`, `not_offered`, …). */
   | { readonly kind: 'refused'; readonly status: string }
@@ -65,6 +68,11 @@ export interface PayConfirmClient {
     onAsserted?: () => void,
   ): Promise<FinishAnswer>;
   finishCode(ceremony: string, code: string): Promise<FinishAnswer>;
+  /**
+   * DESK-D12c: confirm with Touch ID / Windows Hello in the desktop app: no bytes, the server runs
+   * this computer's presence helper for exactly this held statement (04 §2.5.3).
+   */
+  finishNative?(ceremony: string): Promise<FinishAnswer>;
 }
 
 export interface PayConfirmClientOptions {
@@ -139,14 +147,15 @@ export function createPayConfirmClient(options: PayConfirmClientOptions = {}): P
     path: string,
     input: unknown,
     body: Uint8Array<ArrayBuffer>,
-    passkey: boolean,
+    passkey: boolean | 'native',
   ): Promise<{ status: number; json: Record<string, unknown> } | undefined> {
     const headers: Record<string, string> = {
       [CSRF_HEADER]: token(),
       'content-type': 'application/octet-stream',
       'X-AgentLink-Input': base64urlJson(input),
     };
-    if (passkey) headers['X-AgentLink-Presence'] = 'passkey';
+    if (passkey === true) headers['X-AgentLink-Presence'] = 'passkey';
+    if (passkey === 'native') headers['X-AgentLink-Presence'] = 'native';
     try {
       const res = await doFetch(path, {
         method: 'POST',
@@ -203,6 +212,7 @@ export function createPayConfirmClient(options: PayConfirmClientOptions = {}): P
         statementJson: JSON.stringify(statement),
         publicKey,
         rememberOffered: j['rememberOffered'] === true,
+        native: j['native'] === true,
       };
     },
 
@@ -249,6 +259,10 @@ export function createPayConfirmClient(options: PayConfirmClientOptions = {}): P
       return finished(await post(FINISH, { ceremony }, body, true));
     },
 
+    async finishNative(ceremony) {
+      return finished(await post(FINISH, { ceremony }, new Uint8Array(0), 'native'));
+    },
+
     async finishCode(ceremony, code) {
       // A plain Uint8Array of this realm (the code is never kept: post() wipes it).
       const body = Uint8Array.from(new TextEncoder().encode(code));
@@ -264,6 +278,8 @@ export interface PayConfirmProps {
   readonly input: PayConfirmInput;
   readonly platform?: PayPlatform;
   readonly reducedMotion?: boolean;
+  /** DESK-D12c seam (tests): the user agent; default navigator.userAgent. */
+  readonly userAgent?: string;
   /** Runs once when the server applied the confirmed action. */
   readonly onDone: () => void;
   /** The sheet is gone (cancelled, or closed after Done). */
@@ -310,7 +326,10 @@ export function PayConfirm(props: PayConfirmProps): ReactElement {
     publicKey: PayPublicKey;
     statementJson: string;
     stale: boolean;
+    native: boolean;
   }>(undefined);
+  // DESK-D12c: in the desktop app the primary confirm is Touch ID / Windows Hello once it is on.
+  const desktop = desktopPlatform(props.userAgent);
   const input = useRef(props.input);
   const doneOnce = useRef(false);
   const limits = props.input.flow === 'limits';
@@ -344,9 +363,11 @@ export function PayConfirm(props: PayConfirmProps): ReactElement {
         publicKey: answer.publicKey,
         statementJson: answer.statementJson,
         stale: false,
+        native:
+          desktop !== undefined && answer.native === true && client.finishNative !== undefined,
       };
       setOffered(answer.rememberOffered);
-      const canPasskey = answer.publicKey.allowCredentials.length > 0;
+      const canPasskey = answer.publicKey.allowCredentials.length > 0 || held.current.native;
       const changed = before !== undefined && before !== answer.statementJson;
       setState((s) => ({
         ...s,
@@ -447,8 +468,16 @@ export function PayConfirm(props: PayConfirmProps): ReactElement {
       return { ...rest, busy: true };
     });
     if (!(await fresh()) || held.current === undefined) return;
-    const { ceremony, publicKey } = held.current;
+    const { ceremony, publicKey, native } = held.current;
     setState((s) => ({ ...s, phase: 'waiting' }));
+    if (native && client.finishNative !== undefined) {
+      // The OS prompt is the helper's; the statement on screen is what the server signs.
+      const stopNative = recording();
+      const answer = await client.finishNative(ceremony);
+      stopNative();
+      outcome(answer, true);
+      return;
+    }
     // The system prompt is the browser's; the "recording" word only once it is answered.
     let stopTimer: (() => void) | undefined;
     const answer = await client.finishPasskey(ceremony, publicKey, () => {
@@ -481,7 +510,8 @@ export function PayConfirm(props: PayConfirmProps): ReactElement {
     void begin(on);
   };
 
-  const canPasskey = (held.current?.publicKey.allowCredentials.length ?? 0) > 0;
+  const canPasskey =
+    (held.current?.publicKey.allowCredentials.length ?? 0) > 0 || held.current?.native === true;
   return (
     <PayConfirmSheet
       view={state.view}

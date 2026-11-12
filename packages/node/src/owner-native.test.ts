@@ -29,7 +29,6 @@ import {
   randomBytes,
   readNativeBlobHeader,
   sha256,
-  type NativePresenceKind,
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
 import { openNativeSeed, sealPasskeySeed } from '@4thtech-io/crypto/keystore';
@@ -78,7 +77,12 @@ let owner: OwnerPublicKeys;
 /** A fresh keychain with an owner code item (as after setup or `owner init`). */
 async function withOwner(): Promise<MemoryKeychain> {
   const keychain = new MemoryKeychain();
-  await storeOwnerSeed(keychain, seedForTests, { secret: encodeUtf8(CODE), secretKind: 1 }, { kdf: KDF });
+  await storeOwnerSeed(
+    keychain,
+    seedForTests,
+    { secret: encodeUtf8(CODE), secretKind: 1 },
+    { kdf: KDF },
+  );
   keychain.writes.length = 0;
   return keychain;
 }
@@ -98,7 +102,11 @@ async function codeOf(promise: Promise<unknown>): Promise<unknown> {
 }
 
 /** One owner operation with native presence: the helper runs, the store unlocks once. */
-async function nativeOp(keychain: MemoryKeychain, helper: NativeHelper, reason: NativeReason = 'approve') {
+async function nativeOp(
+  keychain: MemoryKeychain,
+  helper: NativeHelper,
+  reason: NativeReason = 'approve',
+) {
   const presence = await nativePresence(keychain, helper, owner.ownerNostr, reason);
   const store = await KeychainOwnerKeyStore.open(keychain, owner);
   try {
@@ -145,16 +153,28 @@ describe('registration is its own owner operation (04 §2.3.4 "Registration")', 
     await registerOwnerNative(keychain, new StandInHelper(NATIVE_PRESENCE_MACOS), owner, code());
     const before = keychain.items.get(OWNER_NATIVE_ACCOUNT)?.slice();
     const again = new StandInHelper(NATIVE_PRESENCE_MACOS);
-    expect(await codeOf(registerOwnerNative(keychain, again, owner, code()))).toBe('owner_native_exists');
+    expect(await codeOf(registerOwnerNative(keychain, again, owner, code()))).toBe(
+      'owner_native_exists',
+    );
     expect(again.calls).toEqual([]);
-    expect(equalBytes(keychain.items.get(OWNER_NATIVE_ACCOUNT) ?? new Uint8Array(0), before ?? new Uint8Array(1))).toBe(true);
+    expect(
+      equalBytes(
+        keychain.items.get(OWNER_NATIVE_ACCOUNT) ?? new Uint8Array(0),
+        before ?? new Uint8Array(1),
+      ),
+    ).toBe(true);
   });
 
   it('a wrong backup code is refused before the helper runs', async () => {
     const keychain = await withOwner();
     const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
-    const wrong = { kind: 'passphrase' as const, secret: encodeUtf8('AAAA BBBB CCCC DDDD EEEE FFFF') };
-    expect(await codeOf(registerOwnerNative(keychain, helper, owner, wrong))).toBe('presence_rejected');
+    const wrong = {
+      kind: 'passphrase' as const,
+      secret: encodeUtf8('AAAA BBBB CCCC DDDD EEEE FFFF'),
+    };
+    expect(await codeOf(registerOwnerNative(keychain, helper, owner, wrong))).toBe(
+      'presence_rejected',
+    );
     expect(helper.calls).toEqual([]);
     expect(keychain.items.has(OWNER_NATIVE_ACCOUNT)).toBe(false);
   });
@@ -216,7 +236,8 @@ describe('presence: one gesture = one owner operation (D-68)', () => {
     const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
     const keychain = await withOwner();
     await registerOwnerNative(keychain, helper, owner, code());
-    for (const reason of ['setup', 'approve', 'pay'] as const) await nativeOp(keychain, helper, reason);
+    for (const reason of ['setup', 'approve', 'pay'] as const)
+      await nativeOp(keychain, helper, reason);
   });
 });
 
@@ -227,7 +248,9 @@ describe('M1-8c: a same-user AI process gets no usable secret without the gestur
     await registerOwnerNative(keychain, helper, owner, code());
     for (const refusal of ['cancelled', 'failed', 'lockout'] as const) {
       helper.gesture = refusal;
-      expect(await codeOf(nativePresence(keychain, helper, owner.ownerNostr, 'approve'))).toBe(refusal);
+      expect(await codeOf(nativePresence(keychain, helper, owner.ownerNostr, 'approve'))).toBe(
+        refusal,
+      );
     }
   });
 
@@ -246,7 +269,11 @@ describe('M1-8c: a same-user AI process gets no usable secret without the gestur
     for (const guess of guesses) {
       await expect(openNativeSeed(blob, guess)).rejects.toBeDefined();
       const store = await KeychainOwnerKeyStore.open(keychain, owner);
-      const presence = { kind: 'native' as const, nativeKind: NATIVE_PRESENCE_MACOS, secret: guess };
+      const presence = {
+        kind: 'native' as const,
+        nativeKind: NATIVE_PRESENCE_MACOS as 1,
+        secret: guess,
+      };
       expect(await codeOf(store.unlock(presence))).toBe('presence_rejected');
       await store.close();
     }
@@ -257,7 +284,12 @@ describe('Windows Hello machines need no backup code after registration', () => 
   it('first-time setup (the held seed): one gesture, then every approval with Windows Hello only', async () => {
     const keychain = new MemoryKeychain();
     const made = newOwnerSeed();
-    await storeOwnerSeed(keychain, made.seed, { secret: encodeUtf8(CODE), secretKind: 1 }, { kdf: KDF });
+    await storeOwnerSeed(
+      keychain,
+      made.seed,
+      { secret: encodeUtf8(CODE), secretKind: 1 },
+      { kdf: KDF },
+    );
     const helper = new StandInHelper(NATIVE_PRESENCE_WINDOWS);
     await storeOwnerNativeSeed(keychain, helper, made.seed, made.keys);
     expect(helper.calls).toEqual(['create@0']);
@@ -298,15 +330,24 @@ describe('cross-type and cross-platform refusal, before the helper runs', () => 
   it('ALKP in owner-native, the other platform, another owner: presence_rejected, no prompt', async () => {
     const keychain = await withOwner();
     const prf = randomBytes(32);
-    await keychain.set(OWNER_NATIVE_ACCOUNT, await sealPasskeySeed(prf, seedForTests, randomBytes(16)));
+    await keychain.set(
+      OWNER_NATIVE_ACCOUNT,
+      await sealPasskeySeed(prf, seedForTests, randomBytes(16)),
+    );
     const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
-    expect(await codeOf(nativePresence(keychain, helper, owner.ownerNostr, 'approve'))).toBe('presence_rejected');
+    expect(await codeOf(nativePresence(keychain, helper, owner.ownerNostr, 'approve'))).toBe(
+      'presence_rejected',
+    );
     await keychain.delete(OWNER_NATIVE_ACCOUNT);
     await registerOwnerNative(keychain, helper, owner, code());
     helper.calls.length = 0;
     const win = new StandInHelper(NATIVE_PRESENCE_WINDOWS);
-    expect(await codeOf(nativePresence(keychain, win, owner.ownerNostr, 'approve'))).toBe('presence_rejected');
-    expect(await codeOf(nativePresence(keychain, helper, new Uint8Array(32).fill(9), 'approve'))).toBe('presence_rejected');
+    expect(await codeOf(nativePresence(keychain, win, owner.ownerNostr, 'approve'))).toBe(
+      'presence_rejected',
+    );
+    expect(
+      await codeOf(nativePresence(keychain, helper, new Uint8Array(32).fill(9), 'approve')),
+    ).toBe('presence_rejected');
     expect(win.calls).toEqual([]);
     expect(helper.calls).toEqual([]);
   });
@@ -315,12 +356,21 @@ describe('cross-type and cross-platform refusal, before the helper runs', () => 
     const keychain = await withOwner();
     const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
     await registerOwnerNative(keychain, helper, owner, code());
-    await keychain.set(OWNER_PASSKEY_ACCOUNT, keychain.items.get(OWNER_NATIVE_ACCOUNT) ?? new Uint8Array(0));
+    await keychain.set(
+      OWNER_PASSKEY_ACCOUNT,
+      keychain.items.get(OWNER_NATIVE_ACCOUNT) ?? new Uint8Array(0),
+    );
     const store = await KeychainOwnerKeyStore.open(keychain, owner);
     const secret = secretFor(NATIVE_PRESENCE_MACOS, MAC_RECORD);
-    expect(await codeOf(store.unlock({ kind: 'passkey-prf', prfOutput: secret }))).toBe('presence_rejected');
+    expect(await codeOf(store.unlock({ kind: 'passkey-prf', prfOutput: secret }))).toBe(
+      'presence_rejected',
+    );
     // A native presence whose kind is not the blob's is refused too.
-    const wrongKind = { kind: 'native' as const, nativeKind: NATIVE_PRESENCE_WINDOWS, secret: secretFor(NATIVE_PRESENCE_MACOS, MAC_RECORD) };
+    const wrongKind = {
+      kind: 'native' as const,
+      nativeKind: NATIVE_PRESENCE_WINDOWS as 2,
+      secret: secretFor(NATIVE_PRESENCE_MACOS, MAC_RECORD),
+    };
     expect(await codeOf(store.unlock(wrongKind))).toBe('presence_rejected');
     await store.close();
     expect(ownerPrfSalt().length).toBe(32);
@@ -329,8 +379,14 @@ describe('cross-type and cross-platform refusal, before the helper runs', () => 
   it('a native presence never registers another native credential', async () => {
     const keychain = await withOwner();
     const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
-    const native = { kind: 'native' as const, nativeKind: NATIVE_PRESENCE_MACOS, secret: randomBytes(32) };
-    expect(await codeOf(registerOwnerNative(keychain, helper, owner, native))).toBe('presence_required');
+    const native = {
+      kind: 'native' as const,
+      nativeKind: NATIVE_PRESENCE_MACOS as 1,
+      secret: randomBytes(32),
+    };
+    expect(await codeOf(registerOwnerNative(keychain, helper, owner, native))).toBe(
+      'presence_required',
+    );
     expect(helper.calls).toEqual([]);
     expect(KeyStoreError).toBeDefined();
   });

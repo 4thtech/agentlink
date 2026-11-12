@@ -21,7 +21,15 @@ import {
 
 const vectors = JSON.parse(
   readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'test-vectors', 'alkh', 'vectors.json'),
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      '..',
+      '..',
+      '..',
+      'test-vectors',
+      'alkh',
+      'vectors.json',
+    ),
     'utf8',
   ),
 ) as { cases: { id: string; input: Record<string, unknown> }[] };
@@ -59,7 +67,9 @@ export class StandInHelper implements NativeHelper {
     if (this.createState !== 'ok') return Promise.reject(new NativeHelperError(this.createState));
     if (this.kind === NATIVE_PRESENCE_MACOS) return Promise.resolve(this.record.slice());
     const sig = secretFor(this.kind, this.record);
-    return Promise.resolve(concatBytes(this.record, new Uint8Array([sig.length >> 8, sig.length & 0xff]), sig));
+    return Promise.resolve(
+      concatBytes(this.record, new Uint8Array([sig.length >> 8, sig.length & 0xff]), sig),
+    );
   }
   check(record: Uint8Array): Promise<void> {
     this.calls.push('check');
@@ -79,4 +89,3 @@ export class StandInHelper implements NativeHelper {
     return Promise.resolve();
   }
 }
-

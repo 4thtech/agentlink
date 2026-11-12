@@ -29,7 +29,10 @@ interface Call {
 function fakeRunner(answer: (args: readonly string[]) => { code: number | null; stdout: string }) {
   const calls: Call[] = [];
   const run: NativeHelperRunner = (args, stdin) => {
-    calls.push({ args: [...args], stdin: stdin === undefined ? undefined : Buffer.from(stdin).toString('utf8') });
+    calls.push({
+      args: [...args],
+      stdin: stdin === undefined ? undefined : Buffer.from(stdin).toString('utf8'),
+    });
     const out = answer(args);
     return Promise.resolve({ code: out.code, stdout: new TextEncoder().encode(out.stdout) });
   };
@@ -42,7 +45,8 @@ describe('fixed argv, hex stdin, hex-only stdout (DESK-D12b contract)', () => {
   it('macOS: create, check and ecdh <reason>; the record goes on stdin as hex and one newline', async () => {
     const { calls, run } = fakeRunner((args) => ({
       code: 0,
-      stdout: args[0] === 'create' ? '0100020a0b\n' : args[0] === 'ecdh' ? `${'11'.repeat(32)}\n` : '',
+      stdout:
+        args[0] === 'create' ? '0100020a0b\n' : args[0] === 'ecdh' ? `${'11'.repeat(32)}\n` : '',
     }));
     const helper = createNativeHelper({ kind: 1, run });
     expect(Array.from(await helper.create())).toEqual([1, 0, 2, 10, 11]);
@@ -71,7 +75,9 @@ describe('fixed argv, hex stdin, hex-only stdout (DESK-D12b contract)', () => {
     const { calls, run } = fakeRunner(() => ({ code: 0, stdout: '' }));
     const helper = createNativeHelper({ kind: 1, run });
     for (const reason of ['Approve', 'approve this $5 payment', '', 'setup ', 'pay\n']) {
-      await expect(helper.release(RECORD, reason as never)).rejects.toBeInstanceOf(NativeHelperError);
+      await expect(helper.release(RECORD, reason as never)).rejects.toBeInstanceOf(
+        NativeHelperError,
+      );
     }
     expect(calls).toEqual([]);
   });
@@ -104,7 +110,10 @@ describe('exit codes map to fixed UI states', () => {
   });
 
   it('a refused gesture gives no bytes, only the state', async () => {
-    const { run } = fakeRunner(() => ({ code: NATIVE_HELPER_EXIT.cancelled, stdout: `${'11'.repeat(32)}\n` }));
+    const { run } = fakeRunner(() => ({
+      code: NATIVE_HELPER_EXIT.cancelled,
+      stdout: `${'11'.repeat(32)}\n`,
+    }));
     const error = await createNativeHelper({ kind: 1, run })
       .release(RECORD, 'approve')
       .catch((e: unknown) => e);
@@ -120,8 +129,18 @@ describe('exit codes map to fixed UI states', () => {
   });
 
   it('available is exit 0 only', async () => {
-    expect(await createNativeHelper({ kind: 1, run: fakeRunner(() => ({ code: 0, stdout: '' })).run }).available()).toBe(true);
-    expect(await createNativeHelper({ kind: 1, run: fakeRunner(() => ({ code: 69, stdout: '' })).run }).available()).toBe(false);
+    expect(
+      await createNativeHelper({
+        kind: 1,
+        run: fakeRunner(() => ({ code: 0, stdout: '' })).run,
+      }).available(),
+    ).toBe(true);
+    expect(
+      await createNativeHelper({
+        kind: 1,
+        run: fakeRunner(() => ({ code: 69, stdout: '' })).run,
+      }).available(),
+    ).toBe(false);
   });
 });
 
@@ -142,7 +161,11 @@ describe('the spawned helper (a stand-in script; never the real helper)', () => 
     const result = await run(['ecdh', 'approve'], new TextEncoder().encode('0102\n'));
     expect(result.code).toBe(0);
     expect(Buffer.from(result.stdout).toString('utf8')).toBe(`${'ab'.repeat(32)}\n`);
-    const seen = JSON.parse(readFileSync(out, 'utf8')) as { argv: string[]; stdin: string; env: string[] };
+    const seen = JSON.parse(readFileSync(out, 'utf8')) as {
+      argv: string[];
+      stdin: string;
+      env: string[];
+    };
     expect(seen.argv).toEqual(['ecdh', 'approve']);
     expect(seen.stdin).toBe('0102\n');
     // Nothing of ours is inherited (no HOME, no PATH, no AGENTLINK_*): a fixed, empty environment.
@@ -158,15 +181,15 @@ describe('the spawned helper (a stand-in script; never the real helper)', () => 
 
 describe('where the desktop app keeps the helper (build-mac / build-win layout)', () => {
   it('macOS: Contents/Helpers next to Contents/Resources/node/bin/node', () => {
-    expect(desktopHelperPath('/Applications/AgentLink.app/Contents/Resources/node/bin/node', 'darwin')).toBe(
-      '/Applications/AgentLink.app/Contents/Helpers/agentlink-presence',
-    );
+    expect(
+      desktopHelperPath('/Applications/AgentLink.app/Contents/Resources/node/bin/node', 'darwin'),
+    ).toBe('/Applications/AgentLink.app/Contents/Helpers/agentlink-presence');
   });
 
   it('Windows: resources\\native next to resources\\node\\node.exe', () => {
-    expect(desktopHelperPath('C:\\Program Files\\AgentLink\\resources\\node\\node.exe', 'win32')).toBe(
-      'C:\\Program Files\\AgentLink\\resources\\native\\agentlink-presence.exe',
-    );
+    expect(
+      desktopHelperPath('C:\\Program Files\\AgentLink\\resources\\node\\node.exe', 'win32'),
+    ).toBe('C:\\Program Files\\AgentLink\\resources\\native\\agentlink-presence.exe');
   });
 
   it('none for an npx node, Linux, or any other layout', () => {

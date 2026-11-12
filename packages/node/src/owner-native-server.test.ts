@@ -11,13 +11,16 @@
 //   towards the wrong-code backoff; a body with the native header, or the native header without a
 //   helper, is refused before the owner store is opened.
 // The helper is the stand-in of owner-native.fixture.ts; no prompt is shown, no real keychain used.
-import { encodeBase64url, encodeHex, encodeUtf8, type JsonObject, type JsonValue } from '@4thtech-io/crypto';
+import {
+  encodeBase64url,
+  encodeHex,
+  encodeUtf8,
+  type JsonObject,
+  type JsonValue,
+} from '@4thtech-io/crypto';
 import { canonicalize } from '@4thtech-io/crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import {
-  startApprovalServerWith,
-  type ApprovalServer,
-} from './approval-server.js';
+import { startApprovalServerWith, type ApprovalServer } from './approval-server.js';
 import {
   approvalId,
   digestOf,
@@ -77,7 +80,9 @@ async function harness(options: { helper?: StandInHelper | null } = {}): Promise
         nonce: 'n'.repeat(22),
         params: { contact: req.params['id'] ?? '' },
       };
-      await ownerOp.sign({ lines: ['Mark the safety code as checked'] }, [{ kind: 'owner-action', action }]);
+      await ownerOp.sign({ lines: ['Mark the safety code as checked'] }, [
+        { kind: 'owner-action', action },
+      ]);
       return { status: 200, body: { status: 'done' } };
     },
   });
@@ -125,13 +130,24 @@ async function harness(options: { helper?: StandInHelper | null } = {}): Promise
   };
 }
 
-const json = (res: RawResponse): Record<string, unknown> => JSON.parse(res.body) as Record<string, unknown>;
+const json = (res: RawResponse): Record<string, unknown> =>
+  JSON.parse(res.body) as Record<string, unknown>;
 const NATIVE = { 'X-AgentLink-Presence': 'native' };
 
 const register = async (h: Harness, page: Record<string, string>) =>
-  send(h.port, '/api/owner/native', { method: 'POST', headers: page, body: encodeUtf8(world.code) });
+  send(h.port, '/api/owner/native', {
+    method: 'POST',
+    headers: page,
+    body: encodeUtf8(world.code),
+  });
 
-async function decide(h: Harness, page: Record<string, string>, n: number, extra: Record<string, string> = NATIVE, body?: Uint8Array) {
+async function decide(
+  h: Harness,
+  page: Record<string, string>,
+  n: number,
+  extra: Record<string, string> = NATIVE,
+  body?: Uint8Array,
+) {
   const row = await h.source.get(approvalId(n));
   return send(h.port, `/api/approvals/${approvalId(n)}/approve`, {
     method: 'POST',
@@ -146,11 +162,17 @@ describe('GET and POST /api/owner/native', () => {
     const page = await h.page();
     const before = await send(h.port, '/api/owner/native', { headers: page });
     expect(before.status).toBe(200);
-    expect(json(before)).toEqual({ native: { available: true, registered: false, platform: 'mac' } });
+    expect(json(before)).toEqual({
+      native: { available: true, registered: false, platform: 'mac' },
+    });
     const reg = await register(h, page);
     expect(reg.status).toBe(200);
     expect(json(reg)).toEqual({ status: 'registered' });
-    expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['create', 'check', 'release:setup']);
+    expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual([
+      'create',
+      'check',
+      'release:setup',
+    ]);
     expect(json(await send(h.port, '/api/owner/native', { headers: page }))).toEqual({
       native: { available: true, registered: true, platform: 'mac' },
     });
@@ -193,7 +215,11 @@ describe('the native presence route kind on decisions and owner routes', () => {
     expect(json(res)).toEqual({ status: 'applied', decision: 'approve' });
     expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:approve']);
     const signed = h.source.applied[0];
-    expect(signed?.body['params']).toEqual({ approvalId: approvalId(1), actionDigest: row.storedDigest, decision: 'approve' });
+    expect(signed?.body['params']).toEqual({
+      approvalId: approvalId(1),
+      actionDigest: row.storedDigest,
+      decision: 'approve',
+    });
     expect(ownerSigValid(world.owner, signed?.body ?? {}, signed?.sig ?? '')).toBe(true);
   });
 
@@ -202,7 +228,10 @@ describe('the native presence route kind on decisions and owner routes', () => {
     const page = await h.page();
     await register(h, page);
     h.helper.calls.length = 0;
-    const res = await send(h.port, '/api/ui/test/c1/check', { method: 'POST', headers: { ...page, ...NATIVE } });
+    const res = await send(h.port, '/api/ui/test/c1/check', {
+      method: 'POST',
+      headers: { ...page, ...NATIVE },
+    });
     expect(res.status).toBe(200);
     expect(h.routeCalls).toEqual([1]);
     expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:approve']);
@@ -272,7 +301,16 @@ describe('pay confirm with native presence (04 §2.5.3): the statement is bound 
       fee: { token: `0x${'ab'.repeat(20)}`, amount: '100000', usd: '0.1' },
     },
   });
-  const inputHeader = (value: JsonValue): string => encodeBase64url(encodeUtf8(canonicalize(value)));
+  const DETAILS = {
+    who: '“Ana” (self-declared)',
+    what: 'Record a proof',
+    cost: '$0.10',
+    expires: '12 Oct 2026 14:02 UTC',
+    rule: 'Above your per-proof limit',
+    fromAi: [],
+  };
+  const inputHeader = (value: JsonValue): string =>
+    encodeBase64url(encodeUtf8(canonicalize(value)));
 
   it('begin offers native; finish with one pay gesture signs exactly that approval; the hold is single use', async () => {
     const h = await harness();
@@ -285,11 +323,14 @@ describe('pay confirm with native presence (04 §2.5.3): the statement is bound 
       actionDigest: digestOf(action),
       storedDigest: digestOf(action),
       summary: 'Record a proof',
-      details: { who: '“Ana” (self-declared)', what: 'Record a proof', cost: '$0.10', expires: '12 Oct 2026 14:02 UTC', rule: 'Above your per-proof limit', fromAi: [] },
+      details: DETAILS,
     });
     const begun = await send(h.port, '/api/ui/pay-confirm/begin', {
       method: 'POST',
-      headers: { ...page, 'X-AgentLink-Input': inputHeader({ flow: 'proof', approvalId: approvalId(6) }) },
+      headers: {
+        ...page,
+        'X-AgentLink-Input': inputHeader({ flow: 'proof', approvalId: approvalId(6) }),
+      },
     });
     expect(begun.status).toBe(200);
     const b = json(begun);
@@ -305,7 +346,11 @@ describe('pay confirm with native presence (04 §2.5.3): the statement is bound 
     expect(json(res)).toEqual({ status: 'applied' });
     expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:pay']);
     expect(h.source.applied).toHaveLength(1);
-    expect(h.source.applied[0]?.body['params']).toEqual({ approvalId: approvalId(6), actionDigest: row.storedDigest, decision: 'approve' });
+    expect(h.source.applied[0]?.body['params']).toEqual({
+      approvalId: approvalId(6),
+      actionDigest: row.storedDigest,
+      decision: 'approve',
+    });
     const again = await finish();
     expect(again.status).toBe(409);
     expect(h.helper.calls).toHaveLength(1);
@@ -316,17 +361,30 @@ describe('pay confirm with native presence (04 §2.5.3): the statement is bound 
     const page = await h.page();
     await register(h, page);
     const action = paidAction();
-    h.source.add(7, { action, actionDigest: digestOf(action), storedDigest: digestOf(action), summary: 'Record a proof' });
+    h.source.add(7, {
+      action,
+      actionDigest: digestOf(action),
+      storedDigest: digestOf(action),
+      summary: 'Record a proof',
+      details: DETAILS,
+    });
     const begun = json(
       await send(h.port, '/api/ui/pay-confirm/begin', {
         method: 'POST',
-        headers: { ...page, 'X-AgentLink-Input': inputHeader({ flow: 'proof', approvalId: approvalId(7) }) },
+        headers: {
+          ...page,
+          'X-AgentLink-Input': inputHeader({ flow: 'proof', approvalId: approvalId(7) }),
+        },
       }),
     );
     h.helper.gesture = 'cancelled';
     const res = await send(h.port, '/api/ui/pay-confirm/finish', {
       method: 'POST',
-      headers: { ...page, ...NATIVE, 'X-AgentLink-Input': inputHeader({ ceremony: String(begun['ceremony']) }) },
+      headers: {
+        ...page,
+        ...NATIVE,
+        'X-AgentLink-Input': inputHeader({ ceremony: String(begun['ceremony']) }),
+      },
     });
     expect(res.status).toBe(403);
     expect(json(res)).toEqual({ status: 'presence_rejected', native: 'cancelled' });

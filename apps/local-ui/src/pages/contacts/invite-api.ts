@@ -11,7 +11,7 @@
 // Everything goes to this same-origin server only (never a 4thTech service, never a shortener). An
 // answer is read through an allowlist: only the named fields, each checked for type and size. The
 // link and the share text are never logged, and no error here carries them (I-7, b11 §21.5).
-import type { PresenceProof } from './owner.js';
+import { presenceBody, presenceMode, type PresenceProof } from './owner.js';
 
 export const INVITE_CREATE_PATH = '/api/ui/invites';
 export const INVITE_CHECK_PATH = '/api/ui/invites/check';
@@ -366,8 +366,9 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
         'content-type': 'application/octet-stream',
         'X-AgentLink-Input': toBase64url(encode({ invite })),
       });
-      if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-      const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
+      const mode = presenceMode(proof);
+      if (mode !== undefined) headers.set('X-AgentLink-Presence', mode);
+      const body = presenceBody(proof);
       const answer = await call(INVITE_ACCEPT_PATH, { headers, body });
       if (answer.kind === 'offline') return { kind: 'offline' };
       const { status, json } = answer;

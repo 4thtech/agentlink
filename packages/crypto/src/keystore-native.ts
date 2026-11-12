@@ -117,6 +117,78 @@ function isP256Point(point: Uint8Array): boolean {
 const isCredentialName = (id: Uint8Array): boolean =>
   id.length >= 1 && id.length <= MAX_CREDENTIAL_NAME && id.every((b) => b >= 0x21 && b <= 0x7e);
 
+/** One DER TLV at `at`: its tag, where its value starts and ends; undefined when not strict DER. */
+function derTlv(
+  der: Uint8Array,
+  at: number,
+): { readonly tag: number; readonly start: number; readonly end: number } | undefined {
+  if (at + 2 > der.length) return undefined;
+  const tag = der[at] as number;
+  const first = der[at + 1] as number;
+  let length: number;
+  let start: number;
+  if (first < 0x80) {
+    length = first;
+    start = at + 2;
+  } else if (first === 0x81 || first === 0x82) {
+    const n = first - 0x80;
+    if (at + 2 + n > der.length) return undefined;
+    length =
+      n === 1 ? (der[at + 2] as number) : ((der[at + 2] as number) << 8) | (der[at + 3] as number);
+    // Minimal length encoding only (DER).
+    if (length < 0x80 || (n === 2 && length < 0x100)) return undefined;
+    start = at + 2 + n;
+  } else {
+    return undefined;
+  }
+  const end = start + length;
+  return end > der.length ? undefined : { tag, start, end };
+}
+
+/** A positive DER INTEGER's magnitude length (no leading zero byte), or undefined. */
+function derPositiveIntegerLength(der: Uint8Array, start: number, end: number): number | undefined {
+  if (end <= start) return undefined;
+  const lead = der[start] as number;
+  if (lead >= 0x80) return undefined; // negative
+  if (lead === 0) {
+    if (end - start === 1 || (der[start + 1] as number) < 0x80) return undefined; // not minimal
+    return end - start - 1;
+  }
+  return end - start;
+}
+
+/** AlgorithmIdentifier { rsaEncryption (1.2.840.113549.1.1.1), NULL }. */
+const RSA_ALGORITHM = [
+  0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00,
+];
+
+/**
+ * Fable review of DESK-D12a (low 3): the byte length of the modulus of an RSA SubjectPublicKeyInfo
+ * (strict DER: rsaEncryption with NULL parameters, a positive modulus, a positive exponent of at most
+ * 8 bytes, nothing after), when it is 256, 384 or 512 bytes (RSA-2048 to 4096); otherwise undefined.
+ * The key is not used for any RSA operation (I-8): this only ties the signature length to the key.
+ */
+function rsaModulusLength(spki: Uint8Array): number | undefined {
+  const outer = derTlv(spki, 0);
+  if (outer?.tag !== 0x30 || outer.end !== spki.length) return undefined;
+  const algEnd = outer.start + RSA_ALGORITHM.length;
+  if (algEnd > spki.length || !RSA_ALGORITHM.every((b, i) => spki[outer.start + i] === b)) {
+    return undefined;
+  }
+  const bits = derTlv(spki, algEnd);
+  if (bits?.tag !== 0x03 || bits.end !== outer.end || spki[bits.start] !== 0x00) return undefined;
+  const key = derTlv(spki, bits.start + 1);
+  if (key?.tag !== 0x30 || key.end !== bits.end) return undefined;
+  const modulus = derTlv(spki, key.start);
+  if (modulus?.tag !== 0x02) return undefined;
+  const exponent = derTlv(spki, modulus.end);
+  if (exponent?.tag !== 0x02 || exponent.end !== key.end) return undefined;
+  const n = derPositiveIntegerLength(spki, modulus.start, modulus.end);
+  const e = derPositiveIntegerLength(spki, exponent.start, exponent.end);
+  if (n === undefined || e === undefined || e > 8) return undefined;
+  return RSA_SIGNATURE_LENGTHS.includes(n) ? n : undefined;
+}
+
 /** The kind's length and point rules for the credential and the challenge (04 §2.3.4). */
 function credentialFits(
   kind: NativePresenceKind,
@@ -126,27 +198,38 @@ function credentialFits(
 ): boolean {
   if (credentialId.length < 1 || credentialId.length > MAX_CREDENTIAL_ID) return false;
   if (kind === NATIVE_PRESENCE_MACOS) {
+    // Fable review of DESK-D12a (low 1): the peer's X coordinate may be neither G's nor the
+    // credential key's, so -G and -credPub are refused as well as G and credPub.
     return (
       isP256Point(publicKey) &&
       isP256Point(challenge) &&
-      !equalBytes(challenge, P256_BASE) &&
-      !equalBytes(challenge, publicKey)
+      !equalBytes(challenge.subarray(1, 33), P256_BASE.subarray(1, 33)) &&
+      !equalBytes(challenge.subarray(1, 33), publicKey.subarray(1, 33))
     );
   }
   return (
     isCredentialName(credentialId) &&
     publicKey.length >= 1 &&
     publicKey.length <= MAX_CREDENTIAL_PUBLIC_KEY &&
+    rsaModulusLength(publicKey) !== undefined &&
     challenge.length === WINDOWS_CHALLENGE_LENGTH
   );
 }
 
-/** A secret of the kind's length that is not all zero bytes. */
-function secretFits(kind: NativePresenceKind, secret: Uint8Array): boolean {
+/**
+ * A secret of the kind's length that is not all zero bytes. Kind 2: exactly the modulus length of
+ * the credential key (Fable review of DESK-D12a, low 3).
+ */
+function secretFits(
+  kind: NativePresenceKind,
+  secret: Uint8Array,
+  credentialPublicKey: Uint8Array,
+): boolean {
   const lengthOk =
     kind === NATIVE_PRESENCE_MACOS
       ? secret.length === P256_SECRET_LENGTH
-      : RSA_SIGNATURE_LENGTHS.includes(secret.length);
+      : RSA_SIGNATURE_LENGTHS.includes(secret.length) &&
+        secret.length === rsaModulusLength(credentialPublicKey);
   return lengthOk && secret.some((byte) => byte !== 0);
 }
 
@@ -192,7 +275,7 @@ function checkWrapKeyInput(input: NativeWrapKeyInput, what: string): void {
       `${what}: the credential ID, public key or challenge does not fit the kind`,
     );
   }
-  if (!secretFits(input.kind, input.nativeSecret)) {
+  if (!secretFits(input.kind, input.nativeSecret, input.credentialPublicKey)) {
     throw new CryptoInputError(
       'invalid_length',
       `${what}: the native secret does not fit the kind`,
@@ -348,7 +431,7 @@ export async function openNativeSeed(
   const parsed = parseAlkh(blob);
   if (parsed === undefined) throw openFailed();
   const { header, length } = parsed;
-  if (!secretFits(header.kind, nativeSecret)) throw openFailed();
+  if (!secretFits(header.kind, nativeSecret, header.credentialPublicKey)) throw openFailed();
   if (expected.owner !== undefined && !equalBytes(header.ownerNostr, expected.owner)) {
     throw openFailed();
   }
@@ -448,4 +531,56 @@ export function readNativeHelperRecord(
   if (!credentialFits(kind, ...fields)) throw badRecord();
   const [credentialId, credentialPublicKey, challenge] = fields;
   return Object.freeze({ credentialId, credentialPublicKey, challenge });
+}
+
+/** What a helper's `create` printed, read by core (Fable review of DESK-D12a, low 2). */
+export interface NativeCreateOutput {
+  /** The record v1 exactly as printed (canonical: it equals the record rebuilt from its fields). */
+  readonly record: Uint8Array;
+  readonly credential: NativeHelperCredential;
+  /**
+   * Kind 2 only: the signature over the challenge that Windows `create` folds in (one prompt at
+   * registration), which is the first native secret. Kind 1 `create` needs no gesture and has none.
+   */
+  readonly firstSecret?: Uint8Array;
+}
+
+/**
+ * 04 §2.3.4 "Helper record": reads the bytes a helper's `create` printed. Kind 1: exactly a record
+ * v1. Kind 2: record v1 ‖ u16be L ‖ L-byte signature, L the modulus length of the record's
+ * SubjectPublicKeyInfo (256, 384 or 512) and the signature not all zero. Anything else, including
+ * trailing bytes, is refused. The fields are fresh copies; `firstSecret` is secret and the caller
+ * wipes it.
+ */
+export function readNativeCreateOutput(
+  kind: NativePresenceKind,
+  output: Uint8Array,
+): NativeCreateOutput {
+  assertBytes(output, 'readNativeCreateOutput: output');
+  if (kind === NATIVE_PRESENCE_MACOS) {
+    const credential = readNativeHelperRecord(kind, output);
+    return Object.freeze({ record: output.slice(), credential });
+  }
+  if (
+    kind !== NATIVE_PRESENCE_WINDOWS ||
+    output.length < 4 ||
+    output[0] !== HELPER_RECORD_VERSION
+  ) {
+    throw badRecord();
+  }
+  const n = output[1] as number;
+  if (output.length < 4 + n) throw badRecord();
+  const k = ((output[2 + n] as number) << 8) | (output[3 + n] as number);
+  const recordEnd = 4 + n + k + WINDOWS_CHALLENGE_LENGTH;
+  if (output.length < recordEnd + 2) throw badRecord();
+  const record = output.slice(0, recordEnd);
+  const credential = readNativeHelperRecord(kind, record);
+  const l = ((output[recordEnd] as number) << 8) | (output[recordEnd + 1] as number);
+  if (output.length !== recordEnd + 2 + l) throw badRecord();
+  const firstSecret = output.slice(recordEnd + 2);
+  if (!secretFits(kind, firstSecret, credential.credentialPublicKey)) {
+    wipe(firstSecret);
+    throw badRecord();
+  }
+  return Object.freeze({ record, credential, firstSecret });
 }

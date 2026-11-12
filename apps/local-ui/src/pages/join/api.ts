@@ -11,7 +11,7 @@
 // - `POST /api/ui/join/dismiss` ("Not now"): the invite kind, an octet-stream body `{}`.
 // Every non-GET carries the page's generation in `X-AgentLink-Generation`: the app's fetch guard
 // stamps it (api/generation.ts). Nothing here is logged.
-import type { PresenceProof } from '../contacts/owner.js';
+import { presenceBody, presenceMode, type PresenceProof } from '../contacts/owner.js';
 
 export const JOIN_PATH = '/api/ui/join';
 export const JOIN_ACCEPT_PATH = '/api/ui/join/accept';
@@ -219,8 +219,9 @@ export function createJoinApi(options: JoinApiOptions = {}): JoinApi {
         'content-type': 'application/octet-stream',
         'X-AgentLink-Input': toBase64url(new TextEncoder().encode(JSON.stringify({ inviteId }))),
       });
-      if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-      const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
+      const mode = presenceMode(proof);
+      if (mode !== undefined) headers.set('X-AgentLink-Presence', mode);
+      const body = presenceBody(proof);
       const answer = await post(JOIN_ACCEPT_PATH, headers, body);
       if (answer === 'offline') return { kind: 'offline' };
       const { status, json } = answer;

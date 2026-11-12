@@ -61,6 +61,7 @@ import {
   normalizeSecret,
   openOwnerSeed,
   openOwnerSeedWithoutCard,
+  openNativeSeed,
   openPasskeySeed,
   sealOwnerSeed,
   signEnvelopeHash,
@@ -86,6 +87,12 @@ export const OWNER_ACCOUNT = 'owner';
  * (`ALKP` v1, 04 §2.3.1; proposed, owner confirms at merge). One per OS user in M1b.
  */
 export const OWNER_PASSKEY_ACCOUNT = 'owner-passkey';
+
+/**
+ * DESK-D12c: the keychain account of the owner seed wrapped under the desktop app's native presence
+ * secret (`ALKH` v1, 04 §2.3.4; owner-native.ts). One per OS user; the `owner` item stays the fallback.
+ */
+export const OWNER_NATIVE_ACCOUNT = 'owner-native';
 
 /** `ALKO` v1 is exactly 90 bytes; byte 5 is `secretKind` (04 §2.8). */
 const ALKO_LENGTH = 90;
@@ -546,7 +553,12 @@ export async function storeRestoredOwnerSeed(
   options: StoreOwnerSeedOptions = {},
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
-  for (const account of [OWNER_ACCOUNT, OWNER_NEXT_ACCOUNT, OWNER_PASSKEY_ACCOUNT]) {
+  for (const account of [
+    OWNER_ACCOUNT,
+    OWNER_NEXT_ACCOUNT,
+    OWNER_PASSKEY_ACCOUNT,
+    OWNER_NATIVE_ACCOUNT,
+  ]) {
     const existing = await guarded(() => keychain.get(account), timeoutMs);
     if (existing !== null) {
       wipe(existing);
@@ -1073,6 +1085,11 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
           if (error instanceof CryptoInputError) throw presenceRejected();
           throw error;
         }
+      } else if (proof.kind === 'native') {
+        this.#open();
+        blob = await guarded(() => this.#keychain.get(OWNER_NATIVE_ACCOUNT), this.#timeoutMs);
+        if (blob === null) throw presenceRejected();
+        seed = await openNative(blob, proof, this.#expected.ownerNostr);
       } else {
         this.#open();
         blob = await guarded(() => this.#keychain.get(OWNER_PASSKEY_ACCOUNT), this.#timeoutMs);
@@ -1244,6 +1261,10 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
           if (error instanceof CryptoInputError) throw presenceRejected();
           throw error;
         }
+      } else if (proof.kind === 'native') {
+        blob = await guarded(() => keychain.get(OWNER_NATIVE_ACCOUNT), timeoutMs);
+        if (blob === null) throw presenceRejected();
+        seed = await openNative(blob, proof, ownerNostr);
       } else {
         blob = await guarded(() => keychain.get(OWNER_PASSKEY_ACCOUNT), timeoutMs);
         if (blob === null) throw presenceRejected();
@@ -1297,15 +1318,17 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
 }
 
 /**
- * The bytes of a presence proof for unlock: a non-empty passphrase, or a 32-byte passkey PRF output
- * (M1-8e). Anything else is `presence_required`, and any bytes it carried are wiped.
+ * The bytes of a presence proof for unlock: a non-empty passphrase, a 32-byte passkey PRF output
+ * (M1-8e), or a native presence secret of 32, 256, 384 or 512 bytes with its kind (DESK-D12c).
+ * Anything else is `presence_required`, and any bytes it carried are wiped.
  */
 function presenceProof(presence: unknown): {
-  readonly kind: 'passphrase' | 'passkey-prf';
+  readonly kind: 'passphrase' | 'passkey-prf' | 'native';
   readonly bytes: Uint8Array;
+  readonly nativeKind?: 1 | 2;
 } {
   if (typeof presence !== 'object' || presence === null) throw presenceRequired();
-  const { kind, secret, prfOutput } = presence as Record<string, unknown>;
+  const { kind, secret, prfOutput, nativeKind } = presence as Record<string, unknown>;
   if (kind === 'passphrase' && secret instanceof Uint8Array && secret.length > 0) {
     if (prfOutput instanceof Uint8Array) wipe(prfOutput);
     return { kind, bytes: secret };
@@ -1314,8 +1337,38 @@ function presenceProof(presence: unknown): {
     if (secret instanceof Uint8Array) wipe(secret);
     return { kind, bytes: prfOutput };
   }
+  if (
+    kind === 'native' &&
+    (nativeKind === 1 || nativeKind === 2) &&
+    secret instanceof Uint8Array &&
+    [32, 256, 384, 512].includes(secret.length)
+  ) {
+    if (prfOutput instanceof Uint8Array) wipe(prfOutput);
+    return { kind, bytes: secret, nativeKind };
+  }
   for (const value of [secret, prfOutput]) if (value instanceof Uint8Array) wipe(value);
   throw presenceRequired();
+}
+
+/**
+ * DESK-D12c (04 §2.3.4): opens the `owner-native` blob with the native secret, for the expected owner
+ * and the presence's kind. A wrong or wiped secret, another kind or owner, a tampered blob and a blob
+ * of another type are one answer, `presence_rejected`. The caller wipes the secret and the seed.
+ */
+async function openNative(
+  blob: Uint8Array,
+  proof: { readonly bytes: Uint8Array; readonly nativeKind?: 1 | 2 },
+  ownerNostr: Uint8Array,
+): Promise<Uint8Array> {
+  try {
+    return await openNativeSeed(blob, proof.bytes, {
+      expectedOwnerNostr: ownerNostr,
+      ...(proof.nativeKind === undefined ? {} : { expectedKind: proof.nativeKind }),
+    });
+  } catch (error) {
+    if (error instanceof CryptoInputError) throw presenceRejected();
+    throw error;
+  }
 }
 
 /**

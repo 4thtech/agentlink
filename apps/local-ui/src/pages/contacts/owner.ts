@@ -13,7 +13,24 @@ import { knownFailureReason, type FailureReasonCode } from '../../api/failure-re
 
 export type PresenceProof =
   | { readonly kind: 'code'; readonly code: string }
-  | { readonly kind: 'passkey'; readonly body: Uint8Array };
+  | { readonly kind: 'passkey'; readonly body: Uint8Array }
+  /**
+   * DESK-D12c: Touch ID / Windows Hello in the desktop app. No bytes: the server runs this computer's
+   * presence helper for this one operation (`X-AgentLink-Presence: native`, empty body).
+   */
+  | { readonly kind: 'native' };
+
+/** DESK-D12c: the `X-AgentLink-Presence` value of a proof (none for the backup code). */
+export function presenceMode(proof: PresenceProof): 'passkey' | 'native' | undefined {
+  return proof.kind === 'code' ? undefined : proof.kind;
+}
+
+/** The octet-stream body of a proof: the code, the passkey assertion, or nothing (native). */
+export function presenceBody(proof: PresenceProof): Uint8Array {
+  if (proof.kind === 'passkey') return proof.body;
+  if (proof.kind === 'native') return new Uint8Array(0);
+  return new TextEncoder().encode(proof.code);
+}
 
 export type OwnerResult =
   | { readonly kind: 'done' }
@@ -138,7 +155,13 @@ export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient
         );
       }
       if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-      const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
+      if (proof.kind === 'native') headers.set('X-AgentLink-Presence', 'native');
+      const body =
+        proof.kind === 'passkey'
+          ? proof.body
+          : proof.kind === 'native'
+            ? new Uint8Array(0)
+            : new TextEncoder().encode(proof.code);
       let res: Response;
       try {
         res = await doFetch(path, {
@@ -155,6 +178,9 @@ export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient
       }
       const { status, reason } = await answerOf(res);
       if (res.status === 200 && status === 'done') return { kind: 'done' };
+      // DESK-D12c: a refused Touch ID / Windows Hello gesture (cancel, lockout, …) changed nothing;
+      // the screen says so and keeps "Use your backup code instead".
+      if (proof.kind === 'native' && status === 'presence_rejected') return { kind: 'rejected' };
       if (res.status === 401) return { kind: 'session' };
       if (res.status === 403 && status === 'presence_rejected') return { kind: 'rejected' };
       if (res.status === 403 && status === 'presence_required') return { kind: 'required' };

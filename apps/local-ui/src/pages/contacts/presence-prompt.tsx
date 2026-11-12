@@ -26,6 +26,8 @@ import {
   type PresenceProof,
 } from './owner.js';
 import { switchToPasskey, type SwitchToPasskey } from './passkey-switch.js';
+import { desktopPlatform, nativeConfirmLabel } from '../../presence/desktop.js';
+import { readNativeStatus, type NativeStatus } from '../../presence/native-api.js';
 import { CONTACTS_STRINGS as S, PASSKEY_WHY } from './strings.js';
 
 type Unavailable = Extract<PasskeyStatus, { kind: 'unavailable' }>;
@@ -40,6 +42,8 @@ export function PresencePrompt({
   passkeyStatus = readPasskeyStatus,
   switchPasskey = switchToPasskey,
   codeFirst = false,
+  nativeStatus = readNativeStatus,
+  userAgent,
 }: {
   summary: string;
   passkey: PasskeyInfo | undefined;
@@ -55,6 +59,9 @@ export function PresencePrompt({
    * prompt opens on the code field and does not ask for the passkey again.
    */
   codeFirst?: boolean;
+  /** DESK-D12c seams (tests): the native presence status read, and the user agent. */
+  nativeStatus?: () => Promise<NativeStatus>;
+  userAgent?: string;
 }): ReactElement {
   const [code, setCode] = useState('');
   const [useCode, setUseCode] = useState(codeFirst || passkey === undefined);
@@ -68,6 +75,9 @@ export function PresencePrompt({
   // F49: a switch already failed in this browser for lack of PRF, so it is not offered again here.
   const [noSwitch, setNoSwitch] = useState(switchUnsupportedHere);
   const mounted = useRef(true);
+  // DESK-D12c: in the desktop app, Touch ID / Windows Hello is the primary confirm once it is on.
+  const desktop = desktopPlatform(userAgent);
+  const [native, setNative] = useState(false);
   const platform = detectPlatform();
   const sensor = SENSOR[platform];
   const info = passkey ?? found;
@@ -82,6 +92,15 @@ export function PresencePrompt({
 
   useEffect(() => {
     mounted.current = true;
+    if (desktop !== undefined && !codeFirst) {
+      void nativeStatus()
+        .catch(() => ({ available: false, registered: false }))
+        .then((status) => {
+          if (!mounted.current || !status.available || !status.registered) return;
+          setNative(true);
+          setUseCode(false);
+        });
+    }
     if (passkey === undefined) {
       void readStatus().then((status) => {
         if (!mounted.current) return;
@@ -238,6 +257,24 @@ export function PresencePrompt({
             </p>
           )}
         </form>
+      ) : native && !useCode && desktop !== undefined ? (
+        <div className="ct-actions">
+          <Button
+            variant="primary"
+            icon="approval"
+            onClick={() => {
+              if (!busy) onSubmit({ kind: 'native' });
+            }}
+            disabled={busy}
+            data-native-confirm=""
+          >
+            {nativeConfirmLabel(desktop)}
+          </Button>
+          <UseCodeInstead onClick={() => setUseCode(true)} disabled={busy} />
+          <Button variant="ghost" onClick={onCancel} disabled={busy}>
+            {S.cancel}
+          </Button>
+        </div>
       ) : useCode ? (
         <>
           {whyText === undefined ? null : (

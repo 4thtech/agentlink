@@ -45,6 +45,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'createInboxFile',
       'createOsKeychainAgent',
       'decideReviewedApprovals',
+      // DESK-D12c: the desktop app's presence helper behind fixed commands (no path or runner seam;
+      // it releases a secret only after the owner's OS gesture, and only the approval server uses it).
+      'desktopNativeHelper',
       // U3-d: removes the keychain items of an agent the app just created (agentId-derived names
       // only; never the owner's items), when it could not be completed.
       'discardNewOsKeychainAgent',
@@ -88,6 +91,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'setUpSendFolder',
       // M1-8d: the local approval server entry point (no owner-store or opener seam).
       'startApprovalServer',
+      // WP-D3: the same server with the desktop app's link sink (the session link goes to fd 3 only).
+      'startApprovalServerWithLinkSink',
       'unlockFileKeyStoreAgent',
       // U3-c (card U3-e uses it): removal takes the folder lock exclusive.
       'withAgentFolderExclusive',

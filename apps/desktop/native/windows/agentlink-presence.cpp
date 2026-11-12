@@ -29,8 +29,9 @@
 //   stdout: on success only, lowercase hex followed by "\n". Nothing else, ever.
 //   stderr: never written. Errors are reported only by the exit code.
 //
-//   Record v1 (what `create` prints and the other commands read back; the core stores it verbatim
-//   next to the ALKH blob — it is not secret):
+//   Record v1 (what `create` prints and the other commands read back; not secret). The core does
+//   not store it: it reads it into the ALKH header fields and rebuilds it from the stored header for
+//   every later call (04 §2.3.4 "Helper record"; DESK-D12c):
 //     [0]        0x01                         record version
 //     [1]        N, 1..64                     length of the credential name
 //     [2..2+N)   credential name, ASCII       "AgentLink-owner-" + 32 lowercase hex (random)
@@ -39,10 +40,11 @@
 //     next 32    challenge                    random per install
 //
 //   create output: hex of (record v1 || u16 big-endian L || L-byte signature over the challenge).
-//   The record is self-delimiting; the core stores only the record and uses the signature once.
+//   The record is self-delimiting; the core keeps it in memory until the seal (it stores only the
+//   ALKH blob) and uses the signature once, as the first secret (readNativeCreateOutput).
 //   sign output: hex of the RSASSA-PKCS1-v1_5 SHA-256 signature over the challenge (256 bytes for
-//   RSA 2048). Suggested ALKH bindings for WP-D12a: credential ID = the name bytes, credential
-//   public-key hash = SHA-256(SPKI DER), plus the record version (0x01).
+//   RSA 2048). The ALKH binding (HKDF info) is in 04 §2.3.4: version, kind, credential ID,
+//   SHA-256 of the credential public key, SHA-256 of the challenge, owner key.
 //
 //   Exit codes (fixed, same numbers on macOS):
 //     0 ok · 10 cancelled (incl. "use password") · 11 failed · 12 not interactive (macOS only)

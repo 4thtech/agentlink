@@ -226,3 +226,11 @@ export {
   type SendFolderSetupOptions,
   type SendFolderSetupResult,
 } from './owner-send-folder.js';
+// DESK-D12c (04 §2.3.4, D-145 phase 2): the desktop app's native presence helper, for the desktop
+// host (apps/cli desktop/host-main.ts passes it to the approval server as `nativePresence`).
+export {
+  desktopNativeHelper,
+  type NativeHelper,
+  type NativeReason,
+  type NativeUiState,
+} from './owner-native-helper.js';
