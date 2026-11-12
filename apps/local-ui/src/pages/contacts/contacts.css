@@ -186,7 +186,7 @@
 }
 .ct-check,
 .ct-open {
-  color: var(--al-color-accent-fg);
+  color: var(--al-color-fg-link);
   text-decoration: underline;
   text-transform: none;
   letter-spacing: normal;

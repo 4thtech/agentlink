@@ -2,6 +2,7 @@
 // Connected moment (prototype v23 A3, A5–A7; 11 §5). `{name}` is always the name the owner typed or
 // the name rule's output, rendered as React text. No "wallet", "gas", "seed phrase", "transaction",
 // "key" or "relay" here. The 12 digits stays 12 digits in 0.4.6 (words later).
+import { sensorWord } from '../../presence-word.js';
 export const INVITE_STRINGS = {
   title: 'Invite someone',
   intro: 'Send them this link. When they accept, your AIs can talk.',
@@ -96,7 +97,9 @@ export const PASTE_STRINGS = {
   open: 'Have an invite link? Paste it',
   /** The paste screen (IR-W4-WIRE-2X-1): the option on its own, no link of yours is made. */
   title: 'Accept an invite',
-  intro: 'Paste the link someone sent you. You accept it with Touch ID.',
+  get intro(): string {
+    return `Paste the link someone sent you. You accept it with ${sensorWord()}.`;
+  },
   label: 'Paste the invite link',
   hint: 'It starts with https://agentlink.4thtech.io/i#',
   go: 'Continue',

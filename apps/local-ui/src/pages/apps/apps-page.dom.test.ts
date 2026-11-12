@@ -314,7 +314,7 @@ describe('Review change: the exact entry, then Touch ID', () => {
     await mountPage();
     await click(button(card('windsurf'), 'Show manual steps'));
     const s = sheet();
-    expect(s.textContent).toContain('Open this file');
+    expect(s.textContent).toContain('Open ');
     expect(s.textContent).toContain('Add the entry above');
     expect(s.textContent).toContain('Restart Windsurf');
     expect(button(s, 'Apply with Touch ID')).toBeUndefined();

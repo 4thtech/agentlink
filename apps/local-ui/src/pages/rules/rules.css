@@ -328,3 +328,12 @@ section.rl-summary {
   display: grid;
   color: var(--al-color-fg-muted);
 }
+
+/* A switch with nothing to switch (no contacts listed): shown quiet, but its words keep full
+   contrast (opacity would drop the help text below WCAG AA). */
+.rl-limits .al-switch-row.is-disabled {
+  opacity: 1;
+}
+.rl-limits .al-switch-row.is-disabled .al-switch-text > .al-text-body {
+  color: var(--al-color-fg-muted);
+}

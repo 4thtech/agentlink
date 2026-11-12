@@ -158,6 +158,20 @@ const nameInput = (c: ContactRow): { alias?: string; name?: string; fingerprint?
 /** The name as the ui name rule shows it, for sentences (always rendered as text). */
 const shownName = (c: ContactRow): string => formatContactName(nameInput(c)).text;
 
+/**
+ * The rename note: the new name is always visible (under your own name for them, as "Now calls
+ * itself {new}"), and "(was {old})" only when the old name differs from what the row shows.
+ */
+export const renameNote = (c: ContactRow): string => {
+  const shown = shownName(c);
+  const parts: string[] = [];
+  if (c.newName !== undefined && c.newName !== shown) parts.push(S.nowCalls(c.newName));
+  if (c.formerName !== undefined && c.formerName !== shown && c.formerName !== c.newName) {
+    parts.push(S.wasName(c.formerName));
+  }
+  return parts.join(' ');
+};
+
 const labelKind = (c: ContactRow): IdentityKind =>
   c.label === 'safety-code-checked' ? 'checked' : 'selfdeclared';
 
@@ -248,10 +262,10 @@ function PersonRow({
   const name = (
     <span className="al-contact-name">
       <bdi>{shownName(c)}</bdi>
-      {c.formerName === undefined ? null : (
+      {renameNote(c) === '' ? null : (
         <span className="al-text-caption al-muted ct-former">
           {' '}
-          <bdi>{S.wasName(c.formerName)}</bdi>
+          <bdi>{renameNote(c)}</bdi>
         </span>
       )}
       {archived === true ? (

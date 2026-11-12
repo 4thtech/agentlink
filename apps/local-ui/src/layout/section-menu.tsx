@@ -72,7 +72,7 @@ export function SectionRail({
   onToggle,
   waiting = 0,
 }: SectionRailProps): ReactElement {
-  const current = sectionOf(path);
+  const current = !hood && path === '/advanced/network' ? 'settings' : sectionOf(path);
   return (
     <nav
       aria-label={S.sections}
@@ -121,7 +121,7 @@ export function SectionSheet({ path, hood }: MenuProps): ReactElement {
   const [open, setOpen] = useState(false);
   const bar = useRef<HTMLButtonElement>(null);
   const sheet = useRef<HTMLElement>(null);
-  const current = sectionOf(path);
+  const current = !hood && path === '/advanced/network' ? 'settings' : sectionOf(path);
   const close = useCallback((restore: boolean): void => {
     setOpen(false);
     if (restore) bar.current?.focus();

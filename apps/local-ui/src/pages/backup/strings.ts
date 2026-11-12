@@ -1,5 +1,7 @@
 // Settings › Backup & restore copy (design-1112 §6.2 to §6.4, §8; WP-R4; 11 §5; 07 §9.4). One recovery
 // kit covers all IDs. Restore itself is the wizard of WP-R3 (links only here).
+import { sensorSentence, sensorWord } from '../../presence-word.js';
+
 export const BACKUP_STRINGS = {
   title: 'Backup & restore',
   // QA-UTH: Under the hood names the kit format.
@@ -45,7 +47,7 @@ export const BACKUP_STRINGS = {
   ],
   againTitle: 'Set up again afterwards',
   again: [
-    'Touch ID and a new master code (one step)',
+    `${sensorSentence()} and a new master code (one step)`,
     'Your AI apps (one click each)',
     'Files you received: they are ordinary files in your Files folder, so copy that folder yourself',
     'Your own storage, if you connected one',
@@ -60,9 +62,11 @@ export const BACKUP_STRINGS = {
     'Save a new kit here first, restore it there, then remove AgentLink from this computer.',
   moveAction: 'How to move',
   footnote:
-    'Saving a kit asks for Touch ID or your master code. Anyone with both the kit file and its code can read your messages, so keep them apart.',
+    `Saving a kit asks for ${sensorWord()} or your master code. Anyone with both the kit file and its code can read your messages, so keep them apart.`,
   // --- saving
-  saveHint: 'Asks for Touch ID or your master code first.',
+  get saveHint(): string {
+    return `Asks for ${sensorWord()} or your master code first.`;
+  },
   confirmSummary: (label: string): string => `Save a recovery kit for ${label}`,
   thisId: 'your IDs',
   saving: 'Saving your recovery kit…',
@@ -119,5 +123,7 @@ export const BACKUP_STRINGS = {
   ],
   sheetKeep: 'Keep this sheet away from the kit file. Never give the code to your AI.',
   // --- slot for the desktop app
-  touchSlotLabel: 'Touch ID on this computer',
+  get touchSlotLabel(): string {
+    return `${sensorSentence()} on this computer`;
+  },
 } as const;

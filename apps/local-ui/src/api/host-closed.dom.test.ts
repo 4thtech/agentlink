@@ -34,7 +34,7 @@ const ok = (): Response => new Response('{}', { status: 200 });
 
 describe('the page learns the host is gone (F25)', () => {
   it('has the one plain line', () => {
-    expect(HOST_CLOSED_TEXT).toBe('AgentLink closed. Run agentlink to open it again.');
+    expect(HOST_CLOSED_TEXT).toBe('AgentLink closed. Open AgentLink again.');
   });
 
   it('two failed requests in a row after a good one mean closed; a good one in between resets', async () => {

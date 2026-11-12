@@ -61,10 +61,10 @@
   align-items: center;
 }
 .ap-warn {
-  color: var(--al-color-status-warning-icon);
+  color: var(--al-color-status-warning-fg);
 }
 .ap-ok {
-  color: var(--al-color-status-success-icon);
+  color: var(--al-color-status-success-fg);
 }
 .ap-card-actions {
   display: flex;

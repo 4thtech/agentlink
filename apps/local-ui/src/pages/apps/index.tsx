@@ -147,7 +147,6 @@ function Card({
     <li
       className="ap-card"
       data-app={row.app}
-      role="group"
       aria-label={S.cardName(row.name, restart ? S.needsRestart : word)}
     >
       <div className="ap-card-head">

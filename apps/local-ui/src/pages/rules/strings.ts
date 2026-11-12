@@ -1,9 +1,8 @@
 // The Rules page's copy (11 §5, §5.6, §6.2.1; DESIGN-ADJ-1 RU-2…RU-6, LS-1; UX audit 6a–6c). Plain
 // words only: no 11 §5.1 term (rules.test.tsx checks the rendered page). The warning sentences of the
 // confirm screen are in warnings.ts (D-119).
+import { sensorWord } from '../../presence-word.js';
 
-import { detectPlatform } from '../first-run/passkey.js';
-import { SENSOR } from '../first-run/strings.js';
 
 export const RULES_STRINGS = {
   lead: 'What your AI may do without asking you. Everything else waits for your approval on Home.',
@@ -93,8 +92,9 @@ export const RULES_STRINGS = {
     'Delivery receipts are on from an older default. Each one shows publicly that a proof reached you, never the content.',
   codeLabel: 'Master code',
   codeHint: 'Never give it to your AI.',
-  // The confirm button shows with a registered passkey: the platform's word (Touch ID on a Mac).
-  save: `Save with ${SENSOR[detectPlatform()]}`,
+  get save(): string {
+    return `Save with ${sensorWord()}`;
+  },
   saveCode: 'Save',
   back: 'Back to editing',
   preparing: 'Checking your changes…',

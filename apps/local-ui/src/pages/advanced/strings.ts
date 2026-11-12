@@ -6,6 +6,7 @@ export const ADVANCED_STRINGS = {
   relays: 'Relays',
   relayCount: (connected: number, total: number): string =>
     `${String(connected)} of ${String(total)} connected`,
+  relaysWorking: 'Working',
   noRelays: 'No relays reported yet',
   network: 'Network',
   networkAuto: 'Picked automatically',

@@ -37,6 +37,8 @@ export interface InvitePanelProps {
   readonly invites?: InviteApi;
   /** A link was made (the pending list can read again). */
   readonly onCreated?: () => void;
+  /** Whether a link is on screen that has not gone anywhere yet (leaving would cancel it). */
+  readonly onUnsent?: (unsent: boolean) => void;
   /** WP-1: the IDs and owner clients of the name update asked before an invite (tests). */
   readonly agents?: AgentsApi;
   readonly owner?: OwnerClient;
@@ -77,6 +79,7 @@ const exact = (ms: number): string =>
 export function InvitePanel({
   invites: givenInvites,
   onCreated,
+  onUnsent,
   now = () => Date.now(),
   agents: givenAgents,
   owner: givenOwner,
@@ -115,6 +118,9 @@ export function InvitePanel({
   // An Email click: the mail app may hide the page; the invite stays pending (not shown as sent).
   const keptRef = useRef(false);
   const run = useRef(0);
+  useEffect(() => {
+    onUnsent?.(made !== undefined && !shared && !keptRef.current);
+  }, [made, shared, onUnsent]);
   const live = useRef(true);
   madeRef.current = made;
   sharedRef.current = shared || keptRef.current;
@@ -388,6 +394,10 @@ export function InvitePanel({
             <div
               ref={boxRef}
               className="inv-link"
+              // A long link scrolls inside its box: the box takes focus so it can be read by keyboard.
+              tabIndex={0}
+              role="group"
+              aria-label={linkLabel(wanted)}
               data-state={ready ? 'ready' : 'making'}
               aria-busy={ready ? undefined : 'true'}
             >

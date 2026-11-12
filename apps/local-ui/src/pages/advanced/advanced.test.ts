@@ -41,6 +41,12 @@ describe('parseRelays', () => {
 });
 
 describe('Relays & network', () => {
+  it('a running answer without relay counts says Working, never "No relays reported yet"', async () => {
+    await mount(async () => ok({ agent: 'running', relays: null, lastSyncAt: null }));
+    expect(host.textContent).toContain(S.relaysWorking);
+    expect(host.textContent).not.toContain(S.noRelays);
+    expect(host.textContent).not.toContain(S.never);
+  });
   it('shows how many relays are connected, the sync time and that the network is automatic', async () => {
     await mount(async () =>
       ok({ agent: 'running', relays: { connected: 2, total: 3 }, lastSyncAt: 1700000000 }),

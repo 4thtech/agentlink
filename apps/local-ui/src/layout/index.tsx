@@ -290,7 +290,7 @@ export function Layout({
     );
   }
   const [statusClass, statusWord] = STATUS[connection];
-  const settings = sectionOf(path) === 'settings';
+  const settings = sectionOf(path) === 'settings' || path === '/advanced/network';
   return (
     <PrefsHood>
       <a href="#al-main" className="al-skip al-text-body-sm" onClick={skipToContent}>

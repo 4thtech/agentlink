@@ -112,6 +112,10 @@ export const FIRST_RUN = {
   /** W4-WIZARD: step 2 without an app found on this computer. */
   yourAiApp: 'your AI app',
   noAppYet: 'Connect an AI app later',
+  noAppCreateBody:
+    "We create your ID. No AI app is connected yet: install one, then connect it in Settings > AI apps. Your confirmation proves it's you.",
+  notFoundCreateBody: (app: string): string =>
+    `${app} isn't on this computer yet, so nothing is added to it now. We create the ID; install ${app}, then connect it in Settings > AI apps.`,
   notFoundTitle: (app: string): string => `${app} isn't on this computer yet`,
   notFoundBody: (app: string): string =>
     `Install ${app}, then come back to Get started. Nothing changed. You can pick another AI app.`,

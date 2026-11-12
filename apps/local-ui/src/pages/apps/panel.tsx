@@ -363,7 +363,7 @@ export function ManualPanel({
           </Button>
         </div>
         <ol className="ap-steps al-text-body">
-          <li>{S.manualOpen}</li>
+          <li>{S.manualOpen(app?.path)}</li>
           <li>{S.manualAdd}</li>
           <li>{S.manualRestart(name ?? S.genericApp)}</li>
         </ol>
