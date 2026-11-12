@@ -9,6 +9,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DESKTOP_MARKER } from './desktop.js';
+import { registerNative, replaceNative } from './native-api.js';
 import {
   NativeWaitNotice,
   cancelNativeWait,
@@ -16,7 +17,7 @@ import {
   nativeWaitFetch,
   nativeWaiting,
 } from './native-wait.js';
-import { NATIVE_STRINGS } from './strings.js';
+import { NATIVE_STRINGS, nativeOutcomeText } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -47,8 +48,14 @@ async function flush(): Promise<void> {
 function heldFetch() {
   const seen: { focused: string | null; signal: AbortSignal | null | undefined }[] = [];
   const pending: { resolve: (r: Response) => void; reject: (e: unknown) => void }[] = [];
+  const calls: { input: RequestInfo | URL; url: string; method: string }[] = [];
   const base = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    void input;
+    calls.push({
+      input,
+      url: typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+      method:
+        init?.method ?? (typeof input === 'object' && 'method' in input ? input.method : 'GET'),
+    });
     seen.push({
       focused: (document.activeElement as HTMLElement | null)?.id ?? null,
       signal: init?.signal,
@@ -60,7 +67,7 @@ function heldFetch() {
       );
     });
   };
-  return { base, seen, pending };
+  return { base, seen, pending, calls };
 }
 
 function focusCodeField(): HTMLInputElement {
@@ -132,21 +139,41 @@ describe('the wrapped fetch', () => {
     input.remove();
   });
 
-  it("Cancel aborts the request with the server's cancelled answer; the caller's abort rejects", async () => {
+  it('Cancel asks the server to cancel and never aborts or answers the request itself', async () => {
     const held = heldFetch();
     const f = nativeWaitFetch(held.base, ORIGIN);
     const p = f('/api/owner/native/replace', { method: 'POST' });
-    cancelNativeWait();
-    const res = await p;
-    expect(held.seen[0]?.signal?.aborted).toBe(true);
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ status: 'presence_rejected', native: 'cancelled' });
+    cancelNativeWait(held.base);
+    // The second call is the cancel request; the original one is still waiting for the server.
+    expect(held.seen).toHaveLength(2);
+    expect(held.seen[0]?.signal).toBeUndefined();
+    expect(held.calls[1]).toMatchObject({ url: '/api/owner/native/cancel', method: 'POST' });
+    expect(nativeWaiting()).toBe(true);
+    held.pending[1]?.resolve(new Response('{"status":"cancelling"}'));
+    // The server's own answer (here: it had already finished) is what the caller gets.
+    const answer = new Response('{"status":"registered"}', { status: 200 });
+    held.pending[0]?.resolve(answer);
+    expect(await p).toBe(answer);
     expect(nativeWaiting()).toBe(false);
+  });
 
+  it("keeps a Request's own signal and tracks every request in flight", async () => {
+    const held = heldFetch();
+    const f = nativeWaitFetch(held.base, ORIGIN);
     const own = new AbortController();
-    const q = f('/api/owner/native', { method: 'POST', signal: own.signal });
-    own.abort();
-    await expect(q).rejects.toThrow();
+    const req = new Request(`${ORIGIN}/api/owner/native`, { method: 'POST', signal: own.signal });
+    const a = f(req);
+    const b = f('/api/approvals/x/approve', {
+      method: 'POST',
+      headers: { 'X-AgentLink-Presence': 'native' },
+    });
+    expect(held.seen[0]?.signal).toBeUndefined();
+    expect(held.calls[0]?.input).toBe(req);
+    held.pending[0]?.resolve(new Response('{}'));
+    await a;
+    expect(nativeWaiting()).toBe(true);
+    held.pending[1]?.resolve(new Response('{}'));
+    await b;
     expect(nativeWaiting()).toBe(false);
   });
 });
@@ -167,6 +194,11 @@ describe('the waiting notice', () => {
     const cancel = host.querySelector<HTMLButtonElement>('[data-native-cancel]');
     expect(cancel?.textContent).toBe(NATIVE_STRINGS.cancel);
     await act(async () => cancel?.click());
+    expect(held.calls[1]?.url).toBe('/api/owner/native/cancel');
+    held.pending[1]?.resolve(new Response('{"status":"cancelling"}'));
+    held.pending[0]?.resolve(
+      new Response('{"status":"presence_rejected","native":"cancelled"}', { status: 403 }),
+    );
     expect((await p).status).toBe(403);
     await flush();
     expect(host.querySelector('[data-native-waiting]')).toBeNull();
@@ -186,5 +218,33 @@ describe('the waiting notice', () => {
     expect(host.querySelector('[data-native-waiting]')).toBeNull();
     held.pending[0]?.resolve(new Response('{}'));
     await p;
+  });
+});
+
+// Fable review L-2 / L-1: honest wording when turning it on again failed after the old one was
+// removed (`nowOff`), and when a keychain write may still have landed (`keychain_unsure`).
+describe('honest answers of turning it on (again)', () => {
+  const answering = (status: number, body: unknown) => () =>
+    Promise.resolve(new Response(JSON.stringify(body), { status }));
+  it('on again that failed after removing the old one says it is now off', async () => {
+    const out = await replaceNative(
+      'CODE',
+      answering(403, { status: 'presence_rejected', native: 'timeout', nowOff: true }),
+      't',
+    );
+    expect(out).toEqual({ kind: 'native', state: 'timeout', nowOff: true });
+    const text = nativeOutcomeText(out, 'mac');
+    expect(text).toBe(NATIVE_STRINGS.nowOff('mac'));
+    expect(text).not.toContain('Nothing was changed');
+  });
+  it('a keychain write that may have landed says so', async () => {
+    const out = await registerNative(
+      'CODE',
+      answering(503, { status: 'failed', native: 'keychain_unsure' }),
+      't',
+    );
+    expect(out).toEqual({ kind: 'native', state: 'keychain_unsure' });
+    expect(nativeOutcomeText(out, 'mac')).toBe(NATIVE_STRINGS.state.keychain_unsure);
+    expect(NATIVE_STRINGS.state.keychain_unsure).not.toContain('Nothing was changed');
   });
 });

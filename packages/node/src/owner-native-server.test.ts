@@ -569,3 +569,130 @@ describe('one fixed diagnostic line per outcome (DESK-NATIVE-DEBUG)', () => {
     );
   });
 });
+
+// DESK-TOUCHID-FIX review round (Fable M-1, L-2, L-1): Cancel on the page asks the server to cancel
+// (POST /api/owner/native/cancel); the server stops the helper of the operation in progress (turn on,
+// on again, or a native approval), releases `busy`, stores nothing, and the page gets the server's
+// own answer. A replace that fails after the old one was removed says so (`nowOff`). A keychain
+// write that timed out and may still land is never reported as "nothing changed".
+describe('cancel, replace wording and a late keychain write (DESK-TOUCHID-FIX review)', () => {
+  const cancel = (h: Harness, page: Record<string, string>) =>
+    send(h.port, '/api/owner/native/cancel', { method: 'POST', headers: page });
+  const untilReleasing = async (h: Harness): Promise<void> => {
+    while (!h.helper.calls.some((c) => c.startsWith('release')))
+      await new Promise((r) => setTimeout(r, 2));
+  };
+
+  it('cancel during turn-on: helper stopped, busy released, nothing stored, server says cancelled', async () => {
+    const h = await harness();
+    const page = await h.page();
+    h.helper.touch = new Promise(() => undefined);
+    h.helper.stopOnAbort = true;
+    const pending = register(h, page);
+    await untilReleasing(h);
+    const c = await cancel(h, page);
+    expect(c.status).toBe(200);
+    expect(json(c)).toEqual({ status: 'cancelling' });
+    const reg = await pending;
+    expect(h.helper.aborted).toBe(1);
+    expect(reg.status).toBe(403);
+    expect(json(reg)).toEqual({ status: 'presence_rejected', native: 'cancelled' });
+    expect(await world.keychain.get(OWNER_NATIVE_ACCOUNT)).toBeNull();
+    h.helper.touch = undefined;
+    // Not busy any more.
+    const again = await register(h, page);
+    expect(json(again)).toEqual({ status: 'registered' });
+  });
+
+  it('cancel during on-again: helper stopped, nothing new stored, and the answer says it is now off', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    h.helper.touch = new Promise(() => undefined);
+    h.helper.stopOnAbort = true;
+    const pending = send(h.port, '/api/owner/native/replace', {
+      method: 'POST',
+      headers: page,
+      body: encodeUtf8(world.code),
+    });
+    await untilReleasing(h);
+    await cancel(h, page);
+    const res = await pending;
+    expect(h.helper.aborted).toBe(1);
+    expect(json(res)).toEqual({ status: 'presence_rejected', native: 'cancelled', nowOff: true });
+    expect(await world.keychain.get(OWNER_NATIVE_ACCOUNT)).toBeNull();
+  });
+
+  it('a page that goes away during turn-on also stops the helper and stores nothing', async () => {
+    const h = await harness();
+    const page = await h.page();
+    h.helper.touch = new Promise(() => undefined);
+    h.helper.stopOnAbort = true;
+    const req = httpRequest({
+      host: '127.0.0.1',
+      port: h.port,
+      path: '/api/owner/native',
+      method: 'POST',
+      headers: { Host: `localhost:${String(h.port)}`, ...page },
+      setHost: false,
+    });
+    req.on('error', () => undefined);
+    req.end(Buffer.from(encodeUtf8(world.code)));
+    await untilReleasing(h);
+    req.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(h.helper.aborted).toBe(1);
+    expect(await world.keychain.get(OWNER_NATIVE_ACCOUNT)).toBeNull();
+    h.helper.touch = undefined;
+    expect(json(await register(h, page))).toEqual({ status: 'registered' });
+  });
+
+  it('cancel during a native approval gives the server answer (cancelled); with nothing running, none', async () => {
+    const h = await harness();
+    const page = await h.page();
+    expect(json(await cancel(h, page))).toEqual({ status: 'none' });
+    await register(h, page);
+    h.source.add(12);
+    h.helper.calls.length = 0;
+    h.helper.touch = new Promise(() => undefined);
+    h.helper.stopOnAbort = true;
+    const pending = decide(h, page, 12);
+    await untilReleasing(h);
+    await cancel(h, page);
+    const res = await pending;
+    expect(json(res)['native']).toBe('cancelled');
+    expect(h.source.applied).toHaveLength(0);
+  });
+
+  it('cancel needs the page session and CSRF token', async () => {
+    const h = await harness();
+    const page = await h.page();
+    const bad = await send(h.port, '/api/owner/native/cancel', {
+      method: 'POST',
+      headers: { ...page, 'X-AgentLink-CSRF': 'x' },
+    });
+    expect(bad.status).toBe(403);
+  });
+
+  it('replace that fails after removing the old one says it is now off (timeout, keychain)', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.gesture = 'timeout';
+    const res = await send(h.port, '/api/owner/native/replace', {
+      method: 'POST',
+      headers: page,
+      body: encodeUtf8(world.code),
+    });
+    expect(json(res)).toEqual({ status: 'presence_rejected', native: 'timeout', nowOff: true });
+    h.helper.gesture = 'ok';
+    // A wrong master code changed nothing: no nowOff.
+    const wrong = await send(h.port, '/api/owner/native/replace', {
+      method: 'POST',
+      headers: page,
+      body: encodeUtf8('WRONG-CODE-0000'),
+    });
+    expect(json(wrong)['nowOff']).toBeUndefined();
+  });
+});

@@ -64,7 +64,8 @@ export class StandInHelper implements NativeHelper {
   }
   #created = 0;
   /** Each `create` after the first makes a new credential (as the real helpers do). */
-  create(): Promise<Uint8Array> {
+  create(signal?: AbortSignal): Promise<Uint8Array> {
+    this.signals.push(signal);
     this.calls.push(`create@${String(this.keychain?.writes.length ?? 0)}`);
     if (this.createState !== 'ok') return Promise.reject(new NativeHelperError(this.createState));
     const record = this.record.slice();
@@ -80,7 +81,8 @@ export class StandInHelper implements NativeHelper {
       concatBytes(record, new Uint8Array([sig.length >> 8, sig.length & 0xff]), sig),
     );
   }
-  check(record: Uint8Array): Promise<void> {
+  check(record: Uint8Array, signal?: AbortSignal): Promise<void> {
+    this.signals.push(signal);
     this.calls.push('check');
     this.records.push(record.slice());
     return this.checkState === 'ok'
@@ -93,6 +95,10 @@ export class StandInHelper implements NativeHelper {
    */
   touch: Promise<void> | undefined;
   aborted = 0;
+  /** DESK-TOUCHID-FIX: like the real helper, a release that was aborted ends at once (cancelled). */
+  stopOnAbort = false;
+  /** DESK-TOUCHID-FIX: the signal each create / check / release was given. */
+  readonly signals: (AbortSignal | undefined)[] = [];
   async release(
     record: Uint8Array,
     reason: NativeReason,
@@ -100,8 +106,20 @@ export class StandInHelper implements NativeHelper {
   ): Promise<Uint8Array> {
     this.calls.push(`release:${reason}@${String(this.keychain?.writes.length ?? 0)}`);
     this.records.push(record.slice());
+    this.signals.push(signal);
     signal?.addEventListener('abort', () => (this.aborted += 1), { once: true });
-    if (this.touch !== undefined) await this.touch;
+    if (this.touch !== undefined) {
+      const stopped =
+        this.stopOnAbort && signal !== undefined
+          ? new Promise<'stopped'>((resolve) => {
+              if (signal.aborted) resolve('stopped');
+              signal.addEventListener('abort', () => resolve('stopped'), { once: true });
+            })
+          : new Promise<never>(() => undefined);
+      if ((await Promise.race([this.touch, stopped])) === 'stopped') {
+        throw new NativeHelperError('cancelled', 'aborted');
+      }
+    }
     if (this.gesture !== 'ok') throw new NativeHelperError(this.gesture);
     return secretFor(this.kind, record);
   }

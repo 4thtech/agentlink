@@ -615,3 +615,73 @@ describe('steps and failures of turning it on (DESK-NATIVE-DEBUG)', () => {
     expect(steps.at(-1)).toBe('keychain_write');
   });
 });
+
+// DESK-TOUCHID-FIX review (Fable L-1): a keychain write that timed out may still land. Core waits for
+// it to settle (bounded) before rolling back, so nothing is left behind; if it never settles, the
+// error says so (`unsure`: it may have been turned on) instead of "nothing changed".
+describe('a keychain write that times out (DESK-TOUCHID-FIX review L-1)', () => {
+  it('lands after the timeout: core waits for it, then removes it again', async () => {
+    const keychain = await withOwner();
+    const real = keychain.set.bind(keychain);
+    keychain.set = (account: string, value: Uint8Array) =>
+      account === OWNER_NATIVE_ACCOUNT
+        ? new Promise<void>((resolve) =>
+            setTimeout(() => void real(account, value).then(resolve), 150),
+          )
+        : real(account, value);
+    const error = await registerOwnerNative(keychain, new StandInHelper(1), owner, code(), {
+      timeoutMs: 100,
+    }).catch((e: unknown) => e as { code?: string; detail?: string });
+    expect([error?.code, error?.detail]).toEqual(['keychain_failed', 'timeout']);
+    // Long after the late write landed: still nothing behind.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(keychain.items.has(OWNER_NATIVE_ACCOUNT)).toBe(false);
+  });
+
+  it('never settles: the error is `unsure` (it may have been turned on)', async () => {
+    const keychain = await withOwner();
+    const real = keychain.set.bind(keychain);
+    keychain.set = (account: string, value: Uint8Array) =>
+      account === OWNER_NATIVE_ACCOUNT ? new Promise<void>(() => undefined) : real(account, value);
+    const error = await registerOwnerNative(keychain, new StandInHelper(1), owner, code(), {
+      timeoutMs: 100,
+    }).catch((e: unknown) => e as { code?: string; detail?: string });
+    expect([error?.code, error?.detail]).toEqual(['keychain_failed', 'unsure']);
+  });
+});
+
+// DESK-TOUCHID-FIX review (Fable M-1): the abort signal reaches every helper call of turning it on
+// (create, check, the setup gesture); an aborted registration stores nothing.
+describe('an aborted registration (DESK-TOUCHID-FIX review M-1)', () => {
+  it('passes the signal to the helper and stores nothing after an abort', async () => {
+    const keychain = await withOwner();
+    const helper = new StandInHelper(1);
+    helper.touch = new Promise(() => undefined);
+    helper.stopOnAbort = true;
+    const stop = new AbortController();
+    const pending = registerOwnerNative(keychain, helper, owner, code(), { signal: stop.signal });
+    while (!helper.calls.some((c) => c.startsWith('release')))
+      await new Promise((r) => setTimeout(r, 2));
+    stop.abort();
+    expect(await codeOf(pending)).toBe('cancelled');
+    expect(helper.aborted).toBe(1);
+    expect(helper.signals.every((s) => s === stop.signal)).toBe(true);
+    expect(helper.signals.length).toBe(3);
+    expect(keychain.items.has(OWNER_NATIVE_ACCOUNT)).toBe(false);
+  });
+
+  it('a touch that lands after the abort stores nothing', async () => {
+    const keychain = await withOwner();
+    const helper = new StandInHelper(1);
+    let touch: () => void = () => undefined;
+    helper.touch = new Promise((r) => (touch = r));
+    const stop = new AbortController();
+    const pending = registerOwnerNative(keychain, helper, owner, code(), { signal: stop.signal });
+    while (!helper.calls.some((c) => c.startsWith('release')))
+      await new Promise((r) => setTimeout(r, 2));
+    stop.abort();
+    touch();
+    expect(await codeOf(pending)).toBe('cancelled');
+    expect(keychain.items.has(OWNER_NATIVE_ACCOUNT)).toBe(false);
+  });
+});
