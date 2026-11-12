@@ -23,6 +23,7 @@ import type {
 import { passkeyProof, type PasskeyInfo, type PresenceProof } from '../contacts/owner.js';
 import { PresencePrompt } from '../contacts/presence-prompt.js';
 import { CONTACTS_STRINGS as C, waitSeconds } from '../contacts/strings.js';
+import { UseCodeInstead } from '../first-run/backup-code.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import type { Platform } from '../first-run/strings.js';
 import { JOIN_STRINGS as J } from '../join/strings.js';
@@ -283,7 +284,8 @@ export function PasteInvite({
         {phase.code ? (
           <PresencePrompt
             summary={J.statement(shown, invite.fingerprint, P.thisAgent)}
-            passkey={undefined}
+            passkey={passkey}
+            codeFirst={passkey !== undefined}
             busy={busy}
             error={message}
             onSubmit={(proof) => send(invite, proof)}
@@ -304,6 +306,16 @@ export function PasteInvite({
                 {passkey === undefined ? J.acceptWithCode : J.acceptWith(platform)}
               </span>
             </Button>
+            {/* FB-8: the backup code is always a way to confirm, also with a passkey here. */}
+            {passkey === undefined ? null : (
+              <UseCodeInstead
+                disabled={busy}
+                onClick={() => {
+                  setMessage(undefined);
+                  setPhase({ k: 'who', invite, code: true });
+                }}
+              />
+            )}
             {busy ? <ProgressBar label={P.connecting(shown)} indeterminate /> : null}
             {message === undefined ? null : <InlineError>{message}</InlineError>}
             <Button variant="ghost" disabled={busy} onClick={restart}>
