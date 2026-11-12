@@ -528,12 +528,15 @@ jobs:
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Knowledge size and links, docs-status drift
+      - name: Knowledge size and links, docs-status drift, wiki copy preflight
         run: |
           set -euo pipefail
           node tools/check-knowledge-size.mjs
           node tools/check-knowledge-links.mjs
           node tools/docs-status/index.mjs --check
+          # DOCS-UNIFY: docs-site still generates a clean 4thTech Docs (wiki) copy: every page in its
+          # SUMMARY.md, every link and image resolves after the GitBook rewrite.
+          node tools/docs/wiki-sync.mjs --preflight
           # Hard rule: no Solidity source in this public repo. The script scans every tracked file,
           # Markdown included (it ran in the lint step of `checks`).
           node tools/check-no-solidity.mjs
@@ -543,7 +546,7 @@ jobs:
         run: >-
           pnpm exec vitest run vocabulary.test.mjs id-vocabulary.test.mjs retired-scope.test.mjs networks-page.test.mjs
           skill-file.test.mjs check-knowledge-links.test.mjs check-knowledge-size.test.mjs docs-status
-          release/deploy-drop.test.mjs
+          release/deploy-drop.test.mjs docs/wiki-sync.test.mjs
 
       - name: Prettier
         run: pnpm exec prettier --check .
