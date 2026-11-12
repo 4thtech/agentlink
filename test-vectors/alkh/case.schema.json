@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/alkh/case.schema.json",
   "title": "alkh case",
-  "description": "Native presence wrap `ALKH` v1 (04 \u00a72.3.4, D-145 phase 2). `wrapKey`: HKDF-SHA256 of the helper's native secret with an empty salt and the info that binds version, kind, credential ID, SHA-256 of the credential public key, SHA-256 of the challenge and the owner key, 32 bytes. `sealNative`: the whole blob for a fixed nonce. `openNative`: the seed, or `outcome: reject`; an empty `expectedOwnerNostr` and `expectedKind` 0 mean the caller knows none. `nativeHeader`: the public header fields (kind as a decimal string). `crossOpen`: an ALKH blob given to the ALKP (`secret` = PRF output hex), ALKR or ALKO (`secret` = code text) reader. Hex without 0x.",
+  "description": "Native presence wrap `ALKH` v1 (04 \u00a72.3.4, D-145 phase 2). `wrapKey`: HKDF-SHA256 of the helper's native secret with an empty salt and the info that binds version, kind, credential ID, SHA-256 of the credential public key, SHA-256 of the challenge and the owner key, 32 bytes. `sealNative`: the whole blob for a fixed nonce. `openNative`: the seed, or `outcome: reject`; an empty `expectedOwnerNostr` and `expectedKind` 0 mean the caller knows none. `nativeHeader`: the public header fields (kind as a decimal string). `crossOpen`: an ALKH blob given to the ALKP (`secret` = PRF output hex), ALKR or ALKO (`secret` = code text) reader. `helperRecord` / `readHelperRecord`: the DESK-D12b helper record v1 built from, and read into, the header fields. Hex without 0x.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -267,6 +267,126 @@
                   "type": "string",
                   "pattern": "^[0-9a-f]{64}$"
                 },
+                "credentialId": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                },
+                "credentialPublicKey": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                },
+                "challenge": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "kind",
+            "credentialId",
+            "credentialPublicKey",
+            "challenge"
+          ],
+          "properties": {
+            "op": {
+              "const": "helperRecord"
+            },
+            "kind": {
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "credentialId": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "credentialPublicKey": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "challenge": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "record"
+          ],
+          "properties": {
+            "record": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "kind",
+            "record"
+          ],
+          "properties": {
+            "op": {
+              "const": "readHelperRecord"
+            },
+            "kind": {
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "record": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "credentialId",
+                "credentialPublicKey",
+                "challenge"
+              ],
+              "properties": {
                 "credentialId": {
                   "type": "string",
                   "pattern": "^([0-9a-f]{2})*$"

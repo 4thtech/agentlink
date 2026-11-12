@@ -4,7 +4,7 @@
 04 §2.3.4 (D-145 phase 2): the owner seed sealed under a secret that a first-party presence helper of
 the desktop app releases after an OS gesture.
 
-  ALKH v1 = "ALKH" | u8 version=1 | u8 aead=1 | u8 kind | ownerNostr 32 B | u16be credIdLen (1..1023)
+  ALKH v1 = "ALKH" | u8 version=1 | u8 aead=1 | u8 kind | ownerNostr 32 B | u16be credIdLen (1..1024)
             | credId | u16be credPubLen | credPub | u8 challengeLen | challenge | nonce 12 B
             | AES-256-GCM(wrapKey, nonce, seed, AAD = header) (32 + 16 B)
   wrapKey = HKDF-SHA256(ikm = nativeSecret, salt = "", info, 32)
@@ -12,7 +12,7 @@ the desktop app releases after an OS gesture.
             | SHA-256(credPub) | SHA-256(challenge) | ownerNostr
   kind 1 (macOS): credPub and challenge are SEC1 uncompressed P-256 points (65 B); nativeSecret is
                   the 32-byte X coordinate of ECDH(Secure Enclave key, challenge).
-  kind 2 (Windows): credPub is the Hello credential's SubjectPublicKeyInfo (DER, 1..1023 B), challenge
+  kind 2 (Windows): credPub is the Hello credential's SubjectPublicKeyInfo (DER, 1..2048 B), credId its name (1..64 ASCII), challenge
                   is 32 bytes, nativeSecret is the RSASSA-PKCS1-v1_5 / SHA-256 signature over it.
 
 The generator stands in for the helpers with labelled test keys: a P-256 key for the Secure Enclave
@@ -49,8 +49,9 @@ SUITE = "alkh"
 VERSION = 1
 SPEC = "04 §2.3.4 ALKH v1"
 INFO_LABEL = b"agentlink/v1/owner-native-wrap"
-MAX_CRED_ID = 1023
-MAX_CRED_PUB = 1023
+MAX_CRED_ID = 1024
+MAX_CRED_PUB = 2048
+MAX_NAME = 64
 KIND_MAC, KIND_WIN = 1, 2
 P256_N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
 P256_G = bytes.fromhex(
@@ -178,9 +179,50 @@ def parse(blob):
     challenge, off = blob[off + 1 : off + 1 + c], off + 1 + c
     if len(blob) != 104 + n + k + c:
         raise ValueError("bad size")
-    if kind == KIND_MAC and (not on_p256(cred_pub) or not on_p256(challenge) or challenge in (P256_G, cred_pub)):
-        raise ValueError("bad P-256 point")
+    if not credential_fits(kind, cred_id, cred_pub, challenge):
+        raise ValueError("credential does not fit the kind")
     return {"kind": kind, "owner": owner, "credId": cred_id, "credPub": cred_pub, "challenge": challenge, "headerLength": off + 12}
+
+
+def is_name(cred_id):
+    return 1 <= len(cred_id) <= MAX_NAME and all(0x21 <= b <= 0x7E for b in cred_id)
+
+
+def credential_fits(kind, cred_id, cred_pub, challenge):
+    if not 1 <= len(cred_id) <= MAX_CRED_ID:
+        return False
+    if kind == KIND_MAC:
+        return on_p256(cred_pub) and on_p256(challenge) and challenge not in (P256_G, cred_pub)
+    return is_name(cred_id) and 1 <= len(cred_pub) <= MAX_CRED_PUB and len(challenge) == 32
+
+
+# The helper records of DESK-D12b (apps/desktop/native/*/agentlink-presence.*, record v1), rebuilt
+# from and read into the ALKH header fields (04 §2.3.4 "Helper record").
+def helper_record(kind, cred_id, cred_pub, challenge):
+    if kind == KIND_MAC:
+        return v.u8(1) + v.u16be(len(cred_id)) + cred_id + cred_pub + challenge
+    return v.u8(1) + v.u8(len(cred_id)) + cred_id + v.u16be(len(cred_pub)) + cred_pub + challenge
+
+
+def read_helper_record(kind, rec):
+    if kind not in (KIND_MAC, KIND_WIN) or len(rec) < 4 or rec[0] != 1:
+        raise ValueError("not a helper record v1")
+    if kind == KIND_MAC:
+        n = int.from_bytes(rec[1:3], "big")
+        if len(rec) != 3 + n + 130:
+            raise ValueError("bad record size")
+        fields = rec[3 : 3 + n], rec[3 + n : 68 + n], rec[68 + n :]
+    else:
+        n = rec[1]
+        if len(rec) < 2 + n + 2:
+            raise ValueError("bad record size")
+        k = int.from_bytes(rec[2 + n : 4 + n], "big")
+        if len(rec) != 4 + n + k + 32:
+            raise ValueError("bad record size")
+        fields = rec[2 : 2 + n], rec[4 + n : 4 + n + k], rec[4 + n + k :]
+    if not credential_fits(kind, *fields):
+        raise ValueError("record does not fit the kind")
+    return fields
 
 
 def secret_fits(kind, secret):
@@ -230,7 +272,7 @@ def build():
     owner, other = owner_nostr(seed), owner_nostr(other_seed)
 
     # Test stand-ins: the Secure Enclave key and its per-install peer keys (their secrets are dropped
-    # here, as core wipes the peer secret at registration); the Hello credential and its challenges.
+    # here, as the helper's `create` discards the peer secret); the Hello credential and its challenges.
     se_key, se_key2 = p256_key("alkh/se-key/1"), p256_key("alkh/se-key/2")
     se_pub, se_pub2 = p256_point(se_key), p256_point(se_key2)
     peer, peer2 = p256_point(p256_key("alkh/peer/1")), p256_point(p256_key("alkh/peer/2"))
@@ -253,7 +295,7 @@ def build():
         v.fail("unexpected RSA-2048 sizes")
 
     mac_cred = v.det("alkh/se-handle/569", 569)  # a Secure Enclave dataRepresentation stand-in
-    win_cred = "agentlink-owner-native".encode("utf-8")  # a KeyCredential name
+    win_cred = ("AgentLink-owner-" + v.det("alkh/hello-name", 16).hex()).encode("ascii")  # a KeyCredential name
 
     def wrap_case(case_id, why, secret, kind, cred, pub, ch, own):
         return v.case(
@@ -287,7 +329,7 @@ def build():
     for case_id, why, kind, secret, cred, pub, ch in [
         ("mac-569", "kind 1 with a 569-byte Secure Enclave handle", KIND_MAC, mac_secret, mac_cred, se_pub, peer),
         ("mac-1", "kind 1 with the shortest credential ID (1 byte)", KIND_MAC, mac_secret, v.det("alkh/cred/1", 1), se_pub, peer),
-        ("mac-1023", "kind 1 with the longest credential ID (1023 bytes)", KIND_MAC, mac_secret, v.det("alkh/cred/1023", 1023), se_pub, peer),
+        ("mac-1024", "kind 1 with the longest credential ID (1024 bytes)", KIND_MAC, mac_secret, v.det("alkh/cred/1024", 1024), se_pub, peer),
         ("win-name", "kind 2 with a KeyCredential name and an RSA-2048 SubjectPublicKeyInfo", KIND_WIN, win_secret, win_cred, win_pub, challenge),
     ]:
         nonce = v.det(f"alkh/{case_id}/nonce", 12)
@@ -357,12 +399,14 @@ def build():
     reject("short", "shorter than the smallest header", m[:30], msecret)
     reject("empty", "empty", b"", msecret)
     reject("cred-len-0", "credIdLen 0 (sealed validly)", mac_seal(cred_id=b""), msecret)
-    reject("cred-len-1024", "credIdLen 1024 (sealed validly)", mac_seal(cred_id=v.det("alkh/cred/1024", 1024)), msecret)
+    reject("cred-len-1025", "credIdLen 1025 (sealed validly)", mac_seal(cred_id=v.det("alkh/cred/1025", 1025)), msecret)
     reject("cred-len-mismatch", "credIdLen one more than the bytes present", m[:39] + v.u16be(len(mcred) + 1) + m[41:], msecret)
     reject("mac-pub-64", "kind 1: a 64-byte credPub (sealed validly)", mac_seal(cred_pub=mpub[:64]), msecret)
     reject("mac-challenge-33", "kind 1: a 33-byte compressed peer point (sealed validly)", mac_seal(challenge=bytes([2 + (mch[64] & 1)]) + mch[1:33]), msecret)
     reject("win-pub-0", "kind 2: credPubLen 0 (sealed validly)", win_seal(cred_pub=b""), wsecret)
-    reject("win-pub-1024", "kind 2: credPubLen 1024 (sealed validly)", win_seal(cred_pub=v.det("alkh/win-pub/1024", 1024)), wsecret)
+    reject("win-pub-2049", "kind 2: credPubLen 2049 (sealed validly)", win_seal(cred_pub=v.det("alkh/win-pub/2049", 2049)), wsecret)
+    reject("win-name-65", "kind 2: a 65-byte credential name (sealed validly)", win_seal(cred_id=b"A" * 65), wsecret)
+    reject("win-name-not-ascii", "kind 2: a credential name with a byte outside printable ASCII (sealed validly)", win_seal(cred_id=wcred[:-1] + b"\x00"), wsecret)
     reject("win-challenge-31", "kind 2: a 31-byte challenge (sealed validly)", win_seal(challenge=wch[:31]), wsecret)
     reject("win-challenge-33", "kind 2: a 33-byte challenge (sealed validly)", win_seal(challenge=wch + b"\x00"), wsecret)
     # Points.
@@ -388,6 +432,34 @@ def build():
     cases.append(v.case("header-reject-version-2", f"{SPEC}: the header reader refuses version 2", {"op": "nativeHeader", "blob": v.hx(mac_seal(version=2))}, {"outcome": "reject"}))
     cases.append(v.case("header-reject-truncated", f"{SPEC}: the header reader refuses a blob one byte short", {"op": "nativeHeader", "blob": v.hx(m[:-1])}, {"outcome": "reject"}))
     cases.append(v.case("header-reject-off-curve", f"{SPEC}: the header reader refuses an off-curve peer point", {"op": "nativeHeader", "blob": v.hx(mac_seal(challenge=off_curve))}, {"outcome": "reject"}))
+
+    # Helper records (DESK-D12b record v1) ---------------------------------------------------------
+    def record_case(case_id, why, kind, cred, pub, ch):
+        rec = helper_record(kind, cred, pub, ch)
+        if read_helper_record(kind, rec) != (cred, pub, ch):
+            v.fail(f"{case_id}: the reference record reader disagrees")
+        cases.append(v.case(f"record-{case_id}", f"{SPEC} helper record ({why}), rebuilt from the header fields", {"op": "helperRecord", "kind": kind, "credentialId": v.hx(cred), "credentialPublicKey": v.hx(pub), "challenge": v.hx(ch)}, {"record": v.hx(rec)}))
+        cases.append(v.case(f"read-record-{case_id}", f"{SPEC} helper record ({why}) read into the header fields", {"op": "readHelperRecord", "kind": kind, "record": v.hx(rec)}, {"credentialId": v.hx(cred), "credentialPublicKey": v.hx(pub), "challenge": v.hx(ch)}))
+        return rec
+
+    mrec = record_case("mac", "kind 1: 01 | u16be L | SE key handle | SE public key | peer public key", KIND_MAC, mcred, mpub, mch)
+    wrec = record_case("win", "kind 2: 01 | u8 N | credential name | u16be S | SPKI | challenge", KIND_WIN, wcred, wpub, wch)
+
+    def record_reject(case_id, why, kind, rec):
+        if not refused(read_helper_record, kind, rec):
+            v.fail(f"{case_id}: the reference record reader accepts it")
+        cases.append(v.case(f"read-record-reject-{case_id}", f"{SPEC} helper record: {why}", {"op": "readHelperRecord", "kind": kind, "record": v.hx(rec)}, {"outcome": "reject"}))
+
+    record_reject("mac-version-2", "record version 2", KIND_MAC, b"\x02" + mrec[1:])
+    record_reject("mac-truncated", "one byte short", KIND_MAC, mrec[:-1])
+    record_reject("mac-extended", "one byte too many", KIND_MAC, mrec + b"\x00")
+    record_reject("mac-peer-off-curve", "a peer point that is not on P-256", KIND_MAC, mrec[:-1] + bytes([mrec[-1] ^ 1]))
+    record_reject("mac-peer-g", "the base point G as the peer point", KIND_MAC, helper_record(KIND_MAC, mcred, mpub, P256_G))
+    record_reject("mac-as-win", "a kind 1 record read as kind 2", KIND_WIN, mrec)
+    record_reject("win-truncated", "one byte short", KIND_WIN, wrec[:-1])
+    record_reject("win-name-0", "an empty credential name", KIND_WIN, helper_record(KIND_WIN, b"", wpub, wch))
+    record_reject("win-as-mac", "a kind 2 record read as kind 1", KIND_MAC, wrec)
+    record_reject("empty", "empty", KIND_MAC, b"")
 
     # Cross-type ----------------------------------------------------------------------------------
     prf_out = v.det("alkh/prf-output", 32)
@@ -439,12 +511,16 @@ SCHEMA = v.case_schema(
     "`sealNative`: the whole blob for a fixed nonce. `openNative`: the seed, or `outcome: reject`; "
     "an empty `expectedOwnerNostr` and `expectedKind` 0 mean the caller knows none. `nativeHeader`: "
     "the public header fields (kind as a decimal string). `crossOpen`: an ALKH blob given to the ALKP "
-    "(`secret` = PRF output hex), ALKR or ALKO (`secret` = code text) reader. Hex without 0x.",
+    "(`secret` = PRF output hex), ALKR or ALKO (`secret` = code text) reader. `helperRecord` / "
+    "`readHelperRecord`: the DESK-D12b helper record v1 built from, and read into, the header fields. "
+    "Hex without 0x.",
     {
         "wrapKey": ({"kind": KIND, "nativeSecret": v.HEX, "credentialId": v.HEX, "credentialPublicKey": v.HEX, "challenge": v.HEX, "ownerNostr": v.hexn(32)}, [{"wrapKey": v.hexn(32)}]),
         "sealNative": ({"kind": KIND, "nativeSecret": v.HEX, "seed": v.hexn(32), "credentialId": v.HEX, "credentialPublicKey": v.HEX, "challenge": v.HEX, "nonce": v.hexn(12)}, [{"blob": v.HEX}]),
         "openNative": ({"blob": v.HEX, "nativeSecret": v.HEX, "expectedOwnerNostr": v.HEX, "expectedKind": {"enum": [0, 1, 2]}}, [{"seed": v.hexn(32)}, v.REJECT]),
         "nativeHeader": ({"blob": v.HEX}, [{"kind": {"enum": ["1", "2"]}, "ownerNostr": v.hexn(32), "credentialId": v.HEX, "credentialPublicKey": v.HEX, "challenge": v.HEX}, v.REJECT]),
+        "helperRecord": ({"kind": KIND, "credentialId": v.HEX, "credentialPublicKey": v.HEX, "challenge": v.HEX}, [{"record": v.HEX}]),
+        "readHelperRecord": ({"kind": KIND, "record": v.HEX}, [{"credentialId": v.HEX, "credentialPublicKey": v.HEX, "challenge": v.HEX}, v.REJECT]),
         "crossOpen": ({"reader": {"enum": ["passkey", "recovery", "owner"]}, "blob": v.HEX, "secret": v.STRING}, [v.REJECT]),
     },
 )

@@ -1,23 +1,25 @@
 // DESK-D12a: the native presence wrap `ALKH` v1 (04 §2.3.4, D-145 phase 2). The byte-exact cases are
-// the `alkh` vectors; these tests pin the API rules: the per-install challenge (a fresh P-256 peer
-// point that is never G, or 32 fresh bytes), a fresh nonce, refusals before decryption, one generic
-// error with no partial output for a wrong secret, a tampered blob or a wrong owner or kind, the
-// binding of the credential and challenge, type separation from `ALKP`, inputs left untouched, and
+// the `alkh` vectors; these tests pin the API rules: a fresh nonce, G or the SE key refused as the
+// peer, refusals before decryption, one generic error with no partial output for a wrong secret, a
+// tampered blob or a wrong owner or kind, the binding of the credential and the per-install peer key
+// or challenge, the DESK-D12b helper records, type separation from `ALKP`, inputs left untouched, and
 // no secret in any error (I-7). The Secure Enclave key is stood in for by a test P-256 key.
 import { p256 } from '@noble/curves/nist.js';
 import { describe, expect, it } from 'vitest';
+import { randomBytes } from './random.js';
 import {
   CryptoInputError,
   KEY_LABELS,
   NATIVE_PRESENCE_MACOS,
   NATIVE_PRESENCE_WINDOWS,
   encodeHex,
+  encodeNativeHelperRecord,
   encodeUtf8,
   readNativeBlobHeader,
+  readNativeHelperRecord,
   sha256,
 } from './index.js';
 import {
-  createNativeChallenge,
   deriveNativeWrapKey,
   derivePublicKey,
   openNativeSeed,
@@ -45,7 +47,14 @@ const OTHER_SE_PUB = p256.getPublicKey(bytesOf('other-se-key'), false);
 const ecdh = (secretKey: Uint8Array, peer: Uint8Array): Uint8Array =>
   p256.getSharedSecret(secretKey, peer, true).slice(1);
 const SE_HANDLE = bytesOf('se-handle');
-const HELLO_NAME = encodeUtf8('agentlink-owner-native');
+const HELLO_NAME = encodeUtf8('AgentLink-owner-00112233445566778899aabbccddeeff');
+
+// Stand-in for the helper's `create` (DESK-D12b): a per-install random peer point (its secret is
+// dropped here, as the helper discards it) or 32 random bytes.
+function createNativeChallenge(kind: number): Uint8Array {
+  if (kind === NATIVE_PRESENCE_WINDOWS) return randomBytes(32);
+  return p256.getPublicKey(p256.utils.randomSecretKey(), false);
+}
 const HELLO_SPKI = new Uint8Array(294).fill(0x30);
 const HELLO_SIGNATURE = new Uint8Array(256).map((_, i) => (i * 7 + 1) & 0xff);
 
@@ -70,7 +79,7 @@ function noSecretIn(error: Error, ...secrets: Uint8Array[]): void {
 function macInput(peer: Uint8Array, overrides: Record<string, unknown> = {}) {
   return {
     kind: NATIVE_PRESENCE_MACOS,
-    nativeSecret: ecdh(SE_SECRET, peer),
+    nativeSecret: 'nativeSecret' in overrides ? overrides.nativeSecret : ecdh(SE_SECRET, peer),
     seed: SEED,
     credentialId: SE_HANDLE,
     credentialPublicKey: SE_PUB,
@@ -89,29 +98,55 @@ const winInput = (challenge: Uint8Array) =>
     challenge,
   }) as const;
 
-describe('createNativeChallenge (04 §2.3.4)', () => {
-  it('kind 1: a fresh P-256 peer point, uncompressed, never G and never repeated', () => {
-    const a = createNativeChallenge(NATIVE_PRESENCE_MACOS);
-    const b = createNativeChallenge(NATIVE_PRESENCE_MACOS);
-    expect(a.length).toBe(65);
-    expect(a[0]).toBe(0x04);
-    expect(() => p256.Point.fromBytes(a).assertValidity()).not.toThrow();
-    expect(encodeHex(a)).not.toBe(encodeHex(b));
-    expect(encodeHex(a)).not.toBe(encodeHex(G));
+describe('helper records (04 §2.3.4, DESK-D12b record v1)', () => {
+  it('kind 1 round-trips 01 ‖ u16be L ‖ handle ‖ SE public key ‖ peer key', () => {
+    const peer = createNativeChallenge(NATIVE_PRESENCE_MACOS);
+    const fields = { credentialId: SE_HANDLE, credentialPublicKey: SE_PUB, challenge: peer };
+    const record = encodeNativeHelperRecord(NATIVE_PRESENCE_MACOS, fields);
+    expect(record.length).toBe(3 + SE_HANDLE.length + 130);
+    expect(record[0]).toBe(1);
+    const read = readNativeHelperRecord(NATIVE_PRESENCE_MACOS, record);
+    expect(encodeHex(read.credentialId)).toBe(encodeHex(SE_HANDLE));
+    expect(encodeHex(read.challenge)).toBe(encodeHex(peer));
   });
 
-  it('kind 2: 32 fresh bytes', () => {
-    const a = createNativeChallenge(NATIVE_PRESENCE_WINDOWS);
-    const b = createNativeChallenge(NATIVE_PRESENCE_WINDOWS);
-    expect(a.length).toBe(32);
-    expect(encodeHex(a)).not.toBe(encodeHex(b));
+  it('kind 2 round-trips 01 ‖ u8 N ‖ name ‖ u16be S ‖ SPKI ‖ challenge', () => {
+    const challenge = createNativeChallenge(NATIVE_PRESENCE_WINDOWS);
+    const fields = { credentialId: HELLO_NAME, credentialPublicKey: HELLO_SPKI, challenge };
+    const record = encodeNativeHelperRecord(NATIVE_PRESENCE_WINDOWS, fields);
+    const read = readNativeHelperRecord(NATIVE_PRESENCE_WINDOWS, record);
+    expect(encodeHex(read.credentialPublicKey)).toBe(encodeHex(HELLO_SPKI));
+    expect(encodeHex(read.challenge)).toBe(encodeHex(challenge));
   });
 
-  it('refuses an unknown kind', async () => {
-    for (const kind of [0, 3, 1.5, '1', undefined]) {
-      const error = await refusal(() => createNativeChallenge(kind as never));
-      expect(error.code).toBe('invalid_argument');
+  it('refuses G or the SE key as the peer, a wrong version, a kind mix-up and a bad name', async () => {
+    const peer = createNativeChallenge(NATIVE_PRESENCE_MACOS);
+    const good = encodeNativeHelperRecord(NATIVE_PRESENCE_MACOS, {
+      credentialId: SE_HANDLE,
+      credentialPublicKey: SE_PUB,
+      challenge: peer,
+    });
+    const v2 = good.slice();
+    v2[0] = 2;
+    await refusal(() => readNativeHelperRecord(NATIVE_PRESENCE_MACOS, v2));
+    await refusal(() => readNativeHelperRecord(NATIVE_PRESENCE_WINDOWS, good));
+    await refusal(() => readNativeHelperRecord(NATIVE_PRESENCE_MACOS, good.subarray(1)));
+    for (const challenge of [G, SE_PUB]) {
+      await refusal(() =>
+        encodeNativeHelperRecord(NATIVE_PRESENCE_MACOS, {
+          credentialId: SE_HANDLE,
+          credentialPublicKey: SE_PUB,
+          challenge,
+        }),
+      );
     }
+    await refusal(() =>
+      encodeNativeHelperRecord(NATIVE_PRESENCE_WINDOWS, {
+        credentialId: new Uint8Array(65).fill(0x41),
+        credentialPublicKey: HELLO_SPKI,
+        challenge: new Uint8Array(32).fill(1),
+      }),
+    );
   });
 });
 
@@ -216,7 +251,7 @@ describe('ALKH v1 seal and open (04 §2.3.4)', () => {
       macInput(peer, { nativeSecret: new Uint8Array(32) }),
       macInput(peer, { nativeSecret: new Uint8Array(33).fill(1) }),
       macInput(peer, { credentialId: new Uint8Array(0) }),
-      macInput(peer, { credentialId: new Uint8Array(1024) }),
+      macInput(peer, { credentialId: new Uint8Array(1025) }),
       macInput(peer, { seed: SEED.subarray(0, 31) }),
       macInput(peer, { kind: 3 }),
       { ...winInput(new Uint8Array(31).fill(1)) },

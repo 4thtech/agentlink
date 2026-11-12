@@ -68,9 +68,7 @@ const SEED_OR_SECRET = [
   // M1-9i-b2 (04 §2.2): the s3:<id> item, which holds the storage secret (KeyStore backends only).
   'encodeStorageCredentialItem',
   'parseStorageCredentialItem',
-  // DESK-D12a (04 §2.3.4): the ALKH native presence wrap, which takes the helper's secret or the
-  // seed, and the per-install challenge, which makes (and wipes) a P-256 peer secret.
-  'createNativeChallenge',
+  // DESK-D12a (04 §2.3.4): the ALKH native presence wrap, which takes the helper's secret or the seed.
   'deriveNativeWrapKey',
   'sealNativeSeed',
   'openNativeSeed',

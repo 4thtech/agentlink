@@ -2,10 +2,17 @@
 // @4thtech-io/crypto. Seals with the vector's fixed nonce go through the test seam; production seals
 // draw a fresh one. The native secrets stand in for what the macOS and Windows helpers release (an
 // ECDH X coordinate, a PKCS#1 v1.5 signature). An empty `expectedOwnerNostr` and `expectedKind` 0
-// mean the caller knows none. `crossOpen` gives an ALKH blob to the ALKP, ALKR and ALKO readers. A
+// mean the caller knows none. `crossOpen` gives an ALKH blob to the ALKP, ALKR and ALKO readers;
+// `helperRecord` / `readHelperRecord` are the DESK-D12b helper record v1. A
 // refusal by the code under test (CryptoInputError) is `outcome: reject`; any other error fails the
 // case. Runs in every runtime.
-import { CryptoInputError, encodeUtf8, readNativeBlobHeader } from '@4thtech-io/crypto';
+import {
+  CryptoInputError,
+  encodeNativeHelperRecord,
+  encodeUtf8,
+  readNativeBlobHeader,
+  readNativeHelperRecord,
+} from '@4thtech-io/crypto';
 import {
   deriveNativeWrapKey,
   openNativeSeed,
@@ -37,9 +44,25 @@ type AlkhInput =
       expectedKind: 0 | NativePresenceKind;
     }
   | { op: 'nativeHeader'; blob: string }
+  | {
+      op: 'helperRecord';
+      kind: NativePresenceKind;
+      credentialId: string;
+      credentialPublicKey: string;
+      challenge: string;
+    }
+  | { op: 'readHelperRecord'; kind: NativePresenceKind; record: string }
   | { op: 'crossOpen'; reader: 'passkey' | 'recovery' | 'owner'; blob: string; secret: string };
 
-const OPS = ['wrapKey', 'sealNative', 'openNative', 'nativeHeader', 'crossOpen'];
+const OPS = [
+  'wrapKey',
+  'sealNative',
+  'openNative',
+  'nativeHeader',
+  'helperRecord',
+  'readHelperRecord',
+  'crossOpen',
+];
 
 function parseInput(input: unknown): AlkhInput {
   const i = input as Record<string, unknown> | null;
@@ -104,6 +127,22 @@ async function evaluateInput(input: AlkhInput): Promise<readonly Comparison[]> {
         { field: 'credentialId', actual: bytesToHex(header.credentialId) },
         { field: 'credentialPublicKey', actual: bytesToHex(header.credentialPublicKey) },
         { field: 'challenge', actual: bytesToHex(header.challenge) },
+      ];
+    }
+    case 'helperRecord': {
+      const record = encodeNativeHelperRecord(input.kind, {
+        credentialId: hexToBytes(input.credentialId),
+        credentialPublicKey: hexToBytes(input.credentialPublicKey),
+        challenge: hexToBytes(input.challenge),
+      });
+      return [{ field: 'record', actual: bytesToHex(record) }];
+    }
+    case 'readHelperRecord': {
+      const read = readNativeHelperRecord(input.kind, hexToBytes(input.record));
+      return [
+        { field: 'credentialId', actual: bytesToHex(read.credentialId) },
+        { field: 'credentialPublicKey', actual: bytesToHex(read.credentialPublicKey) },
+        { field: 'challenge', actual: bytesToHex(read.challenge) },
       ];
     }
     case 'crossOpen': {
