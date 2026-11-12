@@ -294,7 +294,9 @@ describe('docs screens', () => {
       await b
         .getByRole('heading', { name: /^You and “?Tali”? are connected$/ })
         .waitFor({ timeout: 30_000 });
-      const check = b.getByRole('button', { name: /^Optional: make sure it's really .*Check/ });
+      const check = b.getByRole('button', {
+        name: /^Optional: make sure it's really .*Contact check/,
+      });
       if (await check.isVisible()) await check.click();
       await b
         .getByText(/\d{4}\D{1,3}\d{4}\D{1,3}\d{4}/)
