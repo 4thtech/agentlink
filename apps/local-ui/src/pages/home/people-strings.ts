@@ -22,7 +22,7 @@ export const HOME_STRINGS = {
   otherIdNone: 'No one is connected to {name} yet.',
   otherIdUnknown: 'Open {name} to see its people.',
   unavailable: "Home can't be loaded right now. Try again in a minute.",
-  notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
+  notSetUp: "AgentLink isn't set up on this computer yet. Create your first ID on Home.",
   sessionExpired: 'This page has expired. Ask your AI to open AgentLink again.',
   tryAgain: 'Try again',
 

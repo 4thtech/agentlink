@@ -64,6 +64,11 @@
   text-underline-offset: 3px;
 }
 
+/* R1-UI-01: no "Skip to Home" before the ID exists; its room stays so nothing moves. */
+.st-skip-gone {
+  visibility: hidden;
+}
+
 .st-body {
   flex: 1;
   display: flex;
@@ -507,4 +512,11 @@
   border-radius: var(--al-radius-md);
   background: var(--al-color-bg-surface);
   color: var(--al-color-fg-default);
+}
+
+/* R1-UI-01: Home before any ID exists. */
+.st-finish {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
 }

@@ -41,7 +41,8 @@ describe('chapter 1: onboarding', () => {
       .getByText(/Step 1 of 4/)
       .first()
       .waitFor();
-    await page.getByRole('link', { name: 'Skip to Home' }).waitFor();
+    // R1-UI-01: no "Skip to Home" before the ID exists (Home would be a dead end).
+    expect(await page.getByRole('link', { name: 'Skip to Home' }).count()).toBe(0);
     await page.getByRole('button', { name: 'Continue with Claude Code' }).click();
 
     // Step 2 (A1): "Confirm it's you": the agent card (renamed), Connect with Touch ID.
@@ -115,10 +116,10 @@ describe('chapter 1: onboarding', () => {
     ).toBe('/contacts?invite');
   }, 180_000);
 
-  // IR-W4-WIZARD-1 H: the app opens Get started by itself only while setup is incomplete, on the
-  // real entry path (`agentlink ui` opens the session link, which lands on /settings/home); and the
+  // IR-W4-WIZARD-1 H, R1-UI-14: the app opens Get started by itself only on a first run (no ID); an
+  // ID without an AI app gets Home with the Get started card as a nudge. The real entry path (`agentlink ui` opens the session link, which lands on /settings/home); and the
   // load that Get started itself ended on Home never loops back.
-  it('no AI app yet: "Go to Home" stays on Home; the next launch opens Get started by itself', async (ctx) => {
+  it('no AI app yet: "Go to Home" stays on Home; the next launch opens Home too, with a nudge', async (ctx) => {
     const ready = ch.need(ctx);
     if (ready === undefined) return;
     const world = journeyWorld();
@@ -138,11 +139,13 @@ describe('chapter 1: onboarding', () => {
     expect(new URL(page.url()).pathname).toBe('/');
     await first.stop();
 
-    // The next launch, like the real app: the session link → /settings/home → Get started.
+    // The next launch, like the real app: the session link → /settings/home → Home (R1-UI-14: not
+    // Get started on every launch), where the card offers to connect an AI app.
     const again = await startUiRun(pc, ready.files, ch.closers);
     expect(new URL(again.link).pathname).toBe('/settings/home');
     await page.goto(again.link);
-    await page.waitForURL((url) => url.pathname === '/start/app');
-    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
+    await page.getByRole('heading', { name: /^Get started · 0 of 2 done/ }).waitFor();
+    expect(new URL(page.url()).pathname).toBe('/');
+    expect(await text(page)).not.toContain('Which AI app do you use?');
   }, 180_000);
 });

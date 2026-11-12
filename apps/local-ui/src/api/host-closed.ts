@@ -3,8 +3,8 @@
 // the live stream); a host that stops answering after the page had loaded counts as closed too.
 // A page that never reached the host keeps the usual offline words. Nothing here holds data.
 
-/** 11 §5: plain words, no link, no number. */
-export const HOST_CLOSED_TEXT = 'AgentLink closed. Open AgentLink again.';
+/** 11 §5: plain words, no link, no number. R1-UI-12: the page adds how to open it again. */
+export const HOST_CLOSED_TEXT = 'AgentLink closed.';
 
 /** Failed requests in a row (after a good one) that mean the host is gone. */
 const FAILURES_TO_CLOSE = 2;

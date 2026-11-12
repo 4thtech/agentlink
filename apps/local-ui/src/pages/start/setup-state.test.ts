@@ -188,7 +188,16 @@ describe('readSetupState: the four reads', () => {
 });
 
 describe('openStartIfIncomplete: the open-on-launch check', () => {
-  const incomplete = (): Promise<SetupState> => Promise.resolve({ ...SET_UP, appConnected: false });
+  const incomplete = (): Promise<SetupState> => Promise.resolve({ ...SET_UP, owner: 'missing' });
+  const noApp = (): Promise<SetupState> => Promise.resolve({ ...SET_UP, appConnected: false });
+
+  it('R1-UI-14: an owner with an ID and no AI app opens Home, never Get started by itself', async () => {
+    resetAutoShown();
+    localStorage.removeItem(START_LEFT_KEY);
+    const go = vi.fn();
+    expect(await openStartIfIncomplete({ path: () => '/', read: noApp, go })).toBe(false);
+    expect(go).not.toHaveBeenCalled();
+  });
 
   it('opens /start/app from Home while incomplete, once per page life', async () => {
     resetAutoShown();
@@ -229,7 +238,7 @@ describe('openStartIfIncomplete: the open-on-launch check', () => {
       await openStartIfIncomplete({ path: () => '/settings/home', read: incomplete, go }),
     ).toBe(true);
     expect(go).toHaveBeenCalledWith('/start/app');
-    expect(shouldOpenStart('/settings/home', { ...SET_UP, appConnected: false })).toBe(true);
+    expect(shouldOpenStart('/settings/home', { ...SET_UP, owner: 'missing' })).toBe(true);
   });
 
   it('IR-W4-WIZARD-1 H: a load that Get started itself ended ("Go to Home") never loops back', async () => {
@@ -244,9 +253,9 @@ describe('openStartIfIncomplete: the open-on-launch check', () => {
     // The mark is used once, but leaving is kept (N9): with an owner and an ID, a missing AI app
     // no longer takes the page over on the next load; a first run (no owner) still does.
     resetAutoShown();
-    expect(
-      await openStartIfIncomplete({ path: () => '/settings/home', read: incomplete, go }),
-    ).toBe(false);
+    expect(await openStartIfIncomplete({ path: () => '/settings/home', read: noApp, go })).toBe(
+      false,
+    );
     resetAutoShown();
     expect(
       await openStartIfIncomplete({
@@ -258,17 +267,14 @@ describe('openStartIfIncomplete: the open-on-launch check', () => {
     localStorage.removeItem(START_LEFT_KEY);
   });
 
-  it('N9: left on purpose, an ID without an AI app does not reopen Get started on reload', async () => {
+  it('N9 (R1-UI-14): an ID without an AI app does not reopen Get started, left or not', async () => {
     resetAutoShown();
     localStorage.removeItem(START_LEFT_KEY);
     const go = vi.fn();
-    // Not left yet: it opens.
-    expect(await openStartIfIncomplete({ path: () => '/', read: incomplete, go })).toBe(true);
-    // Skip to Home remembers it; the next load (a fresh page life) stays on Home.
+    expect(await openStartIfIncomplete({ path: () => '/', read: noApp, go })).toBe(false);
     skipToHome(() => undefined);
     resetAutoShown();
-    go.mockClear();
-    expect(await openStartIfIncomplete({ path: () => '/', read: incomplete, go })).toBe(false);
+    expect(await openStartIfIncomplete({ path: () => '/', read: noApp, go })).toBe(false);
     expect(go).not.toHaveBeenCalled();
     localStorage.removeItem(START_LEFT_KEY);
   });

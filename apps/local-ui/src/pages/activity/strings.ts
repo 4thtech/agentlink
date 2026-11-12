@@ -204,7 +204,7 @@ export const ACTIVITY_COPY = {
   sessionTitle: 'This page has ended.',
   sessionBody: 'Ask your AI to open AgentLink again.',
   notSetUpTitle: "AgentLink isn't set up on this computer yet.",
-  notSetUpPrompt: 'ask your AI to set up AgentLink',
+  notSetUpPrompt: 'create your first ID on Home',
 } as const;
 
 /** The AI apps by the ids the feed carries (06 §7), as the owner knows them. */

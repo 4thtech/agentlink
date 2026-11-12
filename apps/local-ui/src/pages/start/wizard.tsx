@@ -62,10 +62,18 @@ export interface WizardFrameProps {
   readonly onSkip?: () => void;
   /** W4-WIRE-2: the step's name when it is not the route's own (Add agent's "Name your agent"). */
   readonly stepName?: string;
+  /** R1-UI-01: no "Skip to Home" while there is no ID (Home would be a dead end). */
+  readonly hideSkip?: boolean;
 }
 
 /** The focused column's header and the step under it. */
-export function WizardFrame({ step, children, onSkip, stepName }: WizardFrameProps): ReactElement {
+export function WizardFrame({
+  step,
+  children,
+  onSkip,
+  stepName,
+  hideSkip = false,
+}: WizardFrameProps): ReactElement {
   const n = STEP_IDS.indexOf(step) + 1;
   const label = W.stepLabel(n, stepName ?? W.stepNames[step]);
   const skip = (event: MouseEvent<HTMLAnchorElement>): void => {
@@ -91,9 +99,16 @@ export function WizardFrame({ step, children, onSkip, stepName }: WizardFramePro
             <Segments step={step} />
             <span className="st-eyebrow">{label}</span>
           </span>
-          <a className="st-skip al-text-body-sm" href="/" onClick={skip}>
-            {W.skip}
-          </a>
+          {hideSkip ? (
+            // Keeps its room (no layout shift when the mode is known), but is not there to use.
+            <span className="st-skip st-skip-gone al-text-body-sm" aria-hidden="true">
+              {W.skip}
+            </span>
+          ) : (
+            <a className="st-skip al-text-body-sm" href="/" onClick={skip}>
+              {W.skip}
+            </a>
+          )}
         </div>
       </header>
       <div className="st-body">{children}</div>

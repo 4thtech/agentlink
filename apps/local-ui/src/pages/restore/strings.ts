@@ -185,6 +185,9 @@ export const PROTECT = {
     `Tip: this kit is from ${date}. Save a fresh one from Settings when you are settled.`,
   home: 'Go to Home',
   needSaved: 'Tick "I saved it" to continue.',
+  /** R1-UI-02: Cancel while the new master code (shown once) is not saved. */
+  leaveUnsaved:
+    "Your new master code is shown only once. If you leave now it is gone and we can't show it again. Copy it or print it first. Leave anyway?",
   partial: (names: string): string =>
     `Couldn't finish restoring ${names}. Nothing of it was kept. Your other IDs are fine.`,
   printTitle: 'AgentLink master code',

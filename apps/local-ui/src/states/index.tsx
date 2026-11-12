@@ -3,8 +3,9 @@
 // Classes and components come from packages/ui only (CSP: no inline styles).
 import { Banner, Button, CopyPrompt, EmptyState, PageNotice } from '@4thtech-io/ui';
 import type { ReactElement } from 'react';
+import { detectOs } from '../layout/os.js';
 import { UPGRADE, type Platform } from '../pages/first-run/strings.js';
-import { STATE_STRINGS as S } from './strings.js';
+import { REOPEN as R, STATE_STRINGS as S } from './strings.js';
 
 export { STATE_STRINGS } from './strings.js';
 export {
@@ -50,8 +51,24 @@ export function LinkExpiredState(): ReactElement {
         {S.linkExpiredTitle}
       </h1>
       <p className="al-text-body al-muted">{S.linkExpiredBody}</p>
-      <CopyPrompt command={S.linkExpiredCommand} />
+      <ReopenSteps />
     </section>
+  );
+}
+
+/** R1-UI-12: plain, per-computer steps to open AgentLink again; the terminal command comes last. */
+export function ReopenSteps(): ReactElement {
+  const os = detectOs();
+  return (
+    <div className="al-reopen">
+      <p className="al-text-body">{R.how}</p>
+      <ul>
+        <li>{R[os]}</li>
+        <li>{R.ai}</li>
+      </ul>
+      <p className="al-text-body-sm al-muted">{R.terminal}</p>
+      <CopyPrompt command={S.linkExpiredCommand} />
+    </div>
   );
 }
 
