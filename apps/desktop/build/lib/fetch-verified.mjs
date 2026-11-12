@@ -1,17 +1,14 @@
 // Plain HTTPS fetch + SHA-256 check (no @electron/get). The committed hash is the trust anchor;
 // the host list only narrows where we ask. A mismatch deletes the file and throws.
-import { createHash } from 'node:crypto';
-import { createReadStream, createWriteStream, existsSync } from 'node:fs';
+import { createWriteStream, existsSync } from 'node:fs';
 import { mkdir, rename, rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { sha256FileHex } from './hash.mjs';
 
-export async function sha256File(path) {
-  const h = createHash('sha256');
-  await pipeline(createReadStream(path), h);
-  return h.digest('hex');
-}
+/** SHA-256 of a file (streamed) as lowercase hex, through @4thtech-io/crypto. */
+export const sha256File = sha256FileHex;
 
 function checkUrl(u, allowedHosts, what) {
   if (u.protocol !== 'https:') throw new Error(`Refusing ${what} ${u.protocol}: https only.`);

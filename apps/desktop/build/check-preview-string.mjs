@@ -5,9 +5,7 @@
 //
 //   node check-preview-string.mjs --app <AgentLink.app | AgentLink.exe | path/to/app.asar>
 import { existsSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { PREVIEW_VAR, findPreviewString } from './lib/preview-check.mjs';
 import { parseArgs } from './lib/run.mjs';
 
@@ -21,8 +19,7 @@ const asarPath = given.endsWith('.asar')
     : join(dirname(given), 'resources', 'app.asar');
 if (!existsSync(asarPath)) throw new Error(`No app.asar at ${asarPath}`);
 
-const req = createRequire(new URL('./package.json', import.meta.url));
-const asar = await import(pathToFileURL(req.resolve('@electron/asar')).href);
+const asar = await import('@electron/asar');
 const files = [{ path: '(raw app.asar bytes)', content: readFileSync(asarPath) }];
 for (const p of asar.listPackage(asarPath, { isPack: false })) {
   const rel = p.replace(/^[\\/]/, '');

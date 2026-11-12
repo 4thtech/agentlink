@@ -182,10 +182,13 @@ describe('the spawned helper (a stand-in script; never the real helper)', () => 
 });
 
 describe('where the desktop app keeps the helper (build-mac / build-win layout)', () => {
-  it('macOS: Contents/Helpers next to Contents/Resources/node/bin/node', () => {
+  it('macOS: the helper app in Contents/Helpers, next to Contents/Resources/node/bin/node', () => {
+    // DESK051-C3: a real .app bundle (Info.plist + icon), so the Touch ID sheet names AgentLink.
     expect(
       desktopHelperPath('/Applications/AgentLink.app/Contents/Resources/node/bin/node', 'darwin'),
-    ).toBe('/Applications/AgentLink.app/Contents/Helpers/agentlink-presence');
+    ).toBe(
+      '/Applications/AgentLink.app/Contents/Helpers/AgentLink.app/Contents/MacOS/agentlink-presence',
+    );
   });
 
   it('Windows: resources\\native next to resources\\node\\node.exe', () => {

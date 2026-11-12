@@ -480,7 +480,8 @@ const HELPER_NAME = 'agentlink-presence';
 /**
  * The helper's place in the desktop app (apps/desktop/build/build-mac.mjs, build-win.mjs), derived
  * from the bundled Node's own path: macOS `<App>.app/Contents/Resources/node/bin/node` →
- * `<App>.app/Contents/Helpers/agentlink-presence`; Windows `<dir>\resources\node\node.exe` →
+ * `<App>.app/Contents/Helpers/AgentLink.app/Contents/MacOS/agentlink-presence` (an app bundle, so
+ * the Touch ID sheet shows the AgentLink name and icon; DESK051-C3); Windows `<dir>\resources\node\node.exe` →
  * `<dir>\resources\native\agentlink-presence.exe`. Any other layout (npx, Linux) has none.
  */
 export function desktopHelperPath(execPath: string, platform: NodeJS.Platform): string | undefined {
@@ -499,7 +500,7 @@ export function desktopHelperPath(execPath: string, platform: NodeJS.Platform): 
     ) {
       return undefined;
     }
-    return posix.join(contents, 'Helpers', HELPER_NAME);
+    return posix.join(contents, 'Helpers', 'AgentLink.app', 'Contents', 'MacOS', HELPER_NAME);
   }
   if (platform === 'win32') {
     const node = win32.dirname(execPath);

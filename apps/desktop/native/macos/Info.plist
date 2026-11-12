@@ -1,15 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Embedded in the helper's __TEXT,__info_plist section (native.mjs). Gives the code signature a
-     fixed identifier and the Touch ID sheet the AgentLink name. WP-D12b. -->
+<!-- The helper app's Contents/Info.plist, also embedded in the executable's __TEXT,__info_plist
+     section (native.mjs). Gives the code signature a fixed identifier and the Touch ID sheet the
+     AgentLink name and icon (Contents/Resources/AgentLink.icns). LSUIElement: no Dock icon.
+     WP-D12b; DESK051-C3. -->
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key>
   <string>io.4thtech.agentlink.presence</string>
+  <key>CFBundleExecutable</key>
+  <string>agentlink-presence</string>
   <key>CFBundleName</key>
   <string>AgentLink</string>
   <key>CFBundleDisplayName</key>
   <string>AgentLink</string>
+  <key>CFBundleIconFile</key>
+  <string>AgentLink</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleShortVersionString</key>
@@ -18,5 +26,7 @@
   <string>1</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
+  <key>LSUIElement</key>
+  <true/>
 </dict>
 </plist>

@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fetchVerified } from '../lib/fetch-verified.mjs';
 
 const body = Buffer.from('hello runtime');
-const sha = createHash('sha256').update(body).digest('hex');
+// Fixed SHA-256 values (shasum -a 256), an oracle independent of the code under test.
+const sha = '92030caf1e893211f66c1c043bf1fb8053e95e33ab97517b21ace0403babc483';
 const okFetch = async () => new Response(body, { status: 200 });
 const dir = () => mkdtempSync(join(tmpdir(), 'fv-'));
 const base = { url: 'https://nodejs.org/x', allowedHosts: ['nodejs.org'] };
@@ -98,7 +98,7 @@ test('a cached file with the right hash is reused without fetching', async () =>
 test('a cached file with the wrong hash is discarded and fetched again', async () => {
   const dest = join(dir(), 'a.zip');
   await fetchVerified({ ...base, sha256: sha, dest, fetchImpl: okFetch });
-  const sha2 = createHash('sha256').update('other').digest('hex');
+  const sha2 = 'd9298a10d1b0735837dc4bd85dac641b0f3cef27a47e5d53a54f2f3f5b2fcffa'; // 'other'
   await fetchVerified({
     ...base,
     sha256: sha2,

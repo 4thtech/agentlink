@@ -1,7 +1,7 @@
 // Pure helpers for the lockfile-pinned core install.
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
+import { sha256Hex } from './hash.mjs';
 import { walk } from './run.mjs';
 
 /**
@@ -39,8 +39,8 @@ export function treeHash(root) {
   for (const e of walk(root)) {
     if (e.dir || e.symlink) continue;
     const rel = relative(root, e.path).split('\\').join('/');
-    lines.push(`${rel}\t${createHash('sha256').update(readFileSync(e.path)).digest('hex')}`);
+    lines.push(`${rel}\t${sha256Hex(readFileSync(e.path))}`);
   }
   lines.sort();
-  return createHash('sha256').update(lines.join('\n')).digest('hex');
+  return sha256Hex(lines.join('\n'));
 }

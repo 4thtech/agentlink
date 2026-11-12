@@ -1,5 +1,5 @@
 {
-  "_comment": "One place for every runtime the desktop app bundles. Hashes are copied from nodejs.org SHASUMS256.txt (v22.23.4) and the GitHub release SHASUMS256.txt of electron v45.1.0, and checked by hand. Change a version only together with its hashes; test/constants.test.mjs keeps installer/install.sh and install.ps1 in step with the Node entries.",
+  "_comment": "One place for every runtime the desktop app bundles. Hashes are copied from nodejs.org SHASUMS256.txt (v22.23.4) and the GitHub release SHASUMS256.txt of electron v45.1.0, and checked by hand. Change a version only together with its hashes; test/constants.node-test.mjs keeps installer/install.sh and install.ps1 in step with the Node entries.",
   "allowedHosts": [
     "nodejs.org",
     "github.com",

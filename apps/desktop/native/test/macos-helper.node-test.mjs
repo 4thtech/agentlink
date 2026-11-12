@@ -19,9 +19,10 @@ import { EXIT, buildMacHelper, parseMacRecord } from '../../build/native.mjs';
 const onMac = process.platform === 'darwin';
 // Built at load time: the skip conditions below run the helper while the tests are declared.
 const dir = onMac ? mkdtempSync(join(tmpdir(), 'al-presence-')) : undefined;
-const bin = onMac
+const helper = onMac
   ? buildMacHelper({ arch: process.arch === 'arm64' ? 'arm64' : 'x64', outDir: dir })
   : undefined;
+const bin = helper?.executable;
 
 after(() => {
   if (dir) rmSync(dir, { recursive: true, force: true });
@@ -194,6 +195,27 @@ test(
     const r = spawnSync('codesign', ['-dv', bin], { encoding: 'utf8' });
     assert.match(r.stderr, /^Identifier=io\.4thtech\.agentlink\.presence$/m);
     assert.match(r.stderr, /flags=0x10002\(adhoc,runtime\)/);
+  },
+);
+
+// DESK051-C3: the Touch ID sheet takes its name and icon from the helper's app bundle.
+test(
+  'the helper is a signed app bundle with its Info.plist and the AgentLink icon sealed',
+  { skip: !onMac },
+  () => {
+    const r = spawnSync('codesign', ['-dv', helper.bundle], { encoding: 'utf8' });
+    assert.match(r.stderr, /^Identifier=io\.4thtech\.agentlink\.presence$/m);
+    assert.match(r.stderr, /^Format=app bundle with Mach-O/m);
+    assert.match(r.stderr, /^Info\.plist entries=\d+$/m);
+    assert.match(r.stderr, /flags=0x10002\(adhoc,runtime\)/);
+    const v = spawnSync('codesign', ['--verify', '--strict', '--deep', helper.bundle], {
+      encoding: 'utf8',
+    });
+    assert.equal(v.status, 0, v.stderr);
+    const icon = readFileSync(helper.icon);
+    const brand = readFileSync(new URL('../../assets/AgentLink.icns', import.meta.url));
+    assert.ok(icon.equals(brand), 'the AgentLink icon from apps/desktop/assets');
+    assert.equal(bin, join(helper.bundle, 'Contents', 'MacOS', 'agentlink-presence'));
   },
 );
 

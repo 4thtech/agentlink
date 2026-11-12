@@ -3,13 +3,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
-import { HELPER_PATH, HELPER_SIGN_OPTIONS, macSignPlan } from '../../build/lib/sign-plan.mjs';
+import {
+  HELPER_BUNDLE_PATH,
+  HELPER_PATH,
+  HELPER_SIGN_OPTIONS,
+  macSignPlan,
+} from '../../build/lib/sign-plan.mjs';
 import {
   EXIT,
+  HELPER_APP,
   HELPER_ID,
+  HELPER_NAME,
   MAC_MIN_OS,
   REASONS,
   macBuildPlan,
+  macHelperLayout,
   msvcArgs,
   swiftcArgs,
 } from '../../build/native.mjs';
@@ -139,7 +147,43 @@ test('mac build plan: per-arch compiles, lipo for universal, ad-hoc sign with th
   assert.equal(sign.cmd, 'codesign');
   assert.deepEqual(sign.args.slice(0, 5), ['--force', '--sign', '-', '--identifier', HELPER_ID]);
   assert.deepEqual(sign.args.slice(5, 7), ['--options', 'runtime']);
-  assert.equal(sign.args.at(-1), '/o/agentlink-presence');
+  // DESK051-C3: the whole helper app is signed (Info.plist and icon sealed), not a bare binary.
+  assert.equal(sign.args.at(-1), '/o/AgentLink.app');
+});
+
+// DESK051-C3 (owner feedback): a bare executable makes the macOS Touch ID sheet show a generic
+// "exec" icon. The helper is a real app bundle with the AgentLink name and icon.
+test('mac helper is an app bundle: Contents/MacOS executable, Info.plist, AgentLink icon', () => {
+  assert.equal(HELPER_APP, 'AgentLink.app');
+  const l = macHelperLayout('/o');
+  assert.equal(l.bundle, '/o/AgentLink.app');
+  assert.equal(l.executable, `/o/AgentLink.app/Contents/MacOS/${HELPER_NAME}`);
+  assert.equal(l.infoPlist, '/o/AgentLink.app/Contents/Info.plist');
+  assert.equal(l.icon, '/o/AgentLink.app/Contents/Resources/AgentLink.icns');
+  for (const arch of ['arm64', 'universal']) {
+    const plan = macBuildPlan({ arch, outDir: '/o', work: '/w' });
+    const out = plan.find((s) => s.cmd === 'lipo') ?? plan.find((s) => s.cmd === 'swiftc');
+    assert.equal(out.args.at(-1), l.executable, arch);
+  }
+  // The same layout the app's sign plan and the core use (sign-plan.mjs, owner-native-helper.ts).
+  assert.equal(HELPER_BUNDLE_PATH, '/Contents/Helpers/AgentLink.app');
+  assert.equal(HELPER_PATH, `${HELPER_BUNDLE_PATH}/Contents/MacOS/${HELPER_NAME}`);
+});
+
+test('mac helper Info.plist: fixed identifier, AgentLink name and icon, no Dock icon', () => {
+  const plist = readFileSync(new URL('../macos/Info.plist', import.meta.url), 'utf8');
+  const value = (key) =>
+    (plist.match(new RegExp(`<key>${key}</key>\\s*<(string|true|false)\\s*/?>([^<]*)`)) ?? [])
+      .slice(1)
+      .map((part) => part.trim())
+      .join(':');
+  assert.equal(value('CFBundleIdentifier'), `string:${HELPER_ID}`);
+  assert.equal(value('CFBundleExecutable'), `string:${HELPER_NAME}`);
+  assert.equal(value('CFBundleName'), 'string:AgentLink');
+  assert.equal(value('CFBundleDisplayName'), 'string:AgentLink');
+  assert.equal(value('CFBundleIconFile'), 'string:AgentLink');
+  assert.equal(value('CFBundlePackageType'), 'string:APPL');
+  assert.equal(value('LSUIElement'), 'true:');
 });
 
 test('MSVC args: static CRT, hardening flags, WinRT + bcrypt only, no debug info', () => {
