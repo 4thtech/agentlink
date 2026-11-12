@@ -37,8 +37,12 @@ describe('pinned root', () => {
       rootPublicKey: g,
       minimumStatementSequence: 0,
     });
-    expect(pinnedRoot({ rootPublicKey: g.toUpperCase(), minimumStatementSequence: 0 })).toBeUndefined();
-    expect(pinnedRoot({ rootPublicKey: 'ff'.repeat(32), minimumStatementSequence: 0 })).toBeUndefined();
+    expect(
+      pinnedRoot({ rootPublicKey: g.toUpperCase(), minimumStatementSequence: 0 }),
+    ).toBeUndefined();
+    expect(
+      pinnedRoot({ rootPublicKey: 'ff'.repeat(32), minimumStatementSequence: 0 }),
+    ).toBeUndefined();
     expect(pinnedRoot({ rootPublicKey: g, minimumStatementSequence: -1 })).toBeUndefined();
   });
 
@@ -65,14 +69,19 @@ describe('versions', () => {
     expect(compareVersions('0.5.0-beta.9', '0.5.0')).toBe(-1);
     expect(compareVersions('1.0.0', '1.0.0')).toBe(0);
     for (const bad of ['1.0', '01.0.0', '1.0.0-rc.1', 'v1.0.0', '1.0.0+x', ' 1.0.0']) {
-      expect(code(() => compareVersions(bad, '1.0.0')), bad).toBe('malformed');
+      expect(
+        code(() => compareVersions(bad, '1.0.0')),
+        bad,
+      ).toBe('malformed');
     }
   });
 });
 
 describe('host allowlist', () => {
   it('allows only https to this repository on github.com and the GitHub download hosts', () => {
-    expect(allowedDownloadUrl('https://github.com/4thtech/agentlink/releases/download/v1.0.0/a.dmg')).toBeDefined();
+    expect(
+      allowedDownloadUrl('https://github.com/4thtech/agentlink/releases/download/v1.0.0/a.dmg'),
+    ).toBeDefined();
     expect(allowedDownloadUrl('https://objects.githubusercontent.com/x')).toBeDefined();
     expect(allowedDownloadUrl('https://release-assets.githubusercontent.com/x')).toBeDefined();
     for (const bad of [
@@ -91,10 +100,14 @@ describe('host allowlist', () => {
 
 describe('strict parsing before any signature check', () => {
   it('refuses oversize, non-JSON, other domains and duplicate names', () => {
-    expect(code(() => parseUpdateDocument(new Uint8Array(MAX_DOCUMENT_BYTES + 1)))).toBe('oversize');
+    expect(code(() => parseUpdateDocument(new Uint8Array(MAX_DOCUMENT_BYTES + 1)))).toBe(
+      'oversize',
+    );
     expect(code(() => parseUpdateDocument(enc('not json')))).toBe('malformed');
     expect(code(() => parseUpdateDocument(enc('{"domain":"other/v1"}')))).toBe('malformed');
-    expect(code(() => parseUpdateDocument(enc('{"domain":"agentlink-desktop-root/v1","domain":"x"}')))).toBe('malformed');
+    expect(
+      code(() => parseUpdateDocument(enc('{"domain":"agentlink-desktop-root/v1","domain":"x"}'))),
+    ).toBe('malformed');
     expect(code(() => parseUpdateDocument(Uint8Array.of(0x7b, 0xff, 0x7d)))).toBe('malformed');
   });
 
@@ -107,10 +120,24 @@ describe('strict parsing before any signature check', () => {
       issued: '2026-11-12T10:00:00Z',
     };
     expect(code(() => parseUpdateDocument(enc(JSON.stringify(body))))).toBe('unsigned');
-    expect(code(() => parseUpdateDocument(enc(JSON.stringify({ ...body, sig: '00'.repeat(64), x: 1 }))))).toBe('unknown_field');
-    expect(code(() => parseUpdateDocument(enc(JSON.stringify({ ...body, sig: '00'.repeat(64), sequence: 0 }))))).toBe('malformed');
-    expect(code(() => parseUpdateDocument(enc(JSON.stringify({ ...body, sig: '00'.repeat(64), issued: '2026-02-30T10:00:00Z' }))))).toBe('malformed');
-    expect(parseUpdateDocument(enc(JSON.stringify({ ...body, sig: '00'.repeat(64) }))).kind).toBe('statement');
+    expect(
+      code(() => parseUpdateDocument(enc(JSON.stringify({ ...body, sig: '00'.repeat(64), x: 1 })))),
+    ).toBe('unknown_field');
+    expect(
+      code(() =>
+        parseUpdateDocument(enc(JSON.stringify({ ...body, sig: '00'.repeat(64), sequence: 0 }))),
+      ),
+    ).toBe('malformed');
+    expect(
+      code(() =>
+        parseUpdateDocument(
+          enc(JSON.stringify({ ...body, sig: '00'.repeat(64), issued: '2026-02-30T10:00:00Z' })),
+        ),
+      ),
+    ).toBe('malformed');
+    expect(parseUpdateDocument(enc(JSON.stringify({ ...body, sig: '00'.repeat(64) }))).kind).toBe(
+      'statement',
+    );
   });
 });
 
@@ -121,6 +148,8 @@ describe('phase-1 words and marks', () => {
   });
 
   it('marks the macOS download as downloaded and not yet opened', () => {
-    expect(macQuarantineValue(Date.parse('2026-11-12T10:00:00Z'))).toMatch(/^0081;[0-9a-f]+;AgentLink;$/);
+    expect(macQuarantineValue(Date.parse('2026-11-12T10:00:00Z'))).toMatch(
+      /^0081;[0-9a-f]+;AgentLink;$/,
+    );
   });
 });

@@ -1,7 +1,15 @@
 // WP-D10: the offline signing tool against the app's own verifier (apps/desktop/src/main/updater).
 // Every refusal of the plan's acceptance list, the full rotation rehearsal (introduce → release →
 // rotate → old key refused → revoke → introduce again), and the phase-1 flow with a fake network.
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -65,15 +73,30 @@ const unsignedFor = (version, extra = {}) => ({
   channel: 'stable',
   version,
   minimumVersion: '0.4.0',
-  assets: [assetFor(version), { ...assetFor(version), platform: 'win32', arch: 'x64', url: `https://github.com/4thtech/agentlink/releases/download/v${version}/AgentLink-${version}-setup.exe` }],
+  assets: [
+    assetFor(version),
+    {
+      ...assetFor(version),
+      platform: 'win32',
+      arch: 'x64',
+      url: `https://github.com/4thtech/agentlink/releases/download/v${version}/AgentLink-${version}-setup.exe`,
+    },
+  ],
   ...extra,
 });
 const statement = (sequence, action, updateKey, signer = root) =>
   signStatement({ root: signer, action, updateKey, sequence, now: NOW - DAY });
 const manifest = (version, update, stmt, opts = {}) =>
-  signManifest({ update, statement: stmt, unsigned: unsignedFor(version, opts.extra), now: opts.now ?? NOW - 60_000, days: opts.days });
+  signManifest({
+    update,
+    statement: stmt,
+    unsigned: unsignedFor(version, opts.extra),
+    now: opts.now ?? NOW - 60_000,
+    days: opts.days,
+  });
 
 const bytesOf = (value) => encodeUtf8(JSON.stringify(value));
+const omit = (o, name) => Object.fromEntries(Object.entries(o).filter(([k]) => k !== name));
 const ctx = (state = INITIAL_KEY_STATE, extra = {}) => ({
   root: ROOT,
   state,
@@ -88,7 +111,8 @@ const ctx = (state = INITIAL_KEY_STATE, extra = {}) => ({
 function check(value, context = ctx()) {
   try {
     const doc = parseUpdateDocument(typeof value === 'string' ? encodeUtf8(value) : bytesOf(value));
-    if (doc.kind !== 'manifest') return applyStatement(context.state, doc.statement, context.root, context.now);
+    if (doc.kind !== 'manifest')
+      return applyStatement(context.state, doc.statement, context.root, context.now);
     return acceptManifest(doc.manifest, context);
   } catch (error) {
     if (error?.name === 'UpdateRefusal') return error.code;
@@ -97,7 +121,7 @@ function check(value, context = ctx()) {
 }
 /** Re-signs a modified manifest body with `signer` (to test rules behind the signature). */
 const resign = (m, signer) => {
-  const { sig: _sig, ...body } = m;
+  const body = omit(m, 'sig');
   return { ...body, sig: encodeHex(bip340Sign(signer.secretKey, manifestMessage(body))) };
 };
 
@@ -111,13 +135,26 @@ describe('the tool stays offline and off CI', () => {
     expect(() => refuseInCi({})).not.toThrow();
     let asked = false;
     const io = { readHidden: async () => ((asked = true), PASS) };
-    await expect(main(['generate', '--role', 'root', '--out', '/nonexistent/x'], { env: { CI: '1' }, io })).rejects.toThrow(/does not run in CI/);
+    await expect(
+      main(['generate', '--role', 'root', '--out', '/nonexistent/x'], { env: { CI: '1' }, io }),
+    ).rejects.toThrow(/does not run in CI/);
     expect(asked).toBe(false);
   });
 
   it('imports no network module and calls no network API', () => {
     const source = readFileSync(new URL('./sign-manifest.mjs', import.meta.url), 'utf8');
-    for (const banned of ['node:http', 'node:https', 'node:net', 'node:tls', 'node:dns', 'node:dgram', 'node:child_process', 'fetch(', 'WebSocket', 'XMLHttpRequest']) {
+    for (const banned of [
+      'node:http',
+      'node:https',
+      'node:net',
+      'node:tls',
+      'node:dns',
+      'node:dgram',
+      'node:child_process',
+      'fetch(',
+      'WebSocket',
+      'XMLHttpRequest',
+    ]) {
       expect(source.includes(banned), banned).toBe(false);
     }
   });
@@ -137,18 +174,32 @@ describe('key files (ALKO sealing)', () => {
   });
 
   it('refuses a wrong passphrase, the wrong role, a swapped public key and a short passphrase', async () => {
-    await expect(openKeyFile(file, 'update', encodeUtf8('not the right passphrase'))).rejects.toThrow(/wrong passphrase/);
+    await expect(
+      openKeyFile(file, 'update', encodeUtf8('not the right passphrase')),
+    ).rejects.toThrow(/wrong passphrase/);
     await expect(openKeyFile(file, 'root', PASS)).rejects.toThrow(/update key/);
-    await expect(openKeyFile({ ...file, publicKey: k2.publicKey }, 'update', PASS)).rejects.toThrow(/does not match/);
+    await expect(openKeyFile({ ...file, publicKey: k2.publicKey }, 'update', PASS)).rejects.toThrow(
+      /does not match/,
+    );
     expect(() => readKeyFile({ ...file, extra: 1 })).toThrow(ToolError);
-    await expect(generateKeyFile({ role: 'root', passphrase: encodeUtf8('short'), kdf: FAST_KDF })).rejects.toThrow(/16 characters/);
+    await expect(
+      generateKeyFile({ role: 'root', passphrase: encodeUtf8('short'), kdf: FAST_KDF }),
+    ).rejects.toThrow(/16 characters/);
   });
 
   it('never makes the root key the update key, and signs statements only with the root role', () => {
-    expect(() => signStatement({ root, action: 'introduce', updateKey: root.publicKey, sequence: 1 })).toThrow(/never be the update key/);
-    expect(() => signStatement({ root: k1, action: 'introduce', updateKey: k2.publicKey, sequence: 1 })).toThrow(/root key/);
-    expect(() => signManifest({ update: root, statement: s1, unsigned: unsignedFor('0.5.0') })).toThrow(/update key/);
-    expect(() => signManifest({ update: k2, statement: s1, unsigned: unsignedFor('0.5.0') })).toThrow(/another update key/);
+    expect(() =>
+      signStatement({ root, action: 'introduce', updateKey: root.publicKey, sequence: 1 }),
+    ).toThrow(/never be the update key/);
+    expect(() =>
+      signStatement({ root: k1, action: 'introduce', updateKey: k2.publicKey, sequence: 1 }),
+    ).toThrow(/root key/);
+    expect(() =>
+      signManifest({ update: root, statement: s1, unsigned: unsignedFor('0.5.0') }),
+    ).toThrow(/update key/);
+    expect(() =>
+      signManifest({ update: k2, statement: s1, unsigned: unsignedFor('0.5.0') }),
+    ).toThrow(/another update key/);
   });
 });
 
@@ -159,28 +210,36 @@ describe('the app accepts a manifest the tool signed', () => {
     expect(accepted.required).toBe(false);
     expect(accepted.asset.platform).toBe('darwin');
     expect(accepted.state.updateKey).toBe(k1.publicKey);
-    expect(check(good, ctx(INITIAL_KEY_STATE, { platform: 'win32', arch: 'x64' })).asset.url).toMatch(/setup\.exe$/);
+    expect(
+      check(good, ctx(INITIAL_KEY_STATE, { platform: 'win32', arch: 'x64' })).asset.url,
+    ).toMatch(/setup\.exe$/);
     expect(check(good, ctx(INITIAL_KEY_STATE, { currentVersion: '0.3.9' })).required).toBe(true);
   });
 });
 
 describe('refusals (plan acceptance list)', () => {
   it('tampered: any signed field changed after signing', () => {
-    expect(check({ ...good, version: '0.5.1' })).toBe('bad_signature');
-    expect(check({ ...good, assets: [{ ...good.assets[0], sha256: '0'.repeat(64) }] })).toBe('bad_signature');
+    expect(check({ ...good, minimumVersion: '0.4.1' })).toBe('bad_signature');
+    expect(check({ ...good, assets: [{ ...good.assets[0], sha256: '0'.repeat(64) }] })).toBe(
+      'bad_signature',
+    );
     expect(check({ ...good, statement: { ...s1, sequence: 2 } })).toBe('bad_signature');
   });
 
   it('unsigned: no sig on the manifest or on its statement', () => {
-    const { sig: _a, ...noSig } = good;
+    const noSig = omit(good, 'sig');
     expect(check(noSig)).toBe('unsigned');
-    const { sig: _b, ...stmtNoSig } = s1;
+    const stmtNoSig = omit(s1, 'sig');
     expect(check({ ...good, statement: stmtNoSig })).toBe('unsigned');
   });
 
   it('wrong key: a manifest key the statement does not name, or a statement not from the root', () => {
     expect(check(resign({ ...good, updateKey: k2.publicKey }, k2))).toBe('wrong_key');
-    expect(check(manifest('0.5.0', k1, statement(1, 'introduce', k1.publicKey, { ...k2, role: 'root' })))).toBe('bad_signature');
+    expect(
+      check(
+        manifest('0.5.0', k1, statement(1, 'introduce', k1.publicKey, { ...k2, role: 'root' })),
+      ),
+    ).toBe('bad_signature');
     expect(check(resign(good, k2))).toBe('bad_signature');
     expect(check(resign(good, root))).toBe('bad_signature');
   });
@@ -190,7 +249,9 @@ describe('refusals (plan acceptance list)', () => {
     const state = applyStatement(INITIAL_KEY_STATE, s2, ROOT, NOW);
     expect(check(manifest('0.6.0', k1, s1), ctx(state))).toBe('unrotated_key');
     // The same sequence with different content is not "the statement already held".
-    expect(check(manifest('0.6.0', k1, statement(2, 'rotate', k1.publicKey)), ctx(state))).toBe('unrotated_key');
+    expect(check(manifest('0.6.0', k1, statement(2, 'rotate', k1.publicKey)), ctx(state))).toBe(
+      'unrotated_key',
+    );
     // A floor pinned in a later build refuses older statements even on a fresh state.
     const floored = pinnedRoot({ rootPublicKey: root.publicKey, minimumStatementSequence: 2 });
     expect(check(good, ctx(INITIAL_KEY_STATE, { root: floored }))).toBe('unrotated_key');
@@ -199,15 +260,26 @@ describe('refusals (plan acceptance list)', () => {
   it('downgrade: the same or an older version', () => {
     expect(check(manifest('0.4.13', k1, s1))).toBe('not_newer');
     expect(check(manifest('0.4.2', k1, s1))).toBe('not_newer');
-    expect(check(manifest('0.5.0', k1, s1), ctx(INITIAL_KEY_STATE, { currentVersion: '0.5.0' }))).toBe('not_newer');
-    expect(check(manifest('0.5.0-beta.1', k1, s1, { extra: { channel: 'beta' } }), ctx(INITIAL_KEY_STATE, { channel: 'beta', currentVersion: '0.5.0' }))).toBe('not_newer');
+    expect(
+      check(manifest('0.5.0', k1, s1), ctx(INITIAL_KEY_STATE, { currentVersion: '0.5.0' })),
+    ).toBe('not_newer');
+    expect(
+      check(
+        manifest('0.5.0-beta.1', k1, s1, { extra: { channel: 'beta' } }),
+        ctx(INITIAL_KEY_STATE, { channel: 'beta', currentVersion: '0.5.0' }),
+      ),
+    ).toBe('not_newer');
   });
 
   it('wrong channel, platform or arch', () => {
     expect(check(good, ctx(INITIAL_KEY_STATE, { channel: 'beta' }))).toBe('wrong_channel');
-    expect(check(good, ctx(INITIAL_KEY_STATE, { platform: 'linux' }))).toBe('no_asset_for_this_computer');
+    expect(check(good, ctx(INITIAL_KEY_STATE, { platform: 'linux' }))).toBe(
+      'no_asset_for_this_computer',
+    );
     expect(check(good, ctx(INITIAL_KEY_STATE, { arch: 'x64' }))).toBe('no_asset_for_this_computer');
-    expect(check(good, ctx(INITIAL_KEY_STATE, { platform: 'win32', arch: 'arm64' }))).toBe('no_asset_for_this_computer');
+    expect(check(good, ctx(INITIAL_KEY_STATE, { platform: 'win32', arch: 'arm64' }))).toBe(
+      'no_asset_for_this_computer',
+    );
     expect(check(manifest('0.5.0-beta.1', k1, s1))).toBe('malformed'); // a prerelease on stable
   });
 
@@ -227,11 +299,21 @@ describe('refusals (plan acceptance list)', () => {
       'https://user@github.com/4thtech/agentlink/releases/download/v0.5.0/AgentLink-0.5.0-arm64.dmg',
       'https://github.com:444/4thtech/agentlink/releases/download/v0.5.0/AgentLink-0.5.0-arm64.dmg',
     ]) {
-      expect(check(resign({ ...good, assets: [{ ...good.assets[0], url }] }, k1)), url).toBe('wrong_host');
+      expect(check(resign({ ...good, assets: [{ ...good.assets[0], url }] }, k1)), url).toBe(
+        'wrong_host',
+      );
     }
-    for (const name of ['../x.dmg', 'a/b.dmg', 'AgentLink.exe', 'AgentLink.dmg?x=1', 'AgentLink%2e.dmg']) {
+    for (const name of [
+      '../x.dmg',
+      'a/b.dmg',
+      'AgentLink.exe',
+      'AgentLink.dmg?x=1',
+      'AgentLink%2e.dmg',
+    ]) {
       const url = `https://github.com/4thtech/agentlink/releases/download/v0.5.0/${name}`;
-      expect(check(resign({ ...good, assets: [{ ...good.assets[0], url }] }, k1)), name).toBe('malformed');
+      expect(check(resign({ ...good, assets: [{ ...good.assets[0], url }] }, k1)), name).toBe(
+        'malformed',
+      );
     }
   });
 
@@ -246,9 +328,15 @@ describe('refusals (plan acceptance list)', () => {
     expect(check(text + ' '.repeat(MAX_DOCUMENT_BYTES - text.length + 1))).toBe('oversize');
     expect(check(text.replace('{"domain"', '{"version":"9.9.9","domain"'))).toBe('malformed');
     expect(check(text.replace('"channel"', '"\\u0063hannel"'))).toBe('malformed');
-    expect(check(resign({ ...good, assets: [{ ...good.assets[0], size: 1.5 }] }, k1))).toBe('malformed');
-    expect(check(resign({ ...good, assets: [{ ...good.assets[0], sha256: 'AB'.repeat(32) }] }, k1))).toBe('malformed');
-    expect(check(resign({ ...good, assets: [good.assets[0], good.assets[0]] }, k1))).toBe('malformed');
+    expect(check(resign({ ...good, assets: [{ ...good.assets[0], size: 1.5 }] }, k1))).toBe(
+      'malformed',
+    );
+    expect(
+      check(resign({ ...good, assets: [{ ...good.assets[0], sha256: 'AB'.repeat(32) }] }, k1)),
+    ).toBe('malformed');
+    expect(check(resign({ ...good, assets: [good.assets[0], good.assets[0]] }, k1))).toBe(
+      'malformed',
+    );
     expect(check(resign({ ...good, released: '2026-11-12T10:00:00.000Z' }, k1))).toBe('malformed');
     expect(check(resign({ ...good, minimumVersion: '0.6.0' }, k1))).toBe('malformed');
     expect(check('[]')).toBe('malformed');
@@ -277,8 +365,12 @@ describe('rotation rehearsal', () => {
       expect(state.updateKey).toBe(k2.publicKey);
 
       // 3. K1 is no longer accepted, with either statement.
-      expect(check(manifest('0.7.0', k1, s1), ctx(state, { currentVersion: '0.6.0' }))).toBe('unrotated_key');
-      expect(check(resign({ ...manifest('0.7.0', k2, s2), updateKey: k1.publicKey }, k1), ctx(state))).toBe('wrong_key');
+      expect(check(manifest('0.7.0', k1, s1), ctx(state, { currentVersion: '0.6.0' }))).toBe(
+        'unrotated_key',
+      );
+      expect(
+        check(resign({ ...manifest('0.7.0', k2, s2), updateKey: k1.publicKey }, k1), ctx(state)),
+      ).toBe('wrong_key');
 
       // 4. Revoke K2 (#3), published as a statement-only document.
       const s3 = statement(3, 'revoke', k2.publicKey);
@@ -287,8 +379,15 @@ describe('rotation rehearsal', () => {
       await saveKeyState(dir, state);
       state = await loadKeyState(dir, ROOT, NOW);
       expect(state.sequence).toBe(3);
-      expect(check(manifest('0.7.0', k2, s2), ctx(state, { currentVersion: '0.6.0' }))).toBe('unrotated_key');
-      expect(check(resign({ ...manifest('0.7.0', k2, s2), statement: s3 }, k2), ctx(state, { currentVersion: '0.6.0' }))).toBe('revoked');
+      expect(check(manifest('0.7.0', k2, s2), ctx(state, { currentVersion: '0.6.0' }))).toBe(
+        'unrotated_key',
+      );
+      expect(
+        check(
+          resign({ ...manifest('0.7.0', k2, s2), statement: s3 }, k2),
+          ctx(state, { currentVersion: '0.6.0' }),
+        ),
+      ).toBe('revoked');
 
       // 5. Introduce K3 (#4) and release again.
       const s4 = statement(4, 'introduce', k3.publicKey);
@@ -311,7 +410,12 @@ describe('phase 1 flow: verified download, then "Open the installer"', () => {
     for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
   });
 
-  function setup({ installer = INSTALLER, redirectTo = 'https://objects.githubusercontent.com/x/y', answer = 0, document = good } = {}) {
+  function setup({
+    installer = INSTALLER,
+    redirectTo = 'https://objects.githubusercontent.com/x/y',
+    answer = 0,
+    document = good,
+  } = {}) {
     const stateDir = mkdtempSync(join(tmpdir(), 'agentlink-upd-state-'));
     const tempRoot = mkdtempSync(join(tmpdir(), 'agentlink-upd-tmp-'));
     dirs.push(stateDir, tempRoot);
@@ -320,8 +424,10 @@ describe('phase 1 flow: verified download, then "Open the installer"', () => {
     const fetchImpl = async (url, init) => {
       seen.push(url);
       expect(init.redirect).toBe('manual');
-      if (url === DOCUMENT_URLS.stable) return new Response(JSON.stringify(document), { status: 200 });
-      if (url === good.assets[0].url) return new Response(null, { status: 302, headers: { location: redirectTo } });
+      if (url === DOCUMENT_URLS.stable)
+        return new Response(JSON.stringify(document), { status: 200 });
+      if (url === good.assets[0].url)
+        return new Response(null, { status: 302, headers: { location: redirectTo } });
       if (url === redirectTo) return new Response(installer, { status: 200 });
       return new Response(null, { status: 404 });
     };
@@ -384,15 +490,97 @@ describe('phase 1 flow: verified download, then "Open the installer"', () => {
   it('an older release is "up to date"; a refused document offers nothing', async () => {
     const t = setup({ document: manifest('0.4.0', k1, s1) });
     expect(await runUpdateCheck(t.deps)).toEqual({ kind: 'up_to_date' });
-    const u = setup({ document: { ...good, version: '0.9.0' } });
+    const u = setup({ document: { ...good, minimumVersion: '0.4.5' } });
     expect(await runUpdateCheck(u.deps)).toEqual({ kind: 'refused', code: 'bad_signature' });
     expect(u.opened).toHaveLength(0);
   });
 
   it('does nothing while the root key is the placeholder', async () => {
     const t = setup();
-    const { root: _r, ...deps } = t.deps;
+    const deps = omit(t.deps, 'root');
     expect(await runUpdateCheck(deps)).toEqual({ kind: 'not_configured' });
     expect(t.seen).toEqual([]);
   });
+});
+
+describe('the command line, end to end (real offline KDF)', () => {
+  it('generate → public-key → check → statement → sign, then the app accepts it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agentlink-keys-'));
+    try {
+      const io = { readHidden: async () => PASS.slice() };
+      const lines = [];
+      const run = (args) => main(args, { env: {}, io, out: (l) => lines.push(l) });
+      const p = (name) => join(dir, name);
+      await run(['generate', '--role', 'root', '--out', p('root.key')]);
+      await run(['generate', '--role', 'update', '--out', p('update.key')]);
+      expect(statSync(p('root.key')).mode & 0o777).toBe(0o600);
+      await expect(run(['generate', '--role', 'root', '--out', p('root.key')])).rejects.toThrow(
+        /already exists/,
+      );
+      const rootFile = JSON.parse(readFileSync(p('root.key'), 'utf8'));
+      const updateFile = JSON.parse(readFileSync(p('update.key'), 'utf8'));
+      expect(readFileSync(p('root.key'), 'utf8')).not.toContain(new TextDecoder().decode(PASS));
+      await run(['public-key', p('update.key')]);
+      expect(lines.at(-1)).toBe(`update public key: ${updateFile.publicKey}`);
+      await run(['check', p('root.key')]);
+      expect(lines.at(-1)).toMatch(/^OK: /);
+      await run([
+        'statement',
+        '--root-key',
+        p('root.key'),
+        '--action',
+        'introduce',
+        '--update-key',
+        updateFile.publicKey,
+        '--sequence',
+        '1',
+        '--out',
+        p('s1.json'),
+      ]);
+      writeFileSync(p('unsigned.json'), JSON.stringify(unsignedFor('0.5.0')));
+      const signArgs = (keyFile, out) => [
+        'sign',
+        '--update-key',
+        keyFile,
+        '--statement',
+        p('s1.json'),
+        '--manifest',
+        p('unsigned.json'),
+        '--out',
+        out,
+      ];
+      await run(signArgs(p('update.key'), p('signed.json')));
+      const appRoot = pinnedRoot({
+        rootPublicKey: rootFile.publicKey,
+        minimumStatementSequence: 0,
+      });
+      const accepted = check(
+        readFileSync(p('signed.json'), 'utf8'),
+        ctx(INITIAL_KEY_STATE, { root: appRoot, now: Date.now() }),
+      );
+      expect(accepted.version).toBe('0.5.0');
+      expect(accepted.state.updateKey).toBe(updateFile.publicKey);
+      // The root key file cannot sign a manifest, nor the update key file a statement.
+      await expect(run(signArgs(p('root.key'), p('x.json')))).rejects.toThrow(
+        /update key is needed/,
+      );
+      await expect(
+        run([
+          'statement',
+          '--root-key',
+          p('update.key'),
+          '--action',
+          'rotate',
+          '--update-key',
+          updateFile.publicKey,
+          '--sequence',
+          '2',
+          '--out',
+          p('y.json'),
+        ]),
+      ).rejects.toThrow(/root key is needed/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 120_000);
 });

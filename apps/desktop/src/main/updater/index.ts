@@ -1,0 +1,182 @@
+// WP-D10 Updater phase 1 (plan 2026-11-12 Decision 5, Fable H3; 08 §8 "Signed updates").
+//
+// One pass: fetch the channel's update document, verify it against the pinned offline root key
+// (manifest.ts), remember a newer root statement (state.ts), download the installer for this
+// computer into a private temp folder and check its size and SHA-256 (download.ts), mark it as
+// downloaded (quarantine.ts), then ask: "Update available" → "Open the installer" or "Later".
+// The person runs the installer. There is NO silent install and no bundle swap in phase 1.
+//
+// Electron is injected (openPath, showMessageBox), as in the rest of the shell. While root-key.json
+// holds the placeholder, the updater does nothing (`not_configured`); release builds refuse to
+// package the placeholder (apps/desktop/build/lib/root-key-check.mjs).
+import rootKeyFile from './root-key.json' with { type: 'json' };
+import { rm } from 'node:fs/promises';
+import { downloadInstaller, fetchDocument, hashFile, type FetchLike } from './download.js';
+import {
+  MAX_DOCUMENT_BYTES,
+  UpdateRefusal,
+  acceptManifest,
+  applyStatement,
+  parseUpdateDocument,
+  pinnedRoot,
+  type AcceptedUpdate,
+  type Channel,
+  type PinnedRoot,
+  type RefusalCode,
+} from './manifest.js';
+import { markDownloaded } from './quarantine.js';
+import { loadKeyState, saveKeyState } from './state.js';
+
+/**
+ * Where each channel's signed document is published (WP-D11 uploads it). `stable` follows the latest
+ * GitHub Release; `beta` a fixed prerelease tag, because "latest" never points at a prerelease.
+ */
+export const DOCUMENT_URLS: Readonly<Record<Channel, string>> = Object.freeze({
+  stable:
+    'https://github.com/4thtech/agentlink/releases/latest/download/agentlink-desktop-stable.json',
+  beta: 'https://github.com/4thtech/agentlink/releases/download/desktop-beta/agentlink-desktop-beta.json',
+});
+
+/** User-facing words (11 §5): plain, no internals. */
+export const UPDATE_COPY = Object.freeze({
+  title: 'Update available',
+  message: (version: string): string => `AgentLink ${version} is ready to install.`,
+  detail:
+    'It was downloaded and checked. Open the installer and follow its steps. Your IDs, contacts and messages stay as they are.',
+  requiredDetail:
+    'This version of AgentLink is too old to keep working well. Open the installer and follow its steps. Your IDs, contacts and messages stay as they are.',
+  open: 'Open the installer',
+  later: 'Later',
+});
+
+export interface MessageBoxOptions {
+  readonly type: 'info';
+  readonly title: string;
+  readonly message: string;
+  readonly detail: string;
+  readonly buttons: readonly string[];
+  readonly defaultId: number;
+  readonly cancelId: number;
+  readonly noLink: true;
+}
+
+export interface UpdaterDeps {
+  readonly currentVersion: string;
+  readonly channel: Channel;
+  readonly platform: string;
+  readonly arch: string;
+  /** The app's own data folder (Electron `app.getPath('userData')`). */
+  readonly stateDir: string;
+  /** Electron `shell.openPath` (resolves '' on success, an error text otherwise). */
+  readonly openPath: (path: string) => Promise<string>;
+  /** Electron `dialog.showMessageBox`. */
+  readonly showMessageBox: (options: MessageBoxOptions) => Promise<{ response: number }>;
+  readonly fetch?: FetchLike;
+  readonly now?: () => number;
+  readonly tempRoot?: string;
+  /** Tests only: a root other than root-key.json. */
+  readonly root?: unknown;
+  readonly markDownloaded?: (path: string, platform: string, nowMs: number) => Promise<void>;
+}
+
+export type UpdateOutcome =
+  | { readonly kind: 'not_configured' }
+  | { readonly kind: 'up_to_date' }
+  | { readonly kind: 'refused'; readonly code: RefusalCode }
+  | { readonly kind: 'later'; readonly version: string }
+  | { readonly kind: 'opened'; readonly version: string };
+
+const defaultFetch: FetchLike = (url, init) => fetch(url, init);
+
+export function configuredRoot(raw: unknown = rootKeyFile): PinnedRoot | undefined {
+  return pinnedRoot(raw);
+}
+
+/**
+ * Fetches and verifies the channel's document. A statement-only document (a revocation, or a
+ * rotation published before the next release) updates the key state and offers nothing.
+ */
+export async function checkForUpdate(
+  deps: UpdaterDeps,
+): Promise<{ root: PinnedRoot; accepted: AcceptedUpdate | undefined }> {
+  const root = configuredRoot(deps.root ?? rootKeyFile);
+  if (root === undefined) throw new UpdateRefusal('root_not_pinned');
+  const now = (deps.now ?? Date.now)();
+  const state = await loadKeyState(deps.stateDir, root, now);
+  const bytes = await fetchDocument(
+    DOCUMENT_URLS[deps.channel],
+    MAX_DOCUMENT_BYTES,
+    deps.fetch ?? defaultFetch,
+  );
+  const document = parseUpdateDocument(bytes);
+  if (document.kind === 'statement') {
+    const next = applyStatement(state, document.statement, root, now);
+    if (next !== state) await saveKeyState(deps.stateDir, next);
+    return { root, accepted: undefined };
+  }
+  const accepted = acceptManifest(document.manifest, {
+    root,
+    state,
+    currentVersion: deps.currentVersion,
+    channel: deps.channel,
+    platform: deps.platform,
+    arch: deps.arch,
+    now,
+  });
+  if (accepted.state !== state) await saveKeyState(deps.stateDir, accepted.state);
+  return { root, accepted };
+}
+
+/**
+ * The whole phase-1 pass. Never throws: every refusal is an outcome with its code, so the caller can
+ * stay quiet (an update check that fails is not the person's problem) and nothing inbound is shown.
+ */
+export async function runUpdateCheck(deps: UpdaterDeps): Promise<UpdateOutcome> {
+  if (configuredRoot(deps.root ?? rootKeyFile) === undefined) return { kind: 'not_configured' };
+  let dir: string | undefined;
+  try {
+    let accepted: AcceptedUpdate | undefined;
+    try {
+      ({ accepted } = await checkForUpdate(deps));
+    } catch (error) {
+      // An older or equal version is the normal "nothing new" case.
+      if (error instanceof UpdateRefusal && error.code === 'not_newer')
+        return { kind: 'up_to_date' };
+      throw error;
+    }
+    if (accepted === undefined) return { kind: 'up_to_date' };
+    const fetchImpl = deps.fetch ?? defaultFetch;
+    const installer = await downloadInstaller(accepted.asset, fetchImpl, deps.tempRoot);
+    dir = installer.dir;
+    const nowMs = (deps.now ?? Date.now)();
+    try {
+      await (deps.markDownloaded ?? markDownloaded)(installer.path, deps.platform, nowMs);
+    } catch {
+      throw new UpdateRefusal('download_failed');
+    }
+    const { response } = await deps.showMessageBox({
+      type: 'info',
+      title: UPDATE_COPY.title,
+      message: UPDATE_COPY.message(accepted.version),
+      detail: accepted.required ? UPDATE_COPY.requiredDetail : UPDATE_COPY.detail,
+      buttons: [UPDATE_COPY.open, UPDATE_COPY.later],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (response !== 0) return { kind: 'later', version: accepted.version };
+    // Check the file again right before it is opened (it sat on disk while the dialog was up).
+    const again = await hashFile(installer.path);
+    if (again.size !== accepted.asset.size) throw new UpdateRefusal('size_mismatch');
+    if (again.sha256 !== accepted.asset.sha256) throw new UpdateRefusal('hash_mismatch');
+    const opened = await deps.openPath(installer.path);
+    if (opened !== '') throw new UpdateRefusal('download_failed');
+    dir = undefined; // the installer is in use; the OS temp folder cleanup removes it later
+    return { kind: 'opened', version: accepted.version };
+  } catch (error) {
+    if (error instanceof UpdateRefusal) return { kind: 'refused', code: error.code };
+    return { kind: 'refused', code: 'download_failed' };
+  } finally {
+    if (dir !== undefined) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}

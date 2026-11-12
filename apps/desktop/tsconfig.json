@@ -10,6 +10,9 @@
     // src/shared/resource-layout.json (the packaged layout, shared with build/).
     "resolveJsonModule": true
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  // The JSON the shell imports (resource-layout.json, updater/root-key.json) must be listed: composite.
+  "include": ["src", "src/**/*.json"],
+  "exclude": ["src/**/*.test.ts"],
+  // WP-D10: the updater verifies BIP-340 signatures and SHA-256 through @4thtech-io/crypto (main entry).
+  "references": [{ "path": "../../packages/crypto" }]
 }

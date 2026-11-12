@@ -30,9 +30,14 @@ test('the committed root-key.json is the placeholder, and a release build refuse
 
 test('a real key passes; the placeholder anywhere in the ASAR still refuses', () => {
   assert.equal(assertRootKeyPinned({ rootKeyJson: REAL, files: cleanAsar, env: {} }), 'pinned');
-  const stale = [{ path: 'dist/main/entry.js', content: Buffer.from(`x="${ROOT_KEY_PLACEHOLDER_MARK}-y"`) }];
+  const stale = [
+    { path: 'dist/main/entry.js', content: Buffer.from(`x="${ROOT_KEY_PLACEHOLDER_MARK}-y"`) },
+  ];
   assert.deepEqual(findRootKeyPlaceholder(stale), ['dist/main/entry.js']);
-  assert.throws(() => assertRootKeyPinned({ rootKeyJson: REAL, files: stale, env: {} }), /in the release ASAR/);
+  assert.throws(
+    () => assertRootKeyPinned({ rootKeyJson: REAL, files: stale, env: {} }),
+    /in the release ASAR/,
+  );
 });
 
 test('malformed keys and floors are refused', () => {
@@ -48,13 +53,20 @@ test('malformed keys and floors are refused', () => {
 
 test('the owner-local exception never applies in CI', () => {
   const local = { [OWNER_LOCAL_VAR]: '1' };
-  assert.equal(assertRootKeyPinned({ rootKeyJson: REPO_JSON, files: cleanAsar, env: local }), 'owner-local');
+  assert.equal(
+    assertRootKeyPinned({ rootKeyJson: REPO_JSON, files: cleanAsar, env: local }),
+    'owner-local',
+  );
   for (const ci of [{ CI: 'true' }, { GITHUB_ACTIONS: 'true' }]) {
     assert.throws(() =>
       assertRootKeyPinned({ rootKeyJson: REPO_JSON, files: cleanAsar, env: { ...local, ...ci } }),
     );
   }
   assert.throws(() =>
-    assertRootKeyPinned({ rootKeyJson: REPO_JSON, files: cleanAsar, env: { [OWNER_LOCAL_VAR]: 'yes' } }),
+    assertRootKeyPinned({
+      rootKeyJson: REPO_JSON,
+      files: cleanAsar,
+      env: { [OWNER_LOCAL_VAR]: 'yes' },
+    }),
   );
 });
