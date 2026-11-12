@@ -17,9 +17,12 @@ import {
 import { evaluateFragment, type InviteView } from './invite-state.js';
 import {
   ASK_AI_TEMPLATE,
+  INSTALL_PS1_TEMPLATE,
+  INSTALL_SH_TEMPLATE,
   JOIN_COMMAND_TEMPLATE,
   MAX_COMMAND_CHARS,
   buildAskAi,
+  buildCommands,
   buildJoinCommand,
 } from './prompt.js';
 
@@ -35,12 +38,18 @@ function expectSafe(view: InviteView, payload: string): void {
   }
   expect(view.inviteUrl).toBe(`${PREFIX}${payload}`);
   expect(view.inviteUrl).toMatch(CANONICAL);
-  expect(view.command).toBe(JOIN_COMMAND_TEMPLATE.replace('{inviteUrl}', view.inviteUrl));
-  expect(view.command).toBe(buildJoinCommand(view.inviteUrl));
-  expect(view.command).toBe(`npx -y @4thtech-io/agentlink join '${view.inviteUrl}'`);
+  // WP-2: one command per computer, each a fixed template plus the link (08 §4).
+  expect(view.commands).toEqual(buildCommands(view.inviteUrl));
+  expect(view.commands?.node).toBe(JOIN_COMMAND_TEMPLATE.replace('{inviteUrl}', view.inviteUrl));
+  expect(view.commands?.node).toBe(buildJoinCommand(view.inviteUrl));
+  expect(view.commands?.node).toBe(`npx -y @4thtech-io/agentlink join '${view.inviteUrl}'`);
+  expect(view.commands?.unix).toBe(`curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite '${view.inviteUrl}'`);
+  expect(view.commands?.windows).toBe(
+    `& ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Invite '${view.inviteUrl}'`,
+  );
   expect(view.sentence).toBe(ASK_AI_TEMPLATE.replaceAll('{inviteUrl}', view.inviteUrl));
   expect(view.sentence).toBe(buildAskAi(view.inviteUrl));
-  for (const text of [view.command ?? '', view.sentence]) {
+  for (const text of [...Object.values(view.commands ?? {}), view.sentence]) {
     expect(text).toMatch(/^[\x20-\x7e]+$/); // ASCII only, no line break anywhere
     expect(text.endsWith('\n')).toBe(false);
   }
@@ -191,7 +200,7 @@ describe('evaluateFragment: hostile inviter names (06 §2.1, I-5)', () => {
       expect(view.inviter.name).toMatch(/^[\p{L}\p{N} .'·-]{1,45}$/u);
       expect(view.inviter.label).toBe('self-declared');
       // Nothing the inviter chose reaches the command or the sentence.
-      for (const text of [view.command ?? '', view.sentence]) {
+      for (const text of [...Object.values(view.commands ?? {}), view.sentence]) {
         for (const word of ['SYSTEM', 'curl', 'ignore', 'onerror', 'approve', 'Copy this']) {
           expect(text).not.toContain(word);
         }
@@ -221,8 +230,11 @@ describe('evaluateFragment: hostile inviter names (06 §2.1, I-5)', () => {
       NOW,
     );
     if (a.kind !== 'ready' || b.kind !== 'ready') throw new Error('expected ready views');
-    expect(a.command?.replaceAll(a.inviteUrl, '{inviteUrl}')).toBe(JOIN_COMMAND_TEMPLATE);
-    expect(b.command?.replaceAll(b.inviteUrl, '{inviteUrl}')).toBe(JOIN_COMMAND_TEMPLATE);
+    for (const v of [a, b]) {
+      expect(v.commands?.node.replaceAll(v.inviteUrl, '{inviteUrl}')).toBe(JOIN_COMMAND_TEMPLATE);
+      expect(v.commands?.unix.replaceAll(v.inviteUrl, '{inviteUrl}')).toBe(INSTALL_SH_TEMPLATE);
+      expect(v.commands?.windows.replaceAll(v.inviteUrl, '{inviteUrl}')).toBe(INSTALL_PS1_TEMPLATE);
+    }
     expect(a.sentence.replaceAll(a.inviteUrl, '{inviteUrl}')).toBe(ASK_AI_TEMPLATE);
     expect(b.sentence.replaceAll(b.inviteUrl, '{inviteUrl}')).toBe(ASK_AI_TEMPLATE);
   });
@@ -299,6 +311,11 @@ describe('U3-invite: crafted fragments give the damaged state, with no command a
   it('offers only the sentence when the command would pass 8 000 characters (cmd.exe)', async () => {
     const link = `${PREFIX}${'A'.repeat(MAX_COMMAND_CHARS)}`;
     expect(buildJoinCommand(link)).toBeUndefined();
+    expect(buildCommands(link)).toBeUndefined();
+    // WP-2: the longest command (PowerShell) decides for all three.
+    const edge = `${PREFIX}${'A'.repeat(MAX_COMMAND_CHARS - INSTALL_PS1_TEMPLATE.length + 11)}`;
+    expect(buildJoinCommand(edge)).toBeDefined();
+    expect(buildCommands(edge)).toBeUndefined();
     expect(buildAskAi(link)).toContain(link);
     const fits = `${PREFIX}${'A'.repeat(100)}`;
     expect(buildJoinCommand(fits)).toBe(`npx -y @4thtech-io/agentlink join '${fits}'`);

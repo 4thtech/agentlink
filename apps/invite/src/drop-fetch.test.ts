@@ -58,7 +58,7 @@ describe('the drop host and the CSP (08 §4, D-139)', () => {
   it('the CSP allows a connection to the drop host only, and changes nothing else', () => {
     const csp = /^\s*Content-Security-Policy:\s*(.+)$/m.exec(headersFile)?.[1]?.trim();
     expect(csp).toBe(
-      "default-src 'none'; script-src 'self'; style-src 'self'; connect-src https://drop.agentlink.4thtech.io; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types 'none'",
+      "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src https://drop.agentlink.4thtech.io; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types 'none'",
     );
     expect(headersFile).toMatch(/^\s*Referrer-Policy: no-referrer$/m);
   });

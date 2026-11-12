@@ -364,6 +364,183 @@ describe.each(shells)('install.sh under %s', (shell) => {
   });
 });
 
+// WP-2 (I-1, I-5, I-6; 08 §4): the one command on the invite page installs AgentLink and opens the
+// app on the invite. The link is checked with the patterns of `agentlink join` before anything else
+// happens; anything else gets one fixed line, and no part of it is ever printed.
+const LONG_LINK = `https://agentlink.4thtech.io/i#${'Ab9_-'.repeat(40)}`;
+const SHORT_LINK = `https://agentlink.4thtech.io/i#2.${'a'.repeat(42)}w`;
+const REFUSED =
+  "AgentLink installer: This isn't a complete AgentLink invite. Open the link again and copy the command.\n";
+const BAD_INVITES = [
+  '',
+  'Ab9_-Ab9_-',
+  'http://agentlink.4thtech.io/i#Ab9_-',
+  'https://agentlink.4thtech.io/i#',
+  'https://agentlink.4thtech.io/i/#Ab9_-',
+  'https://agentlink.4thtech.io/x#Ab9_-',
+  'https://agentlink.4thtech.io.evil.example/i#Ab9_-',
+  'https://evil.example/i#Ab9_-',
+  'https://AGENTLINK.4thtech.io/i#Ab9_-',
+  'https://agentlinkx4thtech.io/i#Ab9_-',
+  'https://аgentlink.4thtech.io/i#Ab9_-', // Cyrillic a
+  `${LONG_LINK} `,
+  ` ${LONG_LINK}`,
+  `${LONG_LINK}\n`,
+  `${LONG_LINK}\nid`,
+  `'${LONG_LINK}'`,
+  `${LONG_LINK}'`,
+  `${LONG_LINK}"`,
+  `${LONG_LINK};id`,
+  `${LONG_LINK}$(id)`,
+  `${LONG_LINK}\`id\``,
+  `${LONG_LINK}&`,
+  `${LONG_LINK}|id`,
+  `${LONG_LINK}%41`,
+  `${LONG_LINK}#x`,
+  `${LONG_LINK}é`,
+  `${LONG_LINK}*`,
+  `${LONG_LINK}.`,
+  `https://agentlink.4thtech.io/i#${'A'.repeat(21847)}`,
+  `https://agentlink.4thtech.io/i#2.${'a'.repeat(42)}b`, // the last character has trailing bits
+  `https://agentlink.4thtech.io/i#2.${'a'.repeat(41)}w`, // 42 characters
+  `https://agentlink.4thtech.io/i#2.${'a'.repeat(43)}w`, // 44 characters
+  `https://agentlink.4thtech.io/i#2.${'a'.repeat(41)}.w`,
+];
+
+/** Runs the installer in a real terminal (`script`), where it starts the app. Undefined without it. */
+function runInTerminal(box, args) {
+  const tool = findTool('script');
+  if (!tool || !['darwin', 'linux'].includes(process.platform)) return undefined;
+  const q = (v) => `'${v.replaceAll("'", `'\\''`)}'`;
+  const argv =
+    process.platform === 'darwin'
+      ? ['-q', '/dev/null', findTool('sh'), box.script, ...args]
+      : ['-qec', [findTool('sh'), box.script, ...args].map(q).join(' '), '/dev/null'];
+  const result = spawnSync(tool, argv, {
+    encoding: 'utf8',
+    timeout: 30_000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      PATH: box.bin,
+      HOME: box.home,
+      SHELL: '/bin/zsh',
+      TMPDIR: box.dir,
+      MOCK_SERVE: box.serve,
+      MOCK_LOG: box.log,
+    },
+  });
+  return {
+    code: result.status,
+    out: `${result.stdout}${result.stderr}`.replaceAll('\r', ''),
+    log: readFileSync(box.log, 'utf8'),
+  };
+}
+
+describe.each(shells)('install.sh --invite under %s (WP-2)', (shell) => {
+  it.each([
+    ['a long link', LONG_LINK],
+    ['a short link', SHORT_LINK],
+  ])('%s: installs, never prints the link, and says how to open the invite', (_, link) => {
+    const box = sandbox();
+    const r = run(box, ['--invite', link], { shell });
+    expect(r.code, r.out).toBe(0);
+    expect(existsSync(launcher(box))).toBe(true);
+    // Not run from a terminal: the app is not started, and nothing names the link.
+    expect(r.out).toContain(
+      'To open the invite, run the command from the invite page again in your own terminal.',
+    );
+    expect(r.out).not.toMatch(/To start it now|Starting AgentLink/);
+    expect(r.out).not.toContain('4thtech.io/i#');
+    expect(r.log).not.toContain('npx(');
+  });
+
+  it('refuses a malformed link with one fixed line, exit code 2, before anything happens', () => {
+    for (const bad of BAD_INVITES) {
+      const box = sandbox();
+      const r = run(box, ['--invite', bad], { shell });
+      expect(r.code, JSON.stringify(bad)).toBe(2);
+      expect(r.out, JSON.stringify(bad)).toBe(REFUSED);
+      expect(r.log, JSON.stringify(bad)).toBe('');
+      expect(readdirSync(box.home), JSON.stringify(bad)).toEqual([]);
+    }
+  });
+
+  it('refuses a missing value, the --invite= form, two invites and --uninstall with an invite', () => {
+    for (const args of [
+      ['--invite'],
+      [`--invite=${LONG_LINK}`],
+      ['--invite', LONG_LINK, '--invite', SHORT_LINK],
+      ['--invite', LONG_LINK, '--uninstall'],
+    ]) {
+      const box = sandbox();
+      const r = run(box, args, { shell });
+      expect(r.code, args.join(' ')).toBe(2);
+      expect(r.out, args.join(' ')).toMatch(/^AgentLink installer: [^\n]*\n$/);
+      expect(r.out, args.join(' ')).not.toContain('Ab9_-');
+      expect(r.out, args.join(' ')).not.toContain('aaaa');
+      expect(readdirSync(box.home)).toEqual([]);
+    }
+  });
+
+  it('refuses an unknown option without echoing it (a link pasted without --invite)', () => {
+    const box = sandbox();
+    const r = run(box, [LONG_LINK], { shell });
+    expect(r.code).toBe(2);
+    expect(r.out).toBe('AgentLink installer: Unknown option (try --help).\n');
+  });
+
+  it('--dry-run with an invite says it would open it, without the link', () => {
+    const box = sandbox();
+    const r = run(box, ['--dry-run', '--invite', SHORT_LINK], { shell });
+    expect(r.code, r.out).toBe(0);
+    expect(r.out).toContain('  would open the invite in AgentLink');
+    expect(r.out).not.toContain('aaaa');
+    expect(readdirSync(box.home)).toEqual([]);
+  });
+
+  it('the launcher tells AgentLink it was started by the installer (D4)', () => {
+    const box = sandbox();
+    expect(run(box, [], { shell }).code).toBe(0);
+    exe(join(runtimeDir(box), 'bin/npx'), 'echo "marker=$AGENTLINK_LAUNCHER" >> "$MOCK_LOG"');
+    expect(launch(box, ['ui'])).toBe('marker=installer\n');
+  });
+});
+
+describe('install.sh in a terminal (WP-2, F43)', () => {
+  it('starts the app on the invite, and says how to start it next time after it closes', () => {
+    const box = sandbox();
+    const r = runInTerminal(box, ['--invite', SHORT_LINK]);
+    if (r === undefined) {
+      expect(process.env.CI, '`script` is required on CI').toBeFalsy();
+      return;
+    }
+    expect(r.code, r.out).toBe(0);
+    // The fake npx records its arguments: the launcher ran `join` with the link as one argument.
+    expect(r.log.endsWith(`@4thtech-io/agentlink@latest join ${SHORT_LINK}\n`), r.log).toBe(true);
+    // The installer itself never prints the link.
+    expect(r.out).not.toContain('aaaa');
+    const lines = r.out.split('\n');
+    const installed = lines.indexOf('AgentLink is installed.');
+    const starting = lines.findIndex((l) => l.startsWith('Starting AgentLink.'));
+    const next = lines.indexOf('Next time, open a new terminal and type: agentlink');
+    expect(installed, r.out).toBeGreaterThan(-1);
+    expect(starting, r.out).toBeGreaterThan(installed);
+    expect(next, r.out).toBeGreaterThan(starting);
+  });
+
+  it('without an invite, starts the app with no arguments', () => {
+    const box = sandbox();
+    const r = runInTerminal(box, []);
+    if (r === undefined) {
+      expect(process.env.CI, '`script` is required on CI').toBeFalsy();
+      return;
+    }
+    expect(r.code, r.out).toBe(0);
+    expect(r.log.endsWith('@4thtech-io/agentlink@latest\n'), r.log).toBe(true);
+    expect(r.out).toContain('Next time, open a new terminal and type: agentlink');
+  });
+});
+
 describe('install.sh source', () => {
   const source = readFileSync(SCRIPT, 'utf8');
 
@@ -397,6 +574,14 @@ describe('install.sh source', () => {
   it('removes its temporary folder as soon as Node.js is unpacked, and on any abort', () => {
     expect(source).toMatch(/trap 'cleanup' EXIT\n\s*trap 'cleanup; exit 130' INT TERM/);
     expect(source).toMatch(/mv "\$tmp\/node-v[^\n]*\n\s*cleanup\n\s*trap - EXIT INT TERM\n/);
+  });
+
+  it('WP-2: opens the invite through the launcher with the link as one quoted argument', () => {
+    expect(source).toContain('"$launcher" join "$invite" </dev/tty');
+    // Ctrl+C closes the app and the installer still prints its last line (F43): a handler, never an
+    // ignored signal, which the app would inherit.
+    expect(source).not.toMatch(/trap '' INT/);
+    expect(source).toMatch(/trap ':' INT/);
   });
 
   it('runs everything from main on the last line (a cut-off download runs nothing)', () => {

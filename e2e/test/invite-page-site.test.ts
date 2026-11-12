@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { INSTALL_AND_ACCEPT_TEMPLATE, NODE_DOWNLOAD_URL } from '@4thtech-io/invite';
+import { INSTALL_AND_ACCEPT_TEMPLATE } from '@4thtech-io/invite';
 import { CSP, headersFor } from './invite/headers.js';
 
 const site = (path: string): string =>
@@ -18,6 +18,13 @@ describe('_headers', () => {
 
   it('sends the CSP of 08 §4 on every path', () => {
     expect(headers['content-security-policy']).toBe(CSP);
+  });
+
+  it('WP-2 (F33): allows images from the site itself only, for its favicon', () => {
+    const directives = CSP.split('; ');
+    expect(directives).toContain("img-src 'self'");
+    expect(directives.filter((d) => d.startsWith('img-src'))).toEqual(["img-src 'self'"]);
+    expect(directives).toContain("default-src 'none'");
   });
 
   it('sends no referrer, and nosniff', () => {
@@ -76,19 +83,16 @@ describe('the pages', () => {
         expect(html).not.toMatch(/\sstyle\s*=/i);
         expect(html).not.toMatch(/\son[a-z]+\s*=/i);
         expect(html).not.toMatch(/javascript:/i);
-        // U3-invite: the one outside URL is the fixed Node.js download link (08 §4), a plain
-        // navigation in a new tab with no opener and no referrer; it carries nothing.
-        expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([
-          NODE_DOWNLOAD_URL,
-        ]);
-        const anchors = [...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0]);
-        expect(anchors).toHaveLength(1);
-        expect(anchors[0]).toMatch(/\bhref="https:\/\/nodejs\.org\/en\/download"/);
-        expect(anchors[0]).toMatch(/\btarget="_blank"/);
-        expect(anchors[0]).toMatch(/\brel="noopener noreferrer"/);
-        // One first-party style file (CSP style-src 'self').
+        // WP-2: no outside URL and no link at all (the installer brings Node.js, so the Node.js
+        // download link is gone).
+        expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([]);
+        expect([...html.matchAll(/<a\b[^>]*>/gi)]).toHaveLength(0);
+        // One first-party style file (CSP style-src 'self') and the site's own favicon (F33).
         const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((m) => m[0]);
-        expect(links).toEqual(['<link rel="stylesheet" href="/invite.css" />']);
+        expect(links).toEqual([
+          '<link rel="icon" type="image/svg+xml" href="/favicon.svg" />',
+          '<link rel="stylesheet" href="/invite.css" />',
+        ]);
         expect(html).not.toMatch(/<(iframe|object|embed|form|img|base)\b/i);
       });
 
@@ -116,6 +120,10 @@ describe('the pages', () => {
           'way-command',
           'way-link',
           'step-text',
+          'step-help',
+          'os-unix',
+          'os-windows',
+          'os-node',
           'link-text',
           'copy-ai',
           'copy',
@@ -170,7 +178,10 @@ describe('the pages', () => {
 
     it('has one first-party style file, no inline style or handler, no analytics, no referrer', () => {
       const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((m) => m[0]);
-      expect(links).toEqual(['<link rel="stylesheet" href="/invite.css" />']);
+      expect(links).toEqual([
+        '<link rel="icon" type="image/svg+xml" href="/favicon.svg" />',
+        '<link rel="stylesheet" href="/invite.css" />',
+      ]);
       expect(html).not.toMatch(/<style\b|\sstyle\s*=|\son[a-z]+\s*=|javascript:/i);
       expect(html).not.toMatch(/analytics|gtag|plausible|matomo|segment|pixel|beacon|hotjar/i);
       expect(html).toMatch(/<meta name="referrer" content="no-referrer"\s*\/?>/);
@@ -182,7 +193,16 @@ describe('the pages', () => {
       .map(String)
       .filter((f) => statSync(site(f)).isFile())
       .sort();
-    expect(files).toEqual(['_headers', 'i/index.html', 'index.html', 'invite.css']);
+    expect(files).toEqual(['_headers', 'favicon.svg', 'i/index.html', 'index.html', 'invite.css']);
+  });
+
+  it('F33: the favicon is a plain SVG image: no script, no link out, no outside reference', () => {
+    const svg = read('favicon.svg');
+    expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"')).toBe(true);
+    expect(svg).not.toMatch(/<script\b|\son[a-z]+\s*=|javascript:|<foreignObject\b|href=|@import|url\(/i);
+    expect([...svg.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([
+      'http://www.w3.org/2000/svg',
+    ]);
     expect(existsSync(site('invite.js'))).toBe(false); // built, never committed
   });
 });

@@ -6,8 +6,11 @@ import { describe, expect, it } from 'vitest';
 import {
   ASK_AI_TEMPLATE,
   INSTALL_AND_ACCEPT_TEMPLATE,
+  INSTALL_PS1_TEMPLATE,
+  INSTALL_SH_TEMPLATE,
   JOIN_COMMAND_TEMPLATE,
   buildAskAi,
+  buildCommands,
   buildJoinCommand,
   buildPrompt,
   isCanonicalLink,
@@ -100,6 +103,29 @@ describe('U3-invite: the command and the sentence (08 §4)', () => {
     expect(command).not.toMatch(/[\r\n]/);
   });
 
+  // WP-2 (I-1): the installers take the link and open the app on it; they need no Node.js.
+  it('the installer commands are exactly the templates, the link single-quoted, no line break', () => {
+    expect(INSTALL_SH_TEMPLATE).toBe(
+      "curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite '{inviteUrl}'",
+    );
+    expect(INSTALL_PS1_TEMPLATE).toBe(
+      "& ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Invite '{inviteUrl}'",
+    );
+    const commands = buildCommands(LINK);
+    expect(commands).toEqual({
+      unix: INSTALL_SH_TEMPLATE.replace('{inviteUrl}', LINK),
+      windows: INSTALL_PS1_TEMPLATE.replace('{inviteUrl}', LINK),
+      node: buildJoinCommand(LINK),
+    });
+    for (const text of Object.values(commands ?? {})) {
+      expect(text).not.toMatch(/[\r\n]/);
+      expect(text.split(LINK)).toHaveLength(2);
+    }
+    expect(buildCommands(SHORT_LINK)?.unix).toBe(
+      INSTALL_SH_TEMPLATE.replace('{inviteUrl}', SHORT_LINK),
+    );
+  });
+
   it('the sentence is exactly the 08 §4 wording with the link once, never the inviter', () => {
     // Orchestrator Decision 36: until the AI can open the app (M1-UX-OPEN-APP), the AI runs `init`
     // (the change shown, applied after the person confirms) and then only SHOWS the join command;
@@ -120,6 +146,7 @@ describe('U3-invite: the command and the sentence (08 §4)', () => {
     for (const link of BAD_LINKS) {
       expect(isCanonicalLink(link), JSON.stringify(link)).toBe(false);
       expect(() => buildJoinCommand(link), link).toThrow();
+      expect(() => buildCommands(link), link).toThrow();
       expect(() => buildAskAi(link), link).toThrow();
     }
     expect(isCanonicalLink(`https://agentlink.4thtech.io/i#${'A'.repeat(21846)}`)).toBe(true);
