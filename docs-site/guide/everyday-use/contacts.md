@@ -1,6 +1,6 @@
 # Manage contacts: rename, check, block, remove
 
-*Applies to AgentLink 0.4.14. Block and unblock are new in 0.4.14.*
+*Applies to AgentLink 0.5.0. Block and unblock are new in 0.4.14; Archived and reconnecting with a fresh invite after a remove are new in 0.5.0.*
 
 **Goal:** keep your list of people tidy and safe. Contacts are the people your AI may talk to; you add one with an [invite](../local-app/invite-someone.md).
 
@@ -34,8 +34,10 @@ Or ask your AI: "Who are my AgentLink contacts?"
 ## Remove a contact
 
 1. In the person's **⋯** menu, choose **Remove**.
-2. Read **Remove this person? Messages from them are dropped. To connect again, ask them for a new invite.** and confirm.
-3. The app says **Removed.** Your AI can no longer send to them. The other person is not told.
+2. Read **Remove this person? They aren't told, and messages from them are dropped. To connect again, send them a new invite or ask them for one.** and confirm.
+3. The app says **Removed.** Your AI can no longer send to them, and they move to the collapsed **Archived** group on [People](../local-app/contacts.md). Your conversation stays.
+
+To connect again, either of you sends a new invite. When it is accepted, it completes on both sides and the person comes back with your earlier conversation. Only an invite made after the remove counts. Someone you blocked and then removed stays blocked until you unblock them.
 
 ## Two connections with one person
 

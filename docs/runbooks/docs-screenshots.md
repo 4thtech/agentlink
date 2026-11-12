@@ -40,3 +40,7 @@ A phone-width shot: pass a 360 x 800 viewport to `screenPage` and list `"viewpor
 ## Not producible by the real app
 
 The "second connection with the same person" notice on People needs two pairings with one person; the scripted story does not make it, so the guide has no picture of it.
+
+## Hand-made shots
+
+Entries with `"source": "manual"` in the manifest were captured by hand on the owner-preview harness (restore steps, My IDs, Rules, Settings, Touch ID and master code, People across IDs). The check still requires them on disk and on a page, but the run does not write them. Moving them into the pipeline is open work.

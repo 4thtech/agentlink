@@ -2,7 +2,7 @@
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-*Applies to AgentLink 0.4.14, a pre-alpha release. Proof runs on test networks only.*
+*Applies to AgentLink 0.5.0, a pre-alpha release. Proof runs on test networks only.*
 
 **AgentLink lets your AI app send private messages and files to the AI of someone you invited, asks you before anything important, and can add a public proof when it matters.**
 
@@ -43,7 +43,7 @@ More in [How AgentLink works, simply](how-agentlink-works.md).
 | Connect with someone | [Invite someone](local-app/invite-someone.md) · [Accept an invite](get-started/join-from-an-invite.md) · [Name and check a contact](get-started/pair-with-someone.md) |
 | Use it every day | [Talk through your AI](get-started/first-message.md) · [Approvals](everyday-use/approvals.md) · [Files](everyday-use/files.md) · [Proofs](everyday-use/agreements-and-proof.md) |
 | Understand IDs and people | [Your IDs and your people](your-ids-and-your-people.md) |
-| Look after your IDs and contacts | [Rename, remove and back up IDs](local-app/ids.md) · [Manage contacts](everyday-use/contacts.md) · [Master code and recovery kit](local-app/first-run.md) |
+| Look after your IDs and contacts | [My IDs](local-app/ids.md) · [Manage contacts](everyday-use/contacts.md) · [Master code and recovery kit](local-app/first-run.md) · [Backup & restore](local-app/backup-and-restore.md) |
 | Understand a screen | [The app, screen by screen](local-app/README.md) |
 | Look up a word | [Glossary](help/glossary.md) |
 | Fix something | [Troubleshooting](help/troubleshooting.md) · [FAQ](help/faq.md) |
@@ -56,9 +56,11 @@ More in [How AgentLink works, simply](how-agentlink-works.md).
 | Invites | Short links you copy, email or share; one-command install from the invite page |
 | Files | Up to about 100 MB, from folders you allow; received files land in `~/AgentLink/Inbox` |
 | Approvals | Touch ID or Windows Hello in the app, with **Use your master code instead** on every confirm |
-| IDs and contacts | Rename an ID (your contacts see the new name), remove it, save a recovery kit; name, check, block or remove a contact |
+| IDs and people | **My IDs** with a card per ID: rename (your contacts see the new name), pause, remove. **People** across all your IDs, with Archived; name, check, block or remove a contact, and reconnect with a fresh invite |
+| Backup and restore | One recovery kit for all your IDs, with a save checklist and **Check that my kit opens**; restore in the app with **I have a recovery kit**, or `agentlink restore` |
+| Settings | Grouped into Safety, Your AI and This app; **Touch ID & master code** to test Touch ID and check or replace your master code; Rules and Activity in plain sentences |
 | Proof | On test networks, with free test credits |
-| Coming soon | Desktop apps for Mac and Windows; later the always-on cloud agent and proof on main networks |
+| Coming soon | Desktop apps for Mac and Windows; the always-on cloud agent (planned for 0.6.0); later proof on main networks |
 
 There is no account to create and nothing to pay to start. *AgentLink is made by 4thTech and is open source ([MIT](https://github.com/4thtech/agentlink)).*
 

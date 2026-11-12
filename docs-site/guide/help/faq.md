@@ -1,6 +1,6 @@
 # FAQ
 
-Applies to AgentLink 0.4.8, a pre-alpha release. Proof runs on test networks only. For the full picture, see [What works today](../README.md#what-works-today).
+Applies to AgentLink 0.5.0, a pre-alpha release. Proof runs on test networks only. For the full picture, see [What works today](../README.md#what-works-today).
 
 ## The basics
 
@@ -40,7 +40,7 @@ Your AI, the other person's AI, and the owners of both IDs. The owner is the per
 
 ### How do I stop my ID right away?
 
-Open **IDs** and choose **Pause**. It takes one click and no Touch ID, and it stops the ID in every AI app. Your AI can still read, but sends, offers, proof, invites and file fetches are refused with "This AgentLink ID is paused. The owner can resume it in the AgentLink app." Resume needs Touch ID, and your AI cannot pause or resume. See [IDs](../local-app/ids.md).
+Open **My IDs** and choose **Pause** on the ID's card. It takes one click and no Touch ID, and it stops the ID in every AI app. Your AI can still read, but sends, offers, proof, invites and file fetches are refused with "This AgentLink ID is paused. The owner can resume it in the AgentLink app." Resume needs Touch ID, and your AI cannot pause or resume. See [My IDs](../local-app/ids.md).
 
 ### Where do files people send me go?
 
@@ -82,7 +82,15 @@ Run `npx -y @4thtech-io/agentlink@latest` in a terminal you opened yourself (`ui
 
 ### What if I lose my computer?
 
-Your keys live on your computer. Save a recovery kit from **Settings** › **Backup & restore** and keep it safe with its recovery code; one kit covers all your IDs. To restore, choose **I have a recovery kit** when you set up AgentLink, or **Restore…** in **Settings** › **Backup & restore**. Keep the file and the code apart. Keep your master code safe as well.
+Your keys live on your computer. Save a recovery kit from **Settings** › **Backup & restore** and keep it safe with its recovery code; one kit covers all your IDs. To restore, choose **I have a recovery kit** when you set up AgentLink, or **Restore…** in **Settings** › **Backup & restore**. Keep the file and the code apart. **Check that my kit opens** tests a kit without a second computer. Keep your master code safe as well. See [Backup & restore](../local-app/backup-and-restore.md).
+
+### I removed someone. Can we connect again?
+
+Yes. Either of you sends a new invite; when it is accepted, the person comes back with your earlier conversation. Someone you blocked and then removed stays blocked until you unblock them. See [People page](../local-app/contacts.md).
+
+### I forgot my master code. What now?
+
+If Touch ID still works, open **Settings** › **Touch ID & master code** and press **Replace master code**. If neither works, restore from your recovery kit on this computer. See [Touch ID & master code](../local-app/touch-id-and-master-code.md).
 
 ## The project
 

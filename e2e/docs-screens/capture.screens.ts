@@ -26,6 +26,7 @@ import { afterAll, beforeAll, describe, it, vi } from 'vitest';
 import {
   builtAppFiles,
   fakeClaudeCode,
+  type AiAppMcp,
   launchBrowser,
   startAiAppMcp,
   until,
@@ -65,7 +66,7 @@ const MASK = {
 /** tools/docs-screenshots/manifest.json: every shot this run must write (docs model section 5). */
 const MANIFEST = JSON.parse(
   readFileSync(new URL('../../tools/docs-screenshots/manifest.json', import.meta.url), 'utf8'),
-) as { shots: { name: string; image: string }[] };
+) as { shots: { name: string; image: string; source?: string }[] };
 const written = new Set<string>();
 
 const CONFIRM_PASSKEY_ANY = /^Confirm with (Touch ID|Windows Hello|your passkey)$/;
@@ -149,9 +150,10 @@ async function shot(
   await page.evaluate(() => document.fonts.ready);
   // Passing notices ("Your new contact accepted your invite") belong to a moment, not to the page.
   for (const x of await page.locator('.al-toast-x').all()) await x.click().catch(() => undefined);
-  await maskFresh(page);
   await page.mouse.move(0, 0);
   await page.waitForTimeout(400);
+  // Last, so a redraw of the page cannot bring a fresh value back before the picture is taken.
+  await maskFresh(page);
   // `above`: crop just above this element (a button that belongs to the page behind the moment).
   const box = options.above === undefined ? null : await options.above.boundingBox();
   const png = await page.screenshot({
@@ -231,6 +233,19 @@ async function step(name: string, run: () => Promise<void>): Promise<void> {
   }
 }
 
+/** The inbox hands each message over once: wait until one with this text has come in. */
+async function arrived(mcp: AiAppMcp, needle: string): Promise<void> {
+  let got = '';
+  await until(
+    `a message with "${needle}"`,
+    async () => {
+      got += JSON.stringify((await mcp.call('agentlink_inbox')).structured);
+      return got.includes(needle) ? true : undefined;
+    },
+    60_000,
+  );
+}
+
 /** Serves the built invite site: `/` and `/i` are pages. */
 function serveInvite(): Promise<Server> {
   const types: Record<string, string> = {
@@ -268,7 +283,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   vi.useRealTimers();
-  const missing = MANIFEST.shots.filter((x) => !written.has(x.name) && ONLY === undefined);
+  const missing = MANIFEST.shots.filter(
+    (x) => x.source !== 'manual' && !written.has(x.name) && ONLY === undefined,
+  );
   if (missing.length > 0) {
     throw new Error(
       `docs screens: the manifest lists shots this run did not write: ${missing.map((x) => x.name).join(', ')}`,
@@ -456,11 +473,13 @@ describe('docs screens', () => {
         text: 'Here is the agenda.',
         path: join(pcB.home, 'AgentLink', 'Send', 'workshop-agenda.txt'),
       });
+      await arrived(mcpA, 'Here is the agenda');
       await mcpA.call('agentlink_send', {
         to: 'Natasa',
         text: 'And the plan.',
         path: join(pcA.home, 'AgentLink', 'Send', 'project-plan.txt'),
       });
+      await arrived(mcpB, 'And the plan.');
       const offered = await mcpB.call('agentlink_propose_terms', {
         to: 'Tali',
         terms: {
@@ -473,18 +492,7 @@ describe('docs screens', () => {
         clientRequestId: 'docs-offer-1',
       });
       if (offered.structured['status'] !== 'ok') throw new Error('the offer was not sent');
-      // The inbox hands each message over once: collect until the file and the offer are both in.
-      let got = '';
-      await until(
-        'Tali has the file and the offer',
-        async () => {
-          got += JSON.stringify((await mcpA.call('agentlink_inbox')).structured);
-          return got.includes('Here is the agenda') && got.includes('Workshop slides')
-            ? true
-            : undefined;
-        },
-        60_000,
-      );
+      await arrived(mcpA, 'Workshop slides');
       await navTo(a, 'Home');
       await a
         .getByRole('button', { name: /Natasa/ })
@@ -522,7 +530,6 @@ describe('docs screens', () => {
       await a.goto(new URL('/settings/rules', a.url()).toString());
       await a.getByRole('heading', { name: 'Rules', level: 1 }).first().waitFor();
       await a.waitForTimeout(800);
-      await shot(a, 'rules-overview');
       await a.getByRole('textbox', { name: 'Ask me over' }).fill('2');
       await a.getByRole('button', { name: 'Review and save' }).click();
       await a.getByRole('checkbox').first().waitFor();
@@ -549,7 +556,6 @@ describe('docs screens', () => {
     await step('people', async () => {
       await goTo(a, 'People');
       await a.getByText('Natasa').first().waitFor();
-      await shot(a, 'people');
       await a.getByRole('list', { name: 'Your people' }).getByText('Natasa').first().click();
       await a.getByRole('region', { name: 'Natasa' }).first().waitFor();
       await a.waitForTimeout(600);
@@ -561,7 +567,6 @@ describe('docs screens', () => {
       await a.keyboard.press('Escape');
       await goTo(a, 'My IDs');
       await a.getByRole('heading', { name: 'My IDs', level: 1 }).first().waitFor();
-      await shot(a, 'ids');
       const card = a.getByRole('main').getByRole('region', { name: 'Tali', exact: true }).first();
       await card.getByRole('button', { name: 'Rename', exact: true }).click();
       await a.getByLabel('Name', { exact: true }).fill('Tali R');
@@ -589,7 +594,6 @@ describe('docs screens', () => {
       const sw = a.getByRole('switch', { name: /Under the hood/ }).first();
       if ((await sw.getAttribute('aria-checked')) !== 'true') await sw.click();
       await a.waitForTimeout(800);
-      await shot(a, 'ids-under-the-hood');
       await navTo(a, 'Home');
       await a.waitForTimeout(800);
       await shot(a, 'home-under-the-hood');
@@ -607,7 +611,6 @@ describe('docs screens', () => {
       await a.goto(new URL('/settings/backup', a.url()).toString());
       await a.getByRole('heading', { level: 1 }).first().waitFor();
       await a.waitForTimeout(800);
-      await shot(a, 'recovery-kit');
       // WP-11: save the kit (Touch ID), then the recovery code shown once. The kit is written into
       // this computer's temp home, never a real Downloads folder.
       await a.getByRole('button', { name: 'Save a recovery kit' }).first().click();
@@ -616,7 +619,6 @@ describe('docs screens', () => {
       await confirm.or(code).first().waitFor({ timeout: 30_000 });
       if (await confirm.isVisible()) await confirm.click();
       await code.waitFor({ timeout: 30_000 });
-      await shot(a, 'recovery-kit-saved');
     });
   });
 });

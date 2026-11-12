@@ -106,26 +106,10 @@
       "theme": "light"
     },
     {
-      "name": "people",
-      "image": "docs-site/assets/screens/people.webp",
-      "page": "People",
-      "state": "One person",
-      "viewport": "1280x800",
-      "theme": "light"
-    },
-    {
       "name": "contact",
       "image": "docs-site/assets/screens/contact.webp",
       "page": "People, Natasa opened",
       "state": "Contact page with Contact check",
-      "viewport": "1280x800",
-      "theme": "light"
-    },
-    {
-      "name": "ids",
-      "image": "docs-site/assets/screens/ids.webp",
-      "page": "My IDs",
-      "state": "Simple view, card for Tali",
       "viewport": "1280x800",
       "theme": "light"
     },
@@ -146,14 +130,6 @@
       "theme": "light"
     },
     {
-      "name": "ids-under-the-hood",
-      "image": "docs-site/assets/screens/ids-under-the-hood.webp",
-      "page": "My IDs, Under the hood on",
-      "state": "Table view",
-      "viewport": "1280x800",
-      "theme": "light"
-    },
-    {
       "name": "home-under-the-hood",
       "image": "docs-site/assets/screens/home-under-the-hood.webp",
       "page": "Home, Under the hood on",
@@ -166,22 +142,6 @@
       "image": "docs-site/assets/screens/ai-apps.webp",
       "page": "Settings, AI apps",
       "state": "Claude Code connected",
-      "viewport": "1280x800",
-      "theme": "light"
-    },
-    {
-      "name": "recovery-kit",
-      "image": "docs-site/assets/screens/recovery-kit.webp",
-      "page": "Settings, Backup and restore",
-      "state": "Before saving the kit",
-      "viewport": "1280x800",
-      "theme": "light"
-    },
-    {
-      "name": "recovery-kit-saved",
-      "image": "docs-site/assets/screens/recovery-kit-saved.webp",
-      "page": "Settings, Backup and restore",
-      "state": "Kit saved, recovery code shown",
       "viewport": "1280x800",
       "theme": "light"
     },
@@ -226,14 +186,6 @@
       "theme": "light"
     },
     {
-      "name": "rules-overview",
-      "image": "docs-site/assets/screens/rules-overview.webp",
-      "page": "Settings, Rules",
-      "state": "Defaults",
-      "viewport": "1280x800",
-      "theme": "light"
-    },
-    {
       "name": "rules-confirm-spending",
       "image": "docs-site/assets/screens/rules-confirm-spending.webp",
       "page": "Settings, Rules, spending sheet",
@@ -256,6 +208,105 @@
       "state": "Today's entries",
       "viewport": "1280x800",
       "theme": "light"
+    },
+    {
+      "name": "backup-restore",
+      "image": "docs-site/assets/screens/backup-restore.webp",
+      "page": "Settings, Backup and restore (Ana)",
+      "state": "Backup and restore overview",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "restore-1-kit",
+      "image": "docs-site/assets/screens/restore-1-kit.webp",
+      "page": "Restore, step 1",
+      "state": "Pick the recovery kit",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "restore-2-code",
+      "image": "docs-site/assets/screens/restore-2-code.webp",
+      "page": "Restore, step 2",
+      "state": "Recovery code",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "restore-3-what-comes-back",
+      "image": "docs-site/assets/screens/restore-3-what-comes-back.webp",
+      "page": "Restore, step 3",
+      "state": "What comes back",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "restore-4-done",
+      "image": "docs-site/assets/screens/restore-4-done.webp",
+      "page": "Restore, step 4",
+      "state": "Done",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "people-all-ids",
+      "image": "docs-site/assets/screens/people-all-ids.webp",
+      "page": "People, all IDs",
+      "state": "People across IDs",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "my-ids",
+      "image": "docs-site/assets/screens/my-ids.webp",
+      "page": "My IDs",
+      "state": "Simple view",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "my-ids-under-the-hood",
+      "image": "docs-site/assets/screens/my-ids-under-the-hood.webp",
+      "page": "My IDs, Under the hood on",
+      "state": "Table view",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "rules",
+      "image": "docs-site/assets/screens/rules.webp",
+      "page": "Settings, Rules (Ana)",
+      "state": "Rules in force with a changed row",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "settings-home",
+      "image": "docs-site/assets/screens/settings-home.webp",
+      "page": "Settings",
+      "state": "Index",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
+    },
+    {
+      "name": "touch-id-master-code",
+      "image": "docs-site/assets/screens/touch-id-master-code.webp",
+      "page": "Settings, Touch ID and master code",
+      "state": "Page overview",
+      "viewport": "1280x800",
+      "theme": "light",
+      "source": "manual"
     }
   ]
 }

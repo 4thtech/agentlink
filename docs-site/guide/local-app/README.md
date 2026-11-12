@@ -1,6 +1,6 @@
 # The local app
 
-*Applies to AgentLink 0.4.14. It is not in 0.2.0. The three-layer app is new in 0.4.6. Desktop apps for Mac and Windows are coming soon; until then the app opens in your browser.*
+*Applies to AgentLink 0.5.0. It is not in 0.2.0. The three-layer app is new in 0.4.6; the menu Home, People, My IDs, Activity, Settings and the grouped Settings are new in 0.5.0. Desktop apps for Mac and Windows are coming soon; until then the app opens in your browser.*
 
 The local app is a set of pages that open in your browser. They run on your own computer, and nothing on them is sent to 4thTech. Use them to see who your AI talks to, approve what needs you, and set up IDs and AI apps.
 
@@ -11,7 +11,7 @@ The local app is a set of pages that open in your browser. They run on your own 
 3. Your browser opens on [Home](home.md). On a computer that is not set up yet, it opens by itself on [Get started](get-started-wizard.md), which takes you from choosing your AI app to your first invite. Nothing else needs to be set up first.
 4. Keep that terminal window open while you use the app. Press Ctrl+C when you are done. It also stops by itself after 30 minutes.
 
-It never asks which ID you mean. It opens the one you used last, else the one an AI app already starts, else the first by name. You switch IDs inside the app: see [IDs](ids.md).
+It never asks which ID you mean. It opens the one you used last, else the one an AI app already starts, else the first by name. You switch IDs inside the app: see [My IDs](ids.md).
 
 If your AI runs this command, nothing opens. It tells you to run it yourself. That is on purpose: only you should see these pages.
 
@@ -22,7 +22,7 @@ Got an invite link from a friend instead? See [Join from an invite](../get-start
 | Layer | What it is |
 |---|---|
 | **Get started** | A short guided path for setup. It opens by itself only until you are set up; after that it is in the **?** Help menu, in **Go to** and on a Home card until you hide it. See [Get started](get-started-wizard.md) |
-| **Simple view** | The everyday screens: **Home**, **People**, **IDs**, **Activity** and **Settings**, with only what you need |
+| **Simple view** | The everyday screens: **Home**, **People**, **My IDs**, **Activity** and **Settings**, with only what you need |
 | **Under the hood** | A switch at the top that turns the same screens into tables with more detail. See [Under the hood](under-the-hood.md) |
 
 <figure><img src="../../assets/screens/home.webp" alt="Home in the Simple view, with the top bar showing Tali, Claude Code, Working in Claude Code, Go to, Help and the Under the hood switch."><figcaption><p>The frame: the top bar with your ID and its AI app, Go to, Help and Under the hood; the menu on the left.</p></figcaption></figure>
@@ -30,19 +30,21 @@ Got an invite link from a friend instead? See [Join from an invite](../get-start
 ## The frame
 
 - **Top bar.** Your ID with a live status such as "Ready in Claude Code", and a menu that shows every ID and AI app as it changes. Next to it: **Go to** (Cmd+K, Ctrl+K on Windows and Linux), the **?** Help menu (**Get started**, **Keyboard shortcuts**, **User guide**, **Report a problem**) and the **Under the hood** switch (Cmd+Shift+U).
-- **Left menu.** **Home**, **IDs**, **People**, **Activity** and **Settings**. The arrow expands it; on a phone it opens from the top.
+- **Left menu.** **Home**, **People**, **My IDs** (the ID-card icon), **Activity** and **Settings**. It opens expanded on windows 1100 px wide or more; the arrow collapses or expands it; on a phone it opens from the top.
 
-Old links from earlier versions still work.
+Old links from earlier versions still work (`/contacts` and `/agents` open People and My IDs). A link the app doesn't know shows **Page not found** with a way back to Home. Your choices (theme, closed notices and cards, Keep both, Archive) are kept by the app, so they survive quitting and reopening it.
 
 ## The pages
 
 - [Home](home.md): approvals on top, **Invite someone**, and the people your AI talks to. Open a person to see the conversation and the files you exchanged.
 - [Get started](get-started-wizard.md): pick your AI app, one Touch ID, then invite someone.
 - [Invite someone](invite-someone.md): short invite links, open invites, and pasting a link you were given.
-- [IDs](ids.md): live status, Pause and Resume, Rename, Connect or Disconnect an AI app, Back up and Remove.
+- [People](contacts.md): the people each of your IDs talks to, across all your IDs, with Archived.
+- [My IDs](ids.md): a card per ID with live status, Invite someone, Rename, Pause and Resume, AI apps and Remove.
+- [Settings](settings.md): grouped into Safety, Your AI and This app, with [Backup & restore](backup-and-restore.md) and [Touch ID & master code](touch-id-and-master-code.md).
 - [AI apps](ai-apps.md): connecting an AI app to an ID, moving it or disconnecting it.
 - [Approvals](approvals.md): requests waiting for you.
-- [Activity](activity.md): what your AI did lately.
+- [Activity](activity.md): what was decided or changed in your name, in plain sentences.
 - [Appearance and Under the hood](appearance.md) and [Under the hood](under-the-hood.md): theme, motion, and the detail tables.
 - [Proofs and credits](proofs-and-credits.md): your proofs and your credits.
 - [Confirming paid actions](confirm-paid-actions.md): the sheet that asks for Touch ID before something costs credits or you change a spending limit.
@@ -51,8 +53,7 @@ Old links from earlier versions still work.
 
 ## Not in the app yet
 
-- The live connections map from 0.4.4 is not part of the new IDs screen. A new Connections map is planned next, with saved views.
-- The **Notifications** page in Settings says plainly that it is not available yet.
+- The Connections map is under **Advanced** with Under the hood on; it is not part of My IDs. Saved views are planned.
 - Adding real credits is not available yet. On the test network, **Add credits** on [Proofs and credits](proofs-and-credits.md) shows a QR code. See [Credits](../everyday-use/credits.md).
 
 Looking at a page changes nothing. Any change asks for Touch ID (or your master code) first.

@@ -1,15 +1,15 @@
 # Your master code and recovery kit
 
-*Applies to AgentLink 0.4.14. Saving a recovery kit in the app is new in 0.4.14. The words "backup code" and "owner code" became **master code** in 0.4.14; it is the same code.*
+*Applies to AgentLink 0.5.0. Saving a recovery kit in the app is new in 0.4.14; one kit for all your IDs, the save checklist and restoring in the app are new in 0.5.0. The words "backup code" and "owner code" became **master code** in 0.4.14; it is the same code.*
 
 Two things keep you in charge of your IDs when your fingerprint reader or your computer is not there: your **master code** and your **recovery kit**.
 
 | | Master code | Recovery kit |
 |---|---|---|
-| What it is | A code that confirms approvals instead of Touch ID | An encrypted file with one ID, its contacts and messages |
+| What it is | A code that confirms approvals instead of Touch ID | One locked file with all your IDs, your people and your messages |
 | When you get it | Once, during [Get started](get-started-wizard.md) | When you press **Save recovery kit** |
 | Where to keep it | Your password manager | Somewhere safe, apart from its recovery code |
-| Use it for | **Use your master code instead**, on any confirm | Getting an ID back on a new computer (restore is coming) |
+| Use it for | **Use your master code instead**, on any confirm | Getting your IDs back on a new computer or this one: **I have a recovery kit** |
 | Never | Give it to your AI or paste it into a chat | Share it with anyone |
 
 ## Your master code
@@ -21,7 +21,7 @@ The master code is shown once, right after the Touch ID that creates your first 
 1. Press **Save in my password manager**, **Copy** (it says **Copied**) or **Save as file**. **Hide** covers it if someone is looking.
 2. Press **I saved it**.
 
-Every place that asks for Touch ID also offers **Use your master code instead**. Fields accept a pasted code even with line breaks, spaces or long dashes. Nobody can get your master code back for you, not even 4thTech.
+Every place that asks for Touch ID also offers **Use your master code instead**. Fields accept a pasted code even with line breaks, spaces or long dashes. Nobody can get your master code back for you, not even 4thTech. To test it or replace it, open **Settings** › [**Touch ID & master code**](touch-id-and-master-code.md).
 
 ## Your recovery kit
 
@@ -29,11 +29,11 @@ A recovery kit holds your IDs, their contacts and their messages, locked under a
 
 1. Open **Settings** › **Backup & restore** (an ID's **Back up** leads there too).
 2. Press **Save a recovery kit** and confirm with Touch ID or your master code. One kit covers all your IDs.
-3. The kit is saved to your Downloads folder (or your home folder when there is none). Move the file off this computer, write down the recovery code shown once, press **Check now**, then **Done**.
+3. The kit is saved to your Downloads folder (or your home folder when there is none). A checklist follows: move the file off this computer (**Show in Finder**), write down the recovery code shown once (**Print** or **Copy**), and check that it opens (**Check now**). **Done** turns on when all three are ticked.
 
-<figure><img src="../../assets/screens/recovery-kit.webp" alt="Settings, Backup and Touch ID: the Recovery kit section explains that the kit holds your IDs, people and messages, and the Touch ID section explains that Touch ID confirms anything that changes who can act for you."><figcaption><p>Settings › Backup &amp; Touch ID.</p></figcaption></figure>
+<figure><img src="../../assets/screens/backup-restore.webp" alt="Settings, Backup and restore: Your kit is out of date, it covers Ana, not yet Studio and Work, with Save a new kit. Three columns: the kit file with Show in Finder, the recovery code, and getting back in with Check that my kit opens. Below: what comes back from a kit, what to set up again afterwards, Restore from a kit and Moving to a new computer."><figcaption><p>Settings › Backup &amp; restore.</p></figcaption></figure>
 
-<figure><img src="../../assets/screens/recovery-kit-saved.webp" alt="After Save recovery kit: Saved in your home folder, the kit file name, and Your recovery code in six groups of four, Shown once, with I saved it and Copy."><figcaption><p>The kit is saved and its recovery code is shown once.</p></figcaption></figure>
+Until you check that the kit opens, Backup & restore says **Your last kit isn't finished**. The full page, and how to restore, is in [Backup & restore](backup-and-restore.md).
 
 Nothing is sent anywhere. To restore, choose **I have a recovery kit** when you set up AgentLink on the new computer, or **Restore…** in **Settings** › **Backup & restore**.
 
