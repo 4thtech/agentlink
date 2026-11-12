@@ -513,12 +513,19 @@ export async function launchBrowser(): Promise<{ browser?: Browser; error?: unkn
   }
 }
 
+const MAC_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
 export async function pageWithTouchId(
   browser: Browser,
   viewport = { width: 1280, height: 900 },
 ): Promise<{ page: Page; context: BrowserContext }> {
+  // The virtual authenticator stands in for Touch ID, and the app names the sensor from the browser's
+  // platform (11 §5: Touch ID / Windows Hello / "your passkey"); the journeys assert the Mac words, so
+  // the harness reports a Mac on every runner. AGENTLINK_TEST_UA overrides it (to prove the other words).
   const context = await browser.newContext({
     viewport,
+    userAgent: process.env['AGENTLINK_TEST_UA'] ?? MAC_USER_AGENT,
     permissions: ['clipboard-read', 'clipboard-write'],
   });
   const page = await context.newPage();
