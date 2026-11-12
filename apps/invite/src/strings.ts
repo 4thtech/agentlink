@@ -47,6 +47,9 @@ export const strings = {
         'Paste it into PowerShell and press Enter. It installs AgentLink, and Node.js if needed, then opens the invite.',
       node: 'For a computer with Node.js 22.14 or later. Paste it into Terminal and press Return.',
     },
+    /** WP-D9: next to the command, the desktop app link and its download page. */
+    openApp: 'Open in the AgentLink app',
+    getApp: 'Get the app (coming soon)',
     link: 'Already have AgentLink? Open it and paste the link',
     linkHelp: 'In AgentLink, choose Accept an invite and paste this link.',
     copy: 'Copy',

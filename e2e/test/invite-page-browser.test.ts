@@ -244,7 +244,9 @@ describe('a good invite (U3-invite)', () => {
     await expect(page.locator('#open-app').getAttribute('href')).resolves.toBe(
       `agentlink://join#${payloadOf(link)}`,
     );
-    await expect(page.locator('#open-app').textContent()).resolves.toBe('Open in the AgentLink app');
+    await expect(page.locator('#open-app').textContent()).resolves.toBe(
+      'Open in the AgentLink app',
+    );
     await expect(page.locator('#get-app').getAttribute('href')).resolves.toBe(
       'https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md',
     );
@@ -506,9 +508,16 @@ describe('accessibility and motion (U3-invite, b11 §33.1)', () => {
       });
       expect(violations, mode.name).toEqual([]);
       const sizes = await page.evaluate(() =>
-        ['copy-ai', 'os-unix', 'os-windows', 'os-node', 'copy', 'copy-link', 'open-app', 'get-app'].map(
-          (id) => document.getElementById(id)?.getBoundingClientRect().height ?? 0,
-        ),
+        [
+          'copy-ai',
+          'os-unix',
+          'os-windows',
+          'os-node',
+          'copy',
+          'copy-link',
+          'open-app',
+          'get-app',
+        ].map((id) => document.getElementById(id)?.getBoundingClientRect().height ?? 0),
       );
       for (const h of sizes) expect(h, mode.name).toBeGreaterThanOrEqual(44);
       expect(

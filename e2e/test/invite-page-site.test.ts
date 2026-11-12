@@ -90,8 +90,14 @@ describe('the pages', () => {
         // gone). WP-D9: exactly two links, both in the command card: "Open in the AgentLink app",
         // whose agentlink://join# address the script sets from the checked invite (none in the
         // file), and "Get the app", the public desktop app page, with no referrer.
-        expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([GET_APP_URL]);
-        expect([...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0])).toEqual([
+        expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([
+          GET_APP_URL,
+        ]);
+        expect(
+          [...html.matchAll(/<a\b[^>]*>/gi)].map((m) =>
+            m[0].replace(/\s+/g, ' ').replace(' >', '>'),
+          ),
+        ).toEqual([
           '<a id="open-app" class="btn secondary">',
           `<a id="get-app" class="btn secondary" href="${GET_APP_URL}" rel="noopener noreferrer">`,
         ]);

@@ -102,3 +102,19 @@ export function buildCommands(inviteUrl: string): InviteCommands | undefined {
 
 /** U3-invite: the sentence for a canonical link. Anything else is refused. */
 export const buildAskAi = (inviteUrl: string): string => fill(ASK_AI_TEMPLATE, inviteUrl);
+
+/**
+ * WP-D9 (plan Decision 4): the scheme link of "Open in the AgentLink app". The desktop app accepts
+ * only this prefix and rebuilds the canonical link from the payload with the same patterns.
+ */
+export const APP_LINK_PREFIX = 'agentlink://join#';
+
+/**
+ * WP-D9: `agentlink://join#<payload>` for a canonical link (the checked payload and nothing else).
+ * The link is opened by the person's own click and handled on this computer; it reaches no server.
+ * Anything else is refused.
+ */
+export function buildAppLink(inviteUrl: string): string {
+  if (!isCanonicalLink(inviteUrl)) throw new Error('not a canonical invite link');
+  return `${APP_LINK_PREFIX}${inviteUrl.slice(CANONICAL_PREFIX.length)}`;
+}

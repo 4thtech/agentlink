@@ -33,6 +33,7 @@ import {
 import type { Invite } from '@4thtech-io/types';
 import {
   CANONICAL_PREFIX,
+  buildAppLink,
   buildAskAi,
   buildCommands,
   isCanonicalLink,
@@ -69,6 +70,8 @@ export type InviteView =
       /** WP-2: the command per computer, or undefined when one would be too long for cmd.exe (08 §4). */
       readonly commands: InviteCommands | undefined;
       readonly sentence: string;
+      /** WP-D9: `agentlink://join#<payload>`, for "Open in the AgentLink app". */
+      readonly appLink: string;
       readonly inviter: Inviter;
     };
 
@@ -128,6 +131,7 @@ export async function evaluateFragment(
       inviteUrl,
       commands: buildCommands(inviteUrl),
       sentence: buildAskAi(inviteUrl),
+      appLink: buildAppLink(inviteUrl),
       inviter: { name, fallback, label: 'self-declared', fingerprint, expiresAt: invite.expiresAt },
     };
   } catch {

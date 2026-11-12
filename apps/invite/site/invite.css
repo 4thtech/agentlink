@@ -227,6 +227,13 @@ a {
   cursor: pointer;
   transition: background-color 120ms cubic-bezier(0.2, 0, 0, 1);
 }
+/* WP-D9: the app links in the command card look like the secondary buttons. */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
 .btn.secondary {
   background: transparent;
   color: var(--text);

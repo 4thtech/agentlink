@@ -92,14 +92,16 @@ describe('toInviteLink: the 08 §4 crafted list is ignored', () => {
     expect(toInviteLink(`agentlink://join#${LONG}#${LONG}`)).toBeNull();
     expect(toInviteLink(`agentlink://join#${encodeURIComponent('A#B')}`)).toBeNull();
     expect(toInviteLink(`agentlink://join#2.${'A'.repeat(42)}B`)).toBeNull(); // trailing bits
-    expect(toInviteLink(`agentlink://join#2.${'A'.repeat(43)}`)).toBeNull(); // too long
+    expect(toInviteLink(`agentlink://join#2.${'A'.repeat(43)}A`)).toBeNull(); // too long
     expect(toInviteLink(`agentlink://join#2.${'A'.repeat(41)}A`)).toBeNull(); // too short
   });
 
   it('ignores a full canonical link or a look-alike host inside the fragment', () => {
     expect(toInviteLink(`agentlink://join#${PREFIX}${LONG}`)).toBeNull();
     expect(toInviteLink(`agentlink://join#agentlink.4thtech.io/i#${LONG}`)).toBeNull();
-    expect(toInviteLink(`agentlink://join#https://agentlink.4thtech.io.evil.example/i#${LONG}`)).toBeNull();
+    expect(
+      toInviteLink(`agentlink://join#https://agentlink.4thtech.io.evil.example/i#${LONG}`),
+    ).toBeNull();
   });
 
   it('ignores any other host, path, query, user info or spelling of the prefix', () => {
@@ -180,15 +182,21 @@ describe('the same patterns as agentlink join and the invite page (08 §4)', () 
   };
 
   it('equals the CANONICAL and SHORT regexes of apps/cli/src/commands/join.ts', () => {
-    expect(INVITE_LONG_PATTERN.source).toBe(regexSource('apps/cli/src/commands/join.ts', 'CANONICAL'));
+    expect(INVITE_LONG_PATTERN.source).toBe(
+      regexSource('apps/cli/src/commands/join.ts', 'CANONICAL'),
+    );
     expect(INVITE_SHORT_PATTERN.source).toBe(regexSource('apps/cli/src/commands/join.ts', 'SHORT'));
     expect(INVITE_LONG_PATTERN.flags).toBe('');
     expect(INVITE_SHORT_PATTERN.flags).toBe('');
   });
 
   it('equals the invite page patterns (apps/invite/src/prompt.ts)', () => {
-    expect(INVITE_LONG_PATTERN.source).toBe(regexSource('apps/invite/src/prompt.ts', 'CANONICAL_LINK'));
-    expect(INVITE_SHORT_PATTERN.source).toBe(regexSource('apps/invite/src/prompt.ts', 'SHORT_LINK'));
+    expect(INVITE_LONG_PATTERN.source).toBe(
+      regexSource('apps/invite/src/prompt.ts', 'CANONICAL_LINK'),
+    );
+    expect(INVITE_SHORT_PATTERN.source).toBe(
+      regexSource('apps/invite/src/prompt.ts', 'SHORT_LINK'),
+    );
   });
 });
 
@@ -268,9 +276,15 @@ describe('the shell with the real handler', () => {
   it('second instance: only the forwarded link, checked again', async () => {
     const { electron, children, proc } = setup([]);
     await runShell(electron, proc);
-    electron.app.emit('second-instance', new FakeEvent(), [EXE, '--', 'agentlink://join#RAW'], '/', {
-      deepLink: 'agentlink://x --remote-debugging-port=1',
-    });
+    electron.app.emit(
+      'second-instance',
+      new FakeEvent(),
+      [EXE, '--', 'agentlink://join#RAW'],
+      '/',
+      {
+        deepLink: 'agentlink://x --remote-debugging-port=1',
+      },
+    );
     electron.app.emit('second-instance', new FakeEvent(), [EXE], '/', {
       deepLink: `agentlink://join#${LONG}`,
     });

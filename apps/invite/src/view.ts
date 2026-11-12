@@ -68,6 +68,8 @@ export function render(
   const next = element(doc, 'next');
   const copyStatus = element(doc, 'copy-status');
   const wayCommand = element(doc, 'way-command');
+  const openApp = element(doc, 'open-app') as HTMLAnchorElement;
+  const getApp = element(doc, 'get-app');
   const osButtons = OSES.map((o) => [o, element(doc, `os-${o}`) as HTMLButtonElement] as const);
   // The three cards, in order: Ask your AI, the command, the link. `text` is what the card shows
   // and its button copies; `label` is the button's resting text.
@@ -112,6 +114,10 @@ export function render(
     (element(doc, c.button) as HTMLButtonElement).onclick = null;
   }
   for (const [, button] of osButtons) button.onclick = null;
+  // WP-D9: no app link unless this view is a checked invite.
+  openApp.removeAttribute('href');
+  openApp.textContent = strings.step.openApp;
+  getApp.textContent = strings.step.getApp;
   retryButton.onclick = null;
   retryButton.hidden = true;
   retryButton.disabled = false;
@@ -227,6 +233,11 @@ export function render(
       };
     }
     choose(chosen);
+
+    // WP-D9: "Open in the AgentLink app" next to the command. The address is the script's own
+    // `agentlink://join#<payload>` (built from the checked payload, never read from the page); the
+    // person's click hands it to the app on this computer, so the fragment reaches no server.
+    openApp.setAttribute('href', view.appLink);
 
     wayCommand.hidden = view.commands === undefined;
     step.hidden = false;
