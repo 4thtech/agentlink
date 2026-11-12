@@ -12,6 +12,7 @@
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { encodeUtf8 } from '@4thtech-io/crypto';
 import {
+  UI_SETTINGS_MAX_BODY_BYTES,
   UI_SETTINGS_PATH,
   UI_SETTINGS_SAMPLES,
   type UiSettings,
@@ -141,11 +142,15 @@ async function harness(
     initial?: boolean;
     withSettings?: boolean;
     routes?: ReturnType<typeof createLocalUiRoutes>;
+    /** UX1113-QA-HOST: the same store across two launches. */
+    world?: World;
+    /** UX1113-QA-HOST: a server without the app bundle. */
+    noApp?: boolean;
   } = {},
 ): Promise<Harness> {
   const opened: string[] = [];
   const ownerStores: number[] = [];
-  const world: World = { stored: undefined, writes: [] };
+  const world: World = options.world ?? { stored: undefined, writes: [] };
   const initial: AppHostAgent = {
     name: 'default',
     label: 'Personal',
@@ -156,7 +161,7 @@ async function harness(
   const server = await startApprovalServerWith(
     {
       source,
-      localUi: { assets: bundle() },
+      localUi: { assets: options.noApp === true ? { files: new Map() } : bundle() },
       ...(options.host === false
         ? {}
         : {
@@ -283,7 +288,7 @@ describe('GET and PUT /api/ui/ui-settings in the app host', () => {
       expect(res.body).not.toContain('passwd');
     }
     expect((await h.put(encodeUtf8('{"underTheHood":tru'))).status).toBe(400);
-    expect((await h.put(encodeUtf8('x'.repeat(200)))).status).toBe(413);
+    expect((await h.put(encodeUtf8('x'.repeat(UI_SETTINGS_MAX_BODY_BYTES + 1)))).status).toBe(413);
     expect(h.world.writes).toEqual([]);
   });
 
@@ -414,5 +419,164 @@ describe('the W4-SHELL-V2 pages are app pages (the shell is served)', () => {
       const res = await send(h.port, path, { headers: { Cookie: h.cookie } });
       expect(res.status, path).toBe(404);
     }
+  });
+});
+
+// UX1113-QA-HOST (B1): a reload on any page of the app shows the app, and an unknown path shows a
+// friendly "Page not found" instead of raw JSON; the API keeps its JSON answers.
+describe('a reload on every app page, and an unknown path', () => {
+  const PAGES = [
+    '/people',
+    '/ids',
+    '/ids/work',
+    '/contacts',
+    '/agents',
+    '/agents/work',
+    '/activity',
+    '/activity/live',
+    '/settings',
+    '/settings/backup',
+    '/settings/appearance',
+    '/settings/compact',
+    '/settings/join',
+    '/advanced/map',
+    '/start/app',
+    '/first-run',
+    '/inbox',
+    '/restore',
+    '/restore/kit',
+    '/restore/code/confirm',
+  ];
+
+  it('serves the app shell for every page path the router knows', async () => {
+    const h = await harness();
+    for (const path of PAGES) {
+      const res = await send(h.port, path, { headers: { Cookie: h.cookie } });
+      expect(res.status, path).toBe(200);
+      expect(res.headers['content-type'], path).toBe('text/html; charset=utf-8');
+      expect(res.body, path).toContain(`<meta name="agentlink-csrf" content="${h.csrf}">`);
+      expect(res.body, path).not.toContain('"status"');
+    }
+  });
+
+  it('an unknown path with a session is a 404 that shows the app (its Page not found)', async () => {
+    const h = await harness();
+    for (const path of ['/nope', '/people/x', '/People', '/index.html', '/app.js', '/a/b/c']) {
+      const res = await send(h.port, path, { headers: { Cookie: h.cookie } });
+      expect(res.status, path).toBe(404);
+      expect(res.headers['content-type'], path).toBe('text/html; charset=utf-8');
+      expect(res.headers['cache-control'], path).toBe('no-store');
+      expect(res.body, path).toContain('<div id="root"></div>');
+      expect(res.body, path).not.toContain('{"status":"refused"}');
+    }
+  });
+
+  it('an unknown path without a session or without the app is a fixed friendly page', async () => {
+    const h = await harness();
+    const noApp = await harness({ noApp: true });
+    const cases: [number, Record<string, string>][] = [
+      [h.port, {}],
+      [noApp.port, { Cookie: noApp.cookie }],
+    ];
+    for (const [port, headers] of cases) {
+      const res = await send(port, '/nope', { headers });
+      expect(res.status).toBe(404);
+      expect(res.headers['content-type']).toBe('text/html; charset=utf-8');
+      expect(res.body).toContain('Page not found');
+      expect(res.body).toContain('<a href="/">Go to Home</a>');
+      expect(res.body).not.toContain('<script');
+      expect(res.body).not.toContain('agentlink-csrf');
+      expect(res.body).not.toContain('nope');
+    }
+  });
+
+  it('API paths keep their JSON answers', async () => {
+    const h = await harness();
+    for (const path of ['/api/ui/nope', '/api/nope', '/api/approvals/x']) {
+      const res = await send(h.port, path, { headers: { Cookie: h.cookie } });
+      expect(res.status, path).toBe(404);
+      expect(res.headers['content-type'], path).toMatch(/application\/json/);
+    }
+    // Only GET shows a page; another method on an unknown path stays JSON.
+    const post = await send(h.port, '/nope', { method: 'POST', headers: { Cookie: h.cookie } });
+    expect(post.headers['content-type']).toMatch(/application\/json/);
+  });
+});
+
+// UX1113-QA-HOST (B3): the page choices the browser kept are lost on every launch (a new port is a
+// new origin). The app keeps them for the owner in its UI settings (`kept`), behind the same gate.
+describe('kept page choices (UI settings `kept`)', () => {
+  const REF = `0x${'ab'.repeat(20)}`;
+  const THEME = JSON.stringify({
+    hood: false,
+    motion: 'system',
+    transparency: 'system',
+    theme: 'light',
+    approvalsLayout: 'grid',
+    activitySort: 'recent',
+  });
+
+  it('stores, merges key by key and forgets on null', async () => {
+    const h = await harness();
+    expect((await h.put({ kept: { 'agentlink.prefs': THEME } })).status).toBe(200);
+    const archived = JSON.stringify([`default/${REF}`]);
+    const put = await h.put({
+      kept: { 'agentlink.home.archived.v1': archived, 'agentlink.recoveryKit.later': '17' },
+    });
+    expect(put.status).toBe(200);
+    expect(JSON.parse(put.body)).toEqual({
+      kept: {
+        'agentlink.prefs': THEME,
+        'agentlink.home.archived.v1': archived,
+        'agentlink.recoveryKit.later': '17',
+      },
+    });
+    await h.put({ kept: { 'agentlink.recoveryKit.later': null }, underTheHood: true });
+    expect(JSON.parse((await h.read()).body)).toEqual({
+      underTheHood: true,
+      kept: { 'agentlink.prefs': THEME, 'agentlink.home.archived.v1': archived },
+    });
+    expect(h.ownerStores).toEqual([]);
+  });
+
+  it('refuses hostile kept values before the store, never echoing them', async () => {
+    const h = await harness();
+    for (const kept of [
+      { 'agentlink.secret': '1' },
+      { 'agentlink.prefs': '{"theme":"dark","note":"Alice says hi"}' },
+      { 'agentlink.home.archived.v1': JSON.stringify(['default/Alice says hi']) },
+      { 'agentlink.getStarted.hidden': '<img src=x onerror=alert(1)>' },
+      { 'agentlink.recoveryKit.later': 'master code 1234' },
+      [],
+      'x',
+    ]) {
+      const res = await h.put({ kept });
+      expect(res.status, JSON.stringify(kept)).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({ error: 'invalid' });
+    }
+    const proto = encodeUtf8('{"kept":{"__proto__":{"agentlink.prefs":"{}"}}}');
+    expect((await h.put(proto)).status).toBe(400);
+    expect(h.world.writes).toEqual([]);
+  });
+
+  it('a second launch on another port keeps the choices (theme, archive, dismissals, kit)', async () => {
+    const world: World = { stored: undefined, writes: [] };
+    const first = await harness({ world });
+    const kept = {
+      'agentlink.prefs': THEME,
+      'agentlink.home.archived.v1': JSON.stringify([`default/${REF}`]),
+      'agentlink.notices.dismissed.v1': JSON.stringify(['tidy-up']),
+      'agentlink.getStarted.hidden': '1',
+      'agentlink.idsFit.hidden': '1',
+      'agentlink.recoveryKit.later': '1762900000000',
+    };
+    expect((await first.put({ kept })).status).toBe(200);
+    servers.splice(servers.indexOf(first.server), 1);
+    await first.server.close();
+    const second = await harness({ world });
+    expect(second.server.origin).not.toBe(first.server.origin);
+    const read = await second.read();
+    expect(read.status).toBe(200);
+    expect(JSON.parse(read.body)).toEqual({ kept });
   });
 });

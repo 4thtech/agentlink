@@ -19,6 +19,8 @@ import {
   sectionOf,
   titleOf,
 } from './nav.js';
+import { isAppPagePath } from '@4thtech-io/types/ui-contract/app-pages';
+import { COMPACT_PATH } from './pages/compact/open.js';
 import { AppRoutes, ROUTES } from './router.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -294,5 +296,34 @@ describe('compact view route (UX2-h)', () => {
   it('adds no route to the shell list or the menu', () => {
     expect(ROUTES.some((r) => r.path.includes('compact'))).toBe(false);
     expect(SECTIONS.some((s) => s.path.includes('compact'))).toBe(false);
+  });
+});
+
+// UX1113-QA-HOST (B1): a reload asks the app host for the path itself, so every path the router
+// shows must be on the host's one list of app pages (types ui-contract/app-pages.ts).
+describe('reload: every routed path is an app page on the host', () => {
+  it('ROUTES, redirects, the menus, one ID and the compact view are all on the list', () => {
+    const paths = [
+      ...ROUTES.map((r) => r.path),
+      ...Object.keys(REDIRECTS),
+      ...Object.values(REDIRECTS),
+      ...SECTIONS.map((s) => s.path),
+      ...ADVANCED_SECTIONS.map((s) => s.path),
+      ...SETTINGS_PAGES.map((p) => p.path),
+      COMPACT_PATH,
+      '/agents/work',
+      '/ids/work',
+    ].map((p) => p.split('?')[0] as string);
+    for (const path of paths) expect(isAppPagePath(path), path).toBe(true);
+  });
+
+  it('an unknown path shows Page not found with a way back to Home', () => {
+    mountAt('/nope');
+    const main = host.querySelector('main');
+    expect(main?.textContent).toContain('Page not found');
+    const home = [...(main?.querySelectorAll('a') ?? [])].find(
+      (a) => a.textContent === 'Go to Home',
+    );
+    expect(home?.getAttribute('href')).toBe('/');
   });
 });
