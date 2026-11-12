@@ -20,7 +20,7 @@
 //   unknown or missing key, wrong value, oversize, bad UTF-8, bad framing) is a PROTOCOL VIOLATION.
 //   The receiver drops the message and closes the pipe; the shell then stops the core (and the
 //   supervisor may start a new one). Nothing from a rejected line is logged or echoed.
-// - Never on the pipe: keys, seeds, owner codes, passphrases, message text, contact names, file names.
+// - Never on the pipe: keys, seeds, master codes, passphrases, message text, contact names, file names.
 //   The session link (`ready.sessionUrl`) and an invite link are the only secrets that travel here,
 //   and neither is ever logged, put in a title, a notification or a file by either side.
 //

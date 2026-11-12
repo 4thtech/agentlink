@@ -54,6 +54,13 @@ export class FakeWebContents extends Emitter implements WebContents {
   devToolsClosed = 0;
   /** The committed URL (FakeBrowserWindow.loadURL sets it). */
   url = '';
+  userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/156 Electron/45.1.0';
+  getUserAgent(): string {
+    return this.userAgent;
+  }
+  setUserAgent(userAgent: string): void {
+    this.userAgent = userAgent;
+  }
   getURL(): string {
     return this.url;
   }

@@ -1,6 +1,6 @@
 // DESK-D12c: the page's two calls for native presence (08 §1 `/api/owner/native`; 04 §2.3.4).
 // - GET: whether this computer's helper is there and turned on for the owner (public).
-// - POST: turns it on, its own owner operation; the body is the backup code (as every owner route
+// - POST: turns it on, its own owner operation; the body is the master code (as every owner route
 //   takes it), sent once to this same-origin server, never logged or kept here.
 // Confirming with it is the presence kind `native` (`X-AgentLink-Presence: native`, empty body) on
 // the screen's existing route; the page never runs the helper and never sees a secret.
@@ -60,7 +60,7 @@ export async function readNativeStatus(
 const isState = (value: unknown): value is NativeState =>
   typeof value === 'string' && (NATIVE_STATES as readonly string[]).includes(value);
 
-/** POST /api/owner/native with the backup code; the OS prompt follows on the server's side. */
+/** POST /api/owner/native with the master code; the OS prompt follows on the server's side. */
 export function registerNative(
   backupCode: string,
   fetcher: Fetch = defaultFetch,
@@ -69,7 +69,7 @@ export function registerNative(
   return nativeOp('/api/owner/native', backupCode, fetcher, token);
 }
 
-/** Fable review M1: turn it off (the backup code; never Touch ID itself). */
+/** Fable review M1: turn it off (the master code; never Touch ID itself). */
 export function turnOffNative(
   backupCode: string,
   fetcher: Fetch = defaultFetch,

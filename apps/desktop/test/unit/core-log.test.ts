@@ -1,7 +1,17 @@
 // The core's stderr log (src/main/core-log.ts): a capped in-memory ring of the last lines and a
 // size-capped, rotating 0600 file in the per-user log folder. Every line is redacted first: links,
 // localhost addresses, token parameters and long hex / base64 runs never reach memory or disk.
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, chmodSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -39,6 +49,13 @@ describe('redactLine', () => {
     [`b64url ${'a_b-'.repeat(9)}`, 'a_b-a_b-'],
     [`std b64 with slashes ab3/${'Q'.repeat(20)}/Rk9P+${'z'.repeat(10)}=`, 'QQQQQQQQ'],
     ['file:///Users/x/.agentlink/store', 'file://'],
+    ['{"passphrase":"correct horse battery"}', 'horse'],
+    ['{"token": "abc123def"}', 'abc123def'],
+    ["{'secret':'s3cr3t'}", 's3cr3t'],
+    ['enter code 123456 now', '123456'],
+    ['passphrase hunter22', 'hunter22'],
+    ['master ABCDEFGHIJKLMNOPQRSTUVWX', 'ABCDEFGH'],
+    ['master ABCD-EFGH-IJKL-MNOP-QRST-UVWX', 'ABCD-EFGH'],
   ])('removes secrets from %j', (line, secret) => {
     const out = redactLine(line);
     expect(out).not.toContain(secret);
@@ -90,6 +107,41 @@ describe('CoreLog', () => {
     for (let i = 0; i < RING_LINES + 50; i += 1) log.write(`line ${i}\n`);
     expect(log.lines()).toHaveLength(RING_LINES);
     expect(log.lines().at(-1)).toBe(`line ${RING_LINES + 49}`);
+  });
+
+  it('redacts an overlong line before cutting it, and drops its cut last word', () => {
+    const log = new CoreLog({ dir: temp() });
+    const secret = 'S'.repeat(20) + '1'.repeat(20);
+    log.write(`${'w '.repeat(MAX_LINE_CHARS * 2 - 5)}key=${secret}`);
+    log.write(`${'y'.repeat(50)}\n`);
+    expect(log.lines().join('\n')).not.toContain('SSSS');
+    const tail = new CoreLog({ dir: temp() });
+    tail.write(`${'w '.repeat(MAX_LINE_CHARS * 2)}${'A1'.repeat(10)}`);
+    tail.write('rest\n');
+    expect(tail.lines().join('\n')).not.toContain('A1A1');
+  });
+
+  it('turns the disk log off when core.log is a symlink (lstat), memory still works', () => {
+    if (process.platform === 'win32') return;
+    const dir = temp();
+    const target = join(dir, 'elsewhere.txt');
+    writeFileSync(target, '');
+    symlinkSync(target, join(dir, CORE_LOG_FILE));
+    const log = new CoreLog({ dir });
+    log.write('hello\n');
+    expect(readFileSync(target, 'utf8')).toBe('');
+    expect(log.lines()).toEqual(['hello']);
+  });
+
+  it('turns the disk log off when the log folder is a symlink', () => {
+    if (process.platform === 'win32') return;
+    const base = temp();
+    const real = join(base, 'real');
+    mkdirSync(real);
+    symlinkSync(real, join(base, 'logs'));
+    const log = new CoreLog({ dir: join(base, 'logs') });
+    log.write('hello\n');
+    expect(existsSync(join(real, CORE_LOG_FILE))).toBe(false);
   });
 
   it('caps a line that never ends', () => {

@@ -2,7 +2,7 @@
 // DESK-D12c (S2; D-145 phase 2; 04 §2.5 "Desktop app owner presence"; 11 §5): in the desktop app
 // (user-agent marker `AgentLinkDesktop/1`) the presence screens offer "Use Touch ID" (macOS) or "Use
 // Windows Hello" (Windows) as the primary confirm, once this computer's native presence is turned on;
-// "Use your backup code instead" stays. First-time setup offers "Turn on Touch ID for approvals"
+// "Use your master code instead" stays. First-time setup offers "Turn on Touch ID for approvals"
 // (one gesture). In a browser nothing changes. The page never runs the helper: it sends the native
 // presence kind (empty body) and the server does the rest.
 import { act, createElement } from 'react';
@@ -107,7 +107,7 @@ describe('the status and registration calls (GET / POST /api/owner/native)', () 
     });
   });
 
-  it('registers with the backup code as the body and maps the fixed answers', async () => {
+  it('registers with the master code as the body and maps the fixed answers', async () => {
     const seen: { url: string; body: string; headers: Headers }[] = [];
     const fetcher =
       (status: number, body: unknown) => (url: RequestInfo | URL, init?: RequestInit) => {
@@ -170,16 +170,16 @@ describe('the presence prompt in the desktop app', () => {
   it('macOS app: "Use Touch ID" is the primary confirm and sends the native kind; the code link stays', async () => {
     const submitted = await render(MAC_APP, { available: true, registered: true });
     expect(buttons()).toContain('Use Touch ID');
-    expect(buttons()).toContain('Use your backup code instead');
+    expect(buttons()).toContain('Use your master code instead');
     expect(button('Use Touch ID').className).toMatch(/primary/);
     await click('Use Touch ID');
     expect(submitted).toEqual([{ kind: 'native' }]);
   });
 
-  it('Windows app: "Use Windows Hello"; the backup code instead opens the code field', async () => {
+  it('Windows app: "Use Windows Hello"; the master code instead opens the code field', async () => {
     await render(WIN_APP, { available: true, registered: true });
     expect(buttons()).toContain('Use Windows Hello');
-    await click('Use your backup code instead');
+    await click('Use your master code instead');
     expect(host.querySelector('input[type="password"]')).not.toBeNull();
     expect(buttons()).not.toContain('Use Windows Hello');
   });
@@ -237,7 +237,7 @@ describe('first-time setup offers "Turn on Touch ID for approvals"', () => {
     return calls;
   }
 
-  it('macOS app: one button sends the backup code from setup once and says it is on', async () => {
+  it('macOS app: one button sends the master code from setup once and says it is on', async () => {
     const calls = await renderOffer(MAC_APP, { kind: 'registered' });
     await click('Turn on Touch ID for approvals');
     expect(calls).toEqual(['ABCD EFGH']);
@@ -271,8 +271,8 @@ describe('first-time setup offers "Turn on Touch ID for approvals"', () => {
 
   it('fixed messages for each helper state (cancel, lockout, re-register, not available)', () => {
     expect(NATIVE_STRINGS.state.cancelled).toMatch(/cancel/i);
-    expect(NATIVE_STRINGS.state.lockout).toMatch(/backup code/i);
+    expect(NATIVE_STRINGS.state.lockout).toMatch(/master code/i);
     expect(NATIVE_STRINGS.state.reregister).toMatch(/turn .* on again/i);
-    expect(NATIVE_STRINGS.state.unavailable).toMatch(/backup code/i);
+    expect(NATIVE_STRINGS.state.unavailable).toMatch(/master code/i);
   });
 });

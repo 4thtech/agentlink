@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds AgentLink.app + DMG + zip for macOS (arm64 or x64). Run on macOS (needs ditto, codesign, hdiutil).
 //
-//   node build-mac.mjs --arch arm64 --tgz <packed-cli.tgz> [--version 0.5.0] [--out dir]
+//   node build-mac.mjs --arch arm64 --tgz <packed-cli.tgz> [--helper <agentlink-presence>] [--version 0.5.0] [--out dir]
 //
 // What it does (WP-D4; Decision 3 / H1):
 //   pinned Electron + Node fetched over plain HTTPS and hash-checked -> Electron.app renamed AgentLink.app
@@ -53,6 +53,7 @@ const args = parseArgs(process.argv.slice(2), {
   version: 'v',
   out: 'v',
   'dist-dir': 'v',
+  helper: 'v',
   'keep-work': 'flag',
 });
 const arch = args.arch ?? 'arm64';
@@ -107,8 +108,19 @@ cpSync(join(nodeSrc, 'bin', 'node'), nodeBin);
 cpSync(join(nodeSrc, 'LICENSE'), join(nodeDest, 'LICENSE'));
 chmodSync(nodeBin, 0o755);
 const nodeBefore = describeSignature(join(nodeSrc, 'bin', 'node'));
-// Owner-presence helper (WP-D12b), built from source for this arch; signed in step 7.
-const presenceHelper = buildMacHelper({ arch, outDir: join(contents, 'Helpers') });
+// Owner-presence helper (WP-D12b): built from source for this arch, or a prebuilt one (--helper);
+// signed in step 7. It must sit at Contents/Helpers/agentlink-presence (owner-native-helper.ts
+// desktopHelperPath), or the app offers no Touch ID.
+const helpersDir = join(contents, 'Helpers');
+let presenceHelper;
+if (args.helper) {
+  mkdirSync(helpersDir, { recursive: true });
+  presenceHelper = join(helpersDir, 'agentlink-presence');
+  cpSync(resolve(args.helper), presenceHelper);
+} else {
+  presenceHelper = buildMacHelper({ arch, outDir: helpersDir });
+}
+chmodSync(presenceHelper, 0o755);
 
 console.log('[5/9] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
 const core = installCore({
@@ -147,6 +159,9 @@ const mode =
   planFor(app, process.env, entitlements).at(-1).identity === '-' ? 'ad-hoc' : 'developer-id';
 const signed = signApp(app, process.env, entitlements);
 verifyApp(app);
+if (!existsSync(presenceHelper) || describeSignature(presenceHelper).identifier === null) {
+  throw new Error('The presence helper is missing or unsigned in Contents/Helpers.');
+}
 const nodeAfter = describeSignature(nodeBin);
 if (nodeAfter.cdhash !== nodeBefore.cdhash || nodeAfter.teamId !== nodeBefore.teamId) {
   throw new Error(

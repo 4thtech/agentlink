@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // DESK-D12c (Fable review M1): Settings "Use Touch ID for approvals" in the desktop app. On, off and
-// on again after a fingerprint change are each confirmed with the backup code; the reregister state
+// on again after a fingerprint change are each confirmed with the master code; the reregister state
 // leads to a working "Turn on again". Nothing in a browser.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -77,7 +77,7 @@ async function render(ua: string, statuses: NativeStatus[]) {
 }
 
 describe('Settings: Use Touch ID for approvals', () => {
-  it('turns it off with the backup code', async () => {
+  it('turns it off with the master code', async () => {
     const calls = await render(MAC_APP, [
       { available: true, registered: true },
       { available: true, registered: false },
@@ -93,7 +93,7 @@ describe('Settings: Use Touch ID for approvals', () => {
     expect(toggle()?.checked).toBe(false);
   });
 
-  it('a fingerprint change shows the reregister state; Turn on again works with the backup code', async () => {
+  it('a fingerprint change shows the reregister state; Turn on again works with the master code', async () => {
     const calls = await render(MAC_APP, [
       { available: true, registered: true, reason: 'reregister' },
       { available: true, registered: true },

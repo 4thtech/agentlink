@@ -4,9 +4,9 @@
 //
 // - The owner seed is stored once more as an `ALKH` v1 blob (04 §2.3.4) under the secret the helper
 //   releases after the OS gesture, in the keychain item service `agentlink`, account `owner-native`.
-//   The `owner` item (`ALKO`, the backup code) is unchanged and stays the fallback; `owner-passkey`
+//   The `owner` item (`ALKO`, the master code) is unchanged and stays the fallback; `owner-passkey`
 //   stays where it exists.
-// - Registration is its own owner operation (registerOwnerNative): one entry of the backup code (or
+// - Registration is its own owner operation (registerOwnerNative): one entry of the master code (or
 //   one passkey gesture, checked by the caller) opens the seed, checked against the owner the card
 //   names; the helper's `create` makes the credential and the per-install peer key or challenge; on
 //   macOS `check` proves the key refuses without a gesture, then one `ecdh setup` releases the
@@ -16,7 +16,7 @@
 //   written between them, so no other process can swap the peer key or challenge in that gap. No
 //   `SignedOwnerAction` is made. A second registration is refused, never a replacement. At first-time
 //   setup the held seed is stored the same way (storeOwnerNativeSeed), so a Windows Hello computer
-//   needs the backup code only as the fallback.
+//   needs the master code only as the fallback.
 // - Presence (nativePresence): the record is rebuilt from the stored header (never stored apart from
 //   the blob), the header must name this platform's kind and the expected owner before the helper
 //   runs, then the helper runs once with a fixed reason. The released secret is handed to
@@ -304,7 +304,7 @@ export async function storeOwnerNativeSeed(
 
 /**
  * Opens the owner seed for an owner operation of native presence itself (register, turn off,
- * replace): `presence` is the backup code (`passphrase`, the `owner` item) or the passkey's PRF output
+ * replace): `presence` is the master code (`passphrase`, the `owner` item) or the passkey's PRF output
  * (`passkey-prf`, `owner-passkey`; the caller has checked the assertion). A native presence is never
  * accepted for these (`presence_required`): a captured native secret cannot turn itself back on. The
  * presented bytes are wiped; the caller wipes the seed.
@@ -362,7 +362,7 @@ async function openSeedForNativeOp(
 
 /**
  * Registers native presence for this owner: its own owner operation (04 §2.3.4 "Registration").
- * `presence` is the backup code or the passkey (openSeedForNativeOp); a native presence never
+ * `presence` is the master code or the passkey (openSeedForNativeOp); a native presence never
  * registers (`presence_required`). Refuses before the helper runs when an `owner-native` item exists
  * (`owner_native_exists`), the presence is wrong (`presence_rejected`) or no owner is set up
  * (`owner_missing`). The presented bytes and the seed are wiped.
@@ -429,7 +429,7 @@ async function revokeStored(
 }
 
 /**
- * Fable review M1: turns native presence OFF, its own owner operation (the backup code or the
+ * Fable review M1: turns native presence OFF, its own owner operation (the master code or the
  * passkey; never native itself). Opens the seed to prove presence, revokes the stored credential
  * (an old blob written back is never opened again) and deletes the `owner-native` item only while it
  * is still the one read. Windows also deletes the Hello credential (best effort). `owner_native_missing`
@@ -462,7 +462,7 @@ export async function turnOffOwnerNative(
 
 /**
  * Fable review M1: turns native presence on AGAIN after a biometry change (or a damaged item), its own
- * owner operation (the backup code or the passkey; never native itself): the old credential is
+ * owner operation (the master code or the passkey; never native itself): the old credential is
  * revoked and its item removed, then a new one is registered exactly as registerOwnerNative does
  * (one gesture). Without a stored item it is a plain registration.
  */

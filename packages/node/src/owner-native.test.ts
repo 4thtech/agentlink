@@ -1,7 +1,7 @@
 // DESK-D12c acceptance (S2; D-145 phase 2; 04 §2.3.4 "Registration", §2.5 "Desktop app owner
 // presence"; D-68; I-1, I-4, I-7). Native presence in core:
 //
-// - Registration is its own owner operation: the backup code (or the passkey) once, the helper's
+// - Registration is its own owner operation: the master code (or the passkey) once, the helper's
 //   `create`, on macOS `check` (the key must refuse without a gesture) and one `ecdh setup`, on
 //   Windows the one signature `create` folds in; the record stays in memory from `create` to the
 //   seal (nothing is written in between); the `owner-native` item holds only the `ALKH` blob, read
@@ -12,7 +12,7 @@
 // - M1-8c (same OS user): an AI process that can read the keychain item and run the helper gets no
 //   usable secret without the owner's gesture (the helper refuses: a stand-in that refuses), and no
 //   guess opens the blob.
-// - Windows Hello machines need no backup code after registration.
+// - Windows Hello machines need no master code after registration.
 // - Cross-type: ALKP in `owner-native`, ALKH in `owner-passkey`, the other platform's kind and
 //   another owner are refused before the helper runs.
 // The helper is a stand-in (no Secure Enclave, no TPM, no Touch ID or Windows Hello prompt); its
@@ -77,7 +77,7 @@ const CODE = 'ABCD EFGH IJKL MNOP QRST UVWX';
 let seedForTests: Uint8Array;
 let owner: OwnerPublicKeys;
 
-/** A fresh keychain with an owner code item (as after setup or `owner init`). */
+/** A fresh keychain with a master code item (as after setup or `owner init`). */
 async function withOwner(): Promise<MemoryKeychain> {
   const keychain = new MemoryKeychain();
   await storeOwnerSeed(
@@ -128,7 +128,7 @@ beforeAll(() => {
 });
 
 describe('registration is its own owner operation (04 §2.3.4 "Registration")', () => {
-  it('macOS: backup code once, create, check, one ecdh setup; nothing written before the seal', async () => {
+  it('macOS: master code once, create, check, one ecdh setup; nothing written before the seal', async () => {
     const keychain = await withOwner();
     const helper = new StandInHelper(NATIVE_PRESENCE_MACOS, MAC_RECORD, keychain);
     await registerOwnerNative(keychain, helper, owner, code());
@@ -168,7 +168,7 @@ describe('registration is its own owner operation (04 §2.3.4 "Registration")', 
     ).toBe(true);
   });
 
-  it('a wrong backup code is refused before the helper runs', async () => {
+  it('a wrong master code is refused before the helper runs', async () => {
     const keychain = await withOwner();
     const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
     const wrong = {
@@ -283,7 +283,7 @@ describe('M1-8c: a same-user AI process gets no usable secret without the gestur
   });
 });
 
-describe('Windows Hello machines need no backup code after registration', () => {
+describe('Windows Hello machines need no master code after registration', () => {
   it('first-time setup (the held seed): one gesture, then every approval with Windows Hello only', async () => {
     const keychain = new MemoryKeychain();
     const made = newOwnerSeed();
@@ -396,7 +396,7 @@ describe('cross-type and cross-platform refusal, before the helper runs', () => 
 });
 
 describe('Fable review M1: turning it off, and on again after a biometry change', () => {
-  it('off with the backup code: the item goes, and a captured secret with its old blob is refused', async () => {
+  it('off with the master code: the item goes, and a captured secret with its old blob is refused', async () => {
     const keychain = await withOwner();
     const helper = new StandInHelper(NATIVE_PRESENCE_WINDOWS);
     await registerOwnerNative(keychain, helper, owner, code());

@@ -20,7 +20,7 @@ export type PresenceProof =
    */
   | { readonly kind: 'native' };
 
-/** DESK-D12c: the `X-AgentLink-Presence` value of a proof (none for the backup code). */
+/** DESK-D12c: the `X-AgentLink-Presence` value of a proof (none for the master code). */
 export function presenceMode(proof: PresenceProof): 'passkey' | 'native' | undefined {
   return proof.kind === 'code' ? undefined : proof.kind;
 }
@@ -179,7 +179,7 @@ export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient
       const { status, reason } = await answerOf(res);
       if (res.status === 200 && status === 'done') return { kind: 'done' };
       // DESK-D12c: a refused Touch ID / Windows Hello gesture (cancel, lockout, …) changed nothing;
-      // the screen says so and keeps "Use your backup code instead".
+      // the screen says so and keeps "Use your master code instead".
       if (proof.kind === 'native' && status === 'presence_rejected') return { kind: 'rejected' };
       if (res.status === 401) return { kind: 'session' };
       if (res.status === 403 && status === 'presence_rejected') return { kind: 'rejected' };

@@ -54,7 +54,7 @@
 //   one owner operation and is wiped. A refused gesture answers a fixed state in `native` (cancelled,
 //   failed, lockout, reregister, unavailable, retry_later, not_registered), never counted towards the
 //   wrong-code backoff (the OS limits its own tries). `/api/owner/native` shows whether the helper is
-//   there and registered for the owner (GET) and registers it (POST: the backup code, or a passkey
+//   there and registered for the owner (GET) and registers it (POST: the master code, or a passkey
 //   assertion with `X-AgentLink-Presence: passkey`), its own owner operation that signs nothing.
 // - What is signed is what the page showed: the page sends back the action digest it displayed; the
 //   server re-reads the request, recomputes the digest from the stored action and refuses any
@@ -2089,7 +2089,7 @@ export async function startApprovalServerWith(
 
   /**
    * POST /api/owner/native: turns on native presence, its own owner operation (04 §2.3.4
-   * "Registration"): the backup code as the body, or a passkey assertion with
+   * "Registration"): the master code as the body, or a passkey assertion with
    * `X-AgentLink-Presence: passkey`; then the helper's one gesture. Signs nothing.
    */
   async function nativeRegister(

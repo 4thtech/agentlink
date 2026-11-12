@@ -1,7 +1,7 @@
 // DESK-D12c (Fable review M1): the Settings switch "Use Touch ID for approvals" (macOS) / "Use
 // Windows Hello for approvals" (Windows), only in the desktop app where the helper is available.
 // Turning it on, off, or on again after a fingerprint or sign-in change is each its own owner
-// operation, confirmed with the backup code (never with Touch ID itself, so a captured Touch ID
+// operation, confirmed with the master code (never with Touch ID itself, so a captured Touch ID
 // secret can neither keep itself on nor turn itself back on). Nothing is shown in a browser.
 import { Button } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';

@@ -122,6 +122,9 @@ export interface WebContents {
   closeDevTools(): void;
   /** The committed URL of the main frame. */
   getURL(): string;
+  /** The page's user agent (navigator.userAgent and the request header). */
+  getUserAgent(): string;
+  setUserAgent(userAgent: string): void;
 }
 
 export interface WebPreferences {

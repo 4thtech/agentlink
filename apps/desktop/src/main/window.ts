@@ -6,7 +6,7 @@
 // hides it; the app keeps running in the tray until the person quits. The title stays "AgentLink"
 // (a page title could carry a name; the window switcher and screen sharing would show it).
 import type { BrowserWindow, BrowserWindowConstructor, Shell } from './electron-api.js';
-import { OriginLock, lockWebContents, windowOptions } from './security.js';
+import { OriginLock, lockWebContents, markWebContents, windowOptions } from './security.js';
 import {
   isStatusPageUrl,
   statusAction,
@@ -45,6 +45,7 @@ export class MainWindow {
     if (this.#window !== null && !this.#window.isDestroyed()) return this.#window;
     const window = new this.#deps.BrowserWindow(windowOptions(this.#deps.platform));
     lockWebContents(window.webContents, this.#deps.lock, this.#deps.shell);
+    markWebContents(window.webContents, this.#deps.platform);
     // The status page's buttons. lockWebContents blocks the navigation itself (the action host is
     // never on the locked origin); this only decides whether to act, and only for the exact fixed
     // URLs on the exact fixed page.

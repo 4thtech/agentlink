@@ -15,7 +15,7 @@
 //   hangs with no UI, while getClientCapabilities() falsely reports a platform authenticator and PRF.
 //   Phase 1 therefore never starts a passkey request in the macOS window: WebAuthn is switched off in
 //   the window's renderer (Blink feature `WebAuth`), so `PublicKeyCredential` is absent and the page's
-//   presence screens take "Use Touch ID in your browser" (plan M2) or the backup code. The user agent
+//   presence screens take "Use Touch ID in your browser" (plan M2) or the master code. The user agent
 //   carries a fixed marker naming the policy for the page. Pages detect support ONLY with
 //   isUserVerifyingPlatformAuthenticatorAvailable(), never getClientCapabilities(). On Windows,
 //   WebAuthn stays on in the window (Windows Hello through webauthn.dll; no PRF).
@@ -56,6 +56,17 @@ export function passkeyPolicy(platform: string): PasskeyPolicy {
 /** The fixed user-agent marker for the page: `AgentLinkDesktop/1 (passkey=<policy>)`. */
 export function userAgentMarker(platform: string): string {
   return `AgentLinkDesktop/1 (passkey=${passkeyPolicy(platform)})`;
+}
+
+/**
+ * Puts the marker on the window's own web contents too (DESK-D12c: the page offers Touch ID /
+ * Windows Hello only when navigator.userAgent has it). The session's user agent does not reach web
+ * contents that already exist, so this does not rely on the order. Never added twice.
+ */
+export function markWebContents(contents: WebContents, platform: string): void {
+  const current = contents.getUserAgent();
+  if (/(?:^|\s)AgentLinkDesktop\/1(?:\s|$)/.test(current)) return;
+  contents.setUserAgent(`${current} ${userAgentMarker(platform)}`);
 }
 
 /** The Blink feature that turns WebAuthn (navigator.credentials publicKey) on in a renderer. */

@@ -2,7 +2,7 @@
 // the approval server, the presence route kind "native" (`X-AgentLink-Presence: native`, empty body).
 //
 // - `GET /api/owner/native` says whether this computer's helper is there and registered for the owner;
-//   `POST /api/owner/native` registers it, its own owner operation (the backup code once).
+//   `POST /api/owner/native` registers it, its own owner operation (the master code once).
 // - A decision, a review list and an owner route of /api/ui/ accept the native presence: the server
 //   runs the helper once with the fixed reason and unlocks the owner store for that one operation.
 // - Pay confirm (04 §2.5.3): the statement shown at begin is what the one native unlock signs; the
@@ -160,7 +160,7 @@ async function decide(
 }
 
 describe('GET and POST /api/owner/native', () => {
-  it('says available, not registered; registers with the backup code once; then registered', async () => {
+  it('says available, not registered; registers with the master code once; then registered', async () => {
     const h = await harness();
     const page = await h.page();
     const before = await send(h.port, '/api/owner/native', { headers: page });
@@ -207,7 +207,7 @@ describe('GET and POST /api/owner/native', () => {
 });
 
 describe('the native presence route kind on decisions and owner routes', () => {
-  it('approves with one helper run (reason approve), signs once, and needs no backup code', async () => {
+  it('approves with one helper run (reason approve), signs once, and needs no master code', async () => {
     const h = await harness();
     const page = await h.page();
     await register(h, page);
@@ -276,7 +276,7 @@ describe('the native presence route kind on decisions and owner routes', () => {
       expect(res.status).toBe(status);
       expect(json(res)).toEqual({ status: 'presence_rejected', native: state });
     }
-    // No 429: the backup code still works right away.
+    // No 429: the master code still works right away.
     const code = await decide(h, page, 4, {}, encodeUtf8(world.code));
     expect(code.status).toBe(200);
     expect(h.source.applied).toHaveLength(1);
@@ -397,7 +397,7 @@ describe('pay confirm with native presence (04 §2.5.3): the statement is bound 
 });
 
 describe('Fable review fixes on the server (M1, L1, L4)', () => {
-  it('M1: off with the backup code, never with native; status then off; on again replaces', async () => {
+  it('M1: off with the master code, never with native; status then off; on again replaces', async () => {
     const h = await harness();
     const page = await h.page();
     await register(h, page);
@@ -471,7 +471,7 @@ describe('Fable review fixes on the server (M1, L1, L4)', () => {
     h.helper.touch = undefined;
     await new Promise((r) => setTimeout(r, 50));
     expect(h.source.applied).toHaveLength(0);
-    // Not busy any more: the backup code decides at once.
+    // Not busy any more: the master code decides at once.
     const code = await decide(h, page, 8, {}, encodeUtf8(world.code));
     expect(code.status).toBe(200);
   });

@@ -136,6 +136,15 @@ describe('MainWindow', () => {
     expect(fake?.loaded).toHaveLength(1);
   });
 
+  it('puts the AgentLinkDesktop/1 marker on the window user agent once (Touch ID UI)', () => {
+    const { window } = make();
+    window.showStatus('starting');
+    const fake = FakeBrowserWindow.created.at(-1);
+    const ua = fake?.webContents.userAgent ?? '';
+    expect(ua.endsWith(' AgentLinkDesktop/1 (passkey=browser)')).toBe(true);
+    expect(ua.match(/AgentLinkDesktop\/1/g)).toHaveLength(1);
+  });
+
   it('switches from the status page to the session link on ready (one window)', () => {
     const { window, lock } = make();
     window.showStatus('starting');

@@ -52,9 +52,9 @@ export const NATIVE_HELPER_EXIT = Object.freeze({
 
 /**
  * What the owner is told, fixed: `cancelled` (the prompt was closed, or the Mac is locked: try again),
- * `failed` (not recognised), `lockout` (too many tries: use the backup code), `reregister` (the key is
+ * `failed` (not recognised), `lockout` (too many tries: use the master code), `reregister` (the key is
  * no longer valid, e.g. fingers changed: turn it on again), `unavailable` (no Touch ID or Windows
- * Hello, or a key that is not hardware-backed: the backup code is the way), `retry_later` (Windows
+ * Hello, or a key that is not hardware-backed: the master code is the way), `retry_later` (Windows
  * could not check the key yet), `error` (anything else).
  */
 export type NativeUiState =

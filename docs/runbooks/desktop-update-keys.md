@@ -53,9 +53,9 @@ Steps:
 
 ### Before you say "merge" on the root-key PR
 The orchestrator opens a PR that puts the root public key into `apps/desktop/src/main/updater/root-key.json`. Before you say "merge":
-1. Plug in ROOT A and run `node tools/desktop/sign-manifest.mjs public-key /Volumes/ROOT_A/root.key`.
+1. Plug in ROOT A and run `node tools/desktop/sign-manifest.mjs check /Volumes/ROOT_A/root.key`, then type the root passphrase. Use `check`, not `public-key`: `public-key` only reads the public half written in the file, which anyone could have changed; `check` opens the key with your passphrase and prints the public key that really belongs to it (`OK: the passphrase opens the root key …`).
 2. Open the PR's file `root-key.json` on GitHub.
-3. Compare all 64 characters with the output of step 1, and with the first and last 8 on your paper. If any character differs, do **not** merge; tell the orchestrator.
+3. Compare all 64 characters with the key `check` printed in step 1, and with the first and last 8 on your paper. If any character differs, do **not** merge; tell the orchestrator.
 
 ## Each release (about 1 minute)
 

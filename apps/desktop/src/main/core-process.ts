@@ -7,7 +7,7 @@
 //   stderr is read and handed to `onStderr` (core-log.ts redacts it and keeps the last lines in
 //   memory and in a 0600 log file), so a core that dies before `ready` leaves a trace.
 // - env: built from an allowlist (home, temp, locale, PATH and the OS basics). NODE_OPTIONS, NODE_*,
-//   ELECTRON_*, AGENTLINK_* secrets (passphrases, owner codes) and everything else are dropped.
+//   ELECTRON_*, AGENTLINK_* secrets (passphrases, master codes) and everything else are dropped.
 // - A protocol violation closes the pipe and stops that core; the supervisor starts a new one with
 //   backoff. After MAX_FAST_FAILURES quick deaths in a row it gives up (state "failed").
 // - A core that says `stopped` with a start-failure reason (no owner, keychain, port, …) is not

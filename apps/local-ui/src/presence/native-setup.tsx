@@ -1,6 +1,6 @@
 // DESK-D12c: the first-time setup offer "Turn on Touch ID for approvals" (macOS) / "Turn on Windows
 // Hello for approvals" (Windows), shown only in the desktop app and only where the helper is
-// available and not yet on. One click sends the backup code the setup just showed (once, to this
+// available and not yet on. One click sends the master code the setup just showed (once, to this
 // same-origin server) and the OS asks for one gesture. Nothing is offered in a browser.
 import { Button } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
@@ -20,7 +20,7 @@ export function NativeSetupOffer({
   register = registerNative,
   onDone,
 }: {
-  /** The backup code the setup just showed; sent once when the owner clicks. */
+  /** The master code the setup just showed; sent once when the owner clicks. */
   readonly backupCode: string;
   /** Seam (tests): the user agent; default navigator.userAgent. */
   readonly userAgent?: string;
