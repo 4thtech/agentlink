@@ -1211,3 +1211,25 @@ describe.runIf(POSIX)('round 2: bounded keychain, silent cores, cancel during pr
     expect(body(await openKit('S1', handle, c))['error']).toBe('presence_required');
   });
 });
+
+describe.runIf(POSIX)('first run fails closed on a hung keychain (owner decision)', () => {
+  it('a keychain that does not answer holds first run; once it answers, nothing is held', async () => {
+    let hang = true;
+    const hung = {
+      get: (account: string) =>
+        hang ? new Promise<Uint8Array | null>(() => undefined) : keychain.get(account),
+      set: (account: string, value: Uint8Array) => keychain.set(account, value),
+      delete: (account: string) => keychain.delete(account),
+    };
+    await engine.close();
+    engine = createRestoreEngine({
+      home: t.home,
+      keychain: () => hung,
+      origin: ORIGIN,
+      keychainTimeoutMs: 50,
+    });
+    expect(await engine.firstRunHold()).toBe('keychain_unavailable');
+    hang = false;
+    expect(await engine.firstRunHold()).toBeUndefined();
+  });
+});

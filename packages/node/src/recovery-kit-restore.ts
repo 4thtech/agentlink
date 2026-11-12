@@ -231,8 +231,17 @@ export interface RestoreEngine {
   ): Promise<string | undefined>;
   /** First run's guard: restored IDs wait for their owner (a crash between agents and owner). */
   restorePending(): Promise<boolean>;
+  /**
+   * First run's hold (fail closed): `finish_restore` while restored IDs wait for their owner,
+   * `keychain_unavailable` when the keychain did not answer (never read as "no owner"), else
+   * undefined.
+   */
+  firstRunHold(): Promise<FirstRunHold | undefined>;
   close(): Promise<void>;
 }
+
+/** Why first run may not create an owner now (04 §2.3.3; fail closed). */
+export type FirstRunHold = 'finish_restore' | 'keychain_unavailable';
 
 /** The terminal's restore (`agentlink restore`): the engine plus a path and the no-gesture apply. */
 export interface TerminalRestore extends RestoreEngine {
@@ -458,6 +467,7 @@ export function createRestoreEngine(options: RestoreEngineOptions): RestoreEngin
     applyFinish,
     registerExportedKit,
     restorePending,
+    firstRunHold,
     close,
   } = full;
   return Object.freeze({
@@ -472,6 +482,7 @@ export function createRestoreEngine(options: RestoreEngineOptions): RestoreEngin
     applyFinish,
     registerExportedKit,
     restorePending,
+    firstRunHold,
     close,
   });
 }
@@ -1247,6 +1258,23 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     return owners.length > 0 || (marker !== undefined && equalBytes(marker, kitOwner));
   }
 
+  /**
+   * 04 §2.3.3: first run never mints an owner while a verified card here names an owner that is not
+   * present (no owner item at all); the marker of an unfinished restore is a hint too. Fail closed:
+   * a keychain that does not answer (or times out) holds first run as `keychain_unavailable`.
+   */
+  async function firstRunHold(): Promise<FirstRunHold | undefined> {
+    let ownerHere: boolean;
+    try {
+      ownerHere = await keychainOwnerPresent();
+    } catch {
+      return 'keychain_unavailable';
+    }
+    if (ownerHere) return undefined;
+    if ((await readPending()) !== undefined) return 'finish_restore';
+    return (await verifiedCardOwners()).length > 0 ? 'finish_restore' : undefined;
+  }
+
   function gestureChallenge(
     label: Uint8Array,
     nonce: Uint8Array,
@@ -1713,14 +1741,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       const ref = await refOf(file.path, 'export', file.kitId);
       return ref === undefined ? undefined : addHandle(sessionKey(session), ref);
     },
-    restorePending: async () => {
-      // 04 §2.3.3: first run never mints an owner while a verified card here names an owner that
-      // is not present (no owner item at all); the marker of an unfinished restore is a hint too.
-      // A keychain that does not answer holds nothing here; first run's own owner checks still run.
-      if (await keychainOwnerPresent().catch(() => true)) return false;
-      if ((await readPending()) !== undefined) return true;
-      return (await verifiedCardOwners()).length > 0;
-    },
+    restorePending: async () => (await firstRunHold()) === 'finish_restore',
+    firstRunHold,
     close: () => {
       clearInterval(sweep);
       wipeHeld();
@@ -1917,18 +1939,18 @@ export function restoreInTerminal(
 }
 
 /**
- * `doctor` (UX1113-R1, 04 §2.3.3): true when restored IDs on this computer wait for their owner (an
- * unfinished restore). Reads this user's keychain owner items, the marker and the agent folders'
+ * `doctor` (UX1113-R1, 04 §2.3.3): why first run is held here: restored IDs wait for their owner
+ * (`finish_restore`), or the keychain did not answer (`keychain_unavailable`). Reads this user's keychain owner items, the marker and the agent folders'
  * verified cards; unlocks nothing and writes nothing. No seam.
  */
-export async function restorePendingHere(): Promise<boolean> {
+export async function restoreHoldHere(): Promise<FirstRunHold | undefined> {
   const engine = createRestoreEngine({
     home: homedir(),
     keychain: osKeychainOnce(),
     origin: 'terminal',
   });
   try {
-    return await engine.restorePending();
+    return await engine.firstRunHold();
   } finally {
     await engine.close();
   }
