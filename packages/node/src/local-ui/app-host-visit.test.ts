@@ -24,6 +24,8 @@ interface World {
   release(name: string): void;
   /** The open of `name` fails from now on. */
   fail(name: string): void;
+  /** The open of `name` works again. */
+  heal(name: string): void;
 }
 
 function world(drainMs = 10_000): World {
@@ -88,6 +90,7 @@ function world(drainMs = 10_000): World {
     hang: (name) => void hanging.add(name),
     release: (name) => hung.get(name)?.(),
     fail: (name) => void failing.add(name),
+    heal: (name) => void failing.delete(name),
   };
 }
 
@@ -228,5 +231,61 @@ describe('visitOthers is bounded and keeps one agent open (WP-R2b, IR M-1)', () 
     expect([...w.open]).toEqual([]);
     // The page's next write (built against generation 1) is refused: it reloads.
     expect(w.slot.enterMutating('1')).toBeUndefined();
+  });
+
+  it('a reopen that hangs is bounded: the host stays unbound (restarting), then binds the ID when it opens', async () => {
+    const w = world();
+    w.hang('default');
+    const started = Date.now();
+    const out = await w.slot.visitOthers(['work'], stepped(w.log), {
+      stepMs: () => 1000,
+      reopenMs: 50,
+    });
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(out).toEqual({ ok: true, restored: false });
+    expect(w.slot.current).toBeUndefined();
+    expect(w.slot.restarting).toBe(true);
+    expect(w.slot.generation).toBe(2);
+    // Not switching any more: writes fail closed on the generation, reads are not held up.
+    expect(w.slot.enterMutating('1')).toBeUndefined();
+    const read = await w.slot.enter();
+    read.leave();
+    // The open finishes later: bound in the background, a new generation (the page reloads).
+    w.release('default');
+    await sleep(10);
+    expect(w.slot.current).toBe('default');
+    expect(w.slot.restarting).toBe(false);
+    expect(w.slot.generation).toBe(3);
+    expect([...w.open]).toEqual(['default']);
+    expect(w.violations).toEqual([]);
+  });
+
+  it('a reopen that fails is retried in the background', async () => {
+    const w = world();
+    w.fail('default');
+    const out = await w.slot.visitOthers(['work'], stepped(w.log), {
+      stepMs: () => 1000,
+      retryDelayMs: 20,
+    });
+    expect(out).toEqual({ ok: true, restored: false });
+    expect(w.slot.restarting).toBe(true);
+    w.heal('default');
+    await sleep(100);
+    expect(w.slot.current).toBe('default');
+    expect(w.slot.restarting).toBe(false);
+    expect([...w.open]).toEqual(['default']);
+  });
+
+  it('a late reopen after another ID was opened meanwhile is closed, never bound', async () => {
+    const w = world();
+    w.hang('default');
+    await w.slot.visitOthers(['work'], stepped(w.log), { stepMs: () => 1000, reopenMs: 30 });
+    // The owner switches to another ID while the first is still restarting.
+    expect(await w.slot.switchTo('shop', '2')).toBe('done');
+    w.release('default');
+    await sleep(10);
+    expect(w.slot.current).toBe('shop');
+    expect([...w.open]).toEqual(['shop']);
+    expect(w.slot.restarting).toBe(false);
   });
 });

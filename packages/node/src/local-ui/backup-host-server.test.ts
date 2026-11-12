@@ -301,6 +301,8 @@ async function harness(
     hangWork?: Promise<void>;
     /** The open ID cannot be opened again after the walk. */
     noReopen?: boolean;
+    /** The open ID's reopen after the walk hangs until this resolves. */
+    hangReopen?: Promise<void>;
   } = {},
 ) {
   homes += 1;
@@ -323,6 +325,7 @@ async function harness(
           if (name !== 'default' && name !== 'work' && name !== 'files') return undefined;
           if (name === 'work' && over.hangWork !== undefined) await over.hangWork;
           if (name === 'default' && over.noReopen === true) return undefined;
+          if (name === 'default' && over.hangReopen !== undefined) await over.hangReopen;
           return ids.agent(name);
         },
       },
@@ -340,7 +343,7 @@ async function harness(
         return Promise.resolve(true);
       },
       restore: { home, kdf: KDF },
-      backupWalk: { stepMs: 300, settleMs: 100 },
+      backupWalk: { stepMs: 300, settleMs: 100, reopenMs: 200 },
     },
   );
   servers.push(server);
@@ -628,6 +631,41 @@ describe('Back up is bounded when another ID does not open (WP-R2b, IR M-1)', ()
     });
     expect(agents.headers['x-agentlink-generation']).toBe('2');
     expect((JSON.parse(agents.body) as { current: string | null }).current).toBeNull();
+  });
+});
+
+describe('the open ID restarting after a save (WP-R2b, IR round 2)', () => {
+  it('a reopen that hangs: the save answers, requests fail closed with a plain restarting answer, then the ID is back', async () => {
+    let done: () => void = () => undefined;
+    const reopen = new Promise<void>((resolve) => {
+      done = resolve;
+    });
+    const h = await harness({ hangReopen: reopen });
+    const started = Date.now();
+    const res = await h.exportKit(world.code);
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(res.status).toBe(200);
+    const read = () =>
+      send(h.server.port, '/api/ui/contacts', {
+        headers: {
+          Cookie: h.headers().Cookie,
+          'X-AgentLink-CSRF': h.headers()['X-AgentLink-CSRF'],
+          'Sec-Fetch-Site': 'same-origin',
+        },
+      });
+    const waiting = await read();
+    expect(waiting.status).toBe(503);
+    expect(JSON.parse(waiting.body)).toEqual({
+      status: 'restarting',
+      message: 'AgentLink is restarting this ID. Try again in a moment.',
+    });
+    expect([...h.ids.open]).toEqual([]);
+    done();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect([...h.ids.open]).toEqual(['default']);
+    // The ID is open again: the answer is the route's own, no longer "restarting".
+    expect((await read()).body).not.toContain('restarting');
+    expect(h.ids.violations).toEqual([]);
   });
 });
 

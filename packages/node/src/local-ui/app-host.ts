@@ -259,6 +259,14 @@ export const SWITCH_DRAIN_MS = 10_000;
 export const VISIT_STEP_MS = 15_000;
 /** WP-R2b: how long a late open may take to settle before the open agent is opened again. */
 export const VISIT_SETTLE_MS = 5_000;
+/**
+ * WP-R2b (IR round 2): the most the walk waits to open the first ID again; past it the host stays
+ * unbound (`restarting`) and keeps trying in the background.
+ */
+export const VISIT_REOPEN_MS = 15_000;
+/** WP-R2b: background tries to open the first ID again after a reopen timed out or failed. */
+const REOPEN_RETRIES = 3;
+const REOPEN_RETRY_DELAY_MS = 1_000;
 
 /** Resolves `{done: true, value}` when `p` settles within `ms`, else `{done: false}`. */
 async function within<T>(
@@ -297,6 +305,8 @@ export class AppHostSlot {
   #idle: (() => void)[] = [];
   #switching: Promise<void> | undefined;
   #closed = false;
+  /** WP-R2b: the ID being opened again in the background after the walk (none open meanwhile). */
+  #restarting: string | undefined;
 
   constructor(
     options: AppHostOptions,
@@ -315,6 +325,14 @@ export class AppHostSlot {
   }
 
   /** The open agent's name, or undefined when none is open. */
+  /**
+   * WP-R2b: true while the ID that was open before a recovery-kit walk is being opened again in the
+   * background (none is open; requests answer "AgentLink is restarting this ID, try again").
+   */
+  get restarting(): boolean {
+    return this.#restarting !== undefined && this.#agent === undefined;
+  }
+
   get current(): string | undefined {
     return this.#agent?.name;
   }
@@ -598,7 +616,12 @@ export class AppHostSlot {
   async visitOthers(
     names: readonly string[],
     visit: (name: string, agent: AppHostAgent | undefined) => Promise<boolean>,
-    bounds: { readonly stepMs: () => number; readonly settleMs?: number } = {
+    bounds: {
+      readonly stepMs: () => number;
+      readonly settleMs?: number;
+      readonly reopenMs?: number;
+      readonly retryDelayMs?: number;
+    } = {
       stepMs: () => VISIT_STEP_MS,
     },
   ): Promise<{ readonly ok: boolean; readonly restored: boolean }> {
@@ -669,23 +692,80 @@ export class AppHostSlot {
       }
     } finally {
       if (late !== undefined) await within(late, bounds.settleMs ?? VISIT_SETTLE_MS);
-      // The agent that was open, opened again (never while another is open).
-      const back = this.#closed
-        ? undefined
-        : await this.#options.open(previous.name).catch(() => undefined);
+      // The agent that was open, opened again (never while another is open), bounded (IR round 2).
+      const reopening = this.#closed
+        ? Promise.resolve(undefined)
+        : this.#options.open(previous.name).catch(() => undefined);
+      const reopened = await within(reopening, bounds.reopenMs ?? VISIT_REOPEN_MS);
+      const back = reopened.done ? reopened.value : undefined;
       if (back !== undefined && back.name === previous.name && !this.#closed) {
         this.#agent = back;
         this.#bind(back);
         restored = true;
       } else {
         await back?.close().catch(() => undefined);
-        // Nothing open now (never half-open): every page reloads and shows it.
+        // Nothing open now (never half-open): every page reloads and shows it. Unless the host is
+        // closing, the ID is opened again in the background; requests fail closed meanwhile.
         this.#generation += 1;
+        if (!this.#closed) {
+          this.#restarting = previous.name;
+          void this.#reopenLater(
+            previous.name,
+            reopened.done ? Promise.resolve(undefined) : reopening,
+            bounds.retryDelayMs ?? REOPEN_RETRY_DELAY_MS,
+          );
+        }
       }
       this.#switching = undefined;
       finish();
     }
     return { ok, restored };
+  }
+
+  /**
+   * WP-R2b (IR round 2): after a walk could not open `name` again in time, waits for that open (it
+   * may still finish) and otherwise tries again a few times. The agent is bound only while the host
+   * is still empty, open and not switching; any other agent it yields is closed at once. Never
+   * rejects.
+   */
+  async #reopenLater(
+    name: string,
+    pending: Promise<AppHostAgent | undefined>,
+    delayMs: number,
+  ): Promise<void> {
+    try {
+      let attempt: Promise<AppHostAgent | undefined> = pending;
+      for (let tries = 0; tries <= REOPEN_RETRIES; tries += 1) {
+        const agent = await attempt.catch(() => undefined);
+        if (this.#restarting !== name) {
+          await agent?.close().catch(() => undefined);
+          return;
+        }
+        if (agent !== undefined) {
+          if (
+            agent.name === name &&
+            !this.#closed &&
+            this.#agent === undefined &&
+            this.#switching === undefined
+          ) {
+            this.#agent = agent;
+            this.#bind(agent);
+            this.#generation += 1;
+          } else {
+            await agent.close().catch(() => undefined);
+          }
+          this.#restarting = undefined;
+          return;
+        }
+        if (this.#closed || this.#agent !== undefined || tries === REOPEN_RETRIES) break;
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+        if (this.#closed || this.#agent !== undefined || this.#switching !== undefined) break;
+        attempt = this.#options.open(name).catch(() => undefined);
+      }
+    } catch {
+      // Never rejects; the host stays empty and the page shows it.
+    }
+    this.#restarting = undefined;
   }
 
   /** Resolves when at most `keep` requests are in flight (the caller's own), or after the drain. */

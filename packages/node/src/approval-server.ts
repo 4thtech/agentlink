@@ -859,7 +859,11 @@ export interface ApprovalServerInternals {
    * WP-R2b (IR M-1): the recovery-kit export walk's per-ID limit and the settle time of a late open
    * (tests: shorter). Default VISIT_STEP_MS and VISIT_SETTLE_MS (app-host.ts).
    */
-  readonly backupWalk?: { readonly stepMs?: number; readonly settleMs?: number };
+  readonly backupWalk?: {
+    readonly stepMs?: number;
+    readonly settleMs?: number;
+    readonly reopenMs?: number;
+  };
 }
 
 export interface ApprovalServer {
@@ -1744,6 +1748,9 @@ export async function startApprovalServerWith(
             ...(internals.backupWalk?.settleMs === undefined
               ? {}
               : { settleMs: internals.backupWalk.settleMs }),
+            ...(internals.backupWalk?.reopenMs === undefined
+              ? {}
+              : { reopenMs: internals.backupWalk.reopenMs }),
           },
         );
         return { ok: walked.ok, notIncluded };
@@ -5483,6 +5490,14 @@ export async function startApprovalServerWith(
   function noAgent(res: ServerResponse): void {
     emit({ kind: 'rejected', reason: 'no_agent' });
     stamp(res);
+    // WP-R2b (IR round 2): the ID open before a recovery-kit save is being opened again.
+    if (host?.restarting === true) {
+      sendJson(res, 503, {
+        status: 'restarting',
+        message: 'AgentLink is restarting this ID. Try again in a moment.',
+      });
+      return;
+    }
     sendJson(res, 409, { status: 'no_agent' });
   }
 
