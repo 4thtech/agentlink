@@ -139,6 +139,46 @@ export function contactPath(ref: string, what: string): string {
   return `${LIST_PATH}/${ref}/${what}`;
 }
 
+// WP-P2 (design-1112 spec §5): `GET /api/ui/people` (packages/node/src/local-ui/api/people-all.ts),
+// every ID with its people. An ID's `name` is the folder name the switch route takes (never shown);
+// its `label` is the owner's own label (plain text). Rows are checked by the same `row` as above.
+
+export const PEOPLE_ALL_PATH = '/api/ui/people';
+const ID_NAME = /^[a-z][a-z0-9-]{0,31}$/;
+const MAX_LABEL = 128;
+
+export interface IdPeople {
+  readonly name: string;
+  readonly label: string;
+  readonly current: boolean;
+  /** Undefined: that ID's people could not be read just now. */
+  readonly contacts: readonly ContactRow[] | undefined;
+}
+
+/** The IDs of the read; undefined when the answer is not usable (the page keeps one ID's list). */
+export function parsePeopleAll(data: unknown): readonly IdPeople[] | undefined {
+  if (!isObject(data) || data.status !== 'ok' || !Array.isArray(data.ids)) return undefined;
+  const ids: IdPeople[] = [];
+  for (const item of data.ids as unknown[]) {
+    if (!isObject(item)) continue;
+    const { name, label, current, status, contacts } = item;
+    if (typeof name !== 'string' || !ID_NAME.test(name)) continue;
+    if (ids.some((id) => id.name === name)) continue;
+    const shown =
+      typeof label === 'string' && label.length > 0 && label.length <= MAX_LABEL ? label : name;
+    let rows: ContactRow[] | undefined;
+    if (status === 'ok' && Array.isArray(contacts)) {
+      rows = [];
+      for (const c of contacts as unknown[]) {
+        const r = row(c);
+        if (r !== undefined) rows.push(r);
+      }
+    }
+    ids.push({ name, label: shown, current: current === true, contacts: rows });
+  }
+  return ids;
+}
+
 export function renameCheckPath(ref: string, alias: string): string {
   return `${contactPath(ref, 'rename-check')}?alias=${encodeURIComponent(alias)}`;
 }

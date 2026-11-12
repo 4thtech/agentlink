@@ -178,6 +178,24 @@ export function waitSeconds(seconds: number): string {
   return `Too many wrong tries. Wait ${String(seconds)} seconds, then try again. Nothing was changed.`;
 }
 
+/** WP-P2 (design-1112 spec §5): People across all IDs. ID labels are plain text, isolated. */
+export const ALL_IDS = {
+  filterLabel: 'Show people of',
+  allIds: 'All my IDs',
+  search: 'Find a person',
+  noMatch: 'Nobody matches that name.',
+  /** "with Tali" on each row when there are 2+ IDs (the label follows in its own `<bdi>`). */
+  with: 'with',
+  /** The existing switch step, before a person of another ID opens. */
+  opening: (label: string): string => `Opening ⁨${label}⁩…`,
+  openFailed: "That ID can't be opened right now. Try again in a minute.",
+  /** One or more IDs could not be read: their people are missing from the list. */
+  missing: (labels: readonly string[]): string =>
+    labels.length === 1
+      ? `People of ⁨${labels[0] ?? ''}⁩ can't be shown right now.`
+      : `People of ${String(labels.length)} of your IDs can't be shown right now.`,
+} as const;
+
 export const SUMMARY = {
   check: (name: string): string => `Mark ${name} as Contact checked.`,
   rename: (name: string, alias: string): string => `Rename ${name} to ${alias}.`,

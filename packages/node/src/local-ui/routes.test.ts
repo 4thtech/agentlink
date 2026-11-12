@@ -211,6 +211,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // WP-11: the Backup page's read and the recovery-kit export (backup-export-server.test.ts).
       '/api/ui/backup',
       '/api/ui/backup/export',
+      // WP-P2: People across all IDs (local-ui/api/people-all.test.ts).
+      '/api/ui/people',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

@@ -8,6 +8,7 @@
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
 import type { LiveAgentState, LiveAppRecord } from './live-status.js';
+import type { LocalUiPeopleAllDesk } from './api/people-all.js';
 import {
   CoreError,
   acceptInviteAction,
@@ -683,6 +684,8 @@ export interface LocalUiContext {
    * only: it lists, it never opens, switches or writes.
    */
   readonly agents?: LocalUiAgentsDesk;
+  /** WP-P2: every ID's people for `GET /api/ui/people` (api/people-all.ts); app host only. Reads only. */
+  readonly peopleAll?: LocalUiPeopleAllDesk;
   /**
    * U3-d (D-138, 08 §1): the open agent and saving a verified label, for the owner routes of
    * api/agents-manage.ts and api/apps.ts only; absent outside the app host. It signs nothing: a

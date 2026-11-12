@@ -243,6 +243,36 @@
   margin-left: auto;
   text-align: right;
 }
+/* WP-P2 (spec §5): the ID filter, the name search and "with {ID}" on each row. */
+.ct-toolbar .ct-idfilter {
+  flex: 0 1 200px;
+  height: 40px;
+}
+.ct-toolbar .ct-search {
+  flex: 1 1 220px;
+  max-width: 380px;
+  height: 40px;
+}
+.ct-with {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.ct-missing,
+.ct-nomatch {
+  margin: var(--al-space-3) 0 0;
+}
+@media (max-width: 600px) {
+  .ct-toolbar .ct-idfilter,
+  .ct-toolbar .ct-search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  .ct-with {
+    max-width: 120px;
+  }
+}
 .ct-check,
 .ct-open {
   text-transform: none;
