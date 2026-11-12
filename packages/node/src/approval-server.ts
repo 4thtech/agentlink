@@ -216,6 +216,13 @@ import {
   type PayConfirmHold,
   type PayConfirmTarget,
 } from './pay-confirm.js';
+import {
+  PRESENCE_CEREMONY_HEADER,
+  PRESENCE_CEREMONY_TTL_MS,
+  PRESENCE_CHALLENGE_MODE,
+  PresenceCeremonies,
+  presenceBinding,
+} from './presence-ceremony.js';
 import { takeReviewedRules } from './local-ui/api/rules.js';
 import { grouped } from './owner-init.js';
 import {
@@ -273,7 +280,7 @@ import { AI_APP_IDS, appChangeId } from './local-ui/api/apps.js';
 import {
   PASSKEY_RP_ID,
   assertPasskeyAssertion,
-  parsePasskeyAssertion,
+  encodePasskeyAssertion,
   parsePasskeyRegistration,
   readOwnerPasskeyHeader,
   readOwnerPasskeyKey,
@@ -665,6 +672,10 @@ export type ApprovalServerEvent =
         | 'paid_item_in_batch'
         /** M1-PAY-CONFIRM-a: approving a paid item takes its own confirmation (begin, finish). */
         | 'confirm_required'
+        /** REL051-SF1: the passkey has no kept credential key; the master code works. */
+        | 'passkey_update_needed'
+        /** REL051-SF1: the gesture was signed without user verification. */
+        | 'verification_required'
         /** M1-11a: wrong-code backoff in force. */
         | 'wait'
         | 'refused'
@@ -703,6 +714,10 @@ export type ApprovalServerEvent =
         | 'invalid'
         | 'presence_required'
         | 'presence_rejected'
+        /** REL051-SF1: the passkey has no kept credential key; the master code works. */
+        | 'passkey_update_needed'
+        /** REL051-SF1: the gesture was signed without user verification. */
+        | 'verification_required'
         | 'busy'
         | 'needs_setup'
         | 'refused'
@@ -2028,11 +2043,16 @@ export async function startApprovalServerWith(
       req.resume();
       return;
     }
-    const body = await boundedBody(req, res, passkey ? MAX_PASSKEY_BYTES : MAX_SECRET_BYTES);
+    const body = await boundedBody(
+      req,
+      res,
+      passkey ? MAX_PAY_CONFIRM_ASSERTION_BYTES : MAX_SECRET_BYTES,
+    );
     if (body === undefined) return;
     const ids = picks.map((p) => p.approvalId);
     const listed = (items: readonly string[]): Record<string, unknown> => (review ? { items } : {});
     // Every secret byte this request carried; wiped whatever happens (unlock also wipes its copy).
+    let proof: CeremonyProof | undefined;
     let assertion: PasskeyAssertion | undefined;
     let presence: OwnerPresence | undefined;
     try {
@@ -2041,17 +2061,15 @@ export async function startApprovalServerWith(
         return;
       }
       if (passkey) {
-        try {
-          assertion = parsePasskeyAssertion(body);
-        } catch {
+        // REL051-SF1: the ceremony this gesture answers (this approval, digest or list) is taken
+        // (spent) before any await. A PRF-less authenticator never gets this far: the page offers
+        // the master code.
+        proof = takeCeremonyProof(req, body);
+        if (proof === undefined) {
           finishDecision(res, 403, 'presence_required');
           return;
         }
-        if (assertion.prfOutput.length === 0) {
-          // A PRF-less authenticator: the master code is the way (the page offers it).
-          finishDecision(res, 403, 'presence_required');
-          return;
-        }
+        assertion = proof.assertion;
       }
       // Check and claim with no await in between: one owner operation at a time.
       const already = ids.filter((approvalId) => decided.has(approvalId));
@@ -2124,19 +2142,21 @@ export async function startApprovalServerWith(
           finishDecision(res, 503, 'needs_setup');
           return;
         }
-        if (assertion !== undefined) {
+        if (proof !== undefined) {
           // 04 §2.3.1: the assertion names the stored credential, the owner as user handle, RP ID
-          // localhost and UP and UV, before its PRF output is used at all.
-          try {
-            const stored = await readOwnerPasskeyHeader(keychainOf());
-            if (stored === null) throw new KeyStoreError('presence_rejected', 'presence');
-            assertPasskeyAssertion(stored, context.owner, assertion);
-          } catch {
+          // localhost and UP and UV, before its PRF output is used at all; REL051-SF1: it answers
+          // this request's ceremony and is signed by the stored passkey.
+          const check = await checkCeremonyProof(proof, context.owner.ownerNostr);
+          if (check === 'passkey_update_needed' || check === 'verification_required') {
+            finishDecision(res, check === 'passkey_update_needed' ? 409 : 403, check);
+            return;
+          }
+          if (check !== 'ok') {
             presenceFailed();
             finishDecision(res, 403, 'presence_rejected');
             return;
           }
-          presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
+          presence = { kind: 'passkey-prf', prfOutput: proof.assertion.prfOutput };
         } else {
           presence = { kind: 'passphrase', secret: body };
         }
@@ -2212,6 +2232,7 @@ export async function startApprovalServerWith(
       }
     } finally {
       wipe(body, assertion?.prfOutput);
+      wipeCeremonyProof(proof);
     }
   }
 
@@ -2354,6 +2375,161 @@ export async function startApprovalServerWith(
     sendJson(res, result.status, result.body);
   };
 
+  // --- REL051-SF1: the single-use, action-bound challenge of a passkey proof (presence-ceremony.ts) --
+
+  const ceremonies = new PresenceCeremonies(() => now());
+
+  /** The page session (its held bytes) a request carries, or undefined. */
+  const sessionOf = (req: IncomingMessage): Uint8Array | undefined => {
+    const at = matchIndex(cookieToken(req), sessions);
+    return at < 0 ? undefined : sessions[at];
+  };
+
+  /** What a ceremony is bound to: the method, the target and the action headers, as sent. */
+  const bindingOf = (req: IncomingMessage): Uint8Array =>
+    presenceBinding({
+      method: req.method ?? '',
+      target: req.url ?? '',
+      input: header(req, 'x-agentlink-input'),
+      items: header(req, 'x-agentlink-items'),
+      digest: header(req, 'x-agentlink-digest'),
+    });
+
+  /** True when the request asks for a ceremony (`X-AgentLink-Presence: challenge`). */
+  const asksChallenge = (req: IncomingMessage): boolean =>
+    header(req, 'x-agentlink-presence') === PRESENCE_CHALLENGE_MODE;
+
+  /**
+   * Answers a ceremony request for the route this request names (it is never acted on): an empty
+   * body, the wrong-code wait, a stored passkey with its credential key, then a new ceremony bound to
+   * this page session and this request. Nothing is unlocked, counted or emitted; the answer carries
+   * the WebAuthn request values and nothing else (I-7).
+   */
+  async function presenceChallenge(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (header(req, PRESENCE_CEREMONY_HEADER) !== undefined) {
+      req.resume();
+      sendJson(res, 400, { status: 'invalid' });
+      return;
+    }
+    // At most one byte is read: anything but an empty body is refused.
+    const body = await boundedBody(req, res, 1);
+    if (body === undefined) return;
+    if (body.length !== 0) {
+      wipe(body);
+      sendJson(res, 400, { status: 'invalid' });
+      return;
+    }
+    const wait = waitSeconds();
+    if (wait > 0) {
+      res.setHeader('Retry-After', String(wait));
+      sendJson(res, 429, { status: 'wait', retryAfter: wait });
+      return;
+    }
+    const session = sessionOf(req);
+    if (session === undefined) {
+      sendJson(res, 401, { error: 'token' });
+      return;
+    }
+    let credentialId: Uint8Array | undefined;
+    let keyKept = false;
+    try {
+      const stored = await readOwnerPasskeyHeader(keychainOf());
+      if (stored !== null) {
+        credentialId = stored.credentialId;
+        keyKept = (await readOwnerPasskeyKey(keychainOf(), stored.credentialId)) !== null;
+      }
+    } catch {
+      credentialId = undefined;
+    }
+    if (credentialId === undefined) {
+      sendJson(res, 403, { status: 'presence_required' });
+      return;
+    }
+    if (!keyKept) {
+      // No kept credential key: a gesture could not be verified, so the passkey path is refused.
+      sendJson(res, 409, { status: 'passkey_update_needed' });
+      return;
+    }
+    ceremonies.sweep((held) => sessions.some((s) => equalBytes(s, held)));
+    const ceremony = ceremonies.issue(session, bindingOf(req));
+    sendJson(res, 200, {
+      status: 'ready',
+      ceremony: ceremony.id,
+      expiresInMs: PRESENCE_CEREMONY_TTL_MS,
+      publicKey: {
+        rpId: PASSKEY_RP_ID,
+        challenge: encodeBase64url(ceremony.challenge),
+        allowCredentials: [encodeBase64url(credentialId)],
+        userVerification: 'required',
+        timeoutMs: PRESENCE_CEREMONY_TTL_MS,
+        prfSalt: encodeBase64url(ownerPrfSalt()),
+      },
+    });
+  }
+
+  /** A passkey proof taken with its ceremony: the assertion and the challenge it must answer. */
+  interface CeremonyProof {
+    readonly assertion: PayConfirmAssertion;
+    readonly challenge: Uint8Array;
+  }
+
+  /**
+   * Parses a passkey body and takes the ceremony it names (single use, before any await). Undefined
+   * (`presence_required`) when the body is malformed, no ceremony is named, or the ceremony is
+   * unknown, another session's, expired or bound to another request.
+   */
+  const takeCeremonyProof = (req: IncomingMessage, body: Uint8Array): CeremonyProof | undefined => {
+    const session = sessionOf(req);
+    const id = header(req, PRESENCE_CEREMONY_HEADER);
+    if (session === undefined || id === undefined) return undefined;
+    const taken = ceremonies.take(id, session, bindingOf(req));
+    if (typeof taken === 'string') return undefined;
+    const challenge = taken.challenge.slice();
+    PresenceCeremonies.wipeOf(taken);
+    const assertion = parsePayConfirmAssertion(body);
+    if (assertion === undefined) {
+      wipe(challenge);
+      return undefined;
+    }
+    return { assertion, challenge };
+  };
+
+  /**
+   * The assertion of a taken ceremony against the stored passkey, its kept credential key and the
+   * owner (pay-confirm.ts checkPayConfirmAssertion: type, challenge, origin, rpIdHash, UP, credential,
+   * user handle, signature, UV). The challenge is wiped.
+   */
+  async function checkCeremonyProof(
+    proof: CeremonyProof,
+    ownerNostr: Uint8Array,
+  ): Promise<'ok' | 'presence_rejected' | 'verification_required' | 'passkey_update_needed'> {
+    try {
+      const stored = await readOwnerPasskeyHeader(keychainOf());
+      if (stored === null) return 'presence_rejected';
+      const check = checkPayConfirmAssertion(proof.assertion, {
+        challenge: proof.challenge,
+        origin,
+        passkey: stored,
+        publicKey: await readOwnerPasskeyKey(keychainOf(), stored.credentialId),
+        owner: { ownerNostr },
+      });
+      if (check === 'key_missing') return 'passkey_update_needed';
+      if (check !== 'ok') return check;
+      assertPasskeyAssertion(stored, { ownerNostr }, proof.assertion);
+      return 'ok';
+    } catch {
+      return 'presence_rejected';
+    } finally {
+      wipe(proof.challenge);
+    }
+  }
+
+  /** Wipes a ceremony proof's bytes (the challenge, the signature, the PRF output once used). */
+  const wipeCeremonyProof = (proof: CeremonyProof | undefined): void => {
+    if (proof === undefined) return;
+    wipe(proof.challenge, proof.assertion.prfOutput, proof.assertion.signature);
+  };
+
   /**
    * M1-11s-b, the central presence gate for a /api/ui/ owner route (04 §2.5, I-4; IR-M1-11s-b-1 H-1).
    * Owner presence is verified before `run` (the handler) is called: the wrong-code backoff, a
@@ -2453,8 +2629,13 @@ export async function startApprovalServerWith(
         return;
       }
     }
-    const body = await boundedBody(req, res, passkey ? MAX_PASSKEY_BYTES : MAX_SECRET_BYTES);
+    const body = await boundedBody(
+      req,
+      res,
+      passkey ? MAX_PAY_CONFIRM_ASSERTION_BYTES : MAX_SECRET_BYTES,
+    );
     if (body === undefined) return;
+    let proof: CeremonyProof | undefined;
     let assertion: PasskeyAssertion | undefined;
     try {
       if (body.length === 0) {
@@ -2462,16 +2643,13 @@ export async function startApprovalServerWith(
         return;
       }
       if (passkey) {
-        try {
-          assertion = parsePasskeyAssertion(body);
-        } catch {
+        // REL051-SF1: the ceremony this gesture answers is taken (spent) before any await.
+        proof = takeCeremonyProof(req, body);
+        if (proof === undefined) {
           finishOwner(res, 403, 'presence_required');
           return;
         }
-        if (assertion.prfOutput.length === 0) {
-          finishOwner(res, 403, 'presence_required');
-          return;
-        }
+        assertion = proof.assertion;
       }
       if (busy) {
         finishOwner(res, 409, 'busy');
@@ -2493,17 +2671,23 @@ export async function startApprovalServerWith(
           return;
         }
         let presence: OwnerPresence;
-        if (assertion !== undefined) {
-          try {
-            const stored = await readOwnerPasskeyHeader(keychainOf());
-            if (stored === null) throw new KeyStoreError('presence_rejected', 'presence');
-            assertPasskeyAssertion(stored, { ownerNostr: expectedNostr }, assertion);
-          } catch {
+        if (proof !== undefined) {
+          // REL051-SF1: the gesture answers this ceremony, signed by the stored passkey.
+          const check = await checkCeremonyProof(proof, expectedNostr);
+          if (check === 'passkey_update_needed') {
+            finishOwner(res, 409, 'passkey_update_needed');
+            return;
+          }
+          if (check === 'verification_required') {
+            finishOwner(res, 403, 'verification_required');
+            return;
+          }
+          if (check !== 'ok') {
             presenceFailed();
             finishOwner(res, 403, 'presence_rejected');
             return;
           }
-          presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
+          presence = { kind: 'passkey-prf', prfOutput: proof.assertion.prfOutput };
         } else {
           presence = { kind: 'passphrase', secret: body };
         }
@@ -2778,6 +2962,7 @@ export async function startApprovalServerWith(
       }
     } finally {
       wipe(body, assertion?.prfOutput);
+      wipeCeremonyProof(proof);
     }
   }
 
@@ -5020,6 +5205,11 @@ export async function startApprovalServerWith(
     const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
     if (type !== 'application/octet-stream') return refuse(415, 'content_type');
     const mode = header(req, 'x-agentlink-presence');
+    if (route.step === 'presence' && mode === PRESENCE_CHALLENGE_MODE) {
+      // REL051-SF1: a ceremony for the restore's passkey gesture (this handle, this session).
+      await presenceChallenge(req, res);
+      return;
+    }
     if (mode !== undefined && (route.step !== 'presence' || mode !== 'passkey')) {
       return refuse(400, 'invalid');
     }
@@ -5041,26 +5231,50 @@ export async function startApprovalServerWith(
       route.step === 'applyFinish'
         ? MAX_SETUP_REGISTRATION_BYTES
         : route.step === 'presence'
-          ? MAX_PASSKEY_BYTES
+          ? MAX_PAY_CONFIRM_ASSERTION_BYTES
           : route.step === 'open' || route.step === 'check'
             ? MAX_SECRET_BYTES
             : 0;
     const body = await boundedBody(req, res, limit);
     if (body === undefined) return;
+    let proof: CeremonyProof | undefined;
     try {
       let answer;
       switch (route.step) {
         case 'header':
           answer = await engine.header(cookie, input);
           break;
-        case 'presence':
+        case 'presence': {
+          let presented: Uint8Array = body.slice();
+          if (mode === 'passkey' && body.length > 0) {
+            // REL051-SF1: the gesture answers this request's ceremony and is signed by the stored
+            // passkey; the engine then checks it against the kit's owner as before.
+            wipe(presented);
+            proof = takeCeremonyProof(req, body);
+            if (proof === undefined) {
+              sendJson(res, 403, { error: 'presence_required' });
+              return;
+            }
+            const stored = await readOwnerPasskeyHeader(keychainOf()).catch(() => null);
+            const check =
+              stored === null
+                ? 'presence_rejected'
+                : await checkCeremonyProof(proof, stored.ownerNostr);
+            if (check !== 'ok') {
+              if (check === 'presence_rejected') presenceFailed();
+              sendJson(res, check === 'passkey_update_needed' ? 409 : 403, { error: check });
+              return;
+            }
+            presented = encodePasskeyAssertion(proof.assertion);
+          }
           answer = await engine.presence(
             cookie,
             input,
-            body.slice(),
+            presented,
             mode === 'passkey' ? 'passkey' : 'passphrase',
           );
           break;
+        }
         case 'open':
           answer = await engine.open(cookie, input, body.slice());
           break;
@@ -5086,6 +5300,7 @@ export async function startApprovalServerWith(
       sendJson(res, 500, { error: 'failed' });
     } finally {
       wipe(body);
+      wipeCeremonyProof(proof);
     }
   }
 
@@ -5401,6 +5616,21 @@ export async function startApprovalServerWith(
       sendResult(res, NOT_AVAILABLE);
       return;
     }
+    if (asksChallenge(req)) {
+      // REL051-SF1: a ceremony for a passkey gesture on this route, before anything else runs. Only
+      // routes the central gate takes a passkey on (an owner-code step only where its one kind of
+      // proof is the passkey) and Remove (which runs the central gate); never acted on.
+      const takesPasskey =
+        route.presence === 'remove' ||
+        (route.presence === true &&
+          (route.ownerCode === undefined || ownerCodeProofAllowed(route.ownerCode, true)));
+      if (takesPasskey) await presenceChallenge(req, res);
+      else {
+        req.resume();
+        sendJson(res, 400, { status: 'invalid' });
+      }
+      return;
+    }
     if (route.presence === 'remove') {
       // U3-e: removing an agent has its own gate around ownerGate (the folder lock, its context).
       await removeGate(req, res, url);
@@ -5638,6 +5868,15 @@ export async function startApprovalServerWith(
     decideMatch: RegExpExecArray | null,
   ): Promise<void> {
     {
+      if (asksChallenge(req)) {
+        // REL051-SF1: a ceremony for this decision (or review list), never for registering.
+        if (reviewRoute || decideMatch !== null) await presenceChallenge(req, res);
+        else {
+          req.resume();
+          sendJson(res, 400, { status: 'invalid' });
+        }
+        return;
+      }
       if (reviewRoute) {
         const picks = parseReviewItems(header(req, 'x-agentlink-items'));
         if (picks === undefined) {
@@ -5710,6 +5949,7 @@ export async function startApprovalServerWith(
     decided.clear();
     dropSetup();
     payHolds.clear();
+    ceremonies.clear();
     // W4-ONE-TOUCH: a held New agent plan names the old agent's owner and Send folder home.
     dropCreate();
     boundHome = agent?.firstCard?.firstPolicy?.home;
@@ -6431,6 +6671,7 @@ export async function startApprovalServerWith(
       await restoreInstance?.close();
       dropSetup();
       payHolds.clear();
+      ceremonies.clear();
       dropCreate();
       // WP-S2: a staged master-code change this server began is removed (the old code keeps working).
       await ownerCodes.clear();

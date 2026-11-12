@@ -78,8 +78,18 @@ describe('the Save client and the contract (W4-FILES-SAVE)', () => {
     expect(sent).toEqual([]);
   });
 
-  it('a dismissed passkey prompt sends nothing', async () => {
-    const { sent, fetchFn } = fake(200, { status: 'saved' });
+  it('a dismissed passkey prompt sends no proof (only the ceremony was asked for)', async () => {
+    const { sent, fetchFn } = fake(200, {
+      status: 'ready',
+      ceremony: 'C'.repeat(22),
+      publicKey: {
+        rpId: 'localhost',
+        challenge: 'AAEC',
+        allowCredentials: ['AQID'],
+        timeoutMs: 120000,
+        prfSalt: 'BAUG',
+      },
+    });
     const credentials = { get: () => Promise.reject(new Error('NotAllowed')) };
     const api = createSaveApi({
       fetch: fetchFn,
@@ -91,7 +101,10 @@ describe('the Save client and the contract (W4-FILES-SAVE)', () => {
       passkey: { credentialId: 'AQID', prfSalt: 'BAUG' },
     });
     expect(out).toEqual({ kind: 'dismissed' });
-    expect(sent).toEqual([]);
+    // REL051-SF1: the one request is the ceremony ask: no body, no passkey header.
+    expect(sent).toHaveLength(1);
+    expect(new Headers(sent[0]?.init.headers).get('X-AgentLink-Presence')).toBe('challenge');
+    expect(sent[0]?.init.body).toEqual(new Uint8Array(0));
   });
 
   it('reads every contract answer as its outcome word', () => {

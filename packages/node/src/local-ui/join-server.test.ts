@@ -33,6 +33,7 @@ import {
   type JsonObject,
   type JsonValue,
 } from '@4thtech-io/crypto';
+import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   startApprovalServerWith,
@@ -43,8 +44,9 @@ import {
 } from '../approval-server.js';
 import { ownerSigValid, ownerWorld, send, type OwnerWorld } from '../approval-ui.fixture.js';
 import { KeychainOwnerKeyStore, OWNER_PASSKEY_ACCOUNT } from '../owner-keystore.js';
-import { encodePasskeyAssertion, encodePasskeyRegistration } from '../owner-passkey.js';
+import { OWNER_PASSKEY_KEY_ACCOUNT, encodePasskeyRegistration } from '../owner-passkey.js';
 import { VirtualPrfAuthenticator } from '../passkey-authenticator.fixture.js';
+import { ceremonyMaker, withCeremony } from '../presence-ceremony.fixture.js';
 import type { AgentDirectory, AppHostAgent, AppHostHandoffRecordValue } from './app-host.js';
 import type { LocalUiAssets } from './context.js';
 import {
@@ -952,6 +954,7 @@ describe('the host passes for the open agent (Decision 37 (b), (c))', () => {
 describe('HOTFIX-045-TOUCHID: Accept on a computer without Touch ID set up yet', () => {
   afterEach(async () => {
     await world.keychain.delete(OWNER_PASSKEY_ACCOUNT);
+    await world.keychain.delete(OWNER_PASSKEY_KEY_ACCOUNT);
   });
 
   it('says why, switches once in the flow, then Accept with Touch ID signs (200)', async () => {
@@ -969,7 +972,7 @@ describe('HOTFIX-045-TOUCHID: Accept on a computer without Touch ID set up yet',
     expect(before['userId']).toBe(encodeBase64url(world.owner.ownerNostr));
     // 2. "Switch to Touch ID": the master code once and one touch (the existing registration).
     const salt = ownerPrfSalt();
-    const auth = new VirtualPrfAuthenticator();
+    const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
     const register = await h.registerPasskey(
       encodePasskeyRegistration(encodeUtf8(world.code), auth.create(world.owner.ownerNostr, salt)),
     );
@@ -979,10 +982,16 @@ describe('HOTFIX-045-TOUCHID: Accept on a computer without Touch ID set up yet',
     const after = await info();
     expect(after['registered']).toBe(true);
     expect(after['credentialId']).toBe(encodeBase64url(auth.credentialId));
-    // 3. Accept with Touch ID: one approval.decide by the owner key.
-    const res = await h.accept(INVITE_ID, encodePasskeyAssertion(auth.get(salt)), {
-      'X-AgentLink-Presence': 'passkey',
-    });
+    // 3. Accept with Touch ID: one approval.decide by the owner key. REL051-SF1: the gesture
+    // answers the ceremony the route issued for this accept.
+    const res = await withCeremony(
+      async (extra, body) => {
+        const answer = await h.accept(INVITE_ID, body, extra);
+        return { ...answer, json: parse(answer.body) as Record<string, unknown> };
+      },
+      ceremonyMaker(auth, salt),
+      h.server.origin,
+    );
     expect(res.status).toBe(200);
     expect(parse(res.body)).toMatchObject({ status: 'pending' });
     expect(h.core.applied).toHaveLength(1);

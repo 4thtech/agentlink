@@ -254,7 +254,11 @@ async function mount(extra: Partial<FirstRunPageProps> = {}): Promise<Mounted> {
       passkeysAvailable: () => true,
       platform: 'mac',
       prfSupport: () => Promise.resolve('yes'),
-      passkeyProof: () => Promise.resolve({ kind: 'passkey', body: new Uint8Array([1, 2, 3]) }),
+      passkeyProof: () =>
+        Promise.resolve({
+          kind: 'passkey',
+          gesture: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+        }),
       goHome: home,
       onSkip: skip,
       readSignal: () => Promise.resolve(undefined),

@@ -241,8 +241,9 @@ function needBrowser(skip: () => void): void {
 }
 
 /**
- * In the page: one passkey assertion with PRF for the registered credential, encoded as the page's
- * presence body (owner-passkey.ts encodePasskeyAssertion), POSTed to a /api/ui/ presence route.
+ * In the page: REL051-SF1, the ceremony asked from the /api/ui/ presence route, then one passkey
+ * assertion with PRF for its challenge (the six fields of api/presence-ceremony.ts), POSTed to the
+ * route with the ceremony.
  */
 const PASSKEY_UI_POST = `(async () => {
   const b64 = (s) => {
@@ -251,20 +252,30 @@ const PASSKEY_UI_POST = `(async () => {
     return Uint8Array.from(bin, (c) => c.charCodeAt(0));
   };
   const csrf = document.querySelector('meta[name="agentlink-csrf"]').getAttribute('content');
-  const info = await (await fetch('/api/owner/passkey', { headers: { 'X-AgentLink-CSRF': csrf } })).json();
+  const ask = await (await fetch('/api/ui/test/c1/check', {
+    method: 'POST',
+    headers: {
+      'X-AgentLink-CSRF': csrf,
+      'X-AgentLink-Presence': 'challenge',
+      'Content-Type': 'application/octet-stream',
+    },
+    body: new Uint8Array(0),
+  })).json();
   const cred = await navigator.credentials.get({
     publicKey: {
-      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      challenge: b64(ask.publicKey.challenge),
       rpId: 'localhost',
-      allowCredentials: [{ type: 'public-key', id: b64(info.passkey.credentialId) }],
+      allowCredentials: ask.publicKey.allowCredentials.map((id) => ({ type: 'public-key', id: b64(id) })),
       userVerification: 'required',
-      extensions: { prf: { eval: { first: b64(info.passkey.prfSalt) } } },
+      extensions: { prf: { eval: { first: b64(ask.publicKey.prfSalt) } } },
     },
   });
   const prf = cred.getClientExtensionResults().prf?.results?.first;
   const fields = [
     new Uint8Array(cred.rawId),
     new Uint8Array(cred.response.authenticatorData),
+    new Uint8Array(cred.response.clientDataJSON),
+    new Uint8Array(cred.response.signature),
     new Uint8Array(cred.response.userHandle ?? new ArrayBuffer(0)),
     new Uint8Array(prf ?? new ArrayBuffer(0)),
   ];
@@ -281,6 +292,7 @@ const PASSKEY_UI_POST = `(async () => {
     headers: {
       'X-AgentLink-CSRF': csrf,
       'X-AgentLink-Presence': 'passkey',
+      'X-AgentLink-Ceremony': ask.ceremony,
       'Content-Type': 'application/octet-stream',
     },
     body,

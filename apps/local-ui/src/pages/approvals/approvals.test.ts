@@ -434,20 +434,26 @@ describe('one request: its own Approve or Deny, then presence', () => {
     expect(buttonNamed(S.approve, cardOf('D') as ParentNode)).toBeDefined();
   });
 
-  it('with a passkey: one gesture, the presence header, the four fields', async () => {
+  it('with a passkey: the ceremony for this decision, one gesture for its challenge, then the six fields', async () => {
     const asked: CredentialRequestOptions[] = [];
     const credentials = {
       get: (options: CredentialRequestOptions) => {
         asked.push(options);
         return Promise.resolve({
           rawId: new Uint8Array([9]).buffer,
-          response: { authenticatorData: new Uint8Array([1, 2]).buffer, userHandle: null },
+          response: {
+            authenticatorData: new Uint8Array([1, 2]).buffer,
+            clientDataJSON: new Uint8Array([3]).buffer,
+            signature: new Uint8Array([4]).buffer,
+            userHandle: null,
+          },
           getClientExtensionResults: () => ({
             prf: { results: { first: new Uint8Array(32).fill(5).buffer } },
           }),
         });
       },
     } as unknown as CredentialsContainer;
+    const ceremony = 'C'.repeat(22);
     const srv = server({
       [PASSKEY]: [
         ok({
@@ -461,7 +467,22 @@ describe('one request: its own Approve or Deny, then presence', () => {
         }),
       ],
       [LIST]: [ok({ approvals: [item('D', { commitment: true })] })],
-      [`/api/approvals/${id('D')}/approve`]: [ok({ status: 'applied', decision: 'approve' })],
+      [`/api/approvals/${id('D')}/approve`]: [
+        ok({
+          status: 'ready',
+          ceremony,
+          expiresInMs: 120000,
+          publicKey: {
+            rpId: 'localhost',
+            challenge: 'AAEC',
+            allowCredentials: ['CQ'],
+            userVerification: 'required',
+            timeoutMs: 120000,
+            prfSalt: 'BQY',
+          },
+        }),
+        ok({ status: 'applied', decision: 'approve' }),
+      ],
     });
     act(() =>
       root.render(
@@ -478,9 +499,18 @@ describe('one request: its own Approve or Deny, then presence', () => {
     expect(asked).toHaveLength(1);
     expect(asked[0]?.publicKey?.rpId).toBe('localhost');
     expect(asked[0]?.publicKey?.userVerification).toBe('required');
-    const call = srv.calls.find((c) => c.url.endsWith('/approve'));
+    expect([...new Uint8Array(asked[0]?.publicKey?.challenge as ArrayBuffer)]).toEqual([0, 1, 2]);
+    const [ask, call] = srv.calls.filter((c) => c.url.endsWith('/approve'));
+    // The ceremony is asked with the same decision headers and no body.
+    expect(ask?.headers.get('x-agentlink-presence')).toBe('challenge');
+    expect(ask?.headers.get('x-agentlink-digest')).toBe(DIGEST('d'));
+    expect(ask?.body).toHaveLength(0);
     expect(call?.headers.get('x-agentlink-presence')).toBe('passkey');
+    expect(call?.headers.get('x-agentlink-ceremony')).toBe(ceremony);
     expect(call?.headers.get('x-agentlink-digest')).toBe(DIGEST('d'));
+    // Six length-prefixed fields: credential ID, authenticator data, clientDataJSON, signature,
+    // user handle (none) and the PRF output.
+    expect(call?.body).toHaveLength(2 + 1 + 2 + 2 + 2 + 1 + 2 + 1 + 2 + 2 + 32);
     expect(statuses()).toContain(S.approved);
   });
 

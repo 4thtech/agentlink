@@ -11,6 +11,7 @@
 // - `POST /api/ui/join/dismiss` ("Not now"): the invite kind, an octet-stream body `{}`.
 // Every non-GET carries the page's generation in `X-AgentLink-Generation`: the app's fetch guard
 // stamps it (api/generation.ts). Nothing here is logged.
+import { sendWithProof } from '../../api/presence-ceremony.js';
 import type { PresenceProof } from '../contacts/owner.js';
 
 export const JOIN_PATH = '/api/ui/join';
@@ -147,21 +148,25 @@ export function createJoinApi(options: JoinApiOptions = {}): JoinApi {
   async function post(
     path: string,
     headers: Headers,
-    body: Uint8Array,
+    body: Uint8Array | PresenceProof,
   ): Promise<{ status: number; json: Record<string, unknown> } | 'offline'> {
     let res: Response;
     try {
-      res = await doFetch(path, {
-        method: 'POST',
-        headers,
-        body: body as BodyInit,
-        credentials: 'same-origin',
-        cache: 'no-store',
-      });
+      // REL051-SF1: an owner proof goes through its ceremony (api/presence-ceremony.ts).
+      res =
+        body instanceof Uint8Array
+          ? await doFetch(path, {
+              method: 'POST',
+              headers,
+              body: body as BodyInit,
+              credentials: 'same-origin',
+              cache: 'no-store',
+            })
+          : await sendWithProof(doFetch, path, headers, body);
     } catch {
       return 'offline';
     } finally {
-      body.fill(0);
+      if (body instanceof Uint8Array) body.fill(0);
     }
     let json: unknown;
     try {
@@ -219,9 +224,7 @@ export function createJoinApi(options: JoinApiOptions = {}): JoinApi {
         'content-type': 'application/octet-stream',
         'X-AgentLink-Input': toBase64url(new TextEncoder().encode(JSON.stringify({ inviteId }))),
       });
-      if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-      const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
-      const answer = await post(JOIN_ACCEPT_PATH, headers, body);
+      const answer = await post(JOIN_ACCEPT_PATH, headers, proof);
       if (answer === 'offline') return { kind: 'offline' };
       const { status, json } = answer;
       // Refusals come as {status} (the gates) or {error} (the route).

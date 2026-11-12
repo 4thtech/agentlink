@@ -23,6 +23,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createApiClient, type ApiClient, type OwnerApiResult } from '../../api/client.js';
+import type { CeremonyGesture } from '../../api/presence-ceremony.js';
 import { UnderTheHood } from '../../lazy/hood.js';
 import { notify } from '../../notices/index.js';
 import { gateMessage } from '../agents/owner-gate.js';
@@ -94,8 +95,8 @@ export interface TouchIdPageProps {
 type Panel = 'none' | 'check' | 'replace' | 'lost' | 'turn-on';
 type Note = { readonly tone: 'good' | 'bad' | 'plain'; readonly text: string } | undefined;
 
-const presenceOf = (proof: PresenceProof): string | { passkey: Uint8Array } =>
-  proof.kind === 'code' ? proof.code : { passkey: proof.body };
+const presenceOf = (proof: PresenceProof): string | { passkey: CeremonyGesture } =>
+  proof.kind === 'code' ? proof.code : { passkey: proof.gesture };
 
 /** The gate's own outcomes in plain words (the shared presence messages). */
 function gateWords(result: OwnerApiResult): string | undefined {

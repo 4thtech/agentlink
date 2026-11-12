@@ -336,16 +336,28 @@ function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
     try {
       let outcome: CommitOutcome;
       if (code === undefined && passkey !== undefined) {
-        const gesture = await passkeyPresence(passkey);
-        if (gesture.kind !== 'ok') {
+        const chosen = passkeyPresence(passkey);
+        if (chosen.kind !== 'ok') {
           setNotice({ tone: 'info', text: S.passkeyNotUsed });
           return;
         }
+        let notUsed = false;
         outcome = await api.commit(
           COMMIT_PATH,
           { review: review.review, acknowledged: [...acknowledged] },
-          { kind: 'passkey', body: gesture.body },
+          {
+            kind: 'passkey',
+            gesture: async (publicKey) => {
+              const body = await chosen.gesture(publicKey);
+              if (body === undefined) notUsed = true;
+              return body;
+            },
+          },
         );
+        if (notUsed) {
+          setNotice({ tone: 'info', text: S.passkeyNotUsed });
+          return;
+        }
       } else {
         outcome = await api.commit(
           COMMIT_PATH,

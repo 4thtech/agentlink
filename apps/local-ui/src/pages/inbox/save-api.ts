@@ -3,13 +3,14 @@
 // - `X-AgentLink-Input`: base64url JSON of exactly `{"id":"<item ID>"}`. Never a file name, a folder
 //   or a path: the server finds the file itself, and core saves it into the Inbox folder;
 // - the body is the owner's presence, sent only after the owner clicked: the passkey assertion
-//   (`X-AgentLink-Presence: passkey`, the same four fields as an approval) or the master code as UTF-8;
+//   (`X-AgentLink-Presence: passkey`, answering the ceremony for this request, REL051-SF1) or the
+//   master code as UTF-8;
 // - the session token travels as `X-AgentLink-CSRF`; the app host's fetch guard adds the generation.
 // The browser never signs (D-118). The code and the assertion bytes are wiped after the request and
 // never logged. Answers become one outcome word (types ui-contract/inbox.ts); no answer carries a
 // name or a path.
 import type { FileSaveOutcome } from '@4thtech-io/types/ui-contract/inbox';
-import { passkeyAssertion, type DecisionPasskey } from '../approvals/client.js';
+import { sendWithPresence, type DecisionPasskey } from '../approvals/client.js';
 
 /** The contract path (ui-contract FILE_SAVE_PATH; save-api.test.ts checks they are equal). */
 export const FILE_SAVE_PATH = '/api/ui/files/save';
@@ -109,40 +110,28 @@ export function createSaveApi(options: SaveApiOptions = {}): SaveApi {
     async save(id, presence) {
       // Only a received item ID is ever sent; anything else never leaves the page.
       if (!ITEM_ID.test(id)) return { kind: 'outcome', outcome: 'bad_request' };
-      let body: Uint8Array<ArrayBuffer>;
-      const headers: Record<string, string> = {
+      const headers = new Headers({
         [CSRF_HEADER]: token(),
         'content-type': 'application/octet-stream',
         'X-AgentLink-Input': base64url(JSON.stringify({ id })),
-      };
-      if (presence.kind === 'passkey') {
-        const assertion = await passkeyAssertion(credentials(), presence.passkey);
-        if (assertion === undefined) return { kind: 'dismissed' };
-        body = assertion;
-        headers['X-AgentLink-Presence'] = 'passkey';
-      } else {
-        body = Uint8Array.from(new TextEncoder().encode(presence.code));
-      }
+      });
+      // REL051-SF1: the passkey answers the ceremony the server issued for exactly this request.
+      const sent = await sendWithPresence(
+        doFetch,
+        credentials(),
+        FILE_SAVE_PATH,
+        headers,
+        presence,
+      );
+      if (sent === 'dismissed') return { kind: 'dismissed' };
+      if (sent === undefined) return { kind: 'offline' };
+      let json: unknown;
       try {
-        const res = await doFetch(FILE_SAVE_PATH, {
-          method: 'POST',
-          headers,
-          body,
-          credentials: 'same-origin',
-          cache: 'no-store',
-        });
-        let json: unknown;
-        try {
-          json = await res.json();
-        } catch {
-          json = undefined;
-        }
-        return readSaveAnswer(res.status, json);
+        json = await sent.json();
       } catch {
-        return { kind: 'offline' };
-      } finally {
-        body.fill(0);
+        json = undefined;
       }
+      return readSaveAnswer(sent.status, json);
     },
   };
 }

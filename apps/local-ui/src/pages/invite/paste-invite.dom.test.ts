@@ -19,7 +19,10 @@ const SECRET = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcdE';
 const SHORT = `https://agentlink.4thtech.io/i#2.${SECRET}`;
 const LONG = `https://agentlink.4thtech.io/i#${'q1W2e3R4t5Y6u7I8o9P0_-'.repeat(20)}`;
 const PASSKEY: PasskeyInfo = { credentialId: 'AQID', prfSalt: 'BwgJ' } as unknown as PasskeyInfo;
-const PROOF: PresenceProof = { kind: 'passkey', body: new Uint8Array([1, 2, 3]) };
+const PROOF: PresenceProof = {
+  kind: 'passkey',
+  gesture: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+};
 
 interface Fake extends InviteApi {
   checked: string[];

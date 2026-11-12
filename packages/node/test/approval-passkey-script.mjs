@@ -4,9 +4,15 @@
 // case), the keychain stand-in (the `owner` and `owner-passkey` items included), the public passkey
 // data (credential ID, user handle, PRF salt, a well-formed authenticator data for `localhost` with
 // UP and UV set, which any process can build) and `AGENTLINK_OWNER_*` variables. What it does not
-// have is the passkey's PRF output, which only the authenticator makes after the owner's gesture.
+// have is the passkey's PRF output and its signing key, which only the authenticator uses after the
+// owner's gesture.
 // It tries every passkey-shaped request it can think of and writes the HTTP status of each attempt
 // to the job's outFile. The parent checks that none was applied.
+//
+// REL051-SF1: a passkey proof answers a server-issued, single-use ceremony for one request, signed
+// by the passkey. The script tries the old body without a ceremony, and asks a fresh ceremony for
+// every guess and answers it with a forged signature. With `leaked` (a harness control) it first
+// sends one real gesture's body captured before it was used, then the same body again (a replay).
 //
 // Usage: node approval-passkey-script.mjs <job.json>
 import { Buffer } from 'node:buffer';
@@ -30,11 +36,14 @@ function send(path, { method = 'GET', headers = {}, body } = {}) {
         setHost: false,
       },
       (res) => {
-        res.resume();
-        res.on('end', () => resolve(res.statusCode ?? 0));
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () =>
+          resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }),
+        );
       },
     );
-    req.on('error', () => resolve(0));
+    req.on('error', () => resolve({ status: 0, body: '' }));
     if (body !== undefined) req.write(body);
     req.end();
   });
@@ -49,17 +58,21 @@ const page = {
 };
 
 async function attempt(name, path, options) {
-  attempts.push({ name, status: await send(path, options) });
+  attempts.push({ name, status: (await send(path, options)).status });
 }
 
-/** The passkey presence body: credId, authData, userHandle, PRF output, each after its 16-bit big-endian length. */
-function assertion(credentialId, authenticatorData, userHandle, prfOutput) {
-  const parts = [credentialId, authenticatorData, userHandle, prfOutput];
+/** Each part after its 16-bit big-endian length. */
+function fields(parts) {
   const out = [];
   for (const part of parts) {
     out.push(Buffer.from([part.length >> 8, part.length & 0xff]), Buffer.from(part));
   }
   return Buffer.concat(out);
+}
+
+/** The pre-0.5.1 passkey presence body: credId, authData, userHandle, PRF output. */
+function assertion(credentialId, authenticatorData, userHandle, prfOutput) {
+  return fields([credentialId, authenticatorData, userHandle, prfOutput]);
 }
 
 const credentialId = b64(job.credentialId);
@@ -91,10 +104,25 @@ for (const value of [process.env.AGENTLINK_OWNER_CODE, process.env.AGENTLINK_OWN
 }
 if (job.leakedPrf) prfGuesses.push(b64(job.leakedPrf));
 
+// The harness control: one real gesture's body, captured before it reached the server, then the
+// same body again.
+if (job.leaked) {
+  const headers = {
+    ...page,
+    'X-AgentLink-Digest': job.leaked.digest,
+    'X-AgentLink-Presence': 'passkey',
+    'X-AgentLink-Ceremony': job.leaked.ceremony,
+  };
+  const body = Buffer.from(job.leaked.body, 'base64url');
+  await attempt('leaked live gesture', job.leaked.path, { method: 'POST', headers, body });
+  await attempt('leaked replay', job.leaked.path, { method: 'POST', headers, body });
+}
+
 for (const { approvalId, digest } of job.approvals) {
   for (const decision of ['approve', 'deny']) {
     const path = `/api/approvals/${approvalId}/${decision}`;
-    const headers = { ...page, 'X-AgentLink-Digest': digest, 'X-AgentLink-Presence': 'passkey' };
+    const base = { ...page, 'X-AgentLink-Digest': digest };
+    const headers = { ...base, 'X-AgentLink-Presence': 'passkey' };
     await attempt(`${decision} passkey no body`, path, { method: 'POST', headers });
     await attempt(`${decision} passkey no PRF`, path, {
       method: 'POST',
@@ -102,10 +130,41 @@ for (const { approvalId, digest } of job.approvals) {
       body: assertion(credentialId, authenticatorData, userHandle, new Uint8Array(0)),
     });
     for (const prf of prfGuesses) {
-      await attempt(`${decision} passkey guess`, path, {
+      // The old body, without a ceremony.
+      await attempt(`${decision} passkey guess without a ceremony`, path, {
         method: 'POST',
         headers,
         body: assertion(credentialId, authenticatorData, userHandle, prf),
+      });
+      // A fresh ceremony, answered with a forged signature.
+      const ask = await send(path, {
+        method: 'POST',
+        headers: { ...base, 'X-AgentLink-Presence': 'challenge' },
+      });
+      let ready;
+      try {
+        ready = JSON.parse(ask.body);
+      } catch {
+        ready = undefined;
+      }
+      if (ask.status !== 200 || typeof ready?.ceremony !== 'string') {
+        attempts.push({ name: `${decision} ceremony ask`, status: ask.status });
+        continue;
+      }
+      const clientDataJSON = Buffer.from(
+        JSON.stringify({
+          type: 'webauthn.get',
+          challenge: ready.publicKey.challenge,
+          origin: job.origin,
+          crossOrigin: false,
+        }),
+      );
+      const forged = new Uint8Array(72);
+      for (let i = 0; i < forged.length; i += 1) forged[i] = Math.floor(Math.random() * 256);
+      await attempt(`${decision} passkey guess with a forged signature`, path, {
+        method: 'POST',
+        headers: { ...headers, 'X-AgentLink-Ceremony': ready.ceremony },
+        body: fields([credentialId, authenticatorData, clientDataJSON, forged, userHandle, prf]),
       });
     }
   }

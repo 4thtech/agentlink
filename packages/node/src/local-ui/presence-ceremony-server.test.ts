@@ -334,11 +334,7 @@ describe('the ceremony: issued by the route, used once (R1-SEC-01)', () => {
     const h = await harness();
     const key = await withPasskey(h.world);
     const g = await ceremonyGesture(h, key, TEST);
-    const res = await h.post(
-      TEST,
-      g.body.slice(),
-      withCeremony(encodeBase64url(randomBytes(16))),
-    );
+    const res = await h.post(TEST, g.body.slice(), withCeremony(encodeBase64url(randomBytes(16))));
     expect(res.status).toBe(403);
   });
 

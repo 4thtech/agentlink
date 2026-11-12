@@ -406,7 +406,7 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
     expect(confirm?.textContent).toContain(warningText('sell_auto_accept', { amount: '$50.00' }));
   });
 
-  it('with a passkey: the passkey prompt only after the click, its assertion is the body', async () => {
+  it('with a passkey: the passkey prompt only after the click, for the ceremony of this save; its assertion is the body', async () => {
     let asked = 0;
     const credentials = {
       get: () => {
@@ -415,6 +415,8 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
           rawId: new Uint8Array([1, 2]).buffer,
           response: {
             authenticatorData: new Uint8Array(37).buffer,
+            clientDataJSON: new Uint8Array(3).buffer,
+            signature: new Uint8Array(4).buffer,
             userHandle: new Uint8Array([9]).buffer,
           },
           getClientExtensionResults: () => ({
@@ -436,7 +438,20 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
             credentialId: 'AQI',
           },
         },
-        'POST /api/ui/rules': { status: 'saved', version: 1 },
+        'POST /api/ui/rules': (call: Call) =>
+          call.headers.get('x-agentlink-presence') === 'challenge'
+            ? {
+                status: 'ready',
+                ceremony: 'C'.repeat(22),
+                publicKey: {
+                  rpId: 'localhost',
+                  challenge: 'AAEC',
+                  allowCredentials: ['AQI'],
+                  timeoutMs: 120000,
+                  prfSalt: 'AA',
+                },
+              }
+            : { status: 'saved', version: 1 },
       },
       credentials,
     );
@@ -446,10 +461,14 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
     expect(inputLabelled(S.codeLabel)).toBeNull();
     await click(buttonByText(S.save));
     expect(asked).toBe(1);
-    const post = srv.calls.find((c) => c.method === 'POST');
+    const [ask, post] = srv.calls.filter((c) => c.method === 'POST');
+    expect(ask?.headers.get('x-agentlink-presence')).toBe('challenge');
+    expect(ask?.headers.get('x-agentlink-input')).toBe(post?.headers.get('x-agentlink-input'));
     expect(post?.headers.get('x-agentlink-presence')).toBe('passkey');
-    // credentialId, authenticatorData, userHandle, PRF output: each with a 16-bit length first.
-    expect(post?.body?.length).toBe(2 + 2 + 2 + 37 + 2 + 1 + 2 + 32);
+    expect(post?.headers.get('x-agentlink-ceremony')).toBe('C'.repeat(22));
+    // credentialId, authenticatorData, clientDataJSON, signature, userHandle, PRF output: each with
+    // a 16-bit length first.
+    expect(post?.body?.length).toBe(2 + 2 + 2 + 37 + 2 + 3 + 2 + 4 + 2 + 1 + 2 + 32);
     expect(text()).toContain(S.saved);
   });
 

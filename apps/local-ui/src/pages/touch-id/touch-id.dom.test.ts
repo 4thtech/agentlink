@@ -112,7 +112,7 @@ async function render(
 ) {
   const { api, calls } = fakeApi(answers);
   const proof = vi.fn((): Promise<PresenceProof | undefined> =>
-    Promise.resolve({ kind: 'passkey', body: new Uint8Array([1, 2, 3]) }),
+    Promise.resolve({ kind: 'passkey', gesture: () => Promise.resolve(new Uint8Array([1, 2, 3])) }),
   );
   await act(async () => {
     root.render(

@@ -3,6 +3,7 @@
 // code, the master code, the passkey assertion or the first-run registration encoding. The operation's
 // input travels base64url JSON in `X-AgentLink-Input`. The page's copy of every secret body is zeroed
 // once fetch has it. Answers become fixed codes; the server's text is never shown. Nothing is logged.
+import { sendWithProof } from '../../api/presence-ceremony.js';
 import type { PresenceProof } from '../contacts/owner.js';
 
 export const RESTORE_BASE = '/api/ui/restore';
@@ -259,11 +260,10 @@ export function createRestoreApi(options: RestoreApiOptions = {}): RestoreApi {
     path: string,
     body?: Uint8Array | Blob,
     input?: unknown,
-    passkey = false,
+    passkey?: PresenceProof & { readonly kind: 'passkey' },
   ): Promise<Answer | 'offline'> {
     const headers = new Headers({ [CSRF_HEADER]: options.token ?? pageToken() });
     if (input !== undefined) headers.set(INPUT_HEADER, inputOf(input));
-    if (passkey) headers.set('X-AgentLink-Presence', 'passkey');
     const init: RequestInit = { method, headers, credentials: 'same-origin', cache: 'no-store' };
     let sent: Uint8Array<ArrayBuffer> | undefined;
     if (method === 'POST') {
@@ -276,7 +276,11 @@ export function createRestoreApi(options: RestoreApiOptions = {}): RestoreApi {
     }
     let res: Response;
     try {
-      res = await doFetch(path, init);
+      // REL051-SF1: the passkey answers a ceremony for this request (api/presence-ceremony.ts).
+      res =
+        passkey === undefined
+          ? await doFetch(path, init)
+          : await sendWithProof(doFetch, path, headers, passkey);
     } catch {
       return 'offline';
     } finally {
@@ -289,6 +293,16 @@ export function createRestoreApi(options: RestoreApiOptions = {}): RestoreApi {
       json = isRecord(parsed) ? parsed : undefined;
     } catch {
       json = undefined;
+    }
+    // The ceremony's own refusals come as {status}; a passkey that can't be used here is the
+    // master code's turn (`presence_required`).
+    if (passkey !== undefined && json !== undefined && json['error'] === undefined) {
+      const word = json['status'];
+      if (typeof word === 'string' && res.status !== 200) json = { ...json, error: word };
+    }
+    const error = json?.['error'];
+    if (error === 'passkey_update_needed' || error === 'verification_required') {
+      json = { ...json, error: 'presence_required' };
     }
     return { status: res.status, json };
   }
@@ -366,14 +380,12 @@ export function createRestoreApi(options: RestoreApiOptions = {}): RestoreApi {
       return { kind: 'ok', header, ownerPresent: a.json?.['ownerPresent'] === true };
     },
     async presence(handle, proof) {
-      const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
-      const a = await call(
-        'POST',
-        `${RESTORE_BASE}/presence`,
-        body,
-        { handle },
-        proof.kind === 'passkey',
-      );
+      const a =
+        proof.kind === 'passkey'
+          ? await call('POST', `${RESTORE_BASE}/presence`, undefined, { handle }, proof)
+          : await call('POST', `${RESTORE_BASE}/presence`, new TextEncoder().encode(proof.code), {
+              handle,
+            });
       if (!okOnly(a)) return failure(a);
       return { kind: 'ok' };
     },

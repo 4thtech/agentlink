@@ -66,7 +66,7 @@ describe('PresenceCeremonies', () => {
     expect(c.take(one.id, A, bindingOf('/a'))).toBe('unknown');
   });
 
-  it("another session neither sees nor spends it", () => {
+  it('another session neither sees nor spends it', () => {
     const c = new PresenceCeremonies(clock().now);
     const one = c.issue(A, bindingOf('/a'));
     expect(c.take(one.id, B, bindingOf('/a'))).toBe('unknown');
