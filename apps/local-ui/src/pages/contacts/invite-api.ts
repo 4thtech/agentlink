@@ -17,6 +17,8 @@ export const INVITE_CREATE_PATH = '/api/ui/invites';
 export const INVITE_CHECK_PATH = '/api/ui/invites/check';
 export const INVITE_ACCEPT_PATH = '/api/ui/invites/accept';
 export const INVITE_CANCEL_PATH = '/api/ui/invites/cancel';
+/** REL051-B1 (N2): cancel this agent's accepts that wait on one person (the invite kind, `{ref}`). */
+export const CONNECTING_CANCEL_PATH = '/api/ui/invites/connecting/cancel';
 /** The open invites are read with a GET on the create path (W4-INVITES-LIST). */
 export const INVITES_LIST_PATH = '/api/ui/invites';
 
@@ -135,6 +137,11 @@ export interface InviteApi {
   cancel(inviteId: string, options?: { readonly keepalive?: boolean }): Promise<CancelOutcome>;
   check(invite: string): Promise<CheckOutcome>;
   accept(invite: string, proof: PresenceProof): Promise<AcceptOutcome>;
+  /**
+   * REL051-B1 (N2): Cancel on an accept that waits for `ref`'s answer. Optional so older fakes stay
+   * valid; the page offers no Cancel without it.
+   */
+  cancelConnecting?(ref: string): Promise<CancelOutcome>;
 }
 
 export interface InviteApiOptions {
@@ -344,6 +351,20 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
         headers: inviteHeaders(),
         body,
         ...(options?.keepalive === true ? { keepalive: true } : {}),
+      });
+      if (answer.kind === 'offline') return { kind: 'offline' };
+      const { status, json } = answer;
+      if (status === 200 && json['status'] === 'cancelled') return { kind: 'cancelled' };
+      if (status === 401) return { kind: 'session_expired' };
+      if (status === 404 && json['error'] === 'not_found') return { kind: 'not_found' };
+      return { kind: 'failed' };
+    },
+
+    async cancelConnecting(ref) {
+      if (!REF.test(ref)) return { kind: 'failed' };
+      const answer = await call(CONNECTING_CANCEL_PATH, {
+        headers: inviteHeaders(),
+        body: encode({ ref }),
       });
       if (answer.kind === 'offline') return { kind: 'offline' };
       const { status, json } = answer;

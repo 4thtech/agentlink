@@ -194,6 +194,8 @@ export const FEEDBACK_STRINGS = {
   youBlocked: (name: string): string => `You blocked ${name}. Unblock to connect.`,
   unblockAction: 'Unblock',
   cancelConnecting: 'Cancel',
+  // REL051-B1 (N2): Cancel on a waiting accept reached the server but nothing was cancelled.
+  cancelConnectingFailed: "Couldn't cancel. Try again in a minute.",
   waitingOnline: (name: string): string =>
     `Waiting for ${name} to come online. This finishes on its own.`,
   already: (name: string): string => `You're already connected to ${name}. Connect again?`,

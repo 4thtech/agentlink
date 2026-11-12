@@ -443,6 +443,27 @@ describe('Home simple (A4)', () => {
     expect(post?.method).toBe('POST');
   });
 
+  it('N2 (REL051-B1): an accept waiting on a person blocked here says so; Cancel posts the server route', async () => {
+    const expires = new Date(Date.now() + 6.5 * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
+    const bo = '0x' + 'b0'.repeat(20);
+    const s = await render(
+      base({
+        '/api/ui/invites': ok({
+          invites: [],
+          connecting: [
+            { ref: bo, name: 'Bo', expiresAt: expires, sent: true, again: false, blocked: true },
+          ],
+        }),
+        '/api/ui/invites/connecting/cancel': ok({ status: 'cancelled' }),
+      }),
+    );
+    expect(host.textContent).toContain('You blocked Bo. Unblock to connect.');
+    await click(byText('button', 'Cancel'));
+    const post = s.calls.find((c) => c.url === '/api/ui/invites/connecting/cancel');
+    expect(post?.method).toBe('POST');
+    expect(JSON.parse(new TextDecoder().decode(post?.body))).toEqual({ ref: bo });
+  });
+
   it('shows only the stretch both boxes cover: a reply older than the other side’s oldest loaded message waits for Load earlier (IR-W4-HOME-1)', async () => {
     await render(
       base({

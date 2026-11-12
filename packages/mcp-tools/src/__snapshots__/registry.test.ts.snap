@@ -101,6 +101,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
               "contact": {
                 "additionalProperties": false,
                 "properties": {
+                  "connectedAt": {
+                    "maxLength": 64,
+                    "type": "string",
+                  },
                   "id": {
                     "pattern": "^0x[0-9a-f]{40}$",
                     "type": "string",
@@ -168,6 +172,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
               "contact": {
                 "additionalProperties": false,
                 "properties": {
+                  "connectedAt": {
+                    "maxLength": 64,
+                    "type": "string",
+                  },
                   "id": {
                     "pattern": "^0x[0-9a-f]{40}$",
                     "type": "string",
@@ -589,6 +597,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "items": {
             "additionalProperties": false,
             "properties": {
+              "connectedAt": {
+                "maxLength": 64,
+                "type": "string",
+              },
               "id": {
                 "pattern": "^0x[0-9a-f]{40}$",
                 "type": "string",
@@ -632,6 +644,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
               },
               "safetyCodeChecked": {
                 "type": "boolean",
+              },
+              "shortId": {
+                "maxLength": 16,
+                "type": "string",
               },
               "unread": {
                 "minimum": 0,
@@ -770,6 +786,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "items": {
             "additionalProperties": false,
             "properties": {
+              "connectedAt": {
+                "maxLength": 64,
+                "type": "string",
+              },
               "id": {
                 "pattern": "^0x[0-9a-f]{40}$",
                 "type": "string",
@@ -1181,6 +1201,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "items": {
             "additionalProperties": false,
             "properties": {
+              "connectedAt": {
+                "maxLength": 64,
+                "type": "string",
+              },
               "id": {
                 "pattern": "^0x[0-9a-f]{40}$",
                 "type": "string",
@@ -1793,6 +1817,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "items": {
             "additionalProperties": false,
             "properties": {
+              "connectedAt": {
+                "maxLength": 64,
+                "type": "string",
+              },
               "id": {
                 "pattern": "^0x[0-9a-f]{40}$",
                 "type": "string",
@@ -1853,6 +1881,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
                   {
                     "additionalProperties": false,
                     "properties": {
+                      "connectedAt": {
+                        "maxLength": 64,
+                        "type": "string",
+                      },
                       "id": {
                         "pattern": "^0x[0-9a-f]{40}$",
                         "type": "string",

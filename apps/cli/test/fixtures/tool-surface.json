@@ -116,6 +116,10 @@
                   "shortId": {
                     "type": "string",
                     "maxLength": 16
+                  },
+                  "connectedAt": {
+                    "type": "string",
+                    "maxLength": 64
                   }
                 },
                 "required": ["id", "name", "label", "nameSource"],
@@ -179,6 +183,10 @@
                   "shortId": {
                     "type": "string",
                     "maxLength": 16
+                  },
+                  "connectedAt": {
+                    "type": "string",
+                    "maxLength": 64
                   }
                 },
                 "required": ["id", "name", "label", "nameSource"],
@@ -554,12 +562,20 @@
                 "type": "string",
                 "pattern": "^[0-9A-F]{4}·[0-9A-F]{4}$"
               },
+              "shortId": {
+                "type": "string",
+                "maxLength": 16
+              },
               "pairing": {
                 "type": "string",
                 "enum": ["pending", "complete", "mismatch"]
               },
               "safetyCodeChecked": {
                 "type": "boolean"
+              },
+              "connectedAt": {
+                "type": "string",
+                "maxLength": 64
               },
               "lastActivity": {
                 "type": "string",
@@ -846,6 +862,10 @@
               "shortId": {
                 "type": "string",
                 "maxLength": 16
+              },
+              "connectedAt": {
+                "type": "string",
+                "maxLength": 64
               }
             },
             "required": ["id", "name", "label", "nameSource"],
@@ -1167,6 +1187,10 @@
               "shortId": {
                 "type": "string",
                 "maxLength": 16
+              },
+              "connectedAt": {
+                "type": "string",
+                "maxLength": 64
               }
             },
             "required": ["id", "name", "label", "nameSource"],
@@ -1685,6 +1709,10 @@
                       "shortId": {
                         "type": "string",
                         "maxLength": 16
+                      },
+                      "connectedAt": {
+                        "type": "string",
+                        "maxLength": 64
                       }
                     },
                     "required": ["id", "name", "label", "nameSource"],
@@ -1792,6 +1820,10 @@
               "shortId": {
                 "type": "string",
                 "maxLength": 16
+              },
+              "connectedAt": {
+                "type": "string",
+                "maxLength": 64
               }
             },
             "required": ["id", "name", "label", "nameSource"],
