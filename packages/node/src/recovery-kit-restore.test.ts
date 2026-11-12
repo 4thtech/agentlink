@@ -1480,4 +1480,38 @@ describe.runIf(POSIX)('UX1113-QA2 N4: a restored ID keeps the name people know',
     });
     expect(rows.find((r) => r['agentId'] === plain.agentId)).not.toHaveProperty('label');
   }, 60_000);
+
+  it("a clash names the ID already here by its label (per request, never another ID's)", async () => {
+    const owner = await makeOwner();
+    const ana = await makeAgent(t.root, owner, 'default', { label: 'Ana' });
+    const first = await makeKit(t.root, owner, [ana], 'agentlink-recovery-kit-c1.alkk', t.root);
+    await writeFile(
+      join(t.home, 'Downloads', 'agentlink-recovery-kit-c1.alkk'),
+      await readFile(first.path),
+    );
+    const opened = await openKit('S1', await foundHandle('S1'), first.code);
+    await gestureAndFinish('S1', body(opened)['kit'] as string, [ana.agentId]);
+    // Another ID of this owner whose folder is also `default`.
+    const other = await makeAgent(t.root, owner, 'default');
+    const second = await makeKit(t.root, owner, [other], 'agentlink-recovery-kit-c2.alkk', t.root);
+    await writeFile(
+      join(t.home, 'Downloads', 'agentlink-recovery-kit-c2.alkk'),
+      await readFile(second.path),
+    );
+    await engine.close();
+    engine = newEngine({ knownOwner: owner.keys.ownerNostr });
+    const h = await foundHandle('S2', 'agentlink-recovery-kit-c2.alkk');
+    const checked = await engine.check('S2', { handle: h }, code(second.code));
+    const rows = (body(checked)['summary'] as { ids: Record<string, unknown>[] }).ids;
+    expect(rows).toEqual([
+      expect.objectContaining({
+        agentId: other.agentId,
+        name: 'default',
+        state: 'name_taken',
+        suggestedName: 'default-2',
+        takenLabel: 'Ana',
+      }),
+    ]);
+    expect(rows[0]).not.toHaveProperty('label');
+  }, 60_000);
 });

@@ -182,6 +182,23 @@ describe('My IDs (WP-I1)', () => {
     expect(card('macbook-agent-1').querySelector('input')).not.toBeNull();
   });
 
+  it('UX1113-QA2: two IDs with the same name: the second one asks for a name people can tell apart', async () => {
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list([
+        ...THREE(),
+        agent('work-2', 'Work', { state: 'ready', apps: [{ app: 'codex', state: 'ready' }] }),
+      ]),
+    };
+    await mount();
+    expect(card('work').querySelector('[data-nudge]')).toBeNull();
+    const nudge = card('work-2').querySelector<HTMLElement>('[data-nudge]')!;
+    expect(nudge.textContent).toContain(
+      'Another of your IDs is also called Work. Give this one a name people can tell apart.',
+    );
+    expect(nudge.querySelector('strong bdi')?.textContent).toBe('Work');
+  });
+
   it('the machine-name rule', () => {
     expect(machineNamed({ label: 'macbook-agent-1', name: 'x' })).toBe(true);
     expect(machineNamed({ label: 'ci-3', name: 'x' })).toBe(true);
