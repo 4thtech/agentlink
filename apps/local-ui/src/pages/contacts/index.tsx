@@ -157,9 +157,9 @@ function initials(text: string): string {
 
 function Chip({ icon, tone, children }: { icon: string; tone: string; children: string }) {
   return (
-    <span className={`al-chip al-tone-${tone}`}>
+    <span className={`ct-chip al-tone-${tone}`}>
       <Icon name={icon} size={12} strokeWidth={2.25} />
-      <span className="al-text-label">{children}</span>
+      <span className="al-text-body-sm">{children}</span>
     </span>
   );
 }
@@ -264,7 +264,7 @@ function PersonRow({
         </span>
         <span className="al-contact-side">
           {archived === true ? (
-            <span className="al-text-label ct-open">{S.open}</span>
+            <span className="al-text-body-sm ct-open">{S.open}</span>
           ) : (
             <>
               <StateChip contact={c} />
@@ -274,7 +274,7 @@ function PersonRow({
                     {HOOD.checked}
                   </Chip>
                 ) : (
-                  <span className="al-text-label ct-check">{S.checkContact}</span>
+                  <span className="al-text-body-sm ct-check">{S.checkContact}</span>
                 )
               ) : null}
             </>
@@ -341,7 +341,7 @@ function ArchivedList({
   };
   return (
     <details className="ct-archived">
-      <summary className="al-text-label">{`${S.archivedLabel} (${String(gone.length)})`}</summary>
+      <summary className="al-text-body ct-sum">{`${S.archivedLabel} (${String(gone.length)})`}</summary>
       <Surface as="ul" level={1} className="ct-list ct-list-archived" aria-label={S.archivedLabel}>
         {gone.map((c) => (
           <PersonRow
@@ -1246,7 +1246,7 @@ export function ContactsPage({
   const invitesList = (
     <>
       {waitingCount > 0 ? (
-        <h2 className="al-text-label al-muted ct-group">{`${S.invitesWaiting} (${String(waitingCount)})`}</h2>
+        <h2 className="al-text-body ct-group">{`${S.invitesWaiting} (${String(waitingCount)})`}</h2>
       ) : null}
       <PendingInvites
         rows={rows}
@@ -1363,18 +1363,21 @@ export function ContactsPage({
       <>
         {title}
         <p className="al-text-body al-muted ct-lead">{S.lead}</p>
-        <p className="al-text-label al-muted ct-count">
-          {countLine(list.contacts.filter((c) => c.status !== 'revoked').length, rows.length)}
-        </p>
+
         {removed ? (
           <p className="al-text-body" role="status">
             {S.removed}
           </p>
         ) : null}
         {status}
+        <div className="ct-toolbar">
+          <ActivitySort />
+          <p className="al-text-body-sm al-muted ct-count">
+            {countLine(list.contacts.filter((c) => c.status !== 'revoked').length, rows.length)}
+          </p>
+        </div>
         <div className="ct-layout">
           {invitesList}
-          <ActivitySort />
           <ContactList
             contacts={liveSorted}
             selected={current?.ref}

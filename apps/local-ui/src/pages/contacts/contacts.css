@@ -210,7 +210,50 @@
 .ct-row .al-contact-side {
   align-items: center;
 }
-.ct-row .al-chip {
-  width: fit-content;
+/* The shell restyles .al-chip for the agent switcher, so the row chips have their own class. */
+.ct-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-1);
+  height: 22px;
+  padding: 0 var(--al-space-2);
+  border-radius: var(--al-radius-sm);
+  border: var(--al-border-width-thin) solid var(--t-bd);
+  background: var(--t-bg);
+  color: var(--t-fg);
+  white-space: nowrap;
   flex: none;
+}
+.ct-chip .al-icon {
+  color: var(--t-ic);
+}
+
+.ct-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-4);
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--al-space-5);
+}
+.ct-toolbar + .ct-layout {
+  margin-top: var(--al-space-4);
+}
+.ct-toolbar .ct-count {
+  margin-left: auto;
+  text-align: right;
+}
+.ct-check,
+.ct-open {
+  text-transform: none;
+  letter-spacing: normal;
+}
+.ct-sum,
+.ct-group {
+  text-transform: none;
+  font-weight: 600;
+  margin: 0;
+}
+.ct-list-archived .ct-row.is-revoked {
+  opacity: 1;
 }
