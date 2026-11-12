@@ -53,6 +53,11 @@ import { INVITE_PATH } from '../../nav.js';
 import { createInviteApi, type InviteApi } from '../contacts/invite-api.js';
 import { navigate } from '../../router.js';
 import { setFinishRestore } from '../restore/outcome.js';
+import {
+  NEW_MASTER_CODE_PATH,
+  createMasterCodeApi,
+  type MasterCodeApi,
+} from '../restore/master-code-api.js';
 import { announceAgentsChanged } from '../agents/use-agents.js';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import {
@@ -240,7 +245,18 @@ export interface FirstRunPageProps {
   readonly openJoin?: () => void;
   /** W4-WIRE-2: the agents (names already used, and opening the new one). Default: the server's. */
   readonly agentsApi?: Pick<AgentsApi, 'list' | 'switchTo'>;
+  /**
+   * REL051-CF3: the master code shown once, again after a reload of its step. Default: the server's
+   * (with a test `api` and none given: nothing held).
+   */
+  readonly masterCodeApi?: MasterCodeApi;
 }
+
+/** REL051-CF3: a test seam's default when only `api` is given (nothing held). */
+const NOTHING_HELD: MasterCodeApi = {
+  show: () => Promise.resolve({ kind: 'none' }),
+  saved: () => Promise.resolve(),
+};
 
 interface Done {
   readonly confirmed: boolean;
@@ -292,6 +308,11 @@ type View =
   | { readonly k: 'expired' }
   | { readonly k: 'down' }
   | { readonly k: 'stuck'; readonly message: string }
+  /**
+   * REL051-CF3 (R1-CLASS-03): the master code was made here and never saved (the app was closed, or
+   * the 10 minutes passed): say so and offer a new one; never ask for it.
+   */
+  | { readonly k: 'lost'; readonly touchId: boolean }
   | { readonly k: 'done'; readonly done: Done };
 
 /** A fixed problem code in plain words (never server or browser text). */
@@ -636,11 +657,15 @@ export function FirstRunPage({
   readJoin = () => createJoinApi().read(),
   openJoin = () => window.location.assign(JOIN),
   agentsApi: givenAgents,
+  masterCodeApi: givenMasterCode,
 }: FirstRunPageProps = {}): ReactElement {
   // W4-WIRE-2: decided once per mount, before the remembered choices are read.
   useState(startRun);
   const goHome = givenHome ?? (wantsNewAgent() ? leaveAddAgent : openHome);
   const [api] = useState<SetupApi>(() => given ?? createSetupApi());
+  const [masterCode] = useState<MasterCodeApi>(
+    () => givenMasterCode ?? (given === undefined ? createMasterCodeApi() : NOTHING_HELD),
+  );
   const [upgradeApi] = useState<UpgradeApi>(() => givenUpgrade ?? createUpgradeApi());
   const [appsApi] = useState<AppsApi>(() => givenApps ?? createAppsApi());
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
@@ -786,12 +811,59 @@ export function FirstRunPage({
     [upgradeApi, available, prfSupport, appsApi, lookForApps],
   );
 
+  /**
+   * REL051-CF3 (R1-CLASS-03, R1-UI-02): an owner exists. A master code this page session was shown
+   * and has not confirmed comes back with its step (a reload of "Your master code"); a code made here
+   * and never saved is named as lost, with a new one offered; restored IDs waiting for their owner go
+   * to "Finish restoring". Otherwise Get started goes on for this owner.
+   */
+  const heldCode = useCallback(
+    async (isLive: () => boolean): Promise<void> => {
+      const held = await masterCode.show();
+      if (!isLive()) return;
+      if (held.kind === 'shown' && held.which === 'first_run') {
+        const { view: shown } = held;
+        setMode({ k: 'first' });
+        if (step !== 'connect') toStep('connect', true);
+        setView({
+          k: 'done',
+          done: {
+            confirmed: shown.outcome !== 'done_unconfirmed',
+            passkey: shown.passkey,
+            fingerprint: shown.fingerprint,
+            sendFolder:
+              shown.sendFolder === 'allowed' ||
+              shown.sendFolder === 'not_allowed' ||
+              shown.sendFolder === 'not_confirmed'
+                ? shown.sendFolder
+                : 'none',
+            ownerCode: held.code,
+            computerName: shown.computerName ?? '',
+          },
+        });
+        return;
+      }
+      if (held.kind === 'finish_restore') {
+        setFinishRestore(true);
+        navigate('/restore/kit');
+        return;
+      }
+      if (held.kind === 'lost') {
+        setView({ k: 'lost', touchId: held.touchId });
+        return;
+      }
+      await existingOwner(isLive);
+    },
+    // toStep and step are read when the answer arrives; the call itself runs once per mount.
+    [masterCode, existingOwner],
+  );
+
   useEffect(() => {
     let live = true;
     void api.status().then((result) => {
       if (!live) return;
       if (result.kind === 'ok') {
-        if (result.owner === 'set_up') void existingOwner(() => live);
+        if (result.owner === 'set_up') void heldCode(() => live);
         // IR-M1-11b-1-1 L-1: a failed check is never "no owner": doctor, not setup.
         else if (result.owner === 'unknown') {
           setView({ k: 'stuck', message: SETUP_MESSAGES.unknown });
@@ -814,7 +886,7 @@ export function FirstRunPage({
     return () => {
       live = false;
     };
-  }, [api, available, prfSupport, existingOwner, lookForApps]);
+  }, [api, available, prfSupport, heldCode, lookForApps]);
 
   // The look's answer, when it arrived while another step was on screen.
   useEffect(() => {
@@ -1076,6 +1148,8 @@ export function FirstRunPage({
   // kit is put off ("Later", remembered for the banner). W4-WIZARD: then Connected (A2).
   const leave = (done: Done): void => {
     rememberRecoveryKitLater();
+    // REL051-CF3: "I saved it": the server forgets the code it kept for a reload.
+    void masterCode.saved();
     // The master code leaves the page now, whichever screen comes next (L-3).
     setView({ k: 'leaving' });
     // U3-invite (08 §4, b11 §33.2): an invite left waiting by `agentlink join` comes first.
@@ -1110,6 +1184,7 @@ export function FirstRunPage({
     // address) is "I saved it" without the click: the code leaves the state and the page, never
     // hidden to come back; the kit is put off as with the click.
     if (view.k === 'done' && step !== 'connect') {
+      // REL051-CF3: the code leaves the page, but the server keeps it (Back is not "I saved it").
       rememberRecoveryKitLater();
       rememberWizard({
         outcome: { label, ...(view.done.app === undefined ? {} : { app: view.done.app }) },
@@ -1223,6 +1298,31 @@ export function FirstRunPage({
       return <LinkExpiredState />;
     case 'down':
       return <NotRunningState />;
+    case 'lost':
+      return frame(
+        <section className="st-screen st-w-560" aria-labelledby="fr-h" data-testid="code-lost">
+          <h1 id="fr-h" className="st-title-2">
+            {T.lostTitle}
+          </h1>
+          <Banner tone="warning">{view.touchId ? T.lostBody(sensor) : T.lostBodyNoSensor}</Banner>
+          <div className="st-actions">
+            {view.touchId ? (
+              <Button variant="primary" onClick={() => navigate(NEW_MASTER_CODE_PATH)}>
+                {T.lostNew}
+              </Button>
+            ) : null}
+            <Button
+              variant={view.touchId ? 'secondary' : 'primary'}
+              onClick={() => {
+                setView({ k: 'loading' });
+                void existingOwner();
+              }}
+            >
+              {T.lostLater}
+            </Button>
+          </div>
+        </section>,
+      );
     case 'stuck':
       return frame(
         <section className="st-screen st-w-560" aria-labelledby="fr-h">

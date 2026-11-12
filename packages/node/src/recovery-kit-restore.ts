@@ -66,6 +66,7 @@ import {
   createKeyImportControl,
   discardImportedAgent,
   importOwnerPasskey,
+  importRestoredOwner,
   inOwnersRevokedList,
   unlockForRestore,
   type RestoreOwnerSessionHold,
@@ -75,7 +76,18 @@ import { markKitRecordChecked } from './kit-record.js';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded, openRecordedKeyStore } from './keychain-keystore.js';
 import { ttyOwnerTerminal } from './owner-terminal.js';
-import { OWNER_ACCOUNT, OWNER_NEXT_ACCOUNT } from './owner-keystore.js';
+import {
+  OWNER_ACCOUNT,
+  OWNER_NEXT_ACCOUNT,
+  readOwnerItem,
+  removeOwnerItemIfOurs,
+} from './owner-keystore.js';
+import {
+  readUnsavedMarker,
+  removeUnsavedMarker,
+  writeUnsavedMarker,
+  type UnsavedKind,
+} from './master-code-unsaved.js';
 import {
   PASSKEY_RP_ID,
   assertPasskeyAssertion,
@@ -95,6 +107,7 @@ import {
   installRestoredStore,
   peekQuarantinedSnapshot,
   quarantineAuthenticated,
+  processAlive,
   removeStaleRestoreFiles,
   restoreFileName,
   trackRestoreFile,
@@ -209,7 +222,22 @@ export interface RestoreEngineOptions {
   /** Limit of each native keychain read (default KEYCHAIN_CALL_TIMEOUT_MS). */
   readonly keychainTimeoutMs?: number;
   readonly freeBytes?: (dir: string) => Promise<number | undefined>;
+  /**
+   * REL051-CF3 (T-7): whether the run that wrote the unsaved-master-code marker still runs (its
+   * owner write may be in progress). Default: this process, or a live process with that ID.
+   */
+  readonly runAlive?: (pid: number) => boolean;
+  /** REL051-CF3 test seam: how the `shown` marker is written (default writeUnsavedMarker). */
+  readonly writeMarker?: typeof writeUnsavedMarker;
 }
+
+/** REL051-CF3: what the page says about a master code that was made here and not saved. */
+export type MasterCodeState =
+  | { readonly status: 'none' }
+  /** Restored IDs wait for their owner: "Finish restoring" with the same kit. */
+  | { readonly status: 'finish_restore' }
+  /** The code was made and never saved; `touchId`: a passkey can approve making a new one. */
+  | { readonly status: 'lost'; readonly kind: UnsavedKind; readonly touchId: boolean };
 
 /** The route-facing restore engine. No member writes an owner without the gesture or a session. */
 export interface RestoreEngine {
@@ -252,6 +280,17 @@ export interface RestoreEngine {
    * undefined.
    */
   firstRunHold(): Promise<FirstRunHold | undefined>;
+  /**
+   * REL051-CF3 (R1-CLASS-04; T-7): at start-up, an owner item that a restore which is gone wrote and
+   * whose master code never left the server (marker `writing`, exactly that item, no passkey item) is
+   * removed again, so first run says "Finish restoring" instead of asking for a code nobody has. A
+   * marker with no owner item goes. Anything else is kept. Never throws.
+   */
+  settle(): Promise<void>;
+  /** REL051-CF3: the unsaved master code's state for the page (never the code). */
+  masterCodeState(): Promise<MasterCodeState>;
+  /** REL051-CF3: "I saved it" (or the code was replaced): the marker goes. */
+  masterCodeSaved(): Promise<void>;
   /**
    * REL051-SF3 (T-7): removes the quarantine and upload files of restores that are gone (the engine
    * runs it after every apply and cancel; the server sweeps the folder itself when it starts).
@@ -597,6 +636,9 @@ export function createRestoreEngine(options: RestoreEngineOptions): RestoreEngin
     registerExportedKit,
     restorePending,
     firstRunHold,
+    settle,
+    masterCodeState,
+    masterCodeSaved,
     sweep,
     close,
   } = full;
@@ -613,6 +655,9 @@ export function createRestoreEngine(options: RestoreEngineOptions): RestoreEngin
     registerExportedKit,
     restorePending,
     firstRunHold,
+    settle,
+    masterCodeState,
+    masterCodeSaved,
     sweep,
     close,
   });
@@ -1521,16 +1566,31 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         await unlink(pendingPath).catch(() => undefined);
         return fail('failed', { ids: outcomesJson(outcomes) });
       }
-      const control = createKeyImportControl({
-        backend: 'keychain',
-        keychain: options.keychain(),
-        ownerKeychain: options.keychain(),
-        revokedDir,
-        ...(options.kdf === undefined ? {} : { kdf: options.kdf }),
-      });
+      // REL051-CF3 (T-7): the marker names the item before it is written, so a start after the
+      // app closed mid-way can tell its own item apart (settle).
+      let item: Uint8Array | undefined;
+      const ownerNostr = current.kit.ownerNostr.slice();
       try {
-        code = new Uint8Array(await control.importOwner(current.kit));
+        code = new Uint8Array(
+          await importRestoredOwner(current.kit, options.keychain(), {
+            ...(options.kdf === undefined ? {} : { kdf: options.kdf }),
+            timeoutMs: keychainTimeoutMs,
+            beforeWrite: async (blob) => {
+              item = sha256(blob);
+              wipe(blob);
+              await writeUnsavedMarker(home, {
+                kind: 'restore',
+                stage: 'writing',
+                ownerNostr,
+                item,
+                pid: process.pid,
+                at: now(),
+              });
+            },
+          }),
+        );
       } catch {
+        if (item !== undefined) await removeUnsavedMarker(home);
         if (passkey !== undefined) wipe(passkey.prfOutput);
         // Nothing of this kit was written: no hint is left behind (an ID that was restored keeps
         // it, with its verified card, for owner-only completion).
@@ -1544,6 +1604,14 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         passkey === undefined
           ? false
           : await importOwnerPasskey(current.kit, options.keychain(), passkey);
+      // REL051-CF3: the code is in this answer now; the marker stays until "I saved it". A `writing`
+      // marker must never outlive a code that was shown (a later start would roll that owner back):
+      // one retry, then the marker goes; if neither works, the code is not shown (the owner is then
+      // rolled back to "Finish restoring" at the next start, or replaced with Touch ID).
+      if (!(await markShown(ownerNostr, item))) {
+        await restored(outcomes);
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
       await unlink(pendingPath).catch(() => undefined);
       await restored(outcomes);
       return ok({
@@ -1622,6 +1690,103 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     if (passkeyLeft) return 'finish_restore';
     if ((await readPending()) !== undefined) return 'finish_restore';
     return (await verifiedCardOwners()).length > 0 ? 'finish_restore' : undefined;
+  }
+
+  const runAlive = options.runAlive ?? ((pid: number) => pid === process.pid || processAlive(pid));
+
+  /** REL051-CF3: the restore's marker moves to `shown` (or goes); false when neither worked. */
+  async function markShown(ownerNostr: Uint8Array, item: Uint8Array | undefined): Promise<boolean> {
+    const write = options.writeMarker ?? writeUnsavedMarker;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await write(home, {
+          kind: 'restore',
+          stage: 'shown',
+          ownerNostr,
+          ...(item === undefined ? {} : { item }),
+          pid: process.pid,
+          at: now(),
+        });
+        return true;
+      } catch {
+        // Tried again once.
+      }
+    }
+    try {
+      await removeUnsavedMarker(home);
+      return (await readUnsavedMarker(home)) === undefined;
+    } catch {
+      return false;
+    }
+  }
+
+  async function settle(): Promise<void> {
+    try {
+      const marker = await readUnsavedMarker(home);
+      if (marker === undefined || runAlive(marker.pid)) return;
+      const keychain = options.keychain();
+      const ownerBlob = await readOwnerItem(keychain, keychainTimeoutMs);
+      if (ownerBlob === null) {
+        // No owner was written (or it went since): restored IDs, if any, wait for "Finish
+        // restoring" through restore-pending.json and their cards; nothing is unsaved.
+        await removeUnsavedMarker(home);
+        return;
+      }
+      try {
+        if (
+          marker.kind !== 'restore' ||
+          marker.stage !== 'writing' ||
+          marker.item === undefined ||
+          !equalBytes(sha256(ownerBlob), marker.item)
+        ) {
+          return;
+        }
+        const passkey = await readOwnerPasskeyItem(keychain, keychainTimeoutMs);
+        if (passkey !== null) {
+          wipe(passkey);
+          return;
+        }
+        // Its code never left this computer's server and no Touch ID wraps it: nobody can use it.
+        // The IDs stay; first run says "Finish restoring" (owner-only completion, same kit).
+        if ((await readPending()) === undefined) await writePending(marker.ownerNostr);
+        const next = await guarded(() => keychain.get(OWNER_NEXT_ACCOUNT), keychainTimeoutMs);
+        if (next !== null) {
+          if (equalBytes(sha256(next), marker.item)) {
+            await guarded(() => keychain.delete(OWNER_NEXT_ACCOUNT), keychainTimeoutMs);
+          }
+          wipe(next);
+        }
+        const removed = await removeOwnerItemIfOurs(keychain, ownerBlob, keychainTimeoutMs);
+        if (removed === 'removed' || removed === 'absent') await removeUnsavedMarker(home);
+      } finally {
+        wipe(ownerBlob);
+      }
+    } catch {
+      // Fail safe: nothing is removed when anything here could not be read.
+    }
+  }
+
+  async function masterCodeState(): Promise<MasterCodeState> {
+    if ((await firstRunHold()) === 'finish_restore') return { status: 'finish_restore' };
+    const marker = await readUnsavedMarker(home);
+    if (marker === undefined) return { status: 'none' };
+    const keychain = options.keychain();
+    const owner = await readOwnerItem(keychain, keychainTimeoutMs);
+    if (owner === null) return { status: 'none' };
+    wipe(owner);
+    // A marker of another owner than the one here now is stale: it goes, and nothing is said.
+    const present = await knownOwner().catch(() => undefined);
+    if (present !== undefined && !equalBytes(present, marker.ownerNostr)) {
+      await removeUnsavedMarker(home);
+      return { status: 'none' };
+    }
+    const passkey = await readOwnerPasskeyItem(keychain, keychainTimeoutMs);
+    wipe(passkey ?? undefined);
+    return { status: 'lost', kind: marker.kind, touchId: passkey !== null };
+  }
+
+  async function masterCodeSaved(): Promise<void> {
+    await removeUnsavedMarker(home);
   }
 
   function gestureChallenge(
@@ -2098,6 +2263,9 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     },
     restorePending: async () => (await firstRunHold()) === 'finish_restore',
     firstRunHold,
+    settle,
+    masterCodeState,
+    masterCodeSaved,
     sweep: sweepNow,
     close: () => {
       clearInterval(sweep);
@@ -2269,6 +2437,8 @@ export async function runRestoreInTerminal(
       terminal.write(master);
       await terminal.confirm(text.savedIt);
       terminal.clearScreen();
+      // REL051-CF3: shown in the terminal and confirmed there; the app has nothing to add.
+      await engine.masterCodeSaved();
     }
     terminal.write(text.nextSteps);
     return 'restored';

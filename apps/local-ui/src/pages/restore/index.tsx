@@ -24,7 +24,8 @@ import {
   type Summary,
 } from './api.js';
 import { emptyGroups, codeOf } from './code-field.js';
-import { setOutcome, takeFinishRestore, useOutcome } from './outcome.js';
+import { getOutcome, setOutcome, takeFinishRestore, useOutcome } from './outcome.js';
+import { createMasterCodeApi, type MasterCodeApi } from './master-code-api.js';
 import { canRestoreHere, createRestorePasskey, getRestorePrf } from './passkey.js';
 import {
   CheckedStep,
@@ -61,6 +62,11 @@ export interface RestoreWizardProps {
   readonly passkeyProof?: (info: PasskeyInfo) => Promise<PresenceProof | undefined>;
   /** Test seam: leaves the wizard (Cancel, Done, Go to Home). Default: a full load of Home. */
   readonly onLeave?: (to: string) => void;
+  /**
+   * REL051-CF3: step 4's master code again after a reload. Default: the server's (with a test `api`
+   * and none given: nothing held).
+   */
+  readonly masterCodeApi?: MasterCodeApi;
 }
 
 function leaveDefault(to: string): void {
@@ -101,9 +107,17 @@ export function RestoreWizard({
   platform: givenPlatform,
   passkeyProof = browserPasskeyProof,
   onLeave = leaveDefault,
+  masterCodeApi: givenMasterCode,
 }: RestoreWizardProps = {}): ReactElement {
   const check = mode === 'check';
   const [api] = useState<RestoreApi>(() => givenApi ?? createRestoreApi());
+  const [masterCode] = useState<MasterCodeApi>(
+    () =>
+      givenMasterCode ??
+      (givenApi === undefined
+        ? createMasterCodeApi()
+        : { show: () => Promise.resolve({ kind: 'none' }), saved: () => Promise.resolve() }),
+  );
   const [appsApi] = useState<AppsApi>(() => givenApps ?? createAppsApi());
   const [owner] = useState<OwnerClient>(() => givenOwner ?? createOwnerClient());
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
@@ -131,6 +145,28 @@ export function RestoreWizard({
   /** One request at a time: Continue and Open stay off while one is in flight (no double submit). */
   const inflight = useRef(false);
   const [finishing] = useState(() => takeFinishRestore());
+
+  // REL051-CF3 (R1-CLASS-03): a reload on step 4 shows the same new master code and outcome again
+  // (the server keeps them for this page session only, 10 minutes, until "I saved it").
+  useEffect(() => {
+    if (check || getOutcome() !== undefined) return undefined;
+    let live = true;
+    void masterCode.show().then((held) => {
+      if (!live || held.kind !== 'shown' || held.which !== 'restore') return;
+      if (getOutcome() !== undefined) return;
+      setOutcome({
+        restored: held.ids.filter((i) => i.outcome === 'restored').map((i) => i.label ?? i.name),
+        restoredFolders: held.ids.filter((i) => i.outcome === 'restored').map((i) => i.name),
+        failed: held.ids.filter((i) => i.outcome === 'failed').map((i) => i.label ?? i.name),
+        masterCode: held.code,
+        touchId: held.touchId,
+        kitDate: undefined,
+      });
+    });
+    return () => {
+      live = false;
+    };
+  }, [check, masterCode]);
 
   // Found kit files (name pattern and header only; nothing is opened).
   useEffect(() => {
@@ -431,7 +467,11 @@ export function RestoreWizard({
         }
         saved={saved}
         onSaved={setSaved}
-        onHome={() => leave('/')}
+        onHome={() => {
+          // REL051-CF3: "I saved it" was ticked: the server forgets the code it kept for a reload.
+          if (outcome.masterCode !== undefined && saved) void masterCode.saved();
+          leave('/');
+        }}
         storage={false}
       />,
       'protect',

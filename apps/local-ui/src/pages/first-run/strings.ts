@@ -74,6 +74,14 @@ export const FIRST_RUN = {
   savedAsLabel: (computer: string): string => `AgentLink master code – ${computer}`,
   clipboardWarning: 'Other apps can read your clipboard.',
   savedIt: 'I saved it',
+  // REL051-CF3 (R1-CLASS-03): the master code was made and never saved (the app closed, or too long).
+  lostTitle: "Your master code wasn't saved",
+  lostBody: (sensor: string): string =>
+    `It was shown once and can't be shown again. Make a new one now with ${sensor}. Your IDs and people are fine.`,
+  lostBodyNoSensor:
+    "It was shown once and can't be shown again. If you saved it, keep using it. If not, run `agentlink doctor` in your own terminal.",
+  lostNew: 'Make a new master code',
+  lostLater: 'Later',
   // The first policy's outcome (D-130 (2)).
   sendAllowed:
     'Your AI can send files you put in ~/AgentLink/Send. Nothing else on this computer can be sent.',

@@ -23,7 +23,7 @@
 // - A path is fixed segments `[a-z0-9-]` and `:name` parameters; a parameter matches only
 //   `[A-Za-z0-9_-]{1,128}` (no dot, no percent-escape, no slash), so no handler sees `..` or an
 //   encoded separator. Duplicates throw.
-// - UX1113-R1 (D-147): a `presence: 'restore'` route is one of the nine fixed RESTORE_PATHS, each
+// - UX1113-R1 (D-147): a `presence: 'restore'` route is one of the eleven fixed RESTORE_PATHS, each
 //   registered once, `found` a GET and every other step a POST, with no handler; the server's restore
 //   gate runs it (recovery-kit-restore.ts). No other path, method or route can use the kind.
 // - WP-R2b (04 §2.3.3 "Kit record"): a `presence: 'kit-reveal'` route (Show in Finder for the

@@ -67,7 +67,8 @@ export function trackRestoreFile(path: string, live = true): void {
   else LIVE.delete(path);
 }
 
-function processAlive(pid: number): boolean {
+/** True while a process with this ID runs (EPERM: it runs as another user). */
+export function processAlive(pid: number): boolean {
   if (!Number.isSafeInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);

@@ -450,13 +450,19 @@ export const RESTORE_PATHS = Object.freeze({
   cancel: '/api/ui/restore/cancel',
   applyBegin: '/api/ui/restore/apply/begin',
   applyFinish: '/api/ui/restore/apply/finish',
+  /**
+   * REL051-CF3: the master code first run or a restore just showed, again for the same page session
+   * after a reload (or what to say instead); and "I saved it". Restore-kind gate, no input, no body.
+   */
+  codeShow: '/api/ui/master-code/show',
+  codeSaved: '/api/ui/master-code/saved',
 } as const);
 
 export type LocalUiRestoreStep = keyof typeof RESTORE_PATHS;
 
 /**
  * UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app"; 08 §1): restoring from a recovery kit, the
- * eleventh named route kind. Nine fixed paths (RESTORE_PATHS), each registered once, `found` a GET
+ * eleventh named route kind. Eleven fixed paths (RESTORE_PATHS; REL051-CF3 added the two master-code steps), each registered once, `found` a GET
  * and the rest POSTs, with no handler: the server's restore gate runs them after the session, CSRF,
  * Host, fetch-metadata (and, for a POST, Origin and octet-stream) checks, refuses a query, and hands
  * the restore engine (recovery-kit-restore.ts) only the page session, the parsed

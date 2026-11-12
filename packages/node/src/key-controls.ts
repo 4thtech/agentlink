@@ -728,6 +728,36 @@ export async function importOwnerPasskey(
   }
 }
 
+/**
+ * REL051-CF3 (04 §2.3.3 step 6 "In the app", T-7): importOwner of the app's restore, the same write
+ * (a new generated master code, the `owner-next` protocol, never overwrites), with `beforeWrite`
+ * awaited with the sealed `ALKO` blob before anything is written, so the restore can mark the item
+ * it is about to store (master-code-unsaved.ts). Returns the new code for the one answer.
+ */
+export async function importRestoredOwner(
+  kit: RecoveryKitImport,
+  keychain: KeychainBackend,
+  options: {
+    readonly kdf?: Argon2idParams;
+    readonly timeoutMs?: number;
+    readonly beforeWrite: (blob: Uint8Array) => Promise<void>;
+  },
+): Promise<DisplayCode> {
+  const opened = stateOf(kit);
+  const ownerCode = generateSecretCode();
+  try {
+    await storeRestoredOwnerSeed(keychain, opened.ownerSeed, opened.ownerNostr, ownerCode, {
+      ...(options.kdf === undefined ? {} : { kdf: options.kdf }),
+      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      beforeWrite: options.beforeWrite,
+    });
+    return asDisplayCode(ownerCode);
+  } catch (error) {
+    wipe(ownerCode);
+    throw error;
+  }
+}
+
 /** The owner public keys a seed derives (04 §2.1, epoch 0). */
 function ownerKeysOfSeed(seed: Uint8Array): OwnerPublicKeys {
   const evm = derivePublicKey(seed, KEY_LABELS.evm, 0);

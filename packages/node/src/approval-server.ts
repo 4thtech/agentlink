@@ -256,6 +256,15 @@ import {
 } from './owner-setup.js';
 import { createRestoreEngine, type RestoreEngine } from './recovery-kit-restore.js';
 import { removeStaleRestoreFiles } from './restore-quarantine.js';
+import { MasterCodeHold } from './local-ui/master-code-hold.js';
+import {
+  readUnsavedMarker,
+  removeUnsavedMarker,
+  writeUnsavedMarker,
+} from './master-code-unsaved.js';
+
+/** REL051-CF3: how long a /api/ui/ request waits for the start-up settle at most. */
+const SETTLE_WAIT_MS = 5_000;
 import {
   keepsFolder,
   prepareSendFolder,
@@ -1472,6 +1481,11 @@ export async function startApprovalServerWith(
   /** Rejected presence proofs in a row, and when the wait they caused ends (ms). */
   let failures = 0;
   let waitUntil = 0;
+  /**
+   * REL051-CF3: the master code first run or a restore just showed, for a reload of that step
+   * (memory only, this page session, 10 minutes; master-code-hold.ts).
+   */
+  const codeHold = new MasterCodeHold({ now: () => now() });
   /** UX1113 WP-S2: the one staged master-code change, bound to its page session. */
   const ownerCodes = new OwnerCodeChanges({
     keychain: () => keychainOf(),
@@ -1847,6 +1861,26 @@ export async function startApprovalServerWith(
     const restoreHome = internals.restore?.home ?? homedir();
     void removeStaleRestoreFiles(join(restoreHome, '.agentlink', 'restore')).catch(() => undefined);
   }
+  /**
+   * REL051-CF3 (R1-CLASS-03/04; T-7): where the unsaved-master-code marker lives: the restore home
+   * (a test's) or, in the shipped server, this user's home. Undefined: no marker is written or read
+   * (a test server without a home never touches the real one).
+   */
+  const markerHome =
+    internals.restore?.home ?? (internals.sweepRestoreAtStart === true ? homedir() : undefined);
+  /**
+   * REL051-CF3 (R1-CLASS-04): at start-up an owner item a restore wrote whose code never left a
+   * server that is gone is rolled back to "Finish restoring" (recovery-kit-restore.ts settle). Every
+   * /api/ui/ request waits for it, so no page reads the state before it is settled.
+   */
+  const settled: Promise<void> =
+    markerHome === undefined
+      ? Promise.resolve()
+      : Promise.race([
+          restoreEngine().settle(),
+          // Never holds the app back for long: a keychain that does not answer leaves it as is.
+          new Promise<void>((resolve) => setTimeout(resolve, SETTLE_WAIT_MS).unref()),
+        ]);
 
   /**
    * WP-R2b (04 §2.3.3 "In the local app"; §2.5 "KeyStore isolation"): the recovery-kit export's walk
@@ -3193,7 +3227,15 @@ export async function startApprovalServerWith(
         sign: () => Promise.reject(ownerOperationRefused()),
         finishOwnerCode: async () => {
           once();
-          return ownerCodes.finish(held);
+          const outcome = await ownerCodes.finish(held);
+          // REL051-CF3: a new master code replaced the one that was never saved.
+          codeHold.clear();
+          if (markerHome !== undefined) {
+            await restoreEngine()
+              .masterCodeSaved()
+              .catch(() => undefined);
+          }
+          return outcome;
         },
       }),
       run,
@@ -4583,6 +4625,22 @@ export async function startApprovalServerWith(
       }
       const firstCard = planned ?? labelled;
       let result: Awaited<ReturnType<typeof completeOwnerSetup>>;
+      // REL051-CF3 (R1-CLASS-03): a new master code is about to be made; until the owner says "I
+      // saved it", a later start tells the page it was never saved (never asks for it).
+      // An earlier marker (another run's) is never overwritten here, and only this run's is removed.
+      let markerOurs = false;
+      if (markerHome !== undefined && (await readUnsavedMarker(markerHome)) === undefined) {
+        markerOurs = await writeUnsavedMarker(markerHome, {
+          kind: 'first_run',
+          stage: 'writing',
+          ownerNostr: held.keys.ownerNostr,
+          pid: process.pid,
+          at: now(),
+        }).then(
+          () => true,
+          () => false,
+        );
+      }
       try {
         result = await completeOwnerSetup(
           keychainOf(),
@@ -4601,6 +4659,8 @@ export async function startApprovalServerWith(
           },
         );
       } catch (error) {
+        // REL051-CF3: rolled back (or another owner's): no code of this run exists.
+        if (markerHome !== undefined && markerOurs) await removeUnsavedMarker(markerHome);
         const code = error instanceof NodeKeyStoreError ? error.code : undefined;
         if (code === 'owner_exists') await answer(res, 409, 'owner_exists');
         else if (code === 'owner_card_failed') {
@@ -4660,13 +4720,34 @@ export async function startApprovalServerWith(
           : connected === 'not_connected'
             ? 'created_not_connected'
             : 'done';
+        const shownCode = grouped(result.ownerCode);
+        // REL051-CF3 (R1-CLASS-03): a reload of "Your master code" shows this code and step again,
+        // to this page session only, until "I saved it" (master-code-hold.ts).
+        codeHold.hold(encodeUtf8(cookie), shownCode, 'first_run', {
+          outcome,
+          passkey: result.passkey,
+          fingerprint,
+          computerName: computerNameOf(safeHostname()),
+          ...(sendFolder === undefined ? {} : { sendFolder }),
+          ...(held.app === undefined ? {} : { app: held.app.app }),
+          ...(connected === undefined ? {} : { connected: connected !== 'not_connected' }),
+        });
+        if (markerHome !== undefined) {
+          await writeUnsavedMarker(markerHome, {
+            kind: 'first_run',
+            stage: 'shown',
+            ownerNostr: held.keys.ownerNostr,
+            pid: process.pid,
+            at: now(),
+          }).catch(() => undefined);
+        }
         await answer(
           res,
           200,
           outcome,
           {
             passkey: result.passkey,
-            ownerCode: grouped(result.ownerCode),
+            ownerCode: shownCode,
             fingerprint,
             computerName: computerNameOf(safeHostname()),
             ...(sendFolder === undefined ? {} : { sendFolder }),
@@ -5365,6 +5446,18 @@ export async function startApprovalServerWith(
     if (mode !== undefined && (route.step !== 'presence' || mode !== 'passkey')) {
       return refuse(400, 'invalid');
     }
+    if (route.step === 'codeShow' || route.step === 'codeSaved') {
+      // REL051-CF3: no input and no body; the answer is for this page session only.
+      if (header(req, 'x-agentlink-input') !== undefined) return refuse(400, 'invalid');
+      const empty = await boundedBody(req, res, 0);
+      if (empty === undefined) return;
+      try {
+        await masterCodeStep(res, route.step, cookie);
+      } catch {
+        sendJson(res, 500, { error: 'failed' });
+      }
+      return;
+    }
     if (route.step === 'upload') {
       if (header(req, 'x-agentlink-input') !== undefined) return refuse(400, 'invalid');
       const declaredText = header(req, 'content-length');
@@ -5441,7 +5534,10 @@ export async function startApprovalServerWith(
           break;
         case 'applyFinish':
           answer = await engine.applyFinish(cookie, input, body.slice());
+          holdRestoredCode(answer, cookie);
           break;
+        default:
+          answer = { status: 400, body: { error: 'invalid' } };
       }
       if (answer.status === 429) {
         const retry = (answer.body as { retryAfter?: unknown }).retryAfter;
@@ -5453,6 +5549,61 @@ export async function startApprovalServerWith(
     } finally {
       wipe(body);
       wipeCeremonyProof(proof);
+    }
+  }
+
+  /**
+   * REL051-CF3: a restore that made a new master code: that code and the step-4 outcome are held for
+   * this page session (a reload shows them again until "I saved it").
+   */
+  function holdRestoredCode(answer: { status: number; body: unknown }, cookie: string): void {
+    if (answer.status !== 200 || typeof answer.body !== 'object' || answer.body === null) return;
+    const done = answer.body as Record<string, JsonValue>;
+    const code = done['masterCode'];
+    if (done['status'] !== 'done' || typeof code !== 'string') return;
+    codeHold.hold(encodeUtf8(cookie), code, 'restore', {
+      ids: done['ids'] ?? [],
+      touchId: done['touchId'] === true,
+    });
+  }
+
+  /**
+   * REL051-CF3 (R1-CLASS-03/04, R1-UI-02): `show` answers this session's held code with its step, or
+   * what the page should say instead (`lost`: made and never saved, with whether Touch ID can make
+   * a new one; `finish_restore`; `none`); never a code to another session. `saved` ends it.
+   */
+  async function masterCodeStep(
+    res: ServerResponse,
+    step: 'codeShow' | 'codeSaved',
+    cookie: string,
+  ): Promise<void> {
+    const session = encodeUtf8(cookie);
+    try {
+      if (step === 'codeSaved') {
+        // Only the session that holds it ends another session's display.
+        const mine = codeHold.saved(session);
+        if (mine && markerHome !== undefined) await restoreEngine().masterCodeSaved();
+        sendJson(res, 200, { status: 'saved' });
+        return;
+      }
+      const held = codeHold.shownTo(session);
+      if (held.status === 'shown') {
+        sendJson(res, 200, {
+          status: 'shown',
+          kind: held.kind,
+          code: held.code,
+          ...held.view,
+        });
+        return;
+      }
+      if (held.status === 'elsewhere' || markerHome === undefined) {
+        sendJson(res, 200, { status: 'none' });
+        return;
+      }
+      const state = await restoreEngine().masterCodeState();
+      sendJson(res, 200, state as unknown as JsonValue);
+    } finally {
+      wipe(session);
     }
   }
 
@@ -5647,6 +5798,7 @@ export async function startApprovalServerWith(
     method: string,
     originHeader: string | undefined,
   ): Promise<void> {
+    await settled;
     const found = routes.match(method, url.pathname);
     if (found === undefined) {
       req.resume();
@@ -6851,6 +7003,8 @@ export async function startApprovalServerWith(
       dropCreate();
       // WP-S2: a staged master-code change this server began is removed (the old code keeps working).
       await ownerCodes.clear();
+      // REL051-CF3: a held master code goes with the server (a restart never shows it again).
+      codeHold.clear();
       await folderRemoval;
       // U3-invite: the handoff record goes first, so no `join` hands over to a closing host.
       if (handoffWritten) await options.host?.handoff?.remove().catch(() => undefined);

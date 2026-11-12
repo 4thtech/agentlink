@@ -10,7 +10,15 @@ import { ownerWorld, send, type OwnerWorld } from '../approval-ui.fixture.js';
 import { TEST_APP } from '../local-ui-app.fixture.js';
 import { KeychainOwnerKeyStore } from '../owner-keystore.js';
 import type { KeychainBackend } from '../keychain.js';
-import { MemoryKeychain } from '../recovery-kit-restore.fixture.js';
+import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
+import { VirtualPrfAuthenticator } from '../passkey-authenticator.fixture.js';
+import {
+  MemoryKeychain,
+  makeAgent,
+  makeKit,
+  makeOwner,
+  webauthnCreate,
+} from '../recovery-kit-restore.fixture.js';
 import { RESTORE_PATHS, restoreRoutes } from './api/restore.js';
 import { LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
 
@@ -34,10 +42,12 @@ async function harness(
     keychain?: KeychainBackend;
     keychainTimeoutMs?: number;
     before?: (home: string) => void;
+    /** REL051-CF3: the same home again (a restart). */
+    home?: string;
   } = {},
 ) {
   homes += 1;
-  const home = join(world.root, `home-${String(homes)}`);
+  const home = over.home ?? join(world.root, `home-${String(homes)}`);
   mkdirSync(join(home, 'Downloads'), { recursive: true });
   over.before?.(home);
   const opened: string[] = [];
@@ -103,9 +113,12 @@ describe('restore route registration (I-4)', () => {
         'POST /api/ui/restore/cancel',
         'POST /api/ui/restore/apply/begin',
         'POST /api/ui/restore/apply/finish',
+        // REL051-CF3: the master code a restore or first run showed once, again after a reload.
+        'POST /api/ui/master-code/show',
+        'POST /api/ui/master-code/saved',
       ].sort(),
     );
-    expect(Object.values(RESTORE_PATHS)).toHaveLength(9);
+    expect(Object.values(RESTORE_PATHS)).toHaveLength(11);
     const registry = new LocalUiRouteRegistry();
     for (const route of restoreRoutes) registry.register(route);
     expect(() => registry.register(restoreRoutes[0] as never)).toThrow();
@@ -254,4 +267,84 @@ describe('stale restore files go when the server starts (T-7; R1-SEC-08)', () =>
     }
     expect(readdirSync(dir)).toEqual([]);
   });
+});
+
+// REL051-CF3 (R1-CLASS-03, R1-UI-02; 04 §2.3.3 T-12): a reload on restore step 4 ("Your new master
+// code for this computer") shows the same code and outcome again, for this page session only, until
+// "I saved it"; after a restart the page is told the code was not saved, never asked for it.
+describe('REL051-CF3: restore step 4 survives a reload', () => {
+  const SHOW = '/api/ui/master-code/show';
+  const SAVED = '/api/ui/master-code/saved';
+
+  async function restored(keychain: MemoryKeychain, home?: string) {
+    const h = await harness({ keychain, ...(home === undefined ? {} : { home }) });
+    const owner = await makeOwner();
+    const a1 = await makeAgent(world.root, owner, 'alpha');
+    const kit = await makeKit(
+      world.root,
+      owner,
+      [a1],
+      'agentlink-recovery-kit-a.alkk',
+      join(h.home, 'Downloads'),
+    );
+    const call = async (path: string, value?: unknown, body?: Uint8Array) => {
+      const res = await send(h.server.port, path, {
+        method: 'POST',
+        headers: h.headers(value === undefined ? {} : { 'X-AgentLink-Input': input(value) }),
+        ...(body === undefined ? {} : { body }),
+      });
+      return { status: res.status, json: JSON.parse(res.body) as Record<string, unknown> };
+    };
+    const found = await send(h.server.port, RESTORE_PATHS.found, {
+      headers: { Cookie: h.cookie, 'X-AgentLink-CSRF': h.csrf, 'Sec-Fetch-Site': 'same-origin' },
+    });
+    const handle = (JSON.parse(found.body) as { kits: { handle: string }[] }).kits[0]?.handle;
+    expect((await call(RESTORE_PATHS.header, { handle })).json['header']).toBe('ok');
+    const opened = await call(RESTORE_PATHS.open, { handle }, encodeUtf8(kit.code));
+    const begun = await call(RESTORE_PATHS.applyBegin, {
+      kit: opened.json['kit'],
+      selection: [a1.agentId],
+      names: {},
+    });
+    const pk = begun.json['publicKey'] as { challenge: string; userId: string; prfSalt: string };
+    const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+    const done = await call(
+      RESTORE_PATHS.applyFinish,
+      { nonce: begun.json['nonce'] },
+      webauthnCreate(auth, pk, h.server.origin),
+    );
+    expect(done.json['status']).toBe('done');
+    return { h, call, done: done.json };
+  }
+
+  it('the same page session gets the same code and outcome back; another never does', async () => {
+    const keychain = new MemoryKeychain();
+    const { h, call, done } = await restored(keychain);
+    const again = await call(SHOW);
+    expect(again.status).toBe(200);
+    expect(again.json).toMatchObject({
+      status: 'shown',
+      kind: 'restore',
+      code: done['masterCode'],
+      touchId: true,
+      ids: done['ids'],
+    });
+    const other = await send(h.server.port, SHOW, {
+      method: 'POST',
+      headers: h.headers({ Cookie: 'agentlink_session=other' }),
+    });
+    expect(other.body).not.toContain(String(done['masterCode']));
+    expect((await call(SAVED)).status).toBe(200);
+    expect((await call(SHOW)).json).toEqual({ status: 'none' });
+  }, 60_000);
+
+  it('after a restart the page is told the code was never saved, with Touch ID to replace it', async () => {
+    const keychain = new MemoryKeychain();
+    const { h, done } = await restored(keychain);
+    await h.server.close();
+    const next = await harness({ keychain, home: h.home });
+    const lost = await send(next.server.port, SHOW, { method: 'POST', headers: next.headers() });
+    expect(JSON.parse(lost.body)).toEqual({ status: 'lost', kind: 'restore', touchId: true });
+    expect(lost.body).not.toContain(String(done['masterCode']));
+  }, 60_000);
 });
