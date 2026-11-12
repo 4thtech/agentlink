@@ -194,11 +194,11 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
     const h = await harness();
     const res = await h.read();
     expect(res.status).toBe(200);
-    // WP-R2: without the backup desk wired the kit record reads as unreadable (the page's fallback).
+    // WP-R2b: the backup desk is wired; with no kit saved yet the record reads as none.
     expect(JSON.parse(res.body)).toEqual({
       export: 'available',
-      record: 'unreadable',
-      state: 'unknown',
+      record: 'none',
+      state: 'none',
       lastKit: null,
       missing: null,
     });
