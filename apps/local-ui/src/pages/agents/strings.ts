@@ -130,6 +130,9 @@ export const AGENTS_STRINGS = {
   // The name nudge (I-3): a machine name such as macbook-agent-1.
   nudgeBefore: 'People see this ID as ',
   nudgeAfter: '. Give it a name they will recognise, like your own.',
+  // UX1113-QA2: two IDs with the same name (a restore next to an ID of the same name keeps both).
+  duplicateBefore: 'Another of your IDs is also called ',
+  duplicateAfter: '. Give this one a name people can tell apart.',
   // The "how it fits" strip (spec §2.1).
   fitLabel: 'How it fits together',
   fitHide: 'Hide this',

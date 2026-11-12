@@ -85,10 +85,13 @@ export function BackupPanel(): ReactElement {
 export function AgentCard({
   row,
   actions: a,
+  duplicate = false,
 }: {
   row: AgentRow;
   tidy?: boolean;
   actions: CardActions;
+  /** UX1113-QA2: an earlier ID in the list has the same name. */
+  duplicate?: boolean;
 }): ReactElement {
   const [renamingHere, setRenaming] = useState(false);
   const [more, setMore] = useState(false);
@@ -180,7 +183,9 @@ export function AgentCard({
           onUpdated={a.onCardUpdated}
         />
       ) : null}
-      {machineNamed(row) && !renaming ? <NameNudge row={row} onRename={startRename} /> : null}
+      {(machineNamed(row) || duplicate) && !renaming ? (
+        <NameNudge row={row} onRename={startRename} duplicate={duplicate && !machineNamed(row)} />
+      ) : null}
       {renaming ? (
         <RenameEditor
           row={row}

@@ -157,6 +157,18 @@ export function AgentsPage({
 
   const rows = useMemo(() => orderAgents(list?.agents ?? []), [list]);
   const tidy = useMemo(() => new Set(tidyCandidates(rows).map((r) => r.name)), [rows]);
+  // UX1113-QA2: every ID after the first with the same name (case ignored) gets the name nudge.
+  const duplicates = useMemo(() => {
+    const seen = new Set<string>();
+    const out = new Set<string>();
+    for (const r of rows) {
+      if (r.removing) continue;
+      const key = r.label.toLocaleLowerCase();
+      if (seen.has(key)) out.add(r.name);
+      else seen.add(key);
+    }
+    return out;
+  }, [rows]);
   const generation = list?.generation;
   const open = rows.find((r) => r.current);
   const labelOf = useCallback(
@@ -442,6 +454,7 @@ export function AgentsPage({
             key={row.name}
             row={row}
             tidy={tidy.has(row.name)}
+            duplicate={duplicates.has(row.name)}
             actions={{
               api,
               owner,

@@ -73,6 +73,8 @@ export interface SummaryRow {
   readonly suggestedName?: string;
   /** UX1113-QA2 N4: an ID already here: the label this computer shows for it. */
   readonly label?: string;
+  /** UX1113-QA2: for `name_taken`, the name of the ID already here in that folder. */
+  readonly takenLabel?: string;
 }
 export interface Summary {
   readonly kitId: string;
@@ -188,7 +190,7 @@ function summaryOf(value: unknown): Summary | undefined {
   const ids: SummaryRow[] = [];
   for (const row of value['ids']) {
     if (!isRecord(row)) return undefined;
-    const { agentId, name, people, lastMessageAt, state, suggestedName, label } = row;
+    const { agentId, name, people, lastMessageAt, state, suggestedName, label, takenLabel } = row;
     if (
       typeof agentId !== 'string' ||
       typeof name !== 'string' ||
@@ -209,6 +211,7 @@ function summaryOf(value: unknown): Summary | undefined {
       state,
       ...(typeof suggestedName === 'string' ? { suggestedName } : {}),
       ...(typeof label === 'string' && ROW_LABEL.test(label) ? { label } : {}),
+      ...(typeof takenLabel === 'string' && ROW_LABEL.test(takenLabel) ? { takenLabel } : {}),
     });
   }
   return { kitId, createdAt, contents, ids };

@@ -115,19 +115,16 @@ export const REVIEW = {
     } · rules and credits`,
   newLineIdentity: (people: number): string =>
     `${people} ${people === 1 ? 'person' : 'people'} · rules and credits · no messages in this kit`,
+  // UX1113-QA2 (Fable ruling, D-115 E / D-147): restore signs no owner action, so a clash changes
+  // only the folder; the ID keeps its name and is renamed afterwards with Touch ID or the master code.
   takenLine: (people: number, name: string): string =>
-    `${people === 0 ? 'No people yet' : `${people} ${people === 1 ? 'person' : 'people'}`} · this computer already has an ID called ${name}, so it comes back as `,
+    `${people === 0 ? 'No people yet' : `${people} ${people === 1 ? 'person' : 'people'}`} · This computer already has an ID called ${name}. This one comes back next to it, still named the same. You can rename it afterwards.`,
   hereLine: 'Already on this computer. Skipped, nothing is overwritten.',
   removedLine: (date: string): string =>
     `You removed this ID${date === '' ? '' : ` on ${date}`} and your people were told. A removed ID can't come back.`,
   willBeRestored: 'Will be restored',
   alreadyHere: 'Already here',
   removedEarlier: 'Removed earlier',
-  changeName: 'Change name',
-  nameLabel: (name: string): string => `New name for ${name}`,
-  nameSave: 'Use this name',
-  nameInvalid: 'Use 1 to 32 letters, numbers or dashes, starting with a letter.',
-  nameClash: 'Another ID here or in this kit has that name.',
   comesBack: 'Comes back',
   /** UX1113-R1-LABEL: the kit names an ID by its folder; the label is inside, read after restore. */
   nameHint: 'Its name comes back with it',

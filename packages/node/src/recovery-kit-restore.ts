@@ -291,6 +291,8 @@ interface SummaryRow {
    * (the kit's manifest has no label, so step 3 stays by folder).
    */
   readonly label?: string;
+  /** UX1113-QA2: for `name_taken`, the label of the ID already here in that folder, when known. */
+  readonly takenLabel?: string;
 }
 
 interface HeldKit {
@@ -861,13 +863,15 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     }
   }
 
-  /** UX1113-QA2 N4: the label each local agentId's config.json carries (display text only). */
-  const localLabels = new Map<string, string>();
-
-  /** The agent folders here: name → the agentId of its config (undefined when unreadable). */
-  async function existingFolders(): Promise<Map<string, string | undefined>> {
+  /**
+   * The agent folders here: name → the agentId of its config (undefined when unreadable). UX1113-QA2
+   * N4: `labels`, when given (one per request, never shared), receives the label each local agentId's
+   * config.json carries (display text only).
+   */
+  async function existingFolders(
+    labels?: Map<string, string>,
+  ): Promise<Map<string, string | undefined>> {
     const out = new Map<string, string | undefined>();
-    localLabels.clear();
     let names: string[];
     try {
       names = await readdir(agentsDir);
@@ -887,7 +891,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
           };
           if (typeof parsed.agentId === 'string' && AGENT_ID.test(parsed.agentId)) {
             agentId = parsed.agentId;
-            if (isConfigLabel(parsed.label)) localLabels.set(agentId, parsed.label);
+            if (isConfigLabel(parsed.label)) labels?.set(agentId, parsed.label);
           }
         }
       } catch {
@@ -899,7 +903,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   }
 
   async function summaryOf(kit: RecoveryKitImport): Promise<SummaryRow[]> {
-    const folders = await existingFolders();
+    const localLabels = new Map<string, string>();
+    const folders = await existingFolders(localLabels);
     const ids = new Set([...folders.values()].filter((v): v is string => v !== undefined));
     const taken = new Set([...folders.keys()]);
     const kitNames = new Set(kit.agents.map((a) => ascii(a.name)));
@@ -936,6 +941,9 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         }
       }
       const label = state === 'already_here' ? localLabels.get(agent.agentId) : undefined;
+      // UX1113-QA2 (Fable ruling): a clash names the ID already here by the name people see.
+      const takenId = state === 'name_taken' ? folders.get(name) : undefined;
+      const takenLabel = takenId === undefined ? undefined : localLabels.get(takenId);
       rows.push(
         Object.freeze({
           agentId: agent.agentId,
@@ -945,6 +953,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
           state,
           ...(suggestedName === undefined ? {} : { suggestedName }),
           ...(label === undefined ? {} : { label }),
+          ...(takenLabel === undefined ? {} : { takenLabel }),
         }),
       );
     }
