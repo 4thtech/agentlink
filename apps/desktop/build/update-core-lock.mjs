@@ -1,19 +1,21 @@
 #!/usr/bin/env node
-// Regenerates core-lock/package-lock.json: the committed, reviewed npm lock for the CLI's production
-// dependencies (apps/cli/package.json `dependencies`, exact pins). build-mac/build-win install it with
-// `npm ci --ignore-scripts` and then unpack the packed CLI tarball on top, so no transitive package
-// is ever resolved at build time. Review the lock diff like any dependency change (no new install
-// scripts, integrity hashes present, registry URLs only registry.npmjs.org).
+// Regenerates core-lock/ FROM pnpm-lock.yaml (no network, no second resolution): the same
+// name@version and integrity the repository already locked for apps/cli's production dependencies.
+// build-mac/build-win install it with `npm ci --ignore-scripts`, then unpack the packed CLI tarball.
+// Run it whenever pnpm-lock.yaml changes for apps/cli; test/core-lock.test.mjs fails on drift.
 //
-//   node update-core-lock.mjs [--days 7]     (7 days = the repo cooldown for crypto/transport deps)
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+//   node update-core-lock.mjs
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { REGISTRY, defaultBefore } from './lib/stage.mjs';
-import { parseArgs, run } from './lib/run.mjs';
+import { fileURLToPath } from 'node:url';
+import { buildCoreLock, readPnpmLock } from './lib/pnpm-core-lock.mjs';
 
-const args = parseArgs(process.argv.slice(2), { days: 'v' });
-const dir = new URL('./core-lock/', import.meta.url).pathname;
-const cli = JSON.parse(readFileSync(new URL('../../cli/package.json', import.meta.url), 'utf8'));
+const dir = fileURLToPath(new URL('./core-lock/', import.meta.url));
+const repo = fileURLToPath(new URL('../../../', import.meta.url));
+
+const cli = JSON.parse(readFileSync(join(repo, 'apps', 'cli', 'package.json'), 'utf8'));
+const pnpm = await readPnpmLock(join(repo, 'pnpm-lock.yaml'));
+const lock = buildCoreLock(pnpm, 'apps/cli', cli.dependencies);
 writeFileSync(
   join(dir, 'package.json'),
   JSON.stringify(
@@ -27,16 +29,7 @@ writeFileSync(
     2,
   ) + '\n',
 );
-rmSync(join(dir, 'package-lock.json'), { force: true });
-run('npm', [
-  'install',
-  '--package-lock-only',
-  '--ignore-scripts',
-  '--no-audit',
-  '--no-fund',
-  `--registry=${REGISTRY}`,
-  `--before=${defaultBefore(Number(args.days ?? 7))}`,
-  '--prefix',
-  dir,
-]);
-console.log('core-lock updated. Review the diff.');
+writeFileSync(join(dir, 'package-lock.json'), JSON.stringify(lock, null, 2) + '\n');
+console.log(
+  `core-lock written: ${Object.keys(lock.packages).length - 1} packages. Review the diff.`,
+);
