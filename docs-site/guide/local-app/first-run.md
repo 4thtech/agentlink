@@ -27,9 +27,9 @@ Every place that asks for Touch ID also offers **Use your master code instead**.
 
 A recovery kit holds your IDs, their contacts and their messages, locked under a new **recovery code** that is shown once. It is everything you need to get AgentLink back on any computer; keep the file and the code safe, and apart.
 
-1. Open **Settings** › **Backup & Touch ID**, or press **Back up** on an ID's card on [IDs](ids.md).
-2. Press **Save recovery kit** and confirm with Touch ID or your master code.
-3. The kit is saved to your Downloads folder (or your home folder when there is none). Write down the recovery code shown once, and keep it apart from the kit.
+1. Open **Settings** › **Backup & restore** (an ID's **Back up** leads there too).
+2. Press **Save a recovery kit** and confirm with Touch ID or your master code. One kit covers all your IDs.
+3. The kit is saved to your Downloads folder (or your home folder when there is none). Move the file off this computer, write down the recovery code shown once, press **Check now**, then **Done**.
 
 <figure><img src="../../assets/screens/recovery-kit.webp" alt="Settings, Backup and Touch ID: the Recovery kit section explains that the kit holds your IDs, people and messages, and the Touch ID section explains that Touch ID confirms anything that changes who can act for you."><figcaption><p>Settings › Backup &amp; Touch ID.</p></figcaption></figure>
 

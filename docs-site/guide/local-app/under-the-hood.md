@@ -20,7 +20,7 @@ Under the hood is a switch at the top of every page (Cmd+Shift+U, Ctrl+Shift+U o
 - **Live activity stream.** What is happening now, as it happens.
 - **Network.** How AgentLink reaches the network. It is picked automatically and named here only.
 - **Diagnostics.** A report you can copy and share when you ask for help. It never contains a key, a code, a token or a private link.
-- **Backup & Touch ID** and **Notifications** are listed but say plainly that they are not available yet.
+- **Notifications** is listed but says plainly that it is not available yet.
 
 Advanced opens in place inside [Settings](README.md), which is one list with a line under each setting.
 
