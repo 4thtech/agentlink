@@ -56,8 +56,8 @@ To see whether it is on, open **Windows Security**, then **App & browser control
 
 ## What is different from the browser version
 
-- Touch ID in the app window is not available in the first builds on Mac. Approvals use your browser or your master code (to be confirmed).
-- Windows Hello approvals in the app window are to be confirmed.
+- **Touch ID in the app window.** Open **Settings**, then **Touch ID & master code**, and click the switch **Use Touch ID for approvals**. The switch stops half-way while you confirm: type your master code once (adding Touch ID is something only you may do), then touch the sensor. When the switch is fully on, approvals in the app ask for Touch ID. **Test Touch ID** on the same page checks that it works, and the Settings list shows "Touch ID on". If you cancel or the touch does not work, the switch goes back to off and nothing changes. Your master code keeps working either way.
+- **Windows Hello** works the same way on Windows (to be confirmed).
 - Nothing about your IDs, contacts or messages changes. Your data stays in your AgentLink folder on your computer.
 
 ## Where your data lives

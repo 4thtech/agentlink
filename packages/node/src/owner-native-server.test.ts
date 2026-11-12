@@ -696,3 +696,81 @@ describe('cancel, replace wording and a late keychain write (DESK-TOUCHID-FIX re
     expect(json(wrong)['nowOff']).toBeUndefined();
   });
 });
+
+// DESK051-C2 (04 §2.5 "Touch ID & master code page"; 08 §1): the owner-code steps with the native
+// presence kind. Test Touch ID in the desktop app is the native gesture (it opens `ALKH`, so "works"
+// means native approvals will work) and signs nothing; Replace takes any presence; Check and the new
+// code typed back are about the typed master code, so native is refused there before the helper runs.
+describe('owner-code steps with native presence (DESK051-C2)', () => {
+  const CODE_STEP = { 'X-AgentLink-Input': 'e30' }; // base64url of `{}`
+  const post = (
+    h: Harness,
+    page: Record<string, string>,
+    path: string,
+    extra: Record<string, string> = NATIVE,
+  ) => send(h.port, path, { method: 'POST', headers: { ...page, ...CODE_STEP, ...extra } });
+
+  it('Test Touch ID accepts native: one helper run, done, signs nothing', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    const res = await post(h, page, '/api/ui/owner-presence/test');
+    expect(res.status).toBe(200);
+    expect(json(res)).toEqual({ status: 'done' });
+    expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:approve']);
+    expect(h.source.applied).toEqual([]);
+  });
+
+  it('Test Touch ID with native but nothing turned on: not_registered, helper not run', async () => {
+    const h = await harness();
+    const page = await h.page();
+    const res = await post(h, page, '/api/ui/owner-presence/test');
+    expect(res.status).toBe(403);
+    expect(json(res)).toEqual({ status: 'presence_rejected', native: 'not_registered' });
+    expect(h.helper.calls).toEqual([]);
+  });
+
+  it('a cancelled Test gesture is a fixed state, never the wrong-code wait', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.gesture = 'cancelled';
+    const res = await post(h, page, '/api/ui/owner-presence/test');
+    expect(res.status).toBe(403);
+    expect(json(res)).toEqual({ status: 'presence_rejected', native: 'cancelled' });
+    h.helper.gesture = 'ok';
+    const again = await post(h, page, '/api/ui/owner-presence/test');
+    expect(again.status).toBe(200);
+  });
+
+  it('Replace master code accepts native and stages a new code', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    const res = await post(h, page, '/api/ui/owner-code/replace');
+    expect(res.status).toBe(200);
+    expect(json(res)['status']).toBe('staged');
+    expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:approve']);
+    const drop = await post(h, page, '/api/ui/owner-code/replace/cancel', {});
+    expect(json(drop)['status']).toBe('cancelled');
+  });
+
+  it('Check and finish refuse native before the helper runs; Cancel refuses any presence header', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    for (const path of [
+      '/api/ui/owner-code/check',
+      '/api/ui/owner-code/replace/finish',
+      '/api/ui/owner-code/replace/cancel',
+    ]) {
+      const res = await post(h, page, path);
+      expect(res.status, path).toBe(403);
+      expect(json(res)['status'], path).toBe('presence_required');
+    }
+    expect(h.helper.calls).toEqual([]);
+  });
+});

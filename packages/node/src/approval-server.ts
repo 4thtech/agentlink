@@ -2805,9 +2805,11 @@ export async function startApprovalServerWith(
     const codeStep = gate.ownerCode;
     if (codeStep !== undefined) {
       // WP-S2: the step's one kind of proof, before the body is read or anything is opened.
-      // DESKTOP-051 merge: native presence carries no typed code and no passkey assertion, so of
-      // the owner-code steps only Replace (any presence) takes it.
-      if (!ownerCodeProofAllowed(codeStep, passkey) || (native && codeStep !== 'replace')) {
+      // DESK051-C2: native presence carries no typed code and no passkey assertion, so of the
+      // owner-code steps it is taken by Test Touch ID (the desktop app's own Touch ID) and Replace
+      // (any presence) only; never by Check or finish (owner-code-paths.ts).
+      const kind = native ? 'native' : passkey ? 'passkey' : 'code';
+      if (!ownerCodeProofAllowed(codeStep, kind)) {
         req.resume();
         finishOwner(res, 403, 'presence_required');
         return;
