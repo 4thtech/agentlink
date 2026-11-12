@@ -12,6 +12,14 @@ const c = (cx: string, cy: string, r: string): Shape => ['circle', { cx, cy, r }
 export const SHELL_ICONS = {
   home: [p('m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'), p('M9 22V12h6v10')],
   agents: [c('12', '8', '4'), p('M4 21a8 8 0 0 1 16 0')],
+  // WP-N1: an ID card (Lucide id-card), so it cannot be mistaken for the People icon.
+  idcard: [
+    ['rect', { x: '2', y: '5', width: '20', height: '14', rx: '2' }],
+    c('9', '11', '2'),
+    p('M6.17 15a3 3 0 0 1 5.66 0'),
+    p('M16 10h2'),
+    p('M16 14h2'),
+  ],
   people: [
     c('9', '7', '4'),
     p('M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2'),

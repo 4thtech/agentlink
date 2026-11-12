@@ -18,7 +18,12 @@ import { getPrefs, setPref, subscribePrefs } from './store.js';
 
 export type UiSettingsFetch = typeof fetch;
 
-let menuExpanded = false;
+/** The owner's saved choice; undefined until he makes one (then the width decides, see below). */
+let menuChoice: boolean | undefined;
+/** WP-N1 (design-1112 §2.2): the menu opens expanded on windows this wide and wider. */
+const WIDE_WINDOW = 1100;
+const menuExpandedNow = (): boolean =>
+  menuChoice ?? (typeof window !== 'undefined' && window.innerWidth >= WIDE_WINDOW);
 const menuListeners = new Set<() => void>();
 let started = false;
 let fetchImpl: UiSettingsFetch | undefined;
@@ -115,8 +120,8 @@ export async function startUiSettings(seam?: { fetch?: UiSettingsFetch }): Promi
     synced = true;
     void saveUiSettings({ underTheHood: true });
   }
-  if (stored?.menuExpanded !== undefined && stored.menuExpanded !== menuExpanded) {
-    menuExpanded = stored.menuExpanded;
+  if (stored?.menuExpanded !== undefined && stored.menuExpanded !== menuChoice) {
+    menuChoice = stored.menuExpanded;
     for (const l of menuListeners) l();
   }
   settleUiSettings();
@@ -128,12 +133,12 @@ export function setUnderTheHood(on: boolean): void {
 }
 
 export function getMenuExpanded(): boolean {
-  return menuExpanded;
+  return menuExpandedNow();
 }
 
 export function setMenuExpanded(on: boolean): void {
-  if (on === menuExpanded) return;
-  menuExpanded = on;
+  if (on === menuChoice) return;
+  menuChoice = on;
   for (const l of menuListeners) l();
   void saveUiSettings({ menuExpanded: on });
 }
@@ -150,7 +155,7 @@ export function resetUiSettingsForTests(): void {
   started = false;
   fetchImpl = undefined;
   synced = undefined;
-  menuExpanded = false;
+  menuChoice = undefined;
   settled = false;
   for (const l of menuListeners) l();
   for (const l of settledListeners) l();

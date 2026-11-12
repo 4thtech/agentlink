@@ -436,15 +436,15 @@ describe('the live agent dropdown', () => {
 });
 
 describe('the section menu (Decision 48)', () => {
-  it('is a minimized rail: Home, IDs, People, Activity, Settings, the current one marked', async () => {
+  it('is a minimized rail: Home, People, My IDs, Activity, Settings, the current one marked', async () => {
     serve(world());
     await mountAt('/agents');
     expect(rail()?.getAttribute('aria-label')).toBe('Sections');
     expect(rail()?.dataset['expanded']).toBe('false');
-    expect(railLabels()).toEqual(['Home', 'IDs', 'People', 'Activity', 'Settings']);
+    expect(railLabels()).toEqual(['Home', 'People', 'My IDs', 'Activity', 'Settings']);
     expect(
       qa('nav.al-rail [aria-current="page"]').map((a) => a.getAttribute('aria-label')),
-    ).toEqual(['IDs']);
+    ).toEqual(['My IDs']);
     // Minimized: icons only; the name is on the link.
     expect(q('nav.al-rail .al-rail-label')).toBeNull();
     // Inbox and Contacts are no destinations any more.
@@ -463,14 +463,59 @@ describe('the section menu (Decision 48)', () => {
     expect(qa('nav.al-rail .al-rail-label').map((l) => l.textContent)).toEqual([
       'Collapse',
       'Home',
-      'IDs',
       'People',
+      'My IDs',
       'Activity',
       'Settings',
     ]);
     expect(w.puts).toContainEqual({ menuExpanded: true });
     await click(button('Collapse menu'));
     expect(rail()?.dataset['expanded']).toBe('false');
+  });
+
+  it('the collapsed rail shows different icons for People and My IDs, each with a title (WP-N1)', async () => {
+    serve(world());
+    await mountAt('/');
+    const link = (label: string): Element | null => q(`nav.al-rail a[aria-label="${label}"]`);
+    const shape = (label: string): string =>
+      link(label)?.querySelector('svg')?.innerHTML.replace(/\s+/g, ' ') ?? '';
+    expect(shape('People')).not.toBe('');
+    expect(shape('My IDs')).not.toBe('');
+    expect(shape('People')).not.toBe(shape('My IDs'));
+    // The ID card is a rounded rectangle; the People icon has none.
+    expect(link('My IDs')?.querySelector('svg rect')).not.toBeNull();
+    expect(link('People')?.querySelector('svg rect')).toBeNull();
+    expect(link('People')?.getAttribute('title')).toBe('People');
+    expect(link('My IDs')?.getAttribute('title')).toBe('My IDs');
+  });
+
+  describe('default width rule (WP-N1)', () => {
+    const real = window.innerWidth;
+    const widen = (w: number): void => {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: w });
+    };
+    afterEach(() => widen(real));
+
+    it('opens expanded on a window 1100 px wide or more', async () => {
+      widen(1280);
+      serve(world());
+      await mountAt('/');
+      expect(rail()?.dataset['expanded']).toBe('true');
+    });
+
+    it('stays collapsed below 1100 px', async () => {
+      widen(1099);
+      serve(world());
+      await mountAt('/');
+      expect(rail()?.dataset['expanded']).toBe('false');
+    });
+
+    it("keeps the owner's own choice, wide or not", async () => {
+      widen(1280);
+      serve(world({ settings: { menuExpanded: false } }));
+      await mountAt('/');
+      expect(rail()?.dataset['expanded']).toBe('false');
+    });
   });
 
   it('opens expanded when the app says so', async () => {
@@ -488,14 +533,7 @@ describe('the section menu (Decision 48)', () => {
     expect(group?.getAttribute('aria-label')).toBe('Advanced');
     expect(
       [...(group?.querySelectorAll('a') ?? [])].map((a) => a.getAttribute('aria-label')),
-    ).toEqual([
-      'Live activity',
-      'Rules',
-      'Proofs & credits',
-      'Relays & network',
-      'Diagnostics',
-      'Connections map',
-    ]);
+    ).toEqual(['Live activity', 'Relays & network', 'Diagnostics', 'Connections map']);
   });
 
   it('on a phone: a bar names the page and its arrow opens the sections as a sheet', async () => {
@@ -509,8 +547,8 @@ describe('the section menu (Decision 48)', () => {
     const sheet = q('#al-section-sheet');
     expect([...(sheet?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual([
       'Home',
-      'IDs',
       'People',
+      'My IDs',
       'Activity',
       'Settings',
     ]);
@@ -664,7 +702,7 @@ describe('Cmd+K (kept from #715), in both modes', () => {
     serve(world());
     await mountAt('/');
     expect(await open()).not.toBeNull();
-    expect(options().slice(0, 5)).toEqual(['Home', 'IDs', 'People', 'Activity', 'Settings']);
+    expect(options().slice(0, 5)).toEqual(['Home', 'People', 'My IDs', 'Activity', 'Settings']);
     expect(options()).toContain('Get started');
     expect(options()).toContain('Turn on Under the hood');
     expect(options()).toContain('Keyboard shortcuts');
