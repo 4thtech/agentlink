@@ -262,6 +262,7 @@ export default tseslint.config(
     files: [
       'tools/**',
       'apps/cli/scripts/**/*.mjs',
+      'apps/desktop/build/**/*.mjs',
       '**/*.test.ts',
       '**/*.config.{ts,mjs}',
       'eslint.config.mjs',
@@ -271,7 +272,12 @@ export default tseslint.config(
   {
     // The console channels and the repository scripts. This turns off ALL no-restricted-syntax
     // selectors for these files, not only CONSOLE_SYNTAX: keep the list to these exact paths.
-    files: ['tools/**', 'apps/cli/scripts/**/*.mjs', ...CONSOLE_CHANNELS],
+    files: [
+      'tools/**',
+      'apps/cli/scripts/**/*.mjs',
+      'apps/desktop/build/**/*.mjs',
+      ...CONSOLE_CHANNELS,
+    ],
     rules: { 'no-console': 'off', 'no-restricted-syntax': 'off' },
   },
 );
