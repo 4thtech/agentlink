@@ -42,7 +42,7 @@ const BACKED_UP = {
 const STALE = {
   ...BACKED_UP,
   state: 'out_of_date',
-  missing: { ids: [{ name: 'macbook-agent-1', label: 'x' }], people: 2 },
+  missing: { ids: [{ name: 'macbook-agent-1', label: 'MacBook' }], people: 2 },
 };
 const NONE = { export: 'available', record: 'none', state: 'none', lastKit: null, missing: null };
 const UNREADABLE = {
@@ -107,7 +107,7 @@ describe('Backup & restore', () => {
     await show(STALE);
     expect(host.querySelector('[data-kit-state="out_of_date"]')?.className).toContain('is-warn');
     expect(text()).toContain(S.staleTitle);
-    expect(text()).toContain('Not in it yet: macbook-agent-1 and 2 people who joined since.');
+    expect(text()).toContain('Not in it yet: MacBook and 2 people who joined since.');
     expect(labels()).toContain(S.saveNew);
   });
 

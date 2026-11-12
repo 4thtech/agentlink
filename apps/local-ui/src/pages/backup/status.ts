@@ -32,7 +32,10 @@ function names(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const out: string[] = [];
   for (const item of value) {
-    const n = isObject(item) ? item['name'] : item;
+    // WP-R2 sends {name, label}: the label is what people see (the folder name only as a fallback).
+    const label = isObject(item) ? item['label'] : undefined;
+    const n =
+      typeof label === 'string' && NAME.test(label) ? label : isObject(item) ? item['name'] : item;
     if (typeof n === 'string' && NAME.test(n) && out.length < 12) out.push(n);
   }
   return out;
