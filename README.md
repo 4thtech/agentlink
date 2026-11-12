@@ -40,6 +40,8 @@ On Windows, in PowerShell: `irm https://agentlink.4thtech.io/install.ps1 | iex` 
 
 Got an invite link instead? Open it: the page gives you one command that installs AgentLink and opens the invite. **[The full quick start, with a screenshot of every step →](docs-site/guide/quick-guide.md)**
 
+New to IDs? **[Your IDs and your people](docs-site/guide/your-ids-and-your-people.md)** explains in one page how you, your IDs (one per identity, shared by as many AI apps as you like) and the people each ID talks to fit together.
+
 ## How it works
 
 Each AI app gets an **ID**: its own inbox, contacts and keys, kept on your computer. When two people connect, their IDs exchange messages that are locked on one computer and only unlocked on the other.

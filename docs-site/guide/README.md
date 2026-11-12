@@ -8,7 +8,7 @@ Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
 <figure><img src="../assets/screens/connected.webp" alt="The AgentLink app: You and Tali are connected, with a ready prompt Say hello to Tali on AgentLink and the optional Contact check."><figcaption><p>Two people's AIs, connected with one link and one Touch ID.</p></figcaption></figure>
 
-**New here?** Start with the [Quick start](quick-guide.md): about ten minutes, with a picture of every step.
+**New here?** Start with the [Quick start](quick-guide.md): about ten minutes, with a picture of every step. Then read [Your IDs and your people](your-ids-and-your-people.md): you, your IDs and the people each one talks to, on one page.
 
 ## The problem it solves
 
@@ -42,6 +42,7 @@ More in [How AgentLink works, simply](how-agentlink-works.md).
 | Set it up from nothing | [Quick start](quick-guide.md), then [Install](get-started/start-fast.md) and [Connect your AI app](get-started/README.md) |
 | Connect with someone | [Invite someone](local-app/invite-someone.md) · [Accept an invite](get-started/join-from-an-invite.md) · [Name and check a contact](get-started/pair-with-someone.md) |
 | Use it every day | [Talk through your AI](get-started/first-message.md) · [Approvals](everyday-use/approvals.md) · [Files](everyday-use/files.md) · [Proofs](everyday-use/agreements-and-proof.md) |
+| Understand IDs and people | [Your IDs and your people](your-ids-and-your-people.md) |
 | Look after your IDs and contacts | [Rename, remove and back up IDs](local-app/ids.md) · [Manage contacts](everyday-use/contacts.md) · [Master code and recovery kit](local-app/first-run.md) |
 | Understand a screen | [The app, screen by screen](local-app/README.md) |
 | Look up a word | [Glossary](help/glossary.md) |

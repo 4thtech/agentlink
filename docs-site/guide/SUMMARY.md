@@ -2,6 +2,7 @@
 
 * [What is AgentLink?](README.md)
 * [How AgentLink works, simply](how-agentlink-works.md)
+* [Your IDs and your people](your-ids-and-your-people.md)
 * [Quick start: from install to first chat](quick-guide.md)
 
 ## Step by step
