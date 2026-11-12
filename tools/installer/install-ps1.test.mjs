@@ -89,7 +89,7 @@ describe('install.ps1 source', () => {
 
   it('WP-2: takes the invite as -Invite, checks it before anything else, and hands it to join', () => {
     expect(source).toContain(
-      'param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite, [Parameter(ValueFromRemainingArguments = $true)]$Rest)',
+      'param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Desktop, $Invite, [Parameter(ValueFromRemainingArguments = $true)]$Rest)',
     );
     // The same patterns as `agentlink join` (08 §4), case-sensitive and anchored at the very end.
     expect(source).toContain("$prefix = [regex]::Escape('https://agentlink.4thtech.io/i#')");
@@ -115,6 +115,33 @@ describe('install.ps1 source', () => {
       /finally \{\s*\[Net\.ServicePointManager\]::SecurityProtocol = \$savedProtocol/,
     );
     expect(source).toContain('-MaximumRedirection 0');
+  });
+
+  it('ships with the desktop app switched off, so today the installer does what it did', () => {
+    expect(source).toContain('  $DesktopReleased = $false\n');
+    expect(source).toContain(
+      "  $DesktopReleases = 'https://github.com/4thtech/agentlink/releases/download'\n",
+    );
+    // -Desktop goes to Install-AgentLinkDesktop, whose first line is the switch.
+    expect(source).toMatch(
+      /function Install-AgentLinkDesktop \{\n\s*param\([^\n]*\)\n\s*if \(-not \$DesktopReleased\) \{ throw 'The AgentLink desktop app is not released yet\./,
+    );
+  });
+
+  it('never removes the mark of the web and never changes SmartScreen or Defender', () => {
+    const code = source.replace(/^\s*#.*$/gm, '');
+    expect(code).not.toMatch(
+      /Unblock-File|Zone\.Identifier|-Stream|SmartScreen|Set-MpPreference|Add-MpPreference|Policies\\|RunAs/i,
+    );
+  });
+
+  it('downloads the desktop app following no redirect itself, and runs only the checked setup', () => {
+    expect(source).toContain('$request.AllowAutoRedirect = $false');
+    expect(source.match(/Save-ReleaseFile "/g)).toHaveLength(2);
+    expect(source).toContain(
+      "Assert-DesktopSetup $setup ([IO.File]::ReadAllText($sums)) $setupName $pinned\n      Write-Host 'Checked: the download matches the release and this installer.'\n      $code = Invoke-DesktopSetup $setup",
+    );
+    expect(source).toContain("Start-Process -FilePath $Setup -ArgumentList '/S' -Wait -PassThru");
   });
 
   it('keeps to Windows PowerShell 5.1 syntax', () => {
