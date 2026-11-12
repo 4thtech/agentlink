@@ -3,10 +3,11 @@
 // checks it with the same patterns as `agentlink join` and forwards it over the pipe. Everything
 // else (the 08 §4 crafted list, other schemes, switch injection, several links) is ignored, and
 // nothing from the argument is ever shown or logged.
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   DEEP_LINK_JOIN_PREFIX,
   INVITE_LONG_PATTERN,
@@ -18,6 +19,9 @@ import {
 import { realProcess, runShell, type ShellProcess } from '../../src/main/main.js';
 import { INVITE_OUTCOMES, isCanonicalInviteLink } from '../../src/shared/protocol.js';
 import { FakeEvent, FakeTimers, fakeElectron, fakeSpawn } from './fakes.js';
+
+const LOG_ROOT = mkdtempSync(join(tmpdir(), 'agentlink-deep-link-'));
+afterAll(() => rmSync(LOG_ROOT, { recursive: true, force: true }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '../../../..');
@@ -236,6 +240,7 @@ function setup(args: string[]) {
     spawn,
     timers: new FakeTimers(),
     preview: null,
+    logDir: join(LOG_ROOT, 'logs'),
     toInviteLink,
   };
   return { electron, children, proc };

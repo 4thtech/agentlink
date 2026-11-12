@@ -117,6 +117,8 @@ export interface WebContents {
     listener: (event: ElectronEvent, devices: unknown[], callback: (id: string) => void) => void,
   ): void;
   closeDevTools(): void;
+  /** The committed URL of the main frame. */
+  getURL(): string;
 }
 
 export interface WebPreferences {
@@ -199,6 +201,18 @@ export interface Dialog {
 
 export interface Shell {
   openExternal(url: string): Promise<void>;
+  /** Opens a local folder in the OS file manager (Finder / Explorer). Resolves '' on success. */
+  openPath(path: string): Promise<string>;
+}
+
+export interface NativeImage {
+  isEmpty(): boolean;
+  setTemplateImage(template: boolean): void;
+}
+
+export interface NativeImageModule {
+  createFromPath(path: string): NativeImage;
+  createFromBuffer(buffer: Uint8Array, options?: { scaleFactor?: number }): NativeImage;
 }
 
 /** The Electron module as main.ts uses it. */
@@ -206,7 +220,8 @@ export interface ElectronModule {
   readonly app: App;
   readonly BrowserWindow: BrowserWindowConstructor;
   readonly session: { fromPartition(partition: string, options?: { cache: boolean }): Session };
-  readonly Tray: new (iconPath: string) => Tray;
+  readonly Tray: new (icon: string | NativeImage) => Tray;
+  readonly nativeImage: NativeImageModule;
   readonly Menu: { buildFromTemplate(template: MenuItemOptions[]): Menu };
   readonly dialog: Dialog;
   readonly shell: Shell;

@@ -14,7 +14,7 @@
 
 The one canonical page is [Desktop app](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md). Short version:
 
-- **Mac:** open the `.dmg`, drag AgentLink to Applications, open it, then System Settings, Privacy & Security, **Open Anyway**.
+- **Mac:** recommended once available: the one-command installer. Manual: open the `.dmg`, drag AgentLink to Applications, run `xattr -dr com.apple.quarantine /Applications/AgentLink.app` in Terminal, then open it. (The preview is not signed by Apple yet, so macOS says it is "damaged"; the command only removes the download mark for this one app.)
 - **Windows:** run the installer, **More info**, **Run anyway**.
 - **Windows with Smart App Control on:** the preview cannot run yet. Use the browser version until the signed build. Do not turn Smart App Control off.
 

@@ -9,6 +9,7 @@ import {
   MAX_FAST_FAILURES,
   SHUTDOWN_GRACE_MS,
   STABLE_RUN_MS,
+  aiAppMarkerSet,
   cleanCoreEnv,
   type SupervisorState,
 } from '../../src/main/core-process.js';
@@ -23,6 +24,8 @@ function setup(env: Record<string, string> = { HOME: '/Users/x', PATH: '/usr/bin
   const timers = new FakeTimers();
   const { spawn, children } = fakeSpawn();
   const messages: CoreMessage[] = [];
+  const stderr: string[] = [];
+  const exits: Array<[number | null, string | null]> = [];
   const states: SupervisorState[] = [];
   let starts = 0;
   const violations: string[] = [];
@@ -40,8 +43,36 @@ function setup(env: Record<string, string> = { HOME: '/Users/x', PATH: '/usr/bin
     },
     onViolation: (v) => violations.push(v),
     onStateChange: (s) => states.push(s),
+    onStderr: (chunk) => stderr.push(new TextDecoder().decode(chunk)),
+    onExit: (code, signal) => exits.push([code, signal]),
   });
-  return { supervisor, timers, children, messages, states, violations, starts: () => starts };
+  return {
+    supervisor,
+    timers,
+    children,
+    messages,
+    states,
+    violations,
+    stderr,
+    exits,
+    starts: () => starts,
+  };
+}
+
+/** Lets every quick start of the series fail, until the supervisor gives up. */
+function failAll(
+  ctx: ReturnType<typeof setup>,
+  each: (child: NonNullable<ReturnType<typeof setup>['children'][number]>) => void = () =>
+    undefined,
+): void {
+  ctx.supervisor.start();
+  for (let i = 0; i < MAX_FAST_FAILURES; i += 1) {
+    const child = ctx.children[i];
+    if (child === undefined) throw new Error('no child');
+    each(child);
+    child.exit(1);
+    ctx.timers.advance(BACKOFF_MAX_MS);
+  }
 }
 
 describe('cleanCoreEnv', () => {
@@ -70,6 +101,15 @@ describe('cleanCoreEnv', () => {
     expect(
       cleanCoreEnv({ HOME: '/Users/x', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli' }, 'darwin'),
     ).toEqual({ HOME: '/Users/x', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli' });
+  });
+
+  it('aiAppMarkerSet: any AI app marker with a value (Windows: any case)', () => {
+    expect(aiAppMarkerSet({ HOME: '/Users/x' }, 'darwin')).toBe(false);
+    expect(aiAppMarkerSet({ CLAUDECODE: '' }, 'darwin')).toBe(false);
+    expect(aiAppMarkerSet({ CLAUDECODE: '1' }, 'darwin')).toBe(true);
+    expect(aiAppMarkerSet({ GEMINI_CLI: '1' }, 'darwin')).toBe(true);
+    expect(aiAppMarkerSet({ claudecode: '1' }, 'darwin')).toBe(false);
+    expect(aiAppMarkerSet({ ClaudeCode: '1' }, 'win32')).toBe(true);
   });
 
   it('matches Windows names case-insensitively, keeping their spelling', () => {
@@ -106,7 +146,7 @@ describe('CoreSupervisor', () => {
     expect(child?.args).toEqual([HOST]);
     expect(child?.options).toEqual({
       env: { HOME: '/Users/x' },
-      stdio: ['ignore', 'ignore', 'ignore', 'pipe'],
+      stdio: ['ignore', 'ignore', 'pipe', 'pipe'],
       windowsHide: true,
       shell: false,
       detached: false,
@@ -280,6 +320,77 @@ describe('CoreSupervisor', () => {
     timers.advance(BACKOFF_MAX_MS);
     expect(children).toHaveLength(1);
     expect(supervisor.state).toBe('stopped');
+  });
+
+  it('reads the core’s stderr and passes it on (it is never forwarded anywhere else)', () => {
+    const { supervisor, children, stderr } = setup();
+    supervisor.start();
+    children[0]?.stderr.push('boom\n');
+    expect(stderr).toEqual(['boom\n']);
+  });
+
+  it('reports every exit with its code and signal', () => {
+    const { supervisor, children, exits } = setup();
+    supervisor.start();
+    children[0]?.exit(1, null);
+    expect(exits).toEqual([[1, null]]);
+  });
+
+  it('failureKind: a start-failure reason', () => {
+    const { supervisor, children } = setup();
+    supervisor.start();
+    children[0]?.stream.push('{"v":1,"type":"stopped","reason":"no_owner"}\n');
+    children[0]?.exit(1);
+    expect(supervisor.failureKind).toBe('no_owner');
+  });
+
+  it('failureKind: "exited" when no core of the series reached ready', () => {
+    const ctx = setup();
+    failAll(ctx);
+    expect(ctx.supervisor.state).toBe('failed');
+    expect(ctx.supervisor.failureReason).toBeNull();
+    expect(ctx.supervisor.failureKind).toBe('exited');
+  });
+
+  it('failureKind: "port" when the last core said its port was taken', () => {
+    const ctx = setup();
+    failAll(ctx, (child) => child.stream.push('{"v":1,"type":"stopped","reason":"port"}\n'));
+    expect(ctx.supervisor.failureKind).toBe('port');
+  });
+
+  it('failureKind: "retries" when a core had been ready but kept stopping', () => {
+    const ctx = setup();
+    failAll(ctx, (child) => child.stream.push(readyLine()));
+    expect(ctx.supervisor.failureKind).toBe('retries');
+  });
+
+  it('failureKind: "exited" when the core cannot even be spawned', () => {
+    const timers = new FakeTimers();
+    const supervisor = new CoreSupervisor({
+      nodePath: NODE,
+      hostScript: HOST,
+      cwd: '/',
+      env: {},
+      platform: 'darwin',
+      spawn: () => {
+        throw new Error('ENOENT');
+      },
+      timers,
+      onMessage: () => undefined,
+    });
+    supervisor.start();
+    for (let i = 0; i < MAX_FAST_FAILURES; i += 1) timers.advance(BACKOFF_MAX_MS);
+    expect(supervisor.state).toBe('failed');
+    expect(supervisor.failureKind).toBe('exited');
+  });
+
+  it('failureKind is null unless failed, and retry clears it', () => {
+    const ctx = setup();
+    expect(ctx.supervisor.failureKind).toBeNull();
+    failAll(ctx);
+    ctx.supervisor.retry();
+    expect(ctx.supervisor.state).toBe('running');
+    expect(ctx.supervisor.failureKind).toBeNull();
   });
 
   it('send works only while running', () => {

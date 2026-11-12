@@ -175,7 +175,11 @@ export function requestAllowed(lock: OriginLock, url: string): boolean {
  * the locked origin, every window.open denied (allowlisted https → OS browser), no webview, devtools
  * closed if they open, no Bluetooth device picker.
  */
-export function lockWebContents(contents: WebContents, lock: OriginLock, shell: Shell): void {
+export function lockWebContents(
+  contents: WebContents,
+  lock: OriginLock,
+  shell: Pick<Shell, 'openExternal'>,
+): void {
   const block = (event: { preventDefault(): void }, url: string): void => {
     if (!lock.allows(url)) event.preventDefault();
   };

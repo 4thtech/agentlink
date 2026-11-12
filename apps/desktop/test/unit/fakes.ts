@@ -11,6 +11,7 @@ import type {
   Menu,
   MenuItemOptions,
   MessageBoxOptions,
+  NativeImage,
   OnBeforeRequestDetails,
   PermissionRequestDetails,
   Session,
@@ -51,6 +52,11 @@ class Emitter {
 export class FakeWebContents extends Emitter implements WebContents {
   windowOpenHandler: ((details: { url: string }) => { action: 'deny' }) | null = null;
   devToolsClosed = 0;
+  /** The committed URL (FakeBrowserWindow.loadURL sets it). */
+  url = '';
+  getURL(): string {
+    return this.url;
+  }
   setWindowOpenHandler(handler: (details: { url: string }) => { action: 'deny' }): void {
     this.windowOpenHandler = handler;
   }
@@ -78,6 +84,7 @@ export class FakeBrowserWindow extends Emitter implements BrowserWindow {
   }
   loadURL(url: string): Promise<void> {
     this.loaded.push(url);
+    this.webContents.url = url;
     return Promise.resolve();
   }
   show(): void {
@@ -188,12 +195,27 @@ export class FakeSession extends Emitter implements Session {
   }
 }
 
+export class FakeNativeImage implements NativeImage {
+  template = false;
+  constructor(
+    readonly source: string,
+    readonly empty: boolean,
+    readonly scaleFactor = 1,
+  ) {}
+  isEmpty(): boolean {
+    return this.empty;
+  }
+  setTemplateImage(template: boolean): void {
+    this.template = template;
+  }
+}
+
 export class FakeTray extends Emitter implements Tray {
   static created: FakeTray[] = [];
   tooltip = '';
   menu: Menu | null = null;
   destroyed = false;
-  constructor(readonly icon: string) {
+  constructor(readonly icon: string | NativeImage) {
     super();
     FakeTray.created.push(this);
   }
@@ -270,6 +292,10 @@ export interface FakeElectron extends ElectronModule {
   readonly dialog: FakeDialog;
   readonly sessions: Map<string, FakeSession>;
   readonly opened: string[];
+  /** Folders handed to shell.openPath. */
+  readonly openedPaths: string[];
+  /** Image files that exist for nativeImage.createFromPath (others give an empty image). */
+  readonly imageFiles: Set<string>;
 }
 
 export function fakeElectron(): FakeElectron {
@@ -277,6 +303,8 @@ export function fakeElectron(): FakeElectron {
   FakeTray.created = [];
   const sessions = new Map<string, FakeSession>();
   const opened: string[] = [];
+  const openedPaths: string[] = [];
+  const imageFiles = new Set<string>();
   return {
     app: new FakeApp(),
     BrowserWindow: FakeBrowserWindow,
@@ -297,9 +325,20 @@ export function fakeElectron(): FakeElectron {
         opened.push(url);
         return Promise.resolve();
       },
+      openPath: (path: string) => {
+        openedPaths.push(path);
+        return Promise.resolve('');
+      },
+    },
+    nativeImage: {
+      createFromPath: (path: string) => new FakeNativeImage(path, !imageFiles.has(path)),
+      createFromBuffer: (buffer: Uint8Array, options?: { scaleFactor?: number }) =>
+        new FakeNativeImage(`buffer:${buffer.length}`, buffer.length === 0, options?.scaleFactor),
     },
     sessions,
     opened,
+    openedPaths,
+    imageFiles,
   };
 }
 
@@ -323,7 +362,9 @@ export class FakeStream extends EventEmitter {
 
 export class FakeChild extends EventEmitter implements CoreChild {
   readonly stream = new FakeStream();
-  readonly stdio: unknown[] = [null, null, null, this.stream];
+  /** The core's stderr: the test writes with `stderr.push`. */
+  readonly stderr = new FakeStream();
+  readonly stdio: unknown[] = [null, null, this.stderr, this.stream];
   exitCode: number | null = null;
   readonly kills: string[] = [];
   constructor(
@@ -338,9 +379,9 @@ export class FakeChild extends EventEmitter implements CoreChild {
     return true;
   }
   /** The process exits. */
-  exit(code = 0): void {
+  exit(code = 0, signal: string | null = null): void {
     this.exitCode = code;
-    this.emit('exit', code, null);
+    this.emit('exit', code, signal);
   }
 }
 

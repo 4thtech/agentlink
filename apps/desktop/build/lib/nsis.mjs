@@ -7,7 +7,7 @@
 
 const q = (s) => String(s).replace(/\$/g, '$$$$').replace(/"/g, '$\\"');
 
-export function nsisScript({ version, sourceDir, outFile }) {
+export function nsisScript({ version, sourceDir, outFile, iconFile }) {
   if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version))
     throw new Error(`Bad version: ${version}`);
   const exe = 'AgentLink.exe';
@@ -23,7 +23,7 @@ SetCompressor /SOLID lzma
 BrandingText "4thTech AgentLink ${version}"
 
 !define MUI_ABORTWARNING
-!insertmacro MUI_PAGE_INSTFILES
+${iconFile ? `!define MUI_ICON "${q(iconFile)}"\n!define MUI_UNICON "${q(iconFile)}"\n` : ''}!insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"

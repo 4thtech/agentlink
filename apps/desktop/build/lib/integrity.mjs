@@ -84,3 +84,22 @@ export async function writeWinIntegrity(exePath, key, integrity) {
   res.outputResource(exe);
   await writeFile(exePath, Buffer.from(exe.generate()));
 }
+
+/** Embeds the app icon (.ico) into a Windows exe as its icon group (resedit). */
+export async function writeWinIcon(exePath, icoPath) {
+  const { NtExecutable, NtExecutableResource, Resource, Data } = await importDep('resedit');
+  const exe = NtExecutable.from(await readFile(exePath));
+  const res = NtExecutableResource.from(exe);
+  const iconFile = Data.IconFile.from(await readFile(icoPath));
+  const groups = Resource.IconGroupEntry.fromEntries(res.entries);
+  const id = groups[0]?.id ?? 1;
+  const lang = groups[0]?.lang ?? 1033;
+  Resource.IconGroupEntry.replaceIconsForResource(
+    res.entries,
+    id,
+    lang,
+    iconFile.icons.map((i) => i.data),
+  );
+  res.outputResource(exe);
+  await writeFile(exePath, Buffer.from(exe.generate()));
+}
