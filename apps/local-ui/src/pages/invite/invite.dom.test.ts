@@ -325,6 +325,36 @@ describe('the invite panel (A3/A5)', () => {
     expect(nameField().readOnly).toBe(true);
   });
 
+  it('IR-REL051-UF3-1: a link for another name on its way is never copied (the field changed back)', async () => {
+    const w = world();
+    const written = stubClipboard();
+    const releases: (() => void)[] = [];
+    const slow: InviteApi = {
+      ...w.invites,
+      create: (label, options) =>
+        w.created.length === 0 && releases.length === 0
+          ? w.invites.create(label, options)
+          : new Promise((resolve) => {
+              releases.push(() => resolve(w.invites.create(label, options)));
+            }),
+    };
+    await show(panel(w, { invites: slow }));
+    await typeName('Denis');
+    await blurName();
+    // The name is cleared again while Denis's link is still being made; then Copy.
+    await typeName('');
+    await act(async () => button(S.copy).click());
+    await act(async () => {
+      for (const release of releases) release();
+    });
+    await settle();
+    expect(w.created.map((c) => c.label)).toEqual([undefined, 'Denis', undefined]);
+    // Denis's link (made second, SHORT_B) lands late, is cancelled, and is not what was copied.
+    expect(written).toEqual([SHORT_A]);
+    expect(w.cancelled).toContain('invite-0000000000000002');
+    expect(hasButton(S.copied)).toBe(true);
+  });
+
   it('REL051-UF3 (R1-UI-04): a Copy click before the name was saved saves it first, once', async () => {
     const w = world();
     const written = stubClipboard();

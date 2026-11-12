@@ -225,7 +225,10 @@ export function InvitePanel({
     // it is still open (the link route answers only an open invite); otherwise make one.
     const kept = screenInvite();
     const reuse = async (): Promise<void> => {
-      if (kept === undefined || invites.link === undefined) return make('', false);
+      if (kept === undefined || invites.link === undefined) {
+        await make('', false);
+        return;
+      }
       const out = await invites.link(kept.id);
       if (!live.current) return;
       if (out.kind !== 'ok' || madeRef.current !== undefined) {
@@ -337,6 +340,11 @@ export function InvitePanel({
       return make(wanted, current.askedLong).then((m) => m?.invite);
     }
     if (pending !== undefined) {
+      // IR-REL051-UF3-1: a link for another name is on its way (the field changed back): never copy
+      // that one; make the link for the name in the field (the other is cancelled when it lands).
+      if (current !== undefined && !sharedRef.current && pending.label !== wanted) {
+        return make(wanted, current.askedLong).then((m) => m?.invite);
+      }
       return pending.promise.then((m) => m?.invite ?? madeRef.current?.invite);
     }
     return current?.invite;

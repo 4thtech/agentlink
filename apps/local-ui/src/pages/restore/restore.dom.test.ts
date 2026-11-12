@@ -7,7 +7,7 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppsApi } from '../first-run/apps-api.js';
-import type { OwnerClient } from '../contacts/owner.js';
+import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import type { RestoreApi, Summary } from './api.js';
 import { clean, toGroups } from './code-field.js';
 import { createSetupApi } from '../first-run/setup-api.js';
@@ -345,6 +345,32 @@ describe('step 2: your recovery code', () => {
     expect(text()).toContain(S.CODE.warnTitle);
     expect(text()).toContain(S.CODE.warn);
     expect(text()).toContain(S.CODE.assurance);
+  });
+
+  it('REL051-UF3 (R1-UI-06): a double click on Confirm with Touch ID asks once and confirms once', async () => {
+    const presence = vi.fn(() => ok({}));
+    const api = fakeApi({
+      header: () => ok({ header: 'ok' as const, ownerPresent: true }),
+      presence,
+    });
+    let answer: ((p: PresenceProof) => void) | undefined;
+    const passkeyProof = vi.fn(
+      (): Promise<PresenceProof | undefined> =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    await mount(api, { owner: owner(true), passkeyProof });
+    await click(S.KIT.next);
+    const confirm = button(S.PRESENCE.usePasskey('Touch ID'));
+    await act(async () => confirm?.click());
+    await act(async () => confirm?.click());
+    expect(passkeyProof).toHaveBeenCalledTimes(1);
+    expect(confirm?.disabled).toBe(true);
+    await act(async () => answer?.({ kind: 'passkey', body: new Uint8Array([1]) }));
+    await settle();
+    expect(presence).toHaveBeenCalledTimes(1);
+    expect(text()).toContain(S.CODE.title);
   });
 
   it('asks for presence first on a computer that already has an owner', async () => {
