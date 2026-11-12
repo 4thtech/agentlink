@@ -363,6 +363,17 @@ a {
 .mac-app span {
   display: block;
 }
+.mac-app .mac-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+}
+.mac-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 500;
+}
 .next {
   margin: 16px 0 0;
   font-weight: 500;

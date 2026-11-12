@@ -5,14 +5,11 @@
  * The step-by-step guides on 4thTech Docs (wiki.4thtech.io, generated from docs-site/guide at each
  * release; a page's URL is `products/agentlink/` plus its path under docs-site/guide, without `.md`).
  * The links are plain links in the HTML (new tab, no referrer); a test keeps the HTML equal to these.
- *
- * TODO(REL051-INV): when docs-site/guide/get-started/students.md ("Students: start here") is
- * published, point `guide` at `${DOCS_BASE}/get-started/students`.
  */
 export const DOCS_BASE = 'https://wiki.4thtech.io/products/agentlink';
 export const DOCS_LINKS = {
-  /** "Install AgentLink" (docs-site/guide/get-started/start-fast.md). */
-  guide: `${DOCS_BASE}/get-started/start-fast`,
+  /** "Start here" (docs-site/guide/get-started/start-here.md; its docs PR merges first). */
+  guide: `${DOCS_BASE}/get-started/start-here`,
   /** "Windows" (docs-site/guide/get-started/windows.md). */
   windows: `${DOCS_BASE}/get-started/windows`,
 } as const;
@@ -20,7 +17,7 @@ export const DOCS_LINKS = {
 /**
  * The Mac app (early build, not signed by Apple yet; planned for 0.5.1). OFF until that build is
  * released: while it is false the page never mentions the app and its link has no `href`. Turn it on
- * in the release PR, after checking that `MAC_APP_URL` downloads the released file.
+ * in the release PR, after checking that both `MAC_APP_URLS` download the released files.
  */
 export const MAC_APP_AVAILABLE = false;
 
@@ -30,9 +27,13 @@ export const MAC_APP_VERSION = '0.5.1';
 /**
  * The Mac app's file name, as the desktop build writes it (apps/desktop/build/build-mac.mjs on
  * desktop/integration-051: `AgentLink-<version>-mac-<arch>.dmg`, arch arm64 or x64). The page links
- * the Apple silicon (arm64) build.
+ * both: Apple chip (arm64) and Intel chip (x64).
  */
-export const macAppAsset = (version: string): string => `AgentLink-${version}-mac-arm64.dmg`;
+export const macAppAsset = (version: string, arch: 'arm64' | 'x64'): string =>
+  `AgentLink-${version}-mac-${arch}.dmg`;
 
-/** The Mac app's download: that exact asset of that exact GitHub Release (never `latest`). */
-export const MAC_APP_URL = `https://github.com/4thtech/agentlink/releases/download/v${MAC_APP_VERSION}/${macAppAsset(MAC_APP_VERSION)}`;
+const macAppUrl = (arch: 'arm64' | 'x64'): string =>
+  `https://github.com/4thtech/agentlink/releases/download/v${MAC_APP_VERSION}/${macAppAsset(MAC_APP_VERSION, arch)}`;
+
+/** The Mac app's downloads: those exact assets of that exact GitHub Release (never `latest`). */
+export const MAC_APP_URLS = { arm64: macAppUrl('arm64'), x64: macAppUrl('x64') } as const;

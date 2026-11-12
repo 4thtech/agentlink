@@ -323,18 +323,39 @@ describe('a good invite (U3-invite)', () => {
       ],
       [
         'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1',
-        'os-mac',
+        null,
         true,
+        0,
+      ],
+      // iPadOS 13+ reports a Mac; its touch points make it a tablet.
+      [
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15',
+        null,
+        true,
+        5,
       ],
     ] as const;
-    for (const [userAgent, chosen, phone] of cases) {
+    for (const [userAgent, chosen, phone, touchPoints = 0] of cases) {
       const context = await browser.newContext({ userAgent });
       const page = await context.newPage();
+      await page.addInitScript((n) => {
+        Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => n });
+      }, touchPoints);
       const requests: string[] = [];
       page.on('request', (r) => requests.push(new URL(r.url()).pathname));
       await page.goto(`${originOf(site)}/i#${payloadOf(link)}`);
       await page.waitForFunction(() => document.getElementById('state')?.dataset.ready === 'true');
-      await expect(page.locator(`#${chosen}`).getAttribute('aria-pressed')).resolves.toBe('true');
+      if (chosen === null) {
+        await expect(
+          page.locator('#way-command [role="group"] button[aria-pressed="true"]').count(),
+        ).resolves.toBe(0);
+        await expect(page.locator('#copy').isHidden()).resolves.toBe(true);
+        await expect(page.locator('#open-help').textContent()).resolves.toBe(
+          'Choose the computer you will install AgentLink on.',
+        );
+      } else {
+        await expect(page.locator(`#${chosen}`).getAttribute('aria-pressed')).resolves.toBe('true');
+      }
       await expect(page.locator('#phone-note').isVisible()).resolves.toBe(phone);
       await expect(page.locator('#mac-app').isHidden()).resolves.toBe(true);
       expect(requests.sort()).toEqual(['/i', '/invite.css', '/invite.js']);
@@ -409,7 +430,7 @@ describe('a hostile invite (I-5)', () => {
       expect(await page.locator('object, embed, form, input, style').count()).toBe(0);
       // REL051-INV: no link but the three fixed ones of the HTML (two help links, the Mac app's
       // link with no href while its switch is off); none comes from the name.
-      expect(await page.locator('a').count()).toBe(3);
+      expect(await page.locator('a').count()).toBe(4);
       await expect(
         page.locator('a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href'))),
       ).resolves.toEqual([DOCS_LINKS.guide, DOCS_LINKS.windows]);

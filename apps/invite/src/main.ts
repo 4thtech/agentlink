@@ -12,7 +12,9 @@ const fetchObject = inviteFetcher((input, init) => window.fetch(input, init));
 const copy = (text: string): Promise<void> => navigator.clipboard.writeText(text);
 // WP-2, REL051-INV: the computer shown first, and whether this is a phone, from the browser's own
 // user agent (nothing leaves the page).
-const options = { os: osFor(navigator.userAgent), phone: isPhone(navigator.userAgent) };
+// A phone or tablet (iPadOS reports a Mac, so touch points count too) gets no computer chosen first.
+const phone = isPhone(navigator.userAgent, navigator.maxTouchPoints);
+const options = { os: phone ? null : osFor(navigator.userAgent), phone };
 
 async function show(): Promise<void> {
   const view = await evaluateFragment(hash, Math.floor(Date.now() / 1000), fetchObject);

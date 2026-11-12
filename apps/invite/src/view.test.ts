@@ -8,7 +8,7 @@ import {
   DOCS_BASE,
   DOCS_LINKS,
   MAC_APP_AVAILABLE,
-  MAC_APP_URL,
+  MAC_APP_URLS,
   MAC_APP_VERSION,
   macAppAsset,
 } from './config.js';
@@ -57,6 +57,18 @@ describe('osFor and isPhone (REL051-INV)', () => {
     for (const ua of [UA.mac, UA.windows, UA.linux, UA.chromebook]) expect(isPhone(ua)).toBe(false);
   });
 
+  it('knows an iPad that reports a Mac (iPadOS 13+) by its touch points', () => {
+    expect(isPhone(UA.safari, 5)).toBe(true);
+    expect(isPhone(UA.mac, 5)).toBe(true);
+    // A Mac has no touch points (0), and one is not enough to call it a tablet.
+    expect(isPhone(UA.safari, 0)).toBe(false);
+    expect(isPhone(UA.safari, 1)).toBe(false);
+    expect(isPhone(UA.safari)).toBe(false);
+    // Touch points alone never make a Windows or Linux computer a tablet.
+    expect(isPhone(UA.windows, 10)).toBe(false);
+    expect(isPhone(UA.linux, 10)).toBe(false);
+  });
+
   it('Mac and Linux copy the shell installer, Windows the PowerShell one, Node.js npx', () => {
     expect(COMMAND_FOR).toEqual({ mac: 'unix', linux: 'unix', windows: 'windows', node: 'node' });
   });
@@ -70,19 +82,27 @@ describe('config (REL051-INV)', () => {
   it('links only to 4thTech Docs and the project’s GitHub releases, over https', () => {
     for (const url of Object.values(DOCS_LINKS)) expect(url.startsWith(`${DOCS_BASE}/`)).toBe(true);
     expect(DOCS_BASE).toBe('https://wiki.4thtech.io/products/agentlink');
-    expect(MAC_APP_URL).toMatch(/^https:\/\/github\.com\/4thtech\/agentlink\/releases\//);
+    for (const url of Object.values(MAC_APP_URLS))
+      expect(url).toMatch(/^https:\/\/github\.com\/4thtech\/agentlink\/releases\//);
   });
 
-  it('pins the Mac app link to the exact release asset of the desktop build, never latest', () => {
+  it('pins both Mac app links to the exact release assets of the desktop build, never latest', () => {
     expect(MAC_APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(macAppAsset('0.5.1')).toBe('AgentLink-0.5.1-mac-arm64.dmg');
-    expect(MAC_APP_URL).toMatch(
-      /^https:\/\/github\.com\/4thtech\/agentlink\/releases\/download\/v(\d+\.\d+\.\d+)\/AgentLink-\1-mac-arm64\.dmg$/,
-    );
-    expect(MAC_APP_URL).toBe(
-      `https://github.com/4thtech/agentlink/releases/download/v${MAC_APP_VERSION}/AgentLink-${MAC_APP_VERSION}-mac-arm64.dmg`,
-    );
-    expect(MAC_APP_URL).not.toContain('latest');
+    expect(macAppAsset('0.5.1', 'arm64')).toBe('AgentLink-0.5.1-mac-arm64.dmg');
+    expect(macAppAsset('0.5.1', 'x64')).toBe('AgentLink-0.5.1-mac-x64.dmg');
+    for (const arch of ['arm64', 'x64'] as const) {
+      const url = MAC_APP_URLS[arch];
+      const match =
+        /^https:\/\/github\.com\/4thtech\/agentlink\/releases\/download\/v(\d+\.\d+\.\d+)\/AgentLink-(\d+\.\d+\.\d+)-mac-(arm64|x64)\.dmg$/.exec(
+          url,
+        );
+      expect(match, url).not.toBeNull();
+      expect(match?.[1]).toBe(MAC_APP_VERSION);
+      expect(match?.[2]).toBe(MAC_APP_VERSION);
+      expect(match?.[3]).toBe(arch);
+      expect(url).not.toContain('latest');
+    }
+    expect(MAC_APP_URLS.arm64).not.toBe(MAC_APP_URLS.x64);
   });
 
   it('the page links are exactly the docs links, each in a new tab with no referrer', () => {
@@ -93,9 +113,10 @@ describe('config (REL051-INV)', () => {
       expect(a).toMatch(/\btarget="_blank"/);
       expect(a).toMatch(/\brel="noopener noreferrer"/);
     }
-    // The Mac app's link has no href in the HTML: only the switch gives it one.
-    expect(pageHtml).toMatch(/<a id="mac-app-link"(?![^>]*href)[^>]*>/);
-    expect(pageHtml).not.toContain(MAC_APP_URL);
+    // The Mac app's links have no href in the HTML: only the switch gives them one.
+    expect(pageHtml).toMatch(/<a id="mac-app-arm64"(?![^>]*href)[^>]*>/);
+    expect(pageHtml).toMatch(/<a id="mac-app-x64"(?![^>]*href)[^>]*>/);
+    for (const url of Object.values(MAC_APP_URLS)) expect(pageHtml).not.toContain(url);
   });
 
   it('the help section says what the strings say', () => {
@@ -227,6 +248,36 @@ describe('render (REL051-INV)', () => {
     expect(copied).toEqual([commands?.windows, commands?.unix]);
   });
 
+  it('on a phone or tablet chooses no computer and shows no command until the person picks one', () => {
+    const { doc, el } = fakeDocument();
+    const copied: string[] = [];
+    render(
+      doc,
+      ready(),
+      (t) => {
+        copied.push(t);
+        return Promise.resolve();
+      },
+      undefined,
+      { phone: true, macApp: true },
+    );
+    for (const o of ['mac', 'windows', 'linux', 'node'])
+      expect(el(`os-${o}`).getAttribute('aria-pressed')).toBe('false');
+    expect(el('open-help').textContent).toBe(strings.step.pickComputer);
+    expect(el('step-text').hidden).toBe(true);
+    expect(el('step-text').textContent).toBe('');
+    expect(el('copy').hidden).toBe(true);
+    expect(el('mac-app').hidden).toBe(true);
+    el('copy').onclick?.();
+    expect(copied).toEqual([]);
+    expect(el('way-command').hidden).toBe(false);
+    el('os-windows').onclick?.();
+    expect(el('os-windows').getAttribute('aria-pressed')).toBe('true');
+    expect(el('copy').hidden).toBe(false);
+    expect(el('step-text').hidden).toBe(false);
+    expect(el('open-help').textContent).toBe(strings.step.openHelp.windows);
+  });
+
   it('shows the phone line only on a phone', () => {
     const one = fakeDocument();
     render(one.doc, ready(), noCopy, undefined, { os: 'mac', phone: true });
@@ -242,8 +293,10 @@ describe('render (REL051-INV)', () => {
       const { doc, el } = fakeDocument();
       render(doc, ready(), noCopy, undefined, { os });
       expect(el('mac-app').hidden).toBe(true);
-      expect(el('mac-app-link').getAttribute('href')).toBeNull();
-      expect(el('mac-app-link').textContent).toBe('');
+      for (const arch of ['arm64', 'x64']) {
+        expect(el(`mac-app-${arch}`).getAttribute('href')).toBeNull();
+        expect(el(`mac-app-${arch}`).textContent).toBe('');
+      }
     }
   });
 
@@ -251,8 +304,11 @@ describe('render (REL051-INV)', () => {
     const { doc, el } = fakeDocument();
     render(doc, ready(), noCopy, undefined, { os: 'mac', macApp: true });
     expect(el('mac-app').hidden).toBe(false);
-    expect(el('mac-app-link').getAttribute('href')).toBe(MAC_APP_URL);
-    expect(el('mac-app-link').textContent).toBe(strings.step.macApp.link);
+    expect(el('mac-app-arm64').getAttribute('href')).toBe(MAC_APP_URLS.arm64);
+    expect(el('mac-app-arm64').textContent).toBe('Mac with Apple chip (M1 or newer)');
+    expect(el('mac-app-x64').getAttribute('href')).toBe(MAC_APP_URLS.x64);
+    expect(el('mac-app-x64').textContent).toBe('Mac with Intel chip');
+    expect(el('mac-app-which').textContent).toBe('Not sure? Apple menu → About This Mac → Chip.');
     expect(el('mac-app-note').textContent).toBe(strings.step.macApp.note);
     el('os-windows').onclick?.();
     expect(el('mac-app').hidden).toBe(true);
@@ -270,7 +326,8 @@ describe('render (REL051-INV)', () => {
     expect(el('step').hidden).toBe(true);
     expect(el('phone-note').hidden).toBe(true);
     expect(el('mac-app').hidden).toBe(true);
-    expect(el('mac-app-link').getAttribute('href')).toBeNull();
+    expect(el('mac-app-arm64').getAttribute('href')).toBeNull();
+    expect(el('mac-app-x64').getAttribute('href')).toBeNull();
     expect(el('help-again').hidden).toBe(true);
   });
 });

@@ -43,6 +43,8 @@ export const strings = {
       linux: 'Linux',
       node: 'Node.js',
     },
+    /** REL051-INV: on a phone or tablet no computer is chosen first. */
+    pickComputer: 'Choose the computer you will install AgentLink on.',
     /** REL051-INV: where to paste it, one line per computer. */
     openHelp: {
       mac: 'Open Terminal: press Command and Space, type Terminal, then press Return.',
@@ -64,8 +66,10 @@ export const strings = {
       'AgentLink runs on a computer. Send this invite to yourself and open it on your Mac, Windows or Linux computer.',
     /** REL051-INV: the Mac app, shown only when MAC_APP_AVAILABLE is on (config.ts). */
     macApp: {
-      lead: 'Prefer an app?',
-      link: 'Download AgentLink for Mac (early build)',
+      lead: 'Prefer an app? Download AgentLink for Mac (early build):',
+      arm64: 'Mac with Apple chip (M1 or newer)',
+      x64: 'Mac with Intel chip',
+      which: 'Not sure? Apple menu → About This Mac → Chip.',
       note: 'This early build is not signed by Apple yet. The first time, right-click the app and choose Open.',
     },
     link: 'Already have AgentLink? Open it and paste the link',

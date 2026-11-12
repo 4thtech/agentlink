@@ -91,7 +91,7 @@ describe('the pages', () => {
           DOCS_LINKS.windows,
         ]);
         const anchors = [...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0]);
-        expect(anchors).toHaveLength(3);
+        expect(anchors).toHaveLength(4);
         for (const a of anchors) {
           expect(a).toMatch(/\btarget="_blank"/);
           expect(a).toMatch(/\brel="noopener noreferrer"/);
@@ -138,7 +138,8 @@ describe('the pages', () => {
           'open-help',
           'phone-note',
           'mac-app',
-          'mac-app-link',
+          'mac-app-arm64',
+          'mac-app-x64',
           'help-again',
           'link-text',
           'copy-ai',

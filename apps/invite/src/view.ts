@@ -14,7 +14,7 @@
 // with where to paste it), then the link for people who already have AgentLink, then Ask your AI. A
 // phone gets a line saying AgentLink runs on a computer. The Mac app shows only when the release
 // switch MAC_APP_AVAILABLE is on (config.ts); its link is a build constant.
-import { MAC_APP_AVAILABLE, MAC_APP_URL } from './config.js';
+import { MAC_APP_AVAILABLE, MAC_APP_URLS } from './config.js';
 import type { InviteView } from './invite-state.js';
 import type { InviteCommands } from './prompt.js';
 import { expiredFor, invitesHeading, nextFor, strings } from './strings.js';
@@ -67,17 +67,22 @@ export function osFor(userAgent: string): Exclude<Os, 'node'> {
   return 'mac';
 }
 
-/** REL051-INV: true for a phone or tablet, where the command cannot run. */
-export const isPhone = (userAgent: string): boolean =>
-  /\b(iPhone|iPad|iPod|Android|Mobile)\b/.test(userAgent);
+/**
+ * REL051-INV: true for a phone or tablet, where the command cannot run. iPadOS 13 and later report
+ * a Mac user agent, so a Mac user agent with more than one touch point (`navigator.maxTouchPoints`)
+ * is a tablet too; a Mac has none.
+ */
+export const isPhone = (userAgent: string, maxTouchPoints = 0): boolean =>
+  /\b(iPhone|iPad|iPod|Android|Mobile)\b/.test(userAgent) ||
+  (/\bMacintosh\b/.test(userAgent) && maxTouchPoints > 1);
 
 /** How long "Copied" stays (b11 §6 row 6). */
 const COPIED_MS = 1600;
 
 /** Page options read from the browser (REL051-INV). `macApp` defaults to MAC_APP_AVAILABLE. */
 export interface RenderOptions {
-  /** The computer shown first (WP-2). */
-  readonly os?: Os;
+  /** The computer shown first (WP-2); null: none yet (a phone or tablet), the person picks one. */
+  readonly os?: Os | null;
   /** A phone or tablet: show the "runs on a computer" line. */
   readonly phone?: boolean;
   /** The Mac app release switch (tests pass it; the page uses the build constant). */
@@ -95,7 +100,8 @@ export function render(
   retry?: () => void,
   options: RenderOptions = {},
 ): void {
-  const { os = 'mac', phone = false, macApp = MAC_APP_AVAILABLE } = options;
+  const { phone = false, macApp = MAC_APP_AVAILABLE } = options;
+  const os = options.os === undefined ? (phone ? null : 'mac') : options.os;
   const state = element(doc, 'state');
   const retryButton = element(doc, 'retry') as HTMLButtonElement;
   const inviter = element(doc, 'inviter');
@@ -137,7 +143,9 @@ export function render(
   ] as const;
   const phoneNote = element(doc, 'phone-note');
   const macAppBlock = element(doc, 'mac-app');
-  const macAppLink = element(doc, 'mac-app-link');
+  const macAppLinks = (['arm64', 'x64'] as const).map(
+    (arch) => [arch, element(doc, `mac-app-${arch}`)] as const,
+  );
   const helpAgain = element(doc, 'help-again');
 
   // Start from nothing shown: a state never shows a command or a sentence.
@@ -154,7 +162,7 @@ export function render(
   retryButton.onclick = null;
   phoneNote.hidden = true;
   macAppBlock.hidden = true;
-  macAppLink.removeAttribute('href');
+  for (const [, link] of macAppLinks) link.removeAttribute('href');
   helpAgain.hidden = true;
   retryButton.hidden = true;
   retryButton.disabled = false;
@@ -190,19 +198,23 @@ export function render(
     element(doc, 'inviter-expiry').textContent = formatExpiry(who.expiresAt);
     inviter.hidden = false;
 
-    let chosen: Os = os;
+    let chosen: Os | null = os;
     // Held by the script; each button copies one of these strings, never the page's text.
     const textOf = (card: (typeof cards)[number]['card']): string | undefined =>
       card === 'way-ai'
         ? view.sentence
         : card === 'way-command'
-          ? view.commands?.[COMMAND_FOR[chosen]]
+          ? chosen === null
+            ? undefined
+            : view.commands?.[COMMAND_FOR[chosen]]
           : view.inviteUrl;
     const helpOf = (card: (typeof cards)[number]['card']): string =>
       card === 'way-ai'
         ? strings.step.askAiHelp
         : card === 'way-command'
-          ? strings.step.commandHelp[chosen]
+          ? chosen === null
+            ? ''
+            : strings.step.commandHelp[chosen]
           : strings.step.linkHelp;
     const timers = new Map<string, ReturnType<typeof setTimeout>>();
     const resetLabels = (): void => {
@@ -257,16 +269,24 @@ export function render(
     const commandCard = cards[0];
     if (macApp) {
       element(doc, 'mac-app-lead').textContent = strings.step.macApp.lead;
-      macAppLink.textContent = strings.step.macApp.link;
-      macAppLink.setAttribute('href', MAC_APP_URL);
+      for (const [arch, link] of macAppLinks) {
+        link.textContent = strings.step.macApp[arch];
+        link.setAttribute('href', MAC_APP_URLS[arch]);
+      }
+      element(doc, 'mac-app-which').textContent = strings.step.macApp.which;
       element(doc, 'mac-app-note').textContent = strings.step.macApp.note;
     }
-    const choose = (o: Os): void => {
+    // On a phone or tablet nothing is chosen first (null): no command is shown until the person
+    // picks the computer they will use.
+    const choose = (o: Os | null): void => {
       chosen = o;
       for (const [other, button] of osButtons) {
         button.setAttribute('aria-pressed', other === o ? 'true' : 'false');
       }
-      element(doc, 'open-help').textContent = strings.step.openHelp[o];
+      element(doc, 'open-help').textContent =
+        o === null ? strings.step.pickComputer : strings.step.openHelp[o];
+      element(doc, 'step-text').hidden = o === null;
+      element(doc, 'copy').hidden = o === null;
       macAppBlock.hidden = !(macApp && o === 'mac');
       show(commandCard);
     };
