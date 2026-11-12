@@ -52,6 +52,36 @@ test('refuses http, a host off the list and a bad status', async () => {
   );
 });
 
+test('every redirect hop is checked against https and the host list', async () => {
+  const dest = join(dir(), 'a.zip');
+  const hop = (location) => async () => new Response('', { status: 302, headers: { location } });
+  await assert.rejects(
+    fetchVerified({ ...base, sha256: sha, dest, fetchImpl: hop('https://evil.example/x') }),
+    /redirect to host/,
+  );
+  await assert.rejects(
+    fetchVerified({ ...base, sha256: sha, dest, fetchImpl: hop('http://nodejs.org/x') }),
+    /redirect to http/,
+  );
+  let n = 0;
+  const chain = async () =>
+    n++ === 0
+      ? new Response('', { status: 302, headers: { location: 'https://nodejs.org/y' } })
+      : new Response(body);
+  await fetchVerified({ ...base, sha256: sha, dest, fetchImpl: chain });
+  assert.deepEqual(readFileSync(dest), body);
+});
+
+test('a download over the size cap is refused and leaves nothing', async () => {
+  const dest = join(dir(), 'a.zip');
+  await assert.rejects(
+    fetchVerified({ ...base, sha256: sha, dest, maxBytes: 4, fetchImpl: okFetch }),
+    /exceeded|too large/,
+  );
+  assert.equal(existsSync(dest), false);
+  assert.equal(existsSync(dest + '.part'), false);
+});
+
 test('a cached file with the right hash is reused without fetching', async () => {
   const dest = join(dir(), 'a.zip');
   await fetchVerified({ ...base, sha256: sha, dest, fetchImpl: okFetch });

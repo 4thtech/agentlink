@@ -3,7 +3,7 @@
 // Runs on windows-2022 in CI (needs `tar` and `makensis`), or anywhere with --nsi-only for a dry run
 // (the PE edits and fuses are pure Node, so everything except makensis can be checked on a Mac).
 //
-//   node build-win.mjs --tgz <packed-cli.tgz> [--version 0.5.0] [--out dir] [--before ISO] [--nsi-only]
+//   node build-win.mjs --tgz <packed-cli.tgz> [--version 0.5.0] [--out dir] [--nsi-only]
 //
 // Signing: Authenticode is a hook that is OFF. DESKTOP_SIGNING=on is refused here until WP-D18.
 import { cpSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -11,7 +11,7 @@ import { createRequire } from 'node:module';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { constants } from './lib/constants.mjs';
-import { FUSES } from './lib/fuses.mjs';
+import { BUILD_FUSES } from './lib/fuses.mjs';
 import { asarIntegrity, writeWinIntegrity } from './lib/integrity.mjs';
 import { nsisScript } from './lib/nsis.mjs';
 import { capture, parseArgs, run } from './lib/run.mjs';
@@ -19,7 +19,6 @@ import {
   CACHE_DIR,
   OUT_DIR,
   buildPayload,
-  defaultBefore,
   extract,
   fetchRuntimes,
   gitHeadOrNull,
@@ -32,7 +31,6 @@ const args = parseArgs(process.argv.slice(2), {
   tgz: 'v',
   version: 'v',
   out: 'v',
-  before: 'v',
   'dist-dir': 'v',
   'nsi-only': 'flag',
 });
@@ -43,7 +41,6 @@ const version = args.version ?? '0.0.0-dev';
 const platform = 'win32-x64';
 const out = resolve(args.out ?? OUT_DIR);
 const work = join(CACHE_DIR, `work-${platform}`);
-const before = args.before ?? defaultBefore();
 const tgz = resolve(args.tgz);
 
 const req = createRequire(new URL('./package.json', import.meta.url));
@@ -76,15 +73,15 @@ mkdirSync(join(dir, 'resources', 'node'), { recursive: true });
 cpSync(join(nodeSrc, 'node.exe'), join(dir, 'resources', 'node', 'node.exe'));
 cpSync(join(nodeSrc, 'LICENSE'), join(dir, 'resources', 'node', 'LICENSE'));
 
-console.log('[5/7] core (packed tarball, --ignore-scripts, --before cooldown)');
-installCore({ tgz, dest: join(dir, 'resources', 'core'), os: 'win32', cpu: 'x64', before });
+console.log('[5/7] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
+const core = installCore({ tgz, dest: join(dir, 'resources', 'core'), os: 'win32', cpu: 'x64' });
 
 console.log('[6/7] fuses and ASAR integrity resource');
 const exe = join(dir, 'AgentLink.exe');
 await fuses.flipFuses(exe, {
   version: fuses.FuseVersion.V1,
-  strictlyRequireAllFuses: false,
-  ...Object.fromEntries(Object.entries(FUSES).map(([k, v]) => [fuses.FuseV1Options[k], v])),
+  strictlyRequireAllFuses: true,
+  ...Object.fromEntries(Object.entries(BUILD_FUSES).map(([k, v]) => [fuses.FuseV1Options[k], v])),
 });
 await writeWinIntegrity(exe, 'resources\\app.asar', integrity);
 
@@ -122,7 +119,8 @@ writeFileSync(
       node: { version: constants.node.version, sha256: constants.node.assets[platform].sha256 },
       coreTgzSha256: await sha256Of(tgz),
       asarHeaderSha256: integrity.hash,
-      npmBefore: before,
+      coreLockSha256: core.lockSha256,
+      coreTreeSha256: core.treeSha256,
       git: gitHeadOrNull(),
     },
     null,

@@ -58,6 +58,14 @@ Section "Uninstall"
   DeleteRegKey HKCU "${uninstKey}"
   Delete "$SMPROGRAMS\\AgentLink\\AgentLink.lnk"
   RMDir "$SMPROGRAMS\\AgentLink"
+  ; Recursive delete only of the exact per-user install dir, and only when it really is an AgentLink
+  ; install (a /D= override or a stray Uninstall.exe elsewhere must never delete a user directory).
+  StrCmp "$INSTDIR" "$LOCALAPPDATA\\Programs\\AgentLink" +2 0
+    Abort "Refusing to remove an unexpected folder."
+  IfFileExists "$INSTDIR\\${exe}" +2 0
+    Abort "AgentLink.exe is not in this folder; nothing was removed."
+  IfFileExists "$INSTDIR\\Uninstall.exe" +2 0
+    Abort "This is not an AgentLink install folder; nothing was removed."
   RMDir /r "$INSTDIR"
 SectionEnd
 `;

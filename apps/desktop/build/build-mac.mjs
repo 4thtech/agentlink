@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds AgentLink.app + DMG + zip for macOS (arm64 or x64). Run on macOS (needs ditto, codesign, hdiutil).
 //
-//   node build-mac.mjs --arch arm64 --tgz <packed-cli.tgz> [--version 0.5.0] [--out dir] [--before ISO]
+//   node build-mac.mjs --arch arm64 --tgz <packed-cli.tgz> [--version 0.5.0] [--out dir]
 //
 // What it does (WP-D4; Decision 3 / H1):
 //   pinned Electron + Node fetched over plain HTTPS and hash-checked -> Electron.app renamed AgentLink.app
@@ -21,7 +21,7 @@ import { createRequire } from 'node:module';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { constants } from './lib/constants.mjs';
-import { FUSES } from './lib/fuses.mjs';
+import { BUILD_FUSES } from './lib/fuses.mjs';
 import { makeIcns } from './lib/icon.mjs';
 import { asarIntegrity, writeMacDigest } from './lib/integrity.mjs';
 import { describeSignature, planFor, signApp, verifyApp } from './lib/mac-sign.mjs';
@@ -32,7 +32,6 @@ import {
   DESKTOP_DIR,
   OUT_DIR,
   buildPayload,
-  defaultBefore,
   extract,
   fetchRuntimes,
   gitHeadOrNull,
@@ -48,7 +47,6 @@ const args = parseArgs(process.argv.slice(2), {
   tgz: 'v',
   version: 'v',
   out: 'v',
-  before: 'v',
   'dist-dir': 'v',
   'keep-work': 'flag',
 });
@@ -59,7 +57,6 @@ const version = args.version ?? '0.0.0-dev';
 const platform = `darwin-${arch}`;
 const out = resolve(args.out ?? OUT_DIR);
 const work = join(CACHE_DIR, `work-${platform}`);
-const before = args.before ?? defaultBefore();
 const tgz = resolve(args.tgz);
 
 const req = createRequire(new URL('./package.json', import.meta.url));
@@ -101,8 +98,13 @@ cpSync(join(nodeSrc, 'LICENSE'), join(nodeDest, 'LICENSE'));
 chmodSync(join(nodeDest, 'bin', 'node'), 0o755);
 const nodeBefore = describeSignature(join(nodeSrc, 'bin', 'node'));
 
-console.log('[5/9] core (packed tarball, --ignore-scripts, --before cooldown)');
-installCore({ tgz, dest: join(contents, 'Resources', 'core'), os: 'darwin', cpu: arch, before });
+console.log('[5/9] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
+const core = installCore({
+  tgz,
+  dest: join(contents, 'Resources', 'core'),
+  os: 'darwin',
+  cpu: arch,
+});
 
 console.log('[6/9] Info.plist, fuses, ASAR integrity digest');
 writeFileSync(join(contents, 'Info.plist'), infoPlist({ version, asarHash: integrity.hash }));
@@ -117,8 +119,8 @@ const frameworkBin = join(
 const slots = await writeMacDigest(frameworkBin, { 'Resources/app.asar': integrity });
 await fuses.flipFuses(join(contents, 'MacOS', APP_NAME), {
   version: fuses.FuseVersion.V1,
-  strictlyRequireAllFuses: false,
-  ...Object.fromEntries(Object.entries(FUSES).map(([k, v]) => [fuses.FuseV1Options[k], v])),
+  strictlyRequireAllFuses: true,
+  ...Object.fromEntries(Object.entries(BUILD_FUSES).map(([k, v]) => [fuses.FuseV1Options[k], v])),
 });
 
 console.log('[7/9] sign (ad-hoc, our bundle and Electron parts only)');
@@ -185,7 +187,8 @@ const inputs = {
   asarHeaderSha256: integrity.hash,
   integritySlotsPatched: slots,
   signedTargets: signed,
-  npmBefore: before,
+  coreLockSha256: core.lockSha256,
+  coreTreeSha256: core.treeSha256,
   git: gitHeadOrNull(),
 };
 writeFileSync(join(out, `inputs-mac-${arch}.json`), JSON.stringify(inputs, null, 2) + '\n');

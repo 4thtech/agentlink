@@ -67,14 +67,16 @@ if (app.endsWith('.app')) {
     ),
   );
   const sentinel = Buffer.from('AGbevlPCksUGKNL8TSn7wGmJEuJsXb2A');
-  const at = fw.indexOf(sentinel);
-  const slot = at < 0 ? null : fw.subarray(at + sentinel.length, at + sentinel.length + 34);
   const want = integrityDigest({ 'Resources/app.asar': real });
-  if (!slot || slot[0] !== 1 || slot[1] !== 1 || !slot.subarray(2).equals(want)) {
-    problems.push(
-      'Electron Framework integrity digest slot is not written or does not match app.asar',
-    );
+  let slots = 0;
+  for (let at = fw.indexOf(sentinel); at !== -1; at = fw.indexOf(sentinel, at + 1)) {
+    slots++;
+    const slot = fw.subarray(at + sentinel.length, at + sentinel.length + 34);
+    if (slot.length < 34 || slot[0] !== 1 || slot[1] !== 1 || !slot.subarray(2).equals(want)) {
+      problems.push(`Electron Framework integrity digest slot ${slots} is not written or wrong`);
+    }
   }
+  if (slots === 0) problems.push('Electron Framework has no integrity digest slot');
 } else {
   const asarPath = join(dirname(app), 'resources', 'app.asar');
   if (!existsSync(asarPath)) problems.push('resources/app.asar is missing');

@@ -10,6 +10,10 @@ export const FUSES = {
   GrantFileProtocolExtraPrivileges: false,
 };
 
+// What the build writes: the pinned set plus WasmTrapHandlers (Electron's default, on), so the build
+// can set strictlyRequireAllFuses and fails when a new Electron adds a fuse nobody has chosen.
+export const BUILD_FUSES = { ...FUSES, WasmTrapHandlers: true };
+
 // Index in the fuse wire -> name (mirror of FuseV1Options; check-fuses cross-checks it).
 export const FUSE_NAMES = [
   'RunAsNode',
