@@ -84,6 +84,7 @@ export { ownerSetupAvailable } from './owner-setup.js';
 // The engine, its seams and the restore-only owner session stay inside the package.
 export {
   restoreInTerminal,
+  restorePendingHere,
   type RestoreError,
   type RestoreTerminalText,
   type TerminalRestoreOutcome,
