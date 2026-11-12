@@ -11,6 +11,9 @@ import { CSP, headersFor } from './invite/headers.js';
 const site = (path: string): string =>
   fileURLToPath(new URL(`../../apps/invite/site/${path}`, import.meta.url));
 const read = (path: string): string => readFileSync(site(path), 'utf8');
+/** WP-D9: "Get the app" (the desktop app page of the public docs). */
+const GET_APP_URL =
+  'https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md';
 
 describe('_headers', () => {
   const file = read('_headers');
@@ -83,10 +86,19 @@ describe('the pages', () => {
         expect(html).not.toMatch(/\sstyle\s*=/i);
         expect(html).not.toMatch(/\son[a-z]+\s*=/i);
         expect(html).not.toMatch(/javascript:/i);
-        // WP-2: no outside URL and no link at all (the installer brings Node.js, so the Node.js
-        // download link is gone).
-        expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([]);
-        expect([...html.matchAll(/<a\b[^>]*>/gi)]).toHaveLength(0);
+        // WP-2: no outside URL (the installer brings Node.js, so the Node.js download link is
+        // gone). WP-D9: exactly two links, both in the command card: "Open in the AgentLink app",
+        // whose agentlink://join# address the script sets from the checked invite (none in the
+        // file), and "Get the app", the public desktop app page, with no referrer.
+        expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([GET_APP_URL]);
+        expect([...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0])).toEqual([
+          '<a id="open-app" class="btn secondary">',
+          `<a id="get-app" class="btn secondary" href="${GET_APP_URL}" rel="noopener noreferrer">`,
+        ]);
+        const command = /<article id="way-command"[\s\S]*?<\/article>/.exec(html)?.[0] ?? '';
+        expect(command).toContain('id="open-app"');
+        expect(command).toContain('id="get-app"');
+        expect(html).not.toContain('agentlink://');
         // One first-party style file (CSP style-src 'self') and the site's own favicon (F33).
         const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((m) => m[0]);
         expect(links).toEqual([
@@ -128,6 +140,8 @@ describe('the pages', () => {
           'copy-ai',
           'copy',
           'copy-link',
+          'open-app',
+          'get-app',
           'next',
         ]) {
           expect(html, id).toMatch(new RegExp(`id="${id}"`));

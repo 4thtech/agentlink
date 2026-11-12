@@ -238,7 +238,17 @@ describe('a good invite (U3-invite)', () => {
     await expect(page.locator('#step-help').textContent()).resolves.toBe(
       'Paste it into Terminal and press Return. It installs AgentLink, and Node.js if needed, then opens the invite.',
     );
-    expect(await page.locator('a').count()).toBe(0);
+    // WP-D9: the two links next to the command: the app link with the checked payload, and the
+    // public desktop app page. Nothing else links out.
+    expect(await page.locator('a').count()).toBe(2);
+    await expect(page.locator('#open-app').getAttribute('href')).resolves.toBe(
+      `agentlink://join#${payloadOf(link)}`,
+    );
+    await expect(page.locator('#open-app').textContent()).resolves.toBe('Open in the AgentLink app');
+    await expect(page.locator('#get-app').getAttribute('href')).resolves.toBe(
+      'https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md',
+    );
+    await expect(page.locator('#get-app').textContent()).resolves.toBe('Get the app (coming soon)');
     await expect(page.locator('#next').textContent()).resolves.toBe(
       "AgentLink opens in your browser. Set it up, then accept Marko's invite.",
     );
@@ -351,8 +361,11 @@ describe('a hostile invite (I-5)', () => {
       // The only svg is the fixed AgentLink mark in the header.
       expect(await page.locator('img, div, svg:not(.mark), iframe').count()).toBe(0);
       expect(await page.locator('object, embed, form, input, style').count()).toBe(0);
-      // No link at all (WP-2).
-      expect(await page.locator('a').count()).toBe(0);
+      // Only the two fixed links (WP-D9); the app link carries the checked payload only.
+      expect(await page.locator('a').count()).toBe(2);
+      await expect(page.locator('#open-app').getAttribute('href')).resolves.toBe(
+        `agentlink://join#${payloadOf(link)}`,
+      );
       expect(await page.locator('script').count()).toBe(1);
       expect(
         await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned),
@@ -408,6 +421,8 @@ describe('states with no command and no sentence', () => {
     expect(await page.locator('#next').isVisible()).toBe(false);
     expect(await page.locator('#step').evaluate((e) => (e as HTMLElement).hidden)).toBe(true);
     expect((await page.locator('#step-text').textContent()) ?? '').toBe('');
+    // WP-D9: no app link without a checked invite.
+    expect(await page.locator('#open-app').getAttribute('href')).toBeNull();
     expect(probe.violations).toEqual([]);
     expect(probe.consoleErrors).toEqual([]);
     await context.close();
@@ -491,7 +506,7 @@ describe('accessibility and motion (U3-invite, b11 §33.1)', () => {
       });
       expect(violations, mode.name).toEqual([]);
       const sizes = await page.evaluate(() =>
-        ['copy-ai', 'os-unix', 'os-windows', 'os-node', 'copy', 'copy-link'].map(
+        ['copy-ai', 'os-unix', 'os-windows', 'os-node', 'copy', 'copy-link', 'open-app', 'get-app'].map(
           (id) => document.getElementById(id)?.getBoundingClientRect().height ?? 0,
         ),
       );
