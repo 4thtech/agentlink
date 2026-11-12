@@ -709,32 +709,6 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (0
     }
   });
 
-  // DESK051-C3: the desktop build tooling's node:test files (apps/desktop/build, apps/desktop/native)
-  // are run by `node --test` and compiled by no tsconfig, so `*.test.mjs` is their test name there and
-  // only there. They still count as production code for every import rule (isTestFile stays false).
-  it('accepts *.test.mjs only in the desktop build tooling test directories', () => {
-    for (const file of [
-      'apps/desktop/build/test/sign-plan.test.mjs',
-      'apps/desktop/native/test/native-build.test.mjs',
-    ]) {
-      expect(misnamedTestFile(file), file).toBeNull();
-      expect(isTestFile(file), file).toBe(false);
-    }
-    for (const file of [
-      'apps/desktop/src/main/a.test.mjs',
-      'apps/desktop/test/unit/a.test.mjs',
-      'apps/desktop/build/a.test.mjs',
-      'apps/desktop/build/test/a.spec.mjs',
-      'apps/desktop/build/test/a.test.js',
-      'apps/desktop/build/test/a.test.mts',
-      'apps/desktop/build/test/nested/a.test.mjs',
-      'apps/cli/build/test/a.test.mjs',
-      'packages/core/apps/desktop/build/test/a.test.mjs',
-    ]) {
-      expect(misnamedTestFile(file), file).toMatch(/\*\.test\.ts/);
-    }
-  });
-
   const dirs = [];
   afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });

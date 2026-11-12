@@ -2,7 +2,7 @@
 // Regenerates core-lock/ FROM pnpm-lock.yaml (no network, no second resolution): the same
 // name@version and integrity the repository already locked for apps/cli's production dependencies.
 // build-mac/build-win install it with `npm ci --ignore-scripts`, then unpack the packed CLI tarball.
-// Run it whenever pnpm-lock.yaml changes for apps/cli; test/core-lock.test.mjs fails on drift.
+// Run it whenever pnpm-lock.yaml changes for apps/cli; test/core-lock.node-test.mjs fails on drift.
 //
 //   node update-core-lock.mjs
 import { readFileSync, writeFileSync } from 'node:fs';

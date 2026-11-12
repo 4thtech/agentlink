@@ -9,7 +9,7 @@
     "node": ">=22.14.0"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs ../native/test/*.test.mjs"
+    "test": "node --test test/*.node-test.mjs ../native/test/*.node-test.mjs"
   },
   "devDependencies": {
     "@4thtech-io/crypto": "workspace:*",

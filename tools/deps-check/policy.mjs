@@ -186,26 +186,9 @@ const TEST_LIKE = /\.(?:test|spec)\.[^/\\.]+$/;
 export const MISNAMED_TEST_MESSAGE =
   'test files are named *.test.ts: package builds exclude only that name, so this file would be built into dist/ and counts as production code (IR-M1-1c-G2-1 L-1); rename it';
 
-/**
- * Directories whose `*.test.mjs` files are node:test files (DESK051-C3). The desktop build tooling
- * (apps/desktop/build, a private workspace package, and the presence-helper tests next to the native
- * sources) is plain ESM run by `node --test`, compiled by no tsconfig (apps/desktop/tsconfig.json
- * includes only src/) and never packed into the app (the ASAR holds the shell bundle only), so the
- * "would be built into dist/" reason does not apply there. Only that exact name in exactly these
- * directories (not below them) is accepted; the files are NOT test files for any import rule
- * (isTestFile stays false: the production rules apply to them in full).
- */
-export const NODE_TEST_DIRS = ['apps/desktop/build/test/', 'apps/desktop/native/test/'];
-
-const isNodeTestFile = (file) =>
-  /\.test\.mjs$/.test(file) &&
-  NODE_TEST_DIRS.some((dir) => file.startsWith(dir) && !file.slice(dir.length).includes('/'));
-
 /** The message for a test-like file name that is not `*.test.ts`, or null. */
 export const misnamedTestFile = (file) =>
-  TEST_LIKE.test(file ?? '') && !isTestFile(file) && !isNodeTestFile(file ?? '')
-    ? MISNAMED_TEST_MESSAGE
-    : null;
+  TEST_LIKE.test(file ?? '') && !isTestFile(file) ? MISNAMED_TEST_MESSAGE : null;
 
 /** True when `lib` may be used in `zone`: everywhere in its zones, in tests only in its testZones. */
 export const libraryAllowed = (lib, zone, { test = false } = {}) =>
