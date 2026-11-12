@@ -2,7 +2,7 @@
 // with the name the contact chose, shown as theirs ("Self-declared", "Not checked yet"). Only when
 // the owner confirms it does it become the owner's own alias, through the existing rename route
 // (owner presence, one POST); until then no prompt or heading carries the contact's own name (I-5).
-import { Button, TextField } from '@4thtech-io/ui';
+import { Button, ContactName, TextField } from '@4thtech-io/ui';
 import { useCallback, useEffect, useState, type FormEvent, type ReactElement } from 'react';
 import type { ApiClient } from '../../api/client.js';
 import { contactPath, parseRenameCheck, renameCheckPath } from '../contacts/data.js';
@@ -119,6 +119,9 @@ export function NameContact({
           onChange={(e) => setAlias(e.currentTarget.value)}
           {...(fieldError === undefined ? {} : { error: fieldError })}
         />
+        <p className="al-text-body-sm al-muted">
+          <ContactName name={chosen} label="selfdeclared" showLabel />
+        </p>
         <Button type="submit" variant="primary">
           {C.saveName}
         </Button>

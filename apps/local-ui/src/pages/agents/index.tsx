@@ -68,9 +68,8 @@ export function setAgentsMapView(view: AgentsMapView | undefined): void {
  * (only while fresh), so the person still reads it.
  */
 let carriedNotice: { readonly text: string; readonly at: number } | undefined;
-function takeCarriedNotice(): string | undefined {
+function peekCarriedNotice(): string | undefined {
   const c = carriedNotice;
-  carriedNotice = undefined;
   return c !== undefined && Date.now() - c.at < 5_000 ? c.text : undefined;
 }
 
@@ -158,9 +157,11 @@ export function AgentsPage({
   const [pausing, setPausing] = useState<AgentRow | undefined>(undefined);
   const [resuming, setResuming] = useState(false);
   const [cardName, setCardName] = useState<string | undefined>(undefined);
-  const [notice, setNotice] = useState<string | undefined>(takeCarriedNotice);
+  const [notice, setNotice] = useState<string | undefined>(peekCarriedNotice);
 
   useEffect(() => {
+    // Consumed once: a later mount within the 5 s window must not show it again.
+    carriedNotice = undefined;
     markAgentsOpened();
   }, []);
 
