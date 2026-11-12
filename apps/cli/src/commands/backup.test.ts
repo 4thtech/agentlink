@@ -2,6 +2,9 @@
 // 04 §2.3.3 "Restore"): interactive terminal only, harness-marker guard, no piped stdin. The flow
 // itself (hidden prompts, never overwrites, the new master code once) is node's restoreInTerminal,
 // tested over a temporary HOME in packages/node/src/recovery-kit-restore.test.ts ("the terminal").
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   COMMAND_NAMES,
@@ -13,7 +16,7 @@ import {
 } from '../dispatch.js';
 import type { TerminalContext } from '../runtime/guards.js';
 import { BACKUP_TEXT, restoreText } from './backup-strings.js';
-import { createBackupHandler } from './backup.js';
+import { backupCommandHandler, createBackupHandler } from './backup.js';
 
 const OWNER_TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 
@@ -97,5 +100,35 @@ describe('agentlink backup restore and agentlink restore (06 §8)', () => {
     ].join('\n');
     expect(all).not.toMatch(/seed phrase|wallet|transaction|\bgas\b/i);
     expect(text.recoveryCodePrompt).toMatch(/never give it to your AI/);
+  });
+});
+
+describe('main wiring: agentlink restore reaches node and refuses without a real terminal', () => {
+  it('runs restoreInTerminal (the dispatcher passes; the node prompt refuses a non-TTY) and writes nothing', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'al-r1-e2e-'));
+    const saved = process.env['HOME'];
+    process.env['HOME'] = home;
+    try {
+      await mkdir(join(home, 'Downloads'), { recursive: true });
+      await writeFile(join(home, 'Downloads', 'agentlink-recovery-kit-x.alkk'), 'ALKK....');
+      const out: string[] = [];
+      const dispatch = createDispatcher({
+        backup: backupCommandHandler,
+        restore: backupCommandHandler,
+      });
+      // The test runner's stdin is not a TTY, so node's own prompt refuses before anything is read.
+      const code = await dispatch(['restore'], {
+        output: { print: (t) => out.push(t), printError: (t) => out.push(t) },
+        terminal: OWNER_TTY,
+        version: '0.0.0',
+      });
+      expect(code).toBe(EXIT_FAILED);
+      expect(await readdir(home)).toEqual(['Downloads']);
+      expect(out.join(' ')).not.toMatch(/ALKK|Downloads/);
+    } finally {
+      if (saved === undefined) delete process.env['HOME'];
+      else process.env['HOME'] = saved;
+      await rm(home, { recursive: true, force: true });
+    }
   });
 });
