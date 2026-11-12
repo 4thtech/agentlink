@@ -12,6 +12,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
+import { clearTimeout, setTimeout } from 'node:timers';
 import { URL, fileURLToPath } from 'node:url';
 import { EXIT, buildMacHelper, parseMacRecord } from '../../build/native.mjs';
 

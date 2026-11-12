@@ -11,6 +11,7 @@ import {
   type NativeRegistration,
   type NativeStatus,
 } from './native-api.js';
+import { NativeWaitNotice } from './native-wait.js';
 import { NATIVE_STRINGS, nativeOutcomeText } from './strings.js';
 
 export function NativeSetupOffer({
@@ -92,9 +93,7 @@ export function NativeSetupOffer({
         </Button>
       </div>
       {working ? (
-        <p className="al-text-body-sm" role="status" data-native-waiting="">
-          {NATIVE_STRINGS.waiting(platform)}
-        </p>
+        <NativeWaitNotice inline {...(userAgent === undefined ? {} : { userAgent })} />
       ) : null}
       {note === undefined ? null : (
         <p className="al-text-body-sm ct-error" role="alert">

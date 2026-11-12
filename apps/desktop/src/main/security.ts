@@ -225,14 +225,42 @@ export function permissionAllowed(
   return origin !== null && lock.origin !== null && origin === lock.origin;
 }
 
+/** DESK-TOUCHID-FIX: the routes that turn native presence on or on again (they run the helper). */
+const NATIVE_HELPER_PATHS: readonly string[] = ['/api/owner/native', '/api/owner/native/replace'];
+
+/**
+ * DESK-TOUCHID-FIX: true for a request that will start the native presence helper: a POST with
+ * `X-AgentLink-Presence: native` (any owner route), or a POST that turns it on or on again.
+ */
+export function isNativePresenceRequest(
+  method: string,
+  url: string,
+  headers: Record<string, string>,
+): boolean {
+  if (method.toUpperCase() !== 'POST') return false;
+  const parsed = parseUrl(url);
+  if (parsed === null) return false;
+  for (const [name, value] of Object.entries(headers)) {
+    if (name.toLowerCase() === 'x-agentlink-presence' && value.trim().toLowerCase() === 'native') {
+      return true;
+    }
+  }
+  return NATIVE_HELPER_PATHS.includes(parsed.pathname);
+}
+
 /**
  * Hardens the window's session: permissions, device pickers, screen capture, requests, downloads,
  * a direct proxy (a system proxy never sees the loopback traffic) and the user-agent marker.
+ * DESK-TOUCHID-FIX: `onNativePresence` runs before a request that starts the presence helper leaves
+ * the window (main.ts takes focus off the page with it, so a focused master-code field cannot keep
+ * macOS secure input on while the Touch ID sheet wants to become key). The page blurs the field
+ * itself first; this is the backstop. Headers pass unchanged.
  */
 export async function hardenSession(
   session: Session,
   lock: OriginLock,
   platform: string,
+  onNativePresence?: () => void,
 ): Promise<void> {
   session.setPermissionRequestHandler((_contents, permission, callback, details) => {
     callback(permissionAllowed(lock, permission, details.requestingUrl));
@@ -250,6 +278,20 @@ export async function hardenSession(
   }
   session.webRequest.onBeforeRequest((details, callback) => {
     callback({ cancel: !requestAllowed(lock, details.url) });
+  });
+  session.webRequest.onBeforeSendHeaders((details, callback) => {
+    if (
+      onNativePresence !== undefined &&
+      lock.allows(details.url) &&
+      isNativePresenceRequest(details.method, details.url, details.requestHeaders)
+    ) {
+      try {
+        onNativePresence();
+      } catch {
+        // Never blocks the request.
+      }
+    }
+    callback({ requestHeaders: details.requestHeaders });
   });
   session.on('will-download', (event, item) => {
     if (!lock.allowsBlob(item.getURL())) {

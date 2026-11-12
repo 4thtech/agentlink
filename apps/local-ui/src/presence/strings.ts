@@ -49,10 +49,13 @@ export const NATIVE_STRINGS = Object.freeze({
     `${nativeSensor(platform)} is off for approvals on this computer.`,
   wrongCode: 'That master code did not work. Nothing was changed.',
   working: 'Waiting for you…',
-  /** DESK-NATIVE-DEBUG: shown while the OS prompt is up, so a waiting request is never silent. */
+  /**
+   * DESK-NATIVE-DEBUG: shown while the OS prompt is up, so a waiting request is never silent.
+   * DESK-TOUCHID-FIX: the Mac wording names the key to rest a finger on (with a Cancel beside it).
+   */
   waiting: (platform: DesktopPlatform): string =>
     platform === 'mac'
-      ? 'Waiting for Touch ID. Touch the sensor when your Mac asks.'
+      ? 'Rest your finger on the Touch ID key.'
       : 'Waiting for Windows Hello. Follow the Windows Hello prompt.',
   /** DESK-NATIVE-DEBUG: the page's own answers when the server did not finish. */
   busy: 'Another approval is in progress. Finish it, then try again.',

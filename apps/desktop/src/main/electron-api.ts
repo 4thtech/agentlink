@@ -60,7 +60,20 @@ export interface OnBeforeRequestDetails {
   readonly url: string;
 }
 
+/** DESK-TOUCHID-FIX: what onBeforeSendHeaders sees of a request. */
+export interface OnBeforeSendHeadersDetails {
+  readonly url: string;
+  readonly method: string;
+  readonly requestHeaders: Record<string, string>;
+}
+
 export interface WebRequest {
+  onBeforeSendHeaders(
+    listener: (
+      details: OnBeforeSendHeadersDetails,
+      callback: (response: { cancel?: boolean; requestHeaders?: Record<string, string> }) => void,
+    ) => void,
+  ): void;
   onBeforeRequest(
     listener: (
       details: OnBeforeRequestDetails,
@@ -161,6 +174,8 @@ export interface BrowserWindow {
   loadURL(url: string): Promise<void>;
   show(): void;
   focus(): void;
+  /** DESK-TOUCHID-FIX: takes keyboard focus away from the web contents. */
+  blurWebView(): void;
   hide(): void;
   isDestroyed(): boolean;
   isMinimized(): boolean;

@@ -22,7 +22,7 @@ import { NATIVE_STRINGS } from './strings.js';
 
 const MAC_APP = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Electron/39.0 ${DESKTOP_MARKER}`;
 const WIN_APP = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) Electron/39.0 ${DESKTOP_MARKER}`;
-const ORIGIN = 'http://localhost';
+const ORIGIN = location.origin;
 
 let host: HTMLElement;
 let root: Root;
@@ -132,12 +132,15 @@ describe('the wrapped fetch', () => {
     input.remove();
   });
 
-  it("Cancel aborts the request; the caller's own abort still works", async () => {
+  it("Cancel aborts the request with the server's cancelled answer; the caller's abort rejects", async () => {
     const held = heldFetch();
     const f = nativeWaitFetch(held.base, ORIGIN);
     const p = f('/api/owner/native/replace', { method: 'POST' });
     cancelNativeWait();
-    await expect(p).rejects.toThrow();
+    const res = await p;
+    expect(held.seen[0]?.signal?.aborted).toBe(true);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ status: 'presence_rejected', native: 'cancelled' });
     expect(nativeWaiting()).toBe(false);
 
     const own = new AbortController();
@@ -164,7 +167,7 @@ describe('the waiting notice', () => {
     const cancel = host.querySelector<HTMLButtonElement>('[data-native-cancel]');
     expect(cancel?.textContent).toBe(NATIVE_STRINGS.cancel);
     await act(async () => cancel?.click());
-    await expect(p).rejects.toThrow();
+    expect((await p).status).toBe(403);
     await flush();
     expect(host.querySelector('[data-native-waiting]')).toBeNull();
   });
