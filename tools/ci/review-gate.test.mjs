@@ -202,6 +202,38 @@ describe('review-gate path classes', () => {
     expect(rules).toMatch(/^\| `installer\/\*\*` \| S2 \|/m);
   });
 
+  it('D-145: the desktop apps and the core desktop host are S2, and CODEOWNERS and audit-rules list them', () => {
+    for (const p of [
+      'apps/desktop/package.json',
+      'apps/desktop/src/main/main.ts',
+      'apps/cli/src/desktop/host.ts',
+    ]) {
+      expect(classify(p), p).toBe(2);
+    }
+    expect(classify('apps/cli/src/commands/ui.ts')).toBe(1);
+    expect(classify('apps/desktopx/a.ts')).toBe(0);
+    expect(classifyFiles(['apps/desktop/src/main/main.ts'])).toMatchObject({
+      cls: 2,
+      reviewRequired: true,
+    });
+    // D-145 (5): the offline update-key tooling is S2 and a sensitive path.
+    for (const p of ['tools/desktop/sign-manifest.mjs', 'tools/desktop/sign-manifest.test.mjs']) {
+      expect(classify(p), p).toBe(2);
+      expect(isSensitive(p), p).toBe(true);
+    }
+    expect(isSensitive('tools/desktop-extension/build.mjs')).toBe(false);
+    expect(classify('tools/desktop-extension/build.mjs')).toBe(0);
+    const codeowners = readFileSync(join(root, '.github/CODEOWNERS'), 'utf8');
+    for (const path of ['/apps/desktop/', '/apps/cli/src/desktop/', '/tools/desktop/']) {
+      expect(codeowners).toMatch(
+        new RegExp(`^${path.replaceAll('/', '\\/')}\\s+@talirezun @denisjazbec$`, 'm'),
+      );
+    }
+    const rules = readFileSync(join(root, 'docs/process/audit-rules.md'), 'utf8');
+    expect(rules).toMatch(/^\| `apps\/desktop\/\*\*`, `apps\/cli\/src\/desktop\/\*\*` \| S2 \|/m);
+    expect(rules).toMatch(/^\| `tools\/desktop\/\*\*` \| S2 \|/m);
+  });
+
   it('classifyFiles: the highest class wins; review only for S2 or sensitive', () => {
     expect(classifyFiles(['README.md'])).toMatchObject({ cls: 0, reviewRequired: false });
     expect(classifyFiles(['apps/cli/src/a.ts'])).toMatchObject({
