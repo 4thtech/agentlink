@@ -174,15 +174,18 @@ await step('S3', 'ui without a terminal answers its fixed line', async () => {
   need(/own terminal/.test(r.out), `printed: ${r.out.slice(-200)}`);
 });
 
+// Claude Desktop does not exist on Linux; a student there uses Claude Code.
+const harness = process.platform === 'linux' ? 'claude-code' : 'claude-desktop';
+
 await step('S4', 'init in two profiles (ana, ben)', async () => {
   for (const [who, home] of Object.entries(homes)) {
-    const first = await cli(['init', '--harness', 'claude-desktop'], home);
+    const first = await cli(['init', '--harness', harness], home);
     const code = /--confirm ([0-9a-f]{4}-[0-9a-f]{4})/.exec(first.out)?.[1];
     need(
       code !== undefined,
       `${who}: init did not ask for its one-time code: ${first.out.slice(-150)}`,
     );
-    const second = await cli(['init', '--harness', 'claude-desktop', '--confirm', code], home);
+    const second = await cli(['init', '--harness', harness, '--confirm', code], home);
     need(second.code === 0, `${who}: init --confirm exited ${second.code}`);
   }
 });
