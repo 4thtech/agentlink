@@ -5,9 +5,10 @@
 // in storage, a URL, an attribute or a file.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient, OwnerApiResult, OwnerPresence } from '../../api/client.js';
 import { RECOVERY_KIT_LATER_KEY, rememberRecoveryKitLater } from '../../states/index.js';
+import { navigate } from '../../router.js';
 import { BackupPage } from './index.js';
 import { BACKUP_CHECK_PATH } from './save-checklist.js';
 import { BACKUP_STRINGS as S } from './strings.js';
@@ -177,6 +178,36 @@ describe('Back up: save the recovery kit in the app', () => {
     expect(host.textContent).toContain('agentlink-recovery-kit-2026-11-12.alkk');
     expect(host.textContent).toContain(S.savedIn('Downloads'));
     expect(host.querySelector('[data-recovery-code]')?.textContent).toBe(CODE.replace(/-/g, ''));
+  });
+
+  it('UX1113-QA2 N14: leaving while the code and checklist are up asks first; after Done it does not', async () => {
+    history.replaceState(null, '', '/settings/backup');
+    const f = fakeApi(SAVED);
+    await saveKit(f, { checkKit: checkKit(), openWindow: fakeWindow().open });
+    const unload = (): boolean => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(unload()).toBe(true);
+    // In the app: "stay" keeps the page and the code.
+    const stay = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    act(() => navigate('/settings'));
+    expect(stay).toHaveBeenCalledWith(S.leaveWarning);
+    expect(location.pathname).toBe('/settings/backup');
+    expect(host.querySelector('[data-recovery-code]')).not.toBeNull();
+    stay.mockRestore();
+    // Finishing the checklist lifts the guard.
+    await tick(S.stepMove);
+    await tick(S.stepWrite);
+    await click(S.checkNow);
+    await click(S.finish);
+    const asked = vi.spyOn(window, 'confirm');
+    expect(unload()).toBe(false);
+    act(() => navigate('/settings'));
+    expect(asked).not.toHaveBeenCalled();
+    expect(location.pathname).toBe('/settings');
+    asked.mockRestore();
   });
 
   it('Done stays off until the three steps are ticked; the check ticks itself when it opens', async () => {

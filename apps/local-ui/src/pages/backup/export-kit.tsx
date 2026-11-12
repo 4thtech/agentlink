@@ -8,6 +8,7 @@
 import { Button } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient, type OwnerApiResult } from '../../api/client.js';
+import { useLeaveGuard } from '../../leave-guard.js';
 import { forgetRecoveryKitLater } from '../../states/index.js';
 import { gateMessage, OwnerGate } from '../agents/owner-gate.js';
 import { createOwnerClient, type PasskeyInfo, type PresenceProof } from '../contacts/owner.js';
@@ -222,6 +223,8 @@ export function ExportKit({
   const availability = useAvailability(api, known);
   const passkey = usePasskeyInfo(readPasskey);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  // UX1113-QA2 N14: while the kit is being saved, or its code and checklist are up, leaving asks.
+  useLeaveGuard(phase.kind === 'working' || phase.kind === 'saved' ? S.leaveWarning : undefined);
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState<string | undefined>(undefined);
   const codeId = useId();
