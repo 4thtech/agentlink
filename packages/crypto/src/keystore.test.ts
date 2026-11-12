@@ -68,6 +68,12 @@ const SEED_OR_SECRET = [
   // M1-9i-b2 (04 §2.2): the s3:<id> item, which holds the storage secret (KeyStore backends only).
   'encodeStorageCredentialItem',
   'parseStorageCredentialItem',
+  // DESK-D12a (04 §2.3.4): the ALKH native presence wrap, which takes the helper's secret or the
+  // seed, and the per-install challenge, which makes (and wipes) a P-256 peer secret.
+  'createNativeChallenge',
+  'deriveNativeWrapKey',
+  'sealNativeSeed',
+  'openNativeSeed',
 ];
 
 // The one deterministic test seam (@4thtech-io/crypto/testing, never built or exported).
@@ -89,6 +95,8 @@ const TEST_SEAM = [
   // M1-1k: fixed nonce (and salt) for ALKP and ALKR.
   'sealPasskeySeedWithNonce',
   'sealRecoverySeedWithSaltAndNonce',
+  // DESK-D12a: fixed nonce for ALKH.
+  'sealNativeSeedWithNonce',
   // M1-9i-b: the ALKK kit with a fixed code, salt and nonce prefix, its kek, and opening with a kek.
   'sealRecoveryKitWith',
   'deriveRecoveryKitKek',

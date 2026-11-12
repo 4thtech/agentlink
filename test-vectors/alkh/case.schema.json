@@ -1,0 +1,347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/alkh/case.schema.json",
+  "title": "alkh case",
+  "description": "Native presence wrap `ALKH` v1 (04 \u00a72.3.4, D-145 phase 2). `wrapKey`: HKDF-SHA256 of the helper's native secret with an empty salt and the info that binds version, kind, credential ID, SHA-256 of the credential public key, SHA-256 of the challenge and the owner key, 32 bytes. `sealNative`: the whole blob for a fixed nonce. `openNative`: the seed, or `outcome: reject`; an empty `expectedOwnerNostr` and `expectedKind` 0 mean the caller knows none. `nativeHeader`: the public header fields (kind as a decimal string). `crossOpen`: an ALKH blob given to the ALKP (`secret` = PRF output hex), ALKR or ALKO (`secret` = code text) reader. Hex without 0x.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "kind",
+            "nativeSecret",
+            "credentialId",
+            "credentialPublicKey",
+            "challenge",
+            "ownerNostr"
+          ],
+          "properties": {
+            "op": {
+              "const": "wrapKey"
+            },
+            "kind": {
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "nativeSecret": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "credentialId": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "credentialPublicKey": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "challenge": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "ownerNostr": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "wrapKey"
+          ],
+          "properties": {
+            "wrapKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "kind",
+            "nativeSecret",
+            "seed",
+            "credentialId",
+            "credentialPublicKey",
+            "challenge",
+            "nonce"
+          ],
+          "properties": {
+            "op": {
+              "const": "sealNative"
+            },
+            "kind": {
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "nativeSecret": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "seed": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "credentialId": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "credentialPublicKey": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "challenge": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "nonce": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{24}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "blob"
+          ],
+          "properties": {
+            "blob": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "blob",
+            "nativeSecret",
+            "expectedOwnerNostr",
+            "expectedKind"
+          ],
+          "properties": {
+            "op": {
+              "const": "openNative"
+            },
+            "blob": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "nativeSecret": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "expectedOwnerNostr": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "expectedKind": {
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "seed"
+              ],
+              "properties": {
+                "seed": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "blob"
+          ],
+          "properties": {
+            "op": {
+              "const": "nativeHeader"
+            },
+            "blob": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "ownerNostr",
+                "credentialId",
+                "credentialPublicKey",
+                "challenge"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "1",
+                    "2"
+                  ]
+                },
+                "ownerNostr": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "credentialId": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                },
+                "credentialPublicKey": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                },
+                "challenge": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "reader",
+            "blob",
+            "secret"
+          ],
+          "properties": {
+            "op": {
+              "const": "crossOpen"
+            },
+            "reader": {
+              "enum": [
+                "passkey",
+                "recovery",
+                "owner"
+              ]
+            },
+            "blob": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "secret": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "reject"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
