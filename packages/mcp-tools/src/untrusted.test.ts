@@ -197,3 +197,35 @@ describe('untrustedBlock and untrustedText (06 \u00a74 format)', () => {
     expect(hostile).toContain('envelope="&quot;&gt;&lt;b&gt;"');
   });
 });
+
+describe('IR-REL051-A12-1 M1: tag escaping is linear (no ReDoS on 64 KB of file text)', () => {
+  const inputs: [string, string][] = [
+    ['one "<" then 64 KB of spaces', `<${' '.repeat(65_535)}`],
+    ['one "<" then 64 KB of spaces and newlines', `<${' \n'.repeat(32_767)} `],
+    ['"< /" then 64 KB of whitespace', `< /${' \n'.repeat(32_766)}`],
+    ['64 KB of "<" and whitespace runs', `<${' '.repeat(255)}`.repeat(256)],
+  ];
+  it.each(inputs)('%s finishes in under 100 ms', (_label, input) => {
+    sanitizeUntrustedText('warm up');
+    const start = performance.now();
+    sanitizeUntrustedText(input);
+    expect(performance.now() - start).toBeLessThan(100);
+  });
+
+  it('the linear pattern still escapes spaced and slashed tags', () => {
+    expect(sanitizeUntrustedText('< / untrusted_content>')).toBe('&lt; / untrusted_content>');
+    expect(sanitizeUntrustedText('<\n/\nuntrusted content')).toBe('&lt;\n/\nuntrusted content');
+    expect(sanitizeUntrustedText('<   untrusted--content')).toBe('&lt;   untrusted--content');
+  });
+});
+
+describe('IR-REL051-A12-1 L3: tabs kept in file content only', () => {
+  it('keepTabs keeps a tab; the default still makes it a space', () => {
+    expect(sanitizeUntrustedText('a\tb')).toBe('a b');
+    expect(sanitizeUntrustedText('func main() {\n\treturn\n}', { keepTabs: true })).toBe(
+      'func main() {\n\treturn\n}',
+    );
+    // Every other control character is still removed.
+    expect(sanitizeUntrustedText('a\t\u001b[31mb‮', { keepTabs: true })).toBe('a\t[31mb');
+  });
+});
