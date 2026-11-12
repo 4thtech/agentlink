@@ -313,3 +313,43 @@ describe('contact rows carry pairedAt', () => {
     expect(rows[1]).not.toHaveProperty('pairedAt');
   });
 });
+
+// REL051-CF1 (R1-CLASS-01, -06): a waiting accept also answers when it began (`startedAt`, RFC 3339
+// from core's unix seconds), so the app can say "still waiting" and, later, "no answer" (also after a
+// restart). A value of another shape is left out.
+describe('R1-CLASS-01/06: a waiting accept answers startedAt', () => {
+  const port = (startedAt: unknown) =>
+    ({
+      list: () => Promise.resolve([]),
+      connecting: () =>
+        Promise.resolve([
+          {
+            id: FEEDBACK_WORLD.ref,
+            display: { name: 'Marko', label: 'self-declared', nameSource: 'counterparty' },
+            expiresAt: EXPIRES,
+            startedAt,
+            sent: true,
+            again: false,
+            blocked: false,
+          },
+        ]),
+    }) as unknown as LocalUiInviteAcceptPort;
+
+  it('answers startedAt as RFC 3339', async () => {
+    const result = await invitesListRoute.handler(
+      context({ invites: port(1_799_999_000) }),
+      request(),
+    );
+    const [row] = (result.body as { connecting: Record<string, unknown>[] }).connecting;
+    expect(row?.['startedAt']).toBe('2027-01-15T07:43:20Z');
+  });
+
+  it('leaves startedAt out for anything but a unix time', async () => {
+    for (const value of [undefined, -1, 'x', 1.5]) {
+      const result = await invitesListRoute.handler(context({ invites: port(value) }), request());
+      const [row] = (result.body as { connecting: Record<string, unknown>[] }).connecting;
+      expect(row).toBeDefined();
+      expect(Object.hasOwn(row ?? {}, 'startedAt')).toBe(false);
+    }
+  });
+});

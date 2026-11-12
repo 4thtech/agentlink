@@ -443,6 +443,37 @@ describe('Home simple (A4)', () => {
     expect(post?.method).toBe('POST');
   });
 
+  it('R1-CLASS-01 (REL051-CF1): an accept with no answer after the bound says so, with a real Cancel', async () => {
+    const expires = new Date(Date.now() + 6.5 * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
+    const started = new Date(Date.now() - 5 * 60_000).toISOString().replace(/\.\d+Z$/, 'Z');
+    const ana = '0x' + 'a1'.repeat(20);
+    const s = await render(
+      base({
+        '/api/ui/invites': ok({
+          invites: [],
+          connecting: [
+            {
+              ref: ana,
+              name: 'Ana',
+              expiresAt: expires,
+              startedAt: started,
+              sent: true,
+              again: false,
+            },
+          ],
+        }),
+        '/api/ui/invites/connecting/cancel': ok({ status: 'cancelled' }),
+      }),
+    );
+    expect(host.textContent).toContain(
+      "No answer from Ana yet. If this invite was already used or cancelled, it won't connect. Ask Ana for a new one.",
+    );
+    expect(host.textContent).not.toContain('Connecting to Ana…');
+    await click(byText('button', 'Cancel'));
+    const post = s.calls.find((c) => c.url === '/api/ui/invites/connecting/cancel');
+    expect(JSON.parse(new TextDecoder().decode(post?.body))).toEqual({ ref: ana });
+  });
+
   it('N2 (REL051-B1): an accept waiting on a person blocked here says so; Cancel posts the server route', async () => {
     const expires = new Date(Date.now() + 6.5 * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
     const bo = '0x' + 'b0'.repeat(20);

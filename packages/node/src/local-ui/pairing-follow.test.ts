@@ -89,3 +89,68 @@ describe('a paused agent gets no host pass (W4-PAUSE)', () => {
     expect(calls.sync).toBe(1);
   });
 });
+
+// REL051-CF1 (R1-CLASS-10): on a slow network one pass's 3 s fetch budget can end before the first
+// answer arrives, every time. A pass that ended partial (the relay did not finish) doubles the next
+// pass's budget, up to 12 s; a pass that finished resets it.
+describe('a slow network gets a longer pass (R1-CLASS-10)', () => {
+  function slow(partial: () => boolean) {
+    const budgets: number[] = [];
+    const c: PairingFollowClient = {
+      publisherLease: () => ({
+        take: () => Promise.resolve(true),
+        release: () => Promise.resolve(true),
+      }),
+      syncInbox: (options) => {
+        budgets.push(options?.budgetMs ?? -1);
+        return Promise.resolve({ partial: partial() });
+      },
+      outbox: { processDue: () => Promise.resolve() },
+      pairing: { waiting: () => Promise.resolve(true) },
+    };
+    return { c, budgets };
+  }
+
+  it('doubles the budget after a partial pass, up to the cap, and resets after a full one', async () => {
+    let partial = true;
+    const { c, budgets } = slow(() => partial);
+    let t = 0;
+    const follower = pairingFollower(c, { nowMs: () => t });
+    for (let i = 0; i < 5; i += 1) {
+      expect(await follower.follow()).toBe('ran');
+      t += 5_000;
+    }
+    expect(budgets).toEqual([3_000, 6_000, 12_000, 12_000, 12_000]);
+    partial = false;
+    await follower.follow();
+    t += 5_000;
+    await follower.follow();
+    expect(budgets.slice(5)).toEqual([12_000, 3_000]);
+  });
+
+  it('a sync that throws or answers nothing keeps the base budget', async () => {
+    const budgets: number[] = [];
+    let t = 0;
+    const follower = pairingFollower(
+      {
+        publisherLease: () => ({
+          take: () => Promise.resolve(true),
+          release: () => Promise.resolve(true),
+        }),
+        syncInbox: (options) => {
+          budgets.push(options?.budgetMs ?? -1);
+          return budgets.length === 1 ? Promise.reject(new Error('x')) : Promise.resolve();
+        },
+        outbox: { processDue: () => Promise.resolve() },
+        pairing: { waiting: () => Promise.resolve(true) },
+      },
+      { nowMs: () => t },
+    );
+    await follower.follow();
+    t += 5_000;
+    await follower.follow();
+    t += 5_000;
+    await follower.follow();
+    expect(budgets).toEqual([3_000, 3_000, 3_000]);
+  });
+});

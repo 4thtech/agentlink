@@ -259,7 +259,7 @@ describe('the link nextStep command prefix (M1-36a)', () => {
     const url = `http://localhost:47321/approve/${APPROVAL}`;
     const npx = 'npx -y @4thtech-io/agentlink';
     const text = approvalLinkNextStep(APPROVAL, url, `a${'b'.repeat(31)}`, npx);
-    expect(text).toContain(' or in your terminal run ');
+    expect(text).toContain('run this in your own terminal: ');
     expect(Array.from(text).length).toBeLessThanOrEqual(500);
   });
 
@@ -273,6 +273,15 @@ describe('the link nextStep command prefix (M1-36a)', () => {
 });
 
 describe('the nextStep with the link (06 §2.5; 11 §6.10)', () => {
+  it('REL051-CF1 (carried C5): points to Home in the AgentLink app first, the terminal last', () => {
+    const url = `http://localhost:47321/approve/${APPROVAL}`;
+    const text = approvalLinkNextStep(APPROVAL, url, 'default');
+    expect(text).toContain('AgentLink app');
+    expect(text.indexOf('Home')).toBeGreaterThan(-1);
+    expect(text.indexOf('Home')).toBeLessThan(text.indexOf(url));
+    expect(text.indexOf(url)).toBeLessThan(text.indexOf('terminal'));
+  });
+
   it('names the link, keeps the CLI command and tells the agent never to open or fetch it', () => {
     const url = `http://localhost:47321/approve/${APPROVAL}`;
     const text = approvalLinkNextStep(APPROVAL, url, 'default');
