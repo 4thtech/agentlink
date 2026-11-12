@@ -44,6 +44,12 @@
 // expiry, `sent`, `again`), check answers `alreadyContact` `{ref, name}` for an invite from a paired
 // contact, and accept answers `again` next to `sent`.
 //
+// REL051-B1 (N2; 08 §1): a `connecting` row also answers `blocked: true` while core says the person
+// is blocked here (their answer is dropped; Unblock is `POST /api/ui/contacts/:ref/unblock`), and
+// `POST /api/ui/invites/connecting/cancel`, the invite kind, step `cancel-connecting`, body exactly
+// `{"ref"}`, drops this agent's accepts that wait for that contact (core `cancelConnecting`; nothing
+// is signed or sent), as Cancel on an open invite does for the other side.
+//
 // Only the canonical link `https://agentlink.4thtech.io/i#<payload>` or the bare payload ever reaches
 // core: any other host, scheme, path, percent-escape, whitespace or size is refused here first, and
 // nothing in these routes fetches anything (04 §4). The link holds the invite secret: it is answered
@@ -71,6 +77,7 @@ import {
   INVITE_ACCEPT_PATH,
   INVITE_CANCEL_PATH,
   INVITE_CHECK_PATH,
+  INVITE_CONNECTING_CANCEL_PATH,
   INVITE_CREATE_PATH,
   INVITES_LIST_PATH,
 } from '../invite-paths.js';
@@ -402,6 +409,8 @@ async function listInvites(
         expiresAt: when,
         sent: item.sent === true,
         again: item.again === true,
+        // REL051-B1 (N2): only while core says this person is blocked here.
+        ...(item.blocked === true ? { blocked: true } : {}),
       });
     }
   } catch {
@@ -424,6 +433,31 @@ async function cancelInvite(
   let outcome: 'cancelled' | 'not_found';
   try {
     outcome = await invites.cancel(inviteId);
+  } catch (error) {
+    if (error instanceof CoreError && error.code === 'identity_missing') return UI_NOT_SET_UP;
+    return UNAVAILABLE;
+  }
+  if (outcome === 'not_found') return NOT_FOUND;
+  return Object.freeze({ status: 200, body: Object.freeze({ status: 'cancelled' }) });
+}
+
+/**
+ * REL051-B1 (N2): Cancel on an accept that waits (the invite kind, step `cancel-connecting`): body
+ * exactly `{"ref"}`, the contact ID the `connecting` row carries. Core drops this agent's staged
+ * accepts for it; nothing is signed or sent. 404 when none waits.
+ */
+async function cancelConnecting(
+  _context: LocalUiContext,
+  body: JsonObject,
+  invites: LocalUiInviteDesk | undefined,
+): Promise<LocalUiResult> {
+  if (invites === undefined) return UI_NOT_SET_UP;
+  const keys = Object.keys(body);
+  const ref = body['ref'];
+  if (keys.length !== 1 || typeof ref !== 'string' || !REF.test(ref)) return INVALID;
+  let outcome: 'cancelled' | 'not_found';
+  try {
+    outcome = await invites.cancelConnecting(ref);
   } catch (error) {
     if (error instanceof CoreError && error.code === 'identity_missing') return UI_NOT_SET_UP;
     return UNAVAILABLE;
@@ -606,10 +640,19 @@ export const inviteCancelRoute: LocalUiInviteRoute = Object.freeze<LocalUiInvite
   handler: cancelInvite,
 });
 
+export const inviteConnectingCancelRoute: LocalUiInviteRoute = Object.freeze<LocalUiInviteRoute>({
+  method: 'POST',
+  path: INVITE_CONNECTING_CANCEL_PATH,
+  presence: 'invite',
+  step: 'cancel-connecting',
+  handler: cancelConnecting,
+});
+
 export const invitesRoutes: readonly LocalUiRoute[] = Object.freeze([
   inviteCreateRoute,
   inviteCheckRoute,
   inviteAcceptRoute,
   invitesListRoute,
   inviteCancelRoute,
+  inviteConnectingCancelRoute,
 ]);

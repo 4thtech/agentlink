@@ -75,6 +75,9 @@ import {
 } from './stored-envelope.js';
 import type { StoreTx } from './store/store.js';
 
+/** A contact ID: its agent's EVM address, lowercase (04 §2.9). */
+const EVM_ID = /^0x[0-9a-f]{40}$/;
+
 export type ContactStatus = Row<'contacts'>['status'];
 export type PairingState = Row<'contacts'>['pairing'];
 
@@ -150,6 +153,12 @@ export interface ConnectingContact {
   readonly sent: boolean;
   /** True when the agent is already an active, paired contact: a re-pair (04 §2.9). */
   readonly again: boolean;
+  /**
+   * REL051-B1 (N2): true while this person is blocked here (the contact is blocked, or it was
+   * blocked and then removed, so its key is in `blocked_keys`): the inviter's answer is dropped, and
+   * the accept can't finish until the owner unblocks them (`contact.unblock`) or cancels it.
+   */
+  readonly blocked: boolean;
 }
 
 /** W5-INVITE-FEEDBACK: the kept `handshake` row's plain time and direction. */
@@ -537,14 +546,20 @@ export class ContactBook {
       tx
         .select('pairings', { role: 'invitee' }, { orderBy: [['created_at', 'asc']] })
         .filter((r) => r.expires_at > now)
-        .map((r) => ({
-          row: r,
-          contact: tx.get('contacts', { contact_id: r.contact_id }),
-          delivery: tx.get('envelopes', { envelope_id: r.pairing_id })?.delivery ?? null,
-        })),
+        .map((r) => {
+          const contact = tx.get('contacts', { contact_id: r.contact_id });
+          return {
+            row: r,
+            contact,
+            delivery: tx.get('envelopes', { envelope_id: r.pairing_id })?.delivery ?? null,
+            blocked:
+              contact?.status === 'blocked' ||
+              tx.get('blocked_keys', { from_key: r.agent_nostr }) !== undefined,
+          };
+        }),
     );
     const out: ConnectingContact[] = [];
-    for (const { row, contact, delivery } of rows) {
+    for (const { row, contact, delivery, blocked } of rows) {
       const again = contact?.status === 'active' && contact.pairing === 'complete';
       let display: ContactDisplayName;
       try {
@@ -568,9 +583,24 @@ export class ContactBook {
         expiresAt: row.expires_at,
         sent: delivery === 'sent',
         again,
+        blocked,
       });
     }
     return out;
+  }
+
+  /**
+   * REL051-B1 (N2; 08 §1): drops this agent's accepts that wait for `id`'s answer (its staged
+   * `invitee` pairings), so they leave "Connecting to …". Nothing else changes: an answer that
+   * arrives later names no pairing in progress and completes nothing. `not_found` when none waits
+   * (or `id` is not a contact ID).
+   */
+  async cancelConnecting(id: string): Promise<'cancelled' | 'not_found'> {
+    if (typeof id !== 'string' || !EVM_ID.test(id)) return 'not_found';
+    const deleted = await this.#ctx.store.transaction((tx) =>
+      tx.delete('pairings', { contact_id: id, role: 'invitee' }),
+    );
+    return deleted > 0 ? 'cancelled' : 'not_found';
   }
 
   /** D-141: the unseen former-name note of a contact shown by its own name, if any. */
@@ -1390,6 +1420,19 @@ export function removeContactTx(tx: StoreTx, row: Row<'contacts'>, now: number):
     'contacts',
     { contact_id: id, status: { in: ['active', 'blocked'] } },
     { status: 'removed', updated_at: now },
+  );
+}
+
+/**
+ * REL051-B1 (N2; 04 §2.5.1 `contact.unblock`): the keys of a removed contact that are still in
+ * `blocked_keys` (it was blocked when it was removed, audit L2), inside the caller's transaction.
+ * Empty for any other contact: unknown, not removed, revoked, or removed with no key blocked.
+ */
+export function removedBlockedKeysTx(tx: StoreTx, contactId: string): string[] {
+  const row = tx.get('contacts', { contact_id: contactId });
+  if (row?.status !== 'removed' || isRevoked(tx, contactId, row)) return [];
+  return [...new Set([row.agent_nostr, ...parseKeyList(row.nostr_keys)])].filter(
+    (key) => tx.get('blocked_keys', { from_key: key }) !== undefined,
   );
 }
 

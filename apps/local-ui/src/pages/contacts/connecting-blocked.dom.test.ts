@@ -121,7 +121,7 @@ describe('createInviteApi().cancelConnecting (N2)', () => {
     });
     const api = createInviteApi({ fetch: s.fetch, token: 't' });
     expect(CONNECTING_CANCEL_PATH).toBe('/api/ui/invites/connecting/cancel');
-    expect(await api.cancelConnecting(BO)).toEqual({ kind: 'cancelled' });
+    expect(await api.cancelConnecting?.(BO)).toEqual({ kind: 'cancelled' });
     const [call] = s.calls;
     expect(call?.method).toBe('POST');
     expect(JSON.parse(call?.body ?? '')).toEqual({ ref: BO });
@@ -129,7 +129,7 @@ describe('createInviteApi().cancelConnecting (N2)', () => {
     expect(call?.headers.get('x-agentlink-input')).toBeNull();
     expect(call?.headers.get('x-agentlink-presence')).toBeNull();
     // A ref of another shape never leaves the page.
-    expect(await api.cancelConnecting('bo')).toEqual({ kind: 'failed' });
+    expect(await api.cancelConnecting?.('bo')).toEqual({ kind: 'failed' });
     expect(s.calls).toHaveLength(1);
   });
 
@@ -137,14 +137,18 @@ describe('createInviteApi().cancelConnecting (N2)', () => {
     const gone = server({
       [`POST ${CONNECTING_CANCEL_PATH}`]: { status: 404, body: { error: 'not_found' } },
     });
-    expect(await createInviteApi({ fetch: gone.fetch, token: 't' }).cancelConnecting(BO)).toEqual({
-      kind: 'not_found',
-    });
+    expect(await createInviteApi({ fetch: gone.fetch, token: 't' }).cancelConnecting?.(BO)).toEqual(
+      {
+        kind: 'not_found',
+      },
+    );
     const down = server({});
     down.fetch = (() => Promise.resolve(new Response('{}', { status: 503 }))) as typeof fetch;
-    expect(await createInviteApi({ fetch: down.fetch, token: 't' }).cancelConnecting(BO)).toEqual({
-      kind: 'failed',
-    });
+    expect(await createInviteApi({ fetch: down.fetch, token: 't' }).cancelConnecting?.(BO)).toEqual(
+      {
+        kind: 'failed',
+      },
+    );
   });
 });
 

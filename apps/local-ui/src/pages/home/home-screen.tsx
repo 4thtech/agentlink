@@ -450,9 +450,18 @@ function PendingInviteRow({
  * W5-INVITE-FEEDBACK: an accept of this agent that waits for the inviter's answer: "Connecting to
  * {name}…", or "Waiting for {name} to come online. This finishes on its own." Text only (I-5).
  */
-function ConnectingRowView({ row }: { readonly row: ConnectingRow }): ReactElement {
-  // A blocked person's accept never finishes: say so; Unblock lives on People.
+function ConnectingRowView({
+  row,
+  api,
+}: {
+  readonly row: ConnectingRow;
+  readonly api: InviteApi;
+}): ReactElement {
+  // A blocked person's accept never finishes: say so; Unblock lives on People. REL051-B1 (N2):
+  // Cancel goes through the server (`POST /api/ui/invites/connecting/cancel`).
   const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   if (hidden) return <></>;
   return (
     <div className="hm-invite-row hm-f" data-blocked={row.blocked === true ? 'true' : undefined}>
@@ -468,15 +477,37 @@ function ConnectingRowView({ row }: { readonly row: ConnectingRow }): ReactEleme
               ? F.connecting(row.name)
               : F.waitingOnline(row.name)}
         </span>
+        {failed ? (
+          <span role="alert" className="hm-inline-error al-text-body-sm">
+            {F.cancelConnectingFailed}
+          </span>
+        ) : null}
       </span>
       {row.blocked === true ? (
         <>
           <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH}>
             {F.unblockAction}
           </a>
-          <Button size="sm" variant="ghost" onClick={() => setHidden(true)}>
-            {F.cancelConnecting}
-          </Button>
+          {api.cancelConnecting === undefined ? null : (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => {
+                const cancel = api.cancelConnecting;
+                if (cancel === undefined) return;
+                setBusy(true);
+                setFailed(false);
+                void cancel(row.ref).then((outcome) => {
+                  setBusy(false);
+                  if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') setHidden(true);
+                  else setFailed(true);
+                });
+              }}
+            >
+              {F.cancelConnecting}
+            </Button>
+          )}
         </>
       ) : null}
     </div>
@@ -1053,7 +1084,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                   </div>
                 ) : null}
                 {connectingRows.map((row) => (
-                  <ConnectingRowView key={`c-${row.ref}`} row={row} />
+                  <ConnectingRowView key={`c-${row.ref}`} row={row} api={clients.invites} />
                 ))}
                 {props.pendingRows ??
                   pending.map((invite) => (

@@ -86,6 +86,7 @@ function desk(over: Partial<LocalUiInviteDesk> = {}) {
       cancelled.push(id);
       return Promise.resolve(id === INVITES_WORLD.inviteId ? 'cancelled' : 'not_found');
     },
+    cancelConnecting: () => Promise.resolve('not_found'),
     ...over,
   };
   return { desk: d, created, checked, cancelled };

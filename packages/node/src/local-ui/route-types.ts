@@ -286,7 +286,7 @@ export interface LocalUiKitRevealRoute {
 }
 
 /** UX2-d1: the steps of the invite kind (U3-invite adds `dismiss`, "Not now" on the join screen). */
-export type LocalUiInviteStep = 'create' | 'check' | 'dismiss' | 'cancel';
+export type LocalUiInviteStep = 'create' | 'check' | 'dismiss' | 'cancel' | 'cancel-connecting';
 
 /** UX2-d1: a pasted invite after core's accept step 1 (04 §3.6): who it is and its expiry. */
 export interface LocalUiCheckedInvite {
@@ -307,6 +307,11 @@ export interface LocalUiInviteDesk {
   check(link: string): Promise<LocalUiCheckedInvite>;
   /** W4-INVITES-LIST: core `cancelInvite` (04 §3.6.2: an owner action on the local page). */
   cancel(inviteId: string): Promise<'cancelled' | 'not_found'>;
+  /**
+   * REL051-B1 (N2): core `contacts.cancelConnecting`: drops this agent's accepts that wait for that
+   * contact's answer (its staged invitee pairings). Signs and sends nothing.
+   */
+  cancelConnecting(ref: string): Promise<'cancelled' | 'not_found'>;
 }
 
 /**

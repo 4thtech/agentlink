@@ -938,6 +938,7 @@ function PendingInvites({
   connecting = [],
   blockedRefs,
   onUnblock,
+  onCancelConnecting,
 }: {
   rows: readonly OpenInvite[];
   cancelled: readonly OpenInvite[];
@@ -948,7 +949,10 @@ function PendingInvites({
   connecting?: readonly ConnectingRow[];
   /** Contacts the page knows are blocked (matched to a waiting accept by ref). */
   blockedRefs?: ReadonlySet<string>;
-  onUnblock?: (ref: string) => void;
+  /** REL051-B1 (N2): Unblock for a waiting accept on a blocked person (the server flag or the list). */
+  onUnblock?: (ref: string, name: string) => void;
+  /** REL051-B1 (N2): Cancel a waiting accept through the server. */
+  onCancelConnecting?: (ref: string) => Promise<CancelResult>;
 }): ReactElement | null {
   const gone = cancelled.filter((c) => !rows.some((r) => r.inviteId === c.inviteId));
   if (rows.length === 0 && gone.length === 0 && connecting.length === 0) return null;
@@ -960,9 +964,12 @@ function PendingInvites({
           key={`c-${c.ref}`}
           row={c}
           blocked={c.blocked === true || blockedRefs?.has(c.ref) === true}
-          {...(onUnblock === undefined || blockedRefs?.has(c.ref) !== true
+          {...(onUnblock === undefined || (c.blocked !== true && blockedRefs?.has(c.ref) !== true)
             ? {}
-            : { onUnblock: () => onUnblock(c.ref) })}
+            : { onUnblock: () => onUnblock(c.ref, c.name) })}
+          {...(onCancelConnecting === undefined
+            ? {}
+            : { onCancel: () => onCancelConnecting(c.ref) })}
         />
       ))}
       {[...gone, ...rows].map((r) => (
@@ -1361,6 +1368,46 @@ export function ContactsPage({
     }
     return 'failed';
   };
+  // REL051-B1 (N2): Unblock for a waiting accept on a person who is not in the list (blocked, then
+  // removed): owner presence here, then `POST /api/ui/contacts/:ref/unblock`; the page never signs.
+  const [unblocking, setUnblocking] = useState<{ ref: string; name: string } | undefined>(
+    undefined,
+  );
+  const [unblockBusy, setUnblockBusy] = useState(false);
+  const [unblockError, setUnblockError] = useState<string | undefined>(undefined);
+  const submitUnblock = (proof: PresenceProof): void => {
+    if (unblocking === undefined) return;
+    setUnblockBusy(true);
+    setUnblockError(undefined);
+    void owner.post(contactPath(unblocking.ref, 'unblock'), undefined, proof).then((result) => {
+      setUnblockBusy(false);
+      if (result.kind === 'wait') {
+        setUnblockError(waitSeconds(result.seconds));
+        return;
+      }
+      if (result.kind === 'rejected' || result.kind === 'required') {
+        setUnblockError(MESSAGE[result.kind]);
+        return;
+      }
+      setUnblocking(undefined);
+      if (result.kind === 'done') {
+        setNotice(S.unblocked);
+        setTick((n) => n + 1);
+        return;
+      }
+      setNotice(result.kind === 'failed' ? failureCopy(result.reason) : MESSAGE[result.kind]);
+    });
+  };
+  const cancelConnecting = async (ref: string): Promise<CancelResult> => {
+    if (invites.cancelConnecting === undefined) return 'failed';
+    const outcome = await invites.cancelConnecting(ref);
+    if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') {
+      setConnectingRows((list) => list.filter((c) => c.ref !== ref));
+      setTick((n) => n + 1);
+      return outcome.kind === 'cancelled' ? 'cancelled' : 'gone';
+    }
+    return 'failed';
+  };
   const waitingCount = rows.length + connectingRows.length;
   const invitesList = (
     <>
@@ -1381,12 +1428,35 @@ export function ContactsPage({
               .map((c) => c.ref),
           )
         }
-        onUnblock={(ref) => {
-          setRemoved(false);
-          setSelected(ref);
-          setSheetOpen(true);
+        onUnblock={(ref, name) => {
+          const known = (list.phase === 'ok' ? list.contacts : []).some(
+            (c) => c.ref === ref && c.status === 'blocked',
+          );
+          if (known) {
+            setRemoved(false);
+            setSelected(ref);
+            setSheetOpen(true);
+            return;
+          }
+          setNotice(undefined);
+          setUnblockError(undefined);
+          setUnblocking({ ref, name });
         }}
+        onCancelConnecting={cancelConnecting}
       />
+      {unblocking === undefined ? null : (
+        <PresencePrompt
+          summary={SUMMARY.unblock(unblocking.name)}
+          passkey={passkey}
+          busy={unblockBusy}
+          error={unblockError}
+          onSubmit={submitUnblock}
+          onCancel={() => {
+            setUnblocking(undefined);
+            setUnblockError(undefined);
+          }}
+        />
+      )}
     </>
   );
   const moment =
