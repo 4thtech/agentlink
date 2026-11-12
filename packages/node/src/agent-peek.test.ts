@@ -302,3 +302,51 @@ describe('peekAgentStore: the pause row (W4-PAUSE)', () => {
     expect(readFileSync(path).equals(before)).toBe(true);
   });
 });
+
+// WP-13 (F-4 / F45; 07 §3.2 `mcp_sessions`.version): each live session carries the AgentLink version
+// its process runs, so the app can say "Restart {app} to use the new version". A row without one (a
+// process from before the column, or a store from before version 13) reads as no version.
+describe('peekAgentStore: the running version (WP-13)', () => {
+  function withVersions(versions: readonly unknown[]): void {
+    seed(['active'], undefined, {
+      sessions: versions.map((_, i) => ({ id: `v${String(i)}`, app: 'claude-code' })),
+    });
+    const db = new Database(path);
+    db.exec('ALTER TABLE mcp_sessions ADD COLUMN version');
+    versions.forEach((v, i) => {
+      db.prepare('UPDATE mcp_sessions SET version = ? WHERE session_id = ?').run(
+        v as string | number | null,
+        `v${String(i)}`,
+      );
+    });
+    db.close();
+  }
+
+  it('a live row carries its version; null, odd or forged values read as no version', () => {
+    withVersions(['0.4.14', null, 'x</script>', 7, `1.0.0-${'a'.repeat(40)}`]);
+    const sessions = peekAgentStore(path, NOW)?.sessions ?? [];
+    expect(sessions).toHaveLength(5);
+    expect(sessions[0]).toEqual({
+      app: 'claude-code',
+      startedAt: NOW - 5,
+      lastToolAt: null,
+      version: '0.4.14',
+    });
+    for (const s of sessions.slice(1)) expect(s).not.toHaveProperty('version');
+    expect(JSON.stringify(sessions)).not.toContain('script');
+  });
+
+  it('a store from before version 13 (no column) reads, with no version', () => {
+    seed(['active'], undefined, { sessions: [{ app: 'codex' }] });
+    const peek = peekAgentStore(path, NOW);
+    expect(peek?.running).toBe(true);
+    expect(peek?.sessions[0]).not.toHaveProperty('version');
+  });
+
+  it('reading the version writes nothing', () => {
+    withVersions(['0.4.14']);
+    const before = readFileSync(path);
+    peekAgentStore(path, NOW);
+    expect(readFileSync(path).equals(before)).toBe(true);
+  });
+});

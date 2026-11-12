@@ -254,7 +254,7 @@ describe('liveAgentRecord: the one allowlist (08 §1 "Allowlist")', () => {
       'lastSeenAt',
       'apps',
     ]);
-    expect(LIVE_APP_FIELDS).toEqual(['app', 'state', 'since', 'lastSeenAt']);
+    expect(LIVE_APP_FIELDS).toEqual(['app', 'state', 'since', 'lastSeenAt', 'outdated']);
   });
 
   it('drops a state or app id outside the fixed words, and odd times', () => {
@@ -282,5 +282,96 @@ describe('liveAgentRecord: the one allowlist (08 §1 "Allowlist")', () => {
         { app: 'cursor', state: 'idle' },
       ],
     });
+  });
+});
+
+// WP-13 (F-4 / F45; 08 §1 "Live AI-app status"): an AI app whose live session runs an older
+// AgentLink than the app (or one from before sessions carried a version) is `outdated`, so the page
+// says "Restart {app} to use the new version". Only the flag leaves: never the version text.
+describe('outdated: an AI app still runs an older AgentLink (WP-13)', () => {
+  const live = (version?: string | null) => ({
+    app: 'claude-code',
+    startedAt: NOW - 30,
+    lastToolAt: null,
+    ...(version === undefined ? {} : { version }),
+  });
+
+  it('a live session older than the app, or without a version, is outdated', () => {
+    for (const v of ['0.4.13', null, undefined]) {
+      const s = liveStatus(
+        input({ configured: ['claude-code'], sessions: [live(v)], currentVersion: '0.4.14' }),
+        NOW,
+      );
+      expect(s.apps[0]).toEqual({
+        app: 'claude-code',
+        state: 'ready',
+        since: NOW - 30,
+        outdated: true,
+      });
+      expect(s.state).toBe('ready');
+    }
+  });
+
+  it('the same or a newer version is not outdated; without the app version, never', () => {
+    for (const [v, current] of [
+      ['0.4.14', '0.4.14'],
+      ['0.4.15', '0.4.14'],
+      [null, undefined],
+      ['0.4.13', 'garbage'],
+    ] as const) {
+      const s = liveStatus(
+        input({
+          configured: ['claude-code'],
+          sessions: [live(v)],
+          ...(current === undefined ? {} : { currentVersion: current }),
+        }),
+        NOW,
+      );
+      expect(s.apps[0]).not.toHaveProperty('outdated');
+    }
+  });
+
+  it('one older session among current ones marks the app; a not running app never is', () => {
+    const s = liveStatus(
+      input({
+        configured: ['claude-code', 'codex'],
+        sessions: [live('0.4.14'), live('0.4.12')],
+        currentVersion: '0.4.14',
+      }),
+      NOW,
+    );
+    expect(s.apps).toEqual([
+      { app: 'claude-code', state: 'ready', since: NOW - 30, outdated: true },
+      { app: 'codex', state: 'not_running' },
+    ]);
+  });
+
+  it('the tracker keeps the flag while since is held', () => {
+    const tracker = new LiveStatusTracker();
+    const base = input({ configured: ['claude-code'], currentVersion: '0.4.14' });
+    tracker.status('a', { ...base, sessions: [live('0.4.13')] }, NOW);
+    const later = tracker.status('a', { ...base, sessions: [live('0.4.13')] }, NOW + 5);
+    expect(later.apps[0]).toMatchObject({ outdated: true, since: NOW - 30 });
+    const restarted = tracker.status('a', { ...base, sessions: [live('0.4.14')] }, NOW + 10);
+    expect(restarted.apps[0]).not.toHaveProperty('outdated');
+  });
+
+  it('the allowlist keeps `outdated: true` only, never a version text', () => {
+    const record = liveAgentRecord({
+      name: 'default',
+      label: 'Personal',
+      current: true,
+      removing: false,
+      state: 'ready',
+      apps: [
+        { app: 'codex', state: 'ready', outdated: true, version: '0.4.13' } as never,
+        { app: 'cursor', state: 'ready', outdated: 'yes' } as never,
+      ],
+    });
+    expect(record.apps).toEqual([
+      { app: 'codex', state: 'ready', outdated: true },
+      { app: 'cursor', state: 'ready' },
+    ]);
+    expect(JSON.stringify(record)).not.toContain('0.4.13');
   });
 });

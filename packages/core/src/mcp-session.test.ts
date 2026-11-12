@@ -9,6 +9,8 @@ import {
   MCP_SESSION_TTL_SECONDS,
   McpSession,
   mcpSessionLive,
+  mcpVersionOutdated,
+  mcpVersionValid,
 } from './mcp-session.js';
 import { PublisherLease } from './publisher-lease.js';
 import { STORE_SCHEMA_VERSION } from './constants.js';
@@ -57,6 +59,7 @@ describe('MCP session heartbeat: write, beat, stamp, exit', () => {
       started_at: clock.t,
       beat_until: clock.t + 45,
       last_tool_at: null,
+      version: null,
     });
     expect(s.sessionId).toMatch(/^[A-Za-z0-9_-]{22}$/);
     expect(session(store, clock).sessionId).not.toBe(s.sessionId);
@@ -265,5 +268,77 @@ describe('mcpSessionLive: the reader rule (06 §6 "Read", 04 §2.5)', () => {
 
   it('ignores a row of another agent', () => {
     expect(mcpSessionLive(row({ agent_id: OTHER_AGENT }), now, AGENT, alive)).toBe(false);
+  });
+});
+
+// WP-13 (F-4 / F45; 07 §3.2 `mcp_sessions`.version): each process writes the AgentLink version it
+// runs, so the app can tell an AI app that still runs older code after an update ("Restart {app} to
+// use the new version"). Store schema version 13 adds the nullable column; a row written by a
+// process from before it has none (null), which reads as older.
+describe('MCP session heartbeat: the running version (WP-13, F45)', () => {
+  it('writes the version it runs; an odd version string is stored as null', async () => {
+    const clock = new FakeClock();
+    const store = new MemoryStore();
+    const s = new McpSession({ store, now: clock.now, agentId: AGENT, pid: 4242, version: '0.4.14' });
+    await s.start('claude-code');
+    expect((await rows(store))[0]?.version).toBe('0.4.14');
+    const odd = new MemoryStore();
+    const t = new McpSession({
+      store: odd,
+      now: clock.now,
+      agentId: AGENT,
+      pid: 4242,
+      version: '1.2.3 </script> CANARY',
+    });
+    await t.start('codex');
+    expect((await rows(odd))[0]?.version).toBeNull();
+    const none = new MemoryStore();
+    await session(none, clock).start('codex');
+    expect((await rows(none))[0]?.version).toBeNull();
+  });
+
+  it('a pruned row is written again with its version', async () => {
+    const clock = new FakeClock();
+    const store = new MemoryStore();
+    const s = new McpSession({ store, now: clock.now, agentId: AGENT, pid: 4242, version: '0.5.0' });
+    await s.start('codex');
+    await store.transaction((tx) => tx.delete('mcp_sessions', { session_id: s.sessionId }));
+    await s.beat();
+    expect((await rows(store))[0]?.version).toBe('0.5.0');
+  });
+
+  it('the store schema has the version column (version 13)', () => {
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(13);
+  });
+});
+
+describe('mcpVersionOutdated (WP-13, F45)', () => {
+  it('older, missing or odd session versions are outdated against a valid current version', () => {
+    expect(mcpVersionOutdated('0.4.13', '0.4.14')).toBe(true);
+    expect(mcpVersionOutdated('0.4.14', '0.5.0')).toBe(true);
+    expect(mcpVersionOutdated('0.9.9', '1.0.0')).toBe(true);
+    expect(mcpVersionOutdated('0.4.9', '0.4.10')).toBe(true);
+    expect(mcpVersionOutdated(null, '0.4.14')).toBe(true);
+    expect(mcpVersionOutdated(undefined, '0.4.14')).toBe(true);
+    expect(mcpVersionOutdated('nonsense', '0.4.14')).toBe(true);
+    expect(mcpVersionOutdated('0.5.0-next.1', '0.5.0')).toBe(true);
+  });
+
+  it('the same or a newer session version is not outdated; no valid current version, never', () => {
+    expect(mcpVersionOutdated('0.4.14', '0.4.14')).toBe(false);
+    expect(mcpVersionOutdated('0.4.15', '0.4.14')).toBe(false);
+    expect(mcpVersionOutdated('0.4.10', '0.4.9')).toBe(false);
+    expect(mcpVersionOutdated(null, undefined)).toBe(false);
+    expect(mcpVersionOutdated('0.4.13', 'garbage')).toBe(false);
+    expect(mcpVersionOutdated(null, '')).toBe(false);
+  });
+
+  it('mcpVersionValid accepts x.y.z with an optional short prerelease only', () => {
+    expect(mcpVersionValid('0.4.14')).toBe(true);
+    expect(mcpVersionValid('1.0.0-next.2')).toBe(true);
+    expect(mcpVersionValid('1.0')).toBe(false);
+    expect(mcpVersionValid('1.0.0 x')).toBe(false);
+    expect(mcpVersionValid(`1.0.0-${'a'.repeat(40)}`)).toBe(false);
+    expect(mcpVersionValid(14)).toBe(false);
   });
 });

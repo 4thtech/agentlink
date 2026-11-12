@@ -449,8 +449,10 @@ describe(
       // add a migration with the next version instead (07 §3.7: forward migrations only).
       const digestOf = (i: number) =>
         encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-      expect(STORE_SCHEMA_VERSION).toBe(12);
-      expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+      expect(STORE_SCHEMA_VERSION).toBe(13);
+      expect(MIGRATIONS.map((m) => m.version)).toEqual([
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+      ]);
       // Version 1 (G-9) is unchanged by D-72.
       expect(digestOf(0)).toMatchInlineSnapshot(
         `"6a2a36755c97cca746bdfe0b166c409cf1a067b1fd526011470446c0bb7dfd1b"`,
@@ -584,6 +586,102 @@ describe(
       ]);
       expect(v12.some((s) => s.startsWith('ALTER TABLE'))).toBe(false);
       expect(digestOf(11)).toBe('f5d859a2db529e082e7b501d3c53a13c0db3dc6853ac5b2e28f250d2cdada731');
+      // Version 13 (WP-13, F45; 07 §3.2): `mcp_sessions.version`, one nullable column appended.
+      // Versions 1 to 12 keep their digests above (version 10 is frozen without the column).
+      expect(MIGRATIONS[12]?.statements).toEqual([
+        `ALTER TABLE "mcp_sessions" ADD COLUMN "version" TEXT CHECK ("version" IS NULL OR (typeof("version") = 'text' AND length("version") > 0))`,
+      ]);
+    });
+
+    it('migrates a version 12 file to version 13 (WP-13, F45): rows kept, version null', async () => {
+      const raw = new Database(path());
+      for (const m of MIGRATIONS.slice(0, 12)) {
+        for (const statement of m.statements) raw.prepare(statement).run();
+      }
+      raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+      raw.pragma('user_version = 12');
+      // A row an older `agentlink mcp` wrote (no version column yet), and the other heartbeat rows.
+      raw
+        .prepare(
+          'INSERT INTO "mcp_sessions" ("session_id", "app", "agent_id", "pid", "started_at", ' +
+            '"beat_until", "last_tool_at") VALUES (?, ?, ?, 4242, 1, 46, NULL)',
+        )
+        .run('AAAAAAAAAAAAAAAAAAAAAA', 'claude-code', '0x' + 'a'.repeat(40));
+      raw.prepare('INSERT INTO "mcp_last_seen" ("app", "last_seen_at") VALUES (?, 1)').run('codex');
+      raw.prepare('INSERT INTO "agent_pause" ("slot", "paused_at") VALUES (?, 7)').run('current');
+      raw.close();
+      const v13 = await SqliteStore.open(path());
+      expect(v13.schemaVersion).toBe(13);
+      expect(await v13.transaction((tx) => tx.select('mcp_sessions'))).toEqual([
+        {
+          session_id: 'AAAAAAAAAAAAAAAAAAAAAA',
+          app: 'claude-code',
+          agent_id: '0x' + 'a'.repeat(40),
+          pid: 4242,
+          started_at: 1,
+          beat_until: 46,
+          last_tool_at: null,
+          version: null,
+        },
+      ]);
+      expect(await v13.transaction((tx) => tx.select('mcp_last_seen'))).toHaveLength(1);
+      expect(await v13.transaction((tx) => tx.select('agent_pause'))).toHaveLength(1);
+      // A new process writes its version; an empty text is refused.
+      await v13.transaction((tx) => {
+        tx.insert('mcp_sessions', {
+          session_id: 'BBBBBBBBBBBBBBBBBBBBBB',
+          app: 'codex',
+          agent_id: '0x' + 'a'.repeat(40),
+          pid: 4243,
+          started_at: 2,
+          beat_until: 47,
+          last_tool_at: null,
+          version: '0.4.14',
+        });
+      });
+      const rows = await v13.transaction((tx) => tx.select('mcp_sessions'));
+      expect(rows.map((r) => r.version)).toEqual([null, '0.4.14']);
+      await expect(
+        v13.transaction((tx) => {
+          tx.update('mcp_sessions', { session_id: 'BBBBBBBBBBBBBBBBBBBBBB' }, { version: '' });
+        }),
+      ).rejects.toThrow();
+      await v13.close();
+      // Opening it again runs no migration and keeps the rows.
+      const again = await SqliteStore.open(path());
+      expect(again.schemaVersion).toBe(13);
+      expect(await again.transaction((tx) => tx.select('mcp_sessions'))).toHaveLength(2);
+      await again.close();
+    });
+
+    it('a version 12 file with a live older session migrates; that row still reads as live (WP-13)', async () => {
+      // The process that wrote the row keeps running the older code after the update: the migration
+      // only appends a nullable column, so its later writes (named columns, no version) still work.
+      const raw = new Database(path());
+      for (const m of MIGRATIONS.slice(0, 12)) {
+        for (const statement of m.statements) raw.prepare(statement).run();
+      }
+      raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+      raw.pragma('user_version = 12');
+      raw.close();
+      const v13 = await SqliteStore.open(path());
+      await v13.close();
+      const older = new Database(path());
+      older
+        .prepare(
+          'INSERT INTO "mcp_sessions" ("session_id", "app", "agent_id", "pid", "started_at", ' +
+            '"beat_until", "last_tool_at") VALUES (?, ?, ?, 4242, 1, 46, NULL)',
+        )
+        .run('CCCCCCCCCCCCCCCCCCCCCC', 'codex', '0x' + 'a'.repeat(40));
+      older
+        .prepare('UPDATE "mcp_sessions" SET "beat_until" = 91 WHERE "session_id" = ?')
+        .run('CCCCCCCCCCCCCCCCCCCCCC');
+      older.close();
+      const reopened = await SqliteStore.open(path());
+      const [row] = await reopened.transaction((tx) => tx.select('mcp_sessions'));
+      expect(row?.beat_until).toBe(91);
+      expect(row?.version).toBeNull();
+      await reopened.close();
     });
 
     it('migrates a version 10 file to version 11 (D-142): the notice only for an agent that updates', async () => {
@@ -629,7 +727,7 @@ describe(
       raw.prepare('INSERT INTO "mcp_last_seen" ("app", "last_seen_at") VALUES (?, 1)').run('codex');
       raw.close();
       const v12 = await SqliteStore.open(path());
-      expect(v12.schemaVersion).toBe(12);
+      expect(v12.schemaVersion).toBe(STORE_SCHEMA_VERSION);
       expect(await v12.transaction((tx) => tx.select('mcp_last_seen'))).toHaveLength(1);
       expect(await v12.transaction((tx) => tx.select('agent_pause'))).toEqual([]);
       await v12.transaction((tx) => {
