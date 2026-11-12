@@ -43,19 +43,30 @@ describe('page copy', () => {
     expect(strings.step.command).toBe('Install and accept with one command');
     expect(strings.step.link).toBe('Already have AgentLink? Open it and paste the link');
     expect(strings.step.copyLink).toBe('Copy link');
-    // WP-2 (I-1, I-2): the installer brings Node.js; the Node.js choice names the real floor.
+    // WP-2 (I-1, I-2), REL051-INV: the installer brings Node.js; the Node.js choice names the real
+    // floor; each computer says where to paste the command.
     expect(strings.step.os).toEqual({
       label: 'Your computer',
-      unix: 'Mac or Linux',
+      mac: 'Mac',
       windows: 'Windows',
+      linux: 'Linux',
       node: 'Node.js',
     });
-    expect(strings.step.commandHelp).toEqual({
-      unix: 'Paste it into Terminal and press Return. It installs AgentLink, and Node.js if needed, then opens the invite.',
-      windows:
-        'Paste it into PowerShell and press Enter. It installs AgentLink, and Node.js if needed, then opens the invite.',
-      node: 'For a computer with Node.js 22.14 or later. Paste it into Terminal and press Return.',
-    });
+    expect(strings.step.commandHelp.mac).toBe(
+      'Paste it into Terminal and press Return. It installs AgentLink, and Node.js if needed, then opens the invite.',
+    );
+    expect(strings.step.commandHelp.windows).toBe(
+      'Paste it into PowerShell and press Enter. It installs AgentLink, and Node.js if needed, then opens the invite.',
+    );
+    expect(strings.step.openHelp.mac).toMatch(/Terminal/);
+    expect(strings.step.openHelp.windows).toMatch(/PowerShell/);
+    expect(strings.step.openHelp.node).toMatch(/Node\.js 22\.14 or later/);
+    // Every computer has a button, a where-to-paste line and a what-it-does line.
+    for (const os of ['mac', 'windows', 'linux', 'node'] as const) {
+      expect(strings.step.os[os]).not.toBe('');
+      expect(strings.step.openHelp[os]).not.toBe('');
+      expect(strings.step.commandHelp[os]).not.toBe('');
+    }
     expect(strings.step.copyFailed).toBe("Copy didn't work. Select the text and copy it.");
     expect(expiredFor('Marko')).toBe('This invite has expired. Ask Marko for a new one.');
     expect(nextFor('Marko')).toBe(

@@ -53,22 +53,32 @@
 
       <section id="step" hidden aria-labelledby="step-heading">
         <h2 id="step-heading">Set up in 2 minutes</h2>
-        <article id="way-ai" class="card way" aria-labelledby="way-ai-title">
-          <h3 id="way-ai-title"></h3>
-          <p id="ai-help" class="muted small"></p>
-          <p class="actions"><button id="copy-ai" type="button" class="btn secondary"></button></p>
-        </article>
+        <p id="phone-note" class="note small" hidden></p>
         <article id="way-command" class="card way primary" aria-labelledby="way-command-title">
           <h3 id="way-command-title"></h3>
           <p id="os-group" class="seg" role="group">
-            <button id="os-unix" type="button" class="seg-option" aria-pressed="false"></button>
+            <button id="os-mac" type="button" class="seg-option" aria-pressed="false"></button>
             <button id="os-windows" type="button" class="seg-option" aria-pressed="false"></button>
+            <button id="os-linux" type="button" class="seg-option" aria-pressed="false"></button>
             <button id="os-node" type="button" class="seg-option" aria-pressed="false"></button>
           </p>
-          <p id="step-help" class="muted small"></p>
-          <p id="step-text" class="preview mono"></p>
-          <p class="actions">
-            <button id="copy" type="button" class="btn"></button>
+          <ol class="how">
+            <li>
+              <span id="copy-step"></span>
+              <span id="step-text" class="preview mono"></span>
+              <span class="actions"><button id="copy" type="button" class="btn big"></button></span>
+            </li>
+            <li id="open-help"></li>
+            <li id="step-help"></li>
+          </ol>
+          <p id="mac-app" class="mac-app small" hidden>
+            <span id="mac-app-lead"></span>
+            <span class="mac-links">
+              <a id="mac-app-arm64" target="_blank" rel="noopener noreferrer"></a>
+              <a id="mac-app-x64" target="_blank" rel="noopener noreferrer"></a>
+            </span>
+            <span id="mac-app-which" class="muted"></span>
+            <span id="mac-app-note" class="muted"></span>
           </p>
         </article>
         <article id="way-link" class="card way" aria-labelledby="way-link-title">
@@ -79,9 +89,40 @@
             <button id="copy-link" type="button" class="btn secondary"></button>
           </p>
         </article>
+        <article id="way-ai" class="card way" aria-labelledby="way-ai-title">
+          <h3 id="way-ai-title"></h3>
+          <p id="ai-help" class="muted small"></p>
+          <p class="actions"><button id="copy-ai" type="button" class="btn secondary"></button></p>
+        </article>
         <p id="copy-status" class="small" role="status" aria-live="polite"></p>
       </section>
-      <p id="next" class="muted small" hidden></p>
+      <p id="next" class="next" hidden></p>
+
+      <section id="help" aria-labelledby="help-heading">
+        <h2 id="help-heading">Need help?</h2>
+        <ul class="links">
+          <li>
+            <a
+              href="https://wiki.4thtech.io/products/agentlink/get-started/start-fast"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Step-by-step guide</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://wiki.4thtech.io/products/agentlink/get-started/windows"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Windows guide</a
+            >
+          </li>
+        </ul>
+        <p id="help-again" class="muted small" hidden>
+          Closed AgentLink before you accepted? Run the same command again: it opens this invite
+          again until it expires.
+        </p>
+      </section>
 
       <section id="about" aria-labelledby="about-heading">
         <h2 id="about-heading">What this is</h2>

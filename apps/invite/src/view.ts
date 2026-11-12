@@ -5,19 +5,32 @@
 //
 // U3-invite: the step section ("Set up in 2 minutes") sits under our own heading, apart from the
 // inviter section, and holds no payload text: only the fixed sentence, command and canonical link.
-// W6-INVITE-DESIGN: the three ways to accept are three cards, in this order: the sentence for the
-// person's AI, the command, and the link to paste into AgentLink. Each Copy button copies the string
+// W6-INVITE-DESIGN: the three ways to accept are three cards (order: REL051-INV below). Each Copy
+// button copies the string
 // the script holds for its card, never text read back from the page, with no trailing line break.
-// WP-2: the command card offers one command per computer (Mac or Linux, Windows, Node.js), chosen
-// from the browser and changeable with three buttons; the installers need no Node.js.
+// WP-2: the command card offers one command per computer, chosen from the browser and changeable
+// with buttons; the installers need no Node.js.
+// REL051-INV: the simplest path first. The command card leads (Mac, Windows, Linux or Node.js, each
+// with where to paste it), then the link for people who already have AgentLink, then Ask your AI. A
+// phone gets a line saying AgentLink runs on a computer. The Mac app shows only when the release
+// switch MAC_APP_AVAILABLE is on (config.ts); its link is a build constant.
+import { MAC_APP_AVAILABLE, MAC_APP_URLS } from './config.js';
 import type { InviteView } from './invite-state.js';
 import type { InviteCommands } from './prompt.js';
 import { expiredFor, invitesHeading, nextFor, strings } from './strings.js';
 
-/** The computer a command is for (WP-2). */
-export type Os = keyof InviteCommands;
+/** The computer a command is for (WP-2, REL051-INV). */
+export type Os = 'mac' | 'windows' | 'linux' | 'node';
 
-const OSES: readonly Os[] = ['unix', 'windows', 'node'];
+const OSES: readonly Os[] = ['mac', 'windows', 'linux', 'node'];
+
+/** Which of the three commands each choice copies: Mac and Linux share the shell installer. */
+export const COMMAND_FOR: Readonly<Record<Os, keyof InviteCommands>> = {
+  mac: 'unix',
+  windows: 'windows',
+  linux: 'unix',
+  node: 'node',
+};
 
 function element(doc: Document, id: string): HTMLElement {
   const found = doc.getElementById(id);
@@ -42,25 +55,53 @@ export function shorten(link: string): string {
   return rest.length <= 14 ? head + rest : `${head}${rest.slice(0, 4)}…${rest.slice(-5)}`;
 }
 
-/** WP-2: the default command for a browser's user agent: Windows, or Mac or Linux. */
-export const osFor = (userAgent: string): Os =>
-  /\bWindows\b/.test(userAgent) ? 'windows' : 'unix';
+/**
+ * WP-2, REL051-INV: the computer chosen first for a browser's user agent: Windows, Linux (also
+ * ChromeOS and Android), otherwise Mac (also iPhone and iPad, and anything unknown). Read in the
+ * page only; nothing is sent to choose it.
+ */
+export function osFor(userAgent: string): Exclude<Os, 'node'> {
+  if (/\bWindows\b/.test(userAgent)) return 'windows';
+  if (/\b(iPhone|iPad|iPod|Macintosh|Mac OS X)\b/.test(userAgent)) return 'mac';
+  if (/\b(Linux|X11|CrOS|Android)\b/.test(userAgent)) return 'linux';
+  return 'mac';
+}
+
+/**
+ * REL051-INV: true for a phone or tablet, where the command cannot run. iPadOS 13 and later report
+ * a Mac user agent, so a Mac user agent with more than one touch point (`navigator.maxTouchPoints`)
+ * is a tablet too; a Mac has none.
+ */
+export const isPhone = (userAgent: string, maxTouchPoints = 0): boolean =>
+  /\b(iPhone|iPad|iPod|Android|Mobile)\b/.test(userAgent) ||
+  (/\bMacintosh\b/.test(userAgent) && maxTouchPoints > 1);
 
 /** How long "Copied" stays (b11 §6 row 6). */
 const COPIED_MS = 1600;
 
+/** Page options read from the browser (REL051-INV). `macApp` defaults to MAC_APP_AVAILABLE. */
+export interface RenderOptions {
+  /** The computer shown first (WP-2); null: none yet (a phone or tablet), the person picks one. */
+  readonly os?: Os | null;
+  /** A phone or tablet: show the "runs on a computer" line. */
+  readonly phone?: boolean;
+  /** The Mac app release switch (tests pass it; the page uses the build constant). */
+  readonly macApp?: boolean;
+}
+
 /**
  * Shows `view`. `copy` writes a string to the clipboard; the page never pastes or opens anything.
- * `retry` checks the invite once more (the `unreachable` state's Try again button). `os` is the
- * command shown first (WP-2).
+ * `retry` checks the invite once more (the `unreachable` state's Try again button).
  */
 export function render(
   doc: Document,
   view: InviteView,
   copy: (text: string) => Promise<void>,
   retry?: () => void,
-  os: Os = 'unix',
+  options: RenderOptions = {},
 ): void {
+  const { phone = false, macApp = MAC_APP_AVAILABLE } = options;
+  const os = options.os === undefined ? (phone ? null : 'mac') : options.os;
   const state = element(doc, 'state');
   const retryButton = element(doc, 'retry') as HTMLButtonElement;
   const inviter = element(doc, 'inviter');
@@ -69,18 +110,9 @@ export function render(
   const copyStatus = element(doc, 'copy-status');
   const wayCommand = element(doc, 'way-command');
   const osButtons = OSES.map((o) => [o, element(doc, `os-${o}`) as HTMLButtonElement] as const);
-  // The three cards, in order: Ask your AI, the command, the link. `text` is what the card shows
-  // and its button copies; `label` is the button's resting text.
+  // The three cards, in order (REL051-INV): the command, the link, Ask your AI. `text` is what the
+  // card shows and its button copies; `label` is the button's resting text.
   const cards = [
-    {
-      card: 'way-ai',
-      title: strings.step.askAi,
-      help: 'ai-help',
-      text: undefined,
-      button: 'copy-ai',
-      label: strings.step.copy,
-      title_id: 'way-ai-title',
-    },
     {
       card: 'way-command',
       title: strings.step.command,
@@ -99,7 +131,22 @@ export function render(
       label: strings.step.copyLink,
       title_id: 'way-link-title',
     },
+    {
+      card: 'way-ai',
+      title: strings.step.askAi,
+      help: 'ai-help',
+      text: undefined,
+      button: 'copy-ai',
+      label: strings.step.copy,
+      title_id: 'way-ai-title',
+    },
   ] as const;
+  const phoneNote = element(doc, 'phone-note');
+  const macAppBlock = element(doc, 'mac-app');
+  const macAppLinks = (['arm64', 'x64'] as const).map(
+    (arch) => [arch, element(doc, `mac-app-${arch}`)] as const,
+  );
+  const helpAgain = element(doc, 'help-again');
 
   // Start from nothing shown: a state never shows a command or a sentence.
   inviter.hidden = true;
@@ -113,6 +160,10 @@ export function render(
   }
   for (const [, button] of osButtons) button.onclick = null;
   retryButton.onclick = null;
+  phoneNote.hidden = true;
+  macAppBlock.hidden = true;
+  for (const [, link] of macAppLinks) link.removeAttribute('href');
+  helpAgain.hidden = true;
   retryButton.hidden = true;
   retryButton.disabled = false;
 
@@ -147,19 +198,23 @@ export function render(
     element(doc, 'inviter-expiry').textContent = formatExpiry(who.expiresAt);
     inviter.hidden = false;
 
-    let chosen: Os = os;
+    let chosen: Os | null = os;
     // Held by the script; each button copies one of these strings, never the page's text.
     const textOf = (card: (typeof cards)[number]['card']): string | undefined =>
       card === 'way-ai'
         ? view.sentence
         : card === 'way-command'
-          ? view.commands?.[chosen]
+          ? chosen === null
+            ? undefined
+            : view.commands?.[COMMAND_FOR[chosen]]
           : view.inviteUrl;
     const helpOf = (card: (typeof cards)[number]['card']): string =>
       card === 'way-ai'
         ? strings.step.askAiHelp
         : card === 'way-command'
-          ? strings.step.commandHelp[chosen]
+          ? chosen === null
+            ? ''
+            : strings.step.commandHelp[chosen]
           : strings.step.linkHelp;
     const timers = new Map<string, ReturnType<typeof setTimeout>>();
     const resetLabels = (): void => {
@@ -207,14 +262,32 @@ export function render(
       };
     }
 
-    // WP-2: the computer buttons. Each shows its command and help line; the Copy button follows.
+    // WP-2: the computer buttons. Each shows its command, where to paste it and what it does; the
+    // Copy button follows. The Mac app (release switch) shows under the Mac choice only.
     element(doc, 'os-group').setAttribute('aria-label', strings.step.os.label);
-    const commandCard = cards[1];
-    const choose = (o: Os): void => {
+    element(doc, 'copy-step').textContent = strings.step.copyStep;
+    const commandCard = cards[0];
+    if (macApp) {
+      element(doc, 'mac-app-lead').textContent = strings.step.macApp.lead;
+      for (const [arch, link] of macAppLinks) {
+        link.textContent = strings.step.macApp[arch];
+        link.setAttribute('href', MAC_APP_URLS[arch]);
+      }
+      element(doc, 'mac-app-which').textContent = strings.step.macApp.which;
+      element(doc, 'mac-app-note').textContent = strings.step.macApp.note;
+    }
+    // On a phone or tablet nothing is chosen first (null): no command is shown until the person
+    // picks the computer they will use.
+    const choose = (o: Os | null): void => {
       chosen = o;
       for (const [other, button] of osButtons) {
         button.setAttribute('aria-pressed', other === o ? 'true' : 'false');
       }
+      element(doc, 'open-help').textContent =
+        o === null ? strings.step.pickComputer : strings.step.openHelp[o];
+      element(doc, 'step-text').hidden = o === null;
+      element(doc, 'copy').hidden = o === null;
+      macAppBlock.hidden = !(macApp && o === 'mac');
       show(commandCard);
     };
     for (const [o, button] of osButtons) {
@@ -229,6 +302,9 @@ export function render(
     choose(chosen);
 
     wayCommand.hidden = view.commands === undefined;
+    phoneNote.textContent = strings.step.phone;
+    phoneNote.hidden = !phone;
+    helpAgain.hidden = view.commands === undefined;
     step.hidden = false;
     next.textContent = who.fallback ? strings.step.nextSomeone : nextFor(who.name);
     next.hidden = false;

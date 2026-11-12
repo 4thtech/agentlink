@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildAskAi, buildCommands } from '@4thtech-io/invite';
+import { DOCS_LINKS, buildAskAi, buildCommands } from '@4thtech-io/invite';
 import { CSP, headersFor } from './invite/headers.js';
 import {
   BASE_INVITE,
@@ -214,31 +214,39 @@ describe('a good invite (U3-invite)', () => {
     );
     // The step: our own heading, the installer command for this computer by default.
     await expect(page.locator('#step-heading').textContent()).resolves.toBe('Set up in 2 minutes');
-    // The three ways, in order: Ask your AI, the command, the link.
+    // The three ways, in order (REL051-INV: the simplest first): the command, the link, Ask your AI.
     await expect(page.locator('#step h3').allTextContents()).resolves.toEqual([
-      'Ask your AI',
       'Install and accept with one command',
       'Already have AgentLink? Open it and paste the link',
+      'Ask your AI',
     ]);
     // One short line each; the full link is never on screen, only in the copy.
-    // WP-2: Chromium here is not Windows, so the Mac or Linux installer is chosen.
+    // WP-2: headless Chromium here reports Linux (or Mac), never Windows: the shell installer.
     await expect(page.locator('#step-text').textContent()).resolves.toMatch(
       /^curl -fsSL https:\/\/agentlink\.4thtech\.io\/install\.sh \| sh -s -- --invite 'agentlink\.4thtech\.io\/i#.{4}….{5}'$/,
     );
-    await expect(page.locator('#os-unix').getAttribute('aria-pressed')).resolves.toBe('true');
+    const pressed = await page
+      .locator('#way-command [role="group"] button[aria-pressed="true"]')
+      .getAttribute('id');
+    expect(['os-mac', 'os-linux']).toContain(pressed);
     await expect(page.locator('#os-windows').getAttribute('aria-pressed')).resolves.toBe('false');
     await expect(page.locator('#os-node').getAttribute('aria-pressed')).resolves.toBe('false');
     await expect(
       page.locator('#way-command [role="group"] button').allTextContents(),
-    ).resolves.toEqual(['Mac or Linux', 'Windows', 'Node.js']);
+    ).resolves.toEqual(['Mac', 'Windows', 'Linux', 'Node.js']);
     await expect(page.locator('#link-text').textContent()).resolves.toMatch(
       /^agentlink\.4thtech\.io\/i#.{4}….{5}$/,
     );
     expect((await page.locator('main').innerText()).includes(payloadOf(link))).toBe(false);
-    await expect(page.locator('#step-help').textContent()).resolves.toBe(
-      'Paste it into Terminal and press Return. It installs AgentLink, and Node.js if needed, then opens the invite.',
+    await expect(page.locator('#step-help').textContent()).resolves.toMatch(
+      /^Paste it into (Terminal|the terminal \(Ctrl, Shift and V\)) and press (Return|Enter)\. It installs AgentLink, and Node\.js if needed, then opens the invite\.$/,
     );
-    expect(await page.locator('a').count()).toBe(0);
+    // REL051-INV: the only links are the two help links; the Mac app (switch off) is not shown.
+    await expect(
+      page.locator('a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href'))),
+    ).resolves.toEqual([DOCS_LINKS.guide, DOCS_LINKS.windows]);
+    await expect(page.locator('#mac-app').isHidden()).resolves.toBe(true);
+    await expect(page.locator('#phone-note').isHidden()).resolves.toBe(true);
     await expect(page.locator('#next').textContent()).resolves.toBe(
       "AgentLink opens in your browser. Set it up, then accept Marko's invite.",
     );
@@ -262,7 +270,11 @@ describe('a good invite (U3-invite)', () => {
     // WP-2: each computer's command, chosen with its button; the help line follows.
     await page.locator('#os-windows').click();
     await expect(page.locator('#os-windows').getAttribute('aria-pressed')).resolves.toBe('true');
-    await expect(page.locator('#os-unix').getAttribute('aria-pressed')).resolves.toBe('false');
+    await expect(page.locator('#os-mac').getAttribute('aria-pressed')).resolves.toBe('false');
+    await expect(page.locator('#os-linux').getAttribute('aria-pressed')).resolves.toBe('false');
+    await expect(page.locator('#open-help').textContent()).resolves.toBe(
+      'Open PowerShell: click Start, type PowerShell, then press Enter.',
+    );
     await expect(page.locator('#step-help').textContent()).resolves.toBe(
       'Paste it into PowerShell and press Enter. It installs AgentLink, and Node.js if needed, then opens the invite.',
     );
@@ -270,8 +282,11 @@ describe('a good invite (U3-invite)', () => {
     await page.locator('#copy').click();
     await expect.poll(() => clipboard(page)).toBe(commands?.windows);
     await page.locator('#os-node').click();
+    await expect(page.locator('#open-help').textContent()).resolves.toBe(
+      'Open a terminal on a computer with Node.js 22.14 or later.',
+    );
     await expect(page.locator('#step-help').textContent()).resolves.toBe(
-      'For a computer with Node.js 22.14 or later. Paste it into Terminal and press Return.',
+      'Paste it and press Return. It installs AgentLink, then opens the invite.',
     );
     await page.locator('#copy').click();
     await expect.poll(() => clipboard(page)).toBe(commands?.node);
@@ -284,6 +299,68 @@ describe('a good invite (U3-invite)', () => {
     await expect.poll(() => clipboard(page)).toBe(link);
     expect(/[\r\n]/.test(await clipboard(page))).toBe(false);
     await context.close();
+  });
+
+  // REL051-INV: the computer chosen first comes from the browser's user agent, read in the page;
+  // a phone gets the "runs on a computer" line. Nothing is requested to choose it.
+  it('chooses the computer from the user agent and tells a phone to use a computer', async () => {
+    const link = await futureLink();
+    const cases = [
+      [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36',
+        'os-windows',
+        false,
+      ],
+      [
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130.0 Safari/537.36',
+        'os-mac',
+        false,
+      ],
+      [
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36',
+        'os-linux',
+        false,
+      ],
+      [
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1',
+        null,
+        true,
+        0,
+      ],
+      // iPadOS 13+ reports a Mac; its touch points make it a tablet.
+      [
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15',
+        null,
+        true,
+        5,
+      ],
+    ] as const;
+    for (const [userAgent, chosen, phone, touchPoints = 0] of cases) {
+      const context = await browser.newContext({ userAgent });
+      const page = await context.newPage();
+      await page.addInitScript((n) => {
+        Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => n });
+      }, touchPoints);
+      const requests: string[] = [];
+      page.on('request', (r) => requests.push(new URL(r.url()).pathname));
+      await page.goto(`${originOf(site)}/i#${payloadOf(link)}`);
+      await page.waitForFunction(() => document.getElementById('state')?.dataset.ready === 'true');
+      if (chosen === null) {
+        await expect(
+          page.locator('#way-command [role="group"] button[aria-pressed="true"]').count(),
+        ).resolves.toBe(0);
+        await expect(page.locator('#copy').isHidden()).resolves.toBe(true);
+        await expect(page.locator('#open-help').textContent()).resolves.toBe(
+          'Choose the computer you will install AgentLink on.',
+        );
+      } else {
+        await expect(page.locator(`#${chosen}`).getAttribute('aria-pressed')).resolves.toBe('true');
+      }
+      await expect(page.locator('#phone-note').isVisible()).resolves.toBe(phone);
+      await expect(page.locator('#mac-app').isHidden()).resolves.toBe(true);
+      expect(requests.sort()).toEqual(['/i', '/invite.css', '/invite.js']);
+      await context.close();
+    }
   });
 
   it('copies the script’s string, not what the DOM shows', async () => {
@@ -351,8 +428,12 @@ describe('a hostile invite (I-5)', () => {
       // The only svg is the fixed AgentLink mark in the header.
       expect(await page.locator('img, div, svg:not(.mark), iframe').count()).toBe(0);
       expect(await page.locator('object, embed, form, input, style').count()).toBe(0);
-      // No link at all (WP-2).
-      expect(await page.locator('a').count()).toBe(0);
+      // REL051-INV: no link but the three fixed ones of the HTML (two help links, the Mac app's
+      // link with no href while its switch is off); none comes from the name.
+      expect(await page.locator('a').count()).toBe(4);
+      await expect(
+        page.locator('a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href'))),
+      ).resolves.toEqual([DOCS_LINKS.guide, DOCS_LINKS.windows]);
       expect(await page.locator('script').count()).toBe(1);
       expect(
         await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned),
@@ -491,7 +572,7 @@ describe('accessibility and motion (U3-invite, b11 §33.1)', () => {
       });
       expect(violations, mode.name).toEqual([]);
       const sizes = await page.evaluate(() =>
-        ['copy-ai', 'os-unix', 'os-windows', 'os-node', 'copy', 'copy-link'].map(
+        ['copy-ai', 'os-mac', 'os-windows', 'os-linux', 'os-node', 'copy', 'copy-link'].map(
           (id) => document.getElementById(id)?.getBoundingClientRect().height ?? 0,
         ),
       );

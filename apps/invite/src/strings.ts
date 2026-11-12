@@ -33,19 +33,44 @@ export const strings = {
     askAiHelp:
       'For an AI app that can run commands on this computer, like Claude Code or Codex. It shows you the change before it makes it.',
     command: 'Install and accept with one command',
-    /** WP-2: the computer the command is for; chosen from the browser, the person can change it. */
+    /** REL051-INV: the step numbers of the command card. */
+    copyStep: 'Copy the command.',
+    /** WP-2, REL051-INV: the computer the command is for; chosen from the browser, the person can change it. */
     os: {
       label: 'Your computer',
-      unix: 'Mac or Linux',
+      mac: 'Mac',
       windows: 'Windows',
+      linux: 'Linux',
       node: 'Node.js',
     },
-    /** WP-2 (I-1, I-2): one help line per command. */
+    /** REL051-INV: on a phone or tablet no computer is chosen first. */
+    pickComputer: 'Choose the computer you will install AgentLink on.',
+    /** REL051-INV: where to paste it, one line per computer. */
+    openHelp: {
+      mac: 'Open Terminal: press Command and Space, type Terminal, then press Return.',
+      windows: 'Open PowerShell: click Start, type PowerShell, then press Enter.',
+      linux: 'Open a terminal: on most computers, press Ctrl, Alt and T together.',
+      node: 'Open a terminal on a computer with Node.js 22.14 or later.',
+    },
+    /** WP-2 (I-1, I-2): what the command does, one line per computer. */
     commandHelp: {
-      unix: 'Paste it into Terminal and press Return. It installs AgentLink, and Node.js if needed, then opens the invite.',
+      mac: 'Paste it into Terminal and press Return. It installs AgentLink, and Node.js if needed, then opens the invite.',
       windows:
         'Paste it into PowerShell and press Enter. It installs AgentLink, and Node.js if needed, then opens the invite.',
-      node: 'For a computer with Node.js 22.14 or later. Paste it into Terminal and press Return.',
+      linux:
+        'Paste it into the terminal (Ctrl, Shift and V) and press Enter. It installs AgentLink, and Node.js if needed, then opens the invite.',
+      node: 'Paste it and press Return. It installs AgentLink, then opens the invite.',
+    },
+    /** REL051-INV: on a phone or tablet the command cannot run there. */
+    phone:
+      'AgentLink runs on a computer. Send this invite to yourself and open it on your Mac, Windows or Linux computer.',
+    /** REL051-INV: the Mac app, shown only when MAC_APP_AVAILABLE is on (config.ts). */
+    macApp: {
+      lead: 'Prefer an app? Download AgentLink for Mac (early build):',
+      arm64: 'Mac with Apple chip (M1 or newer)',
+      x64: 'Mac with Intel chip',
+      which: 'Not sure? Apple menu → About This Mac → Chip.',
+      note: 'This early build is not signed by Apple yet. The first time, right-click the app and choose Open.',
     },
     link: 'Already have AgentLink? Open it and paste the link',
     linkHelp: 'In AgentLink, choose “Have an invite link? Paste it” and paste this link.',
@@ -54,6 +79,14 @@ export const strings = {
     copied: 'Copied',
     copyFailed: "Copy didn't work. Select the text and copy it.",
     nextSomeone: 'AgentLink opens in your browser. Set it up, then accept the invite.',
+  },
+  /** REL051-INV: the help section (fixed text; the links are fixed in the HTML, config.ts). */
+  help: {
+    heading: 'Need help?',
+    guide: 'Step-by-step guide',
+    windows: 'Windows guide',
+    again:
+      'Closed AgentLink before you accepted? Run the same command again: it opens this invite again until it expires.',
   },
 } as const;
 

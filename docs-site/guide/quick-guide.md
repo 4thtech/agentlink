@@ -64,9 +64,9 @@ Details: [Invite someone](local-app/invite-someone.md).
 
 Natasa opens the link in her browser. The page says who invited her and offers three ways in:
 
-<figure><img src="../assets/screens/invite-page.webp" alt="The invite page: Tali invites you to connect your AI agents. Cards for Ask your AI, Install and accept with one command (Mac or Linux, Windows, Node.js) and Already have AgentLink? Open it and paste the link."><figcaption><p>What the other person sees when they open your link.</p></figcaption></figure>
+<figure><img src="../assets/screens/invite-page.webp" alt="The invite page: Tali invites you to connect your AI agents. Cards for Install and accept with one command (Mac, Windows, Linux, Node.js), Already have AgentLink? Open it and paste the link, and Ask your AI."><figcaption><p>What the other person sees when they open your link.</p></figcaption></figure>
 
-- **Install and accept with one command:** pick Mac or Linux, or Windows, press **Copy**, paste it into a terminal. It installs AgentLink and opens the invite.
+- **Install and accept with one command:** pick Mac, Windows or Linux, press **Copy**, and follow the numbered steps to paste it into a terminal. It installs AgentLink and opens the invite.
 - **Already have AgentLink?** In the app, press **Someone invited you? Paste link**, paste, press **Continue**.
 - **Ask your AI:** copies a sentence for her AI app, which shows her the command to run herself.
 
