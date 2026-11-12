@@ -89,7 +89,10 @@ describe('chapter 7: advanced', () => {
     }
 
     // Shifts count from the Advanced pages on: the shell's live status strip fills in first.
-    await page.getByRole('region', { name: 'Live status' }).getByText('AgentLink').waitFor();
+    await page
+      .getByRole('region', { name: 'Live status' })
+      .getByText('AgentLink', { exact: true })
+      .waitFor();
     await page.waitForTimeout(1500);
     expect((await layoutShiftScore(page)) - beforeHood).toBeLessThanOrEqual(0.01);
     // The observer replays earlier shifts (the shell's own, when the switch turned): count the walk.
