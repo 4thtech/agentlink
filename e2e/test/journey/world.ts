@@ -386,7 +386,7 @@ export async function startUiRun(
 /**
  * First run, the seed of the chapters that need an owner with a real passkey on this computer.
  * W4-WIZARD: Get started (helpers-wizard.ts): the first app tile, the name, Touch ID (one `create`),
- * the backup code; no AI app is on these computers, so step 3 says "{label} is ready" and "Go to
+ * the master code; no AI app is on these computers, so step 3 says "{label} is ready" and "Go to
  * Home" ends on the app's Home.
  */
 export async function firstRunWithTouchId(

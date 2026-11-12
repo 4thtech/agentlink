@@ -103,7 +103,7 @@ describe('contract (page): New agent with one gesture (W4-ONE-TOUCH)', () => {
     expect(s.headers.get('X-AgentLink-Presence')).toBe('passkey');
   });
 
-  it('finish with the backup code sends the code as the body; created_not_connected keeps the agent', async () => {
+  it('finish with the master code sends the code as the body; created_not_connected keeps the agent', async () => {
     const t = answering(sample.notConnected);
     const api = createAgentApi({ fetch: t.fetch, token: 't' });
     const result = await api.finishCode(sample.finishInput.nonce, 'ABCD');

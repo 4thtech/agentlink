@@ -5,8 +5,8 @@
 // The browser never signs and never sees what is signed. A confirm sends the review token and the
 // acknowledged warning codes (base64url JSON in `X-AgentLink-Input`) and the owner's presence in the
 // body: the passkey assertion (credential ID, authenticator data, user handle and PRF output, each
-// after a 16-bit big-endian length, `X-AgentLink-Presence: passkey`), or the owner code as UTF-8.
-// The server checks presence, then signs. Bodies, the token and the owner code are never logged.
+// after a 16-bit big-endian length, `X-AgentLink-Presence: passkey`), or the master code as UTF-8.
+// The server checks presence, then signs. Bodies, the token and the master code are never logged.
 //
 // MSG-FILES-IO-h: `reveal` (Show in Finder, D-134) needs no presence: an octet-stream POST whose
 // body is only `{"id":"<item ID>"}`. Never a file name or a path; the server finds the file itself.

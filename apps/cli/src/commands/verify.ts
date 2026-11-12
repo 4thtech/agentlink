@@ -15,7 +15,7 @@
 //   neutral (D-95) and never shown as a pass. A test-network proof is labelled right under the
 //   verdict with its network ID and is never presented as a live proof (05 §9.1 (iv)).
 // - Then one line per check the verifier made: the record, who recorded it (06 §2.1 name rule:
-//   a contact's shown name, this agent, or the owner fingerprint; never a name from the pack),
+//   a contact's shown name, this agent, or the ID tag; never a name from the pack),
 //   receipts, the disclosed content, the owner approval, and the non-fatal notices (D-96).
 // - The disclosed content, when it opened, is printed only inside the marked untrusted region
 //   (06 §8), after the checks.

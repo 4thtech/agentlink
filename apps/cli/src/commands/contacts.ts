@@ -2,7 +2,7 @@
 //
 // A name appears only as the owner's alias or the restricted name with its identity label
 // (`display`, rendered by renderContactName), never as the name the contact declared (D-53, I-5).
-// The list carries no safety code and no message text. Each contact's ID is listed for
+// The list carries no Contact check and no message text. Each contact's ID is listed for
 // `contacts rename | remove` † (M1-9za), which the dispatcher guards and the owner handler runs.
 // `contacts --verify` (M1-9m) is not registered, so nothing names it (M1-36c).
 import { renderContactName } from '@4thtech-io/core';
@@ -37,9 +37,7 @@ export function createContactsHandler(
               ? 'paired'
               : String(contact.status)
             : `pairing ${String(contact.pairing)}`;
-        const checked = contact.safetyCodeChecked
-          ? 'safety code checked'
-          : 'safety code not checked';
+        const checked = contact.safetyCodeChecked ? 'contact checked' : 'Contact check not done';
         lines.push(
           fill('{index}. {name}', {
             index: index + 1,

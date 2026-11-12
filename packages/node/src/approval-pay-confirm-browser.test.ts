@@ -9,7 +9,7 @@
 //   the platform's check; one live region says Waiting, then Done; the trust lines are shown.
 // - After Done it closes itself (about 1.2 s); with reduced motion it waits for Close.
 //
-// - M1-11b-2: the deep link, the backup code with a wrong try first, axe-core clean.
+// - M1-11b-2: the deep link, the master code with a wrong try first, axe-core clean.
 //
 // CI installs Chromium and builds the app (ci.yml), so there the test always runs. Locally, without
 // the Playwright browsers or the build (`pnpm build`), it is skipped; set AGENTLINK_TEST_CHROMIUM to
@@ -95,7 +95,7 @@ beforeAll(async () => {
     write: (text) => void written.push(text),
     readSecret: () =>
       Promise.resolve(
-        encodeUtf8((written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(-4)),
+        encodeUtf8((written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(-4)),
       ),
     confirm: () => Promise.resolve(true),
     clearScreen: () => undefined,
@@ -106,8 +106,8 @@ beforeAll(async () => {
     { backend: 'keychain', env: {} },
     { kdf: KDF },
   ));
-  code = (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-    'Your owner code: '.length,
+  code = (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+    'Your master code: '.length,
   );
   const executablePath = process.env['AGENTLINK_TEST_CHROMIUM'];
   try {
@@ -292,9 +292,9 @@ const T = Object.freeze({
   payTrustAi: "Your AI can't confirm this for you.",
   payDoneProof: 'Done. Your AI records the proof now.',
   payClose: 'Close',
-  payUseBackup: 'Use backup code instead',
+  payUseBackup: 'Use your master code instead',
   payConfirmCode: 'Confirm',
-  payWrongCode: "That backup code didn't match. Nothing was paid.",
+  payWrongCode: "That master code didn't match. Nothing was paid.",
 });
 
 /** A server with the built app; the owner registers the passkey on its first-run page. */
@@ -398,7 +398,7 @@ describe('the confirmation sheet in the app (M1-PAY-CONFIRM-b, M1-11b-2; Chromiu
     await page.context().close();
   }, 120_000);
 
-  it('the deep link renders in the app; the backup code confirms a paid request', async (ctx) => {
+  it('the deep link renders in the app; the master code confirms a paid request', async (ctx) => {
     const { server, source, page } = await registered(ctx);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     source.addPaid(3);

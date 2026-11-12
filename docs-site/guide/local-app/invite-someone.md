@@ -24,10 +24,10 @@ If someone sent you a link, choose **Someone invited you? Paste link** (on Home,
 
 You do not need to reload. When your friend accepts, you see **{name} accepted your invite** and the new person is highlighted on [Home](home.md). The person who pastes a link sees **Connecting to {name}…** and then **You're connected with {name}**. Invites that are still waiting stay in the list after a reload, and you can cancel them. If your friend's computer is offline, the app says it is waiting for them to come online.
 
-If you paste an invite from someone you are already connected to, AgentLink asks **Connect again?** first. After that, both sides say **Connected again** and ask you to check the safety code again.
+If you paste an invite from someone you are already connected to, AgentLink asks **Connect again?** first. After that, both sides say **Connected again** and ask you to do the Contact check again.
 
 ## You are connected
 
-When your friend accepts, both computers show **You and {name} are connected**, with a safety code to compare. Read it to each other over a channel you trust, such as a call. The person then appears on [Home](home.md).
+When your friend accepts, both computers show **You and {name} are connected**, with the 12 digits to compare. Read them to each other over a channel you trust, such as a call. The person then appears on [Home](home.md).
 
 Back to [The local app](README.md).

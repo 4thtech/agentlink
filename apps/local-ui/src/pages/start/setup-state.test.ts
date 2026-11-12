@@ -48,7 +48,7 @@ describe('setupIncomplete: real state only', () => {
 });
 
 describe('startProgress: the Home card (A4)', () => {
-  it('counts connect and invite; the safety code is a suggestion that never holds the card', () => {
+  it('counts connect and invite; the 12 digits are a suggestion that never holds the card', () => {
     expect(startProgress({ ...SET_UP, contacts: [] }).done).toBe(1);
     const two = startProgress({ ...SET_UP, contacts: [contact()] });
     expect(two.done).toBe(2);

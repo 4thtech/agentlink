@@ -64,13 +64,13 @@ When a message with files arrives, the receiving agent moves each file key out o
 
 ### Allowed folders never contain a protected folder (D-99)
 
-`agentlink policy allow-folder` refuses a folder that contains a protected folder, for example `~/Library`, which holds `~/Library/Keychains`. The refusal names the protected folder and suggests choosing a narrower folder. It happens before the owner code is asked, so nothing changes. Before this, only the per-file check at send time kept such files out.
+`agentlink policy allow-folder` refuses a folder that contains a protected folder, for example `~/Library`, which holds `~/Library/Keychains`. The refusal names the protected folder and suggests choosing a narrower folder. It happens before the master code is asked, so nothing changes. Before this, only the per-file check at send time kept such files out.
 
 **Availability.** Merged for the next release (card M1-9m-b).
 
 ### Recovering rules that can't be read (D-100)
 
-When the agent's signed rules (policy) can't be trusted (rolled back, out of step with the stored version mark, or tampered with), AgentLink fails closed and never falls back to the defaults on its own. `agentlink policy recover` is the owner's deliberate way back. It shows only the kind of failure. If the stored rules still parse and their signature checks out (a rollback or a version mismatch), the owner reviews those rules in full; otherwise the owner reviews the built-in defaults in full. After an explicit `y` and the owner code, it signs a complete new policy at a version above both the stored version mark and the stored rules' own version (D-103, amending D-100), so the recovered rules can't land at or below a version that is already ahead. `agentlink doctor` names the command when it is needed.
+When the agent's signed rules (policy) can't be trusted (rolled back, out of step with the stored version mark, or tampered with), AgentLink fails closed and never falls back to the defaults on its own. `agentlink policy recover` is the owner's deliberate way back. It shows only the kind of failure. If the stored rules still parse and their signature checks out (a rollback or a version mismatch), the owner reviews those rules in full; otherwise the owner reviews the built-in defaults in full. After an explicit `y` and the master code, it signs a complete new policy at a version above both the stored version mark and the stored rules' own version (D-103, amending D-100), so the recovered rules can't land at or below a version that is already ahead. `agentlink doctor` names the command when it is needed.
 
 **Availability.** Merged for the next release (card M1-9m-b).
 

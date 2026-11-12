@@ -1,6 +1,6 @@
 // M1-11b-2: the approvals words (11 §5 vocabulary; 11 §6.2.1 copy). The same text as the former
 // server-rendered approval page's UI_STRINGS (removed in M1-11b-2c; these are now the only ones),
-// except that the local app says "backup code" where that page used the older wording (11 §5.5,
+// except that the local app says "master code" where that page used the older wording (11 §5.5,
 // UX-031-QUICKWINS; BACKUP_CODE_WORDING below). `{name}` marks an inserted value;
 // the result is only ever rendered as text. The sheet's words are @4thtech-io/ui PAY_CONFIRM_STRINGS.
 
@@ -12,11 +12,11 @@ export const APPROVAL_STRINGS = Object.freeze({
   notRunning: `AgentLink is not running. Open it again from your AI, or run ${CLI_PREFIX} approve in your own terminal.`,
   firstRunTitle: 'Protect your approvals',
   firstRun:
-    'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey or backup code, and only after you click Approve. Never give them to your AI.',
+    'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey or master code, and only after you click Approve. Never give them to your AI.',
   desktopNote: 'The desktop app protects approvals more strongly.',
   needsOwnerTitle: 'Set up AgentLink',
-  needsOwner: `Set up your backup code first: run ${CLI_PREFIX} owner init in your own terminal. Until then, nothing can be approved here.`,
-  noPasskeys: "Passkeys aren't available in this browser. Approve with your backup code.",
+  needsOwner: `Set up your master code first: run ${CLI_PREFIX} owner init in your own terminal. Until then, nothing can be approved here.`,
+  noPasskeys: "Passkeys aren't available in this browser. Approve with your master code.",
   appTitle: 'Approvals',
   // UX2-a (B-11 §26.2): the Grid/List control.
   layout: 'Layout',
@@ -54,9 +54,9 @@ export const APPROVAL_STRINGS = Object.freeze({
   confirmPasskey: 'Confirm with your passkey',
   confirm: 'Confirm',
   back: 'Change my choices',
-  orCode: 'Or use your backup code:',
-  codeLabel: 'Backup code',
-  codeHint: 'Paste the backup code AgentLink showed you when you set up',
+  orCode: 'Or use your master code:',
+  codeLabel: 'Master code',
+  codeHint: 'Paste the master code AgentLink showed you when you set up',
   show: 'Show',
   hide: 'Hide',
   doneApprove: 'Done: approved {approve}.',
@@ -71,8 +71,8 @@ export const APPROVAL_STRINGS = Object.freeze({
   freeExplained:
     'Free means your messages travel over the network at no cost. Only proofs cost a small fee.',
   denied: 'Denied.',
-  presenceRequired: 'Enter your backup code. Nothing was changed.',
-  presenceRejected: "That didn't match your passkey or backup code. Nothing was changed.",
+  presenceRequired: 'Enter your master code. Nothing was changed.',
+  presenceRejected: "That didn't match your passkey or master code. Nothing was changed.",
   wait: `Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was changed. You can also run ${CLI_PREFIX} approve in your own terminal.`,
   notPending: 'This request is no longer waiting for you.',
   listNotPending:
@@ -83,8 +83,8 @@ export const APPROVAL_STRINGS = Object.freeze({
   busy: 'Another approval is being confirmed. Try again in a moment.',
   refused: 'This decision was not applied. Nothing was changed.',
   listRefused: 'These decisions were not applied. Nothing was changed. Review the list again.',
-  needsSetup: `Set up your backup code first: run ${CLI_PREFIX} owner init in your own terminal.`,
-  notUsed: "The passkey wasn't used. Nothing was changed. You can enter your backup code instead.",
+  needsSetup: `Set up your master code first: run ${CLI_PREFIX} owner init in your own terminal.`,
+  notUsed: "The passkey wasn't used. Nothing was changed. You can enter your master code instead.",
   paidAlone: 'This costs credits. Approve it on its own.',
   listPaid:
     'A request in this list costs credits and is approved on its own. Nothing was changed. Review the list again.',

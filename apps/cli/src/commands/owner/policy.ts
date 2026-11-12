@@ -5,7 +5,7 @@
 // - `allow-send-folder` (M1-36b-2-c, D-121 D6): the Send folder for an agent that already has its
 //   card (set up before `owner init`/`owner add-agent` signed first rules). @4thtech-io/node's
 //   `setUpSendFolder` creates or checks `~/AgentLink/Send` (real path, 0700, new or empty, no link)
-//   before any owner code and signs one `policy.set` that adds only that folder (byte-exact check),
+//   before any master code and signs one `policy.set` that adds only that folder (byte-exact check),
 //   through the same owner operation as every other policy command.
 // - A folder typed with another spelling of a real folder (case, Unicode form; never a link) is not
 //   refused outright any more (M1-36b-2-c): the exact on-disk path is shown and the owner is asked
@@ -17,13 +17,13 @@
 //
 // - Owner operation (I-4): the dispatcher's owner-terminal guard runs first (interactive terminal,
 //   no AI-app marker; a UX guard, not a security boundary, D-67). Then @4thtech-io/node shows the
-//   fixed summary, reads the owner code once at its own TTY prompt and signs one `policy.set`
+//   fixed summary, reads the master code once at its own TTY prompt and signs one `policy.set`
 //   (04 §2.5.1). The core verifies the owner signature, the nonce and the version and applies it.
 //   No MCP tool reaches this module (06 §1: packages/mcp-tools and src/mcp/ never import commands/owner).
 // - The new policy is the CURRENT verified policy (core's G-6 loader) with only
 //   `files.allowedFolders` changed, at version + 1. When the rules can't be read (fail closed), the
 //   command refuses: it never rebuilds the rules from the defaults, which could undo stricter rules.
-// - A folder is checked before any owner code is asked (04 §4): a full path (`~/` is the home
+// - A folder is checked before any master code is asked (04 §4): a full path (`~/` is the home
 //   folder); an existing folder; no symbolic link anywhere in it (its realpath must be the path
 //   itself, and the refusal names the real path to use); not the root, the home folder or a folder
 //   above it; not hidden and not under a protected folder (`~/.ssh`, `~/.agentlink`, keychains).
@@ -31,19 +31,19 @@
 //   every use @4thtech-io/node resolves it again and uses it only while its realpath is still that
 //   stored path (M1-36b-2-d), so a folder replaced by a link later (or below one) is not used.
 // - D-99: a folder that CONTAINS a protected folder (for example `~/Library`, which holds
-//   `~/Library/Keychains`) is refused too, before any owner code; the refusal names the protected
+//   `~/Library/Keychains`) is refused too, before any master code; the refusal names the protected
 //   folder and asks for a narrower one. Each protected folder is compared in its lexical form and
 //   its realpath (a `~/.ssh` that links elsewhere is found where it really is), ignoring case
 //   (macOS and Windows volumes). Whether it exists doesn't matter: fail closed.
 // - `policy recover` (D-100; 06 §3 G-6, §8): the deliberate way back from rules that fail closed.
 //   It prints only the kind of failure; the owner then reviews, in full, the stored rules when they
 //   parse and their signature verifies (`rolled_back`, `mark_mismatch`), otherwise the 06 §3
-//   defaults; after an explicit `y` and the owner code it signs that complete policy at the version
+//   defaults; after an explicit `y` and the master code it signs that complete policy at the version
 //   the core needs (the mark + 1, or above the stored version when that is higher). It is refused
 //   while the rules are valid, and nothing is ever rebuilt without that review.
 // - The path is shown to the owner exactly as signed: one that terminal sanitizing would change
 //   (control, bidi, zero-width characters) is refused, so what the owner reads is what is signed.
-// - The owner code is never an argument, a variable or a pipe (deps.ts). A wrong code is refused by
+// - The master code is never an argument, a variable or a pipe (deps.ts). A wrong code is refused by
 //   the owner store (`presence_rejected`): nothing is signed, nothing changes, and the next run asks
 //   again. There is one try per run.
 import { lstat, realpath, stat } from 'node:fs/promises';
@@ -624,7 +624,7 @@ async function signAndApply(
     issuedAt,
     expiresAt: issuedAt + POLICY_SET_LIFETIME_SECONDS,
   };
-  // The owner code reminder is printed by signOwnerAction itself (M1-9zd, prompts.ts).
+  // The master code reminder is printed by signOwnerAction itself (M1-9zd, prompts.ts).
   let signature;
   try {
     signature = await deps.signOwnerAction(owner.owner, {
@@ -817,8 +817,8 @@ async function removeFolder(
 
 /**
  * `policy allow-send-folder` † (M1-36b-2-c): `~/AgentLink/Send` for an agent that already has its
- * card. @4thtech-io/node checks or creates the folder before any owner code and signs one
- * `policy.set` that adds only that folder, through `deps.signOwnerAction` (the owner code at its TTY
+ * card. @4thtech-io/node checks or creates the folder before any master code and signs one
+ * `policy.set` that adds only that folder, through `deps.signOwnerAction` (the master code at its TTY
  * prompt). Delivery receipts on from an older default are asked about first (D-109).
  */
 async function setUpSend(

@@ -23,6 +23,7 @@ const SAMPLES: Record<string, string> = {
   mcp: 'Add the MCP',
   'owner key / signature': 'Check the signature',
   keystore: 'Open the keystore',
+  'old code names': 'Enter your backup code',
   password: 'Enter a password',
   contract: 'A legally binding contract',
   'commitment label': 'A new commitment',

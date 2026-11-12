@@ -5,7 +5,7 @@
 //   gets the statement to show, the nonce and the plan-bound WebAuthn challenge;
 // - `finish` sends only `{nonce}` and the presence proof: one `navigator.credentials.get` with that
 //   challenge (`X-AgentLink-Presence: passkey`, the six-field body of the paid-action confirmation)
-//   or the backup code as the body. A wrong code keeps the plan: the page may try again with the
+//   or the master code as the body. A wrong code keeps the plan: the page may try again with the
 //   same nonce (the third wrong one ends it).
 // The PRF output and the code are wiped once sent; nothing here is logged or kept.
 

@@ -102,8 +102,8 @@ describe('ReviewTogether', () => {
   });
   it('calls onConfirm once per click and names the presence method', () => {
     const onConfirm = vi.fn();
-    mount(view({ onConfirm, method: 'owner code', decisions: { a: 'approve' } }));
-    expect(host.textContent).toContain('owner code');
+    mount(view({ onConfirm, method: 'master code', decisions: { a: 'approve' } }));
+    expect(host.textContent).toContain('master code');
     click(q('[data-review-confirm]'));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });

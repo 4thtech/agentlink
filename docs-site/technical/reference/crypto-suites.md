@@ -14,6 +14,6 @@
 | Files | AES-256-GCM STREAM (`ALF1`), 1 MiB chunks, additional data = the 17-byte header plus the final-chunk flag, so header changes and truncation fail decryption |
 | Owner passphrase | Argon2id key wrapping |
 | Passkeys | WebAuthn PRF output to wrap the owner seed (`ALKP` v1, AES-256-GCM); recovery code wrap `ALKR` v1 (Argon2id, AES-256-GCM) |
-| Pairing | HMAC-SHA256 handshake proof; commit-then-reveal safety code (tagged SHA-256 over both cards, the invite ID and a nonce from each side), shown as 12 digits |
+| Pairing | HMAC-SHA256 handshake proof; commit-then-reveal safety code (the Contact check) (tagged SHA-256 over both cards, the invite ID and a nonce from each side), shown as 12 digits |
 
 **Libraries:** `@noble/curves`, `@noble/hashes`, `@noble/ciphers`, `@hpke/core`, `nostr-tools`, `viem` and WebCrypto. No custom primitives; all crypto goes through `@4thtech-io/crypto`.

@@ -7,7 +7,7 @@
 // - The passkey: one navigator.credentials.get with that challenge, `userVerification: 'required'`
 //   and the PRF salt, only after the owner clicks; its response goes back to /finish as six fields
 //   (credential ID, authenticator data, clientDataJSON, signature, user handle, PRF output), each
-//   with a 16-bit length first. Or the backup code as the body.
+//   with a 16-bit length first. Or the master code as the body.
 // - The browser never signs (D-118), and nothing here is logged; the presence bytes are wiped.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import {

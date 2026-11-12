@@ -2,7 +2,7 @@
 // approval server as the app host with NO agent yet, Chromium with a CDP virtual authenticator. First
 // run creates the first agent and opens it in the same host, so the `finish` answer carries a new
 // generation; the page's generation guard adopts it (the answer is marked) instead of reloading. The
-// one-time backup code stays on screen, and the next change the page sends carries the new
+// one-time master code stays on screen, and the next change the page sends carries the new
 // generation and is not refused with `agent_changed`.
 //
 // Needs the built packages and app (`pnpm build`) and the Playwright Chromium; without them it is
@@ -234,7 +234,7 @@ function noAgentWorld(keychain: KeychainBackend) {
 }
 
 describe('first run with no agent yet in a real browser (U3-g-b)', () => {
-  it('after Touch ID the backup code stays on screen and the next change carries the new generation', async (ctx) => {
+  it('after Touch ID the master code stays on screen and the next change carries the new generation', async (ctx) => {
     const files = appAssets();
     // Only the Linux `checks` job installs Playwright's Chromium; node-os (macOS, Windows) has none
     // (CI-WELCOME-BROWSER-OS), so a missing browser fails the test on Linux CI only.
@@ -296,14 +296,14 @@ describe('first run with no agent yet in a real browser (U3-g-b)', () => {
     await page
       .getByRole('button', { name: /^Connect with (Touch ID|Windows Hello|your passkey)$/ })
       .click();
-    await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
+    await page.getByRole('heading', { name: 'Your master code' }).waitFor();
     const loadsAfterFinish = loads;
     const code = await page.locator('.al-secret-val').innerText();
     expect(code).toMatch(/[A-Z0-9]{4}/);
     // Give a reload every chance to happen (the guard reloads at once on a mismatch).
     await page.waitForTimeout(1500);
     expect(loads).toBe(loadsAfterFinish);
-    await expect(page.getByRole('heading', { name: 'Your backup code' }).isVisible()).resolves.toBe(
+    await expect(page.getByRole('heading', { name: 'Your master code' }).isVisible()).resolves.toBe(
       true,
     );
     expect(await page.locator('.al-secret-val').innerText()).toBe(code);

@@ -1,7 +1,7 @@
 // UI-REFRESH-d (S1): live state and moments (B-11 §5, §6 rows 1, 3, 4, 7 to 10 and 13, §14, §15.1).
 // - LiveDot: the six state shapes, each with a word and a tone (never colour alone); one soft pulse
 //   when it arrives at Connected; Checking fills once and gives up after 4 s.
-// - SuccessMoment: the once-only signature moments (approved check, proof stamp, safety codes
+// - SuccessMoment: the once-only signature moments (approved check, proof stamp, Contact check
 //   merging, file drop). A text line is always there; motion only adds to it.
 // - CountBadge: the number, "99+" above 99, with a tick when the shown value changes.
 // - useRowPresence: a new row slides in with a 1.2 s highlight; a leaving row collapses.

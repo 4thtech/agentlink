@@ -37,7 +37,7 @@
 // fingerprint is only a grouping key here and never leaves.
 // W4-RENAME-REACHES-CONTACTS (D-141; 08 §1): a contact whose card-update changed its name, with the
 // note not seen yet, also carries `formerName`, core's restricted form of the name the owner last saw
-// (the seen mark is api/contacts-renamed.ts). The label and "Safety code checked" stay as core says.
+// (the seen mark is api/contacts-renamed.ts). The label and "Contact checked" stay as core says.
 import type { ContactView, PreparedOwnerAction } from '@4thtech-io/core';
 import type { JsonObject, JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiContext } from '../context.js';
@@ -55,9 +55,9 @@ import {
 
 /** A contact's ID: its agent's EVM address, lowercase (04 §2.9). */
 const REF = /^0x[0-9a-f]{40}$/;
-/** The shown safety code: three groups of four digits (04 §3.6.1). */
+/** The shown Contact check: three groups of four digits (04 §3.6.1). */
 const CODE = /^[0-9]{4} [0-9]{4} [0-9]{4}$/;
-/** The short owner fingerprint core shows (04 §2.9). */
+/** The short ID tag core shows (04 §2.9). */
 const FINGERPRINT = /^[0-9A-F]{4}·[0-9A-F]{4}$/;
 /** An alias as typed; core checks the restricted form (at most 32 code points). */
 const MAX_ALIAS_CHARS = 128;
@@ -104,7 +104,7 @@ function row(view: ContactView): JsonObject | undefined {
   const name: unknown = display.name;
   if (typeof name !== 'string' || name.length > MAX_NAME_CHARS) return undefined;
   const owner = display.nameSource === 'owner';
-  // Never stronger than core: "Safety code checked" only while core re-verified it on this read.
+  // Never stronger than core: "Contact checked" only while core re-verified it on this read.
   const checked = display.label === 'safety-code-checked' && view.safetyCodeChecked === true;
   const short = view.ownerFingerprint.short;
   return {
@@ -135,7 +135,7 @@ function row(view: ContactView): JsonObject | undefined {
 
 /**
  * M1-UX3-DUP-CONTACTS: for each active contact, the ref of the next older active contact with the
- * same owner (same full owner fingerprint, 04 §2.9; cards are owner-signed, so the same fingerprint
+ * same owner (same full ID tag, 04 §2.9; cards are owner-signed, so the same fingerprint
  * means the same owner keys). Older is by pairing date, then list order. Only refs leave; the
  * fingerprint is used here as a grouping key and never added to a row.
  */
@@ -205,7 +205,7 @@ async function safetyCode(
     if (found.status === 'ok' && typeof found.code === 'string' && CODE.test(found.code)) {
       return { status: 200, body: { status: 'ok', code: found.code } };
     }
-    // "Can't show the safety code" (04 §3.6.1 step 5): no reason, no digest.
+    // "Can't show the 12 digits" (04 §3.6.1 step 5): no reason, no digest.
     return { status: 200, body: { status: 'unavailable' } };
   } catch {
     return UI_UNAVAILABLE;
@@ -278,8 +278,8 @@ async function signAndApply(
 }
 
 const CHECK_LINES = Object.freeze([
-  'Mark this contact as Safety code checked.',
-  'You compared the 12-digit safety code with them, and it matched.',
+  'Mark this contact as Contact checked.',
+  'You compared the 12-digit Contact check with them, and it matched.',
 ]);
 const RENAME_LINES = Object.freeze(['Rename this contact on this computer.']);
 const REMOVE_LINES = Object.freeze([

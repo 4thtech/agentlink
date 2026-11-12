@@ -1,6 +1,6 @@
 // W4-WIZARD: what Get started remembers between its steps. Each step is its own route, so the page
 // mounts again on every step; this module keeps the person's choices in memory for the life of the
-// page (never in storage). It holds no secret: the backup code stays in the connect step's own state
+// page (never in storage). It holds no secret: the master code stays in the connect step's own state
 // and leaves the page before the next step opens.
 import type { DetectedApp } from '../first-run/apps-api.js';
 

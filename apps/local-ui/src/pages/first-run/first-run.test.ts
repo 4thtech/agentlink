@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 // M1-11b-1 acceptance (D-120; 08 §1; d1 Local-firstrun with DESIGN-ADJ-1 (a)):
 // - passkey-first setup: begin, one browser passkey gesture, finish; the browser never signs;
-// - after setup: the owner fingerprint, the owner code collapsed as the backup way to approve (open
+// - after setup: the ID tag, the master code collapsed as the backup way to approve (open
 //   and confirmed when the passkey can't protect approvals), and `done_unconfirmed` still shows the
 //   code plus the restart line;
 // - every fixed reason code in plain words; nothing from the server or the browser is shown;
-// - the recovery kit stays "Later" (remembered for the persistent banner) when the backup code is saved;
+// - the recovery kit stays "Later" (remembered for the persistent banner) when the master code is saved;
 // - W4-WIZARD (W4 UX v2 layer 1): the setup page is Get started: these tests pick the app on step 1
 //   (start/wizard.dom.test.ts covers the steps), run step 2 and end on step 3, Connected;
 // - the default views use no web3 or key words (11 §5.1; UX north star).
@@ -232,11 +232,11 @@ describe('first run: protect approvals (D-120 (1))', () => {
     expect(api.finished[0]).toEqual(BODY);
   });
 
-  it('M1-UX-FIRSTRUN-V2: shows "Your backup code" once, in a save form, with the fingerprint', async () => {
+  it('M1-UX-FIRSTRUN-V2: shows "Your master code" once, in a save form, with the fingerprint', async () => {
     await mount(fakeApi());
     await click(GO.other);
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
-    // WP-5 (B-3): the fingerprint is not on the backup code screen.
+    // WP-5 (B-3): the fingerprint is not on the master code screen.
     expect(host.querySelector('.al-fp')).toBeNull();
     // The code is plain, readable text on the page (Q-130-1 stays open), never collapsed.
     expect(host.querySelector('details')).toBeNull();
@@ -259,7 +259,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
     expect(host.querySelector('.al-secret-val')?.textContent).toContain('UVWX');
   });
 
-  it('without a passkey that protects approvals, the backup code is the way to approve here', async () => {
+  it('without a passkey that protects approvals, the master code is the way to approve here', async () => {
     await mount(fakeApi({ finish: done({ passkey: false }) }));
     await click(GO.other);
     expect(text()).toContain(FIRST_RUN.doneNoPasskeyBody);
@@ -267,13 +267,13 @@ describe('first run: protect approvals (D-120 (1))', () => {
     expect(button(FIRST_RUN.savedIt)).toBeDefined();
   });
 
-  it('M1-11s-c-c: without a passkey, a prominent warning says the backup code is needed to approve', async () => {
+  it('M1-11s-c-c: without a passkey, a prominent warning says the master code is needed to approve', async () => {
     await mount(fakeApi({ finish: done({ passkey: false }) }));
     await click(GO.other);
     const banner = host.querySelector('[data-testid="backup-needed"]');
     expect(banner).not.toBeNull();
     expect(banner?.textContent).toContain(FIRST_RUN.doneNoPasskeyTitle);
-    expect(FIRST_RUN.doneNoPasskeyTitle).toMatch(/Save your backup code/);
+    expect(FIRST_RUN.doneNoPasskeyTitle).toMatch(/Save your master code/);
     expect(FIRST_RUN.doneNoPasskeyTitle).toMatch(/you need it to approve/);
     // It comes before the code itself.
     const code = host.querySelector('.al-secret-val');
@@ -423,14 +423,14 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(asked).toEqual([{ platform: true }]);
   });
 
-  it('the backup code sits in a real save form; Copy is secondary with the clipboard warning', async () => {
+  it('the master code sits in a real save form; Copy is secondary with the clipboard warning', async () => {
     await mount(fakeApi(), undefined, true, { platform: 'mac' });
     await click(GO.mac);
     const form = host.querySelector('form');
     expect(form).not.toBeNull();
     const user = form?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
     const secret = form?.querySelector<HTMLInputElement>('input[autocomplete="new-password"]');
-    expect(user?.value).toBe('AgentLink backup code – Talis-MacBook-Pro');
+    expect(user?.value).toBe('AgentLink master code – Talis-MacBook-Pro');
     expect(secret?.type).toBe('password');
     expect(secret?.value).toBe(CODE);
     const save = button(FIRST_RUN.saveToManager);
@@ -528,9 +528,9 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(host.querySelector('input[autocomplete="new-password"]')).toBeNull();
   });
 
-  // M1-UX-FIRSTRUN-V2-b L-3 (IR-M1-UX-FIRSTRUN-V2-1): after "I saved it" the backup code is in no
+  // M1-UX-FIRSTRUN-V2-b L-3 (IR-M1-UX-FIRSTRUN-V2-1): after "I saved it" the master code is in no
   // node, attribute or field value of the whole document (not only the page's visible text).
-  it('L-3: the backup code leaves the DOM after "I saved it"', async () => {
+  it('L-3: the master code leaves the DOM after "I saved it"', async () => {
     await mount(fakeApi());
     await click(GO.other);
     const fields = (): string[] =>
@@ -563,7 +563,7 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(text()).not.toMatch(BANNED);
   });
 
-  it('no PRF in this browser: names a browser that works, or continues with a backup code only', async () => {
+  it('no PRF in this browser: names a browser that works, or continues with a master code only', async () => {
     const asked: unknown[] = [];
     await mount(
       fakeApi({ finish: done({ passkey: false }) }),

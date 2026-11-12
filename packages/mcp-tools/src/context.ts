@@ -56,7 +56,7 @@ export interface SelfView {
   readonly agentId: string;
   /** Short agent fingerprint (04 §2.9), `7F3A·19C2`. */
   readonly agentFingerprint: string;
-  /** Short owner fingerprint. */
+  /** Short ID tag. */
   readonly ownerFingerprint: string;
   /**
    * F17: the ID's display name, only the owner-signed `agent.label` once verified (never a

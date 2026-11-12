@@ -263,7 +263,7 @@ export interface LocalUiReadClient {
     preparePolicyEdit(patch: unknown, options?: PolicyEditOptions): Promise<PreparedPolicyEdit>;
   };
   /**
-   * M1-11c-a2 (Contacts): the contact list, the safety code recomputed for the owner surface (04
+   * M1-11c-a2 (Contacts): the contact list, the 12 digits recomputed for the owner surface (04
    * §3.6.1) and core's prepare helpers for `contact.check`, `contact.rename`, `contact.remove`,
    * and (UX1112 WP-12, F-2) `contact.block` and `contact.unblock` (#415). Each prepare builds an unsigned body and writes nothing (I-4); only a signature from the
    * gate's one-use `sign`, applied by core, changes anything. No direct block, remove or apply.

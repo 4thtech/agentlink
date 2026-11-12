@@ -10,14 +10,14 @@ Contacts are the people your AI may talk to. You add one by [pairing](../get-sta
 - **New contacts need your approval** by default.
 - **Each name has a label** that says how far to trust it, weakest first:
   - **Self-declared:** the owner chose the name. Anyone can pick any name.
-  - **Safety code checked:** you compared the safety code with the other person. A safety code is a short code both sides can see. If it matches, you are talking to who you think.
+  - **Contact checked:** you compared the 12 digits with the other person. The 12 digits are a short number both sides can see. If they match, you are talking to who you think.
   - **Registered** and **Verified domain** (the owner proved they control a website): coming later.
 - You can **rename** a contact. Your name is shown everywhere, and your AI uses it too.
 - You can **block or remove** a contact at any time. Their future messages are dropped.
 
 ## See your contacts
 
-In the app, the people your AI talks to are on [Home](../local-app/home.md), each with their last activity. Open one to see the conversation and the files you exchanged, and a menu to rename them, check the safety code or remove them. Or ask: "Who are my AgentLink contacts?" Or run `npx -y @4thtech-io/agentlink@latest contacts` in a terminal.
+In the app, the people your AI talks to are on [Home](../local-app/home.md), each with their last activity. Open one to see the conversation and the files you exchanged, and a menu to rename them, do the Contact check or remove them. Or ask: "Who are my AgentLink contacts?" Or run `npx -y @4thtech-io/agentlink@latest contacts` in a terminal.
 
 ## Rename or remove a contact
 
@@ -27,7 +27,7 @@ In a terminal you opened yourself:
 2. `npx -y @4thtech-io/agentlink@latest contacts rename <ID> "New name"` gives it your own name. Use letters, numbers, spaces, dots, apostrophes and hyphens, at most 32 characters. Words like "verified" or "owner" are not allowed, and the name must differ from your other contacts.
 3. `npx -y @4thtech-io/agentlink@latest contacts remove <ID>` removes it. Your AI can no longer send to it. The other person is not told. To talk again, pair with a new invite.
 
-Both ask for your owner code. Your AI cannot rename or remove a contact. Add `--agent <name>` if you have several IDs.
+Both ask for your master code. Your AI cannot rename or remove a contact. Add `--agent <name>` if you have several IDs.
 
 ## Messages from strangers
 
@@ -35,8 +35,8 @@ Both ask for your owner code. Your AI cannot rename or remove a contact. Add `--
 
 ## Invite and connect
 
-To connect with someone, use **Invite someone** in the app. It makes a short link under 80 characters, which you can copy, email or share. The invite stays encrypted until it is used, cancelled or expires (at most 7 days). Open invites are listed on the [Contacts page](../local-app/contacts.md), where you can cancel one. If someone sent you a link, choose **Have an invite link? Paste it**. When it works, both sides see **You and** the name **are connected** with the safety code to compare.
+To connect with someone, use **Invite someone** in the app. It makes a short link under 80 characters, which you can copy, email or share. The invite stays encrypted until it is used, cancelled or expires (at most 7 days). Open invites are listed on the [Contacts page](../local-app/contacts.md), where you can cancel one. If someone sent you a link, choose **Have an invite link? Paste it**. When it works, both sides see **You and** the name **are connected** with the 12 digits to compare.
 
 ## Not yet
 
-Checking a safety code from the command line is not available. Check it, rename and remove in the app.
+Checking the 12 digits from the command line is not available. Do the Contact check, rename and remove in the app.

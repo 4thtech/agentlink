@@ -58,7 +58,7 @@ const IDENTITY: Readonly<
   Record<IdentityKind, readonly [tone: string, icon: string, word: string]>
 > = {
   selfdeclared: ['selfdeclared', 'identity-selfdeclared', 'Not checked yet'],
-  checked: ['checked', 'identity-checked', 'Safety code checked'],
+  checked: ['checked', 'identity-checked', 'Contact checked'],
   registered: ['registered', 'identity-registered', 'Registered'],
   verified: ['verified', 'identity-verified', 'Verified domain'],
   'domain-warning': ['warning', 'domain-warning', 'Domain no longer verified'],
@@ -95,7 +95,7 @@ export function IdentityLabel({
       className={cx('al-idl', `al-idl-${tone}`, className)}
       title={
         kind === 'selfdeclared'
-          ? 'Name chosen by its owner. Compare the safety code to be sure.'
+          ? 'Name chosen by its owner. Compare the 12 digits to be sure.'
           : undefined
       }
     >
@@ -110,7 +110,7 @@ export function IdentityLabel({
 }
 
 export interface FingerprintProps {
-  /** The short owner fingerprint, for example `7F3A·19C2`. */
+  /** The short ID tag, for example `7F3A·19C2`. */
   value: string;
   /** `Contact` renders the fallback name for unnamed or suspicious senders. */
   prefix?: string;
@@ -136,7 +136,7 @@ const RESERVED = [
   'registered',
   'self-declared',
   'selfdeclared',
-  'safety code',
+  'Contact check',
   'checked',
   'agentlink',
   'system',
@@ -228,11 +228,11 @@ export function SafetyCode({
   const groups = cleanText(code, 64).split(' ');
   const who = contactName === undefined ? 'your contact' : cleanText(contactName, 100);
   return (
-    <section className={cx('al-sc', `is-${state}`)} aria-label="Safety code">
+    <section className={cx('al-sc', `is-${state}`)} aria-label="Contact check">
       <div className="al-sc-head">
         <Icon name="safety-code" size={16} />
         <span className="al-text-label">
-          {state === 'changed' ? 'Safety code changed' : 'Safety code'}
+          {state === 'changed' ? 'Contact check changed' : 'Contact check'}
         </span>
       </div>
       <div
@@ -246,7 +246,7 @@ export function SafetyCode({
       </div>
       {state === 'changed' ? (
         <p className="al-text-body">
-          {`${contactName === undefined ? 'This contact' : who} updated its keys (same owner). The safety code changed. Compare it again.`}
+          {`${contactName === undefined ? 'This contact' : who} updated its keys (same owner). The 12 digits changed. Compare them again.`}
         </p>
       ) : null}
       {state === 'waiting' ? (
@@ -272,7 +272,7 @@ export function SafetyCode({
       {state === 'matched' ? (
         <p className="al-sc-ok al-text-body">
           <Icon name="identity-checked" size={16} />
-          {`Matched. ${who} now shows as Safety code checked.`}
+          {`Matched. ${who} now shows as Contact checked.`}
         </p>
       ) : null}
       {state === 'mismatch' ? (
@@ -298,7 +298,7 @@ const CONTACT_STATE = {
   revoked: ['neutral', 'x', 'Revoked'],
   paused: ['neutral', 'pause', 'Paused'],
   flagged: ['warning', 'triangle-alert', 'Flagged'],
-  mismatch: ['warning', 'triangle-alert', 'Safety code did not match'],
+  mismatch: ['warning', 'triangle-alert', '12 digits did not match'],
 } as const satisfies Record<string, readonly [Tone, string, string]>;
 
 export interface ContactCardProps extends ContactNameInput {
@@ -311,7 +311,7 @@ export interface ContactCardProps extends ContactNameInput {
   statusDetail?: string;
   /** For example "Last activity 2 hours ago". */
   lastActivity?: string;
-  /** `flagged`: a proof did not match (M1-7g-c); `mismatch`: the safety code did not match. */
+  /** `flagged`: a proof did not match (M1-7g-c); `mismatch`: the 12 digits did not match. */
   state?: keyof typeof CONTACT_STATE;
   /** A sender who is not a contact: "an unknown sender", never "Contact …" (D-72, X-7). */
   unknownSender?: boolean;

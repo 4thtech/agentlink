@@ -136,8 +136,8 @@ async function existingAgent(): Promise<{ agent: Agent; owner: OwnerPublicKeys; 
     identity: agent.client.identity,
   };
   const shown = (): string =>
-    (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-      'Your owner code: '.length,
+    (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+      'Your master code: '.length,
     );
   const terminal: OwnerTerminal = {
     write: (text) => void written.push(text),
@@ -513,7 +513,7 @@ describe('setUpSendFolder: an existing agent gains only the Send folder (M1-36b-
     expect(await exists(join(home, 'AgentLink'))).toBe(false);
   });
 
-  it('a wrong owner code: the error reaches the caller, nothing changes, the folder is removed', async () => {
+  it('a wrong master code: the error reaches the caller, nothing changes, the folder is removed', async () => {
     const { agent, owner } = await existingAgent();
     const before = await rulesOf(agent);
     const owners = ownerSigning(() => 'WRONG');
@@ -601,7 +601,7 @@ describe('setUpSendFolder: an existing agent gains only the Send folder (M1-36b-
 // M1-36b-2-d (IR-M1-36b-2-c-1 L1-L3): the AI agent runs as the same OS user (04 §2.5), so it can
 // rename, replace or link the Send folder at any moment. The folder the owner checked is pinned (its
 // real path and its identity on disk) and must still be exactly that folder, real and empty, just
-// before the owner code is asked AND after signing, just before the rules are applied. Otherwise
+// before the master code is asked AND after signing, just before the rules are applied. Otherwise
 // nothing is applied (fail closed) and nothing the run did not create is removed.
 describe('setUpSendFolder: one folder from the check to the rules (M1-36b-2-d)', () => {
   type Swap = (folder: string) => Promise<void>;
@@ -633,7 +633,7 @@ describe('setUpSendFolder: one folder from the check to the rules (M1-36b-2-d)',
   ];
 
   for (const [label, swap] of swaps) {
-    it(`replaced by ${label} between the check and the owner code: nothing signed`, async () => {
+    it(`replaced by ${label} between the check and the master code: nothing signed`, async () => {
       const { agent, owner, code } = await existingAgent();
       const before = await rulesOf(agent);
       const folder = await sendFolder();

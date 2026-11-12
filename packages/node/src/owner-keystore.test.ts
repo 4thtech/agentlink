@@ -121,9 +121,9 @@ function scripted(answers: Answer[], confirms: boolean[] = []) {
 
 /** The generated code as shown by `owner init`, read back from the transcript. */
 function shownCode(written: readonly string[]): string {
-  const line = written.find((text) => text.startsWith('Your owner code: '));
+  const line = written.find((text) => text.startsWith('Your master code: '));
   if (line === undefined) throw new Error('no code shown');
-  return line.slice('Your owner code: '.length);
+  return line.slice('Your master code: '.length);
 }
 const lastGroup = (written: readonly string[]): string => shownCode(written).slice(-4);
 
@@ -239,16 +239,18 @@ describe('owner init on a keychain machine (04 §2.2, D-67)', () => {
 
   it('shows the fingerprint and the lost-code consequence before the code, once, then clears', async () => {
     const { result, written } = await setUpOwner(new FakeKeychain());
-    const codeAt = written.findIndex((t) => t.startsWith('Your owner code: '));
+    const codeAt = written.findIndex((t) => t.startsWith('Your master code: '));
     const fpAt = written.findIndex((t) => t.includes(result.fingerprint));
-    const lostAt = written.findIndex((t) => t.startsWith('Store this owner code off this machine'));
+    const lostAt = written.findIndex((t) =>
+      t.startsWith('Store this master code off this machine'),
+    );
     expect(fpAt).toBeGreaterThanOrEqual(0);
     expect(fpAt).toBeLessThan(codeAt);
     expect(lostAt).toBeLessThan(codeAt);
-    expect(written.filter((t) => t.startsWith('Your owner code: '))).toHaveLength(1);
+    expect(written.filter((t) => t.startsWith('Your master code: '))).toHaveLength(1);
     expect(written[codeAt + 1]).toBe('<clear>');
     expect(written.at(-1)).toBe(
-      `Owner set up. Your owner fingerprint: ${result.fingerprint}. Check that \`npx -y @4thtech-io/agentlink doctor\` shows the same one.`,
+      `Owner set up. Your ID tag: ${result.fingerprint}. Check that \`npx -y @4thtech-io/agentlink doctor\` shows the same one.`,
     );
   });
 
@@ -338,9 +340,9 @@ describe('owner init on a keychain machine (04 §2.2, D-67)', () => {
     expect(result.secretKind).toBe(2);
     expect(keychain.items.get(OWNER_ACCOUNT)?.[5]).toBe(2);
     expect(run.written[0]).toContain('try to guess the passphrase offline');
-    expect(run.written.join('\n')).not.toContain('Your owner code');
+    expect(run.written.join('\n')).not.toContain('Your master code');
     // IR-M1-8c-1 F-5: the fingerprint and what a lost passphrase means come before the passphrase.
-    expect(beforePrompt).toContain(`Your owner fingerprint: ${result.fingerprint}.`);
+    expect(beforePrompt).toContain(`Your ID tag: ${result.fingerprint}.`);
     expect(
       beforePrompt.some((t) => t.startsWith('Keep this owner passphrase off this machine')),
     ).toBe(true);
@@ -524,7 +526,7 @@ describe('one owner operation (04 §2.5, D-68)', () => {
     const body = approvalBody(owner);
     const run = scripted([code]);
     const out = await signAction(store, run.terminal, body, ['Approve: send a message to Acme']);
-    expect(run.labels).toEqual(['Owner code:']);
+    expect(run.labels).toEqual(['Master code:']);
     expect(run.written).toEqual(['Approve: send a message to Acme']);
     if (out.kind !== 'owner-action') throw new Error('unreachable');
     expect(out.signed.body).toEqual(body);
@@ -668,7 +670,7 @@ describe('one owner operation (04 §2.5, D-68)', () => {
       { kind: 'owner-action', action: approvalBody(owner) },
       { kind: 'owner-action', action: policy },
     ]);
-    expect(run.labels).toEqual(['Owner code:']);
+    expect(run.labels).toEqual(['Master code:']);
     expect(out).toHaveLength(2);
     for (const signature of out) {
       if (signature.kind !== 'owner-action') throw new Error('unreachable');
@@ -706,7 +708,7 @@ describe('one owner operation (04 §2.5, D-68)', () => {
     const run = scripted([code, code]);
     await signAction(store, run.terminal, approvalBody(owner));
     await signAction(store, run.terminal, approvalBody(owner));
-    expect(run.labels).toEqual(['Owner code:', 'Owner code:']);
+    expect(run.labels).toEqual(['Master code:', 'Master code:']);
     await expect(signAction(store, scripted([]).terminal, approvalBody(owner))).rejects.toThrow(
       'no scripted answer',
     );
@@ -796,7 +798,7 @@ describe('batch approval (04 §2.5.2, D-68)', () => {
     const items = [reviewed(3), reviewed(1, 'deny'), reviewed(2), reviewed(0)];
     const run = scripted([code], [true]);
     const signed = await decideReviewedWith(store, run.terminal, context, items, fixed);
-    expect(run.labels).toEqual(['Owner code:']);
+    expect(run.labels).toEqual(['Master code:']);
     expect(signed.body['op']).toBe('approval.decideBatch');
     const params = signed.body['params'] as {
       items: { approvalId: string; actionDigest: string; decision: string }[];
@@ -821,7 +823,7 @@ describe('batch approval (04 §2.5.2, D-68)', () => {
       '  2. Deny: Send a message to Contact 1',
       '  3. Approve: Send a message to Contact 2',
       '  4. Approve: Send a message to Contact 3',
-      'Approve 3 and deny 1. Your owner code covers exactly these 4. Anything new waits for your next review.',
+      'Approve 3 and deny 1. Your master code covers exactly these 4. Anything new waits for your next review.',
     ]);
   });
 
@@ -978,7 +980,7 @@ describe('batch approval (04 §2.5.2, D-68)', () => {
     const run = scripted([code, code], [true, true]);
     await decideReviewedWith(store, run.terminal, context, [reviewed(0), reviewed(1)], fixed);
     await decideReviewedWith(store, run.terminal, context, [reviewed(2), reviewed(3)], fixed);
-    expect(run.labels).toEqual(['Owner code:', 'Owner code:']);
+    expect(run.labels).toEqual(['Master code:', 'Master code:']);
     expect(run.handedOut.every(zeroed)).toBe(true);
     expect(captured.seeds.every(zeroed)).toBe(true);
   });
@@ -1077,7 +1079,7 @@ describe('the TTY prompt (04 §2.8, 07 §9.2)', () => {
     const tty = new FakeTty();
     const { out, stream } = fakeOut();
     const terminal = ttyOwnerTerminal({ input: tty, output: stream });
-    const reading = terminal.readSecret('Owner code:');
+    const reading = terminal.readSecret('Master code:');
     const chunks = [
       Buffer.from('abX'),
       Buffer.from([0x7f]),
@@ -1089,7 +1091,7 @@ describe('the TTY prompt (04 §2.8, 07 §9.2)', () => {
     for (const chunk of chunks) tty.emit('data', chunk);
     const secret = await reading;
     expect(new TextDecoder().decode(secret)).toBe('abcd');
-    expect(out.join('')).toBe('Owner code: \n');
+    expect(out.join('')).toBe('Master code: \n');
     expect(tty.rawCalls).toEqual([true, false]);
     expect(chunks.every(zeroed)).toBe(true);
   });
@@ -1110,7 +1112,7 @@ describe('the TTY prompt (04 §2.8, 07 §9.2)', () => {
   it('Ctrl-C cancels', async () => {
     const tty = new FakeTty();
     const terminal = ttyOwnerTerminal({ input: tty, output: fakeOut().stream });
-    const reading = terminal.readSecret('Owner code:');
+    const reading = terminal.readSecret('Master code:');
     await tick();
     tty.emit('data', Buffer.from([0x61, 0x03]));
     expect(await codeOf(() => reading)).toBe('owner_prompt_cancelled');

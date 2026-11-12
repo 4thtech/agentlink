@@ -234,6 +234,18 @@ describe('the lint itself (self-test)', () => {
     expect(lintVocabulary('your owner key')).toEqual(['owner key']);
   });
 
+  it('bans the old code names (D-146)', () => {
+    for (const phrase of [
+      'your backup code',
+      'the owner code',
+      'a safety code',
+      'owner fingerprint',
+    ]) {
+      expect(lintVocabulary(phrase), phrase).toEqual(['old code names']);
+    }
+    expect(lintVocabulary('Your master code and the 12 digits')).toEqual([]);
+  });
+
   it('names every 11 §5.1 term', () => {
     const names = NEVER_SAY.map((t) => t.name);
     for (const term of ['wallet', 'gas', 'seed phrase', 'transaction', 'chain', 'address']) {

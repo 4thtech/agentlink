@@ -8,8 +8,8 @@
 //   same-origin server, through the existing accept path (`POST /api/ui/invites/check`, then the
 //   owner route `POST /api/ui/invites/accept`), which resolves short links and keeps its SSRF rules.
 // - Checked: the friend's card (as the join screen draws it), "{name} invites you to connect your
-//   AIs", the short owner fingerprint and the date it works until, and one Accept with Touch ID (or
-//   the backup code). The inviter's name is React text under the name rule; the link is never in an
+//   AIs", the short ID tag and the date it works until, and one Accept with Touch ID (or
+//   the master code). The inviter's name is React text under the name rule; the link is never in an
 //   attribute, the address, the title, a log or an error.
 // - Accepted: the page shows the Connected moment once the new contact arrives (People).
 import { Button, InlineError, ProgressBar, TextArea, formatContactName } from '@4thtech-io/ui';
@@ -52,7 +52,7 @@ const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', t
 
 export interface PasteInviteProps {
   readonly invites: InviteApi;
-  /** The owner's passkey on this computer; without one, Accept asks for the backup code. */
+  /** The owner's passkey on this computer; without one, Accept asks for the master code. */
   readonly passkey?: PasskeyInfo | undefined;
   /** The passkey gesture. Default: passkeyProof. */
   readonly gesture?: (info: PasskeyInfo) => Promise<PresenceProof | undefined>;
@@ -272,7 +272,7 @@ export function PasteInvite({
         <h2 className="inv-friend-title">{invitesYou(shown)}</h2>
         <p className="al-text-body-sm al-muted inv-paste-note">{S.acceptBody(shown)}</p>
         <p className="al-text-body-sm al-muted inv-paste-note">
-          {J.check(shown, invite.fingerprint)} · {J.until(until)}
+          {J.check(shown)} · {J.until(until)}
         </p>
         {invite.already === undefined ? null : (
           // W5-INVITE-FEEDBACK (04 §2.9): a re-pair, said before Touch ID.
@@ -306,7 +306,7 @@ export function PasteInvite({
                 {passkey === undefined ? J.acceptWithCode : J.acceptWith(platform)}
               </span>
             </Button>
-            {/* FB-8: the backup code is always a way to confirm, also with a passkey here. */}
+            {/* FB-8: the master code is always a way to confirm, also with a passkey here. */}
             {passkey === undefined ? null : (
               <UseCodeInstead
                 disabled={busy}

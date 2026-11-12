@@ -2,12 +2,12 @@
 // one-shot session link and the wrong-code backoff (08 §1; 04 §2.5, §2.5.2; 11 §6.2.1; D-68;
 // IR-M1-8d-1 L-2, L-3).
 //
-// - Review together (D-68): one owner code entry signs one `approval.decideBatch` over exactly the
+// - Review together (D-68): one master code entry signs one `approval.decideBatch` over exactly the
 //   items the page listed (2 to 20), or one `approval.decide` for a single item. A commitment is
 //   never part of it: the server refuses the whole request before the owner store is opened.
 // - The session link (`/?t=…`) is one-shot: the first request exchanges it for a session cookie and
 //   it never works again; a link also dies after SESSION_LINK_LIFETIME_MS. `open()` mints a new one.
-// - After FREE_PRESENCE_ATTEMPTS wrong owner codes or passkeys in a row, every owner operation waits
+// - After FREE_PRESENCE_ATTEMPTS wrong master codes or passkeys in a row, every owner operation waits
 //   (429 `wait`, Retry-After) before the owner store is opened, doubling up to a cap; a success resets.
 import { encodeUtf8 } from '@4thtech-io/crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -167,7 +167,7 @@ const WRONG = 'AAAA BBBB CCCC DDDD EEEE FFFF';
 const json = (res: RawResponse): Record<string, unknown> =>
   JSON.parse(res.body) as Record<string, unknown>;
 
-describe('review together: one owner code entry, exactly the listed items (D-68, 04 §2.5.2)', () => {
+describe('review together: one master code entry, exactly the listed items (D-68, 04 §2.5.2)', () => {
   it('signs one approval.decideBatch over exactly the selected items, in canonical order', async () => {
     const h = await harness();
     for (const n of [1, 2, 3, 4, 5]) h.source.add(n);
@@ -404,7 +404,7 @@ describe('the session link is one-shot (IR-M1-8d-1 L-3)', () => {
   });
 });
 
-describe('wrong owner codes back off (IR-M1-8d-1 L-2)', () => {
+describe('wrong master codes back off (IR-M1-8d-1 L-2)', () => {
   it('waits after FREE_PRESENCE_ATTEMPTS wrong codes, without opening the owner store', async () => {
     const h = await harness();
     h.source.add(1);

@@ -5,9 +5,9 @@
 //
 // M1-UX-FIRSTRUN-V2 (08 §1 first run v2): the passkey is asked of the platform authenticator
 // (Touch ID, Windows Hello: `authenticatorAttachment: 'platform'`, `hints: ['client-device']`).
-// Where the browser reports no PRF, the page offers "continue with a backup code only", which asks
+// Where the browser reports no PRF, the page offers "continue with a master code only", which asks
 // for any passkey (no attachment): the gesture still proves presence, and the server keeps the
-// backup code as the way to approve.
+// master code as the way to approve.
 //
 // M1-11s-c-c (F48): where create() returns `prf.enabled` without a PRF output, a second gesture
 // (get() for the new credential) follows at once in the same owner operation; its PRF output and
@@ -37,7 +37,7 @@ export function detectPlatform(): Platform {
 /**
  * M1-UX-PRF-MATRIX detection: `no` when the browser says there is no platform authenticator with
  * user verification, or (where it can tell) no PRF; `unknown` when it can't tell (the server then
- * learns it from the creation response, and without PRF the backup code stays the way to approve).
+ * learns it from the creation response, and without PRF the master code stays the way to approve).
  */
 export async function prfSupport(): Promise<PrfSupport> {
   if (!passkeysAvailable()) return 'no';
@@ -198,7 +198,7 @@ export async function createSetupPasskey(
   const second = bytesOf((used.getClientExtensionResults() as PrfFlag).prf?.results?.first);
   try {
     if (second.length !== 32) {
-      // No PRF on use either: the creation alone, and the backup code is the way to approve.
+      // No PRF on use either: the creation alone, and the master code is the way to approve.
       return { kind: 'ok', body: encodeRegistration([...created, new Uint8Array(0)]) };
     }
     return {
@@ -217,19 +217,19 @@ export async function createSetupPasskey(
   }
 }
 
-// --- M1-UX-FIRSTRUN-V2-c (B-9): the passkey for an owner who already has a backup code ----------
+// --- M1-UX-FIRSTRUN-V2-c (B-9): the passkey for an owner who already has a master code ----------
 //
 // The approval server's existing registration (owner-passkey.ts registerOwnerPasskey) takes an
 // assertion body: credential ID, authenticator data, user handle (the owner key) and the 32-byte PRF
 // output, each after its 16-bit length (encodePasskeyAssertion). The server checks rpIdHash, UP, UV
-// and the user handle, then opens the `owner` item with the backup code and seals the same owner key
+// and the user handle, then opens the `owner` item with the master code and seals the same owner key
 // under the PRF output. The challenge is the page's own: the server relies on the PRF output (the
 // presence proof is the successful decryption), never on the signature (04 §2.3.1, M1-8e).
 
 export type UpgradePasskeyResult =
   | { readonly kind: 'ok'; readonly body: Uint8Array }
   | { readonly kind: 'cancelled' }
-  /** No passkey, or no PRF from it: nothing is sent, the backup code stays the way to approve. */
+  /** No passkey, or no PRF from it: nothing is sent, the master code stays the way to approve. */
   | { readonly kind: 'unsupported' };
 
 function challenge(): Uint8Array<ArrayBuffer> {
@@ -351,7 +351,7 @@ export async function createUpgradePasskey(
 
 /**
  * The registration body of `POST /api/owner/passkey` (owner-passkey.ts parsePasskeyRegistration):
- * the backup code after its 16-bit big-endian length, then the assertion body. The caller zeroes
+ * the master code after its 16-bit big-endian length, then the assertion body. The caller zeroes
  * both inputs and the result.
  */
 export function encodeUpgradeBody(code: Uint8Array, assertion: Uint8Array): Uint8Array {

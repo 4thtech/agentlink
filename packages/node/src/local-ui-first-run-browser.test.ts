@@ -1,13 +1,13 @@
 // M1-11b-1 acceptance, the whole first run in a real browser: the built local app (apps/local-ui
 // dist) served by the approval server on `http://localhost:<port>`, Chromium with a CDP virtual
 // authenticator (PRF, user verification, resident keys). The page creates the passkey, the server
-// creates the owner, the page shows the owner fingerprint and the collapsed backup owner code, the
+// creates the owner, the page shows the ID tag and the collapsed backup master code, the
 // recovery kit is put off ("Later") and Ready hands back to the AI; axe-core finds no WCAG 2.1 AA
 // violation on any step. A second visit then shows
 // "already protected" and never offers setup again.
 //
 // M1-UX-FIRSTRUN-V2 (D-130 (1), (2)): the button names the platform, the same gesture signs the
-// first policy (Send allowed, in a temp home), and "Your backup code" is shown once in a save form
+// first policy (Send allowed, in a temp home), and "Your master code" is shown once in a save form
 // that moves on only after "I saved it".
 //
 // Needs the built packages and app (`pnpm build`) and the Playwright Chromium; without them it is
@@ -187,7 +187,7 @@ async function pageWithAuthenticator(): Promise<Page> {
 }
 
 describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
-  it('Welcome, pick, name with one gesture, backup code, and Home (U3-g; M1-11b-1, D-120)', async (ctx) => {
+  it('Welcome, pick, name with one gesture, master code, and Home (U3-g; M1-11b-1, D-120)', async (ctx) => {
     const files = appAssets();
     if (browser === undefined && process.env['CI'] !== undefined) throw launchError;
     if (browser === undefined || files === undefined) {
@@ -331,7 +331,7 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     await page
       .getByRole('button', { name: /^Connect with (Touch ID|Windows Hello|your passkey)$/ })
       .click();
-    await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
+    await page.getByRole('heading', { name: 'Your master code' }).waitFor();
 
     // The label was checked, then carried by begin exactly as the server parses it (X-AgentLink-Input
     // = base64url JSON {label}); W4-ONE-TOUCH (04 §2.8): finish carries only {nonce}. The first
@@ -363,7 +363,7 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
       ]);
     }
 
-    // The owner is set up (the server said done); the page shows the one backup code, once, in a
+    // The owner is set up (the server said done); the page shows the one master code, once, in a
     // save form. The fingerprint is no longer on this screen (WP-5): the code is the only display.
     const view = await client.identity.get();
     expect(view).toBeDefined();
@@ -374,7 +374,7 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     expect(await page.locator('.al-secret-val').innerText()).toMatch(/[A-Z0-9]{4}/);
     expect(await page.locator('form input[autocomplete="new-password"]').count()).toBe(1);
     expect(await page.locator('form input[autocomplete="username"]').inputValue()).toMatch(
-      /^AgentLink backup code – /,
+      /^AgentLink master code – /,
     );
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).not.toBeNull();
 

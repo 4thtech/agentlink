@@ -124,7 +124,7 @@ exports[`copy catalogue (M1-9g) > cli.approve.resultDenied > renders as designed
 
 exports[`copy catalogue (M1-9g) > cli.approve.resultFailed > renders as designed 1`] = `"Problem  Didn't go through: send a file to Marko's agent with proof. Nothing was sent."`;
 
-exports[`copy catalogue (M1-9g) > cli.approve.summary > renders as designed 1`] = `"Approve 3 and deny 1. Your owner code or passphrase covers exactly these 4. Anything new waits for your next review."`;
+exports[`copy catalogue (M1-9g) > cli.approve.summary > renders as designed 1`] = `"Approve 3 and deny 1. Your master code or passphrase covers exactly these 4. Anything new waits for your next review."`;
 
 exports[`copy catalogue (M1-9g) > cli.approve.terms.commits > renders as designed 1`] = `"This one approval sends your acceptance and adds your Accepted receipt to their record. Nothing else."`;
 
@@ -205,11 +205,11 @@ exports[`copy catalogue (M1-9g) > cli.owner.again > renders as designed 1`] = `"
 exports[`copy catalogue (M1-9g) > cli.owner.done > renders as designed 1`] = `"OK Approvals are protected."`;
 
 exports[`copy catalogue (M1-9g) > cli.owner.explain > renders as designed 1`] = `
-"Your owner code protects approvals on this machine. Your AI can't approve anything without it.
+"Your master code protects approvals on this machine. Your AI can't approve anything without it.
 It is never passed as an argument."
 `;
 
-exports[`copy catalogue (M1-9g) > cli.owner.prompt > renders as designed 1`] = `"owner code:"`;
+exports[`copy catalogue (M1-9g) > cli.owner.prompt > renders as designed 1`] = `"master code:"`;
 
 exports[`copy catalogue (M1-9g) > cli.requests.choose > renders as designed 1`] = `"Accept, ignore or block? (a/i/b/Enter to skip)"`;
 
@@ -233,7 +233,7 @@ exports[`copy catalogue (M1-9g) > cli.status.warning > renders as designed 1`] =
 
 exports[`copy catalogue (M1-9g) > cli.unlock.wrong > renders as designed 1`] = `"That unlock code didn't work."`;
 
-exports[`copy catalogue (M1-9g) > common.identity.checked > renders as designed 1`] = `"Safety code checked"`;
+exports[`copy catalogue (M1-9g) > common.identity.checked > renders as designed 1`] = `"Contact checked"`;
 
 exports[`copy catalogue (M1-9g) > common.identity.domainWarning > renders as designed 1`] = `"Domain no longer verified"`;
 

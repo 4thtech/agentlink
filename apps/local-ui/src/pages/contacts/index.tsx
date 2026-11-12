@@ -5,20 +5,20 @@
 // name under the ui name rule (formatContactName), always as React text; the short fingerprint only
 // as that rule's fallback. No presence for contacts (X-11).
 //
-// The safety code: on a paired contact that is not yet checked, the page shows the 12 digits with a
+// The 12 digits: on a paired contact that is not yet checked, the page shows the 12 digits with a
 // gentle nudge and three choices. "They match" asks for owner presence and posts the code it showed;
 // the server signs `contact.check` (it signs only if that is still the code). "They don't match"
 // signs nothing by itself (04 §3.6.1): it explains and offers Remove. "Skip" keeps the contact
 // Self-declared.
 //
-// Rename and Remove ask for owner presence (the passkey, or the owner code). Every change is one POST
+// Rename and Remove ask for owner presence (the passkey, or the master code). Every change is one POST
 // to a presence route; the page never signs (owner.ts). UX1112 WP-12 (F-2; D-72): Block (after a
 // short explanation) and Unblock sit in the same menu and ask for presence the same way.
 //
 // W4-PEOPLE-INVITE (prototype v23 A4, A5, A7): "Invite someone" opens the Invite screen in place
 // (`?invite` too); open invites are PendingInviteRow rows that say so once cancelled; Rename, Check
-// safety code and Remove sit in the person ⋯ menu; and when an open invite is answered (or a pasted
-// one connects), the new contact arrives with the Connected moment and its safety code.
+// Contact check and Remove sit in the person ⋯ menu; and when an open invite is answered (or a pasted
+// one connects), the new contact arrives with the Connected moment and its Contact check.
 import {
   Banner,
   Button,
@@ -847,7 +847,7 @@ export function ContactsPage({
   const [removed, setRemoved] = useState(false);
   const [kept, setKept] = useState(loadKept);
   const [sheetOpen, setSheetOpen] = useState(false);
-  // W5-SAFETY-STEP: Home's "Compare safety code" link (`?check=<ref>`) opens that contact's panel.
+  // W5-SAFETY-STEP: Home's "Compare the 12 digits" link (`?check=<ref>`) opens that contact's panel.
   const wantsCheck = useRef(peekCheckRef());
   const [rows, setRows] = useState<readonly OpenInvite[]>([]);
   const [highlight, setHighlight] = useState<string | undefined>(undefined);
@@ -926,7 +926,7 @@ export function ContactsPage({
         }
         setList({ phase: 'ok', contacts: answer.contacts });
         // W5-INVITE-FEEDBACK: the contact that connected (or connected again) gets a short pulse;
-        // after a re-pair the safety code check starts over, so the page says so.
+        // after a re-pair the Contact check starts over, so the page says so.
         const prior = lastRead.current;
         lastRead.current = {
           contacts: answer.contacts,

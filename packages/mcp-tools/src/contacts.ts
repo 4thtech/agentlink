@@ -60,7 +60,7 @@ export function renderRef(ref: ContactRef): string {
   return ref.ownerFingerprint === undefined ? name : `${name} (owner ${ref.ownerFingerprint})`;
 }
 
-/** A candidate of `AMBIGUOUS_CONTACT`: the name-rule ref plus owner fingerprint and short ID. */
+/** A candidate of `AMBIGUOUS_CONTACT`: the name-rule ref plus ID tag and short ID. */
 export function candidateRef(view: ContactView): ContactRef {
   return Object.freeze({
     ...contactRef(view),
@@ -70,7 +70,7 @@ export function candidateRef(view: ContactView): ContactRef {
 }
 
 /**
- * Refs by contact ID for `views`, with the owner fingerprint added where another contact shows the
+ * Refs by contact ID for `views`, with the ID tag added where another contact shows the
  * same name (WAVE-030). Compared the way `resolveContact` compares, so a pair that cannot be told
  * apart by name is exactly a pair that shows its fingerprint.
  */

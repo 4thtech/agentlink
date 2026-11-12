@@ -354,8 +354,9 @@ describe('W4-WIRE-2: Paste it on the Invite screen', () => {
     expect(posts(calls, ACCEPT)).toEqual([]);
     expect(text()).toContain('Marko Novak invites you to connect your AIs');
     expect(text()).toContain('Name set by the sender');
-    expect(text()).toContain('7F3A·19C2');
-    expect(buttons('Accept with your backup code').length).toBe(1);
+    // N-3 (D-146): the ID tag is not in the Simple view.
+    expect(text()).not.toContain('7F3A·19C2');
+    expect(buttons('Accept with your master code').length).toBe(1);
     expect(attributesWithLink()).toEqual([]);
   });
 
@@ -382,7 +383,7 @@ describe('W4-WIRE-2: Paste it on the Invite screen', () => {
     });
     await click(P.go);
     expect(document.querySelector('input[name="owner-code"]')).toBeNull();
-    await click('Accept with your backup code');
+    await click('Accept with your master code');
     await type(document.querySelector('input[name="owner-code"]') as HTMLInputElement, 'ABCD-EFGH');
     await click(S.confirmWithCode);
     const accepts = posts(calls, ACCEPT);
@@ -422,7 +423,7 @@ describe('W4-WIRE-2: Paste it on the Invite screen', () => {
     const sentence = { expired: P.expired, own: P.own, damaged: P.damaged }[kind];
     expect(text()).toContain(sentence);
     expect(text()).toContain(P.askForNew);
-    expect(buttons('Accept with your backup code')).toEqual([]);
+    expect(buttons('Accept with your master code')).toEqual([]);
   });
 
   it('keeps the pasted text when AgentLink cannot be reached', async () => {

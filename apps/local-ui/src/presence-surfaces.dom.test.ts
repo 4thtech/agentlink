@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // FB-8 (UX audit 2026-11-12 §1.6, P-1…P-5): every screen that asks for Touch ID, Windows Hello or a
-// passkey also offers "Use your backup code instead", and that choice submits the screen's existing
+// passkey also offers "Use your master code instead", and that choice submits the screen's existing
 // backup-code path (the server's presence gate takes either, approval-server.ts).
 //
 // Two parts, both table-driven:
@@ -29,7 +29,7 @@ import type { OwnerClient as RulesOwner, Presence } from './pages/rules/owner.js
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 /** The words the owner sees on every presence screen (FB-8). */
-const USE_CODE = 'Use your backup code instead';
+const USE_CODE = 'Use your master code instead';
 const CODE = 'ABCD-EFGH-IJKL-MNOP-QRST-UVWX';
 const PASSKEY: PasskeyInfo = { credentialId: 'Y3JlZA', prfSalt: 'c2FsdA' };
 
@@ -97,7 +97,7 @@ interface Surface {
   readonly mount: (sent: Sent, gestures: { n: number }) => Promise<void>;
   /** Gets from the first screen to the one that asks for the passkey (if any). */
   readonly reach?: () => Promise<void>;
-  /** The button that submits the backup code once the option was chosen. */
+  /** The button that submits the master code once the option was chosen. */
   readonly submit: string;
 }
 
@@ -197,7 +197,7 @@ const SURFACES: readonly Surface[] = [
   {
     file: 'pages/contacts/presence-prompt.tsx',
     name: 'the shared presence prompt (contacts, IDs, people)',
-    submit: 'Confirm with your backup code',
+    submit: 'Confirm with your master code',
     mount: (sent, gestures) =>
       render(
         createElement(PresencePrompt, {
@@ -243,7 +243,7 @@ const SURFACES: readonly Surface[] = [
   {
     file: 'pages/first-run/connect-app.tsx',
     name: 'P-2 First-run connect app',
-    submit: 'Apply with my backup code',
+    submit: 'Apply with my master code',
     mount: (sent, gestures) => {
       const appsApi: AppsApi = {
         list: () => Promise.resolve({ kind: 'failed' }) as ReturnType<AppsApi['list']>,
@@ -272,7 +272,7 @@ const SURFACES: readonly Surface[] = [
   {
     file: 'pages/join/index.tsx',
     name: 'P-3 Join accept',
-    submit: 'Confirm with your backup code',
+    submit: 'Confirm with your master code',
     mount: (sent, gestures) => {
       const api: JoinApi = {
         read: () =>
@@ -297,7 +297,7 @@ const SURFACES: readonly Surface[] = [
   {
     file: 'pages/invite/paste-invite.tsx',
     name: 'P-4 Paste-invite accept',
-    submit: 'Confirm with your backup code',
+    submit: 'Confirm with your master code',
     mount: (sent, gestures) => {
       const checked: CheckOutcome = {
         kind: 'ok',
@@ -364,9 +364,9 @@ const SURFACES: readonly Surface[] = [
   },
 ];
 
-describe('FB-8: with a passkey present, every presence screen offers the backup code', () => {
+describe('FB-8: with a passkey present, every presence screen offers the master code', () => {
   it.each(SURFACES.map((s) => [s.name, s] as const))(
-    '%s: "Use your backup code instead" is shown and submits the code path',
+    '%s: "Use your master code instead" is shown and submits the code path',
     async (_name, surface) => {
       const sent: Sent = [];
       const gestures = { n: 0 };
@@ -443,7 +443,7 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/home/home-screen.tsx': { notAScreen: 'reads the passkey state; HomeApprovals confirms' },
 };
 
-describe('FB-8 guard: every owner-presence screen is listed and offers the backup code', () => {
+describe('FB-8 guard: every owner-presence screen is listed and offers the master code', () => {
   const found = Object.entries(SOURCES)
     .filter(([path, text]) => !/\.test\./.test(path) && PRESENCE_SIGNAL.test(text))
     .map(([path]) => path.replace(/^\.\//, ''))
@@ -459,7 +459,7 @@ describe('FB-8 guard: every owner-presence screen is listed and offers the backu
     expect(unlisted, 'add each to PRESENCE_FILES with its backup-code option').toEqual([]);
   });
 
-  it.each(Object.entries(PRESENCE_FILES))('%s offers the backup code', (file, entry) => {
+  it.each(Object.entries(PRESENCE_FILES))('%s offers the master code', (file, entry) => {
     const source = sourceOf(file);
     if ('notAScreen' in entry) {
       expect(entry.notAScreen.length).toBeGreaterThan(0);

@@ -10,7 +10,7 @@ You: "Offer Ana a logo for 500 US dollars, delivered by 30 November, valid for a
 
 Your AI writes the terms and sends them to Ana. Ana's AI can accept, reject, or counter with changed terms. Each counter-offer is a new version that replaces the one before.
 
-When you tell your AI to accept, it shows exactly what is being accepted. You approve it once, with your owner code, and only then is it accepted.
+When you tell your AI to accept, it shows exactly what is being accepted. You approve it once, with your master code, and only then is it accepted.
 
 ## Steps
 

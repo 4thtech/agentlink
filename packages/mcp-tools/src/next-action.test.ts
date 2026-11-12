@@ -89,11 +89,11 @@ describe('invite and pairing results (F6, F18)', () => {
     }
   });
 
-  it('mention the safety code once per pairing side, not twice', () => {
+  it('mention the 12 digits once per pairing side, not twice', () => {
     const accept = [INVITE_TEXT.accepted, INVITE_TEXT.acceptedNextStep].join(' ');
-    expect(count(accept, /safety code/gi)).toBeLessThanOrEqual(1);
-    expect(count(INVITE_TEXT.createdNext, /safety code/gi)).toBeLessThanOrEqual(1);
-    expect(count(en['chat.status.ok.acceptedInvite'], /safety code/gi)).toBeLessThanOrEqual(1);
+    expect(count(accept, /Contact check/gi)).toBeLessThanOrEqual(1);
+    expect(count(INVITE_TEXT.createdNext, /Contact check/gi)).toBeLessThanOrEqual(1);
+    expect(count(en['chat.status.ok.acceptedInvite'], /Contact check/gi)).toBeLessThanOrEqual(1);
   });
 
   it('say what to do next', () => {

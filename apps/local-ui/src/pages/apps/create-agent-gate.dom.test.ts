@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 // W8-F11/F12/F13: the New ID presence gate (create-agent-gate.tsx).
 // - F13: an owner without a passkey on this computer is offered the switch to Touch ID inside the
-//   gate: the backup code once (passkey-switch.ts, the same switch as the presence sheet), then the
+//   gate: the master code once (passkey-switch.ts, the same switch as the presence sheet), then the
 //   new ID is created with its own touch. An owner with a passkey sees the one Touch ID button.
-// - F12: the backup-code form says in one plain line what the backup code is.
+// - F12: the backup-code form says in one plain line what the master code is.
 // - F11: the form spaces its field and buttons (a flex column with a gap) and shows one Back; inside
 //   Get started (no onCancel) the wizard's own Back is the only one.
 import { act, createElement } from 'react';
@@ -166,7 +166,7 @@ async function mount(
 }
 
 describe('W8-F13: the New ID gate offers Touch ID to an owner without one here', () => {
-  it('no passkey here (F49): the backup code confirms (primary), the switch is a quiet link', async () => {
+  it('no passkey here (F49): the master code confirms (primary), the switch is a quiet link', async () => {
     await mount(NO_PASSKEY);
     const confirm = [...host.querySelectorAll('button')].find(
       (b) => b.textContent?.trim() === NAME.confirmCode,
@@ -179,7 +179,7 @@ describe('W8-F13: the New ID gate offers Touch ID to an owner without one here',
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     expect(labels()).not.toContain('Connect with Touch ID');
     // F49 low (IR 11-03): the assertion removed with the old banner copy, restored on today's copy:
-    // the screen says in plain words why the backup code is asked for.
+    // the screen says in plain words why the master code is asked for.
     expect(host.querySelector('[role="status"]')?.textContent).toBe(
       PASSKEY_WHY.not_set_up_here('Touch ID'),
     );
@@ -191,7 +191,7 @@ describe('W8-F13: the New ID gate offers Touch ID to an owner without one here',
     expect(labels()).not.toContain(UPGRADE.bannerAction('mac'));
   });
 
-  it('the switch: the backup code once, then the ID is created with its own touch', async () => {
+  it('the switch: the master code once, then the ID is created with its own touch', async () => {
     const { api, onDone, switches } = await mount(NO_PASSKEY);
     await click(UPGRADE.bannerAction('mac'));
     expect((host.textContent ?? '').split(NAME.codeWhat).length - 1).toBe(1);
@@ -220,7 +220,7 @@ describe('W8-F13: the New ID gate offers Touch ID to an owner without one here',
     expect(api.begun).toBe(0);
   });
 
-  it('a switch that does not happen changes nothing and keeps the backup code way', async () => {
+  it('a switch that does not happen changes nothing and keeps the master code way', async () => {
     const { api, onDone } = await mount(NO_PASSKEY, { outcome: { kind: 'cancelled' } });
     await click(UPGRADE.bannerAction('mac'));
     await type('ABCD-EFGH');
@@ -232,7 +232,7 @@ describe('W8-F13: the New ID gate offers Touch ID to an owner without one here',
 });
 
 describe('W8-F12/F11: the backup-code form', () => {
-  it('says what the backup code is, in one plain line', async () => {
+  it('says what the master code is, in one plain line', async () => {
     await mount(READY);
     await click(NAME.backupInstead);
     const text = host.querySelector('form')?.textContent ?? '';

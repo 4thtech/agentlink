@@ -4,7 +4,7 @@
 // Stated scope (G-1, D-67): a script running as the same OS user, with read access to the agent's
 // files, its keychain items (the `owner` item included) and the database, and write access to the
 // store and the keychain, that does NOT modify the installed package and does NOT read process
-// memory, cannot produce a valid approval or policy change without the owner code, cannot add an
+// memory, cannot produce a valid approval or policy change without the master code, cannot add an
 // item to a batch the owner reviewed, and cannot make a signed item cover another action. Outside
 // that scope (a modified package, memory reads, a fake prompt) nothing on a same-user machine stops
 // it; that residual is accepted for M1 and re-decided at M2-GATE.
@@ -139,7 +139,7 @@ function contains(hay: Uint8Array, needle: Uint8Array): boolean {
   return false;
 }
 
-/** No file under `dir` holds the seed (raw, hex or base64url) or the owner code (any spelling). */
+/** No file under `dir` holds the seed (raw, hex or base64url) or the master code (any spelling). */
 function scan(dir: string, seeds: readonly Uint8Array[], code: string): string[] {
   const needles = [
     ...seeds.flatMap((s) => [s, encodeUtf8(encodeHex(s)), encodeUtf8(encodeBase64url(s))]),
@@ -162,7 +162,7 @@ describe('a same-user script cannot approve or change policy (10 M1-8, D-67, D-6
 
     // The owner sets up the owner key; the code exists only on the owner's terminal.
     const setup = terminal([
-      (w) => (w.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(-4),
+      (w) => (w.find((t) => t.startsWith('Your master code: ')) ?? '').slice(-4),
     ]);
     const { owner } = await initOwnerWith(
       keychain,
@@ -170,8 +170,8 @@ describe('a same-user script cannot approve or change policy (10 M1-8, D-67, D-6
       { backend: 'keychain', env: {} },
       { kdf: KDF },
     );
-    const code = (setup.written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-      'Your owner code: '.length,
+    const code = (setup.written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+      'Your master code: '.length,
     );
     expect(code).toMatch(/^[A-Z2-7 ]{29}$/);
 
@@ -237,7 +237,7 @@ describe('a same-user script cannot approve or change policy (10 M1-8, D-67, D-6
       }),
     );
 
-    // No owner-seed bytes and no owner code on disk after setup and after the operations.
+    // No owner-seed bytes and no master code on disk after setup and after the operations.
     expect(seen.seeds.length).toBeGreaterThan(0);
     expect(scan(home, seen.seeds, code)).toEqual([]);
 
@@ -273,7 +273,7 @@ describe('a same-user script cannot approve or change policy (10 M1-8, D-67, D-6
       return JSON.parse(readFileSync(outFile, 'utf8')) as ScriptResult;
     };
 
-    // Harness control (the test is not vacuous): a script that HAS the owner code does produce
+    // Harness control (the test is not vacuous): a script that HAS the master code does produce
     // valid owner signatures. The keychain stand-in is restored after its plant.
     const keychainBefore = readFileSync(keychainFile);
     const leaked = await runScript(code);

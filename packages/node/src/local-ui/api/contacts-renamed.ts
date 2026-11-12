@@ -5,7 +5,7 @@
 // - `GET /api/ui/contacts/:ref/name-seen`: the page showed the note (the Contacts row or the Messages
 //   header); core sets `name_change_seen`, so later reads carry no `formerName`. The page keeps
 //   showing the note until it leaves (08 §1). Display state only (07 §3: nothing is decided from it):
-//   no owner presence, nothing signed, no identity label, safety code or key state changes. A GET,
+//   no owner presence, nothing signed, no identity label, Contact check or key state changes. A GET,
 //   because the shell's only writes are presence-gated owner operations and this is not one; it is
 //   idempotent (a second call finds nothing due) and answers the same either way.
 //

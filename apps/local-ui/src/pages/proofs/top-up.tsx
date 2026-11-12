@@ -7,8 +7,8 @@
 // - The QR code ships only with crediting: Add credits exists only where the server offers the
 //   agent's address and a way to turn received funds into credits (the Gnosis test network).
 // - Turning funds into credits and withdrawing are owner operations: a confirm screen with the amount
-//   and where it goes from and to, then the owner code, sent once as the request body to the
-//   server's presence gate. The owner code is never kept after the request or put in a URL.
+//   and where it goes from and to, then the master code, sent once as the request body to the
+//   server's presence gate. The master code is never kept after the request or put in a URL.
 // - Withdrawals go to the agent's own account only (the recipient grant is a later card).
 // - UX2-e2 (B-11 §23, D-137): under the details, a three-step tracker, Waiting for your funds →
 //   Arrived · $X → Added to credits. Steps move only on server reads (the existing top-up and credits
@@ -744,7 +744,7 @@ export function ConfirmMove({
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [line, setLine] = useState<string | undefined>(undefined);
-  // FB-8 (P-5): Touch ID / Windows Hello when this computer has the passkey; the backup code always.
+  // FB-8 (P-5): Touch ID / Windows Hello when this computer has the passkey; the master code always.
   const [info, setInfo] = useState<PasskeyInfo | undefined>(undefined);
   const [codeChosen, setCodeChosen] = useState(false);
   const name = NETWORK_NAMES[move.net.network];
@@ -784,7 +784,7 @@ export function ConfirmMove({
     event?.preventDefault();
     if (busy || code.length === 0) return;
     const sent = code;
-    // The owner code lives only in this request; the field is cleared whatever happens.
+    // The master code lives only in this request; the field is cleared whatever happens.
     setCode('');
     send({ kind: 'code', code: sent });
   };

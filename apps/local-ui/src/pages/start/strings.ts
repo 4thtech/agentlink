@@ -110,7 +110,7 @@ export const INVITE_STEP = {
   done: 'Done, go to Home',
 } as const;
 
-/** The Home card (A4): "Get started · 1 of 2 done", with a safety code as a gentle suggestion. */
+/** The Home card (A4): "Get started · 1 of 2 done", with the 12 digits as a gentle suggestion. */
 export const CARD = {
   title: (done: number, total: number): string =>
     `Get started · ${String(done)} of ${String(total)} done`,
@@ -119,7 +119,7 @@ export const CARD = {
   connect: 'Connect your AI app',
   invite: 'Invite someone',
   check: (name: string | null): string =>
-    name === null ? 'Check a safety code' : `Check ${name}'s safety code`,
+    name === null ? 'Contact check' : `Contact check with ${name}`,
 } as const;
 
 /**

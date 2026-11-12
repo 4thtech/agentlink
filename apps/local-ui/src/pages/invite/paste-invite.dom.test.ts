@@ -195,7 +195,7 @@ describe('W4-WIRE-2: "Have an invite link? Paste it" on the Invite screen', () =
     await openAndPaste(SHORT);
     expect(text()).toContain('invites you to connect your AIs');
     expect(text()).toContain('Ana');
-    expect(text()).toContain('7F3A·19C2');
+    expect(text()).not.toContain('7F3A·19C2');
     await click('Accept with Touch ID');
     expect(gesture).toHaveBeenCalledTimes(1);
     expect(invites.accepted).toEqual([{ link: SHORT, proof: PROOF }]);
@@ -212,10 +212,10 @@ describe('W4-WIRE-2: "Have an invite link? Paste it" on the Invite screen', () =
     expect(text()).toContain('invites you to connect your AIs');
   });
 
-  it('without a passkey here, Accept asks for the backup code', async () => {
+  it('without a passkey here, Accept asks for the master code', async () => {
     await mount({ passkey: undefined });
     await openAndPaste(SHORT);
-    await click('Accept with your backup code');
+    await click('Accept with your master code');
     expect(host.querySelector('input[type="password"]')).not.toBeNull();
   });
 

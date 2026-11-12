@@ -9,7 +9,7 @@
 //   that would be allowed (a link is followed and the real folder shown) and every warning. The
 //   confirm screen lists each warning in plain words with its own tick; the confirm button stays
 //   off until every one is ticked, and the request names every code and the review it belongs to.
-// - The browser never signs: the confirm sends the owner's passkey gesture or owner code to the
+// - The browser never signs: the confirm sends the owner's passkey gesture or master code to the
 //   local server, which signs.
 // - Server values render as text; the copy has no web3 words and never says "policy".
 import { act, createElement as h } from 'react';
@@ -216,7 +216,7 @@ describe('allow a folder (04 §4, D-119)', () => {
     expect(button(S.confirmAdd).disabled).toBe(true);
   });
 
-  it('sends every code, the review token and the owner code to the server, never signing', async () => {
+  it('sends every code, the review token and the master code to the server, never signing', async () => {
     const s = await toConfirm();
     for (const tick of host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
       await click(tick);
@@ -296,7 +296,7 @@ describe('allow a folder (04 §4, D-119)', () => {
     expect(s.calls.some((c) => c.url.startsWith('/api/ui/files/review'))).toBe(false);
   });
 
-  it('a wrong owner code changes nothing and says so', async () => {
+  it('a wrong master code changes nothing and says so', async () => {
     const s = server({
       [LIST]: { folders: [], max: 32, version: 3 },
       [reviewUrl('add', '/x/y')]: {

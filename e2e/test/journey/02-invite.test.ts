@@ -41,7 +41,7 @@ afterAll(() => ch.stop());
 
 const contactList = (page: JourneyPage['page']) => page.getByRole('list', { name: 'Your people' });
 
-/** The contact row appears in the list by itself; its detail shows the safety code. */
+/** The contact row appears in the list by itself; its detail shows the 12 digits. */
 async function seesSafetyCode(jp: JourneyPage, name: string): Promise<void> {
   const { page } = jp;
   await eventually(
@@ -50,7 +50,7 @@ async function seesSafetyCode(jp: JourneyPage, name: string): Promise<void> {
     30_000,
   );
   await contactList(page).getByText(name).first().click();
-  await page.getByText('Safety code', { exact: true }).first().waitFor({ timeout: 30_000 });
+  await page.getByText('Contact check', { exact: true }).first().waitFor({ timeout: 30_000 });
 }
 
 describe('chapter 2: contacts and invites', () => {
@@ -87,7 +87,7 @@ describe('chapter 2: contacts and invites', () => {
   // to accept" and computer 2 "Connecting to …" (checked 29 Oct on w4-short-invite). The host pass
   // and the idle MCP server's publisher lease need a look (06 §6); the orchestrator routes it.
   it.runIf(WAVE4)(
-    'both Contacts pages reach the safety code by themselves, with no navigation (30 s)',
+    'both Contacts pages reach the 12 digits by themselves, with no navigation (30 s)',
     async (ctx) => {
       const ready = ch.need(ctx);
       if (ready === undefined) return;
@@ -217,10 +217,10 @@ describe('chapter 2: contacts and invites', () => {
     expect(await text(b.page)).not.toContain('Connecting to Ana…');
   }, 180_000);
 
-  // Gate: the same pairing follow as the test above it ("both Contacts pages reach the safety code
+  // Gate: the same pairing follow as the test above it ("both Contacts pages reach the 12 digits
   // by themselves"): neither page completes the pairing in 30 s while nothing calls the MCP server.
   it.runIf(WAVE4)(
-    'both sides see "You and … are connected" with the safety code (A7)',
+    'both sides see "You and … are connected" with the 12 digits (A7)',
     async (ctx) => {
       const ready = ch.need(ctx);
       if (ready === undefined) return;

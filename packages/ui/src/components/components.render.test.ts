@@ -113,7 +113,7 @@ describe('ContactName, Fingerprint, IdentityLabel', () => {
     const t = (kind: 'selfdeclared' | 'checked' | 'registered' | 'verified') =>
       html(h(ui.IdentityLabel, { kind, domain: 'example.com' } as ui.IdentityLabelProps));
     expect(t('selfdeclared')).toContain('Not checked yet');
-    expect(t('checked')).toContain('Safety code checked');
+    expect(t('checked')).toContain('Contact checked');
     expect(t('registered')).toContain('Registered');
     expect(t('verified')).toContain('Verified domain');
     expect(t('verified')).toContain('example.com');
@@ -211,7 +211,7 @@ describe('ContactCard (C-4, X-7, X-11)', () => {
   it('shows the flagged (proof mismatch) and pairing mismatch states with a word', () => {
     expect(html(h(ui.ContactCard, { alias: 'M', state: 'flagged' }))).toContain('Flagged');
     expect(html(h(ui.ContactCard, { alias: 'M', state: 'mismatch' }))).toContain(
-      'Safety code did not match',
+      '12 digits did not match',
     );
     expect(html(h(ui.ContactCard, { alias: 'M', state: 'blocked' }))).toContain('Blocked');
   });
@@ -242,7 +242,7 @@ describe('SafetyCode (C-10, 04 §3.6.1)', () => {
   });
   it('asks to compare again after a key update', () => {
     expect(html(h(ui.SafetyCode, { code, contactName: 'Marko', state: 'changed' }))).toContain(
-      'Safety code changed',
+      'Contact check changed',
     );
   });
 });
@@ -413,9 +413,9 @@ describe('ApprovalCard (C-1, LA-3…LA-9)', () => {
     expect(out).not.toContain('autofocus');
     expect(out).toContain('tabindex="-1"');
   });
-  it('names the owner code and owner passphrase as methods (X-10)', () => {
-    expect(html(h(ui.ApprovalCard, { ...base, type: 'proof', method: 'owner code' }))).toContain(
-      'Approve with owner code',
+  it('names the master code and owner passphrase as methods (X-10)', () => {
+    expect(html(h(ui.ApprovalCard, { ...base, type: 'proof', method: 'master code' }))).toContain(
+      'Approve with master code',
     );
   });
   it('has no file-over-limit approval (LA-5)', () => {
@@ -559,7 +559,7 @@ describe('TermsDiff and CommitmentCard (C-3, LA-8)', () => {
 describe('forms and feedback', () => {
   it('TextField labels, describes and flags an error', () => {
     const out = html(
-      h(ui.TextField, { label: 'Owner code', error: 'Too short', mono: true, id: 'f' }),
+      h(ui.TextField, { label: 'Master code', error: 'Too short', mono: true, id: 'f' }),
     );
     expect(out).toContain('for="f"');
     expect(out).toContain('aria-invalid="true"');

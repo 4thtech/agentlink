@@ -1,7 +1,7 @@
 // W5-INVITE-FEEDBACK (08 §1; 11 §5; I-5): the app-wide toasts for contacts, on every page, so the
 // inviter hears "{name} accepted your invite" and the accepter "You're connected with {name}" the
 // moment the pairing completes, with no reload. After a re-pair: "Connected again with {name}.
-// Check the safety code again." with one action to People, where the code is checked (signed with
+// Do the Contact check again." with one action to People, where the code is checked (signed with
 // Touch ID there; nothing here approves anything). The name is React text only. A toast stays until
 // it is dismissed or 8 s pass; at most three show, newest last.
 import { Toast } from '@4thtech-io/ui';

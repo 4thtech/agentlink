@@ -35,7 +35,7 @@
 // - Cross-site requests: no CORS grant ever; API calls need a per-server CSRF token (in the page,
 //   never in the URL) in `X-AgentLink-CSRF` and fetch metadata that is absent or `same-origin`; a
 //   decision is a POST with `Content-Type: application/octet-stream` (not a simple request).
-// - The token grants viewing only (08 §1). A decision needs owner presence: the owner code or owner
+// - The token grants viewing only (08 §1). A decision needs owner presence: the master code or owner
 //   passphrase, sent as the raw request body, unlocks the owner key for exactly one owner operation
 //   (04 §2.5, D-68: one `approval.decide`), and the buffer is wiped. The signed object goes to the
 //   source (core's `ownerActions.apply`), which verifies it (I-4). No route decides without it.
@@ -44,7 +44,7 @@
 //   checks it against the stored `owner-passkey` item and the owner (credential ID, user handle,
 //   rpIdHash = SHA-256("localhost"), UP and UV) before the PRF output unlocks the owner key for one
 //   owner operation. `/api/owner/passkey` shows the public registration data (GET) and registers the
-//   one passkey (POST: the owner code plus the assertion), its own owner operation that signs
+//   one passkey (POST: the master code plus the assertion), its own owner operation that signs
 //   nothing. The PRF output never leaves this process and is wiped after use.
 // - What is signed is what the page showed: the page sends back the action digest it displayed; the
 //   server re-reads the request, recomputes the digest from the stored action and refuses any
@@ -59,7 +59,7 @@
 //   presence entry then signs one `approval.decideBatch` over exactly those items (one
 //   `approval.decide` for one item) and core applies it whole or not at all.
 // - M1-11a, wrong-code backoff (IR-M1-8d-1 L-2): after FREE_PRESENCE_ATTEMPTS rejected presence
-//   proofs in a row (owner code, owner passphrase or passkey), every owner operation of this server
+//   proofs in a row (master code, owner passphrase or passkey), every owner operation of this server
 //   answers 429 `wait` with Retry-After before its body is read or the owner store is opened; the
 //   wait doubles with each further failure up to MAX_PRESENCE_BACKOFF_S, and a success resets it.
 //   It lives in memory: a same-user process that restarts the server is the accepted G-1 residual,
@@ -87,7 +87,7 @@
 //   must declare `presence: true`. Every route needs the session cookie, the CSRF header and
 //   same-origin fetch metadata; a mutating one also the page's Origin and an octet-stream body. The
 //   central presence gate then runs before the handler: the wrong-code backoff, the presence proof
-//   (the owner code, or the passkey assertion checked as for a decision), one owner operation at a
+//   (the master code, or the passkey assertion checked as for a decision), one owner operation at a
 //   time, the owner being set up, and the owner store unlocked with the proof. A wrong code is 403
 //   `presence_rejected`, counts towards the backoff, and the handler never runs (IR-M1-11s-b-1 H-1).
 //   The handler gets a read-only client view and a one-use `sign` bound to that session (the
@@ -123,8 +123,8 @@
 //   bound to that session; one setup at a time (a second begin is 409 `busy`). It returns only public
 //   WebAuthn creation values: user.id = the owner's x-only Nostr key, a random challenge, the PRF
 //   salt, RP ID `localhost`. `finish` takes the hold (single-use, the bound session only), checks the
-//   creation response and completes the setup all or nothing (owner-setup.ts): the owner code, the
-//   passkey and the agent's first card. The owner code goes to the page once and is never in an
+//   creation response and completes the setup all or nothing (owner-setup.ts): the master code, the
+//   passkey and the agent's first card. The master code goes to the page once and is never in an
 //   event. The held seed is wiped on finish (whatever the outcome), on expiry, when its session is
 //   dropped and when the server closes.
 // - M1-UX-FIRSTRUN-V2 (D-130 (1), (2); 08 §1 first run v2; proposed, owner confirms at merge): when
@@ -369,7 +369,7 @@ const NO_IPV6 = new Set(['EADDRNOTAVAIL', 'EAFNOSUPPORT']);
 /** Longest accepted owner secret in bytes (the same bound as the TTY prompt). */
 const MAX_SECRET_BYTES = 1024;
 /**
- * Longest accepted passkey body (assertion, or owner code plus assertion), M1-8e; M1-PAY-CONFIRM-b
+ * Longest accepted passkey body (assertion, or master code plus assertion), M1-8e; M1-PAY-CONFIRM-b
  * adds room for the create() authenticator data a registration may carry.
  */
 const MAX_PASSKEY_BYTES = 6144;
@@ -689,7 +689,7 @@ export type ApprovalServerEvent =
         | 'agent_changed'
         | 'failed';
     }
-  /** M1-11s-c: the outcome of an owner setup step (never the owner code, a key or a value). */
+  /** M1-11s-c: the outcome of an owner setup step (never the master code, a key or a value). */
   | {
       readonly kind: 'owner_setup';
       readonly outcome:
@@ -733,7 +733,7 @@ export type ApprovalServerEvent =
     }
   /**
    * M1-PAY-CONFIRM-a: the outcome of a paid-action confirmation step (fixed values only: never the
-   * challenge, the statement, an amount, a name, the assertion or the backup code; I-7).
+   * challenge, the statement, an amount, a name, the assertion or the master code; I-7).
    */
   | {
       readonly kind: 'pay_confirm';
@@ -752,7 +752,7 @@ export type ApprovalServerEvent =
         | 'presence_required'
         | 'presence_rejected'
         | 'verification_required'
-        /** Rule 5: the passkey has no stored credential key; use the backup code. */
+        /** Rule 5: the passkey has no stored credential key; use the master code. */
         | 'passkey_update_needed'
         /** M1-PAY-CONFIRM-b: "Remember for this contact" is not offered for this request (06 §3). */
         | 'not_offered'
@@ -824,7 +824,7 @@ export interface ApprovalServerInternals {
   readonly now?: () => number;
   /** M1-11s-b: the /api/ui/ routes. Default: createLocalUiRoutes() (the page files). */
   readonly routes?: LocalUiRouteRegistry;
-  /** M1-11s-c: Argon2id parameters for the new owner code's wrap. Default: the keystore defaults. */
+  /** M1-11s-c: Argon2id parameters for the new master code's wrap. Default: the keystore defaults. */
   readonly ownerKdf?: Argon2idParams;
   /** M1-11s-c: the owner seed source for setup. Default: newOwnerSeed (@4thtech-io/crypto). */
   readonly newOwnerSeed?: () => { readonly seed: Uint8Array; readonly keys: OwnerPublicKeys };
@@ -1138,7 +1138,7 @@ const invalidId = (): NodeKeyStoreError =>
 
 /**
  * A terminal for one page decision: shows nothing, the click was the confirmation, one presence
- * proof (the owner code, or the passkey's PRF output, M1-8e), handed over once.
+ * proof (the master code, or the passkey's PRF output, M1-8e), handed over once.
  */
 function pageTerminal(presence: OwnerPresence): OwnerTerminal {
   let given = false;
@@ -1775,7 +1775,7 @@ export async function startApprovalServerWith(
           return;
         }
         if (assertion.prfOutput.length === 0) {
-          // A PRF-less authenticator: the owner code is the way (the page offers it).
+          // A PRF-less authenticator: the master code is the way (the page offers it).
           finishDecision(res, 403, 'presence_required');
           return;
         }
@@ -1999,7 +1999,7 @@ export async function startApprovalServerWith(
 
   /**
    * POST /api/owner/passkey: registers the one localhost passkey (M1-8e). Its own owner operation:
-   * one entry of the owner code, no signature; the code, the PRF output and the seed are wiped.
+   * one entry of the master code, no signature; the code, the PRF output and the seed are wiped.
    */
   async function passkeyRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (waiting(req, res, 'passkey')) return;
@@ -2084,7 +2084,7 @@ export async function startApprovalServerWith(
   /**
    * M1-11s-b, the central presence gate for a /api/ui/ owner route (04 §2.5, I-4; IR-M1-11s-b-1 H-1).
    * Owner presence is verified before `run` (the handler) is called: the wrong-code backoff, a
-   * presence proof in the body (the owner code, or a passkey assertion verified against the stored
+   * presence proof in the body (the master code, or a passkey assertion verified against the stored
    * passkey and the owner), one owner operation at a time, the owner set up, and then the owner store
    * unlocked with that proof. A wrong code or gesture is 403 `presence_rejected`, counted towards the
    * backoff, and the handler never runs. `run` gets a one-use `sign` bound to that session (the
@@ -2806,7 +2806,7 @@ export async function startApprovalServerWith(
       }
       const hold = payHolds.begin(session, built.target, built.flow, built.requests);
       // Rule 5: the passkey is offered only when its credential key is kept; otherwise the page
-      // offers the backup code (and setting the passkey up again).
+      // offers the master code (and setting the passkey up again).
       let credentialId: string | undefined;
       try {
         const stored = await readOwnerPasskeyHeader(keychainOf());
@@ -2918,7 +2918,7 @@ export async function startApprovalServerWith(
           return;
         }
         if (check === 'key_missing') {
-          // Rule 5: this passkey has no stored key; the backup code (or setting it up again) works.
+          // Rule 5: this passkey has no stored key; the master code (or setting it up again) works.
           finishPay(res, 409, 'passkey_update_needed');
           return;
         }
@@ -3033,7 +3033,7 @@ export async function startApprovalServerWith(
       readonly sendFolder?: SetupSendFolder;
     } = {},
   ): void => {
-    // Fixed values only in the event: never the owner code or anything from the request.
+    // Fixed values only in the event: never the master code or anything from the request.
     emit({ kind: 'owner_setup', outcome, ...fixed });
     // U3-g-b: the generation and label as they are now (first run may have opened the first agent).
     stamp(res);
@@ -3687,7 +3687,7 @@ export async function startApprovalServerWith(
       return;
     }
     const proof = registration as SetupRegistration;
-    // M1-11s-c-c: an unverifiable get() leaves the owner code as the only way; its PRF output goes now.
+    // M1-11s-c-c: an unverifiable get() leaves the master code as the only way; its PRF output goes now.
     if (codeOnly) wipe(proof.prfOutput);
     const prfOutput = codeOnly ? new Uint8Array(0) : proof.prfOutput;
     // Single-use from here: taken before any await; wiped whatever happens below.
@@ -3859,14 +3859,14 @@ export async function startApprovalServerWith(
           await labelReady;
           // IR-U3-g-b-1 H-1: the one answer whose new generation the page adopts instead of
           // reloading (apps/local-ui generation.ts accepts it only on a 200 finish), so the one-time
-          // backup code stays on screen. Set nowhere else.
+          // master code stays on screen. Set nowhere else.
           if (adopted) res.setHeader(GENERATION_ADOPTED_HEADER, '1');
         } else if (result.label === 'saved' && held.label !== undefined) {
           await labelSavedForOpen(held.label);
         }
-        // The owner code goes to the page once, for the backup-code step; never an event.
+        // The master code goes to the page once, for the backup-code step; never an event.
         // IR-M1-11s-c-1 M-1: also when the card is unconfirmed, since the owner was kept.
-        // W4-ONE-TOUCH: `created_not_connected` (still with the owner code) when the app picked
+        // W4-ONE-TOUCH: `created_not_connected` (still with the master code) when the app picked
         // was not connected; the page offers Connect.
         const outcome = !result.confirmed
           ? 'done_unconfirmed'

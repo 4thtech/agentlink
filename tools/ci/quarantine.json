@@ -11,7 +11,7 @@
       "expires": "2026-11-16"
     },
     {
-      "id": "packages/node/src/local-ui-first-run-browser.test.ts > the local first run in a real browser (M1-11b-1, D-120) > Welcome, pick, name with one gesture, backup code, and Home (U3-g; M1-11b-1, D-120)",
+      "id": "packages/node/src/local-ui-first-run-browser.test.ts > the local first run in a real browser (M1-11b-1, D-120) > Welcome, pick, name with one gesture, master code, and Home (U3-g; M1-11b-1, D-120)",
       "scope": "e2e-browser",
       "reason": "Race in the real-browser first run: the page had not yet asked for /api/ui/apps when the test checked (expected false to be true), or the second visit's heading wait timed out. Passed on retry.",
       "evidence": "CI run 41407105776 attempt 1, job 125152055629 checks (AssertionError: expected false to be true); CI run 41115212146, job 124273328796 checks (locator.waitFor timeout, line 386)",

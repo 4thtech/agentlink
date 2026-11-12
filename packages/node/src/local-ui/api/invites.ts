@@ -19,7 +19,7 @@
 //   `approval.decide` (approve) for the accept action, the same action the MCP tool and the CLI build,
 //   under the open request for it or a new one; core verifies and applies it, uses it once, and only
 //   then stages the pairing (04 §3.6 Accept steps 2 and 3; I-4). The pairing stays pending until the
-//   inviter's agent answers; the safety code follows as on Contacts.
+//   inviter's agent answers; the 12 digits follows as on Contacts.
 //
 // W4-SHORT-INVITE and W4-INVITES-LIST (D-139; 04 §3.6.2; 08 §1):
 // - create takes `{"long": true}` from Advanced only (D-139 (7)) and answers the link `format` and
@@ -103,7 +103,7 @@ const PAYLOAD = /^[A-Za-z0-9_-]+$/;
 /** The longest name typed for an invite; core checks the restricted form (06 §2.1). */
 const MAX_LABEL_CHARS = 128;
 const MAX_NAME_CHARS = 128;
-/** The short owner fingerprint core shows (04 §2.9). */
+/** The short ID tag core shows (04 §2.9). */
 const FINGERPRINT = /^[0-9A-F]{4}·[0-9A-F]{4}$/;
 
 const fixed = (status: number, error: string): LocalUiResult =>
@@ -516,7 +516,7 @@ export async function acceptInviteLink(
   if ((await port.decision()) === 'deny') return POLICY_DENIED;
 
   const action = await port.action(link);
-  // IR UX2-d1 M: core's one summary (name, label, owner fingerprint), as the MCP tool and the CLI.
+  // IR UX2-d1 M: core's one summary (name, label, ID tag), as the MCP tool and the CLI.
   const summary = acceptInviteSummary(contact);
   const opened = await port.openRequest(action, summary);
   const operation = buildApprovalOperation(
@@ -542,7 +542,7 @@ export async function acceptInviteLink(
   const outcome = await context.applyOwnerAction(signature.signed);
   if (outcome.status !== 'applied') return NOT_APPLIED;
 
-  // W5-INVITE-FEEDBACK: a re-pair (the safety code check starts over once it completes, 04 §2.9).
+  // W5-INVITE-FEEDBACK: a re-pair (the Contact check starts over once it completes, 04 §2.9).
   const again = (await existingContact(context, contact.id)) !== undefined;
   // Step 3: core uses the applied approval once, then stages and sends the handshake.
   let done: Awaited<ReturnType<typeof port.acceptApproved>>;

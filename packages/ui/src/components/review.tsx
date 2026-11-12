@@ -56,7 +56,7 @@ export interface ReviewTogetherProps {
   /** Controlled: nothing is chosen until the owner chooses. */
   decisions: Readonly<Record<string, ReviewDecision | undefined>>;
   onDecide: (id: string, decision: ReviewDecision) => void;
-  /** The summary button: the caller then starts the browser's own passkey prompt (or owner code). */
+  /** The summary button: the caller then starts the browser's own passkey prompt (or master code). */
   onConfirm: (batch: readonly ReviewBatchEntry[]) => void;
   /**
    * Called when decisions exist for cards that are no longer in the counted set (pushed past the
@@ -66,7 +66,7 @@ export interface ReviewTogetherProps {
   onPrune?: (ids: readonly string[]) => void;
   /** Reviewing, waiting for the owner's confirmation, it failed (nothing applied), or done. */
   phase?: 'reviewing' | 'waiting' | 'failed' | 'done';
-  /** The presence method: "passkey", "owner code" or "owner passphrase". */
+  /** The presence method: "passkey", "master code" or "owner passphrase". */
   method?: string;
   /** Per-card results, shown when `phase` is `done`. */
   results?: Readonly<Record<string, ReviewResult | undefined>>;

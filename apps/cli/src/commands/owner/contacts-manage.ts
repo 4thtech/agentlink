@@ -6,7 +6,7 @@
 //
 // - Owner operations: the dispatcher's owner-terminal guard runs first (interactive terminal, no AI
 //   harness marker; a UX guard, not a security boundary, D-67); then @4thtech-io/node shows the fixed
-//   summary, reads the owner code once at its own TTY prompt and signs one owner action. The core
+//   summary, reads the master code once at its own TTY prompt and signs one owner action. The core
 //   verifies the owner signature and the nonce and applies it (I-4). No MCP tool does either.
 // - The contact is named by its ID only (`agentlink contacts` lists it): a name can be ambiguous,
 //   which is the problem these commands fix.

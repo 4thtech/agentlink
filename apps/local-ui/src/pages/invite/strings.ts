@@ -1,7 +1,7 @@
 // W4-PEOPLE-INVITE: the copy of the Invite screen, the pending-invite row, the person menu and the
 // Connected moment (prototype v23 A3, A5–A7; 11 §5). `{name}` is always the name the owner typed or
 // the name rule's output, rendered as React text. No "wallet", "gas", "seed phrase", "transaction",
-// "key" or "relay" here. The safety code stays 12 digits in 0.4.6 (words later).
+// "key" or "relay" here. The 12 digits stays 12 digits in 0.4.6 (words later).
 export const INVITE_STRINGS = {
   title: 'Invite someone',
   intro: 'Send them this link. When they accept, your AIs can talk.',
@@ -53,7 +53,7 @@ export const INVITE_STRINGS = {
   pendingLabel: 'Invites waiting for an answer',
   // The person menu.
   rename: 'Rename',
-  checkCode: 'Check safety code',
+  checkCode: 'Contact check',
   // UX1112 WP-12 (F-2): Block, or Unblock on a blocked person.
   block: 'Block',
   unblock: 'Unblock',
@@ -66,9 +66,9 @@ export const INVITE_STRINGS = {
   notNow: 'Not now',
   declined: (date: string): string =>
     `No problem. Nothing was shared. The link works until ${date}.`,
-  safetyCode: 'Safety code',
-  codeLoading: 'Getting the safety code…',
-  codeLater: "The safety code appears in People once you're both connected.",
+  safetyCode: 'Contact check',
+  codeLoading: 'Getting the 12 digits…',
+  codeLater: "The 12 digits appear in People once you're both connected.",
   sayHello: (name: string | null): string => (name === null ? 'Say hello' : `Say hello to ${name}`),
   connectedGeneric: 'You are connected',
   thisContact: 'your new contact',
@@ -76,9 +76,10 @@ export const INVITE_STRINGS = {
   nameThisContactHint:
     'Only you see it. Check the name, then confirm it to use it in your AI prompts.',
   nameSummary: (alias: string): string => `Name this contact ${alias}.`,
-  optionalCheck: (name: string): string => `Optional: make sure it's really ${name}. Check →`,
+  optionalCheck: (name: string): string =>
+    `Optional: make sure it's really ${name}. Contact check →`,
   checkPurpose: (name: string): string =>
-    `Read these 12 digits to ${name} by phone or in person. If they match, nobody tampered with your invite. Nothing to save.`,
+    `Optional. Read these 12 digits to ${name} by phone. If they match, nobody tampered with your invite. Nothing to save.`,
   copyMessage: 'Copy invite message',
   copiedMessage: 'Copied. Paste it into your email.',
   copiedMessageAnnounce: 'Invite message copied',
@@ -158,9 +159,9 @@ export function helloPrompt(alias: string | null): string {
     : `Say hello to ${alias} on AgentLink.`;
 }
 
-/** The safety code's spoken form: digits one by one, groups apart. */
+/** The 12 digits's spoken form: digits one by one, groups apart. */
 export function codeLabel(code: string): string {
-  return `Safety code: ${code
+  return `Contact check: ${code
     .split(' ')
     .map((g) => g.split('').join(' '))
     .join(', ')}`;
@@ -185,12 +186,12 @@ export const FEEDBACK_STRINGS = {
   // 11 §5.2: the name here is self-declared until the owner names the contact, so the toast is generic.
   accepted: (): string => 'Your new contact accepted your invite',
   connected: (name: string): string => `You're connected with ${name}`,
-  again: (name: string): string => `Connected again with ${name}. Check the safety code again.`,
+  again: (name: string): string => `Connected again with ${name}. Do the Contact check again.`,
   connecting: (name: string): string => `Connecting to ${name}…`,
   waitingOnline: (name: string): string =>
     `Waiting for ${name} to come online. This finishes on its own.`,
   already: (name: string): string => `You're already connected to ${name}. Connect again?`,
-  againResets: 'Connecting again starts the safety code check over.',
+  againResets: 'Connecting again starts the Contact check over.',
   checkAction: 'Check the code',
   connectingLabel: 'Connections in progress',
   // W5-PASTE-ENTRY.

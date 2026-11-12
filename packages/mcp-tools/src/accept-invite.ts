@@ -13,7 +13,7 @@
 //
 // I-5: the link, and the name and relays it carries, are untrusted. Nothing from the link is echoed
 // except the counterparty's name under the 06 §2.1 rule (restricted name plus label, never the
-// self-declared name). No safety code is ever returned (04 §3.6.1).
+// self-declared name). No Contact check is ever returned (04 §3.6.1).
 import { acceptInviteSummary, type PendingContact } from '@4thtech-io/core';
 import { acceptInviteAction } from './accept-action.js';
 import type { ContactRef } from './contacts.js';
@@ -84,7 +84,7 @@ export async function acceptInviteHandler(
         'POLICY_DENIED',
       );
     }
-    // IR UX2-d1 M: core's one summary (name, label, owner fingerprint), as the app and the CLI.
+    // IR UX2-d1 M: core's one summary (name, label, ID tag), as the app and the CLI.
     const askSummary = acceptInviteSummary(checked);
 
     if (decision === 'approval') {

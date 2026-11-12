@@ -1,4 +1,4 @@
-// M1-9zd: the reminder before every owner code prompt (11 §5.5, §6.10). The owner code is read by
+// M1-9zd: the reminder before every master code prompt (11 §5.5, §6.10). The master code is read by
 // @4thtech-io/node's own TTY prompt inside the steps below; this module only prints fixed text
 // before each of them and never sees the code (I-1). Every owner command gets its deps through
 // `ownerStep` (common.ts), which applies this, so no owner command can prompt without it.
@@ -6,7 +6,7 @@ import type { Output } from '../../output.js';
 import type { OwnerCommandDeps } from './deps.js';
 import { OWNER_TEXT } from './strings.js';
 
-/** `deps` with the reminder printed right before each step that prompts for the owner code. */
+/** `deps` with the reminder printed right before each step that prompts for the master code. */
 export function withOwnerPrompts(deps: OwnerCommandDeps, output: Output): OwnerCommandDeps {
   const hint = (): void => {
     output.print(OWNER_TEXT.codeHint);

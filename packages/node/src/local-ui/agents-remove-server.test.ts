@@ -153,8 +153,8 @@ beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'agentlink-u3e-'));
   const written: string[] = [];
   const shown = (): string =>
-    (written.find((w) => w.startsWith('Your owner code: ')) ?? '').slice(
-      'Your owner code: '.length,
+    (written.find((w) => w.startsWith('Your master code: ')) ?? '').slice(
+      'Your master code: '.length,
     );
   const terminal: OwnerTerminal = {
     write: (text) => void written.push(text),
@@ -595,7 +595,7 @@ describe('POST /api/ui/agents/remove: refusals before the gesture (U3-e)', () =>
     expect(w.log).toEqual(['open work']);
   });
 
-  it('a wrong owner code signs nothing and opens the agent again', async () => {
+  it('a wrong master code signs nothing and opens the agent again', async () => {
     const w = await world();
     const res = await remove(w, { name: 'work', typedLabel: 'Work' }, { presence: '0000-0000' });
     expect(res.status).toBe(403);
@@ -727,7 +727,7 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
     // The recorded entry is kept; nothing more is sent.
     expect(w.revoked.get(w.work.agentId)).toBe(recorded);
     expect(w.carriers).toEqual([]);
-    // A wrong owner code still signs nothing on this path.
+    // A wrong master code still signs nothing on this path.
     expectFixedEvents(w);
   });
 
@@ -760,7 +760,7 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
     expectFixedEvents(w);
   });
 
-  it('GAP B with no agent open: a wrong owner code signs nothing and deletes nothing (HOTFIX-045-REMOVE)', async () => {
+  it('GAP B with no agent open: a wrong master code signs nothing and deletes nothing (HOTFIX-045-REMOVE)', async () => {
     const w = await world({ solo: true });
     w.faults.folder = true;
     await remove(w, { name: 'work', typedLabel: 'Work' });
@@ -787,7 +787,7 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
     expect(right.json).toEqual({ status: 'removed' });
   });
 
-  it("GAP B with no agent open: an entry signed by another owner is never finished, even with this computer's owner code (HOTFIX-045-REMOVE)", async () => {
+  it("GAP B with no agent open: an entry signed by another owner is never finished, even with this computer's master code (HOTFIX-045-REMOVE)", async () => {
     const w = await world({ solo: true });
     // Another owner's signed agent.revoke for this agent sits in the revoked list; its keys are gone.
     const stranger = new MemoryOwnerKeyStore(randomBytes(32), {
@@ -1138,7 +1138,7 @@ beforeEach(() => {
 
 // HOTFIX-045-TOUCHID: Remove with no agent open (the host after a failed removal, or a Mac whose
 // current agent did not open) is confirmed with Touch ID: the page's passkey read answers from the
-// owner store (on main it was 409 `no_agent`, so the sheet asked for the backup code), and the
+// owner store (on main it was 409 `no_agent`, so the sheet asked for the master code), and the
 // removal completes with the passkey assertion through the unchanged central presence gate.
 describe('HOTFIX-045-TOUCHID: Remove with no agent open, with Touch ID', () => {
   afterEach(async () => {
