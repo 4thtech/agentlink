@@ -14,6 +14,9 @@ export const APPROVAL_STRINGS = Object.freeze({
   firstRunTitle: 'Protect your approvals',
   firstRun:
     'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey or master code, and only after you click Approve. Never give them to your AI.',
+  checkFailedTitle: "Couldn't check how approvals are protected",
+  checkFailed: "AgentLink didn't answer just now. Nothing was changed.",
+  retry: 'Try again',
   desktopNote: 'The desktop app protects approvals more strongly.',
   // UX 2026-11-12 (notices): the desktop app's own words (it is never "this browser").
   protectedTitle: 'Approvals use your master code',

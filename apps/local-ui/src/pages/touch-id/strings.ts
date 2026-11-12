@@ -14,6 +14,10 @@ export const TOUCH_ID_STRINGS = {
   onLine: 'Set up on this computer. AgentLink asks for it before every change that needs you.',
   off: (sensor: string): string => `${cap(sensor)} is off`,
   offLine: 'You confirm with your master code.',
+  couldntCheckTitle: (sensor: string): string => `Couldn't check ${sensor}`,
+  couldntCheckLine:
+    "AgentLink didn't answer just now. Try again. Your master code works meanwhile.",
+  tryAgain: 'Try again',
   cantTitle: (sensor: string): string => `${cap(sensor)} can't be used here`,
   test: (sensor: string): string => `Test ${sensor}`,
   testing: 'Waiting for you…',

@@ -81,17 +81,29 @@ export function browserPasskeys(): boolean {
 export interface OwnerView extends OwnerState {
   /** The server offers a localhost passkey (registered or not). */
   readonly offered: boolean;
+  /** R1-UI-13: the read failed, so nothing is known about the passkey (not "no passkey here"). */
+  readonly unknown?: boolean;
+  /** Reads again (the notice's Try again). */
+  readonly retry?: () => void;
 }
 
 /** Reads the owner and the decision passkey once; undefined while loading. */
 export function useOwner(client: ApprovalsClient, canPasskey: boolean): OwnerView | undefined {
   const [owner, setOwner] = useState<OwnerView | undefined>(undefined);
+  const [again, setAgain] = useState(0);
   useEffect(() => {
     let live = true;
     void client.passkey().then((answer) => {
       if (!live) return;
       if (answer.kind === 'needs_owner') setOwner({ ready: false, offered: false });
-      else {
+      else if (answer.kind === 'unknown') {
+        setOwner({
+          ready: true,
+          offered: false,
+          unknown: true,
+          retry: () => setAgain((n) => n + 1),
+        });
+      } else {
         setOwner({
           ready: true,
           offered: answer.offered,
@@ -102,7 +114,7 @@ export function useOwner(client: ApprovalsClient, canPasskey: boolean): OwnerVie
     return () => {
       live = false;
     };
-  }, [client, canPasskey]);
+  }, [client, canPasskey, again]);
   return owner;
 }
 
@@ -149,6 +161,27 @@ export function OwnerPanel({
     return (
       <PageNotice tone="warning" icon="key-round" title={S.needsOwnerTitle}>
         <p>{S.needsOwner}</p>
+      </PageNotice>
+    );
+  }
+  // R1-UI-13: a failed read says so and offers a retry; it never claims passkeys are missing.
+  if (owner.unknown === true) {
+    return (
+      <PageNotice
+        tone="warning"
+        icon="key-round"
+        title={S.checkFailedTitle}
+        {...(owner.retry === undefined
+          ? {}
+          : {
+              actions: (
+                <Button size="sm" onClick={owner.retry}>
+                  {S.retry}
+                </Button>
+              ),
+            })}
+      >
+        <p>{S.checkFailed}</p>
       </PageNotice>
     );
   }

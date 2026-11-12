@@ -24,6 +24,7 @@ import {
   TextField,
 } from '@4thtech-io/ui';
 import { getLive, subscribeLive, switchAgent, type LiveSnapshot } from '../../api/live.js';
+import { useLeaveGuard } from '../../leave-guard.js';
 import { SettingsIcon } from '../settings/icons.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import { SENSOR } from '../first-run/strings.js';
@@ -236,6 +237,13 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
   const checked = useMemo(
     () => (view === undefined || draft === undefined ? undefined : checkDraft(view, draft)),
     [view, draft],
+  );
+
+  // R1-UI-15: leaving with changes that aren't saved asks first (the window and the app's own links).
+  useLeaveGuard(
+    checked !== undefined && (checked.changes > 0 || checked.invalid.size > 0)
+      ? S.leaveWarning
+      : undefined,
   );
 
   const edit = (patch: Partial<Draft>): void => {

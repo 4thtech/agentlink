@@ -18,18 +18,18 @@ import { HOME_STRINGS as S, fmt } from './people-strings.js';
 import { termsLine, termsStateWord, type TermsEvent } from './terms-trail.js';
 
 const COPIED_MS = 1600;
-const SHORT = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+const SHORT = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 const DAY = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
   month: 'short',
-  hour: '2-digit',
+  hour: 'numeric',
   minute: '2-digit',
 });
 const EXACT = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
-  hour: '2-digit',
+  hour: 'numeric',
   minute: '2-digit',
   second: '2-digit',
 });

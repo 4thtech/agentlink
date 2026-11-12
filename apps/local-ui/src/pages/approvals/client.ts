@@ -45,7 +45,9 @@ export type PasskeyAnswer =
   /** The owner is set up; `passkey` when one is registered for `localhost`. */
   | { readonly kind: 'ready'; readonly passkey?: DecisionPasskey; readonly offered: boolean }
   /** No owner yet: nothing can be approved here. */
-  | { readonly kind: 'needs_owner' };
+  | { readonly kind: 'needs_owner' }
+  /** The read failed (no answer, a server error): not the same as "no passkey here" (R1-UI-13). */
+  | { readonly kind: 'unknown' };
 
 export type ListAnswer =
   { readonly kind: 'ok'; readonly items: readonly ApprovalItem[] } | { readonly kind: 'offline' };
@@ -282,8 +284,9 @@ export function createApprovalsClient(options: ApprovalsClientOptions = {}): App
     async passkey() {
       const answer = await get('/api/owner/passkey');
       if (answer?.status === 503) return { kind: 'needs_owner' };
+      // R1-UI-13: no answer, an error or an unreadable body is "couldn't check", never "no passkey".
       if (answer === undefined || answer.status !== 200 || !isObject(answer.json)) {
-        return { kind: 'ready', offered: false };
+        return { kind: 'unknown' };
       }
       const p = answer.json['passkey'];
       if (!isObject(p) || p['rpId'] !== 'localhost') return { kind: 'ready', offered: false };

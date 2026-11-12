@@ -100,6 +100,8 @@ export const RULES_STRINGS = {
   saving: 'Saving…',
 
   saved: 'Rules saved.',
+  leaveWarning:
+    "You have changes to your rules that aren't saved. If you leave now, they are lost. Leave anyway?",
   wrongCode: "That didn't match. Try again.",
   wait: (s: number): string => `Too many tries. Wait ${String(s)} seconds and try again.`,
   refused: 'Not saved. Review your changes again.',

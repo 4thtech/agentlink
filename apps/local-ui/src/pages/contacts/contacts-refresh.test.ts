@@ -94,16 +94,16 @@ async function mount(routes: Routes, hood = false, open = true): Promise<void> {
   await settle();
   if (open) {
     await act(async () => {
-      host.querySelector<HTMLButtonElement>('.ct-row')?.click();
+      document.body.querySelector<HTMLButtonElement>('.ct-row')?.click();
     });
     await settle();
   }
 }
 
-const text = (): string => host.textContent ?? '';
+const text = (): string => document.body.textContent ?? '';
 
 function button(label: string): HTMLButtonElement {
-  const found = [...host.querySelectorAll('button')].find(
+  const found = [...document.body.querySelectorAll('button')].find(
     (b) => (b.textContent ?? '').trim() === label,
   );
   if (found === undefined) throw new Error(`no button "${label}" in: ${text()}`);
@@ -126,12 +126,12 @@ describe('UI-REFRESH-i: first load', () => {
       root.render(createElement<ContactsPageProps>(ContactsPage, { api }));
       await Promise.resolve();
     });
-    expect(host.querySelector('h1')?.textContent).toBe('People');
+    expect(document.body.querySelector('h1')?.textContent).toBe('People');
     await act(async () => {
       vi.advanceTimersByTime(450);
     });
-    expect(host.querySelector('.al-skeleton')).not.toBeNull();
-    expect(host.querySelector('p[aria-busy]')).toBeNull();
+    expect(document.body.querySelector('.al-skeleton')).not.toBeNull();
+    expect(document.body.querySelector('p[aria-busy]')).toBeNull();
   });
 });
 
@@ -143,45 +143,45 @@ describe('UI-REFRESH-i: rows and the detail sheet', () => {
 
   it('puts the rows on a level 1 surface', async () => {
     await mount(routes);
-    const list = host.querySelector('ul.ct-list');
+    const list = document.body.querySelector('ul.ct-list');
     expect(list?.getAttribute('data-level')).toBe('1');
     expect(list?.classList.contains('al-surface')).toBe(true);
   });
 
   it('opens no sheet at load, so the page and the navigation stay usable', async () => {
     await mount(routes, false, false);
-    expect(host.querySelector('aside.al-sheet')).toBeNull();
-    expect(host.querySelectorAll('.ct-row')).toHaveLength(2);
+    expect(document.body.querySelector('aside.al-sheet')).toBeNull();
+    expect(document.body.querySelectorAll('.ct-row')).toHaveLength(2);
   });
 
   it('shows the selected contact in a level 3 sheet with a named close button', async () => {
     await mount(routes);
-    const sheet = host.querySelector('aside.al-sheet');
+    const sheet = document.body.querySelector('aside.al-sheet');
     expect(sheet?.getAttribute('data-level')).toBe('3');
     expect(sheet?.getAttribute('role')).toBe('dialog');
     expect(sheet?.querySelector('.ct-detail')).not.toBeNull();
     expect(sheet?.querySelector('.al-sheet-close')?.getAttribute('aria-label')).toBe(S.closeSheet);
-    expect(host.querySelector('.ct-layout > .ct-detail')).toBeNull();
+    expect(document.body.querySelector('.ct-layout > .ct-detail')).toBeNull();
   });
 
   it('closing the sheet keeps the list; choosing a row opens it again', async () => {
     await mount(routes);
-    await click(host.querySelector('.al-sheet-close') as HTMLElement);
-    expect(host.querySelector('aside.al-sheet')).toBeNull();
-    expect(host.querySelectorAll('.ct-row')).toHaveLength(2);
-    await click(host.querySelectorAll<HTMLElement>('.ct-row')[1] as HTMLElement);
-    const sheet = host.querySelector('aside.al-sheet');
+    await click(document.body.querySelector('.al-sheet-close') as HTMLElement);
+    expect(document.body.querySelector('aside.al-sheet')).toBeNull();
+    expect(document.body.querySelectorAll('.ct-row')).toHaveLength(2);
+    await click(document.body.querySelectorAll<HTMLElement>('.ct-row')[1] as HTMLElement);
+    const sheet = document.body.querySelector('aside.al-sheet');
     expect(sheet).not.toBeNull();
     expect(sheet?.textContent).toContain('Ana');
-    expect(host.querySelectorAll('.ct-row')[1]?.getAttribute('aria-current')).toBe('true');
+    expect(document.body.querySelectorAll('.ct-row')[1]?.getAttribute('aria-current')).toBe('true');
   });
 
   it('every button has a name and the sheet is named by its heading', async () => {
     await mount(routes);
-    for (const b of host.querySelectorAll('button')) {
+    for (const b of document.body.querySelectorAll('button')) {
       expect((b.textContent ?? '').trim() !== '' || b.hasAttribute('aria-label')).toBe(true);
     }
-    const sheet = host.querySelector('aside.al-sheet') as HTMLElement;
+    const sheet = document.body.querySelector('aside.al-sheet') as HTMLElement;
     const heading = document.getElementById(sheet.getAttribute('aria-labelledby') ?? '');
     expect(heading?.textContent?.trim()).not.toBe('');
   });
@@ -192,7 +192,7 @@ describe('UI-REFRESH-i: waiting, codes match, duplicate notice', () => {
 
   it('says "Waiting for {name}" in plain text, with the name only as text', async () => {
     await mount({ [LIST]: { status: 'ok', contacts: [waiting] } });
-    const line = host.querySelector('.ct-waiting');
+    const line = document.body.querySelector('.ct-waiting');
     expect(line?.textContent).toContain('Waiting for');
     expect(line?.textContent).toContain('Marko Novak');
     expect(text()).toContain(S.waitingDetail);
@@ -201,8 +201,8 @@ describe('UI-REFRESH-i: waiting, codes match, duplicate notice', () => {
   it('a hostile name in the waiting line never becomes markup', async () => {
     const evil = { ...waiting, name: '<b id="x">hi</b>' };
     await mount({ [LIST]: { status: 'ok', contacts: [evil] } });
-    expect(host.querySelector('.ct-waiting')).not.toBeNull();
-    expect(host.querySelector('.ct-waiting b, #x')).toBeNull();
+    expect(document.body.querySelector('.ct-waiting')).not.toBeNull();
+    expect(document.body.querySelector('.ct-waiting b, #x')).toBeNull();
   });
 
   it('plays the codes-match moment once after "They match", with its text line', async () => {
@@ -212,9 +212,9 @@ describe('UI-REFRESH-i: waiting, codes match, duplicate notice', () => {
       [`POST /api/ui/contacts/${MARKO}/check`]: { status: 'done' },
     };
     await mount(f);
-    expect(host.querySelector('.al-moment')).toBeNull();
+    expect(document.body.querySelector('.al-moment')).toBeNull();
     await click(button(S.theyMatch));
-    const field = host.querySelector<HTMLInputElement>(
+    const field = document.body.querySelector<HTMLInputElement>(
       'input[name="owner-code"]',
     ) as HTMLInputElement;
     await act(async () => {
@@ -225,7 +225,7 @@ describe('UI-REFRESH-i: waiting, codes match, duplicate notice', () => {
       field.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await click(button(S.confirmWithCode));
-    expect(host.querySelectorAll('.al-moment[data-kind="codes"]')).toHaveLength(1);
+    expect(document.body.querySelectorAll('.al-moment[data-kind="codes"]')).toHaveLength(1);
     expect(text()).toContain(S.matched);
   });
 
@@ -234,17 +234,17 @@ describe('UI-REFRESH-i: waiting, codes match, duplicate notice', () => {
       [LIST]: { status: 'ok', contacts: [marko] },
       [`/api/ui/contacts/${MARKO}/safety-code`]: { status: 'ok', code: CODE },
     });
-    const groups = [...host.querySelectorAll('.al-sc-code > *')];
+    const groups = [...document.body.querySelectorAll('.al-sc-code > *')];
     expect(groups.map((g) => g.textContent)).toEqual(['4821', '0937', '5512']);
-    expect(host.querySelector('.al-sc-code span span')).toBeNull();
+    expect(document.body.querySelector('.al-sc-code span span')).toBeNull();
   });
 
   it('shows the duplicate notice in a level 3 banner', async () => {
     const OLD = { ...ana, name: 'oc-test', label: 'self-declared', since: 1_761_350_400 };
     const NEW = { ...OLD, ref: MARKO, since: 1_761_523_200, olderSameOwner: ANA };
     await mount({ [LIST]: { status: 'ok', contacts: [OLD, NEW] } });
-    await click(host.querySelectorAll<HTMLElement>('.ct-row')[1] as HTMLElement);
-    const notice = host.querySelector('.ct-dup');
+    await click(document.body.querySelectorAll<HTMLElement>('.ct-row')[1] as HTMLElement);
+    const notice = document.body.querySelector('.ct-dup');
     expect(notice?.getAttribute('data-level')).toBe('3');
     expect(notice?.querySelector('.al-banner')).not.toBeNull();
     expect(notice?.textContent).toContain('oc-test');
@@ -257,7 +257,7 @@ describe('UI-REFRESH-i: reduced motion', () => {
   it('marks the waiting line as still when the app setting is reduced', async () => {
     document.documentElement.setAttribute('data-motion', 'reduced');
     await mount(pending);
-    expect(host.querySelector('.ct-waiting')?.getAttribute('data-motion')).toBe('reduced');
+    expect(document.body.querySelector('.ct-waiting')?.getAttribute('data-motion')).toBe('reduced');
   });
 
   it('marks the waiting line as still when the system setting is reduced', async () => {
@@ -268,7 +268,7 @@ describe('UI-REFRESH-i: reduced motion', () => {
       removeEventListener: () => undefined,
     }));
     await mount(pending);
-    expect(host.querySelector('.ct-waiting')?.getAttribute('data-motion')).toBe('reduced');
+    expect(document.body.querySelector('.ct-waiting')?.getAttribute('data-motion')).toBe('reduced');
   });
 });
 
@@ -297,7 +297,7 @@ describe('UI-REFRESH-i: Under the hood', () => {
 
   it('shows the fingerprint, identity level and pairing date of the selected contact', async () => {
     await mount(routes([marko, ana]), true);
-    const hood = host.querySelector('.al-hood');
+    const hood = document.body.querySelector('.al-hood');
     expect(hood).not.toBeNull();
     const rows = [...(hood?.querySelectorAll('.al-hood-row') ?? [])].map((r) => [
       r.querySelector('dt')?.textContent,
@@ -312,19 +312,19 @@ describe('UI-REFRESH-i: Under the hood', () => {
 
   it('also lists the facts inside the opened person panel, and only with the switch on', async () => {
     await mount(routes([marko, ana]), true);
-    const inline = host.querySelector('.ct-hood');
+    const inline = document.body.querySelector('.ct-hood');
     expect(inline?.textContent).toContain('ID tag');
     expect(inline?.textContent).toContain('7F3A·19C2');
     expect(inline?.textContent).toContain('Paired');
     act(() => root.unmount());
     root = createRoot(host);
     await mount(routes([marko, ana]), false);
-    expect(host.querySelector('.ct-hood')).toBeNull();
+    expect(document.body.querySelector('.ct-hood')).toBeNull();
   });
 
   it('leaves out the fingerprint when the server did not send one, and never shows an ID', async () => {
     await mount(routes([ana]), true);
-    const hood = host.querySelector('.al-hood') as HTMLElement;
+    const hood = document.body.querySelector('.al-hood') as HTMLElement;
     expect(hood.textContent).not.toContain('ID tag');
     expect(hood.textContent).toContain('Contact checked');
     expect(hood.textContent).not.toMatch(/0x[0-9a-f]{6}/i);
@@ -333,6 +333,6 @@ describe('UI-REFRESH-i: Under the hood', () => {
 
   it('is absent while the switch is off', async () => {
     await mount(routes([marko]));
-    expect(host.querySelector('.al-hood')).toBeNull();
+    expect(document.body.querySelector('.al-hood')).toBeNull();
   });
 });

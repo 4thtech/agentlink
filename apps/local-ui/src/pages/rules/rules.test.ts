@@ -11,10 +11,11 @@
 //   POST to the presence gate with the passkey assertion or the typed master code as its body.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PAY_CONFIRM_STRINGS as P } from '@4thtech-io/ui';
 import { createApiClient } from '../../api/client.js';
 import { createPayConfirmClient } from '../../pay-confirm/index.js';
+import { mayLeave, setLeaveGuard } from '../../leave-guard.js';
 import { RulesPage, type RulesPageProps } from './index.js';
 import { createOwnerClient } from './owner.js';
 import { RULES_STRINGS as S } from './strings.js';
@@ -604,5 +605,39 @@ describe('spending limits: confirmed on the sheet (D-132)', () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(srv.calls.some((c) => c.url === '/api/ui/pay-confirm/finish')).toBe(false);
     expect(host.querySelector('section[aria-labelledby="rules-confirm"]')).not.toBeNull();
+  });
+});
+
+describe('R1-UI-15: leaving with unsaved changes', () => {
+  afterEach(() => setLeaveGuard(undefined));
+
+  it('asks before the person leaves while a rule is changed, and not after Discard', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await mount({ 'GET /api/ui/rules': RULES() });
+    expect(mayLeave()).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+    await click(radio(S.proofTitle, S.askMe));
+    expect(mayLeave()).toBe(false);
+    expect(confirm).toHaveBeenCalledWith(S.leaveWarning);
+    confirm.mockReturnValue(true);
+    expect(mayLeave()).toBe(true);
+    // Said yes: the guard is off and the next change turns it on again.
+    await click(radio(S.proofTitle, S.allowed));
+    await click(radio(S.proofTitle, S.askMe));
+    await click(buttonByText(S.discard));
+    confirm.mockClear();
+    expect(mayLeave()).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it('turns the guard off when the page goes away', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await mount({ 'GET /api/ui/rules': RULES() });
+    await click(radio(S.proofTitle, S.askMe));
+    act(() => root.unmount());
+    root = createRoot(host);
+    expect(mayLeave()).toBe(true);
+    confirm.mockRestore();
   });
 });

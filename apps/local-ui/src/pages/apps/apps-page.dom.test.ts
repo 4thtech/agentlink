@@ -142,6 +142,12 @@ async function enterCode(): Promise<void> {
 }
 
 describe('the AI apps page: cards and states', () => {
+  it('R1-UI-22: the page is not a <main> of its own (the shell has the one landmark)', async () => {
+    await mountPage();
+    expect(host.querySelector('main')).toBeNull();
+    expect(host.querySelector('.ap-page')?.tagName).toBe('DIV');
+  });
+
   it('shows the open agent and one card per detected AI app', async () => {
     await mountPage();
     expect(host.querySelector('h1')?.textContent).toBe('AI apps');

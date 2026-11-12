@@ -506,7 +506,7 @@ export function AgentsPage({
 
   const removing = removeQueue[0];
   return (
-    <main className="ag-page" data-layer={hood ? 'pro' : 'simple'}>
+    <div className="ag-page" data-layer={hood ? 'pro' : 'simple'}>
       <div className="ag-live al-text-body-sm" role="status" aria-live="polite">
         {notice}
       </div>
@@ -552,6 +552,6 @@ export function AgentsPage({
           }}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
