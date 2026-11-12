@@ -12,6 +12,7 @@
 // from the browser and changeable with three buttons; the installers need no Node.js.
 import type { InviteView } from './invite-state.js';
 import type { InviteCommands } from './prompt.js';
+import { DESKTOP_APP_LINKS, GET_APP_URL } from './flags.js';
 import { expiredFor, invitesHeading, nextFor, strings } from './strings.js';
 
 /** The computer a command is for (WP-2). */
@@ -52,7 +53,7 @@ const COPIED_MS = 1600;
 /**
  * Shows `view`. `copy` writes a string to the clipboard; the page never pastes or opens anything.
  * `retry` checks the invite once more (the `unreachable` state's Try again button). `os` is the
- * command shown first (WP-2).
+ * command shown first (WP-2). WP-D9: the app links follow the build-time flag of flags.ts.
  */
 export function render(
   doc: Document,
@@ -68,7 +69,8 @@ export function render(
   const next = element(doc, 'next');
   const copyStatus = element(doc, 'copy-status');
   const wayCommand = element(doc, 'way-command');
-  const openApp = element(doc, 'open-app') as HTMLAnchorElement;
+  const appLinks = element(doc, 'app-links');
+  const openApp = element(doc, 'open-app');
   const getApp = element(doc, 'get-app');
   const osButtons = OSES.map((o) => [o, element(doc, `os-${o}`) as HTMLButtonElement] as const);
   // The three cards, in order: Ask your AI, the command, the link. `text` is what the card shows
@@ -114,10 +116,12 @@ export function render(
     (element(doc, c.button) as HTMLButtonElement).onclick = null;
   }
   for (const [, button] of osButtons) button.onclick = null;
-  // WP-D9: no app link unless this view is a checked invite.
+  // WP-D9: no app link unless this build has them on and this view is a checked invite.
+  appLinks.hidden = true;
   openApp.removeAttribute('href');
-  openApp.textContent = strings.step.openApp;
-  getApp.textContent = strings.step.getApp;
+  getApp.removeAttribute('href');
+  openApp.textContent = '';
+  getApp.textContent = '';
   retryButton.onclick = null;
   retryButton.hidden = true;
   retryButton.disabled = false;
@@ -237,7 +241,14 @@ export function render(
     // WP-D9: "Open in the AgentLink app" next to the command. The address is the script's own
     // `agentlink://join#<payload>` (built from the checked payload, never read from the page); the
     // person's click hands it to the app on this computer, so the fragment reaches no server.
-    openApp.setAttribute('href', view.appLink);
+    // Behind the build-time flag (flags.ts): off until the desktop app is released.
+    if (DESKTOP_APP_LINKS) {
+      openApp.setAttribute('href', view.appLink);
+      openApp.textContent = strings.step.openApp;
+      getApp.setAttribute('href', GET_APP_URL);
+      getApp.textContent = strings.step.getApp;
+      appLinks.hidden = false;
+    }
 
     wayCommand.hidden = view.commands === undefined;
     step.hidden = false;
