@@ -92,10 +92,12 @@ export function InvitePanel({
   // The latest values for the leave-time cancel and for stale answers.
   const madeRef = useRef<Made | undefined>(undefined);
   const sharedRef = useRef(false);
+  // An Email click: the mail app may hide the page; the invite stays pending (not shown as sent).
+  const keptRef = useRef(false);
   const run = useRef(0);
   const live = useRef(true);
   madeRef.current = made;
-  sharedRef.current = shared;
+  sharedRef.current = shared || keptRef.current;
 
   const make = useCallback(
     async (label: string, long: boolean): Promise<void> => {
@@ -273,6 +275,11 @@ export function InvitePanel({
       () => setCopied('failed'),
     );
   };
+  const keepPending = (): void => {
+    keptRef.current = true;
+    sharedRef.current = true;
+    if (madeRef.current !== undefined) forgetUnsent(madeRef.current.id);
+  };
   // The whole invite text (our words around the link), for a mail written by hand or a chat.
   const copyMessage = (): void => {
     if (invite === undefined) return;
@@ -362,19 +369,28 @@ export function InvitePanel({
           </Button>
         </div>
         <div className="inv-ways">
-          {/* A real link: the mail app opens when there is one. No click handler: nothing tells us
-              it opened, so this does not count as sent (Copy invite message does). */}
-          <a
-            className="al-btn al-btn-secondary al-press inv-email"
-            {...(ready && invite !== undefined
-              ? { href: mailtoOf(invite.shareText) }
-              : { role: 'link', 'aria-disabled': true })}
-          >
-            <span className="inv-btn-in">
-              <MailIcon />
-              {S.email}
-            </span>
-          </a>
+          {/* A real link: the mail app opens when there is one. Nothing tells us it did, so the
+              click is not "sent" (Copy invite message is); it only stops a hidden page from
+              cancelling the invite, which then waits until it expires. */}
+          {ready && invite !== undefined ? (
+            <a
+              className="al-btn al-btn-secondary al-press inv-email"
+              href={mailtoOf(invite.shareText)}
+              onClick={keepPending}
+            >
+              <span className="inv-btn-in">
+                <MailIcon />
+                {S.email}
+              </span>
+            </a>
+          ) : (
+            <Button className="al-press" disabled>
+              <span className="inv-btn-in">
+                <MailIcon />
+                {S.email}
+              </span>
+            </Button>
+          )}
           <Button className="al-press" disabled={!ready} onClick={copyMessage}>
             <span className="inv-btn-in">
               {copiedMessage === 'copied' ? <CheckMark /> : <CopyMark />}

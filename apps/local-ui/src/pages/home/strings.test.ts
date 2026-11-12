@@ -91,7 +91,6 @@ describe('Home copy (11 §5.1)', () => {
     expect(startProgress(2, 4)).toBe('2 of 4');
     expect(startWaiting('Marko')).toBe('Waiting for Marko to accept');
     expect(startHello('Marko')).toBe('Say hello to Marko on AgentLink.');
-    expect(startHello('Natasa', true)).toBe('Say hello to “Natasa” on AgentLink.');
     expect(startHello(null)).toBe('Say hello to my new contact on AgentLink.');
     expect(startStepDone('Invite your first contact', 2, 4)).toBe(
       'Step done: Invite your first contact. 2 of 4.',

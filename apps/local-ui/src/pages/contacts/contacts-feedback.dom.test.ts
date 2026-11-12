@@ -234,7 +234,7 @@ describe('W6-ACCEPT-CONNECTED: the accepter reaches the Connected moment', () =>
 
   const connectedHeading = (): Element | undefined =>
     [...host.querySelectorAll('h1, h2, h3')].find((h) =>
-      /^You and “?Ana”? are connected$/.test(h.textContent ?? ''),
+      /^You are connected$/.test(h.textContent ?? ''),
     );
 
   it('when the pairing completes while the accept is still on its way (real relays)', async () => {

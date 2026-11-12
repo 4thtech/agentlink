@@ -7,10 +7,12 @@
 // words; nothing is signed here.
 // Marking the code as checked stays on the person (People), behind Touch ID.
 import { Button, CopyPrompt } from '@4thtech-io/ui';
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { contactPath, parseCode } from '../contacts/data.js';
+import type { OwnerClient } from '../contacts/owner.js';
 import { CheckMark } from './icons.js';
+import { NameContact } from './name-contact.js';
 import { INVITE_STRINGS as S, codeLabel, connectedWith, helloPrompt, letterOf } from './strings.js';
 import './invite.css';
 
@@ -22,8 +24,10 @@ export interface ConnectedMomentProps {
   /** The new contact's ref, for the safety code. */
   readonly contactRef?: string;
   readonly api?: ApiClient;
-  /** The name came from the other side (default), not from your own alias: the prompt quotes it. */
+  /** The name came from the other side, not from your own alias: it is never our heading or prompt. */
   readonly selfDeclared?: boolean;
+  /** For naming the contact (tests); the page's own owner client by default. */
+  readonly owner?: OwnerClient;
   readonly onDone?: () => void;
   /** 1 on a screen of its own (the join screen), 2 inside a page that has its title. */
   readonly headingLevel?: 1 | 2;
@@ -40,7 +44,8 @@ export function ConnectedMoment({
   contactRef,
   api: givenApi,
   onDone,
-  selfDeclared = true,
+  selfDeclared = false,
+  owner,
   headingLevel = 1,
 }: ConnectedMomentProps): ReactElement {
   const [api] = useState<ApiClient>(() => givenApi ?? createApiClient());
@@ -49,6 +54,15 @@ export function ConnectedMoment({
   );
   const [mismatch, setMismatch] = useState(false);
   const [checking, setChecking] = useState(false);
+  // The alias the owner confirmed (null while the name is only the contact's own, I-5).
+  const [named, setNamed] = useState<string | null>(null);
+  const shown = selfDeclared ? named : name;
+  const who = shown ?? S.thisContact;
+  const digitsId = useId();
+  const digitsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (checking) digitsRef.current?.focus();
+  }, [checking]);
 
   useEffect(() => {
     if (!checking) return undefined;
@@ -83,7 +97,10 @@ export function ConnectedMoment({
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
   const groups = code.kind === 'ok' ? code.code.split(' ') : [];
   return (
-    <section className="inv-connected al-reveal" aria-label={connectedWith(name)}>
+    <section
+      className="inv-connected al-reveal"
+      aria-label={shown === null ? S.connectedGeneric : connectedWith(shown)}
+    >
       <div className="inv-pair" aria-hidden="true">
         {/* The two letters meet (U0 al-slide-in; the right one mirrored so it comes from the right),
             then the check pops (al-pop). Reduced motion: the kit's switch, no movement. */}
@@ -92,7 +109,7 @@ export function ConnectedMoment({
         </span>
         <span className="inv-meet inv-from-right">
           <span className="inv-meet al-slide-in">
-            <span className="inv-avatar inv-avatar--them inv-unflip">{letterOf(name)}</span>
+            <span className="inv-avatar inv-avatar--them inv-unflip">{letterOf(shown ?? '')}</span>
           </span>
         </span>
         <span className="inv-pair-check al-pop">
@@ -100,15 +117,42 @@ export function ConnectedMoment({
         </span>
       </div>
       <div className="inv-connected-head">
-        <Heading className="inv-connected-title">{connectedWith(name)}</Heading>
+        <Heading className="inv-connected-title">
+          {shown === null ? S.connectedGeneric : connectedWith(shown)}
+        </Heading>
       </div>
+      {selfDeclared && named === null && contactRef !== undefined ? (
+        <NameContact
+          contactRef={contactRef}
+          chosen={name}
+          api={api}
+          {...(owner === undefined ? {} : { owner })}
+          onNamed={setNamed}
+        />
+      ) : null}
       <div className="inv-hello">
-        <CopyPrompt title={S.sayHello(name)} prompt={helloPrompt(name, selfDeclared)} />
+        <CopyPrompt title={S.sayHello(shown)} prompt={helloPrompt(shown)} />
       </div>
+      <button
+        type="button"
+        className="inv-link-button inv-optional-check"
+        aria-expanded={checking}
+        aria-controls={digitsId}
+        onClick={() => setChecking((on) => !on)}
+      >
+        {S.optionalCheck(who)}
+      </button>
       {checking ? (
-        <div className="inv-code al-reveal" role="group" aria-label={S.safetyCode}>
+        <div
+          id={digitsId}
+          className="inv-code al-reveal"
+          role="group"
+          aria-label={S.safetyCode}
+          tabIndex={-1}
+          ref={digitsRef}
+        >
           <span className="inv-eyebrow">{S.safetyCode}</span>
-          <p className="al-text-body-sm">{S.checkPurpose(name)}</p>
+          <p className="al-text-body-sm">{S.checkPurpose(who)}</p>
           {code.kind === 'ok' ? (
             <p className="inv-code-digits" role="img" aria-label={codeLabel(code.code)}>
               {groups.map((g, i) => (
@@ -124,18 +168,10 @@ export function ConnectedMoment({
             </p>
           )}
         </div>
-      ) : (
-        <button
-          type="button"
-          className="inv-link-button inv-optional-check"
-          onClick={() => setChecking(true)}
-        >
-          {S.optionalCheck(name)}
-        </button>
-      )}
+      ) : null}
       {mismatch ? (
         <div className="inv-mismatch al-reveal" role="status">
-          {S.mismatch(name)}
+          {S.mismatch(who)}
         </div>
       ) : null}
       <div className="inv-connected-actions">

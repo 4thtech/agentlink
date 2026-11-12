@@ -66,7 +66,12 @@ export const INVITE_STRINGS = {
   safetyCode: 'Safety code',
   codeLoading: 'Getting the safety code…',
   codeLater: "The safety code appears in People once you're both connected.",
-  sayHello: (name: string): string => `Say hello to ${name}`,
+  sayHello: (name: string | null): string => (name === null ? 'Say hello' : `Say hello to ${name}`),
+  connectedGeneric: 'You are connected',
+  thisContact: 'your new contact',
+  nameThisContact: 'Name this contact',
+  nameThisContactHint: 'Only you see it. Confirm it to use it in your AI prompts.',
+  nameSummary: (alias: string): string => `Name this contact ${alias}.`,
   optionalCheck: (name: string): string => `Optional: make sure it's really ${name}. Check →`,
   checkPurpose: (name: string): string =>
     `Read these 12 digits to ${name} by phone or in person. If they match, nobody tampered with your invite. Nothing to save.`,
@@ -139,12 +144,14 @@ export function connectedWith(name: string): string {
   return `You and ${name} are connected`;
 }
 
-/** The prompt to copy after connecting: the shown name (name rule output) only. */
-export function helloPrompt(name: string, selfDeclared = true): string {
-  // A name the contact chose is quoted (11 §5.2), so an AI reads it as a name, not as an order.
-  return selfDeclared
-    ? `Say hello to “${name}” on AgentLink.`
-    : `Say hello to ${name} on AgentLink.`;
+/**
+ * The prompt to copy after connecting (I-5): only the owner's own alias, else our template. A name
+ * the contact chose never goes into a prompt.
+ */
+export function helloPrompt(alias: string | null): string {
+  return alias === null
+    ? 'Say hello to my new contact on AgentLink.'
+    : `Say hello to ${alias} on AgentLink.`;
 }
 
 /** The safety code's spoken form: digits one by one, groups apart. */

@@ -250,15 +250,20 @@ describe('the invite panel (A3/A5)', () => {
     const href = mail?.getAttribute('href') ?? '';
     expect(href).toMatch(/^mailto:\?subject=/);
     expect(decodeURIComponent(href)).toContain(SHORT_A);
-    // A click on it is the mail app's business: nothing is recorded, the link is still unsent.
+    // A click is the mail app's business: it is not shown as sent (the name field stays open), but a
+    // mail app hiding the page must not cancel the invite; it stays pending until it expires.
     await act(async () => {
       mail?.addEventListener('click', (e) => e.preventDefault());
       mail?.click();
     });
+    expect(nameField().readOnly).toBe(false);
+    act(() => window.dispatchEvent(new Event('pagehide')));
+    await settle();
+    expect(w.cancelled).toHaveLength(0);
     act(() => root?.unmount());
     root = undefined;
     await settle();
-    expect(w.cancelled).toHaveLength(1);
+    expect(w.cancelled).toHaveLength(0);
 
     const shared: string[] = [];
     Object.defineProperty(navigator, 'share', {

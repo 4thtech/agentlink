@@ -1121,6 +1121,7 @@ export function ContactsPage({
         <OwnMoment
           name={shownName(arrived)}
           selfDeclared={arrived.nameSource !== 'owner'}
+          owner={owner}
           contactRef={arrived.ref}
           api={api}
           headingLevel={2}

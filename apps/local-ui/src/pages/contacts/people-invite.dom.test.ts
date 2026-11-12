@@ -213,7 +213,7 @@ describe('W4-WIRE-2: a pasted invite link on the Invite screen (Decision 52 (3))
       await new Promise((r) => setTimeout(r, 60));
     });
     await settle();
-    expect(text()).toContain('You and Marko are connected');
+    expect(text()).toContain('You are connected');
     // IR-W4-WIRE-2X-1: pasting someone's invite makes no invite of your own.
     expect(state.created ?? 0).toBe(0);
   });
@@ -231,7 +231,7 @@ describe('W4-WIRE-2: a pasted invite link on the Invite screen (Decision 52 (3))
 });
 
 describe("People: the inviter's Connected moment (A7)", () => {
-  it('an open invite goes and a new paired contact arrives: "You and Marko are connected"', async () => {
+  it('an open invite goes and a new paired contact arrives: "You are connected" (the name they chose stays out of our heading)', async () => {
     const state: State = {
       contacts: [],
       open: [
@@ -247,9 +247,9 @@ describe("People: the inviter's Connected moment (A7)", () => {
     });
     await settle();
     // The name rule quotes a name the contact gave itself (I-5).
-    expect(text()).toContain('You and Marko are connected');
+    expect(text()).toContain('You are connected');
     expect(text()).not.toContain('4821');
-    await click(I.optionalCheck('Marko'));
+    await click(I.optionalCheck('your new contact'));
     expect(text()).toContain('4821');
     await click(I.done);
     expect(text()).not.toContain('are connected');
