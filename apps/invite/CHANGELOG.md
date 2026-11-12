@@ -1,5 +1,13 @@
 # @4thtech-io/invite
 
+## 0.0.20
+
+### Patch Changes
+
+- @4thtech-io/core@0.5.0
+  - @4thtech-io/crypto@0.5.0
+  - @4thtech-io/types@0.5.0
+
 ## 0.0.19
 
 ### Patch Changes

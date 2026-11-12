@@ -1,5 +1,17 @@
 # @4thtech-io/node
 
+## 0.5.0
+
+### Minor Changes
+
+- 849fab6: Restore from a recovery kit in the app and in the terminal (UX1113-R1, D-147): the app's restore routes (found, upload, header, presence, open, check, cancel, apply), the seedless restore-only owner session, and `agentlink restore` (alias of `agentlink backup restore [file] [--check]`).
+
+### Patch Changes
+
+- @4thtech-io/core@0.5.0
+  - @4thtech-io/crypto@0.5.0
+  - @4thtech-io/transport-nostr@0.5.0
+
 ## 0.4.15
 
 ### Patch Changes
