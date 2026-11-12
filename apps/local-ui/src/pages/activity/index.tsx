@@ -1,35 +1,61 @@
-// Activity (M1-11c-a1; d1 Local-activity; 08 §1; 11 §6.2; D-116, D-118).
+// Activity (M1-11c-a1; d1 Local-activity; 08 §1; 11 §6.2; D-116, D-118; UX1113 WP-A2, design-1112 §7).
 //
-// The merged feed of events that are not messages (approvals decided, proofs, blocked senders and
-// contacts, rules updated), newest first, from `GET /api/ui/activity`, with "Show more" for the next
-// page. Read only: nothing on this page changes anything, so nothing asks for presence.
+// Everything that was decided or changed in the owner's name, newest first, from
+// `GET /api/ui/activity`, with "Show earlier" for the next page. Read only: nothing on this page
+// changes anything, so nothing asks for presence.
 //
-// I-5: every value from the server is rendered as React text, never as HTML, and only after it
-// passed the per-kind check below; an entry of another kind is skipped. No IDs, hashes or networks
-// reach the view (the server does not send them), so Under the hood has nothing to list yet. Classes
-// only, no inline styles (08 §4 CSP).
+// Every row is one plain sentence (`time · icon · sentence + one grey line · pill · chevron`), never a
+// table cell with a dash. A person is a reference (`contactId`); the page names them with its own read
+// of `GET /api/ui/contacts`, and a person it cannot name gets neutral words ("a contact"). Names and
+// file names are text in <bdi> (I-5); every value from the server passes the per-kind check in
+// clean.ts first and an entry of another kind is skipped. No IDs, hashes or networks reach the view.
+// Classes only, no inline styles (08 §4 CSP).
 //
-// UI-REFRESH-h: day groups with sticky headers, filter chips, a live dot, and a refresh every 20 s
-// whose new rows enter at the top (at most two with the highlight). Skeleton on the first load.
+// UI-REFRESH-h: day groups with sticky headers, a live dot, and a refresh every 20 s whose new rows
+// enter at the top (at most two with the highlight). Skeleton on the first load.
 import {
   Banner,
   Button,
   EmptyState,
-  Fingerprint,
+  Icon,
   LiveDot,
-  ProofBadge,
   Segmented,
   Skeleton,
-  StatusChip,
   useRowPresence,
   useVisibilityPause,
-  type ProofState,
 } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
-import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
+import { LIST_PATH, parseList } from '../contacts/data.js';
+import { cleanName } from '../home/person-name.js';
 import './activity.css';
-import { ACTIVITY_STRINGS as S } from './strings.js';
+import {
+  WEEK_SECONDS,
+  formatUsd,
+  inCount,
+  inFilter,
+  parseItem,
+  render,
+  sumUsd,
+  type ActivityItem,
+  type CountKey,
+  type Filter,
+  type NameOf,
+  type Part,
+  type Rendered,
+} from './clean.js';
+import { ACTIVITY_COPY as S } from './strings.js';
+
+export type { ActivityItem } from './clean.js';
 
 const PATH = '/api/ui/activity';
 const PAGE_SIZE = 20;
@@ -38,74 +64,13 @@ export const ACTIVITY_POLL_MS = 20_000;
 /** However many rows arrive at once, only this many enter with the highlight. */
 const MAX_ENTERING = 2;
 
-type Decision = 'approved' | 'approved_by_rules' | 'denied' | 'cancelled';
-type ProofView = 'submitted' | 'needs_credits' | 'failed' | 'recorded' | 'received';
-
-/** One feed entry as the page shows it. */
-export type ActivityItem =
-  | { readonly kind: 'approval_decided'; readonly at: number; readonly decision: Decision }
-  | {
-      readonly kind: 'proof';
-      readonly at: number;
-      readonly direction: 'sent' | 'received';
-      readonly state: ProofView;
-    }
-  | { readonly kind: 'sender_blocked'; readonly at: number; readonly senderCode: string }
-  | { readonly kind: 'contact_blocked'; readonly at: number }
-  | { readonly kind: 'rules_changed'; readonly at: number };
-
 interface Page {
   readonly items: readonly ActivityItem[];
   readonly nextCursor?: string;
 }
 
-const DECISIONS: ReadonlySet<string> = new Set([
-  'approved',
-  'approved_by_rules',
-  'denied',
-  'cancelled',
-]);
-const PROOF_VIEWS: ReadonlySet<string> = new Set([
-  'submitted',
-  'needs_credits',
-  'failed',
-  'recorded',
-  'received',
-]);
-const MAX_TEXT = 64;
-
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
-
-/** One entry, or undefined when it is not one this page knows (skipped, never guessed). */
-function parseItem(raw: unknown): ActivityItem | undefined {
-  if (!isRecord(raw)) return undefined;
-  const { kind, at } = raw;
-  if (typeof at !== 'number' || !Number.isSafeInteger(at) || at < 0) return undefined;
-  switch (kind) {
-    case 'approval_decided':
-      return typeof raw['decision'] === 'string' && DECISIONS.has(raw['decision'])
-        ? { kind, at, decision: raw['decision'] as Decision }
-        : undefined;
-    case 'proof': {
-      const { direction, state } = raw;
-      if (direction !== 'sent' && direction !== 'received') return undefined;
-      if (typeof state !== 'string' || !PROOF_VIEWS.has(state)) return undefined;
-      return { kind, at, direction, state: state as ProofView };
-    }
-    case 'sender_blocked': {
-      const code = raw['senderCode'];
-      return typeof code === 'string' && code.length > 0 && code.length <= MAX_TEXT
-        ? { kind, at, senderCode: code }
-        : undefined;
-    }
-    case 'contact_blocked':
-    case 'rules_changed':
-      return { kind, at };
-    default:
-      return undefined;
-  }
-}
 
 /** The page body, or undefined when it is malformed. */
 function parsePage(data: unknown): Page | undefined {
@@ -137,28 +102,20 @@ function problemOf(result: ApiResult<unknown>): Problem {
 }
 
 const TIME = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+const FULL_TIME = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
 const DAY = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 
-type Filter = 'all' | 'approvals' | 'proofs' | 'other';
 const FILTERS: readonly { id: Filter; label: string }[] = [
   { id: 'all', label: S.filterAll },
   { id: 'approvals', label: S.filterApprovals },
   { id: 'proofs', label: S.filterProofs },
-  { id: 'other', label: S.filterOther },
+  { id: 'people', label: S.filterPeople },
+  { id: 'safety', label: S.filterSafety },
 ];
-
-function inFilter(item: ActivityItem, filter: Filter): boolean {
-  switch (filter) {
-    case 'all':
-      return true;
-    case 'approvals':
-      return item.kind === 'approval_decided';
-    case 'proofs':
-      return item.kind === 'proof';
-    case 'other':
-      return item.kind !== 'approval_decided' && item.kind !== 'proof';
-  }
-}
 
 interface Keyed {
   readonly key: string;
@@ -176,12 +133,14 @@ function keyed(items: readonly ActivityItem[]): Keyed[] {
   });
 }
 
+const dayKey = (d: Date): string =>
+  `${String(d.getFullYear())}-${String(d.getMonth())}-${String(d.getDate())}`;
+
 /** The entries grouped by local day, in the order given. */
 function byDay(rows: readonly Keyed[]): { day: string; at: number; rows: Keyed[] }[] {
   const groups: { day: string; at: number; rows: Keyed[] }[] = [];
   for (const row of rows) {
-    const d = new Date(row.item.at * 1000);
-    const day = `${String(d.getFullYear())}-${String(d.getMonth())}-${String(d.getDate())}`;
+    const day = dayKey(new Date(row.item.at * 1000));
     const last = groups[groups.length - 1];
     if (last !== undefined && last.day === day) last.rows.push(row);
     else groups.push({ day, at: row.item.at, rows: [row] });
@@ -189,77 +148,110 @@ function byDay(rows: readonly Keyed[]): { day: string; at: number; rows: Keyed[]
   return groups;
 }
 
-const PROOF_BADGE: Readonly<Record<Exclude<ProofView, 'received'>, ProofState>> = {
-  submitted: 'submitted',
-  needs_credits: 'needs-credits',
-  failed: 'failed',
-  recorded: 'recorded',
-};
-
-/** What happened, who it concerns and its status: plain words per kind. */
-function describeItem(item: ActivityItem): {
-  what: string;
-  contact: ReactNode;
-  status: ReactNode;
-} {
-  const none = <span className="al-muted">{S.none}</span>;
-  switch (item.kind) {
-    case 'approval_decided':
-      switch (item.decision) {
-        case 'approved':
-          return { what: S.approved, contact: none, status: <StatusChip status="approved" /> };
-        case 'approved_by_rules':
-          return {
-            what: S.approvedByRules,
-            contact: none,
-            status: <StatusChip status="approved" />,
-          };
-        case 'denied':
-          return { what: S.denied, contact: none, status: <StatusChip status="denied" /> };
-        case 'cancelled':
-          return {
-            what: S.cancelled,
-            contact: none,
-            status: <StatusChip status="denied">{S.cancelledChip}</StatusChip>,
-          };
-      }
-      break;
-    case 'proof':
-      return item.state === 'received'
-        ? { what: S.proofReceived, contact: none, status: <StatusChip status="received" /> }
-        : {
-            what: item.direction === 'received' ? S.proofReceived : S.proofSent,
-            contact: none,
-            status: <ProofBadge state={PROOF_BADGE[item.state]} />,
-          };
-    case 'sender_blocked':
-      return {
-        what: S.senderBlocked,
-        contact: <Fingerprint prefix={S.senderPrefix} value={item.senderCode} />,
-        status: none,
-      };
-    case 'contact_blocked':
-      return { what: S.contactBlocked, contact: none, status: none };
-    case 'rules_changed':
-      return { what: S.rulesChanged, contact: none, status: none };
-  }
-  return { what: '', contact: none, status: none };
+function dayTitle(at: number): string {
+  const d = new Date(at * 1000);
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const text = DAY.format(d);
+  if (dayKey(d) === dayKey(now)) return `${S.today} · ${text}`;
+  if (dayKey(d) === dayKey(yesterday)) return `${S.yesterday} · ${text}`;
+  return text;
 }
 
-function Row({ item, isNew }: { item: ActivityItem; isNew: boolean }): ReactElement {
-  const date = new Date(item.at * 1000);
-  const { what, contact, status } = describeItem(item);
-  const presence = useRowPresence<HTMLTableRowElement>(true, { isNew });
+/** A sentence: names and file names are text, isolated so they cannot reorder what is around them. */
+function Sentence({ parts }: { parts: readonly Part[] }): ReactElement {
   return (
-    <tr ref={presence.ref}>
-      <td className="al-activity-time al-text-code">
-        {presence.highlight}
-        <time dateTime={date.toISOString()}>{TIME.format(date)}</time>
-      </td>
-      <td>{what}</td>
-      <td>{contact}</td>
-      <td>{status}</td>
-    </tr>
+    <>
+      {parts.map((p, i) =>
+        typeof p === 'string' ? (
+          p
+        ) : 'name' in p ? (
+          <bdi key={i} dir="auto" className="al-act-name">
+            {cleanName(p.name)}
+          </bdi>
+        ) : (
+          <bdi key={i} dir="auto" className="al-act-name">
+            {cleanName(p.file)}
+          </bdi>
+        ),
+      )}
+    </>
+  );
+}
+
+function Row({
+  item,
+  isNew,
+  nameOf,
+  open,
+  onToggle,
+  id,
+}: {
+  item: ActivityItem;
+  isNew: boolean;
+  nameOf: NameOf;
+  open: boolean;
+  onToggle: () => void;
+  id: string;
+}): ReactElement {
+  const date = new Date(item.at * 1000);
+  const r: Rendered = render(item, nameOf, `${DAY.format(date)}, ${FULL_TIME.format(date)}`);
+  const presence = useRowPresence<HTMLLIElement>(true, { isNew });
+  return (
+    <li
+      ref={presence.ref}
+      className="al-act-row"
+      data-open={open ? 'true' : 'false'}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && open) onToggle();
+      }}
+    >
+      <button
+        type="button"
+        className="al-act-head"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={onToggle}
+      >
+        <span className="al-act-time al-text-code">
+          {presence.highlight}
+          <time dateTime={date.toISOString()}>{TIME.format(date)}</time>
+        </span>
+        <span className={`al-act-icon al-tone-${r.tone}`} aria-hidden="true">
+          <Icon name={r.icon} size={16} />
+        </span>
+        <span className="al-act-text">
+          <span className="al-act-sentence al-text-body">
+            <Sentence parts={r.sentence} />
+          </span>
+          <span className="al-act-grey al-text-body-sm">{r.grey}</span>
+        </span>
+        <span className={`al-act-pill al-tone-${r.tone} al-text-label`}>{r.pill}</span>
+        <span className="al-act-chevron" aria-hidden="true">
+          <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} />
+        </span>
+      </button>
+      {open ? (
+        <dl id={id} className="al-act-facts al-text-body">
+          {r.facts.map((f) => (
+            <div key={f.label} className="al-act-fact">
+              <dt className="al-muted">{f.label}</dt>
+              <dd>
+                <Sentence parts={f.parts} />
+              </dd>
+            </div>
+          ))}
+          <div className="al-act-fact">
+            <dt className="al-muted">{S.rowResult}</dt>
+            <dd>
+              <a className="al-link" href={r.link.href}>
+                {r.link.label}
+              </a>
+            </dd>
+          </div>
+        </dl>
+      ) : null}
+    </li>
   );
 }
 
@@ -319,12 +311,32 @@ export interface ActivityPageProps {
   readonly api?: ApiClient;
 }
 
+const COUNTS: readonly { key: CountKey; label: string; sub: string }[] = [
+  { key: 'approved', label: S.countApproved, sub: S.countApprovedSub },
+  { key: 'rules', label: S.countRules, sub: S.countRulesSub },
+  { key: 'blocked', label: S.countBlocked, sub: S.countBlockedSub },
+  { key: 'proofs', label: S.countProofs, sub: '' },
+];
+
 export function ActivityPage({ api }: ActivityPageProps): ReactElement {
   const client = useRef<ApiClient>(api ?? createApiClient());
   const [view, setView] = useState<View>({ state: 'loading' });
   const [filter, setFilter] = useState<Filter>('all');
+  const [count, setCount] = useState<CountKey | undefined>(undefined);
+  const [query, setQuery] = useState('');
+  const [openKey, setOpenKey] = useState<string | undefined>(undefined);
+  const [people, setPeople] = useState<ReadonlyMap<string, string>>(new Map());
   const live = useRef(true);
   const hidden = useVisibilityPause();
+
+  /** The people's names, as the people page shows them; a failure leaves every person unnamed. */
+  const loadPeople = useCallback(async (): Promise<void> => {
+    const result = await client.current.get<unknown>(LIST_PATH);
+    if (!live.current || result.kind !== 'ok') return;
+    const list = parseList(result.data);
+    if (list.kind !== 'ok') return;
+    setPeople(new Map(list.contacts.map((c) => [c.ref.toLowerCase(), c.name])));
+  }, []);
 
   const fetchPage = useCallback(async (cursor?: string): Promise<Page | Problem> => {
     const query = `?limit=${String(PAGE_SIZE)}${cursor === undefined ? '' : `&cursor=${encodeURIComponent(cursor)}`}`;
@@ -335,7 +347,7 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
 
   const loadFirst = useCallback(async (): Promise<void> => {
     setView({ state: 'loading' });
-    const page = await fetchPage();
+    const [page] = await Promise.all([fetchPage(), loadPeople()]);
     if (!live.current) return;
     setView(
       typeof page === 'string'
@@ -350,7 +362,7 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
             entering: [],
           },
     );
-  }, [fetchPage]);
+  }, [fetchPage, loadPeople]);
 
   const loadMore = useCallback(
     async (current: Extract<View, { state: 'ready' }>): Promise<void> => {
@@ -385,6 +397,7 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
       const known = new Set(keyed(current.items).map((k) => k.key));
       const added = keyed(page.items).filter((k) => !known.has(k.key));
       if (added.length === 0) return { ...current, asOf: Date.now(), stale: false, entering: [] };
+      void loadPeople();
       return {
         ...current,
         items: [...added.map((k) => k.item), ...current.items],
@@ -393,7 +406,7 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
         entering: added.slice(0, MAX_ENTERING).map((k) => k.key),
       };
     });
-  }, [fetchPage]);
+  }, [fetchPage, loadPeople]);
 
   useEffect(() => {
     live.current = true;
@@ -410,6 +423,31 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
     return () => clearInterval(timer);
   }, [ready, hidden, refresh]);
 
+  const nameOf = useCallback<NameOf>(
+    (id) => (id === undefined ? undefined : people.get(id.toLowerCase())),
+    [people],
+  );
+
+  const items = view.state === 'ready' ? view.items : undefined;
+  const totals = useMemo(() => {
+    const since = Math.floor(Date.now() / 1000) - WEEK_SECONDS;
+    const week = (items ?? []).filter((i) => i.at >= since);
+    const proofs = week.filter((i) => inCount(i, 'proofs'));
+    const credits = sumUsd(
+      proofs.flatMap((i) => (i.kind === 'proof' && i.costUsd !== undefined ? [i.costUsd] : [])),
+    );
+    return {
+      since,
+      n: {
+        approved: week.filter((i) => inCount(i, 'approved')).length,
+        rules: week.filter((i) => inCount(i, 'rules')).length,
+        blocked: week.filter((i) => inCount(i, 'blocked')).length,
+        proofs: proofs.length,
+      },
+      credits,
+    };
+  }, [items]);
+
   const dot =
     view.state === 'loading'
       ? 'checking'
@@ -418,6 +456,13 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
           ? 'reconnecting'
           : 'connected'
         : 'not-running';
+
+  const pickFilter = (next: Filter): void => {
+    setFilter(next);
+    setCount(undefined);
+    setOpenKey(undefined);
+    setView((cur) => (cur.state === 'ready' ? { ...cur, entering: [] } : cur));
+  };
 
   return (
     <>
@@ -431,6 +476,7 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
           </span>
         ) : null}
       </div>
+      <p className="al-text-body al-muted al-activity-lead">{S.lead}</p>
       {view.state === 'loading' ? (
         <>
           <p className="al-text-body al-muted al-sr-only" role="status">
@@ -446,24 +492,64 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
         <EmptyState icon="activity" title={S.emptyTitle} prompt={S.emptyPrompt} />
       ) : (
         <>
+          <div className="al-act-counts" role="group" aria-label={S.countsLabel}>
+            {COUNTS.map((c) => {
+              const sub =
+                c.key === 'proofs'
+                  ? totals.credits === '0'
+                    ? S.countProofsNoCredits
+                    : S.countProofsCredits.replace('{usd}', formatUsd(totals.credits))
+                  : c.sub;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  className="al-act-count"
+                  aria-pressed={count === c.key}
+                  onClick={() => {
+                    setCount(count === c.key ? undefined : c.key);
+                    setFilter('all');
+                    setOpenKey(undefined);
+                  }}
+                >
+                  <span className="al-act-count-n">{totals.n[c.key]}</span>
+                  <span className="al-act-count-label">{c.label}</span>
+                  <span className="al-act-count-sub al-muted al-text-body-sm">{sub}</span>
+                </button>
+              );
+            })}
+          </div>
           <div className="al-activity-filter">
             <Segmented
               label={S.filterLabel}
               value={filter}
-              onChange={(v) => {
-                setFilter(FILTERS.find((f) => f.id === v)?.id ?? 'all');
-                // A filter change remounts the rows; none of them replays its entrance.
-                setView((cur) => (cur.state === 'ready' ? { ...cur, entering: [] } : cur));
-              }}
+              onChange={(v) => pickFilter(FILTERS.find((f) => f.id === v)?.id ?? 'all')}
               options={FILTERS.map((f) => ({ value: f.id, label: f.label }))}
             />
+            <label className="al-act-search">
+              <Icon name="search" size={16} />
+              <input
+                type="search"
+                className="al-input"
+                aria-label={S.searchLabel}
+                placeholder={S.searchPlaceholder}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </label>
           </div>
           <div className="al-activity-stage">
             <FilteredList
-              key={filter}
+              key={`${filter}-${count ?? ''}`}
               filter={filter}
+              count={count}
+              since={totals.since}
+              query={query}
               items={view.items}
               entering={view.entering}
+              nameOf={nameOf}
+              openKey={openKey}
+              onToggle={(k) => setOpenKey((cur) => (cur === k ? undefined : k))}
             />
           </div>
           {view.more !== 'idle' && view.more !== 'loading' ? (
@@ -491,39 +577,54 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
 /** The list for one filter: day sections with a sticky header each. It fades in when the filter changes. */
 function FilteredList({
   filter,
+  count,
+  since,
+  query,
   items,
   entering,
+  nameOf,
+  openKey,
+  onToggle,
 }: {
   filter: Filter;
+  count: CountKey | undefined;
+  since: number;
+  query: string;
   items: readonly ActivityItem[];
   entering: readonly string[];
+  nameOf: NameOf;
+  openKey: string | undefined;
+  onToggle: (key: string) => void;
 }): ReactElement {
-  const rows = keyed(items).filter((k) => inFilter(k.item, filter));
+  const needle = query.trim().toLowerCase();
+  const rows = keyed(items).filter((k) => {
+    if (count !== undefined && !(inCount(k.item, count) && k.item.at >= since)) return false;
+    if (!inFilter(k.item, filter)) return false;
+    return needle === '' || render(k.item, nameOf, '').search.includes(needle);
+  });
   const isNew = new Set(entering);
+  const empty: ReactNode = needle !== '' ? S.searchEmpty : S.filterEmpty;
   return (
     <div className="al-activity-list" data-filter={filter}>
       {rows.length === 0 ? (
-        <p className="al-text-body al-muted al-activity-none">{S.filterEmpty}</p>
+        <p className="al-text-body al-muted al-activity-none">{empty}</p>
       ) : (
         byDay(rows).map((g) => (
-          <section key={g.day} className="al-activity-section">
-            <h2 className="al-activity-day al-text-label">{DAY.format(g.at * 1000)}</h2>
-            <table className="al-activity-table">
-              <caption className="al-sr-only">{`${S.tableLabel}, ${DAY.format(g.at * 1000)}`}</caption>
-              <thead className="al-sr-only">
-                <tr>
-                  <th scope="col">{S.colTime}</th>
-                  <th scope="col">{S.colWhat}</th>
-                  <th scope="col">{S.colContact}</th>
-                  <th scope="col">{S.colStatus}</th>
-                </tr>
-              </thead>
-              <tbody className="al-text-body">
-                {g.rows.map((k) => (
-                  <Row key={k.key} item={k.item} isNew={isNew.has(k.key)} />
-                ))}
-              </tbody>
-            </table>
+          <section key={g.day} className="al-activity-section" aria-label={dayTitle(g.at)}>
+            <h2 className="al-activity-day al-text-label">{dayTitle(g.at)}</h2>
+            <ul className="al-act-list" aria-label={`${S.tableLabel}, ${dayTitle(g.at)}`}>
+              {g.rows.map((k, i) => (
+                <Row
+                  key={k.key}
+                  id={`al-act-${String(g.at)}-${String(i)}`}
+                  item={k.item}
+                  isNew={isNew.has(k.key)}
+                  nameOf={nameOf}
+                  open={openKey === k.key}
+                  onToggle={() => onToggle(k.key)}
+                />
+              ))}
+            </ul>
           </section>
         ))
       )}
