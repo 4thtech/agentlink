@@ -12,6 +12,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  rmSync,
   statSync,
   symlinkSync,
   writeFileSync,
@@ -47,6 +48,8 @@ const TOOLS = [
   'sed',
   'awk',
   'tar',
+  'wc',
+  'tr',
   'gzip',
   'sha256sum',
   'shasum',
@@ -73,18 +76,47 @@ function sandbox() {
     join(bin, 'uname'),
     'case "$1" in -s) echo "${MOCK_OS:-Linux}" ;; -m) echo "${MOCK_ARCH:-x86_64}" ;; *) echo "${MOCK_OS:-Linux}" ;; esac',
   );
-  // curl -fsSL ... -o <file> <url>: copies serve/<basename of url>, or fails like curl -f.
+  // curl -fsSL ... -o <file> <url>: copies serve/<basename of url> (query removed), or fails like
+  // curl -f. With -w (the desktop app's downloads, which follow redirects themselves) it prints the
+  // status and the redirect address like real curl: a line `<url> <location>` in serve/redirects
+  // answers 302, a missing file 404. A desktop download that asks curl to follow redirects, or does
+  // not forbid them, is written to the log as `curl-follows-redirects`.
   exe(
     join(bin, 'curl'),
     [
-      'out="" url=""',
-      'while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2 ;; --proto|--retry) shift 2 ;; -*) shift ;; *) url="$1"; shift ;; esac; done',
+      'out="" url="" fmt="" follows=0 maxredirs=""',
+      'while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2 ;; -w) fmt="$2"; shift 2 ;; --max-redirs) maxredirs="$2"; shift 2 ;; --proto|--retry|--max-filesize|--max-time) shift 2 ;; --location|-L) follows=1; shift ;; --*) shift ;; -*L*) follows=1; shift ;; -*) shift ;; *) url="$1"; shift ;; esac; done',
       'echo "$url" >> "$MOCK_LOG"',
-      'f="$MOCK_SERVE/${url##*/}"',
-      '[ -f "$f" ] || { echo "curl: (22) 404" >&2; exit 22; }',
+      'if [ -n "$fmt" ]; then',
+      '  { [ "$follows" -eq 0 ] && [ "$maxredirs" = 0 ]; } || echo curl-follows-redirects >> "$MOCK_LOG"',
+      '  if [ -f "$MOCK_SERVE/redirects" ]; then',
+      '    to="$(awk -v u="$url" \'$1 == u { print $2 }\' "$MOCK_SERVE/redirects")"',
+      '    if [ -n "$to" ]; then : > "$out"; [ "$to" != - ] || to=""; printf \'302 %s\' "$to"; exit 0; fi',
+      '  fi',
+      'fi',
+      'f="${url%%\\?*}"',
+      'f="$MOCK_SERVE/${f##*/}"',
+      'if [ ! -f "$f" ]; then',
+      '  [ -z "$fmt" ] || { : > "$out"; printf "404 "; exit 0; }',
+      '  echo "curl: (22) 404" >&2; exit 22',
+      'fi',
       'cat "$f" > "$out"',
+      '[ -z "$fmt" ] || printf "200 "',
     ].join('\n'),
   );
+  // ditto -x -k <zip> <dir> (macOS): unpacks a fixture "zip" into <dir>/AgentLink.app, whose
+  // Contents/MacOS/AgentLink holds the zip's bytes. MOCK_DITTO_EMPTY: unpacks nothing.
+  exe(
+    join(bin, 'ditto'),
+    [
+      'echo "ditto $*" >> "$MOCK_LOG"',
+      '[ "$1 $2" = "-x -k" ] || exit 64',
+      '[ -z "${MOCK_DITTO_EMPTY:-}" ] || exit 0',
+      'mkdir -p "$4/AgentLink.app/Contents/MacOS" && cat "$3" > "$4/AgentLink.app/Contents/MacOS/AgentLink"',
+    ].join('\n'),
+  );
+  // open (macOS): records its arguments.
+  exe(join(bin, 'open'), 'echo "open $*" >> "$MOCK_LOG"');
 
   // The fixture Node.js: bin/node prints the version, bin/npx records its arguments.
   const build = join(dir, 'build');
@@ -408,14 +440,14 @@ const BAD_INVITES = [
 ];
 
 /** Runs the installer in a real terminal (`script`), where it starts the app. Undefined without it. */
-function runInTerminal(box, args) {
+function runInTerminal(box, args, { script = box.script, env = {} } = {}) {
   const tool = findTool('script');
   if (!tool || !['darwin', 'linux'].includes(process.platform)) return undefined;
   const q = (v) => `'${v.replaceAll("'", `'\\''`)}'`;
   const argv =
     process.platform === 'darwin'
-      ? ['-q', '/dev/null', findTool('sh'), box.script, ...args]
-      : ['-qec', [findTool('sh'), box.script, ...args].map(q).join(' '), '/dev/null'];
+      ? ['-q', '/dev/null', findTool('sh'), script, ...args]
+      : ['-qec', [findTool('sh'), script, ...args].map(q).join(' '), '/dev/null'];
   const result = spawnSync(tool, argv, {
     encoding: 'utf8',
     timeout: 30_000,
@@ -427,6 +459,7 @@ function runInTerminal(box, args) {
       TMPDIR: box.dir,
       MOCK_SERVE: box.serve,
       MOCK_LOG: box.log,
+      ...env,
     },
   });
   return {
@@ -541,8 +574,424 @@ describe('install.sh in a terminal (WP-2, F43)', () => {
   });
 });
 
+// --- --desktop (the desktop app, Mac) ------------------------------------------------------------
+// The shipped script has the desktop app switched off (DESKTOP_RELEASED=0). The behaviour tests run
+// a copy with it switched on, version 9.9.9, and the fixture zip's hash pinned for mac-arm64.
+const DESKTOP_VERSION = '9.9.9';
+const RELEASE = `https://github.com/4thtech/agentlink/releases/download/v${DESKTOP_VERSION}`;
+const DESKTOP_ZIP = `AgentLink-${DESKTOP_VERSION}-mac-arm64.zip`;
+const DESKTOP_SUMS = 'SHA256SUMS-mac-arm64';
+const MAC = { MOCK_OS: 'Darwin', MOCK_ARCH: 'arm64' };
+const desktopShells = ['sh', ...['dash', 'bash', 'zsh'].filter((s) => findTool(s))];
+
+function desktopSandbox({
+  released = true,
+  pin = true,
+  zip = 'the AgentLink app 9.9.9\n',
+  maxBytes = null,
+} = {}) {
+  const box = sandbox();
+  // mv that fails (MOCK_MV_FAIL_TO: every move to that path; with MOCK_MV_FAIL_ONCE only the
+  // first) or that stands for Ctrl+C (MOCK_MV_KILL_TO: the first move to that path signals the
+  // installer and fails), else the real mv.
+  const realMv = findTool('mv');
+  rmSync(join(box.bin, 'mv'));
+  exe(
+    join(box.bin, 'mv'),
+    [
+      'last=""; for a in "$@"; do last="$a"; done',
+      'if [ -n "${MOCK_MV_FAIL_TO:-}" ] && [ "$last" = "$MOCK_MV_FAIL_TO" ]; then',
+      '  if [ -z "${MOCK_MV_FAIL_ONCE:-}" ] || [ ! -e "$MOCK_LOG.mvfailed" ]; then : > "$MOCK_LOG.mvfailed"; echo "mv: failed" >&2; exit 1; fi',
+      'fi',
+      'if [ -n "${MOCK_MV_KILL_TO:-}" ] && [ "$last" = "$MOCK_MV_KILL_TO" ] && [ ! -e "$MOCK_LOG.mvkilled" ]; then',
+      '  : > "$MOCK_LOG.mvkilled"; kill -TERM "$PPID"; exit 1',
+      'fi',
+      `exec '${realMv}' "$@"`,
+    ].join('\n'),
+  );
+  writeFileSync(join(box.serve, DESKTOP_ZIP), zip);
+  const sha = createHash('sha256').update(zip).digest('hex');
+  writeFileSync(
+    join(box.serve, DESKTOP_SUMS),
+    `${'1'.repeat(64)}  AgentLink-${DESKTOP_VERSION}-mac-arm64.dmg\n${sha}  ${DESKTOP_ZIP}\n`,
+  );
+  let s = readFileSync(box.script, 'utf8');
+  for (const [from, to] of [
+    ['DESKTOP_RELEASED=0\n', released ? 'DESKTOP_RELEASED=1\n' : 'DESKTOP_RELEASED=0\n'],
+    ['DESKTOP_VERSION=0.0.0\n', `DESKTOP_VERSION=${DESKTOP_VERSION}\n`],
+    ['mac-arm64) echo "" ;;', `mac-arm64) echo ${pin ? sha : ''} ;;`],
+    ['DESKTOP_MAX_BYTES=1073741824\n', `DESKTOP_MAX_BYTES=${maxBytes ?? 1073741824}\n`],
+  ]) {
+    expect(s).toContain(from);
+    s = s.replace(from, to);
+  }
+  writeFileSync(box.script, s);
+  return { ...box, desktopSha: sha, app: join(box.home, 'Applications/AgentLink.app') };
+}
+
+const appBinary = (box) => join(box.app, 'Contents/MacOS/AgentLink');
+const redirect = (box, lines) =>
+  writeFileSync(join(box.serve, 'redirects'), lines.map((l) => l.join(' ')).join('\n') + '\n');
+/** Nothing of the app, and no unpack folder, in ~/Applications; no Node.js, command or PATH line. */
+function expectNothingInstalled(box) {
+  const apps = join(box.home, 'Applications');
+  if (existsSync(apps)) expect(readdirSync(apps).filter((f) => f !== 'AgentLink.app')).toEqual([]);
+  expect(existsSync(join(box.home, '.agentlink'))).toBe(false);
+  expect(existsSync(join(box.home, '.profile'))).toBe(false);
+}
+
+describe.each(desktopShells)('install.sh --desktop, switched off (today), under %s', (shell) => {
+  it('refuses --desktop with one fixed line, exit code 2, before anything happens', () => {
+    const box = sandbox();
+    for (const args of [
+      ['--desktop'],
+      ['--desktop', '--invite', SHORT_LINK],
+      ['--desktop', '--dry-run'],
+    ]) {
+      const r = run(box, args, { shell, script: SCRIPT, env: MAC });
+      expect(r.code, r.out).toBe(2);
+      expect(r.out.trim()).toBe(
+        'AgentLink installer: The AgentLink desktop app is not released yet. Run the installer without --desktop.',
+      );
+      expect(r.log).toBe('');
+      expect(readdirSync(box.home)).toEqual([]);
+    }
+  });
+
+  it('an invite is still checked first', () => {
+    const box = sandbox();
+    const r = run(box, ['--desktop', '--invite', 'https://evil.example/i#Ab9_-'], {
+      shell,
+      script: SCRIPT,
+      env: MAC,
+    });
+    expect(r.code).toBe(2);
+    expect(r.out).toContain("This isn't a complete AgentLink invite.");
+  });
+});
+
+describe.each(desktopShells)('install.sh --desktop, switched on, under %s', (shell) => {
+  it('downloads the app and SHA256SUMS from the release, checks both hashes, installs into ~/Applications', () => {
+    const box = desktopSandbox();
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code, r.out).toBe(0);
+    const fetched = r.log.split('\n').filter((l) => l.startsWith('https://'));
+    expect(fetched).toEqual([`${RELEASE}/${DESKTOP_ZIP}`, `${RELEASE}/${DESKTOP_SUMS}`]);
+    expect(r.log).not.toContain('curl-follows-redirects');
+    expect(r.out).toContain('Checked: the download matches the release and this installer.');
+    expect(readFileSync(appBinary(box), 'utf8')).toBe('the AgentLink app 9.9.9\n');
+    expect(r.out).toContain(`AgentLink is installed: ${box.app}`);
+    // App only: no Node.js, no agentlink command, no PATH line, no unpack folder left behind.
+    expect(r.log).not.toContain('nodejs.org');
+    expect(existsSync(join(box.home, '.agentlink'))).toBe(false);
+    expect(existsSync(join(box.home, '.profile'))).toBe(false);
+    expect(readdirSync(join(box.home, 'Applications')), r.out).toEqual(['AgentLink.app']);
+    expect(readdirSync(box.dir).filter((f) => f.startsWith('agentlink-install'))).toEqual([]);
+    // Not run from a terminal: it opens nothing and says how.
+    expect(r.log).not.toMatch(/^open /m);
+    expect(r.out).toContain(`To open it now, run: open '${box.app}'`);
+  });
+
+  it('follows GitHub redirects itself, checking each hop', () => {
+    const box = desktopSandbox();
+    const hop1 = `https://objects.githubusercontent.com/github-production-release-asset/1/${DESKTOP_ZIP}?a=1&b=x%3D`;
+    const hop2 = `https://release-assets.githubusercontent.com/github-production-release-asset/1/${DESKTOP_ZIP}?sp=r&sig=abc%3D&rsct=application%2Foctet-stream`;
+    redirect(box, [
+      [`${RELEASE}/${DESKTOP_ZIP}`, hop1],
+      [hop1, hop2],
+    ]);
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code, r.out).toBe(0);
+    expect(r.log.split('\n').filter((l) => l.startsWith('https://'))).toEqual([
+      `${RELEASE}/${DESKTOP_ZIP}`,
+      hop1,
+      hop2,
+      `${RELEASE}/${DESKTOP_SUMS}`,
+    ]);
+    // A redirect address (it can hold a signed query) is never printed.
+    expect(r.out).not.toContain('githubusercontent');
+    expect(existsSync(appBinary(box))).toBe(true);
+  });
+
+  it.each([
+    ['another host', 'https://evil.example/AgentLink.zip'],
+    ['plain http', `http://objects.githubusercontent.com/x/${DESKTOP_ZIP}`],
+    ['a user name', `https://github.com@evil.example/${DESKTOP_ZIP}`],
+    ['a port', `https://github.com:8443/${DESKTOP_ZIP}`],
+    ['a look-alike host', `https://objects.githubusercontent.com.evil.example/${DESKTOP_ZIP}`],
+    ['no path', 'https://release-assets.githubusercontent.com'],
+    ['a relative address', `/x/${DESKTOP_ZIP}`],
+    ['a quote', `https://release-assets.githubusercontent.com/x"y/${DESKTOP_ZIP}`],
+    ['a backslash', `https://release-assets.githubusercontent.com/x\\y/${DESKTOP_ZIP}`],
+    ['an empty Location (written - here)', '-'],
+  ])('refuses a redirect to %s, before fetching it, installing nothing', (_, to) => {
+    const box = desktopSandbox();
+    redirect(box, [[`${RELEASE}/${DESKTOP_ZIP}`, to]]);
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code, r.out).toBe(1);
+    expect(r.out).toContain(
+      'The desktop app download was sent to an unexpected address, so nothing was installed.',
+    );
+    expect(r.log.split('\n').filter((l) => l.startsWith('http'))).toEqual([
+      `${RELEASE}/${DESKTOP_ZIP}`,
+    ]);
+    expect(existsSync(box.app)).toBe(false);
+    expectNothingInstalled(box);
+  });
+
+  it('stops after 5 redirects', () => {
+    const box = desktopSandbox();
+    const hop = (n) => `https://objects.githubusercontent.com/hop${n}/${DESKTOP_ZIP}`;
+    redirect(box, [
+      [`${RELEASE}/${DESKTOP_ZIP}`, hop(1)],
+      ...[1, 2, 3, 4, 5].map((n) => [hop(n), hop(n + 1)]),
+    ]);
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code, r.out).toBe(1);
+    expect(r.out).toContain('redirected too often');
+    expect(existsSync(box.app)).toBe(false);
+  });
+
+  it('stops, installing nothing, when the zip does not match SHA256SUMS', () => {
+    const box = desktopSandbox();
+    writeFileSync(join(box.serve, DESKTOP_SUMS), `${'2'.repeat(64)}  ${DESKTOP_ZIP}\n`);
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('did not pass its safety check (SHA-256 mismatch)');
+    expect(r.log).not.toContain('ditto');
+    expect(existsSync(box.app)).toBe(false);
+    expectNothingInstalled(box);
+  });
+
+  it('stops when the zip matches SHA256SUMS but not the hash pinned in the script', () => {
+    // A release whose zip and SHA256SUMS were both swapped: the pinned hash still catches it.
+    const box = desktopSandbox();
+    const other = 'another app\n';
+    writeFileSync(join(box.serve, DESKTOP_ZIP), other);
+    writeFileSync(
+      join(box.serve, DESKTOP_SUMS),
+      `${createHash('sha256').update(other).digest('hex')}  ${DESKTOP_ZIP}\n`,
+    );
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('SHA-256 mismatch');
+    expect(existsSync(box.app)).toBe(false);
+  });
+
+  it('says plainly when a download fails (404)', () => {
+    const box = desktopSandbox();
+    rmSync(join(box.serve, DESKTOP_SUMS));
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain(
+      `Could not download ${RELEASE}/${DESKTOP_SUMS}. Check your internet connection`,
+    );
+    expect(existsSync(box.app)).toBe(false);
+  });
+
+  it('replaces an installed app (an update), leaving nothing else behind', () => {
+    const box = desktopSandbox();
+    mkdirSync(join(box.app, 'Contents/MacOS'), { recursive: true });
+    writeFileSync(appBinary(box), 'old\n');
+    writeFileSync(join(box.app, 'Contents/stale-file'), 'x');
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code, r.out).toBe(0);
+    expect(readFileSync(appBinary(box), 'utf8')).toBe('the AgentLink app 9.9.9\n');
+    expect(existsSync(join(box.app, 'Contents/stale-file'))).toBe(false);
+    expect(readdirSync(join(box.home, 'Applications')), r.out).toEqual(['AgentLink.app']);
+  });
+
+  /** An installed app with this content in its binary. */
+  const oldApp = (box) => {
+    mkdirSync(join(box.app, 'Contents/MacOS'), { recursive: true });
+    writeFileSync(appBinary(box), 'old\n');
+  };
+  const backupPath = (box) => join(box.home, 'Applications/.AgentLink-previous.app');
+
+  it('puts the installed app back when the new one cannot be moved into place', () => {
+    const box = desktopSandbox();
+    oldApp(box);
+    const r = run(box, ['--desktop'], {
+      shell,
+      env: { ...MAC, MOCK_MV_FAIL_TO: box.app, MOCK_MV_FAIL_ONCE: '1' },
+    });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('Could not install AgentLink into');
+    expect(readFileSync(appBinary(box), 'utf8')).toBe('old\n');
+    expect(readdirSync(join(box.home, 'Applications')), r.out).toEqual(['AgentLink.app']);
+  });
+
+  it('never loses the installed app when putting it back fails too: it stays set aside', () => {
+    const box = desktopSandbox();
+    oldApp(box);
+    const r = run(box, ['--desktop'], { shell, env: { ...MAC, MOCK_MV_FAIL_TO: box.app } });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain(`Your previous AgentLink app is kept at ${backupPath(box)}.`);
+    expect(readFileSync(join(backupPath(box), 'Contents/MacOS/AgentLink'), 'utf8')).toBe('old\n');
+    // The next run refuses to touch it.
+    const again = run(box, ['--desktop'], { shell, env: MAC });
+    expect(again.code).toBe(1);
+    expect(again.out).toContain('is left from an earlier run.');
+    expect(readFileSync(join(backupPath(box), 'Contents/MacOS/AgentLink'), 'utf8')).toBe('old\n');
+  });
+
+  it('puts the installed app back on Ctrl+C (a signal) during the swap', () => {
+    const box = desktopSandbox();
+    oldApp(box);
+    const r = run(box, ['--desktop'], { shell, env: { ...MAC, MOCK_MV_KILL_TO: box.app } });
+    expect(r.code).not.toBe(0);
+    expect(readFileSync(appBinary(box), 'utf8')).toBe('old\n');
+    expect(readdirSync(join(box.home, 'Applications')), r.out).toEqual(['AgentLink.app']);
+  });
+
+  it('refuses a SHA256SUMS with the file listed twice', () => {
+    const box = desktopSandbox();
+    const line = `${box.desktopSha}  ${DESKTOP_ZIP}\n`;
+    writeFileSync(join(box.serve, DESKTOP_SUMS), line + line);
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('SHA-256 mismatch');
+    expect(existsSync(box.app)).toBe(false);
+  });
+
+  it('counts the bytes: a download over the size cap is refused, whatever the server announced', () => {
+    const box = desktopSandbox({ maxBytes: 10 });
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('larger than expected, so nothing was installed');
+    expect(existsSync(box.app)).toBe(false);
+  });
+
+  it('keeps the installed app when the download is not a complete app', () => {
+    const box = desktopSandbox();
+    mkdirSync(join(box.app, 'Contents/MacOS'), { recursive: true });
+    writeFileSync(appBinary(box), 'old\n');
+    const r = run(box, ['--desktop'], { shell, env: { ...MAC, MOCK_DITTO_EMPTY: '1' } });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('is not a complete app, so nothing was installed');
+    expect(readFileSync(appBinary(box), 'utf8')).toBe('old\n');
+    expect(readdirSync(join(box.home, 'Applications')), r.out).toEqual(['AgentLink.app']);
+  });
+
+  it('refuses when ~/Applications/AgentLink.app is a link, and leaves what it points to alone', () => {
+    const box = desktopSandbox();
+    const elsewhere = join(box.dir, 'elsewhere');
+    mkdirSync(elsewhere);
+    writeFileSync(join(elsewhere, 'keep'), 'mine');
+    mkdirSync(join(box.home, 'Applications'));
+    symlinkSync(elsewhere, box.app);
+    const r = run(box, ['--desktop'], { shell, env: MAC });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('is a link. Remove it, then run the installer again.');
+    expect(r.log).toBe('');
+    expect(readdirSync(elsewhere)).toEqual(['keep']);
+  });
+
+  it('--dry-run prints the plan and changes nothing', () => {
+    const box = desktopSandbox();
+    const r = run(box, ['--desktop', '--dry-run', '--invite', SHORT_LINK], { shell, env: MAC });
+    expect(r.code, r.out).toBe(0);
+    expect(r.out).toContain(`would download ${RELEASE}/${DESKTOP_ZIP} and ${DESKTOP_SUMS}`);
+    expect(r.out).toContain('would open the invite in AgentLink');
+    expect(r.out).not.toContain('aaaa');
+    expect(r.log).toBe('');
+    expect(readdirSync(box.home)).toEqual([]);
+  });
+
+  it('with an invite, not in a terminal: installs, opens nothing, never prints the link', () => {
+    const box = desktopSandbox();
+    const r = run(box, ['--desktop', '--invite', LONG_LINK], { shell, env: MAC });
+    expect(r.code, r.out).toBe(0);
+    expect(existsSync(appBinary(box))).toBe(true);
+    expect(r.out).toContain(
+      'To open the invite, run the command from the invite page again in your own terminal.',
+    );
+    expect(r.out).not.toContain('4thtech.io/i#');
+    expect(r.log).not.toMatch(/^open /m);
+  });
+
+  it('refuses --uninstall, Linux, and a Mac with no pinned app, before downloading', () => {
+    const box = desktopSandbox();
+    let r = run(box, ['--desktop', '--uninstall'], { shell, env: MAC });
+    expect(r.code).toBe(2);
+    expect(r.out).toContain("--desktop can't be used with --uninstall.");
+    r = run(box, ['--desktop'], { shell, env: { MOCK_OS: 'Linux', MOCK_ARCH: 'x86_64' } });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('The desktop app is for Mac and Windows.');
+    r = run(box, ['--desktop'], { shell, env: { MOCK_OS: 'Darwin', MOCK_ARCH: 'x86_64' } });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('The desktop app is not available for this Mac yet.');
+    expect(r.log).toBe('');
+    expect(readdirSync(box.home)).toEqual([]);
+  });
+
+  it('does not change what the installer does without --desktop', () => {
+    const box = desktopSandbox();
+    const r = run(box, [], { shell });
+    expect(r.code, r.out).toBe(0);
+    expect(r.log).not.toContain('github.com');
+    expect(existsSync(launcher(box))).toBe(true);
+    expect(existsSync(join(box.home, 'Applications'))).toBe(false);
+  });
+});
+
+describe('install.sh --desktop in a terminal', () => {
+  it('opens the installed app on the invite through the agentlink:// link', () => {
+    const box = desktopSandbox();
+    const r = runInTerminal(box, ['--desktop', '--invite', SHORT_LINK], { env: MAC });
+    if (r === undefined) {
+      expect(process.env.CI, '`script` is required on CI').toBeFalsy();
+      return;
+    }
+    expect(r.code, r.out).toBe(0);
+    const payload = SHORT_LINK.slice('https://agentlink.4thtech.io/i#'.length);
+    expect(r.log.trimEnd().split('\n').at(-1)).toBe(
+      `open -a ${box.app} agentlink://join#${payload}`,
+    );
+    expect(r.out).not.toContain(payload);
+    expect(r.out).toContain('Opening AgentLink on the invite.');
+  });
+
+  it('without an invite, opens the app', () => {
+    const box = desktopSandbox();
+    const r = runInTerminal(box, ['--desktop'], { env: MAC });
+    if (r === undefined) {
+      expect(process.env.CI, '`script` is required on CI').toBeFalsy();
+      return;
+    }
+    expect(r.code, r.out).toBe(0);
+    expect(r.log.trimEnd().split('\n').at(-1)).toBe(`open ${box.app}`);
+  });
+});
+
 describe('install.sh source', () => {
   const source = readFileSync(SCRIPT, 'utf8');
+
+  it('ships with the desktop app switched off, so today the installer does what it did', () => {
+    expect(source).toContain('  DESKTOP_RELEASED=0\n');
+    expect(source).toContain(
+      '  DESKTOP_RELEASES="https://github.com/4thtech/agentlink/releases/download"\n',
+    );
+  });
+
+  it('never removes the quarantine mark and never changes Gatekeeper', () => {
+    const code = source.replace(/^\s*#.*$/gm, '');
+    expect(code).not.toMatch(
+      /xattr|com\.apple\.quarantine|spctl|--master-disable|LSQuarantine|sudo/,
+    );
+  });
+
+  it('downloads the desktop app with curl following no redirect itself', () => {
+    const fetch = source.slice(
+      source.indexOf('fetch_release() {'),
+      source.indexOf('install_desktop() {'),
+    );
+    expect(fetch).toContain(
+      "curl -q -sS --proto '=https' --tlsv1.2 --retry 2 --max-redirs 0 --max-time 1800",
+    );
+    expect(fetch).not.toMatch(/curl -[A-Za-z]*L|--location/);
+    expect(source.match(/fetch_release "/g)).toHaveLength(2);
+  });
 
   it('pins the hashes of nodejs.org signed SHASUMS256.txt for its Node.js version', () => {
     expect(source).toContain(`NODE_VERSION=${NODE_VERSION}\n`);
