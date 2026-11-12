@@ -60,7 +60,14 @@ export interface OpenInvite {
  * before the app kept links; `not_found`: it was accepted, cancelled or expired meanwhile.
  */
 export type LinkOutcome =
-  | { readonly kind: 'ok'; readonly inviteUrl: string; readonly shareText: string }
+  | {
+      readonly kind: 'ok';
+      readonly inviteUrl: string;
+      readonly shareText: string;
+      readonly format: 'short' | 'long';
+      /** Unix milliseconds. */
+      readonly expiresAt: number;
+    }
   | {
       readonly kind: 'no_link' | 'not_found' | 'session_expired' | 'offline' | 'failed';
     };
@@ -387,10 +394,14 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
       if (answer.kind === 'offline') return { kind: 'offline' };
       const { status, json } = answer;
       if (status === 200 && json['status'] === 'ok') {
-        const inviteUrl = linkOf(json['inviteUrl'], json['format']);
+        const format = json['format'];
+        const inviteUrl = linkOf(json['inviteUrl'], format);
         const shareText = json['shareText'];
+        const expiresAt = timeOf(json['expiresAt']);
         if (
           inviteUrl === undefined ||
+          (format !== 'short' && format !== 'long') ||
+          expiresAt === undefined ||
           typeof shareText !== 'string' ||
           shareText.length > MAX_SHARE_CHARS ||
           // Our template around this very link (11 §6.1 J7), nothing else.
@@ -398,7 +409,7 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
         ) {
           return { kind: 'failed' };
         }
-        return { kind: 'ok', inviteUrl, shareText };
+        return { kind: 'ok', inviteUrl, shareText, format, expiresAt };
       }
       if (status === 401) return { kind: 'session_expired' };
       if (status === 404 && json['error'] === 'not_found') return { kind: 'not_found' };

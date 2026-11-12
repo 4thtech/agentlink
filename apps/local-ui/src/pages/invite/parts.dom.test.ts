@@ -115,7 +115,13 @@ describe('PendingInviteRow', () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     const onLink = vi.fn(() =>
-      Promise.resolve({ kind: 'ok' as const, inviteUrl: LINK, shareText: `Hi ${LINK}` }),
+      Promise.resolve({
+        kind: 'ok' as const,
+        inviteUrl: LINK,
+        shareText: `Hi ${LINK}`,
+        format: 'short' as const,
+        expiresAt: NOW + 6 * DAY,
+      }),
     );
     await show(
       createElement(

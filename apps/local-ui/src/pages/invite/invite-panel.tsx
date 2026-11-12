@@ -27,7 +27,12 @@ import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import { QrCode } from '../proofs/qr.js';
 import { CheckMark, CopyMark, MailIcon, ShareIcon } from './icons.js';
 import { INVITE_STRINGS as S, linkLabel, mailtoOf, worksFor } from './strings.js';
-import { clearUnsentInvites } from './unsent-invites.js';
+import {
+  clearUnsentInvites,
+  forgetScreenInvite,
+  rememberScreenInvite,
+  screenInvite,
+} from './unsent-invites.js';
 import './invite.css';
 
 const DAY_MS = 86_400_000;
@@ -186,6 +191,8 @@ export function InvitePanel({
         return undefined;
       }
       madeRef.current = next;
+      // IR-REL051-B2-1 (4): a reload shows this invite again instead of making another.
+      rememberScreenInvite(id, label);
       setMade(next);
       setPhase('ready');
       onCreated?.();
@@ -214,9 +221,40 @@ export function InvitePanel({
     // REL051-B2: an older build kept unsent invite IDs in this tab to cancel them later; those
     // invites now wait under Home and People instead, so the key is only cleared.
     clearUnsentInvites();
-    void make('', false);
+    // IR-REL051-B2-1 (4): this tab's screen made an invite before the reload: show it again, while
+    // it is still open (the link route answers only an open invite); otherwise make one.
+    const kept = screenInvite();
+    const reuse = async (): Promise<void> => {
+      if (kept === undefined || invites.link === undefined) return make('', false);
+      const out = await invites.link(kept.id);
+      if (!live.current) return;
+      if (out.kind !== 'ok' || madeRef.current !== undefined) {
+        forgetScreenInvite();
+        if (madeRef.current === undefined) await make('', false);
+        return;
+      }
+      const next: Made = {
+        invite: {
+          inviteUrl: out.inviteUrl,
+          shareText: out.shareText,
+          expiresAt: out.expiresAt,
+          format: out.format,
+          inviteId: kept.id,
+        },
+        id: kept.id,
+        label: kept.label,
+        askedLong: false,
+      };
+      madeRef.current = next;
+      setName(kept.label);
+      setMade(next);
+      setPhase('ready');
+    };
+    void reuse();
     return () => {
       live.current = false;
+      // Left in the app (Done, Back): the next visit is a new invite.
+      forgetScreenInvite();
       // The link stays (Home and People can copy it again), unless the owner chose not to invite.
       const last = madeRef.current;
       if (discard?.current === true && last !== undefined && !sharedRef.current) {
