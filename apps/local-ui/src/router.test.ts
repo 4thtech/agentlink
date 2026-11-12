@@ -20,6 +20,8 @@ import {
   titleOf,
 } from './nav.js';
 import { AppRoutes, ROUTES } from './router.js';
+import { detectPlatform } from './pages/first-run/passkey.js';
+import { SENSOR } from './pages/first-run/strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -56,6 +58,12 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/contacts', 'People', 'People'],
   ['/settings', 'Settings', 'Settings'],
   ['/settings/backup', 'Backup & Touch ID', 'Settings'],
+  // UX1113 WP-S2: the title carries the sensor's word for the platform the test runs on.
+  [
+    '/settings/touch-id',
+    `${SENSOR[detectPlatform()].replace(/^./, (c) => c.toUpperCase())} & master code`,
+    'Settings',
+  ],
   ['/settings/apps', 'AI apps', 'Settings'],
   ['/settings/files', 'Files', 'Settings'],
   ['/settings/appearance', 'Appearance', 'Settings'],
@@ -176,6 +184,7 @@ describe('the sections (nav.ts)', () => {
   it('Settings (A9) in order, ending with Advanced', () => {
     expect(SETTINGS_PAGES.map((p) => p.label)).toEqual([
       'Backup & Touch ID',
+      'Touch ID & master code',
       'AI apps',
       'Files folder',
       'Appearance',

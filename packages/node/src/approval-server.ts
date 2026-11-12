@@ -218,10 +218,14 @@ import { takeReviewedRules } from './local-ui/api/rules.js';
 import { grouped } from './owner-init.js';
 import {
   KeychainOwnerKeyStore,
+  exportSeedOf,
   newOwnerSeed,
   ownerFingerprintText,
   ownerItemPresent,
 } from './owner-keystore.js';
+// UX1113 WP-S2: Touch ID & master code (check, test, replace through ownerGate).
+import { OwnerCodeChanges } from './local-ui/api/owner-presence.js';
+import { ownerCodeProofAllowed, type LocalUiOwnerCodeStep } from './local-ui/owner-code-paths.js';
 import {
   MAX_SETUP_REGISTRATION_BYTES,
   SETUP_HOLD_MS,
@@ -687,6 +691,10 @@ export type ApprovalServerEvent =
         | 'refused'
         /** U3-c: the open agent changed since the page was built (app host). */
         | 'agent_changed'
+        /** UX1113 WP-S2: no staged master-code change for this page session. */
+        | 'not_pending'
+        /** WP-S2: the staged master-code change was dropped (Cancel). */
+        | 'cancelled'
         | 'failed';
     }
   /** M1-11s-c: the outcome of an owner setup step (never the master code, a key or a value). */
@@ -1380,6 +1388,12 @@ export async function startApprovalServerWith(
   /** Rejected presence proofs in a row, and when the wait they caused ends (ms). */
   let failures = 0;
   let waitUntil = 0;
+  /** UX1113 WP-S2: the one staged master-code change, bound to its page session. */
+  const ownerCodes = new OwnerCodeChanges({
+    keychain: () => keychainOf(),
+    now: () => now(),
+    ...(internals.ownerKdf === undefined ? {} : { kdf: internals.ownerKdf }),
+  });
   /** UX2-d1: the invite desk of the invite-kind routes (never reachable from another route). */
   let invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
   /** UX2-d1: when each recent invite was created (ms), oldest first, for the create limit. */
@@ -2116,6 +2130,15 @@ export async function startApprovalServerWith(
        * offers `exportRecoveryKit` for the open agent's recovery-kit source instead.
        */
       readonly recoveryKit?: true;
+      /**
+       * UX1113 WP-S2 (04 §2.5 "Touch ID & master code page"): an owner-code step. Each takes one
+       * kind of proof (owner-code-paths.ts); `check` and `test` close the session before the handler
+       * and sign nothing; `replace` stages a new code; `finish` opens the staged item with the code
+       * typed back instead of the owner store; `cancel` takes no proof. `session` is the request's
+       * page session cookie, which a staged change is bound to.
+       */
+      readonly ownerCode?: LocalUiOwnerCodeStep;
+      readonly session?: string;
     } = {},
   ): Promise<void> {
     const wait = waitSeconds();
@@ -2131,6 +2154,22 @@ export async function startApprovalServerWith(
       req.resume();
       finishOwner(res, 403, 'presence_required');
       return;
+    }
+    const codeStep = gate.ownerCode;
+    if (codeStep !== undefined) {
+      // WP-S2: the step's one kind of proof, before the body is read or anything is opened.
+      if (!ownerCodeProofAllowed(codeStep, passkey)) {
+        req.resume();
+        finishOwner(res, 403, 'presence_required');
+        return;
+      }
+      if (codeStep === 'cancel') {
+        req.resume();
+        const session = gate.session === undefined ? undefined : encodeUtf8(gate.session);
+        const dropped = session !== undefined && (await ownerCodes.cancel(session));
+        finishOwner(res, dropped ? 200 : 409, dropped ? 'cancelled' : 'not_pending');
+        return;
+      }
     }
     const body = await boundedBody(req, res, passkey ? MAX_PASSKEY_BYTES : MAX_SECRET_BYTES);
     if (body === undefined) return;
@@ -2158,6 +2197,11 @@ export async function startApprovalServerWith(
       }
       busy = true;
       try {
+        if (codeStep === 'finish') {
+          // WP-S2: the code typed back opens this session's staged item, not the owner store.
+          await ownerCodeFinish(res, body, gate.session, run);
+          return;
+        }
         const byNostr = gate.ownerNostr;
         const context =
           byNostr === undefined ? await (gate.context ?? (() => source.context()))() : undefined;
@@ -2228,10 +2272,18 @@ export async function startApprovalServerWith(
             finishOwner(res, 409, 'refused');
             return;
           }
+          // WP-S2: replacing the master code re-wraps the keychain owner item; nothing else can.
+          if (codeStep === 'replace' && !(opened instanceof KeychainOwnerKeyStore)) {
+            await opened.close().catch(() => undefined);
+            finishOwner(res, 409, 'refused');
+            return;
+          }
           try {
             // unlock wipes the presented bytes, whether or not they unlock.
+            // WP-S2: replace reads the seed for its re-wrap (exportSeedOf, inside this package only).
             session =
-              gate.recoveryKit === true && opened instanceof KeychainOwnerKeyStore
+              (gate.recoveryKit === true || codeStep === 'replace') &&
+              opened instanceof KeychainOwnerKeyStore
                 ? await opened.unlockForExport(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS })
                 : await opened.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
           } catch (error) {
@@ -2250,6 +2302,11 @@ export async function startApprovalServerWith(
         }
         try {
           presenceSucceeded();
+          if (codeStep !== undefined) {
+            // WP-S2: check, test and replace have their own one-operation object (signs nothing).
+            await ownerCodeRun(res, codeStep, session, store, ownerKeys, gate.session, run);
+            return;
+          }
           let used = false;
           // U3-e: open only between this gesture's signed `agent.revoke` and the end of `run`.
           let carriersOpen = false;
@@ -2427,6 +2484,135 @@ export async function startApprovalServerWith(
     } finally {
       wipe(body, assertion?.prfOutput);
     }
+  }
+
+  // --- UX1113 WP-S2: Touch ID & master code (04 §2.5 "Touch ID & master code page") -----------
+
+  /** Runs an owner-code step's handler with its one operation; the answers of every owner route. */
+  async function ownerCodeOperation(
+    res: ServerResponse,
+    operation: (once: () => void) => LocalUiOwnerOperation,
+    run: (owner: LocalUiOwnerOperation) => Promise<LocalUiResult>,
+  ): Promise<void> {
+    let used = false;
+    const once = (): void => {
+      if (used) {
+        throw new NodeKeyStoreError('owner_operation_invalid', 'One owner operation signs once.');
+      }
+      used = true;
+    };
+    let result: LocalUiResult;
+    try {
+      result = await run(Object.freeze(operation(once)));
+    } catch (error) {
+      if (error instanceof NodeKeyStoreError) finishOwner(res, 409, 'refused');
+      else {
+        const reason = failedBody(error).reason;
+        finishOwner(res, 500, 'failed', reason === 'internal' ? {} : { reason });
+      }
+      return;
+    }
+    if (!used) {
+      finishOwner(res, 409, 'refused');
+      return;
+    }
+    emit({ kind: 'owner_operation', outcome: 'done' });
+    sendResult(res, result);
+  }
+
+  /**
+   * WP-S2 check, test and replace, after the central gate verified presence and opened the owner
+   * store. Nothing is signed. Check and test close the session before the handler runs (nothing stays
+   * unlocked); replace copies the seed for its re-wrap only (exportSeedOf), wipes it at once, and
+   * stages the new code for this page session (OwnerCodeChanges).
+   */
+  async function ownerCodeRun(
+    res: ServerResponse,
+    step: LocalUiOwnerCodeStep,
+    session: OwnerSession,
+    store: unknown,
+    owner: OwnerPublicKeys,
+    cookie: string | undefined,
+    run: (owner: LocalUiOwnerOperation) => Promise<LocalUiResult>,
+  ): Promise<void> {
+    const refuse = (): Promise<never> => Promise.reject(ownerOperationRefused());
+    try {
+      if (step !== 'replace') {
+        await session.close().catch(() => undefined);
+        await ownerCodeOperation(
+          res,
+          (once) => ({ sign: refuse, presenceChecked: () => once() }),
+          run,
+        );
+        return;
+      }
+      await ownerCodeOperation(
+        res,
+        (once) => ({
+          sign: refuse,
+          replaceOwnerCode: async () => {
+            once();
+            if (cookie === undefined || !(store instanceof KeychainOwnerKeyStore)) {
+              throw ownerOperationRefused();
+            }
+            const copy = exportSeedOf(session, store);
+            if (copy.status !== 'ok') throw ownerOperationRefused();
+            try {
+              return await ownerCodes.begin(encodeUtf8(cookie), copy.seed, owner);
+            } finally {
+              wipe(copy.seed);
+            }
+          },
+        }),
+        run,
+      );
+    } finally {
+      await session.close().catch(() => undefined);
+    }
+  }
+
+  /**
+   * WP-S2 finish: the new code typed back must open exactly the staged item this page session began.
+   * A wrong code counts towards the shared backoff (and the third ends the change); then the staged
+   * item replaces the `owner` item, all or nothing (owner-change-code.ts).
+   */
+  async function ownerCodeFinish(
+    res: ServerResponse,
+    body: Uint8Array,
+    cookie: string | undefined,
+    run: (owner: LocalUiOwnerOperation) => Promise<LocalUiResult>,
+  ): Promise<void> {
+    const held = cookie === undefined ? undefined : await ownerCodes.heldBy(encodeUtf8(cookie));
+    if (held === undefined) {
+      finishOwner(res, 409, 'not_pending');
+      return;
+    }
+    let opened: boolean;
+    try {
+      // The copy is wiped by the open, whether or not it opens; `body` by ownerGate.
+      opened = await ownerCodes.open(held, body.slice());
+    } catch {
+      finishOwner(res, 500, 'failed');
+      return;
+    }
+    if (!opened) {
+      presenceFailed();
+      await ownerCodes.rejected(held);
+      finishOwner(res, 403, 'presence_rejected');
+      return;
+    }
+    presenceSucceeded();
+    await ownerCodeOperation(
+      res,
+      (once) => ({
+        sign: () => Promise.reject(ownerOperationRefused()),
+        finishOwnerCode: async () => {
+          once();
+          await ownerCodes.finish(held);
+        },
+      }),
+      run,
+    );
   }
 
   // --- M1-PAY-CONFIRM-a: confirming paid actions (04 §2.5.3; pay-confirm.ts) ---------------------
@@ -4822,7 +5008,11 @@ export async function startApprovalServerWith(
           { params, query: url.searchParams, ...(input === undefined ? {} : { input }) },
           owner,
         ),
-      route.recoveryKit === true ? { recoveryKit: true } : {},
+      route.recoveryKit === true
+        ? { recoveryKit: true }
+        : route.ownerCode !== undefined
+          ? { ownerCode: route.ownerCode, session: cookie }
+          : {},
     );
   }
 
@@ -5767,6 +5957,8 @@ export async function startApprovalServerWith(
       dropSetup();
       payHolds.clear();
       dropCreate();
+      // WP-S2: a staged master-code change this server began is removed (the old code keeps working).
+      await ownerCodes.clear();
       await folderRemoval;
       // U3-invite: the handoff record goes first, so no `join` hands over to a closing host.
       if (handoffWritten) await options.host?.handoff?.remove().catch(() => undefined);

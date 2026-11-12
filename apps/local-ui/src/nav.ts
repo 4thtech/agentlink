@@ -89,6 +89,8 @@ export interface SettingsPage {
 /** Settings (A9), in order; "Advanced" leads to the Advanced pages. */
 export const SETTINGS_PAGES: readonly SettingsPage[] = [
   { label: PAGE_TITLES.backupTouchId, path: '/settings/backup' },
+  // UX1113 WP-S2: Touch ID & master code (Safety group, design-1112 §3.3).
+  { label: PAGE_TITLES.touchId, path: '/settings/touch-id' },
   { label: PAGE_TITLES.apps, path: '/settings/apps' },
   { label: PAGE_TITLES.filesFolder, path: '/settings/files' },
   { label: PAGE_TITLES.appearance, path: '/settings/appearance' },

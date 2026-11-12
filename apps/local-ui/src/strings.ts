@@ -87,6 +87,7 @@ export const PAGE_TITLES = {
   about: 'About',
   // W4-SHELL: the Settings and Advanced entries (b11 §34.6); the pages keep their own headings.
   backupTouchId: 'Backup & Touch ID',
+  touchId: 'Touch ID & master code',
   defaultRules: 'Default rules',
   notifications: 'Notifications',
   activityLog: 'Activity log',

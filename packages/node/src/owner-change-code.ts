@@ -17,6 +17,7 @@
 // - Every secret buffer (current secret, seed, new code) is wiped before returning.
 import {
   KeyStoreError,
+  equalBytes,
   wipe,
   type Argon2idParams,
   type OwnerPublicKeys,
@@ -37,6 +38,8 @@ import {
   readStagedOwnerItem,
   removeStagedOwnerItem,
   replaceOwnerWrap,
+  sameOwnerKeys,
+  stageOwnerWrap,
   storedOwnerSecretKind,
   type OpenedOwnerItem,
 } from './owner-keystore.js';
@@ -342,4 +345,151 @@ export function changeOwnerCode(options: ChangeOwnerCodeOptions): Promise<Change
     assertNoHarnessMarker(options.env ?? process.env);
     return changeOwnerCodeWith(osKeychain(), ttyOwnerTerminal(), options);
   });
+}
+
+// --- UX1113 WP-S2: the app's Replace master code (04 §2.5 "Touch ID & master code page") ---------
+//
+// The same `owner-next` protocol as `owner change-code`, split at the read-back so the owner sees the
+// new code in the app and types it back before anything replaces the `owner` item:
+//
+// 1. stage (after the approval server's presence gate opened the owner store for this request): a
+//    leftover `owner-next` item is never overwritten (`unfinished`: `owner change-code` in the
+//    owner's own terminal finishes or cleans it up); the `owner` item is read as it is now; a new
+//    generated 120-bit master code wraps the same seed into `owner-next`, read back and opened to the
+//    same owner (stageOwnerWrap). The `owner` item is untouched: the current code keeps working.
+// 2. open: the code the owner typed back must open exactly that staged item to the same owner.
+// 3. finish: the staged item replaces the `owner` item only while that is still the item read in
+//    step 1, and is removed only after an exact read-back (promoteStagedOwnerWrap). Any failure keeps
+//    `owner-next`, so the seed is never lost.
+// 4. drop: an unfinished change (Cancel, expiry, three wrong entries, the server closing) removes the
+//    staged item only while it is still those bytes; the current code keeps working.
+//
+// Neither the seed nor the new code is kept: the caller wipes the seed right after staging, and the
+// code's bytes are wiped once its display text is made. Nothing here logs or emits.
+
+/** A staged change: ciphertext and public keys only. */
+export interface StagedOwnerCodeChange {
+  /** The `owner-next` blob this change wrote (ciphertext). */
+  readonly staged: Uint8Array;
+  /** The `owner` item as read when the change was staged (ciphertext). */
+  readonly ownerSeen: Uint8Array;
+  readonly owner: OwnerPublicKeys;
+}
+
+export type StageOwnerCodeOutcome =
+  | {
+      readonly status: 'staged';
+      readonly change: StagedOwnerCodeChange;
+      /** The new master code in six groups of four, for display once. */
+      readonly code: string;
+    }
+  /** A leftover `owner-next` item: nothing was written. */
+  | { readonly status: 'unfinished' };
+
+/**
+ * Step 1. `seed` is the owner seed the caller's presence opened (not modified; the caller wipes it);
+ * it must derive exactly `owner`.
+ */
+export async function stageOwnerCodeChange(
+  keychain: KeychainBackend,
+  seed: Uint8Array,
+  owner: OwnerPublicKeys,
+  internals: ChangeOwnerCodeInternals = {},
+): Promise<StageOwnerCodeOutcome> {
+  const timeoutMs = internals.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  const keys = ownerKeysCopy(owner);
+  if (!sameOwnerKeys(seed, keys)) {
+    throw new NodeKeyStoreError('owner_mismatch', 'The owner key does not match.');
+  }
+  const leftover = await readStagedOwnerItem(keychain, timeoutMs);
+  if (leftover !== null) {
+    wipe(leftover);
+    return { status: 'unfinished' };
+  }
+  const ownerSeen = await readOwnerItem(keychain, timeoutMs);
+  if (ownerSeen === null) throw new NodeKeyStoreError('owner_missing', COPY.noOwner);
+  const code = generateSecretCode();
+  try {
+    const staged = await stageOwnerWrap(keychain, seed, keys, code, {
+      ...(internals.kdf === undefined ? {} : { kdf: internals.kdf }),
+      timeoutMs,
+    });
+    return Object.freeze({
+      status: 'staged' as const,
+      change: Object.freeze({ staged, ownerSeen, owner: keys }),
+      code: grouped(code),
+    });
+  } catch (error) {
+    wipe(ownerSeen);
+    throw error;
+  } finally {
+    wipe(code);
+  }
+}
+
+/**
+ * Step 2. True when `typed` (wiped here) opens exactly the staged item of `change` to its owner;
+ * false for a wrong code. A staged item that is gone or changed throws.
+ */
+export async function openStagedOwnerCode(
+  keychain: KeychainBackend,
+  change: StagedOwnerCodeChange,
+  typed: Uint8Array,
+  internals: ChangeOwnerCodeInternals = {},
+): Promise<boolean> {
+  const timeoutMs = internals.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  let opened: OpenedOwnerItem;
+  try {
+    // openOwnerItem wipes the secret it is given, whether or not it opens.
+    opened = await openOwnerItem(
+      keychain,
+      { kind: 'passphrase', secret: typed },
+      change.owner,
+      timeoutMs,
+      OWNER_NEXT_ACCOUNT,
+    );
+  } catch (error) {
+    if (error instanceof KeyStoreError && error.code === 'presence_rejected') return false;
+    throw error;
+  }
+  try {
+    if (!equalBytes(opened.blob, change.staged)) {
+      throw new NodeKeyStoreError('owner_mismatch', 'The staged change is not this one.');
+    }
+    return true;
+  } finally {
+    wipe(opened.seed, opened.blob);
+  }
+}
+
+/** Step 3: the staged item replaces the `owner` item (all or nothing). */
+export async function finishOwnerCodeChange(
+  keychain: KeychainBackend,
+  change: StagedOwnerCodeChange,
+  internals: ChangeOwnerCodeInternals = {},
+): Promise<void> {
+  await promoteStagedOwnerWrap(
+    keychain,
+    change.staged,
+    change.ownerSeen,
+    internals.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS,
+  );
+}
+
+/** Step 4: removes this change's staged item (only while it is still those bytes). */
+export async function dropOwnerCodeChange(
+  keychain: KeychainBackend,
+  change: StagedOwnerCodeChange,
+  internals: ChangeOwnerCodeInternals = {},
+): Promise<boolean> {
+  return removeStagedOwnerItem(
+    keychain,
+    change.staged,
+    internals.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS,
+  ).catch(() => false);
+}
+
+/** Wipes the ciphertext a change holds (after finish or drop). */
+export function wipeOwnerCodeChange(change: StagedOwnerCodeChange): void {
+  wipe(change.staged, change.ownerSeen);
 }

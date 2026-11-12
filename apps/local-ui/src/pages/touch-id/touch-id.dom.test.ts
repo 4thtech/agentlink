@@ -230,7 +230,7 @@ describe('Touch ID & master code (WP-S2, §3.3)', () => {
   it('Replace with Touch ID sends the passkey as the presence', async () => {
     const { calls } = await render(READY, { '/api/ui/owner-code/replace': [STAGED] });
     await click('Replace master code');
-    await click('Use Touch ID');
+    await click('Confirm with Touch ID');
     expect(calls[0]?.path).toBe('/api/ui/owner-code/replace');
     expect(typeof calls[0]?.presence).toBe('object');
   });
