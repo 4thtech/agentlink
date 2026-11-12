@@ -14,7 +14,7 @@ _Updated 2026-11-12 by @talirezun_
 | Orchestrator waves | @talirezun (agents) | in-progress | 0.4.14 LIVE on npm latest (12 Nov); merged #795-#798 (docs overhaul, hotfix). Next: desktop apps, UX redesign | 2026-11-12 |
 | Cloud agent as 0.5.0 | @talirezun (agents) | ready | groundwork merged (D-131 spec #541, core M2-3a #548); starts after the visual refresh | 2026-10-27 |
 | Desktop apps (Mac/Windows, unsigned early builds, D-145) | @talirezun (agents) | in-progress | branch `desktop/integration`; shell, packaging, CI, invite links, use-the-app, updater, installer desktop mode reviewed; Touch ID in the app (phase 2) blocked: registration not working on a real Mac, under investigation. No external builds yet | 2026-11-12 |
-| UX redesign (design-1112: My IDs, People, Settings, Activity, restore in the app D-147) | @talirezun (agents) | ready | branch `ux1113/base`; restore spec `ux1113/wp-r0` reviewed | 2026-11-12 |
+| UX redesign (design-1112: My IDs, People, Settings, Activity, restore in the app D-147) | @talirezun (agents) | in-progress | base `ux1113/base`; building sidebar, People, Settings (with version number), My IDs, restore engine, all-IDs recovery kit, activity data | 2026-11-12 |
 | Release 0.4.0 | @talirezun | done 27 Oct | npm latest 0.4.0; GitHub Release v0.4.0 with signed desktop bundles (macOS arm64/x64, Windows) | 2026-10-27 |
 
 ## Waiting on a decision
